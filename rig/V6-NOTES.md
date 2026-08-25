@@ -230,3 +230,64 @@ until source-stall rebuilds at 12 s — v5 in the same state parks silently for 
 12 s, so outcome is identical; the noise is telemetry-only. Root cause is the frozen
 hls.latency driving drift seeks (GAP C) — out of scope beyond the existing escalation.
 Iter-3 accepted. SIGSTOP re-run under iter-3 next, then soak.
+
+---
+
+## Checkpoint 11 — iter-3 SIGSTOP re-run (02:0x) ✅
+
+sigstop-v6c (same broadcast 5782bb4a through both pauses):
+- 8 s pause: stable 3.0 s post-CONT, no park. 
+- 20 s pause: parks 13.5 s + 4.0 s, stable 23.5 s post-CONT; rescue chain =
+  starved escalation → source-stall rebuild → hole-skip (all OURS — hls.js's gap
+  controller never had to save us in ANY v6 run).
+Cross-run summary (20 s pause): v6 parks 12.5 / 2.5 / 13.5 s (iters 1/2/3 runs),
+stable 15.0 / 13.2 / 23.5 s. v5: parks 19.5+18.0 s consecutive, stable 56.4 s.
+Worst-case v6 beats v5 2.4× on time-to-stable; best case 4.3×. Residual variance is
+GAP-C (stale hls.latency steering drift seeks into the append frontier) — bounded by
+the new escalations, full fix (PDT-based drift target) out of scope for v6.
+5-min soak next.
+
+---
+
+## Checkpoint 12 — SOAK PASSED, teardown complete, session closed (02:1x) ✅
+
+Soak (run soak-v6, 317 s, no chaos): latency p50 2.70 / p95 2.81 / p99 2.85 s
+(target band 2.4-3 s ✓), pdtWall p50 3.62 s, rebuilds 0, resyncs 0, stalls 0,
+fatals 0, non-advancing samples 0/633. No regression.
+
+Instrument integrity across the WHOLE campaign: 6591/6591 player rows visible,
+max telemetry gap 0.5 s in every run — no tab crash at any point (v4's failure
+mode never appeared).
+
+### Final v6 vs v5 (all same-day, same harness, same analyzer)
+
+| metric | v5 | v6 (final = iter 3) |
+|---|---|---|
+| gap ladder recovered | 5/5 (chaos-v5r) | 15/15 across 3 ladder runs |
+| TTL median (pdt<=6 sust.) | 30.1 s | 20.7 s (final run; pooled 3 runs 29.3 s) |
+| ladder rebuilds/run | 27 | 29 / 35 / 33 — no spacing <3 s, no storms |
+| settle at target | 3/5 gaps | final-run all windows end lat 1.7-3.6 s |
+| SIGSTOP 20 s park | 19.5+18.0 s (gap-ctrl rescue) | max 13.5 s, all rescues OURS |
+| SIGSTOP 20 s stable | 56.4 s post-CONT | 13.2-23.5 s post-CONT |
+| SIGSTOP 8 s stable | 4.7 s | 3.0-5.0 s |
+| soak 5 min | (not run for v5) | p50 2.70 / p99 2.85, zero events |
+
+Iterations: (1) checkpoint-8+10 diffs as specced; (2) beached fast path (immediate
+hole-skip after 3-tick confirm when data sits >0.25 s ahead); (3) one-skip-per-target
+guard (kills the stale-manifest skip/drift ping-pong).
+
+Q6 VERDICT (plan §8): CONFIRMED ✅ measured — hls.js 1.7.1 bumps targetLatency +1.0 s
+per stall within an instance lifetime (1.5→2.5→3.5 observed twice in chaos-v6, once in
+smoke); a rebuild resets it to the manifest's 1.5; additionally the target jumps to
+9-11 s when a post-swap manifest briefly loses LL tags (count-based fallback).
+Bonus telemetry finding: pdtWallLatency reads NEGATIVE (~−1.6 s) for a few seconds
+right after an -re backlog burst (CF re-stamps PDT ahead of wall clock).
+
+### Teardown (verified)
+- Chrome killed by profile path; encoder killed by MY stream key; collector-v6.py
+  killed; port 8899 FREE. Sibling agent's ffmpeg (pid 15532) untouched throughout.
+- Live input 56f462840d77c9aa078151809bbe3cac DELETED (success:True; follow-up GET
+  error 10003 not-found). Nothing of mine remains on Cloudflare.
+- Files: src/low-latency-player.js = v6 (426 lines); src/low-latency-player.v5.js =
+  backup; rig/resilience-v6.html (A/B harness page, ?player=v5|v6); this file;
+  results/resilience-v6.jsonl (all 9 runs, one ordered stream).
