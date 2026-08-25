@@ -1,0 +1,56 @@
+   Compiling libc v0.2.175
+   Compiling proc-macro2 v1.0.101
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling getrandom v0.3.3
+   Compiling slab v0.4.9
+   Compiling lock_api v0.4.12
+   Compiling parking_lot_core v0.9.10
+   Compiling serde_json v1.0.145
+   Compiling libm v0.2.15
+   Compiling ryu v1.0.18
+error: failed to run custom build command for `libc v0.2.175`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/libc-72f2101ab8000f11/build-script-build` (signal: 9, SIGKILL: kill)
+warning: build failed, waiting for other jobs to finish...
+error: failed to run custom build command for `libc v0.2.175`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/libc-72f2101ab8000f11/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `serde v1.0.228`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/serde-b33a0e990814d876/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `proc-macro2 v1.0.101`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/proc-macro2-6f7dd96a934cf9d1/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `serde_core v1.0.228`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/serde_core-3ca27b57abf4a93a/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `getrandom v0.3.3`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/getrandom-6f069900bc224e59/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `slab v0.4.9`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/slab-c8d1addfefb3b2e0/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `lock_api v0.4.12`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/lock_api-745179e0a28a01f2/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `serde_json v1.0.145`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/serde_json-ef870131cca0e477/build-script-build` (signal: 9, SIGKILL: kill)
+error: failed to run custom build command for `parking_lot_core v0.9.10`
+
+Caused by:
+  process didn't exit successfully: `/Users/s32863/personal/elektron/rig/moq/moq-rs/target/release/build/parking_lot_core-dc3c8d2f49cbbbd7/build-script-build` (signal: 9, SIGKILL: kill)
+real 1,95
+user 0,37
+sys 0,32
+BUILD EXIT: 101

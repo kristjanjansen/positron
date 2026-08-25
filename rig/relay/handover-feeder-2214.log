@@ -1,0 +1,14 @@
+22:13:04 splicer: SLATE (ts_offset 0.100s)
+22:13:04 splicer: slate: RAI found — output ungated
+22:13:51 splicer: slate: better tier available, switching
+22:13:51 splicer: LIVE (ts_offset 47.500s)
+22:13:54 splicer: live: RAI found — output ungated
+22:14:44 splicer: live: source EOF
+22:14:44 splicer: SLATE (ts_offset 99.789s)
+22:14:44 splicer: slate: RAI found — output ungated
+22:15:10 splicer: slate: better tier available, switching
+22:15:10 splicer: LIVE (ts_offset 126.289s)
+22:15:13 splicer: live: RAI found — output ungated
+22:16:00 splicer: live: source EOF
+22:16:00 splicer: SLATE (ts_offset 176.318s)
+22:16:00 splicer: slate: RAI found — output ungated

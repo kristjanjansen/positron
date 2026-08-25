@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>same-broadcast resume — Mystery 2 repro</title>
+<style>body{font:13px/1.5 ui-monospace,Menlo,monospace;background:#111;color:#eee;margin:0;padding:16px}
+video{width:640px;background:#000;display:block}#s{white-space:pre;margin-top:12px}</style>
+<video id="v" muted playsinline></video>
+<div id="s">starting…</div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script type="module">
+import { createLowLatencyPlayer } from '../src/low-latency-player.js';
+
+const Q = new URLSearchParams(location.search);
+const UID = Q.get('uid');
+const RUN = Q.get('run') || 'm2';
+const SRC = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${UID}/manifest/video.m3u8?protocol=llhls`;
+const v = document.getElementById('v'), s = document.getElementById('s');
+
+let resyncs = 0, stalls = 0, rebuilds = 0, fatals = 0;
+const events = [];
+const player = createLowLatencyPlayer(v, SRC, {});
+window.player = player;
+player.on('resync',  (p) => { resyncs++;  events.push({e:'resync',  ...p}); });
+player.on('stall',   (p) => { stalls++;   events.push({e:'stall',   ...p}); });
+player.on('rebuild', (p) => { rebuilds++; events.push({e:'rebuild', ...p}); });
+player.on('error',   (p) => { if (p?.fatal) fatals++; if (p?.fatal || p?.details) events.push({e:'error', fatal:!!p?.fatal, details:p?.details}); });
+
+// The discriminating instrumentation: hls.js's media-timeline latency
+// vs PDT wall-clock latency, plus every gate input of tick()/syncToEdge().
+setInterval(() => {
+  const hls = player.hls;
+  const pd = hls?.playingDate;             // PDT of the frame at the playhead
+  const lsp = hls?.liveSyncPosition;
+  const row = {
+    run: RUN,
+    currentTime: +v.currentTime.toFixed(3),
+    readyState: v.readyState, paused: v.paused,
+    playbackRate: +v.playbackRate.toFixed(3),
+    visibility: document.visibilityState,
+    buffered: v.buffered.length ? +(v.buffered.end(v.buffered.length-1) - v.currentTime).toFixed(3) : null,
+    seekableEnd: v.seekable.length ? +v.seekable.end(v.seekable.length-1).toFixed(3) : null,
+    hlsLatency: hls?.latency ?? null,      // media-timeline latency (drift-seek input)
+    playerLatency: player.latency,         // what tick() sees (null-mapped)
+    target: player.target,
+    lsp: lsp == null ? null : +lsp.toFixed(3),
+    lspMinusCt: lsp == null ? null : +(lsp - v.currentTime).toFixed(3),
+    pdtWallLatency: pd ? +((Date.now() - pd.getTime())/1000).toFixed(3) : null,  // TRUE wall staleness
+    resyncs, stalls, rebuilds, fatals,
+    newEvents: events.splice(0, events.length),
+  };
+  s.textContent = JSON.stringify(row, null, 1);
+  fetch('/collect', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(row) }).catch(()=>{});
+}, 500);
+</script>

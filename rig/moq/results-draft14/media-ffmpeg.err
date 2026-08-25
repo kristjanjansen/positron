@@ -1,0 +1,4 @@
+[mp4 @ 0xaaaab1ccc5d0] Packet duration: -1024 / dts: 1541120 is out of range
+[mp4 @ 0xaaaab1ccc5d0] pts has no value
+Error writing trailer of pipe:: Broken pipe
+Error closing file pipe:: Broken pipe

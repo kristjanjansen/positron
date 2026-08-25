@@ -1,0 +1,14 @@
+── phase 0: wait for slate live ──
+  live, videoUID=f507c108c45933434edff446db3bfdd5
+  frame -> 0-slate.png
+── phase 1: encoder IN ──
+  videoUID=f507c108c45933434edff446db3bfdd5  ✓SAME
+  frame -> 1-live.png
+── phase 2: encoder KILLED (gap 10s) ──
+  videoUID=f507c108c45933434edff446db3bfdd5  ✓SAME
+  frame -> 2-slate-again.png
+── phase 3: encoder BACK ──
+  videoUID=f507c108c45933434edff446db3bfdd5  ✓SAME
+  frame -> 3-live-again.png
+── verdict: ONE broadcast across all phases ──
+frames in /tmp/handover2

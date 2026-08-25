@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+node_modules/
+results/
+*.mp4
+*.nut
+src/.last-input
+auto.crt
+auto.key
+rig/moq/moq-rs/
+rig/whep/live_input.json
+rig/whep/logs/
+rig/moq/moq-rs-draft14/

@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Resilience test — LL-HLS ingest interruption</title>
+<style>
+  :root{color-scheme:dark}
+  body{background:#0d1317;color:#e4ecef;font:14px/1.6 ui-monospace,Menlo,monospace;margin:0;padding:20px;
+       display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+  video{width:560px;background:#000;border-radius:6px}
+  .row{display:flex;gap:24px;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .k{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7b8d96}
+  .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .ok{color:#4fb588} .warn{color:#c79b4c} .bad{color:#d9705c}
+  #log{font-size:11.5px;color:#8fa3ad;max-height:220px;overflow:auto;width:min(900px,100%);
+       border-top:1px solid #26343b;padding-top:8px;white-space:pre-wrap}
+</style>
+
+<video id="v" muted playsinline></video>
+<div class="row">
+  <div class="stat"><span class="k">state</span><span class="v" id="st">—</span></div>
+  <div class="stat"><span class="k">latency</span><span class="v" id="lat">—</span></div>
+  <div class="stat"><span class="k">stalls</span><span class="v" id="stalls">0</span></div>
+  <div class="stat"><span class="k">resyncs</span><span class="v" id="rs">0</span></div>
+  <div class="stat"><span class="k">fatal</span><span class="v" id="fat">0</span></div>
+</div>
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script type="module">
+import { createLowLatencyPlayer } from '../src/low-latency-player.js';
+
+const q   = new URLSearchParams(location.search);
+const uid = q.get('uid');
+const src = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
+
+const $ = id => document.getElementById(id);
+const logEl = $('log');
+const log = m => { logEl.textContent = `${new Date().toISOString().slice(11,23)} ${m}\n` + logEl.textContent.slice(0,6000); };
+
+let stalls = 0, resyncs = 0, fatals = 0;
+let lastTime = -1, lastAdvance = performance.now();
+const errors = [];
+
+// Thresholds are URL-tunable so the sweep can vary them without editing code.
+const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
+const CFG = {
+  seekThreshold:  num('seek',   2.0),
+  nudgeThreshold: num('nudge',  0.3),
+  catchUpRate:    num('rate',   1.05),
+  resyncOnVisible: q.get('vis') !== '0',
+};
+const RUN = q.get('run') || 'default';
+
+const player = createLowLatencyPlayer($('v'), src, CFG);
+window.player = player;
+log(`cfg seek=${CFG.seekThreshold} nudge=${CFG.nudgeThreshold} rate=${CFG.catchUpRate}`);
+
+player.on('resync', ({reason,to}) => { resyncs++; $('rs').textContent = resyncs; log(`resync(${reason}) -> ${to.toFixed(2)}`); });
+player.on('error',  (e) => {
+  const d = e?.details || e?.message || String(e);
+  if (e?.fatal) { fatals++; $('fat').textContent = fatals; }
+  // Which URL failed, and with what status — the datum that separates
+  // "stale old-broadcast manifest" from "new segments not yet at the edge".
+  const u = e?.frag?.url || e?.url || e?.context?.url || '';
+  const tail = u ? u.split('/').slice(-4).join('/').split('?')[0] : undefined;
+  errors.push({ t: Date.now(), fatal: !!e?.fatal, details: d,
+                url: tail, code: e?.response?.code });
+  log(`${e?.fatal ? 'FATAL' : 'warn '} ${d} ${e?.response?.code ?? ''} ${tail ?? ''}`);
+});
+player.on('rebuild', ({why, attempt}) => log(`rebuild #${attempt} (${why})`));
+
+// "advancing" is the ground truth for recovery: currentTime must actually move.
+function sample() {
+  const v = $('v');
+  const now = performance.now();
+  const t = v.currentTime;
+  // A rebuild attaches a NEW broadcast whose timeline restarts near zero.
+  // Without this reset, healthy post-rebuild playback reads as "not
+  // advancing" for minutes (measurement bug found in run v5).
+  if (t < lastTime - 1) lastTime = t - 0.02;
+  const advancing = t > lastTime + 0.01;
+  if (advancing) { lastTime = t; lastAdvance = now; }
+  const stalledMs = now - lastAdvance;
+
+  const wasStalled = sample.stalled || false;
+  const isStalled = stalledMs > 1500 && !v.paused;
+  if (isStalled && !wasStalled) { stalls++; $('stalls').textContent = stalls; log(`STALL begins`); }
+  if (!isStalled && wasStalled) log(`recovered after ${(stalledMs/1000).toFixed(1)}s stall`);
+  sample.stalled = isStalled;
+
+  const lat = player.latency;
+  $('st').textContent = v.paused ? 'paused' : isStalled ? 'STALLED' : 'playing';
+  $('st').className = 'v ' + (isStalled ? 'bad' : v.paused ? 'warn' : 'ok');
+  $('lat').textContent = lat == null ? '—' : lat.toFixed(2) + 's';
+  $('lat').className = 'v ' + (lat == null ? '' : lat <= player.target + 1 ? 'ok' : lat <= player.target + 4 ? 'warn' : 'bad');
+
+  const payload = {
+    run: RUN, cfg: CFG,
+    currentTime: +t.toFixed(3),
+    advancing, stalledMs: Math.round(stalledMs),
+    readyState: v.readyState, paused: v.paused,
+    latency: lat, target: player.target,
+    buffered: v.buffered.length ? +(v.buffered.end(v.buffered.length-1) - t).toFixed(3) : null,
+    playbackRate: +v.playbackRate.toFixed(3),
+    stalls, resyncs, fatals,
+    visibility: document.visibilityState,
+    newErrors: errors.splice(0, errors.length),
+  };
+  fetch('/collect', {method:'POST', headers:{'content-type':'application/json'},
+                     body: JSON.stringify(payload)}).catch(()=>{});
+}
+setInterval(sample, 500);
+log(`watching ${uid}`);
+</script>

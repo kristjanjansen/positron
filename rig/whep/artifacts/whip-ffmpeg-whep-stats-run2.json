@@ -1,0 +1,18 @@
+{
+  "state": "negotiated",
+  "http": 201,
+  "err": null,
+  "frames": 122,
+  "stats": {
+    "framesDecoded": 122,
+    "framesReceived": 123,
+    "bytesReceived": 1496172,
+    "w": 1280,
+    "h": 720,
+    "fps": 32,
+    "codec": "CIT01_109_level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f",
+    "pli": 10,
+    "packetsLost": 0
+  },
+  "codec": "video/H264 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f"
+}

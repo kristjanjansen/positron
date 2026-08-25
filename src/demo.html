@@ -1,0 +1,131 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>elektron — live demo: stream + messages</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{background:#0d1317;color:#e4ecef;font:15px/1.6 -apple-system,system-ui,sans-serif;
+       margin:0;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;
+       max-width:1280px}
+  @media (max-width:900px){body{grid-template-columns:1fr}}
+  h1{font-size:15px;margin:0 0 10px;grid-column:1/-1;font-weight:600;letter-spacing:.02em}
+  .stage{position:relative}
+  video{width:100%;background:#000;border-radius:10px;display:block}
+  #overlay{position:absolute;left:0;right:0;bottom:14%;text-align:center;font-size:clamp(18px,3.5vw,34px);
+           font-weight:700;color:#fff;text-shadow:0 2px 12px #000c;pointer-events:none;
+           transition:opacity .3s;opacity:0}
+  #overlay.show{opacity:1}
+  .stats{display:flex;gap:20px;margin-top:10px;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column}
+  .k{font:600 9.5px/1.6 ui-monospace,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase;color:#7b8d96}
+  .v{font:700 18px/1.3 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .ok{color:#4fb588}.warn{color:#c79b4c}.bad{color:#d9705c}
+  aside{display:flex;flex-direction:column;gap:12px}
+  .panel{background:#141d22;border:1px solid #26343b;border-radius:10px;padding:14px 16px}
+  .panel h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#7b8d96;margin:0 0 10px}
+  form{display:flex;gap:8px}
+  input[type=text]{flex:1;background:#0d1317;border:1px solid #26343b;color:#e4ecef;border-radius:7px;
+        padding:9px 11px;font:14px inherit}
+  button{background:#155e68;border:0;color:#e4ecef;border-radius:7px;padding:9px 14px;font:600 13px inherit;
+         cursor:pointer}
+  button:hover{background:#19707c}
+  label{display:flex;align-items:center;gap:8px;font-size:13px;color:#a2b4bc}
+  #feed{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;font-size:13px}
+  #feed div{background:#0d1317;border-radius:6px;padding:6px 10px;color:#a2b4bc}
+  #feed div b{color:#8fd4dd;font-weight:600}
+  .hint{font-size:11.5px;color:#5c6f79;margin-top:8px;line-height:1.5}
+</style>
+
+<h1>elektron — live stream + synced messages</h1>
+
+<div>
+  <div class="stage">
+    <video id="v" muted playsinline controls></video>
+    <div id="overlay"></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span class="k">latency</span><span class="v" id="lat">—</span></div>
+    <div class="stat"><span class="k">target</span><span class="v" id="tgt">—</span></div>
+    <div class="stat"><span class="k">msg channel</span><span class="v" id="rtt">—</span></div>
+    <div class="stat"><span class="k">rebuilds</span><span class="v" id="rb">0</span></div>
+  </div>
+</div>
+
+<aside>
+  <div class="panel">
+    <h2>Send a message</h2>
+    <form id="f">
+      <input type="text" id="msg" placeholder="appears in ~2 s, synced to video" autocomplete="off">
+      <button>Send</button>
+    </form>
+    <label style="margin-top:10px"><input type="checkbox" id="subs"> also as subtitle track</label>
+    <p class="hint">Messages fire when each viewer's <em>playhead</em> reaches the target stream moment —
+    everyone sees them at the same point in the video, whatever their individual latency.</p>
+  </div>
+  <div class="panel">
+    <h2>Received</h2>
+    <div id="feed"></div>
+  </div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script type="module">
+import { createLowLatencyPlayer } from './low-latency-player.js';
+import { createTimedMessages } from './timed-messages.js';
+
+const q = new URLSearchParams(location.search);
+const uid = q.get('uid') || '5cfa5053fffe478fffbb9b5c65773d34';
+const room = q.get('room') || 'demo';
+const src = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
+const WS = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${room}/ws`;
+
+const $ = (id) => document.getElementById(id);
+const v = $('v');
+
+const player = createLowLatencyPlayer(v, src);
+player.on('rebuild', ({ attempt }) => { $('rb').textContent = attempt; });
+
+const cues = createTimedMessages(player, v, {
+  onMessage(cue) {
+    if (!cue.data?.text) return;
+    $('overlay').textContent = cue.data.text;
+    $('overlay').classList.add('show');
+    clearTimeout(onMessage._t);
+    onMessage._t = setTimeout(() => $('overlay').classList.remove('show'), 4000);
+    const d = document.createElement('div');
+    d.innerHTML = `<b>${new Date(cue.at).toISOString().slice(11, 19)}</b> `;
+    d.append(cue.data.text);
+    $('feed').prepend(d);
+  },
+  onMissed() {},   // late-join backlog: listed in feed only if desired
+});
+function onMessage() {}   // holder for the timeout handle above
+cues.connect(WS);
+let subTrack = null;
+window.player = player; window.cues = cues;
+
+// publisher: same socket protocol, separate connection so the demo shows the
+// full network round trip rather than a local echo
+let pub;
+const openPub = () => { pub = new WebSocket(WS); pub.onclose = () => setTimeout(openPub, 2000); };
+openPub();
+
+$('f').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const text = $('msg').value.trim();
+  if (!text) return;
+  const at = (cues.playheadTime ?? Date.now()) + 2000;
+  const cue = { at, until: at + 6000, data: { text } };
+  if ($('subs').checked && !subTrack) subTrack = cues.attachSubtitleTrack('et');
+  if (pub?.readyState === 1) pub.send(JSON.stringify({ type: 'cue', cue }));
+  $('msg').value = '';
+});
+
+setInterval(() => {
+  const lat = player.latency, tgt = player.target;
+  $('lat').textContent = lat != null ? lat.toFixed(2) + 's' : '—';
+  $('lat').className = 'v ' + (lat == null ? '' : lat <= tgt + 1 ? 'ok' : lat <= tgt + 4 ? 'warn' : 'bad');
+  $('tgt').textContent = tgt ? tgt.toFixed(1) + 's' : '—';
+  $('rtt').textContent = cues.stats.rttP50 ? cues.stats.rttP50.toFixed(0) + ' ms' : '—';
+}, 500);
+</script>
