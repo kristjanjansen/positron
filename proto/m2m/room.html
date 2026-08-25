@@ -28,9 +28,24 @@ body{background:#111;color:#ddd;font:13px monospace}
 const q = new URLSearchParams(location.search);
 const MY_ID = (q.get("id") || "X").slice(0, 8);
 const EXPECTED_N = parseInt(q.get("n") || "3", 10);
+// mode=pub  -> LIGHTWEIGHT PUBLISHER: 320x180@15 cheap canvas, publish only,
+//              pull nothing, render nothing (scale-ladder participant class).
+// mode=full -> original behavior (publish + pull all + decode). Probes use this.
+const MODE = q.get("mode") === "pub" ? "pub" : "full";
+const IS_PUB = MODE === "pub";
+// hold=1 -> wait for driver to set window.__go before touching the SFU, so all
+// N participants hit the API in a synchronized join storm.
+const HOLD = q.get("hold") === "1";
 const COLLECT = "/collect";
-document.getElementById("hdr").textContent = "m2m room — participant " + MY_ID + " (expecting " + EXPECTED_N + ")";
+document.getElementById("hdr").textContent = "m2m room — participant " + MY_ID + " (expecting " + EXPECTED_N + ", mode " + MODE + ")";
 document.title = "m2m " + MY_ID;
+// many-tile probe: shrink tiles so all stay in-viewport (decode uses the video
+// frame, not the CSS box, so this only affects compositing cost)
+if (!IS_PUB && EXPECTED_N > 6) {
+  const st = document.createElement("style");
+  st.textContent = ".tile video{width:160px;height:90px}";
+  document.head.appendChild(st);
+}
 
 // ---- binary row geometry (rig/whep pattern, halved to 360p, +1 pid byte) ----
 // 64 blocks: 48-bit ms MSB-first, 8-bit participant id (char code), 8-bit XOR
@@ -42,7 +57,7 @@ const ROW_X = 32;          // row spans 32..608 of 640
 const ROW_Y = 40;
 const ROW_H = 56;
 
-window.__state = { phase: "init", error: null, id: MY_ID, frames: 0,
+window.__state = { phase: "init", error: null, id: MY_ID, mode: MODE, frames: 0,
                    rosterCount: 0, pulled: 0, tiles: {} };
 
 const logEl = document.getElementById("log");
@@ -56,9 +71,42 @@ function event(name, extra) {
 
 // ---- canvas signal (publish.html generator, adapted) -----------------------
 const cv = document.getElementById("cv");
+if (IS_PUB) { cv.width = 320; cv.height = 180; }   // tiny canvas, same relative geometry via ctx scale
 const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
 let frameCounter = 0;
 const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+const PUB_FPS = 15;
+
+// Cheap publisher draw: solid bg + black bed + binary row + id, no gradients,
+// no ISO clock, no moving square (the row's low bits change every frame — the
+// encoder never starves). Drawn at half scale onto the 320x180 canvas so the
+// decoder's normalize-to-640x360 grid still lines up exactly.
+function drawPub() {
+  const ms = Math.round(performance.timeOrigin + performance.now());
+  ctx.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 640, 360);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  ctx.font = "bold 110px monospace";
+  ctx.fillText(MY_ID, 40, 240);
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(String(ms), 160, 180);
+  frameCounter++;
+  window.__state.frames = frameCounter;
+}
 
 function draw() {
   const ms = Math.round(performance.timeOrigin + performance.now());
@@ -96,7 +144,8 @@ function draw() {
   window.__state.frames = frameCounter;
   requestAnimationFrame(draw);
 }
-requestAnimationFrame(draw);
+if (IS_PUB) setInterval(drawPub, Math.round(1000 / PUB_FPS));
+else requestAnimationFrame(draw);
 
 // ---- decoder (play.html pattern; 640x360 reference grid) -------------------
 function makeDecoder() {
@@ -136,10 +185,16 @@ function makeDecoder() {
 }
 
 // ---- sample batching (raw newline body — rig smoke-1 bug avoided) ----------
+// fetch, NOT sendBeacon: beacons have a ~64 KB quota and get silently dropped
+// above it — a probe pulling 19 tracks batches ~285 rows/s ≈ 70 KB (found the
+// hard way at N=20; N<=16 batches were just under the limit).
 let batch = [];
+window.__batchStats = { flushed: 0, failed: 0 };
 setInterval(() => {
   if (batch.length) {
-    navigator.sendBeacon(COLLECT, batch.map(r => JSON.stringify(r)).join("\n"));
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") })
+      .then(() => { window.__batchStats.flushed++; })
+      .catch(() => { window.__batchStats.failed++; });
     batch = [];
   }
 }, 1000);
@@ -245,8 +300,15 @@ const TRACK_NAME = "video-" + MY_ID;
 const midToPid = new Map();
 
 async function publish() {
+  if (HOLD) {                       // synchronized join storm: wait for driver release
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
   window.__state.phase = "connecting";
-  const stream = cv.captureStream(30);
+  window.__state.t_go = performance.timeOrigin + performance.now();
+  const stream = cv.captureStream(IS_PUB ? PUB_FPS : 30);
   pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
     bundlePolicy: "max-bundle"
@@ -297,7 +359,8 @@ async function publish() {
   await fetch("/join", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ participantId: MY_ID, sessionId: SID, trackName: TRACK_NAME }) });
   window.__state.phase = "running";
-  startRosterLoop();
+  window.__state.t_running = performance.timeOrigin + performance.now();
+  if (!IS_PUB) startRosterLoop();   // lightweight publishers pull NOTHING
   startStats();
 }
 
@@ -366,7 +429,8 @@ function startStats() {
   setInterval(async () => {
     try {
       const st = await pc.getStats();
-      const row = { kind: "stats", who: MY_ID, t: performance.timeOrigin + performance.now(),
+      const row = { kind: "stats", who: MY_ID, role: MODE,
+                    t: performance.timeOrigin + performance.now(),
                     vis: document.visibilityState, inbound: [] };
       st.forEach(s => {
         if (s.type === "outbound-rtp" && s.kind === "video") {
@@ -403,9 +467,12 @@ function startStats() {
           row.rtt = s.currentRoundTripTime;
         }
       });
+      window.__state.fps = row.fps;               // driver-visible health
+      window.__state.framesSent = row.framesSent;
+      window.__state.qlr = row.qualityLimitationReason;
       post(row);
     } catch (e) { /* ignore */ }
-  }, 2000);
+  }, IS_PUB ? 3000 : 2000);
 }
 
 publish().catch(e => {

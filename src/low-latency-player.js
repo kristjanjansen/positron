@@ -126,12 +126,21 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // watchdog state
   let lastTime = -1, lastAdvance = Date.now(), failedSeeks = 0;
   let lastEdge = -1, lastEdgeMove = Date.now();
-  let failedDriftSeeks = 0;
+  let failedDriftSeeks = 0, beachedTicks = 0, lastHoleSkipTo = -1;
 
   function resetWatchdogs() {
     lastTime = -1; lastAdvance = Date.now(); failedSeeks = 0;
     lastEdge = -1; lastEdgeMove = Date.now();
-    failedDriftSeeks = 0;
+    failedDriftSeeks = 0; beachedTicks = 0; lastHoleSkipTo = -1;
+  }
+
+  /** First buffered range starting a real hole's width past the playhead. */
+  function nextBufferedAhead(minGap) {
+    const b = video.buffered;
+    for (let i = 0; i < b.length; i++) {
+      if (b.start(i) > video.currentTime + minGap && b.end(i) - b.start(i) > 0.5) return b.start(i) + 0.1;
+    }
+    return null;
   }
 
   /**
@@ -304,23 +313,39 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       // in a buffer hole (same-broadcast resume) leaves readyState at 1
       // indefinitely — measured 20.0 s and 18.5 s parks — and the old
       // early-return disarmed every watchdog while resetting the clock.
+      //
+      // Fast path first: playhead beached at a hole with a real buffered range
+      // just ahead (post-burst appends land beyond the seek point and the
+      // element never recovers on its own — hls.js's gap controller takes
+      // ~20 s). Three consecutive ticks of confirmation (~1.5 s) filter out
+      // ordinary in-flight seeks whose data is still arriving.
+      // One attempt per target: a wedged mid-swap level bounces the playhead
+      // back (measured: ct 0 <-> skip-target loop every ~3 s) — re-skipping to
+      // the same spot is noise; defer to the starved escalation below instead.
+      const ahead = nextBufferedAhead(0.25);
+      if (ahead != null && Math.abs(ahead - lastHoleSkipTo) > 0.5) {
+        beachedTicks++;
+        if (beachedTicks >= 3) {
+          beachedTicks = 0;
+          lastAdvance = Date.now();
+          lastHoleSkipTo = ahead;
+          video.currentTime = ahead;
+          emit('resync', { reason: 'hole-skip', to: ahead });
+          return;
+        }
+      } else beachedTicks = 0;
       if (Date.now() - lastAdvance > cfg.stallTimeout) {
         lastAdvance = Date.now();
         failedSeeks++;
         emit('stall', { kind: 'starved', attempt: failedSeeks });
-        // Prefer jumping to buffered data ahead of the playhead (what hls.js's
-        // gap controller eventually does anyway); escalate if holes repeat.
-        const b = video.buffered;
-        let next = null;
-        for (let i = 0; i < b.length; i++) {
-          if (b.start(i) > video.currentTime + 0.1 && b.end(i) - b.start(i) > 0.5) { next = b.start(i) + 0.1; break; }
-        }
-        if (failedSeeks > cfg.seeksBeforeReload) rebuild('starved');
-        else if (next != null) { video.currentTime = next; emit('resync', { reason: 'hole-skip', to: next }); }
-        else if (!syncToEdge('starved')) rebuild('starved');
+        // Nothing buffered ahead to skip to: seek to the live edge; escalate
+        // to a rebuild if that keeps failing or starvation repeats.
+        if (failedSeeks > cfg.seeksBeforeReload || !syncToEdge('starved')) rebuild('starved');
       }
       return;
     }
+
+    beachedTicks = 0; lastHoleSkipTo = -1;
 
     // -- player watchdog: is the playhead moving? ---------------------------
     if (video.currentTime > lastTime + 0.01) {
