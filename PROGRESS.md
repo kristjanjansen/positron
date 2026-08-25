@@ -54,6 +54,20 @@ PROGRESS.md edits (main session merges).
   Phase 3: 200-soak, recording composite, cue-driven grid choreography, 30-min MoQ
   browser spike (moq-lite forward-compat claim vs repo research conflict).
 
+### M2M scale ladder (user: "test more participants") — ✅ NO CEILING THROUGH N=20
+- ✅ 8→12→16→20 (N−2 lightweight publishers + 2 probes pulling all tracks on one
+  PC each): valid ≥99.58 % every rung, **p95 pinned ~158 ms at every N** — latency
+  flat with participant count. Zero API errors in ~370 calls, no 429s. A probe
+  decoded 19 simultaneous pulls at ~55 % of one core. Local bottleneck: RAM
+  (~800 MB/Chrome → 15.9 GB at N=20), never CPU.
+- Two production notes: 1-of-3 twenty-way join storms had a publisher whose
+  ICE/DTLS never connected (→ publish leg needs connect-timeout retry) and one
+  storm saw a uniform ~3.4 s stall on all sessions/new (⚠️ DNS/edge queueing).
+- Instrument save #3 this project: sendBeacon's 64 KB quota silently dropped
+  probe batches at N=20 (N=16 was just under) — switched to fetch(). Forensic
+  attempt data kept. New: proto/m2m/{run-scale.mjs,analyze-scale.py}, data
+  results/m2m-scale-*.jsonl. plan-m2m §5 risk 2 + §6 phase 1b updated.
+
 ### M2M SFU prototype — ✅ COMPLETE: many-to-many PROVEN at WHEP-class latency
 - ✅ 3-way full mesh through the existing Realtime app ("flabbergaster"): 6/6
   directed pairs, 100 % checksum-valid (n=14,551), pooled p50 96.9 / p95 125 ms

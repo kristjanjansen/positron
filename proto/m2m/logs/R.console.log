@@ -1,0 +1,10 @@
+20:57:33.996 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+20:57:34.917 [log] session ea470e32f4a0…
+20:57:35.715 [log] pc connected, joining room
+21:00:24.368 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+21:00:25.123 [log] session f9ff89b9852f…
+21:00:43.700 [log] FATAL Error: pc connect timeout
+    at http://127.0.0.1:8897/room.html?id=R&n=20&mode=pub&hold=1&cb=1787691624318:352:36
+21:01:26.246 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+21:01:30.125 [log] session 69b31e7a9df3…
+21:01:34.941 [log] pc connected, joining room

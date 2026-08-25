@@ -1,0 +1,2157 @@
+m2m server on :8897, results -> /Users/s32863/personal/elektron/results/m2m-scale-N20.jsonl, app 8c2a974b…
+00:00:05 "GET /roster HTTP/1.1" 200 -
+00:00:12 "GET /roster HTTP/1.1" 200 -
+00:00:12 "POST /reset HTTP/1.1" 200 -
+00:00:12 "GET /room.html?id=1&n=20&mode=full&hold=1&cb=1787691612732 HTTP/1.1" 200 -
+00:00:12 code 404, message File not found
+00:00:12 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:13 "GET /room.html?id=2&n=20&mode=full&hold=1&cb=1787691613276 HTTP/1.1" 200 -
+00:00:13 code 404, message File not found
+00:00:13 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:13 "GET /room.html?id=A&n=20&mode=pub&hold=1&cb=1787691613833 HTTP/1.1" 200 -
+00:00:13 code 404, message File not found
+00:00:13 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:14 "GET /room.html?id=B&n=20&mode=pub&hold=1&cb=1787691614433 HTTP/1.1" 200 -
+00:00:14 code 404, message File not found
+00:00:14 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:15 "GET /room.html?id=C&n=20&mode=pub&hold=1&cb=1787691615014 HTTP/1.1" 200 -
+00:00:15 code 404, message File not found
+00:00:15 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:15 "GET /room.html?id=D&n=20&mode=pub&hold=1&cb=1787691615577 HTTP/1.1" 200 -
+00:00:15 code 404, message File not found
+00:00:15 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:16 "GET /room.html?id=E&n=20&mode=pub&hold=1&cb=1787691616183 HTTP/1.1" 200 -
+00:00:16 code 404, message File not found
+00:00:16 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:16 "GET /room.html?id=F&n=20&mode=pub&hold=1&cb=1787691616764 HTTP/1.1" 200 -
+00:00:16 code 404, message File not found
+00:00:16 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:17 "GET /room.html?id=G&n=20&mode=pub&hold=1&cb=1787691617356 HTTP/1.1" 200 -
+00:00:17 code 404, message File not found
+00:00:17 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:18 "GET /room.html?id=H&n=20&mode=pub&hold=1&cb=1787691617968 HTTP/1.1" 200 -
+00:00:18 code 404, message File not found
+00:00:18 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:18 "GET /room.html?id=I&n=20&mode=pub&hold=1&cb=1787691618545 HTTP/1.1" 200 -
+00:00:18 code 404, message File not found
+00:00:18 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:19 "GET /room.html?id=J&n=20&mode=pub&hold=1&cb=1787691619143 HTTP/1.1" 200 -
+00:00:19 code 404, message File not found
+00:00:19 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:19 "GET /room.html?id=K&n=20&mode=pub&hold=1&cb=1787691619768 HTTP/1.1" 200 -
+00:00:19 code 404, message File not found
+00:00:19 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:20 "GET /room.html?id=L&n=20&mode=pub&hold=1&cb=1787691620359 HTTP/1.1" 200 -
+00:00:20 code 404, message File not found
+00:00:20 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:21 "GET /room.html?id=M&n=20&mode=pub&hold=1&cb=1787691620968 HTTP/1.1" 200 -
+00:00:21 code 404, message File not found
+00:00:21 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:21 "GET /room.html?id=N&n=20&mode=pub&hold=1&cb=1787691621617 HTTP/1.1" 200 -
+00:00:21 code 404, message File not found
+00:00:21 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:22 "GET /room.html?id=O&n=20&mode=pub&hold=1&cb=1787691622298 HTTP/1.1" 200 -
+00:00:22 code 404, message File not found
+00:00:22 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:23 "GET /room.html?id=P&n=20&mode=pub&hold=1&cb=1787691622987 HTTP/1.1" 200 -
+00:00:23 code 404, message File not found
+00:00:23 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:23 "GET /room.html?id=Q&n=20&mode=pub&hold=1&cb=1787691623700 HTTP/1.1" 200 -
+00:00:23 code 404, message File not found
+00:00:23 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:24 "GET /room.html?id=R&n=20&mode=pub&hold=1&cb=1787691624318 HTTP/1.1" 200 -
+00:00:24 code 404, message File not found
+00:00:24 "GET /favicon.ico HTTP/1.1" 404 -
+00:00:24 "POST /collect HTTP/1.1" 200 -
+00:00:25 CF POST /sessions/new -> 201 (332 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (337 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (397 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (354 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (370 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (245 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (375 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (368 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (239 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (240 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (277 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (288 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (240 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (248 ms)
+00:00:25 CF POST /sessions/new -> 201 (356 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (284 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (428 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (291 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (302 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:25 CF POST /sessions/new -> 201 (297 ms)
+00:00:25 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:00:28 "POST /save/pub-offer-l.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-c.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-g.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-d.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-e.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-p.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-r.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-m.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-k.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-b.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-f.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-j.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-i.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-1.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-o.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-q.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-2.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-a.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-n.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-offer-h.sdp HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/3850d1b6bf580c7d96c13cc47ec247ca5c1fc2909f22a8f289397ea84a618eb3/tracks/new -> 200 (347 ms)
+00:00:28 "POST /cf/sessions/3850d1b6bf580c7d96c13cc47ec247ca5c1fc2909f22a8f289397ea84a618eb3/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-c.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/248e5386f2f939d317f4721f7cdc2bc0ec67427ca24a6bce507c658c5dec50cb/tracks/new -> 200 (392 ms)
+00:00:28 "POST /cf/sessions/248e5386f2f939d317f4721f7cdc2bc0ec67427ca24a6bce507c658c5dec50cb/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-d.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/00687c06834bd9a27a11b372011f86ee5e53b74d373b51489ed1a46e183094c0/tracks/new -> 200 (409 ms)
+00:00:28 CF POST /sessions/361c3be78d74a7e69c14bf773d1341749925f4ed62a9bf0a6a0ec3d52ca8dc25/tracks/new -> 200 (423 ms)
+00:00:28 "POST /cf/sessions/00687c06834bd9a27a11b372011f86ee5e53b74d373b51489ed1a46e183094c0/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /cf/sessions/361c3be78d74a7e69c14bf773d1341749925f4ed62a9bf0a6a0ec3d52ca8dc25/tracks/new HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/0fea620a1a52cd4ae70859991357c72a697e3b0bb1cbc7fc2c9a2707984f2fc8/tracks/new -> 200 (432 ms)
+00:00:28 "POST /cf/sessions/0fea620a1a52cd4ae70859991357c72a697e3b0bb1cbc7fc2c9a2707984f2fc8/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-g.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-m.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-p.sdp HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/60813610d74065082be631a8109236d2f9793e03f4247828cb5bb84abdd08774/tracks/new -> 200 (378 ms)
+00:00:28 "POST /cf/sessions/60813610d74065082be631a8109236d2f9793e03f4247828cb5bb84abdd08774/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-h.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/831a03be2a31e473f930ab3d3e32942ec36969193c2d05e78402b9df2338d409/tracks/new -> 200 (513 ms)
+00:00:28 "POST /cf/sessions/831a03be2a31e473f930ab3d3e32942ec36969193c2d05e78402b9df2338d409/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-l.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/f9ff89b9852f1174ac5f8af1eccff9659bbe3330a51da96bfb7d997a80de213a/tracks/new -> 200 (549 ms)
+00:00:28 "POST /cf/sessions/f9ff89b9852f1174ac5f8af1eccff9659bbe3330a51da96bfb7d997a80de213a/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-r.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/a5160bbdd3d4d07aa41663d27ae25acd603ad743ac75ab66b4c773ea95086879/tracks/new -> 200 (499 ms)
+00:00:28 "POST /cf/sessions/a5160bbdd3d4d07aa41663d27ae25acd603ad743ac75ab66b4c773ea95086879/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-n.sdp HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/74028510fdc33b22527848024e6e86c3deb5d365349c91b960158f55d0d643dd/tracks/new -> 200 (502 ms)
+00:00:28 "POST /cf/sessions/74028510fdc33b22527848024e6e86c3deb5d365349c91b960158f55d0d643dd/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-a.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/1ff909555d466f6a4f3537cb3338f15b0f46f2fcad96bab9d5487cbabcc5879a/tracks/new -> 200 (549 ms)
+00:00:28 "POST /cf/sessions/1ff909555d466f6a4f3537cb3338f15b0f46f2fcad96bab9d5487cbabcc5879a/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-b.sdp HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (535 ms)
+00:00:28 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-2.sdp HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/dda636715557d82d64d0a3b9dcc32bd11874241628b50351fd15dc34e126a8b3/tracks/new -> 200 (556 ms)
+00:00:28 "POST /cf/sessions/dda636715557d82d64d0a3b9dcc32bd11874241628b50351fd15dc34e126a8b3/tracks/new HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (539 ms)
+00:00:28 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-1.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-f.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/799cb7d05090257f9c61a6f8587b76711b3fb336e7ed7870986afde7c1089991/tracks/new -> 200 (593 ms)
+00:00:28 "POST /cf/sessions/799cb7d05090257f9c61a6f8587b76711b3fb336e7ed7870986afde7c1089991/tracks/new HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/5d0dcb51c6237d20b32fb8684017a9d62eeed456e871eceda847041c20bf0dba/tracks/new -> 200 (560 ms)
+00:00:28 "POST /cf/sessions/5d0dcb51c6237d20b32fb8684017a9d62eeed456e871eceda847041c20bf0dba/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-e.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-i.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/f4e9272afb498f362123f1119cb347a1936161e78d9c605cd048114da77b976f/tracks/new -> 200 (566 ms)
+00:00:28 "POST /cf/sessions/f4e9272afb498f362123f1119cb347a1936161e78d9c605cd048114da77b976f/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/3f0017bbd651c9b8c48c3afe42943ea7c2e468372f9cce14d3a64cb05c98f1fc/tracks/new -> 200 (570 ms)
+00:00:28 "POST /cf/sessions/3f0017bbd651c9b8c48c3afe42943ea7c2e468372f9cce14d3a64cb05c98f1fc/tracks/new HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/bb7249b195afc2b79e2cd8135e954ded27e2d31e807275f737ad5bc1be639efc/tracks/new -> 200 (550 ms)
+00:00:28 "POST /cf/sessions/bb7249b195afc2b79e2cd8135e954ded27e2d31e807275f737ad5bc1be639efc/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-j.sdp HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-k.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-o.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 CF POST /sessions/d5e96360b2bc2a3f4c21ee9cf3d2ac18e2e30a54e640b669c31700efccdb47dd/tracks/new -> 200 (595 ms)
+00:00:28 "POST /cf/sessions/d5e96360b2bc2a3f4c21ee9cf3d2ac18e2e30a54e640b669c31700efccdb47dd/tracks/new HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /save/pub-answer-q.sdp HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:28 "POST /join HTTP/1.1" 200 -
+00:00:28 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "GET /roster HTTP/1.1" 200 -
+00:00:29 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (307 ms)
+00:00:29 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (166 ms)
+00:00:29 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /join HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "GET /roster HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:29 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (299 ms)
+00:00:29 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:29 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (209 ms)
+00:00:29 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:29 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (147 ms)
+00:00:29 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:29 "POST /collect HTTP/1.1" 200 -
+00:00:30 "POST /join HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 "POST /join HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (155 ms)
+00:00:30 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:30 "POST /join HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (275 ms)
+00:00:30 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:30 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (208 ms)
+00:00:30 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (145 ms)
+00:00:30 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (147 ms)
+00:00:30 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (192 ms)
+00:00:30 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:30 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (337 ms)
+00:00:30 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:30 "POST /join HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (137 ms)
+00:00:30 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:30 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (170 ms)
+00:00:30 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:30 "POST /collect HTTP/1.1" 200 -
+00:00:31 "GET /roster HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (256 ms)
+00:00:31 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:31 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (143 ms)
+00:00:31 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (364 ms)
+00:00:31 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (154 ms)
+00:00:31 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (221 ms)
+00:00:31 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:31 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (149 ms)
+00:00:31 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 "GET /roster HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (290 ms)
+00:00:31 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (206 ms)
+00:00:31 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (137 ms)
+00:00:31 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:31 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (144 ms)
+00:00:31 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:31 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (272 ms)
+00:00:32 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:32 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (258 ms)
+00:00:32 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:32 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (167 ms)
+00:00:32 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (145 ms)
+00:00:32 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (282 ms)
+00:00:32 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:32 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (205 ms)
+00:00:32 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (168 ms)
+00:00:32 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:32 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (174 ms)
+00:00:32 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:32 "POST /collect HTTP/1.1" 200 -
+00:00:33 "GET /roster HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (210 ms)
+00:00:33 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (307 ms)
+00:00:33 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (165 ms)
+00:00:33 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (180 ms)
+00:00:33 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (209 ms)
+00:00:33 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:33 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (275 ms)
+00:00:33 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:33 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (188 ms)
+00:00:33 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 "GET /roster HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (179 ms)
+00:00:33 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:33 "POST /collect HTTP/1.1" 200 -
+00:00:33 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (194 ms)
+00:00:33 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:34 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (385 ms)
+00:00:34 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (569 ms)
+00:00:34 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:34 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (223 ms)
+00:00:34 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:34 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (186 ms)
+00:00:34 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (195 ms)
+00:00:34 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (233 ms)
+00:00:34 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:34 "POST /collect HTTP/1.1" 200 -
+00:00:35 "GET /roster HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (196 ms)
+00:00:35 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (301 ms)
+00:00:35 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:35 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (602 ms)
+00:00:35 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (169 ms)
+00:00:35 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (204 ms)
+00:00:35 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "GET /roster HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 "POST /collect HTTP/1.1" 200 -
+00:00:35 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (306 ms)
+00:00:35 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:35 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (268 ms)
+00:00:35 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (158 ms)
+00:00:36 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (196 ms)
+00:00:36 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (315 ms)
+00:00:36 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:36 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (329 ms)
+00:00:36 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:36 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (199 ms)
+00:00:36 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (240 ms)
+00:00:36 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 "POST /collect HTTP/1.1" 200 -
+00:00:36 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (264 ms)
+00:00:36 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:37 "GET /roster HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (371 ms)
+00:00:37 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:37 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (186 ms)
+00:00:37 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (208 ms)
+00:00:37 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (245 ms)
+00:00:37 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:37 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (160 ms)
+00:00:37 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:37 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (159 ms)
+00:00:37 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (185 ms)
+00:00:37 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "GET /roster HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 CF POST /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new -> 200 (321 ms)
+00:00:37 "POST /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/tracks/new HTTP/1.1" 200 -
+00:00:37 CF POST /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new -> 200 (240 ms)
+00:00:37 "POST /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/tracks/new HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:37 "POST /collect HTTP/1.1" 200 -
+00:00:38 CF PUT /sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate -> 200 (189 ms)
+00:00:38 "PUT /cf/sessions/3290b04736c67c7eed7e0403642c0aa48942777cbe9975ff680820e6251d959e/renegotiate HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 CF PUT /sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate -> 200 (197 ms)
+00:00:38 "PUT /cf/sessions/b7557938f37d0dc9316e59e309f2f3db4af4710feb70829ba6fc62d029395682/renegotiate HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:38 "POST /collect HTTP/1.1" 200 -
+00:00:39 "GET /roster HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "GET /roster HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:39 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:40 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "GET /roster HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "GET /roster HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:41 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:42 "POST /collect HTTP/1.1" 200 -
+00:00:43 "GET /roster HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "GET /roster HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:43 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:44 "POST /collect HTTP/1.1" 200 -
+00:00:45 "POST /collect HTTP/1.1" 200 -
+00:00:45 "POST /collect HTTP/1.1" 200 -
+00:01:13 "GET /roster HTTP/1.1" 200 -
+00:01:14 "POST /reset HTTP/1.1" 200 -
+00:01:14 "GET /room.html?id=1&n=20&mode=full&hold=1&cb=1787691674634 HTTP/1.1" 200 -
+00:01:14 code 404, message File not found
+00:01:14 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:15 "GET /room.html?id=2&n=20&mode=full&hold=1&cb=1787691675197 HTTP/1.1" 200 -
+00:01:15 code 404, message File not found
+00:01:15 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:15 "GET /room.html?id=A&n=20&mode=pub&hold=1&cb=1787691675754 HTTP/1.1" 200 -
+00:01:15 code 404, message File not found
+00:01:15 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:16 "GET /room.html?id=B&n=20&mode=pub&hold=1&cb=1787691676341 HTTP/1.1" 200 -
+00:01:16 code 404, message File not found
+00:01:16 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:16 "GET /room.html?id=C&n=20&mode=pub&hold=1&cb=1787691676926 HTTP/1.1" 200 -
+00:01:16 code 404, message File not found
+00:01:16 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:17 "GET /room.html?id=D&n=20&mode=pub&hold=1&cb=1787691677519 HTTP/1.1" 200 -
+00:01:17 code 404, message File not found
+00:01:17 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:18 "GET /room.html?id=E&n=20&mode=pub&hold=1&cb=1787691678133 HTTP/1.1" 200 -
+00:01:18 code 404, message File not found
+00:01:18 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:18 "GET /room.html?id=F&n=20&mode=pub&hold=1&cb=1787691678718 HTTP/1.1" 200 -
+00:01:18 code 404, message File not found
+00:01:18 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:19 "GET /room.html?id=G&n=20&mode=pub&hold=1&cb=1787691679298 HTTP/1.1" 200 -
+00:01:19 code 404, message File not found
+00:01:19 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:19 "GET /room.html?id=H&n=20&mode=pub&hold=1&cb=1787691679933 HTTP/1.1" 200 -
+00:01:19 code 404, message File not found
+00:01:19 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:20 "GET /room.html?id=I&n=20&mode=pub&hold=1&cb=1787691680525 HTTP/1.1" 200 -
+00:01:20 code 404, message File not found
+00:01:20 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:21 "GET /room.html?id=J&n=20&mode=pub&hold=1&cb=1787691681132 HTTP/1.1" 200 -
+00:01:21 code 404, message File not found
+00:01:21 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:21 "GET /room.html?id=K&n=20&mode=pub&hold=1&cb=1787691681769 HTTP/1.1" 200 -
+00:01:21 code 404, message File not found
+00:01:21 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:22 "GET /room.html?id=L&n=20&mode=pub&hold=1&cb=1787691682383 HTTP/1.1" 200 -
+00:01:22 code 404, message File not found
+00:01:22 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:23 "GET /room.html?id=M&n=20&mode=pub&hold=1&cb=1787691682996 HTTP/1.1" 200 -
+00:01:23 code 404, message File not found
+00:01:23 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:23 "GET /room.html?id=N&n=20&mode=pub&hold=1&cb=1787691683635 HTTP/1.1" 200 -
+00:01:23 code 404, message File not found
+00:01:23 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:24 "GET /room.html?id=O&n=20&mode=pub&hold=1&cb=1787691684251 HTTP/1.1" 200 -
+00:01:24 code 404, message File not found
+00:01:24 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:24 "GET /room.html?id=P&n=20&mode=pub&hold=1&cb=1787691684899 HTTP/1.1" 200 -
+00:01:24 code 404, message File not found
+00:01:24 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:25 "GET /room.html?id=Q&n=20&mode=pub&hold=1&cb=1787691685564 HTTP/1.1" 200 -
+00:01:25 code 404, message File not found
+00:01:25 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:26 "GET /room.html?id=R&n=20&mode=pub&hold=1&cb=1787691686186 HTTP/1.1" 200 -
+00:01:26 code 404, message File not found
+00:01:26 "GET /favicon.ico HTTP/1.1" 404 -
+00:01:26 "POST /collect HTTP/1.1" 200 -
+00:01:30 CF POST /sessions/new -> 201 (3378 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3416 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3336 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3385 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3439 ms)
+00:01:30 CF POST /sessions/new -> 201 (3441 ms)
+00:01:30 CF POST /sessions/new -> 201 (3442 ms)
+00:01:30 CF POST /sessions/new -> 201 (3438 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3436 ms)
+00:01:30 CF POST /sessions/new -> 201 (3445 ms)
+00:01:30 CF POST /sessions/new -> 201 (3431 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3400 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3378 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3447 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3410 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3432 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3403 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3499 ms)
+00:01:30 CF POST /sessions/new -> 201 (3567 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 CF POST /sessions/new -> 201 (3533 ms)
+00:01:30 "POST /cf/sessions/new HTTP/1.1" 201 -
+00:01:30 "POST /save/pub-offer-l.sdp HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-offer-g.sdp HTTP/1.1" 200 -
+00:01:30 CF POST /sessions/3ef665699b2d80c885440411dac0f47b96d9a4a1dacd415a920a206ab73f92a9/tracks/new -> 200 (359 ms)
+00:01:30 "POST /cf/sessions/3ef665699b2d80c885440411dac0f47b96d9a4a1dacd415a920a206ab73f92a9/tracks/new HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-answer-l.sdp HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 CF POST /sessions/be8b99fd0e6eae6a6880e3c3ec3333dca39f5d1253ed63a5d5e9eb81f2963ff8/tracks/new -> 200 (365 ms)
+00:01:30 "POST /cf/sessions/be8b99fd0e6eae6a6880e3c3ec3333dca39f5d1253ed63a5d5e9eb81f2963ff8/tracks/new HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-answer-g.sdp HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /join HTTP/1.1" 200 -
+00:01:30 "POST /collect HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-offer-d.sdp HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-offer-j.sdp HTTP/1.1" 200 -
+00:01:30 "POST /save/pub-offer-q.sdp HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-offer-2.sdp HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-offer-h.sdp HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-offer-c.sdp HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/468ec27af34876bafe5d6bebb24ca9f1bc50317c6ebc5e0b91cba4d00cf3011b/tracks/new -> 200 (380 ms)
+00:01:31 "POST /cf/sessions/468ec27af34876bafe5d6bebb24ca9f1bc50317c6ebc5e0b91cba4d00cf3011b/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-d.sdp HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (391 ms)
+00:01:31 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-2.sdp HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/187c2ea1037bd1c249de4ff0a83bf870404b8d67e1bf45d0bcea8148dbe538ab/tracks/new -> 200 (395 ms)
+00:01:31 "POST /cf/sessions/187c2ea1037bd1c249de4ff0a83bf870404b8d67e1bf45d0bcea8148dbe538ab/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-c.sdp HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/41141e1cdba8ed9918da2e8d9a627c919eac77b135ed060788b14700c5f4adda/tracks/new -> 200 (412 ms)
+00:01:31 "POST /cf/sessions/41141e1cdba8ed9918da2e8d9a627c919eac77b135ed060788b14700c5f4adda/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-q.sdp HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/84b4f150805d647ba9b0f9d562206c56a40aa5851121224605ce6203a5076f0c/tracks/new -> 200 (419 ms)
+00:01:31 "POST /cf/sessions/84b4f150805d647ba9b0f9d562206c56a40aa5851121224605ce6203a5076f0c/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-j.sdp HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/923eb7bdd22cdd0f525b5e4ee2e2d042944fe1b09a2b883039ee70a73ad46f3c/tracks/new -> 200 (435 ms)
+00:01:31 "POST /cf/sessions/923eb7bdd22cdd0f525b5e4ee2e2d042944fe1b09a2b883039ee70a73ad46f3c/tracks/new HTTP/1.1" 200 -
+00:01:31 "POST /save/pub-answer-h.sdp HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "GET /roster HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /join HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 "POST /collect HTTP/1.1" 200 -
+00:01:31 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (324 ms)
+00:01:31 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-1.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-a.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-m.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-o.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-n.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-offer-e.sdp HTTP/1.1" 200 -
+00:01:32 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (147 ms)
+00:01:32 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/b7228116f63686f876759db1066433b613902352898305f173e72e908d5910d9/tracks/new -> 200 (344 ms)
+00:01:32 "POST /cf/sessions/b7228116f63686f876759db1066433b613902352898305f173e72e908d5910d9/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-m.sdp HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/8c255732b15957262c76f1b5abdf9bfabf0e1019a8cd5efc496dfb8c26e9db87/tracks/new -> 200 (383 ms)
+00:01:32 "POST /cf/sessions/8c255732b15957262c76f1b5abdf9bfabf0e1019a8cd5efc496dfb8c26e9db87/tracks/new HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (390 ms)
+00:01:32 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-n.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-1.sdp HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/ba0ce69f6fa280ed7ffde021d6a5f1a64fa5db1a6cf51d5492558f3115e707f9/tracks/new -> 200 (363 ms)
+00:01:32 "POST /cf/sessions/ba0ce69f6fa280ed7ffde021d6a5f1a64fa5db1a6cf51d5492558f3115e707f9/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-e.sdp HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/0b205bbd64ad51eadfcedbebd49d007119276c6b7fc82020d1fd2d7b9390ff8a/tracks/new -> 200 (399 ms)
+00:01:32 "POST /cf/sessions/0b205bbd64ad51eadfcedbebd49d007119276c6b7fc82020d1fd2d7b9390ff8a/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/8990cf0a0cf56b5e560b0c6d6849ea6f6b5a37431ad2e47882626a832c436832/tracks/new -> 200 (403 ms)
+00:01:32 "POST /cf/sessions/8990cf0a0cf56b5e560b0c6d6849ea6f6b5a37431ad2e47882626a832c436832/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-o.sdp HTTP/1.1" 200 -
+00:01:32 "POST /save/pub-answer-a.sdp HTTP/1.1" 200 -
+00:01:32 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (274 ms)
+00:01:32 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (159 ms)
+00:01:32 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:32 "POST /join HTTP/1.1" 200 -
+00:01:32 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-p.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-i.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-r.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-b.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-f.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-offer-k.sdp HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/b2651bf602bdb74d81b300c1c6673acc59271bd00ce9c919b9f5a84564b8dfc2/tracks/new -> 200 (370 ms)
+00:01:33 "POST /cf/sessions/b2651bf602bdb74d81b300c1c6673acc59271bd00ce9c919b9f5a84564b8dfc2/tracks/new HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-i.sdp HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/90835fdc1968f951e11f8c4638eb5a69e99dc3262b9badc793fb2777bbda9500/tracks/new -> 200 (370 ms)
+00:01:33 "POST /cf/sessions/90835fdc1968f951e11f8c4638eb5a69e99dc3262b9badc793fb2777bbda9500/tracks/new HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/69b31e7a9df31c1190ee3b9e132d3cb6927e23e9ad958043a4591c08e8e4deaa/tracks/new -> 200 (400 ms)
+00:01:33 "POST /cf/sessions/69b31e7a9df31c1190ee3b9e132d3cb6927e23e9ad958043a4591c08e8e4deaa/tracks/new HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/055ffc04d3d669b72d865f7a4e9026b34811cfd5159fdb2ffd4e8bc5c9138ae2/tracks/new -> 200 (401 ms)
+00:01:33 "POST /cf/sessions/055ffc04d3d669b72d865f7a4e9026b34811cfd5159fdb2ffd4e8bc5c9138ae2/tracks/new HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-r.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-b.sdp HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-p.sdp HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/ceb0f311abcfa80db5b89ce30bbf4c12b9c10b6f5395fd9ebee0c45466573a4b/tracks/new -> 200 (343 ms)
+00:01:33 "POST /cf/sessions/ceb0f311abcfa80db5b89ce30bbf4c12b9c10b6f5395fd9ebee0c45466573a4b/tracks/new HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-k.sdp HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "GET /roster HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/8e1892ed9c6991a71f411f471a11c287d73f5b8ca3687b378fb3999605cd9297/tracks/new -> 200 (401 ms)
+00:01:33 "POST /cf/sessions/8e1892ed9c6991a71f411f471a11c287d73f5b8ca3687b378fb3999605cd9297/tracks/new HTTP/1.1" 200 -
+00:01:33 "POST /save/pub-answer-f.sdp HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /join HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /join HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (253 ms)
+00:01:33 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:33 "POST /join HTTP/1.1" 200 -
+00:01:33 "POST /collect HTTP/1.1" 200 -
+00:01:34 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (143 ms)
+00:01:34 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (250 ms)
+00:01:34 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:34 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (138 ms)
+00:01:34 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (220 ms)
+00:01:34 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (173 ms)
+00:01:34 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /join HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /join HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:34 "POST /join HTTP/1.1" 200 -
+00:01:34 "POST /collect HTTP/1.1" 200 -
+00:01:35 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (283 ms)
+00:01:35 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (152 ms)
+00:01:35 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /join HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "GET /roster HTTP/1.1" 200 -
+00:01:35 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (283 ms)
+00:01:35 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:35 "GET /roster HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (250 ms)
+00:01:35 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (142 ms)
+00:01:35 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:35 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (162 ms)
+00:01:35 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:35 "POST /collect HTTP/1.1" 200 -
+00:01:36 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (282 ms)
+00:01:36 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:36 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (233 ms)
+00:01:36 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:36 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (167 ms)
+00:01:36 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (132 ms)
+00:01:36 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (282 ms)
+00:01:36 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:36 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (275 ms)
+00:01:36 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:36 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (127 ms)
+00:01:36 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (194 ms)
+00:01:36 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (161 ms)
+00:01:36 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:36 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (258 ms)
+00:01:37 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:37 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (162 ms)
+00:01:37 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (177 ms)
+00:01:37 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (225 ms)
+00:01:37 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (163 ms)
+00:01:37 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "GET /roster HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (277 ms)
+00:01:37 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:37 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (166 ms)
+00:01:37 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:37 "GET /roster HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (178 ms)
+00:01:37 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (155 ms)
+00:01:37 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:37 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (251 ms)
+00:01:37 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:37 "POST /collect HTTP/1.1" 200 -
+00:01:38 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (185 ms)
+00:01:38 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (255 ms)
+00:01:38 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:38 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (195 ms)
+00:01:38 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 "POST /collect HTTP/1.1" 200 -
+00:01:38 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (295 ms)
+00:01:38 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:39 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (1252 ms)
+00:01:39 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:39 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (171 ms)
+00:01:39 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (185 ms)
+00:01:39 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (276 ms)
+00:01:39 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:39 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (208 ms)
+00:01:39 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:39 "GET /roster HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (181 ms)
+00:01:39 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (179 ms)
+00:01:39 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "GET /roster HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (227 ms)
+00:01:39 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:39 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (210 ms)
+00:01:39 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:39 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (153 ms)
+00:01:40 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (201 ms)
+00:01:40 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (282 ms)
+00:01:40 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:40 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (226 ms)
+00:01:40 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:40 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (163 ms)
+00:01:40 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (166 ms)
+00:01:40 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (217 ms)
+00:01:40 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (345 ms)
+00:01:40 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:40 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (175 ms)
+00:01:40 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:40 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (196 ms)
+00:01:41 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:41 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (215 ms)
+00:01:41 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (166 ms)
+00:01:41 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF POST /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new -> 200 (236 ms)
+00:01:41 "POST /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/tracks/new HTTP/1.1" 200 -
+00:01:41 "GET /roster HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (230 ms)
+00:01:41 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:41 CF PUT /sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate -> 200 (165 ms)
+00:01:41 "PUT /cf/sessions/e81bb1bd11e48da84868002a6633ecb735d6a9292329c12908b47bed3d84d465/renegotiate HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "GET /roster HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (156 ms)
+00:01:41 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 "POST /collect HTTP/1.1" 200 -
+00:01:41 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (148 ms)
+00:01:41 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:42 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (167 ms)
+00:01:42 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (205 ms)
+00:01:42 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:42 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (180 ms)
+00:01:42 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (193 ms)
+00:01:42 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (164 ms)
+00:01:42 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:42 "POST /collect HTTP/1.1" 200 -
+00:01:43 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (164 ms)
+00:01:43 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (173 ms)
+00:01:43 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (165 ms)
+00:01:43 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:43 "GET /roster HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "GET /roster HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (167 ms)
+00:01:43 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 CF POST /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new -> 200 (218 ms)
+00:01:43 "POST /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/tracks/new HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:43 "POST /collect HTTP/1.1" 200 -
+00:01:44 CF PUT /sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate -> 200 (169 ms)
+00:01:44 "PUT /cf/sessions/9f7200679b9a79270058f077ac5897398282934dcb830f9332c82428a027796e/renegotiate HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:44 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "GET /roster HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "GET /roster HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:45 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:46 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "GET /roster HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "GET /roster HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:47 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:48 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "GET /roster HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "GET /roster HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:49 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:50 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "GET /roster HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "GET /roster HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:51 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:52 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "GET /roster HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "GET /roster HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:53 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:54 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "GET /roster HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "GET /roster HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:55 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:56 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "GET /roster HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "GET /roster HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:57 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:58 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "GET /roster HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "GET /roster HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:01:59 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:00 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "GET /roster HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "GET /roster HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:01 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:02 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "GET /roster HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "GET /roster HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:03 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:04 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "GET /roster HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "GET /roster HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:05 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:06 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "GET /roster HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "GET /roster HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:07 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:08 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "GET /roster HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "GET /roster HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:09 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:10 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "GET /roster HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "GET /roster HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:11 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:12 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "GET /roster HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "GET /roster HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:13 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:14 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "GET /roster HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "GET /roster HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:15 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:16 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "GET /roster HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "GET /roster HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:17 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:18 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "GET /roster HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "GET /roster HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:19 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:20 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "GET /roster HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "GET /roster HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:21 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:22 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "GET /roster HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "GET /roster HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:23 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:24 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "GET /roster HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "GET /roster HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:25 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:26 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "GET /roster HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "GET /roster HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:27 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:28 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "GET /roster HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "GET /roster HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:29 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:30 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "GET /roster HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "GET /roster HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:31 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:32 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "GET /roster HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "GET /roster HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:33 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:34 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "GET /roster HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "GET /roster HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:35 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:36 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "GET /roster HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "GET /roster HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:37 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:38 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "GET /roster HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "GET /roster HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:39 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:40 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "GET /roster HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "GET /roster HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:41 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:42 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "GET /roster HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "GET /roster HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:43 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:44 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "GET /roster HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "GET /roster HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:45 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:46 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "GET /roster HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "GET /roster HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:47 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:48 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "GET /roster HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "GET /roster HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:49 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:50 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "GET /roster HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "GET /roster HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:51 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:52 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "GET /roster HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "GET /roster HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:53 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:54 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "GET /roster HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "GET /roster HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:55 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:56 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "GET /roster HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "GET /roster HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:57 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:58 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "GET /roster HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "GET /roster HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:02:59 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:00 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "GET /roster HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "GET /roster HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:01 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:02 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "GET /roster HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "GET /roster HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:03 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:04 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "GET /roster HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "GET /roster HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:05 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:06 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "GET /roster HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "GET /roster HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:07 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:08 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "GET /roster HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "GET /roster HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:09 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:10 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "GET /roster HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "GET /roster HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:11 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:12 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "GET /roster HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "GET /roster HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:13 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:14 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "GET /roster HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "GET /roster HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:15 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:16 "POST /collect HTTP/1.1" 200 -
+00:03:17 "POST /collect HTTP/1.1" 200 -
+00:03:17 "POST /collect HTTP/1.1" 200 -
+00:03:17 "POST /collect HTTP/1.1" 200 -

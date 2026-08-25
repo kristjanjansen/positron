@@ -147,3 +147,86 @@ jumps to 9 or 11 when the swap-era manifest momentarily loses LL tags (count-bas
 fallback 3×3 s, plus stall bumps). Plan §8 Q6's "probable" mechanism is now measured.
 
 SIGSTOP phase next (the actual fix validation).
+
+---
+
+## Checkpoint 7 — SIGSTOP v6 run 1: park BOUNDED but 2-cycle; iteration 2 applied (00:3x) ✅
+
+Run sigstop-v6 (same protocol as m2: settle 40 → STOP 8 s → CONT → 60 → STOP 20 s →
+CONT → 90; videoUID 38d32321 SAME through both pauses):
+
+- 8 s pause: stable 3.3-4.3 s post-CONT, 1 rebuild(player-stall) mid-pause — matches
+  v5 behaviour (v5: stable 4.7 s). Note: 9 consecutive drift resyncs to the same frozen
+  lsp during the pause (lsp AHEAD this time, seek "succeeds" as a no-op) — harmless,
+  no escalation (counter resets on success), ends at the player-stall rebuild.
+- 20 s pause (the park scenario): park now 12.5 s (v5: 19.5 s + 18.0 s = 37.5 s parked);
+  stable 15.0 s post-CONT (v5: 56.4 s). Rescue was OURS (starved escalation), not the
+  gap controller. Trace decode: drift-seek t+22.0 → hole; t+22.5-30.0 NOTHING buffered
+  ahead (burst still arriving — platform-bound); starved#1 t+28.5 syncToEdge (correct,
+  no range ahead yet); burst appends land at ~36.9+ leaving playhead beached at 36.325
+  rs=1 WITH 5-17 s buffered just ahead t+30.5-34.5 (pure waste, one full stallTimeout);
+  starved#2 t+34.5 hole-skip to 42.1 → rs=4, stable.
+- Also observed: pdtWallLatency reads NEGATIVE (−1.6 s) briefly right after the -re
+  backlog burst (CF re-stamps PDT ahead of wall clock) — telemetry consumers beware.
+
+**Iteration 2** (the beached fast path): in the rs<2 branch, BEFORE the stallTimeout
+clock — if a buffered range starts >0.25 s ahead (len >0.5 s) for 3 consecutive ticks
+(~1.5 s confirmation, filters in-flight seeks), hole-skip immediately. beachedTicks
+joins watchdog state; starved escalation now = edge-seek/rebuild only (no-data-ahead
+case). Expected: phase-2 waste 6 s → ~1.5 s; v5-m2b-style second park (18 s with 32 s
+buffered ahead) → ~1.5 s. Re-validating: SIGSTOP re-run, then full ladder re-run
+(house rule: every plausible fix re-earns its chaos pass), then soak.
+
+---
+
+## Checkpoint 8 — SIGSTOP re-run with iteration 2: park ≤2.5 s (00:5x) ✅
+
+Run sigstop-v6b (same protocol, same broadcast 38d32321 through both pauses):
+- 8 s pause: stable 5.0 s post-CONT, 1 mid-pause rebuild — unchanged, good.
+- 20 s pause: **max park 2.5 s** (iter-1: 12.5 s; v5: 19.5+18.0 s), stable 13.2 s
+  post-CONT (iter-1: 15.0 s; v5: 56.4 s). maxPdt 24.0 vs v5's 32.8. This run resolved
+  via two quick drift resyncs (t+24.3→26.5 stale, t+25.3→43.0 fresh) — the fast path
+  wasn't needed (micro-timing differs run to run; 2 mid-pause rebuilds left a fresher
+  instance). Post-resume behaviour is now bounded by fast path (1.5 s) with starved
+  escalation as backstop — but the fast path itself did NOT fire this run, so its
+  live proof must come from the ladder re-run (iter-1 ladder had 3 hole-skips at 6 s
+  cadence; iter-2 should convert those to ~1.5 s skips).
+Final ladder re-run (chaos-v6b) next, then 5-min soak.
+
+---
+
+## Checkpoint 9 — ladder re-run with iter-2 exposed a skip-fight; iteration 3 applied (01:1x)
+
+chaos-v6b (iter-2 ladder): 5/5, all windows END healthy (lat 0.5-2.8 / pdt 1.5-3.6),
+35 rebuilds (starved 3, source-stall 5, fragLoadError 12, manifestParsingError 15),
+min spacing 3.0 s — no storm, tab alive. BUT the advancing-criterion "recovery" numbers
+went unstable (3.1-47.1 s) because brief STALE-content playback after a swap satisfies
+3 consecutive advancing samples — metric artifact, will report time-to-live-pdt for all
+runs instead. NEW pathology found in the trace (gap-12 window t+160-177): on a wedged
+mid-swap level hls.js bounces the playhead to 0 repeatedly; the iter-2 fast path then
+re-skips to the SAME buffered-range start every ~3 s, interleaved with drift seeks —
+17 s of seek noise until source-stall rebuilt (outcome same as v5's, just noisy).
+
+**Iteration 3**: fast path skips a given target ONCE (lastHoleSkipTo, ±0.5 s window);
+a bounced-back playhead falls through to the starved escalation (edge-seek → rebuild
+ladder). Cleared on any playhead advancement and in resetWatchdogs. Re-validating:
+ladder (chaos-v6c) + SIGSTOP (sigstop-v6c) + 5-min soak (soak-v6).
+
+---
+
+## Checkpoint 10 — iter-3 ladder: equivalent to v5, tails are platform weather (01:3x) ✅
+
+chaos-v6c (iter-3): 5/5, 33 rebuilds, no spacing <3 s, tab alive. TTL (time-to-live:
+pdt<=6 sustained 5 s, same metric for all runs): 16.5/14.6/20.7 s on gaps 12/25/60 —
+BEATS v5r — but 137.2/79.8 s on gaps 2/5. Trace attribution: those two windows hit
+prolonged Cloudflare post-swap 404 propagation (old-broadcast fragLoadError 404 ladders
+for 45-120 s; historic sessions saw 10-15 s, today's weather is worse) — handled by the
+same rebuild ladder as v5, and the historic v5 file shows identical minutes-long ct=0
+waits in its gap-12. Same-day comparison, pooled TTL medians: v5r 30.1 s (5 gaps) vs
+v6 iters 1-3 pooled 29.3 s (15 gaps) → EQUIVALENT.
+v6-specific residual noise observed: on a stale-manifest phase, hole-skip (to stale
+buffered content) alternates with drift-seek (to stale lsp at frozen edge) every ~2.5 s
+until source-stall rebuilds at 12 s — v5 in the same state parks silently for the same
+12 s, so outcome is identical; the noise is telemetry-only. Root cause is the frozen
+hls.latency driving drift seeks (GAP C) — out of scope beyond the existing escalation.
+Iter-3 accepted. SIGSTOP re-run under iter-3 next, then soak.

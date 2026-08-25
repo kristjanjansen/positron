@@ -293,9 +293,15 @@ Ranked.
    camera". Reuses the repo's OBS/relay Option C infra (✅ built) and the studio-OBS pattern —
    lowest-risk, phase 3. (b) RealtimeKit's recording/raw-RTP-to-R2 📄 — but that means its SDK
    layer, not the raw SFU. (c) per-participant WHIP to Stream inputs records **nothing** today 📄.
-2. **Undocumented scale ceilings** ⚠️ — sessions per app, app-level API rate, join-storm behavior
-   (200 joiners in 60 s = 200 sessions/new + ~2000 tracks/new). Nothing in the docs says no; nothing
-   says yes. Phase-2 synthetic load answers this before any big show depends on it.
+2. **Undocumented scale ceilings** ⚠️→✅ **first probe done (session 4 scale ladder, N=8→20):
+   NO ceiling found through 20 participants.** Zero non-2xx across ~101 sessions/new + ~270
+   tracks/new/renegotiates (no 429s ever); API latencies stable (sessions/new p50 240–500 ms,
+   renegotiate ~170 ms); a probe held 19 recvonly tracks on ONE PeerConnection decoding
+   continuously; pooled latency FLAT with N (p95 ≈ 158 ms at every rung). Local bottleneck is
+   RAM (~800 MB/Chrome), not CPU. Two caveats for phase 2: one 20-way join storm hit a uniform
+   ~3.4 s stall on ALL sessions/new (still 201s — ⚠️ DNS/edge queueing), and one publisher's
+   ICE/DTLS never connected during one storm (1 of 3) → **the publish leg needs a
+   connect-timeout retry**. 200-scale remains unprobed → phase 3 soak stands.
 3. **The two-clock problem** ⚠️ (§2) — grid at 0.1 s vs stage at 2.4–4 s is a *dramaturgical*
    hazard no vendor doc mentions. Mitigations exist (WHEP for publishers; display delay); needs a
    rehearsal-scale human test, not a rig.
@@ -337,6 +343,16 @@ Ranked.
   it). One 3.1 s sender-side freeze observed once, seen identically by all receivers.
 - Artifacts: `proto/m2m/{room.html,server.py,run.mjs,analyze.py,README.md,NOTES.md}`, data
   `results/m2m-sfu*.jsonl`, SDPs + tile screenshots in proto/m2m/. Zero new CF resources created.
+
+**Phase 1b — scale ladder** — ✅ **DONE (session 4): N=8→12→16→20, no durable gate fired.**
+Publishers = N−2 lightweight (320x180@15, publish-only) + 2 full probes pulling all N−1 tracks each.
+Valid rate ≥99.58 % every rung; pooled p50 109–116 ms / p95 pinned ~158 ms — **latency flat with N**;
+publisher fps 15 across the board, `qualityLimitationReason: none` everywhere; join storm → full mesh
+8–18 s. Freezes: 7 events, all ≤0.6 s, all sender/SFU-side (seen identically by both probes).
+Instrument fix: `sendBeacon`'s ~64 KB quota silently dropped probe batches at N=20 — switched to
+`fetch()` (the N=16 rung was just under the cliff; another instrument-first save).
+New tools: `proto/m2m/{run-scale.mjs,analyze-scale.py}`; data `results/m2m-scale-*.jsonl`.
+See §5 risk 2 for the API/storm findings and the publish-retry requirement.
 
 **Phase 2 — the room, at workshop scale (2–10), then synthetic 40**:
 - Build the `RtcRoom` DO frames (§3) + proxy Worker with role tokens; wire the grid UI with

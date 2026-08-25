@@ -9,3 +9,21 @@
 20:25:48.748 [log] pulled A (mid 3)
 20:25:49.771 [log] ontrack mid=4 -> D
 20:25:49.961 [log] pulled D (mid 4)
+20:50:33.039 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+20:50:35.041 [log] session 3548fcb2ae60…
+20:50:35.839 [log] pc connected, joining room
+20:52:46.490 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+20:52:52.722 [log] session ec9f99274a24…
+20:52:53.605 [log] pc connected, joining room
+20:55:00.617 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+20:55:09.593 [log] session 50243a6916ff…
+20:55:10.472 [log] pc connected, joining room
+20:57:22.715 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+20:57:34.905 [log] session 9422119e6d4c…
+20:57:35.770 [log] pc connected, joining room
+21:00:16.301 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+21:00:25.073 [log] session 799cb7d05090…
+21:00:29.723 [log] pc connected, joining room
+21:01:18.246 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+21:01:30.125 [log] session ba0ce69f6fa2…
+21:01:32.722 [log] pc connected, joining room
