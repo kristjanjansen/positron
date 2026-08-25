@@ -1,0 +1,14 @@
+logLevel: info
+rtmp: yes
+rtmpAddress: :1935
+hls: no
+webrtc: no
+rtsp: yes
+rtspAddress: :8554
+srt: no
+api: yes
+apiAddress: :9997
+paths:
+  rig:
+    # a new publisher (the real encoder) kicks the current one (the slate)
+    overridePublisher: yes

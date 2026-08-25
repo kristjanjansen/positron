@@ -1,0 +1,136 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LL-HLS latency probe</title>
+<style>
+  body{font:13px/1.5 ui-monospace,Menlo,monospace;background:#111;color:#eee;margin:0;padding:16px}
+  video{width:640px;background:#000;display:block}
+  #s{white-space:pre;margin-top:12px}
+  .k{color:#7cf}
+</style>
+<video id="v" muted playsinline autoplay controls></video>
+<div id="s">starting…</div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script>
+const Q = new URLSearchParams(location.search);
+const RUN = Q.get('run') || 'default';
+// ?fix=seek    manual hard-seek to live edge (what we tested first)
+// ?fix=config  hls.js's own recovery path via liveMaxLatencyDurationCount
+// (absent)     stock hls.js defaults
+const FIX = Q.get('fix') || 'none';
+const UID = '4c93bc4b4809c29b03cc60fd8add29df';
+const BASE = 'https://customer-mwuu1cmlyif6eluy.cloudflarestream.com';
+const SRC = `${BASE}/${UID}/manifest/video.m3u8?protocol=llhls`;
+
+const v = document.getElementById('v'), s = document.getElementById('s');
+const samples = [];            // PDT-derived latency, ms
+let hls, lastPresented = -1, dropped = 0;
+
+// Map a media-timeline position (seconds) to absolute wall-clock ms via PDT.
+// hls.js Fragment: programDateTime = ms epoch; start/duration = seconds.
+function pdtForMediaTime(tSec){
+  const d = hls?.latestLevelDetails ?? hls?.levels?.[hls.loadLevel]?.details;
+  if (!d?.fragments) return null;
+  for (const f of d.fragments){
+    if (f.programDateTime == null) continue;
+    if (tSec >= f.start && tSec < f.start + f.duration)
+      return f.programDateTime + (tSec - f.start) * 1000;
+  }
+  // fall back to the part list at the live edge
+  const pl = d.partList;
+  if (pl) for (const p of pl){
+    const fr = p.fragment;
+    if (fr?.programDateTime == null) continue;
+    if (tSec >= p.start && tSec < p.start + p.duration)
+      return fr.programDateTime + (p.start - fr.start + (tSec - p.start)) * 1000;
+  }
+  return null;
+}
+
+function pct(a, p){ if(!a.length) return NaN; const b=[...a].sort((x,y)=>x-y);
+  return b[Math.min(b.length-1, Math.floor(p*b.length))]; }
+
+const T0 = performance.timeOrigin;
+
+function onFrame(now, md){
+  v.requestVideoFrameCallback(onFrame);          // re-arm FIRST
+  rvfcFired++;
+  if (lastPresented >= 0) dropped += md.presentedFrames - lastPresented - 1;
+  lastPresented = md.presentedFrames;
+
+  // mediaTime is the PTS of the frame actually being presented
+  const srcMs = pdtForMediaTime(md.mediaTime);
+  if (srcMs == null) return;
+  const displayWallMs = T0 + md.expectedDisplayTime;
+  samples.push(displayWallMs - srcMs);
+  if (samples.length > 5000) samples.shift();
+}
+
+function render(){
+  const n = samples.length;
+  const hlsLat = hls?.latency;
+  s.innerHTML =
+`<span class="k">samples</span>   ${n}   dropped ${dropped}
+<span class="k">PDT latency (display - programDateTime), ms</span>
+  p50 ${pct(samples,.50)|0}   p95 ${pct(samples,.95)|0}   p99 ${pct(samples,.99)|0}   max ${Math.max(...samples)|0}
+<span class="k">hls.js internals</span>
+  hls.latency        ${hlsLat!=null?hlsLat.toFixed(3)+' s':'—'}
+  targetLatency      ${hls?.targetLatency!=null?hls.targetLatency.toFixed(3)+' s':'—'}
+  maxLatency         ${hls?.maxLatency!=null?hls.maxLatency.toFixed(3)+' s':'—'}
+  drift              ${hls?.drift!=null?hls.drift.toFixed(4):'—'}
+  currentLevel       ${hls?.currentLevel}
+  lowLatencyMode     ${hls?.config?.lowLatencyMode}
+  playbackRate       ${v.playbackRate.toFixed(3)}
+<span class="k">buffer</span>
+  buffered end - currentTime  ${v.buffered.length? (v.buffered.end(v.buffered.length-1)-v.currentTime).toFixed(3):'—'} s`;
+  window.__result = { run: RUN, n, p50: pct(samples,.50), p95: pct(samples,.95), p99: pct(samples,.99),
+                      dropped, hlsLatency: hlsLat, rvfcFired, visibility: document.visibilityState,
+                      playbackRate: v.playbackRate, maxLatency: hls?.maxLatency ?? null,
+                      targetLatency: hls?.targetLatency ?? null };
+}
+setInterval(render, 500);
+
+// Exfiltrate to the local collector so results survive regardless of who's watching.
+let rvfcFired = 0;
+setInterval(()=>{
+  if (!window.__result) return;
+  fetch('/collect', {method:'POST', headers:{'content-type':'application/json'},
+                     body: JSON.stringify(window.__result)}).catch(()=>{});
+}, 2000);
+
+if (Hls.isSupported()){
+  hls = new Hls({
+    lowLatencyMode: true,
+    backBufferLength: 30,
+    // arm 'config': enable hls.js's OWN recovery path.
+    // maxLatency = liveMaxLatencyDurationCount x targetduration; unset => Infinity => seek never fires.
+    ...(FIX === 'config' ? { liveMaxLatencyDurationCount: 5, maxLiveSyncPlaybackRate: 1.05 } : {}),
+  });
+  window.hls = hls; window.__log = [];
+  const L = (...a)=>{ window.__log.push(a.map(String).join(' ')); console.log('[rig]',...a); };
+  hls.on(Hls.Events.ERROR, (_e,d)=> L('ERROR', d.fatal?'FATAL':'warn', d.type, d.details, d.reason||'', d.err?.message||''));
+  hls.on(Hls.Events.MANIFEST_PARSED, (_e,d)=>{ L('MANIFEST_PARSED levels=',d.levels.length); v.play().then(()=>L('play ok')).catch(e=>L('play blocked:',e)); });
+  hls.on(Hls.Events.LEVEL_LOADED, (_e,d)=> L('LEVEL_LOADED live=',d.details.live,'parts=',d.details.partList?.length));
+  hls.on(Hls.Events.FRAG_BUFFERED, (_e,d)=> L('FRAG_BUFFERED sn=',d.frag.sn,'part=',d.part?.index));
+  hls.on(Hls.Events.BUFFER_APPENDED, ()=> L('BUFFER_APPENDED'));
+  v.addEventListener('error', ()=> L('video.error', v.error?.code, v.error?.message));
+  hls.loadSource(SRC);
+  hls.attachMedia(v);
+} else if (v.canPlayType('application/vnd.apple.mpegurl')){
+  v.src = SRC; v.play();
+} else s.textContent = 'no HLS support';
+
+v.requestVideoFrameCallback(onFrame);
+
+// --- live-edge sync experiment -------------------------------------------
+// hls.js can start far behind the live edge on Cloudflare LL-HLS and never
+// converge (maxLiveSyncPlaybackRate only claws back ~0.05x per second).
+// ?autosync=1 hard-seeks to liveSyncPosition whenever we drift past 2x target.
+const AUTOSYNC = FIX === 'seek' || Q.has('autosync');
+if (AUTOSYNC) setInterval(()=>{
+  if (!hls || v.readyState < 2) return;
+  const lsp = hls.liveSyncPosition;
+  if (lsp == null) return;
+  const behind = lsp - v.currentTime;
+  if (behind > 2.0){ v.currentTime = lsp; samples.length = 0; }
+}, 1000);
+</script>

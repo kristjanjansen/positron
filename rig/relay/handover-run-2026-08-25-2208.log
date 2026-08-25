@@ -1,0 +1,5 @@
+── phase 0: wait for slate live ──
+  live, videoUID=340414c32c21f02023d360a59a955ae0
+  frame -> 0-slate.png
+── phase 1: encoder IN ──
+  videoUID=-  ✗NEW

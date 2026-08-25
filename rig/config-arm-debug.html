@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>config-arm debug — Mystery 1 repro</title>
+<style>body{font:13px/1.5 ui-monospace,Menlo,monospace;background:#111;color:#eee;margin:0;padding:16px}
+video{width:640px;background:#000;display:block}#s{white-space:pre;margin-top:12px}</style>
+<video id="v" muted playsinline autoplay controls></video>
+<div id="s">starting…</div>
+<script>
+// Capture EVERYTHING before hls.js loads: uncaught errors + all console output,
+// so the exact reason the arm never starts lands in the collector.
+window.__clog = [];
+window.__err = [];
+for (const m of ['log','info','warn','error','debug']) {
+  const orig = console[m].bind(console);
+  console[m] = (...a) => { window.__clog.push(`[${m}] ` + a.map(x => { try { return typeof x === 'string' ? x : JSON.stringify(x); } catch { return String(x); } }).join(' ')); orig(...a); };
+}
+window.addEventListener('error', (e) => {
+  window.__err.push({ message: e.message, source: (e.filename||'').split('/').pop(), line: e.lineno, stack: (e.error && e.error.stack || '').split('\n').slice(0,4).join(' | ') });
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js" crossorigin="anonymous"></script>
+<script>
+const Q = new URLSearchParams(location.search);
+const MODE = Q.get('mode') || 'arm';       // arm | fixed-count | fixed-duration
+const UID = Q.get('uid');
+const SRC = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${UID}/manifest/video.m3u8?protocol=llhls`;
+const v = document.getElementById('v'), s = document.getElementById('s');
+let hls, rvfcFired = 0;
+
+function onFrame() { v.requestVideoFrameCallback(onFrame); rvfcFired++; }
+
+// Telemetry FIRST (as in measure-llhls.html) — must survive a constructor throw.
+setInterval(() => {
+  const payload = {
+    run: `m1-${MODE}`, hlsDefined: typeof hls !== 'undefined' && !!hls,
+    hlsVersion: self.Hls?.version,
+    hlsLatency: hls?.latency, targetLatency: hls?.targetLatency ?? null,
+    maxLatency: hls?.maxLatency ?? null, liveSyncPosition: hls?.liveSyncPosition ?? null,
+    currentTime: +v.currentTime.toFixed(3), readyState: v.readyState, paused: v.paused,
+    rvfcFired, visibility: document.visibilityState,
+    errors: window.__err.splice(0, window.__err.length),
+    consoleTail: window.__clog.splice(0, window.__clog.length).slice(-40),
+  };
+  s.textContent = JSON.stringify(payload, null, 1);
+  fetch('/collect', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) }).catch(()=>{});
+}, 2000);
+
+v.requestVideoFrameCallback(onFrame);
+
+// ---- the configs under test -------------------------------------------------
+// 'arm'            = byte-for-byte the failing arm from measure-llhls.html:106 + debug:true
+// 'fixed-count'    = same + explicit liveSyncDurationCount (hls.js requires BOTH in user config)
+// 'fixed-duration' = seconds-based pair, keeps the manifest-driven low target
+const CONFIGS = {
+  'arm':            { lowLatencyMode: true, backBufferLength: 30, liveMaxLatencyDurationCount: 5, maxLiveSyncPlaybackRate: 1.05, debug: true },
+  'fixed-count':    { lowLatencyMode: true, backBufferLength: 30, liveSyncDurationCount: 3, liveMaxLatencyDurationCount: 5, maxLiveSyncPlaybackRate: 1.05, debug: true },
+  'fixed-duration': { lowLatencyMode: true, backBufferLength: 30, liveSyncDuration: 1.5, liveMaxLatencyDuration: 6, maxLiveSyncPlaybackRate: 1.05, debug: true },
+};
+
+// Deliberately NOT wrapped in try/catch — faithful to the original page.
+hls = new Hls(CONFIGS[MODE]);
+window.hls = hls;
+hls.on(Hls.Events.ERROR, (_e, d) => console.warn('[rig-ERROR]', d.fatal ? 'FATAL' : 'warn', d.type, d.details, d.reason || ''));
+hls.on(Hls.Events.MANIFEST_PARSED, () => { v.play().catch(e => console.warn('[rig] play blocked', e.message)); });
+hls.loadSource(SRC);
+hls.attachMedia(v);
+</script>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WHEP rig — publisher</title>
+<style>body{background:#111;color:#ddd;font:13px monospace}#log{white-space:pre-wrap}</style>
+</head>
+<body>
+<h3>WHIP publisher (canvas 1280x720@30 → Cloudflare Stream)</h3>
+<canvas id="cv" width="1280" height="720" style="width:640px;height:360px;border:1px solid #444"></canvas>
+<div id="log"></div>
+<script>
+"use strict";
+// ---- constants -------------------------------------------------------------
+// WHIP publish URL is a credential (path segment = stream key) — never hardcode it.
+// Pass ?whip=<url-encoded publish URL>; the driver reads it from rig/whep/live_input.json (gitignored).
+const WHIP_URL = new URLSearchParams(location.search).get("whip");
+if (!WHIP_URL) throw new Error("missing ?whip= publish URL (see rig/whep/live_input.json)");
+const ABS_CAPTURE_URI = "http://www.webrtc.org/experiments/rtp-hdrext/abs-capture-time";
+const COLLECT = "http://127.0.0.1:8897/collect";
+const SAVE = "http://127.0.0.1:8897/save/";
+// Binary row geometry — must match play.html exactly.
+const NBLOCKS = 56;          // 48-bit ms (MSB first) + 8-bit XOR checksum
+const BLOCK_W = 20;          // px
+const ROW_X = 40;            // left edge of block 0
+const ROW_Y = 100;           // top of row
+const ROW_H = 80;            // block height
+
+window.__state = { phase: "init", error: null, negotiation: null, frames: 0 };
+
+const logEl = document.getElementById("log");
+function log(...a) {
+  const s = a.join(" ");
+  logEl.textContent += s + "\n";
+  console.log(s);
+}
+function post(obj) {
+  navigator.sendBeacon(COLLECT, JSON.stringify(obj));
+}
+function event(name, extra) {
+  post(Object.assign({ kind: "event", side: "pub", name, t: performance.timeOrigin + performance.now() }, extra || {}));
+}
+
+// ---- canvas signal ---------------------------------------------------------
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+let frameCounter = 0;
+
+function draw() {
+  const nowMs = performance.timeOrigin + performance.now(); // absolute epoch ms, this page's clock
+  const ms = Math.round(nowMs);
+  // background
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 1280, 720);
+  // black bed behind the row (margin so compression ringing has room)
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 20, ROW_Y - 20, NBLOCKS * BLOCK_W + 40, ROW_H + 40);
+  // 48-bit ms MSB-first, then 8-bit XOR checksum of the 6 bytes
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) {
+    for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  }
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  // human-readable digits + frame counter
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 64px monospace";
+  ctx.fillText(String(ms), 60, 320);
+  ctx.font = "bold 48px monospace";
+  ctx.fillText("frame " + frameCounter, 60, 400);
+  ctx.fillText(new Date(ms).toISOString().slice(11, 23), 60, 470);
+  // motion so the encoder never starves / dedupes
+  const x = (frameCounter * 7) % 1200;
+  ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",80%,60%)";
+  ctx.fillRect(40 + x, 560, 80, 80);
+  frameCounter++;
+  window.__state.frames = frameCounter;
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ---- WHIP ------------------------------------------------------------------
+function mungeAbsCaptureTime(sdp) {
+  // add a=extmap:<free id> ABS_CAPTURE_URI to every video m-section lacking it
+  const lines = sdp.split("\r\n");
+  const out = [];
+  let inVideo = false, usedIds = [], sectionStart = -1, changed = false;
+  function flushSection(endIdx) {
+    if (inVideo && !lines.slice(sectionStart, endIdx).some(l => l.includes(ABS_CAPTURE_URI))) {
+      let id = 1;
+      while (usedIds.includes(id)) id++;
+      if (id <= 14) {
+        // insert after the last extmap line of the section (or after c= line)
+        let insertAt = out.length;
+        for (let j = out.length - 1; j >= 0; j--) {
+          if (out[j].startsWith("a=extmap:")) { insertAt = j + 1; break; }
+        }
+        out.splice(insertAt, 0, "a=extmap:" + id + " " + ABS_CAPTURE_URI);
+        changed = true;
+      }
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startsWith("m=")) {
+      flushSection(i);
+      inVideo = l.startsWith("m=video");
+      usedIds = [];
+      sectionStart = i;
+    }
+    if (inVideo && l.startsWith("a=extmap:")) {
+      usedIds.push(parseInt(l.slice(9), 10));
+    }
+    out.push(l);
+  }
+  flushSection(lines.length);
+  return { sdp: out.join("\r\n"), changed };
+}
+
+async function publish() {
+  window.__state.phase = "connecting";
+  const stream = cv.captureStream(30);
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState });
+  pc.onconnectionstatechange = () => {
+    event("pc", { state: pc.connectionState });
+    if (pc.connectionState === "connected") window.__state.phase = "publishing";
+    if (pc.connectionState === "failed") { window.__state.phase = "failed"; window.__state.error = "pc failed"; }
+  };
+  const tx = pc.addTransceiver(stream.getVideoTracks()[0], { direction: "sendonly", streams: [stream] });
+
+  // --- negotiate abs-capture-time: API first, munge fallback ---
+  let negotiation = "none";
+  try {
+    if (typeof tx.getHeaderExtensionsToNegotiate === "function") {
+      const exts = tx.getHeaderExtensionsToNegotiate();
+      const abs = exts.find(e => e.uri === ABS_CAPTURE_URI);
+      if (abs) {
+        abs.direction = "sendrecv";
+        tx.setHeaderExtensionsToNegotiate(exts);
+        negotiation = "api";
+      } else {
+        negotiation = "api-uri-absent";
+      }
+    }
+  } catch (e) {
+    negotiation = "api-threw:" + e.message;
+  }
+  let offer = await pc.createOffer();
+  if (!offer.sdp.includes(ABS_CAPTURE_URI)) {
+    const m = mungeAbsCaptureTime(offer.sdp);
+    if (m.changed) {
+      offer = { type: "offer", sdp: m.sdp };
+      negotiation = negotiation + "+munge";
+    } else {
+      negotiation = negotiation + "+munge-failed";
+    }
+  }
+  window.__state.negotiation = negotiation;
+  log("abs-capture-time negotiation:", negotiation);
+  await pc.setLocalDescription(offer);
+  // wait for ICE gathering complete (WHIP: single-shot SDP, no trickle needed with CF)
+  await new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+  const finalOffer = pc.localDescription.sdp;
+  await fetch(SAVE + "pub-offer.sdp", { method: "POST", body: finalOffer });
+  const resp = await fetch(WHIP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/sdp" },
+    body: finalOffer
+  });
+  const answer = await resp.text();
+  await fetch(SAVE + "pub-answer.sdp", { method: "POST", body: answer });
+  event("whip-response", { status: resp.status, location: resp.headers.get("Location") || null, negotiation });
+  if (!resp.ok) {
+    window.__state.phase = "failed";
+    window.__state.error = "WHIP HTTP " + resp.status + ": " + answer.slice(0, 300);
+    log(window.__state.error);
+    return;
+  }
+  await pc.setRemoteDescription({ type: "answer", sdp: answer });
+  const answerHasAbs = answer.includes(ABS_CAPTURE_URI);
+  log("WHIP", resp.status, "| answer contains abs-capture-time:", answerHasAbs);
+  event("negotiated", { offerHasAbs: true, answerHasAbs, negotiation });
+  window.__state.answerHasAbs = answerHasAbs;
+
+  // --- stats every 2 s ---
+  setInterval(async () => {
+    try {
+      const st = await pc.getStats();
+      const row = { kind: "pub-stats", t: performance.timeOrigin + performance.now(), vis: document.visibilityState };
+      st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "video") {
+          row.framesEncoded = s.framesEncoded;
+          row.framesSent = s.framesSent;
+          row.fps = s.framesPerSecond;
+          row.totalPacketSendDelay = s.totalPacketSendDelay;
+          row.packetsSent = s.packetsSent;
+          row.qualityLimitationReason = s.qualityLimitationReason;
+          row.targetBitrate = s.targetBitrate;
+          row.encoderImplementation = s.encoderImplementation;
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated) {
+          row.rtt = s.currentRoundTripTime;
+        }
+      });
+      post(row);
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+publish().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e) });
+});
+</script>
+</body>
+</html>

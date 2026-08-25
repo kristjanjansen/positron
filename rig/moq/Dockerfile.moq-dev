@@ -1,0 +1,6 @@
+# moq-dev: build+run environment for cloudflare/moq-rs on a ThreatLocker-managed Mac
+# (native compilation is killed by endpoint control — see RUNBOOK.md §3.5).
+# Build:  docker build -t moq-dev -f Dockerfile.moq-dev .
+# Remove: docker rmi moq-dev rust:1-bookworm && docker volume rm moq-target14 moq-target16
+FROM rust:1-bookworm
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*

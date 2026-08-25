@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cloudflare LL-HLS — low latency player</title>
+<style>
+  :root{color-scheme:dark}
+  body{background:#0d1317;color:#e4ecef;font:15px/1.6 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+       margin:0;padding:28px;display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+  video{width:min(900px,100%);background:#000;border-radius:8px;display:block}
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline}
+  .stat{display:flex;flex-direction:column;gap:3px}
+  .k{font:600 10px/1 ui-monospace,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase;color:#7b8d96}
+  .v{font:700 26px/1 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  .ok{color:#4fb588} .warn{color:#c79b4c} .bad{color:#d9705c}
+  #log{font:12px/1.6 ui-monospace,Menlo,monospace;color:#7b8d96;max-height:150px;overflow:auto;
+       border-top:1px solid #26343b;padding-top:10px;width:min(900px,100%)}
+  input{background:#141d22;border:1px solid #26343b;color:#e4ecef;border-radius:6px;padding:8px 10px;
+        font:12px ui-monospace,Menlo,monospace;width:min(900px,100%)}
+</style>
+
+<input id="url" spellcheck="false">
+<video id="v" muted playsinline controls></video>
+
+<div class="row">
+  <div class="stat"><span class="k">latency</span><span class="v" id="lat">—</span></div>
+  <div class="stat"><span class="k">target</span><span class="v" id="tgt">—</span></div>
+  <div class="stat"><span class="k">rate</span><span class="v" id="rate">—</span></div>
+  <div class="stat"><span class="k">resyncs</span><span class="v" id="rs">0</span></div>
+</div>
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script type="module">
+import { createLowLatencyPlayer } from './low-latency-player.js';
+
+const CUSTOMER = 'customer-mwuu1cmlyif6eluy';
+const q = new URLSearchParams(location.search);
+const uid = q.get('uid') || '4c93bc4b4809c29b03cc60fd8add29df';
+const src = q.get('src') ||
+  `https://${CUSTOMER}.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
+
+const $ = (id) => document.getElementById(id);
+$('url').value = src;
+
+const log = (m) => {
+  const el = $('log');
+  el.textContent = `${new Date().toISOString().slice(11,23)}  ${m}\n` + el.textContent;
+};
+
+let resyncs = 0;
+const player = createLowLatencyPlayer($('v'), src);
+
+player.on('latency', ({ latency, target, playbackRate }) => {
+  const el = $('lat');
+  el.textContent = latency.toFixed(2) + 's';
+  el.className = 'v ' + (latency <= target + 0.5 ? 'ok' : latency <= target + 2 ? 'warn' : 'bad');
+  $('tgt').textContent = target.toFixed(2) + 's';
+  $('rate').textContent = playbackRate.toFixed(3);
+});
+player.on('resync', ({ reason, to }) => {
+  $('rs').textContent = ++resyncs;
+  log(`resync (${reason}) -> ${to.toFixed(2)}s`);
+});
+player.on('error', (e) => log('error: ' + (e?.details || e?.message || e)));
+
+window.player = player;
+log('player started');
+</script>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WHEP rig — player</title>
+<style>body{background:#111;color:#ddd;font:13px monospace}#log{white-space:pre-wrap}</style>
+</head>
+<body>
+<h3>WHEP player (Cloudflare Stream → rVFC pixel decode)</h3>
+<video id="vid" autoplay muted playsinline style="width:640px;height:360px;border:1px solid #444"></video>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+const WHEP_URL = "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/224558e8993d5a5efd234d9d3a320f87/webRTC/play";
+const ABS_CAPTURE_URI = "http://www.webrtc.org/experiments/rtp-hdrext/abs-capture-time";
+const COLLECT = "http://127.0.0.1:8897/collect";
+const SAVE = "http://127.0.0.1:8897/save/";
+// Must match publish.html
+const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
+
+window.__state = { phase: "init", error: null, samples: 0, valid: 0, captureTimeSeen: 0, attempts: 0 };
+
+const logEl = document.getElementById("log");
+const hud = document.getElementById("hud");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function post(obj) { navigator.sendBeacon(COLLECT, JSON.stringify(obj)); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", side: "play", name, t: performance.timeOrigin + performance.now() }, extra || {}));
+}
+
+const vid = document.getElementById("vid");
+const work = document.createElement("canvas");
+work.width = 1280; work.height = 720;
+const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+
+// ---- decoder ---------------------------------------------------------------
+function decodeRow() {
+  // normalize whatever resolution arrived onto the 1280x720 reference grid
+  wctx.drawImage(vid, 0, 0, 1280, 720);
+  const y = ROW_Y + ROW_H / 2;
+  const img = wctx.getImageData(ROW_X, y, NBLOCKS * BLOCK_W, 1).data;
+  const levels = [];
+  for (let i = 0; i < NBLOCKS; i++) {
+    // average central 8 px of each block (green channel)
+    let s = 0;
+    for (let dx = 6; dx < 14; dx++) s += img[(i * BLOCK_W + dx) * 4 + 1];
+    levels.push(s / 8);
+  }
+  const mn = Math.min(...levels), mx = Math.max(...levels);
+  if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+  const thr = (mn + mx) / 2;
+  const bits = levels.map(l => (l > thr ? 1 : 0));
+  let ms = 0;
+  for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+  let ck = 0;
+  for (let i = 48; i < 56; i++) ck = ck * 2 + bits[i];
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  let expect = 0;
+  for (const b of bytes) expect ^= b;
+  if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+  return { ok: true, ms, contrast: mx - mn };
+}
+
+// ---- rVFC loop -------------------------------------------------------------
+let busy = false;
+let batch = [];
+let lastPresented = -1;
+function onFrame(now, meta) {
+  vid.requestVideoFrameCallback(onFrame);   // RE-ARM FIRST (§4.1)
+  if (busy) return;                          // busy guard — drop, never queue
+  busy = true;
+  try {
+    if (meta.presentedFrames === lastPresented) return; // duplicate callback for same frame
+    lastPresented = meta.presentedFrames;
+    const dec = decodeRow();
+    const dispWall = performance.timeOrigin + meta.expectedDisplayTime;
+    const row = {
+      kind: "sample",
+      t: performance.timeOrigin + performance.now(),
+      vis: document.visibilityState,
+      presentedFrames: meta.presentedFrames,
+      expectedDisplayTime: meta.expectedDisplayTime,
+      captureTime: (meta.captureTime !== undefined) ? meta.captureTime : null,
+      receiveTime: (meta.receiveTime !== undefined) ? meta.receiveTime : null,
+      rtpTimestamp: (meta.rtpTimestamp !== undefined) ? meta.rtpTimestamp : null,
+      processingDuration: (meta.processingDuration !== undefined) ? meta.processingDuration : null,
+      w: meta.width, h: meta.height,
+      decOk: dec.ok, contrast: Math.round(dec.contrast || 0)
+    };
+    if (dec.ok) {
+      row.burnedTs = dec.ms;
+      row.latencyMs = dispWall - dec.ms;                       // glass-to-glass (burned pixel -> display)
+      window.__state.valid++;
+    } else {
+      row.decWhy = dec.why;
+    }
+    if (meta.captureTime !== undefined && meta.captureTime !== null) {
+      window.__state.captureTimeSeen++;
+      // capture->display in the receiver's clock domain (Chrome maps abs-capture-time onto it)
+      row.captureToDisplayMs = meta.expectedDisplayTime - meta.captureTime;
+    }
+    if (meta.receiveTime !== undefined && meta.receiveTime !== null) {
+      row.receiveToDisplayMs = meta.expectedDisplayTime - meta.receiveTime;
+    }
+    window.__state.samples++;
+    batch.push(row);
+    if (window.__state.samples % 30 === 0) {
+      hud.textContent = "samples=" + window.__state.samples + " valid=" + window.__state.valid +
+        " captureTimeSeen=" + window.__state.captureTimeSeen +
+        (row.latencyMs !== undefined ? " lastLatency=" + Math.round(row.latencyMs) + "ms" : "");
+    }
+  } finally {
+    busy = false;
+  }
+}
+
+setInterval(() => {
+  if (batch.length) {
+    // raw newline-separated JSON body — server splits lines. Do NOT pass through
+    // post(): double-stringify turns the batch into one JSON string literal.
+    navigator.sendBeacon(COLLECT, batch.map(r => JSON.stringify(r)).join("\n"));
+    batch = [];
+  }
+}, 1000);
+
+// ---- WHEP ------------------------------------------------------------------
+function mungeAbsCaptureTime(sdp) {
+  const lines = sdp.split("\r\n");
+  const out = [];
+  let inVideo = false, usedIds = [], sectionStart = -1, changed = false;
+  function flushSection(endIdx) {
+    if (inVideo && !lines.slice(sectionStart, endIdx).some(l => l.includes(ABS_CAPTURE_URI))) {
+      let id = 1;
+      while (usedIds.includes(id)) id++;
+      if (id <= 14) {
+        let insertAt = out.length;
+        for (let j = out.length - 1; j >= 0; j--) {
+          if (out[j].startsWith("a=extmap:")) { insertAt = j + 1; break; }
+        }
+        out.splice(insertAt, 0, "a=extmap:" + id + " " + ABS_CAPTURE_URI);
+        changed = true;
+      }
+    }
+  }
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startsWith("m=")) {
+      flushSection(i);
+      inVideo = l.startsWith("m=video");
+      usedIds = [];
+      sectionStart = i;
+    }
+    if (inVideo && l.startsWith("a=extmap:")) usedIds.push(parseInt(l.slice(9), 10));
+    out.push(l);
+  }
+  flushSection(lines.length);
+  return { sdp: out.join("\r\n"), changed };
+}
+
+let pc = null;
+async function connectOnce(attempt) {
+  pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] });
+  window.__pc = pc;
+  const connected = new Promise((res, rej) => {
+    pc.onconnectionstatechange = () => {
+      event("pc", { state: pc.connectionState, attempt });
+      if (pc.connectionState === "connected") res();
+      if (pc.connectionState === "failed") rej(new Error("pc failed"));
+    };
+    setTimeout(() => rej(new Error("connect timeout")), 15000);
+  });
+  pc.ontrack = (e) => {
+    if (e.track.kind === "video") {
+      vid.srcObject = new MediaStream([e.track]);
+      vid.play().catch(() => {});
+    }
+  };
+  const tx = pc.addTransceiver("video", { direction: "recvonly" });
+  let negotiation = "none";
+  try {
+    if (typeof tx.getHeaderExtensionsToNegotiate === "function") {
+      const exts = tx.getHeaderExtensionsToNegotiate();
+      const abs = exts.find(e => e.uri === ABS_CAPTURE_URI);
+      if (abs) { abs.direction = "sendrecv"; tx.setHeaderExtensionsToNegotiate(exts); negotiation = "api"; }
+      else negotiation = "api-uri-absent";
+    }
+  } catch (e) { negotiation = "api-threw:" + e.message; }
+  let offer = await pc.createOffer();
+  if (!offer.sdp.includes(ABS_CAPTURE_URI)) {
+    const m = mungeAbsCaptureTime(offer.sdp);
+    if (m.changed) { offer = { type: "offer", sdp: m.sdp }; negotiation += "+munge"; }
+    else negotiation += "+munge-failed";
+  }
+  window.__state.negotiation = negotiation;
+  await pc.setLocalDescription(offer);
+  await new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+  const finalOffer = pc.localDescription.sdp;
+  await fetch(SAVE + "play-offer.sdp", { method: "POST", body: finalOffer });
+  const resp = await fetch(WHEP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/sdp" },
+    body: finalOffer
+  });
+  const answer = await resp.text();
+  await fetch(SAVE + "play-answer.sdp", { method: "POST", body: answer });
+  event("whep-response", { status: resp.status, attempt, negotiation });
+  if (!resp.ok) throw new Error("WHEP HTTP " + resp.status + ": " + answer.slice(0, 200));
+  await pc.setRemoteDescription({ type: "answer", sdp: answer });
+  const answerHasAbs = answer.includes(ABS_CAPTURE_URI);
+  log("WHEP", resp.status, "| answer contains abs-capture-time:", answerHasAbs, "| negotiation:", negotiation);
+  event("negotiated", { offerHasAbs: true, answerHasAbs, negotiation });
+  window.__state.answerHasAbs = answerHasAbs;
+  await connected;
+}
+
+async function connect() {
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    window.__state.attempts = attempt;
+    window.__state.phase = "connecting";
+    try {
+      await connectOnce(attempt);
+      window.__state.phase = "playing";
+      log("connected on attempt", attempt);
+      vid.requestVideoFrameCallback(onFrame);
+      startStats();
+      return;
+    } catch (e) {
+      log("attempt", attempt, "failed:", e.message);
+      try { pc.close(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  window.__state.phase = "failed";
+  window.__state.error = "all attempts failed";
+  event("fatal", { error: "all attempts failed" });
+}
+
+function startStats() {
+  setInterval(async () => {
+    try {
+      const st = await pc.getStats();
+      const row = { kind: "play-stats", t: performance.timeOrigin + performance.now(), vis: document.visibilityState };
+      st.forEach(s => {
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          row.jitterBufferDelay = s.jitterBufferDelay;
+          row.jitterBufferEmittedCount = s.jitterBufferEmittedCount;
+          row.jitterBufferTargetDelay = s.jitterBufferTargetDelay;
+          row.jitterBufferMinimumDelay = s.jitterBufferMinimumDelay;
+          row.framesDecoded = s.framesDecoded;
+          row.framesDropped = s.framesDropped;
+          row.framesReceived = s.framesReceived;
+          row.fps = s.framesPerSecond;
+          row.totalDecodeTime = s.totalDecodeTime;
+          row.totalInterFrameDelay = s.totalInterFrameDelay;
+          row.freezeCount = s.freezeCount;
+          row.totalFreezesDuration = s.totalFreezesDuration;
+          row.packetsLost = s.packetsLost;
+          row.nackCount = s.nackCount;
+          row.pliCount = s.pliCount;
+          row.frameWidth = s.frameWidth;
+          row.frameHeight = s.frameHeight;
+          row.decoderImplementation = s.decoderImplementation;
+          row.estimatedPlayoutTimestamp = s.estimatedPlayoutTimestamp;
+          row.lastPacketReceivedTimestamp = s.lastPacketReceivedTimestamp;
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated) {
+          row.rtt = s.currentRoundTripTime;
+        }
+      });
+      post(row);
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+connect().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+});
+</script>
+</body>
+</html>

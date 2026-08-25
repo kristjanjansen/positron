@@ -1,0 +1,109 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cue-to-video sync test</title>
+<style>
+  :root{color-scheme:dark}
+  body{background:#0d1317;color:#e4ecef;font:14px/1.6 ui-monospace,Menlo,monospace;margin:0;padding:20px;
+       display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+  .stage{position:relative;width:640px}
+  video{width:100%;background:#000;border-radius:6px;display:block}
+  #overlay{position:absolute;left:0;right:0;bottom:18%;text-align:center;font-size:30px;font-weight:700;
+           color:#8fd4dd;text-shadow:0 2px 8px #000;pointer-events:none}
+  .row{display:flex;gap:24px;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .k{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#7b8d96}
+  .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  #log{font-size:11.5px;color:#8fa3ad;max-height:200px;overflow:auto;width:min(900px,100%);
+       border-top:1px solid #26343b;padding-top:8px;white-space:pre-wrap}
+</style>
+
+<div class="stage"><video id="v" muted playsinline></video><div id="overlay"></div></div>
+<div class="row">
+  <div class="stat"><span class="k">video latency</span><span class="v" id="vlat">—</span></div>
+  <div class="stat"><span class="k">ws rtt p50</span><span class="v" id="rtt">—</span></div>
+  <div class="stat"><span class="k">cues fired</span><span class="v" id="n">0</span></div>
+  <div class="stat"><span class="k">fire error p50</span><span class="v" id="e50">—</span></div>
+  <div class="stat"><span class="k">fire error p95</span><span class="v" id="e95">—</span></div>
+</div>
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script type="module">
+/**
+ * End-to-end cue->video sync verification, one clock (one tab).
+ *
+ * Every 3 s: publish a cue to the DEPLOYED DO room, targeted at the stream
+ * moment `playheadTime + 2000 ms`. The cue round-trips browser -> DO ->
+ * browser, waits in the queue, and fires when the playhead crosses its `at`.
+ *
+ *   fireError = playheadTime(at fire) - cue.at
+ *
+ * captures the WHOLE chain: WS out, DO relay, WS back, queue poll, PDT
+ * mapping. Positive = late. The 100 ms poll cadence bounds the floor.
+ */
+import { createLowLatencyPlayer } from '../src/low-latency-player.js';
+import { createTimedMessages } from '../src/timed-messages.js';
+
+const q = new URLSearchParams(location.search);
+const uid = q.get('uid');
+const ROOM = `synctest-${Math.random().toString(36).slice(2, 8)}`;
+const WS = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${ROOM}/ws`;
+const src = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
+
+const $ = (id) => document.getElementById(id);
+const log = (m) => { $('log').textContent = `${new Date().toISOString().slice(11,23)} ${m}\n` + $('log').textContent.slice(0, 5000); };
+const pct = (a, p) => a.length ? [...a].sort((x,y)=>x-y)[Math.min(a.length-1, Math.floor(p*a.length))] : null;
+
+const player = createLowLatencyPlayer($('v'), src);
+const errors = [];          // fireError ms
+const sendToFire = [];      // send -> fire wall ms (sanity)
+const sent = new Map();     // id -> {sentPerf, sentEpoch}
+
+const cues = createTimedMessages(player, $('v'), {
+  onMessage(cue, { lateMs }) {
+    if (!cue.data?.sync) return;
+    const err = lateMs;                       // playheadTime(fire) - cue.at
+    errors.push(err);
+    const s = sent.get(cue.id);
+    if (s) sendToFire.push(performance.now() - s.sentPerf);
+    $('overlay').textContent = cue.data.text;
+    setTimeout(() => { if ($('overlay').textContent === cue.data.text) $('overlay').textContent = ''; }, 1500);
+    $('n').textContent = errors.length;
+    $('e50').textContent = pct(errors, .5)?.toFixed(0) + ' ms';
+    $('e95').textContent = pct(errors, .95)?.toFixed(0) + ' ms';
+    log(`cue ${cue.id.slice(-4)} fired: err=${err.toFixed(0)}ms  serverAt-echo=${cue.serverAt ? (cue.serverAt - s?.sentEpoch)+'ms' : '—'}`);
+  },
+});
+cues.connect(WS);
+window.cues = cues; window.player = player;
+
+let seq = 0;
+setInterval(() => {
+  const pt = cues.playheadTime;
+  if (pt == null) return;
+  const id = `s${seq++}`;
+  const at = pt + 2000;                       // 2 s ahead of THIS viewer's playhead
+  sent.set(id, { sentPerf: performance.now(), sentEpoch: Date.now() });
+  // send via the module's socket (it is already open) — raw frame
+  try {
+    cues.add; // (module adds on echo; we publish through the ws directly)
+    window.__ws ||= new WebSocket(WS);
+    if (window.__ws.readyState === 1)
+      window.__ws.send(JSON.stringify({ type: 'cue', cue: { id, at, data: { sync: 1, text: `⏱ ${id}` } } }));
+  } catch {}
+}, 3000);
+
+setInterval(() => {
+  $('vlat').textContent = player.latency ? player.latency.toFixed(2) + 's' : '—';
+  $('rtt').textContent = cues.stats.rttP50 ? cues.stats.rttP50.toFixed(1) + 'ms' : '—';
+  const payload = {
+    run: 'cue-sync', n: errors.length,
+    fireErrP50: pct(errors, .5), fireErrP95: pct(errors, .95), fireErrMax: errors.length ? Math.max(...errors) : null,
+    sendToFireP50: pct(sendToFire, .5),
+    wsRttP50: cues.stats.rttP50, serverClockOffset: cues.stats.serverClockOffsetMs,
+    videoLatency: player.latency, visibility: document.visibilityState,
+  };
+  fetch('/collect', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(payload) }).catch(()=>{});
+}, 2000);
+log(`room ${ROOM}`);
+</script>
