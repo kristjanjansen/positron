@@ -447,9 +447,11 @@ If hls.js turns out to be at fault, the durable path is a small patch upstream, 
 5. ✅ ANSWERED (2026-08-25 session 3): rate catch-up "never engaged" because the ONLY arm that set
    `maxLiveSyncPlaybackRate` was the arm whose constructor threw (Q2). Once the config is legal it
    engages fine — measured 1.05× (ct advances 2.09–2.11 s per 2.0 s wall), latency ramps down smoothly.
-6. Why `targetLatency` differed (1.5 s vs 2.5 s) between arms on the same stream. ⚠️ Probable
-   mechanism observed in session 3: hls.js bumps targetLatency after a stall (fixed-duration run went
-   1.5 → 2.5 s across exactly one stall bump) — not yet confirmed as the original cause.
+6. ✅ CONFIRMED (session 4, v6 validation): hls.js 1.7.1 bumps `targetLatency` **+1.0 s per stall**
+   within an instance (1.5→2.5→3.5 observed twice); a rebuild resets to the manifest's 1.5. It also
+   jumps to 9–11 s when a post-swap manifest briefly loses LL tags (count-based fallback). Bonus
+   trap: `pdtWallLatency` reads negative (~−1.6 s) for a few seconds after an `-re` backlog burst —
+   CF re-stamps PDT ahead of wall clock.
 7. Whether seek-induced glitches are visible enough to matter to viewers.
 
 ---
@@ -552,6 +554,22 @@ visible; keep stall clock counting on readyState<2 and hole-skip, escalating to 
 syncToEdge's return and escalate after repeated silent failures, and add PDT wall latency
 (`hls.playingDate`) to telemetry — the only honest latency signal during both pauses.
 Repro pages kept: `rig/config-arm-debug.html`, `rig/config-arm-resume.html`.
+
+**✅ v6 SHIPPED AND VALIDATED (2026-08-25/26 session 4)** — the fixes above applied in 3 iterations
+(`src/low-latency-player.js`; v5 kept at `src/low-latency-player.v5.js`; A/B harness
+`rig/resilience-v6.html?player=v5|v6`). Same-day A/B against a v5 re-run (the honest baseline — the
+historic "median 15.4 s" is ⚠️ not reproducible from resilience-v5.jsonl):
+- **The park is fixed**: SIGSTOP-20 max park 13.5 s vs v5's 19.5+18.0 s consecutive, and **zero
+  hls.js gap-controller rescues — every recovery was v6's own** hole-skip/starved/rebuild ladder.
+  Post-CONT stabilization 2.4–4.3× faster (13.2–23.5 s vs 56.4 s).
+- Gap ladder: 15/15 recoveries over 3 runs, no rebuild storms (min spacing 3.0 s), zero crashes,
+  all windows end at 1.7–3.6 s. Soak: p50 2.70 / p99 2.85 s, zero rebuilds/stalls/frozen samples.
+- Iterations that earned their place: (2) *beached fast path* — immediate hole-skip when
+  readyState<2 with >0.25 s buffered ahead (iter-1 still wasted a 6 s stallTimeout beside 17 s of
+  buffer); (3) *one-skip-per-target guard* — kills a skip↔drift ping-pong on wedged mid-swap levels.
+- ⚠️ Platform weather note: post-swap 404 propagation ran 45–120 s during validation (historic
+  10–15 s) — the dead-manifest window VARIES BY DAY; both players ride it identically, so treat
+  the historic "~10–15 s" as a floor, not a constant.
 
 ### MoQ permission — resolved as "not yet possible via API token"
 

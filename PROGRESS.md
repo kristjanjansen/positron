@@ -54,6 +54,22 @@ PROGRESS.md edits (main session merges).
   Phase 3: 200-soak, recording composite, cue-driven grid choreography, 30-min MoQ
   browser spike (moq-lite forward-compat claim vs repo research conflict).
 
+### v6 player — ✅ SHIPPED + VALIDATED: the park is fixed, 2.4–4.3× faster recovery
+- ✅ Same-day A/B vs a v5 re-run (historic "15.4 s median" ⚠️ not reproducible from
+  the old jsonl — honest baseline re-measured): SIGSTOP-20 park max 13.5 s vs
+  19.5+18.0 s, ZERO hls.js gap-controller rescues (all recoveries v6's own),
+  post-CONT stable in 13.2–23.5 s vs 56.4 s. Ladder 15/15, no storms, no crashes.
+  Soak p50 2.70 s, zero incidents. 3 iterations (beached fast path;
+  one-skip-per-target guard vs skip↔drift ping-pong).
+- ✅ Q6 CONFIRMED: targetLatency +1.0 s per stall, rebuild resets; 9–11 s jump when
+  a post-swap manifest briefly drops LL tags. PDT reads negative ~−1.6 s after -re
+  backlog bursts (CF re-stamps ahead of wall).
+- ⚠️ Platform weather: post-swap 404 propagation was 45–120 s today vs historic
+  10–15 s — the dead-manifest window varies by day; historic value is a floor.
+- Files: src/low-latency-player.js (v6), .v5.js backup, rig/resilience-v6.html A/B
+  harness, rig/V6-NOTES.md (12 checkpoints), results/resilience-v6.jsonl. Cleanup
+  verified (input deleted, port 8899 free, own kills only).
+
 ### M2M scale ladder (user: "test more participants") — ✅ NO CEILING THROUGH N=20
 - ✅ 8→12→16→20 (N−2 lightweight publishers + 2 probes pulling all tracks on one
   PC each): valid ≥99.58 % every rung, **p95 pinned ~158 ms at every N** — latency
@@ -202,12 +218,11 @@ corrects via sntp sampling; loop-lag and WHEP are same-machine so offset cancels
 4. Eyeball `src/demo.html`; OBS Browser Source overlay page (unchanged).
 5. MoQ draft-16: USER provisions relay in dashboard (RUNBOOK §3; tokens shown once)
    → §4.2 commands → media burn-in/OCR latency measurement.
-6. Decide on the v5 player fix diffs (26 s park: gate split, syncToEdge escalation,
-   PDT telemetry — described in rig/CONFIG-ARM-NOTES.md, not applied) → build v6 →
-   chaos re-validation.
+6. ~~v6 build + validation~~ ✅ DONE session 4 — park fixed, 2.4–4.3× faster
+   recovery, shipped in src/low-latency-player.js (see session-4 entry).
 7. Re-run the config-arm comparison with the legal seconds-based arm
    (liveSyncDuration:1.5/liveMaxLatencyDuration:6) to get its resilience numbers
-   vs the seek-shim player.
+   vs the v6 player.
 8. ~~Part-2-late mystery~~ ✅ SOLVED session 4: CF segmenter hold-and-release cycle,
    encoder exonerated by byte-timing tap — see plan.md §1 and the session-4 entry.
 
