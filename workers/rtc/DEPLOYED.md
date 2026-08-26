@@ -8,6 +8,13 @@ verification.
 persisted per room and readable via `GET /room/{name}/cuelog` (see table). No existing frame or
 route changed; grid.html re-verified against the deployed worker after the redeploy (join +
 SFU publish green).
+**Updated 2026-08-26 20:46 (version 94211c97):** review fixes — operator role now requires
+`opToken` (OPERATOR_TOKEN secret) on join, else demoted to audience; `publish` is enforced
+against the stored perm window (error frame back when closed); rejoin with the same
+participantId no longer emits a ghost `left` when the replaced socket closes; roster capped at
+500 entries (dead-entry eviction, `room full` error otherwise); joiners now receive a cue
+backlog (last ≤200 non-cancelled cues, `backlog:true`); new `cancel` frame (broadcast + cuelog
+cancel record). Verified 14/14 node-WS checks + grid.html running against the deployed worker.
 
 ## Measured (deployed, from this machine)
 
@@ -68,17 +75,30 @@ the DO wall clock (wakes the DO; use sparingly).
 ### client → server
 
 ```
-{type:'join', participantId?, name?, role}
+{type:'join', participantId?, name?, role, opToken?}
     role ∈ performer|audience|operator (default audience).
+    role 'operator' must be EARNED: opToken must equal the OPERATOR_TOKEN worker
+    secret (in the repo .env), else the join is DEMOTED to audience — check
+    roster.self.role to learn your effective role.
     participantId optional ([\w.-]{1,64}); server assigns an 8-char id if omitted.
-    Rejoin with the same participantId replaces the old roster entry.
+    Rejoin with the same participantId replaces the old roster entry AND detaches
+    the old socket (server closes it 4001; its close emits NO 'left').
+    Roster is capped at 500 entries: past the cap, the oldest entries with no
+    live socket are evicted; if all are live the join gets {type:'error',
+    of:'join', error:'room full'}.
 {type:'publish', sessionId, trackNames:[...]}
     After your SFU tracks/new succeeds. trackName convention: <participantId>/<mic|cam|screen>.
+    ENFORCED against the perm window: per-participant grant, then per-role grant,
+    else OPEN. When closed for you: {type:'error', of:'publish', error} back,
+    nothing broadcast.
 {type:'unpublish', trackNames?}          omitted trackNames = unpublish everything
 {type:'perm', grant:{role?|participantId?, publish:bool}}     operator only
 {type:'promote', participantId, tier}    tier ∈ wall|live|featured    operator only
 {type:'demote',  participantId, tier}    same shape                   operator only
 {type:'cue', cue:{...}}                  trivial passthrough broadcast
+{type:'cancel', id}                      unschedule a cue: broadcast + a cancel
+                                         record ({kind:'cancel', id}) appended to
+                                         the cuelog so replay skips it
 ```
 
 ### server → client
@@ -99,7 +119,12 @@ the DO wall clock (wakes the DO; use sparingly).
     tracks/close any pulls from their sessionId.
 {type:'perm', grant:{...}, by}                         publish-window open/close
 {type:'promote'|'demote', participantId, tier, by}     re-evaluate pull vs poll
-{type:'cue', cue:{..., serverAt}, from}
+{type:'cue', cue:{..., serverAt}, from, backlog?}
+    backlog:true = a catch-up replay of a stored cue, sent to a NEW JOINER right
+    after their roster snapshot (last ≤200 non-cancelled cues, oldest first) so a
+    reconnecting stage catches up. Dedupe by cue.id if you already fired it.
+{type:'cancel', id, from}                              drop the pending cue
+{type:'error', of:'join'|'publish', error}             rejected frame (sender only)
 {type:'pong', t0, t1}                                  reply to JSON ping only
 ```
 
@@ -121,3 +146,8 @@ the DO wall clock (wakes the DO; use sparingly).
 - `CF_REALTIME_APP_ID` — plain var in wrangler.jsonc
 - `CF_REALTIME_APP_SECRET` — Worker secret (never in code or client)
 - `ROOM_TOKEN` — Worker secret; same value appended to repo `.env`
+- `OPERATOR_TOKEN` — Worker secret; same value in repo `.env`. Join frames
+  claiming role operator must carry it as `opToken` or they are demoted to
+  audience (fail closed if the secret is unset). Operator clients read it from
+  `.env` (score.mjs, operator.mjs) or take it as the `optoken` page param
+  (grid/show/composite.html, wired through by the run drivers).

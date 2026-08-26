@@ -35,6 +35,8 @@ const DEFAULTS = {
   /** WebSocket reconnect backoff bounds (ms). */
   wsRetryMin: 1000,
   wsRetryMax: 15000,
+  /** Auth token appended to the WS URL (?token=…) when the URL lacks one. */
+  token: null,
 };
 
 export function createTimedMessages(player, video, opts = {}) {
@@ -102,8 +104,16 @@ export function createTimedMessages(player, video, opts = {}) {
    */
   function connect(url) {
     if (destroyed) return;
+    // Guard double-connect: cancel any pending reconnect and close the old
+    // socket, whose handlers below no-op once it is no longer `ws`.
+    clearTimeout(wsTimer);
+    clearInterval(pingTimer);
     try { ws?.close(); } catch {}
-    ws = new WebSocket(url);
+    const wsUrl = cfg.token && !/[?&]token=/.test(url)
+      ? url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(cfg.token)
+      : url;
+    const sock = new WebSocket(wsUrl);
+    ws = sock;
     ws.onopen = () => {
       wsDelay = cfg.wsRetryMin;
       clearInterval(pingTimer);
@@ -111,7 +121,7 @@ export function createTimedMessages(player, video, opts = {}) {
         // Bare "ping" hits the DO's auto-response: answered by the runtime
         // without waking a hibernated object — free, and measures pure
         // network RTT. t0 kept locally (one ping in flight at a time).
-        try { pendingPingT0 = performance.now(); ws.send('ping'); } catch {}
+        try { pendingPingT0 = performance.now(); sock.send('ping'); } catch {}
       }, 5000);
     };
     ws.onmessage = (m) => {
@@ -132,11 +142,11 @@ export function createTimedMessages(player, video, opts = {}) {
       else if (f.type === 'cancel') remove(f.id);
     };
     ws.onclose = () => {
-      if (destroyed) return;
+      if (destroyed || sock !== ws) return; // a replaced socket never reconnects
       wsTimer = setTimeout(() => connect(url), wsDelay);
       wsDelay = Math.min(cfg.wsRetryMax, wsDelay * 2);
     };
-    ws.onerror = () => { try { ws.close(); } catch {} };
+    ws.onerror = () => { try { sock.close(); } catch {} };
   }
 
   /**

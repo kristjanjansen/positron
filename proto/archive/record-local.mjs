@@ -28,12 +28,17 @@ const HERE = `${ROOT}/proto/archive`;
 const REPLAY = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
 const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
-const ROOM = process.env.ROOM || "archive-test";
+// Fresh room + recdir + R2 prefix PER RUN by default (timestamp suffix): the
+// cuelog, local segments and R2 objects of one run can never poison a rerun
+// (per-room cuelog is append-only; a reused prefix would clobber/mix segments).
+// Explicit ROOM=/RECDIR= still override for deliberate reuse.
+const RUNTS = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15); // e.g. 20260826T093015
+const ROOM = process.env.ROOM || `archive-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "190", 10);
 const OFFSETS = process.env.OFFSETS || "15,36,57,78,99,120,141,162";   // 8 cues, now/sched alternating
 const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
-const RECDIR = process.env.RECDIR || `${SCRATCH}/archive-rec`;
+const RECDIR = process.env.RECDIR || `${SCRATCH}/archive-rec-${RUNTS}`;
 const UDD_BASE = `${SCRATCH}/archive-test-udd`;
 const BUCKET = "elektron-archive-test";
 const PREFIX = `shows/${ROOM}`;
@@ -62,6 +67,7 @@ function killByUddPrefix(prefix) {
 }
 
 // ---- screencast -> ffmpeg -> LOCAL HLS -------------------------------------
+const children = [];   // every spawned child — the fatal path kills them ALL
 let ffmpegProc = null, cdp = null, scFrames = 0, scDropped = 0;
 let tSpawnFfmpeg = null, tFirstStamp = null, tFirstMeta = null, tFfFirstProgress = null, ffExit = null;
 async function startScreencastFfmpeg(ctx, page) {
@@ -166,6 +172,7 @@ const run = async () => {
              OUTDIR: `${HERE}/artifacts`, RESULTS: `${ROOT}/results/archive-upload.jsonl` },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    children.push(uploader);
     const upLog = fs.createWriteStream(`${LOGDIR}/record-uploader.log`, { flags: "a" });
     uploader.stdout.on("data", (d) => { upLog.write(d); process.stdout.write("  " + d.toString()); });
     uploader.stderr.on("data", (d) => upLog.write(d));
@@ -185,6 +192,7 @@ const run = async () => {
     env: { ...process.env, BASE_MS: String(T0), ROOM, OFFSETS, OUT: `${HERE}/artifacts/operator-log.json` },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  children.push(operator);
   const opLog = fs.createWriteStream(`${LOGDIR}/record-operator.log`, { flags: "a" });
   operator.stdout.on("data", (d) => { opLog.write(d); process.stdout.write("  op| " + d.toString()); });
   operator.stderr.on("data", (d) => opLog.write(d));
@@ -253,6 +261,9 @@ const run = async () => {
 run().catch(async (e) => {
   console.error(ts(), "DRIVER FATAL:", e.message || e);
   await stopScreencastFfmpeg().catch(() => {});
+  // Kill EVERY spawned child (uploader, operator, …): an orphaned uploader
+  // would keep writing this run's prefix long after the driver is gone.
+  for (const c of children) { try { c.kill("SIGKILL"); } catch {} }
   killByUddPrefix(UDD_BASE);
   process.exit(1);
 });

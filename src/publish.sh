@@ -11,8 +11,11 @@ cd "$(dirname "$0")"
 FF=${FF:-/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg}   # needs libfreetype for the clock overlay
 [ -x "$FF" ] || FF=ffmpeg
 
-eval "$(python3 -c "
-import json;d=json.load(open('.last-input'));print(f'''KEY={d[\"key\"]}''')")"
+# Fail loudly if provision.sh hasn't run: eval'ing an empty substitution would
+# silently publish to rtmps://…/live/ with no key.
+[ -f .last-input ] || { echo "publish.sh: .last-input missing — run ./provision.sh first" >&2; exit 1; }
+KEY=$(python3 -c "import json;print(json.load(open('.last-input'))['key'])") || exit 1
+[ -n "$KEY" ] || { echo "publish.sh: no key in .last-input" >&2; exit 1; }
 
 FPS=30
 GOP=$((FPS * 2))

@@ -133,8 +133,12 @@ async function loadCues() {
   const r = await fetch(`${REMOTE}/room/${ROOM}/cuelog?token=${encodeURIComponent(TOKEN)}`);
   if (!r.ok) throw new Error("cuelog fetch " + r.status);
   const j = await r.json();
+  // The log may carry cancel records ({kind:'cancel', id}): a cancelled cue
+  // must NOT fire in replay, and cancel rows themselves have no .cue.
+  const cancelled = new Set(j.cues.filter(e => e.kind === "cancel").map(e => e.id));
   // sender stamps only (at, sentAt travel verbatim; serverAt/doRecvTs untrusted)
-  return j.cues.map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt ?? null, data: e.cue.data }));
+  return j.cues.filter(e => e.cue && !cancelled.has(e.cue.id))
+    .map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt ?? null, data: e.cue.data }));
 }
 
 // ---- hls VOD ----------------------------------------------------------------
@@ -205,7 +209,7 @@ function onFrame(_now, meta) {
 vid.requestVideoFrameCallback(onFrame);
 
 // ---- cue engine in replay mode ---------------------------------------------
-let engine = null, cues = [], T0 = null;
+let engine = null, cues = [], T0 = null, catchupUntil = 0;
 function makeFakePlayer() {
   return { hls: { get playingDate() {
     return vid.readyState >= 2 ? new Date(T0 + vid.currentTime * 1000) : null;
@@ -213,7 +217,12 @@ function makeFakePlayer() {
 }
 function onMessage(cue, { lateMs }) {
   const d = decodeNow();                                    // frame on glass NOW
-  const kind = lateMs <= 1000 ? "fired" : "caught-up";      // real-time vs catch-up
+  // Classification: the engine delivers via onMessage whenever lateMs <=
+  // pastWindow — those are real fires (lateMs recorded). 'caught-up' is
+  // reserved for catch-up deliveries: the engine's first tick right after a
+  // (re)build on join/seek, which sweeps up already-past cues. The engine
+  // itself doesn't flag the path, so classify by build recency + lateness.
+  const kind = (performance.now() < catchupUntil && lateMs > 250) ? "caught-up" : "fired";
   S.cueStates[cue.id] = kind;
   S.currentCue = { id: cue.id, kind, lateMs: Math.round(lateMs) };
   S.fires.push({
@@ -232,6 +241,7 @@ function onMissed(cue, { lateMs }) {
 }
 function buildEngine(reason) {
   if (engine) engine.destroy();
+  catchupUntil = performance.now() + 350;   // first tick (≤100 ms poll) + margin
   engine = createTimedMessages(makeFakePlayer(), vid, { onMessage, onMissed, pastWindow: PAST_WIN });
   for (const c of cues) engine.add({ id: c.id, at: c.at + FIRE_DELAY, data: c.data });
   S.engineEvents.push({ reason, t: Date.now(), mediaTime: vid.currentTime, pending: engine.pending });

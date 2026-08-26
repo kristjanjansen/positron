@@ -60,6 +60,21 @@ Spec: plan-m2m.md §3; template: workers/cues (deployed, untouched).
   phase=running with framesSent>0 against the redeployed worker (existing protocol intact).
   Consumer: proto/replay (synced VOD replay with cues — see proto/replay/README.md).
 
+- **2026-08-26 20:46** — **Review fixes deployed** (version 94211c97, clean-env OAuth from
+  workers/rtc/). Five behavior changes, all in DEPLOYED.md: (1) rejoin same participantId marks
+  the replaced socket stale + closes it 4001 — its close no longer broadcasts a ghost `left`
+  (per-join `gen` tag, dropped() no-ops on stale/mismatched gen); (2) `publish` enforced against
+  the stored perm window (participant grant > role grant > open default — default flipped from
+  `{audience:false}` to `{}` because it was never enforced and every measured flow publishes
+  ungranted); rejection = `{type:'error', of:'publish'}`; (3) role operator requires `opToken`
+  == new OPERATOR_TOKEN secret, else demoted to audience (clients updated: score.mjs,
+  operator.mjs, grid/show/composite.html via `optoken` param + run drivers); (4) roster capped
+  at 500 with dead-entry eviction and `room full` error; storage puts wrapped so a failed put
+  never kills the room; (5) join now streams a cue backlog (≤200, `backlog:true`, cancelled
+  excluded) and a `cancel` frame exists (broadcast + `{kind:'cancel'}` cuelog record —
+  replay.html skips cancelled cues). Verified: 14/14 node WS checks (perm close/reject/reopen,
+  op with/without token, dual-socket rejoin, backlog, cancel) + headless grid.html running.
+
 ## Residue / open notes
 
 - The verify room's DO instance (`verify-mt9l6a9l`) retains a few KB of roster/tile storage;
