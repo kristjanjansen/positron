@@ -36,6 +36,16 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### MoQ audio spike — ✅ AUDIO WORKS: 32.6 ms, A/V skew −4 ms, zero sync logic
+- ✅ Chromium: audio g2g 32.6/41.6 ms ≈ video; 0 decode errors; skew p50 −3.8 ms
+  free (both tracks at latency ~0). Opus = the cross-browser codec (AAC missing
+  in Chromium; Safari decodes both since 26.0 per WebKit research 2025-09).
+- ✅ Implementer trap: browsers regenerate AudioDecoder timestamps → FIFO-map
+  encoded-chunk timestamps or a join-skip becomes a permanent +534 ms phantom.
+- Deployed page: audio probe on every load + plays ?namespace=elektron-audio-test
+  (iPhone audio verdict = one visit). Audio publisher LEFT RUNNING
+  (moq-audio-pub-udd + audioserver.py :8896; §10.5 restart). RUNBOOK §10.
+
 ### 4K/framerate matrix — ✅ 4K30 CLEAN AT 47 ms; RELAY NEVER THE LIMIT
 - ✅ 720p30 33 ms · 1080p60 33 ms (60 fps ≠ faster: burn-at-capture cancels
   quantization) · **4K30 47/78 ms clean, now LIVE on elektron-safari-test** ·

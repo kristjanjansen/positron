@@ -136,7 +136,7 @@ const wallNow = () => performance.timeOrigin + performance.now();
 	if (!asup.supported) { log("FAIL AudioDecoder unsupported"); return; }
 
 	// jitter buffer: play chunk at wall time (mediaStart + dLive + CUSHION_MS)
-	const CUSHION_MS = 60;
+	const CUSHION_MS = Number(params.get("cushion") ?? 60);
 	let dLiveWin = []; // rolling min of (recvWall - mediaEndMs)
 	let aDecoded = 0, aDecErrors = 0, underruns = 0, lateDropMs = 0, ticks = 0;
 	let lastTickMediaMs = -1e12;
