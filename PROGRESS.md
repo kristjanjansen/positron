@@ -36,6 +36,17 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### Phase 3d MoQ browser spike — ✅ POSITIVE, in 8 minutes
+- ✅ `@moq/net` (kixelated, npm) speaks IETF MoQT to CF's draft-14 relay from
+  headless Chrome: compat CLIENT_SETUP negotiated `moq-transport-14`, subscribe +
+  live objects received, 125 ms to session, 15/15 frames. The "moq-lite ≠ IETF"
+  research conclusion was stale — the lib ships an IETF adapter (drafts 14–19).
+- Next spike when wanted: media layer (hang catalog vs moq-catalog) + draft-16
+  once the dashboard relay exists. RUNBOOK §6 has the repeatable recipe.
+  plan-m2m §1.C rewritten: "transport proven, media layer = next experiment".
+- Traps: ThreatLocker SIGKILLs npm's esbuild → bundle in Docker; `docker run |
+  head` detaches containers. Scratch kept at rig/moq/spike/ (disclosed).
+
 ### Phase 2 — ✅ COMPLETE (both agents, validated against deployed Worker)
 - Worker `elektron-rtc` live: RtcRoom DO + SFU proxy + tile store + token auth.
   join→roster 33 ms, publish→broadcast 38 ms, kill→`left` 38–126 ms (vs 31–47 s

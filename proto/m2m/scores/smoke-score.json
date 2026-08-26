@@ -1,0 +1,31 @@
+{
+  "title": "elektron smoke score — 70 s rig shakeout",
+  "version": 1,
+  "room": "score-show",
+  "durationMs": 70000,
+  "setup": [
+    { "action": "promote", "participantId": "1", "tier": "featured" },
+    { "action": "promote", "participantId": "2", "tier": "featured" },
+    { "action": "promote", "participantId": "A", "tier": "live" },
+    { "action": "promote", "participantId": "B", "tier": "live" },
+    { "action": "promote", "participantId": "C", "tier": "live" },
+    { "action": "promote", "participantId": "D", "tier": "live" },
+    { "action": "promote", "participantId": "E", "tier": "live" },
+    { "action": "promote", "participantId": "F", "tier": "live" }
+  ],
+  "events": [
+    { "id": "s01-spotlight-W", "fireAt": 8000,
+      "actions": [ { "action": "promote", "participantId": "W", "tier": "featured" } ] },
+    { "id": "s02-rotate", "fireAt": 20000,
+      "actions": [ { "action": "cue", "cue": { "cmd": "rotate" } } ] },
+    { "id": "s03-swap", "fireAt": 32000,
+      "actions": [ { "action": "demote", "participantId": "W", "tier": "wall" },
+                   { "action": "promote", "participantId": "Y", "tier": "featured" } ] },
+    { "id": "s04-rotate", "fireAt": 44000,
+      "actions": [ { "action": "cue", "cue": { "cmd": "rotate" } } ] },
+    { "id": "s05-demote-Y", "fireAt": 54000,
+      "actions": [ { "action": "demote", "participantId": "Y", "tier": "wall" } ] },
+    { "id": "s06-note", "fireAt": 62000,
+      "actions": [ { "action": "cue", "cue": { "cmd": "note", "text": "smoke" } } ] }
+  ]
+}

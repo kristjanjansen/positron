@@ -748,3 +748,102 @@ probing; spec: status ∈ active|inactive|waiting).
   ZERO new CF resources (sessions expire server-side), room/tile state on the
   Worker is per-room ephemeral, battery 100% AC end-to-end. Data files:
   m2m-grid-{smoke,rsmoke,rmain-fail1,rmain,rmain2,lmain}.jsonl.
+
+# P3B COMPOSITE — recording the grid WITHOUT OBS (phase 3b)
+
+Design (plan-m2m §5 risk 1a, OBS replaced by headless Chrome): a composite
+participant (composite.html, headless Chrome) joins the room as a silent
+subscriber, pulls featured+live SFU tracks + wall snapshots, draws them all
+onto ONE 1280x720 canvas at 30 fps with a burned wall-clock row, and the
+CAPTURE of that canvas goes to a RECORDED Stream live input. Route A: the page
+itself publishes canvas.captureStream() via WHIP (pure browser). Route B
+(fallback): CDP screencast -> ffmpeg -> RTMPS to the same input. Known repo
+facts stacked against A's *recording* (📄 plan.md §2.2: Stream-WebRTC has "no
+recording" + no cross-protocol since 2022) — A is tested honestly, B is the
+expected archive path. Port 8895, udd prefix m2m-p3b, results
+results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
+
+## Checkpoint P0 — live input provisioned ✅ (2026-08-26 08:0x EEST)
+
+- POST accounts/{acct}/stream/live_inputs `{"meta":{"name":"p3b-composite"},
+  "recording":{"mode":"automatic"},"preferLowLatency":true}` -> success.
+- **uid 12f3a2dd9686887cf6495c8b10aec352**, customer-mwuu1cmlyif6eluy;
+  full JSON (publish URLs = credentials) in artifacts/p3b-live-input.json.
+- Budget: keep total recorded minutes < ~15 (route-A probe ~3 min + main ~10).
+- Plan: composite.html (2 featured 640x360 UNSCALED top + up to 6 live 208x117
+  + wall strip 160x90 + 64-block burned clock row pid 'K' at blockW=12) +
+  composite-viewer.html (WHEP for route A / LL-HLS for route B; decodes
+  featured tile "1"/"2" rows AND the composite 'K' row from one 1280x720 work
+  canvas -> grid-to-viewer and composite-to-viewer glass-to-glass) +
+  run-composite.mjs (N=8 grid: 2 featured + 4 live + 2 wall, all view=lite
+  via deployed Worker; composite in its own Chrome for clean CPU numbers).
+
+============================================================================
+# P3C SCORE (cue-driven choreography agent — show.html / score.mjs /
+# scores/*.json / run-show.mjs / analyze-show.py; port 8893, udd m2m-p3c,
+# room `score-show`, results/m2m-p3c-*.jsonl)
+============================================================================
+
+## Checkpoint P0 — plan of record (2026-08-26 08:00 EEST)
+
+- Goal: prove an operator "score" (timed cue list, editable JSON artifact) can
+  conduct the N=12 tiered grid like a show, via the DEPLOYED Worker only.
+- Machine: 100% AC, ports 8893+8897 free, zero sibling rig processes, node
+  v25.9, playwright cached. Deployed Worker verified in DEPLOYED.md.
+- SEMANTICS DECISION (task item 2): two channels, split by what kind of state
+  the command mutates — both already in the deployed Worker, zero changes:
+  1. TIER CHANGES (spotlight / duet / demote) = direct operator
+     `promote`/`demote` frames. The DO validates the role, persists tier in
+     the roster (late joiners see it in their snapshot), broadcasts to all —
+     so correctness is assertable against roster state.
+  2. VIEW CHOREOGRAPHY (rotate / wave) = `cue` frames `{cmd:'rotate'}`
+     (passthrough broadcast + serverAt). Live-page position is per-client
+     VIEW state, not roster state — a cue is the honest channel, and it
+     reaches every full-view client at once (synchronized crowd sweep,
+     which the phase-2 driver faked by poking each probe individually).
+- Files (all NEW, mine — grid agent's files untouched, per the room-churn
+  precedent of copy-not-edit): show.html = grid.html + (a) `cue` handler
+  (rotate/setLivePage/note + one-way propagation telemetry — operator and
+  browsers share this machine's wall clock), (b) STAGGERED-UNPULL mitigation
+  behind &stag=1 (defer unpulls ~700 ms after the pulls land, then close ALL
+  hidden mids in ONE tracks/close renegotiation instead of N serial ones —
+  targets the measured 0.6–0.9 s featured-tier gap on 4-tile unpull bursts),
+  (c) window.__roster() export for programmatic per-event assertions.
+  score.mjs = node WS operator client: joins role=operator, fires the JSON
+  score (setup cast + timed events), measures fire drift vs scored offset,
+  re-casts any participant that rejoins mid-show (roster fold). run-show.mjs
+  = N=12 driver (2 probes view=full + 6 live + 4 wall lites), spawns
+  score.mjs with T0, asserts expected-vs-observed state after EVERY event,
+  screenshots key moments. Score: scores/demo-score.json — 5 min, 19 events:
+  spotlight t+10, rotate t+30, swap-spotlight t+45, wave1 x6 t+60..110,
+  duet t+120, solo t+150, reset t+180, wave2 x4 t+190..220, spotlight-X
+  t+240, farewell t+270, curtain cue t+285.
+- Run plan: smoke (70 s score) vs Worker, then the 5-min show 2x — run A
+  stag=0 (baseline waves) + run B stag=1 (mitigated waves): satisfies the
+  2x requirement AND is the with/without A/B for wave smoothness (the
+  0.6–0.9 s gap reproduced in all 3 phase-2 runs, so cross-run A/B is fair).
+
+# P3A SOAK (phase-3a agent, 2026-08-26)
+
+Mission: 200+-session control-plane soak DIRECT against rtc.live.cloudflare.com
+(Worker kept out of the blast radius), find the undocumented ceiling; N=24 media
+fleet under control-plane bulk vs the H6 baseline (p50 122.6 / p95 160.9,
+100.00% valid, mesh 16.1 s); egress telemetry from getStats vs plan §4 model.
+Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
+
+## Checkpoint P0 — setup ✅ (2026-08-26 07:59 EEST)
+
+- AC power, battery 100%; vm_stat free+inactive+spec ≈ 15+ GB. Port 8894 free.
+- Plan: (1) SMOKE: what does sessions/new accept (empty vs datachannel-only
+  offer body); lifecycle of a never-connected session (probe +5/+15/+35/+65/+95 s
+  — the "PC must connect in 5 s" doc rule may GC these; if so HOLD becomes a
+  rolling-replacement hold and time-to-410 is itself the measurement).
+  (2) RAMP: 200 sessions in 60 s (doors-open rate ~3.3/s).
+  (3) HOLD 600 s: sparse GET poll (each session ~60 s cadence, 10-session fast
+  set at 10 s); media fleet N=24 (H6 config exactly) runs INSIDE this window,
+  DURATION=300 + driver-side transport-bytes egress sampling.
+  (4) PUSH: +200 @5/s → +200 @10/s → +200 @20/s → +200 @40/s (cap ~1200 total),
+  stop at first hard error class, characterize (429/Retry-After/1015/5xx).
+  (5) GC probe: stop polling, probe samples at +30/+60/+120/+300 s.
+- Drivers: run-p3a-control.mjs (direct CF, custom UA — 1010 trap), run-p3a-media.mjs
+  (run-heavy.mjs clone: BASE :8894, udd m2m-p3a-udd, + kind:"egress" transport rows).

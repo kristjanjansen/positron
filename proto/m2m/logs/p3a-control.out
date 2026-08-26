@@ -1,0 +1,18 @@
+05:01:59.309 SMOKE: sessions/new variants
+05:01:59.653   empty body -> 201 343ms keys=sessionId
+05:02:00.192   dc offer   -> 201 538ms keys=sessionDescription,sessionId
+05:02:00.919   audio offer-> 201 725ms keys=sessionDescription,sessionId
+05:02:06.063   +5s empty GET -> 200 {"tracks":[],"dataChannels":[]}
+05:02:17.424   +5s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:02:28.975   +5s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:02:34.115   +15s empty GET -> 410 {"errorCode":"session_error","errorDescription":"Session appears to be disconnected. Please check if the PeerConnection 
+05:02:45.220   +15s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:02:56.297   +15s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:03:01.522   +35s empty GET -> 410 {"errorCode":"session_error","errorDescription":"Session appears to be disconnected. Please check if the PeerConnection 
+05:03:12.652   +35s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:03:23.710   +35s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:03:28.855   +65s empty GET -> 410 {"errorCode":"session_error","errorDescription":"Session appears to be disconnected. Please check if the PeerConnection 
+05:03:39.941   +65s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:03:50.999   +65s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:03:56.222   +95s empty GET -> 410 {"errorCode":"session_error","errorDescription":"Session appears to be disconnected. Please check if the PeerConnection 
+05:04:07.356   +95s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected

@@ -255,3 +255,70 @@ error). Expect the former error shape whenever a token is missing/expired/revoke
    delivered continuously (subgroup-per-GOP streamed object-by-object, ~43 objects/s observed),
    so sub-100 ms transport for media is credible but **unmeasured** — burn-in + OCR through the
    MoQ path is the next experiment once a draft-16 relay exists.
+
+## 6. Browser spike — CAN a browser talk to CF's IETF-MoQT relay? ✅ YES (draft-14, measured)
+
+✅ 2026-08-26 ~05:01 UTC, time-boxed spike (~25 min active). **Answer: YES — kixelated's
+`@moq/net` (npm, v0.3.3, the "moq-lite" JS client) negotiated genuine IETF moq-transport-14
+with `draft-14.cloudflare.mediaoverquic.com` from headless Chrome and received live track data.**
+The earlier repo-research conclusion "moq-lite ≠ IETF MoQT" is **stale**: the packages moved to
+the `@moq` npm scope and now ship a full IETF adapter (`@moq/net/ietf/`) covering **DRAFT_14
+(0xff00000e) through DRAFT_19 (0xff000013)** alongside moq-lite.
+
+### 6.1 Inventory (what browser clients exist for IETF MoQT)
+- **`@moq/net` + `@moq/hang` (kixelated/moq-dev)** — moq-lite AND IETF drafts 14–19. README
+  claims "moq-lite works with any moq-transport CDN (ex. Cloudflare)"; code even special-cases
+  `mediaoverquic.com` in a `NO_DISCOVERY_HOSTS` list (CF lacks SUBSCRIBE_NAMESPACE on 14). ← tested.
+- facebookexperimental/moq-encoder-player — IETF but **pinned to draft-18 ALPN `moqt-18`**; CF has
+  no draft-18 endpoint (NXDOMAIN) → unusable against CF today.
+- englishm/moq-interop-runner — lists 13 implementations; the ONLY browser-capable one is
+  kixelated's ("moq (moq-dev, JS)"); runner itself is CLI/Docker-oriented.
+- mediamtx embedded web client — pins `moqt-19` (§5.5) → can't talk CF's 14/16.
+
+### 6.2 How the compat actually works (from `@moq/net` source, verified on the wire)
+- WebTransport connect offers subprotocols `lite-05…lite`, `moqt-19…moqt-15`. CF draft-14
+  negotiates **none** → client falls back to a "compat" bidi stream whose first varint,
+  `StreamId.ClientCompat = 0x20`, **is byte-identical to draft-14's CLIENT_SETUP message type**;
+  the CLIENT_SETUP offers versions `[lite-02, lite-01, DRAFT_14 (0xff00000e)]` and the server
+  picks. CF picked draft-14 → full `Ietf.Connection`. (draft-15/16 use the same SETUP path with
+  ALPN pinning; 17+ use uni-stream SETUP type 0x2F00.)
+- So: **moq-lite's hello is deliberately forward-compatible with IETF draft-14+ — the conflict
+  is resolved in favor of "compatible", by construction, not accident.**
+
+### 6.3 The test (repeatable)
+Scratch at `rig/moq/spike/` (npm: `@moq/net @moq/hang esbuild zod`; page `www/index.html` +
+bundle `www/test.js` from `src/test.js`; `server.py` = static server + POST /log collector on
+:8892; results in `spike/browser.log`). ⚠️ esbuild's native binary is SIGKILLed by ThreatLocker
+(§3.5) — bundle inside Docker: `docker run --rm -v "$PWD":/s -w /s node:20-alpine sh -c
+"npx --yes esbuild src/test.js --bundle --format=esm --outfile=www/test.js"`.
+Publisher: detached container `docker run -d --rm --name moq-spike-pub -v moq-target14:/target
+moq-dev timeout 240 /target/release/moq-clock-ietf --publish --namespace moq-spike-x9
+"https://draft-14.cloudflare.mediaoverquic.com"`. Browser: headless Chrome
+(`--headless=new --user-data-dir=<scratch>/moq-spike-udd`) at `http://127.0.0.1:8892/?ns=moq-spike-x9`.
+Client code: `Connection.connect(url, {websocket:{enabled:false}})` → `conn.consume(Path.from(ns))`
+→ `.subscribe("now")` → `nextGroup()`/`readString()`. (moq-clock defaults: namespace `clock`,
+track `now`; we used `--namespace moq-spike-x9`.)
+
+### 6.4 Result (browser.log, 2026-08-26 05:01:35 UTC)
+- `CONNECTED ms=125 class=Connection version=moq-transport-14` — WebTransport + MoQT SETUP in
+  **125 ms** from page load, negotiated version string `moq-transport-14`.
+- SUBSCRIBE accepted; `GROUP seq=1` delivered base frame `"2026-08-26 05:01:"` + catch-up burst
+  of ticks 22–34 in one flush at join (same open-subgroup replay as §3.6), then **live tick "35"
+  one second later**. 15/15 frames read, zero errors, page total < 2 s.
+- ⚠️ No new latency number: publisher (Docker VM clock, resynced at 1 s granularity) vs browser
+  (host clock) differ by up to ±1 s — cross-clock deltas are meaningless here. §3.6's one-clock
+  p50 17.9 ms remains the transport latency reference; this spike proves *function*, not speed.
+- Traps hit: macOS has no `timeout(1)` (use background+poll+pkill); a `docker run | head -N`
+  pipeline detaches the container when head exits — it keeps publishing and a second publisher
+  on the same namespace then dies (exit 1). Kill by container name.
+
+### 6.5 Verdict for plan-m2m §1.C
+**"A browser CAN speak IETF MoQT to Cloudflare today: kixelated's `@moq/net` (moq-lite JS)
+negotiates draft-14 via its compat SETUP (CLIENT_SETUP 0x20 offering 0xff00000e) and receives
+live objects over WebTransport — 125 ms to session, subscribe + data verified. moq-lite vs IETF
+is NOT a blocker at the transport layer."** Caveats: (a) draft-14 only until we have a draft-16
+relay+token — the client also carries ALPN `moqt-16`, so draft-16 should work but is UNTESTED
+(blocked on §3 dashboard step); (b) transport ≠ media: `@moq/hang`'s player expects moq-lite's
+hang catalog, while draft-14 `moq-pub` publishes moq-catalog/fMP4 — media-format interop in the
+browser is the next spike (likely needs our own catalog/track handling on top of `@moq/net`);
+(c) no SUBSCRIBE_NAMESPACE on CF → `announced()` hangs; consume by exact path only.

@@ -123,16 +123,22 @@ measured. But as a *grid*:
 **Verdict**: keep for what it already does (stage ingest, 1–3 *featured* remote performers via the
 measured WHIP path). Wrong tool for the participatory grid.
 
-### C. MoQ — right latency, no client
+### C. MoQ — right latency, and (since the phase-3 spike) a browser CAN speak it
 
 ✅ 17.9 ms one-way relay proven (draft-14, `plan.md` §2.3) — the best transport number in the repo.
-Disqualifiers today: ⚠️ browser client at CF's draft-16 is unproven — two ecosystems share the name
-(IETF MoQT draft-16 vs moq-lite/`hang`; moq.dev claims moq-lite is "forwards compatible with
-moq-transport draft-14+ CDNs" while this repo's earlier research concluded the opposite — direct
-conflict, 30-min test to resolve, https://moq.dev/); a conferencing client means hand-rolling
-WebTransport + WebCodecs + jitter buffers per track; 📄 WebTransport in Safari only since 26.4
-(baseline 2026-03) — recent-Safari-only audiences; no TURN equivalent (UDP-blocked networks just
-fail) ⚠️; draft-16 tokens are dashboard-only, shown once (✅ `plan.md` §10). Phase-3 experiment (§6).
+**✅ SPIKE RESULT (2026-08-26): the moq-lite-vs-IETF conflict is RESOLVED in favor of compatibility.**
+kixelated's `@moq/net` (v0.3.3) connected headless Chrome → WebTransport →
+draft-14.cloudflare.mediaoverquic.com, **negotiated `moq-transport-14` via its compat CLIENT_SETUP**
+(offers lite-02/lite-01/draft-14; ships an IETF adapter for drafts 14–19), subscribed, and received
+live objects — 125 ms to session, 15/15 frames, zero errors. The earlier "moq-lite ≠ IETF"
+conclusion was stale. Recipe + mechanics: `rig/moq/RUNBOOK.md` §6.
+Remaining disqualifiers for the GRID (unchanged): media-layer interop is untested (⚠️ `@moq/hang`
+expects its hang catalog; draft-14 `moq-pub` publishes moq-catalog — the next spike); draft-16
+untested until the dashboard relay exists (client carries `moqt-16` ALPN, ⚠️ should work);
+a conferencing client still means WebCodecs + jitter buffers per track; 📄 WebTransport in Safari
+only since 26.4 — recent-Safari-only audiences; no TURN equivalent (UDP-blocked networks fail) ⚠️.
+Status upgrade: from "no client" to **"transport proven, media layer = next experiment"** — a real
+contender for the delivery path on a 6–12 month horizon, still not for this season's shows.
 
 ### D. Pure P2P mesh — the arithmetic
 
