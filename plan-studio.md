@@ -79,6 +79,55 @@ TO BUILD:
   auto-config; composite-recorder audio mix test; MoQ auto-upgrade tier in the
   audience player; R2 lifecycle rules (retention/pruning).
 
+## 5. MERGED V0 — studio + timeline, one build (3 sessions)
+
+The timeline library IS the engine's event backbone; the SHOW panel IS a
+timeline transport UI. One build, not two.
+
+**Session A — `timeline/` core library** (plain ESM, no framework):
+- `core.mjs`: `Event {at, kind, source, v, payload}` + `Span {at, dur, kind,
+  source, v, mediaRef}`; store interface `append / window(q) / reduce(kind, t)`;
+  backends: memory + JSONL file (engine side). Tombstone + unknown-kind
+  round-trip rules from plan-timeline §5.
+- `transport.mjs`: maria's six functions + `seek(t) / pause / resume /
+  rate(wall-only) / window(q)`; wall-lane scheduler PORTED from
+  src/timed-messages.js (crossing + catch-up generalized to reducers).
+  Adapter contract: `{capture?, actuate, reducer?, interpolate?, caps}`.
+- Adapters: `cue` (actuate+reducer — extracted from replay.html), `roster`
+  (reducer), `media-span` (video-element actuator w/ seek), `chat`.
+- `strip.mjs`: the canonical visualizer (canvas, px/s, playhead, lanes = queries).
+- Tests: trace-replay harness; property test `reduce(t) ≡ play(0→t)`; runs in CI
+  (plain node, no humans).
+- **DoD-A**: proto/replay/replay.html REFACTORED onto the lib and the existing
+  measurement suite (run-record → run-measure) passes ≤100 ms p50 — the lib is
+  proven against already-green numbers before anything new is built on it.
+
+**Session B — `studio/engine.mjs`** (node CLI, TL-proof):
+- Supervises children: ffmpeg RTMPS leg, local segmented recorder (native T₀),
+  fixed uploader, optional MoQ/SFU publisher pages (headless chrome). All child
+  handles tracked; fatal path kills all (review lesson).
+- Emits the run's timeline: `media-span` per closed segment, `marker` events
+  (go-live, stop, leg up/down), `health` events (CPU, fps, upload lag) — one
+  JSONL via the lib's file backend, uploaded beside the show.
+- Control WS on localhost:8899: `{go, stop, status}`; reads .env; per-run names.
+- **DoD-B**: `node studio/engine.mjs` + `go` runs stage + archive end-to-end
+  unattended; `stop` yields an R2 show whose replay works (D below).
+
+**Session C — console + replay** (deploy Worker `elektron-studio`):
+- GO LIVE panel → engine WS (source picker, audio source incl. SILENT, one
+  button, per-leg lights from `health` events).
+- SHOW panel = the strip component live on the room DO feed + cue send box +
+  score loader (scores/*.json). Operator joins with OPERATOR_TOKEN.
+- ARCHIVE panel: list R2 shows (manifest of runs), open replay.
+- Replay page (from DoD-A) linked per show; SOUND = engine-reported meter +
+  5 s loopback check command.
+- **DoD-C (= v0 done)**: one command + one URL runs a complete show; the replay
+  link appears at stop; measurement suite green; grid pages unaffected.
+
+Explicitly OUT of v0: ROOM panel (v1), tight audio lane (v2), rate≠1 on media,
+editing, Tauri. Grid-archive replay (per-participant, roster reducer) is the
+FIRST v1 feature and the reason the roster adapter ships in v0.
+
 ## 4. Risks / open items
 
 - Composite grid-audio mix untested (flagged phase 3); engine treats grid-archive
