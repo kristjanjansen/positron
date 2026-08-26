@@ -1,0 +1,42 @@
+# mediamtx config for the LOCAL-VENUE MoQ chain test (RUNBOOK §12).
+# Own instance, own high ports (188xx) — siblings own 8889/8890/8896.
+# Only WHIP (webrtc) ingest + MoQ server enabled; everything else off.
+
+logLevel: debug
+logDestinations: [file]
+logFile: logs/mediamtx.log
+
+api: false
+metrics: false
+pprof: false
+playback: false
+
+rtsp: false
+rtmp: false
+hls: false
+srt: false
+
+# --- WHIP ingest (the OBS-realistic path) ---
+webrtc: true
+webrtcAddress: :18889
+webrtcEncryption: false
+webrtcAllowOrigins: ["*"]
+webrtcLocalUDPAddress: :18189
+webrtcLocalTCPAddress: ""
+webrtcIPsFromInterfaces: false
+webrtcIPsFromInterfacesList: []
+webrtcAdditionalHosts: [127.0.0.1]
+webrtcICEServers2: []
+
+# --- MoQ server (drafts 16-19; WebTransport on 18892, native QUIC on 18893) ---
+moq: true
+moqHTTP2Address: :18892
+moqHTTP3Address: :18892
+moqQUICAddress: :18893
+moqServerKey: moq-key.pem
+moqServerCert: moq-cert.pem
+moqAllowOrigins: ["*"]
+
+paths:
+  moqmtx:
+    source: publisher

@@ -1,0 +1,32 @@
+07:22:27.471 m2m 4K SFU run: arm=a2-4k30-hw 3840x2160@30 kbps=15000 noise=0 degpref=maintain-resolution codec=h264 channel=chrome duration=90s
+07:22:29.111 1 launched
+07:22:30.225 P launched
+07:22:32.236 mesh: 1:connecting frames=281 | P:connecting frames=51
+07:22:34.242 mesh: 1:running frames=522 | P:connecting frames=111
+07:22:36.245 mesh: 1:running frames=762 fps=30 out=640x360 qlr=none | P:running frames=172
+07:22:38.248 mesh: 1:running frames=972 fps=24 out=640x360 qlr=none tiles[P:13/13@130ms 3840x2160] | P:running frames=233 fps=10 out=3840x2160 qlr=none
+07:22:38.248 FLOWING in 8023 ms — measuring 90s
+07:22:43.661 1:running frames=1553 fps=30 out=640x360 qlr=none tiles[P:104/104@223ms 3840x2160] | P:running frames=397 fps=15 out=3840x2160 qlr=none
+07:22:43.714 CPU total=194.8% ours=124.8% moq-siblings=12.3% load={ 3,09 6,51 9,43 }
+07:22:48.722 1:running frames=2112 fps=30 out=640x360 qlr=none tiles[P:182/182@230ms 3840x2160] | P:running frames=550 fps=16 out=3840x2160 qlr=none
+07:22:53.726 1:running frames=2652 fps=30 out=640x360 qlr=none tiles[P:276/276@219ms 3840x2160] | P:running frames=702 fps=16 out=3840x2160 qlr=none
+07:22:58.740 1:running frames=3209 fps=30 out=640x360 qlr=none tiles[P:340/340@225ms 3840x2160] | P:running frames=854 fps=11 out=3840x2160 qlr=cpu
+07:22:58.790 CPU total=201.5% ours=132% moq-siblings=13% load={ 3,00 6,33 9,31 }
+07:23:03.797 1:running frames=3752 fps=30 out=640x360 qlr=none tiles[P:430/430@195ms 3840x2160] | P:running frames=1007 fps=18 out=3840x2160 qlr=cpu
+07:23:08.801 1:running frames=4291 fps=30 out=640x360 qlr=none tiles[P:522/522@185ms 3840x2160] | P:running frames=1159 fps=17 out=3840x2160 qlr=cpu
+07:23:13.803 1:running frames=4844 fps=30 out=640x360 qlr=none tiles[P:592/592@180ms 3840x2160] | P:running frames=1310 fps=12 out=3840x2160 qlr=cpu
+07:23:13.859 CPU total=162.4% ours=101.6% moq-siblings=12.5% load={ 2,83 6,13 9,19 }
+07:23:18.863 1:running frames=5402 fps=30 out=640x360 qlr=none tiles[P:653/653@190ms 3840x2160] | P:running frames=1464 fps=11 out=3840x2160 qlr=cpu
+07:23:23.866 1:running frames=5967 fps=30 out=640x360 qlr=none tiles[P:713/713@200ms 3840x2160] | P:running frames=1615 fps=12 out=3840x2160 qlr=cpu
+07:23:28.870 1:running frames=6536 fps=30 out=640x360 qlr=none tiles[P:773/773@208ms 3840x2160] | P:running frames=1767 fps=13 out=3840x2160 qlr=cpu
+07:23:28.924 CPU total=153.9% ours=107.7% moq-siblings=11.7% load={ 3,16 6,04 9,10 }
+07:23:33.930 1:running frames=7111 fps=30 out=640x360 qlr=none tiles[P:833/833@215ms 3840x2160] | P:running frames=1920 fps=11 out=3840x2160 qlr=cpu
+07:23:38.934 1:running frames=7675 fps=30 out=640x360 qlr=none tiles[P:894/894@226ms 3840x2160] | P:running frames=2072 fps=12 out=3840x2160 qlr=cpu
+07:23:43.938 1:running frames=8249 fps=30 out=640x360 qlr=none tiles[P:953/953@242ms 3840x2160] | P:running frames=2224 fps=11 out=3840x2160 qlr=cpu
+07:23:43.988 CPU total=183.2% ours=116.5% moq-siblings=11.5% load={ 3,26 5,92 9,00 }
+07:23:48.994 1:running frames=8824 fps=30 out=640x360 qlr=none tiles[P:1014/1014@242ms 3840x2160] | P:running frames=2377 fps=13 out=3840x2160 qlr=cpu
+07:23:53.998 1:running frames=9384 fps=30 out=640x360 qlr=none tiles[P:1074/1074@259ms 3840x2160] | P:running frames=2528 fps=11 out=3840x2160 qlr=cpu
+07:23:59.002 1:running frames=9937 fps=30 out=640x360 qlr=none tiles[P:1134/1134@258ms 3840x2160] | P:running frames=2680 fps=12 out=3840x2160 qlr=cpu
+07:23:59.051 CPU total=146.2% ours=97.9% moq-siblings=12.1% load={ 2,89 5,71 8,88 }
+07:24:04.057 1:running frames=10501 fps=30 out=640x360 qlr=none tiles[P:1195/1195@255ms 3840x2160] | P:running frames=2833 fps=11 out=3840x2160 qlr=cpu
+07:24:09.070 1:running frames=11059 fps=30 out=640x360 qlr=none tiles[P:1255/1255@268ms 3840x2160] | P:running frames=2985 fps=12 out=3840x2160 qlr=cpu

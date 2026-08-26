@@ -4,3 +4,28 @@
 07:20:10.240 mesh: 1:running frames=320 | P:running frames=62
 07:20:12.243 mesh: 1:running frames=552 fps=30 out=640x360 qlr=none tiles[P:15/15@164ms 3840x2160] | P:running frames=122 fps=10 out=3840x2160 qlr=none
 07:20:12.244 FLOWING in 4010 ms — measuring 90s
+07:20:17.341 1:running frames=1148 fps=30 out=640x360 qlr=none tiles[P:102/102@172ms 3840x2160] | P:running frames=277 fps=26 out=3840x2160 qlr=none
+07:20:17.392 CPU total=241.2% ours=162% moq-siblings=17.2% load={ 3,73 8,62 10,59 }
+07:20:22.398 1:running frames=1745 fps=31 out=640x360 qlr=none tiles[P:200/200@182ms 3840x2160] | P:running frames=430 fps=19 out=3840x2160 qlr=none
+07:20:27.402 1:running frames=2323 fps=29 out=640x360 qlr=none tiles[P:309/309@166ms 3840x2160] | P:running frames=582 fps=23 out=3840x2160 qlr=none
+07:20:32.406 1:running frames=2904 fps=30 out=640x360 qlr=none tiles[P:405/405@159ms 3840x2160] | P:running frames=733 fps=17 out=3840x2160 qlr=cpu
+07:20:32.456 CPU total=199.8% ours=139.5% moq-siblings=15.1% load={ 3,61 8,36 10,47 }
+07:20:37.473 1:running frames=3495 fps=30 out=640x360 qlr=none tiles[P:491/491@160ms 3840x2160] | P:running frames=887 fps=17 out=3840x2160 qlr=cpu
+07:20:42.475 1:running frames=4076 fps=29 out=640x360 qlr=none tiles[P:557/557@158ms 3840x2160] | P:running frames=1038 fps=11 out=3840x2160 qlr=cpu
+07:20:47.479 1:running frames=4656 fps=30 out=640x360 qlr=none tiles[P:612/612@165ms 3840x2160] | P:running frames=1190 fps=11 out=3840x2160 qlr=cpu
+07:20:47.526 CPU total=155.8% ours=99.3% moq-siblings=15.2% load={ 3,45 8,10 10,33 }
+07:20:52.531 1:running frames=5252 fps=30 out=640x360 qlr=none tiles[P:667/667@196ms 3840x2160] | P:running frames=1343 fps=11 out=3840x2160 qlr=cpu
+07:20:57.534 1:running frames=5839 fps=30 out=640x360 qlr=none tiles[P:722/722@198ms 3840x2160] | P:running frames=1495 fps=11 out=3840x2160 qlr=cpu
+07:21:02.538 1:running frames=6431 fps=30 out=640x360 qlr=none tiles[P:777/777@208ms 3840x2160] | P:running frames=1646 fps=11 out=3840x2160 qlr=cpu
+07:21:02.586 CPU total=164.3% ours=98.6% moq-siblings=13.2% load={ 3,75 7,93 10,24 }
+07:21:07.596 1:running frames=7025 fps=30 out=640x360 qlr=none tiles[P:833/833@217ms 3840x2160] | P:running frames=1799 fps=11 out=3840x2160 qlr=cpu
+07:21:12.615 1:running frames=7614 fps=31 out=640x360 qlr=none tiles[P:888/888@215ms 3840x2160] | P:running frames=1951 fps=11 out=3840x2160 qlr=cpu
+07:21:17.618 1:running frames=8202 fps=30 out=640x360 qlr=none tiles[P:943/943@222ms 3840x2160] | P:running frames=2103 fps=11 out=3840x2160 qlr=cpu
+07:21:17.665 CPU total=163% ours=104.3% moq-siblings=12.3% load={ 4,14 7,80 10,15 }
+07:21:22.671 1:running frames=8797 fps=30 out=640x360 qlr=none tiles[P:998/998@233ms 3840x2160] | P:running frames=2256 fps=10 out=3840x2160 qlr=cpu
+07:21:27.688 1:running frames=9392 fps=30 out=640x360 qlr=none tiles[P:1054/1054@208ms 3840x2160] | P:running frames=2408 fps=11 out=3840x2160 qlr=cpu
+07:21:32.693 1:running frames=9983 fps=31 out=640x360 qlr=none tiles[P:1108/1108@217ms 3840x2160] | P:running frames=2560 fps=11 out=3840x2160 qlr=cpu
+07:21:32.744 CPU total=163.5% ours=109.2% moq-siblings=12.9% load={ 3,81 7,55 10,02 }
+07:21:37.750 1:running frames=10575 fps=31 out=640x360 qlr=none tiles[P:1164/1164@229ms 3840x2160] | P:running frames=2713 fps=11 out=3840x2160 qlr=cpu
+07:21:42.752 1:running frames=11167 fps=30 out=640x360 qlr=none tiles[P:1219/1219@234ms 3840x2160] | P:running frames=2865 fps=11 out=3840x2160 qlr=cpu
+07:21:44.424 run done

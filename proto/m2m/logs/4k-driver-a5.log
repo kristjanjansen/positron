@@ -1,0 +1,33 @@
+07:35:36.336 m2m 4K SFU run: arm=a5-4k15 3840x2160@15 kbps=15000 noise=0 degpref=maintain-resolution codec=h264 channel=chrome duration=90s
+07:35:37.154 1 launched
+07:35:37.687 P launched
+07:35:39.695 mesh: 1:connecting frames=296 | P:connecting frames=28
+07:35:41.699 mesh: 1:running frames=536 | P:connecting frames=58
+07:35:43.702 mesh: 1:running frames=777 fps=30 out=640x360 qlr=none enc=libvpx | P:running frames=88
+07:35:45.706 mesh: 1:running frames=1009 fps=29 out=640x360 qlr=none enc=libvpx tiles[P:17/17@118ms 3840x2160] | P:running frames=118 fps=11 out=3840x2160 qlr=none enc=OpenH264
+07:35:45.706 FLOWING in 8019 ms — measuring 90s
+07:35:50.776 1:running frames=1603 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:87/87@165ms 3840x2160] | P:running frames=194 fps=14 out=3840x2160 qlr=none enc=OpenH264
+07:35:50.828 CPU total=188% ours=124.5% moq-siblings=11.9% load={ 3,58 3,01 5,24 }
+07:35:55.833 1:running frames=2204 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:154/154@200ms 3840x2160] | P:running frames=269 fps=15 out=3840x2160 qlr=none enc=OpenH264
+07:36:00.837 1:running frames=2784 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:224/224@170ms 3840x2160] | P:running frames=344 fps=14 out=3840x2160 qlr=none enc=OpenH264
+07:36:05.841 1:running frames=3365 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:295/295@165ms 3840x2160] | P:running frames=419 fps=14 out=3840x2160 qlr=none enc=OpenH264
+07:36:05.893 CPU total=201% ours=134.9% moq-siblings=12.5% load={ 3,36 2,99 5,20 }
+07:36:10.897 1:running frames=3964 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:371/371@154ms 3840x2160] | P:running frames=494 fps=15 out=3840x2160 qlr=none enc=OpenH264
+07:36:15.900 1:running frames=4562 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:427/427@175ms 3840x2160] | P:running frames=569 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:20.914 1:running frames=5152 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:478/478@196ms 3840x2160] | P:running frames=643 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:20.964 CPU total=144.9% ours=82.6% moq-siblings=12.6% load={ 2,98 2,92 5,14 }
+07:36:25.969 1:running frames=5744 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:528/528@199ms 3840x2160] | P:running frames=719 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:30.971 1:running frames=6332 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:579/579@200ms 3840x2160] | P:running frames=794 fps=11 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:35.974 1:running frames=6920 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:628/628@207ms 3840x2160] | P:running frames=868 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:36.030 CPU total=166.5% ours=97.3% moq-siblings=12% load={ 2,83 2,89 5,09 }
+07:36:41.035 1:running frames=7516 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:679/679@204ms 3840x2160] | P:running frames=944 fps=9 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:46.038 1:running frames=8107 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:729/729@215ms 3840x2160] | P:running frames=1019 fps=11 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:51.042 1:running frames=8690 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:779/779@210ms 3840x2160] | P:running frames=1093 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:36:51.095 CPU total=162% ours=92.6% moq-siblings=12.2% load={ 2,94 2,91 5,05 }
+07:36:56.114 1:running frames=9271 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:829/829@221ms 3840x2160] | P:running frames=1169 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:37:01.118 1:running frames=9858 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:879/879@232ms 3840x2160] | P:running frames=1244 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:37:06.120 1:running frames=10440 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:930/930@233ms 3840x2160] | P:running frames=1318 fps=9 out=3840x2160 qlr=cpu enc=OpenH264
+07:37:06.170 CPU total=163.6% ours=97.7% moq-siblings=13.1% load={ 2,79 2,88 5,01 }
+07:37:11.176 1:running frames=11035 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:980/980@230ms 3840x2160] | P:running frames=1394 fps=11 out=3840x2160 qlr=cpu enc=OpenH264
+07:37:16.180 1:running frames=11622 fps=30 out=640x360 qlr=none enc=libvpx tiles[P:1030/1030@242ms 3840x2160] | P:running frames=1469 fps=10 out=3840x2160 qlr=cpu enc=OpenH264
+07:37:26.264 run done

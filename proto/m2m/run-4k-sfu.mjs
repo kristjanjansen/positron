@@ -21,6 +21,9 @@ const NOISE = process.env.NOISE === "1" ? "1" : "0";
 const HINT = process.env.HINT || "detail";
 const DEGPREF = process.env.DEGPREF || "maintain-resolution";
 const CODEC = process.env.CODEC || "h264";
+// CH=chrome (default) -> REAL Google Chrome (VideoToolbox hw H.264, same encoder
+// class as the MoQ 4K matrix). CH=chromium -> Playwright build (OpenH264 sw).
+const CH = process.env.CH || "chrome";
 const BASE = "http://127.0.0.1:8889";
 const HERE = "/Users/s32863/personal/elektron/proto/m2m";
 const LOGDIR = `${HERE}/logs`;
@@ -35,6 +38,11 @@ const ARGS = [
   "--disable-renderer-backgrounding",
   "--disable-backgrounding-occluded-windows",
   "--mute-audio",
+  // fake capture device (real camera is WEDGED and must never be opened):
+  // a one-shot fake-gUM unlocks encoderImplementation/decoderImplementation in
+  // getStats (Chrome hides them from capture-less pages to limit fingerprinting)
+  "--use-fake-device-for-media-stream",
+  "--use-fake-ui-for-media-stream",
 ];
 
 function ts() { return new Date().toISOString().slice(11, 23); }
@@ -72,7 +80,7 @@ async function launchParticipant(id) {
   const udd = `${UDD_BASE}-${id}`;
   fs.rmSync(udd, { recursive: true, force: true });
   const ctx = await chromium.launchPersistentContext(udd, {
-    headless: true, channel: "chromium", args: ARGS,
+    headless: true, channel: CH, args: ARGS,
     viewport: { width: 1440, height: 900 },
   });
   const page = ctx.pages()[0] || await ctx.newPage();
@@ -80,8 +88,8 @@ async function launchParticipant(id) {
   page.on("console", m => logStream.write(`${ts()} [${m.type()}] ${m.text()}\n`));
   page.on("pageerror", e => logStream.write(`${ts()} [pageerror] ${e.message}\n`));
   const params = id === "P"
-    ? `id=P&n=2&mode=pub&vw=${VW}&vh=${VH}&vfps=${VFPS}&kbps=${KBPS}&noise=${NOISE}&hint=${HINT}&degpref=${DEGPREF}&codec=${CODEC}&cls=pub4k-${ARM}`
-    : `id=1&n=2&mode=full&cls=probe-${ARM}`;
+    ? `id=P&n=2&mode=pub&vw=${VW}&vh=${VH}&vfps=${VFPS}&kbps=${KBPS}&noise=${NOISE}&hint=${HINT}&degpref=${DEGPREF}&codec=${CODEC}&gum=keep&cls=pub4k-${ARM}`
+    : `id=1&n=2&mode=full&gum=keep&cls=probe-${ARM}`;
   await page.goto(`${BASE}/pub4k-room.html?${params}&cb=${Date.now()}`, { waitUntil: "load" });
   return { id, ctx, page };
 }
@@ -105,7 +113,7 @@ function describe(states) {
 }
 
 const run = async () => {
-  say(`m2m 4K SFU run: arm=${ARM} ${VW}x${VH}@${VFPS} kbps=${KBPS} noise=${NOISE} degpref=${DEGPREF} codec=${CODEC} duration=${DURATION_S}s`);
+  say(`m2m 4K SFU run: arm=${ARM} ${VW}x${VH}@${VFPS} kbps=${KBPS} noise=${NOISE} degpref=${DEGPREF} codec=${CODEC} channel=${CH} duration=${DURATION_S}s`);
   killStale();
   const ro = await fetch(`${BASE}/roster`).catch(() => null);
   if (!ro || !ro.ok) { console.error("server on :8889 not reachable — start server.py first"); process.exit(1); }
@@ -157,12 +165,17 @@ const run = async () => {
     }
   }
 
-  const finals = await Promise.all(parts.map(p => p.page.evaluate(() => window.__state)));
+  // real-Chrome pages under 4K encode load can wedge evaluate/close — bound
+  // every shutdown step (arms A2/A3 hung here; data was already on disk)
+  const bounded = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r("TIMEOUT"), ms))]);
+  const finals = await bounded(Promise.all(parts.map(p => p.page.evaluate(() => window.__state))), 10000);
   await collect({ kind: "final", arm: ARM, t: Date.now(), states: finals });
-  for (const p of parts) await p.page.screenshot({ path: `${LOGDIR}/4k-${p.id}-${ARM}-final.png` }).catch(() => {});
+  for (const p of parts) await bounded(p.page.screenshot({ path: `${LOGDIR}/4k-${p.id}-${ARM}-final.png` }).catch(() => {}), 8000);
   await new Promise(r => setTimeout(r, 1500));
-  for (const p of parts) await p.ctx.close();
+  for (const p of parts) await bounded(p.ctx.close().catch(() => {}), 8000);
+  killStale();
   say("run done");
+  process.exit(0);
 };
 
 run().catch(async e => {

@@ -170,6 +170,17 @@ swallowed 22.9 Mbps sustained / 39.7 peak flawlessly — Cloudflare was never th
 levels behave per spec (3.1 refuses 1080p; High 4.2/5.1/5.2 all hw-true). New datum: draft-14
 ACCEPTS duplicate publishes of a live namespace (first session survives). Practical show guidance:
 720p30–1080p60 for tiles, 4K30 for a stage feed at +14 ms, budget bitrate not resolution.
+
+**✅ 4K ON THE OTHER PATHS (2026-08-26, NOTES §4K-SFU-HLS): MoQ is the ONLY 4K path.**
+- **SFU**: resolution LOCKS (2160p received 100 % of samples, `maintain-resolution` honored, zero
+  silent downscale, BWE never the limiter) — but **the SFU answers H.264 only at Constrained
+  Baseline `42e01f`**, which Mac Chrome maps to the OpenH264 SOFTWARE encoder → 12–14 fps at 4K,
+  +100 ms latency (SDP evidence in proto/m2m/artifacts/). H.265 negotiates VideoToolbox but
+  Chrome's send path queues (p95 681 ms). **Keep the SFU ≤1080p.**
+- **Stream HLS**: RTMPS *accepts* 4K ingest cleanly (input recorded as 3840x2160) but **transcodes
+  down — top rendition 1920x1080** (manifest + frame-grab proven; no limits page exists in the
+  docs). ⚠️ Bonus trap: during 4K ingest the playlists carried NO LL-HLS tags despite
+  preferLowLatency — 4K input silently degrades the input to plain-HLS 2 s segments.
 **✅ iPhone 4K verdict (user screenshot, 2026-08-26 10:11, wifi): decodes 4K30 flawlessly — 30 fps,
 503 frames, 0 errors — but with a ~843 ms p50 / 1083 ms p95 standing latency** (vs ~31 ms at 720p
 on the same phone) and first frame 1.3 s (vs 0.5 s). ⚠️ Attribution inferred: bitrate was only

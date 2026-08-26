@@ -1,0 +1,123 @@
+2026/08/26 10:42:03 INF MediaMTX v1.20.1, darwin, arm64
+2026/08/26 10:42:03 INF configuration loaded from /Users/s32863/personal/elektron/rig/moq/mtx/mtx.yml
+2026/08/26 10:42:03 DEB [path moqmtx] created
+2026/08/26 10:42:03 DEB path manager created
+2026/08/26 10:42:03 INF [WebRTC] started with listeners on :18889 (TCP/HTTP), :18189 (UDP/ICE)
+2026/08/26 10:42:03 INF [MoQ] started with listeners on :18892 (TCP/HTTP2), :18892 (UDP/HTTP3), :18893 (UDP/QUIC)
+2026/08/26 10:42:14 DEB [WebRTC] [conn 127.0.0.1:57879] [c->s] POST /moqmtx/whip HTTP/1.1
+Host: 127.0.0.1:18889
+Accept: */*
+Cache-Control: no-cache
+Connection: close
+Content-Length: 1152
+Content-Type: application/sdp
+Icy-Metadata: 1
+User-Agent: Lavf/63.1.101
+
+v=0
+o=FFmpeg 4489045141692799359 2 IN IP4 127.0.0.1
+s=FFmpegPublishSession
+t=0 0
+a=group:BUNDLE 0 1
+a=extmap-allow-mixed
+a=msid-semantic: WMS
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=ice-ufrag:fd8a1da2
+a=ice-pwd:a087c201fdf2bf73fbac761397c9e42a
+a=fingerprint:sha-256 C8:76:62:4F:C1:75:20:6B:D5:77:63:C0:6D:C5:33:97:E7:5D:5B:6B:36:36:20:02:02:89:96:F0:F8:7D:48:05
+a=setup:passive
+a=mid:0
+a=sendonly
+a=msid:FFmpeg audio
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=ssrc:669140272 cname:FFmpeg
+a=ssrc:669140272 msid:FFmpeg audio
+m=video 9 UDP/TLS/RTP/SAVPF 106 105
+c=IN IP4 0.0.0.0
+a=ice-ufrag:fd8a1da2
+a=ice-pwd:a087c201fdf2bf73fbac761397c9e42a
+a=fingerprint:sha-256 C8:76:62:4F:C1:75:20:6B:D5:77:63:C0:6D:C5:33:97:E7:5D:5B:6B:36:36:20:02:02:89:96:F0:F8:7D:48:05
+a=setup:passive
+a=mid:1
+a=sendonly
+a=msid:FFmpeg video
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=rtpmap:105 rtx/90000
+a=fmtp:105 apt=106
+a=ssrc-group:FID 669140273 669140274
+a=ssrc:669140273 cname:FFmpeg
+a=ssrc:669140273 msid:FFmpeg video
+
+2026/08/26 10:42:14 INF [WebRTC] [session ddca6b93] created by 127.0.0.1:57879
+2026/08/26 10:42:14 DEB [WebRTC] [session ddca6b93] peer connection state: connecting
+2026/08/26 10:42:14 DEB [WebRTC] [conn 127.0.0.1:57879] [s->c] HTTP/1.1 201 Created
+Accept-Patch: application/trickle-ice-sdpfrag
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: ETag, ID, Accept-Patch, Link, Location
+Content-Type: application/sdp
+Etag: *
+Id: ddca6b93-d87f-436b-9494-cfc85aa78cce
+Location: /moqmtx/whip/df20fb36-edaa-4e85-9ec7-37a6b6e1da72
+Server: mediamtx
+
+v=0
+o=- 8555851053252178598 1787730134 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic:WMS *
+a=fingerprint:sha-256 1F:19:30:2A:0C:05:8A:5D:13:BC:4A:CC:EF:0F:B4:5C:66:DC:51:DC:3A:B3:72:9E:0F:1F:AB:B5:CF:7E:BC:4F
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:0
+a=ice-ufrag:dJliKUVaRAKsPdzx
+a=ice-pwd:VwTbiZEVDHcuTsMRNMsXDeuILuoiFrYP
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:111 opus/48000/2
+a=recvonly
+a=candidate:742942838 1 udp 2130706431 127.0.0.1 18189 typ host
+a=candidate:742942838 2 udp 2130706431 127.0.0.1 18189 typ host
+a=end-of-candidates
+m=video 9 UDP/TLS/RTP/SAVPF 106
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:1
+a=ice-ufrag:dJliKUVaRAKsPdzx
+a=ice-pwd:VwTbiZEVDHcuTsMRNMsXDeuILuoiFrYP
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=recvonly
+
+2026/08/26 10:42:15 DEB [WebRTC] [session ddca6b93] peer connection state: connected
+2026/08/26 10:42:15 INF [WebRTC] [session ddca6b93] peer connection established, local candidate: host/udp/127.0.0.1/18189, remote candidate: prflx/udp/127.0.0.1/55060
+2026/08/26 10:42:17 INF [path moqmtx] stream is available and online, 2 tracks (Opus, H264)
+2026/08/26 10:42:17 INF [WebRTC] [session ddca6b93] is publishing to path 'moqmtx'
+2026/08/26 10:42:35 DEB [WebRTC] [conn 127.0.0.1:57881] [c->s] DELETE /moqmtx/whip/df20fb36-edaa-4e85-9ec7-37a6b6e1da72 HTTP/1.1
+Host: 127.0.0.1:18889
+Accept: */*
+Cache-Control: no-cache
+Connection: close
+Icy-Metadata: 1
+User-Agent: Lavf/63.1.101
+
+
+2026/08/26 10:42:35 DEB [WebRTC] [conn 127.0.0.1:57881] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Server: mediamtx
+
+(body of 15 bytes)
+2026/08/26 10:42:35 DEB [WebRTC] [session ddca6b93] peer connection state: closed
+2026/08/26 10:42:35 INF [WebRTC] [session ddca6b93] closed: terminated

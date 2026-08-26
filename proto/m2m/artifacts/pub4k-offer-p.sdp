@@ -1,19 +1,28 @@
 v=0
-o=- 836874131256964145 2 IN IP4 127.0.0.1
+o=- 7473080771087600871 2 IN IP4 127.0.0.1
 s=-
 t=0 0
 a=group:BUNDLE 0
 a=extmap-allow-mixed
 a=msid-semantic: WMS
-m=video 29384 UDP/TLS/RTP/SAVPF 103 104 107 108 109 114 115 116 117 118 39 40 119 120 96 97 45 46 98 99 100 101 49 50 123 124 125
+m=video 29243 UDP/TLS/RTP/SAVPF 102 103 104 107 108 109 114 115 116 117 39 40 118 119 96 97 45 46 98 99 100 101 49 50 122 123 124
 c=IN IP4 46.131.91.119
 a=rtcp:9 IN IP4 0.0.0.0
-a=candidate:844442071 1 udp 2113937151 160daad3-29fb-4f27-b609-d4586da2ca94.local 63164 typ host generation 0 network-cost 999
-a=candidate:1316199798 1 udp 1677729535 46.131.91.119 29384 typ srflx raddr 0.0.0.0 rport 0 generation 0 network-cost 999
-a=ice-ufrag:16Hk
-a=ice-pwd:Z4+vLKUTex1PUIKyFjA4d37R
+a=candidate:3568859436 1 udp 2122129151 192.168.139.3 56877 typ host generation 0 network-id 1
+a=candidate:2416144256 1 udp 2122063615 192.168.194.0 63109 typ host generation 0 network-id 3
+a=candidate:3596227696 1 udp 2121998079 192.168.1.221 58221 typ host generation 0 network-id 5 network-cost 10
+a=candidate:4072644397 1 udp 2122265343 fd07:b51a:cc66:0:a617:db5e:ab7:e9f1 61648 typ host generation 0 network-id 2
+a=candidate:3251859878 1 udp 2122199807 fd07:b51a:cc66:a:ffff:ffff:ffff:fffe 56661 typ host generation 0 network-id 4
+a=candidate:2031154510 1 udp 1685790463 46.131.91.119 29243 typ srflx raddr 192.168.1.221 rport 58221 generation 0 network-id 5 network-cost 10
+a=candidate:2859965364 1 tcp 1518149375 192.168.139.3 9 typ host tcptype active generation 0 network-id 1
+a=candidate:4006382872 1 tcp 1518083839 192.168.194.0 9 typ host tcptype active generation 0 network-id 3
+a=candidate:2828400360 1 tcp 1518018303 192.168.1.221 9 typ host tcptype active generation 0 network-id 5 network-cost 10
+a=candidate:2356182453 1 tcp 1518285567 fd07:b51a:cc66:0:a617:db5e:ab7:e9f1 9 typ host tcptype active generation 0 network-id 2
+a=candidate:3206320958 1 tcp 1518220031 fd07:b51a:cc66:a:ffff:ffff:ffff:fffe 9 typ host tcptype active generation 0 network-id 4
+a=ice-ufrag:OzJ3
+a=ice-pwd:q/lgo34EsognuFCbqMMQaVS3
 a=ice-options:trickle
-a=fingerprint:sha-256 29:C1:11:D5:C7:32:D2:19:6D:AB:94:8E:3C:06:78:52:11:45:EA:37:D3:A2:D9:8F:49:25:D0:33:07:1F:11:5E
+a=fingerprint:sha-256 0B:36:01:EE:E6:67:C7:F1:6A:88:66:0B:07:69:CC:C3:BF:57:B3:12:98:28:77:AF:0F:D6:9E:22:0C:2E:14:EB
 a=setup:actpass
 a=mid:0
 a=extmap:1 urn:ietf:params:rtp-hdrext:toffset
@@ -28,54 +37,82 @@ a=extmap:9 urn:ietf:params:rtp-hdrext:sdes:mid
 a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
 a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id
 a=sendonly
-a=msid:- b87955fb-47e1-452a-8115-b56aebecc417
+a=msid:- 044842c3-f28c-416e-96a1-af412594de28
 a=rtcp-mux
 a=rtcp-rsize
-a=rtpmap:103 H264/90000
-a=rtcp-fb:103 goog-remb
-a=rtcp-fb:103 transport-cc
-a=rtcp-fb:103 ccm fir
-a=rtcp-fb:103 nack
-a=rtcp-fb:103 nack pli
-a=fmtp:103 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
-a=rtpmap:104 rtx/90000
-a=fmtp:104 apt=103
-a=rtpmap:107 H264/90000
-a=rtcp-fb:107 goog-remb
-a=rtcp-fb:107 transport-cc
-a=rtcp-fb:107 ccm fir
-a=rtcp-fb:107 nack
-a=rtcp-fb:107 nack pli
-a=fmtp:107 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f
-a=rtpmap:108 rtx/90000
-a=fmtp:108 apt=107
-a=rtpmap:109 H264/90000
-a=rtcp-fb:109 goog-remb
-a=rtcp-fb:109 transport-cc
-a=rtcp-fb:109 ccm fir
-a=rtcp-fb:109 nack
-a=rtcp-fb:109 nack pli
-a=fmtp:109 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
-a=rtpmap:114 rtx/90000
-a=fmtp:114 apt=109
-a=rtpmap:115 H264/90000
-a=rtcp-fb:115 goog-remb
-a=rtcp-fb:115 transport-cc
-a=rtcp-fb:115 ccm fir
-a=rtcp-fb:115 nack
-a=rtcp-fb:115 nack pli
-a=fmtp:115 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
-a=rtpmap:116 rtx/90000
-a=fmtp:116 apt=115
-a=rtpmap:117 H264/90000
-a=rtcp-fb:117 goog-remb
-a=rtcp-fb:117 transport-cc
-a=rtcp-fb:117 ccm fir
-a=rtcp-fb:117 nack
-a=rtcp-fb:117 nack pli
-a=fmtp:117 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f
-a=rtpmap:118 rtx/90000
-a=fmtp:118 apt=117
+a=rtcp-xr:rcvr-rtt=all
+a=rtcp-fb:102 rrtr
+a=rtcp-fb:103 rrtr
+a=rtcp-fb:104 rrtr
+a=rtcp-fb:107 rrtr
+a=rtcp-fb:108 rrtr
+a=rtcp-fb:109 rrtr
+a=rtcp-fb:114 rrtr
+a=rtcp-fb:115 rrtr
+a=rtcp-fb:116 rrtr
+a=rtcp-fb:117 rrtr
+a=rtcp-fb:39 rrtr
+a=rtcp-fb:40 rrtr
+a=rtcp-fb:118 rrtr
+a=rtcp-fb:119 rrtr
+a=rtcp-fb:96 rrtr
+a=rtcp-fb:97 rrtr
+a=rtcp-fb:45 rrtr
+a=rtcp-fb:46 rrtr
+a=rtcp-fb:98 rrtr
+a=rtcp-fb:99 rrtr
+a=rtcp-fb:100 rrtr
+a=rtcp-fb:101 rrtr
+a=rtcp-fb:49 rrtr
+a=rtcp-fb:50 rrtr
+a=rtcp-fb:122 rrtr
+a=rtcp-fb:123 rrtr
+a=rtcp-fb:124 rrtr
+a=rtpmap:102 H264/90000
+a=rtcp-fb:102 goog-remb
+a=rtcp-fb:102 transport-cc
+a=rtcp-fb:102 ccm fir
+a=rtcp-fb:102 nack
+a=rtcp-fb:102 nack pli
+a=fmtp:102 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtpmap:103 rtx/90000
+a=fmtp:103 apt=102
+a=rtpmap:104 H264/90000
+a=rtcp-fb:104 goog-remb
+a=rtcp-fb:104 transport-cc
+a=rtcp-fb:104 ccm fir
+a=rtcp-fb:104 nack
+a=rtcp-fb:104 nack pli
+a=fmtp:104 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42001f
+a=rtpmap:107 rtx/90000
+a=fmtp:107 apt=104
+a=rtpmap:108 H264/90000
+a=rtcp-fb:108 goog-remb
+a=rtcp-fb:108 transport-cc
+a=rtcp-fb:108 ccm fir
+a=rtcp-fb:108 nack
+a=rtcp-fb:108 nack pli
+a=fmtp:108 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
+a=rtpmap:109 rtx/90000
+a=fmtp:109 apt=108
+a=rtpmap:114 H264/90000
+a=rtcp-fb:114 goog-remb
+a=rtcp-fb:114 transport-cc
+a=rtcp-fb:114 ccm fir
+a=rtcp-fb:114 nack
+a=rtcp-fb:114 nack pli
+a=fmtp:114 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=42e01f
+a=rtpmap:115 rtx/90000
+a=fmtp:115 apt=114
+a=rtpmap:116 H264/90000
+a=rtcp-fb:116 goog-remb
+a=rtcp-fb:116 transport-cc
+a=rtcp-fb:116 ccm fir
+a=rtcp-fb:116 nack
+a=rtcp-fb:116 nack pli
+a=fmtp:116 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=4d001f
+a=rtpmap:117 rtx/90000
+a=fmtp:117 apt=116
 a=rtpmap:39 H264/90000
 a=rtcp-fb:39 goog-remb
 a=rtcp-fb:39 transport-cc
@@ -85,15 +122,15 @@ a=rtcp-fb:39 nack pli
 a=fmtp:39 level-asymmetry-allowed=1;packetization-mode=0;profile-level-id=4d001f
 a=rtpmap:40 rtx/90000
 a=fmtp:40 apt=39
-a=rtpmap:119 H264/90000
-a=rtcp-fb:119 goog-remb
-a=rtcp-fb:119 transport-cc
-a=rtcp-fb:119 ccm fir
-a=rtcp-fb:119 nack
-a=rtcp-fb:119 nack pli
-a=fmtp:119 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f
-a=rtpmap:120 rtx/90000
-a=fmtp:120 apt=119
+a=rtpmap:118 H264/90000
+a=rtcp-fb:118 goog-remb
+a=rtcp-fb:118 transport-cc
+a=rtcp-fb:118 ccm fir
+a=rtcp-fb:118 nack
+a=rtcp-fb:118 nack pli
+a=fmtp:118 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=64001f
+a=rtpmap:119 rtx/90000
+a=fmtp:119 apt=118
 a=rtpmap:96 VP8/90000
 a=rtcp-fb:96 goog-remb
 a=rtcp-fb:96 transport-cc
@@ -138,12 +175,12 @@ a=rtcp-fb:49 nack pli
 a=fmtp:49 level-id=186;profile-id=1;tier-flag=0;tx-mode=SRST
 a=rtpmap:50 rtx/90000
 a=fmtp:50 apt=49
-a=rtpmap:123 red/90000
-a=rtpmap:124 rtx/90000
-a=fmtp:124 apt=123
-a=rtpmap:125 ulpfec/90000
-a=ssrc-group:FID 3850530436 2863159918
-a=ssrc:3850530436 cname:LkTz0R/iAogVbhGk
-a=ssrc:3850530436 msid:- b87955fb-47e1-452a-8115-b56aebecc417
-a=ssrc:2863159918 cname:LkTz0R/iAogVbhGk
-a=ssrc:2863159918 msid:- b87955fb-47e1-452a-8115-b56aebecc417
+a=rtpmap:122 red/90000
+a=rtpmap:123 rtx/90000
+a=fmtp:123 apt=122
+a=rtpmap:124 ulpfec/90000
+a=ssrc-group:FID 1281791114 3571514095
+a=ssrc:1281791114 cname:xUpPqFptLs2Akc3D
+a=ssrc:1281791114 msid:- 044842c3-f28c-416e-96a1-af412594de28
+a=ssrc:3571514095 cname:xUpPqFptLs2Akc3D
+a=ssrc:3571514095 msid:- 044842c3-f28c-416e-96a1-af412594de28
