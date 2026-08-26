@@ -150,7 +150,14 @@ flawlessly, so a **~100-line shim** (hang has a `Container.Cmaf` class) likely b
 Platform data: CF never redelivers a CLOSED group (write-once catalogs invisible to late joiners →
 republish every 2 s; join≈1.0 s), no pending-subscribes (subscribe-before-announce errors → retry),
 optimistic SUBSCRIBE_OK then ~10 s close on unserved tracks. draft-16 is NOT auth-only:
-SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ SAFARI VERIFIED (2026-08-26, RUNBOOK §8): desktop Safari 26.6.2 PLAYS live MoQ video** —
+SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ MOBILE SAFARI VERIFIED BY THE USER (2026-08-26 09:31, iPhone screenshots): Mobile Safari
+26.5.2 plays live MoQ video OVER 4G CELLULAR** — WebTransport YES, H.264 YES, connected 282 ms,
+negotiated moq-transport-14, first frame 0.5 s, LIVE 31 fps / 1166 frames / 0 decode errors,
+glass-to-glass ~31 ms p50 / 51 ms p95 (± phone clock offset). QUIC traversed the cellular network
+fine. iOS delivery over MoQ is REAL on updated devices — the remaining audience gates are version
+adoption (≥26.4) and UDP-hostile wifi.
+
+**✅ SAFARI VERIFIED (2026-08-26, RUNBOOK §8): desktop Safari 26.6.2 PLAYS live MoQ video** —
 connected 131 ms, negotiated moq-transport-14, H.264 decode, 2309 frames / 0 errors over 4 min
 (background-tab-throttled to burst delivery; foreground + iPhone verdicts await the user at
 https://elektron-moq-safari.kristjan-jansen.workers.dev — self-reporting page, beacons via

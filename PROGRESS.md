@@ -36,6 +36,12 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### 📱 iPHONE VERDICT (user screenshots, 09:31) — ✅ MOBILE SAFARI PLAYS MoQ ON 4G
+- Mobile Safari 26.5.2, 4G cellular: connected 282 ms, moq-transport-14, H.264
+  720p30, first frame 0.5 s, 31 fps, 0 decode errors, g2g ~31 ms p50 / 51 p95
+  (± phone clock). QUIC over cellular worked. The full browser matrix for MoQ:
+  Chromium ✅ 33 ms, desktop Safari ✅, mobile Safari-on-4G ✅ ~31 ms.
+
 ### Safari MoQ rig (user request) — ✅ DEPLOYED; desktop Safari OBSERVED PLAYING
 - URL: https://elektron-moq-safari.kristjan-jansen.workers.dev (Worker + beacon
   sink → wrangler tail shows any device's session). H.264 publisher LEFT RUNNING
