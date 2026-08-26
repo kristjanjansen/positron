@@ -51,6 +51,15 @@ Spec: plan-m2m.md §3; template: workers/cues (deployed, untouched).
     GET. 413 >64 KB, 415 non-JPEG, 403 unauthenticated POST.
   - DEPLOYED.md updated with the measured table; protocol unchanged by verification.
 
+- **2026-08-26 09:47** — **Cue-log added (additive), redeployed** (version 53ab064b, clean-env
+  OAuth path as above). Cue frames are persisted per room after broadcast (broadcast-first, the
+  50 ms lesson): `{from, cue, doRecvTs}`, capped 1000/room; new route `GET /room/{name}/cuelog`
+  (token) proxies to the DO. Sender stamps inside `cue` stored VERBATIM — DO clock is frozen
+  during execution and marked untrusted for timing. Verified: node WS smoke (join → cue →
+  broadcast → cuelog shows it; 403 without token) AND a headless grid.html participant reached
+  phase=running with framesSent>0 against the redeployed worker (existing protocol intact).
+  Consumer: proto/replay (synced VOD replay with cues — see proto/replay/README.md).
+
 ## Residue / open notes
 
 - The verify room's DO instance (`verify-mt9l6a9l`) retains a few KB of roster/tile storage;

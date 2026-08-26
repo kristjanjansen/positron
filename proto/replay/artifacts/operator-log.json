@@ -1,0 +1,102 @@
+{
+  "base": 1787737748257,
+  "room": "replay-test",
+  "cues": [
+    {
+      "seq": 1,
+      "id": "CUE-01",
+      "mode": "now",
+      "nominalAt": 1787737760257,
+      "at": 1787737760258,
+      "sentAt": 1787737760258
+    },
+    {
+      "seq": 2,
+      "id": "CUE-02",
+      "mode": "scheduled",
+      "nominalAt": 1787737775257,
+      "at": 1787737775257,
+      "sentAt": 1787737773258
+    },
+    {
+      "seq": 3,
+      "id": "CUE-03",
+      "mode": "now",
+      "nominalAt": 1787737790257,
+      "at": 1787737790257,
+      "sentAt": 1787737790257
+    },
+    {
+      "seq": 4,
+      "id": "CUE-04",
+      "mode": "scheduled",
+      "nominalAt": 1787737805257,
+      "at": 1787737805257,
+      "sentAt": 1787737803259
+    },
+    {
+      "seq": 5,
+      "id": "CUE-05",
+      "mode": "now",
+      "nominalAt": 1787737820257,
+      "at": 1787737820257,
+      "sentAt": 1787737820257
+    },
+    {
+      "seq": 6,
+      "id": "CUE-06",
+      "mode": "scheduled",
+      "nominalAt": 1787737835257,
+      "at": 1787737835257,
+      "sentAt": 1787737833258
+    },
+    {
+      "seq": 7,
+      "id": "CUE-07",
+      "mode": "now",
+      "nominalAt": 1787737850257,
+      "at": 1787737850257,
+      "sentAt": 1787737850257
+    },
+    {
+      "seq": 8,
+      "id": "CUE-08",
+      "mode": "scheduled",
+      "nominalAt": 1787737865257,
+      "at": 1787737865257,
+      "sentAt": 1787737863259
+    },
+    {
+      "seq": 9,
+      "id": "CUE-09",
+      "mode": "now",
+      "nominalAt": 1787737880257,
+      "at": 1787737880266,
+      "sentAt": 1787737880266
+    },
+    {
+      "seq": 10,
+      "id": "CUE-10",
+      "mode": "scheduled",
+      "nominalAt": 1787737895257,
+      "at": 1787737895257,
+      "sentAt": 1787737893263
+    },
+    {
+      "seq": 11,
+      "id": "CUE-11",
+      "mode": "now",
+      "nominalAt": 1787737910257,
+      "at": 1787737910261,
+      "sentAt": 1787737910261
+    },
+    {
+      "seq": 12,
+      "id": "CUE-12",
+      "mode": "scheduled",
+      "nominalAt": 1787737925257,
+      "at": 1787737925257,
+      "sentAt": 1787737923260
+    }
+  ]
+}

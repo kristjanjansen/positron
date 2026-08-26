@@ -1,0 +1,69 @@
+09:49:05.298 RECORD run room=replay-test nopub=false duration=200s liveInput=728e86a0ea372cee137770112d5eebaa
+09:49:08.208 show page RUNNING (+2016 ms)
+09:49:08.243 screencast started -> ffmpeg -> RTMPS
+09:49:08.257 FIRST FRAME -> ffmpeg: T0stamp=1787737748257 T0meta=1787737748253 (delta 4 ms)
+09:49:09.250 T0 (publish start) = 1787737748257
+  op| 09:49:09.567 operator joined room replay-test; sending 12 cues (base 1787737748257)
+09:49:14.255 steady +6s drawFps=30 cues recv=0 fired=0 cur=null sc=183/drop0
+09:49:19.258 steady +11s drawFps=30 cues recv=0 fired=0 cur=null sc=334/drop0
+  op| 09:49:20.258 sent CUE-01 mode=now at=1787737760258 (nominal 1787737760257, drift 1 ms)
+09:49:24.269 steady +16s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=486/drop0
+09:49:29.271 steady +21s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=638/drop0
+  op| 09:49:33.258 sent CUE-02 mode=scheduled at=1787737775257 (nominal 1787737775257, drift 0 ms)
+09:49:34.287 steady +26s drawFps=30 cues recv=2 fired=1 cur=CUE-01 sc=790/drop0
+09:49:39.290 steady +31s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=941/drop0
+09:49:44.294 steady +36s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1093/drop0
+09:49:49.298 steady +41s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1244/drop0
+  op| 09:49:50.257 sent CUE-03 mode=now at=1787737790257 (nominal 1787737790257, drift 0 ms)
+09:49:54.300 steady +46s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=1396/drop0
+09:49:59.302 steady +51s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=1548/drop0
+  op| 09:50:03.259 sent CUE-04 mode=scheduled at=1787737805257 (nominal 1787737805257, drift 0 ms)
+09:50:04.307 steady +56s drawFps=30 cues recv=4 fired=3 cur=CUE-03 sc=1699/drop0
+09:50:09.310 steady +61s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=1851/drop0
+09:50:14.315 steady +66s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2003/drop0
+09:50:19.320 steady +71s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2154/drop0
+  op| 09:50:20.257 sent CUE-05 mode=now at=1787737820257 (nominal 1787737820257, drift 0 ms)
+09:50:24.334 steady +76s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=2306/drop0
+09:50:29.337 steady +81s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=2458/drop0
+  op| 09:50:33.258 sent CUE-06 mode=scheduled at=1787737835257 (nominal 1787737835257, drift 0 ms)
+09:50:34.342 steady +86s drawFps=30 cues recv=6 fired=5 cur=CUE-05 sc=2609/drop0
+09:50:39.345 steady +91s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=2761/drop0
+09:50:44.348 steady +96s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=2913/drop0
+09:50:49.351 steady +101s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=3064/drop0
+  op| 09:50:50.258 sent CUE-07 mode=now at=1787737850257 (nominal 1787737850257, drift 0 ms)
+09:50:54.381 steady +106s drawFps=30 cues recv=7 fired=7 cur=CUE-07 sc=3218/drop0
+09:50:59.385 steady +111s drawFps=30 cues recv=7 fired=7 cur=CUE-07 sc=3369/drop0
+  op| 09:51:03.260 sent CUE-08 mode=scheduled at=1787737865257 (nominal 1787737865257, drift 0 ms)
+09:51:04.387 steady +116s drawFps=30 cues recv=8 fired=7 cur=CUE-07 sc=3521/drop0
+09:51:09.391 steady +121s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=3672/drop0
+09:51:14.397 steady +126s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=3824/drop0
+09:51:19.402 steady +131s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=3976/drop0
+  op| 09:51:20.266 sent CUE-09 mode=now at=1787737880266 (nominal 1787737880257, drift 9 ms)
+09:51:24.406 steady +136s drawFps=30 cues recv=9 fired=9 cur=CUE-09 sc=4127/drop0
+09:51:29.411 steady +141s drawFps=30 cues recv=9 fired=9 cur=CUE-09 sc=4279/drop0
+  op| 09:51:33.263 sent CUE-10 mode=scheduled at=1787737895257 (nominal 1787737895257, drift 0 ms)
+09:51:34.415 steady +146s drawFps=30 cues recv=10 fired=9 cur=CUE-09 sc=4431/drop0
+09:51:39.420 steady +151s drawFps=30 cues recv=10 fired=10 cur=CUE-10 sc=4582/drop0
+09:51:44.425 steady +156s drawFps=30 cues recv=10 fired=10 cur=CUE-10 sc=4734/drop0
+09:51:49.429 steady +161s drawFps=30 cues recv=10 fired=10 cur=CUE-10 sc=4885/drop0
+  op| 09:51:50.262 sent CUE-11 mode=now at=1787737910261 (nominal 1787737910257, drift 4 ms)
+09:51:54.433 steady +166s drawFps=30 cues recv=11 fired=11 cur=CUE-11 sc=5037/drop0
+09:51:59.435 steady +171s drawFps=30 cues recv=11 fired=11 cur=CUE-11 sc=5189/drop0
+  op| 09:52:03.260 sent CUE-12 mode=scheduled at=1787737925257 (nominal 1787737925257, drift 0 ms)
+  op| 09:52:04.263 operator done — log /Users/s32863/personal/elektron/proto/replay/artifacts/operator-log.json
+09:52:04.268 operator exited 0
+09:52:04.438 steady +176s drawFps=30 cues recv=12 fired=11 cur=CUE-11 sc=5340/drop0
+09:52:09.442 steady +181s drawFps=30 cues recv=12 fired=12 cur=CUE-12 sc=5492/drop0
+09:52:14.446 steady +186s drawFps=30 cues recv=12 fired=12 cur=CUE-12 sc=5644/drop0
+09:52:19.462 steady +191s drawFps=30 cues recv=12 fired=12 cur=CUE-12 sc=5795/drop0
+09:52:24.467 steady +196s drawFps=30 cues recv=12 fired=12 cur=CUE-12 sc=5947/drop0
+09:52:29.470 steady +201s drawFps=30 cues recv=12 fired=12 cur=CUE-12 sc=6099/drop0
+09:52:29.496 live fires captured: 12 (lateMs: 59,9,56,6,53,2,49,31,37,29,41,26)
+09:52:29.504 ffmpeg exited code=0 sig=null
+09:52:29.504 stream ended; frames=6101 dropped=0
+09:52:29.815 cuelog fetched: 12 entries
+09:52:29.815 polling for VOD (budget 300s)
+09:52:30.703 +1s videos: de39bf19:live-inprogress:-1s
+09:52:41.553 +12s videos: de39bf19:ready:200.02s
+09:52:41.556 VOD READY uid=de39bf1916469a4bc8b18e73a8726762 duration=200.02s created=2026-08-26T09:49:14.54258Z hls=https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/manifest/video.m3u8
+09:52:41.557 RECORD RUN DONE — meta written

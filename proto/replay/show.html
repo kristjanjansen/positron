@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron replay-test show</title>
+<style>
+html,body{margin:0;padding:0;background:#000;overflow:hidden}
+#stage{display:block;width:1280px;height:720px}  /* MUST fill viewport exactly (CDP screencast) */
+</style>
+</head>
+<body>
+<canvas id="stage" width="1280" height="720"></canvas>
+<script>
+// ============================================================================
+// SHOW PAGE — the "stage" recorded to Stream via CDP screencast -> ffmpeg ->
+// RTMPS (proven p3b pipeline). Everything the replay test needs later is
+// BURNED INTO THE PIXELS:
+//   * main clock row  (y600 h48):  64 blocks blockW 12 — 48-bit wall-clock ms
+//     + pid byte 'S' + XOR ck (identical geometry to p3b's composite K row,
+//     which survived Stream transcode with 100 % decode)
+//   * cue row         (y656 h36):  64 blocks blockW 12 — 48-bit firedAt ms
+//     + 8-bit cue seq (1-based) + XOR ck. Black (undecodable) until the first
+//     cue fires. This is the GROUND TRUTH of when each cue visually fired live.
+//   * human clock + CUE ZONE with the latest cue text, for eyeballs.
+// The page also joins the rtc room as a viewer and fires cues LIVE when the
+// wall clock crosses cue.at (the stage's "playhead" is the wall clock itself —
+// same crossing rule as src/timed-messages.js tick()).
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const ROOM   = q.get("room")   || "replay-test";
+const REMOTE = q.get("remote") || "";
+const TOKEN  = q.get("token")  || "";
+const MY_ID  = q.get("id")     || "stage";
+const SIG = REMOTE.replace(/^http/, "ws") + "/room/" + ROOM + "/ws" +
+            (TOKEN ? "?token=" + encodeURIComponent(TOKEN) : "");
+
+// row geometry (shared contract with replay.html — do not change one side only)
+const NB = 64, BW = 12, RX = 32;
+const CLOCK_Y = 600, CLOCK_H = 48;   // bed 585..720 painted black every frame
+const CUE_Y = 656, CUE_H = 36;
+const PID_BYTE = "S".charCodeAt(0);
+
+window.__state = { phase: "init", wsState: "closed", drawFrames: 0, drawFps: 0,
+                   cuesReceived: 0, cuesFired: 0, currentCue: null, telemetry: [], error: null };
+
+function wallClock() { return performance.timeOrigin + performance.now(); }
+
+// ---- live cue engine (wall clock IS the playhead; crossing rule = tick()) ---
+let pending = [];   // sorted by at
+let seq = 0;        // 1-based seq of the latest fired cue (burned into cue row)
+let current = null; // {seq, id, text, at, firedAt}
+const history = [];
+function addCue(cue) {
+  if (!cue || cue.at == null) return;
+  window.__state.cuesReceived++;
+  pending = pending.filter(c => c.id !== cue.id);       // same-id revision
+  pending.push({ ...cue, recvAt: wallClock() });
+  pending.sort((a, b) => a.at - b.at);
+}
+function fireDue(now) {
+  while (pending.length && pending[0].at <= now) {
+    const cue = pending.shift();
+    seq++;
+    current = { seq, id: cue.id, text: (cue.data && cue.data.text) || cue.id, at: cue.at, firedAt: now };
+    history.unshift(current);
+    if (history.length > 5) history.pop();
+    window.__state.cuesFired = seq;
+    window.__state.currentCue = { seq, id: cue.id, firedAt: now, lateMs: now - cue.at };
+    window.__state.telemetry.push({
+      seq, id: cue.id, at: cue.at, firedAt: now, lateMs: Math.round((now - cue.at) * 10) / 10,
+      sentAt: cue.sentAt ?? null, serverAt: cue.serverAt ?? null, recvAt: cue.recvAt,
+    });
+  }
+}
+
+// ---- signaling --------------------------------------------------------------
+let ws = null;
+function sigConnect() {
+  ws = new WebSocket(SIG);
+  ws.onopen = () => {
+    window.__state.wsState = "open";
+    ws.send(JSON.stringify({ type: "join", participantId: MY_ID, name: "Stage", role: "audience" }));
+  };
+  ws.onmessage = (m) => {
+    if (m.data === "pong") return;
+    let f; try { f = JSON.parse(m.data); } catch { return; }
+    if (f.type === "roster") window.__state.phase = "running";
+    if (f.type === "cue" && f.cue) addCue(f.cue);
+  };
+  ws.onclose = () => { window.__state.wsState = "closed"; setTimeout(sigConnect, 1000); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+sigConnect();
+setInterval(() => { try { if (ws && ws.readyState === 1) ws.send("ping"); } catch (e) {} }, 5000);
+
+// ---- binary row painter -----------------------------------------------------
+const cv = document.getElementById("stage");
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+
+function drawRow(ms48, lastByte, y, h) {
+  const bytes = []; let v = ms48;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(lastByte & 0xff);
+  let ck = 0; for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NB; i++) if (bits[i]) ctx.fillRect(RX + i * BW, y, BW, h);
+}
+
+// ---- draw loop (30 fps setInterval — rAF throttles when occluded) -----------
+let frames = 0; const win = [];
+function draw() {
+  const now = wallClock();
+  fireDue(now);                            // fire-then-draw: the frame that
+                                           // carries seq N is the first frame
+                                           // painted at/after the fire moment
+  // background + header
+  ctx.fillStyle = "#0d0f12"; ctx.fillRect(0, 0, 1280, 585);
+  ctx.fillStyle = "#57c973"; ctx.font = "bold 26px monospace";
+  ctx.fillText("elektron SYNCED-REPLAY TEST · room " + ROOM, 32, 46);
+  ctx.fillStyle = "#6b7683"; ctx.font = "16px monospace";
+  ctx.fillText("stage " + MY_ID + " · ws " + window.__state.wsState + " · f" + frames, 32, 74);
+
+  // big human clock
+  const d = new Date(now);
+  ctx.fillStyle = "#e8e8e8"; ctx.font = "bold 110px monospace";
+  ctx.fillText(d.toISOString().slice(11, 23), 100, 210);
+  ctx.fillStyle = "#4d5661"; ctx.font = "18px monospace";
+  ctx.fillText(d.toISOString().slice(0, 10) + " UTC · epoch " + Math.round(now), 100, 245);
+
+  // CUE ZONE
+  ctx.strokeStyle = "#2c3542"; ctx.lineWidth = 2; ctx.strokeRect(32, 280, 1216, 290);
+  ctx.fillStyle = "#8a93a0"; ctx.font = "bold 18px monospace";
+  ctx.fillText("CUE ZONE", 48, 310);
+  if (current) {
+    ctx.fillStyle = "#e8b44a"; ctx.font = "bold 92px monospace";
+    ctx.fillText(current.text, 60, 430);
+    ctx.fillStyle = "#8a93a0"; ctx.font = "20px monospace";
+    ctx.fillText("seq " + current.seq + " · fireAt " + Math.round(current.at) +
+                 " · firedAt " + Math.round(current.firedAt) +
+                 " · late " + Math.round(current.firedAt - current.at) + " ms", 60, 470);
+    ctx.fillStyle = "#4d5661"; ctx.font = "16px monospace";
+    let hx = 60;
+    for (const h of history.slice(1))
+      { ctx.fillText("#" + h.seq + " " + h.text, hx, 545); hx += 220; }
+  } else {
+    ctx.fillStyle = "#3d4550"; ctx.font = "bold 40px monospace";
+    ctx.fillText("— no cue yet —", 60, 430);
+  }
+
+  // black bed + binary rows
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 585, 1280, 135);
+  drawRow(Math.round(now), PID_BYTE, CLOCK_Y, CLOCK_H);
+  if (current) drawRow(Math.round(current.firedAt), current.seq & 0xff, CUE_Y, CUE_H);
+  ctx.fillStyle = "#3d4550"; ctx.font = "12px monospace";
+  ctx.fillText("clock row: 48-bit ms + 'S' + ck", 32, 712);
+  ctx.fillText(current ? ("cue row: firedAt + seq " + current.seq) : "cue row: (dark until first cue)", 460, 712);
+  ctx.fillText("elektron replay-test", 1080, 712);
+
+  frames++; window.__state.drawFrames = frames;
+  const p = performance.now();
+  win.push(p); while (win.length && p - win[0] > 5000) win.shift();
+  window.__state.drawFps = Math.round(win.length / 5);
+}
+setInterval(draw, 33);
+</script>
+</body>
+</html>

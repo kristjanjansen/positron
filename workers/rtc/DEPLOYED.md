@@ -4,6 +4,10 @@
 **Deployed:** 2026-08-26 07:17 (version b8842387). Status: **live and verified** (node WS clients,
 2026-08-26 07:21). Protocol below is exactly as implemented — no changes were needed during
 verification.
+**Updated 2026-08-26 09:47 (version 53ab064b):** additive cue-log — cue frames are now also
+persisted per room and readable via `GET /room/{name}/cuelog` (see table). No existing frame or
+route changed; grid.html re-verified against the deployed worker after the redeploy (join +
+SFU publish green).
 
 ## Measured (deployed, from this machine)
 
@@ -32,6 +36,7 @@ Tile **GETs** are open (they serve only ~10–25 KB JPEG stills).
 | method | path | auth | purpose |
 |---|---|---|---|
 | WS | `/room/{name}/ws` | token | RtcRoom signaling (one DO per room name) |
+| GET | `/room/{name}/cuelog` | token | every cue frame the room has relayed, oldest first: `{count, cues:[{from, cue:{…, serverAt}, doRecvTs}]}` — the replay feed for recorded shows. Sender stamps inside `cue` (`at`, `sentAt`, …) are stored verbatim and are the only timing authority; `serverAt`/`doRecvTs` are DO-clock breadcrumbs (frozen during execution, ±70 ms — never use for fine timing). Capped at the last 1000 cues per room. |
 | POST/PUT/GET | `/cf/{subpath}` | token | SFU proxy → `rtc.live.cloudflare.com/v1/apps/{appId}/{subpath}` (secret + UA added server-side) |
 | POST | `/tile/{room}/{participantId}` | token | JPEG snapshot tile, body = raw JPEG bytes, **max 64 KB**, must start with JPEG magic (FFD8) |
 | GET | `/tile/{room}/{participantId}` | open | latest tile; `Cache-Control: max-age=2`; headers `X-Tile-Source: cache\|do`, `X-Tile-Age-Ms` |
