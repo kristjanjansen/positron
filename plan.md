@@ -639,6 +639,22 @@ seek rewinds state; forward seek reconstructs). Proof VOD kept: `de39bf1916469a4
   `GET /room/{name}/cuelog`. Run: proto/replay/README.md. Production gaps listed there (audio rig,
   anchor persistence, periodic re-anchor across ingest gaps, cuelog compaction).
 
+**✅ SUPERSEDING DESIGN — LOCAL-FIRST ARCHIVE (user-proposed, proven 2026-08-26, proto/archive/):
+record locally with a NATIVE T₀ → segmented upload to R2 → replay from R2.**
+- **T₀-native vs content truth: −15 ms** (within half a frame) — the stamp at first-frame-written IS
+  the anchor; NO calibration, NO burned strip, NO audio assumed. (Trap: ffmpeg's `-progress`
+  first-frame report is +4.3 s late — stamp the input-side write, never ffmpeg's own report.)
+- Cue replay from R2: **p50 77 / p95 95 ms** — and an honesty correction: the earlier "59 ms" was
+  partly ALIASING (integer-second cue spacing phase-locks the 100 ms poll); 54–95 ms is the true
+  engine band. Both runs comfortably under the 150 ms target.
+- **Disk O(1)**: high-water 2 segments resident regardless of show length. Upload lag p50 5.5 s
+  (near-live archive). Cost ~**25× cheaper than Stream storage** + zero egress. Proof show kept:
+  pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8 (t0=1787745030511).
+- Verification freebie: **R2's ETag == plain MD5** for single-part puts — integrity check for free.
+- Wrangler trap SHARPENED: wrangler auto-loads `.env` from its CWD — env-unsetting is not enough;
+  run from a directory without .env (scripts pin cwd). Stream recording demoted to backup-when-
+  RTMPS-leg-exists; NEVER primary anchor.
+
 ## 12. Cue→video sync — end-to-end verification (added later this session)
 
 ✅ One-tab test (`rig/cue-sync.html`): cues published every 3 s through the DEPLOYED DO room,

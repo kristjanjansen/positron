@@ -1,0 +1,160 @@
+{
+  "hls": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8",
+  "room": "archive-test",
+  "bucket": "elektron-archive-test",
+  "prefix": "shows/archive-test",
+  "anchors": {
+    "native": 1787745030511,
+    "content": 1787745030496,
+    "contentSpreadMs": 38,
+    "contentMinusNativeMs": -15,
+    "tSpawnFfmpeg": 1787745030498,
+    "T0meta": 1787745030506,
+    "tFfFirstProgress": 1787745034768
+  },
+  "perCue": [
+    {
+      "id": "CUE-01",
+      "mode": "now",
+      "at": 1787745045512,
+      "vodT": 15.001,
+      "fired": true,
+      "errMs": 92,
+      "engineLateMs": 80,
+      "liveLateMs": 59,
+      "replayVsLiveMs": 33
+    },
+    {
+      "id": "CUE-02",
+      "mode": "scheduled",
+      "at": 1787745066811,
+      "vodT": 36.3,
+      "fired": true,
+      "errMs": 77,
+      "engineLateMs": 80,
+      "liveLateMs": 12,
+      "replayVsLiveMs": 65
+    },
+    {
+      "id": "CUE-03",
+      "mode": "now",
+      "at": 1787745088213,
+      "vodT": 57.702,
+      "fired": true,
+      "errMs": 59,
+      "engineLateMs": 75,
+      "liveLateMs": 59,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-04",
+      "mode": "scheduled",
+      "at": 1787745108611,
+      "vodT": 78.1,
+      "fired": true,
+      "errMs": 54,
+      "engineLateMs": 73,
+      "liveLateMs": 23,
+      "replayVsLiveMs": 31
+    },
+    {
+      "id": "CUE-05",
+      "mode": "now",
+      "at": 1787745130413,
+      "vodT": 99.902,
+      "fired": true,
+      "errMs": 67,
+      "engineLateMs": 71,
+      "liveLateMs": 67,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-06",
+      "mode": "scheduled",
+      "at": 1787745150911,
+      "vodT": 120.4,
+      "fired": true,
+      "errMs": 95,
+      "engineLateMs": 76,
+      "liveLateMs": 28,
+      "replayVsLiveMs": 67
+    },
+    {
+      "id": "CUE-07",
+      "mode": "now",
+      "at": 1787745172114,
+      "vodT": 141.603,
+      "fired": true,
+      "errMs": 78,
+      "engineLateMs": 76,
+      "liveLateMs": 78,
+      "replayVsLiveMs": 1
+    },
+    {
+      "id": "CUE-08",
+      "mode": "scheduled",
+      "at": 1787745193311,
+      "vodT": 162.8,
+      "fired": true,
+      "errMs": 66,
+      "engineLateMs": 79,
+      "liveLateMs": 1,
+      "replayVsLiveMs": 65
+    }
+  ],
+  "summary": {
+    "n": 8,
+    "p50": 77,
+    "p95": 95,
+    "absP50": 77,
+    "absP95": 95,
+    "min": 54,
+    "max": 95
+  },
+  "checks": [
+    {
+      "name": "r2-playlist-reachable-ended",
+      "ok": true,
+      "detail": "48 segments, 1528 B, ENDLIST=true"
+    },
+    {
+      "name": "content-anchor-derived",
+      "ok": true,
+      "detail": "spread=38ms"
+    },
+    {
+      "name": "all-cues-fired",
+      "ok": true,
+      "detail": "all 8"
+    },
+    {
+      "name": "all-fire-frames-decoded",
+      "ok": true,
+      "detail": "decOk on every fire"
+    },
+    {
+      "name": "abs-p95-under-150ms",
+      "ok": true,
+      "detail": "absP95=95ms"
+    },
+    {
+      "name": "native-anchor-within-1-frame-of-content",
+      "ok": true,
+      "detail": "content−native=-15ms"
+    },
+    {
+      "name": "burn-decode-rate",
+      "ok": true,
+      "detail": "5116/5117"
+    }
+  ],
+  "rvfc": {
+    "samples": 5117,
+    "validClock": 5116,
+    "validCue": 4668
+  },
+  "previousContentAnchoredRun": {
+    "p50": 59,
+    "p95": 71
+  }
+}

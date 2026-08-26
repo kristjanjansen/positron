@@ -1,0 +1,48 @@
+11:54:01.018 ARCHIVE MEASURE hls=https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8 cues=8 T0native=1787745030511 (anchor=stamp — NO calibration)
+11:54:01.294 PASS  r2-playlist-reachable-ended  48 segments, 1528 B, ENDLIST=true
+11:54:03.697 replay RUNNING from R2 (native stamp anchor)
+11:54:03.700 A +0s fires=0 caughtup=0 cur=null rvfc=8/9 content=…
+11:54:08.704 A +5s fires=0 caughtup=0 cur=null rvfc=158/159 content=1787745030496
+11:54:13.707 A +10s fires=0 caughtup=0 cur=null rvfc=308/309 content=1787745030496
+11:54:18.710 A +15s fires=1 caughtup=0 cur=CUE-01 rvfc=458/459 content=1787745030496
+11:54:23.717 A +20s fires=1 caughtup=0 cur=CUE-01 rvfc=608/609 content=1787745030496
+11:54:28.729 A +25s fires=1 caughtup=0 cur=CUE-01 rvfc=758/759 content=1787745030496
+11:54:33.737 A +30s fires=1 caughtup=0 cur=CUE-01 rvfc=908/909 content=1787745030496
+11:54:38.741 A +35s fires=1 caughtup=0 cur=CUE-01 rvfc=1059/1060 content=1787745030496
+11:54:43.744 A +40s fires=2 caughtup=0 cur=CUE-02 rvfc=1209/1210 content=1787745030496
+11:54:48.751 A +45s fires=2 caughtup=0 cur=CUE-02 rvfc=1359/1360 content=1787745030496
+11:54:53.755 A +50s fires=2 caughtup=0 cur=CUE-02 rvfc=1509/1510 content=1787745030496
+11:54:58.765 A +55s fires=2 caughtup=0 cur=CUE-02 rvfc=1660/1661 content=1787745030496
+11:55:03.820 A +60s fires=3 caughtup=0 cur=CUE-03 rvfc=1810/1811 content=1787745030496
+11:55:08.827 A +65s fires=3 caughtup=0 cur=CUE-03 rvfc=1961/1962 content=1787745030496
+11:55:13.832 A +71s fires=3 caughtup=0 cur=CUE-03 rvfc=2112/2113 content=1787745030496
+11:55:18.839 A +76s fires=3 caughtup=0 cur=CUE-03 rvfc=2262/2263 content=1787745030496
+11:55:23.844 A +81s fires=4 caughtup=0 cur=CUE-04 rvfc=2412/2413 content=1787745030496
+11:55:28.850 A +86s fires=4 caughtup=0 cur=CUE-04 rvfc=2562/2563 content=1787745030496
+11:55:33.857 A +91s fires=4 caughtup=0 cur=CUE-04 rvfc=2712/2713 content=1787745030496
+11:55:38.868 A +96s fires=4 caughtup=0 cur=CUE-04 rvfc=2863/2864 content=1787745030496
+11:55:43.872 A +101s fires=5 caughtup=0 cur=CUE-05 rvfc=3013/3014 content=1787745030496
+11:55:48.877 A +106s fires=5 caughtup=0 cur=CUE-05 rvfc=3163/3164 content=1787745030496
+11:55:53.884 A +111s fires=5 caughtup=0 cur=CUE-05 rvfc=3313/3314 content=1787745030496
+11:55:58.897 A +116s fires=5 caughtup=0 cur=CUE-05 rvfc=3463/3464 content=1787745030496
+11:56:03.907 A +121s fires=6 caughtup=0 cur=CUE-06 rvfc=3614/3615 content=1787745030496
+11:56:08.914 A +126s fires=6 caughtup=0 cur=CUE-06 rvfc=3764/3765 content=1787745030496
+11:56:13.922 A +131s fires=6 caughtup=0 cur=CUE-06 rvfc=3914/3915 content=1787745030496
+11:56:18.932 A +136s fires=6 caughtup=0 cur=CUE-06 rvfc=4064/4065 content=1787745030496
+11:56:23.937 A +141s fires=6 caughtup=0 cur=CUE-06 rvfc=4215/4216 content=1787745030496
+11:56:28.942 A +146s fires=7 caughtup=0 cur=CUE-07 rvfc=4365/4366 content=1787745030496
+11:56:33.946 A +151s fires=7 caughtup=0 cur=CUE-07 rvfc=4515/4516 content=1787745030496
+11:56:38.951 A +156s fires=7 caughtup=0 cur=CUE-07 rvfc=4665/4666 content=1787745030496
+11:56:43.959 A +161s fires=7 caughtup=0 cur=CUE-07 rvfc=4815/4816 content=1787745030496
+11:56:48.966 A +166s fires=8 caughtup=0 cur=CUE-08 rvfc=4966/4967 content=1787745030496
+11:56:54.012 done: fires=8 caughtup=0 rvfcValid=5116/5117
+11:56:54.012 ANCHORS  native(stamp)=1787745030511  content=1787745030496  DELTA content−native = -15 ms (spread 38 ms over 15 frames)
+11:56:54.012 PASS  content-anchor-derived  spread=38ms
+11:56:54.012 per-cue err (decodedBurnedClock@fire − fireAt, ms, NATIVE anchor): CUE-01:92 CUE-02:77 CUE-03:59 CUE-04:54 CUE-05:67 CUE-06:95 CUE-07:78 CUE-08:66
+11:56:54.012 summary n=8 p50=77 p95=95 (previous content-anchored run: 59/71)
+11:56:54.012 PASS  all-cues-fired  all 8
+11:56:54.012 PASS  all-fire-frames-decoded  decOk on every fire
+11:56:54.012 PASS  abs-p95-under-150ms  absP95=95ms
+11:56:54.012 PASS  native-anchor-within-1-frame-of-content  content−native=-15ms
+11:56:54.012 PASS  burn-decode-rate  5116/5117
+11:56:54.016 report written; checks: 7/7 pass
