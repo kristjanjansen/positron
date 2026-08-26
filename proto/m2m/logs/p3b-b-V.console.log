@@ -8,3 +8,10 @@
 05:25:25.619 [log] HLS FATAL networkError manifestParsingError
 05:25:39.072 [log] HLS warn networkError fragLoadTimeOut
 05:25:49.130 [log] HLS warn mediaError bufferSeekOverHole
+05:34:09.129 [log] HLS warn networkError audioTrackLoadTimeOut
+05:34:09.196 [log] HLS warn networkError levelLoadTimeOut
+05:34:47.112 [log] HLS warn networkError audioTrackLoadTimeOut
+05:34:47.135 [log] HLS warn networkError levelLoadTimeOut
+05:35:05.096 [log] HLS warn networkError levelLoadTimeOut
+05:35:05.116 [log] HLS warn networkError audioTrackLoadTimeOut
+05:35:33.133 [log] HLS warn networkError levelLoadTimeOut

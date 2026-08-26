@@ -828,6 +828,56 @@ results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
   measured, plan.md §1); a show watches the composite through v5, not stock
   hls.js. Composite/encode side unaffected: drawFps 30, 0 sc drops.
 
+## P3B Checkpoint P3 — ROUTE B MAIN ✅ + recording verified + cleanup (08:4x EEST)
+
+- **632 s screencast->ffmpeg->RTMPS run, all green**: 19202 frames piped
+  (30.36 fps), 0 dropped, ffmpeg 1.02-1.05x realtime; composite drawFps 30
+  min=30 the whole way; LL-HLS viewer decoded 100.00 % of 18102 frames
+  (36204 featured-row + 18102 K-row decodes, 0 invalid).
+- Steady (m2m-p3b-b.jsonl): grid->composite pooled p50 60 / p95 105 / p99
+  134 ms; wall freshness at composite p50 825 ms, 0 misses. Viewer latency
+  p50 10.12 s (the parked join above — viewer-side, not pipeline).
+- **CPU of the whole OBS replacement: composite Chrome p50 39 % (max 43 %) of
+  one core + ffmpeg p50 18 % ≈ 0.6 cores total**, RSS 914 MB + 77 MB.
+  (Route A pure-browser variant: 38 % and NO ffmpeg ≈ 0.4 cores.)
+- **RECORDING (the deliverable): uid ee90ebba017e4a395a96961cea9f77f3,
+  state ready, duration 632.02 s (streamed 633 s — matches), 1280x720,
+  readyToStreamAt +1.8 s after stream end.** Playback:
+  https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/ee90ebba017e4a395a96961cea9f77f3/manifest/video.m3u8
+  (watch: .../ee90ebba017e4a395a96961cea9f77f3/watch). Frame grabs at t=300 /
+  t=620 (logs/p3b-recording-t*.png) show all 8 tiles + advancing clocks;
+  in-frame burned clocks prove tiles were 45-75 ms behind the composite clock
+  at record time — the archive carries its own latency evidence.
+- Driver poll-filter bug (noted, not refixed): "first ready video" matched an
+  old fragment; the real asset was polled manually. run-composite.mjs polls
+  should filter videos by created > run start.
+- CLEANUP: my :8895 server stopped, 0 m2m-p3b-udd chromes, no stray ffmpeg
+  (sibling's :8893 server left untouched). Stream: 2-min fragments bc557619 +
+  bef618a6 DELETED (were aborted-run accidents), live input 12f3a2dd DELETED
+  (404 confirmed) — **recording ee90ebba KEPT and re-verified playable AFTER
+  input deletion** (logs/p3b-recording-postdelete-t60.png). Total recorded
+  ~14.5 min (kept 10.5). Data: m2m-p3b-{smoke,a,b}.jsonl; tools
+  composite.html, composite-viewer.html, run-composite.mjs, analyze-p3b.py;
+  live-input JSON + recording metadata in artifacts/ (publish URLs are dead
+  credentials now — input deleted).
+
+## P3B verdict (for plan-m2m §5 risk 1)
+
+Composite participant WITHOUT OBS: **works, two-command cheap, archive-grade.**
+- Route A (in-page WHIP, pure browser): perfect LIVE path (viewer p50 128 ms
+  glass-to-glass from grid pixels) but **records NOTHING** — Stream WHIP
+  ingest creates no video assets, ever (26 polls, recording.mode=automatic).
+  Use it only for a low-latency confidence/monitor feed.
+- Route B (CDP screencast -> ffmpeg -> RTMPS): **the archive path.** Recording
+  automatic, duration exact, ready in ~2 s, survives live-input deletion.
+  Live playback rides LL-HLS (use the v5 player, not stock hls.js).
+- A real show can run BOTH from the same composite tab: WHIP for the 128 ms
+  monitor, RTMPS for the archive (~0.6 cores total on an M-series laptop).
+- Harden for a show: pull-only SFU session for the recorder (rig publishes a
+  tiny presence track), audio mix (WebAudio -> both outputs; untested — this
+  rig is video-only), batch tracks/close (G4 carry-over), v5-player the
+  confidence view, and fix the videos poll filter.
+
 ============================================================================
 # P3C SCORE (cue-driven choreography agent — show.html / score.mjs /
 # scores/*.json / run-show.mjs / analyze-show.py; port 8893, udd m2m-p3c,
@@ -1047,3 +1097,22 @@ Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
 - Data: results/m2m-p3a-{control,media-N24,egress-show8}.jsonl; tools
   run-p3a-control.mjs, run-p3a-media.mjs (run-heavy clone + kind:"egress"
   transport rows), analyze-p3a.py, analyze-p3a-egress.py; logs/p3a-*.log/out.
+
+## Checkpoint P3 — mitigation iterations v2/v3/v4, each measured (2026-08-26 08:38 EEST)
+
+- stag1b (v2: plain setTimeout defer, m2m-p3c-stag1b.jsonl): 19/19 asserts,
+  promote regression FIXED (swap 699/717 ms, duet-C 591 ms) — but heavy-wave
+  gaps partially RETURNED (672-765 ms on 4/6): the batch now fired ~250 ms
+  after the last pull renegotiation; the idle beat, not just the batching,
+  is load-bearing. Bonus find: e18 demote→fresh snapshot hit **91 ms** —
+  the demoted client's immediate tile-POST won the race against the probe's
+  first poll. The "2.1 s floor" is a poll/post race, not physics: a console
+  that re-polls ~300 ms after a demote gets sub-second demote confirmation.
+- stag1c (v3: defer outside chain + fire only into a quiet chain, idle
+  >= 500 ms, re-arm x8): 19/19 asserts, promotes stay fixed (p50 585 max
+  810), heavy waves 5/6 in 160-358 ms — but ONE 1362 ms outlier (e09):
+  batch fired while probe 2's fresh tile was still PRE-FIRST-FRAME (chain
+  idle but decoder not); the renegotiation pushed that TTFF to 1446 ms.
+  demote-fresh-snap p50 129 ms this run (immediate-post race won 3 of 6).
+- v4 (in flight as stag1d): quiet predicate also requires no pulled tile
+  awaiting its first valid frame (bounded by the same x8 re-arm cap).

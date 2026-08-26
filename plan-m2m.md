@@ -308,12 +308,19 @@ Readings:
 
 Ranked.
 
-1. **No recording in the SFU** 📄 — the grid is ephemeral unless composed. Honest options:
-   (a) **composite participant**: a headless/OBS browser joins as a silent subscriber, renders the
-   grid page, streams RTMPS to a Stream live input → recorded + becomes the archival "audience
-   camera". Reuses the repo's OBS/relay Option C infra (✅ built) and the studio-OBS pattern —
-   lowest-risk, phase 3. (b) RealtimeKit's recording/raw-RTP-to-R2 📄 — but that means its SDK
-   layer, not the raw SFU. (c) per-participant WHIP to Stream inputs records **nothing** today 📄.
+1. **No recording in the SFU** 📄 → **✅ SOLVED (phase 3b, 2026-08-26): the composite participant
+   works, no OBS needed.** A headless Chrome renders the grid onto one canvas; the archive rides
+   **CDP screencast → ffmpeg → RTMPS** into a `recording.mode=automatic` Stream input (19,202
+   frames @ 30.36 fps, 0 dropped; recorded duration exact to the second; VOD ready **1.8 s** after
+   stream end; total cost ≈ 0.6 cores). The same tab can simultaneously publish WHIP for live
+   monitoring at 128 ms glass-to-glass. **Direct-tested platform fact: WHIP ingest records
+   NOTHING** — 183 s against a recording-enabled input produced zero assets; Stream-WebRTC is
+   delivery-only, so the RTMPS leg is mandatory for archive. Proof recording kept:
+   `customer-mwuu1cmlyif6eluy.cloudflarestream.com/ee90ebba017e4a395a96961cea9f77f3/watch`
+   (all 8 tiles + advancing clocks; burned rows still decode at 100 % from the VOD).
+   Hardening list in NOTES §P3B (pull-only recorder session, WebAudio mix, poll filter,
+   hls.js rebuild guard). ⚠️ A live viewer of the RTMPS leg must use our v5/v6 player — stock
+   hls.js parked at ~10 s, the exact pathology the player fixes.
 2. **Undocumented scale ceilings** ⚠️→✅ **first probe done (session 4 scale ladder, N=8→20):
    NO ceiling found through 20 participants.** Zero non-2xx across ~101 sessions/new + ~270
    tracks/new/renegotiates (no 429s ever); API latencies stable (sessions/new p50 240–500 ms,

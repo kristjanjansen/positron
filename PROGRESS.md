@@ -36,6 +36,21 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### Phase 3b composite — ✅ ARCHIVE-GRADE RECORDING WITHOUT OBS
+- ✅ Route B (CDP screencast → ffmpeg → RTMPS): 0 dropped frames, recorded
+  duration exact, VOD ready 1.8 s after end, ~0.6 cores total. Proof VOD kept:
+  ee90ebba017e4a395a96961cea9f77f3 (/watch on the customer host). Burned rows
+  decode at 100 % from the recording — the archive preserves latency evidence.
+- ✅ PLATFORM FACT direct-tested: WHIP ingest records NOTHING (recording-enabled
+  input, 183 s, zero assets) — Stream-WebRTC is delivery-only; plan.md §2.2
+  updated. Route A (in-page WHIP) = live monitor at 128 ms g2g; both outputs can
+  run from one tab.
+- Composite chain: grid→composite 58–60 ms; grid→live-viewer full chain 128 ms
+  p50 (one extra WebRTC hop ≈ one 74 ms unit, as modeled). Stock hls.js parked
+  at 10 s on the RTMPS leg — v5/v6 player mandatory for live composite viewing.
+- Hardening list NOTES §P3B; plan-m2m §5 risk 1 SOLVED. Live input deleted;
+  ~10.5 min stored (under budget).
+
 ### Phase 3a soak — ✅ NO CEILING THROUGH 1003 SESSIONS @ 40/s; cost model +7–12 %
 - ✅ 1003 creates + 2622 GETs direct to the SFU: zero CF errors, latency flat
   (p50 ~530–570 ms every bucket), 0/200 spontaneous deaths in 10 min.

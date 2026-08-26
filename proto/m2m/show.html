@@ -604,10 +604,22 @@ async function unpullTrack(pid, why) {
   }
 }
 
-// P3C delta 2 (v3): fire the deferred batch only when the SDP chain is quiet.
+// P3C delta 2 (v3+v4): fire the deferred batch only when the SDP chain is
+// quiet AND no freshly-pulled tile is still waiting for its first frame
+// (stag1c e09: a batch renegotiation while a tile was pre-first-frame pushed
+// that TTFF to 1.4 s and gapped the featured tier).
+function tileAwaitingFirstFrame() {
+  for (const [pid, st] of pullState) {
+    if (st.state !== "done" || !st.mid) continue;
+    const ts = window.__state.tiles[pid];
+    if (ts && !ts.firstValidT && !ts.dead && !ts.stalled) return true;
+  }
+  return false;
+}
 function scheduleBatchClose(fresh, attempt) {
   setTimeout(() => {
-    const busy = chainPending > 0 || performance.now() - chainLastDoneT < 500;
+    const busy = chainPending > 0 || performance.now() - chainLastDoneT < 500 ||
+                 tileAwaitingFirstFrame();
     if (busy && attempt < 8) return scheduleBatchClose(fresh, attempt + 1);
     chain(async () => {
       const pids = fresh.filter(pid => {
