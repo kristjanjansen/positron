@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>m2m 4K SFU room</title>
+<style>
+body{background:#111;color:#ddd;font:13px monospace}
+#tiles{display:flex;flex-wrap:wrap;gap:8px}
+.tile{border:1px solid #444;padding:4px}
+.tile video{width:480px;height:270px;display:block}
+#log{white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h3 id="hdr">m2m 4K room</h3>
+<canvas id="cv" width="640" height="360" style="width:320px;height:180px;border:1px solid #263"></canvas>
+<div id="tiles"></div>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+// 4K-over-SFU probe — room.html adapted (plan-m2m §6 phase-1 rig) for ONE
+// question: does the Cloudflare Realtime SFU carry a 3840x2160 track intact,
+// or does WebRTC silently downscale?  Differences vs room.html:
+//   - mode=pub canvas defaults 3840x2160@30, kbps default 15000, hint 'detail'
+//   - sender gets degradationPreference (default 'maintain-resolution') and
+//     scaleResolutionDownBy pinned to 1
+//   - codec=h264 (default) reorders transceiver codec prefs so H.264 is
+//     negotiated -> same VideoToolbox encoder class as the MoQ 4K matrix
+//   - noise=1 draws pre-rendered random strips over the bottom quarter
+//     (RUNBOOK §9.3 trick) to force real 4K-class bitrate through BWE
+//   - outbound stats add bytesSent/totalEncodeTime/qualityLimitation*Changes/
+//     negotiated codec; inbound adds bytesReceived
+//   - ALL telemetry rides plain fetch (sendBeacon/keepalive quota traps,
+//     instrument lessons #4/#5)
+const q = new URLSearchParams(location.search);
+const MY_ID = (q.get("id") || "X").slice(0, 8);
+const EXPECTED_N = parseInt(q.get("n") || "2", 10);
+const MODE = q.get("mode") === "pub" ? "pub" : "full";
+const IS_PUB = MODE === "pub";
+const HOLD = q.get("hold") === "1";
+const AUDIO = false;
+const PUB_W = parseInt(q.get("vw") || "3840", 10);
+const PUB_H = parseInt(q.get("vh") || "2160", 10);
+const PUB_FPS = parseInt(q.get("vfps") || "30", 10);
+const KBPS = parseInt(q.get("kbps") || "15000", 10);
+const HINT = q.get("hint") || "detail";
+const DEGPREF = q.get("degpref") || "maintain-resolution";
+const CODEC = q.get("codec") || "h264";     // 'h264' | 'default'
+const NOISE = q.get("noise") === "1";
+const CLS = q.get("cls") || (IS_PUB ? "pub4k" : "probe");
+const COLLECT = "/collect";
+document.getElementById("hdr").textContent = "m2m 4K — " + MY_ID + " mode=" + MODE +
+  (IS_PUB ? " " + PUB_W + "x" + PUB_H + "@" + PUB_FPS + " kbps=" + KBPS +
+            " hint=" + HINT + " degpref=" + DEGPREF + " codec=" + CODEC + (NOISE ? " NOISE" : "") : "");
+document.title = "m2m4k " + MY_ID;
+
+// ---- binary row geometry (identical to room.html: decoder normalizes to
+// 640x360 so ANY 16:9 publish size decodes, including a downscaled one) ------
+const NBLOCKS = 64;
+const BLOCK_W = 9;
+const ROW_X = 32;
+const ROW_Y = 40;
+const ROW_H = 56;
+
+window.__state = { phase: "init", error: null, id: MY_ID, mode: MODE, cls: CLS,
+                   frames: 0, rosterCount: 0, pulled: 0, tiles: {} };
+
+const logEl = document.getElementById("log");
+const hud = document.getElementById("hud");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function post(obj) {   // plain fetch, never sendBeacon (64 KB silent-drop trap)
+  fetch(COLLECT, { method: "POST", body: JSON.stringify(obj) }).catch(() => {});
+}
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name,
+                       t: performance.timeOrigin + performance.now() }, extra || {}));
+}
+
+// ---- canvas signal ---------------------------------------------------------
+const cv = document.getElementById("cv");
+if (IS_PUB) { cv.width = PUB_W; cv.height = PUB_H; }
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+let frameCounter = 0;
+const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+const PUB_SCALE = cv.width / 640;
+
+// noise strips (pub only): pre-rendered once, slid horizontally each frame —
+// incompressible content without per-frame ImageData cost.
+let noiseStrips = null, NOISE_H = 0;
+if (IS_PUB && NOISE) {
+  NOISE_H = Math.floor(cv.height / 4);
+  noiseStrips = [];
+  for (let k = 0; k < 3; k++) {
+    const oc = document.createElement("canvas");
+    oc.width = cv.width; oc.height = NOISE_H;
+    const octx = oc.getContext("2d", { alpha: false });
+    const im = octx.createImageData(cv.width, NOISE_H);
+    const d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = (Math.random() * 256) | 0;
+      d[i + 1] = (Math.random() * 256) | 0;
+      d[i + 2] = (Math.random() * 256) | 0;
+      d[i + 3] = 255;
+    }
+    octx.putImageData(im, 0, 0);
+    noiseStrips.push(oc);
+  }
+}
+
+function drawPub() {
+  const ms = Math.round(performance.timeOrigin + performance.now());
+  ctx.setTransform(PUB_SCALE, 0, 0, PUB_SCALE, 0, 0);
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 640, 360);
+  // moving color blocks across the frame so the encoder always has real work
+  for (let i = 0; i < 24; i++) {
+    ctx.fillStyle = "hsl(" + ((frameCounter * 7 + i * 40) % 360) + ",70%," + (30 + (i % 4) * 12) + "%)";
+    const bx = ((i * 83 + frameCounter * (2 + (i % 3))) % 600);
+    const by = 130 + ((i * 53 + frameCounter * ((i % 2) + 1)) % 200);
+    ctx.fillRect(bx, by, 36, 26);
+  }
+  // black bed + binary row (drawn LAST so nothing overlaps it)
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  ctx.font = "bold 110px monospace";
+  ctx.fillText(MY_ID, 40, 240);
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(String(ms), 160, 180);
+  if (noiseStrips) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const strip = noiseStrips[frameCounter % 3];
+    const shift = (frameCounter * 97) % cv.width;
+    ctx.drawImage(strip, shift, cv.height - NOISE_H);
+    ctx.drawImage(strip, shift - cv.width, cv.height - NOISE_H);
+  }
+  frameCounter++;
+  window.__state.frames = frameCounter;
+}
+
+function draw() {   // full-mode probe keeps room.html's cheap 640x360 signal
+  const ms = Math.round(performance.timeOrigin + performance.now());
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 640, 360);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 110px monospace";
+  ctx.fillText(MY_ID, 40, 240);
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(String(ms), 160, 180);
+  const x = (frameCounter * 5) % 560;
+  ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",80%,60%)";
+  ctx.fillRect(20 + x, 290, 50, 50);
+  frameCounter++;
+  window.__state.frames = frameCounter;
+  requestAnimationFrame(draw);
+}
+if (IS_PUB) setInterval(drawPub, Math.round(1000 / PUB_FPS));
+else requestAnimationFrame(draw);
+
+// ---- decoder (unchanged: normalize whatever arrives onto the 640x360 grid) --
+function makeDecoder() {
+  const work = document.createElement("canvas");
+  work.width = 640; work.height = 360;
+  const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+  return function decodeRow(vid) {
+    wctx.drawImage(vid, 0, 0, 640, 360);
+    const y = ROW_Y + ROW_H / 2;
+    const img = wctx.getImageData(ROW_X, y, NBLOCKS * BLOCK_W, 1).data;
+    const levels = [];
+    for (let i = 0; i < NBLOCKS; i++) {
+      let s = 0;
+      for (let dx = 3; dx < 6; dx++) s += img[(i * BLOCK_W + dx) * 4 + 1];
+      levels.push(s / 3);
+    }
+    const mn = Math.min(...levels), mx = Math.max(...levels);
+    if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+    const thr = (mn + mx) / 2;
+    const bits = levels.map(l => (l > thr ? 1 : 0));
+    let ms = 0;
+    for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+    let pid = 0;
+    for (let i = 48; i < 56; i++) pid = pid * 2 + bits[i];
+    let ck = 0;
+    for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+    const bytes = [];
+    let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(pid);
+    let expect = 0;
+    for (const b of bytes) expect ^= b;
+    if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+    return { ok: true, ms, pid: String.fromCharCode(pid), contrast: mx - mn };
+  };
+}
+
+// ---- sample batching (plain fetch) -----------------------------------------
+let batch = [];
+window.__batchStats = { flushed: 0, failed: 0 };
+setInterval(() => {
+  if (batch.length) {
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") })
+      .then(() => { window.__batchStats.flushed++; })
+      .catch(() => { window.__batchStats.failed++; });
+    batch = [];
+  }
+}, 1000);
+
+// ---- tiles -----------------------------------------------------------------
+const tilesEl = document.getElementById("tiles");
+function startTile(fromPid, track) {
+  const div = document.createElement("div");
+  div.className = "tile";
+  const label = document.createElement("div");
+  label.textContent = fromPid + " -> " + MY_ID;
+  const vid = document.createElement("video");
+  vid.autoplay = true; vid.muted = true; vid.playsInline = true;
+  div.appendChild(label); div.appendChild(vid);
+  tilesEl.appendChild(div);
+  vid.srcObject = new MediaStream([track]);
+  vid.play().catch(() => {});
+
+  const tileState = { samples: 0, valid: 0, pidMismatch: 0, lastLatencyMs: null, lastW: null, lastH: null };
+  window.__state.tiles[fromPid] = tileState;
+  const decodeRow = makeDecoder();
+  let busy = false, lastPresented = -1;
+
+  function onFrame(now, meta) {
+    vid.requestVideoFrameCallback(onFrame);   // RE-ARM FIRST (plan §4.1)
+    if (busy) return;
+    busy = true;
+    try {
+      if (meta.presentedFrames === lastPresented) return;
+      lastPresented = meta.presentedFrames;
+      const dec = decodeRow(vid);
+      const dispWall = performance.timeOrigin + meta.expectedDisplayTime;
+      const row = {
+        kind: "sample", from: fromPid, to: MY_ID,
+        t: performance.timeOrigin + performance.now(),
+        vis: document.visibilityState,
+        presentedFrames: meta.presentedFrames,
+        receiveTime: (meta.receiveTime !== undefined) ? meta.receiveTime : null,
+        w: meta.width, h: meta.height,        // ACTUAL delivered frame size, per frame
+        decOk: dec.ok, contrast: Math.round(dec.contrast || 0)
+      };
+      tileState.lastW = meta.width; tileState.lastH = meta.height;
+      if (dec.ok) {
+        row.burnedTs = dec.ms;
+        row.latencyMs = dispWall - dec.ms;
+        row.decPid = dec.pid;
+        row.pidOk = dec.pid === fromPid;
+        if (!row.pidOk) tileState.pidMismatch++;
+        tileState.valid++;
+        tileState.lastLatencyMs = Math.round(row.latencyMs);
+      } else {
+        row.decWhy = dec.why;
+      }
+      if (meta.receiveTime != null) row.receiveToDisplayMs = meta.expectedDisplayTime - meta.receiveTime;
+      tileState.samples++;
+      batch.push(row);
+    } finally {
+      busy = false;
+    }
+  }
+  vid.requestVideoFrameCallback(onFrame);
+}
+
+setInterval(() => {
+  const parts = Object.entries(window.__state.tiles).map(([pid, s]) =>
+    pid + ":" + s.valid + "/" + s.samples + (s.lastLatencyMs != null ? "@" + s.lastLatencyMs + "ms" : "") +
+    (s.lastW ? " " + s.lastW + "x" + s.lastH : ""));
+  hud.textContent = "phase=" + window.__state.phase + " frames=" + frameCounter +
+    " roster=" + window.__state.rosterCount + " tiles[" + parts.join(" ") + "]" +
+    " qlr=" + (window.__state.qlr || "-") + " out=" + (window.__state.outWH || "-");
+}, 1000);
+
+// ---- SFU client (room.html flow + 4K sender knobs) -------------------------
+async function cf(method, subpath, body) {
+  const resp = await fetch("/cf/" + subpath, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode) {
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  }
+  return obj;
+}
+
+function waitIceGathering(pc) {
+  return new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+
+let pc = null, SID = null;
+const TRACK_NAME = "video-" + MY_ID;
+const midToPid = new Map();
+
+async function publish() {
+  const RETRIES = +(sessionStorage.getItem("m2m4k_connect_retry") || 0);
+  if (HOLD && !RETRIES) {
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
+  window.__state.phase = "connecting";
+  window.__state.t_go = performance.timeOrigin + performance.now();
+  const stream = cv.captureStream(IS_PUB ? PUB_FPS : 30);
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState });
+  pc.onconnectionstatechange = () => {
+    event("pc", { state: pc.connectionState });
+    if (pc.connectionState === "failed") { window.__state.phase = "failed"; window.__state.error = "pc failed"; }
+  };
+  pc.ontrack = (e) => {
+    const pid = midToPid.get(e.transceiver.mid);
+    log("ontrack " + e.track.kind + " mid=" + e.transceiver.mid + " -> " + (pid || "UNKNOWN"));
+    if (!pid) { event("ontrack-unmapped", { mid: e.transceiver.mid, trackKind: e.track.kind }); return; }
+    if (e.track.kind === "video") startTile(pid, e.track);
+  };
+
+  async function cfRetry(method, subpath, body, what) {
+    for (let a = 1; ; a++) {
+      try { return await cf(method, subpath, body); }
+      catch (e) {
+        if (a > 2) throw e;
+        event("publish-retry", { what, attempt: a, error: String(e.message).slice(0, 200) });
+        await new Promise(r => setTimeout(r, 1000 * a));
+      }
+    }
+  }
+  const sess = await cfRetry("POST", "sessions/new", undefined, "sessions/new");
+  SID = sess.sessionId;
+  window.__state.sessionId = SID;
+  log("session " + SID.slice(0, 12) + "…");
+
+  const vtrack = stream.getVideoTracks()[0];
+  if (IS_PUB && HINT) vtrack.contentHint = HINT;
+  const tx = pc.addTransceiver(vtrack, { direction: "sendonly" });
+  // codec preference: H.264 first so the negotiation lands on VideoToolbox
+  // (comparable to the MoQ 4K matrix). level-asymmetry-allowed lets the
+  // encoder exceed the SDP's nominal level for 4K.
+  if (IS_PUB && CODEC === "h264") {
+    try {
+      const caps = RTCRtpSender.getCapabilities("video");
+      const h264 = caps.codecs.filter(c => /h264/i.test(c.mimeType));
+      const rest = caps.codecs.filter(c => !/h264/i.test(c.mimeType));
+      if (h264.length) { tx.setCodecPreferences(h264.concat(rest)); window.__state.codecPref = "h264"; }
+    } catch (e) { event("setcodecpref-failed", { error: String(e).slice(0, 200) }); }
+  }
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+  const lname = MY_ID.toLowerCase();
+  await fetch("/save/pub4k-offer-" + lname + ".sdp", { method: "POST", body: pc.localDescription.sdp });
+  const resp = await cfRetry("POST", "sessions/" + SID + "/tracks/new", {
+    sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+    tracks: [{ location: "local", mid: tx.mid, trackName: TRACK_NAME }]
+  }, "publish-tracks/new");
+  await fetch("/save/pub4k-answer-" + lname + ".sdp", { method: "POST", body: resp.sessionDescription.sdp });
+  await pc.setRemoteDescription(resp.sessionDescription);
+  // sender knobs AFTER answer applied (encodings exist then)
+  if (IS_PUB) {
+    try {
+      const p = tx.sender.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      if (KBPS > 0) p.encodings[0].maxBitrate = KBPS * 1000;
+      p.encodings[0].scaleResolutionDownBy = 1;
+      if (DEGPREF) p.degradationPreference = DEGPREF;
+      await tx.sender.setParameters(p);
+      const chk = tx.sender.getParameters();
+      window.__state.senderParams = {
+        maxBitrate: chk.encodings && chk.encodings[0] && chk.encodings[0].maxBitrate,
+        scaleResolutionDownBy: chk.encodings && chk.encodings[0] && chk.encodings[0].scaleResolutionDownBy,
+        degradationPreference: chk.degradationPreference || null
+      };
+      event("sender-params", window.__state.senderParams);
+    } catch (e) { event("setparams-failed", { error: String(e).slice(0, 200) }); }
+  }
+  event("published", { trackName: TRACK_NAME, renego: !!resp.requiresImmediateRenegotiation,
+                       w: PUB_W, h: PUB_H, fps: PUB_FPS, kbps: KBPS, hint: HINT,
+                       degpref: DEGPREF, codec: CODEC, noise: NOISE });
+
+  try {
+    await new Promise((res, rej) => {
+      if (pc.connectionState === "connected") return res();
+      const t = setTimeout(() => rej(new Error("pc connect timeout")), 15000);
+      pc.addEventListener("connectionstatechange", function h() {
+        if (pc.connectionState === "connected") { clearTimeout(t); pc.removeEventListener("connectionstatechange", h); res(); }
+      });
+    });
+  } catch (e) {
+    if (RETRIES < 2) {
+      sessionStorage.setItem("m2m4k_connect_retry", String(RETRIES + 1));
+      event("connect-retry", { attempt: RETRIES + 1, state: pc.connectionState });
+      try { pc.close(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 500));
+      location.reload();
+      await new Promise(() => {});
+    }
+    throw e;
+  }
+  window.__state.phase = "publishing";
+  log("pc connected, joining room");
+  await fetch("/join", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ participantId: MY_ID, sessionId: SID, trackName: TRACK_NAME }) });
+  window.__state.phase = "running";
+  window.__state.t_running = performance.timeOrigin + performance.now();
+  if (!IS_PUB) startRosterLoop();
+  startStats();
+}
+
+// ---- roster poll + serialized pulls (room.html verbatim, video-only) --------
+const pullState = new Map();
+let pullChain = Promise.resolve();
+
+function startRosterLoop() {
+  const tick = async () => {
+    try {
+      const r = await fetch("/roster");
+      const { participants } = await r.json();
+      window.__state.rosterCount = participants.length;
+      for (const p of participants) {
+        if (p.participantId === MY_ID) continue;
+        const st = pullState.get(p.participantId);
+        if (st && (st.state === "queued" || st.state === "pulling" || st.state === "done")) continue;
+        if (st && st.attempts >= 5) continue;
+        const attempts = st ? st.attempts : 0;
+        pullState.set(p.participantId, { state: "queued", attempts });
+        pullChain = pullChain.then(() => pullTrack(p)).catch(() => {});
+      }
+    } catch (e) { /* server hiccup — next poll */ }
+  };
+  tick();
+  setInterval(tick, 2000);
+}
+
+async function pullTrack(p) {
+  const pid = p.participantId;
+  const st = pullState.get(pid);
+  st.state = "pulling"; st.attempts++;
+  try {
+    const want = [{ location: "remote", sessionId: p.sessionId, trackName: p.trackName }];
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", { tracks: want });
+    const trs = resp.tracks || [];
+    if (trs.length !== want.length) throw new Error("pull " + pid + ": got " + trs.length + "/" + want.length + " tracks");
+    for (const tr of trs) {
+      if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+      if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+      midToPid.set(tr.mid, pid);     // BEFORE setRemoteDescription — ontrack fires during it
+    }
+    const tr = trs[0];
+    if (resp.requiresImmediateRenegotiation) {
+      await pc.setRemoteDescription(resp.sessionDescription);
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await cf("PUT", "sessions/" + SID + "/renegotiate", {
+        sessionDescription: { type: "answer", sdp: pc.localDescription.sdp }
+      });
+    }
+    st.state = "done";
+    window.__state.pulled++;
+    event("pulled", { from: pid, mid: tr.mid, renego: !!resp.requiresImmediateRenegotiation });
+    log("pulled " + pid + " (mid " + tr.mid + ")");
+  } catch (e) {
+    st.state = "failed";
+    log("pull " + pid + " attempt " + st.attempts + " failed: " + e.message);
+    event("pull-failed", { from: pid, attempt: st.attempts, error: String(e.message).slice(0, 300) });
+    if (st.attempts >= 5) { window.__state.error = "pull " + pid + " gave up"; }
+    throw e;
+  }
+}
+
+// ---- getStats every 2 s ----------------------------------------------------
+function startStats() {
+  setInterval(async () => {
+    try {
+      const st = await pc.getStats();
+      const codecs = new Map();
+      st.forEach(s => { if (s.type === "codec") codecs.set(s.id, s); });
+      const row = { kind: "stats", who: MY_ID, role: MODE, cls: CLS,
+                    t: performance.timeOrigin + performance.now(),
+                    vis: document.visibilityState, inbound: [] };
+      st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "video") {
+          row.framesEncoded = s.framesEncoded;
+          row.framesSent = s.framesSent;
+          row.fps = s.framesPerSecond;
+          row.packetsSent = s.packetsSent;
+          row.bytesSent = s.bytesSent;
+          row.totalEncodeTime = s.totalEncodeTime;
+          row.qualityLimitationReason = s.qualityLimitationReason;
+          row.qualityLimitationDurations = s.qualityLimitationDurations;
+          row.qualityLimitationResolutionChanges = s.qualityLimitationResolutionChanges;
+          row.targetBitrate = s.targetBitrate;
+          row.encoderImplementation = s.encoderImplementation;
+          row.outWidth = s.frameWidth; row.outHeight = s.frameHeight;
+          const c = codecs.get(s.codecId);
+          if (c) { row.codec = c.mimeType; row.fmtp = c.sdpFmtpLine; }
+        }
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          const c = codecs.get(s.codecId);
+          row.inbound.push({
+            from: midToPid.get(s.mid) || s.mid,
+            jitterBufferDelay: s.jitterBufferDelay,
+            jitterBufferEmittedCount: s.jitterBufferEmittedCount,
+            framesDecoded: s.framesDecoded,
+            framesDropped: s.framesDropped,
+            framesReceived: s.framesReceived,
+            fps: s.framesPerSecond,
+            freezeCount: s.freezeCount,
+            totalFreezesDuration: s.totalFreezesDuration,
+            packetsLost: s.packetsLost,
+            bytesReceived: s.bytesReceived,
+            nackCount: s.nackCount,
+            pliCount: s.pliCount,
+            frameWidth: s.frameWidth,
+            frameHeight: s.frameHeight,
+            decoderImplementation: s.decoderImplementation,
+            codec: c ? c.mimeType : null
+          });
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated) {
+          row.rtt = s.currentRoundTripTime;
+        }
+      });
+      window.__state.fps = row.fps;
+      window.__state.framesSent = row.framesSent;
+      window.__state.qlr = row.qualityLimitationReason;
+      if (row.outWidth) window.__state.outWH = row.outWidth + "x" + row.outHeight;
+      window.__state.encoderImplementation = row.encoderImplementation;
+      post(row);
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+publish().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e).slice(0, 500) });
+});
+</script>
+</body>
+</html>

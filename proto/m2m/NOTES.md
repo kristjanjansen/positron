@@ -1168,3 +1168,14 @@ Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
   run-show.mjs, analyze-show.py, scores/{demo,smoke}-score.json. Data:
   results/m2m-p3c-{smoke,stag0,stag1,stag1b,stag1c,stag1d}.jsonl.
   grid.html / run-grid.mjs / grid-server.py / plan files untouched.
+
+## §4K-SFU-HLS — can the other two delivery paths do 4K? (agent start 2026-08-26 ~10:15 EEST)
+Context: MoQ 4K30 proven (47 ms g2g, RUNBOOK §9). Now (A) Realtime SFU with a 3840x2160@30
+canvas track (pub4k-room.html + run-4k-sfu.mjs, port 8889, udd m2m-4k-udd-*), (B) Stream
+LL-HLS with a 4K30 RTMPS push (own live input only). Machine at start: AC 100%, load1 16.4 —
+sibling agents live (moq-audio-* trio + the 4K MoQ publisher moq-4k-pub-udd; NOT touched).
+Arms planned: A1 4K30 plain canvas (mirrors the MoQ matrix content), A2 4K30 noise=1 (forces
+real ~15 Mbps through BWE — separates encoder-limited from bandwidth-limited), A3 4K15 only
+if resolution degrades. Sender knobs per brief: contentHint=detail, degradationPreference=
+maintain-resolution, scaleResolutionDownBy=1, maxBitrate 15 Mbps, H.264 codec-pref (same
+VideoToolbox class as MoQ). Telemetry all plain fetch (lessons #4/#5).

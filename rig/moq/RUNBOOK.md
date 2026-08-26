@@ -818,3 +818,36 @@ Opus."**
 Cleanup ✅: player + deploy-verify Chromes killed (`moq-audio-play-udd`, `moq-audio-deployver-udd`);
 publisher + audioserver.py LEFT RUNNING (10.5); siblings' processes/namespaces untouched;
 results in `results/moq-audio-chromium*.jsonl`.
+
+## 11. OBS support (web research 2026-08-26 — all 📄 unless marked)
+
+- **Native OBS MoQ: nonexistent.** Nothing in 31/32.x (latest 32.2.2, 2026-08-14) and zero
+  MoQ/MoQT/WebTransport issues or PRs in obsproject/obs-studio (GitHub search ✅ 2026-08-26).
+  Only official-channel trace: ideas.obsproject.com post #3261 (2026-07-15) requesting MoQ
+  output — **declined same day** by maintainer Joel Bethke ("We do not accept AI-generated
+  submissions"). WHIP (OBS 30, 2023) remains OBS's newest transport; no PR to watch.
+- **The real path is the moq-dev plugin** (kixelated ecosystem, moq-lite lineage): `cpp/obs` in
+  github.com/moq-dev/moq (old moq-dev/obs repo archived 2026-08-05). Loads into **stock OBS** —
+  publish = Settings→Stream service "MoQ", subscribe = "MoQ Source"; H.264/HEVC/AV1 + AAC/Opus;
+  via `libmoq` (Rust/C static lib, background tokio thread). Releases weekly: obs-moq v0.5.10
+  2026-08-25, prebuilt **macOS arm64 + Windows x64 only, unsigned** (Linux = build from source;
+  self-described "under development, but works pretty gud"). Advanced settings include protocol
+  **version pinning** ("offer all of them" default) — CF-IETF-relay interop therefore plausible
+  via the same compat SETUP §6.2 verified for @moq/net, but ⚠️ untested, and ⚠️ ThreatLocker
+  (§3.5, killed OBS itself before) may kill an unsigned downloaded plugin dylib. Docs:
+  doc.moq.dev/bin/obs. History: started as an OBS *fork* ("MoQBS", moq.dev blog 2025-12-19, by
+  bpmedley/emilsas/pangaea) — fork no longer required.
+- **ffmpeg upstream: in progress.** code.ffmpeg.org/FFmpeg/FFmpeg/pulls/23263 "Media over QUIC
+  (MoQ) support" (Ole Andre Birkedal, opened 2026-05-28, un-drafted 2026-08-20, open, awaiting
+  maintainer approval): `-f moq` fMP4 muxer **linking libmoq** — moq-lite lineage, not an
+  independent IETF stack. FATE green; not in ffmpeg 8 (which got WHIP).
+- **Bridge landscape / what this changes here:** mediamtx gained native MoQ **upstream** in
+  v1.19.0 (2026-06-02, from WINK Streaming's winkmichael/mediamtx-moq); v1.20.x (Aug 2026) adds
+  native-QUIC pub/read + drafts 16–19 — so our installed 1.20.1 (§0, §5.5) already makes
+  OBS→RTMP/SRT/WHIP→mediamtx→MoQ a one-box bridge with **no ffmpeg|moq-pub hop** for
+  local/self-hosted serving. For publishing to *Cloudflare's* IETF relay, ffmpeg|moq-pub
+  (cloudflare/moq-rs — active, pushed 2026-08-25) remains canonical; moq-dev also ships
+  `moq-rtmp`/`moq-srt` ingest bridges + moq-gst v0.3.6 for its own relays.
+- **Verdict: (c) native = nonexistent, no timeline signal; plugin ecosystem healthy.** Our
+  documented paths are not obsoleted; two cheap experiments if wanted: obs-moq plugin →
+  CF draft-14 (interop + ThreatLocker), and dropping the ffmpeg|moq-pub hop for local mediamtx.
