@@ -159,8 +159,26 @@ REGENERATE AudioDecoder output timestamps (join-skip becomes a permanent phantom
 encoded-chunk/container timestamps via FIFO map, never `AudioData.timestamp`. The deployed test
 page now probes AudioDecoder on every load and plays audio from `?namespace=elektron-audio-test`
 (iPhone verdict = one page visit). **The MoQ fast tier now has: video ✅, 4K ✅, Safari ✅,
-iOS-on-4G ✅, audio ✅ — remaining gates: draft-16 relay provisioning (USER), catalog shim,
+iOS-on-4G ✅, audio ✅ — remaining gates: draft-16 relay provisioning (USER), ~~catalog shim~~,
 UDP-hostile-network fallback.**
+
+**✅ THE CATALOG SHIM IS BUILT AND THE ECOSYSTEM GAP IS CLOSED (2026-08-26, RUNBOOK §12):
+one 457-line player (~150 lines of actual bridge) now decodes BOTH non-hang dialects.**
+- **Local venue chain PROVEN: ffmpeg WHIP → mediamtx (as MoQ server) → browser at 20.6 ms p50 /
+  57.9 p95, audio +32.5 ms with +12 ms A/V skew, zero errors** — "OBS composes, mediamtx serves,
+  the room watches with no cloud" is measured (OBS speaks the same WHIP; only the OBS binary
+  itself remains untested via ThreatLocker). Surprise: mediamtx's MoQ is NOT WARP/CMAF — it
+  speaks draft-ietf-moq-msf-00 ("loc" packaging, raw AVCC frame-per-group, draft-19) — the shim
+  grew a second branch for it (AVCC→AnnexB, simpler than CMAF).
+- **Cross-ecosystem PROVEN: the same shim decoded moq-pub's WARP/CMAF through Cloudflare at
+  60.6 ms p50** — native publishers (ffmpeg today, obs-moq/gst by extension) → CF relay →
+  any browser is now a working path, closing §7's predicted gap. Late-join init-segment fetch
+  worked (the closed-group worry didn't bite for CMAF init tracks).
+- Interop bug found: mediamtx closes the session on any SUBSCRIBE param except auth-token —
+  9-line client patch strips v15+ params. TLS solved with zero browser flags (mediamtx JIT
+  14-day cert + /fingerprint → serverCertificateHashes). Join≈1.9 s = keyframe wait; use 1 s
+  keyint for venues. ⚠️ Untested: real LAN multi-viewer, Safari-vs-mediamtx cert pinning,
+  draft-16 tokens (shim needs the auth param re-added).
 
 **✅ RESOLUTION/FRAMERATE MATRIX (2026-08-26, RUNBOOK §9): 4K30 through the relay is CLEAN —
 47 ms p50 / 78 ms p95** (hw encode, 0 errors; now live on the test namespace). 1080p60 also clean

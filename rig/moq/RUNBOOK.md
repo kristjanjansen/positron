@@ -891,3 +891,227 @@ mediamtx 1.20.1's MoQ server is NOT WARP/CMAF. What it actually speaks, from
   for mediamtx it is msf-00/"loc"/AVCC (simpler than CMAF: no mp4 demux, just
   AVCC→AnnexB), while IETF moq-pub/CF remains WARP/CMAF (`streamingFormat:1`,
   `1.m4s` moof/mdat + `0.mp4` init). One player, two catalog branches ⇒ covers both.
+
+## 13. Multi-publisher + role flip — CF relay fan-IN, viewer→publisher, publisher death
+
+⏱ START 2026-08-26 07:40 UTC (multi-publisher agent; this agent owns §13 only, port 8887,
+udd prefix `moq-mgrid`, namespaces `elektron-mgrid-*`). Comparator: the SFU grid
+(plan-m2m §6 — N=54 clean / p95 ~158 ms flat; promote cmd→video ~0.5 s; death 38–126 ms
+via DO `left`; rejoin ~3–3.9 s).
+
+### 13.0 Design + setup notes (timestamped)
+
+- 07:40Z Rig: `spike/src/mgrid-{pub,probe,flip}.js` (+ www pages, Docker esbuild §6.3),
+  `spike/mgridserver.py` on **:8887** = static + POST /log + POST /jsonl/<name>
+  (→ `results/moq-mgrid-*.jsonl`) + **/roster** + **/cmd**. Publishers: 320x180@15 canvas
+  (id + burned row = 32-bit low wall-ms + 8-bit XOR in 40×8 px blocks), H.264 baseline
+  `avc1.42001f` annexb 300 kbps, GOP 1 s, catalog republish 2 s, `latencyMax:2000`,
+  one namespace `elektron-mgrid-p{N}` per participant, sw encode (no VT preference —
+  keeps hw sessions free at tiny res). Probes: 2 pages, each ONE MoQ connection,
+  subscribe-all-in-roster (1 s poll), per-pub VideoDecoder + row decode, per-frame
+  `{k:"f",pub,t,d}` + race/close/silent events (silence watchdog: >500 ms without a
+  frame at 15 fps, 100 ms scan).
+- **DISCOVERY LIMITATION (stated up front): draft-14 has no SUBSCRIBE_NAMESPACE**, so
+  publisher discovery here = a local roster registry on :8887 that publishers POST into
+  and viewers poll at 1 s. Production discovery would ride the RtcRoom DO (§plan-m2m).
+  Everything measured includes this shim's 0–1 s poll where noted.
+- 07:47Z TRAP: `--headless=new` refuses multiple URLs ("Multiple targets are not
+  supported in headless mode") → co-tenancy = K=5 publisher *pipelines in one page*
+  (each with its OWN Connection/QUIC session, so relay fan-in still sees one session
+  per publisher), not 5 tabs.
+- HONESTY NOTE: all publishers share ONE uplink + one machine — this measures relay
+  fan-in + protocol behavior, not network diversity.
+- 07:49Z Smoke (N=2 co-tenant + 1 probe): both publish, probe FIRST_FRAME ≈120 ms after
+  FIRST_ENCODED; publish→first-encode ≈1.9 s (encoder init + page settle).
+
+### 12.1 Build log (timestamped, all ✅ verified on this machine)
+
+- 07:42Z mediamtx 1.20.1 started with own config `rig/moq/mtx/mtx.yml`: ONLY webrtc
+  (WHIP :18889, ICE UDP :18189) + MoQ (:18892 TCP-H2 + UDP-H3, :18893 UDP native QUIC);
+  rtsp/rtmp/hls/srt/api all off; path `moqmtx`; logs `rig/moq/mtx/logs/mediamtx.log`.
+- 07:42Z ffmpeg WHIP smoke test (WHIP-FFMPEG-NOTES command, testsrc2+sine) →
+  "is publishing to path 'moqmtx'" FIRST TRY. WHIP ingest friction: none.
+- 07:47Z real publisher: `rig/moq/mtx/gen-frames.py` (python live source; stands in for
+  OBS compositing) — rawvideo rgb24 720p30 on stdout with the rig's 56-block burned-ms
+  row (§7 geometry) + f32le tick-audio (§10 signal design: 4-note loop + 2 kHz tick at
+  every 500 ms wall boundary) via FIFO thread → `run-pub.sh` → ffmpeg libx264 baseline
+  3.1, -bf 0, -g 60, 2 Mbps, -tune zerolatency + libopus 48k → WHIP.
+  - TRAP: `-use_wallclock_as_timestamps 1` caused ~1 s dup/drop churn at start; mediamtx
+    closed the session "deadline exceeded while waiting tracks" (webrtcTrackGatherTimeout
+    2 s). Fix: drop the option (audio FIFO opened in a thread avoids the ffmpeg
+    sequential-input-open deadlock) + webrtcTrackGatherTimeout: 10s.
+- 07:50Z player TRAP 1: pinning my own 10-day cert failed — mediamtx's HTTP/3 listener
+  IGNORES moqServerCert and always serves a JIT in-memory ECDSA P-256 cert (14-day,
+  rotated; `internal/protocols/httpp3/server.go` — deliberate, for the WebTransport
+  serverCertificateHashes ≤14-day rule). Fix: playserver.py proxies mediamtx's live
+  `GET /moqmtx/fingerprint` (plain-HTTP page origin → no cert friction anywhere; NO
+  Chrome flags needed at all — `connect(url, {webtransport:{serverCertificateHashes:
+  [{value:<hex>}]}})` is supported by @moq/net directly).
+- 07:50Z player TRAP 2 (the real interop bug): session died at SUBSCRIBE with mediamtx
+  log "closed: unsupported parameter type: 16". @moq/net (per draft-19) moves
+  subscriber_priority/group_order/forward/filter into SUBSCRIBE *parameters*; mediamtx's
+  parameter parser accepts ONLY AuthorizationToken and CLOSES THE SESSION on any other
+  type (0x10 = FORWARD) — a spec violation (unknown params must be skipped; its own
+  SETUP parser does skip by even/odd). Fix: post-bundle patch (`mtx/build-shim.sh`)
+  strips the four v15+ SUBSCRIBE params (zero params sent; mediamtx doesn't use their
+  semantics anyway). draft-14 encodes them as fixed fields → CF path unaffected.
+- 07:53Z **END-TO-END DECODE**: connect 6 ms, `version=moq-transport-19` negotiated
+  (WT subprotocol; mediamtx prefers 19), catalog `{version:1,tracks:[{name:"0",
+  packaging:"loc",isLive:true,codec:"opus",samplerate:48000,channels:1},{name:"1",
+  packaging:"loc",isLive:true,codec:"avc3.640028"}]}` — exactly the msf-00 shape §12.0
+  predicted (NB channels:1 despite stereo ingest — mediamtx's WHIP→catalog quirk; mono
+  decode works). 20 s trial: video 543/543 frames decoded, 0 decode errors, 0 checksum
+  fails, 0 skipped groups; audio 1000 chunks, 0 errors, 40/40 ticks. g2g p50 18.9 ms.
+  Join→first-frame ~1.9 s = keyframe wait (subscriber joins mid-GOP; -g 60 = 2 s GOP).
+
+### 13.1 ⚠️ FINDING FIRST (accidental, then confirmed): stale-announce namespace pinning
+
+07:51–07:54Z. Rung-1 attempt reused namespaces `p1/p2` from the smoke test whose
+publishers had been SIGKILLed ~10 s earlier. Result, seen identically by both probes:
+- New publishers on the reused names connected + published fine (encoder 15 fps, no error
+  — **the duplicate publish is silently accepted**, §9.3 confirmed).
+- Subscribers got: catalog OK + **one burst of frames with burned-age ≈6.4–6.8 s = the
+  DEAD session's open-group relay cache**, then silence ≤0.6 s later, then every
+  catalog re-subscribe timing out (SUBSCRIBE optimistically OK'd, zero groups — §7.3
+  family) for **>3 min 20 s and counting** while the fresh publisher stood unreachable.
+- Interpretation: **CF draft-14 pins a namespace to the FIRST announce; an unclean kill
+  leaves the name routed to the corpse for minutes.** Fresh sessions on the same name
+  never receive relay subscriptions. (Exact expiry horizon measured in §13.4.)
+- Consequences for the rig: every rung uses NEVER-REUSED id prefixes (a*, b*, c*…);
+  for production: a rejoining publisher MUST take a fresh namespace (session-suffixed),
+  exactly like the SFU world re-creates a session — same-name rejoin is a trap.
+
+### 12.2 MEASURED — local-venue chain, 90 s (✅ 07:54–07:56Z, AC 100%, load avg ~21/12 at start — sibling agents; §7 showed numbers robust under far worse)
+
+Chain: python live source (burned row + tick audio) → ffmpeg WHIP (H.264 baseline 3.1
+-bf 0 -g 60 2 Mbps zerolatency + Opus 48k) → mediamtx 1.20.1 (:18889 WHIP in, :18892 MoQ
+WT out, draft-19) → headless Chrome 151 shim player. Data: `results/moq-mtx-local.jsonl`
+(2653 video rows kind:"v" {t,burned,delta} + 180 audio-tick rows kind:"a" {t,aLat,skew}).
+
+| metric | value |
+|---|---|
+| video g2g p50 / p90 / p95 / p99 | **20.6 / 52.1 / 57.9 / 67.0 ms** |
+| video g2g min / max | 4.0 / 89.5 ms |
+| frames decoded / wire | 2653 / 2653 (30 fps flat, every STATS ~300/10 s) |
+| decode errors / checksum fails / skipped groups | **0 / 0 / 0** |
+| audio ticks measured | 180 (2/s × 90 s) |
+| audio aLat p50 / p95 | **32.5 / 61.0 ms** (decode-out vs 500 ms-boundary tick) |
+| A/V skew p50 / p95 / |max| | **+11.8 / +40.2 / 49.9 ms** (audio behind video) |
+| audio chunks decoded / errors | 4500 / 0 |
+| join → first frame | ~1.9 s (mid-GOP join + -g 60 ⇒ 2 s keyframe wait; -g 30 would halve it) |
+
+- g2g here includes python-draw→pipe→libx264→RTP/WHIP→mediamtx remux→MoQ→WT→decode→canvas.
+  p50 20.6 ms is BELOW the CF-relay hang-path numbers (26–36 ms, §7/§8) — everything is
+  loopback; the p90+ tail (~52 ms) is x264/WHIP-side batching, not MoQ (video p50 varies
+  <2 ms between 20 s and 90 s runs; audio p50 32.5 ms ≈ §10's 32.6 ms over CF, funny).
+- A/V skew +12 ms with zero sync logic (both tracks decoded on arrival) — the €10-word
+  verdict "opus rides ~1 frame behind video through ffmpeg+mediamtx" — well under lip-sync
+  thresholds (±45 ms ITU). No underruns modeled here (no playout buffer — decode-time metric).
+
+### 12.3 BONUS — the SAME shim player against Cloudflare (IETF moq-pub → CF draft-14 → browser)
+
+⏱ 07:55–08:00Z. Publisher: HOST python live source (same burned row, host clock — so
+one-clock g2g stays valid) | HOST ffmpeg (h264 baseline -g 30 zerolatency + aac, fMP4
+`empty_moov+frag_every_frame+separate_moof+omit_tfhd_offset`) | Docker `moq-pub`
+(draft-14, §4 recipe) → `https://draft-14.cloudflare.mediaoverquic.com`, namespace
+`elektron-shim-test` (`rig/moq/mtx/run-cfpub.sh`; Docker clock resynced first, §4 trap).
+Player: the IDENTICAL bundle, `?url=…cloudflare…&ns=elektron-shim-test&fp=0`.
+
+- WARP catalog observed off CF (verbatim, first bytes ever decoded cross-ecosystem):
+  `{"version":1,"streamingFormat":1,"streamingFormatVersion":"0.2","supportsDeltaUpdates":
+  true,"commonTrackFields":{"namespace":"/elektron-shim-test","packaging":"cmaf",
+  "renderGroup":1},"tracks":[{"name":"1.m4s","initTrack":"0.mp4","selectionParams":
+  {"codec":"avc1.42C01F","width":1280,"height":720}},{"name":"2.m4s","initTrack":"0.mp4",
+  "selectionParams":{"codec":"mp4a.40.2",…}}]}`
+- Shim traps found (both fixed in the same player): WARP puts `packaging` under
+  `commonTrackFields` (not per-track) and `codec` under `selectionParams` — first attempt
+  fell into the loc branch and fed moof/mdat to an annexb decoder (0 frames, AAC decode
+  errors); after the two catalog-mapping fixes it decoded immediately.
+- **Init-segment worry from §5.3 did NOT bite**: `0.mp4` (ftyp+moov, 1260 B) arrived
+  ~40 ms after subscribe on a LATE join — moq-pub keeps the init group open, and CF's
+  open-group replay serves it. avcC (37 B) extracted → `avc1.42C01F` + description
+  (AVCC mode); fragments decoded with keyframe = first-fragment-of-group.
+- 20 s trial: connect 92 ms (moq-transport-14), catalog 130 ms, first frame 739 ms from
+  page load; 609 frames, 0 decode errors, 0 checksum fails. g2g p50 60.8 / p95 125.8 ms
+  under load avg 32/12 (three encoders + sibling agents live).
+
+### 12.4 MEASURED — CF bonus, 90 s (✅ 07:57:48–07:59:20Z, AC 100%, load avg ~29/12)
+
+Same shim bundle, `results/moq-mtx-cf.jsonl` (2718 rows kind:"v"):
+
+| metric | mediamtx local (12.2) | ffmpeg→moq-pub→CF→shim |
+|---|---|---|
+| g2g p50 | 20.6 ms | **60.6 ms** |
+| g2g p90 / p95 | 52.1 / 57.9 ms | 73.7 / **79.6 ms** |
+| g2g p99 / max | 67.0 / 89.5 ms | 124.3 / 748 ms |
+| frames / errors / checksum fails | 2653 / 0 / 0 | 2718 (30 fps flat) / **0 / 0** |
+
+CF-path p50 60.6 vs §7.1's hang→CF 26 ms: the extra ~35 ms is the publisher side
+(ffmpeg fMP4 muxing + moq-pub parse + Docker NAT vs in-browser WebCodecs), not the relay;
+tail includes host load 29–32/12. Audio (AAC) deliberately not decoded in the CMAF branch.
+**This closes §7's cross-ecosystem gap: an ffmpeg/OBS-shaped publisher → CF IETF relay →
+plain browser now plays, through a catalog shim only — media bytes needed no translation.**
+
+### 12.5 Verdict (for plan-m2m §1.C) + what the shim actually is
+
+**"The local-venue MoQ chain works end-to-end TODAY: ffmpeg WHIP (the OBS-realistic
+ingest, worked first try) → mediamtx 1.20.1 as MoQ server → browser. @moq/net negotiates
+moq-transport-19 via WT subprotocol in 6 ms on localhost; mediamtx publishes a
+draft-ietf-moq-msf-00 catalog (`.catalog`, packaging 'loc', avc3 AVCC frames one-per-group,
+raw Opus packets) — NOT WARP/CMAF as §7 guessed. 90 s measured: video g2g p50 20.6 /
+p95 57.9 ms, 2653/2653 frames, 0 errors; audio aLat p50 32.5 ms, A/V skew +12 ms with no
+sync logic. The SAME player pointed at Cloudflare draft-14 with an IETF moq-pub publisher
+decodes WARP/CMAF too (p50 60.6 / p95 79.6 ms, 0 errors) — §7's catalog-conventions gap is
+closed in both dialects by ONE browser-side shim."**
+
+- Shim size/design: `spike/src/play-mtx.js`, 457 lines TOTAL of which the actual bridge is
+  ~150 (catalog interpretation ~25, loc branch: AVCC→AnnexB + per-frame groups + reorder
+  ~60, cmaf branch: init-track fetch + avcC scan + mdat walk + group-boundary keyframes
+  ~65); the rest is the §7 measurement rig (burned-row, tick audio, logging). Plus a
+  9-line post-bundle patch (`mtx/build-shim.sh`) stripping v15+ SUBSCRIBE params.
+- Interop bugs to remember (all mediamtx 1.20.1): (1) closes session on ANY SUBSCRIBE
+  param except AuthorizationToken ("unsupported parameter type: 16" = FORWARD) — needs
+  the param-strip patch; one-line fix upstream (skip unknown by even/odd parity, as its
+  own SETUP parser already does). (2) HTTP/3 cert is ALWAYS a JIT in-memory 14-day ECDSA
+  cert — moqServerCert ignored on H3; clients MUST use the `/…/fingerprint` endpoint +
+  serverCertificateHashes (mediamtx's own page does; our playserver proxies it; zero
+  Chrome flags needed). (3) stereo Opus ingested via WHIP is cataloged `channels:1`
+  (decodes as mono — cosmetic/quality quirk, not a blocker).
+- Zero-custom-code venue path ALSO verified at the session level: headless Chrome with
+  `--ignore-certificate-errors` on mediamtx's own embedded page
+  `https://127.0.0.1:18892/moqmtx/` subscribed `.catalog` + both tracks (mediamtx log;
+  frame-level decode not instrumented there — our shim covers that question).
+
+### 12.6 OBS implications + untested
+
+- **Cleanest OBS→mediamtx ingest = WHIP** (Settings→Stream→WHIP, url
+  `http://<host>:18889/<path>/whip`): proven here end-to-end via ffmpeg's WHIP muxer
+  (same H.264+Opus RTP shape OBS emits; B-frames already forbidden by WebRTC so OBS
+  needs no special encoder tuning beyond keyint). RTMP/SRT into mediamtx would also work
+  (untested here) but WHIP had literally zero friction. RTSP fallback was NOT needed.
+- Join→first-frame is keyframe-bound (~2 s at -g 60, ~1 s at -g 30) — set OBS keyframe
+  interval to 1 s for venue joins.
+- UNTESTED: the actual OBS binary (ThreatLocker kills it on this Mac — §11); >1
+  concurrent viewer / LAN (everything here is loopback); Safari against mediamtx
+  (WebKit's WebTransport + serverCertificateHashes support unknown — §8 rig would
+  answer it); mediamtx native-QUIC listener :18893 (browsers can't use it); draft-16
+  CF relay with tokens (shim's SUBSCRIBE-param strip applies to v15+ — would need the
+  AuthorizationToken param added for CF-16).
+
+### 12.7 Artifacts + ops + cleanup
+
+- `rig/moq/mtx/`: mtx.yml, gen-frames.py (live source), run-pub.sh (WHIP publisher),
+  run-cfpub.sh (CF publisher), build-shim.sh (bundle+patch), playserver.py (:8888,
+  /fingerprint proxy + /log), moq-cert/key.pem (only the H2 side uses it), logs/.
+- `rig/moq/spike/src/play-mtx.js` (+ `www/play-mtx.html`, bundle `www/play-mtx.js`).
+- Results: `results/moq-mtx-local.jsonl` (2653 v + 180 a rows), `results/moq-mtx-cf.jsonl`
+  (2718 v rows).
+- Restart the whole local chain:
+  `cd rig/moq/mtx && /opt/homebrew/bin/mediamtx mtx.yml & ./run-pub.sh & python3
+  playserver.py 8888 &` then open `http://127.0.0.1:8888/play-mtx.html`.
+- Cleanup ✅ (08:0xZ): all `moq-mtx-*` Chromes, moq-mtx-cfpub container, both ffmpeg
+  pipelines + gen-frames.py, my mediamtx (mtx.yml), playserver.py:8888 stopped. Siblings
+  (8889/8890/8896, moq-4k/moq-audio udds, their namespaces) untouched. Docker volumes
+  untouched. Nothing outside §12 + rig/moq/mtx/ + the three spike files modified.
+
+⏱ END 2026-08-26 ~08:02 UTC — ~21 min active.

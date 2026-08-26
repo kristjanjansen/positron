@@ -36,6 +36,15 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### mediamtx + catalog shim — ✅ ECOSYSTEM GAP CLOSED, local venue chain proven
+- ✅ ffmpeg WHIP → mediamtx MoQ → browser: 20.6 ms p50, audio A/V skew +12 ms,
+  0 errors. mediamtx speaks msf-00/"loc"/AVCC (NOT WARP) on draft-19 — shim grew
+  a second branch. OBS-realistic ingest (WHIP) had zero friction.
+- ✅ Same shim through CF: moq-pub WARP/CMAF → browser at 60.6 ms — native
+  publishers→CF→browsers now WORKS (§7 gap closed). 457-line player, ~150 bridge.
+- Interop bug: mediamtx rejects non-auth SUBSCRIBE params (client strips them).
+  TLS via JIT cert + fingerprint pinning, no browser flags. RUNBOOK §12.
+
 ### 4K on SFU + HLS — ✅ SETTLED: MoQ is the only 4K path
 - ✅ SFU: 2160p locks (zero silent downscale, BWE never limits) but the SFU
   accepts H.264 only at Constrained Baseline → Mac Chrome lands on SOFTWARE
