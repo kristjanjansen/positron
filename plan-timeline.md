@@ -96,9 +96,61 @@ stamp, never platform metadata. Heavy payloads by reference (R2), presence as
 events. Throttle capture, interpolate replay. Choose the clock per kind, bridge
 explicitly.
 
-## 5. Open questions
+## 5. Self-critique (2026-08-26 review) and the resulting amendments
 
-Reducer cost for long logs (snapshot cadence?); cross-device clock skew bounds
-for multi-user music (wall lane fine at ±50 ms; tight lane needs Link-style
-sync?); event schema versioning (replayed by code that didn't write it);
-rate≠1 over media lanes (element playbackRate vs scheduler scaling).
+**C1 — "everything is one type" was slightly wrong: instants vs SPANS.** A video/
+audio segment is not an instant; it has duration and internal time, and seeking
+into its middle needs span-awareness (at + offset, keyframe granularity). The
+flat-instant purism worked in the prior experiments because payloads were
+moments. AMENDMENT: two primitive shapes on one log — `Event {at, kind, source,
+v, payload}` and `Span {at, dur, kind, source, v, mediaRef}`. Consumers that
+ignore spans still work; media actuators get honest semantics.
+
+**C2 — reducers can become "reimplement every app twice", with bugs invisible
+until someone scrubs.** AMENDMENT: reducers must be pure; the CI property test
+is `reduce(events≤t) === state after play(0→t)` on synthetic traces (the
+simulate_typing rule); kinds with heavy state emit periodic SNAPSHOT events the
+reducer may start from.
+
+**C3 — "two clocks" is really four** (wall, audio, per-media-element, iOS
+suspended-context), and rate() breaks differently in each (element playbackRate
+has range+pitch limits; audio rate = tempo, only sane in beat domain).
+AMENDMENT: v0 rate() applies to the wall lane only; every adapter declares
+`caps: {seek, rate, interpolate}` and the transport degrades honestly.
+
+**C4 — the DO-as-store won't take high-rate streams** (per-event broadcast cost;
+the review already flagged full-array read-modify-write; 128 KiB value limits).
+AMENDMENT: worker store = **DO SQLite rows** (the BeaconStore pattern), never
+one JSON value; transports batch capture at ~100 ms flush (matching the
+throttle-at-capture rule); broadcast batches, not single events.
+
+**C5 — sender stamps from AUDIENCE devices carry unknown skew** (operator
+machines are NTP-checked; a random phone may not be). AMENDMENT: on join, the
+client measures its offset against a worker time endpoint (~±25 ms) and every
+event carries `{at, skewEst}`; replay may correct. Keep raw stamps verbatim
+(never rewrite at).
+
+**C6 — redaction fights append-only, and consent is now load-bearing** (the
+per-participant archive argument). AMENDMENT: tombstone events (`kind:redact,
+source:X`) + a compaction job that physically deletes tombstoned payloads/media
+from R2; replay respects tombstones. First-class from v0, not bolted on.
+
+**C7 — schema versioning is the existential open question, not a footnote**
+(archives outlive code). AMENDMENT as law: every event carries `v` per kind;
+adapters keep old decoders; UNKNOWN kinds round-trip untouched and render as
+opaque ticks — forward-compat by ignoring, never dropping.
+
+**C8 — don't migrate for purity.** Cues/roster work and are measured; migration
+is only justified when a feature needs the substrate. v1 is therefore DRIVEN by
+the per-participant grid-archive replay (which genuinely needs roster-as-
+timeline), and cues migrate only when the replay page refactor proves the lib
+against the existing measurement suite.
+
+**C9 — v3 (editing, timelines-of-timelines) is where such projects die.** It
+stays out of scope until a real show asks for it by name.
+
+## 6. V0 — merged with studio v0
+
+See plan-studio.md §5 "MERGED V0" — the timeline library ships as the studio
+engine's event backbone; the replay-page refactor onto the lib is the
+regression gate (the existing measurement suite must stay green).
