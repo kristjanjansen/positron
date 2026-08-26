@@ -462,3 +462,102 @@ catalog-fetch step and looks shimmable in ~100 lines."**
   spike server killed; Docker volumes untouched; nothing outside §7 + spike/ modified.
 
 ⏱ END 2026-08-26 08:23 EEST (05:23 UTC) — ~16 min active.
+
+## 8. Safari test rig — one URL that self-reports the Safari/iPhone MoQ verdict
+
+⏱ 2026-08-26 ~06:20–06:35 UTC. Status: ✅ deployed and Chromium-proven; ✅ desktop Safari
+26.6.2 OBSERVED playing live H.264 through it (details below); iPhone awaits the user.
+
+### 8.1 The URL
+
+**https://elektron-moq-safari.kristjan-jansen.workers.dev** — open it in Safari (desktop or
+iPhone), tap **TAP TO START**. Query overrides: `?relay=`, `?namespace=` (alias `?ns=`),
+`?codec=`, `?auto=1` (skip the tap gate), `?log=<url>` (extra POST log collector for rig runs).
+
+The page displays, in large text: WebTransport present? (if not: "Safari/iOS 26.4+ required" +
+the UA), `VideoDecoder.isConfigSupported("avc1.42001f")`, CONNECTED + negotiated version,
+catalog found, first-frame time, then live fps / frames decoded / decode errors /
+glass-to-glass p50+p95 from the burned-ms row ("±device clock offset — approximate on
+phones"), and every exception verbatim. Every state change is ALSO beaconed (`POST /beacon`
+with UA + stats every 5 s) to the Worker → **`wrangler tail elektron-moq-safari`** (run from
+`workers/moq-safari/`, clean env — §NOTES rule) shows any device's session live. That is how
+a phone in someone's hand is observed from this machine.
+
+### 8.2 Architecture
+
+- **Publisher (this Mac, long-lived)**: headless Chrome → `rig/moq/spike/www/pub-safari.html`
+  (bundle of `spike/src/pub-safari.js`) — canvas 1280x720@30 ("ELEKTRON MOQ TEST", UTC clock,
+  burned-ms binary row, motion blocks) → WebCodecs **H.264 `avc1.42001f` annexb** (baseline —
+  the Safari-safe codec; annexb keeps SPS/PPS in-band so the decoder needs NO description)
+  → hang legacy container → `@moq/net` → `https://draft-14.cloudflare.mediaoverquic.com`,
+  namespace **`elektron-safari-test`**. Catalog republished every 2 s (§7.1 trap 1);
+  self-heals by page-reload on connection loss. Page served by `spike/pubserver.py` on :8890
+  (also collects the publisher's own POST /log into `spike/logs/moq-safari-pub.log`).
+- **Player (deployed)**: Worker **`elektron-moq-safari`** (`workers/moq-safari/`) — static
+  assets `public/index.html` + `public/play.js` (=`spike/src/safari-play.js` bundled in Docker
+  esbuild, §6.3 recipe) + `src/index.js` logging POST /beacon. Zero other CF resources.
+- Player retries subscribe-before-announce (§7.1 trap 2), auto-reconnects forever, exposes
+  `window.__report` for CDP probes.
+
+### 8.3 ✅ THE SAFARI TRAP FOUND: @moq/net UA-blocks ALL Safari
+
+`@moq/net` v0.3.3 `connection/browser.js` hard-codes `safari: "<0"` (Bowser UA sniff) citing
+WebKit bug 319818 ("flow-control window never refills, permanently stalls sessions") → on
+every Safari, `connect()` throws `no transport available; WebTransport not supported and
+WebSocket is disabled` **without ever trying Safari's real WebTransport** (present since
+26.4; detected `true` on Safari 26.6.2). Fix in `safari-play.js`: catch exactly that error
+and retry with a self-built `new WebTransport(relay, {protocols:[...same ALPN list...]})`
+passed as `connect(url, {transport})` — the library accepts a pre-built session and proceeds
+to the draft-14 compat SETUP. ✅ Observed working (8.5). The WebKit-stall risk is exactly what
+this rig measures on real devices; the reconnect loop + on-screen counters surface it if it bites.
+
+### 8.4 What Chromium proved against the DEPLOYED URL (✅ measured, 2026-08-26 06:21 UTC)
+
+Headless Chrome 151 at `…workers.dev/?auto=1`, CDP-probed `window.__report`, 65 s run:
+connect **102 ms** (moq-transport-14) → catalog avc1.42001f → **first frame 304 ms** after
+start → **1935 frames, 30–31 fps flat, 0 decode errors, 0 reconnects**, glass-to-glass
+**p50 32–34 ms / steady p95 47–57 ms** vs §7.1's 26 ms VP8 baseline (H.264 encode is
+slightly heavier; sane). Whole path validated except Safari itself.
+
+### 8.5 Desktop Safari 26.6.2, this Mac (✅ observed via beacons, NOT guessed)
+
+`open -a Safari '…?auto=1'` (screen possibly locked — nothing visually confirmed; ALL of
+this is from /beacon in `wrangler tail`):
+- boot: `webtransport:true, h264:true` → **feature-detect passes on Safari 26.6.2**.
+- First attempt (pre-8.3 fix): the UA-block error, verbatim, every 2 s. ← how the trap was found.
+- After the fix: `safari-fallback` → **connected 131 ms, moq-transport-14 → catalog →
+  first frame 410 ms → stage live, 1188+ frames decoded, 0 decode errors, 0 reconnects over
+  2+ min**. No WebKit-319818 stall in that window.
+- ⚠️ Background-tab throttling: beacon cadence fell 5 s → ~55 s and frames arrived in bursts
+  (fps counter spiked to ~500 after each throttle nap; inter-beacon average ~7 fps) — Safari
+  throttles timers/streams in non-frontmost tabs. Foreground behaviour (the actual user
+  scenario) could not be observed with the screen locked — **needs the user at the keyboard**.
+
+### 8.6 Publisher operations (the ONE deliberately-left-running process)
+
+```bash
+# STATUS: tail -f rig/moq/spike/logs/moq-safari-pub.log   (STATS every 60 s)
+# STOP:
+pkill -f moq-safari-pub-udd            # the headless-Chrome publisher
+pkill -f pubserver.py                  # its page/log server on :8890
+# START (both detached, survive shell exit):
+cd /Users/s32863/personal/elektron/rig/moq/spike
+nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
+nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --user-data-dir="$PWD/logs/moq-safari-pub-udd" --no-first-run \
+  --autoplay-policy=no-user-gesture-required --window-size=1300,760 \
+  "http://127.0.0.1:8890/pub-safari.html" > logs/moq-safari-pub-chrome.log 2>&1 & disown
+# Rebuild after editing src/: docker esbuild recipe of §6.3, entry src/pub-safari.js or
+# src/safari-play.js; player bundle then goes to workers/moq-safari/public/play.js and
+# `wrangler deploy` from workers/moq-safari/ (clean env — workers/rtc/NOTES.md rule).
+```
+
+⚠️ The publisher dies with laptop sleep/reboot (it's a headless Chrome on this Mac) — restart
+with the block above; the player page just says "is the publisher up?" until then.
+
+### 8.7 What awaits the user
+
+Open the URL on the iPhone (Safari), tap start. Expected on iOS ≥26.4: the four green lines,
+live video, and a latency readout. On iOS <26.4: the explicit red "Safari/iOS 26.4+ required"
+line. Either way `wrangler tail elektron-moq-safari` on this Mac shows the phone's beacons —
+UA, stage, fps, errors — the verdict writes itself from one screen on each side.

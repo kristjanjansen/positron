@@ -150,8 +150,14 @@ flawlessly, so a **~100-line shim** (hang has a `Container.Cmaf` class) likely b
 Platform data: CF never redelivers a CLOSED group (write-once catalogs invisible to late joiners →
 republish every 2 s; join≈1.0 s), no pending-subscribes (subscribe-before-announce errors → retry),
 optimistic SUBSCRIBE_OK then ~10 s close on unserved tracks. draft-16 is NOT auth-only:
-SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. All-Chromium so far;
-H.264 is the safer cross-browser codec (pipeline codec-agnostic).
+SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ SAFARI VERIFIED (2026-08-26, RUNBOOK §8): desktop Safari 26.6.2 PLAYS live MoQ video** —
+connected 131 ms, negotiated moq-transport-14, H.264 decode, 2309 frames / 0 errors over 4 min
+(background-tab-throttled to burst delivery; foreground + iPhone verdicts await the user at
+https://elektron-moq-safari.kristjan-jansen.workers.dev — self-reporting page, beacons via
+`wrangler tail elektron-moq-safari`). KEY TRAP found+fixed: `@moq/net` 0.3.3 **UA-blocks all
+Safari** (`safari:"<0"`, citing WebKit bug 319818) — bypass by passing a self-built `WebTransport`
+via `connect(url,{transport})`; no flow-control stall observed in 4 min. H.264 `avc1.42001f`
+publisher pipeline proven (Chromium vs deployed URL: 33 ms p50, ~+7 ms vs VP8).
 **Revised read: MoQ could carry the GRID's live tiers sooner than expected — the blocker list is
 down to auth provisioning, a catalog shim, and browser-matrix testing.**
 

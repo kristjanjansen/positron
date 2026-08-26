@@ -1,0 +1,10 @@
+{
+	// Safari/iPhone MoQ test page (rig/moq/RUNBOOK.md §8).
+	// Assets-only GETs serve public/; POST /beacon hits src/index.js and shows
+	// up in `wrangler tail elektron-moq-safari` (self-reporting from any device).
+	"name": "elektron-moq-safari",
+	"main": "src/index.js",
+	"compatibility_date": "2026-08-01",
+	"assets": { "directory": "./public" },
+	"observability": { "enabled": true }
+}
