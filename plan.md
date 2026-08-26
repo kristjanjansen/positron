@@ -147,6 +147,11 @@ RTMPS ingest cannot be played over WHEP. The publish URL's path segment **is** t
 The GA, actively-developed surface is the **Realtime SFU** (`rtc.live.cloudflare.com/v1/apps/{appId}`), not
 Stream's WHIP/WHEP. Credentials are in `.env`.
 
+**✅ Direct-tested (2026-08-26 phase 3b): WHIP ingest RECORDS NOTHING** — 183 s of publishing against
+a `recording.mode=automatic` live input produced zero video assets (26 polls during + 241 s after).
+The 2022 "recording coming soon" is still unshipped: Stream-WebRTC is delivery-only. Archive paths
+must ingest via RTMPS/SRT.
+
 **✅ Measured (2026-08-25, browser→CF→browser, burned-pixel timing, zero clock error — both tabs local):**
 glass-to-glass **p50 73.6 ms / p95 83.1 ms / p99 83.8 ms** (n=8079 over 300 s, 720p30 @ 2.5 Mbps,
 per-minute p50 stable 66–75 ms, no drift). Cloudflare's `<1 s` claim holds with ~10× headroom;
