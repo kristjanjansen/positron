@@ -66,3 +66,7 @@
 05:23:09.609 ASSERT e18-farewell: PASS
 05:23:16.605 [score] FIRE e19-curtain (pure cue: propagation only, no visual) drift +1 ms
 05:23:19.127 ASSERT e19-curtain: PASS
+05:23:31.606 [score] score complete; 0 unmatched echoes
+05:23:33.113 score.mjs exited code 0
+05:23:35.639 final: 1:running pg=1/2 v=5/5 wall=4 | 2:running pg=1/2 v=5/5 wall=4 || lites {"running":10}
+05:23:37.587 run done (killed 0 leftover pids) — analyze: python3 /Users/s32863/personal/elektron/proto/m2m/analyze-show.py <results.jsonl>

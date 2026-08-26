@@ -36,6 +36,17 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### Phase 3a soak — ✅ NO CEILING THROUGH 1003 SESSIONS @ 40/s; cost model +7–12 %
+- ✅ 1003 creates + 2622 GETs direct to the SFU: zero CF errors, latency flat
+  (p50 ~530–570 ms every bucket), 0/200 spontaneous deaths in 10 min.
+- ✅ Media under bulk: N=24 inside the hold and N=8 during the 40/s storm =
+  baselines exactly (100 % valid, n=193k). Control-plane blast radius: none.
+- ✅ Egress: audio 32 kbps on the nose; wire overhead ×1.05–1.12; big show
+  ≈ $35–37 vs modeled $32.90. ⚠️ 1 Mbps/cam needs real-camera content to pin.
+- Lifecycle traps: never-connected sessions answer 425 with an ~11 s edge-slot
+  block per GET; old dead sessions eventually GET 500 ("long-dead", not outage).
+- plan-m2m §5 risk 2 CLOSED. Data results/m2m-p3a-*.jsonl; NOTES §P3A.
+
 ### MoQ MEDIA spike (user: "analyze moq stuff") — ✅ BROWSER VIDEO AT 26 ms
 - ✅ hang-on-both-ends through CF draft-14: canvas→WebCodecs VP8 720p30 → relay →
   VideoDecoder. **Glass-to-glass p50 26.2 / p95 42.4 ms, n=2740, 30.3 fps flat,

@@ -325,7 +325,16 @@ Ranked.
    connect-timeout retry** (✅ since IMPLEMENTED in room.html — phase 1c — and it absorbed every
    flake through N=54; flakes grow with storm size: 9/46 legs at N=48). Phase 1c extended the
    no-ceiling result to **N=54 / 106 tracks on one PC / ~1500 API calls, one transient 500**.
-   200-scale remains unprobed → phase 3 soak stands.
+   **✅ Phase 3a CLOSED IT: no ceiling through 1003 sessions at 40 creates/s** — zero CF-side
+   errors ever (no 429/1015), creation latency flat (p50 529–569 ms every bucket #1→#1000),
+   0/200 spontaneous deaths over a 10-min hold, and **live media is measurably unaffected by
+   control-plane bulk** (N=24 inside the hold and N=8 during the 40/s storm both matched their
+   no-storm baselines exactly). A hard app cap, if any, is beyond a big show + 5× doors-open storm.
+   Lifecycle caveats for production: don't poll never-connected sessions (each GET blocks an edge
+   slot ~11 s, answers 425); a GET 500 on an old session means "long-dead", not "SFU down".
+   **Cost model validated (+7–12 %)**: audio exactly 32 kbps; wire overhead ×1.05–1.12; full-quality
+   pull ~0.48 GB/h vs modeled 0.45 → big show ≈ $35–37. ⚠️ Synthetic canvas is content-limited —
+   the 1 Mbps/camera assumption still needs real-camera content to pin.
 3. **The two-clock problem** ⚠️ (§2) — grid at 0.1 s vs stage at 2.4–4 s is a *dramaturgical*
    hazard no vendor doc mentions. Mitigations exist (WHEP for publishers; display delay); needs a
    rehearsal-scale human test, not a rig.

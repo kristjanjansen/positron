@@ -1,0 +1,21 @@
+m2m GRID server on :8893, results -> /Users/s32863/personal/elektron/results/m2m-p3c-stag1c.jsonl, app 8c2a974b…
+08:32:04 "GET /healthz HTTP/1.1" 200 -
+08:32:08 "GET /healthz HTTP/1.1" 200 -
+08:32:09 "GET /show.html?id=1&name=Perf-Ada&room=score-show&role=performer&view=full&ls=4&hold=1&cb=1787722329655&stag=1&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:09 code 404, message File not found
+08:32:09 "GET /favicon.ico HTTP/1.1" 404 -
+08:32:09 "GET /show.html?id=2&name=Perf-Bela&room=score-show&role=performer&view=full&ls=4&hold=1&cb=1787722329766&stag=1&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:09 "GET /show.html?id=B&name=Live-B&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722329870&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:10 "GET /show.html?id=C&name=Live-C&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722329971&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:10 "GET /show.html?id=D&name=Live-D&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722330622&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:10 code 404, message File not found
+08:32:10 "GET /favicon.ico HTTP/1.1" 404 -
+08:32:10 "GET /show.html?id=E&name=Live-E&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722330739&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:10 "GET /show.html?id=F&name=Live-F&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722330847&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:10 "GET /show.html?id=W&name=Wall-W&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722330952&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:11 "GET /show.html?id=A&name=Live-A&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722331600&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:11 code 404, message File not found
+08:32:11 "GET /favicon.ico HTTP/1.1" 404 -
+08:32:11 "GET /show.html?id=X&name=Wall-X&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722331725&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:11 "GET /show.html?id=Y&name=Wall-Y&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722331830&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:32:11 "GET /show.html?id=Z&name=Wall-Z&room=score-show&role=audience&view=lite&ls=4&hold=1&cb=1787722331941&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -

@@ -2,3 +2,9 @@
 05:18:38.266 [error] Failed to load resource: the server responded with a status of 404 (File not found)
 05:21:42.697 [error] Failed to load resource: the server responded with a status of 404 (File not found)
 05:21:43.771 [log] HLS FATAL networkError manifestParsingError
+05:25:19.023 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+05:25:19.823 [log] HLS FATAL networkError manifestParsingError
+05:25:22.779 [log] HLS FATAL networkError manifestParsingError
+05:25:25.619 [log] HLS FATAL networkError manifestParsingError
+05:25:39.072 [log] HLS warn networkError fragLoadTimeOut
+05:25:49.130 [log] HLS warn mediaError bufferSeekOverHole

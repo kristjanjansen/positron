@@ -1,0 +1,122 @@
+05:25:05.602 P3B run ROUTE=B label=b room=p3b-b steady=600s nopub=false
+05:25:05.603 live input 12f3a2dd9686887cf6495c8b10aec352
+05:25:06.559 instance g0 up: 1 2 A B
+05:25:07.486 instance g1 up: C D W X
+05:25:07.506 RELEASED 8 grid participants
+05:25:11.286 all 8 RUNNING (+3800 ms) — casting
+05:25:12.212 cast applied (2 featured + 4 live + 2 wall)
+05:25:13.033 instance gcomp up: K
+05:25:17.080 COMPOSITE READY in 4047 ms (6 video tiles + 2 wall snaps)
+05:25:17.118 screencast started -> ffmpeg -> RTMPS
+05:25:19.021 instance gview up: V
+05:25:49.164 VIEWER first valid K decode +30143 ms after viewer launch (+31044 ms after publish start); latK=11902 ms
+05:25:49.198 STEADY 600s
+05:25:54.273 steady +5s comp[1@43 2@54 B@46 A@72 D@71 C@60] drawFps=30 whip=idle viewer[1@11751 2@11765 K@11713] 1280x720 sc=1126/drop0 cpu comp=41 view=19 ffmpeg=15
+05:25:55.184 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:26:00.255 steady +11s comp[1@51 2@94 B@53 A@59 D@42 C@55] drawFps=30 whip=idle viewer[1@11476 2@11457 K@11403] 1280x720 sc=1308/drop0 cpu comp=39 view=19 ffmpeg=15
+05:26:05.329 steady +16s comp[1@44 2@61 B@145 A@63 D@78 C@62] drawFps=30 whip=idle viewer[1@11207 2@11221 K@11167] 1280x720 sc=1462/drop0 cpu comp=39 view=18 ffmpeg=20
+05:26:10.405 steady +21s comp[1@48 2@59 B@44 A@72 D@72 C@63] drawFps=30 whip=idle viewer[1@10908 2@10923 K@10867] 1280x720 sc=1615/drop0 cpu comp=40 view=16 ffmpeg=16
+05:26:15.482 steady +26s comp[1@46 2@58 B@75 A@68 D@72 C@63] drawFps=30 whip=idle viewer[1@10674 2@10691 K@10634] 1280x720 sc=1769/drop0 cpu comp=38 view=19 ffmpeg=19
+05:26:20.556 steady +31s comp[1@49 2@63 B@51 A@72 D@67 C@63] drawFps=30 whip=idle viewer[1@10447 2@10458 K@10408] 1280x720 sc=1923/drop0 cpu comp=42 view=22 ffmpeg=19
+05:26:25.627 steady +36s comp[1@48 2@62 B@86 A@72 D@68 C@59] drawFps=30 whip=idle viewer[1@10299 2@10277 K@10229] 1280x720 sc=2077/drop0 cpu comp=38 view=16 ffmpeg=17
+05:26:26.556 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:26:31.631 steady +42s comp[1@74 2@56 B@80 A@96 D@69 C@54] drawFps=30 whip=idle viewer[1@10232 2@10186 K@10132] 1280x720 sc=2258/drop0 cpu comp=38 view=14 ffmpeg=14
+05:26:36.707 steady +48s comp[1@38 2@52 B@46 A@103 D@46 C@55] drawFps=30 whip=idle viewer[1@10191 2@10200 K@10150] 1280x720 sc=2412/drop0 cpu comp=39 view=19 ffmpeg=16
+05:26:41.780 steady +53s comp[1@46 2@55 B@45 A@134 D@2641 C@60] drawFps=30 whip=idle viewer[1@10274 2@10255 K@10202] 1280x720 sc=2566/drop0 cpu comp=38 view=15 ffmpeg=14
+05:26:46.851 steady +58s comp[1@45 2@63 B@50 A@104 D@77 C@64] drawFps=30 whip=idle viewer[1@10211 2@10258 K@10174] 1280x720 sc=2720/drop0 cpu comp=39 view=18 ffmpeg=21
+05:26:51.922 steady +63s comp[1@77 2@89 B@77 A@126 D@64 C@57] drawFps=30 whip=idle viewer[1@10125 2@10143 K@10082] 1280x720 sc=2873/drop0 cpu comp=36 view=15 ffmpeg=20
+05:26:56.995 steady +68s comp[1@50 2@59 B@45 A@72 D@67 C@60] drawFps=30 whip=idle viewer[1@10163 2@10143 K@10086] 1280x720 sc=3027/drop0 cpu comp=40 view=18 ffmpeg=16
+05:26:58.015 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:27:03.088 steady +74s comp[1@49 2@59 B@76 A@97 D@63 C@67] drawFps=30 whip=idle viewer[1@10099 2@10108 K@10060] 1280x720 sc=3212/drop0 cpu comp=37 view=18 ffmpeg=17
+05:27:08.164 steady +79s comp[1@44 2@62 B@47 A@105 D@69 C@70] drawFps=30 whip=idle viewer[1@10150 2@10133 K@10075] 1280x720 sc=3366/drop0 cpu comp=40 view=15 ffmpeg=18
+05:27:13.240 steady +84s comp[1@70 2@55 B@48 A@96 D@70 C@56] drawFps=30 whip=idle viewer[1@10132 2@10174 K@10086] 1280x720 sc=3519/drop0 cpu comp=39 view=17 ffmpeg=18
+05:27:18.311 steady +89s comp[1@49 2@57 B@79 A@96 D@66 C@63] drawFps=30 whip=idle viewer[1@10116 2@10129 K@10075] 1280x720 sc=3673/drop0 cpu comp=40 view=19 ffmpeg=17
+05:27:23.384 steady +94s comp[1@43 2@57 B@81 A@99 D@65 C@54] drawFps=30 whip=idle viewer[1@10100 2@10116 K@10058] 1280x720 sc=3827/drop0 cpu comp=37 view=18 ffmpeg=19
+05:27:28.456 steady +99s comp[1@48 2@57 B@42 A@106 D@71 C@62] drawFps=30 whip=idle viewer[1@10126 2@10134 K@10078] 1280x720 sc=3980/drop0 cpu comp=40 view=15 ffmpeg=18
+05:27:29.414 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:27:34.491 steady +105s comp[1@47 2@64 B@49 A@93 D@65 C@60] drawFps=30 whip=idle viewer[1@10115 2@10130 K@10073] 1280x720 sc=4163/drop0 cpu comp=39 view=16 ffmpeg=18
+05:27:39.578 steady +110s comp[1@44 2@63 B@45 A@894 D@71 C@61] drawFps=30 whip=idle viewer[1@10098 2@10114 K@10057] 1280x720 sc=4318/drop0 cpu comp=36 view=14 ffmpeg=20
+05:27:44.652 steady +115s comp[1@869 2@87 B@75 A@71 D@39 C@53] drawFps=30 whip=idle viewer[1@10156 2@10167 K@10108] 1280x720 sc=4471/drop0 cpu comp=40 view=16 ffmpeg=14
+05:27:49.727 steady +121s comp[1@135 2@119 B@78 A@101 D@103 C@97] drawFps=30 whip=idle viewer[1@10100 2@10110 K@10058] 1280x720 sc=4625/drop0 cpu comp=37 view=15 ffmpeg=17
+05:27:54.805 steady +126s comp[1@78 2@87 B@77 A@98 D@101 C@90] drawFps=30 whip=idle viewer[1@11108 2@10199 K@10108] 1280x720 sc=4779/drop0 cpu comp=39 view=18 ffmpeg=16
+05:27:59.881 steady +131s comp[1@78 2@84 B@79 A@131 D@95 C@88] drawFps=30 whip=idle viewer[1@10208 2@10149 K@10067] 1280x720 sc=4933/drop0 cpu comp=40 view=14 ffmpeg=19
+05:28:00.830 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:28:05.921 steady +137s comp[1@111 2@94 B@84 A@104 D@104 C@125] drawFps=30 whip=idle viewer[1@10165 2@10174 K@10088] 1280x720 sc=5116/drop0 cpu comp=39 view=14 ffmpeg=14
+05:28:10.996 steady +142s comp[1@70 2@87 B@76 A@96 D@100 C@93] drawFps=30 whip=idle viewer[1@10216 2@10200 K@10111] 1280x720 sc=5270/drop0 cpu comp=40 view=21 ffmpeg=18
+05:28:16.072 steady +147s comp[1@78 2@99 B@86 A@100 D@70 C@96] drawFps=30 whip=idle viewer[1@10168 2@10183 K@10097] 1280x720 sc=5423/drop0 cpu comp=40 view=16 ffmpeg=15
+05:28:21.149 steady +152s comp[1@113 2@88 B@108 A@101 D@100 C@89] drawFps=30 whip=idle viewer[1@10185 2@10167 K@10074] 1280x720 sc=5577/drop0 cpu comp=40 view=18 ffmpeg=15
+05:28:26.229 steady +157s comp[1@105 2@91 B@85 A@97 D@103 C@88] drawFps=30 whip=idle viewer[1@10173 2@10182 K@10094] 1280x720 sc=5731/drop0 cpu comp=39 view=16 ffmpeg=20
+05:28:31.303 steady +162s comp[1@111 2@87 B@105 A@101 D@106 C@98] drawFps=30 whip=idle viewer[1@10191 2@10166 K@10082] 1280x720 sc=5885/drop0 cpu comp=41 view=16 ffmpeg=18
+05:28:32.269 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:28:37.341 steady +168s comp[1@103 2@115 B@112 A@99 D@99 C@124] drawFps=30 whip=idle viewer[1@10181 2@10165 K@10069] 1280x720 sc=6068/drop0 cpu comp=40 view=16 ffmpeg=21
+05:28:42.411 steady +173s comp[1@109 2@93 B@115 A@98 D@101 C@96] drawFps=30 whip=idle viewer[1@10200 2@10211 K@10093] 1280x720 sc=6221/drop0 cpu comp=42 view=14 ffmpeg=16
+05:28:47.484 steady +178s comp[1@106 2@57 B@107 A@98 D@106 C@123] drawFps=30 whip=idle viewer[1@10167 2@10150 K@10062] 1280x720 sc=6375/drop0 cpu comp=37 view=19 ffmpeg=19
+05:28:52.554 steady +183s comp[1@111 2@49 B@80 A@70 D@65 C@54] drawFps=30 whip=idle viewer[1@10158 2@10160 K@10050] 1280x720 sc=6529/drop0 cpu comp=42 view=19 ffmpeg=16
+05:28:57.622 steady +188s comp[1@78 2@54 B@74 A@66 D@72 C@55] drawFps=30 whip=idle viewer[1@10170 2@10115 K@10060] 1280x720 sc=6683/drop0 cpu comp=40 view=16 ffmpeg=20
+05:29:02.694 steady +193s comp[1@80 2@59 B@80 A@67 D@71 C@66] drawFps=30 whip=idle viewer[1@10159 2@10100 K@10051] 1280x720 sc=6836/drop0 cpu comp=39 view=17 ffmpeg=15
+05:29:03.547 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:29:08.620 steady +199s comp[1@73 2@81 B@83 A@72 D@67 C@58] drawFps=30 whip=idle viewer[1@10150 2@10163 K@10075] 1280x720 sc=7016/drop0 cpu comp=38 view=17 ffmpeg=18
+05:29:13.691 steady +204s comp[1@82 2@63 B@79 A@41 D@69 C@60] drawFps=30 whip=idle viewer[1@10136 2@10117 K@10060] 1280x720 sc=7170/drop0 cpu comp=40 view=15 ffmpeg=15
+05:29:18.767 steady +210s comp[1@71 2@90 B@84 A@65 D@71 C@59] drawFps=30 whip=idle viewer[1@10139 2@10119 K@10068] 1280x720 sc=7324/drop0 cpu comp=39 view=14 ffmpeg=17
+05:29:23.838 steady +215s comp[1@110 2@51 B@104 A@68 D@67 C@65] drawFps=30 whip=idle viewer[1@10129 2@10110 K@10057] 1280x720 sc=7477/drop0 cpu comp=40 view=15 ffmpeg=20
+05:29:28.907 steady +220s comp[1@45 2@53 B@78 A@71 D@46 C@61] drawFps=30 whip=idle viewer[1@10119 2@10101 K@10051] 1280x720 sc=7631/drop0 cpu comp=40 view=18 ffmpeg=20
+05:29:33.982 steady +225s comp[1@47 2@57 B@102 A@64 D@75 C@60] drawFps=30 whip=idle viewer[1@10142 2@10113 K@10059] 1280x720 sc=7784/drop0 cpu comp=39 view=16 ffmpeg=15
+05:29:34.839 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:29:39.917 steady +231s comp[1@47 2@61 B@44 A@60 D@68 C@62] drawFps=30 whip=idle viewer[1@10132 2@10116 K@10058] 1280x720 sc=7964/drop0 cpu comp=38 view=14 ffmpeg=14
+05:29:44.989 steady +236s comp[1@45 2@58 B@49 A@71 D@70 C@63] drawFps=30 whip=idle viewer[1@10121 2@10158 K@10076] 1280x720 sc=8118/drop0 cpu comp=41 view=20 ffmpeg=19
+05:29:50.065 steady +241s comp[1@38 2@49 B@44 A@60 D@73 C@50] drawFps=30 whip=idle viewer[1@10099 2@10118 K@10064] 1280x720 sc=8272/drop0 cpu comp=41 view=15 ffmpeg=16
+05:29:55.141 steady +246s comp[1@75 2@53 B@78 A@60 D@33 C@58] drawFps=30 whip=idle viewer[1@10116 2@10094 K@10043] 1280x720 sc=8426/drop0 cpu comp=40 view=18 ffmpeg=18
+05:30:00.220 steady +251s comp[1@75 2@52 B@71 A@65 D@65 C@57] drawFps=30 whip=idle viewer[1@10101 2@10119 K@10059] 1280x720 sc=8579/drop0 cpu comp=37 view=15 ffmpeg=17
+05:30:05.291 steady +256s comp[1@45 2@54 B@84 A@61 D@71 C@65] drawFps=30 whip=idle viewer[1@10092 2@10102 K@10051] 1280x720 sc=8733/drop0 cpu comp=41 view=18 ffmpeg=18
+05:30:06.297 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:30:11.373 steady +262s comp[1@41 2@85 B@79 A@67 D@44 C@64] drawFps=30 whip=idle viewer[1@10148 2@10125 K@10075] 1280x720 sc=8917/drop0 cpu comp=37 view=15 ffmpeg=18
+05:30:16.448 steady +267s comp[1@50 2@64 B@85 A@74 D@70 C@67] drawFps=30 whip=idle viewer[1@10133 2@10116 K@10063] 1280x720 sc=9071/drop0 cpu comp=43 view=21 ffmpeg=15
+05:30:21.523 steady +272s comp[1@44 2@54 B@78 A@70 D@40 C@59] drawFps=30 whip=idle viewer[1@10082 2@10093 K@10047] 1280x720 sc=9225/drop0 cpu comp=39 view=18 ffmpeg=18
+05:30:26.593 steady +277s comp[1@45 2@51 B@79 A@71 D@37 C@57] drawFps=30 whip=idle viewer[1@10108 2@10117 K@10064] 1280x720 sc=9379/drop0 cpu comp=42 view=18 ffmpeg=19
+05:30:31.669 steady +282s comp[1@45 2@52 B@85 A@66 D@65 C@62] drawFps=30 whip=idle viewer[1@10083 2@10098 K@10049] 1280x720 sc=9533/drop0 cpu comp=38 view=17 ffmpeg=20
+05:30:36.745 steady +288s comp[1@74 2@51 B@80 A@61 D@48 C@55] drawFps=30 whip=idle viewer[1@10110 2@10117 K@10062] 1280x720 sc=9686/drop0 cpu comp=40 view=19 ffmpeg=19
+05:30:37.588 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:30:42.645 steady +293s comp[1@43 2@65 B@76 A@67 D@36 C@62] drawFps=30 whip=idle viewer[1@10133 2@10111 K@10061] 1280x720 sc=9865/drop0 cpu comp=35 view=13 ffmpeg=16
+05:30:47.701 steady +299s comp[1@37 2@52 B@82 A@63 D@75 C@62] drawFps=30 whip=idle viewer[1@10113 2@10099 K@10047] 1280x720 sc=10018/drop0 cpu comp=36 view=16 ffmpeg=16
+05:30:52.765 steady +304s comp[1@43 2@55 B@79 A@40 D@35 C@62] drawFps=30 whip=idle viewer[1@10100 2@10117 K@10059] 1280x720 sc=10171/drop0 cpu comp=36 view=14 ffmpeg=17
+05:30:57.874 steady +309s comp[1@44 2@48 B@51 A@69 D@38 C@59] drawFps=30 whip=idle viewer[1@10082 2@10099 K@10040] 1280x720 sc=10328/drop0 cpu comp=40 view=14 ffmpeg=20
+05:31:02.930 steady +314s comp[1@38 2@53 B@70 A@63 D@67 C@65] drawFps=30 whip=idle viewer[1@10108 2@10081 K@10032] 1280x720 sc=10481/drop0 cpu comp=39 view=14 ffmpeg=19
+05:31:07.993 steady +319s comp[1@38 2@51 B@45 A@68 D@37 C@59] drawFps=30 whip=idle viewer[1@10154 2@10164 K@10108] 1280x720 sc=10634/drop0 cpu comp=41 view=15 ffmpeg=19
+05:31:08.918 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:31:13.975 steady +325s comp[1@40 2@54 B@45 A@60 D@37 C@57] drawFps=30 whip=idle viewer[1@10117 2@10125 K@10075] 1280x720 sc=10815/drop0 cpu comp=36 view=14 ffmpeg=18
+05:31:19.036 steady +330s comp[1@67 2@57 B@74 A@62 D@67 C@63] drawFps=30 whip=idle viewer[1@10096 2@10114 K@10063] 1280x720 sc=10969/drop0 cpu comp=40 view=19 ffmpeg=19
+05:31:24.095 steady +335s comp[1@37 2@82 B@44 A@40 D@41 C@54] drawFps=30 whip=idle viewer[1@10086 2@10125 K@10040] 1280x720 sc=11122/drop0 cpu comp=40 view=20 ffmpeg=14
+05:31:29.154 steady +340s comp[1@38 2@54 B@45 A@64 D@63 C@63] drawFps=30 whip=idle viewer[1@10066 2@10083 K@10025] 1280x720 sc=11275/drop0 cpu comp=37 view=16 ffmpeg=18
+05:31:34.218 steady +345s comp[1@81 2@56 B@47 A@66 D@66 C@64] drawFps=30 whip=idle viewer[1@10124 2@10134 K@10077] 1280x720 sc=11429/drop0 cpu comp=40 view=14 ffmpeg=16
+05:31:39.279 steady +350s comp[1@44 2@54 B@45 A@96 D@37 C@55] drawFps=30 whip=idle viewer[1@10091 2@10097 K@10050] 1280x720 sc=11582/drop0 cpu comp=38 view=15 ffmpeg=18
+05:31:40.157 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:31:45.215 steady +356s comp[1@68 2@54 B@46 A@67 D@62 C@63] drawFps=30 whip=idle viewer[1@10084 2@10095 K@10043] 1280x720 sc=11762/drop0 cpu comp=39 view=16 ffmpeg=18
+05:31:50.278 steady +361s comp[1@77 2@46 B@72 A@62 D@70 C@56] drawFps=30 whip=idle viewer[1@10100 2@10075 K@10029] 1280x720 sc=11916/drop0 cpu comp=38 view=18 ffmpeg=18
+05:31:55.338 steady +366s comp[1@53 2@65 B@44 A@71 D@98 C@66] drawFps=30 whip=idle viewer[1@10055 2@10065 K@10012] 1280x720 sc=12069/drop0 cpu comp=38 view=15 ffmpeg=21
+05:32:00.392 steady +371s comp[1@74 2@50 B@45 A@61 D@33 C@62] drawFps=30 whip=idle viewer[1@10132 2@10107 K@10060] 1280x720 sc=12222/drop0 cpu comp=38 view=15 ffmpeg=19
+05:32:05.457 steady +376s comp[1@49 2@59 B@38 A@38 D@66 C@62] drawFps=30 whip=idle viewer[1@10120 2@10101 K@10048] 1280x720 sc=12375/drop0 cpu comp=38 view=21 ffmpeg=18
+05:32:10.522 steady +381s comp[1@52 2@63 B@52 A@36 D@63 C@54] drawFps=30 whip=idle viewer[1@10064 2@10110 K@10028] 1280x720 sc=12529/drop0 cpu comp=37 view=16 ffmpeg=15
+05:32:11.433 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:32:16.503 steady +387s comp[1@48 2@57 B@47 A@65 D@45 C@64] drawFps=30 whip=idle viewer[1@10068 2@10076 K@10025] 1280x720 sc=12710/drop0 cpu comp=38 view=14 ffmpeg=14
+05:32:21.575 steady +392s comp[1@46 2@61 B@48 A@72 D@35 C@63] drawFps=30 whip=idle viewer[1@10118 2@10131 K@10076] 1280x720 sc=12864/drop0 cpu comp=37 view=18 ffmpeg=16
+05:32:26.646 steady +397s comp[1@48 2@64 B@45 A@67 D@44 C@67] drawFps=30 whip=idle viewer[1@10100 2@10109 K@10055] 1280x720 sc=13017/drop0 cpu comp=38 view=17 ffmpeg=19
+05:32:31.719 steady +403s comp[1@44 2@60 B@42 A@37 D@36 C@66] drawFps=30 whip=idle viewer[1@10089 2@10098 K@10041] 1280x720 sc=13171/drop0 cpu comp=38 view=14 ffmpeg=19
+05:32:36.791 steady +408s comp[1@38 2@54 B@47 A@64 D@42 C@55] drawFps=30 whip=idle viewer[1@10100 2@10114 K@10059] 1280x720 sc=13325/drop0 cpu comp=38 view=14 ffmpeg=19
+05:32:41.861 steady +413s comp[1@40 2@52 B@73 A@61 D@65 C@63] drawFps=30 whip=idle viewer[1@10085 2@10100 K@10049] 1280x720 sc=13479/drop0 cpu comp=37 view=16 ffmpeg=19
+05:32:42.729 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:32:47.802 steady +419s comp[1@39 2@57 B@45 A@60 D@35 C@63] drawFps=30 whip=idle viewer[1@10111 2@10092 K@10041] 1280x720 sc=13659/drop0 cpu comp=37 view=15 ffmpeg=19
+05:32:52.875 steady +424s comp[1@50 2@57 B@49 A@62 D@38 C@54] drawFps=30 whip=idle viewer[1@10067 2@10109 K@10025] 1280x720 sc=13812/drop0 cpu comp=38 view=16 ffmpeg=14
+05:32:57.949 steady +429s comp[1@73 2@59 B@72 A@38 D@94 C@62] drawFps=30 whip=idle viewer[1@10081 2@10098 K@10037] 1280x720 sc=13966/drop0 cpu comp=38 view=15 ffmpeg=19
+05:33:03.021 steady +434s comp[1@77 2@58 B@77 A@72 D@71 C@58] drawFps=30 whip=idle viewer[1@10110 2@10150 K@10066] 1280x720 sc=14120/drop0 cpu comp=36 view=16 ffmpeg=17
+05:33:08.084 steady +439s comp[1@53 2@65 B@45 A@64 D@69 C@58] drawFps=30 whip=idle viewer[1@10124 2@10107 K@10055] 1280x720 sc=14273/drop0 cpu comp=40 view=20 ffmpeg=21
+05:33:13.155 steady +444s comp[1@43 2@52 B@46 A@61 D@39 C@62] drawFps=30 whip=idle viewer[1@10108 2@10118 K@10040] 1280x720 sc=14427/drop0 cpu comp=39 view=17 ffmpeg=16
+05:33:14.056 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:33:19.128 steady +450s comp[1@49 2@57 B@52 A@34 D@41 C@54] drawFps=30 whip=idle viewer[1@10107 2@10115 K@10032] 1280x720 sc=14608/drop0 cpu comp=36 view=21 ffmpeg=12
+05:33:24.196 steady +455s comp[1@72 2@56 B@44 A@44 D@66 C@66] drawFps=30 whip=idle viewer[1@10122 2@10102 K@10050] 1280x720 sc=14762/drop0 cpu comp=39 view=14 ffmpeg=20
+05:33:29.267 steady +460s comp[1@49 2@52 B@35 A@62 D@69 C@90] drawFps=30 whip=idle viewer[1@10077 2@10084 K@10033] 1280x720 sc=14915/drop0 cpu comp=37 view=16 ffmpeg=15
+05:33:34.336 steady +465s comp[1@47 2@64 B@44 A@36 D@38 C@64] drawFps=30 whip=idle viewer[1@10125 2@10108 K@10051] 1280x720 sc=15069/drop0 cpu comp=39 view=17 ffmpeg=17
+05:33:39.409 steady +470s comp[1@44 2@62 B@44 A@64 D@39 C@55] drawFps=30 whip=idle viewer[1@10141 2@10124 K@10068] 1280x720 sc=15222/drop0 cpu comp=37 view=20 ffmpeg=19
+05:33:44.483 steady +475s comp[1@77 2@62 B@76 A@67 D@37 C@62] drawFps=30 whip=idle viewer[1@10091 2@10109 K@10053] 1280x720 sc=15376/drop0 cpu comp=39 view=17 ffmpeg=18
+05:33:45.380 videos-during: ["live-inprogress:ee90ebba","ready:bef618a6","ready:bc557619"]
+05:33:50.452 steady +481s comp[1@108 2@58 B@44 A@37 D@71 C@56] drawFps=30 whip=idle viewer[1@10115 2@10099 K@10050] 1280x720 sc=15557/drop0 cpu comp=39 view=18 ffmpeg=19
+05:33:55.524 steady +486s comp[1@79 2@51 B@44 A@60 D@68 C@91] drawFps=30 whip=idle viewer[1@10108 2@10085 K@10029] 1280x720 sc=15711/drop0 cpu comp=35 view=15 ffmpeg=14

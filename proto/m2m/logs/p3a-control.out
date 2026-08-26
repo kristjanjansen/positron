@@ -53,3 +53,9 @@
 05:19:18.344   +30s gc-ramp: 0 ok / 10 gone
 05:21:12.960   +30s gc-push: 0 ok / 10 gone
 05:23:03.384   +60s gc-ramp: 0 ok / 10 gone
+05:24:54.426   +60s gc-push: 0 ok / 10 gone
+05:26:45.026   +120s gc-ramp: 0 ok / 10 gone
+05:28:36.121   +120s gc-push: 0 ok / 10 gone
+05:30:26.745   +300s gc-ramp: 0 ok / 10 gone
+05:32:17.842   +300s gc-push: 0 ok / 10 gone
+05:32:17.844 P3A control run DONE {"created":1000,"createErr":0,"polls":2579,"pollErr":2579,"deaths":0,"replaced":0}

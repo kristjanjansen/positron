@@ -9,3 +9,5 @@
 05:21:40.734 COMPOSITE READY in 3538 ms (6 video tiles + 2 wall snaps)
 05:21:40.768 screencast started -> ffmpeg -> RTMPS
 05:21:42.695 instance gview up: V
+05:23:42.773 DRIVER FATAL: timeout waiting for viewer decoding composite clock
+05:23:42.790 ffmpeg exited code=0 sig=null

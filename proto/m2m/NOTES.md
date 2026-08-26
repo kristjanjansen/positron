@@ -802,6 +802,32 @@ results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
   coming soon (2022)" for Stream-WebRTC confirmed ✅ by direct test in 2026.
   WHIP ingest is DELIVERY-only. -> Route B (RTMPS) is the archive path.
 
+## P3B Checkpoint P2 — route B bring-up: 2 viewer bugs, 1 free recording proof (08:2x)
+
+- CDP screencast -> ffmpeg -> RTMPS pipeline worked FIRST TRY (Page.
+  startScreencast jpeg q80 -> image2pipe + wallclock PTS -> setpts,fps=30 ->
+  libx264 veryfast zerolatency 2.5 Mbps + anullsrc AAC -> flv rtmps). ~30 fps
+  in, speed 1.02-1.05x, 0 dropped frames at an 8 MB stdin watermark.
+- Viewer bug 1: current hls.js@1 THROWS at construction if
+  liveMaxLatencyDurationCount <= liveSyncDurationCount (measure-llhls.html's
+  bare `liveMaxLatencyDurationCount: 5` is now illegal) — fixed (3/6).
+- Viewer bug 2: joining before the live manifest exists = FATAL
+  manifestParsingError, NO self-recovery in hls.js — exactly
+  low-latency-player.v5.js wrap reason #3. Fixed with the v5 pattern:
+  destroy + rebuild every 2.5 s (took 1 rebuild, ~10 s, in the real run).
+- The two aborted attempts each produced a RECORDED asset anyway — first
+  proof: **RTMPS from the composite records automatically**: bc557619 ready,
+  120.02 s (matches 122 s streamed), 1280x720; readyToStream ~2 s after
+  stream end. Viewer pointed at the RECORDING's VOD manifest decodes all 3
+  burned rows 100 % at 720p (logs/p3b-vodcheck.png) — frame-content
+  verification of the archive by checksum, not by eyeball.
+- Main 600 s route-B run in flight; viewer joined the ~30 s-old stream 12 s
+  behind live edge and stock-config hls.js can only nudge (maxLatency 12 s >
+  actual ~10 s, so no seek fires): steady live latency ~10.1 s. HONEST
+  reading: LL-HLS *join/latency governance* is the v5 player's job (2.6-4 s
+  measured, plan.md §1); a show watches the composite through v5, not stock
+  hls.js. Composite/encode side unaffected: drawFps 30, 0 sc drops.
+
 ============================================================================
 # P3C SCORE (cue-driven choreography agent — show.html / score.mjs /
 # scores/*.json / run-show.mjs / analyze-show.py; port 8893, udd m2m-p3c,
@@ -958,3 +984,66 @@ Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
   1.2 Mbps target — synthetic canvas), audio 32.5 kbps, overhead 1.070.
   Combined with N24 rung: **wire/payload overhead 1.05-1.12; audio = model
   exactly; per-full-quality-pull ~0.48 GB/h vs model 0.45 (+7%)**.
+
+## Checkpoint P2 — THE 5-MIN SHOW 2x: stag0 + stag1, 38/38 asserts ✅; stag=1 v1 flaw found (2026-08-26 08:25 EEST)
+
+- Run A (stag=0, m2m-p3c-stag0.jsonl, 88.5k rows) and run B (stag=1,
+  m2m-p3c-stag1.jsonl, 89.1k rows): **19/19 correctness asserts PASS in
+  BOTH** (tier map both probes + livePage fold + pulled set == featured ∪
+  visible-live + wall pollers + cross-probe liveOrder/page sync, after every
+  event). Zero publish retries, zero pull failures, zero reloads, zero
+  re-casts needed in either run. Exit 0 both.
+- **Score adherence: drift p50 0 / p95 2 / max 3 ms** (both runs; n=38
+  fires). Operator echo through the DO p50 40-44 ms. Cue propagation
+  operator→all-12 p50 9 ms (run A) / 43 ms (run B) — run-to-run DO variance,
+  both ≪ the 100 ms cue-engine polling grain.
+- **Cmd→effect (run A baseline)**: spotlight wall→featured cmd→decoding video
+  506-534 ms; promote from live tier 521-640; rotate cmd→first new-page frame
+  p50 373 ms; demote→FRESH wall snapshot 2052-2068 ms (structural floor
+  reconfirmed); tier-frame prop p50 22 ms.
+- **The phase-2 unpull-burst gap REPRODUCED at will in run A**: every
+  4-unpull/probe rotation (page0→1) put 759-965 ms worst featured-tier gap
+  (5 of 6, one 167 ms outlier); 2-unpull rotations 172-608 ms; steady
+  baseline p99 101 ms.
+- **Run B (batched+deferred unpull): the burst gap is GONE** — 4-unpull
+  rotations worst gap 136-198 ms (p50 166), i.e. ~5x better, within 2x of
+  steady p99. unpull-batch: 30 calls, durMs p50 170 (vs 4x ~264 ms serial).
+- **BUT stag v1 regressed promote latency**: the 700 ms defer lived INSIDE
+  the serialized pull chain, so a promote right after a demote queued its
+  pull behind the sleep — and repeated reconciles stacked DUPLICATE sleeps:
+  e03 promote-video 633→1264 ms, e10 duet 521→2091 ms (chain forensics:
+  [unpull, sleep, sleep, pull, sleep]). FIXED as v2: defer via setTimeout
+  OUTSIDE the chain + pendingClose dedupe set; batch still serializes when
+  it fires. Confirmation run stag1b in flight.
+- Second-order finding (e08 forensics, stag1): on pull-heavy rotations the
+  remaining featured gap (one 1274 ms instance) comes from the SERIAL PULL
+  renegotiations themselves (4x offer/answer back-to-back; last TTFFs 1.4 s).
+  Next optimization for a real console: batch the PULLS into one tracks/new
+  too (heavy-media already proved multi-track pulls in one call).
+- Context: P3A sibling live during run A (other-chrome up to 373%), mostly
+  idle during run B (84%) — media numbers unaffected (featured p50 86/83,
+  live p50 74/75 both runs).
+
+## Checkpoint P4 — GC + lifecycle + WRAP-UP ✅ (2026-08-26 08:35 EEST)
+
+- **FINAL: 1003 sessions/new (3 smoke + 200 ramp + 800 push) + 2622 GETs,
+  ZERO CF-side errors on creation, zero 429/1015/Retry-After EVER.** One
+  client-side "fetch failed" (n=1, local socket). NO ceiling found through
+  1000 sessions at up to 40 creates/s — risk-2's "200-scale unprobed" is
+  now "no ceiling through 1000 @ 40/s".
+- GC/lifecycle of never-connected sessions (all raw statuses in the jsonl;
+  the driver's printed "gone" was a status==200 misclassification):
+  offer-variant records answer **425 (~11 s server-side block) at EVERY age
+  probed — +30 s to +26 min, polled or never-polled — zero 404/410/vanish**.
+  Empty-variant: 200 (+5 s) -> 410 ~5 s answer (+15 s..+95 s) -> deterministic
+  **500 "Backend error" in ~2.1 s by +26 min** (3/3 retries). Production note:
+  a 500 from GET sessions/{id} can mean "session long dead", not "SFU down";
+  and GET on a not-yet-connected session is expensive (11 s edge hold) —
+  don't poll pre-connect sessions.
+- Spontaneous deaths over the 10-min hold: **0 / 200**.
+- CLEANUP ✅: :8894 server down, 0 p3a chromes (by udd path), 0 drivers,
+  udd dirs removed, battery 100% AC throughout, RAM never below 11.85 GB free.
+  ZERO new CF resource types (sessions only; ephemeral server-side).
+- Data: results/m2m-p3a-{control,media-N24,egress-show8}.jsonl; tools
+  run-p3a-control.mjs, run-p3a-media.mjs (run-heavy clone + kind:"egress"
+  transport rows), analyze-p3a.py, analyze-p3a-egress.py; logs/p3a-*.log/out.

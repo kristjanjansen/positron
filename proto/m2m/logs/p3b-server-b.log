@@ -38,3 +38,25 @@ m2m GRID server on :8895, results -> /Users/s32863/personal/elektron/results/m2m
 08:21:42 "GET /composite-viewer.html?mode=hls&url=https%3A%2F%2Fcustomer-mwuu1cmlyif6eluy.cloudflarestream.com%2F12f3a2dd9686887cf6495c8b10aec352%2Fmanifest%2Fvideo.m3u8%3Fprotocol%3Dllhls&cb=1787721702459 HTTP/1.1" 200 -
 08:21:42 code 404, message File not found
 08:21:42 "GET /favicon.ico HTTP/1.1" 404 -
+08:24:44 "GET /composite-viewer.html?mode=hls&url=https%3A%2F%2Fcustomer-mwuu1cmlyif6eluy.cloudflarestream.com%2Fbc557619fd06eef98abbaa5d12c752fb%2Fmanifest%2Fvideo.m3u8 HTTP/1.1" 200 -
+08:24:44 code 404, message File not found
+08:24:44 "GET /favicon.ico HTTP/1.1" 404 -
+08:25:05 "GET /healthz HTTP/1.1" 200 -
+08:25:06 "GET /grid.html?id=1&name=Perf-Ada&room=p3b-b&role=operator&view=lite&hold=1&cb=1787721906210&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:06 code 404, message File not found
+08:25:06 "GET /favicon.ico HTTP/1.1" 404 -
+08:25:06 "GET /grid.html?id=2&name=Perf-Bela&room=p3b-b&role=performer&view=lite&hold=1&cb=1787721906312&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:06 "GET /grid.html?id=A&name=Live-A&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721906411&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:06 "GET /grid.html?id=B&name=Live-B&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721906504&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:07 "GET /grid.html?id=C&name=Live-C&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721907144&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:07 code 404, message File not found
+08:25:07 "GET /favicon.ico HTTP/1.1" 404 -
+08:25:07 "GET /grid.html?id=D&name=Live-D&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721907251&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:07 "GET /grid.html?id=W&name=Wall-W&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721907352&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:07 "GET /grid.html?id=X&name=Wall-X&room=p3b-b&role=audience&view=lite&hold=1&cb=1787721907447&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:25:12 "GET /composite.html?id=K&room=p3b-b&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2&cb=1787721912861 HTTP/1.1" 200 -
+08:25:13 code 404, message File not found
+08:25:13 "GET /favicon.ico HTTP/1.1" 404 -
+08:25:18 "GET /composite-viewer.html?mode=hls&url=https%3A%2F%2Fcustomer-mwuu1cmlyif6eluy.cloudflarestream.com%2F12f3a2dd9686887cf6495c8b10aec352%2Fmanifest%2Fvideo.m3u8%3Fprotocol%3Dllhls&cb=1787721918801 HTTP/1.1" 200 -
+08:25:19 code 404, message File not found
+08:25:19 "GET /favicon.ico HTTP/1.1" 404 -

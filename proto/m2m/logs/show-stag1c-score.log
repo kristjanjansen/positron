@@ -1,0 +1,8 @@
+05:32:16.944 [score] score "elektron demo score — phase 3c cue-driven choreography" -> room score-show, 19 events, t0=2026-08-26T05:32:38.869Z
+05:32:17.171 [score] joined room score-show; firing setup cast (8 actions), t0 in 21.7s
+05:32:48.870 [score] FIRE e01-spotlight-W (spotlight from the crowd (wall->featured)) drift +0 ms
+05:33:08.869 [score] FIRE e02-rotate (advance the live page) drift +0 ms
+05:33:23.870 [score] FIRE e03-swap-spotlight (demote W, spotlight Y) drift +0 ms
+05:33:38.870 [score] FIRE e04-wave1-1 (grid wave: full crowd sweep) drift +0 ms
+05:33:48.870 [score] FIRE e05-wave1-2 (cue) drift +0 ms
+05:33:58.870 [score] FIRE e06-wave1-3 (cue) drift +0 ms

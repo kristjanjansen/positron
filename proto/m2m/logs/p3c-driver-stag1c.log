@@ -1,0 +1,38 @@
+05:32:08.823 SHOW run label=stag1c room=score-show smoke=false stag=true score=scores/demo-score.json (19 events, 300s)
+05:32:08.842 battery:  -InternalBattery-0 (id=23265379)	100%; charged; 0:00 remaining present: true
+05:32:10.028 instance g0 up: 1 2 B C
+05:32:11.010 instance g1 up: D E F W
+05:32:11.998 instance g2 up: A X Y Z
+05:32:12.004 RELEASED all 12
+05:32:12.278 join: 1:held pg=1/1 v=0/0 wall=0 | 2:held pg=1/1 v=0/0 wall=0 || lites {"held":3,"connecting":7}
+05:32:12.790 join: 1:connecting pg=1/1 v=0/0 wall=0 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"connecting":10}
+05:32:13.297 join: 1:connecting pg=1/1 v=0/0 wall=0 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"connecting":8,"signaling":2}
+05:32:13.806 join: 1:signaling pg=1/1 v=0/0 wall=0 | 2:signaling pg=1/1 v=0/0 wall=0 || lites {"running":6,"connecting":2,"signaling":2}
+05:32:14.316 join: 1:running pg=1/1 v=0/0 wall=9 | 2:running pg=1/1 v=0/0 wall=9 || lites {"running":8,"connecting":2}
+05:32:14.828 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:15.337 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:15.847 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:16.358 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:16.869 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:16.869 all 12 RUNNING (tier wall) — spawning the operator (score.mjs)
+05:32:16.880 cast: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:32:16.944 [score] score "elektron demo score — phase 3c cue-driven choreography" -> room score-show, 19 events, t0=2026-08-26T05:32:38.869Z
+05:32:17.171 [score] joined room score-show; firing setup cast (8 actions), t0 in 21.7s
+05:32:17.390 cast: 1:running pg=1/1 v=0/0 wall=10 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:32:17.902 cast: 1:running pg=1/1 v=1/1 wall=6 | 2:running pg=1/1 v=1/2 wall=6 || lites {"running":10}
+05:32:18.411 cast: 1:running pg=1/2 v=1/2 wall=4 | 2:running pg=1/2 v=1/2 wall=4 || lites {"running":10}
+05:32:18.920 cast: 1:running pg=1/2 v=2/3 wall=4 | 2:running pg=1/2 v=3/3 wall=4 || lites {"running":10}
+05:32:19.438 cast: 1:running pg=1/2 v=3/4 wall=4 | 2:running pg=1/2 v=4/5 wall=4 || lites {"running":10}
+05:32:19.950 cast: 1:running pg=1/2 v=4/5 wall=4 | 2:running pg=1/2 v=4/5 wall=4 || lites {"running":10}
+05:32:20.461 cast: 1:running pg=1/2 v=5/5 wall=4 | 2:running pg=1/2 v=5/5 wall=4 || lites {"running":10}
+05:32:20.461 GRID READY 3588 ms after storm, 18408 ms of lead left
+05:32:48.870 [score] FIRE e01-spotlight-W (spotlight from the crowd (wall->featured)) drift +0 ms
+05:32:54.875 ASSERT e01-spotlight-W: PASS
+05:33:08.869 [score] FIRE e02-rotate (advance the live page) drift +0 ms
+05:33:14.874 ASSERT e02-rotate: PASS
+05:33:23.870 [score] FIRE e03-swap-spotlight (demote W, spotlight Y) drift +0 ms
+05:33:31.872 ASSERT e03-swap-spotlight: PASS
+05:33:38.870 [score] FIRE e04-wave1-1 (grid wave: full crowd sweep) drift +0 ms
+05:33:44.873 ASSERT e04-wave1-1: PASS
+05:33:48.870 [score] FIRE e05-wave1-2 (cue) drift +0 ms
+05:33:54.874 ASSERT e05-wave1-2: PASS
