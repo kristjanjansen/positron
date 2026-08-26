@@ -1116,3 +1116,55 @@ Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
   demote-fresh-snap p50 129 ms this run (immediate-post race won 3 of 6).
 - v4 (in flight as stag1d): quiet predicate also requires no pulled tile
   awaiting its first valid frame (bounded by the same x8 re-arm cap).
+
+## Checkpoint P4 — v4 CONFIRMED + WRAP-UP ✅ (2026-08-26 08:50 EEST)
+
+- stag1d (v4, m2m-p3c-stag1d.jsonl): **19/19 asserts PASS**, promotes stay at
+  baseline (p50 596 / max 807), heavy waves 9/11 rotations <= 379 ms; the two
+  ~1.1 s outliers are NOT the mitigation: e08's gap started 834 ms BEFORE the
+  cue fired (the phase-1-documented organic sender-side freeze class) and
+  e07's hit one probe only while the other probe's identical batch closed
+  gaplessly.
+- FINAL WAVE A/B (worst featured-tier gap per rotation, HEAVY = 4-unpull
+  burst/probe; 44 scored rotations across 4 shows):
+    stag0 (no mitigation):  HEAVY p50 894 / max 965 ms — SYSTEMATIC (5/6
+      rotations 759-965); light 172-608. The phase-2 finding, on demand.
+    stag1 v1 (batch+defer in-chain): HEAVY p50 166 / max 198 — but promotes
+      regressed to 2.1 s (defer blocked the pull chain).
+    stag1c v3 (quiet-chain): HEAVY p50 265; one 1362 (pre-first-frame collision).
+    stag1d v4 (quiet + first-frame-aware): HEAVY p50 182; outliers organic.
+  Verdict: batching tracks/close (4 renegotiations -> 1, durMs p50 170-198)
+  + an idle-beat defer ELIMINATES the deterministic 0.6-1.0 s burst gap
+  (~5x median improvement, typical gap now within 2x of steady p99 84-97 ms).
+  Residual ~1/run outlier = known freeze class + occasional renegotiation-
+  during-decode-warmup; next win = batch the PULLS too.
+- TOTALS across 5 runs (smoke + 4 shows) vs the deployed Worker: **88/88
+  correctness assertions PASS**; fire drift p50 0 / max 3 ms (n=63 events);
+  0 publish retries, 0 pull failures, 0 page reloads, 0 re-casts needed,
+  0 non-2xx from the Worker /cf proxy (368 pulls+closes); media flat all
+  five runs (featured p50 83-91, live 74-81 ms) with the P3A sibling
+  swinging 0-509% CPU alongside — the show layer is insensitive to it.
+- Screenshots: logs/show-{stag0,stag1,stag1b,stag1c,stag1d}-{1,2}-
+  {ready,spotlight,wave-mid,wave-settled,duet,spotlight-X,final}.png —
+  spotlight (Y featured beside Perf-Bela), duet (A+C+2 featured, live tier
+  clamped to one page), wave mid-sweep (new page half-landed, featured
+  undisturbed).
+- What a real operator console needs next (measured, not guessed):
+  1. Batch PULLS into one tracks/new (serial pull renegotiations are the
+     remaining rotation cost: last TTFF up to 1.4 s on 4-pull rotations).
+  2. Demote confirmation: re-poll the tile ~300 ms after a demote (the 2.1 s
+     "floor" is a poll/post race — measured 91-129 ms when the immediate
+     post wins).
+  3. Roster echo as command ACK (echo p50 44 ms) + treat promote-of-unknown-id
+     as an error (Worker currently broadcasts it silently).
+  4. The re-cast-on-rejoin rule (implemented in score.mjs) is load-bearing
+     for reloaded tabs; a console should own it.
+  5. Expected-state fold + assertions (run-show.mjs pattern) doubles as a
+     live "show health" panel: every mismatch we injected was caught.
+- CLEANUP: server :8893 stopped (PID file), port free, 0 m2m-p3c chromes,
+  0 score.mjs/run-show processes, CF sessions left to expire server-side,
+  ZERO new CF resources, room `score-show` state ephemeral on the Worker,
+  battery 100% AC end-to-end. Files (all new, mine): show.html, score.mjs,
+  run-show.mjs, analyze-show.py, scores/{demo,smoke}-score.json. Data:
+  results/m2m-p3c-{smoke,stag0,stag1,stag1b,stag1c,stag1d}.jsonl.
+  grid.html / run-grid.mjs / grid-server.py / plan files untouched.

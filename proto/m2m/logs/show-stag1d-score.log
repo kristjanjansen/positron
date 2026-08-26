@@ -3,3 +3,20 @@
 05:39:21.393 [score] FIRE e01-spotlight-W (spotlight from the crowd (wall->featured)) drift +1 ms
 05:39:41.392 [score] FIRE e02-rotate (advance the live page) drift +0 ms
 05:39:56.393 [score] FIRE e03-swap-spotlight (demote W, spotlight Y) drift +1 ms
+05:40:11.392 [score] FIRE e04-wave1-1 (grid wave: full crowd sweep) drift +0 ms
+05:40:21.393 [score] FIRE e05-wave1-2 (cue) drift +0 ms
+05:40:31.393 [score] FIRE e06-wave1-3 (cue) drift +0 ms
+05:40:41.393 [score] FIRE e07-wave1-4 (cue) drift +1 ms
+05:40:51.393 [score] FIRE e08-wave1-5 (cue) drift +0 ms
+05:41:01.392 [score] FIRE e09-wave1-6 (cue) drift +0 ms
+05:41:11.393 [score] FIRE e10-duet (duet: two from the live tier join the stage) drift +1 ms
+05:41:41.401 [score] FIRE e11-solo (back to solo) drift +8 ms
+05:42:11.392 [score] FIRE e12-reset (stage back to the two performers) drift +0 ms
+05:42:21.392 [score] FIRE e13-wave2-1 (second sweep) drift +0 ms
+05:42:31.393 [score] FIRE e14-wave2-2 (cue) drift +0 ms
+05:42:41.393 [score] FIRE e15-wave2-3 (cue) drift +0 ms
+05:42:51.392 [score] FIRE e16-wave2-4 (cue) drift +0 ms
+05:43:11.393 [score] FIRE e17-spotlight-X (final bow from the crowd) drift +1 ms
+05:43:41.393 [score] FIRE e18-farewell (demote) drift +0 ms
+05:43:56.393 [score] FIRE e19-curtain (pure cue: propagation only, no visual) drift +0 ms
+05:44:11.394 [score] score complete; 0 unmatched echoes

@@ -468,7 +468,21 @@ Remaining phase-2 items (deferred, not blocking phase 3):
   layer-switch latency on `tracks/update`.
 - The two-clock rehearsal: real humans, stage on LL-HLS vs WHEP arms, decide §2's option a/b/c.
 
-**Phase 3 — show scale + recording + the experiment**:
+**Phase 3 — ✅ ALL FOUR TRACKS DONE (2026-08-26 session 5):**
+- **3a soak**: no ceiling through 1003 sessions @ 40/s, media unaffected by control-plane bulk,
+  cost model +7–12 % (§5 risk 2 closed).
+- **3b recording**: composite participant works OBS-free (CDP screencast → ffmpeg → RTMPS; VOD
+  exact + ready in 1.8 s; WHIP records NOTHING — direct-tested; §5 risk 1 closed).
+- **3c choreography**: a JSON score conducts the N=12 grid — 88/88 correctness assertions, drift
+  p50 0 ms; spotlight ~0.5 s, rotate ~0.4 s; the unpull-burst frame gap FIXED (batched
+  `tracks/close` into a quiet chain: 894 → 136–200 ms typical, ~5×); demote confirmation is
+  sub-second when the snapshot POST wins the poll race (the 2.1 s "floor" was a race). Operator
+  console next-steps ledger in NOTES §P3C (batch pulls; 300 ms re-poll after demote; promote-of-
+  unknown-id should error; re-cast-on-rejoin; the expected-state fold = show-health panel).
+- **3d MoQ**: transport AND media proven in-browser (26 ms p50 720p30 via CF; catalog shim is the
+  ecosystem bridge; §1.C).
+Score artifacts: `proto/m2m/scores/demo-score.json` + `score.mjs` + `show.html`.
+Remaining phase-3-era items (below) are now the phase-4 backlog:
 - 200-session synthetic soak (cost telemetry vs §4; find the undocumented ceiling before a show does).
 - Recording composite: OBS Browser Source (✅ overlay pattern exists) renders the grid as a silent
   participant → RTMPS → Stream live input (recorded); archive = stage + grid, both on Stream.
