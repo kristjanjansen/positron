@@ -48,6 +48,20 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
   discipline + connection sharding. RUNBOOK §13; 15 data files.
 
+### Code review (high) + fixes — ✅ 10 severe findings fixed, workers redeployed
+- Review: 16 verified correctness findings (clean measured code; issues clustered
+  in deployed-worker state/auth + archive failure paths). Fixes commit 0f71cfd:
+  ghost-'left' gen-tagging, perm ENFORCED + operator role gated by new
+  OPERATOR_TOKEN secret (perm default flipped to open — closing is now an
+  explicit operator act), roster cap 500 + putSafe, cue backlog + cancel parity,
+  cues worker now token-authed (CUES_TOKEN; rotated once after a log echo),
+  uploader retry/exclude/degraded, per-run rooms+prefixes (kills rerun poison +
+  orphan clobber), replay-server hardened (/.env 403), classification fix,
+  4 one-liners. 14/14 WS behavior checks incl. dual-socket rejoin → 0 ghost
+  left; grid regression green; R2 demo replay green.
+- Client-visible protocol changes in workers/rtc/DEPLOYED.md (opToken, backlog
+  frames, cancel, publish rejection; cues token mandatory).
+
 ### Draft-16 relay (user provisioned) — ✅ 3 OF 4 GRID BLOCKERS FIXED
 - ✅ Auth free (136 ms establish, message-level rejects); latency = draft-14
   (17.8 native / 30 ms browser); @moq/net speaks 16 unmodified.
