@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>composite viewer</title>
+<style>
+body{background:#111;color:#ddd;font:13px monospace;margin:0;padding:10px}
+video{width:960px;background:#000;display:block;border:1px solid #333}
+#hud,#log{white-space:pre-wrap;font-size:11px;margin-top:8px}
+#log{color:#777;max-height:200px;overflow:auto}
+</style>
+</head>
+<body>
+<video id="vid" autoplay muted playsinline></video>
+<div id="hud">viewer booting…</div>
+<div id="log"></div>
+<script>
+"use strict";
+// ============================================================================
+// COMPOSITE VIEWER (phase 3b) — plays the composite's Stream live input and
+// decodes THREE burned rows from every presented frame (one 1280x720 work
+// canvas readback each):
+//   F1: featured tile "1" row  — abs (32, 40..96), blockW 9   -> grid glass -> viewer (FULL path)
+//   F2: featured tile "2" row  — abs (672, 40..96), blockW 9
+//   K : composite clock row    — abs (32, 600..648), blockW 12 -> composite draw -> viewer
+// mode=whep : WHEP recvonly against webRTCPlayback (route A — WHIP ingest is
+//             NOT playable as HLS, plan.md §2.2 cross-protocol block)
+// mode=hls  : LL-HLS via hls.js (route B — RTMPS ingest; WHEP is blocked the
+//             other way). Config arm from rig/measure-llhls.html + top-level
+//             lock. The DRIVER watches for parking and reloads (poll, never
+//             trust background notifications).
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const MODE = q.get("mode") || "whep";
+const URL_ = q.get("url");
+if (!URL_) throw new Error("missing ?url=");
+const COLLECT = "/collect";
+
+const ROWS = [
+  { name: "1", x: 32,  yc: 68,  bw: 9,  lo: 3, hi: 6 },
+  { name: "2", x: 672, yc: 68,  bw: 9,  lo: 3, hi: 6 },
+  { name: "K", x: 32,  yc: 624, bw: 12, lo: 4, hi: 9 },
+];
+const NBLOCKS = 64;
+
+window.__state = { phase: "init", mode: MODE, error: null, samples: 0,
+                   valid: { "1": 0, "2": 0, "K": 0 }, last: {}, w: 0, h: 0,
+                   hlsLatency: null, lastValidT: 0, attempts: 0 };
+
+const logEl = document.getElementById("log");
+const hud = document.getElementById("hud");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function wallClock() { return performance.timeOrigin + performance.now(); }
+function post(obj) { fetch(COLLECT, { method: "POST", body: JSON.stringify(obj), keepalive: true }).catch(() => {}); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: "V", name, t: wallClock() }, extra || {}));
+}
+let batch = [];
+setInterval(() => {
+  if (batch.length) {
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") }).catch(() => {});
+    batch = [];
+  }
+}, 1000);
+
+const vid = document.getElementById("vid");
+const work = document.createElement("canvas");
+work.width = 1280; work.height = 720;
+const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+
+// generic 64-block decoder at absolute geometry on the 1280x720 reference grid
+function decodeAt(r) {
+  const img = wctx.getImageData(r.x, r.yc, NBLOCKS * r.bw, 1).data;
+  const levels = [];
+  for (let i = 0; i < NBLOCKS; i++) {
+    let s = 0, n = 0;
+    for (let dx = r.lo; dx < r.hi; dx++) { s += img[(i * r.bw + dx) * 4 + 1]; n++; }
+    levels.push(s / n);
+  }
+  const mn = Math.min(...levels), mx = Math.max(...levels);
+  if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+  const thr = (mn + mx) / 2;
+  const bits = levels.map(l => (l > thr ? 1 : 0));
+  let ms = 0; for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+  let pid = 0; for (let i = 48; i < 56; i++) pid = pid * 2 + bits[i];
+  let ck = 0; for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+  const bytes = []; let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(pid);
+  let expect = 0; for (const b of bytes) expect ^= b;
+  if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+  return { ok: true, ms, pid: String.fromCharCode(pid), contrast: mx - mn };
+}
+
+// ---- rVFC loop --------------------------------------------------------------
+let busy = false, lastPresented = -1;
+function onFrame(now, meta) {
+  vid.requestVideoFrameCallback(onFrame);       // RE-ARM FIRST
+  if (busy) return;
+  busy = true;
+  try {
+    if (meta.presentedFrames === lastPresented) return;
+    lastPresented = meta.presentedFrames;
+    wctx.drawImage(vid, 0, 0, 1280, 720);       // normalize any rendition to reference grid
+    const dispWall = performance.timeOrigin + meta.expectedDisplayTime;
+    const row = { kind: "vsample", mode: MODE, t: wallClock(),
+                  presentedFrames: meta.presentedFrames, w: meta.width, h: meta.height };
+    window.__state.w = meta.width; window.__state.h = meta.height;
+    let anyValid = false;
+    for (const r of ROWS) {
+      const dec = decodeAt(r);
+      if (dec.ok) {
+        row["lat" + r.name] = Math.round(dispWall - dec.ms);
+        row["pidOk" + r.name] = dec.pid === r.name;
+        window.__state.valid[r.name]++;
+        window.__state.last[r.name] = row["lat" + r.name];
+        anyValid = true;
+      } else row["why" + r.name] = dec.why;
+    }
+    if (anyValid) window.__state.lastValidT = row.t;
+    window.__state.samples++;
+    batch.push(row);
+  } finally { busy = false; }
+}
+vid.requestVideoFrameCallback(onFrame);
+
+setInterval(() => {
+  const s = window.__state;
+  hud.textContent = "mode=" + MODE + " phase=" + s.phase + " " + s.w + "x" + s.h +
+    " samples=" + s.samples +
+    " valid[1]=" + s.valid["1"] + (s.last["1"] != null ? "@" + s.last["1"] + "ms" : "") +
+    " valid[2]=" + s.valid["2"] + (s.last["2"] != null ? "@" + s.last["2"] + "ms" : "") +
+    " valid[K]=" + s.valid["K"] + (s.last["K"] != null ? "@" + s.last["K"] + "ms" : "") +
+    (s.hlsLatency != null ? " hlsLat=" + s.hlsLatency.toFixed(2) + "s" : "");
+}, 1000);
+
+// ============================================================================
+// WHEP mode (play.html pattern, video-only, no abs-capture munging)
+// ============================================================================
+let pc = null;
+async function whepOnce(attempt) {
+  pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] });
+  window.__pc = pc;
+  const connected = new Promise((res, rej) => {
+    pc.onconnectionstatechange = () => {
+      event("pc", { state: pc.connectionState, attempt });
+      if (pc.connectionState === "connected") res();
+      if (pc.connectionState === "failed") rej(new Error("pc failed"));
+    };
+    setTimeout(() => rej(new Error("connect timeout")), 15000);
+  });
+  pc.ontrack = (e) => {
+    if (e.track.kind === "video") {
+      vid.srcObject = new MediaStream([e.track]);
+      vid.play().catch(() => {});
+    }
+  };
+  pc.addTransceiver("video", { direction: "recvonly" });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+  const resp = await fetch(URL_, {
+    method: "POST", headers: { "Content-Type": "application/sdp" },
+    body: pc.localDescription.sdp
+  });
+  const answer = await resp.text();
+  event("whep-response", { status: resp.status, attempt });
+  if (!resp.ok) throw new Error("WHEP HTTP " + resp.status + ": " + answer.slice(0, 200));
+  await pc.setRemoteDescription({ type: "answer", sdp: answer });
+  await connected;
+}
+async function whepConnect() {
+  for (let attempt = 1; attempt <= 30; attempt++) {
+    window.__state.attempts = attempt;
+    window.__state.phase = "connecting";
+    try {
+      await whepOnce(attempt);
+      window.__state.phase = "playing";
+      log("WHEP connected on attempt " + attempt);
+      startWhepStats();
+      return;
+    } catch (e) {
+      log("attempt " + attempt + " failed: " + e.message);
+      try { pc.close(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  window.__state.phase = "failed";
+  window.__state.error = "all whep attempts failed";
+}
+function startWhepStats() {
+  setInterval(async () => {
+    try {
+      const st = await pc.getStats();
+      const row = { kind: "viewer-stats", mode: MODE, t: wallClock() };
+      st.forEach(s => {
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          row.framesDecoded = s.framesDecoded; row.fps = s.framesPerSecond;
+          row.freezeCount = s.freezeCount; row.totalFreezesDuration = s.totalFreezesDuration;
+          row.packetsLost = s.packetsLost; row.jitterBufferDelay = s.jitterBufferDelay;
+          row.jitterBufferEmittedCount = s.jitterBufferEmittedCount;
+          row.frameWidth = s.frameWidth; row.frameHeight = s.frameHeight;
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated)
+          row.rtt = s.currentRoundTripTime;
+      });
+      batch.push(row);
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+// ============================================================================
+// LL-HLS mode (hls.js CDN + the rig's 'config' recovery arm + top-level lock)
+// ============================================================================
+function hlsConnect() {
+  window.__state.phase = "loading-hlsjs";
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+  s.onload = () => {
+    if (!window.Hls || !Hls.isSupported()) {
+      window.__state.phase = "failed"; window.__state.error = "hls.js unsupported"; return;
+    }
+    let hls;
+    try {
+      hls = new Hls({
+        lowLatencyMode: true,
+        backBufferLength: 30,
+        // 'config' recovery arm; current hls.js@1 enforces
+        // liveMaxLatencyDurationCount > liveSyncDurationCount at construction
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 6,
+        maxLiveSyncPlaybackRate: 1.05,
+      });
+    } catch (e) {
+      window.__state.phase = "failed";
+      window.__state.error = "hls ctor: " + (e && e.message || e);
+      return;
+    }
+    window.__hls = hls;
+    hls.on(Hls.Events.ERROR, (_e, d) => {
+      event("hls-error", { fatal: !!d.fatal, type: d.type, details: d.details });
+      log("HLS", d.fatal ? "FATAL" : "warn", d.type, d.details);
+    });
+    hls.on(Hls.Events.MANIFEST_PARSED, (_e, d) => {
+      // lock to the top (source) rendition — measurement wants full pixels
+      let best = 0;
+      d.levels.forEach((lv, i) => { if ((lv.height || 0) >= (d.levels[best].height || 0)) best = i; });
+      hls.currentLevel = best;
+      event("hls-manifest", { levels: d.levels.length, lockedLevel: best,
+                              h: d.levels[best] && d.levels[best].height });
+      vid.play().catch(() => {});
+      window.__state.phase = "playing";
+    });
+    hls.loadSource(URL_);
+    hls.attachMedia(vid);
+    setInterval(() => {
+      window.__state.hlsLatency = (typeof hls.latency === "number") ? hls.latency : null;
+      batch.push({ kind: "viewer-hls", t: wallClock(), hlsLatency: hls.latency,
+                   targetLatency: hls.targetLatency, currentLevel: hls.currentLevel,
+                   playbackRate: vid.playbackRate,
+                   buffered: vid.buffered.length ?
+                     vid.buffered.end(vid.buffered.length - 1) - vid.currentTime : null });
+    }, 2000);
+  };
+  s.onerror = () => { window.__state.phase = "failed"; window.__state.error = "hls.js cdn load failed"; };
+  document.head.appendChild(s);
+}
+
+if (MODE === "whep") whepConnect().catch(e => {
+  window.__state.phase = "failed"; window.__state.error = String(e);
+});
+else hlsConnect();
+</script>
+</body>
+</html>

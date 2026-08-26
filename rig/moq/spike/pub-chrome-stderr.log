@@ -1,0 +1,13 @@
+[42451:689394:0826/081146.822400:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[42451:689394:0826/081210.308759:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[42451:689394:0826/081251.297945:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[42451:689394:0826/081432.762184:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[43398:695272:0826/081444.213378:ERROR:services/on_device_model/ml/gpu_blocklist.cc:118] Unable to get gpu adapter
+[43398:695284:0826/081444.214231:ERROR:services/on_device_model/ml/gpu_blocklist.cc:118] Unable to get gpu adapter
+[42451:689394:0826/081504.403295:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -2
+[42451:689245:0826/081504.407181:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (200.019s) location=Button@ui/views/controls/button/button.cc:669
+[42451:689245:0826/081504.407346:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (200.019s) location=Button@ui/views/controls/button/button.cc:669
+[42451:689245:0826/081504.407591:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (200.019s) location=Button@ui/views/controls/button/button.cc:669
+[42451:689245:0826/081504.407612:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (199.45s) location=TabIcon@chrome/browser/ui/views/tabs/tab/tab_icon.cc:98
+[42451:689245:0826/081504.407621:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (169.48s) location=Button@ui/views/controls/button/button.cc:669
+[42451:689245:0826/081504.413740:ERROR:content/browser/gpu/gpu_process_host.cc:999] GPU process exited unexpectedly: exit_code=15

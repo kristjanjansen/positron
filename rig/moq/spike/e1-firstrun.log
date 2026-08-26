@@ -1,0 +1,76 @@
+[/log] PUB 0.606 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1-x7k3 codec=vp8
+[/log] PUB 0.743 CONNECTED ms=136 version=moq-transport-14
+[/log] PUB 0.743 PUBLISHED path=moq-media-e1-x7k3
+[/log] PUB 0.743 CATALOG_WRITTEN {"video":{"renditions":{"video":{"codec":"vp8","container":{"kind":"legacy"},"codedWidth":1280,"codedHeight":720,"framerate":30,"optimizeForLatency":true}}}}
+[/log] PUB 0.747 ENC_SUPPORT true
+[/log] PUB 0.791 ENCODED n=1 type=key bytes=6749
+[/log] PUB 5.702 ENCODED n=150 type=delta bytes=7798
+[/log] PUB 10.652 ENCODED n=300 type=delta bytes=4901
+[/log] PUB 10.749 STATS submitted=303 encoded=302 dropped=0 queue=0
+[/log] PUB 15.601 ENCODED n=450 type=delta bytes=5221
+[/log] PLAY 0.607 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1-x7k3 mode=hang
+[/log] PLAY 0.766 CONNECTED ms=159 version=moq-transport-14
+[/log] PLAY 0.767 CATALOG_SUBSCRIBE_SENT
+[/log] PUB 20.552 ENCODED n=600 type=delta bytes=4854
+[/log] PUB 20.749 STATS submitted=606 encoded=606 dropped=0 queue=0
+[/log] PUB 25.502 ENCODED n=750 type=delta bytes=5713
+[/log] PUB 30.449 ENCODED n=900 type=delta bytes=3371
+[/log] PUB 30.748 STATS submitted=909 encoded=908 dropped=0 queue=0
+[/log] PLAY 15.770 CATALOG_FAIL timeout
+[/log] PUB 35.402 ENCODED n=1050 type=delta bytes=5013
+[/log] PUB 40.352 ENCODED n=1200 type=delta bytes=4303
+[/log] PUB 40.749 STATS submitted=1212 encoded=1212 dropped=0 queue=0
+[/log] PUB 45.302 ENCODED n=1350 type=delta bytes=5518
+[/log] PUB 50.252 ENCODED n=1500 type=delta bytes=4043
+[/log] PUB 50.749 STATS submitted=1515 encoded=1515 dropped=0 queue=0
+[/log] PUB 55.203 ENCODED n=1650 type=delta bytes=5419
+[/log] PUB 60.152 ENCODED n=1800 type=delta bytes=4672
+[/log] PUB 60.749 STATS submitted=1818 encoded=1818 dropped=0 queue=0
+[/log] PUB 65.100 ENCODED n=1950 type=delta bytes=5370
+[/log] PUB 70.052 ENCODED n=2100 type=delta bytes=4876
+[/log] PUB 70.749 STATS submitted=2121 encoded=2121 dropped=0 queue=0
+[/log] PUB 75.002 ENCODED n=2250 type=delta bytes=5100
+[/log] PUB 79.951 ENCODED n=2400 type=delta bytes=4305
+[/log] PUB 80.749 STATS submitted=2424 encoded=2424 dropped=0 queue=0
+[/log] PLAY 0.630 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1-x7k3 rawtrack=video
+[/log] PLAY 0.799 RAW_SUBSCRIBE_SENT video
+[/log] PLAY 0.798 CONNECTED ms=168 version=moq-transport-14
+[/log] PLAY 0.933 RAW_GROUP seq=53
+[/log] PLAY 0.988 SUMMARY none
+[/log] PLAY 0.988 FAIL TypeError "fr.slice is not a function or its return value is not iterable"
+[/log] PLAY 2.312 RAW_TRACK_CLOSED "null"
+[/log] PUB 84.903 ENCODED n=2550 type=delta bytes=5306
+[/log] PUB 89.849 ENCODED n=2700 type=delta bytes=4481
+[/log] PUB 90.750 STATS submitted=2727 encoded=2727 dropped=0 queue=0
+[/log] PUB 94.801 ENCODED n=2850 type=delta bytes=4951
+[/log] PUB 99.752 ENCODED n=3000 type=delta bytes=5027
+[/log] PUB 100.750 STATS submitted=3030 encoded=3030 dropped=0 queue=0
+[/log] PUB 104.701 ENCODED n=3150 type=delta bytes=6772
+[/log] PUB 109.652 ENCODED n=3300 type=delta bytes=5108
+[/log] PUB 110.750 STATS submitted=3333 encoded=3333 dropped=0 queue=0
+[/log] PUB 114.602 ENCODED n=3450 type=delta bytes=4811
+[/log] PUB 119.549 ENCODED n=3600 type=delta bytes=4635
+[/log] PUB 120.750 STATS submitted=3636 encoded=3636 dropped=0 queue=0
+[/log] PUB 124.503 ENCODED n=3750 type=delta bytes=5985
+[/log] PUB 129.449 ENCODED n=3900 type=delta bytes=3239
+[/log] PUB 130.750 STATS submitted=3939 encoded=3939 dropped=0 queue=0
+[/log] PUB 134.401 ENCODED n=4050 type=delta bytes=4483
+[/log] PUB 139.351 ENCODED n=4200 type=delta bytes=4329
+[/log] PUB 140.750 STATS submitted=4242 encoded=4242 dropped=0 queue=0
+[/log] PUB 144.302 ENCODED n=4350 type=delta bytes=5382
+[/log] PUB 149.250 ENCODED n=4500 type=delta bytes=4683
+[/log] PUB 150.750 STATS submitted=4545 encoded=4545 dropped=0 queue=0
+[/log] PUB 154.202 ENCODED n=4650 type=delta bytes=5658
+[/log] PUB 159.152 ENCODED n=4800 type=delta bytes=4779
+[/log] PUB 160.750 STATS submitted=4848 encoded=4848 dropped=0 queue=0
+[/log] PUB 164.102 ENCODED n=4950 type=delta bytes=4845
+[/log] PUB 169.052 ENCODED n=5100 type=delta bytes=4293
+[/log] PUB 170.749 STATS submitted=5151 encoded=5151 dropped=0 queue=0
+[/log] PUB 174.002 ENCODED n=5250 type=delta bytes=4512
+[/log] PUB 178.952 ENCODED n=5400 type=delta bytes=4189
+[/log] PUB 180.750 STATS submitted=5454 encoded=5454 dropped=0 queue=0
+[/log] PUB 183.902 ENCODED n=5550 type=delta bytes=4569
+[/log] PUB 188.852 ENCODED n=5700 type=delta bytes=4170
+[/log] PUB 190.750 STATS submitted=5757 encoded=5757 dropped=0 queue=0
+[/log] PUB 193.802 ENCODED n=5850 type=delta bytes=4847
+[/log] PUB 198.751 ENCODED n=6000 type=delta bytes=4532

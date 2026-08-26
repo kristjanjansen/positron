@@ -322,3 +322,143 @@ relay+token — the client also carries ALPN `moqt-16`, so draft-16 should work 
 hang catalog, while draft-14 `moq-pub` publishes moq-catalog/fMP4 — media-format interop in the
 browser is the next spike (likely needs our own catalog/track handling on top of `@moq/net`);
 (c) no SUBSCRIBE_NAMESPACE on CF → `announced()` hangs; consume by exact path only.
+
+## 7. Media-layer spike — can VIDEO reach a browser through CF MoQ today?
+
+⏱ START 2026-08-26 08:06 EEST (05:06 UTC). Time-box ~60 min active. (section owned by the media-layer spike agent; in progress)
+
+### 7.0 Setup discovered before any experiment
+- **`@moq/hang` 0.4.2 is NOT a batteries-included player/publisher** — it exports only
+  `Catalog` (zod schema of the hang catalog), `Container` (Legacy varint / CMAF / LOC
+  frame formats + a latency-aware `Consumer`), and re-exports of net/signals. The
+  WebCodecs capture/render pipeline (the old `<hang-publish>`/`<hang-watch>` elements)
+  is not in this npm package. So "hang on both ends" = hand-rolled WebCodecs on both
+  sides USING hang's catalog schema + container classes (which IS the hang wire format —
+  what matters for interop).
+- Hang media-layer conventions (from package source, ✅ read):
+  - catalog track name **`catalog.json`** (or DEFLATE `catalog.json.z`); JSON per
+    `Catalog.RootSchema`: `{video:{renditions:{<trackName>:{codec, container:{kind:
+    "legacy"|"cmaf"|"loc"}, codedWidth…}}}}`.
+  - legacy container frame = **microsecond-timestamp varint + raw codec bitstream**;
+    new MoQ group per keyframe (`Container.Legacy.Producer`).
+  - `Container.Consumer(trackSubscriber, {format, latency})` reorders groups, skips slow
+    ones to meet a latency target.
+
+### 7.1 Experiment 1 — hang→CF→hang: ✅ VIDEO WORKS, glass-to-glass p50 26 ms
+
+✅ 2026-08-26 ~05:15 UTC. **Browser→CF-MoQ-relay→browser VIDEO works today**: canvas
+(burned-ms binary row, `rig/whep/publish.html` geometry byte-identical) → WebCodecs
+**VP8 1280x720@30** (`latencyMode:"realtime"`, 2 Mbps, 1 s GOP) → hang legacy container →
+`@moq/net` publish → `draft-14.cloudflare.mediaoverquic.com` (no auth) → second headless
+Chrome: subscribe `catalog.json` → parse hang RootSchema → subscribe rendition track →
+`Container.Consumer` (latency 0) → VideoDecoder → canvas → row decode. Both Chromes on
+the host → one clock, deltas exact.
+
+**Latency, n=2740 decoded frames over 90 s** (`results/moq-media-e1.jsonl`; delta =
+decoded-frame-drawn-to-canvas wall time − burned wall time):
+
+| metric | ms |
+|---|---|
+| p50 | **26.2** |
+| p90 | 36.9 |
+| p95 | **42.4** |
+| p99 | 104.8 |
+| min / max (steady) | 16.4 / 477 |
+
+- Sustained ✅ **30.3 fps at 1280x720 for the full 90 s** (STATS every 10 s: 303 frames/10 s
+  flat), **0 checksum failures, 0 decode errors, 0 encoder drops**. Only the single first
+  frame was join catch-up (1459 ms, open-group replay).
+- vs WebRTC (plan.md §2.2: 74 ms p50 / 83 p95 glass-to-glass): **~3x lower p50**. ⚠️ method
+  caveat: this rig measures burn→decoded-frame-on-canvas (no display); WHEP's number included
+  display (`expectedDisplayTime`). Add ~one vsync (8–16 ms) for a fair comparison → ~35–42 ms
+  effective — still comfortably under 74 ms. Coheres with §3.6: transport 17.9 + encode/
+  decode/jitter ≈ 26.
+- Join-to-first-frame ≈ 1.0 s, dominated by the 2 s catalog republish cadence (below).
+- ✅ Ran under heavy host contention (load avg 24→74 on 12 cores mid-run — sibling agents +
+  a local k8s stack): percentiles stayed flat. Number is robust, if anything pessimistic.
+
+**Traps that cost the first two runs (each ✅ verified, fixes in `spike/src/`):**
+1. **CF draft-14 is live-edge only per GROUP, and a hang-style write-once catalog is a
+   closed group** → a late subscriber gets NOTHING on `catalog.json` (15 s timeout; §3.6's
+   replay applies to the *open* group only). Fix: republish the catalog every 2 s.
+2. **Subscribe-before-announce is rejected, not held**: `SUBSCRIBE error code=4 "not found:
+   Track not found"` immediately. `@moq/net` `consume()` is blind (no announce wait on CF —
+   no SUBSCRIBE_NAMESPACE on 14) → player needs a retry loop (1 s cadence works).
+3. Publisher-side retention: hang's default `trackInfo()` declares a large `latencyMax`
+   (FETCH window) → a late join triggers a multi-group replay blast; capped at
+   `trackInfo({latencyMax: 2000})`.
+4. Headless Chrome session-restore resurrects old spike tabs on a reused `--user-data-dir`
+   (two publishers on one namespace) → fresh udd per run.
+5. `@moq/net` `group.readFrame()` returns `{payload, timestamp}`, not a Uint8Array.
+
+### 7.2 Experiment 2 — IETF `moq-pub` → hang player: ❌ dies at the catalog layer, exactly
+
+✅ Docker draft-14 `moq-pub` (ffmpeg testsrc2 640x360@30 h264+aac fMP4, §4 shape) publishing
+`moq-media-e2-t4x8`. Hang player pointed at it:
+- **Failure point: catalog fetch, before any media logic.** Player subscribes
+  **`catalog.json`** → CF accepts (SUBSCRIBE_OK) → upstream `moq-pub` has no such track →
+  the subscription closes cleanly ~1 s later with **zero groups** (nextGroup → undefined; no
+  error code). Retried 20×, identical. Nothing else is ever requested — death before
+  track-subscribe, decode, everything.
+- What `moq-pub` actually announces (✅ read off the wire by raw `@moq/net` subscribes —
+  **the bytes themselves reach the browser fine**):
+  - track **`.catalog`** = WARP moq-catalog v1 JSON (`streamingFormat:1`, packaging "cmaf",
+    tracks `1.m4s` avc1.64001E + `2.m4s` mp4a.40.2, `initTrack:"0.mp4"`) — 630 bytes,
+    delivered in 130 ms;
+  - track **`1.m4s`** = one group per GOP, one moof+mdat CMAF fragment per frame (~30
+    frames/group, 4.5–13 KB each) — streamed live to the browser without a hitch.
+- So the gap is **purely conventions**: catalog track NAME (`catalog.json` vs `.catalog`),
+  catalog SCHEMA (hang RootSchema vs WARP), and container declaration (hang expects
+  `container.kind` + for CMAF a base64 `init` in the catalog; WARP points at an init TRACK).
+  A ~100-line browser shim (read `.catalog`, fetch `0.mp4` init → avcC → VideoDecoder
+  description, feed `N.m4s` fragments through hang's `Container.Cmaf`/a demuxer) looks
+  entirely feasible — media bytes and transport already interop.
+
+### 7.3 Experiment 3 — hang publisher → IETF `moq-sub`: ❌ mirror image, same layer
+
+✅ While E1's publisher ran: Docker draft-14 `moq-sub --catalog` on the hang namespace.
+Wire trace (RUST_LOG=debug): CLIENT_SETUP DRAFT_14 ok → `SUBSCRIBE track=.catalog
+filter_type=LargestObject` → **`SUBSCRIBE_OK content_exists=false`** (CF accepts a
+subscribe for a track the publisher never offered) → 10 s of silence → relay sends
+**`PUBLISH_DONE status_code=0 stream_count=0`** → `moq-sub` exits "media error: closed,
+code=0". Default (no --catalog) mode subscribes `0.mp4` → identical. Same single failure
+layer, opposite direction: `moq-sub` wants `.catalog`/WARP-CMAF; hang offers
+`catalog.json`/legacy. (Also a CF relay datum: an unserved SUBSCRIBE is optimistically
+OK'd, then closed with PUBLISH_DONE(0) after ~10 s.)
+
+### 7.4 Verdict (for plan-m2m §1.C) + caveats
+
+**"Browser MoQ VIDEO works TODAY via the hang media layer on both ends through Cloudflare's
+draft-14 relay: 1280x720@30 sustained 90 s, glass-to-glass p50 26 ms / p95 42 ms (n=2740) —
+~3x lower than WebRTC's 74 ms. The remaining gap is not transport and not media bytes; it is
+catalog conventions between ecosystems (hang `catalog.json`/RootSchema/legacy-container vs
+IETF-tools `.catalog`/WARP/CMAF-tracks), which kills both interop directions at the
+catalog-fetch step and looks shimmable in ~100 lines."**
+
+- ⚠️ draft-16 would change (📄 from §1/§2, untested — no relay token yet): auth required
+  (token in URL path); + `SUBSCRIBE_NAMESPACE` → hang's `announced()` discovery works, and
+  the subscribe-before-announce race (§7.1 trap 2) gets a clean fix; + `PUBLISH` (push
+  tracks) could cut join latency. `@moq/net` already carries ALPN `moqt-16`. NOT "auth
+  only" — the namespace-subscribe gain is real for a grid.
+- ⚠️ Browser matrix (noted, untested): everything here is Chromium. Safari: WebTransport
+  only since 26.4 (plan-m2m §1.C) and WebCodecs codec coverage differs (VP8 decode iffy;
+  H.264 the safer cross-browser codec — our pipeline is codec-agnostic, `?codec=` param
+  exists). Firefox WebTransport yes, WebCodecs partial. A real product wants H.264 + a
+  capability probe.
+- ⚠️ This was one machine, one edge, loopback-adjacent network; cross-network numbers TBD.
+- ✅ CPU contention during runs: load avg 15–74 on 12 cores (sibling agents + local k8s);
+  results unaffected.
+
+### 7.5 Artifacts / additions (all under `rig/moq/spike/` unless noted)
+- `src/pub.js`, `src/play.js` (+ bundles `www/pub.js`, `www/play.js`, pages `www/pub.html`,
+  `www/play.html`) — the hang-layer publisher/player; player has `?track=&raw` probe mode
+  and `?codec=`/`?dur=` params. `server.py` gained an optional port argv (ran on :8891).
+- Logs: `e1-firstrun.log` (late-join catalog failure), `e1-secondrun.log` (subscribe-race
+  failure), `e2-firstrun.log` (hang-vs-WARP catalog miss), `browser.log` (E2 raw probes),
+  `browser-transport-spike.log` (backup of §6's log), `pub-chrome-stderr.log`,
+  `play-chrome-stderr.log`.
+- Data: `results/moq-media-e1.jsonl` (repo root results/, 2740 rows: t, burned, delta).
+- Cleanup ✅: all `moq-media-*` Chrome instances, the `moq-media-e2pub` container and
+  spike server killed; Docker volumes untouched; nothing outside §7 + spike/ modified.
+
+⏱ END 2026-08-26 08:23 EEST (05:23 UTC) — ~16 min active.

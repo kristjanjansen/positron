@@ -1,0 +1,12 @@
+[42536:690014:0826/081204.542488:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[42536:690014:0826/081231.101628:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[42536:690014:0826/081326.935582:ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+[43465:695562:0826/081500.573309:ERROR:services/on_device_model/ml/gpu_blocklist.cc:118] Unable to get gpu adapter
+[43465:695574:0826/081500.574390:ERROR:services/on_device_model/ml/gpu_blocklist.cc:118] Unable to get gpu adapter
+[42536:689880:0826/081504.416768:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (183.667s) location=Button@ui/views/controls/button/button.cc:669
+[42536:689880:0826/081504.416798:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (183.667s) location=Button@ui/views/controls/button/button.cc:669
+[42536:689880:0826/081504.416806:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (183.667s) location=Button@ui/views/controls/button/button.cc:669
+[42536:689880:0826/081504.416813:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (183.097s) location=TabIcon@chrome/browser/ui/views/tabs/tab/tab_icon.cc:98
+[42536:689880:0826/081504.416818:ERROR:ui/compositor/compositor_animation_observer.cc:65] CompositorAnimationObserver is active for too long (153.126s) location=Button@ui/views/controls/button/button.cc:669
+[42536:690014:0826/081504.426866:ERROR:google_apis/gcm/engine/connection_factory_impl.cc:484] ConnectionHandler failed with net error: -2
+[42536:689880:0826/081504.433926:ERROR:content/browser/gpu/gpu_process_host.cc:999] GPU process exited unexpectedly: exit_code=15

@@ -1,21 +1,26 @@
-[/log] 0.870 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-spike-x9 webtransport=true
-[/log] 0.997 CONNECTED ms=125 class=Connection version=moq-transport-14
-[/log] 0.998 SUBSCRIBE_SENT track=now
-[/log] 1.126 FRAME "23" wall=1787720495374
-[/log] 1.126 FRAME "25" wall=1787720495374
-[/log] 1.126 FRAME "22" wall=1787720495373
-[/log] 1.125 FRAME "2026-08-26 05:01:" wall=1787720495373
-[/log] 1.125 GROUP seq=1
-[/log] 1.126 FRAME "24" wall=1787720495374
-[/log] 1.126 FRAME "27" wall=1787720495374
-[/log] 1.126 FRAME "26" wall=1787720495374
-[/log] 1.126 FRAME "31" wall=1787720495374
-[/log] 1.126 FRAME "30" wall=1787720495374
-[/log] 1.126 FRAME "29" wall=1787720495374
-[/log] 1.126 FRAME "28" wall=1787720495374
-[/log] 1.127 FRAME "33" wall=1787720495374
-[/log] 1.126 FRAME "32" wall=1787720495374
-[/log] 1.127 FRAME "34" wall=1787720495374
-[/log] 1.957 FRAME "35" wall=1787720496204
-[/log] 1.957 DONE frames=15
-[/done] done
+[/log] PLAY 0.678 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e2-t4x8 rawtrack=1.m4s
+[/log] PLAY 0.679 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e2-t4x8 rawtrack=.catalog
+[/log] PLAY 0.832 CONNECTED ms=152 version=moq-transport-14
+[/log] PLAY 0.832 RAW_SUBSCRIBE_SENT .catalog
+[/log] PLAY 0.842 CONNECTED ms=163 version=moq-transport-14
+[/log] PLAY 0.842 RAW_SUBSCRIBE_SENT 1.m4s
+[/log] PLAY 0.932 RAW_GROUP seq=0
+[/log] PLAY 0.932 RAW_FRAME len=630 ts={"value":932.1000000014901,"scale":1000} hex=7b0a20202276657273696f6e223a20312c0a20202273747265616d696e67466f726d6174223a20312c0a202022737472 txt="{.  \"version\": 1,.  \"streamingFormat\": 1,.  \"streamingFormatVersion\": \"0.2\",.  \"supportsDeltaUpdates\": true,.  \"commonTrackFields\": {.    \"namespace\": \"/moq-media-e2-t4x8\",.    \"packaging\": \"cmaf\",.  "
+[/log] PLAY 0.975 RAW_GROUP seq=87
+[/log] PLAY 0.977 RAW_FRAME len=13203 ts={"value":977.1000000014901,"scale":1000} hex=000000686d6f6f66000000106d66686400000000000018d700000050747261660000001c746668640000003800000001 txt="...hmoof....mfhd...........Ptraf....tfhd...8..........3#........tfdt..........ee....trun...........p......3+mdat....e.....gJ..i...-..&...6....1..P\\T|./......`..:.H3..I5....@...y...P..>Rb0.i.|.h."
+[/log] PLAY 0.978 RAW_FRAME len=4658 ts={"value":977.3999999985099,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000018da0000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd...........Ltraf....tfhd...8....................tfdt..........ge....trun...........l....mdat...KA.&#.0X9>....n%.<W.t...v.~..{.l.#....j/..}.H.eq....NF...o..p...<g7.G..W....f........"
+[/log] PLAY 0.982 RAW_FRAME len=5321 ts={"value":981.5,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000018dc0000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd...........Ltraf....tfhd...8...........]........tfdt..........ie....trun...........l...emdat....A.F\".&.......O.5.LH.{........ .[..k(..../T... .X..'On..QO..*.......,......#..u."
+[/log] PLAY 0.982 RAW_FRAME len=4843 ts={"value":981.7000000029802,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000018df0000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd...........Ltraf....tfhd...8....................tfdt..........ke....trun...........l....mdat....A.f\".;.\"..P.2..(.A....u..B..~...fm..j.^.4.v.BR.......g......^...>..uqSk....P.J5..+.^."
+[/log] PLAY 1.619 RAW_GROUP seq=88
+[/log] PLAY 1.620 RAW_FRAME len=12168 ts={"value":1619.6000000014901,"scale":1000} hex=000000686d6f6f66000000106d666864000000000000192000000050747261660000001c746668640000003800000001 txt="...hmoof....mfhd....... ...Ptraf....tfhd...8........../.........tfdt...........e....trun...........p....../ mdat....e..#..gKq.M.....wWf. .z?Y70.}.I...S.5]%gd..7...W-k.j.FM....f...f..H.....a.Y..q&.U.("
+[/log] PLAY 1.650 RAW_FRAME len=4793 ts={"value":1650,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000019230000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......#...Ltraf....tfhd...8...........M........tfdt...........e....trun...........l...Umdat....A.&#...)....e.].Ou\\.mE.r.. O.{..ht&.}gNu}2.....^n...:..J..Q..+....J3..).ibrw...2C.."
+[/log] PLAY 1.683 RAW_FRAME len=5374 ts={"value":1683.1000000014901,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000019250000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......%...Ltraf....tfhd...8....................tfdt...........e....trun...........l....mdat....A.F#.....1....fKi3P.2,..n.K3..,H.I.L?.....~%.W6.2.^...+U.w........iA..1.)7S<4.b.^.-.E."
+[/log] PLAY 1.716 RAW_FRAME len=5136 ts={"value":1716,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000019280000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......(...Ltraf....tfhd...8....................tfdt...........e....trun...........l....mdat....A.f\".....S.F'  t(.p..Pd.@.C._..Tf.].9.I..NF.d....Z..YD.nHUS..R......[.~../..{x....."
+[/log] PLAY 2.652 RAW_GROUP seq=89
+[/log] PLAY 2.653 RAW_FRAME len=12569 ts={"value":2652.60000000149,"scale":1000} hex=000000686d6f6f66000000106d666864000000000000196900000050747261660000001c746668640000003800000001 txt="...hmoof....mfhd.......i...Ptraf....tfhd...8..........0.........tfdt...........e....trun...........p......0.mdat...&e.....gJ..i...-..&...6....1..P\\T|./......`..:.H3..I5....@...y...P..>Rb0.i.|.h."
+[/log] PLAY 2.653 RAW_FRAME len=4580 ts={"value":2652.7000000029802,"scale":1000} hex=000000646d6f6f66000000106d666864000000000000196c0000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......l...Ltraf....tfhd...8...........x........tfdt...........e....trun...........l....mdat...-A.&#.0X9>....n%.<W.t...v.~..{.l.#....j/..}.H.eq....NF...o..p...<g7.G..W....f........"
+[/log] PLAY 2.694 RAW_FRAME len=5091 ts={"value":2694.2000000029802,"scale":1000} hex=000000646d6f6f66000000106d666864000000000000196e0000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......n...Ltraf....tfhd...8...........w........tfdt...........e....trun...........l....mdat...LA.F\".&.......O.5.LH.{........ .[..k(..../T... .X..'On..QO..*.......,......^./.."
+[/log] PLAY 2.727 RAW_DONE
+[/log] PLAY 2.726 RAW_FRAME len=4751 ts={"value":2726.2999999970198,"scale":1000} hex=000000646d6f6f66000000106d66686400000000000019710000004c747261660000001c746668640000003800000001 txt="...dmoof....mfhd.......q...Ltraf....tfhd...8...........#........tfdt...........e....trun...........l...+mdat...IA.f\".;.\"..P.2..(.A....u..B..~...fm..j.^.4.v.BR.......g......^...>..uqSk....P.J5..+.^."
+[/log] PLAY 10.935 RAW_DONE
+[/log] PLAY 10.935 RAW_TIMEOUT waiting for group

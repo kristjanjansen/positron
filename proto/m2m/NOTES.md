@@ -778,6 +778,30 @@ results/m2m-p3b-*.jsonl, room p3b-<label> on the DEPLOYED Worker.
   run-composite.mjs (N=8 grid: 2 featured + 4 live + 2 wall, all view=lite
   via deployed Worker; composite in its own Chrome for clean CPU numbers).
 
+## P3B Checkpoint P1 — rig built + smoke + ROUTE A verdict (2026-08-26 08:2x EEST)
+
+- NOPUB smoke (m2m-p3b-smoke.jsonl): first try. Grid 8 running in 4.9 s, cast
+  <1 s, composite full (6 video tiles + 2 wall snaps) in 4.2 s. Composite draws
+  30 fps; grid->composite decode 40-100 ms right out of the gate.
+- **ROUTE A (in-page WHIP, m2m-p3b-a.jsonl, 183 s published): the CAPTURE path
+  is flawless — canvas.captureStream(30) -> WHIP connected in 2.7 s, encoder
+  30 fps steady (qlr none 70/77 samples), WHEP viewer decoded 100.00 % of
+  8782 featured-row frames.** Steady numbers:
+  - grid glass -> composite page: pooled p50 58 / p95 103 ms (n=4653)
+  - grid glass -> WHEP viewer THROUGH the composite (grid SFU leg + canvas
+    draw + WHIP + WHEP): **p50 128 / p95 183 / p99 205 ms** — the full
+    double-WebRTC-hop chain costs ~2x one SFU hop, exactly as predicted
+  - composite canvas -> viewer: p50 67 / p95 86 ms (= the familiar ~74 ms
+    WHIP->WHEP number, re-measured through a THIRD live input)
+  - WHEP viewer res ramp: 640x360 -> 1280x720 in ~10 s (BWE ramp), then locked
+  - composite Chrome CPU p50 38 % / max 54 % of one core, RSS ~0.95 GB
+- **ROUTE A RECORDING: DOES NOT EXIST.** recording.mode=automatic on the live
+  input; 26 polls of /live_inputs/{uid}/videos over 183 s of live WHIP + 241 s
+  after DELETE+close: **zero video assets ever created** (not even
+  live-inprogress, which RTMPS mints within seconds). 📄 plan.md §2.2 "recording
+  coming soon (2022)" for Stream-WebRTC confirmed ✅ by direct test in 2026.
+  WHIP ingest is DELIVERY-only. -> Route B (RTMPS) is the archive path.
+
 ============================================================================
 # P3C SCORE (cue-driven choreography agent — show.html / score.mjs /
 # scores/*.json / run-show.mjs / analyze-show.py; port 8893, udd m2m-p3c,
@@ -847,3 +871,90 @@ Port 8894, udd prefix m2m-p3a, results/m2m-p3a-*.jsonl.
   (5) GC probe: stop polling, probe samples at +30/+60/+120/+300 s.
 - Drivers: run-p3a-control.mjs (direct CF, custom UA — 1010 trap), run-p3a-media.mjs
   (run-heavy.mjs clone: BASE :8894, udd m2m-p3a-udd, + kind:"egress" transport rows).
+
+## Checkpoint P1 — smoke + ramp ✅ (2026-08-26 08:06 EEST)
+
+- sessions/new accepts ALL THREE variants (201): empty body -> {sessionId} only;
+  dc-only offer AND audio-recvonly offer -> {sessionId, sessionDescription(answer)}.
+- Never-connected session lifecycle (NEW facts): empty-variant flips to
+  **410 "Session appears to be disconnected" between +5 and +15 s**; offer-variant
+  sits at **425 "Session is not ready yet"** at +5..+95 s, and each GET on a
+  not-ready session **BLOCKS ~11 s server-side** before answering (edge holds the
+  request — a slow-poll behavior nobody documents). Session records persist
+  (410/425 are states, not 404s).
+- Fleet variant: dc-offer (fresh SDP per call — exercises SDP processing at
+  doors-open rate, the realistic creation cost).
+- RAMP ✅: 200 sessions / 60.9 s (3.3/s), **200/200 created, ZERO non-2xx**,
+  p50 554 / p90 636 / p99 943 / max 1076 ms. cf-ray shows TLL edge.
+- HOLD begun 08:05:20; media fleet N=24 (H6 config, DURATION=300) launched
+  INSIDE the hold window at 08:05:26.
+
+## Checkpoint P2 — media under bulk ✅ + egress instrument ✅ (2026-08-26 08:14 EEST)
+
+- **N=24 (exact H6 config) WHILE 200 dc-offer sessions held + ~3.5 blocked GETs/s:
+  ALL GATES PASS, statistically identical to the no-bulk baseline.**
+  Mesh 16.129 s (H6: 16.1 s); pooled p50 121.7 / p95 161.1 / p99 167.7
+  (H6: 122.6/160.9); 100.00% valid both probes (n=193,565, 300 s window vs 90 s);
+  46/46 tone pairs 100%; concealment 0.03% both probes (H6: 0.04/0.05);
+  qlr none everywhere, pubs fps med 15. API: 24 sessions/new + 70 tracks/new +
+  46 renegotiate — ZERO non-2xx, sessions/new p50 277 ms (H6-era class).
+  Control-plane bulk has NO measurable media blast radius at this scale.
+- HOLD polls: all 1600+ GETs on never-connected dc-offer sessions return 425
+  after the ~11 s server-side block; ZERO transitions to 404/410 over 10 min —
+  session records do NOT spontaneously vanish (deaths=0), they just aren't
+  "ready". alive=200/200 at every heartbeat.
+- Egress (driver-side transport getStats deltas, 303 s window, honest local
+  instrument — dashboard billing won't show same-day egress):
+  fleet wire RX 225.0 MB = 5.93 Mbps = 2.67 GB/h; per pulled participant (V+A)
+  0.127 Mbps (= 0.081 Mbps video payload at light 320x180 synthetic + 32.4 kbps
+  audio — audio matches §4's 32 kbps EXACTLY); **wire/payload overhead factor
+  1.116** (RTP hdrs+RTCP+DTLS+retrans). §4 numbers scaled by 1.116: big show
+  658 -> ~734 GB / $32.90 -> ~$36.72 if free tier spent. Caveat: light-class
+  video payload (81 kbps) is content-limited far below its 600 kbps target —
+  running show-quality N=8 calibration rung during PUSH for the 1.2 Mbps class.
+
+## Checkpoint P1 — rig built + SMOKE vs deployed Worker ✅ FIRST TRY (2026-08-26 08:12 EEST)
+
+- Built: show.html (grid.html copy + 4 deltas: cue handler, batched/deferred
+  unpull behind stag=1, __roster() assert export, operators excluded from wall
+  tiles), score.mjs, scores/{demo,smoke}-score.json, run-show.mjs (spawns the
+  operator as a real node process with a T0; asserts after EVERY event),
+  analyze-show.py. Server = grid-server.py on :8893 (static+collector only;
+  signaling/SFU/tiles all on the deployed Worker), room `score-show`.
+- Operator pre-flight: Worker ACCEPTS promote frames for ids not yet in the
+  room (echo comes back) — harmless here (cast fires only after all 12 join;
+  a rejoin resets to wall and the operator re-casts), but a production
+  console should treat "promote unknown id" as an error, not a silent no-op.
+- SMOKE (70 s score, N=12): everything on first try. All 12 running 20 s
+  after launch, GRID READY 3.7 s after storm (18 s of t0 lead left).
+  **6/6 asserts PASS** (full expected-vs-observed: tier map on both probes +
+  livePage fold + pulled set + wall pollers + cross-probe order sync).
+  **Fire drift p50 1 / max 3 ms** (wall-clock score; the PDT-synced stage
+  cue engine is 65–98 ms — grid choreography doesn't need PDT).
+  Cmd→effect: spotlight (wall→featured) **511/512 ms**, swap-promote 681/711,
+  rotate page-switch first-new-frame **463–510 ms**, demote→fresh snapshot
+  2081/2122 ms (the structural 2.1 s floor again), tier-frame prop p50 46 ms,
+  cue prop p50 50 ms. Featured p50 91 / live p50 81 ms, wall fresh p50 1.07 s.
+- Context: P3A sibling's fleet live throughout (other-chrome 378–509% CPU);
+  one organic watchdog stall + repull recovery in a featured stream.
+- Data: m2m-p3c-smoke.jsonl (25k rows; contains ~15 s of operator pre-flight
+  residue pre-t0 — analyzer filters it). Next: the 5-min show 2x
+  (stag=0 then stag=1).
+
+## Checkpoint P3 — PUSH: no ceiling through 1003 sessions / 40 creates/s ✅ (2026-08-26 08:20 EEST)
+
+- Four push steps ALL CLEAN — 800 more dc-offer sessions on top of the held 200:
+  +200@5/s p50 557/p99 1035; +200@10/s p50 538/p99 709; +200@20/s p50 534/p99 706;
+  +200@40/s p50 537/p99 849. **ZERO non-2xx across the entire run so far
+  (1003 sessions/new + ~1900 GETs). Creation latency FLAT vs count (554->537 ms
+  p50 from #1 to #1000) and FLAT vs rate (3.3/s -> 40/s).** No 429 ever, no
+  Retry-After, no 1015. The undocumented ceiling is NOT below 1000 sessions /
+  40 creates/s on this app.
+- Show-quality N=8 calibration rung ran DURING the 5-40/s create storms:
+  p50 66.2 / p95 94.5 / 100.00% valid / concealment 0.14-0.15% — IDENTICAL to
+  the H3 no-storm baseline (66/96). Zero non-2xx on its 44 media API calls.
+  Blast radius of a 40/s create storm on live media: none.
+- Show-class egress: video payload 0.311 Mbps (content-limited below the
+  1.2 Mbps target — synthetic canvas), audio 32.5 kbps, overhead 1.070.
+  Combined with N24 rung: **wire/payload overhead 1.05-1.12; audio = model
+  exactly; per-full-quality-pull ~0.48 GB/h vs model 0.45 (+7%)**.

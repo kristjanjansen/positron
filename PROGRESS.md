@@ -36,6 +36,20 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### MoQ MEDIA spike (user: "analyze moq stuff") — ✅ BROWSER VIDEO AT 26 ms
+- ✅ hang-on-both-ends through CF draft-14: canvas→WebCodecs VP8 720p30 → relay →
+  VideoDecoder. **Glass-to-glass p50 26.2 / p95 42.4 ms, n=2740, 30.3 fps flat,
+  0 errors.** ~3× faster than WebRTC 74 ms (+8–16 ms vsync for fairness). Fastest
+  browser path in the project. Robust under load-avg-74 contention.
+- ❌×2 cross-ecosystem (hang↔moq-pub/moq-sub): fails at ONE layer — catalog
+  conventions (catalog.json/legacy vs .catalog/WARP/CMAF). Raw @moq/net pulled
+  WARP catalog + live CMAF into the browser fine → ~100-line shim feasible.
+- Platform data: CF never redelivers closed groups (republish catalog every 2 s;
+  join ≈1.0 s); no pending-subscribes (retry needed); optimistic SUBSCRIBE_OK
+  then ~10 s close. draft-16 NOT auth-only (SUBSCRIBE_NAMESPACE fixes discovery).
+- RUNBOOK §7; results/moq-media-e1.jsonl; 16 min active. plan-m2m §1.C + plan.md
+  §2 table updated: MoQ = real candidate for the grid's live tiers.
+
 ### Phase 3d MoQ browser spike — ✅ POSITIVE, in 8 minutes
 - ✅ `@moq/net` (kixelated, npm) speaks IETF MoQT to CF's draft-14 relay from
   headless Chrome: compat CLIENT_SETUP negotiated `moq-transport-14`, subscribe +

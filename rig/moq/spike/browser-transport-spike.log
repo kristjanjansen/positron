@@ -1,0 +1,21 @@
+[/log] 0.870 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-spike-x9 webtransport=true
+[/log] 0.997 CONNECTED ms=125 class=Connection version=moq-transport-14
+[/log] 0.998 SUBSCRIBE_SENT track=now
+[/log] 1.126 FRAME "23" wall=1787720495374
+[/log] 1.126 FRAME "25" wall=1787720495374
+[/log] 1.126 FRAME "22" wall=1787720495373
+[/log] 1.125 FRAME "2026-08-26 05:01:" wall=1787720495373
+[/log] 1.125 GROUP seq=1
+[/log] 1.126 FRAME "24" wall=1787720495374
+[/log] 1.126 FRAME "27" wall=1787720495374
+[/log] 1.126 FRAME "26" wall=1787720495374
+[/log] 1.126 FRAME "31" wall=1787720495374
+[/log] 1.126 FRAME "30" wall=1787720495374
+[/log] 1.126 FRAME "29" wall=1787720495374
+[/log] 1.126 FRAME "28" wall=1787720495374
+[/log] 1.127 FRAME "33" wall=1787720495374
+[/log] 1.126 FRAME "32" wall=1787720495374
+[/log] 1.127 FRAME "34" wall=1787720495374
+[/log] 1.957 FRAME "35" wall=1787720496204
+[/log] 1.957 DONE frames=15
+[/done] done

@@ -26,4 +26,4 @@ class H(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     open(LOG, "w").close()
-    http.server.ThreadingHTTPServer(("127.0.0.1", 8892), H).serve_forever()
+    http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1]) if len(sys.argv) > 1 else 8892), H).serve_forever()
