@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron grid</title>
+<style>
+:root{
+  --bg:#0d0f12; --panel:#14171c; --edge:#242a33; --ink:#cfd6df; --dim:#6b7683;
+  --feat:#e8b44a; --live:#4ac2e8; --wall:#8a93a0; --dead:#e85b4a; --ok:#57c973;
+}
+*{box-sizing:border-box}
+body{background:#0d0f12;color:#cfd6df;font:13px/1.45 -apple-system,"Helvetica Neue",monospace,sans-serif;margin:0;padding:0 16px 24px}
+header{display:flex;align-items:center;gap:14px;padding:10px 2px;border-bottom:1px solid #242a33;flex-wrap:wrap}
+header h1{font-size:14px;margin:0;font-weight:600;letter-spacing:.04em}
+.pill{border:1px solid #242a33;border-radius:3px;padding:2px 8px;font-size:11px;color:#8a93a0}
+.dot{width:8px;height:8px;border-radius:50%;background:#e85b4a;display:inline-block;margin-right:5px;vertical-align:-1px}
+.dot.on{background:#57c973}
+#selfwrap{margin-left:auto;display:flex;align-items:center;gap:8px}
+#cv{width:128px;height:72px;border:1px solid #242a33;border-radius:2px;display:block}
+button{background:#1a2027;color:#cfd6df;border:1px solid #2c3542;border-radius:3px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer}
+button:hover{border-color:#4ac2e8}
+label.chk{font-size:11px;color:#8a93a0;user-select:none}
+section{margin-top:14px}
+section h2{font-size:11px;font-weight:600;letter-spacing:.14em;color:#6b7683;margin:0 0 8px;text-transform:uppercase}
+section h2 .cnt{color:#3d4550;margin-left:6px}
+.grid{display:grid;gap:10px}
+#featured .grid{grid-template-columns:repeat(auto-fit,minmax(320px,480px))}
+#live .grid{grid-template-columns:repeat(auto-fill,minmax(200px,240px))}
+#wall .grid{grid-template-columns:repeat(auto-fill,minmax(140px,160px))}
+.tile{position:relative;background:#14171c;border:1px solid #242a33;border-radius:4px;overflow:hidden}
+.tile video,.tile img.snap{width:100%;aspect-ratio:16/9;display:block;background:#000;object-fit:cover}
+.tile .bar{display:flex;align-items:center;gap:6px;padding:3px 7px;font-size:11px}
+.tile .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .lat{margin-left:auto;color:#6b7683;font-size:10px;font-variant-numeric:tabular-nums}
+.badge{font-size:9px;letter-spacing:.08em;padding:1px 5px;border-radius:2px;font-weight:700}
+.badge.featured{background:#3d2f12;color:#e8b44a}
+.badge.live{background:#12303d;color:#4ac2e8}
+.badge.wall{background:#232830;color:#8a93a0}
+.badge.you{background:#1c3d24;color:#57c973}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;letter-spacing:.12em;background:rgba(13,15,18,.72);color:#e85b4a;
+  aspect-ratio:16/9;height:auto;bottom:auto;width:100%}
+.overlay.stalled{color:#e8a44a}
+.tile.dead{border-color:#5a2620}
+.tile.dead .bar .nm{color:#6b7683;text-decoration:line-through}
+#log{white-space:pre-wrap;color:#4d5661;font-size:10px;margin-top:18px;max-height:180px;overflow:auto}
+#hud{color:#6b7683;font-size:10px;margin-top:10px}
+.fresh{color:#57c973}.stale{color:#e8a44a}
+</style>
+</head>
+<body>
+<header>
+  <h1>elektron · grid</h1>
+  <span class="pill" id="roominfo">room —</span>
+  <span class="pill"><span class="dot" id="sigdot"></span><span id="sigtxt">signaling</span></span>
+  <span class="pill" id="pageinfo">live page –</span>
+  <button id="rotbtn">Rotate live page</button>
+  <label class="chk"><input type="checkbox" id="autorot"> auto-rotate</label>
+  <div id="selfwrap">
+    <span class="badge you" id="selfbadge">YOU</span>
+    <canvas id="cv" width="640" height="360"></canvas>
+  </div>
+</header>
+<section id="featured"><h2>Featured<span class="cnt" id="nfeat"></span></h2><div class="grid"></div></section>
+<section id="live"><h2>Live<span class="cnt" id="nlive"></span></h2><div class="grid"></div></section>
+<section id="wall"><h2>Wall<span class="cnt" id="nwall"></span></h2><div class="grid"></div></section>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+// ============================================================================
+// elektron SHOW GRID (phase 3c — P3C SCORE agent's copy of grid.html; the
+// grid agent owns the original, room-churn copy-not-edit precedent).
+// DELTAS vs grid.html:
+//   1. `cue` frame handler — operator score commands {cmd:'rotate'|
+//      'setLivePage'|'note'} interpreted by full-view clients; one-way
+//      propagation telemetry (operator + browsers share this machine's
+//      wall clock, so cue.firedAt -> recv is honest).
+//   2. STAGGERED-UNPULL mitigation behind &stag=1 — rotation unpulls are
+//      DEFERRED ~700 ms after the new pulls land, then ALL hidden mids close
+//      in ONE tracks/close renegotiation (instead of N serial ones). Targets
+//      the phase-2 finding: a 4-tile unpull burst puts a 0.6–0.9 s frame gap
+//      on the featured tier. stag=0 (default) = grid.html behavior, byte-
+//      identical, for the A/B baseline.
+//   3. window.__roster() export — per-event programmatic state assertions.
+// ============================================================================
+// elektron TIERED GRID (phase 2) — three tiers on one page:
+//   FEATURED  up to 2, full 640x360@30-class SFU tracks (1.2 Mbps)
+//   LIVE      paged, up to `ls` visible low-cost SFU tracks; pull-on-visible /
+//             tracks-close-on-hidden (plan-m2m §3 discipline, phase-1d proven)
+//   WALL      everyone else as <img> snapshots (GET /tile/{room}/{id}, ~2 s
+//             poll); wall-tier participants POST their own canvas JPEG ~1.5 s
+// Signaling: WebSocket, the deployed Worker's protocol (workers/rtc/
+// DEPLOYED.md — flat join, trackNames, promote/demote operator frames,
+// everyone joins at tier wall). The local stub (grid-server.py) speaks the
+// SAME protocol at the SAME paths, so switching to production is one param:
+//   ?remote=https://elektron-rtc.kristjan-jansen.workers.dev&token=<ROOM_TOKEN>
+// Death = `left` broadcast (socket close) + a 3 s
+// stats-stall watchdog. Publish leg carries the proven connect-retry
+// (room-churn.html: 8 s timeout -> teardown -> fresh session, 3 attempts,
+// backoff 1 s / 2 s). Telemetry = plain fetch batches (NEVER sendBeacon or
+// fetch-keepalive for bulk — both have silent ~64 KB quotas, S5 + C4 bugs).
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const MY_ID    = (q.get("id") || "X").slice(0, 8);         // 1 char burned into pixels
+const MY_NAME  = q.get("name") || ("participant-" + MY_ID);
+const ROOM     = q.get("room") || "grid";
+const MY_ROLE  = q.get("role") || "audience";     // performer|audience|operator
+let   MY_TIER  = "wall";   // EVERYONE joins at tier wall (Worker rule); operator promotes
+const VIEW     = q.get("view") === "lite" ? "lite" : "full"; // lite: publish+wall-post only, no pulls
+const LIVE_PAGE_SIZE = Math.max(1, parseInt(q.get("ls") || "8", 10));
+const HOLD     = q.get("hold") === "1";
+const CONNECT_TIMEOUT_MS = parseInt(q.get("ct") || "8000", 10);
+const MAX_PUB_ATTEMPTS = 3;
+const AUTOROT_MS = parseInt(q.get("ar") || "10000", 10);
+const STAG     = q.get("stag") === "1";   // staggered/batched unpull mitigation (P3C delta 2)
+const TOKEN    = q.get("token") || "";                      // ROOM_TOKEN when Worker deploys
+// --- transport endpoints: ONE-PARAM SWITCH to the production Worker ----------
+// local stub (default): ws://<host>/room/<room>/ws, tiles + /cf same-origin.
+// production:           ?remote=https://elektron-rtc.….workers.dev&token=<ROOM_TOKEN>
+// (individual overrides sig= / tilebase= / cfbase= still win if given)
+const REMOTE   = (q.get("remote") || "").replace(/\/$/, "");
+const SIG_BASE  = q.get("sig") ||
+  (REMOTE ? REMOTE.replace(/^http/, "ws") + "/room/" + ROOM + "/ws"
+          : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/room/" + ROOM + "/ws");
+const TILE_BASE = q.get("tilebase") || REMOTE || "";
+const CF_API    = q.get("cfbase")  || (REMOTE ? REMOTE + "/cf" : "/cf");
+const COLLECT   = "/collect";                               // telemetry stays local, always
+const TRACK_NAME = MY_ID + "/cam";                          // Worker convention <pid>/<cam>
+
+document.getElementById("roominfo").textContent = "room " + ROOM + " · " + MY_NAME + " (" + MY_ID + ")" + (STAG ? " · stag" : "");
+document.title = "show " + MY_ID;
+
+// tier -> publish profile (quality follows tier; setParameters is cheap, no renegotiation)
+const PROFILES = {
+  featured: { fps: 30, kbps: 1200 },
+  live:     { fps: 30, kbps: 500  },
+  wall:     { fps: 15, kbps: 250  },   // track stays published (unpulled) so promote = one pull
+};
+
+window.__state = { phase: "init", error: null, id: MY_ID, tier: MY_TIER, view: VIEW, stag: STAG,
+                   frames: 0, rosterCount: 0, pulled: 0, pubAttempts: 0, pubRetries: 0,
+                   livePage: 0, livePages: 1, sigState: "closed", wallPosting: false,
+                   tiles: {}, wall: {} };
+
+const logEl = document.getElementById("log");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function wallClock() { return performance.timeOrigin + performance.now(); }
+function post(obj) { fetch(COLLECT, { method: "POST", body: JSON.stringify(obj), keepalive: true }).catch(() => {}); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name, t: wallClock() }, extra || {}));
+}
+// bulk telemetry: plain fetch, 1 s batches (no keepalive — 64 KB quota bug, C4)
+let batch = [];
+window.__batchStats = { flushed: 0, failed: 0 };
+setInterval(() => {
+  if (batch.length) {
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") })
+      .then(() => { window.__batchStats.flushed++; })
+      .catch(() => { window.__batchStats.failed++; });
+    batch = [];
+  }
+}, 1000);
+
+// ---- binary row geometry (rig/whep pattern; identical to room-churn.html) --
+const NBLOCKS = 64, BLOCK_W = 9, ROW_X = 32, ROW_Y = 40, ROW_H = 56;
+
+// ============================================================================
+// SOURCE ABSTRACTION — the gUM plug point.
+// This rig uses ONLY canvas synthesis (makeSyntheticSource). The production
+// camera source goes here as makeCameraSource() ~ getUserMedia({video:{...}}).
+// DO NOT call getUserMedia on this machine: the physical camera is WEDGED at
+// the OS level and a gUM call can hang the page. Later swap:
+//   const source = await makeCameraSource();   // production
+// ============================================================================
+function makeSyntheticSource() {
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+  const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+  let frameCounter = 0;
+  function drawFrame() {
+    const ms = Math.round(wallClock());
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#404040"; ctx.fillRect(0, 0, 640, 360);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+    const bytes = []; let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(PID_BYTE);
+    let ck = 0; for (const b of bytes) ck ^= b;
+    const bits = [];
+    for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < NBLOCKS; i++)
+      if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+    ctx.font = "bold 110px monospace"; ctx.fillText(MY_ID, 40, 240);
+    ctx.font = "bold 26px monospace";
+    ctx.fillText(MY_NAME + " · " + MY_TIER, 160, 180);
+    ctx.fillText(String(ms), 160, 215);
+    ctx.fillText(new Date(ms).toISOString().slice(11, 23), 160, 250);
+    const x = (frameCounter * 5) % 560;
+    ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",70%,55%)";
+    ctx.fillRect(20 + x, 290, 50, 50);
+    frameCounter++; window.__state.frames = frameCounter;
+  }
+  // setInterval, not rAF: co-tenanted / occluded pages must keep drawing
+  let timer = null;
+  function setFps(fps) { if (timer) clearInterval(timer); timer = setInterval(drawFrame, Math.round(1000 / fps)); }
+  setFps(PROFILES[MY_TIER].fps);
+  const stream = cv.captureStream(30);
+  const track = stream.getVideoTracks()[0];
+  track.contentHint = "motion";
+  return { track, canvas: cv, setFps };
+}
+// function makeCameraSource() { /* PRODUCTION: getUserMedia lands here — see note above */ }
+const source = makeSyntheticSource();
+
+// ---- burned-row decoder (identical to room-churn.html; input: video OR bitmap)
+function makeDecoder() {
+  const work = document.createElement("canvas");
+  work.width = 640; work.height = 360;
+  const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+  return function decodeRow(src) {
+    wctx.drawImage(src, 0, 0, 640, 360);
+    const y = ROW_Y + ROW_H / 2;
+    const img = wctx.getImageData(ROW_X, y, NBLOCKS * BLOCK_W, 1).data;
+    const levels = [];
+    for (let i = 0; i < NBLOCKS; i++) {
+      let s = 0;
+      for (let dx = 3; dx < 6; dx++) s += img[(i * BLOCK_W + dx) * 4 + 1];
+      levels.push(s / 3);
+    }
+    const mn = Math.min(...levels), mx = Math.max(...levels);
+    if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+    const thr = (mn + mx) / 2;
+    const bits = levels.map(l => (l > thr ? 1 : 0));
+    let ms = 0; for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+    let pid = 0; for (let i = 48; i < 56; i++) pid = pid * 2 + bits[i];
+    let ck = 0; for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+    const bytes = []; let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(pid);
+    let expect = 0; for (const b of bytes) expect ^= b;
+    if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+    return { ok: true, ms, pid: String.fromCharCode(pid), contrast: mx - mn };
+  };
+}
+
+// ============================================================================
+// SIGNALING TRANSPORT (plan-m2m §3 + tier extension) — WS, stub or Worker
+// ============================================================================
+const handlers = {};
+function on(type, fn) { handlers[type] = fn; }
+let ws = null, sigWantOpen = true;
+function sigUrl() { return SIG_BASE + (TOKEN ? (SIG_BASE.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN) : ""); }
+function sigSend(frame) {
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify(frame)); return true; }
+  return false;
+}
+function sigConnect() {
+  ws = new WebSocket(sigUrl());
+  ws.onopen = () => {
+    window.__state.sigState = "open";
+    document.getElementById("sigdot").classList.add("on");
+    document.getElementById("sigtxt").textContent = "signaling";
+    sigSend({ type: "join", participantId: MY_ID, name: MY_NAME, role: MY_ROLE });
+  };
+  ws.onmessage = (e) => {
+    let f; try { f = JSON.parse(e.data); } catch (_) { return; }
+    const h = handlers[f.type];
+    if (h) h(f);
+  };
+  ws.onclose = () => {
+    window.__state.sigState = "closed";
+    document.getElementById("sigdot").classList.remove("on");
+    document.getElementById("sigtxt").textContent = "reconnecting…";
+    if (sigWantOpen) setTimeout(sigConnect, 1000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+
+// ============================================================================
+// SFU client — cf() via proxy; publish leg with CONNECT-RETRY (room-churn)
+// ============================================================================
+async function cf(method, subpath, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const resp = await fetch(CF_API + "/" + subpath, {
+    method, headers, body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode)
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  return obj;
+}
+function waitIceGathering(pc_) {
+  return new Promise(res => {
+    if (pc_.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc_.onicegatheringstatechange = () => {
+      if (pc_.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+
+let pc = null, SID = null, sendTx = null;
+const midToPid = new Map();
+
+function teardownPc(old) {
+  if (!old) return;
+  try {
+    old.onconnectionstatechange = null; old.oniceconnectionstatechange = null;
+    old.onicegatheringstatechange = null; old.ontrack = null; old.close();
+  } catch (e) { /* already dead */ }
+}
+
+async function attemptPublish(track, attempt) {
+  const t0 = performance.now();
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState, attempt });
+  pc.onconnectionstatechange = () => event("pc", { state: pc.connectionState, attempt });
+  pc.ontrack = (e) => {
+    if (e.track.kind !== "video") return;
+    const pid = midToPid.get(e.transceiver.mid);
+    if (pid) attachTrack(pid, e.track);
+    else event("ontrack-unmapped", { mid: e.transceiver.mid });
+  };
+  const sess = await cf("POST", "sessions/new");
+  SID = sess.sessionId;
+  window.__state.sessionId = SID;
+  log("attempt " + attempt + ": session " + SID.slice(0, 12) + "…");
+  sendTx = pc.addTransceiver(track, { direction: "sendonly" });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+  const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+    sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+    tracks: [{ location: "local", mid: sendTx.mid, trackName: TRACK_NAME }]
+  });
+  await pc.setRemoteDescription(resp.sessionDescription);
+  const myPc = pc;
+  await new Promise((res, rej) => {
+    if (myPc.connectionState === "connected") return res();
+    const t = setTimeout(() => rej(new Error(
+      "connect-timeout " + CONNECT_TIMEOUT_MS + "ms (pc=" + myPc.connectionState +
+      " ice=" + myPc.iceConnectionState + ")")), CONNECT_TIMEOUT_MS);
+    myPc.addEventListener("connectionstatechange", function h() {
+      if (myPc.connectionState === "connected") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h); res();
+      } else if (myPc.connectionState === "failed") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h);
+        rej(new Error("pc-failed during connect"));
+      }
+    });
+  });
+  return Math.round(performance.now() - t0);
+}
+
+async function publishWithRetry(track) {
+  for (let attempt = 1; attempt <= MAX_PUB_ATTEMPTS; attempt++) {
+    window.__state.pubAttempts = attempt;
+    event("publish-attempt", { attempt });
+    try {
+      const connectMs = await attemptPublish(track, attempt);
+      event("publish-ok", { attempt, connectMs, sessionId: SID });
+      log("publish ok on attempt " + attempt + " in " + connectMs + " ms");
+      return;
+    } catch (e) {
+      teardownPc(pc); pc = null;
+      const reason = String(e && e.message || e).slice(0, 200);
+      window.__state.pubRetries = attempt;
+      event("publish-retry", { attempt, reason, willRetry: attempt < MAX_PUB_ATTEMPTS });
+      log("publish attempt " + attempt + " FAILED: " + reason);
+      if (attempt >= MAX_PUB_ATTEMPTS) {
+        event("publish-exhausted", { attempts: attempt, reason });
+        throw new Error("publish exhausted after " + attempt + " attempts: " + reason);
+      }
+      // base backoff 1 s / 2 s (room-churn pattern) + 0-1.5 s RANDOM JITTER:
+      // the rmain-1 storm showed deterministic backoff RESYNCHRONIZES all
+      // failing legs (retries collided at +12.9 s and +26.5 s in lockstep)
+      await new Promise(r => setTimeout(r,
+        1000 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 1500)));
+    }
+  }
+}
+
+function applyPublishProfile(tier) {
+  const p = PROFILES[tier];
+  source.setFps(p.fps);
+  if (!sendTx) return;
+  try {
+    const par = sendTx.sender.getParameters();
+    if (!par.encodings || !par.encodings.length) par.encodings = [{}];
+    par.encodings[0].maxBitrate = p.kbps * 1000;
+    sendTx.sender.setParameters(par).catch(() => {});
+  } catch (e) { /* non-fatal */ }
+}
+
+// ============================================================================
+// ROOM MODEL — participants, tiers, ordering
+// ============================================================================
+const parts = new Map();      // id -> {id,name,role,tier,sessionId,tracks,alive,tierT}
+let liveOrder = [];           // display order for live tier (promotions go FIRST)
+let livePage = 0;
+
+function normPart(p) {        // Worker rows carry trackNames:[]; normalize to tracks:[{trackName}]
+  const row = Object.assign({}, p);
+  if (Array.isArray(p.trackNames)) row.tracks = p.trackNames.map(n => ({ trackName: n }));
+  delete row.trackNames;
+  return row;
+}
+function upsertPart(p) {
+  const prev = parts.get(p.id);
+  const row = Object.assign(prev || {}, normPart(p), { alive: true });
+  parts.set(p.id, row);
+  if (row.tier === "live" && !liveOrder.includes(p.id)) liveOrder.push(p.id);
+  if (row.tier !== "live") liveOrder = liveOrder.filter(x => x !== p.id);
+  return row;
+}
+
+function sendPublishFrame() {
+  sigSend({ type: "publish", sessionId: SID, trackNames: [TRACK_NAME] });
+}
+
+on("roster", (f) => {
+  window.__state.selfServerId = f.self && f.self.id;
+  window.__state.selfRole = f.self && f.self.role;
+  for (const p of f.participants || []) if (p.id !== MY_ID) upsertPart(p);
+  window.__state.rosterCount = (f.participants || []).length;
+  // reconnect case: re-announce our published track (roster is rebuilt, not patched)
+  if (SID && window.__state.phase === "running") sendPublishFrame();
+  reconcile("roster");
+});
+on("joined", (f) => {
+  if (!f.participant || f.participant.id === MY_ID) return;
+  upsertPart(f.participant);
+  window.__state.rosterCount = parts.size + 1;
+  event("joined-received", { id: f.participant.id });
+  reconcile("joined");
+});
+on("published", (f) => {
+  const pid = f.participantId;
+  if (pid === MY_ID) return;                   // Worker broadcasts to ALL incl. sender
+  const prev = parts.get(pid);
+  const oldSid = prev && prev.sessionId;
+  const row = upsertPart({ id: pid, sessionId: f.sessionId, trackNames: f.trackNames });
+  if (!row.tier) row.tier = "wall";
+  if (oldSid && oldSid !== f.sessionId) {
+    // publisher restarted = unpublish+publish (§3): repull if we hold the old pull
+    event("sid-change", { id: pid });
+    queueRepull(pid, "rejoin");
+  }
+  reconcile("published");
+});
+on("left", (f) => {
+  const tRecv = wallClock();
+  const pid = f.participantId;
+  const p = parts.get(pid);
+  if (!p) return;
+  p.alive = false;
+  (window.__state.leftReceived = window.__state.leftReceived || {})[pid] = tRecv;
+  markDead(pid, tRecv);                        // same-frame dead marking
+  event("left-received", { id: pid, deadMarkedSameFrame: true });
+  reconcile("left");
+});
+function onTierChange(f) {
+  const tRecv = wallClock();
+  const pid = f.participantId;
+  const tier = f.tier;
+  if (pid === MY_ID) {                         // self promotion/demotion — no rejoin
+    const from = MY_TIER; MY_TIER = tier;
+    window.__state.tier = MY_TIER;
+    applyPublishProfile(MY_TIER);
+    syncWallPosting();
+    document.getElementById("selfbadge").textContent = "YOU · " + MY_TIER.toUpperCase();
+    event("self-tier", { from, to: tier });
+    return;
+  }
+  const p = parts.get(pid);
+  if (!p) return;
+  const from = p.tier; p.tier = tier; p.tierT = tRecv;
+  if (tier === "live") { liveOrder = liveOrder.filter(x => x !== pid); liveOrder.unshift(pid); }
+  else liveOrder = liveOrder.filter(x => x !== pid);
+  event("tier-received", { id: pid, from, to: tier });
+  reconcile("promote");
+}
+on("promote", onTierChange);
+on("demote", onTierChange);
+
+// ---- P3C delta 1: score cues (view choreography rides the cue channel) -----
+// {type:'cue', cue:{cmd, id?, firedAt?, ...}, from} — Worker passthrough
+// broadcast (adds serverAt). Tier changes do NOT come through here (they are
+// roster state — direct promote/demote frames); cues carry VIEW commands.
+on("cue", (f) => {
+  const tRecv = wallClock();
+  const c = (f && f.cue) || {};
+  event("cue-received", {
+    cmd: c.cmd || null, cueId: c.id || null, from: f.from || null,
+    opFiredAt: c.firedAt || null,
+    propMs: c.firedAt ? Math.round(tRecv - c.firedAt) : null,   // same-machine clocks
+    serverAt: c.serverAt || null,
+  });
+  if (VIEW !== "full") return;                 // lites publish only; no view to steer
+  if (c.cmd === "rotate") {
+    rotate();                                  // synchronized crowd sweep
+  } else if (c.cmd === "setLivePage" && Number.isInteger(c.page)) {
+    livePage = c.page;
+    event("rotate", { toPage: livePage, pages: window.__state.livePages, via: "setLivePage" });
+    reconcile("rotate");
+  }
+  // cmd 'note': pure propagation measurement, no visual action
+});
+
+function tierLists() {
+  const alive = [...parts.values()].filter(p => p.alive);
+  const featured = alive.filter(p => p.tier === "featured");
+  const live = liveOrder.map(id => parts.get(id)).filter(p => p && p.alive && p.tier === "live");
+  // P3C delta 4: operators are in the roster but never publish — no wall tile
+  const wall = alive.filter(p => p.tier === "wall" && p.role !== "operator");
+  return { featured, live, wall };
+}
+
+// ============================================================================
+// PULL ENGINE — serialized chain, tracks/close on hidden (room-churn pattern)
+// ============================================================================
+const pullState = new Map();  // pid -> {state, attempts, sessionId, trackName, mid, cause}
+const pullT0 = new Map();     // pid -> wall ms at pull start
+let pullChain = Promise.resolve();
+
+function chain(fn) { pullChain = pullChain.then(fn).catch(() => {}); return pullChain; }
+
+async function pullTrack(p, cause) {
+  const pid = p.id;
+  const st = pullState.get(pid);
+  if (!st || st.state !== "queued") return;
+  if (!p.alive) { pullState.delete(pid); return; }          // died while queued
+  if (!p.sessionId || !p.tracks || !p.tracks.length) { pullState.delete(pid); return; }
+  st.state = "pulling"; st.attempts++; st.cause = cause;
+  const t0 = performance.now();
+  pullT0.set(pid, performance.timeOrigin + t0);
+  try {
+    const trackName = p.tracks[0].trackName;
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+      tracks: [{ location: "remote", sessionId: p.sessionId, trackName }]
+    });
+    const tr = (resp.tracks || [])[0] || {};
+    if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+    if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+    midToPid.set(tr.mid, pid);        // BEFORE setRemoteDescription — ontrack fires during it
+    if (resp.requiresImmediateRenegotiation) {
+      await pc.setRemoteDescription(resp.sessionDescription);
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await cf("PUT", "sessions/" + SID + "/renegotiate", {
+        sessionDescription: { type: "answer", sdp: pc.localDescription.sdp }
+      });
+    }
+    const durMs = Math.round(performance.now() - t0);
+    st.state = "done"; st.sessionId = p.sessionId; st.trackName = trackName; st.mid = tr.mid;
+    window.__state.pulled++;
+    event("pulled", { from: pid, mid: tr.mid, durMs, cause, renego: !!resp.requiresImmediateRenegotiation });
+  } catch (e) {
+    st.state = "failed";
+    event("pull-failed", { from: pid, attempt: st.attempts, cause, error: String(e.message).slice(0, 300) });
+    log("pull " + pid + " attempt " + st.attempts + " failed: " + e.message);
+  }
+}
+
+async function unpullTrack(pid, why) {
+  const st = pullState.get(pid);
+  const mid = st && st.mid;
+  const t0 = performance.now();
+  try {
+    if (!mid) throw new Error("no mid for " + pid);
+    const tx = pc.getTransceivers().find(t => t.mid === mid);
+    if (tx) tx.stop();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const resp = await cf("PUT", "sessions/" + SID + "/tracks/close", {
+      tracks: [{ mid }],
+      sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+      force: false
+    });
+    if (resp.sessionDescription) await pc.setRemoteDescription(resp.sessionDescription);
+    event("unpulled", { from: pid, mid, why, durMs: Math.round(performance.now() - t0) });
+  } catch (e) {
+    event("unpull-error", { from: pid, mid: mid || null, why, error: String(e && e.message || e).slice(0, 300) });
+  } finally {
+    if (mid) midToPid.delete(mid);
+    detachTrack(pid);
+    if (st) { st.state = "unpulled"; st.mid = null; }
+  }
+}
+
+// P3C delta 2: close MANY hidden pulls in ONE tracks/close renegotiation.
+// Rationale (phase-2, 3/3 runs): 4 serial unpull renegotiations during a
+// page-0 -> page-1 rotation put ONE 0.6-0.9 s frame gap on the featured tier
+// (baseline p99 gap 50 ms). One batched close = one offer/answer + one API
+// call instead of four of each.
+async function unpullBatch(pids, why) {
+  const items = [];
+  for (const pid of pids) {
+    const st = pullState.get(pid);
+    if (st && st.state === "done" && st.mid) items.push({ pid, st, mid: st.mid });
+  }
+  if (!items.length) return;
+  const t0 = performance.now();
+  try {
+    for (const it of items) {
+      const tx = pc.getTransceivers().find(t => t.mid === it.mid);
+      if (tx) tx.stop();
+    }
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const resp = await cf("PUT", "sessions/" + SID + "/tracks/close", {
+      tracks: items.map(it => ({ mid: it.mid })),
+      sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+      force: false
+    });
+    if (resp.sessionDescription) await pc.setRemoteDescription(resp.sessionDescription);
+    const durMs = Math.round(performance.now() - t0);
+    event("unpull-batch", { n: items.length, from: items.map(it => it.pid).join(","), why, durMs });
+    for (const it of items)
+      event("unpulled", { from: it.pid, mid: it.mid, why, durMs, batched: true });
+  } catch (e) {
+    event("unpull-batch-error", { n: items.length, from: items.map(it => it.pid).join(","),
+      why, error: String(e && e.message || e).slice(0, 300) });
+  } finally {
+    for (const it of items) {
+      midToPid.delete(it.mid);
+      detachTrack(it.pid);
+      it.st.state = "unpulled"; it.st.mid = null;
+    }
+  }
+}
+
+function queueRepull(pid, cause) {
+  const st = pullState.get(pid);
+  if (!st || (st.state !== "done" && st.state !== "failed")) return;
+  st.state = "repulling";
+  chain(async () => {
+    await unpullTrack(pid, "repull");
+    const p = parts.get(pid);
+    if (!p || !p.alive) return;
+    pullState.set(pid, { state: "queued", attempts: 0 });
+    await pullTrack(p, cause);
+  });
+}
+
+// ============================================================================
+// TILES — DOM per tier + rVFC decode instrumentation
+// ============================================================================
+const grids = {
+  featured: document.querySelector("#featured .grid"),
+  live: document.querySelector("#live .grid"),
+  wall: document.querySelector("#wall .grid"),
+};
+const tileEls = new Map();    // pid -> {root, media, bar, lat, badge, overlay}
+
+function makeTile(p, kind) {  // kind: 'video' | 'snap'
+  removeTileEl(p.id);
+  const root = document.createElement("div");
+  root.className = "tile";
+  const media = kind === "video" ? document.createElement("video") : document.createElement("img");
+  if (kind === "video") { media.autoplay = true; media.muted = true; media.playsInline = true; }
+  else media.className = "snap";
+  const bar = document.createElement("div"); bar.className = "bar";
+  const badge = document.createElement("span"); badge.className = "badge " + p.tier;
+  badge.textContent = p.tier.toUpperCase();
+  const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = p.name || p.id;
+  const lat = document.createElement("span"); lat.className = "lat";
+  bar.appendChild(badge); bar.appendChild(nm); bar.appendChild(lat);
+  root.appendChild(media); root.appendChild(bar);
+  const el = { root, media, bar, lat, badge, overlay: null, kind };
+  tileEls.set(p.id, el);
+  return el;
+}
+function removeTileEl(pid) {
+  const el = tileEls.get(pid);
+  if (el) { el.root.remove(); tileEls.delete(pid); }
+  const ts = window.__state.tiles[pid];
+  if (ts) ts.dead = true;                  // stops rVFC loop
+  delete window.__state.tiles[pid];
+}
+function setOverlay(pid, text, cls) {
+  const el = tileEls.get(pid);
+  if (!el) return;
+  if (el.overlay) { el.overlay.remove(); el.overlay = null; }
+  if (text) {
+    const o = document.createElement("div");
+    o.className = "overlay" + (cls ? " " + cls : "");
+    o.textContent = text;
+    el.root.insertBefore(o, el.bar);
+    el.overlay = o;
+  }
+}
+
+function markDead(pid, tRecv) {
+  const el = tileEls.get(pid);
+  const ts = window.__state.tiles[pid];
+  if (ts) ts.deadSignaled = true;
+  if (el) {
+    el.root.classList.add("dead");
+    setOverlay(pid, "LEFT");
+  }
+  event("dead-marked", { id: pid, t: tRecv });
+  stopWallPoll(pid);
+  const st = pullState.get(pid);
+  if (st && (st.state === "done" || st.state === "pulling"))
+    chain(() => {
+      const s = pullState.get(pid);
+      if (!s || (s.state !== "done" && s.state !== "pulling")) return;
+      return unpullTrack(pid, "left");
+    });
+}
+
+// attach an incoming SFU track to its (existing or new) tile + decoder loop
+function attachTrack(pid, track) {
+  const p = parts.get(pid);
+  if (!p) { event("ontrack-unknown-pid", { pid }); return; }
+  const el = makeTile(p, "video");   // always rebuild: clears dead overlay on rejoin
+  mountTile(pid);
+  el.media.srcObject = new MediaStream([track]);
+  el.media.play().catch(() => {});
+  track.onended = () => event("track-ended", { from: pid });
+
+  const tileState = { samples: 0, valid: 0, pidMismatch: 0, lastLatencyMs: null,
+                      firstValidT: null, lastValidT: null, lastFrameT: wallClock(),
+                      tier: p.tier, dead: false, stalled: false, ttffMs: null };
+  window.__state.tiles[pid] = tileState;
+  const decodeRow = makeDecoder();
+  let busy = false, lastPresented = -1;
+  const vid = el.media;
+  function onFrame(now, meta) {
+    if (tileState.dead) return;
+    vid.requestVideoFrameCallback(onFrame);      // RE-ARM FIRST (plan §4.1)
+    if (busy) return;
+    busy = true;
+    try {
+      if (meta.presentedFrames === lastPresented) return;
+      lastPresented = meta.presentedFrames;
+      tileState.lastFrameT = wallClock();        // watchdog food
+      if (tileState.stalled) { tileState.stalled = false; setOverlay(pid, null); event("stall-recovered", { from: pid }); }
+      const dec = decodeRow(vid);
+      const dispWall = performance.timeOrigin + meta.expectedDisplayTime;
+      const row = { kind: "sample", from: pid, to: MY_ID, tier: (parts.get(pid) || {}).tier,
+                    t: wallClock(), presentedFrames: meta.presentedFrames,
+                    w: meta.width, h: meta.height, decOk: dec.ok,
+                    contrast: Math.round(dec.contrast || 0) };
+      if (dec.ok) {
+        row.burnedTs = dec.ms;
+        row.latencyMs = dispWall - dec.ms;
+        row.decPid = dec.pid;
+        row.pidOk = dec.pid === pid;
+        if (!row.pidOk) tileState.pidMismatch++;
+        tileState.valid++;
+        tileState.lastLatencyMs = Math.round(row.latencyMs);
+        tileState.lastValidT = row.t;
+        el.lat.textContent = tileState.lastLatencyMs + " ms";
+        if (!tileState.firstValidT) {
+          tileState.firstValidT = row.t;
+          const p0 = pullT0.get(pid);
+          const st = pullState.get(pid);
+          tileState.ttffMs = p0 ? Math.round(row.t - p0) : null;
+          event("first-frame", { from: pid, ttffMs: tileState.ttffMs,
+                                 cause: (st && st.cause) || "unknown" });
+        }
+      } else row.decWhy = dec.why;
+      tileState.samples++;
+      batch.push(row);
+    } finally { busy = false; }
+  }
+  vid.requestVideoFrameCallback(onFrame);
+}
+function detachTrack(pid) {
+  const ts = window.__state.tiles[pid];
+  if (ts) ts.dead = true;
+  const el = tileEls.get(pid);
+  if (el && el.kind === "video") el.media.srcObject = null;
+  delete window.__state.tiles[pid];
+}
+
+// place a tile's DOM into the right section per current tier + visibility
+function mountTile(pid) {
+  const p = parts.get(pid);
+  const el = tileEls.get(pid);
+  if (!p || !el) return;
+  el.badge.className = "badge " + p.tier;
+  el.badge.textContent = p.tier.toUpperCase();
+  const target = grids[p.tier];
+  if (el.root.parentElement !== target) target.appendChild(el.root);
+}
+
+// ---- stats-stall WATCHDOG: no frames for 3 s on a live track ---------------
+const WATCHDOG_MS = 3000;
+const lastRepullAttempt = new Map();
+setInterval(() => {
+  const now = wallClock();
+  for (const [pid, ts] of Object.entries(window.__state.tiles)) {
+    if (ts.dead || ts.deadSignaled) continue;
+    if (now - ts.lastFrameT > WATCHDOG_MS && !ts.stalled) {
+      ts.stalled = true;
+      setOverlay(pid, "STALLED", "stalled");
+      event("watchdog-stall", { from: pid, sinceMs: Math.round(now - ts.lastFrameT) });
+      const last = lastRepullAttempt.get(pid) || 0;
+      if (now - last > 8000) {          // badge + ONE repull attempt per 8 s
+        lastRepullAttempt.set(pid, now);
+        event("watchdog-repull", { from: pid });
+        queueRepull(pid, "watchdog");
+      }
+    }
+  }
+}, 1000);
+
+// ============================================================================
+// WALL tier — self POST loop + per-participant <img> pollers
+// ============================================================================
+let wallPostTimer = null;
+function syncWallPosting() {
+  const should = MY_TIER === "wall" && window.__state.phase === "running";
+  if (should && !wallPostTimer) {
+    window.__state.wallPosting = true;
+    postSnapshot();                 // IMMEDIATE first post (demote honesty: peers
+                                    // otherwise see the stale DO-fallback tile
+                                    // until the first interval tick, +1.5 s)
+    wallPostTimer = setInterval(postSnapshot, 1500);
+    event("wall-posting", { on: true });
+  } else if (!should && wallPostTimer) {
+    clearInterval(wallPostTimer); wallPostTimer = null;
+    window.__state.wallPosting = false;
+    event("wall-posting", { on: false });
+  }
+}
+function postSnapshot() {
+  source.canvas.toBlob(b => {
+        if (!b || b.size > 63 * 1024) { if (b) event("tile-too-big", { size: b.size }); return; }
+        const url = TILE_BASE + "/tile/" + ROOM + "/" + MY_ID +
+                    (TOKEN ? "?token=" + encodeURIComponent(TOKEN) : "");
+        fetch(url, { method: "POST", body: b }).catch(() => {});
+  }, "image/jpeg", 0.8);
+}
+
+const wallPollers = new Map();   // pid -> timer
+const wallDecoder = makeDecoder();
+function startWallPoll(pid) {
+  if (wallPollers.has(pid)) return;
+  const p = parts.get(pid);
+  let el = tileEls.get(pid);
+  if (!el || el.kind !== "snap") el = makeTile(p, "snap");
+  mountTile(pid);
+  const tick = async () => {
+    const p2 = parts.get(pid);
+    if (!p2 || !p2.alive || p2.tier !== "wall") return;
+    try {
+      // no cache-buster: the Worker serves max-age=2 from the colo cache; the
+      // 2 s poll interval matches, so we never read older than one interval
+      const r = await fetch(TILE_BASE + "/tile/" + ROOM + "/" + pid);
+      if (!r.ok) {
+        const ws2 = window.__state.wall[pid] || (window.__state.wall[pid] = {});
+        ws2.miss = (ws2.miss || 0) + 1;
+        el.lat.textContent = "no snap"; el.lat.className = "lat stale";
+        batch.push({ kind: "wall", from: pid, to: MY_ID, t: wallClock(), miss: true });
+        return;
+      }
+      const blob = await r.blob();
+      const bmp = await createImageBitmap(blob);
+      if (!wallPollers.has(pid)) { bmp.close(); return; }  // demoted mid-tick
+      const url = URL.createObjectURL(blob);
+      const old = el.media.src;
+      el.media.src = url;
+      if (old && old.startsWith("blob:")) URL.revokeObjectURL(old);
+      const dec = wallDecoder(bmp);
+      bmp.close();
+      const now = wallClock();
+      const row = { kind: "wall", from: pid, to: MY_ID, t: now, decOk: dec.ok };
+      if (dec.ok) {
+        row.burnedTs = dec.ms;
+        row.freshMs = Math.round(now - dec.ms);
+        row.pidOk = dec.pid === pid;
+        const ws2 = window.__state.wall[pid] || (window.__state.wall[pid] = {});
+        ws2.freshMs = row.freshMs; ws2.samples = (ws2.samples || 0) + 1; ws2.lastT = now;
+        el.lat.textContent = (row.freshMs / 1000).toFixed(1) + " s ago";
+        el.lat.className = "lat " + (row.freshMs < 5000 ? "fresh" : "stale");
+      }
+      batch.push(row);
+    } catch (e) { /* next poll */ }
+  };
+  tick();
+  wallPollers.set(pid, setInterval(tick, 2000));
+}
+function stopWallPoll(pid) {
+  const t = wallPollers.get(pid);
+  if (t) { clearInterval(t); wallPollers.delete(pid); }
+  delete window.__state.wall[pid];       // no stale freshness entries in driver state
+}
+
+// ============================================================================
+// RECONCILE — tiers/pages -> desired pulls, wall pollers, DOM
+// ============================================================================
+function reconcile(cause) {
+  if (VIEW !== "full") { updateHeader(); return; }
+  if (window.__state.phase !== "running") return;
+  const { featured, live, wall } = tierLists();
+  const pages = Math.max(1, Math.ceil(live.length / LIVE_PAGE_SIZE));
+  if (livePage >= pages) livePage = 0;
+  window.__state.livePage = livePage; window.__state.livePages = pages;
+  const visibleLive = live.slice(livePage * LIVE_PAGE_SIZE, (livePage + 1) * LIVE_PAGE_SIZE);
+  const wantVideo = new Set([...featured, ...visibleLive].map(p => p.id));
+
+  // wall pollers: exactly the wall tier
+  for (const p of wall) { stopIfNotWall(p.id); startWallPoll(p.id); }
+  for (const pid of [...wallPollers.keys()])
+    if (!wall.find(p => p.id === pid)) stopWallPoll(pid);
+
+  // video pulls: pull-on-visible / tracks-close-on-hidden
+  for (const p of [...featured, ...visibleLive]) {
+    const st = pullState.get(p.id);
+    if (st && (st.state === "queued" || st.state === "pulling" || st.state === "done" ||
+               st.state === "repulling")) { mountTile(p.id); continue; }
+    if (st && st.state === "failed" && st.attempts >= 5) continue;
+    if (!p.sessionId) continue;                 // not published yet — wait for frame
+    const attempts = st ? st.attempts : 0;
+    pullState.set(p.id, { state: "queued", attempts });
+    const cz = cause === "roster" || cause === "joined" || cause === "published" ? "initial" : cause;
+    chain(() => pullTrack(parts.get(p.id), cz));
+  }
+  const toClose = [];
+  for (const [pid, st] of pullState) {
+    if ((st.state === "done" || st.state === "pulling") && !wantVideo.has(pid)) {
+      if (STAG) { toClose.push(pid); continue; }        // P3C delta 2: defer + batch
+      chain(() => {                            // re-check when the chain gets here
+        const s = pullState.get(pid);
+        if (!s || (s.state !== "done" && s.state !== "pulling")) return;
+        return unpullTrack(pid, "hidden");
+      });
+    }
+  }
+  if (STAG && toClose.length) {
+    // Defer a beat AFTER the pulls above complete (chain is serial), so the
+    // incoming tiles reach first frame before we renegotiate the closes; then
+    // close everything still-hidden in ONE call. "pulling" entries are left
+    // for the next tick (can't close a mid that doesn't exist yet).
+    chain(async () => {
+      await new Promise(r => setTimeout(r, 700));
+      const pids = toClose.filter(pid => {
+        const s = pullState.get(pid);
+        return s && s.state === "done" && s.mid;
+      });
+      if (pids.length) return unpullBatch(pids, "hidden");
+    });
+  }
+  // hidden live tiles: drop their DOM (video ones only; dead ones stay visible)
+  for (const [pid, el] of tileEls) {
+    const p = parts.get(pid);
+    if (!p) continue;
+    if (p.alive && el.kind === "video" && !wantVideo.has(pid) && p.tier !== "wall") removeTileEl(pid);
+    if (p.alive && el.kind === "snap" && p.tier !== "wall") removeTileEl(pid);
+  }
+  updateHeader();
+}
+function stopIfNotWall(pid) {
+  const el = tileEls.get(pid);
+  if (el && el.kind === "video") { chain(() => unpullTrack(pid, "demoted")); removeTileEl(pid); }
+}
+function updateHeader() {
+  const { featured, live, wall } = tierLists();
+  document.getElementById("nfeat").textContent = featured.length;
+  document.getElementById("nlive").textContent = live.length + " (page " + (livePage + 1) + "/" + window.__state.livePages + ", " + LIVE_PAGE_SIZE + " visible)";
+  document.getElementById("nwall").textContent = wall.length;
+  document.getElementById("pageinfo").textContent = "live page " + (livePage + 1) + "/" + (window.__state.livePages || 1);
+}
+
+// ---- rotation ---------------------------------------------------------------
+function rotate() {
+  const { live } = tierLists();
+  const pages = Math.max(1, Math.ceil(live.length / LIVE_PAGE_SIZE));
+  livePage = (livePage + 1) % pages;
+  event("rotate", { toPage: livePage, pages });
+  reconcile("rotate");
+}
+document.getElementById("rotbtn").onclick = rotate;
+let autorotTimer = null;
+function setAuto(on) {
+  document.getElementById("autorot").checked = on;
+  if (on && !autorotTimer) autorotTimer = setInterval(rotate, AUTOROT_MS);
+  if (!on && autorotTimer) { clearInterval(autorotTimer); autorotTimer = null; }
+}
+document.getElementById("autorot").onchange = (e) => setAuto(e.target.checked);
+if (q.get("autorotate") === "1") setAuto(true);
+
+// ---- driver API -------------------------------------------------------------
+window.__rotate = rotate;
+window.__setAuto = setAuto;
+// P3C delta 3: full observed room state for per-event programmatic assertions
+window.__roster = () => ({
+  self: { id: MY_ID, tier: MY_TIER, role: MY_ROLE, phase: window.__state.phase },
+  livePage, livePages: window.__state.livePages,
+  liveOrder: liveOrder.slice(),
+  parts: [...parts.values()].map(p => ({ id: p.id, tier: p.tier, alive: !!p.alive }))
+          .sort((a, b) => a.id < b.id ? -1 : 1),
+  pulled: [...pullState.entries()].filter(([, s]) => s.state === "done").map(([pid]) => pid).sort(),
+  wallPolled: [...wallPollers.keys()].sort(),
+});
+const TIER_RANK = { wall: 0, live: 1, featured: 2 };
+window.__promote = (pid, tier) => {         // operator action (Worker enforces role)
+  const cur = pid === MY_ID ? MY_TIER : ((parts.get(pid) || {}).tier || "wall");
+  const type = TIER_RANK[tier] >= TIER_RANK[cur] ? "promote" : "demote";
+  event("promote-sent", { id: pid, tier, frameType: type });
+  return sigSend({ type, participantId: pid, tier });
+};
+
+// ---- HUD --------------------------------------------------------------------
+setInterval(() => {
+  const tls = Object.entries(window.__state.tiles).map(([pid, s]) =>
+    pid + ":" + s.valid + "/" + s.samples + (s.lastLatencyMs != null ? "@" + s.lastLatencyMs : ""));
+  const wls = Object.entries(window.__state.wall).map(([pid, s]) =>
+    pid + (s.freshMs != null ? "@" + (s.freshMs / 1000).toFixed(1) + "s" : ":miss"));
+  document.getElementById("hud").textContent =
+    "phase=" + window.__state.phase + " tier=" + MY_TIER + " frames=" + window.__state.frames +
+    " sig=" + window.__state.sigState + " video[" + tls.join(" ") + "] wall[" + wls.join(" ") + "]";
+}, 1000);
+
+// ---- getStats loop ----------------------------------------------------------
+function startStats() {
+  setInterval(async () => {
+    try {
+      if (!pc) return;
+      const st = await pc.getStats();
+      const row = { kind: "stats", who: MY_ID, tier: MY_TIER, view: VIEW,
+                    t: wallClock(), inbound: [] };
+      st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "video") {
+          row.fps = s.framesPerSecond; row.framesSent = s.framesSent;
+          row.qualityLimitationReason = s.qualityLimitationReason;
+          row.targetBitrate = s.targetBitrate;
+          row.outWidth = s.frameWidth; row.outHeight = s.frameHeight;
+        }
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          row.inbound.push({ from: midToPid.get(s.mid) || s.mid,
+            framesDecoded: s.framesDecoded, fps: s.framesPerSecond,
+            freezeCount: s.freezeCount, totalFreezesDuration: s.totalFreezesDuration,
+            packetsLost: s.packetsLost, nackCount: s.nackCount });
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated)
+          row.rtt = s.currentRoundTripTime;
+      });
+      window.__state.fps = row.fps;
+      window.__state.framesSent = row.framesSent;
+      window.__state.qlr = row.qualityLimitationReason;
+      batch.push(row);                        // plain-fetch batch path (C4 lesson)
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+// ---- reconcile safety tick: retry failed pulls, catch drift -----------------
+setInterval(() => {
+  if (window.__state.phase !== "running" || VIEW !== "full") return;
+  for (const [pid, st] of pullState)
+    if (st.state === "failed" && st.attempts < 5) pullState.set(pid, { state: "queued", attempts: st.attempts });
+  reconcile("tick");
+}, 2000);
+
+// ============================================================================
+// BOOT
+// ============================================================================
+async function boot() {
+  if (HOLD) {
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
+  window.__state.phase = "connecting";
+  window.__state.t_go = wallClock();
+  await publishWithRetry(source.track);
+  applyPublishProfile(MY_TIER);
+  window.__state.phase = "signaling";
+  sigConnect();
+  await new Promise(res => {                 // wait for our roster
+    const t = setInterval(() => { if (window.__state.selfServerId) { clearInterval(t); res(); } }, 25);
+  });
+  sendPublishFrame();
+  window.__state.phase = "running";
+  window.__state.t_running = wallClock();
+  document.getElementById("selfbadge").textContent = "YOU · " + MY_TIER.toUpperCase();
+  syncWallPosting();
+  startStats();
+  reconcile("boot");
+  event("running", { tier: MY_TIER, view: VIEW });
+}
+boot().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e).slice(0, 500) });
+});
+</script>
+</body>
+</html>
