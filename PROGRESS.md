@@ -36,6 +36,24 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### Phase 3c choreography — ✅ A JSON SCORE CONDUCTS THE GRID; PHASE 3 COMPLETE
+- ✅ 4 full 5-min shows + smoke via the deployed Worker: 88/88 correctness
+  assertions, zero errors in ~370 SFU calls. Score-time drift p50 0 / max 8 ms —
+  wall-clock scores need no PDT machinery.
+- ✅ cmd→effect: spotlight 0.5–0.6 s; rotate 0.4 s; tier-frame prop 22–49 ms;
+  demote confirm 91–129 ms when the snapshot POST wins the race (2.1 s "floor"
+  was a race, not physics).
+- ✅ Unpull-burst gap FIXED (3 measured iterations → batched tracks/close fired
+  only into a quiet chain): featured-tier wave gap 894 → 136–200 ms typical (~5×).
+  Two failed intermediate designs documented (defer-in-chain regressed promotes;
+  timer-outside-chain regressed gaps — the idle beat is load-bearing).
+- Semantics: tier changes = DO-validated promote/demote frames; view choreography
+  = cue passthrough. Worker used exactly as deployed, zero changes.
+- Operator-console backlog in NOTES §P3C. Artifacts: scores/demo-score.json,
+  score.mjs, show.html, run-show.mjs; data results/m2m-p3c-*.jsonl.
+- **PHASE 3: all four tracks complete.** plan-m2m §6 updated; remaining items
+  re-labeled phase-4 backlog.
+
 ### Phase 3b composite — ✅ ARCHIVE-GRADE RECORDING WITHOUT OBS
 - ✅ Route B (CDP screencast → ffmpeg → RTMPS): 0 dropped frames, recorded
   duration exact, VOD ready 1.8 s after end, ~0.6 cores total. Proof VOD kept:
