@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8"><title>enc probe</title>
+<script type="module">
+const configs = [
+	["720p30-base31", "avc1.42001f", 1280, 720, 30, 2500000],
+	["1080p60-cb42", "avc1.42c02a", 1920, 1080, 60, 6000000],
+	["1080p60-high42", "avc1.64002a", 1920, 1080, 60, 6000000],
+	["4k30-high51", "avc1.640033", 3840, 2160, 30, 12000000],
+	["4k60-high52", "avc1.640034", 3840, 2160, 60, 18000000],
+	["4k60-base52", "avc1.420034", 3840, 2160, 60, 18000000],
+];
+const out = [];
+for (const [name, codec, w, h, fps, br] of configs) {
+	const base = { codec, width: w, height: h, framerate: fps, bitrate: br, latencyMode: "realtime", avc: { format: "annexb" } };
+	const r = { name, codec };
+	for (const [key, mode] of [["hw", "prefer-hardware"], ["sw", "prefer-software"], ["np", "no-preference"]]) {
+		try { r[key] = (await VideoEncoder.isConfigSupported({ ...base, hardwareAcceleration: mode })).supported; }
+		catch (e) { r[key] = "threw:" + e.message; }
+	}
+	// decode side too
+	try { r.dec = (await VideoDecoder.isConfigSupported({ codec, optimizeForLatency: true })).supported; }
+	catch (e) { r.dec = "threw:" + e.message; }
+	out.push(r);
+}
+await fetch("/log", { method: "POST", body: "PROBE4K " + JSON.stringify(out) });
+document.title = "done";
+</script>

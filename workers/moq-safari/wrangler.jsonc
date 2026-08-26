@@ -1,10 +1,15 @@
 {
 	// Safari/iPhone MoQ test page (rig/moq/RUNBOOK.md §8).
 	// Assets-only GETs serve public/; POST /beacon hits src/index.js and shows
-	// up in `wrangler tail elektron-moq-safari` (self-reporting from any device).
+	// up in `wrangler tail elektron-moq-safari` (self-reporting from any device)
+	// AND persists into the BeaconStore DO — read later at GET /results.
 	"name": "elektron-moq-safari",
 	"main": "src/index.js",
 	"compatibility_date": "2026-08-01",
 	"assets": { "directory": "./public" },
+	"durable_objects": {
+		"bindings": [{ "name": "BEACONS", "class_name": "BeaconStore" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["BeaconStore"] }],
 	"observability": { "enabled": true }
 }

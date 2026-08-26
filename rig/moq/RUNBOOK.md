@@ -561,3 +561,21 @@ Open the URL on the iPhone (Safari), tap start. Expected on iOS ≥26.4: the fou
 live video, and a latency readout. On iOS <26.4: the explicit red "Safari/iOS 26.4+ required"
 line. Either way `wrangler tail elektron-moq-safari` on this Mac shows the phone's beacons —
 UA, stage, fps, errors — the verdict writes itself from one screen on each side.
+
+### 8.8 Persistent verdicts — no live tail needed (✅ deployed + verified 2026-08-26 06:40 UTC)
+
+**https://elektron-moq-safari.kristjan-jansen.workers.dev/results** (`?json=1` for raw) —
+beacons now ALSO persist into a SQLite Durable Object (BeaconStore, last 200 sessions), so the
+page works as an **async device-verdict collector**: forward the test URL to anyone (Android
+owners etc.), read their row here later. One row per page load (per-load `sid` added to both
+beacon paths), newest first: time, parsed browser ("Chrome 142 / Android 15", "Mobile Safari
+26.5.2 / iOS 26.5"…, hover for full UA), furthest stage reached (never regresses on
+reconnect), WT/H264 feature flags, connect/first-frame ms, fps last/max, g2g p50, frames,
+errors (count + last 3 distinct, hover time cell for sid/last-seen). No auth (beacons carry no
+secrets); `X-Robots-Tag: noindex`. Storage started at this deploy — earlier sessions (§8.4/8.5)
+predate it; rows keyed `nosid-…` are old cached pages (pre-sid bundle, UA+IP-hash fallback —
+distinct devices behind one NAT with identical UAs can merge there). UA caveats: iPads
+masquerade as desktop macOS Safari; Chrome/Android UA reduction can freeze "Android 10" and
+minor versions; every iOS browser (CriOS/FxiOS…) is WebKit underneath, so its verdict is
+Safari's. Verified end-to-end: headless Chrome 151 run → row `a86f74a1` showed live / WT:✓
+H264:✓ / connect 159 ms / first frame 401 ms / 30 fps / g2g p50 44 ms / 0 errors.

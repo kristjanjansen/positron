@@ -36,6 +36,10 @@
 		// Boot: feature-detect FIRST, before touching the player bundle, so a
 		// Safari without WebTransport still gets a clear on-screen verdict.
 		const $ = (id) => document.getElementById(id);
+		// Per-page-load session id: keys this run's row in the Worker's
+		// BeaconStore DO (GET /results) — both beacon paths (here + play.js)
+		// include it so a device's whole run collapses into one row.
+		window.__sid = (crypto.randomUUID?.() ?? (Date.now().toString(36) + Math.random().toString(36).slice(2))).slice(0, 8);
 		const params = new URLSearchParams(location.search);
 		const codec = params.get("codec") ?? "avc1.42001f";
 		const ns = params.get("namespace") ?? params.get("ns") ?? "elektron-safari-test";
@@ -45,7 +49,7 @@
 
 		function beacon(event, extra) {
 			try {
-				const body = JSON.stringify({ t: new Date().toISOString(), ua: navigator.userAgent, event, ...extra });
+				const body = JSON.stringify({ t: new Date().toISOString(), sid: window.__sid, ua: navigator.userAgent, event, ...extra });
 				if (navigator.sendBeacon) navigator.sendBeacon("/beacon", body);
 				else fetch("/beacon", { method: "POST", body }).catch(() => {});
 			} catch {}

@@ -15338,6 +15338,7 @@ function beacon(event, extra) {
   try {
     const body = JSON.stringify({
       t: (/* @__PURE__ */ new Date()).toISOString(),
+      sid: window.__sid,
       ua: navigator.userAgent,
       event,
       ns: NS,
