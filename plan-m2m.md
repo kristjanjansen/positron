@@ -162,6 +162,27 @@ page now probes AudioDecoder on every load and plays audio from `?namespace=elek
 iOS-on-4G ✅, audio ✅ — remaining gates: draft-16 relay provisioning (USER), ~~catalog shim~~,
 UDP-hostile-network fallback.**
 
+**✅ MULTI-PUBLISHER + ROLE-FLIP (2026-08-26, RUNBOOK §13): MoQ's first real ceilings found —
+the grid stays on the SFU.**
+- Fan-in clean through **N=20** (pooled 62/88 ms — lower latency than the SFU's 158 ms p95) but
+  **N=30 double-gates**: (a) ⚠️ inferred **per-viewer-session subscription budget ≈ 20 namespaces
+  /40 subs** — extra subscribes get optimistic SUBSCRIBE_OK then starve FOREVER (fresh session
+  reaches a different set; the relay accepted all sessions); (b) this rig's aggregate encode
+  ceiling (~750 ms standing latency, GPU-readback-bound). Client rule discovered: **subscribe
+  churn permanently exhausts a session** — when a post-OK track starves, RECONNECT, never retry
+  forever.
+- **Viewer→publisher flip: 1.64 s p50** — publish itself is 0–1 ms (no renegotiation, MoQ's
+  structural win); the floor is WebCodecs **encoder spin-up 1.5 s** + discovery (≤1.6 s, which
+  draft-16's SUBSCRIBE_NAMESPACE collapses). **Pre-warm the encoder and MoQ's flip beats the
+  SFU's 0.5 s.**
+- **Death: the relay says NOTHING** (no PUBLISH_DONE on served subs; frames just stop; announce
+  GC +10–15 s). Silence watchdog 0.5–0.6 s vs SFU/DO's 38–126 ms — death signaling MUST ride the
+  RtcRoom DO on any MoQ grid. **Same-name rejoin before GC BRICKS the namespace relay-wide for
+  minutes (3× reproduced)** — session-suffixed fresh names are mandatory. Fresh-name rejoin
+  2.5–3.5 s ≈ SFU.
+- Verdict: grid-scale m2m on MoQ needs draft-16 + DO signaling + name discipline + connection
+  sharding (≈20-sub budget per connection). Until then: SFU grid, MoQ delivery — unchanged.
+
 **✅ THE CATALOG SHIM IS BUILT AND THE ECOSYSTEM GAP IS CLOSED (2026-08-26, RUNBOOK §12):
 one 457-line player (~150 lines of actual bridge) now decodes BOTH non-hang dialects.**
 - **Local venue chain PROVEN: ffmpeg WHIP → mediamtx (as MoQ server) → browser at 20.6 ms p50 /

@@ -14,6 +14,7 @@ const NAME = params.get("name") ?? "dev";
 const PROBE = params.get("probe") ?? "probe1";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const ROWLESS = params.get("rowless") === "1";
+const STALLMS = parseInt(params.get("stallms") ?? "10000", 10);
 
 const NBLOCKS = 40, BLOCK_W = 8, ROW_Y = 120, ROW_H = 48, W = 320, H = 180;
 
@@ -132,11 +133,11 @@ async function runOne(st, conn) {
 			if (!st.active) return;
 			const r = await Promise.race([
 				consumer.next(),
-				new Promise((res) => setTimeout(() => res("timeout"), got ? 10000 : 5000)),
+				new Promise((res) => setTimeout(() => res("timeout"), got ? STALLMS : 5000)),
 			]);
 			if (r === "timeout") {
 				if (!got) { report.races++; st.races++; row({ k: "race", pub: p, phase: "video", t: wall(), err: "ok-zero-groups-5s" }); }
-				throw new Error(got ? "video stalled 10 s" : "video zero groups 5 s");
+				throw new Error(got ? `video stalled ${STALLMS} ms` : "video zero groups 5 s");
 			}
 			if (r === undefined) {
 				report.closes++;

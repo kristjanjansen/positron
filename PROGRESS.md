@@ -36,6 +36,18 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### MoQ multi-publisher + role flip — ✅ FIRST REAL MoQ CEILINGS FOUND
+- ✅ Clean to N=20 (62/88 ms); N=30 gates on ⚠️ per-session subscribe budget
+  (~20 ns/40 subs — optimistic OK then permanent starvation; churn exhausts the
+  session → reconnect rule) + local encode ceiling. Relay itself accepted all.
+- ✅ Flip 1.64 s p50: publish 0–1 ms (no renegotiation!), floor = encoder
+  spin-up 1.5 s — pre-warmed + draft-16 would beat the SFU's 0.5 s.
+- ✅ Death: relay signals NOTHING (watchdog 0.5–0.6 s vs DO 38–126 ms); announce
+  GC +10–15 s; **same-name rejoin pre-GC bricks the namespace for minutes** —
+  fresh names mandatory. Rejoin 2.5–3.5 s.
+- Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
+  discipline + connection sharding. RUNBOOK §13; 15 data files.
+
 ### mediamtx + catalog shim — ✅ ECOSYSTEM GAP CLOSED, local venue chain proven
 - ✅ ffmpeg WHIP → mediamtx MoQ → browser: 20.6 ms p50, audio A/V skew +12 ms,
   0 errors. mediamtx speaks msf-00/"loc"/AVCC (NOT WARP) on draft-19 — shim grew
