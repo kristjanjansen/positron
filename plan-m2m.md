@@ -376,9 +376,13 @@ Ranked.
 7. **Secret custody** — the app secret is a full-control credential 📄; it must live only in the
    proxy Worker. ⚠️ And the account API token still needs rotation (`plan.md` §6) — same hygiene
    moment, do both.
-8. **Vendor surface stability** 📄 — SFU pricing GA since 2024-05, docs maintained 2026-04; but
-   Stream-WebRTC is still "beta" since 2022 and MoQ is beta-with-changing-API. The recommended
-   stack deliberately puts the participatory layer on the GA surface only.
+8. **Vendor surface stability** 📄 → researched in depth 2026-08-26: **`research/cf-priorities-2026-08.md`**.
+   Verdict: no abandonment, but hard reprioritization toward AI. Per-product: SFU = investing
+   (AI substrate, safest leg); MoQ = investing but pre-GA/draft-churn (bet directionally);
+   Stream LL-HLS = abandoned-in-place feature-wise (keep player defenses permanent);
+   Stream WHIP/WHEP = fossilized (never wait on its "coming soon"; recording shipped in
+   RealtimeKit instead, ~$0.010/min export when priced). The recommended stack already sits on
+   the right legs.
 
 ---
 
