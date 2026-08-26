@@ -4,6 +4,43 @@ The universal substrate under studio/replay/archive. Synthesis of two lineages:
 the user's four timeline experiments (~/personal/{time,demo,maria,tracker}) and
 elektron's measured machinery. Each supplies what the other lacks.
 
+## −1. ORIGIN — the cultural-heritage horizon (added 2026-08-26, from the user)
+
+The idea predates elektron: it comes from cultural-heritage work — media reuse,
+remix, restoration, storage, archival, preservation — via a PhD project whose
+case study is **Erkki Kurenniemi**: the Finnish electronic-music pioneer whose
+instruments (the DIMI sequencer-synthesizers) were event-capture machines AND
+whose life was an event-capture project (diaries, tapes, photos — everything
+timestamped, with the explicit ambition that the archive could reconstruct the
+mind). His devices and his archive share one shape: timestamped moments
+awaiting replay. The abstraction generalizes that shape; the horizon is public
+media archives (e.g. **ERR** — voice, video, tapes, memories, text) "brought to
+new life" through one timestamp format. Kurenniemi's reconstruction dream IS
+`reduce(events ≤ t) → state` at its limit.
+
+Requirements this origin ADDS (beyond the live-show case):
+- **Deep time + uncertainty**: archival timestamps span decades and are often
+  approximate ("1971, probably spring"). Events gain optional `precision` /
+  `uncertainty` fields; absolute-epoch ms remains the spine, but reducers and
+  visualizers must render fuzziness honestly (a smear, not a fake instant).
+- **Provenance and rights as payload discipline**: source, chain of custody,
+  rights status travel with every ingested event/span — non-negotiable for
+  heritage material, and it strengthens the consent story (C6) for live work.
+- **Ingest adapters become archival**: digitized tapes (spans with internal
+  time), OCR'd diaries (events from dated pages), broadcast logs, photo EXIF —
+  the same capture-adapter contract pointed at the past.
+- **"Create something new on top" = programs quoting traces** (C10 enriched):
+  a new work is a score that QUOTES archive timelines — which gives v3
+  (timelines referencing timelines) its first real client. It stays staged, but
+  it is now mission, not indulgence.
+- **Standards bridge, not reinvention**: the heritage world already has OAIS/
+  PREMIS (preservation), IIIF incl. A/V (presentation), and **W3C Web
+  Annotations with temporal media-fragment targets** — the latter is nearly our
+  cue/span model as a standard. The timeline positions as the ACCESS AND
+  PERFORMANCE layer over preserved objects (export/import to these, never
+  replacing them); archive masters stay in the institution's OAIS custody,
+  our log references them.
+
 ## 0. The convergence
 
 Four prior generations (time→demo→maria→tracker) independently settled on:
