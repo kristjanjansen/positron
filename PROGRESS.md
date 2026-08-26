@@ -48,6 +48,17 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
   discipline + connection sharding. RUNBOOK §13; 15 data files.
 
+### Draft-16 relay (user provisioned) — ✅ 3 OF 4 GRID BLOCKERS FIXED
+- ✅ Auth free (136 ms establish, message-level rejects); latency = draft-14
+  (17.8 native / 30 ms browser); @moq/net speaks 16 unmodified.
+- ✅ SUBSCRIBE_NAMESPACE push ~430 ms — roster + 2 s republish hack obsolete.
+  Races documented (announce→subscribe retry; announce-flap edge-trigger rule).
+- ✅ Mysteries closed: budget = exactly 50 requests/session fixed at SETUP
+  (→ shard ≲20 pubs/conn); same-name rejoin brick GONE (explicit reject, GC
+  16–18 s); death now clean track-end +14 s (still slow — DO stays detector).
+- Engine targets draft-16. Token hygiene: rotate both relay tokens post-
+  experiments (they transited chat + local logs). RUNBOOK §14.
+
 ### 📱 iPhone AUDIO verdict (screenshots 15:16) — ✅ SOUNDING −21 dB, skew −6 ms
 - Opus + AAC-LC decode YES; 2583 chunks / 0 errors; aLat ~66 ms; underruns ~1 %
   (= Chromium band; adaptive cushion still backlog). Video 31 fps, g2g 71 ms.

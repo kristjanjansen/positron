@@ -1297,3 +1297,158 @@ after cleanup: 4K publisher (moq-4k-pub-udd) + pubserver :8890, audio publisher
 free-beta relay, no persistent resources). No plan-file edits; §13 only.
 
 ⏱ END 2026-08-26 08:36 UTC — ~56 min active.
+
+## 14. Draft-16 relay — AUTHENTICATED, provisioned (draft-16 agent; owns this section only)
+
+⏱ START 2026-08-26 12:25 UTC. Relay provisioned by the user (§3 dashboard step DONE);
+credentials in `.env` (MOQ_RELAY_ID + PUBSUB/SUB tokens — never printed, referred to by
+role). Endpoint `https://draft-16.cloudflare.mediaoverquic.com/<token>`. Binaries: main
+branch (draft-16) in volume `moq-target16` (§4). Docker VM clock resynced first (§4 trap).
+
+### 14.1 Auth semantics (✅ measured 12:26Z; `test-d16-auth.sh`, results/moq-d16-auth.jsonl)
+
+| token | connect | what happens |
+|---|---|---|
+| none | QUIC+WT ok | session closed **code=3 "scope resolution failed"** ~200 ms (clean, matches §4.2) |
+| garbage | QUIC+WT ok | mid-SETUP stream end → client "decode error: fill buffer" (~110 ms; no clean MoQT error) |
+| SUB, subscribe | ✅ full session | SETUP fine; subscribe itself works (14.2) |
+| SUB, **publish** | ✅ full session | **rejected at MESSAGE level, not SETUP**: CLIENT_SETUP→SERVER_SETUP ok (ALPN/WT-protocol `moqt-16`, CONNECT 200), then `PUBLISH_NAMESPACE` → **`REQUEST_ERROR error_code=32 retry_interval=0`** ~280 ms later; session stays up |
+| PUBSUB, publish | ✅ | PUBLISH_NAMESPACE accepted, ticks flow |
+
+- **Session-establish latency** (5 runs, in-container, tracing timestamps): connecting→WT
+  CONNECT 200 = 97–137 ms; →SERVER_SETUP (full MoQT session) = **112–162 ms, median ~136 ms**.
+  Same class as draft-14's 125 ms browser number — **auth adds nothing measurable**.
+- Draft-16 renames on the wire (observed): ANNOUNCE → **`PUBLISH_NAMESPACE`**; errors ride
+  a generic **`REQUEST_ERROR`** with numeric codes (32 = unauthorized publish here; 16 seen
+  on subscribe-to-nonexistent — explicit, ~1.5 s, NOT draft-14's optimistic-OK starvation).
+
+### 14.2 Native pub/sub e2e (✅ 12:28Z; `test-d16-inner.sh`, results/moq-d16-clock.jsonl)
+
+- **Clock** (pub=PUBSUB, sub=SUB token, one-clock §3.6 method, 40 s): 44/44 ticks,
+  **steady p50 17.8 ms / p95 32.8 ms** (min 12.7, max 42.8, n=40) — identical to draft-14's
+  17.9 ms p50, tighter tail (32.8 vs 61). Open-group catch-up replay on join: same as §3.6.
+- **Media** (ffmpeg fMP4 → moq-pub → relay → moq-sub, 30 s): valid mov,mp4 5.02 MB,
+  h264 640x360 + aac, duration 34.96 s (30 s + open-group catch-up), zero errors.
+  moq-pub main-branch publishes a WARP catalog incl. audio samplerate/channelConfig.
+
+### 14.3 Browser on draft-16 (✅ 12:34Z; §7 hang pipeline UNCHANGED except a token-redaction
+log line; results/moq-d16-browser-e1.jsonl)
+
+- **@moq/net negotiates draft-16 out of the box**: token-in-URL-path via `?relay=`, WT
+  subprotocol pins `moqt-16` → SETUP path → `version=moq-transport-16`. Publisher
+  connect **98 ms**, player **136 ms** (vs 125 ms draft-14 browser baseline — auth free).
+- **No shim changes needed**: @moq/net's draft-16 SUBSCRIBE encoding (v15+ params as
+  params) is accepted by CF — the §12 param-strip patch is a mediamtx-only need; CF-16
+  needs NO per-message auth param when the token rides the URL path (native + browser both).
+- hang pub (VP8 720p30) + player pair, 60 s: catalog on FIRST attempt, 1819/1820 frames
+  decoded, 0 decode errors, 0 checksum fails; **g2g p50 30.0 / p90 42.2 / p95 48.2 ms**
+  (max 1120 ms = the single join catch-up frame) — same class as draft-14's 26–34 ms
+  (§7.1/§8.4). Auth + draft-16 cost nothing measurable in the media path.
+- ⚠️ `@moq/net`'s `NO_DISCOVERY_HOSTS=["mediaoverquic.com"]` suffix-matches ALL CF MoQ
+  hosts incl. draft-16 → `announced()` is disabled by default; pass
+  `connect(url, {discovery: true})` to enable SUBSCRIBE_NAMESPACE on draft-16 (14.4).
+
+### 14.4 THE HEADLINE — SUBSCRIBE_NAMESPACE (✅ 12:39–12:48Z; rig `spike/src/d16-announce.js`
++ `spike/d16server.py` :8886 (server-side one-clock timestamps); results/moq-d16-announce.jsonl)
+
+**It works: subscribe a namespace PREFIX before any publisher exists → when a hang publisher
+appears under it, the announce is PUSHED to the waiting session — no roster, no catalog
+republish, no polling.** Watcher: `conn.announced(Path.from(prefix))` (prefix `d16annN`,
+publisher ns `d16annN/p1` — tuple-prefix matching works). Both directions verified: replay
+of EXISTING announces on a new SUBSCRIBE_NAMESPACE (~670 ms incl. round-trip) and push of
+NEW announces to an existing one.
+
+| run | publish→announce@sub | announce→catalog | announce→first video bytes |
+|---|---|---|---|
+| ann3 | 229 ms | (one-shot watch died on the race below) | — |
+| ann4 | 789 ms | (same) | — |
+| ann5 | 1191 ms | 145 ms (attempt 0) | 283 ms |
+| ann6 | 428 ms | 716 ms (attempt 1) | 882 ms |
+| ann7 | 176 ms | 679 ms (attempt 1) | 768 ms |
+
+- **Announce push latency: 0.18–1.2 s (median ~430 ms, n=5)** — vs §13.3's draft-14
+  discovery term 0.56–1.6 s of ROSTER POLL + CATALOG REPUBLISH app machinery. The 2 s
+  catalog-republish hack is obsolete for discovery (catalog arrived on the announce-triggered
+  subscribe every time); total publish→video-at-subscriber ≈ 1.0–1.5 s, encoder warmup incl.
+- ⚠️ **Race: SUBSCRIBE within ~1 ms of the announce push fails** — `SUBSCRIBE error code=0
+  "internal error"` + CF error UUID (3/5 runs; not seen when the push itself took >1 s).
+  A 500 ms retry always succeeded on attempt 1. Announce ≠ subscribable-yet; keep a retry.
+- ⚠️ **Interop gap — announce flap**: CF pushes a NEW announce as `PUBLISH_NAMESPACE` on a
+  bidi stream it FINs right after receiving the OK; @moq/net models stream-lifetime =
+  advertisement-lifetime → `active:true` then `active:false` 2–70 ms later (+ its consume-
+  handle cache evicted). Replayed announces (SUBSCRIBE_NAMESPACE entries) do NOT flap. Treat
+  `active:true` as edge-triggered and subscribe regardless; don't gate playback on "still
+  active". (Also means: no announce-withdrawal signal is observable via @moq/net — the
+  PUBLISH_NAMESPACE stream a withdrawal would ride is already gone.)
+- ⚠️ Rig bug that cost 2 runs (self-inflicted, worth remembering): `Promise.race([ann.next(),
+  timeout])` — the orphaned `next()` eats the announce event. Use a single blocking reader.
+- **TRACK_STATUS** (native, `moq-clock-ietf --track-status`): sent before SUBSCRIBE for a
+  LIVE track → CF answers `REQUEST_ERROR code=16 retry_interval=0 reason="track not found"`
+  45 ms later, while the simultaneous SUBSCRIBE for the same track gets SUBSCRIBE_OK + data.
+  So TRACK_STATUS is answered but NOT usable as a liveness probe today. (Also pins the code
+  names: 16 = track not found; the code-32 of 14.1 = unauthorized.)
+- **PUBLISH (push-before-subscriber)**: not exercisable — moq-rs's transport lib has
+  `publish()` (sends PUBLISH) but no CLI drives it (moq-clock/moq-pub use PUBLISH_NAMESPACE);
+  @moq/net only *decodes* PUBLISH and answers incoming ones with NOT_SUPPORTED. Untested.
+
+**Publisher death on draft-16** (SIGKILL the hang publisher Chrome at a live subscriber):
+the served video subscription ends CLEANLY (`nextGroup()` → end-of-track) **+14.05 s** after
+the kill — an actual protocol signal where draft-14 gave silent starvation for 25–39 s
+(§13.4). Still far too slow for UX: client-side silence heuristics (0.2–0.6 s) remain the
+death detector; no announce withdrawal observable (flap caveat above).
+
+### 14.5 §13 re-checks on draft-16 (✅ 12:51–12:55Z; results/moq-d16-{budget,rejoin}.jsonl)
+
+1. **Subscribe budget: REPRODUCES, and the number is now exact — 50 requests/session.**
+   One session churning subscribes to nonexistent namespaces: requests 1–50 each get a FAST
+   explicit `SUBSCRIBE error code=16 "not found: Track not found"` (+ CF error UUID) — the
+   optimistic-OK starvation of §7.3 is GONE. Requests 51+ never go out: CF grants a fixed
+   request budget at SETUP and NEVER sends MAX_REQUEST_ID updates (matrix: "logged only"),
+   so the spec-compliant client blocks locally; the session then cannot acquire even a LIVE
+   broadcast (10/10 timeouts). This unifies §13.2's "≈20-namespace cap" and §13.4's "~40–60
+   budget" into one fact: **50 requests, fixed, never replenished — failed AND closed
+   requests consume budget forever.** Client rule unchanged: count requests, reconnect near
+   ~45 (reconnect costs ~112–162 ms on d16). Grid viewer sharding stays: ≈2 tracks/pub ⇒
+   ~20 publishers per connection, exactly §13.2's observed ceiling.
+2. **Publisher death: a real (slow) protocol signal now exists.** Existing subscriptions end
+   cleanly (`nextGroup()`→end / native "done") ~+14 s after SIGKILL — vs draft-14's silent
+   25–39 s nothing. Fast detection still = client silence heuristics; no usable announce
+   withdrawal via @moq/net (14.4 flap).
+3. **Same-name rejoin: THE BRICK IS GONE.** Pre-GC same-name relaunch is EXPLICITLY REJECTED
+   (`PUBLISH_NAMESPACE` → `REQUEST_ERROR code=32 retry_interval=0`, immediate) instead of
+   draft-14's silent-accept-and-brick; rejected at +4/+10/+16 s post-kill, accepted by
+   ~+18 s (GC horizon ≈16–18 s), after which a fresh subscriber gets live ticks instantly.
+   A publisher can now retry-loop on the SAME name safely (or still session-suffix to skip
+   the ~18 s wait). Draft-14's minutes-long relay-wide bricking did not reproduce.
+
+### 14.6 Verdict for plan-m2m §1.C — what draft-16 changes
+
+**(a) Delivery tier: production-viable NOW on auth grounds.** Isolated relay + tokens work
+end-to-end (pub+sub scoping enforced at message level, sub-only enforced for publish,
+no-token/garbage cleanly rejected); auth costs zero latency (session ~136 ms vs 125 ms d14;
+native p50 17.8 ms vs 17.9; browser g2g p50 30 ms vs 26–34). Live-edge-only (no FETCH/
+GOAWAY) and token-in-URL caveats (§5) unchanged. Mint short-lived per-client tokens.
+
+**(b) MoQ-grid blockers list, rewritten by this session:**
+- ~~out-of-band discovery + 2 s catalog republish~~ → SUBSCRIBE_NAMESPACE push, 0.2–1.2 s
+  (median ~0.4 s), in-protocol. Keep a subscribe retry (~500 ms) for the announce race.
+- ~~same-name rejoin bricks relay-wide~~ → explicit rejection until ~18 s GC, then clean.
+- ~~silent optimistic-OK starvation~~ → explicit code=16 errors.
+- STILL BLOCKING for grid scale: the fixed 50-request/session budget (never replenished) ⇒
+  viewers shard ≲20 publishers/connection or reconnect-rotate; death signal still ~14 s ⇒
+  DO-based death signaling stays; encoder pre-warm still owns the flip floor (§13.3).
+**(c) Studio engine should target draft-16** — @moq/net does it TODAY with zero shim changes
+(ALPN moqt-16 negotiated, token in URL path; only `discovery: true` needed for announce);
+draft-14 remains the free open test bench. Watch draft-18 for the breaking migration.
+
+Artifacts: `test-d16-auth.sh`, `test-d16-inner.sh`, `results-d16/` (rig/moq/); spike:
+`d16server.py`, `src/d16-announce.js`, `src/d16-budget.js` (+ www pages/bundles), token-
+redaction one-liners in src/pub.js+play.js (behavior otherwise untouched). Results:
+results/moq-d16-{auth,clock,browser-e1,announce,budget,rejoin}.jsonl. Cleanup 12:56Z: all
+moq-d16-* Chromes + d16server :8886 killed; containers were one-shot --rm; siblings
+(:8890/:8896 publishers, moq-4k/moq-audio udds) untouched; namespaces left to relay GC.
+NB tokens: never printed here; the SUB token transits local chrome-log URLs
+(`spike/logs/moq-d16-*-chrome.log`) — local files, chmod'd repo, acceptable; rotate via
+dashboard if ever shared.
+
+⏱ END 2026-08-26 ~12:58 UTC — ~33 min active.
