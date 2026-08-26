@@ -819,6 +819,27 @@ Cleanup ✅: player + deploy-verify Chromes killed (`moq-audio-play-udd`, `moq-a
 publisher + audioserver.py LEFT RUNNING (10.5); siblings' processes/namespaces untouched;
 results in `results/moq-audio-chromium*.jsonl`.
 
+### 10.7 Silence detection — "decoded fine" ≠ "audible" (✅ deployed 2026-08-26 12:02 UTC, version 2831f81c)
+
+Addendum deploy of `workers/moq-safari/` (additive; bundle from `src/safari-play.js`, §6.3
+docker esbuild recipe, unminified like prior deploys): the player now measures the ACTUAL
+audio output level, not just decode success. All WebAudio buffer sources feed a master
+GainNode → destination with an **AnalyserNode** tapping the master bus; a 250 ms sampler keeps
+a **rolling 3 s output-power window** → `audioLevelDb` (20·log10 RMS). Decoded-PCM power is
+windowed separately (`pcmDb`) so a silent verdict says WHERE sound died. State machine (1/s):
+**sounding** (level > −50 dB floor) / **silent** (chunks still decoding but 3 s window empty —
+on-page "AUDIO DECODED BUT SILENT ⚠️" + one-shot `audio-silent` beacon, distinguishing
+"decoded PCM has signal — output path broken" from "decoder output itself is silent") /
+**suspended** (AudioContext not running → "TAP TO ENABLE SOUND", NOT counted as silence; any
+tap resumes — gate tap now also calls resume()) / **no-track** (catalog has no audio section —
+new explicit on-page line + beacon). New big on-page verdict line `st-averdict`
+("AUDIO: SOUNDING — level −25 dB"). New beacon/row fields `audioLevelDb, silentSeconds, pcmDb`
+(+ `audioState` now a verdict, not the raw ctx state); /results audio cell shows
+`opus SOUNDING −25dB …` / `no-track` / `SILENT⚠ Ns`. Verified headless (rows in /results,
+udd `moq-sndchk`, killed after): `?namespace=elektron-audio-test` → row `7fe1f0dc` opus
+**sounding −25 dB** (pcm −21 dB, aLat 40 ms, skew −2 ms, 0 dec errors); default video-only 4K
+namespace → row `4adfed8f` **no-track** (live, 0 errors). Publishers untouched.
+
 ## 11. OBS support (web research 2026-08-26 — all 📄 unless marked)
 
 - **Native OBS MoQ: nonexistent.** Nothing in 31/32.x (latest 32.2.2, 2026-08-14) and zero
