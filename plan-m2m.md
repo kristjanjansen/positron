@@ -158,6 +158,13 @@ swallowed 22.9 Mbps sustained / 39.7 peak flawlessly — Cloudflare was never th
 levels behave per spec (3.1 refuses 1080p; High 4.2/5.1/5.2 all hw-true). New datum: draft-14
 ACCEPTS duplicate publishes of a live namespace (first session survives). Practical show guidance:
 720p30–1080p60 for tiles, 4K30 for a stage feed at +14 ms, budget bitrate not resolution.
+**✅ iPhone 4K verdict (user screenshot, 2026-08-26 10:11, wifi): decodes 4K30 flawlessly — 30 fps,
+503 frames, 0 errors — but with a ~843 ms p50 / 1083 ms p95 standing latency** (vs ~31 ms at 720p
+on the same phone) and first frame 1.3 s (vs 0.5 s). ⚠️ Attribution inferred: bitrate was only
+~1.4 Mbps (synthetic content) and connect was 167 ms, so the plateau is the PHONE's 4K
+decode→canvas render path queuing, not network. Device-appropriate renditions are therefore a
+LATENCY feature, not just bandwidth courtesy: phones get ≤1080p, 4K is for machines with render
+headroom (stage screens, projectors).
 
 **✅ MOBILE SAFARI VERIFIED BY THE USER (2026-08-26 09:31, iPhone screenshots): Mobile Safari
 26.5.2 plays live MoQ video OVER 4G CELLULAR** — WebTransport YES, H.264 YES, connected 282 ms,
