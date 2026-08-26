@@ -1,0 +1,76 @@
+05:10:00.321 P3B run ROUTE=A label=a room=p3b-a steady=180s nopub=false
+05:10:00.322 live input 12f3a2dd9686887cf6495c8b10aec352
+05:10:02.319 instance g0 up: 1 2 A B
+05:10:04.026 instance g1 up: C D W X
+05:10:04.038 RELEASED 8 grid participants
+05:10:09.066 all 8 RUNNING (+5039 ms) — casting
+05:10:10.008 cast applied (2 featured + 4 live + 2 wall)
+05:10:11.479 instance gcomp up: K
+05:10:15.553 COMPOSITE READY in 4074 ms (6 video tiles + 2 wall snaps)
+05:10:18.292 startWhip: publishing in 2680 ms
+05:10:18.304 WHIP publishing (connect 2680 ms)
+05:10:20.030 instance gview up: V
+05:10:22.628 VIEWER first valid K decode +2598 ms after viewer launch (+4326 ms after publish start); latK=57 ms
+05:10:22.711 STEADY 180s
+05:10:27.840 steady +5s comp[1@75 2@68 D@82 C@121 A@46 B@63] drawFps=30 whip=publishing@30 viewer[1@138 2@161 K@65] 640x360 cpu comp=34 view=21 ffmpeg=-
+05:10:34.007 steady +11s comp[1@75 2@66 D@54 C@53 A@52 B@62] drawFps=30 whip=publishing@28 viewer[1@116 2@133 K@69] 960x540 cpu comp=48 view=28 ffmpeg=-
+05:10:39.182 steady +16s comp[1@50 2@78 D@76 C@64 A@62 B@68] drawFps=30 whip=publishing@25 viewer[1@123 2@141 K@73] 1280x720 cpu comp=52 view=18 ffmpeg=-
+05:10:44.327 steady +22s comp[1@78 2@69 D@87 C@87 A@58 B@878] drawFps=30 whip=publishing@28 viewer[1@149 2@139 K@76] 1280x720 cpu comp=51 view=20 ffmpeg=-
+05:10:49.481 steady +27s comp[1@45 2@71 D@89 C@64 A@54 B@63] drawFps=30 whip=publishing@27 viewer[1@116 2@141 K@74] 1280x720 cpu comp=54 view=20 ffmpeg=-
+05:10:54.543 steady +32s comp[1@44 2@62 D@88 C@60 A@49 B@64] drawFps=30 whip=publishing@29 viewer[1@113 2@130 K@71] 1280x720 cpu comp=38 view=17 ffmpeg=-
+05:10:59.605 steady +37s comp[1@81 2@72 D@82 C@58 A@51 B@59] drawFps=30 whip=publishing@28 viewer[1@116 2@140 K@67] 1280x720 cpu comp=37 view=18 ffmpeg=-
+05:11:05.575 steady +43s comp[1@50 2@44 D@111 C@59 A@62 B@60] drawFps=30 whip=publishing@29 viewer[1@137 2@130 K@63] 1280x720 cpu comp=35 view=15 ffmpeg=-
+05:11:10.637 steady +48s comp[1@43 2@36 D@79 C@58 A@53 B@62] drawFps=30 whip=publishing@27 viewer[1@143 2@129 K@67] 1280x720 cpu comp=40 view=19 ffmpeg=-
+05:11:15.686 steady +53s comp[1@43 2@35 D@77 C@59 A@56 B@89] drawFps=30 whip=publishing@27 viewer[1@109 2@101 K@67] 1280x720 cpu comp=38 view=17 ffmpeg=-
+05:11:20.757 steady +58s comp[1@47 2@103 D@79 C@52 A@53 B@66] drawFps=30 whip=publishing@25 viewer[1@101 2@123 K@59] 1280x720 cpu comp=36 view=16 ffmpeg=-
+05:11:25.818 steady +63s comp[1@46 2@40 D@85 C@62 A@59 B@55] drawFps=30 whip=publishing@28 viewer[1@110 2@104 K@66] 1280x720 cpu comp=36 view=15 ffmpeg=-
+05:11:30.865 steady +68s comp[1@52 2@35 D@84 C@61 A@52 B@62] drawFps=30 whip=publishing@31 viewer[1@117 2@138 K@67] 1280x720 cpu comp=36 view=16 ffmpeg=-
+05:11:36.818 steady +74s comp[1@47 2@69 D@85 C@54 A@54 B@56] drawFps=30 whip=publishing@30 viewer[1@109 2@130 K@64] 1280x720 cpu comp=39 view=16 ffmpeg=-
+05:11:41.873 steady +79s comp[1@43 2@34 D@46 C@63 A@60 B@63] drawFps=30 whip=publishing@30 viewer[1@106 2@97 K@65] 1280x720 cpu comp=37 view=16 ffmpeg=-
+05:11:46.925 steady +84s comp[1@42 2@61 D@53 C@54 A@88 B@61] drawFps=30 whip=publishing@31 viewer[1@108 2@91 K@67] 1280x720 cpu comp=34 view=14 ffmpeg=-
+05:11:51.972 steady +89s comp[1@44 2@36 D@48 C@65 A@52 B@63] drawFps=30 whip=publishing@29 viewer[1@97 2@91 K@58] 1280x720 cpu comp=35 view=17 ffmpeg=-
+05:11:57.020 steady +94s comp[1@48 2@74 D@52 C@63 A@51 B@61] drawFps=30 whip=publishing@31 viewer[1@117 2@142 K@71] 1280x720 cpu comp=37 view=17 ffmpeg=-
+05:12:02.138 steady +99s comp[1@75 2@72 D@87 C@56 A@51 B@88] drawFps=30 whip=publishing@29 viewer[1@108 2@137 K@69] 1280x720 cpu comp=35 view=14 ffmpeg=-
+05:12:08.024 steady +105s comp[1@43 2@65 D@51 C@61 A@51 B@68] drawFps=30 whip=publishing@31 viewer[1@107 2@166 K@66] 1280x720 cpu comp=32 view=15 ffmpeg=-
+05:12:13.089 steady +110s comp[1@45 2@71 D@52 C@60 A@47 B@62] drawFps=30 whip=publishing@30 viewer[1@99 2@149 K@55] 1280x720 cpu comp=41 view=18 ffmpeg=-
+05:12:18.149 steady +115s comp[1@44 2@104 D@48 C@59 A@153 B@88] drawFps=30 whip=publishing@31 viewer[1@104 2@163 K@64] 1280x720 cpu comp=32 view=14 ffmpeg=-
+05:12:23.214 steady +121s comp[1@40 2@102 D@52 C@55 A@53 B@92] drawFps=30 whip=publishing@30 viewer[1@125 2@174 K@83] 1280x720 cpu comp=40 view=18 ffmpeg=-
+05:12:28.277 steady +126s comp[1@41 2@104 D@58 C@60 A@48 B@93] drawFps=30 whip=publishing@31 viewer[1@122 2@183 K@83] 1280x720 cpu comp=35 view=16 ffmpeg=-
+05:12:33.341 steady +131s comp[1@74 2@100 D@76 C@57 A@46 B@95] drawFps=30 whip=publishing@30 viewer[1@125 2@183 K@84] 1280x720 cpu comp=40 view=17 ffmpeg=-
+05:12:39.362 steady +137s comp[1@49 2@100 D@52 C@58 A@57 B@94] drawFps=30 whip=publishing@30 viewer[1@125 2@180 K@86] 1280x720 cpu comp=40 view=17 ffmpeg=-
+05:12:44.424 steady +142s comp[1@46 2@64 D@51 C@63 A@49 B@97] drawFps=30 whip=publishing@30 viewer[1@133 2@150 K@80] 1280x720 cpu comp=39 view=17 ffmpeg=-
+05:12:49.488 steady +147s comp[1@41 2@67 D@52 C@56 A@50 B@92] drawFps=30 whip=publishing@30 viewer[1@119 2@145 K@80] 1280x720 cpu comp=42 view=18 ffmpeg=-
+05:12:54.554 steady +152s comp[1@44 2@69 D@55 C@67 A@54 B@64] drawFps=30 whip=publishing@30 viewer[1@125 2@149 K@83] 1280x720 cpu comp=39 view=14 ffmpeg=-
+05:12:59.619 steady +157s comp[1@45 2@34 D@46 C@52 A@54 B@62] drawFps=30 whip=publishing@30 viewer[1@150 2@142 K@76] 1280x720 cpu comp=40 view=17 ffmpeg=-
+05:13:04.690 steady +162s comp[1@40 2@67 D@46 C@51 A@55 B@88] drawFps=30 whip=publishing@31 viewer[1@126 2@117 K@83] 1280x720 cpu comp=39 view=18 ffmpeg=-
+05:13:10.599 steady +168s comp[1@45 2@71 D@48 C@55 A@53 B@64] drawFps=30 whip=publishing@30 viewer[1@124 2@149 K@83] 1280x720 cpu comp=35 view=14 ffmpeg=-
+05:13:15.672 steady +173s comp[1@38 2@64 D@54 C@62 A@56 B@56] drawFps=30 whip=publishing@28 viewer[1@150 2@141 K@80] 1280x720 cpu comp=40 view=17 ffmpeg=-
+05:13:20.738 steady +178s comp[1@47 2@37 D@84 C@63 A@51 B@62] drawFps=30 whip=publishing@30 viewer[1@122 2@114 K@74] 1280x720 cpu comp=36 view=16 ffmpeg=-
+05:13:25.804 steady +183s comp[1@78 2@71 D@52 C@55 A@87 B@57] drawFps=30 whip=publishing@29 viewer[1@177 2@170 K@73] 1280x720 cpu comp=38 view=17 ffmpeg=-
+05:13:26.471 stopWhip: stopped
+05:13:26.473 polling for recorded asset (budget 240s)
+05:13:27.358 +1s videos: NONE
+05:13:38.256 +12s videos: NONE
+05:13:49.079 +23s videos: NONE
+05:13:59.910 +33s videos: NONE
+05:14:10.744 +44s videos: NONE
+05:14:21.723 +55s videos: NONE
+05:14:32.515 +66s videos: NONE
+05:14:43.396 +77s videos: NONE
+05:14:54.338 +88s videos: NONE
+05:15:05.531 +99s videos: NONE
+05:15:16.453 +110s videos: NONE
+05:15:27.512 +121s videos: NONE
+05:15:38.405 +132s videos: NONE
+05:15:49.251 +143s videos: NONE
+05:16:00.022 +154s videos: NONE
+05:16:10.845 +164s videos: NONE
+05:16:21.779 +175s videos: NONE
+05:16:32.798 +186s videos: NONE
+05:16:43.675 +197s videos: NONE
+05:16:54.570 +208s videos: NONE
+05:17:05.422 +219s videos: NONE
+05:17:16.266 +230s videos: NONE
+05:17:27.505 +241s videos: NONE
+05:17:37.507 NO ready recording within 240s (sawAny=false) — route A verdict data
+05:17:39.581 run done (killed 0 leftover pids)

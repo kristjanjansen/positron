@@ -103,7 +103,7 @@ the benefit away. It is an industry-wide gap, not a quirk of this setup.
 | **LL-HLS** (RTMPS/SRT → HLS) | ✅ 2.6–4.0 s tuned / 8.4–16.3 s stock | 📄 open beta since Sep 2023 (~35 mo) | ✅ yes | **Best browser option.** Scales like HTTP. |
 | **WebRTC WHIP→WHEP** | ✅ **74 ms p50 / 83 ms p95** glass-to-glass | 📄 beta since Sep 2022 (~4 yr) | ✅ yes | Lowest latency, feature-starved |
 | **SRT / RTMPS playback** | 📄 300–500 ms | 📄 GA | ❌ needs ffmpeg | Sub-second without WebRTC |
-| **MoQ relay** | ✅ 17.9 ms p50 one-way (tiny object, draft-14) | 📄 beta, free, API "will change" | ⚠️ needs draft-16 client | The experimental one. Live-edge only. |
+| **MoQ relay** | ✅ 17.9 ms one-way; **✅ browser→browser VIDEO 26 ms p50 / 42 ms p95 (720p30)** | 📄 beta, free, API "will change" | ✅ yes (@moq/net+hang, Chromium; see plan-m2m §1.C) | The experimental one — now the fastest browser path measured. Live-edge only. |
 
 **Many-to-many (the participatory grid) is planned separately in `plan-m2m.md`** (2026-08-25 session 4):
 recommended architecture = Realtime SFU grid (the `.env` app; 📄 Stream's WHIP/WHEP has been powered by

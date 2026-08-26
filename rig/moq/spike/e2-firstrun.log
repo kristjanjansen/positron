@@ -1,0 +1,30 @@
+[/log] PLAY 0.672 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e2-t4x8 rawtrack=.catalog
+[/log] PLAY 0.673 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e2-t4x8 mode=hang
+[/log] PLAY 0.856 RAW_SUBSCRIBE_SENT .catalog
+[/log] PLAY 0.855 CONNECTED ms=183 version=moq-transport-14
+[/log] PLAY 0.869 CONNECTED ms=195 version=moq-transport-14
+[/log] PLAY 0.870 CATALOG_SUBSCRIBE_SENT
+[/log] PLAY 0.994 RAW_GROUP seq=0
+[/log] PLAY 0.997 FAIL TypeError "fr.slice is not a function or its return value is not iterable"
+[/log] PLAY 0.999 CATALOG_RETRY attempt=0 undefined
+[/log] PLAY 0.997 SUMMARY none
+[/log] PLAY 2.058 CATALOG_RETRY attempt=1 undefined
+[/log] PLAY 3.140 CATALOG_RETRY attempt=2 undefined
+[/log] PLAY 4.187 CATALOG_RETRY attempt=3 undefined
+[/log] PLAY 5.234 CATALOG_RETRY attempt=4 undefined
+[/log] PLAY 6.275 CATALOG_RETRY attempt=5 undefined
+[/log] PLAY 7.325 CATALOG_RETRY attempt=6 undefined
+[/log] PLAY 8.373 CATALOG_RETRY attempt=7 undefined
+[/log] PLAY 9.419 CATALOG_RETRY attempt=8 undefined
+[/log] PLAY 10.463 CATALOG_RETRY attempt=9 undefined
+[/log] PLAY 11.504 CATALOG_RETRY attempt=10 undefined
+[/log] PLAY 12.541 CATALOG_RETRY attempt=11 undefined
+[/log] PLAY 13.584 CATALOG_RETRY attempt=12 undefined
+[/log] PLAY 14.634 CATALOG_RETRY attempt=13 undefined
+[/log] PLAY 15.686 CATALOG_RETRY attempt=14 undefined
+[/log] PLAY 16.729 CATALOG_RETRY attempt=15 undefined
+[/log] PLAY 17.772 CATALOG_RETRY attempt=16 undefined
+[/log] PLAY 18.811 CATALOG_RETRY attempt=17 undefined
+[/log] PLAY 19.852 CATALOG_RETRY attempt=18 undefined
+[/log] PLAY 20.892 CATALOG_RETRY attempt=19 undefined
+[/log] PLAY 21.893 CATALOG_FAIL gave up

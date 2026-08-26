@@ -1,0 +1,47 @@
+05:09:15.801 SHOW run label=smoke room=score-show smoke=true stag=false score=scores/smoke-score.json (6 events, 70s)
+05:09:15.827 battery:  -InternalBattery-0 (id=23265379)	100%; charged; 0:00 remaining present: true
+05:09:17.289 instance g0 up: 1 2 B C
+05:09:18.627 instance g1 up: D E F W
+05:09:19.993 instance g2 up: A X Y Z
+05:09:20.042 RELEASED all 12
+05:09:20.395 join: 1:connecting pg=1/1 v=0/0 wall=0 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"connecting":10}
+05:09:20.911 join: 1:connecting pg=1/1 v=0/0 wall=0 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"connecting":10}
+05:09:21.428 join: 1:signaling pg=1/1 v=0/0 wall=0 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"connecting":6,"signaling":4}
+05:09:21.974 join: 1:running pg=1/1 v=0/0 wall=3 | 2:connecting pg=1/1 v=0/0 wall=0 || lites {"running":9,"connecting":1}
+05:09:22.489 join: 1:running pg=1/1 v=0/0 wall=3 | 2:signaling pg=1/1 v=0/0 wall=0 || lites {"running":9,"connecting":1}
+05:09:23.002 join: 1:running pg=1/1 v=0/0 wall=3 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":9,"connecting":1}
+05:09:23.522 join: 1:running pg=1/1 v=0/0 wall=3 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":9,"connecting":1}
+05:09:24.034 join: 1:running pg=1/1 v=0/0 wall=9 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":9,"signaling":1}
+05:09:24.552 join: 1:running pg=1/1 v=0/0 wall=10 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:09:25.068 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:09:25.583 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:09:26.102 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:09:26.624 join: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:09:26.625 all 12 RUNNING (tier wall) — spawning the operator (score.mjs)
+05:09:26.644 cast: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=11 || lites {"running":10}
+05:09:26.745 [score] score "elektron smoke score — 70 s rig shakeout" -> room score-show, 6 events, t0=2026-08-26T05:09:48.625Z
+05:09:27.033 [score] joined room score-show; firing setup cast (8 actions), t0 in 21.6s
+05:09:27.166 cast: 1:running pg=1/1 v=0/0 wall=11 | 2:running pg=1/1 v=0/0 wall=10 || lites {"running":10}
+05:09:27.683 cast: 1:running pg=1/1 v=0/1 wall=7 | 2:running pg=1/1 v=1/1 wall=7 || lites {"running":10}
+05:09:28.225 cast: 1:running pg=1/2 v=1/2 wall=4 | 2:running pg=1/2 v=1/2 wall=4 || lites {"running":10}
+05:09:28.745 cast: 1:running pg=1/2 v=2/3 wall=4 | 2:running pg=1/2 v=2/3 wall=4 || lites {"running":10}
+05:09:29.265 cast: 1:running pg=1/2 v=3/3 wall=4 | 2:running pg=1/2 v=3/3 wall=4 || lites {"running":10}
+05:09:29.791 cast: 1:running pg=1/2 v=4/4 wall=4 | 2:running pg=1/2 v=4/4 wall=4 || lites {"running":10}
+05:09:30.313 cast: 1:running pg=1/2 v=5/5 wall=4 | 2:running pg=1/2 v=5/5 wall=4 || lites {"running":10}
+05:09:30.314 GRID READY 3682 ms after storm, 18311 ms of lead left
+05:09:56.628 [score] FIRE s01-spotlight-W (promote) drift +2 ms
+05:10:02.634 ASSERT s01-spotlight-W: PASS
+05:10:08.631 [score] FIRE s02-rotate (cue) drift +0 ms
+05:10:14.646 ASSERT s02-rotate: PASS
+05:10:20.628 [score] FIRE s03-swap (demote+promote) drift +2 ms
+05:10:28.637 ASSERT s03-swap: PASS
+05:10:32.630 [score] FIRE s04-rotate (cue) drift +3 ms
+05:10:38.638 ASSERT s04-rotate: PASS
+05:10:42.628 [score] FIRE s05-demote-Y (demote) drift +1 ms
+05:10:50.628 [score] FIRE s06-note (cue) drift +1 ms
+05:10:50.631 ASSERT s05-demote-Y: PASS
+05:10:53.134 ASSERT s06-note: PASS
+05:10:58.629 [score] score complete; 0 unmatched echoes
+05:11:00.137 score.mjs exited code 0
+05:11:02.638 final: 1:running pg=1/2 v=5/5 wall=4 | 2:running pg=1/2 v=5/5 wall=4 || lites {"running":10}
+05:11:04.582 run done (killed 0 leftover pids) — analyze: python3 /Users/s32863/personal/elektron/proto/m2m/analyze-show.py <results.jsonl>

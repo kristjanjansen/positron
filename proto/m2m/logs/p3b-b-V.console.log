@@ -1,0 +1,4 @@
+05:18:38.264 [pageerror] Illegal hls.js config: "liveMaxLatencyDurationCount" must be greater than "liveSyncDurationCount"
+05:18:38.266 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+05:21:42.697 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+05:21:43.771 [log] HLS FATAL networkError manifestParsingError

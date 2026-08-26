@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron composite</title>
+<style>
+*{box-sizing:border-box}
+body{background:#000;color:#cfd6df;font:12px/1.4 monospace;margin:0;padding:0}
+#comp{display:block;width:1280px;height:720px}   /* MUST fill viewport exactly (route-B screencast) */
+#debug{padding:8px 12px}
+#vids video{width:160px;height:90px;border:1px solid #333;margin:2px;background:#111}
+#log{white-space:pre-wrap;color:#4d5661;font-size:10px;max-height:200px;overflow:auto}
+</style>
+</head>
+<body>
+<canvas id="comp" width="1280" height="720"></canvas>
+<div id="debug">
+  <div id="hud">composite booting…</div>
+  <div id="vids"></div>
+  <div id="log"></div>
+</div>
+<script>
+"use strict";
+// ============================================================================
+// elektron COMPOSITE PARTICIPANT (phase 3b) — the OBS replacement.
+// A silent subscriber joins the room, pulls ALL featured+live SFU tracks +
+// wall snapshots, and draws everything onto ONE 1280x720 canvas at 30 fps:
+//     [ featured "1" 640x360 UNSCALED ][ featured "2" 640x360 UNSCALED ]
+//     [ up to 6 live tiles 208x117                                     ]
+//     [ up to 6 wall snapshots 160x90 ]  [ burned clock row pid 'K'    ]
+// Featured tiles are drawn 1:1 so their burned 64-block rows survive to any
+// downstream viewer/recording pixel-exact (block geometry unchanged).
+// Route A: __startWhip() -> canvas.captureStream(30) -> WHIP to a RECORDED
+// Stream live input (pure browser, no ffmpeg). Route B: the driver screencasts
+// this page (viewport == canvas) into ffmpeg -> RTMPS.
+// Derived from grid.html: same signaling (deployed Worker protocol), same
+// SFU pull engine (serialized chain, repull, mid->pid BEFORE setRemoteDesc),
+// same connect-retry publish leg (used for a tiny 160x90@5 "presence" track —
+// establishes the ONE PeerConnection the pulls ride on; proven path, and a
+// real show's recorder should test a pull-only session instead).
+// NO getUserMedia anywhere (camera wedged at OS level). No wall POSTing (the
+// composite is a subscriber, not a tile).
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const MY_ID    = (q.get("id") || "K").slice(0, 8);
+const MY_NAME  = q.get("name") || "composite";
+const ROOM     = q.get("room") || "p3b";
+const MY_ROLE  = q.get("role") || "audience";
+const HOLD     = q.get("hold") === "1";
+const WHIP_URL = q.get("whip") || "";            // Stream live input publish URL (credential)
+const WHIP_KBPS = parseInt(q.get("whipkbps") || "2500", 10);
+const CONNECT_TIMEOUT_MS = parseInt(q.get("ct") || "8000", 10);
+const MAX_PUB_ATTEMPTS = 3;
+const TOKEN    = q.get("token") || "";
+const REMOTE   = (q.get("remote") || "").replace(/\/$/, "");
+const SIG_BASE  = q.get("sig") ||
+  (REMOTE ? REMOTE.replace(/^http/, "ws") + "/room/" + ROOM + "/ws"
+          : (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/room/" + ROOM + "/ws");
+const TILE_BASE = q.get("tilebase") || REMOTE || "";
+const CF_API    = q.get("cfbase")  || (REMOTE ? REMOTE + "/cf" : "/cf");
+const COLLECT   = "/collect";
+const TRACK_NAME = MY_ID + "/cam";
+document.title = "composite " + MY_ID;
+
+// ---- layout (all coordinates are load-bearing: the viewer decodes by them) --
+const FEAT = [{ x: 0, y: 0 }, { x: 640, y: 0 }];              // 640x360 each, UNSCALED
+const LIVE_SLOTS = 6, LIVE_W = 208, LIVE_H = 117, LIVE_Y = 364;
+const WALL_SLOTS = 6, WALL_W = 160, WALL_H = 90, WALL_Y = 489;
+// composite clock row: 64 blocks (48-bit ms + pid byte + XOR ck), blockW 12
+const K_NB = 64, K_BW = 12, K_X = 32, K_Y = 600, K_H = 48;    // bed y 585..660
+// participant tiles carry the grid row: 64 blocks, blockW 9, at (32,40,h56)
+const NBLOCKS = 64, BLOCK_W = 9, ROW_X = 32, ROW_Y = 40, ROW_H = 56;
+
+window.__state = { phase: "init", error: null, id: MY_ID, frames: 0, drawFps: 0,
+                   rosterCount: 0, pulled: 0, pubAttempts: 0, pubRetries: 0,
+                   sigState: "closed", tiles: {}, wall: {},
+                   whip: { phase: "idle", error: null, location: null, connectMs: null } };
+
+const logEl = document.getElementById("log");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function wallClock() { return performance.timeOrigin + performance.now(); }
+function post(obj) { fetch(COLLECT, { method: "POST", body: JSON.stringify(obj), keepalive: true }).catch(() => {}); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name, t: wallClock() }, extra || {}));
+}
+let batch = [];
+setInterval(() => {                       // plain fetch batches (64 KB quota lessons)
+  if (batch.length) {
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") }).catch(() => {});
+    batch = [];
+  }
+}, 1000);
+
+// ---- burned-row decoder (grid.html geometry; source: video OR bitmap) -------
+function makeDecoder() {
+  const work = document.createElement("canvas");
+  work.width = 640; work.height = 360;
+  const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+  return function decodeRow(src) {
+    wctx.drawImage(src, 0, 0, 640, 360);
+    const y = ROW_Y + ROW_H / 2;
+    const img = wctx.getImageData(ROW_X, y, NBLOCKS * BLOCK_W, 1).data;
+    const levels = [];
+    for (let i = 0; i < NBLOCKS; i++) {
+      let s = 0;
+      for (let dx = 3; dx < 6; dx++) s += img[(i * BLOCK_W + dx) * 4 + 1];
+      levels.push(s / 3);
+    }
+    const mn = Math.min(...levels), mx = Math.max(...levels);
+    if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+    const thr = (mn + mx) / 2;
+    const bits = levels.map(l => (l > thr ? 1 : 0));
+    let ms = 0; for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+    let pid = 0; for (let i = 48; i < 56; i++) pid = pid * 2 + bits[i];
+    let ck = 0; for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+    const bytes = []; let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(pid);
+    let expect = 0; for (const b of bytes) expect ^= b;
+    if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+    return { ok: true, ms, pid: String.fromCharCode(pid), contrast: mx - mn };
+  };
+}
+const decoder = makeDecoder();
+
+// ============================================================================
+// SIGNALING (verbatim grid.html transport)
+// ============================================================================
+const handlers = {};
+function on(type, fn) { handlers[type] = fn; }
+let ws = null, sigWantOpen = true;
+function sigUrl() { return SIG_BASE + (TOKEN ? (SIG_BASE.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(TOKEN) : ""); }
+function sigSend(frame) {
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify(frame)); return true; }
+  return false;
+}
+function sigConnect() {
+  ws = new WebSocket(sigUrl());
+  ws.onopen = () => {
+    window.__state.sigState = "open";
+    sigSend({ type: "join", participantId: MY_ID, name: MY_NAME, role: MY_ROLE });
+  };
+  ws.onmessage = (e) => {
+    let f; try { f = JSON.parse(e.data); } catch (_) { return; }
+    const h = handlers[f.type];
+    if (h) h(f);
+  };
+  ws.onclose = () => {
+    window.__state.sigState = "closed";
+    if (sigWantOpen) setTimeout(sigConnect, 1000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+
+// ============================================================================
+// SFU client (verbatim grid.html: cf(), publish retry, pull engine)
+// ============================================================================
+async function cf(method, subpath, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const resp = await fetch(CF_API + "/" + subpath, {
+    method, headers, body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode)
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  return obj;
+}
+function waitIceGathering(pc_) {
+  return new Promise(res => {
+    if (pc_.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc_.onicegatheringstatechange = () => {
+      if (pc_.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+
+let pc = null, SID = null, sendTx = null;
+const midToPid = new Map();
+
+function teardownPc(old) {
+  if (!old) return;
+  try {
+    old.onconnectionstatechange = null; old.oniceconnectionstatechange = null;
+    old.onicegatheringstatechange = null; old.ontrack = null; old.close();
+  } catch (e) { /* already dead */ }
+}
+
+// tiny presence track: 160x90@5fps synthetic (NOT the composite output — cheap)
+function makePresenceSource() {
+  const cv = document.createElement("canvas");
+  cv.width = 160; cv.height = 90;
+  const ctx = cv.getContext("2d", { alpha: false });
+  let n = 0;
+  setInterval(() => {
+    ctx.fillStyle = "#202830"; ctx.fillRect(0, 0, 160, 90);
+    ctx.fillStyle = "#4ac2e8"; ctx.font = "bold 28px monospace";
+    ctx.fillText("REC", 8 + (n % 40), 50);
+    n++;
+  }, 200);
+  const track = cv.captureStream(5).getVideoTracks()[0];
+  return { track };
+}
+
+async function attemptPublish(track, attempt) {
+  const t0 = performance.now();
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState, attempt });
+  pc.onconnectionstatechange = () => event("pc", { state: pc.connectionState, attempt });
+  pc.ontrack = (e) => {
+    if (e.track.kind !== "video") return;
+    const pid = midToPid.get(e.transceiver.mid);
+    if (pid) attachTrack(pid, e.track);
+    else event("ontrack-unmapped", { mid: e.transceiver.mid });
+  };
+  const sess = await cf("POST", "sessions/new");
+  SID = sess.sessionId;
+  window.__state.sessionId = SID;
+  log("attempt " + attempt + ": session " + SID.slice(0, 12) + "…");
+  sendTx = pc.addTransceiver(track, { direction: "sendonly" });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+  const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+    sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+    tracks: [{ location: "local", mid: sendTx.mid, trackName: TRACK_NAME }]
+  });
+  await pc.setRemoteDescription(resp.sessionDescription);
+  const myPc = pc;
+  await new Promise((res, rej) => {
+    if (myPc.connectionState === "connected") return res();
+    const t = setTimeout(() => rej(new Error(
+      "connect-timeout " + CONNECT_TIMEOUT_MS + "ms (pc=" + myPc.connectionState +
+      " ice=" + myPc.iceConnectionState + ")")), CONNECT_TIMEOUT_MS);
+    myPc.addEventListener("connectionstatechange", function h() {
+      if (myPc.connectionState === "connected") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h); res();
+      } else if (myPc.connectionState === "failed") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h);
+        rej(new Error("pc-failed during connect"));
+      }
+    });
+  });
+  try {                                       // presence track needs ~no bits
+    const par = sendTx.sender.getParameters();
+    if (!par.encodings || !par.encodings.length) par.encodings = [{}];
+    par.encodings[0].maxBitrate = 100000;
+    sendTx.sender.setParameters(par).catch(() => {});
+  } catch (e) { /* non-fatal */ }
+  return Math.round(performance.now() - t0);
+}
+
+async function publishWithRetry(track) {
+  for (let attempt = 1; attempt <= MAX_PUB_ATTEMPTS; attempt++) {
+    window.__state.pubAttempts = attempt;
+    event("publish-attempt", { attempt });
+    try {
+      const connectMs = await attemptPublish(track, attempt);
+      event("publish-ok", { attempt, connectMs, sessionId: SID });
+      log("publish ok on attempt " + attempt + " in " + connectMs + " ms");
+      return;
+    } catch (e) {
+      teardownPc(pc); pc = null;
+      const reason = String(e && e.message || e).slice(0, 200);
+      window.__state.pubRetries = attempt;
+      event("publish-retry", { attempt, reason, willRetry: attempt < MAX_PUB_ATTEMPTS });
+      log("publish attempt " + attempt + " FAILED: " + reason);
+      if (attempt >= MAX_PUB_ATTEMPTS) {
+        event("publish-exhausted", { attempts: attempt, reason });
+        throw new Error("publish exhausted after " + attempt + " attempts: " + reason);
+      }
+      await new Promise(r => setTimeout(r,                 // jittered backoff (G3 lesson)
+        1000 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 1500)));
+    }
+  }
+}
+
+// ============================================================================
+// ROOM MODEL
+// ============================================================================
+const parts = new Map();
+let liveOrder = [];
+
+function normPart(p) {
+  const row = Object.assign({}, p);
+  if (Array.isArray(p.trackNames)) row.tracks = p.trackNames.map(n => ({ trackName: n }));
+  delete row.trackNames;
+  return row;
+}
+function upsertPart(p) {
+  const prev = parts.get(p.id);
+  const row = Object.assign(prev || {}, normPart(p), { alive: true });
+  parts.set(p.id, row);
+  if (row.tier === "live" && !liveOrder.includes(p.id)) liveOrder.push(p.id);
+  if (row.tier !== "live") liveOrder = liveOrder.filter(x => x !== p.id);
+  return row;
+}
+function tierLists() {
+  const alive = [...parts.values()].filter(p => p.alive && p.id !== MY_ID);
+  const featured = alive.filter(p => p.tier === "featured").sort((a, b) => a.id < b.id ? -1 : 1);
+  const live = liveOrder.map(id => parts.get(id)).filter(p => p && p.alive && p.tier === "live");
+  const wall = alive.filter(p => p.tier === "wall").sort((a, b) => a.id < b.id ? -1 : 1);
+  return { featured, live, wall };
+}
+
+on("roster", (f) => {
+  window.__state.selfServerId = f.self && f.self.id;
+  for (const p of f.participants || []) if (p.id !== MY_ID) upsertPart(p);
+  window.__state.rosterCount = (f.participants || []).length;
+  if (SID && window.__state.phase === "running")
+    sigSend({ type: "publish", sessionId: SID, trackNames: [TRACK_NAME] });
+  reconcile("roster");
+});
+on("joined", (f) => {
+  if (!f.participant || f.participant.id === MY_ID) return;
+  upsertPart(f.participant);
+  reconcile("joined");
+});
+on("published", (f) => {
+  const pid = f.participantId;
+  if (pid === MY_ID) return;
+  const prev = parts.get(pid);
+  const oldSid = prev && prev.sessionId;
+  const row = upsertPart({ id: pid, sessionId: f.sessionId, trackNames: f.trackNames });
+  if (!row.tier) row.tier = "wall";
+  if (oldSid && oldSid !== f.sessionId) { event("sid-change", { id: pid }); queueRepull(pid, "rejoin"); }
+  reconcile("published");
+});
+on("left", (f) => {
+  const pid = f.participantId;
+  const p = parts.get(pid);
+  if (!p) return;
+  p.alive = false;
+  (window.__state.leftReceived = window.__state.leftReceived || {})[pid] = wallClock();
+  event("left-received", { id: pid });
+  const st = pullState.get(pid);
+  if (st && (st.state === "done" || st.state === "pulling"))
+    chain(() => {
+      const s = pullState.get(pid);
+      if (!s || (s.state !== "done" && s.state !== "pulling")) return;
+      return unpullTrack(pid, "left");
+    });
+  stopWallPoll(pid);
+  reconcile("left");
+});
+function onTierChange(f) {
+  const pid = f.participantId;
+  if (pid === MY_ID) return;                 // composite is never cast
+  const p = parts.get(pid);
+  if (!p) return;
+  const from = p.tier; p.tier = f.tier;
+  if (f.tier === "live") { liveOrder = liveOrder.filter(x => x !== pid); liveOrder.unshift(pid); }
+  else liveOrder = liveOrder.filter(x => x !== pid);
+  event("tier-received", { id: pid, from, to: f.tier });
+  reconcile("promote");
+}
+on("promote", onTierChange);
+on("demote", onTierChange);
+
+// ============================================================================
+// PULL ENGINE (verbatim grid.html)
+// ============================================================================
+const pullState = new Map();
+let pullChain = Promise.resolve();
+function chain(fn) { pullChain = pullChain.then(fn).catch(() => {}); return pullChain; }
+
+async function pullTrack(p, cause) {
+  const pid = p.id;
+  const st = pullState.get(pid);
+  if (!st || st.state !== "queued") return;
+  if (!p.alive) { pullState.delete(pid); return; }
+  if (!p.sessionId || !p.tracks || !p.tracks.length) { pullState.delete(pid); return; }
+  st.state = "pulling"; st.attempts++; st.cause = cause;
+  const t0 = performance.now();
+  try {
+    const trackName = p.tracks[0].trackName;
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+      tracks: [{ location: "remote", sessionId: p.sessionId, trackName }]
+    });
+    const tr = (resp.tracks || [])[0] || {};
+    if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+    if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+    midToPid.set(tr.mid, pid);              // BEFORE setRemoteDescription
+    if (resp.requiresImmediateRenegotiation) {
+      await pc.setRemoteDescription(resp.sessionDescription);
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await cf("PUT", "sessions/" + SID + "/renegotiate", {
+        sessionDescription: { type: "answer", sdp: pc.localDescription.sdp }
+      });
+    }
+    st.state = "done"; st.sessionId = p.sessionId; st.trackName = trackName; st.mid = tr.mid;
+    window.__state.pulled++;
+    event("pulled", { from: pid, mid: tr.mid, durMs: Math.round(performance.now() - t0), cause });
+  } catch (e) {
+    st.state = "failed";
+    event("pull-failed", { from: pid, attempt: st.attempts, cause, error: String(e.message).slice(0, 300) });
+    log("pull " + pid + " attempt " + st.attempts + " failed: " + e.message);
+  }
+}
+
+async function unpullTrack(pid, why) {
+  const st = pullState.get(pid);
+  const mid = st && st.mid;
+  try {
+    if (!mid) throw new Error("no mid for " + pid);
+    const tx = pc.getTransceivers().find(t => t.mid === mid);
+    if (tx) tx.stop();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const resp = await cf("PUT", "sessions/" + SID + "/tracks/close", {
+      tracks: [{ mid }],
+      sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+      force: false
+    });
+    if (resp.sessionDescription) await pc.setRemoteDescription(resp.sessionDescription);
+    event("unpulled", { from: pid, mid, why });
+  } catch (e) {
+    event("unpull-error", { from: pid, mid: mid || null, why, error: String(e && e.message || e).slice(0, 300) });
+  } finally {
+    if (mid) midToPid.delete(mid);
+    detachTrack(pid);
+    if (st) { st.state = "unpulled"; st.mid = null; }
+  }
+}
+
+function queueRepull(pid, cause) {
+  const st = pullState.get(pid);
+  if (!st || (st.state !== "done" && st.state !== "failed")) return;
+  st.state = "repulling";
+  chain(async () => {
+    await unpullTrack(pid, "repull");
+    const p = parts.get(pid);
+    if (!p || !p.alive) return;
+    pullState.set(pid, { state: "queued", attempts: 0 });
+    await pullTrack(p, cause);
+  });
+}
+
+// ============================================================================
+// VIDEO ELEMENTS (hidden below the canvas viewport) + wall bitmaps
+// ============================================================================
+const vids = new Map();          // pid -> <video>
+const vidsBox = document.getElementById("vids");
+
+function attachTrack(pid, track) {
+  detachTrack(pid);
+  const v = document.createElement("video");
+  v.autoplay = true; v.muted = true; v.playsInline = true;
+  v.srcObject = new MediaStream([track]);
+  v.play().catch(() => {});
+  vidsBox.appendChild(v);
+  vids.set(pid, v);
+  window.__state.tiles[pid] = { samples: 0, valid: 0, lastLatencyMs: null,
+                                firstValidT: null, lastValidT: null, framesDecoded: 0,
+                                lastFramesDecoded: 0, lastAdvanceT: wallClock(), stalled: false };
+  event("track-attached", { from: pid });
+}
+function detachTrack(pid) {
+  const v = vids.get(pid);
+  if (v) { v.srcObject = null; v.remove(); vids.delete(pid); }
+  delete window.__state.tiles[pid];
+}
+
+const wallPollers = new Map();   // pid -> timer
+const wallBitmaps = new Map();   // pid -> ImageBitmap (latest, for the compositor)
+function startWallPoll(pid) {
+  if (wallPollers.has(pid)) return;
+  const tick = async () => {
+    const p2 = parts.get(pid);
+    if (!p2 || !p2.alive || p2.tier !== "wall") return;
+    try {
+      const r = await fetch(TILE_BASE + "/tile/" + ROOM + "/" + pid);
+      if (!r.ok) {
+        const ws2 = window.__state.wall[pid] || (window.__state.wall[pid] = {});
+        ws2.miss = (ws2.miss || 0) + 1;
+        batch.push({ kind: "wall", from: pid, to: MY_ID, t: wallClock(), miss: true });
+        return;
+      }
+      const blob = await r.blob();
+      const bmp = await createImageBitmap(blob);
+      if (!wallPollers.has(pid)) { bmp.close(); return; }
+      const old = wallBitmaps.get(pid);
+      wallBitmaps.set(pid, bmp);
+      if (old) old.close();
+      const dec = decoder(bmp);
+      const now = wallClock();
+      const row = { kind: "wall", from: pid, to: MY_ID, t: now, decOk: dec.ok };
+      if (dec.ok) {
+        row.burnedTs = dec.ms; row.freshMs = Math.round(now - dec.ms); row.pidOk = dec.pid === pid;
+        const ws2 = window.__state.wall[pid] || (window.__state.wall[pid] = {});
+        ws2.freshMs = row.freshMs; ws2.samples = (ws2.samples || 0) + 1; ws2.lastT = now;
+      }
+      batch.push(row);
+    } catch (e) { /* next poll */ }
+  };
+  tick();
+  wallPollers.set(pid, setInterval(tick, 2000));
+}
+function stopWallPoll(pid) {
+  const t = wallPollers.get(pid);
+  if (t) { clearInterval(t); wallPollers.delete(pid); }
+  const bmp = wallBitmaps.get(pid);
+  if (bmp) { bmp.close(); wallBitmaps.delete(pid); }
+  delete window.__state.wall[pid];
+}
+
+// ============================================================================
+// RECONCILE — composite pulls ALL featured + first 6 live; walls -> pollers
+// ============================================================================
+function reconcile(cause) {
+  if (window.__state.phase !== "running") return;
+  const { featured, live, wall } = tierLists();
+  const wantVideo = new Set([...featured, ...live.slice(0, LIVE_SLOTS)].map(p => p.id));
+
+  for (const p of wall) startWallPoll(p.id);
+  for (const pid of [...wallPollers.keys()])
+    if (!wall.find(p => p.id === pid)) stopWallPoll(pid);
+
+  for (const p of [...featured, ...live.slice(0, LIVE_SLOTS)]) {
+    const st = pullState.get(p.id);
+    if (st && (st.state === "queued" || st.state === "pulling" || st.state === "done" ||
+               st.state === "repulling")) continue;
+    if (st && st.state === "failed" && st.attempts >= 5) continue;
+    if (!p.sessionId) continue;
+    const attempts = st ? st.attempts : 0;
+    pullState.set(p.id, { state: "queued", attempts });
+    const cz = cause === "roster" || cause === "joined" || cause === "published" ? "initial" : cause;
+    chain(() => pullTrack(parts.get(p.id), cz));
+  }
+  for (const [pid, st] of pullState) {
+    if ((st.state === "done" || st.state === "pulling") && !wantVideo.has(pid)) {
+      chain(() => {
+        const s = pullState.get(pid);
+        if (!s || (s.state !== "done" && s.state !== "pulling")) return;
+        return unpullTrack(pid, "hidden");
+      });
+    }
+  }
+}
+
+// ============================================================================
+// COMPOSITOR — 30 fps setInterval draw loop (rAF throttles when occluded)
+// ============================================================================
+const comp = document.getElementById("comp");
+const cctx = comp.getContext("2d", { alpha: false, desynchronized: true });
+const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+let drawCounter = 0, drawWindow = [];
+
+function drawClockRow(ms) {
+  cctx.fillStyle = "#000";
+  cctx.fillRect(0, 585, 1280, 135);                       // clock bed
+  const bytes = []; let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0; for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  cctx.fillStyle = "#fff";
+  for (let i = 0; i < K_NB; i++)
+    if (bits[i]) cctx.fillRect(K_X + i * K_BW, K_Y, K_BW, K_H);
+  cctx.font = "bold 30px monospace";
+  cctx.fillText("COMPOSITE " + MY_ID + "  " + new Date(ms).toISOString().slice(11, 23) +
+                "  f" + drawCounter, 32, 700);
+  cctx.font = "12px monospace";
+  cctx.fillText("elektron p3b · room " + ROOM, 1050, 700);
+}
+
+function slotLabel(name, x, y, w) {
+  cctx.fillStyle = "rgba(0,0,0,.55)";
+  cctx.fillRect(x, y - 16, Math.min(w, 8 + name.length * 8), 16);
+  cctx.fillStyle = "#cfd6df";
+  cctx.font = "12px monospace";
+  cctx.fillText(name, x + 4, y - 4);
+}
+
+function drawComposite() {
+  const ms = Math.round(wallClock());
+  const { featured, live, wall } = tierLists();
+  cctx.fillStyle = "#0d0f12";
+  cctx.fillRect(0, 0, 1280, 585);
+
+  for (let i = 0; i < 2; i++) {                            // featured 1:1
+    const p = featured[i], s = FEAT[i];
+    const v = p && vids.get(p.id);
+    if (v && v.readyState >= 2) cctx.drawImage(v, s.x, s.y, 640, 360);
+    else {
+      cctx.fillStyle = "#14171c"; cctx.fillRect(s.x, s.y, 640, 360);
+      cctx.fillStyle = "#3d4550"; cctx.font = "bold 22px monospace";
+      cctx.fillText(p ? "waiting " + p.id : "featured —", s.x + 240, s.y + 185);
+    }
+    if (p) slotLabel("FEATURED " + (p.name || p.id), s.x + 4, s.y + 356, 240);
+  }
+  for (let i = 0; i < LIVE_SLOTS; i++) {                   // live row
+    const p = live[i];
+    const x = 4 + i * 212;
+    const v = p && vids.get(p.id);
+    if (v && v.readyState >= 2) cctx.drawImage(v, x, LIVE_Y, LIVE_W, LIVE_H);
+    else { cctx.fillStyle = "#14171c"; cctx.fillRect(x, LIVE_Y, LIVE_W, LIVE_H); }
+    if (p) slotLabel(p.id, x + 2, LIVE_Y + LIVE_H - 2, LIVE_W);
+  }
+  for (let i = 0; i < WALL_SLOTS; i++) {                   // wall strip
+    const p = wall[i];
+    const x = 4 + i * 166;
+    const bmp = p && wallBitmaps.get(p.id);
+    if (bmp) cctx.drawImage(bmp, x, WALL_Y, WALL_W, WALL_H);
+    else { cctx.fillStyle = "#14171c"; cctx.fillRect(x, WALL_Y, WALL_W, WALL_H); }
+    if (p) slotLabel(p.id + " wall", x + 2, WALL_Y + WALL_H - 2, WALL_W);
+  }
+  drawClockRow(ms);
+
+  // instrumentation: decode SOURCE videos on a rotation (featured every 3rd
+  // tick, one live per tick) -> grid-glass -> composite-input latency
+  if (drawCounter % 3 === 0) {
+    for (const p of featured) sampleTile(p.id);
+    const ln = live.slice(0, LIVE_SLOTS);
+    if (ln.length) sampleTile(ln[Math.floor(drawCounter / 3) % ln.length].id);
+  }
+  drawCounter++;
+  window.__state.frames = drawCounter;
+  const now = performance.now();
+  drawWindow.push(now);
+  while (drawWindow.length && now - drawWindow[0] > 5000) drawWindow.shift();
+  window.__state.drawFps = Math.round(drawWindow.length / 5);
+}
+setInterval(drawComposite, 33);
+
+function sampleTile(pid) {
+  const v = vids.get(pid);
+  const ts = window.__state.tiles[pid];
+  if (!v || v.readyState < 2 || !ts) return;
+  const dec = decoder(v);
+  const now = wallClock();
+  const row = { kind: "csample", from: pid, to: MY_ID, t: now, decOk: dec.ok };
+  ts.samples++;
+  if (dec.ok) {
+    row.burnedTs = dec.ms;
+    row.latencyMs = now - dec.ms;
+    row.pidOk = dec.pid === pid;
+    ts.valid++;
+    ts.lastLatencyMs = Math.round(row.latencyMs);
+    ts.lastValidT = now;
+    if (!ts.firstValidT) { ts.firstValidT = now; event("first-frame", { from: pid }); }
+  } else row.decWhy = dec.why;
+  batch.push(row);
+}
+
+// ============================================================================
+// WHIP publish of the composite canvas (route A) — driver calls __startWhip()
+// ============================================================================
+let whipPc = null, whipStream = null;
+window.__startWhip = async function () {
+  const W = window.__state.whip;
+  if (!WHIP_URL) { W.phase = "no-url"; return "no whip url"; }
+  if (whipPc) return "already started";
+  W.phase = "connecting";
+  const t0 = performance.now();
+  event("whip-start", {});
+  try {
+    whipStream = comp.captureStream(30);
+    whipPc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }] });
+    window.__whipPc = whipPc;
+    whipPc.onconnectionstatechange = () => {
+      event("whip-pc", { state: whipPc.connectionState });
+      if (whipPc.connectionState === "connected") W.phase = "publishing";
+      if (whipPc.connectionState === "failed") { W.phase = "failed"; W.error = "pc failed"; }
+    };
+    const tx = whipPc.addTransceiver(whipStream.getVideoTracks()[0],
+                                     { direction: "sendonly", streams: [whipStream] });
+    try {
+      const par = tx.sender.getParameters();
+      if (!par.encodings || !par.encodings.length) par.encodings = [{}];
+      par.encodings[0].maxBitrate = WHIP_KBPS * 1000;
+      tx.sender.setParameters(par).catch(() => {});
+    } catch (e) { /* non-fatal */ }
+    const offer = await whipPc.createOffer();
+    await whipPc.setLocalDescription(offer);
+    await waitIceGathering(whipPc);
+    const resp = await fetch(WHIP_URL, {
+      method: "POST", headers: { "Content-Type": "application/sdp" },
+      body: whipPc.localDescription.sdp
+    });
+    const answer = await resp.text();
+    event("whip-response", { status: resp.status, location: resp.headers.get("Location") || null });
+    if (!resp.ok) throw new Error("WHIP HTTP " + resp.status + ": " + answer.slice(0, 200));
+    W.location = resp.headers.get("Location");
+    await whipPc.setRemoteDescription({ type: "answer", sdp: answer });
+    await new Promise((res, rej) => {
+      if (whipPc.connectionState === "connected") return res();
+      const t = setTimeout(() => rej(new Error("whip connect timeout")), 15000);
+      whipPc.addEventListener("connectionstatechange", function h() {
+        if (whipPc.connectionState === "connected") { clearTimeout(t); res(); }
+      });
+    });
+    W.connectMs = Math.round(performance.now() - t0);
+    W.phase = "publishing";
+    event("whip-publishing", { connectMs: W.connectMs, tWall: wallClock() });
+    return "publishing in " + W.connectMs + " ms";
+  } catch (e) {
+    W.phase = "failed"; W.error = String(e && e.message || e);
+    event("whip-failed", { error: W.error.slice(0, 300) });
+    try { whipPc && whipPc.close(); } catch (_) {}
+    whipPc = null;
+    return "failed: " + W.error;
+  }
+};
+window.__stopWhip = async function () {
+  const W = window.__state.whip;
+  if (!whipPc) return "not started";
+  event("whip-stop", { tWall: wallClock() });
+  try {
+    if (W.location) {
+      const delUrl = new URL(W.location, WHIP_URL).href;
+      await fetch(delUrl, { method: "DELETE" }).catch(() => {});
+    }
+  } finally {
+    try { whipPc.close(); } catch (_) {}
+    whipPc = null;
+    W.phase = "stopped";
+  }
+  return "stopped";
+};
+
+// ============================================================================
+// STATS + framesDecoded watchdog (no rVFC on hidden videos — stats-based)
+// ============================================================================
+function startStats() {
+  setInterval(async () => {
+    try {
+      const now = wallClock();
+      const row = { kind: "stats", who: MY_ID, t: now, drawFps: window.__state.drawFps, inbound: [] };
+      if (pc) {
+        const st = await pc.getStats();
+        st.forEach(s => {
+          if (s.type === "inbound-rtp" && s.kind === "video") {
+            const pid = midToPid.get(s.mid) || s.mid;
+            row.inbound.push({ from: pid, framesDecoded: s.framesDecoded, fps: s.framesPerSecond,
+              freezeCount: s.freezeCount, totalFreezesDuration: s.totalFreezesDuration,
+              packetsLost: s.packetsLost, nackCount: s.nackCount });
+            const ts = window.__state.tiles[pid];
+            if (ts) {
+              if (s.framesDecoded > ts.lastFramesDecoded) {
+                ts.lastFramesDecoded = s.framesDecoded; ts.lastAdvanceT = now;
+                if (ts.stalled) { ts.stalled = false; event("stall-recovered", { from: pid }); }
+              } else if (now - ts.lastAdvanceT > 4000 && !ts.stalled) {
+                ts.stalled = true;
+                event("watchdog-stall", { from: pid, sinceMs: Math.round(now - ts.lastAdvanceT) });
+                queueRepull(pid, "watchdog");
+              }
+              ts.framesDecoded = s.framesDecoded;
+            }
+          }
+          if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated)
+            row.rtt = s.currentRoundTripTime;
+        });
+      }
+      if (whipPc) {
+        const st2 = await whipPc.getStats();
+        st2.forEach(s => {
+          if (s.type === "outbound-rtp" && s.kind === "video") {
+            row.whipFps = s.framesPerSecond; row.whipFramesSent = s.framesSent;
+            row.whipQlr = s.qualityLimitationReason; row.whipTargetBitrate = s.targetBitrate;
+            row.whipW = s.frameWidth; row.whipH = s.frameHeight;
+            window.__state.whip.fps = s.framesPerSecond;
+            window.__state.whip.framesSent = s.framesSent;
+            window.__state.whip.qlr = s.qualityLimitationReason;
+          }
+        });
+      }
+      batch.push(row);
+    } catch (e) { /* ignore */ }
+  }, 2000);
+}
+
+// ---- HUD --------------------------------------------------------------------
+setInterval(() => {
+  const tls = Object.entries(window.__state.tiles).map(([pid, s]) =>
+    pid + ":" + s.valid + "/" + s.samples + (s.lastLatencyMs != null ? "@" + s.lastLatencyMs : ""));
+  const wls = Object.entries(window.__state.wall).map(([pid, s]) =>
+    pid + (s.freshMs != null ? "@" + (s.freshMs / 1000).toFixed(1) + "s" : ":miss"));
+  document.getElementById("hud").textContent =
+    "phase=" + window.__state.phase + " drawFps=" + window.__state.drawFps +
+    " whip=" + window.__state.whip.phase + (window.__state.whip.fps ? "@" + window.__state.whip.fps : "") +
+    " sig=" + window.__state.sigState + " video[" + tls.join(" ") + "] wall[" + wls.join(" ") + "]";
+}, 1000);
+
+// ---- reconcile safety tick --------------------------------------------------
+setInterval(() => {
+  if (window.__state.phase !== "running") return;
+  for (const [pid, st] of pullState)
+    if (st.state === "failed" && st.attempts < 5) pullState.set(pid, { state: "queued", attempts: st.attempts });
+  reconcile("tick");
+}, 2000);
+
+// ============================================================================
+// BOOT
+// ============================================================================
+async function boot() {
+  if (HOLD) {
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
+  window.__state.phase = "connecting";
+  const presence = makePresenceSource();
+  await publishWithRetry(presence.track);
+  window.__state.phase = "signaling";
+  sigConnect();
+  await new Promise(res => {
+    const t = setInterval(() => { if (window.__state.selfServerId) { clearInterval(t); res(); } }, 25);
+  });
+  sigSend({ type: "publish", sessionId: SID, trackNames: [TRACK_NAME] });
+  window.__state.phase = "running";
+  startStats();
+  reconcile("boot");
+  event("running", {});
+}
+boot().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e).slice(0, 500) });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+05:05:26.020 m2m HEAVY run [p3aN24]: N=24 audio=true perInstance=5 pub=320x180@15/0kbps/- duration=300s
+05:05:26.078 RAM before launch: 14.78 GB available
+05:05:27.019 instance g0 up: 1(probe) 2(probe) A(light) B(light) C(light)
+05:05:27.820 instance g1 up: D(light) E(light) F(light) G(light) H(light)
+05:05:28.634 instance g2 up: I(light) J(light) K(light) L(light) M(light)
+05:05:29.498 instance g3 up: N(light) O(light) P(light) Q(light) R(light)
+05:05:30.266 instance g4 up: S(light) T(light) U(light) V(light)
+05:05:30.275 phases before release: held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held,held
+05:05:30.280 RELEASED all 24 at 2026-08-26T05:05:30.275Z
+05:05:32.293 mesh: 1:running v=0/23 a=0/23 | 2:connecting v=0/23 a=0/23 || pubs {"running":16,"connecting":6}
+05:05:34.305 mesh: 1:running v=4/23 a=0/23 lat[111..152] | 2:running v=2/23 a=0/23 lat[46..49] || pubs {"running":21,"connecting":1}
+05:05:36.314 mesh: 1:running v=8/23 a=5/23 lat[-17..107] | 2:running v=7/23 a=3/23 lat[100..155] || pubs {"running":22} fps[11..15]
+05:05:38.339 mesh: 1:running v=12/23 a=9/23 lat[96..145] | 2:running v=11/23 a=8/23 lat[62..139] || pubs {"running":22} fps[14..15]
+05:05:40.349 mesh: 1:running v=16/23 a=13/23 lat[95..155] | 2:running v=16/23 a=13/23 lat[70..139] || pubs {"running":22} fps[14..15]
+05:05:42.381 mesh: 1:running v=20/23 a=17/23 lat[98..159] | 2:running v=20/23 a=17/23 lat[98..157] || pubs {"running":22} fps[12..15]
+05:05:44.392 mesh: 1:running v=23/23 a=21/23 lat[61..149] | 2:running v=23/23 a=21/23 lat[66..165] || pubs {"running":22} fps[12..15]
+05:05:46.404 mesh: 1:running v=23/23 a=23/23 lat[73..162] | 2:running v=23/23 a=23/23 lat[81..170] || pubs {"running":22} fps[10..15]
+05:05:46.404 FULL A/V MESH in 16129 ms — measuring 300s
+05:05:51.595 1:running v=23/23 a=23/23 lat[61..160] | 2:running v=23/23 a=23/23 lat[65..169] || pubs {"running":22} fps[13..15]
+05:05:51.670 CPU total=349.5% ours=266.5% otherChrome=0% rss=7917MB freeRAM=12.58GB
+05:05:56.686 1:running v=23/23 a=23/23 lat[69..158] | 2:running v=23/23 a=23/23 lat[74..166] || pubs {"running":22} fps[12..15]
+05:06:01.712 1:running v=23/23 a=23/23 lat[67..166] | 2:running v=23/23 a=23/23 lat[58..159] || pubs {"running":22} fps[13..15]
+05:06:06.724 1:running v=23/23 a=23/23 lat[70..163] | 2:running v=23/23 a=23/23 lat[72..158] || pubs {"running":22} fps[13..15]
+05:06:06.784 CPU total=304.9% ours=258.6% otherChrome=0% rss=8056MB freeRAM=12.54GB
+05:06:11.799 1:running v=23/23 a=23/23 lat[75..152] | 2:running v=23/23 a=23/23 lat[71..155] || pubs {"running":22} fps[10..15]
+05:06:16.809 1:running v=23/23 a=23/23 lat[67..158] | 2:running v=23/23 a=23/23 lat[75..159] || pubs {"running":22} fps[12..15]
+05:06:21.826 1:running v=23/23 a=23/23 lat[64..156] | 2:running v=23/23 a=23/23 lat[72..158] || pubs {"running":22} fps[12..16]
+05:06:21.914 CPU total=312.8% ours=249.8% otherChrome=0% rss=8132MB freeRAM=12.55GB
+05:06:26.930 1:running v=23/23 a=23/23 lat[75..157] | 2:running v=23/23 a=23/23 lat[58..150] || pubs {"running":22} fps[12..15]
+05:06:31.964 1:running v=23/23 a=23/23 lat[66..158] | 2:running v=23/23 a=23/23 lat[74..163] || pubs {"running":22} fps[12..15]
+05:06:36.987 1:running v=23/23 a=23/23 lat[75..168] | 2:running v=23/23 a=23/23 lat[65..158] || pubs {"running":22} fps[10..15]
+05:06:37.051 CPU total=356.1% ours=261.8% otherChrome=0% rss=8247MB freeRAM=12.49GB
+05:06:42.084 1:running v=23/23 a=23/23 lat[68..162] | 2:running v=23/23 a=23/23 lat[66..164] || pubs {"running":22} fps[11..15]
+05:06:47.096 1:running v=23/23 a=23/23 lat[65..160] | 2:running v=23/23 a=23/23 lat[71..159] || pubs {"running":22} fps[14..15]
+05:06:52.121 1:running v=23/23 a=23/23 lat[75..159] | 2:running v=23/23 a=23/23 lat[73..160] || pubs {"running":22} fps[12..15]
+05:06:52.212 CPU total=350.7% ours=268.9% otherChrome=0% rss=8314MB freeRAM=12.44GB
+05:06:57.228 1:running v=23/23 a=23/23 lat[67..161] | 2:running v=23/23 a=23/23 lat[63..158] || pubs {"running":22} fps[11..15]
+05:07:02.259 1:running v=23/23 a=23/23 lat[75..154] | 2:running v=23/23 a=23/23 lat[73..159] || pubs {"running":22} fps[11..15]
+05:07:07.291 1:running v=23/23 a=23/23 lat[64..170] | 2:running v=23/23 a=23/23 lat[67..168] || pubs {"running":22} fps[10..15]
+05:07:07.356 CPU total=344.4% ours=262.9% otherChrome=0.4% rss=8387MB freeRAM=12.42GB
+05:07:12.374 1:running v=23/23 a=23/23 lat[85..159] | 2:running v=23/23 a=23/23 lat[71..166] || pubs {"running":22} fps[13..15]
+05:07:17.384 1:running v=23/23 a=23/23 lat[71..155] | 2:running v=23/23 a=23/23 lat[79..161] || pubs {"running":22} fps[11..15]
+05:07:22.396 1:running v=23/23 a=23/23 lat[-33..160] | 2:running v=23/23 a=23/23 lat[67..166] || pubs {"running":22} fps[12..15]
+05:07:22.497 CPU total=369.7% ours=272.1% otherChrome=0% rss=8459MB freeRAM=12.37GB
+05:07:27.530 1:running v=23/23 a=23/23 lat[68..160] | 2:running v=23/23 a=23/23 lat[74..161] || pubs {"running":22} fps[12..15]
+05:07:32.541 1:running v=23/23 a=23/23 lat[84..158] | 2:running v=23/23 a=23/23 lat[74..158] || pubs {"running":22} fps[12..15]
+05:07:37.549 1:running v=23/23 a=23/23 lat[66..163] | 2:running v=23/23 a=23/23 lat[63..162] || pubs {"running":22} fps[12..15]
+05:07:37.611 CPU total=331.3% ours=263.8% otherChrome=0% rss=8522MB freeRAM=12.34GB
+05:07:42.630 1:running v=23/23 a=23/23 lat[67..163] | 2:running v=23/23 a=23/23 lat[82..164] || pubs {"running":22} fps[14..15]
+05:07:47.651 1:running v=23/23 a=23/23 lat[64..166] | 2:running v=23/23 a=23/23 lat[47..163] || pubs {"running":22} fps[12..15]
+05:07:52.663 1:running v=23/23 a=23/23 lat[71..165] | 2:running v=23/23 a=23/23 lat[64..165] || pubs {"running":22} fps[11..15]
+05:07:52.737 CPU total=439.5% ours=260.7% otherChrome=0% rss=8633MB freeRAM=12.3GB
+05:07:57.751 1:running v=23/23 a=23/23 lat[61..160] | 2:running v=23/23 a=23/23 lat[61..164] || pubs {"running":22} fps[11..15]
+05:08:02.763 1:running v=23/23 a=23/23 lat[63..157] | 2:running v=23/23 a=23/23 lat[61..156] || pubs {"running":22} fps[12..16]
+05:08:07.787 1:running v=23/23 a=23/23 lat[72..162] | 2:running v=23/23 a=23/23 lat[72..162] || pubs {"running":22} fps[14..15]
+05:08:07.849 CPU total=325.3% ours=264.4% otherChrome=0% rss=8675MB freeRAM=12.28GB
+05:08:12.863 1:running v=23/23 a=23/23 lat[75..157] | 2:running v=23/23 a=23/23 lat[75..157] || pubs {"running":22} fps[9..15]
+05:08:17.879 1:running v=23/23 a=23/23 lat[61..165] | 2:running v=23/23 a=23/23 lat[48..152] || pubs {"running":22} fps[11..15]
+05:08:22.890 1:running v=23/23 a=23/23 lat[62..163] | 2:running v=23/23 a=23/23 lat[62..167] || pubs {"running":22} fps[11..15]
+05:08:22.963 CPU total=353.7% ours=258.7% otherChrome=0% rss=8711MB freeRAM=12.26GB
+05:08:27.986 1:running v=23/23 a=23/23 lat[64..159] | 2:running v=23/23 a=23/23 lat[64..159] || pubs {"running":22} fps[13..15]
+05:08:33.004 1:running v=23/23 a=23/23 lat[71..158] | 2:running v=23/23 a=23/23 lat[71..157] || pubs {"running":22} fps[11..15]
+05:08:38.013 1:running v=23/23 a=23/23 lat[73..158] | 2:running v=23/23 a=23/23 lat[70..161] || pubs {"running":22} fps[12..15]
+05:08:38.076 CPU total=334% ours=267.8% otherChrome=0% rss=8750MB freeRAM=12.27GB
+05:08:43.105 1:running v=23/23 a=23/23 lat[65..168] | 2:running v=23/23 a=23/23 lat[68..167] || pubs {"running":22} fps[11..15]
+05:08:48.123 1:running v=23/23 a=23/23 lat[75..159] | 2:running v=23/23 a=23/23 lat[93..166] || pubs {"running":22} fps[12..15]
+05:08:53.135 1:running v=23/23 a=23/23 lat[72..167] | 2:running v=23/23 a=23/23 lat[80..167] || pubs {"running":22} fps[12..15]
+05:08:53.222 CPU total=612% ours=289.2% otherChrome=70.1% rss=8777MB freeRAM=12.25GB
+05:08:58.255 1:running v=23/23 a=23/23 lat[68..164] | 2:running v=23/23 a=23/23 lat[68..164] || pubs {"running":22} fps[12..15]
+05:09:03.267 1:running v=23/23 a=23/23 lat[66..159] | 2:running v=23/23 a=23/23 lat[66..159] || pubs {"running":22} fps[12..15]
+05:09:08.279 1:running v=23/23 a=23/23 lat[64..162] | 2:running v=23/23 a=23/23 lat[67..162] || pubs {"running":22} fps[11..15]
+05:09:08.364 CPU total=471.7% ours=304.7% otherChrome=91.3% rss=8803MB freeRAM=12.19GB
+05:09:13.395 1:running v=23/23 a=23/23 lat[75..163] | 2:running v=23/23 a=23/23 lat[67..170] || pubs {"running":22} fps[9..15]
+05:09:18.418 1:running v=23/23 a=23/23 lat[62..158] | 2:running v=23/23 a=23/23 lat[63..158] || pubs {"running":22} fps[12..15]
+05:09:23.453 1:running v=23/23 a=23/23 lat[63..159] | 2:running v=23/23 a=23/23 lat[65..166] || pubs {"running":22} fps[12..15]
+05:09:23.586 CPU total=642.1% ours=317.2% otherChrome=180.4% rss=8814MB freeRAM=12.06GB
+05:09:28.617 1:running v=23/23 a=23/23 lat[95..166] | 2:running v=23/23 a=23/23 lat[70..157] || pubs {"running":22} fps[12..15]
+05:09:33.637 1:running v=23/23 a=23/23 lat[73..167] | 2:running v=23/23 a=23/23 lat[73..166] || pubs {"running":22} fps[12..15]
+05:09:38.670 1:running v=23/23 a=23/23 lat[67..158] | 2:running v=23/23 a=23/23 lat[72..171] || pubs {"running":22} fps[13..15]
+05:09:38.806 CPU total=757.9% ours=338% otherChrome=184.7% rss=8794MB freeRAM=12.71GB
+05:09:43.847 1:running v=23/23 a=23/23 lat[66..166] | 2:running v=23/23 a=23/23 lat[66..163] || pubs {"running":22} fps[14..15]
+05:09:48.862 1:running v=23/23 a=23/23 lat[59..169] | 2:running v=23/23 a=23/23 lat[65..159] || pubs {"running":22} fps[10..16]
+05:09:53.875 1:running v=23/23 a=23/23 lat[75..165] | 2:running v=23/23 a=23/23 lat[85..165] || pubs {"running":22} fps[12..15]
+05:09:54.017 CPU total=563.3% ours=310.2% otherChrome=159.8% rss=8810MB freeRAM=12.81GB
+05:09:59.049 1:running v=23/23 a=23/23 lat[66..158] | 2:running v=23/23 a=23/23 lat[66..166] || pubs {"running":22} fps[13..15]
+05:10:04.087 1:running v=23/23 a=23/23 lat[82..167] | 2:running v=23/23 a=23/23 lat[69..167] || pubs {"running":22} fps[13..15]
+05:10:09.132 1:running v=23/23 a=23/23 lat[93..183] | 2:running v=23/23 a=23/23 lat[76..168] || pubs {"running":22} fps[14..15]
+05:10:09.273 CPU total=697.3% ours=314.4% otherChrome=222% rss=8834MB freeRAM=12.09GB
+05:10:14.304 1:running v=23/23 a=23/23 lat[69..162] | 2:running v=23/23 a=23/23 lat[66..164] || pubs {"running":22} fps[12..15]
+05:10:19.336 1:running v=23/23 a=23/23 lat[91..159] | 2:running v=23/23 a=23/23 lat[74..166] || pubs {"running":22} fps[12..15]
+05:10:24.354 1:running v=23/23 a=23/23 lat[73..340] | 2:running v=23/23 a=23/23 lat[66..399] || pubs {"running":22} fps[11..15]
+05:10:24.519 CPU total=740.3% ours=329.2% otherChrome=301% rss=8550MB freeRAM=11.9GB
+05:10:29.538 1:running v=23/23 a=23/23 lat[78..158] | 2:running v=23/23 a=23/23 lat[75..167] || pubs {"running":22} fps[12..15]
+05:10:34.558 1:running v=23/23 a=23/23 lat[67..165] | 2:running v=23/23 a=23/23 lat[79..166] || pubs {"running":22} fps[13..15]
+05:10:39.602 1:running v=23/23 a=23/23 lat[75..170] | 2:running v=23/23 a=23/23 lat[71..160] || pubs {"running":22} fps[10..16]
+05:10:39.775 CPU total=805% ours=334.4% otherChrome=356.5% rss=8563MB freeRAM=11.85GB
+05:10:44.887 1:running v=23/23 a=23/23 lat[83..168] | 2:running v=23/23 a=23/23 lat[80..172] || pubs {"running":22} fps[11..15]
+05:10:49.908 1:running v=23/23 a=23/23 lat[80..166] | 2:running v=23/23 a=23/23 lat[80..166] || pubs {"running":22} fps[12..15]
+05:10:52.617 run done — analyze with: python3 /Users/s32863/personal/elektron/proto/m2m/analyze-heavy.py <results.jsonl> <server.log>

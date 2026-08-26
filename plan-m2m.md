@@ -140,6 +140,21 @@ only since 26.4 — recent-Safari-only audiences; no TURN equivalent (UDP-blocke
 Status upgrade: from "no client" to **"transport proven, media layer = next experiment"** — a real
 contender for the delivery path on a 6–12 month horizon, still not for this season's shows.
 
+**✅ MEDIA SPIKE (2026-08-26, RUNBOOK §7): browser MoQ VIDEO works TODAY —
+hang-on-both-ends through CF at glass-to-glass p50 26.2 / p95 42.4 ms, 720p30 sustained 90 s,
+zero decode errors (n=2740).** ~3× lower than WebRTC's 74 ms (⚠️ add ~8–16 ms display vsync for a
+fair comparison → ~35–42 ms effective — still the fastest browser number in the repo). The
+hang↔IETF-tooling gap is ONE layer: catalog conventions (`catalog.json`/legacy vs `.catalog`/WARP/
+CMAF) — raw `@moq/net` pulled moq-pub's WARP catalog AND live CMAF fragments into the browser
+flawlessly, so a **~100-line shim** (hang has a `Container.Cmaf` class) likely bridges ecosystems.
+Platform data: CF never redelivers a CLOSED group (write-once catalogs invisible to late joiners →
+republish every 2 s; join≈1.0 s), no pending-subscribes (subscribe-before-announce errors → retry),
+optimistic SUBSCRIBE_OK then ~10 s close on unserved tracks. draft-16 is NOT auth-only:
+SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. All-Chromium so far;
+H.264 is the safer cross-browser codec (pipeline codec-agnostic).
+**Revised read: MoQ could carry the GRID's live tiers sooner than expected — the blocker list is
+down to auth provisioning, a catalog shim, and browser-matrix testing.**
+
 ### D. Pure P2P mesh — the arithmetic
 
 Uplink per publisher = (N−1) × 1 Mbps: N=6 → 5 Mbps (viable ⚠️), N=10 → 9 Mbps (marginal on

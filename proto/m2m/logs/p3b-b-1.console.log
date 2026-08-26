@@ -1,0 +1,6 @@
+05:18:23.853 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+05:18:25.588 [log] attempt 1: session 3266e3b4a3c9…
+05:18:26.399 [log] publish ok on attempt 1 in 1231 ms
+05:21:30.361 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+05:21:32.243 [log] attempt 1: session dc56abd632fc…
+05:21:32.990 [log] publish ok on attempt 1 in 1360 ms

@@ -16,3 +16,40 @@
 05:03:50.999   +65s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
 05:03:56.222   +95s empty GET -> 410 {"errorCode":"session_error","errorDescription":"Session appears to be disconnected. Please check if the PeerConnection 
 05:04:07.356   +95s dc-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:04:18.437   +95s audio-recv-offer GET -> 425 {"errorCode":"session_error","errorDescription":"Session is not ready yet. Please ensure the PeerConnection is connected
+05:04:18.438 fleet variant: dc-offer
+05:04:18.439 RAMP: 200 sessions in 60s (3.3/s), variant=dc-offer
+05:05:19.364 RAMP done in 60.9s: {"n":200,"ok":200,"bad":0,"p50":554,"p90":636,"p99":943,"min":413,"max":1076,"badSample":[]}
+05:05:19.367 HOLD: 600s, 200 sessions, ~60s cadence each + 10-session fast set @10s
+05:05:49.369 HOLD hb: alive=200/200 deaths=0 polls=72 pollErr=72
+05:06:19.370 HOLD hb: alive=200/200 deaths=0 polls=201 pollErr=201
+05:06:49.372 HOLD hb: alive=200/200 deaths=0 polls=332 pollErr=332
+05:07:19.374 HOLD hb: alive=200/200 deaths=0 polls=461 pollErr=461
+05:07:49.376 HOLD hb: alive=200/200 deaths=0 polls=591 pollErr=591
+05:08:19.378 HOLD hb: alive=200/200 deaths=0 polls=720 pollErr=720
+05:08:49.379 HOLD hb: alive=200/200 deaths=0 polls=849 pollErr=849
+05:09:19.381 HOLD hb: alive=200/200 deaths=0 polls=979 pollErr=979
+05:09:49.383 HOLD hb: alive=200/200 deaths=0 polls=1109 pollErr=1109
+05:10:19.386 HOLD hb: alive=200/200 deaths=0 polls=1238 pollErr=1238
+05:10:49.386 HOLD hb: alive=200/200 deaths=0 polls=1368 pollErr=1368
+05:11:19.386 HOLD hb: alive=200/200 deaths=0 polls=1497 pollErr=1497
+05:11:49.387 HOLD hb: alive=200/200 deaths=0 polls=1627 pollErr=1627
+05:12:19.390 HOLD hb: alive=200/200 deaths=0 polls=1756 pollErr=1756
+05:12:49.391 HOLD hb: alive=200/200 deaths=0 polls=1885 pollErr=1885
+05:13:19.414 HOLD hb: alive=200/200 deaths=0 polls=2015 pollErr=2015
+05:13:49.423 HOLD hb: alive=200/200 deaths=0 polls=2145 pollErr=2145
+05:14:19.426 HOLD hb: alive=200/200 deaths=0 polls=2274 pollErr=2274
+05:14:49.429 HOLD hb: alive=200/200 deaths=0 polls=2404 pollErr=2404
+05:15:19.398 HOLD done: alive=200/200 deaths=0
+05:15:19.399 PUSH step: +200 @5/s (cum 200 -> 400)
+05:16:00.183   step done: {"n":200,"ok":200,"bad":0,"p50":557,"p90":636,"p99":1035,"min":405,"max":1188,"badSample":[]}
+05:16:05.184 PUSH step: +200 @10/s (cum 400 -> 600)
+05:16:25.965   step done: {"n":200,"ok":200,"bad":0,"p50":538,"p90":615,"p99":709,"min":377,"max":725,"badSample":[]}
+05:16:30.981 PUSH step: +200 @20/s (cum 600 -> 800)
+05:16:41.785   step done: {"n":200,"ok":200,"bad":0,"p50":534,"p90":625,"p99":706,"min":401,"max":716,"badSample":[]}
+05:16:46.791 PUSH step: +200 @40/s (cum 800 -> 1000)
+05:16:52.973   step done: {"n":200,"ok":200,"bad":0,"p50":537,"p90":615,"p99":849,"min":401,"max":1049,"badSample":[]}
+05:16:57.978 GC probe: 10 polled-ramp + 10 unpolled-push sessions at +30/+60/+120/+300s
+05:19:18.344   +30s gc-ramp: 0 ok / 10 gone
+05:21:12.960   +30s gc-push: 0 ok / 10 gone
+05:23:03.384   +60s gc-ramp: 0 ok / 10 gone

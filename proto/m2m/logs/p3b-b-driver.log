@@ -1,0 +1,13 @@
+05:18:22.989 P3B run ROUTE=B label=b room=p3b-b steady=600s nopub=false
+05:18:22.991 live input 12f3a2dd9686887cf6495c8b10aec352
+05:18:24.139 instance g0 up: 1 2 A B
+05:18:25.136 instance g1 up: C D W X
+05:18:25.143 RELEASED 8 grid participants
+05:18:29.966 all 8 RUNNING (+4829 ms) — casting
+05:18:30.897 cast applied (2 featured + 4 live + 2 wall)
+05:18:31.732 instance gcomp up: K
+05:18:35.809 COMPOSITE READY in 4077 ms (6 video tiles + 2 wall snaps)
+05:18:35.850 screencast started -> ffmpeg -> RTMPS
+05:18:38.264 instance gview up: V
+05:20:38.338 DRIVER FATAL: timeout waiting for viewer decoding composite clock
+05:20:38.358 ffmpeg exited code=0 sig=null

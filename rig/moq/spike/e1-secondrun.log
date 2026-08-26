@@ -1,0 +1,33 @@
+[/log] PLAY 1.171 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1-x7k3 mode=hang
+[/log] PLAY 1.113 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1b-q8v1 mode=hang
+[/log] PLAY 1.292 CATALOG_SUBSCRIBE_SENT
+[/log] PLAY 1.292 CONNECTED ms=178 version=moq-transport-14
+[/log] PLAY 1.358 CONNECTED ms=186 version=moq-transport-14
+[/log] PLAY 1.359 CATALOG_SUBSCRIBE_SENT
+[/log] PLAY 1.480 FAIL Error "SUBSCRIBE error: code=4 reason=not found: Track not found [error:3020b0ca-722b-4974-a6cd-4ba56e6f961d]"
+[/log] PLAY 1.480 CATALOG_CLOSED_ERR "SUBSCRIBE error: code=4 reason=not found: Track not found [error:3020b0ca-722b-4974-a6cd-4ba56e6f961d]"
+[/log] PLAY 1.480 SUMMARY none
+[/log] PLAY 1.683 CATALOG_CLOSED_ERR "SUBSCRIBE error: code=4 reason=not found: Track not found [error:5481ec39-0416-4d3a-a6d0-da3aa3280e64]"
+[/log] PLAY 1.683 SUMMARY none
+[/log] PLAY 1.683 FAIL Error "SUBSCRIBE error: code=4 reason=not found: Track not found [error:5481ec39-0416-4d3a-a6d0-da3aa3280e64]"
+[/log] PUB 1.304 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1b-q8v1 codec=vp8
+[/log] PUB 1.479 CONNECTED ms=174 version=moq-transport-14
+[/log] PUB 1.480 PUBLISHED path=moq-media-e1b-q8v1
+[/log] PUB 1.480 CATALOG_WRITTEN {"video":{"renditions":{"video":{"codec":"vp8","container":{"kind":"legacy"},"codedWidth":1280,"codedHeight":720,"framerate":30,"optimizeForLatency":true}}}}
+[/log] PUB 1.485 ENC_SUPPORT true
+[/log] PUB 1.557 ENCODED n=1 type=key bytes=7025
+[/log] PUB 3.783 START relay=https://draft-14.cloudflare.mediaoverquic.com ns=moq-media-e1-x7k3 codec=vp8
+[/log] PUB 4.001 CONNECTED ms=218 version=moq-transport-14
+[/log] PUB 4.002 CATALOG_WRITTEN {"video":{"renditions":{"video":{"codec":"vp8","container":{"kind":"legacy"},"codedWidth":1280,"codedHeight":720,"framerate":30,"optimizeForLatency":true}}}}
+[/log] PUB 4.002 PUBLISHED path=moq-media-e1-x7k3
+[/log] PUB 4.007 ENC_SUPPORT true
+[/log] PUB 4.204 ENCODED n=1 type=key bytes=7050
+[/log] PUB 6.439 ENCODED n=150 type=delta bytes=5272
+[/log] PUB 11.389 ENCODED n=300 type=delta bytes=5573
+[/log] PUB 11.485 STATS submitted=303 encoded=302 dropped=0 queue=0
+[/log] PUB 14.196 STATS submitted=12 encoded=11 dropped=0 queue=0
+[/log] PUB 16.340 ENCODED n=450 type=delta bytes=4666
+[/log] PUB 21.289 ENCODED n=600 type=delta bytes=5008
+[/log] PUB 21.486 STATS submitted=606 encoded=605 dropped=0 queue=0
+[/log] PUB 24.195 STATS submitted=23 encoded=22 dropped=0 queue=0
+[/log] PUB 26.239 ENCODED n=750 type=delta bytes=4552

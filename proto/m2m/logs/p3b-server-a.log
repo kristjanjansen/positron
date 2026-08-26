@@ -1,0 +1,21 @@
+m2m GRID server on :8895, results -> /Users/s32863/personal/elektron/results/m2m-p3b-a.jsonl, app 8c2a974b…
+08:09:56 "GET /healthz HTTP/1.1" 200 -
+08:10:00 "GET /healthz HTTP/1.1" 200 -
+08:10:01 "GET /grid.html?id=1&name=Perf-Ada&room=p3b-a&role=operator&view=lite&hold=1&cb=1787721001690&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:01 code 404, message File not found
+08:10:01 "GET /favicon.ico HTTP/1.1" 404 -
+08:10:01 "GET /grid.html?id=2&name=Perf-Bela&room=p3b-a&role=performer&view=lite&hold=1&cb=1787721001890&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:02 "GET /grid.html?id=A&name=Live-A&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721002071&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:02 "GET /grid.html?id=B&name=Live-B&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721002262&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:03 "GET /grid.html?id=C&name=Live-C&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721003362&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:03 code 404, message File not found
+08:10:03 "GET /favicon.ico HTTP/1.1" 404 -
+08:10:03 "GET /grid.html?id=D&name=Live-D&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721003573&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:03 "GET /grid.html?id=W&name=Wall-W&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721003752&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:03 "GET /grid.html?id=X&name=Wall-X&room=p3b-a&role=audience&view=lite&hold=1&cb=1787721003930&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+08:10:11 "GET /composite.html?id=K&room=p3b-a&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2&whip=https%3A%2F%2Fcustomer-mwuu1cmlyif6eluy.cloudflarestream.com%2F4230c87b140cf40c79b2619cffa732eck12f3a2dd9686887cf6495c8b10aec352%2FwebRTC%2Fpublish&cb=1787721011202 HTTP/1.1" 200 -
+08:10:11 code 404, message File not found
+08:10:11 "GET /favicon.ico HTTP/1.1" 404 -
+08:10:19 "GET /composite-viewer.html?mode=whep&url=https%3A%2F%2Fcustomer-mwuu1cmlyif6eluy.cloudflarestream.com%2F12f3a2dd9686887cf6495c8b10aec352%2FwebRTC%2Fplay&cb=1787721019649 HTTP/1.1" 200 -
+08:10:20 code 404, message File not found
+08:10:20 "GET /favicon.ico HTTP/1.1" 404 -

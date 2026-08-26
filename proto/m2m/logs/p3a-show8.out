@@ -1,0 +1,36 @@
+05:15:20.147 m2m HEAVY run [p3ashow8]: N=8 audio=true perInstance=5 pub=640x360@30/1200kbps/motion duration=90s
+05:15:20.230 RAM before launch: 13.22 GB available
+05:15:21.603 instance g0 up: 1(probe) 2(probe) A(show) B(show) C(show)
+05:15:22.949 instance g1 up: D(show) E(show) F(show)
+05:15:22.961 phases before release: held,held,held,held,held,held,held,held
+05:15:22.965 RELEASED all 8 at 2026-08-26T05:15:22.962Z
+05:15:25.121 mesh: 1:running v=0/7 a=0/7 | 2:running v=0/7 a=0/7 || pubs {"running":6}
+05:15:27.127 mesh: 1:running v=4/7 a=1/7 lat[92..151] | 2:running v=4/7 a=1/7 lat[66..133] || pubs {"running":6}
+05:15:29.136 mesh: 1:running v=7/7 a=4/7 lat[56..80] | 2:running v=7/7 a=4/7 lat[56..72] || pubs {"running":6} fps[25..31]
+05:15:31.144 mesh: 1:running v=7/7 a=7/7 lat[75..112] | 2:running v=7/7 a=7/7 lat[81..110] || pubs {"running":6} fps[28..31]
+05:15:31.144 FULL A/V MESH in 8182 ms — measuring 90s
+05:15:36.387 1:running v=7/7 a=7/7 lat[57..109] | 2:running v=7/7 a=7/7 lat[57..77] || pubs {"running":6} fps[30..31]
+05:15:36.496 CPU total=622.5% ours=169.6% otherChrome=287.5% rss=3042MB freeRAM=12.12GB
+05:15:41.508 1:running v=7/7 a=7/7 lat[75..98] | 2:running v=7/7 a=7/7 lat[59..93] || pubs {"running":6} fps[26..30]
+05:15:46.514 1:running v=7/7 a=7/7 lat[34..109] | 2:running v=7/7 a=7/7 lat[34..93] || pubs {"running":6} fps[26..30]
+05:15:51.525 1:running v=7/7 a=7/7 lat[74..107] | 2:running v=7/7 a=7/7 lat[73..92] || pubs {"running":6} fps[26..29]
+05:15:51.609 CPU total=508.5% ours=160.5% otherChrome=267.8% rss=3081MB freeRAM=12.11GB
+05:15:56.621 1:running v=7/7 a=7/7 lat[46..67] | 2:running v=7/7 a=7/7 lat[47..67] || pubs {"running":6} fps[27..30]
+05:16:01.630 1:running v=7/7 a=7/7 lat[74..98] | 2:running v=7/7 a=7/7 lat[81..91] || pubs {"running":6} fps[26..31]
+05:16:06.638 1:running v=7/7 a=7/7 lat[49..74] | 2:running v=7/7 a=7/7 lat[48..65] || pubs {"running":6} fps[29..31]
+05:16:06.736 CPU total=517.6% ours=165.7% otherChrome=257.4% rss=3112MB freeRAM=12.43GB
+05:16:11.747 1:running v=7/7 a=7/7 lat[74..99] | 2:running v=7/7 a=7/7 lat[57..99] || pubs {"running":6} fps[30..31]
+05:16:16.755 1:running v=7/7 a=7/7 lat[58..72] | 2:running v=7/7 a=7/7 lat[58..81] || pubs {"running":6} fps[24..30]
+05:16:21.762 1:running v=7/7 a=7/7 lat[64..261] | 2:running v=7/7 a=7/7 lat[64..94] || pubs {"running":6} fps[25..29]
+05:16:22.028 CPU total=723.6% ours=150.8% otherChrome=264.1% rss=3166MB freeRAM=12.17GB
+05:16:27.043 1:running v=7/7 a=7/7 lat[43..73] | 2:running v=7/7 a=7/7 lat[53..72] || pubs {"running":6} fps[26..30]
+05:16:32.050 1:running v=7/7 a=7/7 lat[61..83] | 2:running v=7/7 a=7/7 lat[44..73] || pubs {"running":6} fps[24..31]
+05:16:37.059 1:running v=7/7 a=7/7 lat[50..58] | 2:running v=7/7 a=7/7 lat[57..81] || pubs {"running":6} fps[27..31]
+05:16:37.160 CPU total=546.3% ours=164.3% otherChrome=284.3% rss=3203MB freeRAM=12.06GB
+05:16:42.178 1:running v=7/7 a=7/7 lat[59..77] | 2:running v=7/7 a=7/7 lat[59..77] || pubs {"running":6} fps[30..31]
+05:16:47.189 1:running v=7/7 a=7/7 lat[70..94] | 2:running v=7/7 a=7/7 lat[53..78] || pubs {"running":6} fps[26..30]
+05:16:52.195 1:running v=7/7 a=7/7 lat[54..71] | 2:running v=7/7 a=7/7 lat[55..66] || pubs {"running":6} fps[26..30]
+05:16:52.294 CPU total=562.1% ours=165.3% otherChrome=287.6% rss=3235MB freeRAM=12.06GB
+05:16:57.305 1:running v=7/7 a=7/7 lat[64..92] | 2:running v=7/7 a=7/7 lat[70..97] || pubs {"running":6} fps[26..29]
+05:17:02.312 1:running v=7/7 a=7/7 lat[89..106] | 2:running v=7/7 a=7/7 lat[57..74] || pubs {"running":6} fps[24..31]
+05:17:04.288 run done — analyze with: python3 /Users/s32863/personal/elektron/proto/m2m/analyze-heavy.py <results.jsonl> <server.log>

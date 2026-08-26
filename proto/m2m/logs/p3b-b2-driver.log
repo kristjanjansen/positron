@@ -1,0 +1,11 @@
+05:21:29.423 P3B run ROUTE=B label=b room=p3b-b steady=600s nopub=false
+05:21:29.425 live input 12f3a2dd9686887cf6495c8b10aec352
+05:21:30.589 instance g0 up: 1 2 A B
+05:21:31.613 instance g1 up: C D W X
+05:21:31.618 RELEASED 8 grid participants
+05:21:35.455 all 8 RUNNING (+3842 ms) — casting
+05:21:36.381 cast applied (2 featured + 4 live + 2 wall)
+05:21:37.195 instance gcomp up: K
+05:21:40.734 COMPOSITE READY in 3538 ms (6 video tiles + 2 wall snaps)
+05:21:40.768 screencast started -> ffmpeg -> RTMPS
+05:21:42.695 instance gview up: V
