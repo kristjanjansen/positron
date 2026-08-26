@@ -36,6 +36,16 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### Safari MoQ rig (user request) — ✅ DEPLOYED; desktop Safari OBSERVED PLAYING
+- URL: https://elektron-moq-safari.kristjan-jansen.workers.dev (Worker + beacon
+  sink → wrangler tail shows any device's session). H.264 publisher LEFT RUNNING
+  on this Mac (stop: pkill -f moq-safari-pub-udd; pkill -f pubserver.py; dies on
+  sleep/reboot — restart block RUNBOOK §8.6).
+- ✅ TRAP: @moq/net UA-blocks ALL Safari (safari:"<0", WebKit bug 319818) → fixed
+  by passing a self-built WebTransport. Then Safari 26.6.2 connected in 131 ms
+  and played 4 min / 0 errors (background-throttled). Chromium proof vs deployed
+  URL: 33 ms p50 g2g. iPhone + foreground verdicts = user at the keyboard.
+
 ### Phase 3c choreography — ✅ A JSON SCORE CONDUCTS THE GRID; PHASE 3 COMPLETE
 - ✅ 4 full 5-min shows + smoke via the deployed Worker: 88/88 correctness
   assertions, zero errors in ~370 SFU calls. Score-time drift p50 0 / max 8 ms —

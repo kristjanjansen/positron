@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ELEKTRON MoQ Safari Test</title>
+<style>
+	* { margin: 0; padding: 0; box-sizing: border-box; }
+	body { background: #0b0e14; color: #e6e6e6; font-family: -apple-system, "SF Pro", Helvetica, monospace, sans-serif; padding: 14px; padding-bottom: 40px; }
+	h1 { color: #ffd400; font-size: 26px; letter-spacing: 1px; margin-bottom: 10px; }
+	.st { font-size: 19px; line-height: 1.45; margin: 7px 0; word-break: break-word; }
+	.st.ok { color: #4ade80; }
+	.st.fail { color: #f87171; font-weight: bold; font-size: 22px; }
+	.st.wait { color: #facc15; }
+	.st.dim { color: #9ca3af; font-size: 15px; }
+	#st-err { display: none; color: #f87171; background: #1c1017; border: 1px solid #7f1d1d; padding: 10px; margin: 10px 0; font-size: 14px; white-space: pre-wrap; word-break: break-word; }
+	#cv { width: 100%; height: auto; aspect-ratio: 16/9; background: #000; border: 1px solid #333; border-radius: 6px; margin-top: 12px; }
+	#gate { position: fixed; inset: 0; background: rgba(11,14,20,0.92); display: none; align-items: center; justify-content: center; z-index: 10; }
+	#tap { font-size: 34px; font-weight: bold; padding: 30px 50px; background: #ffd400; color: #000; border: none; border-radius: 14px; cursor: pointer; }
+</style>
+<body>
+	<h1>ELEKTRON MOQ TEST</h1>
+	<div id="st-ua" class="st dim"></div>
+	<div id="st-wt" class="st wait">Checking WebTransport…</div>
+	<div id="st-codec" class="st wait">Checking H.264 decoder…</div>
+	<div id="st-conn" class="st dim">Relay: waiting for start</div>
+	<div id="st-catalog" class="st dim"></div>
+	<div id="st-first" class="st dim"></div>
+	<div id="st-live" class="st dim"></div>
+	<div id="st-g2g" class="st dim"></div>
+	<pre id="st-err"></pre>
+	<canvas id="cv"></canvas>
+	<div class="st dim" id="st-meta"></div>
+	<div id="gate"><button id="tap">TAP TO START</button></div>
+
+	<script type="module">
+		// Boot: feature-detect FIRST, before touching the player bundle, so a
+		// Safari without WebTransport still gets a clear on-screen verdict.
+		const $ = (id) => document.getElementById(id);
+		const params = new URLSearchParams(location.search);
+		const codec = params.get("codec") ?? "avc1.42001f";
+		const ns = params.get("namespace") ?? params.get("ns") ?? "elektron-safari-test";
+		const relay = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
+		$("st-meta").textContent = `namespace=${ns} · relay=${relay.replace("https://", "")} · codec=${codec}`;
+		$("st-ua").textContent = navigator.userAgent;
+
+		function beacon(event, extra) {
+			try {
+				const body = JSON.stringify({ t: new Date().toISOString(), ua: navigator.userAgent, event, ...extra });
+				if (navigator.sendBeacon) navigator.sendBeacon("/beacon", body);
+				else fetch("/beacon", { method: "POST", body }).catch(() => {});
+			} catch {}
+		}
+		window.addEventListener("error", (e) => {
+			const el = $("st-err");
+			el.style.display = "block";
+			el.textContent += (el.textContent ? "\n" : "") + String(e.message);
+			beacon("window-error", { msg: String(e.message) });
+		});
+
+		// 1. WebTransport
+		const hasWT = typeof WebTransport === "function";
+		if (hasWT) {
+			$("st-wt").textContent = "WebTransport: YES";
+			$("st-wt").className = "st ok";
+		} else {
+			const m = navigator.userAgent.match(/Version\/(\d+(?:\.\d+)?)/);
+			$("st-wt").textContent = "WebTransport: NOT AVAILABLE — Safari/iOS 26.4 or newer required" + (m ? ` (this browser looks like Safari ${m[1]})` : "");
+			$("st-wt").className = "st fail";
+		}
+
+		// 2. H.264 decode
+		let h264 = false;
+		if (typeof VideoDecoder !== "function") {
+			$("st-codec").textContent = "WebCodecs VideoDecoder: NOT AVAILABLE";
+			$("st-codec").className = "st fail";
+		} else {
+			try {
+				const sup = await VideoDecoder.isConfigSupported({ codec });
+				h264 = !!sup.supported;
+				$("st-codec").textContent = `H.264 decode (${codec}): ${h264 ? "YES" : "NO"}`;
+				$("st-codec").className = "st " + (h264 ? "ok" : "fail");
+			} catch (e) {
+				$("st-codec").textContent = `H.264 decode check threw: ${e.message}`;
+				$("st-codec").className = "st fail";
+			}
+		}
+		beacon("boot", { webtransport: hasWT, h264, codec });
+		if (!hasWT) { $("st-conn").textContent = "Relay: cannot connect without WebTransport"; }
+		else {
+			// 3. Gate (iOS wants a user gesture before media pipelines spin up), then player.
+			const go = async () => {
+				$("gate").style.display = "none";
+				try {
+					const mod = await import("./play.js");
+					await mod.start();
+				} catch (e) {
+					const el = $("st-err");
+					el.style.display = "block";
+					el.textContent += (el.textContent ? "\n" : "") + `player failed to load/start: ${e.constructor?.name}: ${e.message}`;
+					beacon("player-load-error", { msg: String(e.message) });
+				}
+			};
+			if (params.get("auto") === "1") go();
+			else {
+				$("gate").style.display = "flex";
+				$("tap").addEventListener("click", go, { once: true });
+			}
+		}
+	</script>
+</body>
+</html>

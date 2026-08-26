@@ -1,0 +1,39 @@
+PUB 2026-08-26T06:19:48.999Z START relay=https://draft-14.cloudflare.mediaoverquic.com ns=elektron-safari-test codec=avc1.42001f
+PUB 2026-08-26T06:19:49.154Z PUBLISHED path=elektron-safari-test
+PUB 2026-08-26T06:19:49.154Z CATALOG_WRITTEN {"video":{"renditions":{"video":{"codec":"avc1.42001f","container":{"kind":"legacy"},"codedWidth":1280,"codedHeight":720,"framerate":30,"optimizeForLatency":true}}}}
+PUB 2026-08-26T06:19:49.153Z CONNECTED ms=151 version=moq-transport-14
+PUB 2026-08-26T06:19:49.271Z ENC_SUPPORT true
+PUB 2026-08-26T06:19:53.137Z ENCODED n=1 type=key bytes=19401
+{"t":"2026-08-26T06:20:06.232Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"boot","webtransport":true,"h264":true,"codec":"avc1.42001f"}
+PLAY 2026-08-26T06:20:06.245Z START relay=https://draft-14.cloudflare.mediaoverquic.com ns=elektron-safari-test
+{"t":"2026-08-26T06:20:06.246Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"start","ns":"elektron-safari-test","stage":"starting","decoded":0,"fps":0,"decodeErrors":0,"reconnects":0,"relay":"https://draft-14.cloudflare.mediaoverquic.com"}
+PLAY 2026-08-26T06:20:06.405Z CONNECTED ms=159 version=moq-transport-14
+{"t":"2026-08-26T06:20:06.406Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"connected","ns":"elektron-safari-test","stage":"connected","version":"moq-transport-14","decoded":0,"fps":0,"decodeErrors":0,"reconnects":0,"connectMs":159}
+PLAY 2026-08-26T06:20:06.543Z CATALOG {"video":{"renditions":{"video":{"codec":"avc1.42001f","container":{"kind":"legacy"},"codedWidth":1280,"codedHeight":720,"framerate":30,"optimizeForLatency":true}}}}
+{"t":"2026-08-26T06:20:06.543Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"catalog","ns":"elektron-safari-test","stage":"subscribed","version":"moq-transport-14","decoded":0,"fps":0,"decodeErrors":0,"reconnects":0,"codec":"avc1.42001f"}
+PLAY 2026-08-26T06:20:06.920Z FIRST_FRAME ms=675 0x0
+{"t":"2026-08-26T06:20:06.920Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"first-frame","ns":"elektron-safari-test","stage":"live","version":"moq-transport-14","decoded":1,"fps":0,"decodeErrors":0,"firstFrameMs":675,"reconnects":0}
+{"t":"2026-08-26T06:20:11.245Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"stats","ns":"elektron-safari-test","stage":"live","version":"moq-transport-14","decoded":167,"fps":30,"g2g_p50":37,"decodeErrors":0,"firstFrameMs":675,"reconnects":0}
+{"t":"2026-08-26T06:20:16.246Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"stats","ns":"elektron-safari-test","stage":"live","version":"moq-transport-14","decoded":319,"fps":31,"g2g_p50":33,"decodeErrors":0,"firstFrameMs":675,"reconnects":0}
+{"t":"2026-08-26T06:20:21.247Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"stats","ns":"elektron-safari-test","stage":"live","version":"moq-transport-14","decoded":470,"fps":30,"g2g_p50":33,"decodeErrors":0,"firstFrameMs":675,"reconnects":0}
+{"t":"2026-08-26T06:20:26.247Z","ua":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36","event":"stats","ns":"elektron-safari-test","stage":"live","version":"moq-transport-14","decoded":622,"fps":31,"g2g_p50":33,"decodeErrors":0,"firstFrameMs":675,"reconnects":0}
+PUB 2026-08-26T06:20:49.272Z STATS submitted=1708 encoded=1707 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:20:52.317Z ENCODED n=1800 type=delta bytes=1645
+PUB 2026-08-26T06:21:49.273Z STATS submitted=3526 encoded=3525 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:21:51.715Z ENCODED n=3600 type=delta bytes=2022
+PUB 2026-08-26T06:22:49.275Z STATS submitted=5344 encoded=5344 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:22:51.118Z ENCODED n=5400 type=delta bytes=1619
+PUB 2026-08-26T06:23:49.276Z STATS submitted=7162 encoded=7162 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:23:50.517Z ENCODED n=7200 type=delta bytes=1655
+PUB 2026-08-26T06:24:49.276Z STATS submitted=8980 encoded=8980 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:24:49.915Z ENCODED n=9000 type=delta bytes=2015
+PUB 2026-08-26T06:25:49.275Z STATS submitted=10799 encoded=10798 dropped=110 encErrs=0 queue=1
+PUB 2026-08-26T06:25:49.321Z ENCODED n=10800 type=delta bytes=2127
+PUB 2026-08-26T06:26:48.718Z ENCODED n=12600 type=delta bytes=2113
+PUB 2026-08-26T06:26:49.276Z STATS submitted=12617 encoded=12616 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:27:48.117Z ENCODED n=14400 type=delta bytes=1632
+PUB 2026-08-26T06:27:49.277Z STATS submitted=14435 encoded=14435 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:28:47.520Z ENCODED n=16200 type=delta bytes=2361
+PUB 2026-08-26T06:28:49.278Z STATS submitted=16253 encoded=16253 dropped=110 encErrs=0 queue=0
+PUB 2026-08-26T06:29:46.920Z ENCODED n=18000 type=delta bytes=2166
+PUB 2026-08-26T06:29:49.279Z STATS submitted=18071 encoded=18071 dropped=110 encErrs=0 queue=0
