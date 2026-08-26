@@ -1,0 +1,50 @@
+m2m server on :8889, results -> /Users/s32863/personal/elektron/results/m2m-4k-sfu-a1-4k30.jsonl, app 8c2a974b…
+10:20:00 "GET /roster HTTP/1.1" 200 -
+10:20:04 "GET /roster HTTP/1.1" 200 -
+10:20:04 "POST /reset HTTP/1.1" 200 -
+10:20:04 "POST /collect HTTP/1.1" 200 -
+10:20:07 "GET /pub4k-room.html?id=1&n=2&mode=full&cls=probe-a1-4k30&cb=1787728807419 HTTP/1.1" 200 -
+10:20:07 code 404, message File not found
+10:20:07 "GET /favicon.ico HTTP/1.1" 404 -
+10:20:07 CF POST /sessions/new -> 201 (345 ms)
+10:20:07 "POST /cf/sessions/new HTTP/1.1" 201 -
+10:20:08 "POST /save/pub4k-offer-1.sdp HTTP/1.1" 200 -
+10:20:08 "GET /pub4k-room.html?id=P&n=2&mode=pub&vw=3840&vh=2160&vfps=30&kbps=15000&noise=0&hint=detail&degpref=maintain-resolution&codec=h264&cls=pub4k-a1-4k30&cb=1787728808076 HTTP/1.1" 200 -
+10:20:08 code 404, message File not found
+10:20:08 "GET /favicon.ico HTTP/1.1" 404 -
+10:20:08 CF POST /sessions/new -> 201 (217 ms)
+10:20:08 "POST /cf/sessions/new HTTP/1.1" 201 -
+10:20:08 CF POST /sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/tracks/new -> 200 (457 ms)
+10:20:08 "POST /cf/sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/tracks/new HTTP/1.1" 200 -
+10:20:08 "POST /save/pub4k-answer-1.sdp HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /save/pub4k-offer-p.sdp HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 CF POST /sessions/a37553bfb9a2bc34432ae27b675a577c126b00e6e273021fce6ae2a1abc7027a/tracks/new -> 200 (380 ms)
+10:20:08 "POST /cf/sessions/a37553bfb9a2bc34432ae27b675a577c126b00e6e273021fce6ae2a1abc7027a/tracks/new HTTP/1.1" 200 -
+10:20:08 "POST /save/pub4k-answer-p.sdp HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:08 "POST /collect HTTP/1.1" 200 -
+10:20:09 "POST /collect HTTP/1.1" 200 -
+10:20:09 "POST /join HTTP/1.1" 200 -
+10:20:09 "POST /collect HTTP/1.1" 200 -
+10:20:09 "POST /join HTTP/1.1" 200 -
+10:20:09 "POST /collect HTTP/1.1" 200 -
+10:20:09 "GET /roster HTTP/1.1" 200 -
+10:20:10 CF POST /sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/tracks/new -> 200 (341 ms)
+10:20:10 "POST /cf/sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/tracks/new HTTP/1.1" 200 -
+10:20:10 CF PUT /sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/renegotiate -> 200 (158 ms)
+10:20:10 "PUT /cf/sessions/036e83fa88d37fdbd54d1fee79fbc96e247d13bd5c935d5d6902f607f14f03a1/renegotiate HTTP/1.1" 200 -
+10:20:10 "POST /collect HTTP/1.1" 200 -
+10:20:11 "POST /collect HTTP/1.1" 200 -
+10:20:11 "POST /collect HTTP/1.1" 200 -
+10:20:11 "GET /roster HTTP/1.1" 200 -
+10:20:11 "POST /collect HTTP/1.1" 200 -
+10:20:12 "POST /collect HTTP/1.1" 200 -
+10:20:12 "POST /collect HTTP/1.1" 200 -
+10:20:13 "POST /collect HTTP/1.1" 200 -
+10:20:13 "POST /collect HTTP/1.1" 200 -

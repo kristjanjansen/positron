@@ -1,0 +1,6 @@
+07:20:04.736 m2m 4K SFU run: arm=a1-4k30 3840x2160@30 kbps=15000 noise=0 degpref=maintain-resolution codec=h264 duration=90s
+07:20:07.607 1 launched
+07:20:08.234 P launched
+07:20:10.240 mesh: 1:running frames=320 | P:running frames=62
+07:20:12.243 mesh: 1:running frames=552 fps=30 out=640x360 qlr=none tiles[P:15/15@164ms 3840x2160] | P:running frames=122 fps=10 out=3840x2160 qlr=none
+07:20:12.244 FLOWING in 4010 ms — measuring 90s

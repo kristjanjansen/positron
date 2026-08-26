@@ -1,0 +1,5 @@
+07:20:07.625 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+07:20:07.933 [log] session 036e83fa88d3…
+07:20:09.893 [log] pc connected, joining room
+07:20:10.259 [log] ontrack video mid=1 -> P
+07:20:10.413 [log] pulled P (mid 1)
