@@ -48,6 +48,12 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
   discipline + connection sharding. RUNBOOK §13; 15 data files.
 
+### 📱 iPhone AUDIO verdict (screenshots 15:16) — ✅ SOUNDING −21 dB, skew −6 ms
+- Opus + AAC-LC decode YES; 2583 chunks / 0 errors; aLat ~66 ms; underruns ~1 %
+  (= Chromium band; adaptive cushion still backlog). Video 31 fps, g2g 71 ms.
+- Witnessed: transient decoder failure → reconnect attempt 1 → self-healed live.
+  MoQ tier scorecard COMPLETE (video/4K/Safari/iOS/audio/iOS-audio all ✅).
+
 ### Local-first archive → R2 — ✅ USER'S DESIGN WINS: native T₀ −15 ms from truth
 - ✅ R2 enabled + bucket created (no dashboard click needed). Record locally
   (segmented HLS, T₀ stamped at first input write) → upload-verify-delete per
