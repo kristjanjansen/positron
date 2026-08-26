@@ -530,9 +530,16 @@ function tierLists() {
 // ============================================================================
 const pullState = new Map();  // pid -> {state, attempts, sessionId, trackName, mid, cause}
 const pullT0 = new Map();     // pid -> wall ms at pull start
+const pendingClose = new Set();  // STAG: pids with a deferred batch-close scheduled
 let pullChain = Promise.resolve();
+let chainPending = 0, chainLastDoneT = 0;   // STAG v3: quiet-chain detection
 
-function chain(fn) { pullChain = pullChain.then(fn).catch(() => {}); return pullChain; }
+function chain(fn) {
+  chainPending++;
+  pullChain = pullChain.then(fn).catch(() => {})
+    .finally(() => { chainPending--; chainLastDoneT = performance.now(); });
+  return pullChain;
+}
 
 async function pullTrack(p, cause) {
   const pid = p.id;
@@ -595,6 +602,22 @@ async function unpullTrack(pid, why) {
     detachTrack(pid);
     if (st) { st.state = "unpulled"; st.mid = null; }
   }
+}
+
+// P3C delta 2 (v3): fire the deferred batch only when the SDP chain is quiet.
+function scheduleBatchClose(fresh, attempt) {
+  setTimeout(() => {
+    const busy = chainPending > 0 || performance.now() - chainLastDoneT < 500;
+    if (busy && attempt < 8) return scheduleBatchClose(fresh, attempt + 1);
+    chain(async () => {
+      const pids = fresh.filter(pid => {
+        const s = pullState.get(pid);
+        return s && s.state === "done" && s.mid;
+      });
+      for (const pid of fresh) pendingClose.delete(pid);
+      if (pids.length) return unpullBatch(pids, "hidden");
+    });
+  }, attempt === 0 ? 700 : 300);
 }
 
 // P3C delta 2: close MANY hidden pulls in ONE tracks/close renegotiation.
@@ -941,18 +964,19 @@ function reconcile(cause) {
     }
   }
   if (STAG && toClose.length) {
-    // Defer a beat AFTER the pulls above complete (chain is serial), so the
-    // incoming tiles reach first frame before we renegotiate the closes; then
-    // close everything still-hidden in ONE call. "pulling" entries are left
-    // for the next tick (can't close a mid that doesn't exist yet).
-    chain(async () => {
-      await new Promise(r => setTimeout(r, 700));
-      const pids = toClose.filter(pid => {
-        const s = pullState.get(pid);
-        return s && s.state === "done" && s.mid;
-      });
-      if (pids.length) return unpullBatch(pids, "hidden");
-    });
+    // Defer, then close everything still-hidden in ONE call. Two run-measured
+    // lessons baked in (v3):
+    //   v1 (sleep INSIDE the chain): waves smooth, but any pull queued behind
+    //      the sleep ate 700 ms and reconciles stacked duplicate sleeps
+    //      (duet promote-video 0.5 s -> 2.1 s).
+    //   v2 (plain setTimeout): promotes fixed, but the batch fired ~250 ms
+    //      after the last pull renegotiation — the renegotiation DENSITY
+    //      re-opened the 0.7 s featured gap. The idle beat is load-bearing.
+    //   v3: timer outside the chain (pulls never wait) + fire only into a
+    //      QUIET chain (idle >= 500 ms, re-arm x8 max -> bounded at ~3 s).
+    const fresh = toClose.filter(pid => !pendingClose.has(pid));
+    for (const pid of fresh) pendingClose.add(pid);
+    if (fresh.length) scheduleBatchClose(fresh, 0);
   }
   // hidden live tiles: drop their DOM (video ones only; dead ones stay visible)
   for (const [pid, el] of tileEls) {

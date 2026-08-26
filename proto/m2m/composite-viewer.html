@@ -218,51 +218,71 @@ function startWhepStats() {
 // ============================================================================
 // LL-HLS mode (hls.js CDN + the rig's 'config' recovery arm + top-level lock)
 // ============================================================================
+// hls.js has NO recovery for a fatal manifestParsingError (the "page opened
+// before the broadcast exists" case, low-latency-player.v5.js wrap reason #3).
+// Recovery model here = the v5 player's: destroy the instance and REBUILD on a
+// steady cadence until the stream exists.
+let hlsRebuilds = 0;
+function buildHls() {
+  if (!window.Hls || !Hls.isSupported()) {
+    window.__state.phase = "failed"; window.__state.error = "hls.js unsupported"; return;
+  }
+  let hls;
+  try {
+    hls = new Hls({
+      lowLatencyMode: true,
+      backBufferLength: 30,
+      // 'config' recovery arm; current hls.js@1 enforces
+      // liveMaxLatencyDurationCount > liveSyncDurationCount at construction
+      liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 6,
+      maxLiveSyncPlaybackRate: 1.05,
+    });
+  } catch (e) {
+    window.__state.phase = "failed";
+    window.__state.error = "hls ctor: " + (e && e.message || e);
+    return;
+  }
+  window.__hls = hls;
+  hls.on(Hls.Events.ERROR, (_e, d) => {
+    event("hls-error", { fatal: !!d.fatal, type: d.type, details: d.details, rebuilds: hlsRebuilds });
+    log("HLS", d.fatal ? "FATAL" : "warn", d.type, d.details);
+    if (d.fatal) {
+      hlsRebuilds++;
+      window.__state.phase = "rebuilding";
+      window.__state.rebuilds = hlsRebuilds;
+      try { hls.destroy(); } catch (e2) {}
+      if (hlsRebuilds <= 60) setTimeout(buildHls, 2500);   // v5 bootstrapRetryDelay
+      else { window.__state.phase = "failed"; window.__state.error = "hls rebuilds exhausted"; }
+    }
+  });
+  hls.on(Hls.Events.MANIFEST_PARSED, (_e, d) => {
+    // lock to the top (source) rendition — measurement wants full pixels
+    let best = 0;
+    d.levels.forEach((lv, i) => { if ((lv.height || 0) >= (d.levels[best].height || 0)) best = i; });
+    hls.currentLevel = best;
+    event("hls-manifest", { levels: d.levels.length, lockedLevel: best, rebuilds: hlsRebuilds,
+                            h: d.levels[best] && d.levels[best].height });
+    vid.play().catch(() => {});
+    window.__state.phase = "playing";
+  });
+  hls.loadSource(URL_);
+  hls.attachMedia(vid);
+}
 function hlsConnect() {
   window.__state.phase = "loading-hlsjs";
   const s = document.createElement("script");
   s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
   s.onload = () => {
-    if (!window.Hls || !Hls.isSupported()) {
-      window.__state.phase = "failed"; window.__state.error = "hls.js unsupported"; return;
-    }
-    let hls;
-    try {
-      hls = new Hls({
-        lowLatencyMode: true,
-        backBufferLength: 30,
-        // 'config' recovery arm; current hls.js@1 enforces
-        // liveMaxLatencyDurationCount > liveSyncDurationCount at construction
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        maxLiveSyncPlaybackRate: 1.05,
-      });
-    } catch (e) {
-      window.__state.phase = "failed";
-      window.__state.error = "hls ctor: " + (e && e.message || e);
-      return;
-    }
-    window.__hls = hls;
-    hls.on(Hls.Events.ERROR, (_e, d) => {
-      event("hls-error", { fatal: !!d.fatal, type: d.type, details: d.details });
-      log("HLS", d.fatal ? "FATAL" : "warn", d.type, d.details);
-    });
-    hls.on(Hls.Events.MANIFEST_PARSED, (_e, d) => {
-      // lock to the top (source) rendition — measurement wants full pixels
-      let best = 0;
-      d.levels.forEach((lv, i) => { if ((lv.height || 0) >= (d.levels[best].height || 0)) best = i; });
-      hls.currentLevel = best;
-      event("hls-manifest", { levels: d.levels.length, lockedLevel: best,
-                              h: d.levels[best] && d.levels[best].height });
-      vid.play().catch(() => {});
-      window.__state.phase = "playing";
-    });
-    hls.loadSource(URL_);
-    hls.attachMedia(vid);
+    buildHls();
     setInterval(() => {
-      window.__state.hlsLatency = (typeof hls.latency === "number") ? hls.latency : null;
-      batch.push({ kind: "viewer-hls", t: wallClock(), hlsLatency: hls.latency,
-                   targetLatency: hls.targetLatency, currentLevel: hls.currentLevel,
+      const hls = window.__hls;
+      if (!hls) return;
+      let lat = null;
+      try { lat = (typeof hls.latency === "number") ? hls.latency : null; } catch (e) {}
+      window.__state.hlsLatency = lat;
+      batch.push({ kind: "viewer-hls", t: wallClock(), hlsLatency: lat,
+                   currentLevel: hls.currentLevel, rebuilds: hlsRebuilds,
                    playbackRate: vid.playbackRate,
                    buffered: vid.buffered.length ?
                      vid.buffered.end(vid.buffered.length - 1) - vid.currentTime : null });
