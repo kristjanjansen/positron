@@ -1268,3 +1268,43 @@ untouched; port 8889 freed; m2m-4k udd chromes killed; own ffmpeg killed; siblin
 alive (moq-4k publisher encFps 30.0, moq-audio-* running). Files: pub4k-room.html,
 run-4k-sfu.mjs, analyze-4k.py; results/m2m-4k-sfu-a{1..5}-*.jsonl, results/hls-4k-2026-08-26.jsonl;
 SDP evidence artifacts/pub4k-{offer,answer}-p.sdp; screenshots logs/4k-*-{mesh,final}.png.
+
+============================================================================
+
+# REPLAY — synced VOD replay with cues (proto/replay, 2026-08-26)
+
+The p3b pipeline reused end-to-end for the REPLAY question: record a live show
+(show.html canvas stage: burned 64-block wall-clock row at the K-row geometry
++ a second burned CUE ROW carrying firedAt-ms + cue seq) via CDP screencast →
+ffmpeg → RTMPS while 12 cues fire through the DEPLOYED elektron-rtc room, then
+replay the VOD with the cue log and measure every fire against the pixels.
+
+- Worker: additive cue-log added to workers/rtc (version 53ab064b) — cue
+  frames persisted per room, `GET /room/{name}/cuelog` (token). Sender stamps
+  verbatim; DO clock marked untrusted. grid.html re-verified post-redeploy.
+- **No-PDT fact re-verified**: Stream VOD manifests (master + rendition) carry
+  zero EXT-X-PROGRAM-DATE-TIME → `hls.playingDate` is null on VOD → anchor
+  must be metadata. `wallClockAtPlayhead = T0 + currentTime·1000`.
+- **T0 anchors measured** (VOD de39bf1916469a4bc8b18e73a8726762, 200.02 s):
+  content-derived (decode burned clock over first 15 frames, median, 64 ms
+  spread) = truth; publisher first-frame stamp −109 ms; **Stream API
+  `created` +6176 ms** — naive API anchoring = 6 s of cue misplacement.
+- **Replay engine = live engine**: src/timed-messages.js imported UNCHANGED,
+  fed a fake `hls.playingDate` getter (T0 + currentTime·1000). Seek = destroy
+  + rebuild from the full cuelog (rebuild-never-patch); pastWindow routes old
+  cues through onMissed as caught-up.
+- **Straight-through accuracy: p50 59 / p95 71 ms, range 37–71 (n=12)** —
+  error = decoded burned clock on the glass at fire − fireAt. Inside the live
+  engine's own 65–98 ms band; components = 100 ms poll + 33 ms frame quantum.
+  Burned-row decode from the locked top rendition: 5427/5427 (100 %).
+- Seek tests 11/11 assertions green: late join +65 s → latest cue caught-up
+  instantly, no re-fires, next cue fires at 53 ms err; forward seek catch-up;
+  backward seek rewinds state (later cues → pending) and re-fires at 56 ms.
+- **Live-vs-replay asymmetry (finding)**: "now" cues replay−live = 0–1 ms
+  (live transit+draw ≈ replay poll+quantum, they cancel); scheduled cues
+  +33…+67 ms (live fired from queue within 2–31 ms). Replay honors operator
+  INTENT by default; `fireDelayMs=N` reproduces the live feel (verified 500 →
+  +581 ms).
+- Cleanup: live input 728e86a0 deleted (404 verified), **VOD de39bf19 KEPT
+  and playable after input deletion** (manifest 200). 200 s recorded total.
+  Full detail: proto/replay/README.md + artifacts/replay-report.json.
