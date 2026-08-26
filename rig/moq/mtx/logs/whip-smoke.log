@@ -1,0 +1,56 @@
+ffmpeg version 9.0.1 Copyright (c) 2000-2026 the FFmpeg developers
+  built with Apple clang version 21.0.0 (clang-2100.1.1.101)
+  configuration: --prefix=/opt/homebrew/Cellar/ffmpeg/9.0.1_1 --enable-shared --enable-pthreads --enable-version3 --cc=clang --host-cflags= --host-ldflags= --enable-ffplay --enable-gpl --enable-libsvtav1 --enable-libopus --enable-libx264 --enable-libmp3lame --enable-libdav1d --enable-libvmaf --enable-libvpx --enable-libx265 --enable-openssl --enable-videotoolbox --enable-audiotoolbox --enable-neon
+  libavutil      61.  1.101 / 61.  1.101
+  libavcodec     63.  1.101 / 63.  1.101
+  libavformat    63.  1.101 / 63.  1.101
+  libavdevice    63.  1.101 / 63.  1.101
+  libavfilter    12.  1.101 / 12.  1.101
+  libswscale     10.  1.101 / 10.  1.101
+  libswresample   7.  1.101 /  7.  1.101
+Input #0, lavfi, from 'testsrc2=size=1280x720:rate=30':
+  Duration: N/A, start: 0.000000, bitrate: N/A
+  Stream #0:0: Video: wrapped_avframe, yuv420p, 1280x720 [SAR 1:1 DAR 16:9], 30 fps, 30 tbr, 30 tbn
+Input #1, lavfi, from 'sine=frequency=440':
+  Duration: N/A, start: 0.000000, bitrate: 705 kb/s
+  Stream #1:0: Audio: pcm_s16le, 44100 Hz, mono, s16, 705 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (wrapped_avframe (native) -> h264 (libx264))
+  Stream #1:0 -> #0:1 (pcm_s16le (native) -> opus (libopus))
+Press [q] to stop, [?] for help
+[libx264 @ 0xa3f409180] using SAR=1/1
+[libopus @ 0xa3f409c00] No bit rate set. Defaulting to 96000 bps.
+[libx264 @ 0xa3f409180] using cpu capabilities: ARMv8 NEON DotProd I8MM
+[libx264 @ 0xa3f409180] profile Constrained Baseline, level 3.1, 4:2:0, 8-bit
+[libx264 @ 0xa3f409180] 264 - core 165 r3222 b35605a - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 - http://www.videolan.org/x264.html - options: cabac=0 ref=3 deblock=1:0:0 analyse=0x1:0x111 me=hex subme=7 psy=1 psy_rd=1.00:0.00 mixed_ref=1 me_range=16 chroma_me=1 trellis=1 8x8dct=0 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=-2 threads=18 lookahead_threads=3 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=0 weightp=0 keyint=60 keyint_min=6 scenecut=40 intra_refresh=0 rc_lookahead=40 rc=abr mbtree=1 bitrate=2000 ratetol=1.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+[WHIP muxer @ 0xa3f010000] Muxer state=10, buffer_size=4096, max_packet_size=1184, elapsed=1021.31ms(init:2.71,offer:0.01,answer:5.06,udp:0.12,ice:12.53,dtls:1000.73,srtp:0.06)
+Output #0, whip, to 'http://127.0.0.1:18889/moqmtx/whip':
+  Metadata:
+    encoder         : Lavf63.1.101
+  Stream #0:0: Video: h264 (Baseline), yuv420p(tv, progressive), 1280x720 [SAR 1:1 DAR 16:9], q=2-31, 2000 kb/s, 30 fps, 90k tbn
+    Metadata:
+      encoder         : Lavc63.1.101 libx264
+    Side data:
+      CPB properties: bitrate max/min/avg: 0/0/2000000 buffer size: 0 vbv_delay: N/A
+  Stream #0:1: Audio: opus, 48000 Hz, stereo, s16, 96 kb/s
+    Metadata:
+      encoder         : Lavc63.1.101 libopus
+[vist#0:0/wrapped_avframe @ 0xa3ec20180] Resumed reading at pts 0.533 with rate 1.050 after a lag of 1.002s
+frame=    0 fps=0.0 q=0.0 size=N/A time=00:00:00.15 bitrate=N/A speed=0.101x elapsed=0:00:01.52    frame=    0 fps=0.0 q=0.0 size=N/A time=00:00:00.15 bitrate=N/A speed=0.076x elapsed=0:00:02.02    [aist#1:0/pcm_s16le @ 0xa3ec20300] Resumed reading at pts 0.511 with rate 1.050 after a lag of 2.430s
+frame=    4 fps=1.6 q=34.0 size=N/A time=00:00:00.31 bitrate=N/A speed=0.124x elapsed=0:00:02.52    frame=   20 fps=6.6 q=34.0 size=N/A time=00:00:00.79 bitrate=N/A speed=0.261x elapsed=0:00:03.03    frame=   36 fps= 10 q=33.0 size=N/A time=00:00:01.39 bitrate=N/A speed=0.393x elapsed=0:00:03.54    frame=   52 fps= 13 q=32.0 size=N/A time=00:00:01.83 bitrate=N/A speed=0.452x elapsed=0:00:04.05    frame=   68 fps= 15 q=32.0 size=N/A time=00:00:02.47 bitrate=N/A speed=0.543x elapsed=0:00:04.55    frame=   84 fps= 17 q=32.0 size=N/A time=00:00:02.95 bitrate=N/A speed=0.584x elapsed=0:00:05.05    frame=  100 fps= 18 q=32.0 size=N/A time=00:00:03.53 bitrate=N/A speed=0.635x elapsed=0:00:05.56    frame=  116 fps= 19 q=32.0 size=N/A time=00:00:03.99 bitrate=N/A speed=0.658x elapsed=0:00:06.06    frame=  132 fps= 20 q=32.0 size=N/A time=00:00:04.61 bitrate=N/A speed=0.702x elapsed=0:00:06.57    frame=  148 fps= 21 q=32.0 size=N/A time=00:00:05.11 bitrate=N/A speed=0.722x elapsed=0:00:07.07    frame=  164 fps= 22 q=29.0 size=N/A time=00:00:05.61 bitrate=N/A speed=0.74x elapsed=0:00:07.58    frame=  180 fps= 22 q=32.0 size=N/A time=00:00:06.13 bitrate=N/A speed=0.758x elapsed=0:00:08.09    frame=  196 fps= 23 q=32.0 size=N/A time=00:00:06.73 bitrate=N/A speed=0.783x elapsed=0:00:08.60    frame=  212 fps= 23 q=32.0 size=N/A time=00:00:07.21 bitrate=N/A speed=0.792x elapsed=0:00:09.11    frame=  228 fps= 24 q=32.0 size=N/A time=00:00:07.71 bitrate=N/A speed=0.802x elapsed=0:00:09.61    frame=  244 fps= 24 q=32.0 size=N/A time=00:00:08.29 bitrate=N/A speed=0.819x elapsed=0:00:10.12    frame=  260 fps= 24 q=32.0 size=N/A time=00:00:08.89 bitrate=N/A speed=0.836x elapsed=0:00:10.63    frame=  276 fps= 25 q=32.0 size=N/A time=00:00:09.33 bitrate=N/A speed=0.838x elapsed=0:00:11.14    frame=  292 fps= 25 q=32.0 size=N/A time=00:00:09.97 bitrate=N/A speed=0.856x elapsed=0:00:11.65    frame=  308 fps= 25 q=32.0 size=N/A time=00:00:10.45 bitrate=N/A speed=0.86x elapsed=0:00:12.15    frame=  324 fps= 26 q=32.0 size=N/A time=00:00:10.93 bitrate=N/A speed=0.863x elapsed=0:00:12.66    frame=  339 fps= 26 q=32.0 size=N/A time=00:00:11.49 bitrate=N/A speed=0.872x elapsed=0:00:13.17    frame=  356 fps= 26 q=32.0 size=N/A time=00:00:12.11 bitrate=N/A speed=0.885x elapsed=0:00:13.68    frame=  372 fps= 26 q=32.0 size=N/A time=00:00:12.61 bitrate=N/A speed=0.889x elapsed=0:00:14.19    frame=  387 fps= 26 q=32.0 size=N/A time=00:00:13.05 bitrate=N/A speed=0.888x elapsed=0:00:14.69    frame=  403 fps= 27 q=32.0 size=N/A time=00:00:13.63 bitrate=N/A speed=0.897x elapsed=0:00:15.19    frame=  419 fps= 27 q=32.0 size=N/A time=00:00:14.09 bitrate=N/A speed=0.897x elapsed=0:00:15.70    frame=  435 fps= 27 q=32.0 size=N/A time=00:00:14.71 bitrate=N/A speed=0.908x elapsed=0:00:16.21    frame=  451 fps= 27 q=32.0 size=N/A time=00:00:15.21 bitrate=N/A speed=0.91x elapsed=0:00:16.71    frame=  467 fps= 27 q=32.0 size=N/A time=00:00:15.79 bitrate=N/A speed=0.917x elapsed=0:00:17.22    frame=  483 fps= 27 q=32.0 size=N/A time=00:00:16.23 bitrate=N/A speed=0.915x elapsed=0:00:17.73    frame=  499 fps= 27 q=32.0 size=N/A time=00:00:16.83 bitrate=N/A speed=0.923x elapsed=0:00:18.23    frame=  515 fps= 27 q=32.0 size=N/A time=00:00:17.31 bitrate=N/A speed=0.924x elapsed=0:00:18.74    frame=  531 fps= 28 q=32.0 size=N/A time=00:00:17.81 bitrate=N/A speed=0.925x elapsed=0:00:19.24    frame=  541 fps= 27 q=32.0 size=N/A time=00:00:18.67 bitrate=N/A speed=0.945x elapsed=0:00:19.75    frame=  541 fps= 27 q=32.0 size=N/A time=00:00:19.21 bitrate=N/A speed=0.948x elapsed=0:00:20.25    frame=  541 fps= 26 q=32.0 size=N/A time=00:00:19.73 bitrate=N/A speed=0.95x elapsed=0:00:20.76    [vist#0:0/wrapped_avframe @ 0xa3ec20180] Resumed reading at pts 20.067 with rate 1.050 after a lag of 1.461s
+[WHIP muxer @ 0xa3f010000] Failed to read response from DELETE url=http://127.0.0.1:18889/moqmtx/whip/df20fb36-edaa-4e85-9ec7-37a6b6e1da72
+[WHIP muxer @ 0xa3f010000] Failed to dispose resource, ret=-5
+[out#0/whip @ 0xa3e808900] video:4913KiB audio:263KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+frame=  600 fps= 28 q=-1.0 Lsize=N/A time=00:00:20.00 bitrate=N/A speed=0.947x elapsed=0:00:21.12    
+[libx264 @ 0xa3f409180] frame I:10    Avg QP:13.19  size: 27921
+[libx264 @ 0xa3f409180] frame P:590   Avg QP:22.92  size:  8053
+[libx264 @ 0xa3f409180] mb I  I16..4: 89.0%  0.0% 11.0%
+[libx264 @ 0xa3f409180] mb P  I16..4:  2.3%  0.0%  0.1%  P16..4:  6.9%  4.2%  1.5%  0.0%  0.0%    skip:85.1%
+[libx264 @ 0xa3f409180] final ratefactor: 26.16
+[libx264 @ 0xa3f409180] coded y,uvDC,uvAC intra: 4.8% 12.3% 10.4% inter: 3.1% 7.2% 5.8%
+[libx264 @ 0xa3f409180] i16 v,h,dc,p: 89%  8%  2%  0%
+[libx264 @ 0xa3f409180] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 33% 25% 27%  4%  2%  2%  3%  2%  3%
+[libx264 @ 0xa3f409180] i8c dc,h,v,p: 70%  9% 20%  1%
+[libx264 @ 0xa3f409180] ref P L0: 61.3% 21.0% 17.7%
+[libx264 @ 0xa3f409180] kb/s:2012.17
+ffmpeg exit: 0

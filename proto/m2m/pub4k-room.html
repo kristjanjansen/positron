@@ -329,6 +329,18 @@ const TRACK_NAME = "video-" + MY_ID;
 const midToPid = new Map();
 
 async function publish() {
+  // gum=1: one-shot FAKE-device getUserMedia (driver passes
+  // --use-fake-device-for-media-stream; the real, wedged camera is never
+  // touched). Chrome hides encoderImplementation/decoderImplementation in
+  // getStats from pages that never captured media — this unlocks them.
+  if (q.get("gum") === "1" || q.get("gum") === "keep") {
+    try {
+      const gs = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (q.get("gum") === "keep") window.__gumStream = gs;   // stay "capturing" — stats exposure gate
+      else gs.getTracks().forEach(t => t.stop());
+      window.__state.gum = "ok";
+    } catch (e) { window.__state.gum = "failed:" + e.name; event("gum-failed", { error: String(e).slice(0, 120) }); }
+  }
   const RETRIES = +(sessionStorage.getItem("m2m4k_connect_retry") || 0);
   if (HOLD && !RETRIES) {
     window.__state.phase = "held";
@@ -377,12 +389,24 @@ async function publish() {
   // codec preference: H.264 first so the negotiation lands on VideoToolbox
   // (comparable to the MoQ 4K matrix). level-asymmetry-allowed lets the
   // encoder exceed the SDP's nominal level for 4K.
-  if (IS_PUB && CODEC === "h264") {
+  // codec=h264   -> H.264 first, Chrome's default profile order (negotiates
+  //                 42e01f Constrained Baseline -> OpenH264 SOFTWARE on mac)
+  // codec=h264hi -> High-profile (64xxxx) H.264 FIRST -> routes to the
+  //                 VideoToolbox HARDWARE encoder (the profile is only
+  //                 hw-supported on mac; same encoder class as MoQ RUNBOOK §9)
+  // codec=h265  -> H.265 FIRST: the ONLY hw-encodable codec the SFU answers on
+  //                this platform (the SFU strips High/Main H.264 — answer keeps
+  //                only 42e01f CB + VP8/VP9/AV1/H265; CB maps to OpenH264 sw)
+  if (IS_PUB && (CODEC === "h264" || CODEC === "h264hi" || CODEC === "h265")) {
     try {
       const caps = RTCRtpSender.getCapabilities("video");
-      const h264 = caps.codecs.filter(c => /h264/i.test(c.mimeType));
-      const rest = caps.codecs.filter(c => !/h264/i.test(c.mimeType));
-      if (h264.length) { tx.setCodecPreferences(h264.concat(rest)); window.__state.codecPref = "h264"; }
+      const isHi = c => /profile-level-id=64/.test(c.sdpFmtpLine || "");
+      const want = CODEC === "h265" ? /h265|hevc/i : /h264/i;
+      let front = caps.codecs.filter(c => want.test(c.mimeType));
+      if (CODEC === "h264hi") front = front.filter(isHi).concat(front.filter(c => !isHi(c)));
+      const rest = caps.codecs.filter(c => !want.test(c.mimeType));
+      if (front.length) { tx.setCodecPreferences(front.concat(rest)); window.__state.codecPref = CODEC; }
+      event("codec-caps", { front: front.map(c => c.mimeType + " " + (c.sdpFmtpLine || "")) });
     } catch (e) { event("setcodecpref-failed", { error: String(e).slice(0, 200) }); }
   }
   const offer = await pc.createOffer();

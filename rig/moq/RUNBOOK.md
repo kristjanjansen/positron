@@ -851,3 +851,43 @@ results in `results/moq-audio-chromium*.jsonl`.
 - **Verdict: (c) native = nonexistent, no timeline signal; plugin ecosystem healthy.** Our
   documented paths are not obsoleted; two cheap experiments if wanted: obs-moq plugin →
   CF draft-14 (interop + ThreatLocker), and dropping the ffmpeg|moq-pub hop for local mediamtx.
+
+## 12. mediamtx + the catalog shim — LOCAL-VENUE chain: encoder → mediamtx MoQ → browser
+
+⏱ START 2026-08-26 07:41 UTC (mediamtx-shim agent; owns this section only). Conditions:
+AC power 100%, load avg 3.6/12. Resources: port 8888 (page/log server), udd prefix
+`moq-mtx`, own mediamtx instance (config `rig/moq/mtx/mtx.yml`, high ports 188xx),
+own ffmpeg (WHIP into it). Sibling processes (8889/8890/8896, moq-4k/audio udds) untouched.
+
+### 12.0 Pre-experiment source reading (✅ read v1.20.1 sources from GitHub + binary strings)
+
+mediamtx 1.20.1's MoQ server is NOT WARP/CMAF. What it actually speaks, from
+`internal/servers/moq/` + `internal/protocols/moq/` (v1.20.1 tag):
+- **Drafts**: moqt-16…moqt-19 (WT subprotocol negotiation); draft-17+ SETUP over uni
+  streams type 0x2F00; its own embedded web reader pins moqt-19.
+- **Path, not namespace**: the stream path rides the WebTransport CONNECT URL
+  (`https://host:8892/<path>`); the MoQT namespace tuple in SUBSCRIBE is **ignored**
+  (its own reader hardcodes namespace `"stream"`). Native QUIC uses a PATH setup option.
+- **Catalog**: track name **`.catalog`** (same NAME as WARP) but the SCHEMA is
+  **draft-ietf-moq-msf-00**: `{version:1, tracks:[{name:"0"|"1"…, packaging:"loc",
+  isLive, codec, width…, samplerate, channels, initData?}]}` — track names are numeric
+  indices, packaging is **"loc"**, NOT cmaf; H.264 is announced as `avc3.640028`
+  (hardcoded string, in-band params), Opus as `opus` + samplerate/channels (no initData);
+  AAC/FLAC carry base64 initData. Catalog delivered once as group 0 on the subscription.
+- **Media wire format**: one frame = one MoQ **group** on its own uni stream (subgroup
+  header type 0x11 = subgroup+props, groupID increments per frame), single object whose
+  properties carry a **Timestamp** (PTS), payload = **raw AVCC** (4-byte-length-prefixed
+  NALUs) for H.264/H.265, raw packet for Opus/VP8/VP9/AV1. No fMP4, no init segment.
+- **SUBSCRIBE shape** (draft-19): {requestID, namespace, trackName, params} — priority/
+  filter/forward moved into params in 18+, which matches @moq/net's v15+ encoder; each
+  request on its own bidi stream (matches mediamtx's one-message-per-stream reader).
+  SUBSCRIBE_OK: {trackAlias, params, trackProperties(empty)}.
+- **TLS**: moqServerCert/moqServerKey (auto.crt = ECDSA but 10-YEAR validity → fails
+  Chrome's serverCertificateHashes ≤14-day rule; fix = own 10-day ECDSA cert). Server
+  serves `https://…/<path>/fingerprint` (SHA-256 hex of the DER cert) for pinning;
+  @moq/net `connect()` accepts `{webtransport:{serverCertificateHashes:[{value:<hex>}]}}`
+  directly — no custom transport needed, no Chrome cert flags needed.
+- **Shim implication**: the §7 prediction was half right — a catalog shim is needed, but
+  for mediamtx it is msf-00/"loc"/AVCC (simpler than CMAF: no mp4 demux, just
+  AVCC→AnnexB), while IETF moq-pub/CF remains WARP/CMAF (`streamingFormat:1`,
+  `1.m4s` moof/mdat + `0.mp4` init). One player, two catalog branches ⇒ covers both.

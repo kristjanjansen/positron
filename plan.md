@@ -137,6 +137,12 @@ p50 92 ms; 2-way 74 ms = the WHEP baseline exactly.** Phase-1 details in plan-m2
 ✅ Trap: `?protocol=llhls` on a **non**-LL input silently returns a plain v6 playlist with zero LL tags — easy
 to mistake for "LL-HLS is broken". The switch is the `preferLowLatency` field, not the query parameter.
 
+✅ Trap #2 (session 5): **4K ingest silently disables LL-HLS** — a 3840x2160 RTMPS push into a
+`preferLowLatency:true` input produced playlists with no PART/SERVER-CONTROL tags (plain 2 s
+segments). Also empirically settled: Stream accepts 4K ingest but **transcodes down — delivery
+tops out at 1920x1080** (no documented limit anywhere; proven by rendition list + frame grab).
+Keep Stream ingest at 1080p for both reasons.
+
 ### 2.2 WebRTC — mind the gaps
 
 📄 Beta since 2022-09-27; docs' last substantive edit 2024-09-12. The "coming soon" list is verbatim 2022 text:

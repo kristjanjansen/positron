@@ -36,6 +36,16 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### 4K on SFU + HLS — ✅ SETTLED: MoQ is the only 4K path
+- ✅ SFU: 2160p locks (zero silent downscale, BWE never limits) but the SFU
+  accepts H.264 only at Constrained Baseline → Mac Chrome lands on SOFTWARE
+  OpenH264 → 12–14 fps + ~100 ms extra; H.265 gets hw but queues (p95 681 ms).
+  SFU stays ≤1080p.
+- ✅ HLS: 4K RTMPS ingest ACCEPTED, input recorded 3840x2160 — but transcoded,
+  top rendition 1920x1080 (manifest + frame grab). No limits doc exists.
+- ✅ New trap: 4K ingest silently drops LL-HLS mode (no PART tags despite
+  preferLowLatency) — plan.md §2.1 trap #2. Cleanup verified, input deleted.
+
 ### MoQ audio spike — ✅ AUDIO WORKS: 32.6 ms, A/V skew −4 ms, zero sync logic
 - ✅ Chromium: audio g2g 32.6/41.6 ms ≈ video; 0 decode errors; skew p50 −3.8 ms
   free (both tracks at latency ~0). Opus = the cross-browser codec (AAC missing

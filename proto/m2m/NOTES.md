@@ -1179,3 +1179,92 @@ real ~15 Mbps through BWE — separates encoder-limited from bandwidth-limited),
 if resolution degrades. Sender knobs per brief: contentHint=detail, degradationPreference=
 maintain-resolution, scaleResolutionDownBy=1, maxBitrate 15 Mbps, H.264 codec-pref (same
 VideoToolbox class as MoQ). Telemetry all plain fetch (lessons #4/#5).
+
+### Checkpoint 4K-A1/A2 — resolution LOCKS, framerate pays; encoder is OpenH264 SW (10:20-10:24 EEST)
+A1 (Playwright chromium): 2160p held for 100% of 1227 decoded frames (probe inbound 3840x2160,
+qualityLimitationResolutionChanges=0), fps sagged 30->11, qlr=cpu (73.8s cpu vs 20.5s none),
+g2g p50 185 / p95 231 ms, encode 57.2 ms/frame, avg send only 1.2 Mbps (synthetic content,
+targetBitrate ~3.4 Mbps still ramping), 0 checksum fails, 0 freezes.
+A2 (REAL Chrome, same config): identical signature — 2160p locked, fps ~11-16, qlr=cpu,
+encode ~54 ms/frame. NOT a VideoToolbox number. Cause found (web + fmtp evidence): the SFU
+negotiation lands on profile-level-id=42e01f (Constrained Baseline) and Chrome/mac maps CB
+-> OpenH264 SOFTWARE; VideoToolbox hw is only behind High/Main profiles. WebCodecs (MoQ rig)
+could ask prefer-hardware directly; WebRTC can't — but setCodecPreferences with High-profile
+(64xxxx) first should route hw. -> A3 codec=h264hi arm. encoderImplementation string hidden
+(Chrome stats gate: page must be capturing) — gum=keep (fake device, camera untouched) next arm.
+degradationPreference=maintain-resolution WORKS as specified: resolution never gave an inch.
+
+### Checkpoint 4K-A3 — SDP smoking gun: the SFU strips hw-encodable H.264 (10:28-10:31 EEST)
+codec=h264hi arm: Chrome's offer lists High-profile H.264 FIRST (PT 118, 64001f — the
+VideoToolbox-only entry; caps even show 640034 = High 5.2). CF's ANSWER keeps ONLY
+profile-level-id=42e01f CB H.264 + VP8 + AV1 + VP9 + H265 (artifacts/pub4k-{offer,answer}-p.sdp).
+Chrome maps CB H.264 -> OpenH264 SOFTWARE (encoderImplementation now visible via gum=keep:
+"OpenH264"; probe's own 360p track shows libvpx). => Over this SFU, hw H.264 is UNREACHABLE
+from Chrome/mac. The answer DOES carry H265 (PT 49) and Chrome offered it -> possible
+VideoToolbox path via H.265 -> arm A4 codec=h265.
+
+### Checkpoint 4K-A4 — H.265 = VideoToolbox HW over the SFU, negotiated first try (10:33 EEST)
+codec=h265 -> answer takes H265 (profile-id=1, level-id=186), encoderImplementation
+"VideoToolbox", 2160p locked. fps oscillates 12-26 with qlr flapping none<->cpu (hw encoder,
+so the cpu-adaptation is reacting to the whole send pipeline: 4K canvas capture + ARGB->I420
+conversion, not OpenH264). totalEncodeTime misleading for async hw (228 ms/frame includes
+queue wait). g2g mid-run noisy 150-800 ms. Full numbers after run end.
+
+### Checkpoint 4K-A4 final numbers (run 10:33-10:35 EEST, 90 s)
+H265/VideoToolbox: 2160p locked 1618/1618 frames; steady fps median only 14.5 (min 1 during
+ramp, max 33); qlr cpu 70.7s/none 31.7s, resChanges 0; g2g STEADY p50 210 / p95 681 / p99 871 ms
+— hw encode but WORSE tail than OpenH264 (Chrome's H265 send path queues: totalEncodeTime
+193 ms/frame incl. async queue wait). Decoder side: VideoToolboxVideoDecoder hw, 1 freeze 0.24s,
+pli 10. avg send 1.17 Mbps (synthetic), targetBitrate 2.4 Mbps, BANDWIDTH LIMITATION 0.0 s.
+=> Chrome/mac WebRTC cannot do clean 4K30 with ANY codec the SFU accepts; the wall is the
+browser send pipeline (sw encoder for CB H.264; queued hw path for H265), never the SFU
+(which forwarded 2160p flawlessly in all arms) and never bandwidth (qlDur.bandwidth=0 in
+every arm). A5 = 4K15 test running.
+
+### Checkpoint 4K-A5 + SFU matrix COMPLETE (10:35-10:37 EEST)
+A5 4K15 CB-H264: even 15 fps does not hold — steady fps 10 (Chrome cpu-adaptation backs
+OpenH264 off further than its 18 fps ceiling), 2160p locked 1040/1040, g2g STEADY p50 205 /
+p95 241. Zero loss, zero freezes, decode hw (VideoToolboxVideoDecoder).
+SFU 4K MATRIX (all arms: 2160p locked, resChanges 0, qlDur.bandwidth 0.0 s):
+| arm | codec/enc | steady fps (target) | g2g p50/p95 ms |
+| A1 4K30 chromium | CB-H264/OpenH264 sw | 11 (30) | 185/231 |
+| A2 4K30 chrome | CB-H264/OpenH264 sw | 12 (30) | 217/261 |
+| A3 4K30 hi-pref | SFU forces CB -> OpenH264 | 13-14 (30) | 164/249 |
+| A4 4K30 h265 | H265/VideoToolbox HW | 14.5 (30) | 210/681 |
+| A5 4K15 | CB-H264/OpenH264 sw | 10 (15) | 205/241 |
+vs 720p SFU baseline p50 74-95 ms and MoQ 4K30 47 ms / 30 fps (same machine, RUNBOOK §9).
+
+### Checkpoint 4K-B1 — Stream HLS: 4K ingest ACCEPTED, output CAPPED at 1080p (10:37-10:38 EEST)
+Own input 8c1e9933855ea875e64cdfe6c82f9141 (elektron-4k-hls-test, preferLowLatency true,
+recording automatic — REQUIRED for live playback manifests; brief said "recording off" but an
+off-mode input has no playback URLs to measure). Push: ffmpeg@7 (ffmpeg 9 dropped
+-filter_script), testsrc2 3840x2160@30, x264 superfast High 5.1 CBR 13 Mbps, GOP 60, epoch
+burn-in. RTMPS ACCEPTED 4K30: connected in 4 s, manifest 200 in 16 s (push 07:37:53Z,
+connected 07:37:57Z, master 200 at 07:38:09Z). ffmpeg ~138% cpu, sustained realtime.
+HLS master renditions: 426x240, 640x360, 854x480, 1280x720, TOP 1920x1080 (avc1.640028,
+BANDWIDTH 15.08 Mbps) — NO 2160p. DASH heights identical (1080 max, ~14 Mbps top).
+Top-rendition frame grab measures 1920x1080 (ffprobe of stream: h264 High L4.0 30 fps).
+=> Cloudflare TRANSCODES 4K down; delivery ceiling 1080p. AND: child playlist carries NO
+LL-HLS PART/SERVER-CONTROL tags (2.0 s full segments, TARGETDURATION 3) despite
+preferLowLatency=true — 4K input appears to also drop the LL tag set (720p rig had it,
+plan.md §2.1). Recording video id de0bf8a2110916bd302e006f1d9590f8 (delete at cleanup).
+
+### Checkpoint 4K-WRAP — verdicts + cleanup ✅ (10:41 EEST)
+BONUS: the VOD recording of the 4K broadcast ALSO tops out at 1920x1080 (same 5-rung ladder),
+and CF's video object records input {width:3840,height:2160} — proof the full 4K reached them.
+VERDICTS:
+(A) SFU: transport carries 2160p intact (every arm: received 3840x2160, 0 res switches,
+qlDur.bandwidth=0) but Chrome/mac CANNOT FEED it at 30 fps: the SFU only answers CB H.264
+(42e01f -> OpenH264 sw, 54-57 ms/frame -> 10-14 fps) and strips the hw High-profile offer;
+H265 negotiates VideoToolbox hw but Chrome's H265 send path queues (steady 14.5 fps, p95
+681 ms). Locked-2160p-at-<=15fps, g2g ~165-217 ms p50 vs 74-95 ms 720p baseline. 4K stage
+feed over the SFU: NO (not at 30 fps from a Mac browser).
+(B) Stream HLS: RTMPS accepts 4K30 fine (live in 16 s, zero errors) but delivery is
+TRANSCODED-CAPPED at 1920x1080 (HLS+DASH+VOD; no docs page states this — stream-live/limits
+404s, FAQ recommendations stop at 1080p). 4K stage feed over Stream: NO (1080p ceiling).
+The only path that delivers real 4K end-to-end remains MoQ (47 ms, RUNBOOK §9).
+Cleanup: input 8c1e9933… + recording de0bf8a2… deleted (404 verified), 4 pre-existing inputs
+untouched; port 8889 freed; m2m-4k udd chromes killed; own ffmpeg killed; siblings verified
+alive (moq-4k publisher encFps 30.0, moq-audio-* running). Files: pub4k-room.html,
+run-4k-sfu.mjs, analyze-4k.py; results/m2m-4k-sfu-a{1..5}-*.jsonl, results/hls-4k-2026-08-26.jsonl;
+SDP evidence artifacts/pub4k-{offer,answer}-p.sdp; screenshots logs/4k-*-{mesh,final}.png.
