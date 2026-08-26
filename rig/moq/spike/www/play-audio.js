@@ -16686,7 +16686,7 @@ var require_play_audio = __commonJS({
         log("FAIL AudioDecoder unsupported");
         return;
       }
-      const CUSHION_MS = 60;
+      const CUSHION_MS = Number(params.get("cushion") ?? 60);
       let dLiveWin = [];
       let aDecoded = 0, aDecErrors = 0, underruns = 0, lateDropMs = 0, ticks = 0;
       let lastTickMediaMs = -1e12;

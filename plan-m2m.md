@@ -150,7 +150,19 @@ flawlessly, so a **~100-line shim** (hang has a `Container.Cmaf` class) likely b
 Platform data: CF never redelivers a CLOSED group (write-once catalogs invisible to late joiners →
 republish every 2 s; join≈1.0 s), no pending-subscribes (subscribe-before-announce errors → retry),
 optimistic SUBSCRIBE_OK then ~10 s close on unserved tracks. draft-16 is NOT auth-only:
-SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ RESOLUTION/FRAMERATE MATRIX (2026-08-26, RUNBOOK §9): 4K30 through the relay is CLEAN —
+SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ AUDIO SPIKE (2026-08-26, RUNBOOK §10): MoQ audio WORKS — 32.6 ms g2g, A/V skew −4 ms with
+ZERO sync logic** (both tracks ride the relay at latency ~0; 0 decode errors in 4546 chunks;
+underruns 0.9 % at a 60 ms cushion). 📄 Safari/iOS ship WebCodecs AudioDecoder since 26.0
+(2025-09; Opus max 2ch + AAC-LC decode — but AAC is ABSENT in open-source Chromium, so **Opus is
+the cross-browser audio codec**, the mirror of H.264 for video). ✅ Trap for implementers: browsers
+REGENERATE AudioDecoder output timestamps (join-skip becomes a permanent phantom offset) — sync on
+encoded-chunk/container timestamps via FIFO map, never `AudioData.timestamp`. The deployed test
+page now probes AudioDecoder on every load and plays audio from `?namespace=elektron-audio-test`
+(iPhone verdict = one page visit). **The MoQ fast tier now has: video ✅, 4K ✅, Safari ✅,
+iOS-on-4G ✅, audio ✅ — remaining gates: draft-16 relay provisioning (USER), catalog shim,
+UDP-hostile-network fallback.**
+
+**✅ RESOLUTION/FRAMERATE MATRIX (2026-08-26, RUNBOOK §9): 4K30 through the relay is CLEAN —
 47 ms p50 / 78 ms p95** (hw encode, 0 errors; now live on the test namespace). 1080p60 also clean
 (33 ms — no latency win over 30 fps: burn-at-capture cancels interval quantization). 4K60 fails
 LOCALLY (VideoToolbox pins ~50 fps → 200 ms queue plateau), not at the relay. **The relay

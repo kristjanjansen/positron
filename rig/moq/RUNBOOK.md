@@ -661,3 +661,160 @@ nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=
 # results/moq-4k-<name>.jsonl via &name=. Rebuild after src edits: §6.3 docker esbuild, entries
 # src/pub-4k.js / src/play-4k.js.
 ```
+
+## 10. Audio spike — does AUDIO work over browser MoQ, and does SAFARI decode it?
+
+⏱ 2026-08-26 ~07:00–07:20 UTC (audio-spike agent). Status: ✅ built + measured in Chromium;
+✅ deployed page extended with an audio probe + audio playback; Safari verdict = research says
+YES (26.0+), device probe live and awaiting a phone visit. Own namespace **`elektron-audio-test`**
+(the sibling-owned `elektron-safari-test` and its publisher untouched).
+
+### 10.0 Research — WebCodecs audio in Safari/WebKit (📄 sources, checked 2026-08-26)
+
+- **AudioDecoder + AudioEncoder shipped in Safari 26.0, macOS AND iOS, on 2025-09-15** (WebKit
+  blog "WebKit Features in Safari 26.0": "expands support for WebCodecs API by adding
+  AudioEncoder and AudioDecoder" — https://webkit.org/blog/17333/webkit-features-in-safari-26-0/;
+  MDN BCD `api.AudioDecoder`/`api.AudioEncoder`: Safari 26 / Safari iOS 26, 2025-09-15;
+  caniuse.com/webcodecs: 16.4–18.7 "partial" = video-only, 26.0+ full). Back-deployed to macOS
+  Sequoia + Sonoma. Safari version numbering jumped 18.7 → 26; anything ≥26 has it.
+- **Codec coverage (from WebKit source, `AudioDecoderCocoa.cpp`/`AudioEncoderCocoa.cpp`, main)**:
+  decode `opus` (max 2 ch; OpusHead `description` optional, parsed for pre-skip), `mp4a.40.x`
+  AAC family (pass the BARE AudioSpecificConfig as description — WebKit wraps it in an
+  ES_Descriptor itself), plus mp3/flac/vorbis/pcm. Encode: Opus + AAC only.
+- ⚠️ Open WebKit bugs that matter: **#302253** (2025-11-10, open) — Safari's AAC *AudioEncoder*
+  emits an esds-wrapped decoder description instead of the bare ASC → cross-browser interop
+  hazard if Safari ever *publishes* AAC (decode is unaffected). **#284075** — on older macOS
+  (Ventura) AudioDecoder fails for opus/mp3 without a description (matters only for
+  back-deployed Safari on old macOS; our catalog always carries the OpusHead → immune).
+- Chrome baseline: AudioDecoder/Encoder since Chrome 94 (2021). Opus everywhere; AAC decode
+  only in proprietary builds (Google Chrome/Edge yes, open-source Chromium/ungoogled no) —
+  **Opus is the safe cross-browser audio codec**, mirror-image of H.264 for video.
+
+### 10.1 Build — audio through the same hang/CF-draft-14 pipeline (all ✅ verified)
+
+Publisher `spike/src/pub-audio.js` (page `www/pub-audio.html`, server `spike/audioserver.py`
+:8896 → logs/moq-audio.log|.jsonl): **NO getUserMedia** — AudioData objects are synthesized in
+JS (48 kHz stereo f32-planar, 960-frame/20 ms chunks, generated *behind* real time on a 10 ms
+timer like a capture device) → **AudioEncoder Opus 48k stereo 96 kbps** (AAC-LC fallback coded
+but unused — Chromium supports opus) → hang legacy container track `audio` (new group per 1 s)
+alongside the §8-style H.264 720p30 `video` track, namespace `elektron-audio-test`. Catalog =
+hang RootSchema with BOTH sections; audio rendition carries the encoder's OpusHead as base64
+`description`. Signal design: 4-note background sequence (330/392/440/494 Hz, 250 ms each, amp
+0.08) + **6 ms 2 kHz tick at amp 0.9 whenever wall-clock ms crosses a 500 ms boundary**; audio
+timestamps are wall-anchored µs advanced by exact sample count, so a tick's media timestamp IS
+its publisher wall time — the player detects the tick (|s|>0.35), rounds its media time to the
+nearest 500 ms and gets the true wall time exactly (one-clock trick, audio edition).
+
+Player `spike/src/play-audio.js` (`www/play-audio.html?dur=90[&cushion=ms]`): decodes both
+tracks; video → canvas → burned-row g2g (the §7/§8 reference); audio → AudioDecoder → WebAudio
+jitter buffer (schedule at mediaStart + rolling-min-live-edge-delta + 60 ms cushion; late chunk
+⇒ underrun++). Measures per tick: `aLat` (decode-output wall − tick wall = audio g2g analog),
+`playLat` (tick wall → WebAudio graph output), `skew` (aLat − rolling-median video g2g),
+underruns/gap ms. JSONL per tick → `results/moq-audio-chromium.jsonl` (+ a second run
+`results/moq-audio-chromium-cushion120.jsonl`, and the phantom-offset run1 kept at
+`spike/logs/moq-audio-run1-badts.jsonl`). Headless Chrome plays WebAudio fine
+(`--autoplay-policy=no-user-gesture-required`; ctx state `running`, outputLatency 32 ms).
+
+### 10.2 ⚠️ THE TRAP THAT COST RUN 1: AudioDecoder output timestamps are fiction
+
+Run 1 showed audio 534 ms behind video — **constant**, p95 within 10 ms of p50. Cause:
+**Chromium's AudioDecoder regenerates output timestamps** (sample-count accumulation from the
+first chunk, ± Opus pre-skip −6.5 ms measured): any content skip at join (Consumer skipping to
+the latency target across the catch-up burst) becomes a **permanent phantom offset** on
+`AudioData.timestamp` — the media looked 500 ms older than it was, while actual delivery was
+fine. Fix (in both players): Opus 20 ms is 1-chunk-in/1-chunk-out, so carry the ENCODED chunk
+timestamps through a FIFO and ignore `AudioData.timestamp` entirely. After the fix the same
+pipeline measured 32 ms. **Any MoQ audio player that trusts decoder output timestamps for sync
+will sooner or later be seconds off without knowing it.**
+
+### 10.3 Chromium numbers (✅ measured, headless Chrome 151, 90 s runs, load avg ~2–5/12)
+
+| metric | audio | video (same run) |
+|---|---|---|
+| g2g p50 (decode-out) | **32.6 ms** | 36.1 ms |
+| g2g p95 | 41.6 ms | — |
+| A/V skew p50 / p95 / max | **−3.8 / +5.3 / 75 ms** (audio slightly AHEAD) | — |
+| playout latency p50 (incl. 60 ms jitter cushion) | 78.4 ms | — |
+| decode errors | 0 (4546 chunks) | 0 (2730 frames) |
+| ticks measured | 175 (2/s × 87 s warm) | — |
+
+- **Audio g2g ≈ video g2g** (32 vs 26–36 ms across §7/§8 runs) — Opus encode+decode is not the
+  bottleneck; transport dominates both. A/V skew is single-digit ms without ANY explicit sync
+  logic — both tracks just ride their own MoQ tracks at latency 0.
+- Underruns at 60 ms cushion: 42 late chunks/90 s (0.9%) = ~20 single misses (10–20 ms past
+  the cushion) + 2 host-load burst stalls (~1.5 s total gap). A parallel cushion=120 run
+  absorbed singles but not bursts (79 total — it overlapped a host load spike that hit two
+  independent players simultaneously ⇒ publisher/host-side, not cushion-fixable). Production
+  answer: adaptive cushion ~100–150 ms, still ≪ LL-HLS.
+- Deployed-page end-to-end (workers.dev player + CF relay + this Mac's publisher): aLat_p50
+  32 ms, skew −4 ms, 0 decode errors — identical to local (row `672ad0df` in /results).
+
+### 10.4 Deployed Safari rig additions (✅ deployed + verified 2026-08-26 07:12 UTC)
+
+`workers/moq-safari/` version aa7454cc:
+- **AudioDecoder capability probe at boot** (index.html): `isConfigSupported` for `opus` AND
+  `mp4a.40.2` (48k stereo), shown on-page ("Audio decode — Opus: YES · AAC-LC: YES") and
+  beaconed (`audioDec/opus/aac`) on EVERY page load regardless of stream content — any device
+  that merely opens the URL answers the Safari-audio question into /results.
+- **Audio playback when the tuned catalog carries an audio section** (play.js): AudioDecoder →
+  WebAudio jitter buffer (§10.1 design incl. the §10.2 FIFO fix), tick-based aLat + A/V skew.
+  AudioContext is created synchronously INSIDE the tap-gesture handler (iOS transient-activation
+  rule) before the module import. On-page AUDIO line + beacon fields `audioCodec, audioState,
+  aDecoded, aLat_p50, avSkew_p50, aUnderruns, aDecErrors`; /results grew an `audio` column +
+  Op:/AAC: flags in features. NOTE: on phones aLat carries the device-clock offset (like g2g),
+  but **avSkew subtracts the video delta so the clock offset cancels — skew is exact on any
+  device**.
+- Default namespace unchanged (`elektron-safari-test` — video-only, sibling-owned); audio is
+  reachable on any device via **`?namespace=elektron-audio-test`**.
+
+**What the user does on the iPhone**: open
+`https://elektron-moq-safari.kristjan-jansen.workers.dev/?namespace=elektron-audio-test`
+in Safari, tap TAP TO START, listen for ~30 s (expect the 4-note loop + 2 ticks/s alongside
+the video). Then check `/results` from anywhere: the phone's row shows Op:/AAC: probe verdicts
+(these alone settle "does iOS decode WebCodecs audio"), audioCodec/audioState (a `susp` marker
+= AudioContext never left suspended = gesture/autoplay issue), aLat, avSkew (trustworthy on
+phone), underruns, errors. ⚠️ A stale §8.5 desktop-Safari tab may still beacon on the OLD
+bundle (rows without audio fields) — only post-07:12Z page loads carry the probe. 📄 Research
+expectation: iOS ≥ 26 → Opus YES + AAC YES; iOS < 26 → "AudioDecoder: NOT AVAILABLE" line
+(video still plays if ≥26.4… note Safari 26.0–26.3 would pass the audio probe while failing
+WebTransport). Real iPhone rows from 07:09–07:11Z (sibling's 4K run: "Mobile Safari 26.5.2",
+WT ✓ H264 ✓ live) predate the audio deploy by 3 min — a revisit will fill the probe columns.
+
+### 10.5 Publisher operations (the ONE process this spike leaves running)
+
+```bash
+# STATUS: tail -f rig/moq/spike/logs/moq-audio.log        (PUB STATS every 60 s)
+# STOP the audio publisher + its server:
+pkill -f moq-audio-pub-udd
+pkill -f audioserver.py
+# START again (both detached):
+cd /Users/s32863/personal/elektron/rig/moq/spike
+nohup python3 audioserver.py 8896 > logs/moq-audio-server.out 2>&1 & disown
+nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --user-data-dir="$PWD/logs/moq-audio-pub-udd" --no-first-run \
+  --autoplay-policy=no-user-gesture-required --disable-background-timer-throttling \
+  --disable-renderer-backgrounding --disable-backgrounding-occluded-windows \
+  --window-size=1300,760 "http://127.0.0.1:8896/pub-audio.html" \
+  > logs/moq-audio-pub-chrome.log 2>&1 & disown
+# Rebuild after src edits: §6.3 docker esbuild, entries src/pub-audio.js src/play-audio.js
+# src/safari-play.js (→ workers/moq-safari/public/play.js, wrangler deploy clean-env §8.6).
+```
+Dies with laptop sleep/reboot like the §8 publisher; restart with the block above.
+
+### 10.6 Verdict (for plan-m2m §1.C)
+
+**"MoQ AUDIO works in the browser today, at video-equal latency: Opus 48 kHz stereo through
+the hang container over CF's draft-14 relay measures g2g p50 32.6 ms / p95 41.6 ms in Chromium
+(video 36 ms in the same run), A/V skew p50 −3.8 ms / |max| 75 ms with NO explicit sync logic,
+0 decode errors in 90 s, 0.9 % late chunks at a 60 ms jitter cushion. Safari decode: research
+says YES since Safari/iOS 26.0 (2025-09-15 — AudioDecoder Opus ≤2ch + AAC-LC, WebKit source
+confirms), and the deployed test page now probes + plays + beacons audio on any device —
+iPhone row in /results pending a user visit with ?namespace=elektron-audio-test. Watch out:
+(a) decoder output timestamps are regenerated — sync on container timestamps, never on
+AudioData.timestamp (§10.2); (b) Opus is the cross-browser audio codec (Chromium lacks AAC,
+Safari has both); (c) Safari's AAC *encoder* description is broken (WebKit #302253) — publish
+Opus."**
+
+Cleanup ✅: player + deploy-verify Chromes killed (`moq-audio-play-udd`, `moq-audio-deployver-udd`);
+publisher + audioserver.py LEFT RUNNING (10.5); siblings' processes/namespaces untouched;
+results in `results/moq-audio-chromium*.jsonl`.
