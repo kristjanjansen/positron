@@ -14,3 +14,5 @@ rig/whep/logs/
 rig/moq/moq-rs-draft14/
 rig/moq/spike/logs/
 *-udd/
+__pycache__/
+*.log
