@@ -201,6 +201,53 @@ EMITS events; editing means editing the score, not the log. Musical time enters
 as a tempo-map KIND on the log (the MIDI-file move), not by abandoning wall
 time. Blurring this is the one way the abstraction turns hostile.
 
+## 5b. RECONSTRUCTION — from Catmull-Rom to generative restoration (2026-08-26)
+
+demo10 generalized: interpolation of sparse mouse samples is the seed of a full
+restoration capability — and demo10's real insight was drawing ALL paths at
+once (evidence + reconstructions overlaid). That is the ethic; the rest is
+engineering.
+
+**The inference spectrum** (one mechanism, rising epistemic risk):
+1. **Interpolation** — between attested samples (Catmull-Rom, crossfade over a
+   tape splice). Bounded by evidence on both sides.
+2. **Inpainting** — filling a gap from surrounding context + priors (missing
+   diary page summarized from adjacent pages; video frame interpolation across
+   a cut; audio inpainting). Plausible, not attested.
+3. **Generative restoration** — creating detail never captured (super-
+   resolution, colorization, voice enhancement, "AI photo enhance"). A NEW WORK
+   conditioned on the trace. This is fabrication — the design's job is to make
+   fabrication HONEST by construction, not to forbid it.
+
+**Architecture (slots into existing seams, no new machinery):**
+- A **reconstructor is an adapter that READS evidence lanes and APPENDS derived
+  events/spans**: `source: reconstructor-<name>`, provenance = refs to the
+  evidence events, plus `method`, `confidence`, `tier (1|2|3)`. The master
+  trace is never touched (append-only + C6 tombstones already guarantee it);
+  deleting a restoration = dropping its lane. Reversibility for free.
+- **Reconstruction renders INTO the uncertainty smear** (§−1): where evidence
+  is fuzzy or absent, derived lanes fill the smear — visibly.
+- **C10 extends: restoration IS remix** — a program quoting the trace, with
+  restorative rather than transformative intent. One operation, two intents;
+  same provenance rules; unifies the PhD framing (restoration) with the
+  performance framing (new works on top).
+- **The evidence firewall**: `reduce()` and `window()` take an evidence policy
+  — `attested | restored(tier ≤ n) | all` — and the API FORCES the choice; no
+  default that silently mixes dreamed data into archival queries.
+- **The tratteggio principle** (fresco-restoration practice: infill hatched —
+  visible up close, seamless at distance): reconstructed material is
+  perceptually seamless in performance but ALWAYS distinguishable on
+  inspection — styling in the strip, provenance popover, a global
+  evidence-only toggle. demo10's four-paths view is the canonical UI.
+- Models (RIFE/FILM frame interpolation, audio inpainting/enhancement, OCR+LLM
+  text reconstruction, colorization) are pluggable reconstructor adapters —
+  the system hosts them and disciplines them; it never bakes one in.
+- **Performance opportunity**: the gap itself is material — a show can perform
+  the lacunae (render evidence-only vs restored live, let the audience hear
+  the cut and then the dream). Kurenniemi limit-case stated honestly:
+  "reconstructing the mind" is tier-3 all the way down, and the system's value
+  is keeping the attested/dreamed boundary legible even there.
+
 ## 6. V0 — merged with studio v0
 
 See plan-studio.md §5 "MERGED V0" — the timeline library ships as the studio
