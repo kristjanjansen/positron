@@ -121,3 +121,486 @@ Server: mediamtx
 (body of 15 bytes)
 2026/08/26 10:42:35 DEB [WebRTC] [session ddca6b93] peer connection state: closed
 2026/08/26 10:42:35 INF [WebRTC] [session ddca6b93] closed: terminated
+2026/08/26 10:47:44 DEB [WebRTC] [conn 127.0.0.1:58023] [c->s] POST /moqmtx/whip HTTP/1.1
+Host: 127.0.0.1:18889
+Accept: */*
+Cache-Control: no-cache
+Connection: close
+Content-Length: 1158
+Content-Type: application/sdp
+Icy-Metadata: 1
+User-Agent: Lavf/63.1.101
+
+v=0
+o=FFmpeg 4489045141692799359 2 IN IP4 127.0.0.1
+s=FFmpegPublishSession
+t=0 0
+a=group:BUNDLE 0 1
+a=extmap-allow-mixed
+a=msid-semantic: WMS
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=ice-ufrag:77f342d4
+a=ice-pwd:3ecdb0d67fdc2543bc0a10b6418fe154
+a=fingerprint:sha-256 03:BD:2A:07:D0:C0:2C:8A:E2:37:D2:8D:A1:A4:C8:02:50:25:6E:4D:0B:39:BD:C2:DD:63:4C:4C:EF:FF:7F:24
+a=setup:passive
+a=mid:0
+a=sendonly
+a=msid:FFmpeg audio
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=ssrc:3410101212 cname:FFmpeg
+a=ssrc:3410101212 msid:FFmpeg audio
+m=video 9 UDP/TLS/RTP/SAVPF 106 105
+c=IN IP4 0.0.0.0
+a=ice-ufrag:77f342d4
+a=ice-pwd:3ecdb0d67fdc2543bc0a10b6418fe154
+a=fingerprint:sha-256 03:BD:2A:07:D0:C0:2C:8A:E2:37:D2:8D:A1:A4:C8:02:50:25:6E:4D:0B:39:BD:C2:DD:63:4C:4C:EF:FF:7F:24
+a=setup:passive
+a=mid:1
+a=sendonly
+a=msid:FFmpeg video
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=rtpmap:105 rtx/90000
+a=fmtp:105 apt=106
+a=ssrc-group:FID 3410101213 3410101214
+a=ssrc:3410101213 cname:FFmpeg
+a=ssrc:3410101213 msid:FFmpeg video
+
+2026/08/26 10:47:44 INF [WebRTC] [session 87d6e18d] created by 127.0.0.1:58023
+2026/08/26 10:47:44 DEB [WebRTC] [session 87d6e18d] peer connection state: connecting
+2026/08/26 10:47:44 DEB [WebRTC] [conn 127.0.0.1:58023] [s->c] HTTP/1.1 201 Created
+Accept-Patch: application/trickle-ice-sdpfrag
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: ETag, ID, Accept-Patch, Link, Location
+Content-Type: application/sdp
+Etag: *
+Id: 87d6e18d-ee57-4d4a-a772-06b7a14ccc54
+Location: /moqmtx/whip/6d7d951e-6a05-41a6-bbae-30c1eea90069
+Server: mediamtx
+
+v=0
+o=- 212284563154567927 1787730464 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic:WMS *
+a=fingerprint:sha-256 69:86:21:08:4D:85:9B:67:FA:6A:3A:F9:B8:39:48:76:84:34:4A:8E:7D:C9:6C:27:F4:FE:25:AD:BD:3C:00:C7
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:0
+a=ice-ufrag:WioGbUnVXDMxEYoj
+a=ice-pwd:mEjKPbIguBBRtwkSAhjhernTWIVyhmiy
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:111 opus/48000/2
+a=recvonly
+a=candidate:1395745805 1 udp 2130706431 127.0.0.1 18189 typ host
+a=candidate:1395745805 2 udp 2130706431 127.0.0.1 18189 typ host
+a=end-of-candidates
+m=video 9 UDP/TLS/RTP/SAVPF 106
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:1
+a=ice-ufrag:WioGbUnVXDMxEYoj
+a=ice-pwd:mEjKPbIguBBRtwkSAhjhernTWIVyhmiy
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=recvonly
+
+2026/08/26 10:47:45 DEB [WebRTC] [session 87d6e18d] peer connection state: connected
+2026/08/26 10:47:45 INF [WebRTC] [session 87d6e18d] peer connection established, local candidate: host/udp/127.0.0.1/18189, remote candidate: prflx/udp/127.0.0.1/57915
+2026/08/26 10:47:47 DEB [WebRTC] [session 87d6e18d] peer connection state: closed
+2026/08/26 10:47:47 INF [WebRTC] [session 87d6e18d] closed: deadline exceeded while waiting tracks
+2026/08/26 10:48:36 INF reloading configuration (file changed)
+2026/08/26 10:48:36 INF [WebRTC] closing
+2026/08/26 10:48:36 INF [WebRTC] started with listeners on :18889 (TCP/HTTP), :18189 (UDP/ICE)
+2026/08/26 10:48:37 INF MediaMTX v1.20.1, darwin, arm64
+2026/08/26 10:48:37 INF configuration loaded from /Users/s32863/personal/elektron/rig/moq/mtx/mtx.yml
+2026/08/26 10:48:37 DEB [path moqmtx] created
+2026/08/26 10:48:37 DEB path manager created
+2026/08/26 10:48:37 INF [WebRTC] started with listeners on :18889 (TCP/HTTP), :18189 (UDP/ICE)
+2026/08/26 10:48:37 INF [MoQ] started with listeners on :18892 (TCP/HTTP2), :18892 (UDP/HTTP3), :18893 (UDP/QUIC)
+2026/08/26 10:48:40 DEB [WebRTC] [conn 127.0.0.1:58123] [c->s] POST /moqmtx/whip HTTP/1.1
+Host: 127.0.0.1:18889
+Accept: */*
+Cache-Control: no-cache
+Connection: close
+Content-Length: 1158
+Content-Type: application/sdp
+Icy-Metadata: 1
+User-Agent: Lavf/63.1.101
+
+v=0
+o=FFmpeg 4489045141692799359 2 IN IP4 127.0.0.1
+s=FFmpegPublishSession
+t=0 0
+a=group:BUNDLE 0 1
+a=extmap-allow-mixed
+a=msid-semantic: WMS
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=ice-ufrag:018a5e4d
+a=ice-pwd:43efa58ac35ece70e1ccec2aff313f27
+a=fingerprint:sha-256 71:EF:B5:18:9C:D1:C4:83:6D:6F:90:F8:1E:B7:A2:0B:6D:5F:4D:11:38:4E:FC:F8:3D:BF:82:91:97:D6:F1:97
+a=setup:passive
+a=mid:0
+a=sendonly
+a=msid:FFmpeg audio
+a=rtcp-mux
+a=rtpmap:111 opus/48000/2
+a=ssrc:3517385788 cname:FFmpeg
+a=ssrc:3517385788 msid:FFmpeg audio
+m=video 9 UDP/TLS/RTP/SAVPF 106 105
+c=IN IP4 0.0.0.0
+a=ice-ufrag:018a5e4d
+a=ice-pwd:43efa58ac35ece70e1ccec2aff313f27
+a=fingerprint:sha-256 71:EF:B5:18:9C:D1:C4:83:6D:6F:90:F8:1E:B7:A2:0B:6D:5F:4D:11:38:4E:FC:F8:3D:BF:82:91:97:D6:F1:97
+a=setup:passive
+a=mid:1
+a=sendonly
+a=msid:FFmpeg video
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=rtpmap:105 rtx/90000
+a=fmtp:105 apt=106
+a=ssrc-group:FID 3517385789 3517385790
+a=ssrc:3517385789 cname:FFmpeg
+a=ssrc:3517385789 msid:FFmpeg video
+
+2026/08/26 10:48:40 INF [WebRTC] [session 737ac7f1] created by 127.0.0.1:58123
+2026/08/26 10:48:40 DEB [WebRTC] [session 737ac7f1] peer connection state: connecting
+2026/08/26 10:48:40 DEB [WebRTC] [conn 127.0.0.1:58123] [s->c] HTTP/1.1 201 Created
+Accept-Patch: application/trickle-ice-sdpfrag
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: ETag, ID, Accept-Patch, Link, Location
+Content-Type: application/sdp
+Etag: *
+Id: 737ac7f1-8ea6-44c9-b211-977d79be7eb2
+Location: /moqmtx/whip/6f2f3b5e-6022-4cc3-bfec-d9144d7170f7
+Server: mediamtx
+
+v=0
+o=- 2712289360437115152 1787730520 IN IP4 0.0.0.0
+s=-
+t=0 0
+a=msid-semantic:WMS *
+a=fingerprint:sha-256 7D:8B:45:AF:09:42:95:E4:F6:42:ED:01:C1:D6:41:A2:E3:52:82:94:8B:F7:85:72:6A:D6:B0:43:C9:EC:60:0C
+a=extmap-allow-mixed
+a=group:BUNDLE 0 1
+m=audio 9 UDP/TLS/RTP/SAVPF 111
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:0
+a=ice-ufrag:AFxiOBDUAovtCQCh
+a=ice-pwd:wVihImnRtOiECEkqLPFyYTfOJuJKuUtU
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:111 opus/48000/2
+a=recvonly
+a=candidate:3482681994 1 udp 2130706431 127.0.0.1 18189 typ host
+a=candidate:3482681994 2 udp 2130706431 127.0.0.1 18189 typ host
+a=end-of-candidates
+m=video 9 UDP/TLS/RTP/SAVPF 106
+c=IN IP4 0.0.0.0
+a=setup:active
+a=mid:1
+a=ice-ufrag:AFxiOBDUAovtCQCh
+a=ice-pwd:wVihImnRtOiECEkqLPFyYTfOJuJKuUtU
+a=rtcp-mux
+a=rtcp-rsize
+a=rtpmap:106 H264/90000
+a=fmtp:106 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42001f
+a=rtcp-fb:106 nack
+a=recvonly
+
+2026/08/26 10:48:41 DEB [WebRTC] [session 737ac7f1] peer connection state: connected
+2026/08/26 10:48:41 INF [WebRTC] [session 737ac7f1] peer connection established, local candidate: host/udp/127.0.0.1/18189, remote candidate: prflx/udp/127.0.0.1/60805
+2026/08/26 10:48:41 INF [path moqmtx] stream is available and online, 2 tracks (Opus, H264)
+2026/08/26 10:48:41 INF [WebRTC] [session 737ac7f1] is publishing to path 'moqmtx'
+2026/08/26 10:49:34 DEB [MoQ] [conn 127.0.0.1:58315] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:49:34 DEB [MoQ] [conn 127.0.0.1:58315] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:49:34 DEB [MoQ] [conn 127.0.0.1:58316] [c->s] GET /moqmtx/ HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:49:34 DEB [MoQ] [conn 127.0.0.1:58316] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/html
+Server: mediamtx
+
+(body of 4713 bytes)
+2026/08/26 10:50:16 DEB [MoQ] [conn 127.0.0.1:58426] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:50:16 DEB [MoQ] [conn 127.0.0.1:58426] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:50:23 DEB [MoQ] [conn 127.0.0.1:58460] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:50:23 DEB [MoQ] [conn 127.0.0.1:58460] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:50:23 INF [MoQ] [session 7689a05d] created by 127.0.0.1:65374
+2026/08/26 10:50:23 INF [MoQ] [session 7689a05d] closed: unsupported parameter type: 16
+2026/08/26 10:52:56 DEB [MoQ] [conn 127.0.0.1:59191] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:52:56 DEB [MoQ] [conn 127.0.0.1:59191] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:52:56 INF [MoQ] [session 867347c1] created by 127.0.0.1:59955
+2026/08/26 10:52:56 DEB [MoQ] [session 867347c1] SUBSCRIBE track=.catalog
+2026/08/26 10:52:56 INF [MoQ] [session 867347c1] is reading from path moqmtx
+2026/08/26 10:52:56 DEB [MoQ] [session 867347c1] SUBSCRIBE track=0
+2026/08/26 10:52:56 DEB [MoQ] [session 867347c1] SUBSCRIBE track=1
+2026/08/26 10:54:02 INF [MoQ] [session 867347c1] closed: AcceptStream returned: 
+2026/08/26 10:54:14 DEB [MoQ] [conn 127.0.0.1:59543] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+User-Agent: curl/8.7.1
+
+
+2026/08/26 10:54:14 DEB [MoQ] [conn 127.0.0.1:59543] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:54:14 INF [MoQ] [session 1772d69b] created by 127.0.0.1:58949
+2026/08/26 10:54:14 DEB [MoQ] [session 1772d69b] SUBSCRIBE track=.catalog
+2026/08/26 10:54:14 INF [MoQ] [session 1772d69b] is reading from path moqmtx
+2026/08/26 10:54:14 DEB [MoQ] [session 1772d69b] SUBSCRIBE track=0
+2026/08/26 10:54:14 DEB [MoQ] [session 1772d69b] SUBSCRIBE track=1
+2026/08/26 10:56:33 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 14 frames
+2026/08/26 10:56:34 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:35 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:36 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 49 frames
+2026/08/26 10:56:37 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 51 frames
+2026/08/26 10:56:38 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:39 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 16 frames
+2026/08/26 10:56:39 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:40 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 33 frames
+2026/08/26 10:56:40 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:41 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:41 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 31 frames
+2026/08/26 10:56:42 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 34 frames
+2026/08/26 10:56:42 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:43 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 29 frames
+2026/08/26 10:56:43 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 49 frames
+2026/08/26 10:56:44 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 34 frames
+2026/08/26 10:56:44 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 51 frames
+2026/08/26 10:56:45 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:45 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 31 frames
+2026/08/26 10:56:46 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 34 frames
+2026/08/26 10:56:46 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:47 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:47 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 29 frames
+2026/08/26 10:56:48 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:48 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 35 frames
+2026/08/26 10:56:49 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 30 frames
+2026/08/26 10:56:49 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 50 frames
+2026/08/26 10:56:50 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 33 frames
+2026/08/26 10:56:50 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 49 frames
+2026/08/26 10:56:51 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 30 frames
+2026/08/26 10:56:51 WAR [MoQ] [session 1772d69b] reader is too slow, discarding 51 frames
+2026/08/26 10:56:52 INF [MoQ] [session 1772d69b] closed: H3_DATAGRAM_ERROR (local): timeout: no recent network activity
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [c->s] GET /moqmtx/ HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Priority: u=0, i
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: none
+Sec-Fetch-User: ?1
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/html
+Server: mediamtx
+
+(body of 4713 bytes)
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [c->s] GET /moqmtx/reader.js HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Referer: https://127.0.0.1:18892/moqmtx/
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: script
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Cache-Control: max-age=3600
+Content-Type: application/javascript
+Server: mediamtx
+
+(body of 37166 bytes)
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [c->s] GET /moqmtx/authmirror HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Priority: u=1, i
+Referer: https://127.0.0.1:18892/moqmtx/
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [s->c] HTTP/1.1 400 Bad Request
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Server: mediamtx
+
+(body of 54 bytes)
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [c->s] GET /moqmtx/fingerprint HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: */*
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Priority: u=1, i
+Referer: https://127.0.0.1:18892/moqmtx/
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: text/plain; charset=utf-8
+Server: mediamtx
+
+(body of 64 bytes)
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [c->s] GET /favicon.ico HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Priority: u=1, i
+Referer: https://127.0.0.1:18892/moqmtx/
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: image
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61843] [s->c] HTTP/1.1 404 Not Found
+Access-Control-Allow-Origin: *
+Content-Type: text/plain
+Server: mediamtx
+
+(body of 18 bytes)
+2026/08/26 10:59:50 INF [MoQ] [session f098f8ac] created by 127.0.0.1:61446
+2026/08/26 10:59:50 DEB [MoQ] [session f098f8ac] SUBSCRIBE track=.catalog
+2026/08/26 10:59:50 INF [MoQ] [session f098f8ac] is reading from path moqmtx
+2026/08/26 10:59:50 DEB [MoQ] [session f098f8ac] SUBSCRIBE track=0
+2026/08/26 10:59:50 DEB [MoQ] [session f098f8ac] SUBSCRIBE track=1
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61850] [c->s] GET /favicon.ico HTTP/2.0
+Host: 127.0.0.1:18892
+Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
+Accept-Encoding: gzip, deflate, br, zstd
+Accept-Language: en-GB,en-US;q=0.9,en;q=0.8
+Priority: u=1, i
+Referer: https://127.0.0.1:18892/moqmtx/
+Sec-Ch-Ua: "Not=A?Brand";v="99", "Google Chrome";v="151", "Chromium";v="151"
+Sec-Ch-Ua-Mobile: ?0
+Sec-Ch-Ua-Platform: "macOS"
+Sec-Fetch-Dest: image
+Sec-Fetch-Mode: no-cors
+Sec-Fetch-Site: same-origin
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36
+
+
+2026/08/26 10:59:50 DEB [MoQ] [conn 127.0.0.1:61850] [s->c] HTTP/1.1 404 Not Found
+Access-Control-Allow-Origin: *
+Content-Type: text/plain
+Server: mediamtx
+
+(body of 18 bytes)
+2026/08/26 11:00:51 DEB [WebRTC] [conn 127.0.0.1:62220] [c->s] DELETE /moqmtx/whip/6f2f3b5e-6022-4cc3-bfec-d9144d7170f7 HTTP/1.1
+Host: 127.0.0.1:18889
+Accept: */*
+Cache-Control: no-cache
+Connection: close
+Icy-Metadata: 1
+User-Agent: Lavf/63.1.101
+
+
+2026/08/26 11:00:51 DEB [WebRTC] [conn 127.0.0.1:62220] [s->c] HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Server: mediamtx
+
+(body of 15 bytes)
+2026/08/26 11:00:51 INF [MoQ] [session f098f8ac] closed: terminated
+2026/08/26 11:00:51 DEB [WebRTC] [session 737ac7f1] peer connection state: closed
+2026/08/26 11:00:51 INF [WebRTC] [session 737ac7f1] closed: terminated

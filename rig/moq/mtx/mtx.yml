@@ -40,3 +40,4 @@ moqAllowOrigins: ["*"]
 paths:
   moqmtx:
     source: publisher
+webrtcTrackGatherTimeout: 10s
