@@ -568,3 +568,56 @@ probing; spec: status ∈ active|inactive|waiting).
   under co-located CPU pressure and the retry makes it invisible. Production
   note: 8 s is aggressive under load; retry absorbs it either way.
 - Data: m2m-churn-rotate.jsonl. Next: leave/rejoin storms N=10.
+
+## Checkpoint C6 — leave/rejoin storms ✅ (2026-08-26 03:47 EEST)
+
+- N=10, sibling at 572-610% CPU throughout (real contention). Mesh 10.1 s,
+  then 3 cycles: SIGKILL 4 pubs' chrome trees (ungraceful) -> watch 45 s ->
+  relaunch same ids -> time full restore on both probes.
+- **What probes see on dead tracks: NOTHING at the track level.** Zero
+  track-mute / track-ended events in all 12 kill observations. Last decoded
+  frame arrives 0.02-0.23 s after SIGKILL (pipeline drain), then the tile
+  freezes silently. UI death detection MUST come from signaling ('left'
+  broadcast) or stats stalls — the WebRTC track object won't tell you.
+- **Actual SFU GC measured** (GET sessions/{sid} every ~5 s per dead pub):
+  tracks stay status 'active' after the socket dies, then the whole session
+  starts returning **HTTP 410 session_error between +31 s and +47 s**
+  post-kill (B +31-36 s, C +36-41 s, D +42-47 s; A twice outlived the 45 s
+  window). Tracks never transitioned to 'inactive' individually — the session
+  dies wholesale. Matches the documented ~30 s GC + up to ~15 s slop.
+- **Rejoin storm restore** (4 simultaneous rejoins, roster-poll detection):
+  restored-on-both-probes 16.1 s / 4.0 s / 4.0 s after relaunch. The 16 s
+  cycle contained the run's ONE publish retry (D: connect-timeout under load,
+  recovered on attempt 2 in 2.1 s) plus a slow C detect (+13 s). Per-tile:
+  repull-detected 1.5-4.5 s after relaunch (2 s roster poll + join),
+  **repull TTFF 454-658 ms typical** (2 outliers 1.5-1.6 s) — same ~0.5 s
+  tile-switch number as the rotation test.
+- Untouched participants: p50 104.3 / p95 157.8, valid 99.96% across the
+  whole run — kills are invisible to the rest of the room.
+- Registry sessionId-change repull (unpublish+publish per §3) worked 12/12.
+- Data: m2m-churn-storm.jsonl. Next: publisher kill + immediate relaunch.
+
+## Checkpoint C7 — publisher kill + auto-reconnect ✅ + WRAP-UP (2026-08-26 03:52 EEST)
+
+- N=8, kill ONE pub (C) mid-publish + relaunch immediately with same
+  participant id, 3 cycles: **outage-to-restored 3.92 / 3.88 / 3.97 s**
+  (SIGKILL -> both probes decoding the re-published tile). Decomposition:
+  ~0.9 s chrome relaunch + ~1 s publish (session/tracks/connect, attempt 1
+  every time) + <=2 s roster-poll detection + ~0.4 s repull + ~0.5 s TTFF
+  (453-658 ms). With the production DO's WS push (27 ms) replacing the 2 s
+  poll, expect ~2 s. This is the WebRTC encoder-restart story: registry
+  upsert + sessionId-change repull + publish retry = clean recovery, no state
+  repair (rebuild-never-patch holds).
+- Kills invisible to the room: p50 101.9 / p95 156.4, valid 99.98% throughout.
+- RETRY LEDGER across all churn runs: fired 7x total (5x rotate join storm
+  under 287% sibling load, 1x storm cycle-1 D, 1x deterministic Z check),
+  recovered on attempt 2 EVERY time (connect 1.3-6.0 s); never exhausted
+  organically (only the failpub=3 sabotage check exhausted, by design);
+  0 retries on happy path / soak / pubkill (inert when not needed).
+- CLEANUP: server :8896 stopped, 0 m2m-churn-udd chromes left (verified by
+  path), CF sessions left to expire (GC measured live at +31-47 s), ZERO new
+  CF resources, sibling procs never touched, battery 100% AC end-to-end.
+- Files: room-churn.html / run-churn.mjs / analyze-churn.py (new, churn
+  agent's); server.py gained M2M_PORT + GET /cf/ passthrough (defaults
+  unchanged). Data: results/m2m-churn-{retry,happy,soak,rotate,storm,pubkill}
+  .jsonl. Screenshots: logs/churn-*-{mesh,c1..c3,final}.png.

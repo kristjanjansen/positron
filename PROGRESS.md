@@ -17,6 +17,20 @@ Two agents on proto/m2m, machine idle/32 GB/AC at dispatch:
 Both: poll own run state (no notification waits), canvas/WebAudio only (camera
 still wedged), own-udd kills only, no plan edits.
 
+### Churn + endurance — ✅ COMPLETE: stable 30 min, failure lifecycle measured
+- ✅ Soak N=8: zero latency drift (−0.04 ms/min), no RSS leak, 8/8 tracks alive,
+  zero spontaneous renegotiations; tail-of-soak wobble attributed to sibling CPU
+  contention (⚠️ correlation, not isolation).
+- ✅ Rotating grid: 348 API calls / 0 errors; tile-switch TTFF p50 523 ms;
+  untouched tiles unaffected → plan-m2m risk 4 retired.
+- ✅ Dead publishers emit NO track-level events — tiles freeze silently; session
+  410s at +31–47 s. Death detection = RtcRoom `left` + stats-stall watchdog.
+- ✅ Publisher kill → restored ~3.9 s (would be ~2 s with DO push vs 2 s poll);
+  rejoin storm of 4 → 4–16 s. Connect-retry organic fires: 7/7 recovered on
+  attempt 2, inert on happy path — load-bearing, shipped in room-churn.html.
+- Instrument lesson #5: fetch keepalive has its own ~64 KB quota (sendBeacon's
+  lesson, second verse). plan-m2m §5 risk 4 + §6 phase 1d updated.
+
 ### Heavy media — ✅ COMPLETE: N=54 with audio, still no SFU ceiling
 - ✅ Audio first try: FFT-verified tones 106/106 pairs at N=54, concealment ≤0.39 %.
 - ✅ Show-quality 360p30 is FASTER than lightweight (p50 66 vs 123 ms — frame-
