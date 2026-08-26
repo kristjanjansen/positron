@@ -55,6 +55,7 @@ publish path. Grid policy baked: featured+active-speaker audible, rest push-to-t
 | Stage transport | RTMPS→LL-HLS at ≤1080p + v6 player; WHEP direct optional |
 | Fast tier | MoQ auto-upgrade on probe pass (H.264+Opus; phones ≤1080p; 4K only to render-capable endpoints) |
 | Archive | LOCAL segmented + native T0 → R2 (free egress); Stream recording = backup only when RTMPS leg exists; NEVER anchor on Stream API `created` (−6.2 s) |
+| Grid archive | composite RENDERER (headless page, unavoidable — the grid exists only per-browser) → the SAME local recorder → R2. RTMPS from the composite ONLY when it doubles as a live feed (audience-camera cut / HLS grid channel) — a delivery choice, not an archive one |
 | Replay | proto/replay engine (59 ms proven), T0 from engine stamp, cuelog from DO |
 | Cues | operator-stamped fireAt, DO never re-stamps |
 | Audio codecs | Opus (web legs) / AAC (RTMPS); silence is a valid config |
