@@ -926,15 +926,6 @@ var init_internal = __esm({
 });
 
 // node_modules/@moq/net/time.js
-var time_exports = {};
-__export(time_exports, {
-  Micro: () => Micro,
-  Milli: () => Milli,
-  Nano: () => Nano,
-  Second: () => Second,
-  Timescale: () => Timescale,
-  Timestamp: () => Timestamp
-});
 var Nano, Micro, Milli, Timescale, Timestamp, Second;
 var init_time = __esm({
   "node_modules/@moq/net/time.js"() {
@@ -2033,11 +2024,6 @@ var init_track = __esm({
 });
 
 // node_modules/@moq/net/broadcast.js
-var broadcast_exports = {};
-__export(broadcast_exports, {
-  Consumer: () => Consumer4,
-  Producer: () => Producer4
-});
 function dequeueRequest(state) {
   const requested = state.requested.peek();
   requested.sort((a, b) => a.priority - b.priority);
@@ -2115,7 +2101,7 @@ async function fetchGroup(state, name, sequence, options = {}) {
     throw err;
   }
 }
-var BroadcastState, Producer4, makeConsumer3, Consumer4;
+var BroadcastState, makeConsumer3, Consumer4;
 var init_broadcast = __esm({
   "node_modules/@moq/net/broadcast.js"() {
     init_signals();
@@ -2129,80 +2115,6 @@ var init_broadcast = __esm({
       // Live consumer handles sharing this state (see {@link Consumer.clone}). The broadcast
       // closes once the last one closes, so a shared consumer can be handed to several callers.
       consumers = 0;
-    };
-    Producer4 = class {
-      #state = new BroadcastState();
-      /**
-       * Settles once the broadcast closes: `null` on a clean close, or the abort {@link Error}.
-       * Peek it synchronously (`undefined` while open), observe it reactively, or `await` it.
-       */
-      get closed() {
-        return this.#state.closed;
-      }
-      /** A read handle for this broadcast. */
-      consume() {
-        return makeConsumer3(this.#state);
-      }
-      /** Return the next track requested by a peer. */
-      async requested() {
-        for (; ; ) {
-          const request = dequeueRequest(this.#state);
-          if (request)
-            return request;
-          const closed = this.#state.closed.peek();
-          if (closed instanceof Error)
-            throw closed;
-          if (closed !== void 0)
-            return void 0;
-          await Signal.race(this.#state.requested, this.#state.closed);
-        }
-      }
-      /** Insert a track that is served directly, without an on-demand request round-trip. */
-      insertTrack(track) {
-        if (this.#state.closed.peek() !== void 0) {
-          throw new Error(`broadcast is closed: ${this.#state.closed.peek()}`);
-        }
-        const existing = this.#state.tracks.get(track.name);
-        if (existing && existing.closed.peek() === void 0) {
-          throw new Error(`duplicate track: ${track.name}`);
-        }
-        this.#state.tracks.set(track.name, track);
-        void track.closed.then(() => {
-          if (this.#state.tracks.get(track.name) === track) {
-            this.#state.tracks.delete(track.name);
-          }
-        });
-      }
-      /** Create a track, insert it into the broadcast, and return its producer. */
-      createTrack(name, info = {}) {
-        const producer = new Producer3(name).accept(info);
-        this.insertTrack(producer);
-        return producer;
-      }
-      /** Remove a statically inserted track by name. */
-      removeTrack(name) {
-        this.#state.tracks.delete(name);
-      }
-      /** Open a live subscription to a track. Used by the publishing wire layer. */
-      subscribe(name, options) {
-        return subscribe(this.#state, name, options);
-      }
-      /** Resolve a track's immutable info. Used by the publishing wire layer. */
-      resolveTrackInfo(name) {
-        return resolveTrackInfo(this.#state, name);
-      }
-      /** Fetch a single group from the local retained window. Used by track handles. */
-      fetchGroup(name, sequence, options) {
-        return fetchGroup(this.#state, name, sequence, options);
-      }
-      /** A lazy read handle for a track on this broadcast. */
-      track(name) {
-        return new Consumer3(name, this);
-      }
-      /** Close the broadcast, optionally with an error to abort waiters. Idempotent. */
-      close(abort) {
-        closeState2(this.#state, abort);
-      }
     };
     Consumer4 = class _Consumer {
       #state;
@@ -2640,44 +2552,6 @@ var init_timeout = __esm({
 });
 
 // node_modules/@moq/net/varint.js
-var varint_exports = {};
-__export(varint_exports, {
-  MAX_U14: () => MAX_U14,
-  MAX_U30: () => MAX_U30,
-  MAX_U53: () => MAX_U53,
-  MAX_U6: () => MAX_U6,
-  decode: () => decode2,
-  decodeBigInt: () => decodeBigInt,
-  decodeLeadingOnes: () => decodeLeadingOnes,
-  encode: () => encode2,
-  encodeLeadingOnes: () => encodeLeadingOnes,
-  encodeLeadingOnesTo: () => encodeLeadingOnesTo,
-  encodeTo: () => encodeTo,
-  size: () => size,
-  sizeLeadingOnes: () => sizeLeadingOnes
-});
-function sizeLeadingOnes(v) {
-  const b = BigInt(v);
-  if (b < 0n)
-    throw new RangeError(`value is negative: ${v}`);
-  if (b > MAX_U64)
-    throw new RangeError(`value exceeds 64 bits: ${v}`);
-  if (b < 1n << 7n)
-    return 1;
-  if (b < 1n << 14n)
-    return 2;
-  if (b < 1n << 21n)
-    return 3;
-  if (b < 1n << 28n)
-    return 4;
-  if (b < 1n << 35n)
-    return 5;
-  if (b < 1n << 42n)
-    return 6;
-  if (b < 1n << 56n)
-    return 8;
-  return 9;
-}
 function encodeLeadingOnesTo(dst, v) {
   const x = BigInt(v);
   if (x < 0n)
@@ -2795,17 +2669,6 @@ function decodeLeadingOnes(buf) {
   }
   return [value, remain];
 }
-function size(v) {
-  if (v <= MAX_U6)
-    return 1;
-  if (v <= MAX_U14)
-    return 2;
-  if (v <= MAX_U30)
-    return 4;
-  if (v <= MAX_U53)
-    return 8;
-  throw new Error(`overflow, value larger than 53-bits: ${v}`);
-}
 function setUint8(dst, v) {
   const buffer = new Uint8Array(dst, 0, 1);
   buffer[0] = v;
@@ -2853,20 +2716,20 @@ function decodeBigInt(buf) {
   if (buf.length === 0) {
     throw new Error("buffer is empty");
   }
-  const size2 = 1 << ((buf[0] & 192) >> 6);
-  if (buf.length < size2) {
-    throw new Error(`buffer too short: need ${size2} bytes, have ${buf.length}`);
+  const size = 1 << ((buf[0] & 192) >> 6);
+  if (buf.length < size) {
+    throw new Error(`buffer too short: need ${size} bytes, have ${buf.length}`);
   }
-  const view = new DataView(buf.buffer, buf.byteOffset, size2);
-  const remain = buf.subarray(size2);
+  const view = new DataView(buf.buffer, buf.byteOffset, size);
+  const remain = buf.subarray(size);
   let value;
-  if (size2 === 1) {
+  if (size === 1) {
     value = BigInt(buf[0] & 63);
-  } else if (size2 === 2) {
+  } else if (size === 2) {
     value = BigInt(view.getUint16(0) & 16383);
-  } else if (size2 === 4) {
+  } else if (size === 4) {
     value = BigInt(view.getUint32(0) & 1073741823);
-  } else if (size2 === 8) {
+  } else if (size === 8) {
     value = view.getBigUint64(0) & 0x3fffffffffffffffn;
   } else {
     throw new Error("impossible");
@@ -3012,27 +2875,27 @@ var init_stream = __esm({
         return true;
       }
       // Add more data to the buffer until it's at least size bytes.
-      async #fillTo(size2) {
-        if (size2 > MAX_READ_SIZE) {
-          throw new Error(`read size ${size2} exceeds max size ${MAX_READ_SIZE}`);
+      async #fillTo(size) {
+        if (size > MAX_READ_SIZE) {
+          throw new Error(`read size ${size} exceeds max size ${MAX_READ_SIZE}`);
         }
-        while (this.#buffer.byteLength < size2) {
+        while (this.#buffer.byteLength < size) {
           if (!await this.#fill()) {
             throw new Error("unexpected end of stream");
           }
         }
       }
       // Consumes the first size bytes of the buffer.
-      #slice(size2) {
-        const result = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset, size2);
-        this.#buffer = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset + size2, this.#buffer.byteLength - size2);
+      #slice(size) {
+        const result = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset, size);
+        this.#buffer = new Uint8Array(this.#buffer.buffer, this.#buffer.byteOffset + size, this.#buffer.byteLength - size);
         return result;
       }
-      async read(size2) {
-        if (size2 === 0)
+      async read(size) {
+        if (size === 0)
           return new Uint8Array();
-        await this.#fillTo(size2);
-        return this.#slice(size2);
+        await this.#fillTo(size);
+        return this.#slice(size);
       }
       async readAll() {
         while (await this.#fill()) {
@@ -3083,18 +2946,18 @@ var init_stream = __esm({
       }
       async #readQuicVarint() {
         await this.#fillTo(1);
-        const size2 = (this.#buffer[0] & 192) >> 6;
-        if (size2 === 0) {
+        const size = (this.#buffer[0] & 192) >> 6;
+        if (size === 0) {
           const first = this.#slice(1)[0];
           return BigInt(first) & 0x3fn;
         }
-        if (size2 === 1) {
+        if (size === 1) {
           await this.#fillTo(2);
           const slice2 = this.#slice(2);
           const view2 = new DataView(slice2.buffer, slice2.byteOffset, slice2.byteLength);
           return BigInt(view2.getUint16(0)) & 0x3fffn;
         }
-        if (size2 === 2) {
+        if (size === 2) {
           await this.#fillTo(4);
           const slice2 = this.#slice(4);
           const view2 = new DataView(slice2.buffer, slice2.byteOffset, slice2.byteLength);
@@ -3511,8 +3374,8 @@ var init_adapter = __esm({
             if (done)
               break;
             const typeId = await this.#reader.u53();
-            const size2 = await this.#reader.u16();
-            const body = await this.#reader.read(size2);
+            const size = await this.#reader.u16();
+            const body = await this.#reader.read(size);
             const classified = await this.#classify(typeId, body);
             if (classified.route === Route.GoAway) {
               console.warn("received GOAWAY on control stream");
@@ -3521,20 +3384,20 @@ var init_adapter = __esm({
             const { route, requestId } = classified;
             switch (route) {
               case Route.NewRequest:
-                this.#newRequest(typeId, size2, body, requestId);
+                this.#newRequest(typeId, size, body, requestId);
                 break;
               case Route.Response:
-                this.#pushMessage(requestId, typeId, size2, body);
+                this.#pushMessage(requestId, typeId, size, body);
                 break;
               case Route.ErrorResponse:
-                this.#pushMessage(requestId, typeId, size2, body);
+                this.#pushMessage(requestId, typeId, size, body);
                 this.#closeStream(requestId);
                 break;
               case Route.CloseStream:
                 this.#closeStream(requestId);
                 break;
               case Route.FollowUp:
-                this.#pushMessage(requestId, typeId, size2, body);
+                this.#pushMessage(requestId, typeId, size, body);
                 break;
               case Route.MaxRequestId:
                 this.#maxRequestId = requestId;
@@ -3565,7 +3428,7 @@ var init_adapter = __esm({
         } catch {
         }
       }
-      #newRequest(typeId, size2, body, requestId) {
+      #newRequest(typeId, size, body, requestId) {
         let controller;
         const readable = new ReadableStream({
           start(c) {
@@ -3580,7 +3443,7 @@ var init_adapter = __esm({
         stream.reader.version = this.version;
         stream.writer.version = this.version;
         this.#streams.set(requestId, { controller });
-        controller.enqueue(this.#encodeRaw(typeId, size2, body));
+        controller.enqueue(this.#encodeRaw(typeId, size, body));
         const waiter = this.#incomingWaiters.shift();
         if (waiter) {
           waiter(stream);
@@ -3588,14 +3451,14 @@ var init_adapter = __esm({
           this.#incomingQueue.push(stream);
         }
       }
-      #pushMessage(requestId, typeId, size2, body) {
+      #pushMessage(requestId, typeId, size, body) {
         const entry = this.#streams.get(requestId);
         if (!entry) {
           console.warn(`adapter: no stream for requestId=${requestId} typeId=0x${typeId.toString(16)}`);
           return;
         }
         try {
-          entry.controller.enqueue(this.#encodeRaw(typeId, size2, body));
+          entry.controller.enqueue(this.#encodeRaw(typeId, size, body));
         } catch {
         }
       }
@@ -3630,8 +3493,8 @@ var init_adapter = __esm({
         const [, afterType] = decode2(buffer);
         if (afterType.length < 2)
           return void 0;
-        const size2 = afterType[0] << 8 | afterType[1];
-        const totalSize = buffer.length - afterType.length + 2 + size2;
+        const size = afterType[0] << 8 | afterType[1];
+        const totalSize = buffer.length - afterType.length + 2 + size;
         if (buffer.length < totalSize)
           return void 0;
         return totalSize;
@@ -3649,11 +3512,11 @@ var init_adapter = __esm({
         const [typeId, afterType] = decode2(buffer);
         if (afterType.length < 2)
           return void 0;
-        const size2 = afterType[0] << 8 | afterType[1];
+        const size = afterType[0] << 8 | afterType[1];
         const bodyStart = afterType.subarray(2);
-        if (bodyStart.length < size2)
+        if (bodyStart.length < size)
           return void 0;
-        const body = bodyStart.subarray(0, size2);
+        const body = bodyStart.subarray(0, size);
         const [reqId] = decode2(body);
         const requestId = BigInt(reqId);
         if (typeId === 6) {
@@ -3706,12 +3569,12 @@ var init_adapter = __esm({
         });
       }
       /** Encode raw message bytes: [typeId varint][size u16 BE][body] */
-      #encodeRaw(typeId, size2, body) {
+      #encodeRaw(typeId, size, body) {
         const typeIdBytes = encodeTo(new ArrayBuffer(9), typeId);
         const result = new Uint8Array(typeIdBytes.byteLength + 2 + body.byteLength);
         result.set(typeIdBytes, 0);
         const sizeView = new DataView(result.buffer, typeIdBytes.byteLength, 2);
-        sizeView.setUint16(0, size2);
+        sizeView.setUint16(0, size);
         result.set(body, typeIdBytes.byteLength + 2);
         return result;
       }
@@ -4787,8 +4650,8 @@ var init_parameters = __esm({
               if (params.bytes.has(id)) {
                 throw new Error(`duplicate parameter id: ${id.toString()}`);
               }
-              const size2 = await r.u53();
-              const bytes = await r.read(size2);
+              const size = await r.u53();
+              const bytes = await r.read(size);
               params.setBytes(id, bytes);
             }
           }
@@ -4814,8 +4677,8 @@ var init_parameters = __esm({
               if (params.bytes.has(id)) {
                 throw new Error(`duplicate parameter id: ${id.toString()}`);
               }
-              const size2 = await r.u53();
-              const bytes = await r.read(size2);
+              const size = await r.u53();
+              const bytes = await r.read(size);
               params.setBytes(id, bytes);
             }
           }
@@ -5035,8 +4898,8 @@ var init_parameters = __esm({
               const varint = await r.u62();
               params.vars.set(id, varint);
             } else {
-              const size2 = await r.u53();
-              const bytes = await r.read(size2);
+              const size = await r.u53();
+              const bytes = await r.read(size);
               if (id === MSG_PARAM_LARGEST_OBJECT) {
                 if (params.#locations.has(id)) {
                   throw new Error(`duplicate message parameter id: ${id.toString()}`);
@@ -5071,8 +4934,8 @@ var init_parameters = __esm({
               break;
             }
             case "bytes": {
-              const size2 = await r.u53();
-              params.bytes.set(id, await r.read(size2));
+              const size = await r.u53();
+              params.bytes.set(id, await r.read(size));
               break;
             }
           }
@@ -5582,23 +5445,23 @@ var init_varint2 = __esm({
       // Append to the provided buffer
       encode(dst) {
         const x = this.value;
-        const size2 = this.size();
-        if (dst.byteOffset + dst.byteLength + size2 > dst.buffer.byteLength) {
+        const size = this.size();
+        if (dst.byteOffset + dst.byteLength + size > dst.buffer.byteLength) {
           throw new Error("destination buffer too small");
         }
-        const view = new DataView(dst.buffer, dst.byteOffset + dst.byteLength, size2);
-        if (size2 === 1) {
+        const view = new DataView(dst.buffer, dst.byteOffset + dst.byteLength, size);
+        if (size === 1) {
           view.setUint8(0, Number(x));
-        } else if (size2 === 2) {
+        } else if (size === 2) {
           view.setUint16(0, 1 << 14 | Number(x), false);
-        } else if (size2 === 4) {
+        } else if (size === 4) {
           view.setUint32(0, 2 << 30 | Number(x), false);
-        } else if (size2 === 8) {
+        } else if (size === 8) {
           view.setBigUint64(0, 3n << 62n | x, false);
         } else {
           throw new Error("VarInt value too large");
         }
-        return new Uint8Array(dst.buffer, dst.byteOffset, dst.byteLength + size2);
+        return new Uint8Array(dst.buffer, dst.byteOffset, dst.byteLength + size);
       }
       static decode(buffer) {
         if (buffer.byteLength < 1) {
@@ -6850,8 +6713,8 @@ var init_session = __esm({
         return this.#maxDatagramSize;
       }
       /** Resolve the send-payload limit from the negotiated parameters. */
-      setMaxDatagramSize(size2) {
-        this.#maxDatagramSize = size2;
+      setMaxDatagramSize(size) {
+        this.#maxDatagramSize = size;
       }
       /** Deliver an inbound datagram to the reader, dropping it if the queue is full. */
       push(data) {
@@ -8132,8 +7995,8 @@ async function encode6(writer, f) {
   await writer.write(scratch);
 }
 async function decode6(reader, f) {
-  const size2 = await reader.u16();
-  const data = await reader.read(size2);
+  const size = await reader.u16();
+  const data = await reader.read(size);
   const limit = new Reader(void 0, data, reader.version);
   const msg = await f(limit);
   if (!await limit.done()) {
@@ -8225,8 +8088,8 @@ async function encodeObjectExtensions(timestamp, timescale, version2) {
   await encodeObjectTime(writer, timestamp, timescale, version2);
   writer.close();
   await writer.closed;
-  const size2 = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-  const result = new Uint8Array(size2);
+  const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  const result = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) {
     result.set(chunk, offset);
@@ -8252,8 +8115,8 @@ async function decodeObjectTime(r, timescale, version2) {
         overrideScale = value;
       }
     } else {
-      const size2 = await r.u53();
-      await r.read(size2);
+      const size = await r.u53();
+      await r.read(size);
     }
   }
   if (timestamp === void 0) {
@@ -10428,8 +10291,8 @@ var init_subscriber = __esm({
             if (respTypeId === RequestOk.id) {
               await RequestOk.decode(stream.reader, version2);
             } else if (respTypeId === SubscribeNamespaceOk.id) {
-              const size2 = await stream.reader.u16();
-              await stream.reader.read(size2);
+              const size = await stream.reader.u16();
+              await stream.reader.read(size);
             } else {
               throw new Error(`SubscribeNamespace rejected: typeId=0x${respTypeId.toString(16)}`);
             }
@@ -11545,8 +11408,8 @@ async function encode8(writer, f) {
   }
 }
 async function decode8(reader, f) {
-  const size2 = await reader.u53();
-  const data = await reader.read(size2);
+  const size = await reader.u53();
+  const data = await reader.read(size);
   const limit = new Reader(void 0, data);
   const msg = await f(limit);
   if (!await limit.done()) {
@@ -12118,8 +11981,8 @@ function datagrams(quic) {
   return quic.datagrams;
 }
 function maxDatagramSize(quic) {
-  const size2 = datagrams(quic)?.maxDatagramSize;
-  return typeof size2 === "number" && size2 > 0 ? size2 : 0;
+  const size = datagrams(quic)?.maxDatagramSize;
+  return typeof size === "number" && size > 0 ? size : 0;
 }
 function datagramReader(quic) {
   const readable = datagrams(quic)?.readable;
@@ -13425,8 +13288,8 @@ var init_setup2 = __esm({
           if (params.#entries.has(id)) {
             throw new Error(`duplicate parameter id: ${id.toString()}`);
           }
-          const size2 = await r.u53();
-          const value = await r.read(size2);
+          const size = await r.u53();
+          const value = await r.read(size);
           params.#entries.set(id, value);
         }
         return params;
@@ -13944,8 +13807,8 @@ var init_subscriber2 = __esm({
               break;
             prevTs += unzigzag(await stream.reader.u62());
             const timestamp = new Timestamp(Number(prevTs), timescale);
-            const size2 = await stream.reader.u53();
-            const payload = await stream.reader.read(size2);
+            const size = await stream.reader.u53();
+            const payload = await stream.reader.read(size);
             if (!payload)
               break;
             group.writeFrame({ payload, timestamp });
@@ -14056,8 +13919,8 @@ var init_subscriber2 = __esm({
             } else {
               timestamp = Timestamp.now();
             }
-            const size2 = await stream.u53();
-            const payload = await stream.read(size2);
+            const size = await stream.u53();
+            const payload = await stream.read(size);
             if (!payload)
               break;
             producer.writeFrame({ payload, timestamp });
@@ -16045,125 +15908,22 @@ var init_connection3 = __esm({
 // node_modules/@moq/net/index.js
 var init_net = __esm({
   "node_modules/@moq/net/index.js"() {
-    init_broadcast();
     init_connection3();
     init_path();
-    init_time();
-    init_varint();
   }
 });
 
-// node_modules/@moq/hang/container/legacy.js
-var legacy_exports = {};
-__export(legacy_exports, {
-  Format: () => Format,
-  Producer: () => Producer5,
-  encodeFrame: () => encodeFrame
-});
-function encodeFrame(source, timestamp) {
-  const timestampBytes = varint_exports.encode(timestamp);
-  const data = new Uint8Array(timestampBytes.byteLength + source.byteLength);
-  data.set(timestampBytes, 0);
-  if (source instanceof Uint8Array) {
-    data.set(source, timestampBytes.byteLength);
-  } else {
-    source.copyTo(data.subarray(timestampBytes.byteLength));
-  }
-  return data;
-}
-var Format, Producer5;
-var init_legacy = __esm({
-  "node_modules/@moq/hang/container/legacy.js"() {
+// src/d16-budget.js
+var require_d16_budget = __commonJS({
+  "src/d16-budget.js"() {
     init_net();
-    init_net();
-    Format = class {
-      /** Return the marker timestamp for an empty codec payload. */
-      end(frame) {
-        return frame.payload.byteLength === 0 ? frame.timestamp : void 0;
-      }
-      /** Decode one legacy frame, including an empty-payload endpoint marker. */
-      decode(frame) {
-        const [timestamp, data] = varint_exports.decode(frame);
-        return [{ payload: data, timestamp, keyframe: false }];
-      }
-    };
-    Producer5 = class {
-      #track;
-      #group;
-      #timeline;
-      /** Wrap a track to publish legacy-container frames into it. */
-      constructor(track, props = {}) {
-        this.#track = track;
-        this.#timeline = props.timeline;
-      }
-      /** Encode and append a frame; a keyframe starts a new group. Throws if the first frame is not a keyframe. */
-      encode(data, timestamp, keyframe) {
-        if (keyframe) {
-          this.#group?.close();
-          this.#group = this.#track.appendGroup();
-          this.#timeline?.record(this.#group.sequence, timestamp);
-        } else if (!this.#group) {
-          throw new Error("must start with a keyframe");
-        }
-        this.#group?.writeFrame({
-          payload: encodeFrame(data, timestamp),
-          timestamp: time_exports.Timestamp.fromMicros(timestamp)
-        });
-      }
-      /** Close the track and current group, optionally with an error. */
-      close(err) {
-        this.#track.close(err);
-        this.#group?.close();
-      }
-    };
-  }
-});
-
-// node_modules/@moq/hang/container/track.js
-function trackInfo(options) {
-  return { timescale: time_exports.Timescale.MICRO, latencyMax: options?.latencyMax ?? LATENCY_MAX_MS };
-}
-var LATENCY_MAX_MS;
-var init_track4 = __esm({
-  "node_modules/@moq/hang/container/track.js"() {
-    init_net();
-    LATENCY_MAX_MS = 3e4;
-  }
-});
-
-// node_modules/@moq/hang/container/types.js
-var init_types = __esm({
-  "node_modules/@moq/hang/container/types.js"() {
-  }
-});
-
-// node_modules/@moq/hang/container/index.js
-var init_container = __esm({
-  "node_modules/@moq/hang/container/index.js"() {
-    init_legacy();
-    init_track4();
-    init_types();
-  }
-});
-
-// src/pub.js
-var require_pub = __commonJS({
-  "src/pub.js"() {
-    init_net();
-    init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "moq-media-x1";
-    var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
-    var CODEC = params.get("codec") ?? "vp8";
-    var FPS = 30;
-    var GOP = 30;
-    var NBLOCKS = 56;
-    var BLOCK_W = 20;
-    var ROW_X = 40;
-    var ROW_Y = 100;
-    var ROW_H = 80;
+    var RELAY = params.get("relay");
+    var CHURN = Number(params.get("churn") ?? 60);
+    var LIVE = params.get("live") ?? "d16budget/live";
+    var wall = () => (performance.timeOrigin + performance.now()).toFixed(1);
     function log(...a) {
-      const line = `PUB ${(performance.now() / 1e3).toFixed(3)} ${a.join(" ")}`;
+      const line = `BUD ${wall()} ${a.join(" ")}`;
       console.log(line);
       fetch("/log", { method: "POST", body: line }).catch(() => {
       });
@@ -16172,112 +15932,65 @@ var require_pub = __commonJS({
       "unhandledrejection",
       (e) => log("UNHANDLED", e.reason?.constructor?.name, JSON.stringify(e.reason?.message ?? String(e.reason)))
     );
-    var cv = document.getElementById("cv");
-    cv.width = 1280;
-    cv.height = 720;
-    var ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
-    var frameCounter = 0;
-    function draw() {
-      const ms = Math.round(performance.timeOrigin + performance.now());
-      ctx.fillStyle = "#404040";
-      ctx.fillRect(0, 0, 1280, 720);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(ROW_X - 20, ROW_Y - 20, NBLOCKS * BLOCK_W + 40, ROW_H + 40);
-      const bytes = [];
-      let v = ms;
-      for (let i = 5; i >= 0; i--) {
-        bytes[i] = v % 256;
-        v = Math.floor(v / 256);
+    async function trySub(conn, path, track, timeoutMs) {
+      try {
+        const bc = conn.consume(path_exports.from(path));
+        const sub = bc.subscribe(track);
+        const r = await Promise.race([
+          sub.nextGroup().catch((e) => ({ err: e })),
+          sub.closed.then((e) => ({ err: e ?? new Error("closed-clean") })),
+          new Promise((res) => setTimeout(() => res("timeout"), timeoutMs))
+        ]);
+        return { r, sub, bc };
+      } catch (e) {
+        return { r: { err: e } };
       }
-      let ck = 0;
-      for (const b of bytes) ck ^= b;
-      const bits = [];
-      for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push(b >> i & 1);
-      ctx.fillStyle = "#fff";
-      for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
-      ctx.font = "bold 64px monospace";
-      ctx.fillText(String(ms), 60, 320);
-      ctx.font = "bold 48px monospace";
-      ctx.fillText("moq-media pub / frame " + frameCounter, 60, 400);
-      ctx.fillText(new Date(ms).toISOString().slice(11, 23), 60, 470);
-      const x = frameCounter * 7 % 1200;
-      ctx.fillStyle = "#0f0";
-      ctx.fillRect(x, 600, 80, 80);
-      frameCounter++;
     }
     (async () => {
       try {
-        log("START", `relay=${new URL(RELAY).origin}`, `ns=${NS}`, `codec=${CODEC}`);
+        log("START", `relay=${new URL(RELAY).origin}`, `churn=${CHURN}`, `live=${LIVE}`);
         const t0 = performance.now();
         const conn = await connection_exports.connect(new URL(RELAY), { websocket: { enabled: false } });
         log("CONNECTED", `ms=${(performance.now() - t0).toFixed(0)}`, `version=${conn.version}`);
-        const bc = new broadcast_exports.Producer();
-        conn.publish(path_exports.from(NS), bc);
-        log("PUBLISHED path=" + NS);
-        const catalog = {
-          video: {
-            renditions: {
-              video: {
-                codec: CODEC,
-                container: { kind: "legacy" },
-                codedWidth: 1280,
-                codedHeight: 720,
-                framerate: FPS,
-                optimizeForLatency: true
-              }
-            }
+        let errors = 0, timeouts = 0;
+        for (let i = 0; i < CHURN; i++) {
+          const { r, sub } = await trySub(conn, `d16budget-none-${i}`, "catalog.json", 3e3);
+          if (r === "timeout") timeouts++;
+          else errors++;
+          if (i === 0) log("CHURN_FIRST", JSON.stringify(String(r?.err?.message ?? r)));
+          try {
+            sub?.close?.();
+          } catch {
           }
-        };
-        const catTrack = bc.createTrack("catalog.json");
-        catTrack.writeJson(catalog);
-        log("CATALOG_WRITTEN", JSON.stringify(catalog));
-        setInterval(() => catTrack.writeJson(catalog), 2e3);
-        const vTrack = bc.createTrack("video", trackInfo({ latencyMax: 2e3 }));
-        const prod = new legacy_exports.Producer(vTrack);
-        let encoded = 0, encErrors = 0;
-        const encoder = new VideoEncoder({
-          output: (chunk) => {
-            try {
-              prod.encode(chunk, chunk.timestamp, chunk.type === "key");
-              encoded++;
-              if (encoded === 1 || encoded % 150 === 0)
-                log("ENCODED", `n=${encoded}`, `type=${chunk.type}`, `bytes=${chunk.byteLength}`);
-            } catch (e) {
-              encErrors++;
-              log("PROD_ERR", JSON.stringify(String(e?.message ?? e)));
-            }
-          },
-          error: (e) => log("ENC_ERR", JSON.stringify(String(e?.message ?? e)))
-        });
-        const cfg = {
-          codec: CODEC,
-          width: 1280,
-          height: 720,
-          framerate: FPS,
-          bitrate: 2e6,
-          latencyMode: "realtime"
-        };
-        const support = await VideoEncoder.isConfigSupported(cfg);
-        log("ENC_SUPPORT", JSON.stringify(support.supported));
-        encoder.configure(cfg);
-        let i = 0, dropped = 0;
-        setInterval(() => {
-          draw();
-          if (encoder.encodeQueueSize > 3) {
-            dropped++;
+          if ((i + 1) % 10 === 0) log("CHURN", `n=${i + 1}`, `errors=${errors}`, `timeouts=${timeouts}`);
+        }
+        log("CHURN_DONE", `errors=${errors}`, `timeouts=${timeouts}`);
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const { r, bc } = await trySub(conn, LIVE, "catalog.json", 5e3);
+          if (r && r !== "timeout" && !r.err) {
+            log("LIVE_CATALOG_ACQUIRED", `attempt=${attempt}`);
+            const cat = await r.readJson();
+            const name = Object.keys(cat?.video?.renditions ?? {})[0];
+            const vs = bc.subscribe(name);
+            const g = await Promise.race([
+              vs.nextGroup().catch((e) => ({ err: e })),
+              new Promise((res) => setTimeout(() => res("timeout"), 5e3))
+            ]);
+            if (g && g !== "timeout" && !g.err) {
+              const f = await g.readFrame();
+              log("LIVE_VIDEO_OK", `bytes=${f?.payload?.byteLength ?? "?"}`);
+            } else log("LIVE_VIDEO_FAIL", JSON.stringify(String(g?.err?.message ?? g)));
+            log("VERDICT session-still-usable-after-churn");
             return;
           }
-          const ts = Math.round(performance.now() * 1e3);
-          const vf = new VideoFrame(cv, { timestamp: ts });
-          encoder.encode(vf, { keyFrame: i % GOP === 0 });
-          vf.close();
-          i++;
-        }, 1e3 / FPS);
-        setInterval(() => log("STATS", `submitted=${i}`, `encoded=${encoded}`, `dropped=${dropped}`, `queue=${encoder.encodeQueueSize}`), 1e4);
+          log("LIVE_RETRY", `attempt=${attempt}`, JSON.stringify(String(r?.err?.message ?? r)));
+          await new Promise((res) => setTimeout(res, 1e3));
+        }
+        log("LIVE_GIVEUP VERDICT session-exhausted-or-live-missing");
       } catch (e) {
         log("FAIL", e?.constructor?.name, JSON.stringify(e?.message ?? String(e)));
       }
     })();
   }
 });
-export default require_pub();
+export default require_d16_budget();

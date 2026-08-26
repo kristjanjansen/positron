@@ -56,7 +56,7 @@ function draw() {
 
 (async () => {
 	try {
-		log("START", `relay=${RELAY}`, `ns=${NS}`, `codec=${CODEC}`);
+		log("START", `relay=${new URL(RELAY).origin}`, `ns=${NS}`, `codec=${CODEC}`);
 		const t0 = performance.now();
 		const conn = await Connection.connect(new URL(RELAY), { websocket: { enabled: false } });
 		log("CONNECTED", `ms=${(performance.now() - t0).toFixed(0)}`, `version=${conn.version}`);

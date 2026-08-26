@@ -201,6 +201,26 @@ one 457-line player (~150 lines of actual bridge) now decodes BOTH non-hang dial
   keyint for venues. ⚠️ Untested: real LAN multi-viewer, Safari-vs-mediamtx cert pinning,
   draft-16 tokens (shim needs the auth param re-added).
 
+**✅ DRAFT-16 AUTHENTICATED RELAY TESTED (2026-08-26, RUNBOOK §14; user-provisioned relay,
+tokens in .env): production-viable, and 3 of §13's 4 grid blockers FIXED.**
+- **Auth costs nothing**: session establish ~136 ms (= draft-14), sub-only tokens rejected at
+  message level (code=32) with the session surviving; no-token cleanly refused. Latency identical:
+  native 17.8 ms, browser g2g 30 ms — @moq/net speaks moq-transport-16 **unmodified** (token in
+  URL path; pass `discovery:true` — its host-suffix list trap).
+- **SUBSCRIBE_NAMESPACE works**: prefix-subscribe before any publisher → announce PUSHED in
+  ~0.43 s median — the out-of-band roster and 2 s catalog-republish are obsolete. Gotchas: an
+  announce→subscribe race (~1 ms window, 500 ms retry fixes), announce-flap interop quirk (treat
+  active:true as edge-triggered), TRACK_STATUS useless as liveness probe, PUBLISH-push untestable.
+- **§13 mysteries resolved**: the subscribe budget is EXACTLY **50 requests/session, fixed at
+  SETUP, never replenished** (explicit code=16 now, not optimistic-OK starvation) → shard viewers
+  at ≲20 pubs/connection. **The same-name rejoin brick is GONE** (explicit reject pre-GC, accepted
+  at ~16–18 s). Death improved to a clean track-end at +14 s — still too slow; DO + silence
+  watchdog remain the detectors.
+- **Engine verdict: target draft-16.** Remaining MoQ-grid blockers: the 50-request budget
+  (sharding) and the 14 s death signal (DO). ⚠️ Ops: the SUB token transits URLs in local
+  spike/logs/moq-d16-* — rotate tokens if logs are ever shared; both tokens also appeared in the
+  chat transcript at provisioning → rotate after the experiment phase regardless.
+
 **📱 iPHONE AUDIO VERDICT (user screenshots, 2026-08-26 15:16): MOBILE SAFARI PLAYS MoQ
 AUDIO+VIDEO IN SYNC — "AUDIO: SOUNDING −21 dB"**, Opus decode YES + AAC-LC YES (probe), 2583
 chunks / 0 errors, audio latency ~66 ms, **A/V skew −6 ms on-device**, video 31 fps g2g ~71 ms.
