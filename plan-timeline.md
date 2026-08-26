@@ -149,6 +149,13 @@ against the existing measurement suite.
 **C9 — v3 (editing, timelines-of-timelines) is where such projects die.** It
 stays out of scope until a real show asks for it by name.
 
+**C10 — THE BOUNDARY: the timeline is a TRACE format, never an AUTHORING
+format.** Scores/patches are programs (relative, conditional, structural time);
+the timeline is the trace a performance of them leaves. Performing a score
+EMITS events; editing means editing the score, not the log. Musical time enters
+as a tempo-map KIND on the log (the MIDI-file move), not by abandoning wall
+time. Blurring this is the one way the abstraction turns hostile.
+
 ## 6. V0 — merged with studio v0
 
 See plan-studio.md §5 "MERGED V0" — the timeline library ships as the studio
