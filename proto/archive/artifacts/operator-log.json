@@ -1,0 +1,70 @@
+{
+  "base": 1787745030511,
+  "room": "archive-test",
+  "cues": [
+    {
+      "seq": 1,
+      "id": "CUE-01",
+      "mode": "now",
+      "nominalAt": 1787745045511,
+      "at": 1787745045512,
+      "sentAt": 1787745045512
+    },
+    {
+      "seq": 2,
+      "id": "CUE-02",
+      "mode": "scheduled",
+      "nominalAt": 1787745066811,
+      "at": 1787745066811,
+      "sentAt": 1787745064813
+    },
+    {
+      "seq": 3,
+      "id": "CUE-03",
+      "mode": "now",
+      "nominalAt": 1787745088211,
+      "at": 1787745088213,
+      "sentAt": 1787745088213
+    },
+    {
+      "seq": 4,
+      "id": "CUE-04",
+      "mode": "scheduled",
+      "nominalAt": 1787745108611,
+      "at": 1787745108611,
+      "sentAt": 1787745106614
+    },
+    {
+      "seq": 5,
+      "id": "CUE-05",
+      "mode": "now",
+      "nominalAt": 1787745130411,
+      "at": 1787745130413,
+      "sentAt": 1787745130413
+    },
+    {
+      "seq": 6,
+      "id": "CUE-06",
+      "mode": "scheduled",
+      "nominalAt": 1787745150911,
+      "at": 1787745150911,
+      "sentAt": 1787745148913
+    },
+    {
+      "seq": 7,
+      "id": "CUE-07",
+      "mode": "now",
+      "nominalAt": 1787745172111,
+      "at": 1787745172114,
+      "sentAt": 1787745172114
+    },
+    {
+      "seq": 8,
+      "id": "CUE-08",
+      "mode": "scheduled",
+      "nominalAt": 1787745193311,
+      "at": 1787745193311,
+      "sentAt": 1787745191314
+    }
+  ]
+}

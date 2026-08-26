@@ -1,0 +1,14 @@
+11:48:44.028 operator joined room archive-smoke; sending 2 cues (base 1787744922754)
+11:48:52.756 sent CUE-01 mode=now at=1787744932755 (nominal 1787744932754, drift 1 ms)
+11:49:00.756 sent CUE-02 mode=scheduled at=1787744942754 (nominal 1787744942754, drift 0 ms)
+11:49:01.760 operator done — log /Users/s32863/personal/elektron/proto/archive/artifacts/operator-log.json
+11:50:31.789 operator joined room archive-test; sending 8 cues (base 1787745030511)
+11:50:45.513 sent CUE-01 mode=now at=1787745045512 (nominal 1787745045511, drift 1 ms)
+11:51:04.814 sent CUE-02 mode=scheduled at=1787745066811 (nominal 1787745066811, drift 0 ms)
+11:51:28.213 sent CUE-03 mode=now at=1787745088213 (nominal 1787745088211, drift 2 ms)
+11:51:46.615 sent CUE-04 mode=scheduled at=1787745108611 (nominal 1787745108611, drift 0 ms)
+11:52:10.413 sent CUE-05 mode=now at=1787745130413 (nominal 1787745130411, drift 2 ms)
+11:52:28.914 sent CUE-06 mode=scheduled at=1787745150911 (nominal 1787745150911, drift 0 ms)
+11:52:52.114 sent CUE-07 mode=now at=1787745172114 (nominal 1787745172111, drift 3 ms)
+11:53:11.314 sent CUE-08 mode=scheduled at=1787745193311 (nominal 1787745193311, drift 0 ms)
+11:53:12.318 operator done — log /Users/s32863/personal/elektron/proto/archive/artifacts/operator-log.json

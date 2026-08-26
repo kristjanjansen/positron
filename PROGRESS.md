@@ -48,6 +48,18 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
   discipline + connection sharding. RUNBOOK §13; 15 data files.
 
+### Local-first archive → R2 — ✅ USER'S DESIGN WINS: native T₀ −15 ms from truth
+- ✅ R2 enabled + bucket created (no dashboard click needed). Record locally
+  (segmented HLS, T₀ stamped at first input write) → upload-verify-delete per
+  segment → replay from R2 with `anchor=stamp`: cue p50 77 / p95 95 ms, 7/7
+  checks. NO calibration, no strip, no audio dependency.
+- ✅ Disk O(1) (2 segments resident of a 48-segment show); upload lag 5.5 s
+  (near-live archive); cost ~25× under Stream storage, egress $0. ETag==MD5
+  free verification. Honesty note: prior 59 ms partly poll-phase aliasing;
+  true engine band 54–95 ms.
+- ✅ Wrangler trap sharpened: auto-loads .env from CWD — run outside the repo.
+  Proof show kept on r2.dev (playable with cues). proto/archive/README.md.
+
 ### VOD cue replay — ✅ PROVEN: p50 59 ms, seeks pass, API anchor −6.2 s trap
 - ✅ Full pipeline: live show + 12 cues via deployed Worker → recorded VOD →
   replay page fires each cue within 59/71 ms (p50/p95) of its burned ground

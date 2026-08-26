@@ -74,6 +74,9 @@ function beacon(event, extra) {
 			avSkew_p50: report.avSkew_p50,
 			aUnderruns: report.aUnderruns,
 			aDecErrors: report.aDecErrors,
+			audioLevelDb: report.audioLevelDb,
+			silentSeconds: report.silentSeconds,
+			pcmDb: report.pcmDb,
 			...extra,
 		});
 		if (navigator.sendBeacon) navigator.sendBeacon("/beacon", body);
@@ -113,6 +116,12 @@ function decodeRow() {
 
 // rolling audio measurement windows (tick-based; see RUNBOOK §10)
 const aLats = [], aSkews = [];
+// silence detection (RUNBOOK §10.7): per-session hook installed by the audio
+// branch; called once per second from the stats interval. Sets audioState to
+// sounding | silent | suspended (+ audioLevelDb / pcmDb / silentSeconds).
+let audioTick = null;
+const NOISE_FLOOR_DB = -50;
+const toDb = (rms) => Math.round(20 * Math.log10(Math.max(rms, 1e-7)));
 function aQuant(arr, p) {
 	if (!arr.length) return undefined;
 	const s = [...arr].sort((a, b) => a - b);

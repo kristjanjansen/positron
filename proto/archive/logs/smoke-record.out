@@ -1,0 +1,33 @@
+11:48:39.390 ARCHIVE RECORD room=archive-smoke nopub=false duration=30s offsets=10,20 rec=/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:48:42.731 show page RUNNING (+2024 ms)
+11:48:42.739 screencast started -> ffmpeg -> local HLS /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:48:42.754 FIRST FRAME -> ffmpeg: T0stamp=1787744922754 T0meta=1787744922746 (delta 8 ms)
+  11:48:42.829 up| watching /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec -> r2://elektron-archive-test/shows/archive-smoke (verify via https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev)
+11:48:43.741 T0 native (first frame -> ffmpeg) = 1787744922754
+  op| 11:48:44.028 operator joined room archive-smoke; sending 2 cues (base 1787744922754)
+11:48:46.996 ffmpeg first encoded frame reported: tFfFirstProgress=1787744926996 (+4242 ms after first write)
+11:48:48.747 steady +6s drawFps=30 cues recv=0 fired=0 cur=null sc=183/drop0
+  11:48:50.127 up| seg00000.ts 725 KB put=2566ms lag=3080ms resident=0seg/0.0MB
+  op| 11:48:52.756 sent CUE-01 mode=now at=1787744932755 (nominal 1787744932754, drift 1 ms)
+11:48:53.750 steady +11s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=334/drop0
+  11:48:54.658 up| seg00001.ts 758 KB put=2081ms lag=3774ms resident=0seg/0.0MB
+11:48:58.754 steady +16s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=486/drop0
+  11:48:59.662 up| seg00002.ts 796 KB put=2011ms lag=4788ms resident=1seg/0.8MB
+  op| 11:49:00.756 sent CUE-02 mode=scheduled at=1787744942754 (nominal 1787744942754, drift 0 ms)
+  op| 11:49:01.760 operator done — log /Users/s32863/personal/elektron/proto/archive/artifacts/operator-log.json
+11:49:01.765 operator exited 0
+11:49:03.788 steady +21s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=640/drop0
+  11:49:04.044 up| seg00003.ts 867 KB put=1989ms lag=5172ms resident=1seg/0.8MB
+  11:49:08.634 up| seg00004.ts 865 KB put=2195ms lag=5768ms resident=1seg/0.8MB
+11:49:08.791 steady +26s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=791/drop0
+  11:49:13.239 up| seg00005.ts 861 KB put=1989ms lag=6349ms resident=1seg/0.8MB
+11:49:13.793 steady +31s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=943/drop0
+11:49:13.814 live fires captured: 2 (lateMs: 63,30)
+11:49:13.821 ffmpeg exited code=0 sig=null
+11:49:13.821 recording ended; frames=944 dropped=0
+11:49:14.049 cuelog fetched: 2 entries
+  11:49:15.489 up| seg00006.ts 862 KB put=2082ms lag=4603ms resident=1seg/0.7MB
+  11:49:20.007 up| seg00007.ts 703 KB put=2060ms lag=6188ms resident=0seg/0.0MB
+  11:49:21.916 up| DONE segs=8 total=6.3MB hwm=1.7MB (2 segs) lag p50=5172ms p95=6349ms
+11:49:21.922 uploader exited 0
+11:49:22.063 ARCHIVE RECORD DONE — hls=https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-smoke/index.m3u8 T0native=1787744922754

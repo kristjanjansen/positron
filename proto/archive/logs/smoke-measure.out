@@ -1,0 +1,19 @@
+11:49:36.401 ARCHIVE MEASURE hls=https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-smoke/index.m3u8 cues=2 T0native=1787744922754 (anchor=stamp — NO calibration)
+11:49:36.624 PASS  r2-playlist-reachable-ended  8 segments, 328 B, ENDLIST=true
+11:49:40.438 replay RUNNING from R2 (native stamp anchor)
+11:49:40.440 A +0s fires=0 caughtup=0 cur=null rvfc=8/8 content=…
+11:49:45.446 A +5s fires=0 caughtup=0 cur=null rvfc=158/158 content=1787744922762
+11:49:50.452 A +10s fires=1 caughtup=0 cur=CUE-01 rvfc=308/308 content=1787744922762
+11:49:55.461 A +15s fires=1 caughtup=0 cur=CUE-01 rvfc=458/458 content=1787744922762
+11:50:00.469 A +20s fires=2 caughtup=0 cur=CUE-02 rvfc=608/608 content=1787744922762
+11:50:05.525 done: fires=2 caughtup=0 rvfcValid=759/759
+11:50:05.525 ANCHORS  native(stamp)=1787744922754  content=1787744922762  DELTA content−native = 8.3 ms (spread 37 ms over 15 frames)
+11:50:05.525 PASS  content-anchor-derived  spread=37ms
+11:50:05.525 per-cue err (decodedBurnedClock@fire − fireAt, ms, NATIVE anchor): CUE-01:129 CUE-02:129
+11:50:05.525 summary n=2 p50=129 p95=129 (previous content-anchored run: 59/71)
+11:50:05.525 PASS  all-cues-fired  all 2
+11:50:05.525 PASS  all-fire-frames-decoded  decOk on every fire
+11:50:05.525 PASS  abs-p95-under-150ms  absP95=129ms
+11:50:05.525 PASS  native-anchor-within-1-frame-of-content  content−native=8.3ms
+11:50:05.525 PASS  burn-decode-rate  759/759
+11:50:05.527 report written; checks: 7/7 pass

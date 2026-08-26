@@ -1,0 +1,25 @@
+{
+  "room": "archive-test",
+  "recdir": "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec",
+  "bucket": "elektron-archive-test",
+  "prefix": "shows/archive-test",
+  "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8",
+  "T0native": 1787745030511,
+  "stamps": {
+    "tSpawnFfmpeg": 1787745030498,
+    "T0stamp": 1787745030511,
+    "T0meta": 1787745030506,
+    "tFfFirstProgress": 1787745034768,
+    "tEnd": 1787745221697
+  },
+  "scFrames": 5796,
+  "scDropped": 0,
+  "durationS": 190,
+  "offsets": "15,36.3,57.7,78.1,99.9,120.4,141.6,162.8",
+  "uploaderExit": 0,
+  "ffExit": {
+    "code": 0,
+    "sig": null,
+    "t": 1787745221697
+  }
+}

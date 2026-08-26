@@ -1,0 +1,111 @@
+11:50:27.716 ARCHIVE RECORD room=archive-test nopub=false duration=190s offsets=15,36.3,57.7,78.1,99.9,120.4,141.6,162.8 rec=/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:50:30.496 show page RUNNING (+2020 ms)
+11:50:30.502 screencast started -> ffmpeg -> local HLS /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:50:30.511 FIRST FRAME -> ffmpeg: T0stamp=1787745030511 T0meta=1787745030506 (delta 5 ms)
+  11:50:30.591 up| watching /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec -> r2://elektron-archive-test/shows/archive-test (verify via https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev)
+11:50:31.507 T0 native (first frame -> ffmpeg) = 1787745030511
+  op| 11:50:31.789 operator joined room archive-test; sending 8 cues (base 1787745030511)
+11:50:34.768 ffmpeg first encoded frame reported: tFfFirstProgress=1787745034768 (+4257 ms after first write)
+11:50:36.511 steady +6s drawFps=30 cues recv=0 fired=0 cur=null sc=183/drop0
+  11:50:37.482 up| seg00000.ts 732 KB put=2170ms lag=2674ms resident=0seg/0.0MB
+11:50:41.516 steady +11s drawFps=30 cues recv=0 fired=0 cur=null sc=334/drop0
+  11:50:41.945 up| seg00001.ts 735 KB put=1978ms lag=3354ms resident=0seg/0.0MB
+  op| 11:50:45.513 sent CUE-01 mode=now at=1787745045512 (nominal 1787745045511, drift 1 ms)
+  11:50:46.297 up| seg00002.ts 771 KB put=1952ms lag=3718ms resident=0seg/0.0MB
+11:50:46.516 steady +16s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=486/drop0
+  11:50:50.919 up| seg00003.ts 793 KB put=2252ms lag=4313ms resident=1seg/0.8MB
+11:50:51.518 steady +21s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=638/drop0
+  11:50:55.424 up| seg00004.ts 858 KB put=1978ms lag=4823ms resident=1seg/0.8MB
+11:50:56.524 steady +26s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=789/drop0
+  11:50:59.805 up| seg00005.ts 837 KB put=1969ms lag=5212ms resident=1seg/0.8MB
+11:51:01.526 steady +31s drawFps=30 cues recv=1 fired=1 cur=CUE-01 sc=941/drop0
+  11:51:04.132 up| seg00006.ts 837 KB put=1877ms lag=5547ms resident=1seg/0.8MB
+  op| 11:51:04.814 sent CUE-02 mode=scheduled at=1787745066811 (nominal 1787745066811, drift 0 ms)
+11:51:06.530 steady +36s drawFps=30 cues recv=2 fired=1 cur=CUE-01 sc=1092/drop0
+  11:51:08.564 up| seg00007.ts 844 KB put=1975ms lag=5952ms resident=1seg/0.8MB
+11:51:11.533 steady +41s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1244/drop0
+  11:51:13.212 up| seg00008.ts 841 KB put=2212ms lag=6609ms resident=1seg/0.9MB
+  11:51:15.480 up| seg00009.ts 875 KB put=2094ms lag=4879ms resident=1seg/0.8MB
+11:51:16.534 steady +46s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1396/drop0
+  11:51:19.926 up| seg00010.ts 855 KB put=2110ms lag=5334ms resident=1seg/0.8MB
+11:51:21.538 steady +51s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1547/drop0
+  11:51:24.597 up| seg00011.ts 861 KB put=2097ms lag=6009ms resident=1seg/0.8MB
+11:51:26.540 steady +56s drawFps=30 cues recv=2 fired=2 cur=CUE-02 sc=1699/drop0
+  op| 11:51:28.213 sent CUE-03 mode=now at=1787745088213 (nominal 1787745088211, drift 2 ms)
+  11:51:29.150 up| seg00012.ts 864 KB put=1935ms lag=6541ms resident=1seg/0.8MB
+  11:51:31.221 up| seg00013.ts 865 KB put=1948ms lag=4615ms resident=1seg/0.9MB
+11:51:31.543 steady +61s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=1850/drop0
+  11:51:35.692 up| seg00014.ts 870 KB put=1939ms lag=5092ms resident=1seg/0.8MB
+11:51:36.546 steady +66s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=2002/drop0
+  11:51:40.162 up| seg00015.ts 852 KB put=2104ms lag=5568ms resident=1seg/0.8MB
+11:51:41.548 steady +71s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=2154/drop0
+  11:51:44.763 up| seg00016.ts 854 KB put=2108ms lag=6182ms resident=1seg/0.8MB
+11:51:46.550 steady +76s drawFps=30 cues recv=3 fired=3 cur=CUE-03 sc=2305/drop0
+  op| 11:51:46.615 sent CUE-04 mode=scheduled at=1787745108611 (nominal 1787745108611, drift 0 ms)
+  11:51:49.402 up| seg00017.ts 861 KB put=2074ms lag=6795ms resident=1seg/0.8MB
+  11:51:51.495 up| seg00018.ts 865 KB put=1944ms lag=4890ms resident=1seg/0.9MB
+11:51:51.553 steady +81s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2457/drop0
+  11:51:56.157 up| seg00019.ts 873 KB put=2023ms lag=5560ms resident=1seg/0.8MB
+11:51:56.556 steady +86s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2608/drop0
+  11:52:00.781 up| seg00020.ts 846 KB put=1970ms lag=6194ms resident=1seg/0.8MB
+11:52:01.558 steady +91s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2760/drop0
+  11:52:02.893 up| seg00021.ts 855 KB put=1952ms lag=4311ms resident=1seg/0.9MB
+11:52:06.560 steady +96s drawFps=30 cues recv=4 fired=4 cur=CUE-04 sc=2911/drop0
+  11:52:07.459 up| seg00022.ts 875 KB put=2065ms lag=4850ms resident=1seg/0.8MB
+  op| 11:52:10.413 sent CUE-05 mode=now at=1787745130413 (nominal 1787745130411, drift 2 ms)
+11:52:11.599 steady +101s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=3065/drop0
+  11:52:11.959 up| seg00023.ts 862 KB put=1968ms lag=5361ms resident=1seg/0.9MB
+  11:52:16.444 up| seg00024.ts 880 KB put=1955ms lag=5851ms resident=1seg/0.8MB
+11:52:16.601 steady +106s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=3217/drop0
+  11:52:20.817 up| seg00025.ts 848 KB put=1944ms lag=6233ms resident=1seg/0.8MB
+11:52:21.605 steady +111s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=3368/drop0
+  11:52:23.398 up| seg00026.ts 864 KB put=1949ms lag=4820ms resident=1seg/0.9MB
+11:52:26.607 steady +116s drawFps=30 cues recv=5 fired=5 cur=CUE-05 sc=3520/drop0
+  11:52:27.850 up| seg00027.ts 873 KB put=1955ms lag=5243ms resident=1seg/0.8MB
+  op| 11:52:28.914 sent CUE-06 mode=scheduled at=1787745150911 (nominal 1787745150911, drift 0 ms)
+11:52:31.611 steady +121s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=3672/drop0
+  11:52:32.439 up| seg00028.ts 861 KB put=2094ms lag=5841ms resident=1seg/0.8MB
+11:52:36.617 steady +126s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=3823/drop0
+  11:52:36.833 up| seg00029.ts 864 KB put=2002ms lag=6237ms resident=1seg/0.8MB
+  11:52:39.007 up| seg00030.ts 865 KB put=2012ms lag=4422ms resident=1seg/0.9MB
+11:52:41.619 steady +131s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=3975/drop0
+  11:52:43.677 up| seg00031.ts 876 KB put=2160ms lag=5067ms resident=1seg/0.9MB
+11:52:46.623 steady +136s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=4126/drop0
+  11:52:48.244 up| seg00032.ts 890 KB put=2119ms lag=5638ms resident=1seg/0.9MB
+11:52:51.626 steady +141s drawFps=30 cues recv=6 fired=6 cur=CUE-06 sc=4278/drop0
+  op| 11:52:52.114 sent CUE-07 mode=now at=1787745172114 (nominal 1787745172111, drift 3 ms)
+  11:52:53.004 up| seg00033.ts 872 KB put=2142ms lag=6410ms resident=1seg/0.9MB
+11:52:56.629 steady +146s drawFps=30 cues recv=7 fired=7 cur=CUE-07 sc=4430/drop0
+  11:52:57.758 up| seg00034.ts 875 KB put=1902ms lag=7170ms resident=1seg/0.9MB
+  11:52:59.887 up| seg00035.ts 889 KB put=1991ms lag=5301ms resident=1seg/0.9MB
+11:53:01.633 steady +151s drawFps=30 cues recv=7 fired=7 cur=CUE-07 sc=4581/drop0
+  11:53:04.667 up| seg00036.ts 887 KB put=2328ms lag=6057ms resident=1seg/0.9MB
+11:53:06.634 steady +156s drawFps=30 cues recv=7 fired=7 cur=CUE-07 sc=4733/drop0
+  11:53:09.175 up| seg00037.ts 888 KB put=1963ms lag=6575ms resident=1seg/0.9MB
+  op| 11:53:11.314 sent CUE-08 mode=scheduled at=1787745193311 (nominal 1787745193311, drift 0 ms)
+  11:53:11.318 up| seg00038.ts 871 KB put=2014ms lag=4722ms resident=1seg/0.9MB
+11:53:11.637 steady +161s drawFps=30 cues recv=8 fired=7 cur=CUE-07 sc=4885/drop0
+  op| 11:53:12.318 operator done — log /Users/s32863/personal/elektron/proto/archive/artifacts/operator-log.json
+11:53:12.335 operator exited 0
+  11:53:15.718 up| seg00039.ts 878 KB put=2012ms lag=5127ms resident=1seg/0.9MB
+11:53:16.641 steady +166s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5036/drop0
+  11:53:20.227 up| seg00040.ts 876 KB put=2052ms lag=5646ms resident=1seg/0.9MB
+11:53:21.644 steady +171s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5188/drop0
+  11:53:24.447 up| seg00041.ts 912 KB put=1931ms lag=5842ms resident=1seg/0.9MB
+11:53:26.649 steady +176s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5339/drop0
+  11:53:28.918 up| seg00042.ts 905 KB put=2064ms lag=6320ms resident=1seg/0.9MB
+  11:53:31.144 up| seg00043.ts 897 KB put=2022ms lag=4549ms resident=1seg/0.9MB
+11:53:31.652 steady +181s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5491/drop0
+  11:53:35.794 up| seg00044.ts 892 KB put=2160ms lag=5207ms resident=1seg/0.9MB
+11:53:36.654 steady +186s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5643/drop0
+  11:53:40.297 up| seg00045.ts 898 KB put=2031ms lag=5718ms resident=1seg/0.9MB
+11:53:41.658 steady +191s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5794/drop0
+11:53:41.687 live fires captured: 8 (lateMs: 59,12,59,23,67,28,78,1)
+11:53:41.697 ffmpeg exited code=0 sig=null
+11:53:41.697 recording ended; frames=5796 dropped=0
+11:53:42.033 cuelog fetched: 8 entries
+  11:53:44.941 up| seg00046.ts 905 KB put=2132ms lag=6339ms resident=1seg/0.7MB
+  11:53:47.127 up| seg00047.ts 748 KB put=2013ms lag=5432ms resident=0seg/0.0MB
+  11:53:49.112 up| DONE segs=48 total=40.2MB hwm=1.8MB (2 segs) lag p50=5547ms p95=6609ms
+11:53:49.118 uploader exited 0
+11:53:50.045 ARCHIVE RECORD DONE — hls=https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8 T0native=1787745030511
