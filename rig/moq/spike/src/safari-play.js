@@ -155,6 +155,7 @@ setInterval(() => {
 				? `glass-to-glass ~${Math.round(p50)} ms p50 / ${Math.round(p95)} ms p95 (±device clock offset — approximate on phones)`
 				: "glass-to-glass: waiting for readable timestamps…", "dim");
 		if (report.audioCodec) {
+			audioTick?.(); // update audioLevelDb / pcmDb / audioState / silentSeconds
 			const al = aQuant(aLats, 0.5), sk = aQuant(aSkews, 0.5);
 			report.aLat_p50 = al !== undefined ? Math.round(al) : undefined;
 			report.avSkew_p50 = sk !== undefined ? Math.round(sk) : undefined;
@@ -163,6 +164,20 @@ setInterval(() => {
 				+ `${report.aDecoded} chunks decoded · lat ~${al !== undefined ? Math.round(al) : "?"} ms `
 				+ `· A/V skew ${sk !== undefined ? (sk > 0 ? "+" : "") + Math.round(sk) : "?"} ms `
 				+ `· ${report.aUnderruns} underruns · ${report.aDecErrors} errors`, "ok");
+			// The big audibility verdict — "decoded fine" is NOT "audible".
+			if (report.audioState === "suspended")
+				setStatus("st-averdict", "TAP TO ENABLE SOUND — AudioContext suspended (autoplay policy)", "wait");
+			else if (report.audioState === "sounding")
+				setStatus("st-averdict", `AUDIO: SOUNDING — level ${report.audioLevelDb} dB`, "ok");
+			else if (report.audioState === "silent")
+				setStatus("st-averdict",
+					`AUDIO DECODED BUT SILENT ⚠️ — ${report.silentSeconds} s at ${report.audioLevelDb} dB`
+					+ (report.pcmDb !== undefined && report.pcmDb > NOISE_FLOOR_DB
+						? " (decoded PCM has signal — output path broken)"
+						: " (decoder output itself is silent)"), "fail");
+			else setStatus("st-averdict", "AUDIO: measuring output level…", "wait");
+		} else if (report.audioState === "no-track") {
+			setStatus("st-averdict", "AUDIO: no audio track in this namespace", "dim");
 		}
 	}
 }, 1000);
@@ -279,6 +294,13 @@ async function session(startedAt) {
 	// (aLat − video g2g) cancels it — skew is exact on any device.
 	let audioStop = () => {};
 	const aName = Object.keys(catalog?.audio?.renditions ?? {})[0];
+	if (!aName) {
+		report.audioState = "no-track";
+		report.audioLevelDb = undefined;
+		report.silentSeconds = undefined;
+		setStatus("st-averdict", "AUDIO: no audio track in this namespace", "dim");
+		beacon("audio-none", { audioState: "no-track" });
+	}
 	if (aName && typeof AudioDecoder !== "function") {
 		report.audioCodec = "no AudioDecoder API";
 		beacon("audio-unsupported", { audioCodec: "none" });
@@ -299,9 +321,76 @@ async function session(startedAt) {
 				audioCtx.resume().catch(() => {});
 				report.audioCodec = aCfg.codec;
 				report.audioState = audioCtx.state;
-				audioCtx.onstatechange = () => { report.audioState = audioCtx.state; };
+				// only propagate NON-running states here (suspension surfaces at once);
+				// "running" is refined into sounding/silent by audioTick below.
+				audioCtx.onstatechange = () => { if (audioCtx.state !== "running") report.audioState = audioCtx.state; };
 				log("AUDIO", `codec=${aCfg.codec}`, `ctx=${audioCtx.state}`);
 				beacon("audio-start", { audioCodec: aCfg.codec, audioState: audioCtx.state });
+
+				// --- SILENCE DETECTION (RUNBOOK §10.7): measure the ACTUAL output
+				// level, not just decode success. All buffer sources feed a master
+				// gain -> destination, with an AnalyserNode tapping the master bus;
+				// a 250 ms sampler collects output power into a rolling 3 s window.
+				// Decoded-PCM power is windowed separately (pcmDb) so a SILENT
+				// verdict can say WHERE the sound died (decoder vs output path).
+				const masterGain = audioCtx.createGain();
+				masterGain.connect(audioCtx.destination);
+				const analyser = audioCtx.createAnalyser();
+				analyser.fftSize = 2048;
+				analyser.smoothingTimeConstant = 0;
+				masterGain.connect(analyser);
+				const anBuf = new Float32Array(analyser.fftSize);
+				const outPow = []; // 12 x 250 ms = rolling 3 s of output power
+				const pcmWin = []; // rolling 3 s of decoded-PCM {ss,n} (150 x 20 ms)
+				const meter = setInterval(() => {
+					if (typeof analyser.getFloatTimeDomainData === "function") {
+						analyser.getFloatTimeDomainData(anBuf);
+					} else { // old-WebKit fallback: byte data centered on 128
+						const b = new Uint8Array(analyser.fftSize);
+						analyser.getByteTimeDomainData(b);
+						for (let i = 0; i < b.length; i++) anBuf[i] = (b[i] - 128) / 128;
+					}
+					let ss = 0;
+					for (let i = 0; i < anBuf.length; i++) ss += anBuf[i] * anBuf[i];
+					outPow.push(ss / anBuf.length);
+					if (outPow.length > 12) outPow.shift();
+				}, 250);
+				let silentStreak = 0, lastADecoded = report.aDecoded;
+				audioTick = () => {
+					const rms = Math.sqrt(outPow.reduce((a, b) => a + b, 0) / Math.max(outPow.length, 1));
+					report.audioLevelDb = toDb(rms);
+					let pss = 0, pn = 0;
+					for (const w of pcmWin) { pss += w.ss; pn += w.n; }
+					report.pcmDb = pn ? toDb(Math.sqrt(pss / pn)) : undefined;
+					const decoding = report.aDecoded > lastADecoded;
+					lastADecoded = report.aDecoded;
+					if (audioCtx.state !== "running") {
+						// suspended ctx renders nothing — do NOT call that silence
+						report.audioState = "suspended";
+						silentStreak = 0;
+					} else if (report.audioLevelDb > NOISE_FLOOR_DB) {
+						report.audioState = "sounding";
+						silentStreak = 0;
+					} else if (decoding) {
+						silentStreak++;
+						if (silentStreak >= 3) { // rolling 3 s window genuinely empty
+							if (report.audioState !== "silent") {
+								log("AUDIO_SILENT", `levelDb=${report.audioLevelDb}`, `pcmDb=${report.pcmDb}`);
+								beacon("audio-silent", { audioLevelDb: report.audioLevelDb, pcmDb: report.pcmDb });
+							}
+							report.audioState = "silent";
+						}
+					} else {
+						silentStreak = 0; // no fresh chunks: stall, not a silence verdict
+					}
+					report.silentSeconds = report.audioState === "silent" ? silentStreak : 0;
+				};
+				// iOS autoplay policy: a suspended ctx resumes only from a user
+				// gesture — any tap on the page counts (the pre-start gate tap
+				// already created+resumed it; this covers later suspensions).
+				const resumeTap = () => { audioCtx.resume().catch(() => {}); };
+				document.addEventListener("click", resumeTap);
+				document.addEventListener("touchend", resumeTap, { passive: true });
 
 				const CUSHION_MS = 60, TICK_EVERY = 500, TICK_THRESH = 0.35, REFRACT_MS = 300;
 				const dLiveWin = [];
@@ -332,6 +421,10 @@ async function session(startedAt) {
 							ad.copyTo(inter, { planeIndex: 0 });
 							for (let i = 0; i < ad.numberOfFrames; i++) pcm[i] = inter[i * ad.numberOfChannels];
 						}
+						let pcmSS = 0;
+						for (let i = 0; i < pcm.length; i++) pcmSS += pcm[i] * pcm[i];
+						pcmWin.push({ ss: pcmSS, n: pcm.length });
+						if (pcmWin.length > 150) pcmWin.shift();
 						const warm = performance.now() - aStart > 3000; // skip join catch-up burst
 						// jitter buffer: play at wall (mediaStart + live-edge delta + cushion)
 						let when = audioCtx.currentTime + (mediaStartMs + dLive + CUSHION_MS - wallNow()) / 1000;
@@ -344,7 +437,7 @@ async function session(startedAt) {
 							buf.copyToChannel(pcm, 0);
 							const src = audioCtx.createBufferSource();
 							src.buffer = buf;
-							src.connect(audioCtx.destination);
+							src.connect(masterGain);
 							src.start(when);
 						}
 						for (let i = 0; i < pcm.length; i++) {
@@ -376,6 +469,11 @@ async function session(startedAt) {
 				let aDead = false;
 				audioStop = () => {
 					aDead = true;
+					clearInterval(meter);
+					audioTick = null;
+					document.removeEventListener("click", resumeTap);
+					document.removeEventListener("touchend", resumeTap);
+					try { masterGain.disconnect(); analyser.disconnect(); } catch { /* already gone */ }
 					try { aCons.close(); } catch { /* already closed */ }
 					try { aDec.close(); } catch { /* already closed */ }
 				};

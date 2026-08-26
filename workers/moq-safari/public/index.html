@@ -23,6 +23,7 @@
 	<div id="st-wt" class="st wait">Checking WebTransport…</div>
 	<div id="st-codec" class="st wait">Checking H.264 decoder…</div>
 	<div id="st-acodec" class="st wait">Checking audio decoder…</div>
+	<div id="st-averdict" class="st dim" style="font-size:23px;font-weight:bold"></div>
 	<div id="st-audio" class="st dim"></div>
 	<div id="st-conn" class="st dim">Relay: waiting for start</div>
 	<div id="st-catalog" class="st dim"></div>
@@ -119,6 +120,9 @@
 				try {
 					if (typeof AudioContext === "function" && !window.__audioCtx)
 						window.__audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
+					// resume INSIDE the gesture too — a ctx that came up suspended
+					// (autoplay policy) only unsuspends from a user gesture.
+					window.__audioCtx?.resume?.().catch?.(() => {});
 				} catch {}
 				try {
 					const mod = await import("./play.js");

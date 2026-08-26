@@ -120,7 +120,8 @@ export class BeaconStore {
 		for (const k of ["webtransport", "h264", "codec", "version", "connectMs",
 			"firstFrameMs", "decoded", "decodeErrors", "reconnects", "g2g_p50",
 			"audioDec", "opus", "aac", "audioCodec", "audioState",
-			"aDecoded", "aLat_p50", "avSkew_p50", "aUnderruns", "aDecErrors"]) {
+			"aDecoded", "aLat_p50", "avSkew_p50", "aUnderruns", "aDecErrors",
+			"audioLevelDb", "silentSeconds", "pcmDb"]) {
 			if (b[k] !== undefined && b[k] !== null) rec[k] = b[k];
 		}
 		if (typeof b.fps === "number") {
@@ -183,9 +184,16 @@ export class BeaconStore {
 			const feat = (s.webtransport === undefined && s.h264 === undefined) ? "·"
 				: `WT:${s.webtransport ? "✓" : "✗"} H264:${s.h264 ? "✓" : "✗"}`
 				+ (s.audioDec === undefined ? "" : ` Op:${s.opus ? "✓" : "✗"} AAC:${s.aac ? "✓" : "✗"}`);
-			// audio column: probe verdict always; stream stats when it played one
-			const audio = s.audioCodec === undefined ? "·"
-				: `${s.audioCodec}${s.audioState === "suspended" ? " (susp)" : ""}`
+			// audio column: probe verdict always; stream stats when it played one;
+			// audibility verdict (sounding/silent + level) from the AnalyserNode.
+			const aState = s.audioState === "sounding" ? " SOUNDING"
+				: s.audioState === "silent" ? ` SILENT⚠${s.silentSeconds ? " " + s.silentSeconds + "s" : ""}`
+				: s.audioState === "suspended" ? " (susp)"
+				: "";
+			const aLevel = (s.audioLevelDb !== undefined && s.audioLevelDb !== null) ? ` ${s.audioLevelDb}dB` : "";
+			const audio = s.audioState === "no-track" ? "no-track"
+				: s.audioCodec === undefined ? "·"
+				: `${s.audioCodec}${aState}${aLevel}`
 				+ (s.aDecoded ? ` ${s.aDecoded}ch` : "")
 				+ (s.aLat_p50 !== undefined && s.aLat_p50 !== null ? ` lat ${s.aLat_p50}ms` : "")
 				+ (s.avSkew_p50 !== undefined && s.avSkew_p50 !== null ? ` skew ${s.avSkew_p50 > 0 ? "+" : ""}${s.avSkew_p50}ms` : "")
