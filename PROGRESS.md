@@ -44,6 +44,10 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
   draft-14 accepts duplicate publish (first session wins). Deployed page needed
   zero changes (codec auto from catalog). RUNBOOK §9; results/moq-4k-*.jsonl.
 - USER: reload the phone test page — it's 4K now.
+- 📱 iPhone 4K verdict (screenshot 10:11, wifi): **decodes 4K30 clean (30 fps,
+  0 errors) but at ~843 ms standing latency** (vs 31 ms at 720p) + 1.3 s first
+  frame — ⚠️ phone render-path queuing (bitrate only ~1.4 Mbps). Lesson: serve
+  phones ≤1080p for latency; 4K for render-capable endpoints. plan-m2m updated.
 
 ### 📱 iPHONE VERDICT (user screenshots, 09:31) — ✅ MOBILE SAFARI PLAYS MoQ ON 4G
 - Mobile Safari 26.5.2, 4G cellular: connected 282 ms, moq-transport-14, H.264

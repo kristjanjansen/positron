@@ -22,6 +22,8 @@
 	<div id="st-ua" class="st dim"></div>
 	<div id="st-wt" class="st wait">Checking WebTransport…</div>
 	<div id="st-codec" class="st wait">Checking H.264 decoder…</div>
+	<div id="st-acodec" class="st wait">Checking audio decoder…</div>
+	<div id="st-audio" class="st dim"></div>
 	<div id="st-conn" class="st dim">Relay: waiting for start</div>
 	<div id="st-catalog" class="st dim"></div>
 	<div id="st-first" class="st dim"></div>
@@ -88,12 +90,36 @@
 				$("st-codec").className = "st fail";
 			}
 		}
-		beacon("boot", { webtransport: hasWT, h264, codec });
+		// 2b. AudioDecoder capability probe (Opus + AAC-LC) — beaconed regardless
+		// of what the tuned-in stream carries; this alone answers "does Safari
+		// decode WebCodecs audio" for any device that merely opens the page.
+		let opus = false, aac = false;
+		if (typeof AudioDecoder !== "function") {
+			$("st-acodec").textContent = "WebCodecs AudioDecoder: NOT AVAILABLE" + (/iPhone|iPad|Mac/.test(navigator.userAgent) ? " (Safari 26+ required)" : "");
+			$("st-acodec").className = "st fail";
+		} else {
+			try {
+				opus = !!(await AudioDecoder.isConfigSupported({ codec: "opus", sampleRate: 48000, numberOfChannels: 2 })).supported;
+			} catch {}
+			try {
+				aac = !!(await AudioDecoder.isConfigSupported({ codec: "mp4a.40.2", sampleRate: 48000, numberOfChannels: 2 })).supported;
+			} catch {}
+			$("st-acodec").textContent = `Audio decode — Opus: ${opus ? "YES" : "NO"} · AAC-LC: ${aac ? "YES" : "NO"}`;
+			$("st-acodec").className = "st " + (opus || aac ? "ok" : "fail");
+		}
+		beacon("boot", { webtransport: hasWT, h264, codec, audioDec: typeof AudioDecoder === "function", opus, aac });
 		if (!hasWT) { $("st-conn").textContent = "Relay: cannot connect without WebTransport"; }
 		else {
 			// 3. Gate (iOS wants a user gesture before media pipelines spin up), then player.
 			const go = async () => {
 				$("gate").style.display = "none";
+				// AudioContext MUST be created synchronously inside the user
+				// gesture on iOS — before any awaited import can eat the
+				// transient activation. play.js resumes + uses it.
+				try {
+					if (typeof AudioContext === "function" && !window.__audioCtx)
+						window.__audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
+				} catch {}
 				try {
 					const mod = await import("./play.js");
 					await mod.start();

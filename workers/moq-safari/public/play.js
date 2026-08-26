@@ -15308,6 +15308,9 @@ report.decoded = 0;
 report.decodeErrors = 0;
 report.fps = 0;
 report.reconnects = 0;
+report.aDecoded = 0;
+report.aDecErrors = 0;
+report.aUnderruns = 0;
 var $ = (id) => document.getElementById(id);
 function setStatus(id, text, cls) {
   const el = $(id);
@@ -15339,6 +15342,7 @@ function beacon(event, extra) {
     const body = JSON.stringify({
       t: (/* @__PURE__ */ new Date()).toISOString(),
       sid: window.__sid,
+      // per-page-load id set by index.html → BeaconStore row key
       ua: navigator.userAgent,
       event,
       ns: NS,
@@ -15350,6 +15354,13 @@ function beacon(event, extra) {
       decodeErrors: report.decodeErrors,
       firstFrameMs: report.firstFrameMs,
       reconnects: report.reconnects,
+      audioCodec: report.audioCodec,
+      audioState: report.audioState,
+      aDecoded: report.aDecoded,
+      aLat_p50: report.aLat_p50,
+      avSkew_p50: report.avSkew_p50,
+      aUnderruns: report.aUnderruns,
+      aDecErrors: report.aDecErrors,
       ...extra
     });
     if (navigator.sendBeacon) navigator.sendBeacon("/beacon", body);
@@ -15390,6 +15401,13 @@ function decodeRow() {
   if (expect !== ck) return { ok: false };
   return { ok: true, ms };
 }
+var aLats = [];
+var aSkews = [];
+function aQuant(arr, p) {
+  if (!arr.length) return void 0;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(p * s.length))];
+}
 var deltas = [];
 function pushDelta(d) {
   deltas.push(d);
@@ -15418,6 +15436,16 @@ setInterval(() => {
       p50 !== void 0 ? `glass-to-glass ~${Math.round(p50)} ms p50 / ${Math.round(p95)} ms p95 (\xB1device clock offset \u2014 approximate on phones)` : "glass-to-glass: waiting for readable timestamps\u2026",
       "dim"
     );
+    if (report.audioCodec) {
+      const al = aQuant(aLats, 0.5), sk = aQuant(aSkews, 0.5);
+      report.aLat_p50 = al !== void 0 ? Math.round(al) : void 0;
+      report.avSkew_p50 = sk !== void 0 ? Math.round(sk) : void 0;
+      setStatus(
+        "st-audio",
+        `AUDIO ${report.audioCodec}${report.audioState === "suspended" ? " (ctx suspended \u2014 no speaker out)" : ""}: ${report.aDecoded} chunks decoded \xB7 lat ~${al !== void 0 ? Math.round(al) : "?"} ms \xB7 A/V skew ${sk !== void 0 ? (sk > 0 ? "+" : "") + Math.round(sk) : "?"} ms \xB7 ${report.aUnderruns} underruns \xB7 ${report.aDecErrors} errors`,
+        "ok"
+      );
+    }
   }
 }, 1e3);
 setInterval(() => beacon("stats"), 5e3);
@@ -15517,20 +15545,147 @@ async function session(startedAt) {
     }
   });
   decoder.configure(dcfg);
+  let audioStop = () => {
+  };
+  const aName = Object.keys(catalog?.audio?.renditions ?? {})[0];
+  if (aName && typeof AudioDecoder !== "function") {
+    report.audioCodec = "no AudioDecoder API";
+    beacon("audio-unsupported", { audioCodec: "none" });
+  } else if (aName) {
+    try {
+      const aCfg = catalog.audio.renditions[aName];
+      const adcfg = { codec: aCfg.codec, sampleRate: aCfg.sampleRate, numberOfChannels: aCfg.numberOfChannels };
+      if (aCfg.description) adcfg.description = Uint8Array.from(atob(aCfg.description), (c) => c.charCodeAt(0));
+      const asup = await AudioDecoder.isConfigSupported(adcfg).catch(() => ({ supported: false }));
+      if (!asup.supported) {
+        report.audioCodec = aCfg.codec + " UNSUPPORTED";
+        setStatus("st-audio", `AUDIO: catalog offers ${aCfg.codec} but AudioDecoder says unsupported`, "fail");
+        beacon("audio-unsupported", { audioCodec: aCfg.codec });
+      } else {
+        const audioCtx = window.__audioCtx ?? new AudioContext({ sampleRate: 48e3, latencyHint: "interactive" });
+        window.__audioCtx = audioCtx;
+        audioCtx.resume().catch(() => {
+        });
+        report.audioCodec = aCfg.codec;
+        report.audioState = audioCtx.state;
+        audioCtx.onstatechange = () => {
+          report.audioState = audioCtx.state;
+        };
+        log("AUDIO", `codec=${aCfg.codec}`, `ctx=${audioCtx.state}`);
+        beacon("audio-start", { audioCodec: aCfg.codec, audioState: audioCtx.state });
+        const CUSHION_MS = 60, TICK_EVERY = 500, TICK_THRESH = 0.35, REFRACT_MS = 300;
+        const dLiveWin = [];
+        let lastTickMediaMs = -1e12;
+        const aStart = performance.now();
+        const wallNow = () => performance.timeOrigin + performance.now();
+        const inTsQ = [];
+        const aDec = new AudioDecoder({
+          output: (ad) => {
+            const recvWall = wallNow();
+            report.aDecoded++;
+            const encTs = inTsQ.shift();
+            const mediaStartMs = (encTs ?? ad.timestamp) / 1e3;
+            const durMs = ad.numberOfFrames / ad.sampleRate * 1e3;
+            dLiveWin.push(recvWall - (mediaStartMs + durMs));
+            if (dLiveWin.length > 250) dLiveWin.shift();
+            const dLive = Math.min(...dLiveWin);
+            const pcm = new Float32Array(ad.numberOfFrames);
+            try {
+              ad.copyTo(pcm, { planeIndex: 0, format: "f32-planar" });
+            } catch {
+              const inter = new Float32Array(ad.numberOfFrames * ad.numberOfChannels);
+              ad.copyTo(inter, { planeIndex: 0 });
+              for (let i = 0; i < ad.numberOfFrames; i++) pcm[i] = inter[i * ad.numberOfChannels];
+            }
+            const warm = performance.now() - aStart > 3e3;
+            let when = audioCtx.currentTime + (mediaStartMs + dLive + CUSHION_MS - wallNow()) / 1e3;
+            if (when < audioCtx.currentTime) {
+              if (warm) report.aUnderruns++;
+              when = audioCtx.currentTime + 3e-3;
+            }
+            if (audioCtx.state === "running") {
+              const buf = audioCtx.createBuffer(1, ad.numberOfFrames, ad.sampleRate);
+              buf.copyToChannel(pcm, 0);
+              const src = audioCtx.createBufferSource();
+              src.buffer = buf;
+              src.connect(audioCtx.destination);
+              src.start(when);
+            }
+            for (let i = 0; i < pcm.length; i++) {
+              if (Math.abs(pcm[i]) > TICK_THRESH) {
+                const tickMediaMs = mediaStartMs + i / ad.sampleRate * 1e3;
+                if (tickMediaMs - lastTickMediaMs < REFRACT_MS) break;
+                lastTickMediaMs = tickMediaMs;
+                const tickWall = Math.round(tickMediaMs / TICK_EVERY) * TICK_EVERY;
+                if (warm) {
+                  const aLat = recvWall - tickWall;
+                  aLats.push(aLat);
+                  if (aLats.length > 300) aLats.shift();
+                  const vm = quant(0.5);
+                  if (vm !== void 0) {
+                    aSkews.push(aLat - vm);
+                    if (aSkews.length > 300) aSkews.shift();
+                  }
+                }
+                break;
+              }
+            }
+            ad.close();
+          },
+          error: (e) => {
+            report.aDecErrors++;
+            showError(e);
+          }
+        });
+        aDec.configure(adcfg);
+        const aSub = bc.subscribe(aName);
+        const aCons = new Consumer5(aSub, { format: new legacy_exports.Format(), latency: 0 });
+        let aDead = false;
+        audioStop = () => {
+          aDead = true;
+          try {
+            aCons.close();
+          } catch {
+          }
+          try {
+            aDec.close();
+          } catch {
+          }
+        };
+        (async () => {
+          while (!aDead) {
+            const r = await aCons.next();
+            if (r === void 0) return;
+            if (!r.frame) continue;
+            inTsQ.push(r.frame.timestamp);
+            aDec.decode(new EncodedAudioChunk({ type: "key", timestamp: r.frame.timestamp, data: r.frame.payload }));
+          }
+        })().catch((e) => {
+          if (!aDead) showError(e);
+        });
+      }
+    } catch (e) {
+      showError(e);
+    }
+  }
   const vSub = bc.subscribe(name);
   const consumer = new Consumer5(vSub, { format: new legacy_exports.Format(), latency: 0 });
-  while (!dead) {
-    const r = await Promise.race([consumer.next(), new Promise((res) => setTimeout(() => res("timeout"), 15e3))]);
-    if (r === "timeout") throw new Error("no video data for 15 s (publisher stalled?)");
-    if (r === void 0) throw new Error("video track closed by relay");
-    if (!r.frame) continue;
-    decoder.decode(new EncodedVideoChunk({
-      type: r.frame.keyframe ? "key" : "delta",
-      timestamp: r.frame.timestamp,
-      data: r.frame.payload
-    }));
+  try {
+    while (!dead) {
+      const r = await Promise.race([consumer.next(), new Promise((res) => setTimeout(() => res("timeout"), 15e3))]);
+      if (r === "timeout") throw new Error("no video data for 15 s (publisher stalled?)");
+      if (r === void 0) throw new Error("video track closed by relay");
+      if (!r.frame) continue;
+      decoder.decode(new EncodedVideoChunk({
+        type: r.frame.keyframe ? "key" : "delta",
+        timestamp: r.frame.timestamp,
+        data: r.frame.payload
+      }));
+    }
+    throw new Error("relay connection closed");
+  } finally {
+    audioStop();
   }
-  throw new Error("relay connection closed");
 }
 async function start() {
   const startedAt = performance.now();

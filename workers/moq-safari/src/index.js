@@ -118,7 +118,9 @@ export class BeaconStore {
 
 		// Latest defined value wins for the rolling numbers.
 		for (const k of ["webtransport", "h264", "codec", "version", "connectMs",
-			"firstFrameMs", "decoded", "decodeErrors", "reconnects", "g2g_p50"]) {
+			"firstFrameMs", "decoded", "decodeErrors", "reconnects", "g2g_p50",
+			"audioDec", "opus", "aac", "audioCodec", "audioState",
+			"aDecoded", "aLat_p50", "avSkew_p50", "aUnderruns", "aDecErrors"]) {
 			if (b[k] !== undefined && b[k] !== null) rec[k] = b[k];
 		}
 		if (typeof b.fps === "number") {
@@ -179,7 +181,16 @@ export class BeaconStore {
 		const num = (v, unit = "") => (v === undefined || v === null ? "·" : esc(v) + unit);
 		const tr = (s) => {
 			const feat = (s.webtransport === undefined && s.h264 === undefined) ? "·"
-				: `WT:${s.webtransport ? "✓" : "✗"} H264:${s.h264 ? "✓" : "✗"}`;
+				: `WT:${s.webtransport ? "✓" : "✗"} H264:${s.h264 ? "✓" : "✗"}`
+				+ (s.audioDec === undefined ? "" : ` Op:${s.opus ? "✓" : "✗"} AAC:${s.aac ? "✓" : "✗"}`);
+			// audio column: probe verdict always; stream stats when it played one
+			const audio = s.audioCodec === undefined ? "·"
+				: `${s.audioCodec}${s.audioState === "suspended" ? " (susp)" : ""}`
+				+ (s.aDecoded ? ` ${s.aDecoded}ch` : "")
+				+ (s.aLat_p50 !== undefined && s.aLat_p50 !== null ? ` lat ${s.aLat_p50}ms` : "")
+				+ (s.avSkew_p50 !== undefined && s.avSkew_p50 !== null ? ` skew ${s.avSkew_p50 > 0 ? "+" : ""}${s.avSkew_p50}ms` : "")
+				+ (s.aUnderruns ? ` ${s.aUnderruns}under` : "")
+				+ (s.aDecErrors ? ` ${s.aDecErrors}err` : "");
 			const bad = (s.errorCount ?? 0) > 0;
 			const live = s.furthest === "live" || s.furthest === "first-frame";
 			return `<tr>
@@ -191,6 +202,7 @@ export class BeaconStore {
 				<td>${num(s.firstFrameMs, " ms")}</td>
 				<td>${num(s.fps)}${s.fpsMax !== undefined ? " / " + esc(s.fpsMax) : ""}</td>
 				<td>${num(s.g2g_p50, " ms")}</td>
+				<td>${esc(audio)}</td>
 				<td>${num(s.decoded)}</td>
 				<td class="${bad ? "err" : ""}">${bad ? esc(s.errorCount) + "× " + esc((s.errors ?? []).slice(-1)[0] ?? "") : "·"}</td>
 			</tr>`;
@@ -215,7 +227,7 @@ export class BeaconStore {
 <p>One row per test-page load, newest first, last ${MAX_SESSIONS} kept. Times UTC; hover a row's
 time for last-seen + session id, hover the browser for the full UA. <a style="color:#ffd400" href="/results?json=1">raw json</a></p>
 <div class="wrap"><table>
-<tr><th>first seen (UTC)</th><th>browser</th><th>furthest stage</th><th>features</th><th>connect</th><th>first frame</th><th>fps last/max</th><th>g2g p50</th><th>frames</th><th>errors</th></tr>
+<tr><th>first seen (UTC)</th><th>browser</th><th>furthest stage</th><th>features</th><th>connect</th><th>first frame</th><th>fps last/max</th><th>g2g p50</th><th>audio</th><th>frames</th><th>errors</th></tr>
 ${rows.map(tr).join("\n")}
 </table></div>`;
 		return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
