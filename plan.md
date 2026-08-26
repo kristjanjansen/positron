@@ -622,6 +622,23 @@ Cloudflare strips all in-band metadata, so messages ride a side channel aligned 
 
 ---
 
+## 11b. SYNCED VOD REPLAY WITH CUES — ✅ PROVEN (2026-08-26, proto/replay/)
+
+The archive replays with its cues in sync: **per-cue error p50 59 ms / p95 71 ms** (12 cues, live
+show → recorded VOD → replay; inside the live engine's own 65–98 ms band), burned-row decode
+5427/5427 from the VOD, **all seek tests pass** (late join catches up without re-firing; backward
+seek rewinds state; forward seek reconstructs). Proof VOD kept: `de39bf1916469a4bc8b18e73a8726762`.
+- **Anchor design VALIDATED THE HARD WAY: content-derived T₀ is mandatory.** Publisher-stamp was
+  +109 ms off (cold-start head loss); **Stream API `created` was −6.2 SECONDS off** — naive
+  metadata anchoring would misplace every cue by ~6 s. Calibrate from pixels (or equivalent),
+  persist the result in asset `meta` (see research/timecode-sync-2026-08.md — ATSC 3.0
+  independently standardized this exact strip+out-of-band pattern).
+- Live-vs-replay asymmetry measured: "now" cues cancel to 0–1 ms; scheduled cues replay 33–67 ms
+  earlier than the live burn; `fireDelayMs` flag reproduces the live feel (default = operator intent).
+- Worker: RtcRoom now persists cue frames (sender stamps verbatim, DO clock labeled untrusted) +
+  `GET /room/{name}/cuelog`. Run: proto/replay/README.md. Production gaps listed there (audio rig,
+  anchor persistence, periodic re-anchor across ingest gaps, cuelog compaction).
+
 ## 12. Cue→video sync — end-to-end verification (added later this session)
 
 ✅ One-tab test (`rig/cue-sync.html`): cues published every 3 s through the DEPLOYED DO room,

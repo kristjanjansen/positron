@@ -48,6 +48,19 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 - Verdict: grid stays on SFU; MoQ grid needs draft-16 + DO signaling + name
   discipline + connection sharding. RUNBOOK §13; 15 data files.
 
+### VOD cue replay — ✅ PROVEN: p50 59 ms, seeks pass, API anchor −6.2 s trap
+- ✅ Full pipeline: live show + 12 cues via deployed Worker → recorded VOD →
+  replay page fires each cue within 59/71 ms (p50/p95) of its burned ground
+  truth. Seeks: late-join catch-up (0 re-fires), backward rewind, forward
+  reconstruct — all assertions green. VOD kept: de39bf19….
+- ✅ USER'S cold-start concern vindicated: content anchor vs publisher stamp
+  +109 ms, vs **Stream API `created` −6.2 s** — naive anchoring = every cue ~6 s
+  wrong. Content-derived T₀ is now the documented rule.
+- ✅ Asymmetry: "now" cues 0–1 ms; scheduled replay 33–67 ms early vs live;
+  fireDelayMs reproduces live feel. Worker cuelog added (additive, verified).
+- proto/replay/{replay.html,run-record.mjs,run-measure.mjs,README.md};
+  plan.md §11b; research/timecode-sync-2026-08.md holds the industry synthesis.
+
 ### mediamtx + catalog shim — ✅ ECOSYSTEM GAP CLOSED, local venue chain proven
 - ✅ ffmpeg WHIP → mediamtx MoQ → browser: 20.6 ms p50, audio A/V skew +12 ms,
   0 errors. mediamtx speaks msf-00/"loc"/AVCC (NOT WARP) on draft-19 — shim grew
