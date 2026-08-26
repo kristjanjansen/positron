@@ -52,6 +52,7 @@ function beacon(event, extra) {
 	try {
 		const body = JSON.stringify({
 			t: new Date().toISOString(),
+			sid: window.__sid, // per-page-load id set by index.html → BeaconStore row key
 			ua: navigator.userAgent,
 			event,
 			ns: NS,
