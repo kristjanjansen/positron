@@ -1115,3 +1115,164 @@ closed in both dialects by ONE browser-side shim."**
   untouched. Nothing outside §12 + rig/moq/mtx/ + the three spike files modified.
 
 ⏱ END 2026-08-26 ~08:02 UTC — ~21 min active.
+
+### 13.2 Fan-in ladder (✅ measured 07:49–08:12Z; 90 s+ per rung, warmup 5 s dropped, 2 probes
+subscribing ALL; namespaces fresh per rung after the §13.1 lesson)
+
+| N | valid % | pooled g2g p50/p95 ms | worst-pub p50/p95 | spread p50 | races | decode err | mgrid CPU / machine |
+|---|---|---|---|---|---|---|---|
+| 2 (smoke) | 100.00 | 29.7 / 52.0 | 31.0 / 53.7 | 28.5–31.0 | 0 | 0 | – / load1 2 |
+| 5 | 100.00 | 44.7 / 65.9 | 47.1 / 70.4 | 26.2–47.1 | 0 | 0 | ~55 % one core / 14 % machine (load1 31 sibling) |
+| 10 | 100.00 | 36.7 / 56.2 | 43.1 / 63.0 | 29.6–43.1 | 0 | 0 | ~87 % / 32 % (load1 27) |
+| 20 | 100.00 | 62.2 / 87.9 | 70.3 / 95.8 | 54.7–70.3 | 0 | 0 | ~165 % / 33 % (load1 55!) |
+| 30 | 100.00* | **754 / 792** | 757.6 / 797.9 | 749.6–757.6 | **504** | 0 | ~157 % / 21 % (load1 6) |
+| 30 rerun | 100.00* | **752 / 790** | 755.9 / 794.7 | 748.3–755.9 | **680** | 0 | ~150 % (gpu 96 + rend 47) / 19 % |
+
+*valid % counts only DELIVERED streams — at N=30 only 24 (run 1) / 20 (run 2) of 30
+publishers ever reached a given probe. Delivered frames stayed 100 % checksum-valid at
+every rung; 0 decode errors anywhere; encoders 15.0 fps ≤N=20.
+
+**Two DISTINCT gates fired at N=30, both confirmed by rerun:**
+
+1. **Per-viewer-session subscription cap ≈ 20 namespaces (~40 subscriptions).** Run 1:
+   both probes starved the same 6 pubs (catalog-phase timeouts, 84 retries/pub, never
+   recovered); a FRESH single connection started later reached a DIFFERENT set — exactly
+   20 live, 10 starved, including pubs dead-to-probes (d26) and vice versa (d11–14,d23).
+   Run 2: both probes served exactly g1–g20, starved g21–g30 at the VIDEO phase (catalog
+   OK). So: **relay fan-IN is fine — all 30 publisher sessions were accepted and every
+   namespace was servable to SOME session; what breaks is fan-OUT per downstream session.**
+   Failure mode is silent starvation (SUBSCRIBE_OK then zero groups forever — §7.3's
+   optimistic OK at scale); retries never rescue an over-cap session. Production
+   mitigation (untested): shard a grid viewer across ≥2 WebTransport connections
+   (≤15 namespaces each), or draft-16 (unknown if the cap differs).
+2. **Publisher-side aggregate encode ceiling of THIS RIG between 20 and 30 encoders**:
+   at N=30 every encoder pinned at ~11.8/15 fps, encode queue at cap (4), ~30 % capture
+   drops → a FLAT ~750 ms standing g2g on all delivered streams (§9.2's saturation
+   signature, aggregate edition). NOT machine CPU (19–21 % total, load1 6–8; sibling 4K
+   ffmpeg untouched); Chrome-role split says GPU-process (canvas→VideoFrame readback)
+   ≈2× renderer cost. So the honest scope: **one Mac cannot SOURCE 30 clean synthetic
+   streams; relay fan-in beyond 30 sessions is untestable from a single rig** —
+   sw-vs-hw-encoder split not isolated (open).
+
+Ceiling call: **fan-in "none through N=20" (clean, 100 % valid, p95 88 ms);
+N=30 fails for viewer-cap + local-encode reasons, NOT relay fan-in refusal** — CF
+accepted 32 concurrent sessions (30 pub + 2 probe) + 2 sibling publishers without any
+connection-level error at any rung. All publishers share one uplink+machine: this
+measured relay/protocol behavior, not network diversity. Sibling load (4K + audio pubs,
+ffmpeg 4K; load1 swung 2→55) ran throughout — latency tables held flat regardless.
+Data: results/moq-mgrid-{smoke,r5,r5a,r10,r20,r30,r30b,d26check}.jsonl (r5 = the
+contaminated §13.1 run, kept as the stale-pinning evidence).
+
+### 13.3 Viewer→publisher flip ("spotlight from the crowd"), 5×, at N=10 steady (✅ 08:13–08:16Z)
+
+Setup: fresh viewer page (own Chrome) subscribing ALL 10 base publishers, polling
+/cmd at 100 ms; on command it publishes its canvas **on its already-open MoQ
+connection**, self-registers in the roster; probes discover via 1 s roster poll +
+catalog retry. All clocks = one host.
+
+| flip | cmd→publish+catalog | cmd→catalog@probe | cmd→first-encoded | cmd→FIRST DECODED (both probes) |
+|---|---|---|---|---|
+| f1 | 0 ms | 1599 | 1460 | **1644** |
+| f2 | 0 ms | 614 | 1635 | **1665** |
+| f3 | 1 ms | 802 | 1456 | **1487** |
+| f4 | 1 ms | 562 | 1514 | **1547** |
+| f5 | 0 ms | 1600 | 1551 | **1686** |
+
+**Flip p50 = 1.64 s (range 1.49–1.69 s), 5/5 success**, steady g2g normal (33–51 ms)
+immediately after the warmup burst; command-poll overhead 23–95 ms included.
+
+**Breakdown — the surprise: draft-14 discovery is NOT the dominant term.**
+- publish-on-existing-connection is FREE (0–1 ms; no renegotiation, no new handshake —
+  MoQ's structural win over WebRTC here);
+- discovery (roster-poll 0–0.7 s + closed-catalog republish wait ≤2 s) = 0.56–1.60 s,
+  fully OVERLAPPED by
+- **WebCodecs VideoEncoder spin-up to first output ≈ 1.46–1.64 s** (same ~1.4–1.5 s
+  constant as §7.1's first-frame catch-up) — the actual floor.
+
+What draft-16 SUBSCRIBE_NAMESPACE would save: the discovery term (up to ~1.6 s of the
+spread, i.e. the catalog-republish + roster-poll chain collapses to an announce push) —
+but p50 barely moves unless the encoder is PRE-WARMED. A production flip should
+configure+run the encoder at page load (or on "camera on") and discard output until
+promoted; then draft-14's floor = republish cadence (0–2 s) and draft-16's ≈ RTT —
+that's where the two drafts truly diverge. vs SFU spotlight cmd→video ~0.5 s
+(plan-m2m §6 phase-2): MoQ-14 as-built is ~3× slower, but with encoder pre-warm +
+draft-16 the structural floor is LOWER than the SFU's (no pull/renegotiate step at all).
+Data: results/moq-mgrid-flips.jsonl.
+
+### 13.4 Publisher death + rejoin (✅ 08:17–08:34Z; 3 SIGKILLs of a solo-Chrome victim at
+N=10 steady, richer instrumentation each round; all clocks one host)
+
+**What viewers observe when a publisher dies abruptly (identical in all 3 kills, both probes):**
+| signal | when (after SIGKILL) |
+|---|---|
+| last decoded frame | −34…+37 ms (delivery just stops) |
+| our silence watchdog (>500 ms no-frame, 100 ms scan) | **+539…+600 ms** (floor ≈3 frame intervals ≈200 ms @15 fps) |
+| relay close / PUBLISH_DONE on the SERVED subscription | **NEVER** (observed 25–39 s windows; only a silent group-end marker ~+14 s) |
+| re-subscribe behavior | clean-close/zero-groups until **announce GC at ~+10–15 s**, then hard `SUBSCRIBE code=4 "not found"` |
+
+**Death detection verdict: CF draft-14 gives NO usable downstream death signal.** Detection
+must be client-side silence heuristics (~200–600 ms at 15 fps) or app-level signaling — the
+SFU/DO `left` broadcast (38–126 ms) has NO MoQ-14 equivalent; production would ride the same
+RtcRoom DO for both worlds anyway.
+
+**Rejoin — the trap field-guide (each arm measured):**
+- **Same-name relaunch BEFORE corpse GC (+1.1 s): BRICKS THE NAMESPACE RELAY-WIDE.**
+  The v2 publisher connects+publishes 15 fps happily forever, but NO session — old,
+  lightly-used, or brand-new (k1check2, born post-GC) — ever receives a byte:
+  subscribes are OK'd and starve (still dead at +3 m 45 s; §13.1's accidental >3 m 20 s
+  reproduced under control). Recovery procedure PROVEN: drop the duplicate session,
+  wait ≥GC (~15–20 s), publish again → a fresh viewer session acquired v3 in 2.5 s.
+- **Same-name relaunch AFTER GC (+103 s): works — but only for viewer sessions that are
+  not subscribe-exhausted** (fresh probes acquired h10-v2 normally).
+- **Fresh-name relaunch (production path): clean.** Publisher restored to encoding in
+  2.3 s after Chrome relaunch (0.8 s to PUBLISHED, +1.5 s encoder warmup); healthy
+  viewer acquires it in the normal join time (seen→first p50 1.3–2.8 s across the
+  ladder; brand-new viewer session end-to-end sample: 2.48 s). Total ≈2.5–3.5 s —
+  same class as the SFU's measured 3.9 s relaunch cycle.
+
+**The unifying discovery — per-session subscription EXHAUSTION (major):** viewer sessions
+that churn subscribe retries permanently lose the ability to acquire ANY new track, while
+their existing subscriptions keep flowing. Proven by: probes cycling a dead namespace at
+~1/s starved on brand-new never-used names (k1) minutes later, while a fresh connection
+acquired the same publisher in 2.3–2.5 s; three watcher sessions starved on k1-v3 that a
+4th, brand-new session got instantly. Best-fit model: **a fixed per-session subscription
+budget (~40–60; MAX_SUBSCRIBE_ID family) that is never replenished — closed AND failed
+subscribes leak credits permanently.** This also reframes §13.2 gate 1: the "≈20-namespace
+cap" = 2 tracks/pub ≈ the same budget. Client rule derived: **count your subscribes; when
+nearing ~40, or when any track starves >5 s post-OK, RECONNECT the whole session (~150 ms
++ resubscribe) instead of retrying forever — retries only dig the hole deeper.**
+Wire-level MAX_SUBSCRIBE_ID not captured (would need a raw-QUIC trace) — model marked
+best-fit, behavior itself is 3×-reproduced fact. Data: results/moq-mgrid-{death-run,death,
+k1check,k1check2,k1check3,h10check}.jsonl.
+
+### 13.5 Verdict vs the SFU grid + artifacts + cleanup
+
+| axis | SFU/WebRTC grid (plan-m2m §6) | CF MoQ draft-14 (this section) |
+|---|---|---|
+| capacity | N=54 pubs clean, p95 ~158 ms flat | N=20 clean (100 % valid, pooled p50 62 / p95 88 ms — LOWER latency); N=30 fails: per-session subscribe budget + this rig's encode ceiling; relay accepted 32 sessions without complaint |
+| flip (crowd→spotlight) | cmd→video ~0.5 s | 1.49–1.69 s (p50 1.64 s), floor = encoder warm-up ~1.5 s, publish itself 0–1 ms on the live connection; with encoder pre-warm + draft-16 announce, structurally CAN beat the SFU |
+| death detection | 38–126 ms (DO `left`) | no protocol signal at all; silence heuristic 0.2–0.6 s; announce GC +10–15 s |
+| rejoin | ~3.9 s | fresh-name ~2.5–3.5 s; same-name pre-GC = namespace bricked minutes (relay-wide) |
+| discovery | roster push (DO) | none in draft-14 (SUBSCRIBE_NAMESPACE is draft-16) — local registry shim here; production rides the same DO |
+
+**One-sentence verdict: CF's draft-14 MoQ relay swallows 30+ concurrent publishers from one
+machine with better latency than the SFU at N≤20, but the per-session subscription budget
+(~40–60, never replenished), the total absence of a death signal, and the
+brick-on-fast-same-name-rejoin behavior mean a production m2m grid on MoQ TODAY needs:
+DO-based roster + death signaling, session-suffixed namespaces, subscribe-count-triggered
+session reconnects, and viewers sharded ≲15 publishers per connection — none of which the
+SFU path needs; grid-scale m2m stays on the SFU until draft-16 (+announce, +auth) retests.**
+
+Artifacts: spike/{mgridserver.py, mgrid-rung.sh, mgrid-flipdrive.sh, mgrid-deathdrive.sh
+(superseded by inline driving), mgrid-analyze.py}, spike/src/mgrid-{pub,probe,flip}.js
+(+ www bundles/pages, Docker esbuild §6.3). Results: results/moq-mgrid-*.jsonl (14 files).
+Logs: spike/logs/moq-mgrid*.log, headless udds spike/logs/moq-mgrid-*-udd (disposable).
+
+Cleanup (08:35Z): ALL moq-mgrid Chromes killed (pubs, probes, victims, checkers, flip);
+mgridserver.py :8887 stopped; roster gone with it. Siblings verified untouched and running
+after cleanup: 4K publisher (moq-4k-pub-udd) + pubserver :8890, audio publisher
+(moq-audio-pub-udd) + audioserver :8896, the §12 agent's mediamtx/ffmpeg stack, ports
+8888/8889 agents. Namespaces elektron-mgrid-* left to relay GC (all publishers dead;
+free-beta relay, no persistent resources). No plan-file edits; §13 only.
+
+⏱ END 2026-08-26 08:36 UTC — ~56 min active.

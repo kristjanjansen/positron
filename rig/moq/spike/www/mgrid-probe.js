@@ -16556,6 +16556,7 @@ var require_mgrid_probe = __commonJS({
     var PROBE = params.get("probe") ?? "probe1";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var ROWLESS = params.get("rowless") === "1";
+    var STALLMS = parseInt(params.get("stallms") ?? "10000", 10);
     var NBLOCKS = 40;
     var BLOCK_W = 8;
     var ROW_Y = 120;
@@ -16684,7 +16685,7 @@ var require_mgrid_probe = __commonJS({
           if (!st.active) return;
           const r = await Promise.race([
             consumer.next(),
-            new Promise((res) => setTimeout(() => res("timeout"), got ? 1e4 : 5e3))
+            new Promise((res) => setTimeout(() => res("timeout"), got ? STALLMS : 5e3))
           ]);
           if (r === "timeout") {
             if (!got) {
@@ -16692,7 +16693,7 @@ var require_mgrid_probe = __commonJS({
               st.races++;
               row({ k: "race", pub: p, phase: "video", t: wall(), err: "ok-zero-groups-5s" });
             }
-            throw new Error(got ? "video stalled 10 s" : "video zero groups 5 s");
+            throw new Error(got ? `video stalled ${STALLMS} ms` : "video zero groups 5 s");
           }
           if (r === void 0) {
             report.closes++;
