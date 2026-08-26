@@ -149,6 +149,14 @@ against the existing measurement suite.
 **C9 — v3 (editing, timelines-of-timelines) is where such projects die.** It
 stays out of scope until a real show asks for it by name.
 
+**Interop stance (2026-08-26): MIDI 2.0 = adapter + interchange, NEVER the
+protocol.** UMP is a device vocabulary; JR timestamps are jitter offsets, not
+absolute time; Web MIDI still exposes 1.0 semantics. Ship: a `midi` kind
+(maria's adapter, payload holds raw/UMP words — 32-bit res + per-note data
+survive inside), SMF/SMF2 export-import of the midi lane (DAW interchange;
+imports are score material per C10), and MIDI Show Control as an actuator for
+lighting desks. Same layer-verdict as NDI: great at its layer, wrong substrate.
+
 **C10 — THE BOUNDARY: the timeline is a TRACE format, never an AUTHORING
 format.** Scores/patches are programs (relative, conditional, structural time);
 the timeline is the trace a performance of them leaves. Performing a score
