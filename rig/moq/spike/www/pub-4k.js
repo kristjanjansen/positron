@@ -16160,6 +16160,8 @@ var require_pub_4k = __commonJS({
     var FPS = parseInt(params.get("fps") ?? "30", 10);
     var BITRATE = parseInt(params.get("bitrate") ?? "2500000", 10);
     var STATSMS = parseInt(params.get("statsms") ?? "5000", 10);
+    var CBR = params.get("cbr") === "1";
+    var NOISE = params.get("noise") === "1";
     var GOP = FPS;
     var NBLOCKS = 56;
     var BLOCK_W = 20;
@@ -16184,6 +16186,26 @@ var require_pub_4k = __commonJS({
     cv.height = H;
     var ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
     var frameCounter = 0;
+    var noiseStrips = [];
+    if (NOISE) {
+      const nh = Math.floor(H / 4);
+      for (let n = 0; n < 6; n++) {
+        const nc = document.createElement("canvas");
+        nc.width = W;
+        nc.height = nh;
+        const nctx = nc.getContext("2d");
+        const id = nctx.createImageData(W, nh);
+        const d = id.data;
+        for (let p = 0; p < d.length; p += 4) {
+          d[p] = Math.random() * 256 | 0;
+          d[p + 1] = Math.random() * 256 | 0;
+          d[p + 2] = Math.random() * 256 | 0;
+          d[p + 3] = 255;
+        }
+        nctx.putImageData(id, 0, 0);
+        noiseStrips.push(nc);
+      }
+    }
     function draw() {
       const ms = Math.round(performance.timeOrigin + performance.now());
       ctx.setTransform(SX, 0, 0, SY, 0, 0);
@@ -16217,6 +16239,10 @@ var require_pub_4k = __commonJS({
       ctx.fillStyle = "#f0f";
       ctx.fillRect(1200 - x, 600, 40, 40);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (noiseStrips.length) {
+        const nc = noiseStrips[frameCounter % noiseStrips.length];
+        ctx.drawImage(nc, 0, H - nc.height);
+      }
       frameCounter++;
     }
     (async () => {
@@ -16276,6 +16302,7 @@ var require_pub_4k = __commonJS({
           bitrate: BITRATE,
           latencyMode: "realtime"
         };
+        if (CBR) base.bitrateMode = "constant";
         if (CODEC.startsWith("avc1")) base.avc = { format: "annexb" };
         const probe = async (mode2) => {
           try {

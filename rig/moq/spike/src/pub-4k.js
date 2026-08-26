@@ -16,6 +16,7 @@ const FPS = parseInt(params.get("fps") ?? "30", 10);
 const BITRATE = parseInt(params.get("bitrate") ?? "2500000", 10);
 const STATSMS = parseInt(params.get("statsms") ?? "5000", 10);
 const CBR = params.get("cbr") === "1"; // bitrateMode constant — force real bytes for bandwidth-gate runs
+const NOISE = params.get("noise") === "1"; // incompressible bottom strip: the ONLY way to force real bitrate (VT won't pad)
 const GOP = FPS; // 1 s GOP always
 
 // Binary row geometry — 1280x720 REFERENCE grid (matches safari-play.js decode);
@@ -38,6 +39,28 @@ const cv = document.getElementById("cv");
 cv.width = W; cv.height = H;
 const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
 let frameCounter = 0;
+
+// Pre-generated noise strips (device pixels, bottom quarter of the frame).
+// Cycled per frame so temporal prediction can't collapse them.
+const noiseStrips = [];
+if (NOISE) {
+	const nh = Math.floor(H / 4);
+	for (let n = 0; n < 6; n++) {
+		const nc = document.createElement("canvas");
+		nc.width = W; nc.height = nh;
+		const nctx = nc.getContext("2d");
+		const id = nctx.createImageData(W, nh);
+		const d = id.data;
+		for (let p = 0; p < d.length; p += 4) {
+			d[p] = (Math.random() * 256) | 0;
+			d[p + 1] = (Math.random() * 256) | 0;
+			d[p + 2] = (Math.random() * 256) | 0;
+			d[p + 3] = 255;
+		}
+		nctx.putImageData(id, 0, 0);
+		noiseStrips.push(nc);
+	}
+}
 
 function draw() {
 	const ms = Math.round(performance.timeOrigin + performance.now());
@@ -70,6 +93,10 @@ function draw() {
 	ctx.fillStyle = "#f0f";
 	ctx.fillRect(1200 - x, 600, 40, 40);
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
+	if (noiseStrips.length) {
+		const nc = noiseStrips[frameCounter % noiseStrips.length];
+		ctx.drawImage(nc, 0, H - nc.height);
+	}
 	frameCounter++;
 }
 

@@ -579,3 +579,85 @@ masquerade as desktop macOS Safari; Chrome/Android UA reduction can freeze "Andr
 minor versions; every iOS browser (CriOS/FxiOS…) is WebKit underneath, so its verdict is
 Safari's. Verified end-to-end: headless Chrome 151 run → row `a86f74a1` showed live / WT:✓
 H264:✓ / connect 159 ms / first frame 401 ms / 30 fps / g2g p50 44 ms / 0 errors.
+
+## 9. Resolution/framerate matrix — how far does the pipeline go? (✅ measured 2026-08-26 ~06:42–07:02 UTC)
+
+Question: from this Mac, through CF's draft-14 relay, how far can resolution/framerate go — 4K? 60 fps? — and
+what does it do to latency? Method: parameterized clones of the §8 pipeline (`src/pub-4k.js` / `src/play-4k.js`,
+bundles in `www/`, served by `matrixserver.py :8894`), one namespace per config (`elektron-4k-test-<cfg>`),
+90–100 s each, H.264 annexb hw-encode (VideoToolbox via WebCodecs `hardwareAcceleration:"prefer-hardware"` —
+probed per config, all TRUE incl. 4K60 High 5.2), measured by a local headless-Chromium player running the same
+code path as the deployed page (per-frame burned-row g2g → `results/moq-4k-<cfg>.jsonl`).
+
+### 9.1 The table (g2g steady-state = after first 5 s; wire bytes = realtime-VBR on the synthetic canvas)
+
+| config | codec | enc fps (target) | dec fps | g2g p50/p95 ms | enc | wire bytes/s | CPU pub/play | verdict |
+|---|---|---|---|---|---|---|---|---|
+| 720p30 | avc1.42001f | **30.0** (30) | 30.1 | **33.2 / 54.8** | hw | ~105 KB | 13% / 26% | ✅ clean (sanity vs §8.4's 32–34 ✓) |
+| 1080p60 | avc1.64002a (High 4.2) | **60.0** (60) | 60.4 | **33.2 / 51.1** | hw | ~170 KB | 14% / 56% | ✅ clean |
+| 2160p30 (4K) | avc1.640033 (High 5.1) | **30.0** (30) | 30.2 | **47.3 / 78.2** | hw | ~171 KB | 8% / 57% | ✅ clean → **WINNER** |
+| 2160p60 (4K) | avc1.640034 (High 5.2) | **50.0** (60) ❌ | 49.7 | **201.2 / 314.3** | hw | ~300 KB | 15% / 91% | ❌ encoder saturates |
+| 2160p30 noise stress | avc1.640033 + `?noise=1&cbr=1` | **14.0** (30) ❌ | 14.0 | 240 / 396 | hw | **2.86 MB (22.9 Mbps), peak 4.97 MB** | 15% / 45% | relay ✅, encoder ❌ |
+
+- All runs: **0 decode errors, 0 row-checksum failures, 0 reconnects** (one exception, §9.3), decoder queue ≤2
+  except 4K60 (≤7). First frame 359–851 ms. n(frames): 3006 / 6041 / 3024 / 4976 / 1258.
+- ⚠️ Host contention (sibling agents): load1 spiked to ~22 at 720p30 start and **~43 at 4K60 start**, decaying
+  through each run; 4K60's encFps stayed pinned at exactly ~50 while load fell 43→12 → the ceiling is the
+  encoder, not CPU contention. CPU numbers are one-core %.
+
+### 9.2 Gates hit (each characterized, not guessed)
+
+1. **H.264 level** works exactly as advertised: level 3.1 (`42001f`) refuses ≥720p30 (`isConfigSupported:false`
+   for 1080p — seen live in the §9.4 dup probe where High 3.1@1080p FAIL-looped); High 4.2/5.1/5.2 all probe
+   hw-supported and configure. The deployed player takes the codec string from the catalog → **no player change
+   needed for any config** (verified: page assets untouched all session).
+2. **4K60 = encoder saturation, not relay choke.** Draw loop holds 60.0 exactly; VideoToolbox emits ~50 fps
+   (83% of target, flat); encode queue rides the backpressure cap (3–4) → **standing latency: g2g p50 jumps
+   47→201 ms, p95 314 ms**. "Choking" looks like: bounded-but-full queues, ~10 capture drops/s forever, latency
+   plateau ~200 ms — NOT errors, NOT disconnects, NOT relay loss (0 decode errors, relay delivered every frame).
+3. **Bitrate honesty**: realtime VT does NOT pad — `bitrateMode:"constant"` changed nothing on synthetic content
+   (~1.4 Mbps at "12 Mbps" 4K30). Forcing incompressible content (`?noise=1`, rotating random strips over the
+   bottom quarter) → encoder emits **22.9 Mbps sustained / 39.7 Mbps burst through the relay flawlessly** but
+   collapses to 14 fps with ~240 ms g2g (internal realtime frame-dropping; queue stays ≤1). So on this Mac the
+   wall is ALWAYS the hw encoder; **CF relay bandwidth was never the limit** (free-beta caveat: runs kept ≤120 s).
+4. **60 fps ≠ lower latency** (phase-1 hypothesis NOT reproduced here): 1080p60 p50 identical to 720p30
+   (33.2 vs 33.2), p95 only −3.7 ms. This rig burns the timestamp at capture-time (no camera-interval
+   quantization), so the frame-interval halving mostly cancels; encode+network+decode floor dominates.
+5. **4K costs ~14 ms**: p50 33→47 ms, entirely encode+decode time of the 8.3 MP frame (same network path).
+
+### 9.3 Operational findings
+- **Video-track subscribe race** (§7.1 trap-2 family, new location): one run's player subscribed `video` right
+  after catalog, got SUBSCRIBE_OK but zero groups for 15 s → its own timeout+reconnect fixed it (17.5 s to first
+  frame). The deployed player has the same reconnect loop → self-heals; just don't panic at one slow join.
+- **Duplicate publish is ACCEPTED by CF draft-14**: second `conn.publish()` of an already-live namespace gets
+  PUBLISHED, first session is NOT closed (unlike moq-rs §6.4). Subscriber routing under two live publishers is
+  UNTESTED → the §9.5 swap still did stop-old-first.
+
+### 9.4 What runs NOW (since 2026-08-26 07:00 UTC)
+**`elektron-safari-test` carries 4K30** — `pub-4k.html?ns=elektron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000`,
+headless Chrome udd `logs/moq-4k-pub-udd`, page still served by `pubserver.py :8890` (kept alive — it serves the
+new publisher page and collects its `/log` into `logs/moq-safari-pub.log`, same file, lines now prefixed `PUB4K`).
+The old 720p30 publisher Chrome (`moq-safari-pub-udd`) was stopped only AFTER the deployed workers.dev page was
+CDP-verified live on 4K30: pre-switch on the test namespace, and post-switch on the default URL — 30 fps, 0 decode
+errors, g2g p50 47 / p95 66–80 ms, first frame 437 ms, catalog codec auto-picked. Verify anytime:
+`tail -f rig/moq/spike/logs/moq-safari-pub.log` (STATS every 60 s).
+
+### 9.5 Restart commands (publisher dies with sleep/reboot — §8.6 caveat applies)
+```bash
+cd /Users/s32863/personal/elektron/rig/moq/spike
+# page/log server (if not already up):
+nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
+# the 4K30 publisher:
+nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --user-data-dir="$PWD/logs/moq-4k-pub-udd" --no-first-run \
+  --autoplay-policy=no-user-gesture-required --window-size=1300,760 \
+  --disable-background-timer-throttling --disable-renderer-backgrounding \
+  --disable-backgrounding-occluded-windows \
+  "http://127.0.0.1:8890/pub-4k.html?ns=elektron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000" \
+  > logs/moq-4k-pub-chrome.log 2>&1 & disown
+# STOP: pkill -f moq-4k-pub-udd    (fall back to 720p30: §8.6 START block, unchanged)
+# Re-run the matrix: python3 matrixserver.py 8894 &  then pub-4k.html/play-4k.html with
+# ?ns=elektron-4k-test-<cfg>&codec=&w=&h=&fps=&bitrate=[&cbr=1&noise=1]; player JSONL lands in
+# results/moq-4k-<name>.jsonl via &name=. Rebuild after src edits: §6.3 docker esbuild, entries
+# src/pub-4k.js / src/play-4k.js.
+```

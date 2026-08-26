@@ -36,6 +36,15 @@ control-plane soak + cost telemetry; recording composite WITHOUT OBS via headles
 grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
 30-min time-boxed MoQ browser spike).
 
+### 4K/framerate matrix — ✅ 4K30 CLEAN AT 47 ms; RELAY NEVER THE LIMIT
+- ✅ 720p30 33 ms · 1080p60 33 ms (60 fps ≠ faster: burn-at-capture cancels
+  quantization) · **4K30 47/78 ms clean, now LIVE on elektron-safari-test** ·
+  4K60 ❌ local VideoToolbox ~50 fps ceiling (200 ms plateau, zero relay errors).
+- ✅ Stress: 22.9 Mbps sustained through CF flawlessly. Levels per spec. Datum:
+  draft-14 accepts duplicate publish (first session wins). Deployed page needed
+  zero changes (codec auto from catalog). RUNBOOK §9; results/moq-4k-*.jsonl.
+- USER: reload the phone test page — it's 4K now.
+
 ### 📱 iPHONE VERDICT (user screenshots, 09:31) — ✅ MOBILE SAFARI PLAYS MoQ ON 4G
 - Mobile Safari 26.5.2, 4G cellular: connected 282 ms, moq-transport-14, H.264
   720p30, first frame 0.5 s, 31 fps, 0 decode errors, g2g ~31 ms p50 / 51 p95

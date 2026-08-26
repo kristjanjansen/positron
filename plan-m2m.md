@@ -150,7 +150,16 @@ flawlessly, so a **~100-line shim** (hang has a `Container.Cmaf` class) likely b
 Platform data: CF never redelivers a CLOSED group (write-once catalogs invisible to late joiners →
 republish every 2 s; join≈1.0 s), no pending-subscribes (subscribe-before-announce errors → retry),
 optimistic SUBSCRIBE_OK then ~10 s close on unserved tracks. draft-16 is NOT auth-only:
-SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ MOBILE SAFARI VERIFIED BY THE USER (2026-08-26 09:31, iPhone screenshots): Mobile Safari
+SUBSCRIBE_NAMESPACE fixes the discovery race, PUBLISH could cut join latency. **✅ RESOLUTION/FRAMERATE MATRIX (2026-08-26, RUNBOOK §9): 4K30 through the relay is CLEAN —
+47 ms p50 / 78 ms p95** (hw encode, 0 errors; now live on the test namespace). 1080p60 also clean
+(33 ms — no latency win over 30 fps: burn-at-capture cancels interval quantization). 4K60 fails
+LOCALLY (VideoToolbox pins ~50 fps → 200 ms queue plateau), not at the relay. **The relay
+swallowed 22.9 Mbps sustained / 39.7 peak flawlessly — Cloudflare was never the limit.** H.264
+levels behave per spec (3.1 refuses 1080p; High 4.2/5.1/5.2 all hw-true). New datum: draft-14
+ACCEPTS duplicate publishes of a live namespace (first session survives). Practical show guidance:
+720p30–1080p60 for tiles, 4K30 for a stage feed at +14 ms, budget bitrate not resolution.
+
+**✅ MOBILE SAFARI VERIFIED BY THE USER (2026-08-26 09:31, iPhone screenshots): Mobile Safari
 26.5.2 plays live MoQ video OVER 4G CELLULAR** — WebTransport YES, H.264 YES, connected 282 ms,
 negotiated moq-transport-14, first frame 0.5 s, LIVE 31 fps / 1166 frames / 0 decode errors,
 glass-to-glass ~31 ms p50 / 51 ms p95 (± phone clock offset). QUIC traversed the cellular network
