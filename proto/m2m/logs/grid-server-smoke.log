@@ -1,0 +1,206 @@
+Traceback (most recent call last):
+  File "/Users/s32863/personal/elektron/proto/m2m/grid-server.py", line 398, in <module>
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 457, in __init__
+    self.server_bind()
+    ~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/07:32:55 "GET /healthz HTTP/1.1" 200 -
+07:32:59 "GET /healthz HTTP/1.1" 200 -
+07:33:00 "GET /grid.html?id=1&name=Perf-Ada&room=grid-smoke&role=operator&view=full&ls=4&hold=1&cb=1787718780564 HTTP/1.1" 200 -
+07:33:00 code 404, message File not found
+07:33:00 "GET /favicon.ico HTTP/1.1" 404 -
+07:33:00 "GET /grid.html?id=2&name=Perf-Bela&room=grid-smoke&role=performer&view=full&ls=4&hold=1&cb=1787718780669 HTTP/1.1" 200 -
+07:33:00 "GET /grid.html?id=B&name=Live-B&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718780756 HTTP/1.1" 200 -
+07:33:00 "GET /grid.html?id=C&name=Live-C&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718780842 HTTP/1.1" 200 -
+07:33:01 "GET /grid.html?id=D&name=Live-D&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718781319 HTTP/1.1" 200 -
+07:33:01 code 404, message File not found
+07:33:01 "GET /favicon.ico HTTP/1.1" 404 -
+07:33:01 "GET /grid.html?id=E&name=Live-E&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718781418 HTTP/1.1" 200 -
+07:33:01 "GET /grid.html?id=F&name=Live-F&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718781507 HTTP/1.1" 200 -
+07:33:01 "GET /grid.html?id=W&name=Wall-W&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718781596 HTTP/1.1" 200 -
+07:33:02 "GET /grid.html?id=X&name=Wall-X&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718782095 HTTP/1.1" 200 -
+07:33:02 code 404, message File not found
+07:33:02 "GET /favicon.ico HTTP/1.1" 404 -
+07:33:02 "GET /grid.html?id=Y&name=Wall-Y&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718782194 HTTP/1.1" 200 -
+07:33:02 "GET /grid.html?id=Z&name=Wall-Z&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718782283 HTTP/1.1" 200 -
+07:33:02 "GET /grid.html?id=A&name=Live-A&room=grid-smoke&role=audience&view=lite&ls=4&hold=1&cb=1787718782807 HTTP/1.1" 200 -
+07:33:02 code 404, message File not found
+07:33:02 "GET /favicon.ico HTTP/1.1" 404 -
+07:33:03 CF POST /sessions/new -> 201 (555 ms)
+07:33:03 CF POST /sessions/new -> 201 (555 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 CF POST /sessions/new -> 201 (554 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 CF POST /sessions/new -> 201 (613 ms)
+07:33:03 CF POST /sessions/new -> 201 (612 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 CF POST /sessions/new -> 201 (612 ms)
+07:33:03 CF POST /sessions/new -> 201 (612 ms)
+07:33:03 CF POST /sessions/new -> 201 (613 ms)
+07:33:03 CF POST /sessions/new -> 201 (613 ms)
+07:33:03 CF POST /sessions/new -> 201 (612 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 CF POST /sessions/new -> 201 (612 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:03 CF POST /sessions/new -> 201 (613 ms)
+07:33:03 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:33:04 CF POST /sessions/b25f18bb56201ae748ab58fb2c21432ab861b5c643f9df4837ecb32019822055/tracks/new -> 200 (334 ms)
+07:33:04 "POST /cf/sessions/b25f18bb56201ae748ab58fb2c21432ab861b5c643f9df4837ecb32019822055/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/5c7e67531481696bc7d77789d05591bc301dcc71ce929648c1d2e2719d75bcf4/tracks/new -> 200 (342 ms)
+07:33:04 "POST /cf/sessions/5c7e67531481696bc7d77789d05591bc301dcc71ce929648c1d2e2719d75bcf4/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/afd70cfab4b386741a14559e40b02a66d90ba41fd762a8de740b79a47729e617/tracks/new -> 200 (358 ms)
+07:33:04 "POST /cf/sessions/afd70cfab4b386741a14559e40b02a66d90ba41fd762a8de740b79a47729e617/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/6788ca54ff2a5a5322894713dd3cc6a06d4021df709be8d81a65acb89ef3cd4b/tracks/new -> 200 (357 ms)
+07:33:04 "POST /cf/sessions/6788ca54ff2a5a5322894713dd3cc6a06d4021df709be8d81a65acb89ef3cd4b/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (372 ms)
+07:33:04 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/f57cc9eaedd4046be903a74a576292e0cd2c8e4dd5d4da25e0d543e247af4fe9/tracks/new -> 200 (377 ms)
+07:33:04 "POST /cf/sessions/f57cc9eaedd4046be903a74a576292e0cd2c8e4dd5d4da25e0d543e247af4fe9/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/767f2956f68cb86ba4f1086e8795ab4009701434e5852d6dabcad64b658d7fcc/tracks/new -> 200 (378 ms)
+07:33:04 "POST /cf/sessions/767f2956f68cb86ba4f1086e8795ab4009701434e5852d6dabcad64b658d7fcc/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (387 ms)
+07:33:04 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/eb722dd83db4da25497557051f0f875edbe9f21a494e5c9f8950cb3a0ca9ab4b/tracks/new -> 200 (391 ms)
+07:33:04 "POST /cf/sessions/eb722dd83db4da25497557051f0f875edbe9f21a494e5c9f8950cb3a0ca9ab4b/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/175f60cf8fe8d57385da97385e266d280940b1548a66411eb58494788b7501bd/tracks/new -> 200 (397 ms)
+07:33:04 "POST /cf/sessions/175f60cf8fe8d57385da97385e266d280940b1548a66411eb58494788b7501bd/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/31b8dc5066430c793bb2252c666780b8a6b9cf2994a7d7be0f3212802cec4cc3/tracks/new -> 200 (401 ms)
+07:33:04 "POST /cf/sessions/31b8dc5066430c793bb2252c666780b8a6b9cf2994a7d7be0f3212802cec4cc3/tracks/new HTTP/1.1" 200 -
+07:33:04 CF POST /sessions/20a35d9837ae541d94f34f1a95407435848498d4ac2c3075da9092ca1ef9800e/tracks/new -> 200 (413 ms)
+07:33:04 "POST /cf/sessions/20a35d9837ae541d94f34f1a95407435848498d4ac2c3075da9092ca1ef9800e/tracks/new HTTP/1.1" 200 -
+07:33:04 WS grid-smoke/C joined (audience), n=1
+07:33:04 WS grid-smoke/Z joined (audience), n=2
+07:33:04 WS grid-smoke/A joined (audience), n=3
+07:33:04 WS grid-smoke/E joined (audience), n=4
+07:33:04 WS grid-smoke/1 joined (operator), n=5
+07:33:04 WS grid-smoke/F joined (audience), n=6
+07:33:04 WS grid-smoke/2 joined (performer), n=7
+07:33:04 WS grid-smoke/Y joined (audience), n=8
+07:33:04 WS grid-smoke/W joined (audience), n=9
+07:33:04 WS grid-smoke/B joined (audience), n=10
+07:33:04 WS grid-smoke/X joined (audience), n=11
+07:33:04 WS grid-smoke/D joined (audience), n=12
+07:33:06 WS grid-smoke/1 -> tier featured (promote by 1)
+07:33:07 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (262 ms)
+07:33:07 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:07 WS grid-smoke/2 -> tier featured (promote by 1)
+07:33:07 WS grid-smoke/A -> tier live (promote by 1)
+07:33:07 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (151 ms)
+07:33:07 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:07 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (249 ms)
+07:33:07 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:07 WS grid-smoke/B -> tier live (promote by 1)
+07:33:07 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (269 ms)
+07:33:07 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:07 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (185 ms)
+07:33:07 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:07 WS grid-smoke/C -> tier live (promote by 1)
+07:33:07 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (157 ms)
+07:33:07 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:07 WS grid-smoke/D -> tier live (promote by 1)
+07:33:07 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (208 ms)
+07:33:07 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:07 WS grid-smoke/E -> tier live (promote by 1)
+07:33:07 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (146 ms)
+07:33:07 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:08 WS grid-smoke/F -> tier live (promote by 1)
+07:33:08 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (331 ms)
+07:33:08 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:08 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (325 ms)
+07:33:08 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:08 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (200 ms)
+07:33:08 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:08 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (160 ms)
+07:33:08 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:08 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (312 ms)
+07:33:08 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:08 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (249 ms)
+07:33:08 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:08 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (172 ms)
+07:33:08 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (499 ms)
+07:33:09 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:09 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (294 ms)
+07:33:09 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:09 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (192 ms)
+07:33:09 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (183 ms)
+07:33:09 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (139 ms)
+07:33:09 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:09 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (280 ms)
+07:33:09 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:09 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (217 ms)
+07:33:09 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (141 ms)
+07:33:09 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (209 ms)
+07:33:09 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:09 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/close -> 200 (195 ms)
+07:33:09 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/close HTTP/1.1" 200 -
+07:33:10 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/close -> 200 (194 ms)
+07:33:10 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/close HTTP/1.1" 200 -
+07:33:10 CF POST /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new -> 200 (187 ms)
+07:33:10 "POST /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/new HTTP/1.1" 200 -
+07:33:10 CF POST /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new -> 200 (285 ms)
+07:33:10 "POST /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/new HTTP/1.1" 200 -
+07:33:10 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate -> 200 (150 ms)
+07:33:10 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/renegotiate HTTP/1.1" 200 -
+07:33:10 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate -> 200 (163 ms)
+07:33:10 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/renegotiate HTTP/1.1" 200 -
+07:33:10 CF PUT /sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/close -> 200 (185 ms)
+07:33:10 "PUT /cf/sessions/23b7e7631e952ba45c9b96979c9a89c2ab034479333d7327ae573449d258d227/tracks/close HTTP/1.1" 200 -
+07:33:10 CF PUT /sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/close -> 200 (230 ms)
+07:33:10 "PUT /cf/sessions/f7e2e9ef0fcd97198176f14d6c5b36405bf1e7fa2772cebace72c580f47a3cf8/tracks/close HTTP/1.1" 200 -
+07:33:43 WS grid-smoke/C error: client close frame
+07:33:43 WS grid-smoke/B error: client close frame
+07:33:43 WS grid-smoke/C LEFT (socket-closed)
+07:33:43 WS grid-smoke/B LEFT (socket-closed)
+07:33:43 WS grid-smoke/2 error: client close frame
+07:33:43 WS grid-smoke/2 LEFT (socket-closed)
+07:33:43 WS grid-smoke/1 error: client close frame
+07:33:43 WS grid-smoke/1 LEFT (socket-closed)
+07:33:43 WS grid-smoke/W error: client close frame
+07:33:43 WS grid-smoke/W LEFT (socket-closed)
+07:33:43 WS grid-smoke/F error: client close frame
+07:33:43 WS grid-smoke/F LEFT (socket-closed)
+07:33:43 WS grid-smoke/E error: client close frame
+07:33:43 WS grid-smoke/E LEFT (socket-closed)
+07:33:43 WS grid-smoke/D error: client close frame
+07:33:43 WS grid-smoke/D LEFT (socket-closed)
+07:33:43 WS grid-smoke/Z error: client close frame
+07:33:43 WS grid-smoke/Y error: client close frame
+07:33:43 WS grid-smoke/Z LEFT (socket-closed)
+07:33:43 WS grid-smoke/Y LEFT (socket-closed)
+07:33:43 WS grid-smoke/X error: client close frame
+07:33:43 WS grid-smoke/X LEFT (socket-closed)
+07:33:43 WS grid-smoke/A error: client close frame
+07:33:43 WS grid-smoke/A LEFT (socket-closed)
+07:34:23 "GET /healthz HTTP/1.1" 200 -
+07:34:27 "GET /healthz HTTP/1.1" 200 -
+07:34:28 "GET /grid.html?id=1&name=Perf-Ada&room=grid-rsmoke&role=operator&view=full&ls=4&hold=1&cb=1787718868547&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:28 code 404, message File not found
+07:34:28 "GET /favicon.ico HTTP/1.1" 404 -
+07:34:28 "GET /grid.html?id=2&name=Perf-Bela&room=grid-rsmoke&role=performer&view=full&ls=4&hold=1&cb=1787718868646&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:28 "GET /grid.html?id=B&name=Live-B&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718868732&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:28 "GET /grid.html?id=C&name=Live-C&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718868821&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:29 "GET /grid.html?id=D&name=Live-D&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718869363&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:29 code 404, message File not found
+07:34:29 "GET /favicon.ico HTTP/1.1" 404 -
+07:34:29 "GET /grid.html?id=E&name=Live-E&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718869463&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:29 "GET /grid.html?id=F&name=Live-F&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718869552&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:29 "GET /grid.html?id=W&name=Wall-W&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718869640&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:30 "GET /grid.html?id=X&name=Wall-X&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718870214&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:30 code 404, message File not found
+07:34:30 "GET /favicon.ico HTTP/1.1" 404 -
+07:34:30 "GET /grid.html?id=Y&name=Wall-Y&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718870317&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:30 "GET /grid.html?id=Z&name=Wall-Z&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718870409&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:31 "GET /grid.html?id=A&name=Live-A&room=grid-rsmoke&role=audience&view=lite&ls=4&hold=1&cb=1787718870972&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&token=dae4e3d4c7e705580a02691082f53cc2 HTTP/1.1" 200 -
+07:34:31 code 404, message File not found
+07:34:31 "GET /favicon.ico HTTP/1.1" 404 -

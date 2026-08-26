@@ -1,0 +1,15 @@
+04:36:35.496 [log] attempt 1: session 73270714d3c0…
+04:36:44.604 [log] publish ok on attempt 1 in 9593 ms
+04:36:44.847 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:44.851 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:44.852 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:51.893 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:52.975 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:05.882 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:10.936 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:12.955 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:06.306 [log] attempt 1: session dfc4492a5207…
+04:39:07.270 [log] publish ok on attempt 1 in 1473 ms
+04:39:07.696 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:07.767 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:07.769 [error] Failed to load resource: the server responded with a status of 404 ()

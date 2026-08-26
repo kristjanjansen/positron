@@ -1,0 +1,4 @@
+04:44:35.478 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:44:38.354 [log] attempt 1: session 529f9384b981…
+04:44:39.264 [log] publish ok on attempt 1 in 1361 ms
+04:44:40.496 [error] Failed to load resource: the server responded with a status of 404 ()

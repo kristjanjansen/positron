@@ -1,0 +1,401 @@
+/**
+ * elektron-rtc — production signaling layer for many-to-many video (plan-m2m §3).
+ *
+ * Three jobs in one worker:
+ *
+ *   1. RtcRoom Durable Object (one per room name) — presence + track directory
+ *      over hibernatable WebSockets. The DO's `left` broadcast IS the death
+ *      detector: dead publishers emit NO track-level events (tiles freeze
+ *      silently; SFU sessions 410 only at +31–47 s — measured, plan-m2m §5.4).
+ *
+ *   2. SFU proxy /cf/* — forwards to the Cloudflare Realtime SFU HTTPS API,
+ *      adding the app secret server-side. The secret can mint sessions and pull
+ *      any track in the app; it never reaches a browser.
+ *
+ *   3. Snapshot tiles /tile/{room}/{pid} — small JPEG stills for the wall tier
+ *      (the big-grid participants who don't get live WebRTC pulls). Cache API
+ *      primary + DO-latest fallback. Per-colo cache is fine for the prototype;
+ *      production = R2 or KV.
+ *
+ * Routes:
+ *   WS   /room/{name}/ws          token required   → RtcRoom DO
+ *   ANY  /cf/{subpath}            token required   → rtc.live.cloudflare.com
+ *   POST /tile/{room}/{pid}       token required   JPEG ≤ 64 KB
+ *   GET  /tile/{room}/{pid}       open             cache-first, max-age=2
+ *
+ * Auth: ?token=… or Authorization: Bearer … must equal the ROOM_TOKEN secret.
+ * Without it, anyone with the workers.dev URL could mint SFU sessions.
+ *
+ * Frame protocol (client → server / server → client): see RtcRoom below and
+ * DEPLOYED.md. Design rules inherited from workers/cues (deployed, measured):
+ *   - setWebSocketAutoResponse('ping'→'pong'): pings never wake the DO.
+ *   - broadcast BEFORE storage.put: persistence-gating cost ~50 ms (measured).
+ *   - ws.serializeAttachment for identity across hibernation.
+ *   - rebuild-never-patch: reconnect = new join + new publish, no state repair.
+ */
+
+const SFU_BASE = 'https://rtc.live.cloudflare.com/v1/apps';
+// Cloudflare's edge 1010-blocks generic/default UAs (measured, proto/m2m).
+const SFU_UA = 'elektron-rtc-worker/1.0 (curl-compatible)';
+const CF_SUBPATH_RE = /^[A-Za-z0-9/_-]{1,200}$/;
+const ROOM_RE = /^[\w-]{1,64}$/;
+const PID_RE = /^[\w.-]{1,64}$/;
+const TILE_MAX_BYTES = 64 * 1024;
+const TILE_CACHE_TTL_S = 6; // stored-copy lifetime at the colo
+const TILE_CLIENT_TTL_S = 2; // what pollers may reuse without refetching
+const ROLES = new Set(['performer', 'audience', 'operator']);
+const TIERS = new Set(['wall', 'live', 'featured']);
+
+// ---------------------------------------------------------------------------
+// RtcRoom — one Durable Object instance per room name.
+// ---------------------------------------------------------------------------
+export class RtcRoom {
+  constructor(state) {
+    this.state = state;
+    // Answer literal "ping" with "pong" WITHOUT waking a hibernated DO
+    // (cues pattern, measured 32–38 ms RTT with zero wake cost).
+    this.state.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair('ping', 'pong'),
+    );
+  }
+
+  // --- roster persistence (survives DO restarts; broadcast-before-persist) --
+  async roster() {
+    return (await this.state.storage.get('roster')) || {};
+  }
+  async putRoster(r) {
+    await this.state.storage.put('roster', r);
+  }
+  async perm() {
+    return (await this.state.storage.get('perm')) || { publish: { audience: false } };
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    // Internal tile fallback store (worker-only paths, never routed raw).
+    // Kept in the room's own storage so tiles survive colo-cache misses;
+    // production should move this to R2/KV — a busy wall polling the DO
+    // defeats hibernation and would eat the free-plan request budget.
+    const tileM = url.pathname.match(/^\/tile-(put|get)\/([\w.-]{1,64})$/);
+    if (tileM) {
+      const [, op, pid] = tileM;
+      if (op === 'put') {
+        const buf = await request.arrayBuffer();
+        await this.state.storage.put('tile:' + pid, { t: Date.now(), jpeg: buf });
+        return new Response(null, { status: 204 });
+      }
+      const rec = await this.state.storage.get('tile:' + pid);
+      if (!rec) return new Response('no tile', { status: 404 });
+      return new Response(rec.jpeg, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'X-Tile-Age-Ms': String(Date.now() - rec.t),
+        },
+      });
+    }
+
+    if (request.headers.get('Upgrade') !== 'websocket') {
+      return new Response('expected websocket', { status: 426 });
+    }
+    const pair = new WebSocketPair();
+    this.state.acceptWebSocket(pair[1]);
+    // Identity is attached on `join`; until then the socket is a spectator.
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  async webSocketMessage(ws, raw) {
+    let f;
+    try { f = JSON.parse(raw); } catch { return; }
+    const me = ws.deserializeAttachment?.() || null;
+
+    // In-band latency probe (autoresponse covers the literal 'ping' string;
+    // this covers JSON pings that want the DO wall clock).
+    if (f.type === 'ping') {
+      ws.send(JSON.stringify({ type: 'pong', t0: f.t0, t1: Date.now() }));
+      return;
+    }
+
+    // -- join: {type:'join', participantId?, name?, role} ------------------
+    // Server assigns participantId when omitted. Reply: full roster snapshot
+    // (the cue-backlog pattern). Broadcast: joined. Rejoining an existing
+    // participantId replaces the old entry (rebuild-never-patch).
+    if (f.type === 'join') {
+      const role = ROLES.has(f.role) ? f.role : 'audience';
+      const id = (typeof f.participantId === 'string' && PID_RE.test(f.participantId))
+        ? f.participantId
+        : crypto.randomUUID().slice(0, 8);
+      ws.serializeAttachment({ id, role });
+      const roster = await this.roster();
+      const participant = {
+        id,
+        name: typeof f.name === 'string' ? f.name.slice(0, 64) : id,
+        role,
+        tier: 'wall', // everyone starts on the snapshot wall; promote moves them
+        sessionId: null,
+        trackNames: [],
+        joinedAt: Date.now(),
+      };
+      roster[id] = participant;
+      // Snapshot to the joiner FIRST, then delta to the room, then persist.
+      ws.send(JSON.stringify({
+        type: 'roster',
+        self: { id, role },
+        participants: Object.values(roster),
+        perm: await this.perm(),
+      }));
+      this.broadcast({ type: 'joined', participant }, ws);
+      await this.putRoster(roster);
+      return;
+    }
+
+    if (!me) return; // everything below requires a completed join
+
+    // -- publish: {type:'publish', sessionId, trackNames:[...]} ------------
+    // trackName convention: <participantId>/<mic|cam|screen> (plan-m2m §3).
+    if (f.type === 'publish' && typeof f.sessionId === 'string' && Array.isArray(f.trackNames)) {
+      const trackNames = f.trackNames.filter((t) => typeof t === 'string').slice(0, 16);
+      this.broadcast({
+        type: 'published',
+        participantId: me.id,
+        sessionId: f.sessionId,
+        trackNames,
+      });
+      const roster = await this.roster();
+      if (roster[me.id]) {
+        roster[me.id].sessionId = f.sessionId;
+        roster[me.id].trackNames = trackNames;
+        await this.putRoster(roster);
+      }
+      return;
+    }
+
+    // -- unpublish: {type:'unpublish', trackNames?} ------------------------
+    if (f.type === 'unpublish') {
+      const trackNames = Array.isArray(f.trackNames)
+        ? f.trackNames.filter((t) => typeof t === 'string')
+        : null; // null = everything
+      this.broadcast({ type: 'unpublished', participantId: me.id, trackNames });
+      const roster = await this.roster();
+      if (roster[me.id]) {
+        roster[me.id].trackNames = trackNames
+          ? roster[me.id].trackNames.filter((t) => !trackNames.includes(t))
+          : [];
+        if (!trackNames) roster[me.id].sessionId = null;
+        await this.putRoster(roster);
+      }
+      return;
+    }
+
+    // -- perm: {type:'perm', grant:{role?|participantId?, publish:bool}} ---
+    // Operator-only publish-permission window (cue-drivable).
+    if (f.type === 'perm' && me.role === 'operator' && f.grant && typeof f.grant.publish === 'boolean') {
+      const grant = {
+        publish: f.grant.publish,
+        ...(typeof f.grant.role === 'string' ? { role: f.grant.role } : {}),
+        ...(typeof f.grant.participantId === 'string' ? { participantId: f.grant.participantId } : {}),
+      };
+      this.broadcast({ type: 'perm', grant, by: me.id });
+      const perm = await this.perm();
+      if (grant.role) perm.publish[grant.role] = grant.publish;
+      if (grant.participantId) perm.publish[grant.participantId] = grant.publish;
+      if (!grant.role && !grant.participantId) perm.publish.audience = grant.publish;
+      await this.state.storage.put('perm', perm);
+      return;
+    }
+
+    // -- promote/demote: {type:'promote'|'demote', participantId, tier} ----
+    // Tier changes wall→live→featured; forwarded to all so every client
+    // re-evaluates what to pull (live) vs poll (wall snapshots). Operator only.
+    if ((f.type === 'promote' || f.type === 'demote') && me.role === 'operator'
+        && typeof f.participantId === 'string' && TIERS.has(f.tier)) {
+      this.broadcast({ type: f.type, participantId: f.participantId, tier: f.tier, by: me.id });
+      const roster = await this.roster();
+      if (roster[f.participantId]) {
+        roster[f.participantId].tier = f.tier;
+        await this.putRoster(roster);
+      }
+      return;
+    }
+
+    // -- cue passthrough: {type:'cue', cue:{...}} --------------------------
+    // Trivial relay so a cue can drive the participation layer without a
+    // second socket; the full cue engine stays on workers/cues.
+    if (f.type === 'cue' && f.cue) {
+      this.broadcast({ type: 'cue', cue: { ...f.cue, serverAt: Date.now() }, from: me.id });
+      return;
+    }
+  }
+
+  // The death signal. In the one-to-many world a closed socket kills the
+  // broadcast (plan.md §10); here it is the FEATURE: dead publishers emit no
+  // track-level events and their SFU sessions 410 only at +31–47 s (measured,
+  // plan-m2m §5.4) — this broadcast is what tells survivors to tracks/close.
+  async webSocketClose(ws) { await this.dropped(ws); }
+  async webSocketError(ws) { await this.dropped(ws); }
+
+  async dropped(ws) {
+    const me = ws.deserializeAttachment?.() || null;
+    if (!me) return;
+    // Broadcast IMMEDIATELY; persistence follows (the 50 ms lesson).
+    this.broadcast({ type: 'left', participantId: me.id });
+    const roster = await this.roster();
+    if (roster[me.id]) {
+      delete roster[me.id];
+      await this.putRoster(roster);
+    }
+  }
+
+  broadcast(frame, skip) {
+    const msg = JSON.stringify(frame);
+    for (const s of this.state.getWebSockets()) {
+      if (s === skip) continue;
+      try { s.send(msg); } catch {}
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Worker: routing, auth, SFU proxy, tiles.
+// ---------------------------------------------------------------------------
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Max-Age': '86400',
+};
+
+function withCors(resp) {
+  const h = new Headers(resp.headers);
+  for (const [k, v] of Object.entries(CORS)) h.set(k, v);
+  return new Response(resp.body, { status: resp.status, headers: h });
+}
+
+function text(status, body) {
+  return withCors(new Response(body, { status, headers: { 'Content-Type': 'text/plain' } }));
+}
+
+function authorized(request, url, env) {
+  if (!env.ROOM_TOKEN) return false; // fail closed if the secret is missing
+  const q = url.searchParams.get('token');
+  const h = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  const supplied = q || h;
+  if (!supplied || supplied.length !== env.ROOM_TOKEN.length) return false;
+  // Constant-time-ish compare; the token is random, not a password, so this
+  // is hygiene rather than a hard requirement.
+  let diff = 0;
+  for (let i = 0; i < supplied.length; i++) {
+    diff |= supplied.charCodeAt(i) ^ env.ROOM_TOKEN.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function tileCacheKey(url, room, pid) {
+  // Stable synthetic key on our own origin; querystring (token) excluded.
+  return new Request(`${url.origin}/tile/${room}/${pid}`, { method: 'GET' });
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    const { pathname } = url;
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS });
+    }
+
+    // ---- room WebSocket --------------------------------------------------
+    const roomM = pathname.match(/^\/room\/([\w-]{1,64})\/ws$/);
+    if (roomM) {
+      if (!authorized(request, url, env)) return text(403, 'bad or missing token');
+      const id = env.ROOMS.idFromName(roomM[1]);
+      return env.ROOMS.get(id).fetch(request);
+    }
+
+    // ---- SFU proxy -------------------------------------------------------
+    if (pathname.startsWith('/cf/')) {
+      if (!authorized(request, url, env)) return text(403, 'bad or missing token');
+      if (!['GET', 'POST', 'PUT'].includes(request.method)) return text(405, 'method');
+      const sub = pathname.slice('/cf/'.length);
+      if (!CF_SUBPATH_RE.test(sub)) return text(400, 'bad cf subpath');
+      const target = `${SFU_BASE}/${env.CF_REALTIME_APP_ID}/${sub}`;
+      const t0 = Date.now();
+      const upstream = await fetch(target, {
+        method: request.method,
+        headers: {
+          Authorization: `Bearer ${env.CF_REALTIME_APP_SECRET}`,
+          'Content-Type': 'application/json',
+          'User-Agent': SFU_UA, // default/generic UAs get 1010-blocked
+        },
+        body: ['POST', 'PUT'].includes(request.method) ? request.body : undefined,
+      });
+      const h = new Headers(CORS);
+      h.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
+      h.set('X-Proxy-Ms', String(Date.now() - t0));
+      return new Response(upstream.body, { status: upstream.status, headers: h });
+    }
+
+    // ---- snapshot tiles --------------------------------------------------
+    const tileM = pathname.match(/^\/tile\/([\w-]{1,64})\/([\w.-]{1,64})$/);
+    if (tileM) {
+      const [, room, pid] = tileM;
+      if (!ROOM_RE.test(room) || !PID_RE.test(pid)) return text(400, 'bad path');
+
+      if (request.method === 'POST') {
+        if (!authorized(request, url, env)) return text(403, 'bad or missing token');
+        const buf = await request.arrayBuffer();
+        if (buf.byteLength > TILE_MAX_BYTES) return text(413, 'tile too large (64 KB max)');
+        if (buf.byteLength < 4 || new Uint8Array(buf)[0] !== 0xff || new Uint8Array(buf)[1] !== 0xd8) {
+          return text(415, 'not a JPEG');
+        }
+        // Primary store: colo cache (fine for the prototype — viewers and
+        // publishers of one show tend to share a colo; production = R2/KV).
+        const cacheResp = new Response(buf, {
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Cache-Control': `public, max-age=${TILE_CACHE_TTL_S}`,
+            'X-Tile-Stored-At': String(Date.now()),
+          },
+        });
+        ctx.waitUntil(caches.default.put(tileCacheKey(url, room, pid), cacheResp));
+        // Fallback store: latest-per-participant in the room DO (survives
+        // cache misses / other colos; trivial — one small put, no broadcast).
+        ctx.waitUntil(
+          env.ROOMS.get(env.ROOMS.idFromName(room))
+            .fetch(`https://do/tile-put/${pid}`, { method: 'POST', body: buf }),
+        );
+        return withCors(new Response(JSON.stringify({ ok: true, bytes: buf.byteLength }), {
+          status: 200, headers: { 'Content-Type': 'application/json' },
+        }));
+      }
+
+      if (request.method === 'GET') {
+        const hit = await caches.default.match(tileCacheKey(url, room, pid));
+        if (hit) {
+          const storedAt = Number(hit.headers.get('X-Tile-Stored-At') || 0);
+          const h = new Headers(CORS);
+          h.set('Content-Type', 'image/jpeg');
+          h.set('Cache-Control', `public, max-age=${TILE_CLIENT_TTL_S}`);
+          h.set('X-Tile-Source', 'cache');
+          if (storedAt) h.set('X-Tile-Age-Ms', String(Date.now() - storedAt));
+          return new Response(hit.body, { status: 200, headers: h });
+        }
+        const doResp = await env.ROOMS.get(env.ROOMS.idFromName(room))
+          .fetch(`https://do/tile-get/${pid}`);
+        if (doResp.status !== 200) return text(404, 'no tile');
+        const h = new Headers(CORS);
+        h.set('Content-Type', 'image/jpeg');
+        h.set('Cache-Control', `public, max-age=${TILE_CLIENT_TTL_S}`);
+        h.set('X-Tile-Source', 'do');
+        const age = doResp.headers.get('X-Tile-Age-Ms');
+        if (age) h.set('X-Tile-Age-Ms', age);
+        return new Response(doResp.body, { status: 200, headers: h });
+      }
+      return text(405, 'method');
+    }
+
+    return text(404, 'elektron-rtc: /room/{name}/ws · /cf/* · /tile/{room}/{pid}');
+  },
+};

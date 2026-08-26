@@ -1,0 +1,18 @@
+04:36:32.613 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:36:35.466 [log] attempt 1: session 391f3e572fa9…
+04:36:36.290 [log] publish ok on attempt 1 in 1280 ms
+04:36:43.676 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:43.765 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:43.783 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:44.822 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:51.827 [error] Failed to load resource: the server responded with a status of 404 ()
+04:36:53.034 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:05.930 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:11.006 [error] Failed to load resource: the server responded with a status of 404 ()
+04:37:12.913 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:03.405 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:39:06.260 [log] attempt 1: session 0e778aad5907…
+04:39:08.158 [log] publish ok on attempt 1 in 2355 ms
+04:39:08.394 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:08.394 [error] Failed to load resource: the server responded with a status of 404 ()
+04:39:08.397 [error] Failed to load resource: the server responded with a status of 404 ()

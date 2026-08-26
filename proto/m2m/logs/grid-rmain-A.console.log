@@ -1,0 +1,9 @@
+04:36:35.004 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:36:35.474 [log] attempt 1: session 1be552c82cb3…
+04:36:43.526 [log] publish ok on attempt 1 in 8513 ms
+04:39:05.785 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:39:06.243 [log] attempt 1: session 67dcff18768a…
+04:39:07.033 [log] publish ok on attempt 1 in 1239 ms
+04:42:07.706 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+04:42:08.062 [log] attempt 1: session 14e0a160b591…
+04:42:08.905 [log] publish ok on attempt 1 in 1191 ms

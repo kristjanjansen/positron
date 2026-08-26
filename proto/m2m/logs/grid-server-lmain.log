@@ -1,0 +1,444 @@
+m2m GRID server on :8897, results -> /Users/s32863/personal/elektron/results/m2m-grid-lmain.jsonl, app 8c2a974b…
+07:48:43 "GET /healthz HTTP/1.1" 200 -
+07:48:47 "GET /healthz HTTP/1.1" 200 -
+07:48:47 "GET /grid.html?id=1&name=Perf-Ada&room=grid-lmain&role=operator&view=full&ls=4&hold=1&cb=1787719727756 HTTP/1.1" 200 -
+07:48:47 code 404, message File not found
+07:48:47 "GET /favicon.ico HTTP/1.1" 404 -
+07:48:47 "GET /grid.html?id=2&name=Perf-Bela&room=grid-lmain&role=performer&view=full&ls=4&hold=1&cb=1787719727852 HTTP/1.1" 200 -
+07:48:47 "GET /grid.html?id=B&name=Live-B&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719727939 HTTP/1.1" 200 -
+07:48:48 "GET /grid.html?id=C&name=Live-C&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719728028 HTTP/1.1" 200 -
+07:48:48 "GET /grid.html?id=D&name=Live-D&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719728560 HTTP/1.1" 200 -
+07:48:48 code 404, message File not found
+07:48:48 "GET /favicon.ico HTTP/1.1" 404 -
+07:48:48 "GET /grid.html?id=E&name=Live-E&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719728664 HTTP/1.1" 200 -
+07:48:48 "GET /grid.html?id=F&name=Live-F&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719728757 HTTP/1.1" 200 -
+07:48:48 "GET /grid.html?id=W&name=Wall-W&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719728842 HTTP/1.1" 200 -
+07:48:49 "GET /grid.html?id=X&name=Wall-X&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719729391 HTTP/1.1" 200 -
+07:48:49 code 404, message File not found
+07:48:49 "GET /favicon.ico HTTP/1.1" 404 -
+07:48:49 "GET /grid.html?id=Y&name=Wall-Y&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719729521 HTTP/1.1" 200 -
+07:48:49 "GET /grid.html?id=Z&name=Wall-Z&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719729611 HTTP/1.1" 200 -
+07:48:50 "GET /grid.html?id=A&name=Live-A&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719730179 HTTP/1.1" 200 -
+07:48:50 code 404, message File not found
+07:48:50 "GET /favicon.ico HTTP/1.1" 404 -
+07:48:50 CF POST /sessions/new -> 201 (316 ms)
+07:48:50 CF POST /sessions/new -> 201 (315 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (317 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (321 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (322 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (324 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (324 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (325 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (329 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (357 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (306 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:50 CF POST /sessions/new -> 201 (390 ms)
+07:48:50 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:48:51 CF POST /sessions/9fbd6961c136e146272e72ac470c9a20bc5c80cb5c8bd7018fa845de50ebcef3/tracks/new -> 200 (354 ms)
+07:48:51 "POST /cf/sessions/9fbd6961c136e146272e72ac470c9a20bc5c80cb5c8bd7018fa845de50ebcef3/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/768fdaee6700a034de17363fd6d457345b65a41add6886ade79b08b54783e7be/tracks/new -> 200 (416 ms)
+07:48:51 "POST /cf/sessions/768fdaee6700a034de17363fd6d457345b65a41add6886ade79b08b54783e7be/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/2cec1ed9309617fa6a1162c2d6ef612ac94d005029fd6b1b9ca9a70311ca0c31/tracks/new -> 200 (425 ms)
+07:48:51 "POST /cf/sessions/2cec1ed9309617fa6a1162c2d6ef612ac94d005029fd6b1b9ca9a70311ca0c31/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/5420a8d4dc58d6c9e1034681ab8152e34bdac8a2c4661c6c7ba4e182ac8230dd/tracks/new -> 200 (395 ms)
+07:48:51 "POST /cf/sessions/5420a8d4dc58d6c9e1034681ab8152e34bdac8a2c4661c6c7ba4e182ac8230dd/tracks/new HTTP/1.1" 200 -
+07:48:51 WS grid-lmain/C joined (audience), n=1
+07:48:51 CF POST /sessions/e3ef7363398f0196538c8e347ccc032c70bed789239464ac48cb8bf510569f96/tracks/new -> 200 (359 ms)
+07:48:51 "POST /cf/sessions/e3ef7363398f0196538c8e347ccc032c70bed789239464ac48cb8bf510569f96/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (335 ms)
+07:48:51 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/12d05c11bc8855b34465b26b4dd8bb3c4f96d8943836319b8c43a3a229d3c2d7/tracks/new -> 200 (311 ms)
+07:48:51 "POST /cf/sessions/12d05c11bc8855b34465b26b4dd8bb3c4f96d8943836319b8c43a3a229d3c2d7/tracks/new HTTP/1.1" 200 -
+07:48:51 WS grid-lmain/Z joined (audience), n=2
+07:48:51 CF POST /sessions/4f49d41604080c556ec4a7c8011d88ddb5c7a5315d3be93fce30f1b071c5c039/tracks/new -> 200 (317 ms)
+07:48:51 "POST /cf/sessions/4f49d41604080c556ec4a7c8011d88ddb5c7a5315d3be93fce30f1b071c5c039/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/db8ffc8e516cb8afc9e53c56f761ab629b20bf36c53ffc94ae28c7e042fdecb4/tracks/new -> 200 (318 ms)
+07:48:51 "POST /cf/sessions/db8ffc8e516cb8afc9e53c56f761ab629b20bf36c53ffc94ae28c7e042fdecb4/tracks/new HTTP/1.1" 200 -
+07:48:51 CF POST /sessions/3a50409ed9b432ba8cc6be7003afe2acb7fdf8f411a22a74de34cad2284f901b/tracks/new -> 200 (345 ms)
+07:48:51 "POST /cf/sessions/3a50409ed9b432ba8cc6be7003afe2acb7fdf8f411a22a74de34cad2284f901b/tracks/new HTTP/1.1" 200 -
+07:48:51 WS grid-lmain/A joined (audience), n=3
+07:48:51 CF POST /sessions/7f4a70a204fd329082290afad19d2528a21a280c35e537f281f6d1f67f6fc3eb/tracks/new -> 200 (371 ms)
+07:48:51 "POST /cf/sessions/7f4a70a204fd329082290afad19d2528a21a280c35e537f281f6d1f67f6fc3eb/tracks/new HTTP/1.1" 200 -
+07:48:51 WS grid-lmain/W joined (audience), n=4
+07:48:51 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (382 ms)
+07:48:51 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:51 WS grid-lmain/X joined (audience), n=5
+07:48:51 WS grid-lmain/E joined (audience), n=6
+07:48:51 WS grid-lmain/B joined (audience), n=7
+07:48:51 WS grid-lmain/F joined (audience), n=8
+07:48:51 WS grid-lmain/D joined (audience), n=9
+07:48:51 WS grid-lmain/1 joined (operator), n=10
+07:48:52 WS grid-lmain/2 joined (performer), n=11
+07:48:52 WS grid-lmain/Y joined (audience), n=12
+07:48:55 WS grid-lmain/1 -> tier featured (promote by 1)
+07:48:55 WS grid-lmain/2 -> tier featured (promote by 1)
+07:48:55 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (264 ms)
+07:48:55 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:55 WS grid-lmain/A -> tier live (promote by 1)
+07:48:55 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (255 ms)
+07:48:55 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:55 WS grid-lmain/B -> tier live (promote by 1)
+07:48:55 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (185 ms)
+07:48:55 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:55 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (177 ms)
+07:48:55 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:55 WS grid-lmain/C -> tier live (promote by 1)
+07:48:55 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (279 ms)
+07:48:55 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:55 WS grid-lmain/D -> tier live (promote by 1)
+07:48:56 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (228 ms)
+07:48:56 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:56 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (133 ms)
+07:48:56 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:56 WS grid-lmain/E -> tier live (promote by 1)
+07:48:56 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (131 ms)
+07:48:56 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:56 WS grid-lmain/F -> tier live (promote by 1)
+07:48:56 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (259 ms)
+07:48:56 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:56 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (215 ms)
+07:48:56 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:56 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (148 ms)
+07:48:56 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:56 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (139 ms)
+07:48:56 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:56 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (242 ms)
+07:48:56 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:56 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (275 ms)
+07:48:56 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:56 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (159 ms)
+07:48:56 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:56 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (173 ms)
+07:48:56 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:57 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (274 ms)
+07:48:57 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:57 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (299 ms)
+07:48:57 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:57 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (158 ms)
+07:48:57 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:57 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (177 ms)
+07:48:57 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:57 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (300 ms)
+07:48:57 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:57 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (304 ms)
+07:48:57 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:57 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (147 ms)
+07:48:57 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:57 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (148 ms)
+07:48:57 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (205 ms)
+07:48:58 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (213 ms)
+07:48:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:48:58 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (288 ms)
+07:48:58 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:48:58 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (310 ms)
+07:48:58 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (176 ms)
+07:48:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (164 ms)
+07:48:58 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (194 ms)
+07:48:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:48:58 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (199 ms)
+07:48:58 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:50:59 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (258 ms)
+07:50:59 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:50:59 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (257 ms)
+07:50:59 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:50:59 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (176 ms)
+07:50:59 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:50:59 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (177 ms)
+07:50:59 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:00 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (272 ms)
+07:51:00 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:00 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (278 ms)
+07:51:00 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (156 ms)
+07:51:00 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (173 ms)
+07:51:00 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (223 ms)
+07:51:00 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (229 ms)
+07:51:00 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (223 ms)
+07:51:00 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:00 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (232 ms)
+07:51:00 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:01 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (214 ms)
+07:51:01 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:01 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (236 ms)
+07:51:01 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:01 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (200 ms)
+07:51:01 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:01 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (243 ms)
+07:51:01 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:07 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (223 ms)
+07:51:07 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:07 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (223 ms)
+07:51:07 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:07 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (180 ms)
+07:51:07 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:07 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (181 ms)
+07:51:07 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:08 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (238 ms)
+07:51:08 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (238 ms)
+07:51:08 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:08 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:08 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (180 ms)
+07:51:08 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:08 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (192 ms)
+07:51:08 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:08 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (218 ms)
+07:51:08 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:08 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (212 ms)
+07:51:08 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:08 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (193 ms)
+07:51:08 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:08 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (206 ms)
+07:51:08 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:09 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (221 ms)
+07:51:09 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:09 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (240 ms)
+07:51:09 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (162 ms)
+07:51:09 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (165 ms)
+07:51:09 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (216 ms)
+07:51:09 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (209 ms)
+07:51:09 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (203 ms)
+07:51:09 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:09 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (206 ms)
+07:51:09 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:15 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (153 ms)
+07:51:15 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:15 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (169 ms)
+07:51:15 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:15 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (149 ms)
+07:51:15 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:15 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (164 ms)
+07:51:15 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:15 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (148 ms)
+07:51:15 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:16 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (170 ms)
+07:51:16 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (161 ms)
+07:51:16 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (176 ms)
+07:51:16 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (251 ms)
+07:51:16 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (249 ms)
+07:51:16 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (228 ms)
+07:51:16 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (197 ms)
+07:51:16 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (203 ms)
+07:51:16 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:16 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (242 ms)
+07:51:16 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:17 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (203 ms)
+07:51:17 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:17 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (213 ms)
+07:51:17 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:23 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (173 ms)
+07:51:23 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:23 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (187 ms)
+07:51:23 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:23 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (165 ms)
+07:51:23 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:23 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (155 ms)
+07:51:23 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:24 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (170 ms)
+07:51:24 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:24 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (169 ms)
+07:51:24 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:24 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (452 ms)
+07:51:24 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:24 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (163 ms)
+07:51:24 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:24 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (189 ms)
+07:51:24 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:24 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (148 ms)
+07:51:24 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:24 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (144 ms)
+07:51:24 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:24 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (171 ms)
+07:51:24 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:24 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (192 ms)
+07:51:24 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:24 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (205 ms)
+07:51:24 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:25 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (151 ms)
+07:51:25 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:25 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (228 ms)
+07:51:25 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:25 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (202 ms)
+07:51:25 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:25 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (223 ms)
+07:51:25 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:25 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (209 ms)
+07:51:25 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:25 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (217 ms)
+07:51:25 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:31 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (172 ms)
+07:51:31 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:31 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (193 ms)
+07:51:31 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:31 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (177 ms)
+07:51:31 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:31 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (175 ms)
+07:51:31 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:32 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (166 ms)
+07:51:32 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:32 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (186 ms)
+07:51:32 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (162 ms)
+07:51:32 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (157 ms)
+07:51:32 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (190 ms)
+07:51:32 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (189 ms)
+07:51:32 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (217 ms)
+07:51:32 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (236 ms)
+07:51:32 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (201 ms)
+07:51:32 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:32 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (189 ms)
+07:51:32 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:33 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (209 ms)
+07:51:33 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:33 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (209 ms)
+07:51:33 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:46 WS grid-lmain/A error: eof
+07:51:46 WS grid-lmain/A LEFT (socket-closed)
+07:51:46 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (206 ms)
+07:51:46 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:46 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (224 ms)
+07:51:46 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:53 "GET /grid.html?id=A&name=Live-A&room=grid-lmain&role=audience&view=lite&ls=4&hold=1&cb=1787719913056 HTTP/1.1" 200 -
+07:51:53 code 404, message File not found
+07:51:53 "GET /favicon.ico HTTP/1.1" 404 -
+07:51:53 CF POST /sessions/new -> 201 (253 ms)
+07:51:53 "POST /cf/sessions/new HTTP/1.1" 201 -
+07:51:54 CF POST /sessions/08f9d5b4e576fbbe102f0593c01c00780e3b212da5c3706ce7021bf3a2cd1c33/tracks/new -> 200 (396 ms)
+07:51:54 "POST /cf/sessions/08f9d5b4e576fbbe102f0593c01c00780e3b212da5c3706ce7021bf3a2cd1c33/tracks/new HTTP/1.1" 200 -
+07:51:54 WS grid-lmain/A joined (audience), n=12
+07:51:54 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (157 ms)
+07:51:54 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:55 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (184 ms)
+07:51:55 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:55 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (187 ms)
+07:51:55 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:55 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (162 ms)
+07:51:55 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:55 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (152 ms)
+07:51:55 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:55 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (166 ms)
+07:51:55 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:55 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (157 ms)
+07:51:55 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:56 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (201 ms)
+07:51:56 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:51:56 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (218 ms)
+07:51:56 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:51:57 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (147 ms)
+07:51:57 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:57 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (181 ms)
+07:51:57 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:57 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (145 ms)
+07:51:57 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:57 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (172 ms)
+07:51:57 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:57 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (157 ms)
+07:51:57 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (171 ms)
+07:51:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:58 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (168 ms)
+07:51:58 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:51:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (169 ms)
+07:51:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:51:58 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (202 ms)
+07:51:58 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:51:59 WS grid-lmain/A -> tier live (promote by 1)
+07:51:59 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (252 ms)
+07:51:59 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:51:59 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (277 ms)
+07:51:59 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:52:00 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (172 ms)
+07:52:00 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:52:00 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (152 ms)
+07:52:00 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:52:00 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (215 ms)
+07:52:00 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:52:00 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (226 ms)
+07:52:00 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:52:04 WS grid-lmain/W -> tier live (promote by 1)
+07:52:04 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (212 ms)
+07:52:04 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:52:05 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (257 ms)
+07:52:05 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:52:05 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (153 ms)
+07:52:05 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:52:05 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (157 ms)
+07:52:05 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:52:05 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (210 ms)
+07:52:05 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:52:05 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (209 ms)
+07:52:05 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:52:15 WS grid-lmain/W -> tier wall (demote by 1)
+07:52:15 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close -> 200 (215 ms)
+07:52:15 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/close HTTP/1.1" 200 -
+07:52:15 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close -> 200 (259 ms)
+07:52:15 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/close HTTP/1.1" 200 -
+07:52:15 CF POST /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new -> 200 (176 ms)
+07:52:15 "POST /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/tracks/new HTTP/1.1" 200 -
+07:52:15 CF POST /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new -> 200 (221 ms)
+07:52:15 "POST /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/tracks/new HTTP/1.1" 200 -
+07:52:15 CF PUT /sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate -> 200 (148 ms)
+07:52:15 "PUT /cf/sessions/ffd0f6b9e80c707fe40e5c018a806c7d09804e0ab590b08b279147057e83184f/renegotiate HTTP/1.1" 200 -
+07:52:15 CF PUT /sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate -> 200 (168 ms)
+07:52:15 "PUT /cf/sessions/7edcf2974d81388290a8057c0e1c1330d1f9bf8ed67134b41c9299250dad4490/renegotiate HTTP/1.1" 200 -
+07:52:24 WS grid-lmain/C error: client close frame
+07:52:24 WS grid-lmain/C LEFT (socket-closed)
+07:52:24 WS grid-lmain/B error: client close frame
+07:52:24 WS grid-lmain/B LEFT (socket-closed)
+07:52:24 WS grid-lmain/2 error: client close frame
+07:52:24 WS grid-lmain/2 LEFT (socket-closed)
+07:52:24 WS grid-lmain/1 error: client close frame
+07:52:24 WS grid-lmain/1 LEFT (socket-closed)
+07:52:24 WS grid-lmain/W error: client close frame
+07:52:24 WS grid-lmain/W LEFT (socket-closed)
+07:52:24 WS grid-lmain/F error: client close frame
+07:52:24 WS grid-lmain/F LEFT (socket-closed)
+07:52:24 WS grid-lmain/E error: client close frame
+07:52:24 WS grid-lmain/E LEFT (socket-closed)
+07:52:24 WS grid-lmain/D error: client close frame
+07:52:24 WS grid-lmain/D LEFT (socket-closed)
+07:52:24 WS grid-lmain/Z error: client close frame
+07:52:24 WS grid-lmain/Z LEFT (socket-closed)
+07:52:24 WS grid-lmain/Y error: client close frame
+07:52:24 WS grid-lmain/Y LEFT (socket-closed)
+07:52:24 WS grid-lmain/X error: client close frame
+07:52:24 WS grid-lmain/X LEFT (socket-closed)
+07:52:24 WS grid-lmain/A error: client close frame
+07:52:24 WS grid-lmain/A LEFT (socket-closed)

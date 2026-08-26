@@ -17,6 +17,37 @@ Two agents on proto/m2m, machine idle/32 GB/AC at dispatch:
 Both: poll own run state (no notification waits), canvas/WebAudio only (camera
 still wedged), own-udd kills only, no plan edits.
 
+## Session 5 phase-2 dispatch (user: "do it") — production m2m layer
+
+Two agents:
+- **Worker/DO** (owns workers/rtc/): RtcRoom DO (hibernation patterns from cues;
+  `left` broadcast = the death detector phase 1d proved necessary) + /cf/ SFU
+  proxy holding the app secret + snapshot-tile store (Cache API, wall tier of the
+  big-grid design) + ROOM_TOKEN auth. Deploys to workers.dev (authorized), writes
+  workers/rtc/DEPLOYED.md for the sibling, measures signaling latencies incl.
+  socket-close→left-broadcast (replaces the 31–47 s SFU GC).
+- **Grid UI** (owns proto/m2m/grid.html, run-grid.mjs, port 8897): three-tier grid
+  (2 featured + live page w/ pull-on-visible + snapshot wall), connect-retry from
+  room-churn.html, death badges, promote/demote live transitions. Validates N=12:
+  per-tier latency, rotation TTFF, kill→left→dead-tile time, wall→live promotion,
+  rejoin. Polls for DEPLOYED.md; local stub until then.
+USER DIRECTIVE: when phase 2 done → report → proceed to PHASE 3 (200-session
+control-plane soak + cost telemetry; recording composite WITHOUT OBS via headless
+grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
+30-min time-boxed MoQ browser spike).
+
+### Phase 2 — ✅ COMPLETE (both agents, validated against deployed Worker)
+- Worker `elektron-rtc` live: RtcRoom DO + SFU proxy + tile store + token auth.
+  join→roster 33 ms, publish→broadcast 38 ms, kill→`left` 38–126 ms (vs 31–47 s
+  SFU GC). Worker proxy FASTER than local python proxy (257 vs 413 ms).
+- Grid N=12 vs Worker: featured 98 / live 78 ms, wall 1.1 s, 100 % valid;
+  rotation TTFF 330 ms; kill→dead-tile same-frame; spotlight promote →video 0.5 s;
+  rejoin ~3 s. Screenshots verify the UI.
+- Discovered + fixed: deterministic retry backoff causes lockstep retry storms
+  under real ICE degradation → jitter added. Discovered, deferred: unpull bursts
+  put 0.6–0.9 s frame gap on featured → batch tracks/close (phase 3).
+- plan-m2m §6 phase 2 updated. Dispatching PHASE 3 (4 agents) per directive.
+
 ### Churn + endurance — ✅ COMPLETE: stable 30 min, failure lifecycle measured
 - ✅ Soak N=8: zero latency drift (−0.04 ms/min), no RSS leak, 8/8 tracks alive,
   zero spontaneous renegotiations; tail-of-soak wobble attributed to sibling CPU

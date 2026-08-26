@@ -1,0 +1,5 @@
+04:48:50.704 [log] attempt 1: session ffd0f6b9e80c…
+04:48:52.884 [log] publish ok on attempt 1 in 2619 ms
+04:48:52.948 [error] Failed to load resource: the server responded with a status of 404 (Not Found)
+04:51:54.313 [error] Failed to load resource: the server responded with a status of 404 (Not Found)
+04:52:15.335 [error] Failed to load resource: the server responded with a status of 404 (Not Found)
