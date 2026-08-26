@@ -1,0 +1,310 @@
+{
+  "vodUid": "de39bf1916469a4bc8b18e73a8726762",
+  "vodDurationS": 200.02,
+  "room": "replay-test",
+  "hls": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/manifest/video.m3u8",
+  "anchors": {
+    "content": 1787737748366,
+    "contentSpreadMs": 64,
+    "stamp": 1787737748257,
+    "meta": 1787737748253,
+    "apiCreated": 1787737754542,
+    "contentMinusStampMs": 109,
+    "contentMinusMetaMs": 113,
+    "contentMinusApiMs": -6176
+  },
+  "perCue": [
+    {
+      "id": "CUE-01",
+      "mode": "now",
+      "at": 1787737760258,
+      "vodT": 11.892,
+      "fired": true,
+      "errMs": 59,
+      "engineLateMs": 63,
+      "liveLateMs": 59,
+      "liveFiredAtBurn": 1787737760317,
+      "liveFiredAtTelemetry": 1787737760317,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-02",
+      "mode": "scheduled",
+      "at": 1787737775257,
+      "vodT": 26.891,
+      "fired": true,
+      "errMs": 42,
+      "engineLateMs": 65,
+      "liveLateMs": 9,
+      "liveFiredAtBurn": 1787737775266,
+      "liveFiredAtTelemetry": 1787737775266,
+      "replayVsLiveMs": 33
+    },
+    {
+      "id": "CUE-03",
+      "mode": "now",
+      "at": 1787737790257,
+      "vodT": 41.891,
+      "fired": true,
+      "errMs": 56,
+      "engineLateMs": 67,
+      "liveLateMs": 56,
+      "liveFiredAtBurn": 1787737790313,
+      "liveFiredAtTelemetry": 1787737790313,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-04",
+      "mode": "scheduled",
+      "at": 1787737805257,
+      "vodT": 56.891,
+      "fired": true,
+      "errMs": 71,
+      "engineLateMs": 63,
+      "liveLateMs": 6,
+      "liveFiredAtBurn": 1787737805263,
+      "liveFiredAtTelemetry": 1787737805263,
+      "replayVsLiveMs": 65
+    },
+    {
+      "id": "CUE-05",
+      "mode": "now",
+      "at": 1787737820257,
+      "vodT": 71.891,
+      "fired": true,
+      "errMs": 53,
+      "engineLateMs": 66,
+      "liveLateMs": 53,
+      "liveFiredAtBurn": 1787737820310,
+      "liveFiredAtTelemetry": 1787737820310,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-06",
+      "mode": "scheduled",
+      "at": 1787737835257,
+      "vodT": 86.891,
+      "fired": true,
+      "errMs": 69,
+      "engineLateMs": 64,
+      "liveLateMs": 2,
+      "liveFiredAtBurn": 1787737835259,
+      "liveFiredAtTelemetry": 1787737835259,
+      "replayVsLiveMs": 67
+    },
+    {
+      "id": "CUE-07",
+      "mode": "now",
+      "at": 1787737850257,
+      "vodT": 101.891,
+      "fired": true,
+      "errMs": 49,
+      "engineLateMs": 68,
+      "liveLateMs": 49,
+      "liveFiredAtBurn": 1787737850306,
+      "liveFiredAtTelemetry": 1787737850306,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-08",
+      "mode": "scheduled",
+      "at": 1787737865257,
+      "vodT": 116.891,
+      "fired": true,
+      "errMs": 65,
+      "engineLateMs": 68,
+      "liveLateMs": 31,
+      "liveFiredAtBurn": 1787737865288,
+      "liveFiredAtTelemetry": 1787737865288,
+      "replayVsLiveMs": 34
+    },
+    {
+      "id": "CUE-09",
+      "mode": "now",
+      "at": 1787737880266,
+      "vodT": 131.9,
+      "fired": true,
+      "errMs": 37,
+      "engineLateMs": 57,
+      "liveLateMs": 37,
+      "liveFiredAtBurn": 1787737880303,
+      "liveFiredAtTelemetry": 1787737880303,
+      "replayVsLiveMs": 0
+    },
+    {
+      "id": "CUE-10",
+      "mode": "scheduled",
+      "at": 1787737895257,
+      "vodT": 146.891,
+      "fired": true,
+      "errMs": 62,
+      "engineLateMs": 67,
+      "liveLateMs": 29,
+      "liveFiredAtBurn": 1787737895286,
+      "liveFiredAtTelemetry": 1787737895286,
+      "replayVsLiveMs": 33
+    },
+    {
+      "id": "CUE-11",
+      "mode": "now",
+      "at": 1787737910261,
+      "vodT": 161.895,
+      "fired": true,
+      "errMs": 41,
+      "engineLateMs": 62,
+      "liveLateMs": 41,
+      "liveFiredAtBurn": 1787737910302,
+      "liveFiredAtTelemetry": 1787737910302,
+      "replayVsLiveMs": 1
+    },
+    {
+      "id": "CUE-12",
+      "mode": "scheduled",
+      "at": 1787737925257,
+      "vodT": 176.891,
+      "fired": true,
+      "errMs": 60,
+      "engineLateMs": 63,
+      "liveLateMs": 26,
+      "liveFiredAtBurn": 1787737925283,
+      "liveFiredAtTelemetry": 1787737925283,
+      "replayVsLiveMs": 34
+    }
+  ],
+  "summary": {
+    "n": 12,
+    "p50": 59,
+    "p95": 71,
+    "absP50": 59,
+    "absP95": 71,
+    "min": 37,
+    "max": 71
+  },
+  "checks": [
+    {
+      "name": "vod-manifest-has-no-PDT",
+      "ok": true,
+      "detail": "main 1100 B, rendition 46452 B"
+    },
+    {
+      "name": "A-all-12-fired",
+      "ok": true,
+      "detail": "all"
+    },
+    {
+      "name": "A-abs-p95-under-150ms",
+      "ok": true,
+      "detail": "absP95=71ms"
+    },
+    {
+      "name": "A-live-burn-decodes-match-telemetry",
+      "ok": true,
+      "detail": "12 matched, max delta 0 ms"
+    },
+    {
+      "name": "B-latest-cue-shown-immediately",
+      "ok": true,
+      "detail": "currentCue=CUE-04/caught-up want CUE-04/caught-up"
+    },
+    {
+      "name": "B-earlier-cues-caught-up-not-refired",
+      "ok": true,
+      "detail": "states=caught-up,caught-up,caught-up,caught-up realFires=0"
+    },
+    {
+      "name": "B-next-cue-fires-normally",
+      "ok": true,
+      "detail": "CUE-05 err=53ms late=97ms"
+    },
+    {
+      "name": "C-forward-seek-catchup",
+      "ok": true,
+      "detail": "currentCue=CUE-10 want CUE-10; states ok=true"
+    },
+    {
+      "name": "C-cue-fires-after-forward-seek",
+      "ok": true,
+      "detail": "CUE-11 err=41ms"
+    },
+    {
+      "name": "C-backward-seek-state-rewinds",
+      "ok": true,
+      "detail": "currentCue=CUE-02 want CUE-02; later cleared=true"
+    },
+    {
+      "name": "C-cue-refires-after-backward-seek",
+      "ok": true,
+      "detail": "CUE-03 err=56ms"
+    }
+  ],
+  "liveVsReplay": {
+    "perCueMs": [
+      {
+        "id": "CUE-01",
+        "mode": "now",
+        "replayVsLiveMs": 0
+      },
+      {
+        "id": "CUE-02",
+        "mode": "scheduled",
+        "replayVsLiveMs": 33
+      },
+      {
+        "id": "CUE-03",
+        "mode": "now",
+        "replayVsLiveMs": 0
+      },
+      {
+        "id": "CUE-04",
+        "mode": "scheduled",
+        "replayVsLiveMs": 65
+      },
+      {
+        "id": "CUE-05",
+        "mode": "now",
+        "replayVsLiveMs": 0
+      },
+      {
+        "id": "CUE-06",
+        "mode": "scheduled",
+        "replayVsLiveMs": 67
+      },
+      {
+        "id": "CUE-07",
+        "mode": "now",
+        "replayVsLiveMs": 0
+      },
+      {
+        "id": "CUE-08",
+        "mode": "scheduled",
+        "replayVsLiveMs": 34
+      },
+      {
+        "id": "CUE-09",
+        "mode": "now",
+        "replayVsLiveMs": 0
+      },
+      {
+        "id": "CUE-10",
+        "mode": "scheduled",
+        "replayVsLiveMs": 33
+      },
+      {
+        "id": "CUE-11",
+        "mode": "now",
+        "replayVsLiveMs": 1
+      },
+      {
+        "id": "CUE-12",
+        "mode": "scheduled",
+        "replayVsLiveMs": 34
+      }
+    ],
+    "note": "negative = replay fired EARLIER than the live burn (live pays transit+poll on 'now' cues; replay honors operator intent at fireAt). fireDelayMs param reproduces the live experience instead."
+  },
+  "rvfc": {
+    "samples": 5427,
+    "validClock": 5427,
+    "validCue": 5074
+  }
+}

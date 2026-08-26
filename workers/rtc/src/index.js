@@ -96,6 +96,17 @@ export class RtcRoom {
       });
     }
 
+    // Internal cue-log read (worker-only path; exposed as GET /room/{name}/cuelog,
+    // token-authed at the worker layer). Returns every cue frame this room has
+    // relayed, oldest first: [{ts, from, cue:{..., serverAt}}].
+    if (url.pathname === '/cuelog') {
+      const log = (await this.state.storage.get('cuelog')) || [];
+      return new Response(JSON.stringify({ count: log.length, cues: log }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('expected websocket', { status: 426 });
     }
@@ -223,7 +234,19 @@ export class RtcRoom {
     // Trivial relay so a cue can drive the participation layer without a
     // second socket; the full cue engine stays on workers/cues.
     if (f.type === 'cue' && f.cue) {
-      this.broadcast({ type: 'cue', cue: { ...f.cue, serverAt: Date.now() }, from: me.id });
+      const cue = { ...f.cue, serverAt: Date.now() };
+      this.broadcast({ type: 'cue', cue, from: me.id });
+      // Persist AFTER broadcasting (the 50 ms lesson): the cue-log is what makes
+      // a recorded show replayable — VOD replay fetches /room/{name}/cuelog and
+      // re-fires each cue at its `at` moment against the recording's wall clock.
+      // The sender's own stamps inside `cue` (at/fireAt, sentAt, …) are stored
+      // VERBATIM and are the only timing authority: the DO's Date.now() is
+      // frozen during execution (~±70 ms apparent skew) and pub→DO→sub transit
+      // is 27–38 ms, so `serverAt`/`doRecvTs` are debugging breadcrumbs only.
+      const log = (await this.state.storage.get('cuelog')) || [];
+      log.push({ from: me.id, cue, doRecvTs: cue.serverAt /* UNTRUSTED for timing */ });
+      if (log.length > 1000) log.splice(0, log.length - 1000); // bound storage
+      await this.state.storage.put('cuelog', log);
       return;
     }
   }
@@ -314,6 +337,18 @@ export default {
       return env.ROOMS.get(id).fetch(request);
     }
 
+    // ---- room cue-log (VOD replay: re-fire recorded cues against T0) -----
+    const cuelogM = pathname.match(/^\/room\/([\w-]{1,64})\/cuelog$/);
+    if (cuelogM) {
+      if (!authorized(request, url, env)) return text(403, 'bad or missing token');
+      if (request.method !== 'GET') return text(405, 'method');
+      const id = env.ROOMS.idFromName(cuelogM[1]);
+      const resp = await env.ROOMS.get(id).fetch('https://do/cuelog');
+      const h = new Headers(CORS);
+      h.set('Content-Type', 'application/json');
+      return new Response(resp.body, { status: resp.status, headers: h });
+    }
+
     // ---- SFU proxy -------------------------------------------------------
     if (pathname.startsWith('/cf/')) {
       if (!authorized(request, url, env)) return text(403, 'bad or missing token');
@@ -396,6 +431,6 @@ export default {
       return text(405, 'method');
     }
 
-    return text(404, 'elektron-rtc: /room/{name}/ws · /cf/* · /tile/{room}/{pid}');
+    return text(404, 'elektron-rtc: /room/{name}/ws · /room/{name}/cuelog · /cf/* · /tile/{room}/{pid}');
   },
 };

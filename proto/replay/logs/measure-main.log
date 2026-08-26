@@ -1,0 +1,56 @@
+09:57:15.261 MEASURE vod=de39bf1916469a4bc8b18e73a8726762 (200.02s) cues=12 hls=https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/manifest/video.m3u8
+09:57:16.065 PASS  vod-manifest-has-no-PDT  main 1100 B, rendition 46452 B
+09:57:16.844 PHASE A — straight-through replay
+09:57:20.949 anchors: content=1787737748366 stamp=1787737748257 meta=1787737748253 api(created)=1787737754542 spread=64ms
+09:57:20.951 A +1s fires=0 caughtup=0 cur=null rvfc=18/18
+09:57:25.957 A +6s fires=0 caughtup=0 cur=null rvfc=168/168
+09:57:30.962 A +11s fires=0 caughtup=0 cur=null rvfc=318/318
+09:57:35.967 A +16s fires=1 caughtup=0 cur=CUE-01 rvfc=468/468
+09:57:40.972 A +21s fires=1 caughtup=0 cur=CUE-01 rvfc=618/618
+09:57:45.981 A +26s fires=1 caughtup=0 cur=CUE-01 rvfc=769/769
+09:57:50.985 A +31s fires=2 caughtup=0 cur=CUE-02 rvfc=919/919
+09:57:55.991 A +36s fires=2 caughtup=0 cur=CUE-02 rvfc=1069/1069
+09:58:00.996 A +41s fires=2 caughtup=0 cur=CUE-02 rvfc=1219/1219
+09:58:06.002 A +46s fires=3 caughtup=0 cur=CUE-03 rvfc=1369/1369
+09:58:11.011 A +51s fires=3 caughtup=0 cur=CUE-03 rvfc=1519/1519
+09:58:16.014 A +56s fires=3 caughtup=0 cur=CUE-03 rvfc=1670/1670
+09:58:21.068 A +61s fires=4 caughtup=0 cur=CUE-04 rvfc=1820/1820
+09:58:26.079 A +66s fires=4 caughtup=0 cur=CUE-04 rvfc=1971/1971
+09:58:31.084 A +71s fires=4 caughtup=0 cur=CUE-04 rvfc=2122/2122
+09:58:36.091 A +76s fires=5 caughtup=0 cur=CUE-05 rvfc=2272/2272
+09:58:41.100 A +81s fires=5 caughtup=0 cur=CUE-05 rvfc=2422/2422
+09:58:46.104 A +86s fires=5 caughtup=0 cur=CUE-05 rvfc=2572/2572
+09:58:51.114 A +91s fires=6 caughtup=0 cur=CUE-06 rvfc=2723/2723
+09:58:56.119 A +96s fires=6 caughtup=0 cur=CUE-06 rvfc=2873/2873
+09:59:01.125 A +101s fires=6 caughtup=0 cur=CUE-06 rvfc=3023/3023
+09:59:06.133 A +106s fires=7 caughtup=0 cur=CUE-07 rvfc=3173/3173
+09:59:11.141 A +111s fires=7 caughtup=0 cur=CUE-07 rvfc=3323/3323
+09:59:16.147 A +116s fires=7 caughtup=0 cur=CUE-07 rvfc=3474/3474
+09:59:21.152 A +121s fires=8 caughtup=0 cur=CUE-08 rvfc=3624/3624
+09:59:26.160 A +126s fires=8 caughtup=0 cur=CUE-08 rvfc=3774/3774
+09:59:31.169 A +131s fires=8 caughtup=0 cur=CUE-08 rvfc=3924/3924
+09:59:36.179 A +136s fires=9 caughtup=0 cur=CUE-09 rvfc=4074/4074
+09:59:41.184 A +141s fires=9 caughtup=0 cur=CUE-09 rvfc=4225/4225
+09:59:46.192 A +146s fires=9 caughtup=0 cur=CUE-09 rvfc=4375/4375
+09:59:51.200 A +151s fires=10 caughtup=0 cur=CUE-10 rvfc=4525/4525
+09:59:56.207 A +156s fires=10 caughtup=0 cur=CUE-10 rvfc=4675/4675
+10:00:01.217 A +161s fires=10 caughtup=0 cur=CUE-10 rvfc=4826/4826
+10:00:06.224 A +166s fires=11 caughtup=0 cur=CUE-11 rvfc=4976/4976
+10:00:11.231 A +171s fires=11 caughtup=0 cur=CUE-11 rvfc=5126/5126
+10:00:16.238 A +176s fires=11 caughtup=0 cur=CUE-11 rvfc=5276/5276
+10:00:21.296 A done: fires=12 caughtup=0 rvfcValid=5427/5427
+10:00:21.297 per-cue errors (decodedBurnedClock@fire − fireAt, ms): CUE-01:59 CUE-02:42 CUE-03:56 CUE-04:71 CUE-05:53 CUE-06:69 CUE-07:49 CUE-08:65 CUE-09:37 CUE-10:62 CUE-11:41 CUE-12:60
+10:00:21.297 summary n=12 p50=59 p95=71 abs p50/p95=59/71
+10:00:21.297 PASS  A-all-12-fired  all
+10:00:21.297 PASS  A-abs-p95-under-150ms  absP95=71ms
+10:00:21.297 PASS  A-live-burn-decodes-match-telemetry  12 matched, max delta 0 ms
+10:00:21.297 PHASE B — late join at startAt=65 s
+10:00:24.935 PASS  B-latest-cue-shown-immediately  currentCue=CUE-04/caught-up want CUE-04/caught-up
+10:00:24.935 PASS  B-earlier-cues-caught-up-not-refired  states=caught-up,caught-up,caught-up,caught-up realFires=0
+10:00:28.971 PASS  B-next-cue-fires-normally  CUE-05 err=53ms late=97ms
+10:00:28.971 PHASE C — forward seek to 150 s, then backward to 30 s
+10:00:31.477 PASS  C-forward-seek-catchup  currentCue=CUE-10 want CUE-10; states ok=true
+10:00:41.084 PASS  C-cue-fires-after-forward-seek  CUE-11 err=41ms
+10:00:43.642 PASS  C-backward-seek-state-rewinds  currentCue=CUE-02 want CUE-02; later cleared=true
+10:00:53.258 PASS  C-cue-refires-after-backward-seek  CUE-03 err=56ms
+10:00:53.301 report written; checks: 11/11 pass

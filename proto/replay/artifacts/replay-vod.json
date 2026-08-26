@@ -1,0 +1,46 @@
+{
+  "uid": "de39bf1916469a4bc8b18e73a8726762",
+  "creator": null,
+  "thumbnail": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/thumbnails/thumbnail.jpg",
+  "thumbnailTimestampPct": 0,
+  "readyToStream": true,
+  "readyToStreamAt": "2026-08-26T09:52:30.89109Z",
+  "status": {
+    "state": "ready",
+    "pctComplete": "100.000000",
+    "errorReasonCode": "",
+    "errorReasonText": ""
+  },
+  "meta": {
+    "name": "replay-test-show 26 Aug 26 09:49 UTC"
+  },
+  "created": "2026-08-26T09:49:14.54258Z",
+  "modified": "2026-08-26T09:52:30.894959Z",
+  "scheduledDeletion": null,
+  "size": 0,
+  "preview": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/watch",
+  "allowedOrigins": [],
+  "requireSignedURLs": false,
+  "uploaded": "2026-08-26T09:49:14.539976Z",
+  "uploadExpiry": null,
+  "maxSizeBytes": null,
+  "maxDurationSeconds": null,
+  "duration": 200.02,
+  "input": {
+    "width": 1280,
+    "height": 720
+  },
+  "playback": {
+    "hls": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/manifest/video.m3u8",
+    "dash": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/de39bf1916469a4bc8b18e73a8726762/manifest/video.mpd"
+  },
+  "watermark": null,
+  "liveInput": "728e86a0ea372cee137770112d5eebaa",
+  "clippedFrom": null,
+  "publicDetails": {
+    "title": null,
+    "share_link": null,
+    "channel_link": null,
+    "logo": null
+  }
+}

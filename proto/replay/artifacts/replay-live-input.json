@@ -1,0 +1,51 @@
+{
+  "result": {
+    "uid": "728e86a0ea372cee137770112d5eebaa",
+    "rtmps": {
+      "url": "rtmps://live.cloudflare.com:443/live/",
+      "streamKey": "49b07f29c28c22909195aaf411720d20k728e86a0ea372cee137770112d5eebaa"
+    },
+    "rtmpsPlayback": {
+      "url": "rtmps://live.cloudflare.com:443/live/",
+      "streamKey": "c0e52804df04e7749affa6c97ec59bf0k728e86a0ea372cee137770112d5eebaa"
+    },
+    "srt": {
+      "url": "srt://live.cloudflare.com:778",
+      "streamId": "728e86a0ea372cee137770112d5eebaa",
+      "passphrase": "b42c23f425f57d7fe9164756b07b46abk728e86a0ea372cee137770112d5eebaa"
+    },
+    "srtPlayback": {
+      "url": "srt://live.cloudflare.com:778",
+      "streamId": "play728e86a0ea372cee137770112d5eebaa",
+      "passphrase": "edf356241ba841558f5f09ca69cb4b49k728e86a0ea372cee137770112d5eebaa"
+    },
+    "webRTC": {
+      "url": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/228b73418325c6d311489cbf93501044k728e86a0ea372cee137770112d5eebaa/webRTC/publish"
+    },
+    "webRTCPlayback": {
+      "url": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/728e86a0ea372cee137770112d5eebaa/webRTC/play"
+    },
+    "playback": {
+      "hls": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/728e86a0ea372cee137770112d5eebaa/manifest/video.m3u8",
+      "dash": "https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/728e86a0ea372cee137770112d5eebaa/manifest/video.mpd"
+    },
+    "created": "2026-08-26T09:45:31.352744Z",
+    "modified": "2026-08-26T09:45:31.352744Z",
+    "enabled": true,
+    "meta": {
+      "name": "replay-test-show"
+    },
+    "status": null,
+    "recording": {
+      "mode": "automatic",
+      "requireSignedURLs": false,
+      "allowedOrigins": null,
+      "hideLiveViewerCount": false
+    },
+    "deleteRecordingAfterDays": null,
+    "preferLowLatency": true
+  },
+  "success": true,
+  "errors": [],
+  "messages": []
+}

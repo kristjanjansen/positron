@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron VOD replay + cues</title>
+<style>
+:root{--bg:#0d0f12;--panel:#14171c;--edge:#242a33;--ink:#cfd6df;--dim:#6b7683}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 monospace;margin:0;padding:12px}
+#wrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+#vidbox{position:relative;width:854px}
+video{width:854px;height:480px;background:#000;display:block;border:1px solid var(--edge)}
+#overlay{position:absolute;left:0;right:0;bottom:64px;text-align:center;pointer-events:none}
+#overlay .cue{display:inline-block;padding:8px 26px;border-radius:6px;font-size:34px;font-weight:700;
+  background:rgba(0,0,0,.72);color:#e8b44a;border:2px solid #e8b44a}
+#overlay .cue.catchup{color:#8a93a0;border-color:#4d5661}
+#overlay .tag{display:block;font-size:11px;color:#8a93a0;margin-top:4px}
+#side{width:400px}
+#hud,#cues{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:10px;margin-bottom:10px;
+  white-space:pre-wrap;font-size:11px;color:var(--dim)}
+#cues .fired{color:#57c973}
+#cues .catchup{color:#e8a44a}
+#cues .pending{color:#4d5661}
+h1{font-size:14px;margin:0 0 10px}
+</style>
+</head>
+<body>
+<h1>elektron · synced VOD replay with cues</h1>
+<div id="wrap">
+  <div id="vidbox">
+    <video id="vid" muted playsinline></video>
+    <div id="overlay"></div>
+  </div>
+  <div id="side"><div id="hud">booting…</div><div id="cues"></div></div>
+</div>
+<script type="module">
+// ============================================================================
+// VOD REPLAY WITH CUES — plain hls.js VOD playback + the LIVE cue engine
+// (src/timed-messages.js, imported unchanged) running in REPLAY MODE.
+//
+// Cloudflare Stream VOD manifests carry NO PROGRAM-DATE-TIME (measured), so
+// hls.playingDate is null on a VOD and the live engine would never tick. The
+// adapter below hands the engine a fake player whose `hls.playingDate` is
+//        T0 + video.currentTime * 1000
+// — the one line that turns the live engine into a replay engine. Everything
+// else (crossing rule, ordering, pastWindow catch-up for late joins/seeks) is
+// the battle-tested live code, reused verbatim.
+//
+// T0 anchor (three candidates, PRIMARY = content):
+//   content — decoded from the burned wall-clock row in the VOD pixels:
+//             T0 = median(decodedMs_i − mediaTime_i·1000) over the first N
+//             presented frames. Self-calibrating: immune to publisher cold
+//             start (RTMPS connect, keyframe wait, head trim).
+//   stamp   — the publisher's own Date.now() at first-frame-sent (query param).
+//   api     — Stream asset metadata `created` (driver-side cross-check).
+//
+// Fire semantics flag: fireDelayMs=0 (default) honors OPERATOR INTENT (fire at
+// cue.at). Set fireDelayMs≈live p50 lateness to REPRODUCE THE LIVE EXPERIENCE
+// (live viewers see "now" cues transit+poll late; replay would otherwise run
+// ahead of the live burn — the measured asymmetry).
+// ============================================================================
+import { createTimedMessages } from "/src/timed-messages.js";
+
+const q = new URLSearchParams(location.search);
+const SRC        = q.get("src");
+const REMOTE     = q.get("remote") || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const ROOM       = q.get("room") || "replay-test";
+const TOKEN      = q.get("token") || "";
+const T0_PARAM   = q.get("t0") ? parseFloat(q.get("t0")) : null;   // stamp anchor
+const ANCHOR     = q.get("anchor") || "content";                    // content|stamp
+const START_AT   = parseFloat(q.get("startAt") || "0");
+const PAST_WIN   = parseInt(q.get("pastWindow") || "2000", 10);
+const FIRE_DELAY = parseInt(q.get("fireDelayMs") || "0", 10);       // 0 = intent
+const ANCHOR_N   = parseInt(q.get("anchorN") || "15", 10);
+
+// burned-row geometry (contract with show.html; yc = y + h/2)
+const NBLOCKS = 64;
+const ROW_CLOCK = { x: 32, yc: 624, bw: 12, lo: 4, hi: 9 };
+const ROW_CUE   = { x: 32, yc: 674, bw: 12, lo: 4, hi: 9 };
+
+const S = window.__state = {
+  phase: "boot", error: null,
+  t0: { used: null, mode: null, content: null, stamp: T0_PARAM, spreadMs: null, estimates: [] },
+  fires: [], missed: [], cueStates: {}, currentCue: null,
+  rvfc: { samples: 0, validClock: 0, validCue: 0, last: null },
+  liveBurns: {},           // seq -> first frame where the cue-row showed it
+  engineEvents: [],        // engine lifecycle: start / rebuild-on-seek
+  levels: null, level: null, cuesLoaded: 0, ended: false,
+};
+const vid = document.getElementById("vid");
+const hudEl = document.getElementById("hud");
+const cuesEl = document.getElementById("cues");
+const overlayEl = document.getElementById("overlay");
+
+// ---- burned-row decoder (composite-viewer geometry, proven on p3b VOD) ------
+const work = document.createElement("canvas");
+work.width = 1280; work.height = 720;
+const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+function decodeAt(r) {
+  const img = wctx.getImageData(r.x, r.yc, NBLOCKS * r.bw, 1).data;
+  const levels = [];
+  for (let i = 0; i < NBLOCKS; i++) {
+    let s = 0, n = 0;
+    for (let dx = r.lo; dx < r.hi; dx++) { s += img[(i * r.bw + dx) * 4 + 1]; n++; }
+    levels.push(s / n);
+  }
+  const mn = Math.min(...levels), mx = Math.max(...levels);
+  if (mx - mn < 60) return { ok: false, why: "low-contrast" };
+  const thr = (mn + mx) / 2;
+  const bits = levels.map(l => (l > thr ? 1 : 0));
+  let ms = 0; for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+  let last = 0; for (let i = 48; i < 56; i++) last = last * 2 + bits[i];
+  let ck = 0; for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+  const bytes = []; let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(last);
+  let expect = 0; for (const b of bytes) expect ^= b;
+  if (expect !== ck) return { ok: false, why: "checksum" };
+  return { ok: true, ms, last };
+}
+/** Decode BOTH rows from the currently displayed frame. */
+function decodeNow() {
+  if (vid.readyState < 2) return { ok: false, why: "no-frame" };
+  wctx.drawImage(vid, 0, 0, 1280, 720);
+  const clock = decodeAt(ROW_CLOCK);
+  const cue = decodeAt(ROW_CUE);
+  return { ok: clock.ok, clockMs: clock.ok ? clock.ms : null, clockPid: clock.ok ? clock.last : null,
+           cueOk: cue.ok, cueSeq: cue.ok ? cue.last : null, cueFiredAt: cue.ok ? cue.ms : null };
+}
+
+// ---- cue log ----------------------------------------------------------------
+async function loadCues() {
+  const r = await fetch(`${REMOTE}/room/${ROOM}/cuelog?token=${encodeURIComponent(TOKEN)}`);
+  if (!r.ok) throw new Error("cuelog fetch " + r.status);
+  const j = await r.json();
+  // sender stamps only (at, sentAt travel verbatim; serverAt/doRecvTs untrusted)
+  return j.cues.map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt ?? null, data: e.cue.data }));
+}
+
+// ---- hls VOD ----------------------------------------------------------------
+function startHls() {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+    s.onload = () => {
+      if (!window.Hls || !Hls.isSupported()) return reject(new Error("hls.js unsupported"));
+      const hls = new Hls();                    // plain VOD: no live logic needed
+      hls.on(Hls.Events.MANIFEST_PARSED, (_e, d) => {
+        let best = 0;                            // lock the top rendition: the
+        d.levels.forEach((lv, i) => {            // burned rows are read back at
+          if ((lv.height || 0) >= (d.levels[best].height || 0)) best = i;  // 720p
+        });
+        hls.startLevel = best;
+        hls.currentLevel = best;
+        S.levels = d.levels.map(l => l.height);
+        S.level = best;
+        resolve(hls);
+      });
+      hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal) { S.phase = "failed"; S.error = "hls:" + d.details; } });
+      hls.loadSource(SRC);
+      hls.attachMedia(vid);
+    };
+    s.onerror = () => reject(new Error("hls.js cdn load failed"));
+    document.head.appendChild(s);
+  });
+}
+
+// ---- rVFC: continuous per-presented-frame decode ---------------------------
+let anchorEstimates = [];
+let busy = false, lastPresented = -1;
+function onFrame(_now, meta) {
+  vid.requestVideoFrameCallback(onFrame);
+  if (busy) return;
+  busy = true;
+  try {
+    if (meta.presentedFrames === lastPresented) return;
+    lastPresented = meta.presentedFrames;
+    const d = decodeNow();
+    S.rvfc.samples++;
+    if (d.ok) {
+      S.rvfc.validClock++;
+      S.rvfc.last = { clockMs: d.clockMs, mediaTime: meta.mediaTime, cueSeq: d.cueSeq,
+                      cueFiredAt: d.cueFiredAt, presentedFrames: meta.presentedFrames };
+      if (S.t0.content == null) {
+        anchorEstimates.push(d.clockMs - meta.mediaTime * 1000);
+        if (anchorEstimates.length >= ANCHOR_N) {
+          const srt = [...anchorEstimates].sort((a, b) => a - b);
+          S.t0.content = srt[Math.floor(srt.length / 2)];
+          S.t0.spreadMs = Math.round(srt[srt.length - 1] - srt[0]);
+          S.t0.estimates = anchorEstimates.map(e => Math.round(e));
+        }
+      }
+      if (d.cueOk) {
+        S.rvfc.validCue++;
+        // first frame in which the live burn showed each cue seq = the live
+        // firing as carried by the pixels (ground truth for cross-check 5c)
+        if (!(d.cueSeq in S.liveBurns)) {
+          S.liveBurns[d.cueSeq] = { firstSeenMediaTime: meta.mediaTime,
+                                    firstSeenClockMs: d.clockMs, cueFiredAt: d.cueFiredAt };
+        }
+      }
+    }
+  } finally { busy = false; }
+}
+vid.requestVideoFrameCallback(onFrame);
+
+// ---- cue engine in replay mode ---------------------------------------------
+let engine = null, cues = [], T0 = null;
+function makeFakePlayer() {
+  return { hls: { get playingDate() {
+    return vid.readyState >= 2 ? new Date(T0 + vid.currentTime * 1000) : null;
+  } } };
+}
+function onMessage(cue, { lateMs }) {
+  const d = decodeNow();                                    // frame on glass NOW
+  const kind = lateMs <= 1000 ? "fired" : "caught-up";      // real-time vs catch-up
+  S.cueStates[cue.id] = kind;
+  S.currentCue = { id: cue.id, kind, lateMs: Math.round(lateMs) };
+  S.fires.push({
+    id: cue.id, at: cue.at, kind, lateMs: Math.round(lateMs * 10) / 10,
+    currentTime: vid.currentTime, playheadWall: T0 + vid.currentTime * 1000,
+    decOk: d.ok, decClockMs: d.clockMs, decCueSeq: d.cueSeq, decCueFiredAt: d.cueFiredAt,
+    t: Date.now(),
+  });
+  renderOverlay();
+}
+function onMissed(cue, { lateMs }) {
+  S.cueStates[cue.id] = "caught-up";
+  S.currentCue = { id: cue.id, kind: "caught-up", lateMs: Math.round(lateMs) };
+  S.missed.push({ id: cue.id, at: cue.at, lateMs: Math.round(lateMs), currentTime: vid.currentTime, t: Date.now() });
+  renderOverlay();
+}
+function buildEngine(reason) {
+  if (engine) engine.destroy();
+  engine = createTimedMessages(makeFakePlayer(), vid, { onMessage, onMissed, pastWindow: PAST_WIN });
+  for (const c of cues) engine.add({ id: c.id, at: c.at + FIRE_DELAY, data: c.data });
+  S.engineEvents.push({ reason, t: Date.now(), mediaTime: vid.currentTime, pending: engine.pending });
+}
+window.__seekTo = (sec) => {
+  // Seek = rebuild, never patch (the repo's own reconnect philosophy): state
+  // rewinds/forwards by replaying the whole cue log against the new playhead —
+  // first tick fires the newest past cues (≤ pastWindow) and routes older ones
+  // through onMissed as caught-up.
+  S.cueStates = {}; S.currentCue = null;
+  vid.currentTime = sec;
+};
+vid.addEventListener("seeked", () => {
+  if (T0 != null) { S.cueStates = {}; S.currentCue = null; buildEngine("seek@" + vid.currentTime.toFixed(2)); renderOverlay(); }
+});
+vid.addEventListener("ended", () => { S.ended = true; });
+
+// ---- UI ---------------------------------------------------------------------
+function renderOverlay() {
+  const c = S.currentCue;
+  overlayEl.innerHTML = c
+    ? `<span class="cue ${c.kind === "fired" ? "" : "catchup"}">${c.id}` +
+      `<span class="tag">${c.kind === "fired" ? "FIRED · late " + c.lateMs + " ms" : "CAUGHT UP (not re-fired)"}</span></span>`
+    : "";
+  cuesEl.innerHTML = cues.map(c2 => {
+    const st = S.cueStates[c2.id] || "pending";
+    return `<div class="${st}">${c2.id} · at ${c2.at} · vodT ${T0 ? ((c2.at - T0) / 1000).toFixed(1) + "s" : "?"} · ${st}</div>`;
+  }).join("");
+}
+setInterval(() => {
+  hudEl.textContent =
+    `phase ${S.phase}  ct ${vid.currentTime.toFixed(2)}s  level ${S.level} of [${S.levels}]\n` +
+    `T0 ${S.t0.mode}: ${S.t0.used ? Math.round(S.t0.used) : "…"}  (content ${S.t0.content ? Math.round(S.t0.content) : "…"}` +
+    `${S.t0.stamp ? " · stamp " + S.t0.stamp + " · Δ " + (S.t0.content ? Math.round(S.t0.content - S.t0.stamp) + " ms" : "?") : ""})\n` +
+    `anchor spread ${S.t0.spreadMs} ms over ${ANCHOR_N} frames\n` +
+    `rvfc ${S.rvfc.samples} samples · clock ${S.rvfc.validClock} · cue ${S.rvfc.validCue}\n` +
+    `fires ${S.fires.length} · caught-up ${S.missed.length} · fireDelay ${FIRE_DELAY} ms (${FIRE_DELAY ? "live-experience" : "intent"})\n` +
+    (S.rvfc.last ? `frame clock ${S.rvfc.last.clockMs} cueSeq ${S.rvfc.last.cueSeq}\n` : "") +
+    (S.error ? `ERROR ${S.error}` : "");
+}, 250);
+
+// ---- boot -------------------------------------------------------------------
+(async () => {
+  try {
+    if (!SRC) throw new Error("src param required");
+    S.phase = "loading";
+    cues = await loadCues();
+    S.cuesLoaded = cues.length;
+    await startHls();
+    if (START_AT > 0) vid.currentTime = START_AT;
+    await vid.play();
+    S.phase = "anchoring";
+    // wait for the content anchor (or use the stamp directly)
+    const tA = performance.now();
+    while (ANCHOR !== "stamp" && S.t0.content == null) {
+      if (performance.now() - tA > 20000) throw new Error("no content anchor in 20 s (rows undecodable?)");
+      await new Promise(r => setTimeout(r, 50));
+    }
+    if (ANCHOR === "stamp") {
+      if (T0_PARAM == null) throw new Error("anchor=stamp needs t0 param");
+      T0 = T0_PARAM; S.t0.mode = "stamp";
+    } else {
+      T0 = S.t0.content; S.t0.mode = "content";
+    }
+    S.t0.used = T0;
+    buildEngine("start");
+    S.phase = "running";
+    renderOverlay();
+  } catch (e) {
+    S.phase = "failed"; S.error = String(e.message || e);
+  }
+})();
+</script>
+</body>
+</html>
