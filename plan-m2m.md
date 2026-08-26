@@ -308,10 +308,13 @@ Ranked.
 3. **The two-clock problem** ⚠️ (§2) — grid at 0.1 s vs stage at 2.4–4 s is a *dramaturgical*
    hazard no vendor doc mentions. Mitigations exist (WHEP for publishers; display delay); needs a
    rehearsal-scale human test, not a rig.
-4. **Renegotiation churn** ⚠️ — every pull/unpull is an API call + possible renegotiation on a
-   shared PC; a 200-viewer rotating grid multiplies this. 📄 50 API calls/s/session is ample per
-   client, but batching (≤64 tracks/call 📄) and grid-page discipline (pull on tile-visible,
-   close on tile-hidden) must be designed in from phase 2, not retrofitted.
+4. **Renegotiation churn** ⚠️→✅ **measured and retired (phase 1d)**: a rotating grid at N=10 ran
+   348 pull/unpull API calls with 0 errors at 0.6 calls/s/session (budget 📄 50/s), renegotiated
+   pull p50 386 ms, **tile-switch TTFF p50 523 / p95 646 ms**, untouched tiles unaffected, zero
+   degradation over the run. Grid-page discipline (pull on visible, close on hidden) still applies
+   at 200-viewer scale, but the mechanism is proven cheap. NEW measured fact for the room design:
+   **dead publishers emit NO track-level signal** (tile freezes silently; session 410s only at
+   +31–47 s) — the RtcRoom `left` broadcast + a stats-stall watchdog are the death detectors.
 5. **Browser matrix** ⚠️ — Safari/Firefox WebRTC is fine for plain pub/sub 📄, but rid-based
    simulcast publish behavior and layer-switch smoothness differ per browser; Orange Meets is the
    existence proof it's workable 📄, unmeasured here. Phase-2 matrix test (the repo's Playwright
@@ -374,6 +377,27 @@ See §5 risk 2 for the API/storm findings and the publish-retry requirement.
   fan-in saturates the page's rAF/encode (4–7 fps near ~100 tracks) long before decode fails.
 - Tools: `proto/m2m/{run-heavy.mjs,analyze-heavy.py}`, data `results/m2m-heavy-*.jsonl`,
   NOTES.md §HEAVY MEDIA.
+
+**Phase 1d — churn + endurance** — ✅ **DONE (2026-08-26 session 5): stable, and the failure
+lifecycle is now measured end to end.**
+- **30-min soak, N=8: STABLE.** p50 slope −0.04 ms/min (zero drift), no RSS leak (publishers
+  SHRANK), 8/8 tracks alive at every poll, zero spontaneous renegotiations. 20 brief stalls
+  (max 3.2 s) in 30 min, none in the final 5.
+- **Rotating grid (risk 4 retired):** 27 rotations × 2 probes = 348 API calls, 0 errors — 0.6
+  calls/s/session vs the 📄 50/s budget. **Tile-switch time-to-first-frame p50 523 / p95 646 ms**;
+  untouched tiles unaffected; no degradation over 5 min.
+- **Dead publishers are INVISIBLE at the track level** — zero mute/ended events in 12 kills; the
+  tile just freezes; `GET sessions/{sid}` flips to 410 only at **+31–47 s**. Death detection MUST
+  come from signaling (the RtcRoom `left` broadcast + stats-stall watchdog) — validates §3's design.
+- **Publisher kill → fully restored in ~3.9 s** (relaunch + publish + 2 s roster poll + repull);
+  with DO push replacing the poll, expect ~2 s. Rejoin storms of 4: restored in 4–16 s.
+- **Connect-retry proven load-bearing**: 7 organic ICE flakes under load, all recovered on attempt
+  2, never exhausted; inert on the happy path. Implemented in room-churn.html (8 s timeout,
+  3 attempts, backoff).
+- Instrument lesson #5: fetch `keepalive` has its own ~64 KB pending quota (sendBeacon's lesson,
+  second verse) — bulk telemetry must ride plain fetch.
+- Tools: `proto/m2m/{room-churn.html,run-churn.mjs,analyze-churn.py}`; data
+  `results/m2m-churn-*.jsonl`; NOTES.md §CHURN.
 
 **Phase 2 — the room, at workshop scale (2–10), then synthetic 40**:
 - Build the `RtcRoom` DO frames (§3) + proxy Worker with role tokens; wire the grid UI with

@@ -242,3 +242,54 @@
 03:43:18.596 [log] unpulled D (mid 6) in 279 ms
 03:43:18.833 [log] ontrack mid=6 -> D
 03:43:19.029 [log] pulled D (mid 6) in 433 ms
+03:44:44.644 [log] unpulled A (mid 8) in 327 ms
+03:44:44.877 [log] ontrack mid=8 -> A
+03:44:45.098 [log] pulled A (mid 8) in 454 ms
+03:44:45.434 [log] unpulled C (mid 4) in 335 ms
+03:44:45.719 [log] ontrack mid=4 -> C
+03:44:45.937 [log] pulled C (mid 4) in 502 ms
+03:44:46.640 [log] unpulled B (mid 1) in 320 ms
+03:44:46.870 [log] ontrack mid=1 -> B
+03:44:47.035 [log] pulled B (mid 1) in 394 ms
+03:44:47.343 [log] unpulled D (mid 6) in 308 ms
+03:44:47.569 [log] ontrack mid=6 -> D
+03:44:47.748 [log] pulled D (mid 6) in 404 ms
+03:46:08.606 [log] unpulled A (mid 8) in 291 ms
+03:46:08.899 [log] ontrack mid=8 -> A
+03:46:09.067 [log] pulled A (mid 8) in 461 ms
+03:46:09.457 [log] unpulled B (mid 1) in 389 ms
+03:46:09.675 [log] ontrack mid=1 -> B
+03:46:09.848 [log] pulled B (mid 1) in 391 ms
+03:46:10.613 [log] unpulled C (mid 4) in 298 ms
+03:46:10.796 [log] ontrack mid=4 -> C
+03:46:10.966 [log] pulled C (mid 4) in 353 ms
+03:46:11.258 [log] unpulled D (mid 6) in 290 ms
+03:46:11.439 [log] ontrack mid=6 -> D
+03:46:11.612 [log] pulled D (mid 6) in 355 ms
+03:48:00.670 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:48:05.114 [log] attempt 1: session db00ff23d301…
+03:48:05.809 [log] publish ok on attempt 1 in 1253 ms
+03:48:05.809 [log] pc connected, joining room
+03:48:06.119 [log] ontrack mid=1 -> C
+03:48:06.278 [log] pulled C (mid 1) in 465 ms
+03:48:08.032 [log] ontrack mid=2 -> B
+03:48:08.146 [log] pulled B (mid 2) in 330 ms
+03:48:08.395 [log] ontrack mid=3 -> E
+03:48:08.524 [log] pulled E (mid 3) in 378 ms
+03:48:08.784 [log] ontrack mid=4 -> 2
+03:48:08.906 [log] pulled 2 (mid 4) in 381 ms
+03:48:09.119 [log] ontrack mid=5 -> F
+03:48:09.269 [log] pulled F (mid 5) in 363 ms
+03:48:09.499 [log] ontrack mid=6 -> A
+03:48:09.658 [log] pulled A (mid 6) in 389 ms
+03:48:10.121 [log] ontrack mid=7 -> D
+03:48:10.279 [log] pulled D (mid 7) in 460 ms
+03:49:16.081 [log] unpulled C (mid 1) in 265 ms
+03:49:16.369 [log] ontrack mid=1 -> C
+03:49:16.539 [log] pulled C (mid 1) in 458 ms
+03:49:40.088 [log] unpulled C (mid 1) in 269 ms
+03:49:40.383 [log] ontrack mid=1 -> C
+03:49:40.562 [log] pulled C (mid 1) in 473 ms
+03:50:04.063 [log] unpulled C (mid 1) in 244 ms
+03:50:04.366 [log] ontrack mid=1 -> C
+03:50:04.523 [log] pulled C (mid 1) in 459 ms

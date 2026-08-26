@@ -63,3 +63,40 @@
 03:44:05.454 [gc 16s] 1:running tiles=9/9 lat[90..164] | 2:running tiles=9/9 lat[104..158] || pubs {"running":4}
 03:44:08.071 [gc 18s] 1:running tiles=9/9 lat[75..164] | 2:running tiles=9/9 lat[67..147] || pubs {"running":4}
 03:44:10.673 [gc 21s] 1:running tiles=9/9 lat[85..164] | 2:running tiles=9/9 lat[71..147] || pubs {"running":4}
+03:44:13.227 [gc 24s] 1:running tiles=9/9 lat[84..164] | 2:running tiles=9/9 lat[58..158] || pubs {"running":4}
+03:44:15.824 [gc 26s] 1:running tiles=9/9 lat[86..164] | 2:running tiles=9/9 lat[71..150] || pubs {"running":4}
+03:44:18.385 [gc 29s] 1:running tiles=9/9 lat[90..164] | 2:running tiles=9/9 lat[71..158] || pubs {"running":4}
+03:44:41.017 [gc 51s] 1:running tiles=9/9 lat[81..164] | 2:running tiles=9/9 lat[70..154] || pubs {"running":4}
+03:44:41.017 relaunching A,B,C,D
+03:44:47.975 cycle 2: restored in 4019 ms after relaunch (58355 ms after kill)
+03:44:48.361 settle 30s
+03:44:53.375 [5s] 1:running tiles=9/9 lat[73..157] | 2:running tiles=9/9 lat[65..149] || pubs {"running":8}
+03:44:53.427 CPU total=283.1% ours=111.9% sibling=0% rss=7905MB
+03:45:03.450 [15s] 1:running tiles=9/9 lat[63..133] | 2:running tiles=9/9 lat[85..155] || pubs {"running":8}
+03:45:13.471 [25s] 1:running tiles=9/9 lat[75..158] | 2:running tiles=9/9 lat[66..142] || pubs {"running":8}
+03:45:18.487 ==== storm cycle 3/3: killing A,B,C,D ====
+03:45:18.555 killHard A: SIGKILL 6 pids (root 37068)
+03:45:18.620 killHard B: SIGKILL 6 pids (root 37083)
+03:45:18.694 killHard C: SIGKILL 6 pids (root 37096)
+03:45:18.759 killHard D: SIGKILL 6 pids (root 37111)
+03:45:18.761 killed at 2026-08-26T03:45:18.489Z
+03:45:21.383 [gc 3s] 1:running tiles=9/9 lat[74..156] | 2:running tiles=9/9 lat[90..165] || pubs {"running":4}
+03:45:23.991 [gc 6s] 1:running tiles=9/9 lat[67..156] | 2:running tiles=9/9 lat[75..165] || pubs {"running":4}
+03:45:26.657 [gc 8s] 1:running tiles=9/9 lat[92..157] | 2:running tiles=9/9 lat[69..165] || pubs {"running":4}
+03:45:29.225 [gc 11s] 1:running tiles=9/9 lat[65..156] | 2:running tiles=9/9 lat[75..165] || pubs {"running":4}
+03:45:31.950 [gc 13s] 1:running tiles=9/9 lat[86..156] | 2:running tiles=9/9 lat[66..165] || pubs {"running":4}
+03:45:34.519 [gc 16s] 1:running tiles=9/9 lat[90..156] | 2:running tiles=9/9 lat[98..165] || pubs {"running":4}
+03:45:37.092 [gc 19s] 1:running tiles=9/9 lat[68..156] | 2:running tiles=9/9 lat[69..165] || pubs {"running":4}
+03:45:39.648 [gc 21s] 1:running tiles=9/9 lat[84..156] | 2:running tiles=9/9 lat[69..165] || pubs {"running":4}
+03:45:42.225 [gc 24s] 1:running tiles=9/9 lat[67..156] | 2:running tiles=9/9 lat[72..165] || pubs {"running":4}
+03:45:44.853 [gc 26s] 1:running tiles=9/9 lat[90..156] | 2:running tiles=9/9 lat[97..165] || pubs {"running":4}
+03:45:47.445 [gc 29s] 1:running tiles=9/9 lat[85..156] | 2:running tiles=9/9 lat[95..165] || pubs {"running":4}
+03:46:05.089 [gc 47s] 1:running tiles=9/9 lat[91..156] | 2:running tiles=9/9 lat[98..165] || pubs {"running":4}
+03:46:05.089 relaunching A,B,C,D
+03:46:12.088 cycle 3: restored in 4020 ms after relaunch (53599 ms after kill)
+03:46:12.418 settle 30s
+03:46:17.425 [5s] 1:running tiles=9/9 lat[92..157] | 2:running tiles=9/9 lat[104..149] || pubs {"running":8}
+03:46:17.475 CPU total=280.9% ours=106.9% sibling=0% rss=7969MB
+03:46:27.492 [15s] 1:running tiles=9/9 lat[73..163] | 2:running tiles=9/9 lat[76..149] || pubs {"running":8}
+03:46:37.509 [25s] 1:running tiles=9/9 lat[88..162] | 2:running tiles=9/9 lat[78..162] || pubs {"running":8}
+03:46:44.776 run done (MODE=storm)
