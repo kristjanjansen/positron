@@ -201,6 +201,14 @@ one 457-line player (~150 lines of actual bridge) now decodes BOTH non-hang dial
   keyint for venues. ⚠️ Untested: real LAN multi-viewer, Safari-vs-mediamtx cert pinning,
   draft-16 tokens (shim needs the auth param re-added).
 
+**📱 iPHONE AUDIO VERDICT (user screenshots, 2026-08-26 15:16): MOBILE SAFARI PLAYS MoQ
+AUDIO+VIDEO IN SYNC — "AUDIO: SOUNDING −21 dB"**, Opus decode YES + AAC-LC YES (probe), 2583
+chunks / 0 errors, audio latency ~66 ms, **A/V skew −6 ms on-device**, video 31 fps g2g ~71 ms.
+Underruns 24 (~1 %, matches Chromium's 0.9 % at the fixed 60 ms cushion — the adaptive-cushion
+backlog item stands). BONUS witnessed live: a transient decoder/transport hiccup → "Reconnecting
+(attempt 1)" → fully recovered to 31 fps / 0 errors — the retry loop self-healed on a real device.
+**The MoQ tier scorecard is now complete: video ✅ 4K ✅ Safari ✅ iOS-4G ✅ audio ✅ iOS-audio ✅.**
+
 **✅ RESOLUTION/FRAMERATE MATRIX (2026-08-26, RUNBOOK §9): 4K30 through the relay is CLEAN —
 47 ms p50 / 78 ms p95** (hw encode, 0 errors; now live on the test namespace). 1080p60 also clean
 (33 ms — no latency win over 30 fps: burn-at-capture cancels interval quantization). 4K60 fails
