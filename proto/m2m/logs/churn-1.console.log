@@ -1,0 +1,244 @@
+02:58:24.054 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+02:58:26.969 [log] attempt 1: session 89357131b1a3…
+02:58:27.802 [log] publish ok on attempt 1 in 1277 ms
+02:58:27.802 [log] pc connected, joining room
+02:58:28.102 [log] ontrack mid=1 -> C
+02:58:28.243 [log] pulled C (mid 1) in 436 ms
+02:58:28.569 [log] ontrack mid=2 -> 2
+02:58:28.687 [log] pulled 2 (mid 2) in 443 ms
+02:58:28.900 [log] ontrack mid=3 -> D
+02:58:29.051 [log] pulled D (mid 3) in 364 ms
+02:58:30.020 [log] ontrack mid=4 -> A
+02:58:30.159 [log] pulled A (mid 4) in 350 ms
+02:58:30.492 [log] ontrack mid=5 -> B
+02:58:30.543 [log] pulled B (mid 5) in 384 ms
+03:00:07.984 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:00:13.348 [log] attempt 1: session 2f9e9c4b6bfc…
+03:00:14.176 [log] publish ok on attempt 1 in 1370 ms
+03:00:14.176 [log] pc connected, joining room
+03:00:14.495 [log] ontrack mid=1 -> B
+03:00:14.629 [log] pulled B (mid 1) in 416 ms
+03:00:15.018 [log] ontrack mid=2 -> D
+03:00:15.142 [log] pulled D (mid 2) in 512 ms
+03:00:15.451 [log] ontrack mid=3 -> C
+03:00:15.590 [log] pulled C (mid 3) in 448 ms
+03:00:15.881 [log] ontrack mid=4 -> E
+03:00:16.074 [log] pulled E (mid 4) in 483 ms
+03:00:16.360 [log] ontrack mid=5 -> A
+03:00:16.508 [log] pulled A (mid 5) in 435 ms
+03:00:16.785 [log] ontrack mid=6 -> F
+03:00:16.911 [log] pulled F (mid 6) in 401 ms
+03:00:17.169 [log] ontrack mid=7 -> 2
+03:00:17.323 [log] pulled 2 (mid 7) in 412 ms
+03:33:31.615 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:33:45.242 [log] attempt 1: session 172904629e72…
+03:33:55.543 [log] publish ok on attempt 1 in 11343 ms
+03:33:55.543 [log] pc connected, joining room
+03:34:04.766 [log] ontrack mid=1 -> A
+03:34:04.922 [log] pulled A (mid 1) in 430 ms
+03:34:05.473 [log] ontrack mid=2 -> B
+03:34:05.616 [log] pulled B (mid 2) in 692 ms
+03:34:05.917 [log] ontrack mid=3 -> C
+03:34:06.052 [log] pulled C (mid 3) in 435 ms
+03:34:06.367 [log] ontrack mid=4 -> D
+03:34:06.529 [log] pulled D (mid 4) in 471 ms
+03:34:06.816 [log] ontrack mid=5 -> E
+03:34:06.987 [log] pulled E (mid 5) in 454 ms
+03:34:07.268 [log] ontrack mid=6 -> F
+03:34:07.451 [log] pulled F (mid 6) in 462 ms
+03:34:22.519 [log] unpulled A (mid 1) in 278 ms
+03:34:22.772 [log] unpulled B (mid 2) in 249 ms
+03:34:23.126 [log] ontrack mid=1 -> G
+03:34:23.269 [log] pulled G (mid 1) in 493 ms
+03:34:23.515 [log] ontrack mid=2 -> H
+03:34:23.713 [log] pulled H (mid 2) in 439 ms
+03:34:34.241 [log] unpulled C (mid 3) in 337 ms
+03:34:34.501 [log] unpulled D (mid 4) in 256 ms
+03:34:34.716 [log] ontrack mid=3 -> A
+03:34:34.865 [log] pulled A (mid 3) in 360 ms
+03:34:35.037 [log] ontrack mid=4 -> B
+03:34:35.241 [log] pulled B (mid 4) in 373 ms
+03:34:45.729 [log] unpulled E (mid 5) in 303 ms
+03:34:45.990 [log] unpulled F (mid 6) in 260 ms
+03:34:46.209 [log] ontrack mid=5 -> C
+03:34:46.374 [log] pulled C (mid 5) in 379 ms
+03:34:46.556 [log] ontrack mid=6 -> D
+03:34:46.748 [log] pulled D (mid 6) in 372 ms
+03:34:57.036 [log] unpulled G (mid 1) in 249 ms
+03:34:57.339 [log] unpulled H (mid 2) in 286 ms
+03:34:57.542 [log] ontrack mid=1 -> E
+03:34:57.683 [log] pulled E (mid 1) in 343 ms
+03:34:57.862 [log] ontrack mid=2 -> F
+03:34:58.049 [log] pulled F (mid 2) in 364 ms
+03:35:08.406 [log] unpulled A (mid 3) in 323 ms
+03:35:08.631 [log] unpulled B (mid 4) in 223 ms
+03:35:08.797 [log] ontrack mid=3 -> G
+03:35:08.952 [log] pulled G (mid 3) in 319 ms
+03:35:09.104 [log] ontrack mid=4 -> H
+03:35:09.284 [log] pulled H (mid 4) in 330 ms
+03:35:19.603 [log] unpulled C (mid 5) in 258 ms
+03:35:19.848 [log] unpulled D (mid 6) in 244 ms
+03:35:20.107 [log] ontrack mid=5 -> A
+03:35:20.236 [log] pulled A (mid 5) in 386 ms
+03:35:20.385 [log] ontrack mid=6 -> B
+03:35:20.564 [log] pulled B (mid 6) in 326 ms
+03:35:30.880 [log] unpulled E (mid 1) in 234 ms
+03:35:31.098 [log] unpulled F (mid 2) in 216 ms
+03:35:31.365 [log] ontrack mid=1 -> C
+03:35:31.516 [log] pulled C (mid 1) in 417 ms
+03:35:31.750 [log] ontrack mid=2 -> D
+03:35:31.907 [log] pulled D (mid 2) in 389 ms
+03:35:42.470 [log] unpulled G (mid 3) in 267 ms
+03:35:42.735 [log] unpulled H (mid 4) in 260 ms
+03:35:42.980 [log] ontrack mid=3 -> E
+03:35:43.137 [log] pulled E (mid 3) in 399 ms
+03:35:43.403 [log] ontrack mid=4 -> F
+03:35:43.574 [log] pulled F (mid 4) in 433 ms
+03:35:53.872 [log] unpulled A (mid 5) in 266 ms
+03:35:54.105 [log] unpulled B (mid 6) in 229 ms
+03:35:54.383 [log] ontrack mid=5 -> G
+03:35:54.544 [log] pulled G (mid 5) in 437 ms
+03:35:54.793 [log] ontrack mid=6 -> H
+03:35:54.971 [log] pulled H (mid 6) in 425 ms
+03:36:05.270 [log] unpulled C (mid 1) in 279 ms
+03:36:05.541 [log] unpulled D (mid 2) in 264 ms
+03:36:05.795 [log] ontrack mid=1 -> A
+03:36:05.941 [log] pulled A (mid 1) in 398 ms
+03:36:06.117 [log] ontrack mid=2 -> B
+03:36:06.316 [log] pulled B (mid 2) in 374 ms
+03:36:16.586 [log] unpulled E (mid 3) in 258 ms
+03:36:16.852 [log] unpulled F (mid 4) in 260 ms
+03:36:17.056 [log] ontrack mid=3 -> C
+03:36:17.219 [log] pulled C (mid 3) in 362 ms
+03:36:17.384 [log] ontrack mid=4 -> D
+03:36:17.563 [log] pulled D (mid 4) in 342 ms
+03:36:27.950 [log] unpulled G (mid 5) in 293 ms
+03:36:28.229 [log] unpulled H (mid 6) in 272 ms
+03:36:28.429 [log] ontrack mid=5 -> E
+03:36:28.586 [log] pulled E (mid 5) in 352 ms
+03:36:28.806 [log] ontrack mid=6 -> F
+03:36:29.000 [log] pulled F (mid 6) in 406 ms
+03:36:39.363 [log] unpulled A (mid 1) in 299 ms
+03:36:39.702 [log] unpulled B (mid 2) in 336 ms
+03:36:39.945 [log] ontrack mid=1 -> G
+03:36:40.052 [log] pulled G (mid 1) in 349 ms
+03:36:40.259 [log] ontrack mid=2 -> H
+03:36:40.439 [log] pulled H (mid 2) in 387 ms
+03:36:50.968 [log] unpulled C (mid 3) in 338 ms
+03:36:51.231 [log] unpulled D (mid 4) in 257 ms
+03:36:51.513 [log] ontrack mid=3 -> A
+03:36:51.689 [log] pulled A (mid 3) in 445 ms
+03:36:51.882 [log] ontrack mid=4 -> B
+03:36:52.100 [log] pulled B (mid 4) in 406 ms
+03:37:02.386 [log] unpulled E (mid 5) in 239 ms
+03:37:02.655 [log] unpulled F (mid 6) in 256 ms
+03:37:02.940 [log] ontrack mid=5 -> C
+03:37:03.161 [log] pulled C (mid 5) in 499 ms
+03:37:03.407 [log] ontrack mid=6 -> D
+03:37:03.640 [log] pulled D (mid 6) in 474 ms
+03:37:13.935 [log] unpulled G (mid 1) in 283 ms
+03:37:14.190 [log] unpulled H (mid 2) in 255 ms
+03:37:14.435 [log] ontrack mid=1 -> E
+03:37:14.658 [log] pulled E (mid 1) in 463 ms
+03:37:14.899 [log] ontrack mid=2 -> F
+03:37:15.098 [log] pulled F (mid 2) in 438 ms
+03:37:25.427 [log] unpulled A (mid 3) in 293 ms
+03:37:25.678 [log] unpulled B (mid 4) in 248 ms
+03:37:25.993 [log] ontrack mid=3 -> G
+03:37:26.164 [log] pulled G (mid 3) in 471 ms
+03:37:26.430 [log] ontrack mid=4 -> H
+03:37:26.623 [log] pulled H (mid 4) in 454 ms
+03:37:36.994 [log] unpulled C (mid 5) in 361 ms
+03:37:37.268 [log] unpulled D (mid 6) in 268 ms
+03:37:37.484 [log] ontrack mid=5 -> A
+03:37:37.651 [log] pulled A (mid 5) in 382 ms
+03:37:37.828 [log] ontrack mid=6 -> B
+03:37:38.025 [log] pulled B (mid 6) in 372 ms
+03:37:48.344 [log] unpulled E (mid 1) in 296 ms
+03:37:48.628 [log] unpulled F (mid 2) in 271 ms
+03:37:48.905 [log] ontrack mid=1 -> C
+03:37:49.018 [log] pulled C (mid 1) in 385 ms
+03:37:49.209 [log] ontrack mid=2 -> D
+03:37:49.411 [log] pulled D (mid 2) in 389 ms
+03:37:59.975 [log] unpulled G (mid 3) in 266 ms
+03:38:00.294 [log] unpulled H (mid 4) in 317 ms
+03:38:00.502 [log] ontrack mid=3 -> E
+03:38:00.634 [log] pulled E (mid 3) in 340 ms
+03:38:00.814 [log] ontrack mid=4 -> F
+03:38:01.006 [log] pulled F (mid 4) in 370 ms
+03:38:11.294 [log] unpulled A (mid 5) in 259 ms
+03:38:11.527 [log] unpulled B (mid 6) in 231 ms
+03:38:11.702 [log] ontrack mid=5 -> G
+03:38:11.864 [log] pulled G (mid 5) in 336 ms
+03:38:12.013 [log] ontrack mid=6 -> H
+03:38:12.170 [log] pulled H (mid 6) in 304 ms
+03:38:22.464 [log] unpulled C (mid 1) in 288 ms
+03:38:22.677 [log] unpulled D (mid 2) in 211 ms
+03:38:22.966 [log] ontrack mid=1 -> A
+03:38:23.129 [log] pulled A (mid 1) in 450 ms
+03:38:23.269 [log] ontrack mid=2 -> B
+03:38:23.452 [log] pulled B (mid 2) in 322 ms
+03:38:33.809 [log] unpulled E (mid 3) in 244 ms
+03:38:34.028 [log] unpulled F (mid 4) in 217 ms
+03:38:34.264 [log] ontrack mid=3 -> C
+03:38:34.406 [log] pulled C (mid 3) in 376 ms
+03:38:34.622 [log] ontrack mid=4 -> D
+03:38:34.782 [log] pulled D (mid 4) in 375 ms
+03:38:44.996 [log] unpulled G (mid 5) in 204 ms
+03:38:45.214 [log] unpulled H (mid 6) in 216 ms
+03:38:45.441 [log] ontrack mid=5 -> E
+03:38:45.590 [log] pulled E (mid 5) in 375 ms
+03:38:45.800 [log] ontrack mid=6 -> F
+03:38:45.960 [log] pulled F (mid 6) in 369 ms
+03:38:56.202 [log] unpulled A (mid 1) in 235 ms
+03:38:56.411 [log] unpulled B (mid 2) in 207 ms
+03:38:56.682 [log] ontrack mid=1 -> G
+03:38:56.839 [log] pulled G (mid 1) in 426 ms
+03:38:57.082 [log] ontrack mid=2 -> H
+03:38:57.288 [log] pulled H (mid 2) in 447 ms
+03:39:07.617 [log] unpulled C (mid 3) in 253 ms
+03:39:07.884 [log] unpulled D (mid 4) in 266 ms
+03:39:08.087 [log] ontrack mid=3 -> A
+03:39:08.199 [log] pulled A (mid 3) in 313 ms
+03:39:08.361 [log] ontrack mid=4 -> B
+03:39:08.554 [log] pulled B (mid 4) in 354 ms
+03:39:18.804 [log] unpulled E (mid 5) in 243 ms
+03:39:19.049 [log] unpulled F (mid 6) in 242 ms
+03:39:19.311 [log] ontrack mid=5 -> C
+03:39:19.427 [log] pulled C (mid 5) in 376 ms
+03:39:19.605 [log] ontrack mid=6 -> D
+03:39:19.785 [log] pulled D (mid 6) in 356 ms
+03:40:46.986 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:41:03.478 [log] attempt 1: session cf2b934baa8e…
+03:41:04.303 [log] publish ok on attempt 1 in 1821 ms
+03:41:04.304 [log] pc connected, joining room
+03:41:06.600 [log] ontrack mid=1 -> B
+03:41:06.785 [log] pulled B (mid 1) in 467 ms
+03:41:07.077 [log] ontrack mid=2 -> 2
+03:41:07.225 [log] pulled 2 (mid 2) in 434 ms
+03:41:07.504 [log] ontrack mid=3 -> E
+03:41:07.714 [log] pulled E (mid 3) in 493 ms
+03:41:07.963 [log] ontrack mid=4 -> C
+03:41:08.144 [log] pulled C (mid 4) in 430 ms
+03:41:08.376 [log] ontrack mid=5 -> G
+03:41:08.571 [log] pulled G (mid 5) in 426 ms
+03:41:08.939 [log] ontrack mid=6 -> D
+03:41:09.121 [log] pulled D (mid 6) in 552 ms
+03:41:09.387 [log] ontrack mid=7 -> H
+03:41:09.633 [log] pulled H (mid 7) in 507 ms
+03:41:09.952 [log] ontrack mid=8 -> A
+03:41:10.184 [log] pulled A (mid 8) in 553 ms
+03:41:10.520 [log] ontrack mid=9 -> F
+03:41:10.725 [log] pulled F (mid 9) in 542 ms
+03:43:02.660 [log] unpulled A (mid 8) in 340 ms
+03:43:02.972 [log] ontrack mid=8 -> A
+03:43:03.171 [log] pulled A (mid 8) in 511 ms
+03:43:04.599 [log] unpulled B (mid 1) in 276 ms
+03:43:04.922 [log] ontrack mid=1 -> B
+03:43:05.080 [log] pulled B (mid 1) in 482 ms
+03:43:14.587 [log] unpulled C (mid 4) in 269 ms
+03:43:14.898 [log] ontrack mid=4 -> C
+03:43:15.096 [log] pulled C (mid 4) in 509 ms
+03:43:18.596 [log] unpulled D (mid 6) in 279 ms
+03:43:18.833 [log] ontrack mid=6 -> D
+03:43:19.029 [log] pulled D (mid 6) in 433 ms

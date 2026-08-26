@@ -1,0 +1,20 @@
+02:58:23.296 m2m CHURN run: MODE=happy N=6 (pubs=ABCD probes=12)
+02:58:24.045 1 launched (full)
+02:58:24.517 2 launched (full)
+02:58:24.980 A launched (pub)
+02:58:25.494 B launched (pub)
+02:58:26.001 C launched (pub)
+02:58:26.513 D launched (pub)
+02:58:26.517 RELEASED all 6
+02:58:28.545 mesh: 1:running tiles=1/1 lat[51..51] | 2:running tiles=1/2 lat[42..42] || pubs {"running":3,"connecting":1}
+02:58:30.550 mesh: 1:running tiles=4/5 lat[71..98] | 2:running tiles=5/5 lat[48..72] || pubs {"running":4}
+02:58:32.554 mesh: 1:running tiles=5/5 lat[65..134] | 2:running tiles=5/5 lat[74..125] || pubs {"running":4}
+02:58:32.554 FULL MESH in 6028 ms
+02:58:37.736 [5s] 1:running tiles=5/5 lat[71..103] | 2:running tiles=5/5 lat[67..92] || pubs {"running":4}
+02:58:37.794 CPU total=139.5% ours=70.1% sibling=0% rss=4729MB
+02:58:47.810 [15s] 1:running tiles=5/5 lat[70..140] | 2:running tiles=5/5 lat[86..133] || pubs {"running":4}
+02:58:57.821 [25s] 1:running tiles=5/5 lat[98..160] | 2:running tiles=5/5 lat[87..141] || pubs {"running":4}
+02:59:07.826 [35s] 1:running tiles=5/5 lat[76..151] | 2:running tiles=5/5 lat[68..142] || pubs {"running":4}
+02:59:17.838 [45s] 1:running tiles=5/5 lat[71..120] | 2:running tiles=5/5 lat[87..160] || pubs {"running":4}
+02:59:27.846 [55s] 1:running tiles=5/5 lat[76..133] | 2:running tiles=5/5 lat[88..148] || pubs {"running":4}
+02:59:34.864 run done (MODE=happy)

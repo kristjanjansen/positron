@@ -301,7 +301,10 @@ Ranked.
    RAM (~800 MB/Chrome), not CPU. Two caveats for phase 2: one 20-way join storm hit a uniform
    ~3.4 s stall on ALL sessions/new (still 201s — ⚠️ DNS/edge queueing), and one publisher's
    ICE/DTLS never connected during one storm (1 of 3) → **the publish leg needs a
-   connect-timeout retry**. 200-scale remains unprobed → phase 3 soak stands.
+   connect-timeout retry** (✅ since IMPLEMENTED in room.html — phase 1c — and it absorbed every
+   flake through N=54; flakes grow with storm size: 9/46 legs at N=48). Phase 1c extended the
+   no-ceiling result to **N=54 / 106 tracks on one PC / ~1500 API calls, one transient 500**.
+   200-scale remains unprobed → phase 3 soak stands.
 3. **The two-clock problem** ⚠️ (§2) — grid at 0.1 s vs stage at 2.4–4 s is a *dramaturgical*
    hazard no vendor doc mentions. Mitigations exist (WHEP for publishers; display delay); needs a
    rehearsal-scale human test, not a rig.
@@ -353,6 +356,24 @@ Instrument fix: `sendBeacon`'s ~64 KB quota silently dropped probe batches at N=
 `fetch()` (the N=16 rung was just under the cliff; another instrument-first save).
 New tools: `proto/m2m/{run-scale.mjs,analyze-scale.py}`; data `results/m2m-scale-*.jsonl`.
 See §5 risk 2 for the API/storm findings and the publish-retry requirement.
+
+**Phase 1c — heavy media** — ✅ **DONE (2026-08-26 session 5): audio+video to N=54, still no SFU ceiling.**
+- **Audio works, first try, everywhere**: per-participant FFT-verified tones on every directed pair up
+  to 106/106 at N=54; concealment ≤0.39 % pooled (gate was 5 %). Pulling A+V in one `tracks/new`
+  keeps renegotiation count unchanged.
+- **Show-quality (640x360@30, 1.2 Mbps) is FASTER than lightweight: p50 66 / p95 96 ms** — 30 fps
+  halves frame-interval quantization; zero freezes (the freeze-prone class is 15 fps lightweight).
+  720p featured tiles alongside small ones degrade nothing.
+- **Co-tenancy (5 pages/Chrome) is clean** (+5 ms p50, fps unthrottled) and cuts RAM 58 % — that's
+  what unlocked **N=54: 106 tracks on ONE PeerConnection**, SFU-path p50 flat 122–137 ms from
+  N=8→54, ~1500 API calls, one transient 500 ever.
+- **Publish/connect retry now IMPLEMENTED in room.html** (failure-only path): join-storm ICE flakes
+  grow with N (0/24 → 9/46 legs at N=48) and the retry absorbed every one — without it a 30-way
+  storm is ~1-in-2 fatal. Production requirements surfaced: an end-to-end video-sanity heartbeat
+  (one sender emitted corrupt frames for 110 s while its own getStats read healthy), and viewer
+  fan-in saturates the page's rAF/encode (4–7 fps near ~100 tracks) long before decode fails.
+- Tools: `proto/m2m/{run-heavy.mjs,analyze-heavy.py}`, data `results/m2m-heavy-*.jsonl`,
+  NOTES.md §HEAVY MEDIA.
 
 **Phase 2 — the room, at workshop scale (2–10), then synthetic 40**:
 - Build the `RtcRoom` DO frames (§3) + proxy Worker with role tokens; wire the grid UI with

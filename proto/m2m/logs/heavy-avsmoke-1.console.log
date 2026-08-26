@@ -1,0 +1,12 @@
+02:53:44.225 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+02:53:46.049 [log] session a157c1c149c5…
+02:53:47.185 [log] pc connected, joining room
+02:53:47.480 [log] ontrack video mid=2 -> 2
+02:53:47.480 [log] ontrack audio mid=3 -> 2
+02:53:47.666 [log] pulled 2 (mid 2)
+02:53:47.971 [log] ontrack video mid=4 -> A
+02:53:47.971 [log] ontrack audio mid=5 -> A
+02:53:48.107 [log] pulled A (mid 4)
+02:53:49.434 [log] ontrack video mid=6 -> B
+02:53:49.435 [log] ontrack audio mid=7 -> B
+02:53:49.582 [log] pulled B (mid 6)

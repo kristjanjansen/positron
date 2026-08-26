@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>m2m SFU room (churn)</title>
+<style>
+body{background:#111;color:#ddd;font:13px monospace}
+#tiles{display:flex;flex-wrap:wrap;gap:8px}
+.tile{border:1px solid #444;padding:4px}
+.tile video{width:320px;height:180px;display:block}
+#log{white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h3 id="hdr">m2m room (churn)</h3>
+<canvas id="cv" width="640" height="360" style="width:320px;height:180px;border:1px solid #263"></canvas>
+<div id="tiles"></div>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+// CHURN variant of room.html (churn agent owns this file; room.html is the
+// sibling's). Deltas vs room.html:
+//   1. PUBLISH-LEG CONNECT-RETRY (production deliverable, plan-m2m §5 risk 2):
+//      connect timeout (default 8 s) to PeerConnection 'connected' -> teardown
+//      -> fresh sessions/new + tracks/new, max 3 attempts, backoff 1 s / 2 s.
+//      All attempts logged (publish-attempt / publish-retry / publish-ok /
+//      publish-exhausted events). failpub=N query param sabotages the first N
+//      attempts (discards the SFU answer) to exercise the real timeout path.
+//   2. UNPULL (tracks/close, renegotiated per plan-m2m §3 tile-hidden
+//      discipline) + driver-driven rotation: window.__pullPid / __unpullPid,
+//      auto=0 disables auto roster pulls.
+//   3. REPULL on sessionId change (publisher restart = unpublish+publish per
+//      §3 reconnect design): roster loop detects a participant whose sessionId
+//      changed, closes the dead pull, pulls the fresh track.
+//   4. Track-death instrumentation: track mute/unmute/ended events + per-tile
+//      first-frame (time-to-first-frame from pull start = tile-switch UX).
+//   5. post() uses fetch keepalive (never sendBeacon — 64 KB quota, S5 bug).
+const q = new URLSearchParams(location.search);
+const MY_ID = (q.get("id") || "X").slice(0, 8);
+const EXPECTED_N = parseInt(q.get("n") || "3", 10);
+const MODE = q.get("mode") === "pub" ? "pub" : "full";
+const IS_PUB = MODE === "pub";
+const HOLD = q.get("hold") === "1";
+const AUTO = q.get("auto") !== "0";        // auto=0 -> driver drives pulls
+const CONNECT_TIMEOUT_MS = parseInt(q.get("ct") || "8000", 10);
+const MAX_PUB_ATTEMPTS = 3;
+const FAILPUB = parseInt(q.get("failpub") || "0", 10);   // test hook
+const COLLECT = "/collect";
+document.getElementById("hdr").textContent = "m2m churn — participant " + MY_ID + " (expecting " + EXPECTED_N + ", mode " + MODE + ", auto " + (AUTO ? 1 : 0) + ")";
+document.title = "m2m-churn " + MY_ID;
+if (!IS_PUB && EXPECTED_N > 6) {
+  const st = document.createElement("style");
+  st.textContent = ".tile video{width:160px;height:90px}";
+  document.head.appendChild(st);
+}
+
+// ---- binary row geometry (rig/whep pattern, halved to 360p, +1 pid byte) ----
+const NBLOCKS = 64;
+const BLOCK_W = 9;
+const ROW_X = 32;
+const ROW_Y = 40;
+const ROW_H = 56;
+
+window.__state = { phase: "init", error: null, id: MY_ID, mode: MODE, frames: 0,
+                   rosterCount: 0, pulled: 0, pubAttempts: 0, pubRetries: 0, tiles: {} };
+
+const logEl = document.getElementById("log");
+const hud = document.getElementById("hud");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+// fetch, NOT sendBeacon (64 KB quota silently drops big beacons — S5 bug)
+function post(obj) {
+  fetch(COLLECT, { method: "POST", body: JSON.stringify(obj), keepalive: true }).catch(() => {});
+}
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name,
+                       t: performance.timeOrigin + performance.now() }, extra || {}));
+}
+
+// ---- canvas signal ---------------------------------------------------------
+const cv = document.getElementById("cv");
+if (IS_PUB) { cv.width = 320; cv.height = 180; }
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+let frameCounter = 0;
+const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+const PUB_FPS = 15;
+
+function drawPub() {
+  const ms = Math.round(performance.timeOrigin + performance.now());
+  ctx.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 640, 360);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  ctx.font = "bold 110px monospace";
+  ctx.fillText(MY_ID, 40, 240);
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(String(ms), 160, 180);
+  frameCounter++;
+  window.__state.frames = frameCounter;
+}
+
+function draw() {
+  const ms = Math.round(performance.timeOrigin + performance.now());
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 640, 360);
+  ctx.fillStyle = "#000";
+  ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+  const bytes = [];
+  let v = ms;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(PID_BYTE);
+  let ck = 0;
+  for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NBLOCKS; i++) {
+    if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+  }
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 110px monospace";
+  ctx.fillText(MY_ID, 40, 240);
+  ctx.font = "bold 28px monospace";
+  ctx.fillText(String(ms), 160, 180);
+  ctx.fillText("frame " + frameCounter, 160, 215);
+  ctx.fillText(new Date(ms).toISOString().slice(11, 23), 160, 250);
+  const x = (frameCounter * 5) % 560;
+  ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",80%,60%)";
+  ctx.fillRect(20 + x, 290, 50, 50);
+  frameCounter++;
+  window.__state.frames = frameCounter;
+  requestAnimationFrame(draw);
+}
+if (IS_PUB) setInterval(drawPub, Math.round(1000 / PUB_FPS));
+else requestAnimationFrame(draw);
+
+// ---- decoder ---------------------------------------------------------------
+function makeDecoder() {
+  const work = document.createElement("canvas");
+  work.width = 640; work.height = 360;
+  const wctx = work.getContext("2d", { alpha: false, willReadFrequently: true });
+  return function decodeRow(vid) {
+    wctx.drawImage(vid, 0, 0, 640, 360);
+    const y = ROW_Y + ROW_H / 2;
+    const img = wctx.getImageData(ROW_X, y, NBLOCKS * BLOCK_W, 1).data;
+    const levels = [];
+    for (let i = 0; i < NBLOCKS; i++) {
+      let s = 0;
+      for (let dx = 3; dx < 6; dx++) s += img[(i * BLOCK_W + dx) * 4 + 1];
+      levels.push(s / 3);
+    }
+    const mn = Math.min(...levels), mx = Math.max(...levels);
+    if (mx - mn < 60) return { ok: false, why: "low-contrast", contrast: mx - mn };
+    const thr = (mn + mx) / 2;
+    const bits = levels.map(l => (l > thr ? 1 : 0));
+    let ms = 0;
+    for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
+    let pid = 0;
+    for (let i = 48; i < 56; i++) pid = pid * 2 + bits[i];
+    let ck = 0;
+    for (let i = 56; i < 64; i++) ck = ck * 2 + bits[i];
+    const bytes = [];
+    let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(pid);
+    let expect = 0;
+    for (const b of bytes) expect ^= b;
+    if (expect !== ck) return { ok: false, why: "checksum", contrast: mx - mn };
+    return { ok: true, ms, pid: String.fromCharCode(pid), contrast: mx - mn };
+  };
+}
+
+// ---- sample batching (fetch, no beacon quota) -------------------------------
+let batch = [];
+window.__batchStats = { flushed: 0, failed: 0 };
+setInterval(() => {
+  if (batch.length) {
+    fetch(COLLECT, { method: "POST", body: batch.map(r => JSON.stringify(r)).join("\n") })
+      .then(() => { window.__batchStats.flushed++; })
+      .catch(() => { window.__batchStats.failed++; });
+    batch = [];
+  }
+}, 1000);
+
+// ---- tiles -----------------------------------------------------------------
+const tilesEl = document.getElementById("tiles");
+const tileDivs = new Map();       // pid -> div
+const pullT0 = new Map();         // pid -> wall-clock ms when the pull started
+
+function removeTile(pid) {
+  const d = tileDivs.get(pid);
+  if (d) { d.remove(); tileDivs.delete(pid); }
+  const ts = window.__state.tiles[pid];
+  if (ts) ts.dead = true;         // stops the rVFC re-arm loop
+  delete window.__state.tiles[pid];
+}
+
+function startTile(fromPid, track) {
+  removeTile(fromPid);            // repull replaces any stale tile
+  const div = document.createElement("div");
+  div.className = "tile";
+  const label = document.createElement("div");
+  label.textContent = fromPid + " -> " + MY_ID;
+  const vid = document.createElement("video");
+  vid.autoplay = true; vid.muted = true; vid.playsInline = true;
+  div.appendChild(label); div.appendChild(vid);
+  tilesEl.appendChild(div);
+  tileDivs.set(fromPid, div);
+  vid.srcObject = new MediaStream([track]);
+  vid.play().catch(() => {});
+
+  // dead-track observability: what does a subscriber SEE when a publisher dies?
+  track.onmute = () => event("track-mute", { from: fromPid });
+  track.onunmute = () => event("track-unmute", { from: fromPid });
+  track.onended = () => event("track-ended", { from: fromPid });
+
+  const tileState = { samples: 0, valid: 0, pidMismatch: 0, lastLatencyMs: null,
+                      firstValidT: null, lastValidT: null, dead: false };
+  window.__state.tiles[fromPid] = tileState;
+  const decodeRow = makeDecoder();
+  let busy = false, lastPresented = -1;
+
+  function onFrame(now, meta) {
+    if (tileState.dead) return;                // tile was unpulled — stop
+    vid.requestVideoFrameCallback(onFrame);    // RE-ARM FIRST (plan §4.1)
+    if (busy) return;
+    busy = true;
+    try {
+      if (meta.presentedFrames === lastPresented) return;
+      lastPresented = meta.presentedFrames;
+      const dec = decodeRow(vid);
+      const dispWall = performance.timeOrigin + meta.expectedDisplayTime;
+      const row = {
+        kind: "sample", from: fromPid, to: MY_ID,
+        t: performance.timeOrigin + performance.now(),
+        vis: document.visibilityState,
+        presentedFrames: meta.presentedFrames,
+        receiveTime: (meta.receiveTime !== undefined) ? meta.receiveTime : null,
+        w: meta.width, h: meta.height,
+        decOk: dec.ok, contrast: Math.round(dec.contrast || 0)
+      };
+      if (dec.ok) {
+        row.burnedTs = dec.ms;
+        row.latencyMs = dispWall - dec.ms;
+        row.decPid = dec.pid;
+        row.pidOk = dec.pid === fromPid;
+        if (!row.pidOk) tileState.pidMismatch++;
+        tileState.valid++;
+        tileState.lastLatencyMs = Math.round(row.latencyMs);
+        tileState.lastValidT = row.t;
+        if (!tileState.firstValidT) {
+          tileState.firstValidT = row.t;
+          const p0 = pullT0.get(fromPid);
+          event("first-frame", { from: fromPid,
+            ttffMs: p0 ? Math.round(row.t - p0) : null });
+        }
+      } else {
+        row.decWhy = dec.why;
+      }
+      if (meta.receiveTime != null) row.receiveToDisplayMs = meta.expectedDisplayTime - meta.receiveTime;
+      tileState.samples++;
+      batch.push(row);
+    } finally {
+      busy = false;
+    }
+  }
+  vid.requestVideoFrameCallback(onFrame);
+}
+
+setInterval(() => {
+  const parts = Object.entries(window.__state.tiles).map(([pid, s]) =>
+    pid + ":" + s.valid + "/" + s.samples + (s.lastLatencyMs != null ? "@" + s.lastLatencyMs + "ms" : ""));
+  hud.textContent = "phase=" + window.__state.phase + " frames=" + frameCounter +
+    " attempts=" + window.__state.pubAttempts +
+    " roster=" + window.__state.rosterCount + " tiles[" + parts.join(" ") + "]";
+}, 1000);
+
+// ---- SFU client ------------------------------------------------------------
+async function cf(method, subpath, body) {
+  const resp = await fetch("/cf/" + subpath, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode) {
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  }
+  return obj;
+}
+
+function waitIceGathering(pc_) {
+  return new Promise(res => {
+    if (pc_.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc_.onicegatheringstatechange = () => {
+      if (pc_.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+
+let pc = null, SID = null;
+const TRACK_NAME = "video-" + MY_ID;
+const midToPid = new Map();
+
+// ---- publish leg with CONNECT-RETRY (the production deliverable) -----------
+function teardownPc(old) {
+  if (!old) return;
+  try {
+    old.onconnectionstatechange = null;
+    old.oniceconnectionstatechange = null;
+    old.onicegatheringstatechange = null;
+    old.ontrack = null;
+    old.close();
+  } catch (e) { /* already dead */ }
+}
+
+async function attemptPublish(track, attempt) {
+  const t0 = performance.now();
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState, attempt });
+  pc.onconnectionstatechange = () => event("pc", { state: pc.connectionState, attempt });
+  pc.ontrack = (e) => {
+    if (e.track.kind !== "video") return;
+    const pid = midToPid.get(e.transceiver.mid);
+    log("ontrack mid=" + e.transceiver.mid + " -> " + (pid || "UNKNOWN"));
+    if (pid) startTile(pid, e.track);
+    else event("ontrack-unmapped", { mid: e.transceiver.mid });
+  };
+
+  const sess = await cf("POST", "sessions/new");
+  SID = sess.sessionId;
+  window.__state.sessionId = SID;
+  log("attempt " + attempt + ": session " + SID.slice(0, 12) + "…");
+
+  const tx = pc.addTransceiver(track, { direction: "sendonly" });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+  const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+    sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+    tracks: [{ location: "local", mid: tx.mid, trackName: TRACK_NAME }]
+  });
+  if (attempt <= FAILPUB) {
+    // TEST HOOK: discard the answer -> ICE/DTLS can never come up -> the real
+    // connect-timeout path fires. The orphaned session is GC'd server-side.
+    log("failpub hook: discarding SFU answer on attempt " + attempt);
+  } else {
+    await pc.setRemoteDescription(resp.sessionDescription);
+  }
+
+  // wait for ICE/DTLS with a hard timeout; 'failed' short-circuits
+  const myPc = pc;
+  await new Promise((res, rej) => {
+    if (myPc.connectionState === "connected") return res();
+    const t = setTimeout(() => rej(new Error(
+      "connect-timeout " + CONNECT_TIMEOUT_MS + "ms (pc=" + myPc.connectionState +
+      " ice=" + myPc.iceConnectionState + ")")), CONNECT_TIMEOUT_MS);
+    myPc.addEventListener("connectionstatechange", function h() {
+      if (myPc.connectionState === "connected") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h); res();
+      } else if (myPc.connectionState === "failed") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h);
+        rej(new Error("pc-failed during connect"));
+      }
+    });
+  });
+  return Math.round(performance.now() - t0);
+}
+
+async function publishWithRetry(track) {
+  for (let attempt = 1; attempt <= MAX_PUB_ATTEMPTS; attempt++) {
+    window.__state.pubAttempts = attempt;
+    event("publish-attempt", { attempt });
+    try {
+      const connectMs = await attemptPublish(track, attempt);
+      event("publish-ok", { attempt, connectMs, sessionId: SID });
+      log("publish ok on attempt " + attempt + " in " + connectMs + " ms");
+      return;
+    } catch (e) {
+      teardownPc(pc); pc = null;
+      const reason = String(e && e.message || e).slice(0, 200);
+      window.__state.pubRetries = attempt;
+      event("publish-retry", { attempt, reason, willRetry: attempt < MAX_PUB_ATTEMPTS });
+      log("publish attempt " + attempt + " FAILED: " + reason);
+      if (attempt >= MAX_PUB_ATTEMPTS) {
+        event("publish-exhausted", { attempts: attempt, reason });
+        throw new Error("publish exhausted after " + attempt + " attempts: " + reason);
+      }
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));  // 1 s, 2 s
+    }
+  }
+}
+
+async function publish() {
+  if (HOLD) {
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
+  window.__state.phase = "connecting";
+  window.__state.t_go = performance.timeOrigin + performance.now();
+  const stream = cv.captureStream(IS_PUB ? PUB_FPS : 30);
+  await publishWithRetry(stream.getVideoTracks()[0]);
+  window.__state.phase = "publishing";
+  log("pc connected, joining room");
+  await fetch("/join", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ participantId: MY_ID, sessionId: SID, trackName: TRACK_NAME }) });
+  window.__state.phase = "running";
+  window.__state.t_running = performance.timeOrigin + performance.now();
+  if (!IS_PUB) startRosterLoop();
+  startStats();
+}
+
+// ---- roster poll + serialized pull/unpull ----------------------------------
+// pid -> {state: queued|pulling|done|failed|repulling|unpulled, attempts,
+//         sessionId, trackName, mid}
+const pullState = new Map();
+let pullChain = Promise.resolve();
+let lastRoster = [];
+
+function startRosterLoop() {
+  const tick = async () => {
+    try {
+      const r = await fetch("/roster");
+      const { participants } = await r.json();
+      lastRoster = participants;
+      window.__state.rosterCount = participants.length;
+      if (!AUTO) return;               // driver drives pulls (rotate mode)
+      for (const p of participants) {
+        if (p.participantId === MY_ID) continue;
+        const st = pullState.get(p.participantId);
+        if (st && st.state === "done" && st.sessionId && st.sessionId !== p.sessionId) {
+          // publisher restarted with a NEW session -> unpublish+publish (§3)
+          st.state = "repulling";
+          event("repull-detected", { from: p.participantId,
+            oldSession: st.sessionId.slice(0, 8), newSession: p.sessionId.slice(0, 8) });
+          pullChain = pullChain.then(() => repullTrack(p)).catch(() => {});
+          continue;
+        }
+        if (st && (st.state === "queued" || st.state === "pulling" ||
+                   st.state === "done" || st.state === "repulling" ||
+                   st.state === "unpulled")) continue;
+        if (st && st.attempts >= 5) continue;
+        const attempts = st ? st.attempts : 0;
+        pullState.set(p.participantId, { state: "queued", attempts });
+        pullChain = pullChain.then(() => pullTrack(p)).catch(() => {});
+      }
+    } catch (e) { /* server hiccup — next poll */ }
+  };
+  tick();
+  setInterval(tick, 2000);
+}
+
+async function pullTrack(p) {
+  const pid = p.participantId;
+  const st = pullState.get(pid);
+  st.state = "pulling"; st.attempts++;
+  const t0 = performance.now();
+  pullT0.set(pid, performance.timeOrigin + t0);
+  try {
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+      tracks: [{ location: "remote", sessionId: p.sessionId, trackName: p.trackName }]
+    });
+    const tr = (resp.tracks || [])[0] || {};
+    if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+    if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+    midToPid.set(tr.mid, pid);       // BEFORE setRemoteDescription — ontrack fires during it
+    if (resp.requiresImmediateRenegotiation) {
+      await pc.setRemoteDescription(resp.sessionDescription);
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      await cf("PUT", "sessions/" + SID + "/renegotiate", {
+        sessionDescription: { type: "answer", sdp: pc.localDescription.sdp }
+      });
+    }
+    const durMs = Math.round(performance.now() - t0);
+    st.state = "done"; st.sessionId = p.sessionId; st.trackName = p.trackName; st.mid = tr.mid;
+    window.__state.pulled++;
+    event("pulled", { from: pid, mid: tr.mid, durMs, renego: !!resp.requiresImmediateRenegotiation });
+    log("pulled " + pid + " (mid " + tr.mid + ") in " + durMs + " ms");
+  } catch (e) {
+    st.state = "failed";
+    log("pull " + pid + " attempt " + st.attempts + " failed: " + e.message);
+    event("pull-failed", { from: pid, attempt: st.attempts, error: String(e.message).slice(0, 300) });
+    if (st.attempts >= 5) { window.__state.error = "pull " + pid + " gave up"; }
+    throw e;
+  }
+}
+
+// unpull = tracks/close with renegotiation (plan-m2m §3 tile-hidden discipline)
+async function unpullTrack(pid) {
+  const st = pullState.get(pid);
+  const mid = st && st.mid;
+  const t0 = performance.now();
+  try {
+    if (!mid) throw new Error("no mid for " + pid);
+    const tx = pc.getTransceivers().find(t => t.mid === mid);
+    if (tx) tx.stop();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const resp = await cf("PUT", "sessions/" + SID + "/tracks/close", {
+      tracks: [{ mid }],
+      sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+      force: false
+    });
+    if (resp.sessionDescription) await pc.setRemoteDescription(resp.sessionDescription);
+    const durMs = Math.round(performance.now() - t0);
+    event("unpulled", { from: pid, mid, durMs });
+    log("unpulled " + pid + " (mid " + mid + ") in " + durMs + " ms");
+  } catch (e) {
+    event("unpull-error", { from: pid, mid: mid || null,
+      error: String(e && e.message || e).slice(0, 300) });
+    log("unpull " + pid + " error: " + (e && e.message || e));
+    throw e;
+  } finally {
+    if (mid) midToPid.delete(mid);
+    removeTile(pid);
+    if (st) { st.state = "unpulled"; st.mid = null; }
+  }
+}
+
+async function repullTrack(p) {
+  const pid = p.participantId;
+  const tDetect = performance.timeOrigin + performance.now();
+  try { await unpullTrack(pid); } catch (e) { /* logged; dead track may not close cleanly */ }
+  const st = pullState.get(pid);
+  st.state = "queued"; st.attempts = 0;
+  await pullTrack(p);
+  event("repull-done", { from: pid, sinceDetectMs: Math.round(performance.timeOrigin + performance.now() - tDetect) });
+}
+
+// ---- driver-facing churn API (rotate mode: auto=0, driver calls these) -----
+window.__pullPid = (pid) => {
+  const pr = pullChain.then(async () => {
+    let p = lastRoster.find(x => x.participantId === pid);
+    if (!p) {
+      const j = await fetch("/roster").then(r => r.json());
+      p = j.participants.find(x => x.participantId === pid);
+    }
+    if (!p) throw new Error("not in roster: " + pid);
+    const st = pullState.get(pid);
+    if (st && (st.state === "done" || st.state === "pulling")) return "already";
+    pullState.set(pid, { state: "queued", attempts: 0 });
+    await pullTrack(p);
+    return "pulled";
+  });
+  pullChain = pr.catch(() => {});
+  return pr;
+};
+window.__unpullPid = (pid) => {
+  const pr = pullChain.then(() => unpullTrack(pid));
+  pullChain = pr.catch(() => {});
+  return pr;
+};
+
+// ---- getStats --------------------------------------------------------------
+function startStats() {
+  setInterval(async () => {
+    try {
+      if (!pc) return;
+      const st = await pc.getStats();
+      const row = { kind: "stats", who: MY_ID, role: MODE,
+                    t: performance.timeOrigin + performance.now(),
+                    vis: document.visibilityState, inbound: [] };
+      st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "video") {
+          row.framesEncoded = s.framesEncoded;
+          row.framesSent = s.framesSent;
+          row.fps = s.framesPerSecond;
+          row.packetsSent = s.packetsSent;
+          row.qualityLimitationReason = s.qualityLimitationReason;
+          row.qualityLimitationDurations = s.qualityLimitationDurations;
+          row.targetBitrate = s.targetBitrate;
+          row.encoderImplementation = s.encoderImplementation;
+          row.outWidth = s.frameWidth; row.outHeight = s.frameHeight;
+        }
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          row.inbound.push({
+            from: midToPid.get(s.mid) || s.mid,
+            jitterBufferDelay: s.jitterBufferDelay,
+            jitterBufferEmittedCount: s.jitterBufferEmittedCount,
+            framesDecoded: s.framesDecoded,
+            framesDropped: s.framesDropped,
+            framesReceived: s.framesReceived,
+            fps: s.framesPerSecond,
+            freezeCount: s.freezeCount,
+            totalFreezesDuration: s.totalFreezesDuration,
+            packetsLost: s.packetsLost,
+            nackCount: s.nackCount,
+            pliCount: s.pliCount,
+            frameWidth: s.frameWidth,
+            frameHeight: s.frameHeight,
+            decoderImplementation: s.decoderImplementation
+          });
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated) {
+          row.rtt = s.currentRoundTripTime;
+        }
+      });
+      window.__state.fps = row.fps;
+      window.__state.framesSent = row.framesSent;
+      window.__state.qlr = row.qualityLimitationReason;
+      // batch, NOT post(): keepalive fetches share a 64 KB pending-body quota;
+      // probe stats rows (~2 KB every 2 s) silently starved it after ~1 min in
+      // the 30-min soak (pub rows, 300 B / 3 s, survived). The plain-fetch
+      // batch path ran the full 30 min. Same bug family as S5's sendBeacon.
+      batch.push(row);
+    } catch (e) { /* ignore */ }
+  }, IS_PUB ? 3000 : 2000);
+}
+
+publish().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e).slice(0, 500) });
+});
+</script>
+</body>
+</html>

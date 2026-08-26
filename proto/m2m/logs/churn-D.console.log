@@ -1,0 +1,22 @@
+02:58:26.516 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+02:58:27.078 [log] attempt 1: session 090fcc586cc9…
+02:58:27.801 [log] publish ok on attempt 1 in 1260 ms
+02:58:27.801 [log] pc connected, joining room
+03:00:11.476 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:00:13.249 [log] attempt 1: session 0aae83ba51e8…
+03:00:14.114 [log] publish ok on attempt 1 in 1315 ms
+03:00:14.114 [log] pc connected, joining room
+03:33:37.562 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:33:45.241 [log] attempt 1: session 47ec66e19952…
+03:33:51.565 [log] publish ok on attempt 1 in 7339 ms
+03:33:51.565 [log] pc connected, joining room
+03:40:55.246 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:41:03.548 [log] attempt 1: session 43c6d76cd5fb…
+03:41:04.442 [log] publish ok on attempt 1 in 1933 ms
+03:41:04.442 [log] pc connected, joining room
+03:43:03.060 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:43:03.262 [log] attempt 1: session 5634d976a898…
+03:43:14.674 [log] publish attempt 1 FAILED: connect-timeout 8000ms (pc=connecting ice=checking)
+03:43:15.906 [log] attempt 2: session 86e2dcb0d123…
+03:43:17.783 [log] publish ok on attempt 2 in 2105 ms
+03:43:17.783 [log] pc connected, joining room

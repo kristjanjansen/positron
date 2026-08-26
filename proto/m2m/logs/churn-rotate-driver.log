@@ -1,0 +1,71 @@
+03:33:30.469 m2m CHURN run: MODE=rotate N=10 (pubs=ABCDEFGH probes=12)
+03:33:31.499 1 launched (full)
+03:33:32.548 2 launched (full)
+03:33:33.632 A launched (pub)
+03:33:34.844 B launched (pub)
+03:33:36.074 C launched (pub)
+03:33:37.409 D launched (pub)
+03:33:38.847 E launched (pub)
+03:33:40.239 F launched (pub)
+03:33:41.543 G launched (pub)
+03:33:44.183 H launched (pub)
+03:33:44.266 RELEASED all 10
+03:33:46.357 join: 1:connecting 2:connecting A:connecting B:connecting C:connecting D:connecting E:connecting F:connecting G:connecting H:connecting
+03:33:48.373 join: 1:connecting 2:connecting A:connecting B:connecting C:connecting D:connecting E:connecting F:connecting G:connecting H:running
+03:33:50.391 join: 1:connecting 2:connecting A:connecting B:connecting C:connecting D:connecting E:connecting F:connecting G:connecting H:running
+03:33:52.416 join: 1:connecting 2:connecting A:connecting B:connecting C:connecting D:running E:connecting F:connecting G:connecting H:running
+03:33:54.427 join: 1:connecting 2:connecting A:connecting B:connecting C:connecting D:running E:connecting F:connecting G:connecting H:running
+03:33:56.441 join: 1:running 2:connecting A:connecting B:connecting C:connecting D:running E:connecting F:connecting G:connecting H:running
+03:33:58.449 join: 1:running 2:connecting A:connecting B:connecting C:running D:running E:running F:connecting G:connecting H:running
+03:34:00.458 join: 1:running 2:running A:connecting B:connecting C:running D:running E:running F:connecting G:connecting H:running
+03:34:02.471 join: 1:running 2:running A:running B:connecting C:running D:running E:running F:running G:connecting H:running
+03:34:04.487 join: 1:running 2:running A:running B:running C:running D:running E:running F:running G:running H:running
+03:34:04.487 all running; initial working set = A..F on both probes
+03:34:04.922 probe 1 pull A: pulled
+03:34:05.616 probe 1 pull B: pulled
+03:34:06.052 probe 1 pull C: pulled
+03:34:06.530 probe 1 pull D: pulled
+03:34:06.987 probe 1 pull E: pulled
+03:34:07.451 probe 1 pull F: pulled
+03:34:07.840 probe 2 pull A: pulled
+03:34:08.562 probe 2 pull B: pulled
+03:34:09.002 probe 2 pull C: pulled
+03:34:09.397 probe 2 pull D: pulled
+03:34:09.810 probe 2 pull E: pulled
+03:34:10.208 probe 2 pull F: pulled
+03:34:12.224 mesh: 1:running tiles=6/6 lat[91..157] | 2:running tiles=6/6 lat[124..164] || pubs {"running":8} RETRIES[2:1,A:1,B:1,F:1,G:1]
+03:34:12.224 initial 6-tile grids up in 2016 ms — rotating every 10s for 300s
+03:34:23.719 rotation 1 done (each probe: -2 +2)
+03:34:23.889 CPU total=803.9% ours=83.4% sibling=585.4% rss=7427MB
+03:34:35.408 rotation 2 done (each probe: -2 +2)
+03:34:46.748 rotation 3 done (each probe: -2 +2)
+03:34:58.075 rotation 4 done (each probe: -2 +2)
+03:35:09.337 rotation 5 done (each probe: -2 +2)
+03:35:20.639 rotation 6 done (each probe: -2 +2)
+03:35:32.099 rotation 7 done (each probe: -2 +2)
+03:35:32.187 CPU total=394.8% ours=83% sibling=224.2% rss=7254MB
+03:35:43.592 rotation 8 done (each probe: -2 +2)
+03:35:54.981 rotation 9 done (each probe: -2 +2)
+03:36:06.317 rotation 10 done (each probe: -2 +2)
+03:36:17.646 rotation 11 done (each probe: -2 +2)
+03:36:29.000 rotation 12 done (each probe: -2 +2)
+03:36:40.440 rotation 13 done (each probe: -2 +2)
+03:36:40.610 CPU total=794.4% ours=85.2% sibling=587.4% rss=7042MB
+03:36:52.140 rotation 14 done (each probe: -2 +2)
+03:37:03.640 rotation 15 done (each probe: -2 +2)
+03:37:15.124 rotation 16 done (each probe: -2 +2)
+03:37:26.623 rotation 17 done (each probe: -2 +2)
+03:37:38.040 rotation 18 done (each probe: -2 +2)
+03:37:49.501 rotation 19 done (each probe: -2 +2)
+03:37:49.695 CPU total=911.6% ours=98.8% sibling=598% rss=7139MB
+03:38:01.027 rotation 20 done (each probe: -2 +2)
+03:38:12.170 rotation 21 done (each probe: -2 +2)
+03:38:23.558 rotation 22 done (each probe: -2 +2)
+03:38:34.783 rotation 23 done (each probe: -2 +2)
+03:38:45.960 rotation 24 done (each probe: -2 +2)
+03:38:57.288 rotation 25 done (each probe: -2 +2)
+03:38:57.345 CPU total=147.4% ours=97% sibling=0% rss=7251MB
+03:39:08.555 rotation 26 done (each probe: -2 +2)
+03:39:19.785 rotation 27 done (each probe: -2 +2)
+03:39:19.785 27 rotations complete
+03:39:24.169 run done (MODE=rotate)

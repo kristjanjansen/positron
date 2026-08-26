@@ -1,0 +1,5 @@
+03:13:01.018 [log] session 6e41df413bb2…
+03:13:02.159 [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+03:13:02.160 [log] FATAL Error: POST /sessions/6e41df413bb29a3e836629f755d9690b2efcc672365e6c5552e341178eebb939/tracks/new -> HTTP 500 {"errorCode":"internal_error","errorDescription":"Backend error"}
+    at cf (http://127.0.0.1:8897/room.html?id=E&n=30&hold=1&cb=1787713975941&audio=1&mode=pub&vw=320&vh=180&vfps=15&cls=light:310:11)
+    at async publish (http://127.0.0.1:8897/room.html?id=E&n=30&hold=1&cb=1787713975941&audio=1&mode=pub&vw=320&vh=180&vfps=15&cls=light:437:16)

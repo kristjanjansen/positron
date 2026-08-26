@@ -1,0 +1,117 @@
+03:00:07.134 m2m CHURN run: MODE=soak N=8 (pubs=ABCDEF probes=12)
+03:00:07.901 1 launched (full)
+03:00:08.594 2 launched (full)
+03:00:09.289 A launched (pub)
+03:00:10.019 B launched (pub)
+03:00:10.750 C launched (pub)
+03:00:11.468 D launched (pub)
+03:00:12.138 E launched (pub)
+03:00:12.778 F launched (pub)
+03:00:12.785 RELEASED all 8
+03:00:14.997 mesh: 1:running tiles=1/1 lat[24..24] | 2:connecting tiles=0/0 || pubs {"running":6}
+03:00:17.003 mesh: 1:running tiles=5/6 lat[98..147] | 2:running tiles=4/4 lat[32..142] || pubs {"running":6}
+03:00:19.008 mesh: 1:running tiles=7/7 lat[64..148] | 2:running tiles=7/7 lat[66..132] || pubs {"running":6}
+03:00:19.008 FULL MESH in 6205 ms
+03:00:24.397 [5s] 1:running tiles=7/7 lat[66..153] | 2:running tiles=7/7 lat[66..135] || pubs {"running":6}
+03:00:24.462 CPU total=301.4% ours=83.1% sibling=0% rss=6269MB
+03:00:24.652 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:00:24.793 session-poll A: HTTP 200 tracks=["active"]
+03:00:54.830 [35s] 1:running tiles=7/7 lat[94..156] | 2:running tiles=7/7 lat[99..155] || pubs {"running":6}
+03:01:24.872 [65s] 1:running tiles=7/7 lat[92..163] | 2:running tiles=7/7 lat[91..163] || pubs {"running":6}
+03:01:24.932 CPU total=312% ours=79.4% sibling=0% rss=6423MB
+03:01:54.990 [96s] 1:running tiles=7/7 lat[77..144] | 2:running tiles=7/7 lat[68..157] || pubs {"running":6}
+03:02:25.030 [126s] 1:running tiles=7/7 lat[63..159] | 2:running tiles=7/7 lat[63..159] || pubs {"running":6}
+03:02:25.083 CPU total=144.4% ours=107.2% sibling=0% rss=6488MB
+03:02:55.123 [156s] 1:running tiles=7/7 lat[87..153] | 2:running tiles=7/7 lat[90..152] || pubs {"running":6}
+03:03:25.170 [186s] 1:running tiles=7/7 lat[58..167] | 2:running tiles=7/7 lat[91..167] || pubs {"running":6}
+03:03:25.228 CPU total=483.6% ours=68.1% sibling=0% rss=6561MB
+03:03:55.271 [216s] 1:running tiles=7/7 lat[73..141] | 2:running tiles=7/7 lat[73..138] || pubs {"running":6}
+03:04:25.315 [246s] 1:running tiles=7/7 lat[125..184] | 2:running tiles=7/7 lat[135..192] || pubs {"running":6}
+03:04:25.374 CPU total=152.7% ours=92.5% sibling=0% rss=6611MB
+03:04:55.427 [276s] 1:running tiles=7/7 lat[109..157] | 2:running tiles=7/7 lat[82..167] || pubs {"running":6}
+03:05:25.466 [306s] 1:running tiles=7/7 lat[73..158] | 2:running tiles=7/7 lat[73..148] || pubs {"running":6}
+03:05:25.529 CPU total=310.7% ours=85.6% sibling=0% rss=6655MB
+03:05:25.675 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:05:25.816 session-poll A: HTTP 200 tracks=["active"]
+03:05:55.850 [336s] 1:running tiles=7/7 lat[70..164] | 2:running tiles=7/7 lat[65..139] || pubs {"running":6}
+03:06:25.891 [367s] 1:running tiles=7/7 lat[80..161] | 2:running tiles=7/7 lat[91..158] || pubs {"running":6}
+03:06:25.950 CPU total=170% ours=98.9% sibling=0% rss=6684MB
+03:06:55.995 [397s] 1:running tiles=7/7 lat[90..158] | 2:running tiles=7/7 lat[90..163] || pubs {"running":6}
+03:07:26.025 [427s] 1:running tiles=7/7 lat[67..158] | 2:running tiles=7/7 lat[66..150] || pubs {"running":6}
+03:07:26.075 CPU total=274.9% ours=77.9% sibling=0% rss=6710MB
+03:07:56.110 [457s] 1:running tiles=7/7 lat[112..146] | 2:running tiles=7/7 lat[103..142] || pubs {"running":6}
+03:08:26.150 [487s] 1:running tiles=7/7 lat[96..158] | 2:running tiles=7/7 lat[100..194] || pubs {"running":6}
+03:08:26.200 CPU total=226.8% ours=64% sibling=0% rss=6735MB
+03:08:56.248 [517s] 1:running tiles=7/7 lat[87..125] | 2:running tiles=7/7 lat[83..167] || pubs {"running":6}
+03:09:26.287 [547s] 1:running tiles=7/7 lat[76..152] | 2:running tiles=7/7 lat[83..159] || pubs {"running":6}
+03:09:26.341 CPU total=171.8% ours=105.8% sibling=0% rss=6761MB
+03:09:56.379 [577s] 1:running tiles=7/7 lat[77..162] | 2:running tiles=7/7 lat[68..154] || pubs {"running":6}
+03:10:26.417 [607s] 1:running tiles=7/7 lat[70..155] | 2:running tiles=7/7 lat[75..157] || pubs {"running":6}
+03:10:26.486 CPU total=492.9% ours=88.5% sibling=0% rss=6800MB
+03:10:26.703 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:10:26.855 session-poll A: HTTP 200 tracks=["active"]
+03:10:56.904 [638s] 1:running tiles=7/7 lat[82..200] | 2:running tiles=7/7 lat[71..167] || pubs {"running":6}
+03:11:26.940 [668s] 1:running tiles=7/7 lat[70..182] | 2:running tiles=7/7 lat[83..191] || pubs {"running":6}
+03:11:27.008 CPU total=467.3% ours=86.5% sibling=0% rss=6819MB
+03:11:57.049 [698s] 1:running tiles=7/7 lat[77..159] | 2:running tiles=7/7 lat[91..120] || pubs {"running":6}
+03:12:27.088 [728s] 1:running tiles=7/7 lat[82..163] | 2:running tiles=7/7 lat[71..149] || pubs {"running":6}
+03:12:27.161 CPU total=456.2% ours=85% sibling=0% rss=6845MB
+03:12:57.209 [758s] 1:running tiles=7/7 lat[66..150] | 2:running tiles=7/7 lat[73..158] || pubs {"running":6}
+03:13:27.254 [788s] 1:running tiles=7/7 lat[58..147] | 2:running tiles=7/7 lat[67..159] || pubs {"running":6}
+03:13:27.318 CPU total=152% ours=106.9% sibling=0% rss=6867MB
+03:13:57.358 [818s] 1:running tiles=7/7 lat[66..166] | 2:running tiles=7/7 lat[74..142] || pubs {"running":6}
+03:14:27.398 [848s] 1:running tiles=7/7 lat[84..158] | 2:running tiles=7/7 lat[70..162] || pubs {"running":6}
+03:14:27.475 CPU total=534.5% ours=86.9% sibling=0% rss=6884MB
+03:14:57.529 [878s] 1:running tiles=7/7 lat[88..149] | 2:running tiles=7/7 lat[105..159] || pubs {"running":6}
+03:15:27.568 [908s] 1:running tiles=7/7 lat[83..182] | 2:running tiles=7/7 lat[65..190] || pubs {"running":6}
+03:15:27.645 CPU total=533.6% ours=87.2% sibling=0% rss=6913MB
+03:15:27.836 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:15:27.978 session-poll A: HTTP 200 tracks=["active"]
+03:15:58.023 [939s] 1:running tiles=7/7 lat[66..159] | 2:running tiles=7/7 lat[74..123] || pubs {"running":6}
+03:16:28.065 [969s] 1:running tiles=7/7 lat[83..152] | 2:running tiles=7/7 lat[129..170] || pubs {"running":6}
+03:16:28.138 CPU total=439.2% ours=83.1% sibling=0% rss=6932MB
+03:16:58.186 [999s] 1:running tiles=7/7 lat[66..167] | 2:running tiles=7/7 lat[75..157] || pubs {"running":6}
+03:17:28.233 [1029s] 1:running tiles=7/7 lat[77..148] | 2:running tiles=7/7 lat[86..157] || pubs {"running":6}
+03:17:28.319 CPU total=577.1% ours=88.4% sibling=0% rss=6949MB
+03:17:58.365 [1059s] 1:running tiles=7/7 lat[80..166] | 2:running tiles=7/7 lat[90..142] || pubs {"running":6}
+03:18:28.416 [1089s] 1:running tiles=7/7 lat[86..162] | 2:running tiles=7/7 lat[93..165] || pubs {"running":6}
+03:18:28.470 CPU total=158.2% ours=107% sibling=0% rss=6964MB
+03:18:58.513 [1119s] 1:running tiles=7/7 lat[67..150] | 2:running tiles=7/7 lat[75..159] || pubs {"running":6}
+03:19:28.557 [1149s] 1:running tiles=7/7 lat[61..147] | 2:running tiles=7/7 lat[66..155] || pubs {"running":6}
+03:19:28.640 CPU total=490.5% ours=86.6% sibling=0% rss=6987MB
+03:19:58.693 [1179s] 1:running tiles=7/7 lat[82..166] | 2:running tiles=7/7 lat[71..155] || pubs {"running":6}
+03:20:28.735 [1209s] 1:running tiles=7/7 lat[89..165] | 2:running tiles=7/7 lat[95..159] || pubs {"running":6}
+03:20:28.796 CPU total=159.2% ours=105.5% sibling=0% rss=6301MB
+03:20:29.050 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:20:29.189 session-poll A: HTTP 200 tracks=["active"]
+03:20:59.240 [1240s] 1:running tiles=7/7 lat[87..158] | 2:running tiles=7/7 lat[90..158] || pubs {"running":6}
+03:21:29.300 [1270s] 1:running tiles=7/7 lat[75..147] | 2:running tiles=7/7 lat[72..142] || pubs {"running":6}
+03:21:29.391 CPU total=608.3% ours=95.8% sibling=0% rss=6322MB
+03:21:59.438 [1300s] 1:running tiles=7/7 lat[75..158] | 2:running tiles=7/7 lat[75..153] || pubs {"running":6}
+03:22:29.481 [1330s] 1:running tiles=7/7 lat[89..154] | 2:running tiles=7/7 lat[87..154] || pubs {"running":6}
+03:22:29.581 CPU total=618.1% ours=91.6% sibling=0% rss=6061MB
+03:22:59.621 [1360s] 1:running tiles=7/7 lat[54..158] | 2:running tiles=7/7 lat[89..142] || pubs {"running":6}
+03:23:29.657 [1390s] 1:running tiles=7/7 lat[66..139] | 2:running tiles=7/7 lat[66..156] || pubs {"running":6}
+03:23:29.712 CPU total=141.8% ours=106.1% sibling=0% rss=6040MB
+03:23:59.754 [1420s] 1:running tiles=7/7 lat[89..159] | 2:running tiles=7/7 lat[89..159] || pubs {"running":6}
+03:24:29.804 [1450s] 1:running tiles=7/7 lat[94..167] | 2:running tiles=7/7 lat[98..152] || pubs {"running":6}
+03:24:29.915 CPU total=717% ours=91.9% sibling=0% rss=5973MB
+03:24:59.971 [1481s] 1:running tiles=7/7 lat[75..154] | 2:running tiles=7/7 lat[83..165] || pubs {"running":6}
+03:25:30.034 [1511s] 1:running tiles=7/7 lat[75..156] | 2:running tiles=7/7 lat[58..158] || pubs {"running":6}
+03:25:30.089 CPU total=166.1% ours=108.4% sibling=0% rss=5950MB
+03:25:30.278 session-poll 1: HTTP 200 tracks=["active","active","active","active","active","active","active","active"]
+03:25:30.427 session-poll A: HTTP 200 tracks=["active"]
+03:26:00.468 [1541s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..156] || pubs {"running":6}
+03:26:30.519 [1571s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..146] || pubs {"running":6}
+03:26:30.638 CPU total=645.1% ours=70% sibling=0% rss=5974MB
+03:27:00.696 [1601s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..157] || pubs {"running":6}
+03:27:30.742 [1631s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..155] || pubs {"running":6}
+03:27:30.851 CPU total=644.1% ours=77% sibling=0% rss=5969MB
+03:28:00.910 [1662s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..157] || pubs {"running":6}
+03:28:30.956 [1692s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..147] || pubs {"running":6}
+03:28:31.001 CPU total=180.5% ours=83% sibling=0% rss=6007MB
+03:29:01.035 [1722s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..158] || pubs {"running":6}
+03:29:31.096 [1752s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..155] || pubs {"running":6}
+03:29:31.229 CPU total=723% ours=72.4% sibling=0% rss=5969MB
+03:30:01.318 [1782s] 1:running tiles=7/7 lat[81..159] | 2:running tiles=7/7 lat[99..162] || pubs {"running":6}
+03:30:23.942 run done (MODE=soak)

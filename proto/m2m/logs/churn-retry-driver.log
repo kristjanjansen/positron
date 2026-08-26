@@ -1,0 +1,31 @@
+02:56:56.369 m2m CHURN run: MODE=retry N=0 (pubs= probes=)
+02:56:56.436 retry check 1: failpub=2 -> expect 2 retries then success on attempt 3
+02:56:59.282 Z phase=connecting attempts=1 retries=0
+02:57:01.286 Z phase=connecting attempts=1 retries=0
+02:57:03.290 Z phase=connecting attempts=1 retries=0
+02:57:05.293 Z phase=connecting attempts=1 retries=0
+02:57:07.296 Z phase=connecting attempts=2 retries=1
+02:57:09.300 Z phase=connecting attempts=2 retries=1
+02:57:11.302 Z phase=connecting attempts=2 retries=1
+02:57:13.304 Z phase=connecting attempts=2 retries=1
+02:57:15.308 Z phase=connecting attempts=2 retries=1
+02:57:17.312 Z phase=connecting attempts=2 retries=2
+02:57:19.315 Z phase=connecting attempts=3 retries=2
+02:57:21.318 Z phase=running attempts=3 retries=2
+02:57:21.404 retry check 2: failpub=3 -> expect exhausted after 3 attempts
+02:57:24.228 Y phase=connecting attempts=1 retries=0
+02:57:26.230 Y phase=connecting attempts=1 retries=0
+02:57:28.233 Y phase=connecting attempts=1 retries=0
+02:57:30.234 Y phase=connecting attempts=1 retries=0
+02:57:32.238 Y phase=connecting attempts=2 retries=1
+02:57:34.240 Y phase=connecting attempts=2 retries=1
+02:57:36.242 Y phase=connecting attempts=2 retries=1
+02:57:38.251 Y phase=connecting attempts=2 retries=1
+02:57:40.255 Y phase=connecting attempts=2 retries=1
+02:57:42.259 Y phase=connecting attempts=2 retries=2
+02:57:44.265 Y phase=connecting attempts=3 retries=2
+02:57:46.271 Y phase=connecting attempts=3 retries=2
+02:57:48.277 Y phase=connecting attempts=3 retries=2
+02:57:50.283 Y phase=connecting attempts=3 retries=2
+02:57:52.292 Y phase=failed attempts=3 retries=3
+02:57:52.361 retry mode done

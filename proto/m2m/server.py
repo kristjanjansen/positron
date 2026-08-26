@@ -34,7 +34,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 RESULTS_DEFAULT = os.path.join(ROOT, "results", "m2m-sfu.jsonl")
 RESULTS = os.environ.get("M2M_RESULTS", RESULTS_DEFAULT)
 ARTIFACTS = os.path.join(HERE, "artifacts")
-PORT = 8897
+PORT = int(os.environ.get("M2M_PORT", "8897"))  # churn agent runs a 2nd instance on 8896
 SAVE_NAME_RE = re.compile(r"^[a-z0-9._-]{1,64}$")
 CF_BASE = "https://rtc.live.cloudflare.com/v1/apps"
 CF_SUBPATH_RE = re.compile(r"^[A-Za-z0-9/_-]{1,200}$")
@@ -119,6 +119,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     # ---- routes ------------------------------------------------------------
     def do_GET(self):
+        if self.path.startswith("/cf/"):        # e.g. GET sessions/{sid} — track GC state
+            self._proxy_cf("GET", None)
+            return
         if self.path == "/roster":
             with REG_LOCK:
                 parts = sorted(REGISTRY.values(), key=lambda p: p["t"])

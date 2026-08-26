@@ -36,6 +36,30 @@ const IS_PUB = MODE === "pub";
 // hold=1 -> wait for driver to set window.__go before touching the SFU, so all
 // N participants hit the API in a synchronized join storm.
 const HOLD = q.get("hold") === "1";
+// ---- HEAVY MEDIA params (all default-off: video-only behavior unchanged) ----
+// audio=1  -> publish a WebAudio oscillator track (distinct low-volume tone per
+//             participant id, trackName "audio-<id>"); full-mode pages ALSO pull
+//             every remote's audio track (deterministic name — no server change)
+//             and verify per-sender arrival via an AnalyserNode FFT peak.
+// vw/vh/vfps -> pub-mode canvas size + draw rate (default 320x180@15). The
+//             decoder normalizes to the 640x360 grid, so any 16:9 size works.
+// kbps     -> sender maxBitrate (video), e.g. 1200 for show-quality tiles.
+// hint     -> video track contentHint ('motion' for show config).
+// cls      -> free-form class label carried into stats rows (light/show/feat/probe).
+const AUDIO = q.get("audio") === "1";
+const PUB_W = parseInt(q.get("vw") || "320", 10);
+const PUB_H = parseInt(q.get("vh") || "180", 10);
+const PUB_FPS = parseInt(q.get("vfps") || "15", 10);
+const KBPS = parseInt(q.get("kbps") || "0", 10);
+const HINT = q.get("hint") || "";
+const CLS = q.get("cls") || MODE;
+// distinct FFT-separable tone per id: probes '1','2' then 'A'..'Z' then 'a'..'h'
+// -> 300..1700 Hz in 40 Hz steps (analyser bin ~5.9 Hz at fft 8192/48k).
+function toneFor(pid) {
+  const c = pid.charCodeAt(0);
+  const idx = c >= 97 ? c - 97 + 28 : (c >= 65 ? c - 65 + 2 : c - 49);
+  return 300 + idx * 40;
+}
 const COLLECT = "/collect";
 document.getElementById("hdr").textContent = "m2m room — participant " + MY_ID + " (expecting " + EXPECTED_N + ", mode " + MODE + ")";
 document.title = "m2m " + MY_ID;
@@ -57,8 +81,8 @@ const ROW_X = 32;          // row spans 32..608 of 640
 const ROW_Y = 40;
 const ROW_H = 56;
 
-window.__state = { phase: "init", error: null, id: MY_ID, mode: MODE, frames: 0,
-                   rosterCount: 0, pulled: 0, tiles: {} };
+window.__state = { phase: "init", error: null, id: MY_ID, mode: MODE, cls: CLS,
+                   frames: 0, rosterCount: 0, pulled: 0, tiles: {}, audio: {} };
 
 const logEl = document.getElementById("log");
 const hud = document.getElementById("hud");
@@ -71,11 +95,11 @@ function event(name, extra) {
 
 // ---- canvas signal (publish.html generator, adapted) -----------------------
 const cv = document.getElementById("cv");
-if (IS_PUB) { cv.width = 320; cv.height = 180; }   // tiny canvas, same relative geometry via ctx scale
+if (IS_PUB) { cv.width = PUB_W; cv.height = PUB_H; }  // any 16:9 size, same relative geometry via ctx scale
 const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
 let frameCounter = 0;
 const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
-const PUB_FPS = 15;
+const PUB_SCALE = cv.width / 640;   // drawPub transform: 320->0.5, 640->1, 1280->2
 
 // Cheap publisher draw: solid bg + black bed + binary row + id, no gradients,
 // no ISO clock, no moving square (the row's low bits change every frame — the
@@ -83,7 +107,7 @@ const PUB_FPS = 15;
 // decoder's normalize-to-640x360 grid still lines up exactly.
 function drawPub() {
   const ms = Math.round(performance.timeOrigin + performance.now());
-  ctx.setTransform(0.5, 0, 0, 0.5, 0, 0);
+  ctx.setTransform(PUB_SCALE, 0, 0, PUB_SCALE, 0, 0);
   ctx.fillStyle = "#404040";
   ctx.fillRect(0, 0, 640, 360);
   ctx.fillStyle = "#000";
@@ -260,8 +284,11 @@ function startTile(fromPid, track) {
 setInterval(() => {
   const parts = Object.entries(window.__state.tiles).map(([pid, s]) =>
     pid + ":" + s.valid + "/" + s.samples + (s.lastLatencyMs != null ? "@" + s.lastLatencyMs + "ms" : ""));
+  const aud = Object.entries(window.__state.audio).map(([pid, a]) =>
+    pid + ":" + a.matches + "/" + a.checks + (a.hz != null ? "@" + a.hz + "Hz" : ""));
   hud.textContent = "phase=" + window.__state.phase + " frames=" + frameCounter +
-    " roster=" + window.__state.rosterCount + " tiles[" + parts.join(" ") + "]";
+    " roster=" + window.__state.rosterCount + " tiles[" + parts.join(" ") + "]" +
+    (aud.length ? " audio[" + aud.join(" ") + "]" : "");
 }, 1000);
 
 // ---- SFU client ------------------------------------------------------------
@@ -297,10 +324,76 @@ function waitIceGathering(pc) {
 
 let pc = null, SID = null;
 const TRACK_NAME = "video-" + MY_ID;
+const ATRACK_NAME = "audio-" + MY_ID;   // deterministic: pullers derive it from pid
 const midToPid = new Map();
 
+// ---- audio: publish-side synthesis (NO getUserMedia — mic never touched) ----
+// Oscillator at toneFor(MY_ID) Hz -> low gain -> MediaStreamAudioDestination.
+// The tone is per-id unique so a probe can verify per-SENDER arrival by FFT.
+let pubAudioCtx = null;
+function makeAudioTrack() {
+  pubAudioCtx = new AudioContext();
+  const osc = pubAudioCtx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = toneFor(MY_ID);
+  const g = pubAudioCtx.createGain();
+  g.gain.value = 0.05;
+  const dst = pubAudioCtx.createMediaStreamDestination();
+  osc.connect(g); g.connect(dst);
+  osc.start();
+  // defensive: keep nudging until 'running' (autoplay flag should make this a no-op)
+  const kick = setInterval(() => {
+    window.__state.audioCtxState = pubAudioCtx.state;
+    if (pubAudioCtx.state === "running") clearInterval(kick);
+    else pubAudioCtx.resume().catch(() => {});
+  }, 500);
+  pubAudioCtx.resume().catch(() => {});
+  window.__state.audioCtxState = pubAudioCtx.state;
+  return dst.stream.getAudioTracks()[0];
+}
+
+// ---- audio: receive-side verification (probe) -------------------------------
+// Chrome quirk: a remote WebRTC audio track only feeds WebAudio if it is also
+// attached to a media element — attach a muted <audio>, then AnalyserNode.
+let probeAudioCtx = null;
+const audioNodes = {};                   // pid -> refs (prevent GC)
+function startAudioProbe(pid, track) {
+  if (!probeAudioCtx) probeAudioCtx = new AudioContext();
+  probeAudioCtx.resume().catch(() => {});
+  const ms = new MediaStream([track]);
+  const el = new Audio();
+  el.srcObject = ms; el.muted = true;
+  const src = probeAudioCtx.createMediaStreamSource(ms);
+  const an = probeAudioCtx.createAnalyser();
+  an.fftSize = 8192; an.smoothingTimeConstant = 0;   // ~5.9 Hz/bin at 48 kHz
+  src.connect(an);
+  const buf = new Float32Array(an.frequencyBinCount);
+  const expected = toneFor(pid);
+  const ast = { expected, hz: null, db: null, checks: 0, matches: 0 };
+  window.__state.audio[pid] = ast;
+  audioNodes[pid] = { el, src, an, ms };
+  const iv = setInterval(() => {
+    an.getFloatFrequencyData(buf);
+    const hzPerBin = probeAudioCtx.sampleRate / an.fftSize;
+    let bi = 0, bv = -Infinity;
+    for (let i = Math.floor(100 / hzPerBin); i < buf.length; i++)
+      if (buf[i] > bv) { bv = buf[i]; bi = i; }
+    const hz = Math.round(bi * hzPerBin);
+    ast.checks++; ast.hz = hz; ast.db = Math.round(bv);
+    const match = isFinite(bv) && bv > -110 && Math.abs(hz - expected) <= 25;
+    if (match) ast.matches++;
+    batch.push({ kind: "tone", from: pid, to: MY_ID,
+                 t: performance.timeOrigin + performance.now(),
+                 hz, expected, db: isFinite(bv) ? Math.round(bv) : null, match });
+  }, 2000);
+  audioNodes[pid].iv = iv;
+}
+
 async function publish() {
-  if (HOLD) {                       // synchronized join storm: wait for driver release
+  // connect-retry reloads skip the hold (the driver's __go release already
+  // happened in this tab's previous life; sessionStorage survives reload)
+  const RETRIES = +(sessionStorage.getItem("m2m_connect_retry") || 0);
+  if (HOLD && !RETRIES) {           // synchronized join storm: wait for driver release
     window.__state.phase = "held";
     await new Promise(res => {
       const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
@@ -320,40 +413,85 @@ async function publish() {
     if (pc.connectionState === "failed") { window.__state.phase = "failed"; window.__state.error = "pc failed"; }
   };
   pc.ontrack = (e) => {
-    if (e.track.kind !== "video") return;
     const pid = midToPid.get(e.transceiver.mid);
-    log("ontrack mid=" + e.transceiver.mid + " -> " + (pid || "UNKNOWN"));
-    if (pid) startTile(pid, e.track);
-    else event("ontrack-unmapped", { mid: e.transceiver.mid });
+    log("ontrack " + e.track.kind + " mid=" + e.transceiver.mid + " -> " + (pid || "UNKNOWN"));
+    if (!pid) { event("ontrack-unmapped", { mid: e.transceiver.mid, trackKind: e.track.kind }); return; }
+    if (e.track.kind === "video") startTile(pid, e.track);
+    else startAudioProbe(pid, e.track);
   };
 
-  const sess = await cf("POST", "sessions/new");
+  // publish-leg retry (plan-m2m §5 risk 2: production requirement found in
+  // phase 1b): a 30-way storm surfaced ONE transient 500 internal_error on a
+  // publish tracks/new — retry up to 2x with backoff, log every retry as an
+  // event so flake frequency stays measurable. Healthy runs take path 1.
+  async function cfRetry(method, subpath, body, what) {
+    for (let a = 1; ; a++) {
+      try { return await cf(method, subpath, body); }
+      catch (e) {
+        if (a > 2) throw e;
+        event("publish-retry", { what, attempt: a, error: String(e.message).slice(0, 200) });
+        await new Promise(r => setTimeout(r, 1000 * a));
+      }
+    }
+  }
+  const sess = await cfRetry("POST", "sessions/new", undefined, "sessions/new");
   SID = sess.sessionId;
   window.__state.sessionId = SID;
   log("session " + SID.slice(0, 12) + "…");
 
-  const tx = pc.addTransceiver(stream.getVideoTracks()[0], { direction: "sendonly" });
+  const vtrack = stream.getVideoTracks()[0];
+  if (HINT) vtrack.contentHint = HINT;             // 'motion' for show-quality tiles
+  const tx = pc.addTransceiver(vtrack, { direction: "sendonly" });
+  let atx = null;
+  if (AUDIO) atx = pc.addTransceiver(makeAudioTrack(), { direction: "sendonly" });
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   await waitIceGathering(pc);
   const lname = MY_ID.toLowerCase();
   await fetch("/save/pub-offer-" + lname + ".sdp", { method: "POST", body: pc.localDescription.sdp });
-  const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+  const localTracks = [{ location: "local", mid: tx.mid, trackName: TRACK_NAME }];
+  if (atx) localTracks.push({ location: "local", mid: atx.mid, trackName: ATRACK_NAME });
+  const resp = await cfRetry("POST", "sessions/" + SID + "/tracks/new", {
     sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
-    tracks: [{ location: "local", mid: tx.mid, trackName: TRACK_NAME }]
-  });
+    tracks: localTracks
+  }, "publish-tracks/new");
   await fetch("/save/pub-answer-" + lname + ".sdp", { method: "POST", body: resp.sessionDescription.sdp });
   await pc.setRemoteDescription(resp.sessionDescription);
-  event("published", { trackName: TRACK_NAME, renego: !!resp.requiresImmediateRenegotiation });
+  if (KBPS > 0) {                                   // after answer applied: encodings exist
+    try {
+      const p = tx.sender.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      p.encodings[0].maxBitrate = KBPS * 1000;
+      await tx.sender.setParameters(p);
+      window.__state.maxBitrate = KBPS * 1000;
+    } catch (e) { event("setparams-failed", { error: String(e).slice(0, 200) }); }
+  }
+  event("published", { trackName: TRACK_NAME, audio: !!atx, renego: !!resp.requiresImmediateRenegotiation });
 
-  // wait for the PeerConnection to actually connect before pulling
-  await new Promise((res, rej) => {
-    if (pc.connectionState === "connected") return res();
-    const t = setTimeout(() => rej(new Error("pc connect timeout")), 15000);
-    pc.addEventListener("connectionstatechange", function h() {
-      if (pc.connectionState === "connected") { clearTimeout(t); pc.removeEventListener("connectionstatechange", h); res(); }
+  // wait for the PeerConnection to actually connect before pulling.
+  // Storm flake (phase 1b + N=30 here): ICE/DTLS occasionally never comes up
+  // on a leg during an N-way join storm. Production mitigation per plan-m2m
+  // §5.2 — recreate the session. Here: log + reload the page once or twice
+  // (fresh PC + fresh sessions/new; old session GCs server-side in 30 s).
+  try {
+    await new Promise((res, rej) => {
+      if (pc.connectionState === "connected") return res();
+      const t = setTimeout(() => rej(new Error("pc connect timeout")), 15000);
+      pc.addEventListener("connectionstatechange", function h() {
+        if (pc.connectionState === "connected") { clearTimeout(t); pc.removeEventListener("connectionstatechange", h); res(); }
+      });
     });
-  });
+  } catch (e) {
+    if (RETRIES < 2) {
+      sessionStorage.setItem("m2m_connect_retry", String(RETRIES + 1));
+      event("connect-retry", { attempt: RETRIES + 1, state: pc.connectionState });
+      try { pc.close(); } catch (_) {}
+      await new Promise(r => setTimeout(r, 500));   // let the event beacon flush
+      location.reload();
+      await new Promise(() => {});                  // halt this life of the page
+    }
+    throw e;
+  }
   window.__state.phase = "publishing";
   log("pc connected, joining room");
   await fetch("/join", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -396,13 +534,19 @@ async function pullTrack(p) {
   const st = pullState.get(pid);
   st.state = "pulling"; st.attempts++;
   try {
-    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
-      tracks: [{ location: "remote", sessionId: p.sessionId, trackName: p.trackName }]
-    });
-    const tr = (resp.tracks || [])[0] || {};
-    if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
-    if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
-    midToPid.set(tr.mid, pid);       // BEFORE setRemoteDescription — ontrack fires during it
+    // audio=1: pull BOTH tracks in ONE call (one renegotiation covers A+V —
+    // audio trackName is deterministic "audio-<pid>", no roster change needed)
+    const want = [{ location: "remote", sessionId: p.sessionId, trackName: p.trackName }];
+    if (AUDIO) want.push({ location: "remote", sessionId: p.sessionId, trackName: "audio-" + pid });
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", { tracks: want });
+    const trs = resp.tracks || [];
+    if (trs.length !== want.length) throw new Error("pull " + pid + ": got " + trs.length + "/" + want.length + " tracks");
+    for (const tr of trs) {
+      if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+      if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+      midToPid.set(tr.mid, pid);     // BEFORE setRemoteDescription — ontrack fires during it
+    }
+    const tr = trs[0];
     if (resp.requiresImmediateRenegotiation) {
       await pc.setRemoteDescription(resp.sessionDescription);   // SFU's offer
       const ans = await pc.createAnswer();
@@ -429,10 +573,32 @@ function startStats() {
   setInterval(async () => {
     try {
       const st = await pc.getStats();
-      const row = { kind: "stats", who: MY_ID, role: MODE,
+      const row = { kind: "stats", who: MY_ID, role: MODE, cls: CLS,
                     t: performance.timeOrigin + performance.now(),
-                    vis: document.visibilityState, inbound: [] };
+                    vis: document.visibilityState, inbound: [], audioInbound: [] };
       st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "audio") {
+          row.aPacketsSent = s.packetsSent;
+          row.aBytesSent = s.bytesSent;
+          row.aTargetBitrate = s.targetBitrate;
+        }
+        if (s.type === "inbound-rtp" && s.kind === "audio") {
+          row.audioInbound.push({
+            from: midToPid.get(s.mid) || s.mid,
+            concealedSamples: s.concealedSamples,
+            silentConcealedSamples: s.silentConcealedSamples,
+            concealmentEvents: s.concealmentEvents,
+            totalSamplesReceived: s.totalSamplesReceived,
+            jitterBufferDelay: s.jitterBufferDelay,
+            jitterBufferEmittedCount: s.jitterBufferEmittedCount,
+            insertedSamplesForDeceleration: s.insertedSamplesForDeceleration,
+            removedSamplesForAcceleration: s.removedSamplesForAcceleration,
+            packetsReceived: s.packetsReceived,
+            packetsLost: s.packetsLost,
+            jitter: s.jitter,
+            audioLevel: s.audioLevel
+          });
+        }
         if (s.type === "outbound-rtp" && s.kind === "video") {
           row.framesEncoded = s.framesEncoded;
           row.framesSent = s.framesSent;

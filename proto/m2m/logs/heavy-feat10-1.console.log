@@ -1,0 +1,30 @@
+03:04:34.586 [error] Failed to load resource: the server responded with a status of 404 (File not found)
+03:04:40.535 [log] session b281516d284e…
+03:04:42.212 [log] pc connected, joining room
+03:04:42.500 [log] ontrack video mid=2 -> F
+03:04:42.500 [log] ontrack audio mid=3 -> F
+03:04:42.669 [log] pulled F (mid 2)
+03:04:42.912 [log] ontrack video mid=4 -> B
+03:04:42.912 [log] ontrack audio mid=5 -> B
+03:04:43.048 [log] pulled B (mid 4)
+03:04:44.481 [log] ontrack video mid=6 -> 2
+03:04:44.481 [log] ontrack audio mid=7 -> 2
+03:04:44.634 [log] pulled 2 (mid 6)
+03:04:44.825 [log] ontrack video mid=8 -> E
+03:04:44.825 [log] ontrack audio mid=9 -> E
+03:04:44.984 [log] pulled E (mid 8)
+03:04:45.173 [log] ontrack video mid=10 -> G
+03:04:45.173 [log] ontrack audio mid=11 -> G
+03:04:45.318 [log] pulled G (mid 10)
+03:04:45.481 [log] ontrack video mid=12 -> D
+03:04:45.481 [log] ontrack audio mid=13 -> D
+03:04:45.636 [log] pulled D (mid 12)
+03:04:45.854 [log] ontrack video mid=14 -> A
+03:04:45.854 [log] ontrack audio mid=15 -> A
+03:04:46.011 [log] pulled A (mid 14)
+03:04:46.231 [log] ontrack video mid=16 -> C
+03:04:46.232 [log] ontrack audio mid=17 -> C
+03:04:46.388 [log] pulled C (mid 16)
+03:04:46.617 [log] ontrack video mid=18 -> H
+03:04:46.617 [log] ontrack audio mid=19 -> H
+03:04:46.761 [log] pulled H (mid 18)

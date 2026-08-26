@@ -1,0 +1,57 @@
+m2m server on :8896, results -> /Users/s32863/personal/elektron/results/m2m-churn-retry.jsonl, app 8c2a974b…
+05:56:50 "GET /roster HTTP/1.1" 200 -
+05:56:51 CF POST /sessions/new -> 201 (212 ms)
+05:56:51 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:56:56 "GET /roster HTTP/1.1" 200 -
+05:56:56 "POST /reset HTTP/1.1" 200 -
+05:56:57 "GET /room-churn.html?id=Z&n=0&mode=pub&failpub=2&ct=8000&cb=1787713017101 HTTP/1.1" 200 -
+05:56:57 "POST /collect HTTP/1.1" 200 -
+05:56:57 code 404, message File not found
+05:56:57 "GET /favicon.ico HTTP/1.1" 404 -
+05:56:57 CF POST /sessions/new -> 201 (189 ms)
+05:56:57 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:56:57 CF POST /sessions/292a66558a24166f002e07207d0e8cd903015a7a7e4944904e15b3647e3af1c6/tracks/new -> 200 (396 ms)
+05:56:57 "POST /cf/sessions/292a66558a24166f002e07207d0e8cd903015a7a7e4944904e15b3647e3af1c6/tracks/new HTTP/1.1" 200 -
+05:57:05 "POST /collect HTTP/1.1" 200 -
+05:57:06 "POST /collect HTTP/1.1" 200 -
+05:57:07 CF POST /sessions/new -> 201 (257 ms)
+05:57:07 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:57:07 CF POST /sessions/a7176a862b42ab5dcbe71a89e0e38c589a2430115ed8156fdc79490ef2284a2a/tracks/new -> 200 (434 ms)
+05:57:07 "POST /cf/sessions/a7176a862b42ab5dcbe71a89e0e38c589a2430115ed8156fdc79490ef2284a2a/tracks/new HTTP/1.1" 200 -
+05:57:15 "POST /collect HTTP/1.1" 200 -
+05:57:17 "POST /collect HTTP/1.1" 200 -
+05:57:18 CF POST /sessions/new -> 201 (181 ms)
+05:57:18 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:57:18 CF POST /sessions/750b5db9a8469c058c2c84811e04313cfbb85d368aa4b48d513656c5e0a45fb1/tracks/new -> 200 (302 ms)
+05:57:18 "POST /cf/sessions/750b5db9a8469c058c2c84811e04313cfbb85d368aa4b48d513656c5e0a45fb1/tracks/new HTTP/1.1" 200 -
+05:57:18 "POST /collect HTTP/1.1" 200 -
+05:57:18 "POST /collect HTTP/1.1" 200 -
+05:57:18 "POST /collect HTTP/1.1" 200 -
+05:57:19 "POST /join HTTP/1.1" 200 -
+05:57:19 "POST /collect HTTP/1.1" 200 -
+05:57:19 "POST /collect HTTP/1.1" 200 -
+05:57:21 "POST /collect HTTP/1.1" 200 -
+05:57:22 "GET /room-churn.html?id=Y&n=0&mode=pub&failpub=3&ct=8000&cb=1787713042053 HTTP/1.1" 200 -
+05:57:22 "POST /collect HTTP/1.1" 200 -
+05:57:22 code 404, message File not found
+05:57:22 "GET /favicon.ico HTTP/1.1" 404 -
+05:57:22 CF POST /sessions/new -> 201 (185 ms)
+05:57:22 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:57:22 CF POST /sessions/7cd5cc89aeac99e19130bb29bd65788325fc92cd7021a3d4686d57d32cb5b2eb/tracks/new -> 200 (328 ms)
+05:57:22 "POST /cf/sessions/7cd5cc89aeac99e19130bb29bd65788325fc92cd7021a3d4686d57d32cb5b2eb/tracks/new HTTP/1.1" 200 -
+05:57:30 "POST /collect HTTP/1.1" 200 -
+05:57:31 "POST /collect HTTP/1.1" 200 -
+05:57:32 CF POST /sessions/new -> 201 (207 ms)
+05:57:32 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:57:32 CF POST /sessions/9ac22c224fcb865eb7ffab0488489fadcea1962989881a6667594e02170ced16/tracks/new -> 200 (338 ms)
+05:57:32 "POST /cf/sessions/9ac22c224fcb865eb7ffab0488489fadcea1962989881a6667594e02170ced16/tracks/new HTTP/1.1" 200 -
+05:57:40 "POST /collect HTTP/1.1" 200 -
+05:57:42 "POST /collect HTTP/1.1" 200 -
+05:57:42 CF POST /sessions/new -> 201 (284 ms)
+05:57:42 "POST /cf/sessions/new HTTP/1.1" 201 -
+05:57:43 CF POST /sessions/35debf55b12bc8b284c3aa6889cca201ebedfe83bfaad7029fbe7d1b3e40d556/tracks/new -> 200 (318 ms)
+05:57:43 "POST /cf/sessions/35debf55b12bc8b284c3aa6889cca201ebedfe83bfaad7029fbe7d1b3e40d556/tracks/new HTTP/1.1" 200 -
+05:57:51 "POST /collect HTTP/1.1" 200 -
+05:57:51 "POST /collect HTTP/1.1" 200 -
+05:57:51 "POST /collect HTTP/1.1" 200 -
+05:57:52 "POST /collect HTTP/1.1" 200 -

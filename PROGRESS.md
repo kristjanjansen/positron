@@ -1,4 +1,38 @@
-# Progress log — 2026-08-25
+# Progress log — 2026-08-25 → 26
+
+## Session 5 dispatch (2026-08-26) — heavier WebRTC tests (user request)
+
+Two agents on proto/m2m, machine idle/32 GB/AC at dispatch:
+- **Heavy media** (owns room.html, run-heavy.mjs, port 8897, results/m2m-heavy-*):
+  audio+video per participant (grid has never carried audio), show-quality 360p30
+  rung, 720p featured-tile mix, then max-N 24→30→36 via multi-context RAM strategy
+  (co-tenancy validated against separate-instance baseline first). Notes section
+  "HEAVY MEDIA".
+- **Churn + endurance** (owns room-churn.html copy, run-churn.mjs, port 8896,
+  results/m2m-churn-*): implements the publish-leg connect-retry (production
+  deliverable from the N=20 storm flake), 30-min soak w/ leak+drift tracking,
+  rotating-grid pull/unpull churn (plan-m2m risk 4), ungraceful leave + rejoin
+  storms (measure the real dead-track GC), publisher kill + auto-reconnect. Notes
+  section "CHURN".
+Both: poll own run state (no notification waits), canvas/WebAudio only (camera
+still wedged), own-udd kills only, no plan edits.
+
+### Heavy media — ✅ COMPLETE: N=54 with audio, still no SFU ceiling
+- ✅ Audio first try: FFT-verified tones 106/106 pairs at N=54, concealment ≤0.39 %.
+- ✅ Show-quality 360p30 is FASTER than lightweight (p50 66 vs 123 ms — frame-
+  interval quantization); 720p featured tiles degrade nothing.
+- ✅ Co-tenancy clean (+5 ms, RAM −58 %) → N=54 = 106 tracks on one PeerConnection,
+  SFU p50 flat 122–137 ms, ~1500 API calls / one transient 500.
+- ✅ Publish/connect retry IMPLEMENTED in room.html; absorbed all ICE storm flakes
+  (9/46 legs at N=48 — a 30-way storm without retry ≈ 1-in-2 fatal).
+- Production asks recorded: end-to-end video-sanity heartbeat (sender emitted
+  corrupt frames 110 s while its own getStats read healthy); viewer fan-in
+  saturates page rAF (4–7 fps ~100 tracks) before decode fails.
+- plan-m2m §5 risk 2 + §6 phase 1c updated. Data results/m2m-heavy-*.jsonl (23).
+- Churn agent: parked once on a monitor wake that never fires (5th occurrence
+  today); resumed by main session mid-soak.
+
+---
 
 ## Session 4 dispatch — v6 + last mysteries + MANY-TO-MANY track (user: "update plans,
 ## solve mysteries, new plan and prototypes for many-to-many video")

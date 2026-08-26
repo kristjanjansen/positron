@@ -1,0 +1,23 @@
+03:07:10.208 [log] session 6eb30522baf4…
+03:07:11.282 [log] pc connected, joining room
+03:07:11.531 [log] ontrack video mid=2 -> E
+03:07:11.532 [log] ontrack audio mid=3 -> E
+03:07:11.671 [log] pulled E (mid 2)
+03:07:11.935 [log] ontrack video mid=4 -> D
+03:07:11.935 [log] ontrack audio mid=5 -> D
+03:07:12.070 [log] pulled D (mid 4)
+03:07:12.292 [log] ontrack video mid=6 -> A
+03:07:12.292 [log] ontrack audio mid=7 -> A
+03:07:12.411 [log] pulled A (mid 6)
+03:07:12.782 [log] ontrack video mid=8 -> F
+03:07:12.782 [log] ontrack audio mid=9 -> F
+03:07:12.911 [log] pulled F (mid 8)
+03:07:13.561 [log] ontrack video mid=10 -> B
+03:07:13.561 [log] ontrack audio mid=11 -> B
+03:07:13.711 [log] pulled B (mid 10)
+03:07:13.990 [log] ontrack video mid=12 -> C
+03:07:13.992 [log] ontrack audio mid=13 -> C
+03:07:14.172 [log] pulled C (mid 12)
+03:07:14.412 [log] ontrack video mid=14 -> 1
+03:07:14.412 [log] ontrack audio mid=15 -> 1
+03:07:14.558 [log] pulled 1 (mid 14)

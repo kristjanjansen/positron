@@ -1,0 +1,172 @@
+03:15:11.030 [log] session 457619814fc8…
+03:15:12.585 [log] pc connected, joining room
+03:15:12.778 [log] ontrack video mid=2 -> R
+03:15:12.778 [log] ontrack audio mid=3 -> R
+03:15:12.916 [log] pulled R (mid 2)
+03:15:13.071 [log] ontrack video mid=4 -> M
+03:15:13.071 [log] ontrack audio mid=5 -> M
+03:15:13.232 [log] pulled M (mid 4)
+03:15:13.472 [log] ontrack video mid=6 -> 1
+03:15:13.472 [log] ontrack audio mid=7 -> 1
+03:15:13.608 [log] pulled 1 (mid 6)
+03:15:13.840 [log] ontrack video mid=8 -> V
+03:15:13.840 [log] ontrack audio mid=9 -> V
+03:15:13.976 [log] pulled V (mid 8)
+03:15:14.136 [log] ontrack video mid=10 -> S
+03:15:14.136 [log] ontrack audio mid=11 -> S
+03:15:14.308 [log] pulled S (mid 10)
+03:15:14.627 [log] ontrack video mid=12 -> T
+03:15:14.627 [log] ontrack audio mid=13 -> T
+03:15:14.803 [log] pulled T (mid 12)
+03:15:15.064 [log] ontrack video mid=14 -> U
+03:15:15.064 [log] ontrack audio mid=15 -> U
+03:15:15.225 [log] pulled U (mid 14)
+03:15:15.499 [log] ontrack video mid=16 -> W
+03:15:15.499 [log] ontrack audio mid=17 -> W
+03:15:15.663 [log] pulled W (mid 16)
+03:15:15.950 [log] ontrack video mid=18 -> F
+03:15:15.950 [log] ontrack audio mid=19 -> F
+03:15:16.140 [log] pulled F (mid 18)
+03:15:16.394 [log] ontrack video mid=20 -> N
+03:15:16.394 [log] ontrack audio mid=21 -> N
+03:15:16.557 [log] pulled N (mid 20)
+03:15:16.805 [log] ontrack video mid=22 -> a
+03:15:16.805 [log] ontrack audio mid=23 -> a
+03:15:16.977 [log] pulled a (mid 22)
+03:15:17.215 [log] ontrack video mid=24 -> Z
+03:15:17.215 [log] ontrack audio mid=25 -> Z
+03:15:17.427 [log] pulled Z (mid 24)
+03:15:17.749 [log] ontrack video mid=26 -> I
+03:15:17.749 [log] ontrack audio mid=27 -> I
+03:15:17.978 [log] pulled I (mid 26)
+03:15:18.274 [log] ontrack video mid=28 -> Y
+03:15:18.274 [log] ontrack audio mid=29 -> Y
+03:15:18.499 [log] pulled Y (mid 28)
+03:15:18.726 [log] ontrack video mid=30 -> K
+03:15:18.726 [log] ontrack audio mid=31 -> K
+03:15:18.954 [log] pulled K (mid 30)
+03:15:19.192 [log] ontrack video mid=32 -> X
+03:15:19.192 [log] ontrack audio mid=33 -> X
+03:15:19.364 [log] pulled X (mid 32)
+03:15:19.650 [log] ontrack video mid=34 -> b
+03:15:19.650 [log] ontrack audio mid=35 -> b
+03:15:19.842 [log] pulled b (mid 34)
+03:15:20.138 [log] ontrack video mid=36 -> G
+03:15:20.139 [log] ontrack audio mid=37 -> G
+03:15:20.361 [log] pulled G (mid 36)
+03:15:20.686 [log] ontrack video mid=38 -> P
+03:15:20.686 [log] ontrack audio mid=39 -> P
+03:15:20.922 [log] pulled P (mid 38)
+03:15:21.246 [log] ontrack video mid=40 -> B
+03:15:21.246 [log] ontrack audio mid=41 -> B
+03:15:21.523 [log] pulled B (mid 40)
+03:15:21.825 [log] ontrack video mid=42 -> A
+03:15:21.826 [log] ontrack audio mid=43 -> A
+03:15:22.048 [log] pulled A (mid 42)
+03:15:22.484 [log] ontrack video mid=44 -> L
+03:15:22.484 [log] ontrack audio mid=45 -> L
+03:15:22.736 [log] pulled L (mid 44)
+03:15:23.033 [log] ontrack video mid=46 -> O
+03:15:23.033 [log] ontrack audio mid=47 -> O
+03:15:23.308 [log] pulled O (mid 46)
+03:15:23.603 [log] ontrack video mid=48 -> J
+03:15:23.603 [log] ontrack audio mid=49 -> J
+03:15:23.902 [log] pulled J (mid 48)
+03:15:24.201 [log] ontrack video mid=50 -> C
+03:15:24.201 [log] ontrack audio mid=51 -> C
+03:15:24.477 [log] pulled C (mid 50)
+03:15:24.770 [log] ontrack video mid=52 -> Q
+03:15:24.770 [log] ontrack audio mid=53 -> Q
+03:15:25.043 [log] pulled Q (mid 52)
+03:15:25.335 [log] ontrack video mid=54 -> E
+03:15:25.335 [log] ontrack audio mid=55 -> E
+03:15:25.698 [log] pulled E (mid 54)
+03:16:24.637 [log] session ace3f952836d…
+03:16:26.155 [log] pc connected, joining room
+03:16:26.441 [log] ontrack video mid=2 -> b
+03:16:26.442 [log] ontrack audio mid=3 -> b
+03:16:26.588 [log] pulled b (mid 2)
+03:16:26.872 [log] ontrack video mid=4 -> M
+03:16:26.872 [log] ontrack audio mid=5 -> M
+03:16:27.001 [log] pulled M (mid 4)
+03:16:27.259 [log] ontrack video mid=6 -> a
+03:16:27.259 [log] ontrack audio mid=7 -> a
+03:16:27.392 [log] pulled a (mid 6)
+03:16:27.690 [log] ontrack video mid=8 -> J
+03:16:27.690 [log] ontrack audio mid=9 -> J
+03:16:27.836 [log] pulled J (mid 8)
+03:16:28.197 [log] ontrack video mid=10 -> R
+03:16:28.197 [log] ontrack audio mid=11 -> R
+03:16:28.359 [log] pulled R (mid 10)
+03:16:28.625 [log] ontrack video mid=12 -> U
+03:16:28.625 [log] ontrack audio mid=13 -> U
+03:16:28.781 [log] pulled U (mid 12)
+03:16:29.077 [log] ontrack video mid=14 -> D
+03:16:29.077 [log] ontrack audio mid=15 -> D
+03:16:29.252 [log] pulled D (mid 14)
+03:16:29.444 [log] ontrack video mid=16 -> I
+03:16:29.444 [log] ontrack audio mid=17 -> I
+03:16:29.609 [log] pulled I (mid 16)
+03:16:29.873 [log] ontrack video mid=18 -> F
+03:16:29.874 [log] ontrack audio mid=19 -> F
+03:16:30.026 [log] pulled F (mid 18)
+03:16:30.308 [log] ontrack video mid=20 -> C
+03:16:30.308 [log] ontrack audio mid=21 -> C
+03:16:30.488 [log] pulled C (mid 20)
+03:16:30.752 [log] ontrack video mid=22 -> A
+03:16:30.752 [log] ontrack audio mid=23 -> A
+03:16:30.960 [log] pulled A (mid 22)
+03:16:31.259 [log] ontrack video mid=24 -> Y
+03:16:31.259 [log] ontrack audio mid=25 -> Y
+03:16:31.441 [log] pulled Y (mid 24)
+03:16:31.798 [log] ontrack video mid=26 -> O
+03:16:31.798 [log] ontrack audio mid=27 -> O
+03:16:31.966 [log] pulled O (mid 26)
+03:16:32.276 [log] ontrack video mid=28 -> 1
+03:16:32.276 [log] ontrack audio mid=29 -> 1
+03:16:32.488 [log] pulled 1 (mid 28)
+03:16:32.740 [log] ontrack video mid=30 -> V
+03:16:32.740 [log] ontrack audio mid=31 -> V
+03:16:32.945 [log] pulled V (mid 30)
+03:16:33.268 [log] ontrack video mid=32 -> G
+03:16:33.268 [log] ontrack audio mid=33 -> G
+03:16:33.473 [log] pulled G (mid 32)
+03:16:33.733 [log] ontrack video mid=34 -> E
+03:16:33.733 [log] ontrack audio mid=35 -> E
+03:16:33.973 [log] pulled E (mid 34)
+03:16:34.324 [log] ontrack video mid=36 -> B
+03:16:34.324 [log] ontrack audio mid=37 -> B
+03:16:34.552 [log] pulled B (mid 36)
+03:16:34.889 [log] ontrack video mid=38 -> P
+03:16:34.889 [log] ontrack audio mid=39 -> P
+03:16:35.150 [log] pulled P (mid 38)
+03:16:35.443 [log] ontrack video mid=40 -> Z
+03:16:35.443 [log] ontrack audio mid=41 -> Z
+03:16:35.701 [log] pulled Z (mid 40)
+03:16:35.941 [log] ontrack video mid=42 -> T
+03:16:35.941 [log] ontrack audio mid=43 -> T
+03:16:36.248 [log] pulled T (mid 42)
+03:16:36.589 [log] ontrack video mid=44 -> N
+03:16:36.589 [log] ontrack audio mid=45 -> N
+03:16:36.843 [log] pulled N (mid 44)
+03:16:37.119 [log] ontrack video mid=46 -> K
+03:16:37.119 [log] ontrack audio mid=47 -> K
+03:16:37.405 [log] pulled K (mid 46)
+03:16:37.637 [log] ontrack video mid=48 -> S
+03:16:37.637 [log] ontrack audio mid=49 -> S
+03:16:37.898 [log] pulled S (mid 48)
+03:16:38.179 [log] ontrack video mid=50 -> L
+03:16:38.179 [log] ontrack audio mid=51 -> L
+03:16:38.451 [log] pulled L (mid 50)
+03:16:38.740 [log] ontrack video mid=52 -> Q
+03:16:38.740 [log] ontrack audio mid=53 -> Q
+03:16:39.019 [log] pulled Q (mid 52)
+03:16:39.383 [log] ontrack video mid=54 -> H
+03:16:39.383 [log] ontrack audio mid=55 -> H
+03:16:39.685 [log] pulled H (mid 54)
+03:16:40.019 [log] ontrack video mid=56 -> X
+03:16:40.019 [log] ontrack audio mid=57 -> X
+03:16:40.353 [log] pulled X (mid 56)
+03:16:44.541 [log] ontrack video mid=58 -> W
+03:16:44.541 [log] ontrack audio mid=59 -> W
+03:16:44.838 [log] pulled W (mid 58)
