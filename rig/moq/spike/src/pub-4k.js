@@ -15,6 +15,7 @@ const H = parseInt(params.get("h") ?? "720", 10);
 const FPS = parseInt(params.get("fps") ?? "30", 10);
 const BITRATE = parseInt(params.get("bitrate") ?? "2500000", 10);
 const STATSMS = parseInt(params.get("statsms") ?? "5000", 10);
+const CBR = params.get("cbr") === "1"; // bitrateMode constant — force real bytes for bandwidth-gate runs
 const GOP = FPS; // 1 s GOP always
 
 // Binary row geometry — 1280x720 REFERENCE grid (matches safari-play.js decode);
@@ -130,6 +131,7 @@ function draw() {
 			codec: CODEC, width: W, height: H, framerate: FPS,
 			bitrate: BITRATE, latencyMode: "realtime",
 		};
+		if (CBR) base.bitrateMode = "constant";
 		if (CODEC.startsWith("avc1")) base.avc = { format: "annexb" };
 		// hw vs sw: probe explicitly and configure with the strongest supported mode.
 		const probe = async (mode) => {
