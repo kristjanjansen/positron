@@ -1,0 +1,16 @@
+{
+  "name": "elektron-rtc",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "vars": {
+    // App id is not a credential (it appears in every SFU URL); the app SECRET
+    // is a Worker secret (wrangler secret put CF_REALTIME_APP_SECRET) and the
+    // room token likewise (wrangler secret put ROOM_TOKEN). Never in this file.
+    "CF_REALTIME_APP_ID": "8c2a974bb21528d398ff927116bcca9e"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "RtcRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RtcRoom"] }],
+  "observability": { "enabled": true }
+}

@@ -399,7 +399,28 @@ lifecycle is now measured end to end.**
 - Tools: `proto/m2m/{room-churn.html,run-churn.mjs,analyze-churn.py}`; data
   `results/m2m-churn-*.jsonl`; NOTES.md §CHURN.
 
-**Phase 2 — the room, at workshop scale (2–10), then synthetic 40**:
+**Phase 2 — ✅ CORE DONE (2026-08-26 session 5): production signaling + tiered grid, deployed and
+validated end-to-end.**
+- **`elektron-rtc` Worker live** at elektron-rtc.kristjan-jansen.workers.dev (workers/rtc/, protocol
+  in DEPLOYED.md): RtcRoom DO (hibernating WS, roster, instant `left`), /cf/ SFU proxy (secret
+  server-side; pull API p50 257–281 ms — FASTER than the local python proxy's 413), snapshot-tile
+  store (colo cache 28 ms + DO fallback), ROOM_TOKEN auth. Signaling measured: join→roster 33 ms,
+  publish→broadcast 38 ms, **socket-kill→`left` 38–126 ms (~300–1000× faster than the SFU's 31–47 s)**.
+  ⚠️ A FIN-less network vanish still needs the client stats-stall watchdog (kept).
+- **Tiered grid validated at N=12 vs the deployed Worker** (proto/m2m/grid.html + run-grid.mjs):
+  featured p50 98 / live p50 78 ms / wall freshness p50 1.1 s, 100 % valid; rotation TTFF p50
+  ~330 ms (beats the 523 ms 1d baseline); kill→dead-tile same-frame after `left` (104–126 ms);
+  **spotlight (wall→featured promote) cmd→video ~0.5 s**; demote's fresh-snapshot floor 2.1 s
+  (structural: poll + cache TTL; stale DO snapshot appears at +105 ms as a free placeholder);
+  rejoin ≈3 s + operator re-promote 0.5 s; watchdog repull recovery 465 ms.
+- **New requirements discovered**: (1) retry backoff MUST be jittered — deterministic backoff
+  resynchronized failing legs into lockstep retry storms during a real 40 s ICE-degradation window
+  (fixed: 0–1.5 s jitter + reload fallback); (2) a 4-tile unpull burst puts a 0.6–0.9 s frame gap
+  on the featured tier — batch `tracks/close` or defer unpulls (phase-3 item).
+- Media latency identical stub-vs-Worker (same SFU plane) — the Worker adds control-plane value at
+  zero media cost. Camera source remains a one-function swap (`makeSyntheticSource`→`makeCameraSource`).
+
+Remaining phase-2 items (deferred, not blocking phase 3):
 - Build the `RtcRoom` DO frames (§3) + proxy Worker with role tokens; wire the grid UI with
   selective pull + `preferredRid` by tile size; publish-permission window driven by a cue.
 - Chaos, ported from `plan.md` discipline: kill a participant's network mid-publish (blast radius

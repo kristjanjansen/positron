@@ -621,3 +621,130 @@ probing; spec: status ∈ active|inactive|waiting).
   agent's); server.py gained M2M_PORT + GET /cf/ passthrough (defaults
   unchanged). Data: results/m2m-churn-{retry,happy,soak,rotate,storm,pubkill}
   .jsonl. Screenshots: logs/churn-*-{mesh,c1..c3,final}.png.
+
+============================================================================
+# GRID (tiered grid UI agent — grid.html / grid-server.py / run-grid.mjs / analyze-grid.py)
+============================================================================
+
+## Checkpoint G0 — rig built (2026-08-26 07:32 EEST)
+
+- Machine: 100% AC, port 8897 free, no stale grid chromes. Node v25.9, playwright cached.
+- Built: grid.html (three-tier UI: featured 2x640x360@30@1.2Mbps, live paged ls
+  tiles @500kbps, wall <img> snapshots 1.5s POST / 2s poll; connect-retry copied
+  from room-churn (8s/3 attempts/backoff); left-broadcast death + 3s stall
+  watchdog + repull; promote/demote live without rejoin; gUM explicitly stubbed
+  out — camera WEDGED, source abstraction marked), grid-server.py (stub: static
+  + CF proxy + collector + tile store + hand-rolled RFC6455 WS signaling),
+  run-grid.mjs (N=12: 2 featured probes view=full, 6 live + 4 wall view=lite;
+  co-tenancy 4+4+3, kill target A isolated; stages ready/cast/steady/rotate x5/
+  kill/rejoin/promote/demote), analyze-grid.py.
+- workers/rtc/DEPLOYED.md appeared DURING build (07:17) — protocol aligned to
+  the Worker EXACTLY (flat join, trackNames, promote/demote operator frames,
+  everyone joins tier wall, /room/{name}/ws, tile POST auth + 64KB/FFD8).
+  Stub speaks the same protocol at the same paths -> REMOTE=1 env flips the
+  whole rig to the deployed Worker (ROOM_TOKEN read from .env).
+- Cast design consequence: initial tiers are OPERATOR promotes after join
+  (probe 1 = operator role), matching production choreography.
+- Next: SMOKE=1 vs local stub, then full program vs stub, then vs Worker.
+
+## Checkpoint G1 — SMOKE vs local stub ✅ FIRST TRY (2026-08-26 07:34 EEST)
+
+- N=12 storm -> all running 4 s -> operator cast (8 promotes) -> GRID READY at
+  7.9 s total (cast->ready 4.0 s). 30 s steady: featured p50 86.0 / p95 118 ms,
+  live p50 74.5 / p95 108 ms, 100.00% valid decode both tiers; wall freshness
+  p50 1015 / p95 1543 ms, 0 misses. Cast TTFF (12 pulls under promote storm)
+  p50 703 ms. 0 publish retries, 0 pull failures. UI verified by screenshot:
+  three tier sections + badges + paging + freshness ages + self-preview.
+- liveOrder note: promotions unshift -> cast order A..F displays as F,E,D,C on
+  page 0 (spotlight-first semantics; deliberate).
+- Data: m2m-grid-smoke.jsonl (9039 rows). Next: REMOTE smoke vs deployed Worker.
+
+## Checkpoint G2 — SMOKE vs DEPLOYED WORKER ✅ (2026-08-26 07:37 EEST)
+
+- REMOTE=1: signaling wss://elektron-rtc…/room/grid-rsmoke/ws, SFU via Worker
+  /cf proxy, tiles via Worker (colo cache + DO fallback), ROOM_TOKEN auth.
+  Zero code changes vs stub run — the protocol-parity stub did its job.
+- Storm -> all running 4.9 s -> cast -> GRID READY 7.66 s. 30 s steady:
+  featured p50 182 / p95 266 ms, live p50 194 / p95 275 ms (a jitter-buffer
+  adaptation swing mid-window — polls started and ended in the 76-145 ms band;
+  120 s main run will characterize), 100.00% valid. Wall freshness p50 1286 /
+  p95 3149 ms (colo cache age visible, inside the 2-4 s budget), 0 misses.
+  Cast TTFF p50 440 ms, pull API p50 328 ms (through the Worker).
+- OPS BUG (mine): second grid-server.py couldn't bind :8897, old instance
+  served on; rsmoke rows landed in the smoke jsonl (split post-hoc, both files
+  clean now). Server lifecycle now by explicit PID.
+- In-flight wall-poll tick could resurrect a deleted __state.wall entry after
+  a promote (hud showed wall=5) — guarded (bmp discard when poller stopped).
+
+## Checkpoint G3 — MAIN PROGRAM vs DEPLOYED WORKER (2026-08-26 07:43 EEST)
+
+- ATTEMPT 1 FAILED, valuably: a sustained ~40 s ICE-degradation window hit the
+  12-way publish storm; retries with DETERMINISTIC backoff resynchronized (all
+  failing legs retried in lockstep at +12.9 s and +26.5 s) and C+Z exhausted
+  3 attempts. Control plane (Worker /cf) fine throughout — sessions and answers
+  returned; only ICE/DTLS to the SFU stalled. Evidence: m2m-grid-rmain-fail1
+  .jsonl. FIXES: (a) 0-1.5 s random jitter on the connect-retry backoff,
+  (b) driver reloads a publish-exhausted page (max 2, the production
+  "reload the tab" recovery) + operator re-promotes reloaded pages.
+- ATTEMPT 2 (m2m-grid-rmain.jsonl, 49366 rows): ALL STAGES PASS, 0 retries,
+  0 reloads needed. storm->GRID READY 7.67 s.
+  - Steady 120 s: featured p50 94.9 / p95 124.9 / p99 133 ms, live p50 79.4 /
+    p95 107.9 ms, 100.00% valid decode (n=31419); wall freshness p50 1093 /
+    p95 2057 ms, 0 misses.
+  - Rotation x5: tile-switch TTFF p50 324 / p95 395 ms (vs 523 ms 1d baseline —
+    faster, page had warmed). Featured tier: undisturbed in 3/5 rotations
+    (max gap <= 375 ms vs 50 ms baseline p99); rotations 3+5 (the 4-tile
+    unpull burst to the small page) put ONE ~875 ms gap on the featured tier —
+    renegotiation main-thread cost, operator-visible, note for phase 3.
+  - KILL (SIGKILL isolated Chrome): kill -> left-received 104/103 ms at the two
+    probes, dead-marked SAME FRAME. vs 31-47 s SFU-only. Target <2 s: beaten 20x.
+  - REJOIN: relaunch -> publish-ok attempt 1 (connect 1.2 s) -> running +2.3 s;
+    re-promote -> decoding on both probes +0.5 s. Total measured 7.8 s but ~5 s
+    of that is driver pacing (poll + deliberate page-0 rotation); system time
+    ~2.8 s — matches churn C7 (~3.9 s with 2 s poll -> ~2 s with DO push).
+  - PROMOTE W (spotlight from the crowd): promote frame propagation 39-53 ms;
+    cmd -> real video decoding on both probes 467-490 ms (TTFF 427-446 ms).
+  - Watchdog: 1 organic stall >3 s -> badge + repull, recovered in 465 ms.
+  - DEMOTE W: tier frame +51 ms; ANY snapshot on probes +104 ms — but it was
+    the STALE pre-promotion tile from the DO fallback (freshMs 12.2 s); truly
+    FRESH content at +2.08 s (1.5 s post interval + poll). Honest number 2.1 s.
+    UX note: the stale-fallback actually softens the transition. FIXES: post
+    one snapshot IMMEDIATELY on becoming wall-tier; driver + analyzer now
+    require freshMs < 4 s. Rerunning as rmain2 to confirm.
+
+## Checkpoint G4 — CONFIRMATORY + STUB-vs-WORKER SPLIT + WRAP-UP ✅ (2026-08-26 07:53 EEST)
+
+- rmain2 (Worker, all fixes in): reproduces rmain within noise. featured p50
+  97.8 / p95 129.9, live p50 77.8 / p95 107.1, 100.00% valid (n=31429); wall
+  p50 1082 / p95 1879 ms; rotate TTFF p50 332 / p95 419; spotlight 493-517 ms;
+  kill->left 125/126 ms; demote: ANY snapshot +105 ms (stale DO fallback =
+  free "last seen" placeholder), FRESH content +2.10 s (floor = 2 s poll +
+  2 s colo cache; inside the 2-4 s budget).
+- lmain (local stub, same program): media latencies IDENTICAL (featured 88.8 /
+  live 82.7 p50 — same SFU either way). Control plane split: kill->left 58 ms
+  stub vs 104-126 ms Worker; tier-frame propagation 5-8 ms stub vs 39-66 ms
+  Worker (the real DO hop, matches the 27-38 ms cues numbers + broadcast);
+  pull API p50 413 ms via local python proxy vs 257-281 ms via the Worker
+  (CF-edge-to-SFU beats laptop urllib).
+- Consistent finding across all 3 full runs: rotations that UNPULL 4 tiles at
+  once (page 0 -> page 1) put ONE 0.6-0.9 s frame gap on the featured tier
+  (baseline p99 gap 50 ms); pull-heavy rotations do not. Phase-3 note: batch
+  the tracks/close into one call and/or defer unpulls a beat after pulls.
+- UI evidence (logs/grid-rmain2-*.png): LEFT overlay + red border + struck
+  name on kill, tier badges, live paging indicator, wall freshness ages,
+  self-preview. Watchdog STALLED overlay fired once organically in rmain and
+  repulled in 465 ms.
+- HOW TO RUN:
+    cd proto/m2m
+    M2M_RESULTS=…/results/m2m-grid-<label>.jsonl python3 grid-server.py &
+    SMOKE=1 node run-grid.mjs                      # 30 s smoke vs local stub
+    REMOTE=1 LABEL=x DURATION=120 node run-grid.mjs  # full program vs Worker
+    python3 analyze-grid.py ../../results/m2m-grid-x.jsonl
+  Manual browsing: open http://127.0.0.1:8897/grid.html?id=Q&name=You&role=operator
+  (+ &remote=https://elektron-rtc.kristjan-jansen.workers.dev&token=<ROOM_TOKEN>
+  for production). gUM deliberately NOT wired (camera wedged) — source
+  abstraction marked in grid.html (makeSyntheticSource -> makeCameraSource).
+- CLEANUP: server :8897 stopped, 0 m2m-grid-udd chromes (verified by path),
+  ZERO new CF resources (sessions expire server-side), room/tile state on the
+  Worker is per-room ephemeral, battery 100% AC end-to-end. Data files:
+  m2m-grid-{smoke,rsmoke,rmain-fail1,rmain,rmain2,lmain}.jsonl.
