@@ -43,7 +43,10 @@ const PID_BYTE = "S".charCodeAt(0);
 window.__state = { phase: "init", wsState: "closed", drawFrames: 0, drawFps: 0,
                    cuesReceived: 0, cuesFired: 0, currentCue: null, telemetry: [], error: null };
 
-function wallClock() { return performance.timeOrigin + performance.now(); }
+// ONE clock domain for everything burned/compared: Date.now(). Mixing
+// performance.timeOrigin+performance.now() with the operator's Date.now()
+// stamps skews burned rows by the (drifting) offset between the two clocks.
+function wallClock() { return Date.now(); }
 
 // ---- live cue engine (wall clock IS the playhead; crossing rule = tick()) ---
 let pending = [];   // sorted by at

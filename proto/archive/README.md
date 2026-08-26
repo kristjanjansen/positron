@@ -98,10 +98,22 @@ serves via a custom domain on the bucket, same zero egress.)
   `proto/replay/show.html` + `operator.mjs` verbatim) → CDP screencast →
   ffmpeg → local segmented HLS; stamps all T₀ candidates; spawns the uploader;
   writes `artifacts/archive-meta.json` (+ cuelog, live fires).
+  **Per-run isolation (default):** room, RECDIR and the R2 prefix all get a
+  timestamp suffix (`archive-test-<ts>`, `shows/archive-test-<ts>`) so a rerun
+  can never replay a stale cuelog or clobber/mix a previous run's segments;
+  `ROOM=`/`RECDIR=` still override for deliberate reuse. On any fatal, the
+  driver kills **every** spawned child (uploader, operator) — no orphan
+  uploader keeps writing the prefix after the driver dies.
 - `uploader.mjs` — the daemon: a segment listed in `index.m3u8` is closed
   (ffmpeg appends only after the .ts is fully written) → put to R2 → verify
   (HEAD: length + etag==md5) → delete local. Playlist after its segments on
   every change; ENDLIST playlist last. Tracks disk high-water at 1 Hz.
+  **Failed segments are RETRIED** on later passes with exponential backoff
+  (`MAX_SEG_ATTEMPTS`, default 10); the playlist is only uploaded once every
+  segment it references is verified in R2. A segment that exhausts its
+  attempts is logged loudly and **EXCLUDED from the uploaded playlist**
+  (never a 404 reference); the report is then `degraded:true` and the exit
+  code is 2.
   Report → `artifacts/uploader-report.json`, JSONL → `results/archive-upload.jsonl`.
 - `run-measure-archive.mjs` — replay from R2 via `proto/replay/replay.html`
   **unchanged** (`anchor=stamp&t0=<native>`); per-cue burned-frame errors, the
@@ -153,6 +165,9 @@ Proof artifact (kept): room `archive-test`, 48 segments + playlist at
   error distribution (129 ms at locked phase vs 54–95 ms honest spread).
 - Room cuelog is per-room and append-only — reuse a room name and the replay
   will load stale cues. `archive-test` was verified empty before the run.
+  Since the review fixes, record-local defaults to a fresh
+  `archive-test-<ts>` room per run (meta.room carries it to the measure
+  script), so this footgun only exists behind an explicit `ROOM=` override.
 - Kept CF resources: bucket `elektron-archive-test` (public dev URL enabled)
   containing only `shows/archive-test/*` (49 objects, 40.2 MB). Smoke debris
   (`shows/archive-smoke/*`, `smoke/smoke.txt`) deleted and 404-verified.

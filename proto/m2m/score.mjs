@@ -27,13 +27,15 @@ const BASE = args.base || "http://127.0.0.1:8893";
 const REMOTE_URL = args.remote || "https://elektron-rtc.kristjan-jansen.workers.dev";
 const OP_ID = "OP";
 
-function roomToken() {
+function envToken(key) {
   const line = fs.readFileSync("/Users/s32863/personal/elektron/.env", "utf8")
-    .split("\n").find(l => l.startsWith("ROOM_TOKEN="));
-  return line ? line.slice("ROOM_TOKEN=".length).trim() : "";
+    .split("\n").find(l => l.startsWith(key + "="));
+  return line ? line.slice(key.length + 1).trim() : "";
 }
-const TOKEN = roomToken();
+const TOKEN = envToken("ROOM_TOKEN");
 if (!TOKEN) { console.error("no ROOM_TOKEN in .env"); process.exit(1); }
+const OP_TOKEN = envToken("OPERATOR_TOKEN"); // join role=operator requires it
+if (!OP_TOKEN) { console.error("no OPERATOR_TOKEN in .env"); process.exit(1); }
 
 function ts() { return new Date().toISOString().slice(11, 23); }
 function say(...a) { console.log(ts(), "[score]", ...a); }
@@ -63,7 +65,7 @@ function connect() {
   ws = new WebSocket(`${REMOTE_URL.replace(/^http/, "ws")}/room/${ROOM}/ws?token=${encodeURIComponent(TOKEN)}`);
   ws.onopen = () => {
     wsOpen = true;
-    send({ type: "join", participantId: OP_ID, name: "Operator", role: "operator" });
+    send({ type: "join", participantId: OP_ID, name: "Operator", role: "operator", opToken: OP_TOKEN });
   };
   ws.onclose = () => {
     wsOpen = false; joined = false;

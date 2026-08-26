@@ -10,7 +10,19 @@
  *
  *   node rig/do-lag.mjs [wss://...] [n]
  */
-const URL_ = process.argv[2] || 'wss://elektron-cues.kristjan-jansen.workers.dev/room/lagtest/ws';
+import { readFileSync } from 'fs';
+const cuesToken = () => {
+  try {
+    const l = readFileSync('/Users/s32863/personal/elektron/.env', 'utf8')
+      .split('\n').find((x) => x.startsWith('CUES_TOKEN='));
+    return l ? l.slice(11).trim() : '';
+  } catch { return ''; }
+};
+let URL_ = process.argv[2] || 'wss://elektron-cues.kristjan-jansen.workers.dev/room/lagtest/ws';
+if (!/[?&]token=/.test(URL_)) {
+  const t = cuesToken();       // the worker requires CUES_TOKEN since the review fixes
+  if (t) URL_ += (URL_.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+}
 const N = Number(process.argv[3] || 100);
 
 const pct = (a, p) => a.slice().sort((x, y) => x - y)[Math.min(a.length - 1, Math.floor(p * a.length))];
@@ -63,7 +75,7 @@ for (let i = 0; i < N; i++) {
 }
 await new Promise((r) => setTimeout(r, 1000));
 
-console.log(`target: ${URL_}`);
+console.log(`target: ${URL_.replace(/([?&]token=)[^&]+/, '$1<redacted>')}`);
 console.log(`RTT (ping->pong)          ${stats(rtts)}`);
 console.log(`one-way (pub->DO->sub)    ${stats(oneway)}`);
 console.log(`DO->sub hop (via serverAt)${stats(serverHop)}`);

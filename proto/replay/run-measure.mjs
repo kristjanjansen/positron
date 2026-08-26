@@ -31,10 +31,14 @@ const TOKEN = envVal("ROOM_TOKEN");
 const meta = JSON.parse(fs.readFileSync(`${HERE}/artifacts/replay-run-meta.json`, "utf8"));
 const cuelog = JSON.parse(fs.readFileSync(`${HERE}/artifacts/replay-cuelog.json`, "utf8"));
 const liveFires = JSON.parse(fs.readFileSync(`${HERE}/artifacts/replay-live-fires.json`, "utf8"));
-const CUES = cuelog.cues.map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt,
-                                     mode: e.cue.data && e.cue.data.mode }));
+// cuelog may carry cancel records ({kind:'cancel', id}) — cancelled cues must
+// not be part of the plan, and cancel rows themselves have no .cue
+const cancelled = new Set(cuelog.cues.filter(e => e.kind === "cancel").map(e => e.id));
+const CUES = cuelog.cues.filter(e => e.cue && !cancelled.has(e.cue.id))
+  .map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt,
+               mode: e.cue.data && e.cue.data.mode }));
 const HLS = meta.vodHls;
-const ROOM = meta.room;
+const ROOM = process.env.ROOM || meta.room;   // meta carries the per-run room
 
 function ts() { return new Date().toISOString().slice(11, 23); }
 function say(...a) { console.log(ts(), ...a); }

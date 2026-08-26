@@ -19,7 +19,11 @@ const ROOT = "/Users/s32863/personal/elektron";
 const HERE = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
 const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
-const ROOM = process.env.ROOM || "replay-test";
+// Fresh room PER RUN by default (per-room cuelog is append-only — a reused
+// room name replays stale cues into the next run). meta.room carries the
+// generated name to run-measure.mjs; explicit ROOM= still overrides.
+const RUNTS = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15); // e.g. 20260826T093015
+const ROOM = process.env.ROOM || `replay-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "200", 10);
 const POLL_S = parseInt(process.env.POLL_S || "300", 10);
@@ -209,7 +213,7 @@ const run = async () => {
       const vids = ((j && j.result) || []).filter(v => new Date(v.created).getTime() >= tRunStart - 60000);
       const ready = vids.find(v => v.status && v.status.state === "ready");
       say(`+${Math.round((Date.now() - tEnd) / 1000)}s videos: ` +
-          vids.map(v => `${v.uid.slice(0, 8)}:${v.status && v.status.state}:${v.duration}s`).join(" ") || "none");
+          (vids.map(v => `${v.uid.slice(0, 8)}:${v.status && v.status.state}:${v.duration}s`).join(" ") || "none"));
       if (ready) { vod = ready; break; }
       await new Promise(r => setTimeout(r, 10000));
     }

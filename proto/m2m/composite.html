@@ -46,6 +46,7 @@ const MY_ID    = (q.get("id") || "K").slice(0, 8);
 const MY_NAME  = q.get("name") || "composite";
 const ROOM     = q.get("room") || "p3b";
 const MY_ROLE  = q.get("role") || "audience";
+const OP_TOKEN = q.get("optoken") || "";   // required to actually get role=operator
 const HOLD     = q.get("hold") === "1";
 const WHIP_URL = q.get("whip") || "";            // Stream live input publish URL (credential)
 const WHIP_KBPS = parseInt(q.get("whipkbps") || "2500", 10);
@@ -138,7 +139,8 @@ function sigConnect() {
   ws = new WebSocket(sigUrl());
   ws.onopen = () => {
     window.__state.sigState = "open";
-    sigSend({ type: "join", participantId: MY_ID, name: MY_NAME, role: MY_ROLE });
+    sigSend({ type: "join", participantId: MY_ID, name: MY_NAME, role: MY_ROLE,
+              ...(OP_TOKEN ? { opToken: OP_TOKEN } : {}) });
   };
   ws.onmessage = (e) => {
     let f; try { f = JSON.parse(e.data); } catch (_) { return; }

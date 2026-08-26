@@ -13,11 +13,20 @@
  *
  *   node rig/overlay-bridge.mjs [room] [file]
  */
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 
 const ROOM = process.argv[2] || 'burnin';
 const FILE = process.argv[3] || '/tmp/overlay.txt';
-const URL_ = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${ROOM}/ws`;
+const cuesToken = () => {
+  try {
+    const l = readFileSync('/Users/s32863/personal/elektron/.env', 'utf8')
+      .split('\n').find((x) => x.startsWith('CUES_TOKEN='));
+    return l ? l.slice(11).trim() : '';
+  } catch { return ''; }
+};
+const TOKEN = cuesToken();       // the worker requires CUES_TOKEN since the review fixes
+const URL_ = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${ROOM}/ws` +
+             (TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : '');
 
 let current = null;               // {text, until}
 const write = (s) => { try { writeFileSync(FILE, s); } catch {} };

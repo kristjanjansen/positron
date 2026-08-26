@@ -36,13 +36,14 @@ fs.mkdirSync(LOGDIR, { recursive: true });
 
 const score = JSON.parse(fs.readFileSync(`${HERE}/${SCORE_FILE}`, "utf8"));
 
-function roomToken() {
+function roomToken(key = "ROOM_TOKEN") {
   const line = fs.readFileSync("/Users/s32863/personal/elektron/.env", "utf8")
-    .split("\n").find(l => l.startsWith("ROOM_TOKEN="));
-  return line ? line.slice("ROOM_TOKEN=".length).trim() : "";
+    .split("\n").find(l => l.startsWith(key + "="));
+  return line ? line.slice(key.length + 1).trim() : "";
 }
 const TOKEN = roomToken();
 if (!TOKEN) { console.error("no ROOM_TOKEN in .env"); process.exit(1); }
+const OP_TOKEN = roomToken("OPERATOR_TOKEN");   // operator joins need it
 
 const ROSTER = {
   "1": { name: "Perf-Ada",  role: "performer", view: "full" },
@@ -106,6 +107,7 @@ function urlFor(id) {
   return `${BASE}/show.html?id=${id}&name=${r.name}&room=${ROOM}&role=${r.role}` +
          `&view=${r.view}&ls=${LS}&hold=1&cb=${Date.now()}` +
          (r.view === "full" && STAG ? `&stag=1` : "") +
+         (r.role === "operator" && OP_TOKEN ? `&optoken=${encodeURIComponent(OP_TOKEN)}` : "") +
          `&remote=${encodeURIComponent(REMOTE_URL)}&token=${encodeURIComponent(TOKEN)}`;
 }
 

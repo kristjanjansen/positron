@@ -9,8 +9,9 @@
 import fs from "fs";
 
 const ROOT = "/Users/s32863/personal/elektron";
-const TOKEN = fs.readFileSync(`${ROOT}/.env`, "utf8").split("\n")
-  .find(l => l.startsWith("ROOM_TOKEN=")).slice(11).trim();
+const ENV = fs.readFileSync(`${ROOT}/.env`, "utf8").split("\n");
+const TOKEN = ENV.find(l => l.startsWith("ROOM_TOKEN=")).slice(11).trim();
+const OP_TOKEN = (ENV.find(l => l.startsWith("OPERATOR_TOKEN=")) || "").slice(15).trim();
 const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
 const ROOM = process.env.ROOM || "replay-test";
 const BASE = parseInt(process.env.BASE_MS || "0", 10);
@@ -31,7 +32,7 @@ const log = { base: BASE, room: ROOM, cues: [] };
 
 const ws = new WebSocket(`${REMOTE.replace("https", "wss")}/room/${ROOM}/ws?token=${TOKEN}`);
 ws.onerror = (e) => { console.error("ws error", e.message || e); process.exit(1); };
-ws.onopen = () => ws.send(JSON.stringify({ type: "join", participantId: "op", name: "Operator", role: "operator" }));
+ws.onopen = () => ws.send(JSON.stringify({ type: "join", participantId: "op", name: "Operator", role: "operator", opToken: OP_TOKEN }));
 ws.onmessage = async (m) => {
   let f; try { f = JSON.parse(m.data); } catch { return; }
   if (f.type !== "roster") return;

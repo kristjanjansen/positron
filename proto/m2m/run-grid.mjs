@@ -36,15 +36,16 @@ const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55ab
 const LS = 4;                 // live page size in the rig: 6 live -> pages of 4+2
 fs.mkdirSync(LOGDIR, { recursive: true });
 
-function roomToken() {        // ROOM_TOKEN from .env (Worker auth; never committed)
+function roomToken(key = "ROOM_TOKEN") {   // token from .env (Worker auth; never committed)
   try {
     const line = fs.readFileSync("/Users/s32863/personal/elektron/.env", "utf8")
-      .split("\n").find(l => l.startsWith("ROOM_TOKEN="));
-    return line ? line.slice("ROOM_TOKEN=".length).trim() : "";
+      .split("\n").find(l => l.startsWith(key + "="));
+    return line ? line.slice(key.length + 1).trim() : "";
   } catch (e) { return ""; }
 }
 const TOKEN = REMOTE ? roomToken() : "";
 if (REMOTE && !TOKEN) { console.error("REMOTE=1 but no ROOM_TOKEN in .env"); process.exit(1); }
+const OP_TOKEN = REMOTE ? roomToken("OPERATOR_TOKEN") : "";   // operator joins need it
 
 // id -> {tier: TARGET tier (cast by the operator after join), name, role, view}
 const ROSTER = {
@@ -96,6 +97,7 @@ function urlFor(id) {
   const r = ROSTER[id];
   return `${BASE}/grid.html?id=${id}&name=${r.name}&room=${ROOM}&role=${r.role}` +
          `&view=${r.view}&ls=${LS}&hold=1&cb=${Date.now()}` +
+         (r.role === "operator" && OP_TOKEN ? `&optoken=${encodeURIComponent(OP_TOKEN)}` : "") +
          (REMOTE ? `&remote=${encodeURIComponent(REMOTE_URL)}&token=${encodeURIComponent(TOKEN)}` : "");
 }
 

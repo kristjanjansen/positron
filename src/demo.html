@@ -76,8 +76,10 @@ import { createTimedMessages } from './timed-messages.js';
 const q = new URLSearchParams(location.search);
 const uid = q.get('uid') || '5cfa5053fffe478fffbb9b5c65773d34';
 const room = q.get('room') || 'demo';
+const token = q.get('token') || '';   // CUES_TOKEN — the worker requires it
 const src = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
-const WS = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${room}/ws`;
+const WS = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${room}/ws` +
+           (token ? `?token=${encodeURIComponent(token)}` : '');
 
 const $ = (id) => document.getElementById(id);
 const v = $('v');

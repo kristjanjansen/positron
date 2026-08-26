@@ -70,9 +70,16 @@ so viewers see a still image, not black.
 (`https://elektron-cues.kristjan-jansen.workers.dev/room/<name>/ws`) deliver
 cues synced to the *stream moment* via `EXT-X-PROGRAM-DATE-TIME`:
 
+The relay now requires a token: `?token=<CUES_TOKEN>` (or Authorization Bearer)
+on the WS URL — the value lives in the repo `.env` as `CUES_TOKEN` (worker
+secret; never committed). `createTimedMessages` accepts it as a `token` option
+and appends it to the URL; `demo.html` takes it as a `token` query param. The
+worker also validates cue frames (finite `at`, ≤ 8 KB serialized) and answers
+bad ones with `{type:'error'}` instead of relaying.
+
 ```js
 import { createTimedMessages } from './timed-messages.js';
-const cues = createTimedMessages(player, videoEl, { onMessage: showOverlay });
+const cues = createTimedMessages(player, videoEl, { onMessage: showOverlay, token: CUES_TOKEN });
 cues.connect('wss://elektron-cues.kristjan-jansen.workers.dev/room/show1/ws');
 cues.attachSubtitleTrack('et');          // visible: native subtitle rendering
 cues.attachMetadataTrack(onEvent);       // invisible: exact-time events

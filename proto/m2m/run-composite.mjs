@@ -41,6 +41,7 @@ function envVal(key) {
   return line ? line.slice(key.length + 1).trim() : "";
 }
 const TOKEN = envVal("ROOM_TOKEN");
+const OP_TOKEN = envVal("OPERATOR_TOKEN");   // operator joins need it
 const CF_API_TOKEN = envVal("CF_API_TOKEN");
 const CF_ACCOUNT_ID = envVal("CF_ACCOUNT_ID");
 if (!TOKEN || !CF_API_TOKEN || !CF_ACCOUNT_ID) { console.error("missing .env values"); process.exit(1); }
@@ -99,6 +100,7 @@ function gridUrl(id) {
   const r = ROSTER[id];
   return `${BASE}/grid.html?id=${id}&name=${r.name}&room=${ROOM}&role=${r.role}` +
          `&view=${r.view}&hold=1&cb=${Date.now()}` +
+         (r.role === "operator" && OP_TOKEN ? `&optoken=${encodeURIComponent(OP_TOKEN)}` : "") +
          `&remote=${encodeURIComponent(REMOTE_URL)}&token=${encodeURIComponent(TOKEN)}`;
 }
 function compositeUrl() {

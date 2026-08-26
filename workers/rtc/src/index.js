@@ -45,13 +45,16 @@ const TILE_CACHE_TTL_S = 6; // stored-copy lifetime at the colo
 const TILE_CLIENT_TTL_S = 2; // what pollers may reuse without refetching
 const ROLES = new Set(['performer', 'audience', 'operator']);
 const TIERS = new Set(['wall', 'live', 'featured']);
+const ROSTER_MAX = 500; // hard cap on stored roster entries per room
+const CUE_BACKLOG_ON_JOIN = 200; // recent cues replayed to every joiner
 
 // ---------------------------------------------------------------------------
 // RtcRoom — one Durable Object instance per room name.
 // ---------------------------------------------------------------------------
 export class RtcRoom {
-  constructor(state) {
+  constructor(state, env) {
     this.state = state;
+    this.env = env;
     // Answer literal "ping" with "pong" WITHOUT waking a hibernated DO
     // (cues pattern, measured 32–38 ms RTT with zero wake cost).
     this.state.setWebSocketAutoResponse(
@@ -63,11 +66,23 @@ export class RtcRoom {
   async roster() {
     return (await this.state.storage.get('roster')) || {};
   }
-  async putRoster(r) {
-    await this.state.storage.put('roster', r);
+  // Storage writes never take the room down: broadcasts have already gone out
+  // (the 50 ms lesson), so a failed put costs durability, not the live show.
+  async putSafe(key, val) {
+    try { await this.state.storage.put(key, val); }
+    catch (e) { console.error(`storage.put(${key}) failed (room kept alive):`, e && e.message); }
   }
+  async putRoster(r) {
+    await this.putSafe('roster', r);
+  }
+  async putCuelog(log) {
+    await this.putSafe('cuelog', log);
+  }
+  // Publish-permission window. Default = OPEN (no restriction): every measured
+  // flow publishes without an operator grant; the window only closes when an
+  // operator explicitly sets publish:false for a role/participant.
   async perm() {
-    return (await this.state.storage.get('perm')) || { publish: { audience: false } };
+    return (await this.state.storage.get('perm')) || { publish: {} };
   }
 
   async fetch(request) {
@@ -128,17 +143,56 @@ export class RtcRoom {
       return;
     }
 
-    // -- join: {type:'join', participantId?, name?, role} ------------------
+    // -- join: {type:'join', participantId?, name?, role, opToken?} --------
     // Server assigns participantId when omitted. Reply: full roster snapshot
-    // (the cue-backlog pattern). Broadcast: joined. Rejoining an existing
-    // participantId replaces the old entry (rebuild-never-patch).
+    // (the cue-backlog pattern) + recent cue backlog. Broadcast: joined.
+    // Rejoining an existing participantId replaces the old entry (rebuild-
+    // never-patch) and DETACHES the old socket so its close emits no 'left'.
     if (f.type === 'join') {
-      const role = ROLES.has(f.role) ? f.role : 'audience';
+      let role = ROLES.has(f.role) ? f.role : 'audience';
+      // 'operator' must be EARNED: the join frame must carry opToken matching
+      // the OPERATOR_TOKEN worker secret, else the joiner is demoted to
+      // audience (fail closed when the secret is unset).
+      if (role === 'operator'
+          && !(this.env && this.env.OPERATOR_TOKEN && f.opToken === this.env.OPERATOR_TOKEN)) {
+        role = 'audience';
+      }
       const id = (typeof f.participantId === 'string' && PID_RE.test(f.participantId))
         ? f.participantId
         : crypto.randomUUID().slice(0, 8);
-      ws.serializeAttachment({ id, role });
+      // Per-join generation tag: dropped() no-ops on any socket that is not
+      // the participant's CURRENT one (the ghost-'left' rejoin bug).
+      const gen = crypto.randomUUID();
+      for (const s of this.state.getWebSockets()) {
+        if (s === ws) continue;
+        const a = s.deserializeAttachment?.();
+        if (a && a.id === id && !a.stale) {
+          s.serializeAttachment({ ...a, stale: true }); // must NOT trigger 'left'
+          try { s.close(4001, 'replaced by rejoin'); } catch {}
+        }
+      }
+      ws.serializeAttachment({ id, role, gen });
       const roster = await this.roster();
+      // Roster bound: past the cap, evict the oldest entries whose socket is
+      // gone (never a live one); if the room is genuinely full, reject.
+      if (!roster[id] && Object.keys(roster).length >= ROSTER_MAX) {
+        const live = new Set([id]);
+        for (const s of this.state.getWebSockets()) {
+          const a = s.deserializeAttachment?.();
+          if (a && !a.stale) live.add(a.id);
+        }
+        const evictable = Object.values(roster)
+          .filter((p) => !live.has(p.id))
+          .sort((a, b) => a.joinedAt - b.joinedAt);
+        for (const p of evictable) {
+          if (Object.keys(roster).length < ROSTER_MAX) break;
+          delete roster[p.id];
+        }
+        if (Object.keys(roster).length >= ROSTER_MAX) {
+          ws.send(JSON.stringify({ type: 'error', of: 'join', error: 'room full' }));
+          return;
+        }
+      }
       const participant = {
         id,
         name: typeof f.name === 'string' ? f.name.slice(0, 64) : id,
@@ -147,6 +201,7 @@ export class RtcRoom {
         sessionId: null,
         trackNames: [],
         joinedAt: Date.now(),
+        gen,
       };
       roster[id] = participant;
       // Snapshot to the joiner FIRST, then delta to the room, then persist.
@@ -156,6 +211,16 @@ export class RtcRoom {
         participants: Object.values(roster),
         perm: await this.perm(),
       }));
+      // Cue parity: replay the recent cue backlog to the joiner (same shape as
+      // the live broadcast, flagged backlog:true) so a reconnecting stage
+      // catches up. Cancelled cues are excluded.
+      const log = (await this.state.storage.get('cuelog')) || [];
+      if (log.length) {
+        const cancelled = new Set(log.filter((e) => e.kind === 'cancel').map((e) => e.id));
+        for (const e of log.filter((e2) => e2.cue && !cancelled.has(e2.cue.id)).slice(-CUE_BACKLOG_ON_JOIN)) {
+          try { ws.send(JSON.stringify({ type: 'cue', cue: e.cue, from: e.from, backlog: true })); } catch {}
+        }
+      }
       this.broadcast({ type: 'joined', participant }, ws);
       await this.putRoster(roster);
       return;
@@ -166,6 +231,16 @@ export class RtcRoom {
     // -- publish: {type:'publish', sessionId, trackNames:[...]} ------------
     // trackName convention: <participantId>/<mic|cam|screen> (plan-m2m §3).
     if (f.type === 'publish' && typeof f.sessionId === 'string' && Array.isArray(f.trackNames)) {
+      // Enforce the operator's publish-permission window server-side: an
+      // explicit per-participant grant wins, then per-role; absent both,
+      // publishing is open (the pre-perm default every measured flow relies on).
+      const permNow = (await this.perm()).publish || {};
+      const allowed = permNow[me.id] != null ? permNow[me.id]
+        : (permNow[me.role] != null ? permNow[me.role] : true);
+      if (!allowed) {
+        ws.send(JSON.stringify({ type: 'error', of: 'publish', error: `publishing closed for ${me.role}` }));
+        return;
+      }
       const trackNames = f.trackNames.filter((t) => typeof t === 'string').slice(0, 16);
       this.broadcast({
         type: 'published',
@@ -212,7 +287,7 @@ export class RtcRoom {
       if (grant.role) perm.publish[grant.role] = grant.publish;
       if (grant.participantId) perm.publish[grant.participantId] = grant.publish;
       if (!grant.role && !grant.participantId) perm.publish.audience = grant.publish;
-      await this.state.storage.put('perm', perm);
+      await this.putSafe('perm', perm);
       return;
     }
 
@@ -246,7 +321,19 @@ export class RtcRoom {
       const log = (await this.state.storage.get('cuelog')) || [];
       log.push({ from: me.id, cue, doRecvTs: cue.serverAt /* UNTRUSTED for timing */ });
       if (log.length > 1000) log.splice(0, log.length - 1000); // bound storage
-      await this.state.storage.put('cuelog', log);
+      await this.putCuelog(log);
+      return;
+    }
+
+    // -- cancel: {type:'cancel', id} ---------------------------------------
+    // Unschedule a pending cue. Broadcast to everyone AND append a cancel
+    // record to the cuelog so replay knows the cue must not fire.
+    if (f.type === 'cancel' && typeof f.id === 'string') {
+      this.broadcast({ type: 'cancel', id: f.id, from: me.id });
+      const log = (await this.state.storage.get('cuelog')) || [];
+      log.push({ kind: 'cancel', id: f.id, from: me.id, doRecvTs: Date.now() });
+      if (log.length > 1000) log.splice(0, log.length - 1000); // bound storage
+      await this.putCuelog(log);
       return;
     }
   }
@@ -260,11 +347,15 @@ export class RtcRoom {
 
   async dropped(ws) {
     const me = ws.deserializeAttachment?.() || null;
-    if (!me) return;
+    // A socket replaced by a rejoin (stale) is NOT the participant's current
+    // socket: its close must not broadcast 'left' or touch the roster.
+    if (!me || me.stale) return;
     // Broadcast IMMEDIATELY; persistence follows (the 50 ms lesson).
     this.broadcast({ type: 'left', participantId: me.id });
     const roster = await this.roster();
-    if (roster[me.id]) {
+    // Belt and suspenders: only the generation that owns the roster entry may
+    // delete it (pre-gen entries have no gen and keep the old behavior).
+    if (roster[me.id] && (roster[me.id].gen == null || roster[me.id].gen === me.gen)) {
       delete roster[me.id];
       await this.putRoster(roster);
     }
