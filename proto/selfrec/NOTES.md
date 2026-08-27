@@ -261,6 +261,165 @@ Show **sync-20260827T093613**, room **selfrecsync-20260827T093613**, stagger
   results/selfrec-sync.jsonl. All selfrec processes dead, :8894 free,
   scratch UDDs removed.
 
+# PLAYBACK LEG (2026-08-27, session 6c) — participant-archive playback layer
+
+Four pieces on top of the kept proof show sync-20260827T093613 (REUSED, no new
+recording): postshow runner (engine seed), replay-grid from show.json + scrubber
+UI, no-ffmpeg masters replay (Range+MSE), SimpleBlock-level index (hour-scale
+re-anchor question). Same machine rules (port 8894, selfrec patterns).
+
+## Playback checkpoint 1 — postshow runner green (2026-08-27 ~10:11 UTC)
+
+- **elektron-selfrec redeployed, version 81c20db7** (same URL): adds
+  `POST /show/<show>` -> `selfrec/<show>/show.json` (Bearer; show-level key
+  that no participant-scoped route could write; consent delete sweeps it).
+  Verified: 403 w/o token, put + pub readback; probe debris deleted.
+- repackage.mjs + indexer.mjs refactored into module+CLI (exported
+  `repackageParticipant` / `indexParticipant`; run-sync.mjs CLI spawn path
+  unchanged). Block indexer core added (see checkpoint 4).
+- **postshow.mjs** (the engine.mjs Session B call): /list -> pids UNION cuelog
+  media-span sources (cuelog-only participant => degraded no-masters row);
+  repackage+index only what's missing; show.json always rewritten (pure
+  function of stored state). ROOM defaults to "selfrec"+SHOW (run-sync
+  convention). Cuelog unreachable is non-fatal (skewEst null, cuelogOk:false).
+- **Proof-show numbers**: run 1 (nothing to do) 1537 ms, all
+  skipped — IDEMPOTENT. run 2 FORCE=1 (full pipeline, overwrite same keys):
+  **37,726 ms end-to-end** for 2×75 s participants = p1 copy (ffmpeg 219 ms,
+  dl 4.3 s, ul 6.9 s) + p2 transcode (ffmpeg 1229 ms, dl 4.9 s, ul 7.5 s) +
+  2× index (~5.2 s each, dominated by re-download). run 3: skipped again,
+  1406 ms. Engine note: repackage and indexer each download the chunks
+  (~4.5 s×4 of the 37.7 s) — sharing one download per pid would cut ~9 s.
+- show.json readback: both pids, T0==marker start.at (t0MatchesMarker true),
+  skewEst 42/41.5 carried from cuelog, hls/masters/index/manifest refs.
+
+## Playback checkpoint 2 — RECONCILE mode (scope addendum) (2026-08-27 ~10:25 UTC)
+
+"Studio doesn't always run; chunks arrive late; what does it resume?" —
+`node postshow.mjs --reconcile` sweeps ALL of selfrec/ (new tokenless-arg
+`GET /list` = whole prefix; worker **version 381acbe8**) and computes
+desired-vs-actual per participant. R2 is the ONLY truth; every derived
+artifact is reproducible from masters.
+
+**STATE MODEL** (masters = chunk-*.webm + manifest.json; derived/* and
+show.json are our own writes and NEVER reset the settle clock — else the
+sweep would inhibit itself):
+
+| state | action |
+|---|---|
+| deleted.marker present, prefix otherwise empty | noop (tombstoned) |
+| deleted.marker + ANY other objects (zombie drain) | re-delete prefix (resurrection-blocked); NEVER derive |
+| any pid's newest master younger than SETTLE_MIN (10 min default) | whole show deferred ("settling" — a partial show.json would be wrong-but-plausible) |
+| chunks, NO manifest (tab died pre-finalize) | synthesize manifest: mime SNIFFED from chunk-0 EBML (V_MPEG4/ISO/AVC etc.), dur=n×timeslice estimated, degraded+finalized:false+seq gaps in missing[]; then derive |
+| manifest missing listed chunks (post-finalize late arrivals) | extend manifest (lateSeqs, closeT null, degraded); RE-derive (stale) |
+| show.json row != listing, unexplained | re-derive pid (derived vintage unknowable — conservative, converging) |
+| derived or show.json missing | plain postshow derive |
+| everything matches | noop |
+
+- Tombstone: POST /delete now writes `deleted.marker` after the sweep
+  (consent deletes survive late uploads); `?tombstone=0` purges marker+all
+  (test debris only).
+- **Proof (all on live R2)**: sweep run A derived the a1 show (legitimately
+  underived PROTO A keep: transcode 1501 ms/90 s + 26-cluster index +
+  show.json — a real reconcile find, +3.9 MB); run B **0 actions, 1042 ms
+  wall, one 331 ms listing of 198 objects**. Demo show rczdemo-20260827
+  (COPY of sync p1 chunks, kept proof untouched): 37 chunks no-finalize →
+  default gate said "settling 5s old" (rule 1); SETTLE_MIN=0 →
+  synthesize-manifest (mime sniffed h264 → copy remux) + derive + show.json
+  (rule 3); +1 late chunk → extend-manifest +re-derive, show.json
+  chunkCount 37→38 lateSeqs:[37] (rule 2); re-run 0 actions (rule 5);
+  tombstone + zombie chunk → resurrection-blocked re-delete, then
+  tombstoned-noop (rule 4); purged with ?tombstone=0 (count 0 verified).
+- Sweep cost at current bucket size (~200 objects, 3 shows): list 330-500 ms,
+  no-op sweep ~1.0-1.4 s wall total.
+
+## Playback checkpoint 3 — replay-grid promoted to ?show= (2026-08-27 ~10:17 UTC)
+
+- replay-grid.html boots from `?show=<id>`: show.json = spans (T0/skewEst/
+  dur/refs), room cuelog = CUE LANE ONLY (unreachable cuelog degrades to an
+  empty lane, not a failure); `?room=` legacy path kept intact (run-sync
+  regression still drives it). New transport UI: play/pause button, scrubber
+  with click-to-seek + per-span underlay bars + cue ticks (fired ticks
+  recolor), time readout, last-crossed-cue display. Absent-tile rendering
+  kept. buildAnchors skips closeT:null rows (synthesized manifests).
+- **verify-replay.mjs headless vs proof show — 5/5**:
+  - R1-style inter-tile skew through the NEW loading path: **p50 4 / max
+    33 ms** (samples 0/4/33; target ≤100; run-sync's own-orchestration run
+    was p50 29 / max 34 — the show.json path is equal-or-better).
+  - 2 SCRUBBER seeks (real mouse clicks on #scrub): burned-clock errs
+    30 s: p1 −49/p2 −51 ms, 70 s: p1 −65/p2 −41 ms — all in the 150 ms
+    band. Scrubber pixel quantization measured −49/0 ms (≈600 px for 84 s
+    → ~140 ms/px; the clicked-T is the grid's own truth, so this is UI
+    resolution, not sync error).
+
+## Playback checkpoint 4 — the no-ffmpeg masters path VERDICT (2026-08-27 ~10:26 UTC)
+
+replay-masters.html: untouched WebM masters via cluster index + HTTP Range
+(206 + CORS proven on the pub URL) + MSE, fresh MediaSource per seek so
+bytes-per-seek is honest; init = logical bytes [0, headerBytes), media =
+[cluster(<=t), cluster(>t+8 s)) mapped through manifest chunk sizes to
+per-object Range fetches; timestampOffset stays 0 (webm cluster timecodes
+ARE span time). verify-masters.mjs, split verdict:
+
+- **p2 (vp8): WORKS, and beats the derived-HLS path on accuracy.** Seek errs
+  **+11/+5/+5 ms** vs T0+t at 10/40/70 s (vs −29…−69 ms through hls.js —
+  no skewEst bias applied here, and MSE lands frame-exact); bytes/seek
+  **1.1–2.0 MB = 10.4–18.8 % of the 10.6 MB full file** (5–8 range reqs,
+  0.9–1.3 s cold-seek wall incl. R2 RTTs); ZERO back-steps — every cluster
+  starts on a keyframe (block index: 22 keyframes == 22 clusters).
+- **p1 (h264-in-webm): MSE REFUSES the mime.** Chrome
+  MediaSource.isTypeSupported=false for ALL of: video/webm;codecs=h264,
+  ;codecs="h264", ;codecs="avc1.42E01E", video/x-matroska;codecs="avc1.42E01E",
+  bare video/webm — even though MediaRecorder RECORDS h264-in-webm and
+  <video> plays it. The 1 kHz-timebase fight never happens; it dies at the
+  door. **Consequence: h264-in-webm masters (the 22× cheaper repackage) have
+  NO in-browser MSE replay — they need the ffmpeg remux (80 ms/75 s) or a
+  JS webm→fMP4 transmux. vp8 masters need no ffmpeg at all.**
+
+## Playback checkpoint 5 — SimpleBlock index: the hour-scale answer (2026-08-27 ~10:26 UTC)
+
+- indexer.mjs `--blocks` (BLOCKS=1): walks validated clusters' children by
+  element size (SimpleBlock 0xA3 rel-int16 + keyframe flag; BlockGroup 0xA0
+  handled w/ ReferenceBlock detection, keyflag −1 if undetectable) →
+  derived/index-blocks.json, columnar [tMs, byteOffset, keyflag].
+  Validation: a1-concat gives **2591 blocks == the ffprobe-verified 2591
+  real frames** (A5), gaps p50 33 ms, 0 bails.
+- Proof-show cost: p1 2132 / p2 2142 blocks, block walk **+1 ms** on top of
+  the ~86-105 ms cluster scan (total 10.2-12.2 ms/MB), index **38.0/38.5 KB
+  ≈ 1.8 MB per media-hour** (~20× the 1.8 KB cluster index; still trivial).
+- **R3 re-run** (verify-replay V4, tail 73 s): block anchoring cuts the
+  anchored-vs-linear mapping divergence from **±33-72 ms (cluster interp)
+  to 15-22 ms** — the ±100-270 ms interpolation noise is GONE; the residual
+  is closeT jitter + true drift. Decoded seek err at tail: linear −64/−69,
+  cluster-anchored −100/−99, **blocks −64/−99** — at 75 s scale block
+  anchoring TIES linear on p1 and is one 30 ms frame worse on p2, so
+  **linear+skew still wins at minute scale — but the mechanism now works**:
+  with mapping noise ~20 ms < the 30-50 ms/90 s drift rate, block-anchored
+  mapping overtakes linear once accumulated drift clears ~50 ms (≈2-3 min
+  of show) and is the required tool at hour scale (drift extrapolates to
+  1.2-2 s/h vs the flat ~20 ms block-anchor residual). Number reported
+  either way, as asked.
+
+### Kept / deleted (playback leg)
+
+- KEPT worker: elektron-selfrec **version 381acbe8** (adds POST /show,
+  bare GET /list sweep, delete-tombstone + ?tombstone=0 purge).
+- KEPT proof show: sync-20260827T093613 masters UNTOUCHED (38+38 chunks +
+  2 manifests byte-identical); derived/hls re-generated in place by the
+  FORCE run (same keys), + NEW: show.json (2 KB), 2× index-blocks.json
+  (76 KB). Room cuelog untouched. a1-20260827T083642 masters untouched +
+  NEW derived/hls + index.json + show.json (+3.9 MB, the reconcile run-A
+  find). **R2 selfrec/ total: 198 objects, 44.2 MB; net additions this leg
+  ≈ +4.0 MB** (budget <50 MB).
+- DELETED: rczdemo-20260827 (all phases + tombstone, ?tombstone=0,
+  list count 0 verified), showprobe-test (1 obj). Scratch UDDs + test
+  scripts removed; :8894 free; no selfrec processes (ps-verified).
+- Files: NEW postshow.mjs (+reconcile), replay-masters.html,
+  verify-replay.mjs, verify-masters.mjs; MODIFIED repackage.mjs +
+  indexer.mjs (module+CLI refactor, --blocks), replay-grid.html (show-mode
+  + transport UI + blocks mapping), collector.mjs (+replay-masters route),
+  workers/selfrec/src/index.js. Reports: artifacts/playback-report.json,
+  results/selfrec-playback.jsonl, logs/playback-*.png.
+
 ## Plan of record
 
 1. participant.html — canvas 1280x720 + captureStream(30), burned binary

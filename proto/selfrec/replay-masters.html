@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron selfrec masters replay (Range+MSE, no ffmpeg)</title>
+<style>
+html,body{margin:0;padding:0;background:#0b0e12;color:#dfe5ec;font:13px monospace}
+#wrap{padding:8px}
+video{width:640px;height:360px;background:#000;border:1px solid #2a3340;display:block}
+#bar{padding:6px 0;color:#8a93a0;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div id="wrap"><video muted playsinline></video><div id="bar">loading…</div></div>
+<script>
+// ============================================================================
+// THE NO-FFMPEG PATH — play the UNTOUCHED WebM masters straight from R2:
+//   cluster index (derived/index.json, pure-JS EBML indexer)
+//   + HTTP Range requests against the chunk objects (206 + CORS proven)
+//   + MediaSource (desktop Chrome).
+//
+// The chunk sequence is ONE logical webm byte stream; the index maps
+// t -> global byteOffset of the cluster covering t. On seek(t):
+//   1. append INIT SEGMENT  = logical bytes [0, headerBytes)   (chunk 0 head)
+//   2. append MEDIA         = logical bytes [cluster(<=t).byteOffset, end of
+//      the cluster window covering t+WINDOW) — mapped through the manifest's
+//      per-chunk sizes to per-object Range fetches.
+//   3. video.currentTime = t/1000.
+// TIMESTAMPS: MediaRecorder webm cluster timecodes are absolute on the
+// recording's own media timeline (0 = first frame), so element time IS span
+// time with timestampOffset = 0 — wall mapping stays T0 + skew + t, same
+// linear mapping the grid uses. (The known risk: the 1 kHz-timebase stream +
+// unknown-size clusters + non-keyframe cluster starts may fight MSE — every
+// failure is caught and reported with the exact error.)
+//
+// A FRESH MediaSource is built per seek: bytes-per-seek is then an honest
+// number (no reuse of previously buffered data), which is the measurement.
+// If t lands outside buffered after append (cluster didn't start on a
+// keyframe — MSE drops leading deltas until a random access point), we step
+// back one cluster and retry (counted, reported).
+//
+// Params: ?show=&pid=[&pub=][&window=8000]
+// API (driver): window.__m = {phase, error, info}
+//   await window.__seekMasters(tMs [,opts]) -> full measurement row
+//   window.__decode() -> burned-clock decode of the current frame
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const SHOW = q.get("show"), PID = q.get("pid");
+const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const WINDOW = parseInt(q.get("window") || "8000", 10);
+const video = document.querySelector("video");
+const bar = document.getElementById("bar");
+const M = window.__m = { phase: "init", error: null, info: {} };
+
+// ---- burned-row decoder (same contract as replay-grid) ----------------------
+const dec = document.createElement("canvas");
+dec.width = 1280; dec.height = 720;
+const dctx = dec.getContext("2d", { willReadFrequently: true });
+window.__decode = () => {
+  if (!video.videoWidth) return { ok: false, why: "no frame" };
+  try { dctx.drawImage(video, 0, 0, 1280, 720); } catch { return { ok: false, why: "draw" }; }
+  const img = dctx.getImageData(0, 592, 1280, 64).data;
+  const lum = (x, y) => { const i = ((y - 592) * 1280 + x) * 4; return 0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2]; };
+  const bits = [];
+  for (let i = 0; i < 64; i++) {
+    const cx = 32 + i * 12 + 6;
+    let s = 0, n = 0;
+    for (const dy of [-8, 0, 8]) for (const dx of [-2, 0, 2]) { s += lum(cx + dx, 624 + dy); n++; }
+    bits.push(s / n > 110 ? 1 : 0);
+  }
+  const bytes = [];
+  for (let b = 0; b < 8; b++) { let v = 0; for (let i = 0; i < 8; i++) v = (v << 1) | bits[b * 8 + i]; bytes.push(v); }
+  let ck = 0; for (let i = 0; i < 7; i++) ck ^= bytes[i];
+  if (ck !== bytes[7]) return { ok: false, why: "checksum" };
+  let ms = 0; for (let i = 0; i < 6; i++) ms = ms * 256 + bytes[i];
+  return { ok: true, ms, pid: String.fromCharCode(bytes[6]), videoTimeMs: Math.round(video.currentTime * 1000) };
+};
+
+// ---- byte-range plumbing ----------------------------------------------------
+let man = null, idx = null, starts = [], totalBytes = 0, initBytes = null, mimeChosen = null;
+async function rangeFetch(gLo, gHi, acct) {   // [gLo, gHi) of the LOGICAL stream
+  const parts = [];
+  for (let i = 0; i < man.chunks.length; i++) {
+    const cLo = starts[i], cHi = cLo + man.chunks[i].bytes;
+    if (cHi <= gLo || cLo >= gHi) continue;
+    const lo = Math.max(gLo, cLo) - cLo, hi = Math.min(gHi, cHi) - cLo;
+    const r = await fetch(`${PUB}/${man.chunks[i].key}`, { headers: { Range: `bytes=${lo}-${hi - 1}` } });
+    if (r.status !== 206 && r.status !== 200) throw new Error(`range ${man.chunks[i].key} [${lo},${hi}): ${r.status}`);
+    const b = new Uint8Array(await r.arrayBuffer());
+    if (b.length !== hi - lo) throw new Error(`range short read ${b.length} != ${hi - lo}`);
+    acct.requests++; acct.bytesFetched += b.length;
+    acct.ranges.push({ chunk: man.chunks[i].seq, lo, hi });
+    parts.push(b);
+  }
+  const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
+  let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+// ---- MSE session (fresh per seek — honest bytes accounting) ----------------
+function freshMediaSource(mime) {
+  return new Promise((resolve, reject) => {
+    const ms = new MediaSource();
+    const to = setTimeout(() => reject(new Error("sourceopen timeout")), 5000);
+    ms.addEventListener("sourceopen", () => {
+      clearTimeout(to);
+      try { resolve({ ms, sb: ms.addSourceBuffer(mime) }); }
+      catch (e) { reject(new Error("addSourceBuffer: " + e.message)); }
+    }, { once: true });
+    video.src = URL.createObjectURL(ms);
+  });
+}
+function appendB(sb, bytes) {
+  return new Promise((resolve, reject) => {
+    const onErr = () => reject(new Error("sourcebuffer error event (append rejected)"));
+    sb.addEventListener("updateend", () => { sb.removeEventListener("error", onErr); resolve(); }, { once: true });
+    sb.addEventListener("error", onErr, { once: true });
+    try { sb.appendBuffer(bytes); } catch (e) { reject(new Error("appendBuffer: " + e.message)); }
+  });
+}
+const bufList = () => {
+  const out = [];
+  for (let i = 0; i < video.buffered.length; i++)
+    out.push([Math.round(video.buffered.start(i) * 1000), Math.round(video.buffered.end(i) * 1000)]);
+  return out;
+};
+
+window.__seekMasters = async (tMs, opts = {}) => {
+  const t0 = performance.now();
+  const acct = { requests: 0, bytesFetched: 0, ranges: [] };
+  const row = { tMs, ok: false, backSteps: 0, ...acct };
+  try {
+    if (M.phase !== "ready") throw new Error("not ready: " + (M.error || M.phase));
+    const cl = idx.clusters;
+    let ci = 0;
+    for (let i = 0; i < cl.length; i++) if (cl[i].tMs <= tMs) ci = i;
+    const maxBack = opts.maxBack ?? 2;
+    for (let back = 0; back <= maxBack; back++) {
+      const si = Math.max(0, ci - back);
+      let ei = cl.length;
+      for (let i = si; i < cl.length; i++) if (cl[i].tMs > tMs + WINDOW) { ei = i; break; }
+      const gLo = cl[si].byteOffset, gHi = ei < cl.length ? cl[ei].byteOffset : totalBytes;
+      const { ms, sb } = await freshMediaSource(mimeChosen);
+      await appendB(sb, initBytes);
+      const media = await rangeFetch(gLo, gHi, acct);
+      await appendB(sb, media);
+      try { ms.endOfStream(); } catch {}
+      const buffered = bufList();
+      const tS = tMs / 1000;
+      const covered = buffered.some(([a, b]) => a <= tMs + 1 && tMs <= b + 1);
+      if (!covered) {
+        row.backSteps = back + 1;
+        row.retryNote = `t=${tMs} not in buffered ${JSON.stringify(buffered)} from cluster ${si} (t=${cl[si].tMs}) — stepping back`;
+        if (back === maxBack) throw new Error(`t never covered after ${maxBack} back-steps; buffered=${JSON.stringify(buffered)}`);
+        continue;
+      }
+      await new Promise((resolve, reject) => {
+        const to = setTimeout(() => reject(new Error("seeked timeout (buffered=" + JSON.stringify(bufList()) + ")")), 5000);
+        video.addEventListener("seeked", () => { clearTimeout(to); resolve(); }, { once: true });
+        video.currentTime = tS;
+      });
+      await new Promise((r) => setTimeout(r, 150));   // let the frame present
+      const d = window.__decode();
+      Object.assign(row, {
+        ok: true, requests: acct.requests, bytesFetched: acct.bytesFetched, ranges: acct.ranges,
+        startCluster: si, startClusterTMs: cl[si].tMs, windowEndCluster: ei,
+        buffered, videoTimeMs: Math.round(video.currentTime * 1000),
+        clock: d.ok ? d.ms : null, pidByte: d.ok ? d.pid : null, decodeWhy: d.why || null,
+        wallMs: Math.round(performance.now() - t0),
+      });
+      break;
+    }
+  } catch (e) {
+    Object.assign(row, { ok: false, error: String(e && e.message || e),
+      requests: acct.requests, bytesFetched: acct.bytesFetched,
+      wallMs: Math.round(performance.now() - t0) });
+  }
+  bar.textContent = JSON.stringify({ ...row, ranges: row.ranges && row.ranges.length }, null, 0);
+  return row;
+};
+
+// ---- boot -------------------------------------------------------------------
+(async () => {
+  try {
+    if (!SHOW || !PID) throw new Error("show and pid params required");
+    man = await (await fetch(`${PUB}/selfrec/${SHOW}/${PID}/manifest.json`)).json();
+    idx = await (await fetch(`${PUB}/selfrec/${SHOW}/${PID}/derived/index.json`)).json();
+    let g = 0;
+    for (const c of man.chunks) { starts.push(g); g += c.bytes; }
+    totalBytes = g;
+    // mime candidates: the recorded mime verbatim, then MSE-flavoured variants
+    const rec = man.mimeType || "video/webm";
+    const cands = [rec,
+      'video/webm;codecs="h264"', 'video/webm;codecs="avc1.42E01E"',
+      'video/x-matroska;codecs="avc1.42E01E"',
+      'video/webm;codecs="vp8"', 'video/webm;codecs="vp9"', "video/webm"];
+    const support = {};
+    for (const c of cands) support[c] = MediaSource.isTypeSupported(c);
+    // honesty rule: for an h264 recording only accept an h264-capable mime —
+    // falling through to "video/webm" (≙ vp8/vp9) would just fail at append.
+    const isH264 = /h264|avc/i.test(rec);
+    mimeChosen = cands.find((c) => support[c] && (!isH264 || /h264|avc/i.test(c))) || null;
+    M.info = { show: SHOW, pid: PID, mimeType: rec, mimeSupport: support, mimeChosen,
+               clusters: idx.clusters.length, headerBytes: idx.headerBytes,
+               totalBytes, chunks: man.chunks.length, durMs: man.durationMs,
+               T0: man.T0recStartDate, windowMs: WINDOW };
+    if (!mimeChosen) {
+      M.phase = "unsupported";
+      M.error = `MediaSource.isTypeSupported=false for all candidates of ${rec}: ` + JSON.stringify(support);
+      bar.textContent = "UNSUPPORTED: " + M.error;
+      return;
+    }
+    // init segment fetched once (bytes [0, headerBytes) of chunk 0)
+    const acct = { requests: 0, bytesFetched: 0, ranges: [] };
+    initBytes = await rangeFetch(0, idx.headerBytes, acct);
+    M.info.initBytes = initBytes.length;
+    M.phase = "ready";
+    bar.textContent = `ready: ${PID} ${rec} -> MSE "${mimeChosen}", ${idx.clusters.length} clusters, ` +
+      `${(totalBytes / 1048576).toFixed(1)} MB masters, init ${initBytes.length} B`;
+  } catch (e) {
+    M.error = String(e && e.message || e);
+    M.phase = "failed";
+    bar.textContent = "FAILED: " + M.error;
+  }
+})();
+</script>
+</body>
+</html>

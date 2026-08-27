@@ -20,6 +20,8 @@
 //        skew endpoint (rate-guarded, no storage ops; see comment below)
 //     POST /derived/<show>/<participant>/<...> -> derived artifacts (fMP4 HLS,
 //        index.json) under selfrec/<show>/<participant>/derived/
+//     POST /show/<show>                        -> selfrec/<show>/show.json
+//        (show-level manifest written by the postshow runner)
 //
 // Auth: every route needs Bearer SELFREC_TOKEN (or ?token=). Objects are
 // publicly READABLE via the bucket's r2.dev URL (already enabled for
@@ -135,11 +137,30 @@ export default {
       return j(200, { ok: true, key, size: obj.size, etag: obj.httpEtag });
     }
 
-    // ---- GET /list/<show>[/<participant>] ----------------------------------
-    if (req.method === "GET" && parts[0] === "list" && (parts.length === 2 || parts.length === 3)) {
+    // ---- POST /show/<show> — SHOW MANIFEST (postshow.mjs writes it) --------
+    // show.json lives at the SHOW level (selfrec/<show>/show.json), above the
+    // participant prefixes — none of the participant-scoped routes can write
+    // there, hence this route. It is the replay entrypoint: participants[]
+    // with T0/skewEst/dur/hls/masters/index refs. The consent delete
+    // (POST /delete/<show>) sweeps it with everything else.
+    if (req.method === "POST" && parts[0] === "show" && parts.length === 2) {
+      const show = parts[1];
+      if (!ID.test(show)) return j(400, { error: "bad path" });
+      const body = await req.text();
+      if (body.length > MAX_MANIFEST) return j(413, { error: "manifest too large" });
+      try { JSON.parse(body); } catch { return j(400, { error: "manifest not json" }); }
+      const key = `selfrec/${show}/show.json`;
+      const obj = await env.ARCHIVE.put(key, body, { httpMetadata: { contentType: "application/json" } });
+      return j(200, { ok: true, key, size: obj.size });
+    }
+
+    // ---- GET /list[/<show>[/<participant>]] --------------------------------
+    // Bare GET /list sweeps the WHOLE selfrec/ prefix — the reconcile mode's
+    // single source of truth ("engine starts whenever — it reconciles R2").
+    if (req.method === "GET" && parts[0] === "list" && parts.length <= 3) {
       const ids = parts.slice(1);
       if (!ids.every((p) => ID.test(p))) return j(400, { error: "bad path" });
-      const prefix = "selfrec/" + ids.join("/") + "/";
+      const prefix = ids.length ? "selfrec/" + ids.join("/") + "/" : "selfrec/";
       const objects = [];
       let cursor;
       do {
@@ -151,6 +172,11 @@ export default {
     }
 
     // ---- POST /delete/<show> — the consent story: one prefix, gone ---------
+    // A TOMBSTONE (deleted.marker) is written after the sweep: chunk uploads
+    // can arrive AFTER a consent delete (a dead tab's elastic buffer draining
+    // late), and the reconcile mode must never re-derive a deleted show —
+    // the marker is what it checks. ?tombstone=0 purges marker and all
+    // (test-debris cleanup; consent deletes keep the default marker).
     if (req.method === "POST" && parts[0] === "delete" && parts.length === 2) {
       const show = parts[1];
       if (!ID.test(show)) return j(400, { error: "bad path" });
@@ -162,7 +188,13 @@ export default {
         if (keys.length) { await env.ARCHIVE.delete(keys); deleted += keys.length; }
         cursor = r.truncated ? r.cursor : null;
       } while (cursor);
-      return j(200, { ok: true, prefix, deleted });
+      const tombstone = url.searchParams.get("tombstone") !== "0";
+      if (tombstone) {
+        await env.ARCHIVE.put(`${prefix}deleted.marker`,
+          JSON.stringify({ deletedAt: Date.now(), deletedObjects: deleted }),
+          { httpMetadata: { contentType: "application/json" } });
+      }
+      return j(200, { ok: true, prefix, deleted, tombstone });
     }
 
     return j(404, { error: "no route" });

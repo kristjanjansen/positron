@@ -1,0 +1,293 @@
+{
+  "grid_promoted": {
+    "show": "sync-20260827T093613",
+    "T0": 1787823376294,
+    "V2": {
+      "samples": [
+        {
+          "atS": 15.03,
+          "clockA": 1787823391280,
+          "clockB": 1787823391247,
+          "interTileSkewMs": 33,
+          "tileErrA": -45,
+          "tileErrB": -78
+        },
+        {
+          "atS": 35.04,
+          "clockA": 1787823411283,
+          "clockB": 1787823411279,
+          "interTileSkewMs": 4,
+          "tileErrA": -52,
+          "tileErrB": -56
+        },
+        {
+          "atS": 65.05,
+          "clockA": 1787823441279,
+          "clockB": 1787823441279,
+          "interTileSkewMs": 0,
+          "tileErrA": -64,
+          "tileErrB": -64
+        }
+      ],
+      "p50": 4,
+      "max": 33,
+      "targetMs": 100
+    },
+    "V3": {
+      "rows": [
+        {
+          "intendedT": 1787823406294,
+          "offS": 30,
+          "clickedT": 1787823406245,
+          "pixelQuantMs": -49,
+          "tiles": {
+            "p1": {
+              "absent": false,
+              "clock": 1787823406196,
+              "errMs": -49
+            },
+            "p2": {
+              "absent": false,
+              "clock": 1787823406194,
+              "errMs": -51
+            }
+          }
+        },
+        {
+          "intendedT": 1787823446294,
+          "offS": 70,
+          "clickedT": 1787823446294,
+          "pixelQuantMs": 0,
+          "tiles": {
+            "p1": {
+              "absent": false,
+              "clock": 1787823446229,
+              "errMs": -65
+            },
+            "p2": {
+              "absent": false,
+              "clock": 1787823446253,
+              "errMs": -41
+            }
+          }
+        }
+      ],
+      "bandMs": 150
+    },
+    "V4": {
+      "tailAtS": 73,
+      "divergenceVsLinearAtTail": {
+        "p1": {
+          "cluster": 55.9,
+          "blocks": 15
+        },
+        "p2": {
+          "cluster": 32.8,
+          "blocks": 18
+        }
+      },
+      "divergenceVsLinearAtHead": {
+        "p1": {
+          "cluster": 56.4,
+          "blocks": 19
+        },
+        "p2": {
+          "cluster": -71.7,
+          "blocks": 22
+        }
+      },
+      "decodedErrAtTail": {
+        "linear": {
+          "p1": -64,
+          "p2": -69
+        },
+        "anchored": {
+          "p1": -100,
+          "p2": -99
+        },
+        "blocks": {
+          "p1": -64,
+          "p2": -99
+        }
+      },
+      "note": "decodedErr = burned clock - playhead T at the 73 s tail; block anchoring wins iff |blocks| < |linear|"
+    },
+    "checks": [
+      {
+        "name": "V1-boot-from-show-json",
+        "ok": true,
+        "detail": "mode=show spans=p1,p2 cues=RCUE-20,RCUE-40,RCUE-60 cueLane=cuelog"
+      },
+      {
+        "name": "V1-block-anchors-loaded",
+        "ok": true,
+        "detail": "blocks mapping p1=true p2=true"
+      },
+      {
+        "name": "V2-inter-tile-skew-new-path",
+        "ok": true,
+        "detail": "p50=4 max=33 (0,4,33)"
+      },
+      {
+        "name": "V3-scrubber-seeks",
+        "ok": true,
+        "detail": "30s(quant-49ms): p1 -49ms / p2 -51ms | 70s(quant+0ms): p1 -65ms / p2 -41ms"
+      },
+      {
+        "name": "V4-block-anchor-measured",
+        "ok": true,
+        "detail": "tail err linear p1=-64/p2=-69, cluster-anchored p1=-100/p2=-99, BLOCKS p1=-64/p2=-99 — winner p1:linear p2:linear"
+      }
+    ]
+  },
+  "updatedAt": "2026-08-27T10:26:18.762Z",
+  "masters_mse": {
+    "show": "sync-20260827T093613",
+    "participants": {
+      "p1": {
+        "phase": "unsupported",
+        "error": "MediaSource.isTypeSupported=false for all candidates of video/webm;codecs=h264: {\"video/webm;codecs=h264\":false,\"video/webm;codecs=\\\"h264\\\"\":false,\"video/webm;codecs=\\\"avc1.42E01E\\\"\":false,\"video/x-matroska;codecs=\\\"avc1.42E01E\\\"\":false,\"video/webm;codecs=\\\"vp8\\\"\":true,\"video/webm;codecs=\\\"vp9\\\"\":true,\"video/webm\":false}",
+        "info": {
+          "show": "sync-20260827T093613",
+          "pid": "p1",
+          "mimeType": "video/webm;codecs=h264",
+          "mimeSupport": {
+            "video/webm;codecs=h264": false,
+            "video/webm;codecs=\"h264\"": false,
+            "video/webm;codecs=\"avc1.42E01E\"": false,
+            "video/x-matroska;codecs=\"avc1.42E01E\"": false,
+            "video/webm;codecs=\"vp8\"": true,
+            "video/webm;codecs=\"vp9\"": true,
+            "video/webm": false
+          },
+          "mimeChosen": null,
+          "clusters": 22,
+          "headerBytes": 151,
+          "totalBytes": 7423325,
+          "chunks": 38,
+          "durMs": 75100,
+          "T0": 1787823376294,
+          "windowMs": 8000
+        },
+        "seeks": []
+      },
+      "p2": {
+        "phase": "ready",
+        "error": null,
+        "info": {
+          "show": "sync-20260827T093613",
+          "pid": "p2",
+          "mimeType": "video/webm;codecs=vp8",
+          "mimeSupport": {
+            "video/webm;codecs=vp8": true,
+            "video/webm;codecs=\"h264\"": false,
+            "video/webm;codecs=\"avc1.42E01E\"": false,
+            "video/x-matroska;codecs=\"avc1.42E01E\"": false,
+            "video/webm;codecs=\"vp8\"": true,
+            "video/webm;codecs=\"vp9\"": true,
+            "video/webm": false
+          },
+          "mimeChosen": "video/webm;codecs=vp8",
+          "clusters": 22,
+          "headerBytes": 145,
+          "totalBytes": 10842374,
+          "chunks": 38,
+          "durMs": 75105,
+          "T0": 1787823383116,
+          "windowMs": 8000,
+          "initBytes": 145
+        },
+        "seeks": [
+          {
+            "tMs": 10000,
+            "ok": true,
+            "errMs": 11,
+            "clock": 1787823393127,
+            "pidByte": "2",
+            "videoTimeMs": 10000,
+            "bytesFetched": 2038653,
+            "requests": 8,
+            "pctOfFull": 18.8,
+            "backSteps": 0,
+            "wallMs": 1290,
+            "startClusterTMs": 6961,
+            "buffered": [
+              [
+                6961,
+                21156
+              ]
+            ],
+            "error": null,
+            "decodeWhy": null
+          },
+          {
+            "tMs": 40000,
+            "ok": true,
+            "errMs": 5,
+            "clock": 1787823423121,
+            "pidByte": "2",
+            "videoTimeMs": 40000,
+            "bytesFetched": 1432109,
+            "requests": 6,
+            "pctOfFull": 13.2,
+            "backSteps": 0,
+            "wallMs": 1333,
+            "startClusterTMs": 38877,
+            "buffered": [
+              [
+                38877,
+                49335
+              ]
+            ],
+            "error": null,
+            "decodeWhy": null
+          },
+          {
+            "tMs": 70000,
+            "ok": true,
+            "errMs": 5,
+            "clock": 1787823453121,
+            "pidByte": "2",
+            "videoTimeMs": 70000,
+            "bytesFetched": 1132891,
+            "requests": 5,
+            "pctOfFull": 10.4,
+            "backSteps": 0,
+            "wallMs": 926,
+            "startClusterTMs": 67222,
+            "buffered": [
+              [
+                67222,
+                75075
+              ]
+            ],
+            "error": null,
+            "decodeWhy": null
+          }
+        ]
+      }
+    },
+    "checks": [
+      {
+        "name": "M-p1-boot",
+        "ok": false,
+        "detail": "unsupported: MediaSource.isTypeSupported=false for all candidates of video/webm;codecs=h264: {\"video/webm;codecs=h264\":false,\"video/webm;codecs=\\\"h264\\\"\":false,\"video/webm;codecs=\\\"avc1.42E01E\\\"\":false,\"video/x-matroska;codecs=\\\"avc1.42E01E\\\"\":false,\"video/webm;codecs=\\\"vp8\\\"\":true,\"video/webm;codecs=\\\"vp9\\\"\":true,\"video/webm\":false}"
+      },
+      {
+        "name": "M-p2-boot",
+        "ok": true,
+        "detail": "mime \"video/webm;codecs=vp8\" -> MSE \"video/webm;codecs=vp8\", 22 clusters, init 145 B"
+      },
+      {
+        "name": "M-p2-seeks",
+        "ok": true,
+        "detail": "10s: 11 ms, 1991 KB (18.8%) | 40s: 5 ms, 1399 KB (13.2%) | 70s: 5 ms, 1106 KB (10.4%)"
+      },
+      {
+        "name": "M-p2-band150",
+        "ok": true,
+        "detail": "errs 11/5/5 ms (informational band ±150)"
+      }
+    ]
+  }
+}

@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 // ============================================================================
-// SERVERLESS-shaped webm cluster indexer — the no-ffmpeg CF path.
+// SERVERLESS-shaped webm indexer — the no-ffmpeg CF path.
 //
 // The chunk sequence selfrec/<show>/<pid>/chunk-*.webm is ONE logical webm
 // byte stream (only chunk 0 has the EBML/Segment header). This parses that
-// stream with ZERO deps (pure JS, no ffmpeg, no wasm) and emits a cluster
-// index:   [{tMs, chunkSeq, offsetInChunk, byteOffset}]
-// -> selfrec/<show>/<pid>/derived/index.json
+// stream with ZERO deps (pure JS, no ffmpeg, no wasm) and emits:
+//
+//   CLUSTER index (default):  [{tMs, chunkSeq, offsetInChunk, byteOffset}]
+//      -> selfrec/<show>/<pid>/derived/index.json
+//   BLOCK index (--blocks / BLOCKS=1): per-SimpleBlock rows [tMs, byteOffset,
+//      keyflag] (columnar arrays, ~3 kB/min vs objects) — the hour-scale
+//      re-anchoring question needs sub-cluster byte->time granularity.
+//      -> selfrec/<show>/<pid>/derived/index-blocks.json
 //
 // Replay without ffmpeg then works via HTTP Range requests + MSE: send the
 // init segment (bytes [0, firstClusterOffset) of chunk 0 = EBML header +
@@ -20,13 +25,16 @@
 // the next element inside must be Timecode (0xE7, 1-8 byte uint) and the
 // timecode must be plausibly monotonic. False positives (the pattern inside
 // compressed payload) fail validation and are counted, not indexed.
+// SimpleBlocks DO carry sizes, so within a validated cluster the block pass
+// is a proper element walk (no scanning) bounded by the next cluster offset.
 // TimecodeScale is read from Segment Info (default 1_000_000 ns = 1 ms tick).
 //
-// The core (indexWebmBuffer) takes bytes + chunk boundaries — exactly what a
-// Worker cron would have after R2 get()s — and is measured per-MB so the
-// Worker CPU-limit question (free 10 ms vs paid 30 s) gets a real number.
+// The cores (indexWebmBuffer / indexWebmBlocks) take bytes + chunk boundaries
+// — exactly what a Worker cron would have after R2 get()s — and are measured
+// per-MB so the Worker CPU-limit question gets a real number.
 //
-// Usage: SHOW=<show> PID=<pid> [LOCAL=<dir with chunk-*.webm>] node indexer.mjs
+// CLI:    SHOW=<show> PID=<pid> [BLOCKS=1] [LOCAL=<dir>] node indexer.mjs [--blocks]
+// module: await indexParticipant({ show, pid, blocks?, results? })
 // ============================================================================
 import fs from "fs";
 
@@ -34,8 +42,6 @@ const ROOT = "/Users/s32863/personal/elektron";
 const HERE = `${ROOT}/proto/selfrec`;
 const BASE = "https://elektron-selfrec.kristjan-jansen.workers.dev";
 const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
-const SHOW = process.env.SHOW, PID = process.env.PID;
-const RESULTS = process.env.RESULTS || `${ROOT}/results/selfrec-sync.jsonl`;
 
 function ts() { return new Date().toISOString().slice(11, 23); }
 function say(...a) { console.log(ts(), "idx|", ...a); }
@@ -62,8 +68,18 @@ function readUint(buf, off, len) {
   for (let i = 0; i < len; i++) v = v * 256 + buf[off + i];
   return v;
 }
+// Element ID length from the first byte (IDs keep their marker bit — we only
+// need the byte length to step over them; matching uses the first byte since
+// all cluster-level children of interest have 1-byte IDs).
+function idLen(first) {
+  if (first & 0x80) return 1;
+  if (first & 0x40) return 2;
+  if (first & 0x20) return 3;
+  if (first & 0x10) return 4;
+  return 0; // invalid
+}
 
-// ---- the serverless-shaped core --------------------------------------------
+// ---- core 1: cluster index --------------------------------------------------
 // buf: Uint8Array of the LOGICAL stream (chunks concatenated)
 // bounds: [{seq, start}] ascending — chunk seq for a global offset
 // Returns {timecodeScale, clusters, headerBytes, falsePositives}
@@ -104,24 +120,85 @@ export function indexWebmBuffer(buf, bounds) {
     if (tMs < lastT - 1000 || tMs > lastT + 600000) { falsePositives++; continue; } // monotonic-ish
     const b = chunkFor(i);
     if (headerBytes == null) headerBytes = i;                  // init segment = [0, firstCluster)
-    clusters.push({ tMs: Math.round(tMs), chunkSeq: b.seq, offsetInChunk: i - b.start, byteOffset: i });
+    clusters.push({ tMs: Math.round(tMs), chunkSeq: b.seq, offsetInChunk: i - b.start, byteOffset: i,
+                    childrenAt: inner });                      // block pass entry point
     lastT = tMs;
     i = inner + tsz.length + tsz.value;                        // skip past validated Timecode (loop i++ lands after it)
   }
   return { timecodeScale, clusters, headerBytes, falsePositives };
 }
 
+// ---- core 2: SimpleBlock index ---------------------------------------------
+// Walks each validated cluster's children (Timecode, SimpleBlock, BlockGroup,
+// Void...) bounded by the next cluster's byte offset. Emits columnar rows
+// [tMs, byteOffset, keyflag]; keyflag: 1 = SimpleBlock keyframe bit set,
+// 0 = not a keyframe, -1 = undetectable (Block-in-BlockGroup without walking
+// ReferenceBlock — flagged, not guessed).
+// Returns {blocks, bailed} — `bailed` counts clusters abandoned mid-walk on a
+// malformed element (their remaining blocks are simply absent, stated).
+export function indexWebmBlocks(buf, clusterIdx) {
+  const { timecodeScale, clusters } = clusterIdx;
+  const blocks = [];
+  let bailed = 0;
+  for (let ci = 0; ci < clusters.length; ci++) {
+    const cl = clusters[ci];
+    const end = ci + 1 < clusters.length ? clusters[ci + 1].byteOffset : buf.length;
+    let p = cl.childrenAt;
+    let ok = true;
+    while (p < end - 1) {
+      const il = idLen(buf[p]);
+      if (!il) { ok = false; break; }
+      const id1 = buf[p];
+      const sz = readVint(buf, p + il);
+      if (!sz || sz.unknown || p + il + sz.length + sz.value > buf.length) { ok = false; break; }
+      const q = p + il + sz.length;
+      if (id1 === 0xa3) {                                     // SimpleBlock
+        const tr = readVint(buf, q);
+        if (!tr) { ok = false; break; }
+        const rel = (buf[q + tr.length] << 8 | buf[q + tr.length + 1]) << 16 >> 16; // int16
+        const flags = buf[q + tr.length + 2];
+        const tMs = (cl.tMs * 1e6 / timecodeScale + rel) * timecodeScale / 1e6;
+        blocks.push([Math.round(tMs), p, (flags & 0x80) ? 1 : 0]);
+      } else if (id1 === 0xa0) {                              // BlockGroup: find Block 0xA1 + ReferenceBlock 0xFB
+        let bp = q, bT = null, hasRef = false;
+        while (bp < q + sz.value - 1) {
+          const bil = idLen(buf[bp]);
+          if (!bil) break;
+          const bsz = readVint(buf, bp + bil);
+          if (!bsz || bsz.unknown) break;
+          if (buf[bp] === 0xa1 && bT == null) {
+            const tr = readVint(buf, bp + bil + bsz.length);
+            if (tr) {
+              const rel = (buf[bp + bil + bsz.length + tr.length] << 8 |
+                           buf[bp + bil + bsz.length + tr.length + 1]) << 16 >> 16;
+              bT = (cl.tMs * 1e6 / timecodeScale + rel) * timecodeScale / 1e6;
+            }
+          }
+          if (buf[bp] === 0xfb) hasRef = true;
+          bp += bil + bsz.length + bsz.value;
+        }
+        if (bT != null) blocks.push([Math.round(bT), p, hasRef ? 0 : -1]);
+      }
+      // 0xE7 Timecode / 0xEC Void / 0xAB PrevSize etc: just step over
+      p = q + sz.value;
+    }
+    if (!ok && p < end - 4) bailed++;   // malformed before the cluster's real end
+  }
+  return { blocks, bailed };
+}
+
 // ---- node wrapper: fetch, measure, upload -----------------------------------
-const run = async () => {
-  if (!SHOW || !PID) { console.error("SHOW and PID required"); process.exit(1); }
+export async function indexParticipant({ show, pid, blocks = false,
+    results = `${ROOT}/results/selfrec-sync.jsonl`, local = null } = {}) {
+  if (!show || !pid) throw new Error("show and pid required");
   const TOKEN = fs.readFileSync(`${HERE}/.env.selfrec`, "utf8").trim().split("=")[1];
-  const man = await (await fetch(`${PUB}/selfrec/${SHOW}/${PID}/manifest.json`)).json();
+  const man = await (await fetch(`${PUB}/selfrec/${show}/${pid}/manifest.json`)).json();
   const parts = [], bounds = [];
   let g = 0;
   const tFetch = Date.now();
   for (const c of man.chunks) {
     let b;
-    if (process.env.LOCAL) b = fs.readFileSync(`${process.env.LOCAL}/chunk-${String(c.seq).padStart(5, "0")}.webm`);
+    if (local) b = fs.readFileSync(`${local}/chunk-${String(c.seq).padStart(5, "0")}.webm`);
     else b = Buffer.from(await (await fetch(`${PUB}/${c.key}`)).arrayBuffer());
     bounds.push({ seq: c.seq, start: g });
     parts.push(b); g += b.length;
@@ -135,38 +212,99 @@ const run = async () => {
   const mb = buf.length / 1048576;
   const msPerMB = +(parseMs / mb).toFixed(2);
 
-  const index = {
-    show: SHOW, pid: PID, mimeType: man.mimeType,
-    timecodeScale: idx.timecodeScale,
-    headerBytes: idx.headerBytes,               // init segment = chunk0[0, headerBytes)
-    clusterCount: idx.clusters.length,
-    firstTMs: idx.clusters[0] && idx.clusters[0].tMs,
-    lastTMs: idx.clusters.length ? idx.clusters[idx.clusters.length - 1].tMs : null,
-    falsePositives: idx.falsePositives,
-    stats: { bytes: buf.length, chunks: man.chunks.length, fetchMs, parseMs, msPerMB },
-    clusters: idx.clusters,
-  };
-  const body = JSON.stringify(index);
-  const r = await fetch(`${BASE}/derived/${SHOW}/${PID}/index.json`, {
+  let report, body, dest;
+  if (blocks) {
+    // ---- BLOCK mode: emit index-blocks.json --------------------------------
+    const tB = Date.now();
+    const blk = indexWebmBlocks(buf, idx);
+    const blockParseMs = Date.now() - tB;
+    const keyframes = blk.blocks.filter((b) => b[2] === 1).length;
+    const undetectable = blk.blocks.filter((b) => b[2] === -1).length;
+    const spanMs = blk.blocks.length ? blk.blocks[blk.blocks.length - 1][0] - blk.blocks[0][0] : 0;
+    const index = {
+      show, pid, mimeType: man.mimeType,
+      timecodeScale: idx.timecodeScale, headerBytes: idx.headerBytes,
+      cols: ["tMs", "byteOffset", "keyflag"],   // keyflag 1=key 0=delta -1=undetectable
+      blockCount: blk.blocks.length, keyframes, undetectable, bailedClusters: blk.bailed,
+      firstTMs: blk.blocks[0] && blk.blocks[0][0],
+      lastTMs: blk.blocks.length ? blk.blocks[blk.blocks.length - 1][0] : null,
+      stats: { bytes: buf.length, chunks: man.chunks.length, fetchMs,
+               clusterParseMs: parseMs, blockParseMs, msPerMB },
+      blocks: blk.blocks,
+    };
+    body = JSON.stringify(index);
+    dest = `index-blocks.json`;
+    report = {
+      kind: "indexer-blocks", show, pid,
+      bytes: buf.length, mb: +mb.toFixed(2),
+      clusters: idx.clusters.length, blocks: blk.blocks.length,
+      keyframes, undetectable, bailedClusters: blk.bailed,
+      medianBlockGapMs: medianGap(blk.blocks),
+      spanMs, manifestDurMs: man.durationMs,
+      clusterParseMs: parseMs, blockParseMs, totalParseMs: parseMs + blockParseMs,
+      msPerMB: +((parseMs + blockParseMs) / mb).toFixed(2),
+      fetchMs, indexBytes: body.length,
+      indexBytesPerMediaHour: Math.round(body.length / Math.max(1, spanMs) * 3600e3),
+      workerCronFit: { freeTier10ms: parseMs + blockParseMs <= 10, paidTier30s: parseMs + blockParseMs <= 30000 },
+    };
+  } else {
+    // ---- CLUSTER mode (unchanged wire format: index.json) ------------------
+    const clusters = idx.clusters.map(({ childrenAt, ...c }) => c);  // childrenAt is internal
+    const index = {
+      show, pid, mimeType: man.mimeType,
+      timecodeScale: idx.timecodeScale,
+      headerBytes: idx.headerBytes,               // init segment = chunk0[0, headerBytes)
+      clusterCount: clusters.length,
+      firstTMs: clusters[0] && clusters[0].tMs,
+      lastTMs: clusters.length ? clusters[clusters.length - 1].tMs : null,
+      falsePositives: idx.falsePositives,
+      stats: { bytes: buf.length, chunks: man.chunks.length, fetchMs, parseMs, msPerMB },
+      clusters,
+    };
+    body = JSON.stringify(index);
+    dest = `index.json`;
+    report = {
+      kind: "indexer", show, pid,
+      bytes: buf.length, mb: +mb.toFixed(2), clusters: clusters.length,
+      falsePositives: idx.falsePositives, headerBytes: idx.headerBytes,
+      spanMs: index.lastTMs - index.firstTMs, manifestDurMs: man.durationMs,
+      parseMs, msPerMB, fetchMs, indexBytes: body.length,
+      // the Worker-cron verdict inputs: CPU ms for THIS recording, and per-MB
+      workerCronFit: { freeTier10ms: parseMs <= 10, paidTier30s: parseMs <= 30000 },
+    };
+  }
+  const r = await fetch(`${BASE}/derived/${show}/${pid}/${dest}`, {
     method: "POST", headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" }, body,
   });
-  if (!r.ok) throw new Error("index upload failed " + r.status);
+  if (!r.ok) throw new Error(`${dest} upload failed ` + r.status);
 
-  const report = {
-    kind: "indexer", show: SHOW, pid: PID,
-    bytes: buf.length, mb: +mb.toFixed(2), clusters: idx.clusters.length,
-    falsePositives: idx.falsePositives, headerBytes: idx.headerBytes,
-    spanMs: index.lastTMs - index.firstTMs, manifestDurMs: man.durationMs,
-    parseMs, msPerMB, fetchMs, indexBytes: body.length,
-    // the Worker-cron verdict inputs: CPU ms for THIS recording, and per-MB
-    workerCronFit: { freeTier10ms: parseMs <= 10, paidTier30s: parseMs <= 30000 },
-  };
-  fs.appendFileSync(RESULTS, JSON.stringify({ t: Date.now(), ...report }) + "\n");
-  say(`DONE ${idx.clusters.length} clusters from ${mb.toFixed(1)} MB in ${parseMs} ms ` +
-      `(${msPerMB} ms/MB), span ${report.spanMs} ms vs manifest ${man.durationMs} ms, ` +
-      `falsePos=${idx.falsePositives}`);
-  console.log("REPORT " + JSON.stringify(report));
-};
+  fs.appendFileSync(results, JSON.stringify({ t: Date.now(), ...report }) + "\n");
+  if (blocks) {
+    say(`DONE blocks: ${report.blocks} blocks (${report.keyframes} key) from ${mb.toFixed(1)} MB in ` +
+        `${report.totalParseMs} ms (${report.msPerMB} ms/MB), index ${report.indexBytes} B ` +
+        `(${report.indexBytesPerMediaHour} B/media-hour), bailed=${report.bailedClusters}`);
+  } else {
+    say(`DONE ${report.clusters} clusters from ${mb.toFixed(1)} MB in ${parseMs} ms ` +
+        `(${msPerMB} ms/MB), span ${report.spanMs} ms vs manifest ${man.durationMs} ms, ` +
+        `falsePos=${report.falsePositives}`);
+  }
+  return report;
+}
+function medianGap(rows) {
+  if (rows.length < 2) return null;
+  const gaps = [];
+  for (let i = 1; i < rows.length; i++) gaps.push(rows[i][0] - rows[i - 1][0]);
+  gaps.sort((a, b) => a - b);
+  return gaps[gaps.length >> 1];
+}
+
+// ---- CLI (run-sync.mjs spawns this) ----------------------------------------
 if (process.argv[1] && process.argv[1].endsWith("indexer.mjs")) {
-  run().catch((e) => { console.error(ts(), "idx FATAL:", e.message || e); process.exit(1); });
+  indexParticipant({
+    show: process.env.SHOW, pid: process.env.PID,
+    blocks: !!process.env.BLOCKS || process.argv.includes("--blocks"),
+    results: process.env.RESULTS || `${ROOT}/results/selfrec-sync.jsonl`,
+    local: process.env.LOCAL || null,
+  }).then((report) => console.log("REPORT " + JSON.stringify(report)))
+    .catch((e) => { console.error(ts(), "idx FATAL:", e.message || e); process.exit(1); });
 }
