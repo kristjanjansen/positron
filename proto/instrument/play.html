@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>play a remote instrument</title>
+<style>
+  :root {
+    --bg:#0e1012; --panel:#16191d; --line:#262b31; --ink:#d7dde3; --dim:#7d8791;
+    --ok:#7fd18a; --bad:#e2726e; --warn:#e0b862; --hot:#79b8ff;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { display:flex; align-items:baseline; gap:14px; padding:10px 16px;
+           border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:13px; margin:0; letter-spacing:.14em; text-transform:uppercase; }
+  header .sub { color:var(--dim); }
+  header a { color:var(--hot); }
+  main { display:grid; grid-template-columns:360px 1fr; gap:14px; padding:14px 16px; align-items:start; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:11px 12px; margin-bottom:14px; }
+  h2 { font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--dim); margin:0 0 9px; font-weight:600; }
+  button, select { font:inherit; background:#1d232a; color:var(--ink); border:1px solid var(--line);
+                   border-radius:3px; padding:5px 7px; width:100%; cursor:pointer; }
+  button:hover:not(:disabled) { background:#26303a; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.go { background:#1e3a2a; border-color:#2f5f45; color:var(--ok); }
+  button.stop { background:#3a1f1e; border-color:#5f302f; color:var(--bad); }
+  .row { display:flex; gap:7px; } .row > * { flex:1; }
+  .card { border:1px solid var(--line); border-radius:4px; padding:8px 9px; margin-bottom:8px; background:#12151a; }
+  .card.sel { border-color:#2f5f45; background:#141d18; }
+  .card .nm { font-size:13px; }
+  .card .meta { color:var(--dim); }
+  .pill { display:inline-block; padding:0 6px; border-radius:9px; border:1px solid var(--line); font-size:11px; }
+  .pill.on { color:var(--ok); border-color:#2f5f45; }
+  .pill.off { color:var(--dim); }
+  .pill.busy { color:var(--warn); border-color:#5f4c2f; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:2px 0; vertical-align:top; }
+  td.k { color:var(--dim); width:150px; }
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .dim{color:var(--dim)}
+  .num { font-size:22px; }
+  video { width:100%; max-width:520px; aspect-ratio:16/9; background:#000; border:1px solid var(--line); border-radius:4px; display:block; }
+  #keys { display:flex; gap:4px; margin-top:9px; }
+  #keys div { flex:1; text-align:center; padding:16px 0 8px; background:#12151a;
+              border:1px solid var(--line); border-radius:3px; color:var(--dim); }
+  #keys div.lit { background:#1e3a2a; border-color:#2f5f45; color:var(--ok); }
+  #feed { height:160px; overflow-y:auto; font-size:11px; }
+  #feed div { border-bottom:1px solid #1c2126; padding:1px 0; }
+  #feed div.replay { color:var(--warn); }
+  #log { height:120px; overflow-y:auto; white-space:pre-wrap; font-size:11px; color:var(--dim); }
+  .hint { color:var(--dim); font-size:11px; margin-top:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Play a remote instrument</h1>
+  <span class="sub">someone else's hardware, your fingers · <span id="pstate">booting</span></span>
+  <span style="margin-left:auto"><a href="/host.html">I own a synth — host it ↗</a></span>
+</header>
+
+<main>
+<div>
+  <section>
+    <h2>Catalog</h2>
+    <div id="list" class="dim">loading…</div>
+    <button id="b-refresh" style="margin-top:7px">Refresh</button>
+  </section>
+
+  <section>
+    <h2>Session</h2>
+    <div class="row">
+      <button id="b-req" class="go" disabled>Request session</button>
+      <button id="b-end" class="stop" disabled>End</button>
+    </div>
+    <div id="reqstate" class="hint">Pick an instrument.</div>
+  </section>
+
+  <section>
+    <h2>Input</h2>
+    <select id="midiin"><option value="">— computer keyboard (A S D F G H J K L ;) —</option></select>
+    <div id="keys"></div>
+    <div class="hint">Hold to sustain, release to send note-off. Shift = octave up.</div>
+  </section>
+</div>
+
+<div>
+  <section>
+    <h2>HUD</h2>
+    <table>
+      <tr><td class="k">connection</td><td id="h-conn" class="dim">—</td></tr>
+      <tr><td class="k">session setup</td><td id="h-setup" class="dim">—</td></tr>
+      <tr><td class="k">notes sent</td><td id="h-sent" class="num">0</td></tr>
+      <tr><td class="k">one-way MIDI (p50)</td><td id="h-ow" class="num dim">—</td></tr>
+      <tr><td class="k">key → ear round trip</td><td id="h-ear" class="num dim">—</td></tr>
+      <tr><td class="k">audio onsets heard</td><td id="h-ons" class="dim">0</td></tr>
+      <tr><td class="k">clock</td><td id="h-clock" class="dim">—</td></tr>
+      <tr><td class="k">timeline log</td><td id="h-log" class="dim">0 events</td></tr>
+    </table>
+    <div class="row" style="margin-top:9px">
+      <button id="b-dl">Download session (JSONL)</button>
+      <button id="b-replay">Replay through the same path</button>
+    </div>
+    <div class="hint">Replay re-fires the log through the identical actuate path
+      — the recording and the performance are one artefact.</div>
+  </section>
+
+  <section>
+    <h2>The instrument, returning</h2>
+    <video id="vid" autoplay playsinline></video>
+  </section>
+
+  <section>
+    <h2>Events</h2>
+    <div id="feed"></div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <div id="log"></div>
+  </section>
+</div>
+</main>
+
+<script type="module" src="/play.js"></script>
+</body>
+</html>
