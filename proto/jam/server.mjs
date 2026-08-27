@@ -109,10 +109,11 @@ const server = http.createServer(async (req, res) => {
       res.end('{"ok":true}');
       return;
     }
-    // static
+    // static (/timeline/* is aliased to the repo's shared timeline library so
+    // the demo imports the SAME transport.mjs the lab measured — no copy)
     const rel = normalize(p === '/' ? '/harness/bench.html' : p).replace(/^\/+/, '');
     if (rel.includes('..')) { res.writeHead(403); res.end(); return; }
-    const file = join(ROOT, rel);
+    const file = rel.startsWith('timeline/') ? join(ROOT, '..', '..', rel) : join(ROOT, rel);
     try {
       const data = await readFile(file);
       const ext = rel.split('.').pop();

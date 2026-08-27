@@ -343,6 +343,77 @@ research/music-jamming-2026-08.md — not touched here.
     :8893 free; proto/instrument/ and workers/instrument/ untouched; d14 public relay
     only, session-suffixed namespaces per run (§13.4).
 
+- **C11 (UNIFICATION — jam.html is the timeline library's FIRST real client)**.
+  Until now `timeline/transport.mjs` was proven only in its own lab; every proto
+  hand-rolled its replay loop. jam.html's replay is now the library's.
+  Files: **jam-timeline.js NEW (105 lines)** — the jam⇄library seam; jam-core.js
+  +103/−21; jam.html +44; server.mjs +3/−2 (`/timeline/*` aliased to the repo
+  library so the demo imports the SAME file the lab measured, no copy);
+  harness/run-demo.mjs +107/−4 (transport asserts); harness/cdp.mjs +6/−2
+  (page/console error capture). **The live duet path was not touched** — it still
+  runs on its own 25 ms/120 ms audio-lookahead loop and its own owMs HUD.
+  - Replay = `createTransport()` (wall clock) + `createScheduler(tick 25 /
+    horizon 100 / grace 150, `workerTickHost`)` feeding the EXISTING `actuate()`.
+    Position domain = ms since the first logged event + 250 ms lead-in (so
+    seek(0) is strictly before every event and replays the whole session).
+  - **`midi` adapter** in `{actuate, caps, reduce}` shape. caps:
+    `{kind, domain:'wall', unit:'ms', seekable, reducible, rates:[.5,1,2],
+    catchUp:'burst'}` (musical: never silently drop a note). The reducer is the
+    C2 story in miniature — fold note-on/off over events ≤ t, expire one-shot
+    voices past this instrument's 400 ms envelope, → the sounding set;
+    `assertState()` on seek silences every voice and re-asserts exactly that set.
+    That required a **voice registry** in the synth (`voices` Map +
+    `silenceAll()` + `soundingNotes()`): without one there is no held state to
+    reduce to, and seek is meaningless.
+  - UI: play / pause / scrubber / 0.5×–1×–2× over the recorded session — the
+    four operations the four prior generations never had. HUD replay line now
+    reads the **library's drift channel** (`drainDrift()`), not owMs.
+  - **VERIFIED headless (2 Chromes, jam-udd, :8893, DC-direct, 25 s duet,
+    133-event log each side; `results/demo-verify-jam-dc.json`)** — 14/14:
+    - replay fired 133/133 = log, both peers; `logGrewBy 0` (overdub rule
+      intact); audit `{1: 133}` = every event fired exactly once; 0 armed
+      timers after; all 133 origins `commit` (no bursts, no drops).
+    - **firing error vs the recorded `at` (worker host)**: A p50 **7.2** / p95
+      **14.3** / max 15.7 ms · B p50 **9.2** / p95 **15.6** / max 16.8 ms —
+      squarely in the lab's worker band (5.0 / 15.3). Worker host chosen because
+      it is the only one that survives a hidden tab (lab: 8.5 ms p95 hidden vs
+      main ~1 s, rAF 9.2 s); `?tickhost=main` opts into the tighter 6.4 ms p95.
+    - **BASELINE, the hand-rolled loop this replaced, measured for the first
+      time** (its shape reproduced over a 10 s slice of the same log): p50
+      **−100.8 ms**, range **−118.5…−95.9**. It fired everything inside a 120 ms
+      horizon *at the tick*, so the wall/visual side (flash + HUD) always landed
+      ~100 ms EARLY and only the audio was on time (via the `acT` it passed to
+      WebAudio). The library ties both to the same instant: 7 ms instead of
+      −101 ms, and now with a number attached at all.
+    - seek ×3 (5.0 / 12.5 / 19.9 s): sounding set == `reduce(events ≤ t)` at all
+      three ([64,69] / [64] / [64,69]); **0 orphans** (nothing behind the
+      playhead rang in the 1.2 s window after each seek), **0 double-fires**.
+    - pause: position delta **0.00000 ms**, **0 fires** during a 900 ms pause.
+    - rate: same 5 s timeline window — median inter-fire **188.0 ms @1×** vs
+      **100.1 ms @2×** (ratio **0.53**) and 328.2 ms @0.5× (1.75×).
+    - live duet unaffected: a 69 / b 64 sent, 0 lost either way, one-way p50
+      1.59 / 1.61 ms (matches the C4/C5 DC-direct band), 0 page errors,
+      0 console errors. Screenshot `results/jam-jam-a.png` (controls + drift HUD).
+  - **API feedback for timeline/transport.mjs** (the point of the exercise):
+    (1) *no adapter registry* — clients think `{actuate, caps, reduce}` per kind
+    but the library only offers unfiltered `onFire` + `setPolicy`; the ~12-line
+    `registerAdapter()` in jam-timeline.js is what every client will rewrite.
+    (2) *`setRate()` doubles as `play()`* — there is no set-rate-while-paused,
+    and `lastRate` is private, so a paused UI can only display `0.00×`. Cost me
+    a red assert on the first run.
+    (3) `createScheduler`'s coded default is `mainTickHost()` while the lab
+    VERDICT ships `worker` — the code and the doc disagree.
+    (4) *no wall→audio bridge*: the wall lane hands `actuate()` an instant, not a
+    lead time, so a client wanting sample-accurate audio must run the audio lane
+    separately; the drift record already carries `deltaMs` at fire time and a
+    negative (early) delta could be converted to an `AudioContext` time for free.
+    (5) the reduce *policy* only sees the events missed in one scan, not the
+    whole prefix — fine for a held-note fold, wrong for a non-commutative one.
+    (6) `drainDrift()` is destructive, so a HUD and an assert harness cannot both
+    read it; every client will keep its own accumulator (jam-timeline.js does).
+  - Cleanup: jam-udd Chromes + server killed, :8893 free; sibling's :8899 /
+    proto/instrument / workers/instrument never touched.
+
 ## Layout (planned)
 
 - server.mjs — :8893 static + /time-local (µs, shared clock) + mailbox signaling + /log sink

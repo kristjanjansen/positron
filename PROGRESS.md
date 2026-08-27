@@ -148,6 +148,41 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### TRANSPORT ADOPTED IN A DEMO (session 6n) — ✅ 14/14 (proto/jam + timeline/)
+`timeline/transport.mjs` has its first real client: jam.html's replay is now
+vector + lookahead + worker tick feeding the EXISTING actuate(). New seam
+`proto/jam/jam-timeline.js` (105 lines); server aliases `/timeline/*` to the
+repo library so the demo imports the SAME file the lab measured.
+- **The hand-rolled path was firing ~100 ms EARLY and nobody knew**: measured
+  for the first time at **p50 −100.8 ms** (range −118.5…−95.9) — it fired
+  everything inside a 120 ms horizon AT THE TICK, so flash+HUD landed early
+  while only audio was on time (it passed `acT` to WebAudio separately). The
+  library ties both to one instant: **7.2/14.3 ms (worker host)**. The lesson
+  generalizes: an unmeasured scheduler hides constant offsets, not just jitter.
+- Firing error vs recorded `at`: A p50 7.2 / p95 14.3, B 9.2 / 15.6 — squarely
+  the lab's worker band. `?tickhost=main` opts into 6.4 ms p95.
+- The `midi` adapter is `{actuate, caps, reduce, assertState}`; catchUp:'burst'
+  (musical — never silently drop a note). **Seek required a voice registry in
+  the synth** (voices Map + silenceAll + soundingNotes): without held state
+  there is nothing to reduce to and seek is meaningless — the only genuinely
+  per-client piece of adoption.
+- Asserts: 133/133 fired both peers, logGrewBy 0, exactly-once audit, 0 armed
+  timers; seek ×3 sounding == reduce(events≤t), 0 orphans/double-fires; pause
+  position delta 0.00000 ms; rate median 188.0 ms @1× → 100.1 @2× (0.53);
+  live duet untouched (one-way 1.59/1.61 ms, 0 loss).
+- **Six API seams the first client found** (fix upstream before the next
+  adoption): (1) NO ADAPTER REGISTRY — every client will rewrite the same
+  ~12-line registerAdapter; (2) setRate() doubles as play() so there is no
+  set-rate-while-paused and a paused UI can only show 0.00×; (3)
+  createScheduler defaults to mainTickHost while the lab VERDICT ships worker —
+  code and doc disagree; (4) no wall→audio bridge (actuate gets an instant, not
+  a lead, though the drift record already carries deltaMs); (5) the reduce
+  policy sees only one scan's missed events, not the whole prefix — wrong for
+  non-commutative reducers; (6) drainDrift() is destructive so a HUD and an
+  assert harness cannot both read it.
+- Next adoption ≈ half a day per demo (an hour once the registry and
+  set-rate-while-paused land upstream); jam-interval.html is free.
+
 ### INSTRUMENT SESSION STORAGE (session 6m) — ✅ 42/42 (workers/instrument, proto/instrument)
 Sessions are now durable: notes as ROWS in a DO SQLite (C4), audio in R2 by
 reference (C6-deletable), both lanes on one log.
