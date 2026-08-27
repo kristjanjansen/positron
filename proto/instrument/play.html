@@ -49,75 +49,76 @@
   #feed div.replay { color:var(--warn); }
   #log { height:120px; overflow-y:auto; white-space:pre-wrap; font-size:11px; color:var(--dim); }
   .hint { color:var(--dim); font-size:11px; margin-top:6px; }
+
+  header { display:flex; align-items:center; gap:12px; padding:8px 14px; flex-wrap:wrap; }
+  header h1 { font-size:12px; letter-spacing:.14em; text-transform:uppercase; margin:0; }
+  header button { width:auto; padding:3px 9px; }
+  header a { color:var(--hot); text-decoration:none; }
+  main { display:grid; grid-template-columns: minmax(300px,360px) 1fr; gap:12px; padding:12px 14px; align-items:start; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:9px 10px; margin-bottom:10px; }
+  h2 { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--dim); margin:0 0 7px; font-weight:600; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { border:1px solid var(--line); border-radius:3px; padding:3px 7px; background:#0b0d0f; }
+  .chip b { font-weight:600; color:var(--dim); font-size:10px; letter-spacing:.08em; text-transform:uppercase; margin-right:5px; }
+  details > summary { cursor:pointer; color:var(--dim); font-size:10px; letter-spacing:.13em; text-transform:uppercase; }
+  details[open] > summary { margin-bottom:7px; }
+  #feed { height:120px; overflow-y:auto; font-size:11px; }
+  #log { height:110px; }
+  video { width:100%; aspect-ratio:16/9; background:#000; border:1px solid var(--line); border-radius:4px; display:block; }
 </style>
 </head>
 <body>
 <header>
   <h1>Play a remote instrument</h1>
-  <span class="sub">someone else's hardware, your fingers · <span id="pstate">booting</span></span>
-  <span style="margin-left:auto"><a href="/host.html">I own a synth — host it ↗</a></span>
+  <span class="dim" id="pstate">booting</span>
+  <span style="flex:1"></span>
+  <button id="b-req" class="go" disabled>Request session</button>
+  <button id="b-end" class="stop" disabled>End</button>
+  <a href="/host.html">Host my synth ↗</a>
 </header>
 
 <main>
 <div>
-  <section>
-    <h2>Catalog</h2>
+  <div class="card">
+    <h2>Catalog <button id="b-refresh" style="width:auto;padding:2px 7px;float:right">↻</button></h2>
     <div id="list" class="dim">loading…</div>
-    <button id="b-refresh" style="margin-top:7px">Refresh</button>
-  </section>
-
-  <section>
-    <h2>Session</h2>
-    <div class="row">
-      <button id="b-req" class="go" disabled>Request session</button>
-      <button id="b-end" class="stop" disabled>End</button>
-    </div>
     <div id="reqstate" class="hint">Pick an instrument.</div>
-  </section>
+  </div>
 
-  <section>
+  <div class="card">
     <h2>Input</h2>
     <select id="midiin"><option value="">— computer keyboard (A S D F G H J K L ;) —</option></select>
     <div id="keys"></div>
-    <div class="hint">Hold to sustain, release to send note-off. Shift = octave up.</div>
-  </section>
+    <div class="hint">Hold to sustain, release sends note-off. Shift = octave up.</div>
+  </div>
+
+  <details class="card"><summary>Log</summary><div id="log"></div></details>
 </div>
 
 <div>
-  <section>
-    <h2>HUD</h2>
-    <table>
-      <tr><td class="k">connection</td><td id="h-conn" class="dim">—</td></tr>
-      <tr><td class="k">session setup</td><td id="h-setup" class="dim">—</td></tr>
-      <tr><td class="k">notes sent</td><td id="h-sent" class="num">0</td></tr>
-      <tr><td class="k">one-way MIDI (p50)</td><td id="h-ow" class="num dim">—</td></tr>
-      <tr><td class="k">key → ear round trip</td><td id="h-ear" class="num dim">—</td></tr>
-      <tr><td class="k">audio onsets heard</td><td id="h-ons" class="dim">0</td></tr>
-      <tr><td class="k">clock</td><td id="h-clock" class="dim">—</td></tr>
-      <tr><td class="k">timeline log</td><td id="h-log" class="dim">0 events</td></tr>
-    </table>
-    <div class="row" style="margin-top:9px">
-      <button id="b-dl">Download session (JSONL)</button>
-      <button id="b-replay">Replay through the same path</button>
-    </div>
-    <div class="hint">Replay re-fires the log through the identical actuate path
-      — the recording and the performance are one artefact.</div>
-  </section>
-
-  <section>
-    <h2>The instrument, returning</h2>
+  <div class="card">
     <video id="vid" autoplay playsinline></video>
-  </section>
+  </div>
 
-  <section>
-    <h2>Events</h2>
-    <div id="feed"></div>
-  </section>
+  <div class="card">
+    <div class="chips">
+      <span class="chip"><b>conn</b><span id="h-conn" class="dim">—</span></span>
+      <span class="chip"><b>setup</b><span id="h-setup" class="dim">—</span></span>
+      <span class="chip"><b>sent</b><span id="h-sent">0</span></span>
+      <span class="chip"><b>one-way</b><span id="h-ow" class="dim">—</span></span>
+      <span class="chip"><b>key→ear</b><span id="h-ear" class="dim">—</span></span>
+      <span class="chip"><b>onsets</b><span id="h-ons" class="dim">0</span></span>
+      <span class="chip"><b>clock</b><span id="h-clock" class="dim">—</span></span>
+      <span class="chip"><b>log</b><span id="h-log" class="dim">0 events</span></span>
+    </div>
+    <div class="row" style="margin-top:7px">
+      <button id="b-dl">Download session</button>
+      <button id="b-replay">Replay same path</button>
+    </div>
+  </div>
 
-  <section>
-    <h2>Log</h2>
-    <div id="log"></div>
-  </section>
+  <details class="card"><summary>Events</summary><div id="feed"></div></details>
 </div>
 </main>
 
