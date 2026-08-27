@@ -664,6 +664,331 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
+// ---------------------------------------------------------------------------
+// suite 5: CONTINUOUS KINDS (v0.4). A kind whose state is defined BETWEEN
+// samples. Every arm here is one of the six seams proto/paths filed:
+//   5a sampleAt() against an ANALYTIC curve (and the proof that a two-sample
+//      ctx really does force a C1 interpolator down to linear)
+//   5b the CURSOR is not O(n) — comparisons counted under forward play,
+//      backward seek and random access
+//   5c info.next / info.nexts: an interpolated reduce is expressible, and it
+//      agrees with sampleAt to the last bit
+//   5d caps are READ, and refusals are reported {wanted, chose, degraded, reason}
+//   5e caps.followsTransport: play/pause/rate delivered, seek and sync NOT
+//   5f logdeck: a row's epoch-µs `at` must not clobber the injected position `at`
+// ---------------------------------------------------------------------------
+import { createCursor } from '../transport.mjs';
+import { makeLogDeck } from '../logdeck.mjs';
+
+const CURVE = { A: 380, B: 240, cx: 480, cy: 300, f1: 1, f2: 2, phase: 0.4 };
+const DUR = 6000;
+const curveAt = (ms) => {
+  const s = ms / DUR;
+  return { x: CURVE.cx + CURVE.A * Math.sin(2 * Math.PI * CURVE.f1 * s + CURVE.phase),
+           y: CURVE.cy + CURVE.B * Math.sin(2 * Math.PI * CURVE.f2 * s) };
+};
+const lerp1 = (a, b, u) => a + (b - a) * u;
+const clamp01 = (u) => Math.min(1, Math.max(0, u));
+
+/** time-knotted (non-uniform) Catmull-Rom as a cubic Hermite — the same form
+ *  proto/paths uses; p0/p3 null -> reflected phantom endpoints. */
+function catmull(p0, p1, p2, p3, u) {
+  const t1 = p1.at, t2 = p2.at, h = t2 - t1;
+  if (!(h > 0)) return { x: p1.x, y: p1.y, at: t1 };
+  const P0 = p0 && p0.at < t1 ? p0 : { x: 2 * p1.x - p2.x, y: 2 * p1.y - p2.y, at: t1 - h };
+  const P3 = p3 && p3.at > t2 ? p3 : { x: 2 * p2.x - p1.x, y: 2 * p2.y - p1.y, at: t2 + h };
+  const d1 = t2 - P0.at, d2 = P3.at - t1;
+  const m1x = (p2.x - P0.x) / d1, m1y = (p2.y - P0.y) / d1;
+  const m2x = (P3.x - p1.x) / d2, m2y = (P3.y - p1.y) / d2;
+  const u2 = u * u, u3 = u2 * u;
+  const h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+  return { x: h00 * p1.x + h10 * h * m1x + h01 * p2.x + h11 * h * m2x,
+           y: h00 * p1.y + h10 * h * m1y + h01 * p2.y + h11 * h * m2y, at: lerp1(t1, t2, u) };
+}
+
+function makePointerish() {
+  const stats = { interp: 0, reduce: 0, transport: [] };
+  const ad = {
+    stats,
+    caps: {
+      continuous: true, interpolate: true, interpolators: ['hold', 'linear', 'catmull-rom'],
+      neighbourhood: 1,                    // 0 = two-sample, 1 = one each side
+      method: 'catmull-rom', catchUp: 'reduce', assertOnSeek: true,
+      seek: true, rate: true, rates: [0.25, 0.5, 1, 2, 4], followsTransport: true,
+    },
+    actuate() {},
+    transport(st) { stats.transport.push(st.reason); },
+    interpolate(a, b, u, ctx) {
+      stats.interp++;
+      const m = (ctx && ctx.mode) || 'catmull-rom';
+      if (m === 'hold') return { x: a.x, y: a.y, at: a.at, method: 'hold' };
+      const lin = { x: lerp1(a.x, b.x, u), y: lerp1(a.y, b.y, u), at: lerp1(a.at, b.at, u), method: 'linear' };
+      if (m === 'linear') return lin;
+      // A SPLINE IS NOT A FUNCTION OF TWO SAMPLES: with no neighbourhood at all
+      // this is the honest best, and it says so.
+      if (!ctx || (ctx.prev === undefined && ctx.next === undefined))
+        return { ...lin, method: 'linear-degraded' };
+      return { ...catmull(ctx.prev || null, a, b, ctx.next || null, u), method: 'catmull-rom' };
+    },
+    reduce(payloads, pos, info) {
+      stats.reduce++;
+      if (!payloads.length) return null;
+      const a = payloads[payloads.length - 1];
+      const b = info && info.next && info.next.payload;      // C4: the successor
+      if (!b || !(b.at > a.at)) return { x: a.x, y: a.y, at: a.at, method: 'hold' };
+      return ad.interpolate(a, b, clamp01((pos - a.at) / (b.at - a.at)), {
+        prev: payloads[payloads.length - 2],
+        next: info.nexts[1] ? info.nexts[1].payload : undefined,
+        pos, aAt: a.at, bAt: b.at, dtMs: b.at - a.at,
+      });
+    },
+    assertState() {},
+  };
+  return ad;
+}
+
+function makeContinuousDeck(vr, { stepMs = 100, jitterMs = 2, seed = 7 } = {}) {
+  const rand = mulberry32(seed);
+  const items = [];
+  for (let t = 0; t <= DUR; t += stepMs) {
+    const at = t === 0 || t + stepMs > DUR ? t : +(t + (rand() - 0.5) * 2 * jitterMs).toFixed(3);
+    const p = curveAt(at);
+    items.push({ at, kind: 'p', payload: { x: p.x, y: p.y, at, i: items.length } });
+  }
+  const ad = makePointerish();
+  const disc = { caps: { catchUp: 'burst' }, actuate() {} };
+  const deck = createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), range: [0, DUR], items: [
+      ...items, { at: 500, kind: 'd', payload: { v: 1 } }, { at: 2500, kind: 'd', payload: { v: 2 } },
+    ],
+    adapters: { p: ad, d: disc },
+  });
+  return { deck, ad, items };
+}
+
+// --- 5a: sampleAt() vs analytic truth --------------------------------------
+{
+  const vr = sharedVR();
+  const { deck, ad, items } = makeContinuousDeck(vr);
+  const err = { hold: [], linear: [], catmull: [], degraded: [] };
+  for (let t = 0; t <= DUR; t += 7.3) {
+    const truth = curveAt(t);
+    const d = (s) => Math.hypot(s.x - truth.x, s.y - truth.y);
+    err.hold.push(d(deck.sampleAt('p', t, { mode: 'hold' })));
+    err.linear.push(d(deck.sampleAt('p', t, { mode: 'linear' })));
+    err.catmull.push(d(deck.sampleAt('p', t)));
+    err.degraded.push(d(deck.sampleAt('p', t, { neighbourhood: 0 })));
+  }
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const [mh, ml, mc, md] = [mean(err.hold), mean(err.linear), mean(err.catmull), mean(err.degraded)];
+  check('cont-sample', 0, mh > ml && ml > mc,
+    `sampleAt px error must order hold(${mh.toFixed(3)}) > linear(${ml.toFixed(3)}) > catmull(${mc.toFixed(4)})`);
+  check('cont-sample', 0, mc < 0.2, `catmull sampleAt mean error ${mc.toFixed(4)} px (want < 0.2 vs analytic truth)`);
+  if (VERBOSE) console.log(`cont-sample mean px error: hold ${mh.toFixed(3)} · linear ${ml.toFixed(4)} · catmull ${mc.toFixed(4)}`);
+  check('cont-sample', 0, Math.abs(md - ml) < 1e-9,
+    `C3: with neighbourhood 0 a C1 interpolator MUST degrade to linear (${md.toFixed(4)} vs ${ml.toFixed(4)})`);
+  check('cont-sample', 0, deck.sampleAt('p', 0, { neighbourhood: 0 }).method === 'linear-degraded',
+    'the degradation must be visible in the returned value, not silent');
+  // exactly on an attested sample: u === 0, the value IS the sample
+  for (const k of [0, 7, 30, items.length - 1]) {
+    const it = items[k];
+    const s = deck.sampleAt('p', it.at);
+    check('cont-sample', k, Math.abs(s.x - it.payload.x) < 1e-9 && Math.abs(s.y - it.payload.y) < 1e-9,
+      `sampleAt AT an attested sample must return that sample (i=${k}: ${s.x} vs ${it.payload.x})`);
+  }
+  // and the ends clamp rather than extrapolate
+  const before = deck.sampleAt('p', -5000), after = deck.sampleAt('p', DUR + 5000);
+  check('cont-sample', 1, Math.abs(before.x - items[0].payload.x) < 1e-9 &&
+    Math.abs(after.x - items[items.length - 1].payload.x) < 1e-9,
+    'outside the attested span sampleAt must clamp to the terminal samples, never extrapolate');
+  // C2: the raw pair, and caps.neighbourhood honoured
+  const br = deck.bracket('p', 1234.5);
+  check('cont-bracket', 0, br.a.at <= 1234.5 && br.b.at > 1234.5 && br.u > 0 && br.u < 1,
+    `bracket must straddle pos: a=${br.a.at} b=${br.b.at} u=${br.u}`);
+  check('cont-bracket', 0, br.prevs.length === 1 && br.nexts.length === 1 &&
+    br.prev.i === br.a.i - 1 && br.next.i === br.b.i + 1,
+    `caps.neighbourhood=1 must give exactly one sample EACH SIDE of the pair (${br.prevs.length}/${br.nexts.length})`);
+  check('cont-bracket', 0, deck.bracket('p', 1234.5, { neighbourhood: 3 }).prevs.length === 3,
+    'an explicit neighbourhood override must widen the request');
+  check('cont-bracket', 0, ad.stats.interp > 0, 'the library must actually CALL interpolate() (S1: it never did)');
+  deck.dispose();
+}
+
+// --- 5b: the cursor is O(1) amortised, not O(n) ----------------------------
+{
+  const vr = sharedVR();
+  const N = 2000;
+  const mkDeck = (n) => {
+    const items = [];
+    for (let i = 0; i < n; i++) items.push({ at: i * 10, kind: 'p', payload: { x: i, y: -i, at: i * 10, i } });
+    return createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, n * 10], items,
+      adapters: { p: makePointerish() } });
+  };
+  const deck = mkDeck(N);
+  const cmps = () => deck.cursorStats('p').cursor.comparisons;
+
+  // forward play: 60 Hz over the whole trace — the render loop's access pattern.
+  // THE WITNESS that it is not O(n): the same sweep over a 4x longer trace must
+  // cost the same PER FRAME. A rescan would cost 4x more.
+  const sweep = (dk, n, frames) => {
+    dk.sampleAt('p', 0);
+    const c0 = dk.cursorStats('p').cursor.comparisons;
+    for (let f = 0; f < frames; f++) dk.sampleAt('p', (f * n * 10) / frames);
+    return (dk.cursorStats('p').cursor.comparisons - c0) / frames;
+  };
+  const FRAMES = 1200;
+  const perForward = sweep(deck, N, FRAMES);
+  const big = mkDeck(N * 4);
+  const perForwardBig = sweep(big, N * 4, FRAMES * 4);   // same cadence, 4x the content
+  check('cont-cursor', 0, perForward < 12,
+    `forward play: ${perForward.toFixed(2)} comparisons/frame over ${N} samples (a rescan would be ~${N / 2})`);
+  check('cont-cursor', 0, perForwardBig < perForward * 1.5,
+    `NOT O(n): ${N} samples cost ${perForward.toFixed(2)} cmp/frame, ${N * 4} samples cost ${perForwardBig.toFixed(2)} (a rescan would be 4x)`);
+  big.dispose();
+
+  // backward seek, then forward again: the cursor must re-find, not walk back
+  const c1 = cmps();
+  for (let f = FRAMES; f > 0; f--) deck.sampleAt('p', (f * N * 10) / FRAMES);
+  const perBackward = (cmps() - c1) / FRAMES;
+  check('cont-cursor', 1, perBackward < 2 * Math.ceil(Math.log2(N)) + 8,
+    `backward sweep: ${perBackward.toFixed(2)} comparisons/call (binary-search bound ~${2 * Math.ceil(Math.log2(N)) + 8})`);
+
+  // random access: strictly bounded by the binary search, never by n
+  const rand = mulberry32(4242);
+  const c2 = cmps();
+  const K = 400;
+  for (let k = 0; k < K; k++) deck.sampleAt('p', rand() * N * 10);
+  const perRandom = (cmps() - c2) / K;
+  check('cont-cursor', 2, perRandom < 2 * Math.ceil(Math.log2(N)) + 8 && perRandom < N / 50,
+    `random access: ${perRandom.toFixed(2)} comparisons/call — must be O(log n), not O(n)=${N}`);
+  const st = deck.cursorStats('p').cursor;
+  if (VERBOSE) console.log(`cont-cursor cmp/call: forward ${perForward.toFixed(2)} (n=${N}) · ${perForwardBig.toFixed(2)} (n=${N * 4}) · backward ${perBackward.toFixed(2)} · random ${perRandom.toFixed(2)} · rescan would be ${N / 2}`);
+  check('cont-cursor', 3, st.advances > 0 && st.searches > 0,
+    `the cursor must use BOTH paths (linear advance ${st.advances}, binary search ${st.searches})`);
+  // the free-standing cursor is the same object a client can put over its own
+  // un-logged lanes (proto/paths' evidence lane)
+  const rows = [];
+  for (let k = 0; k < N; k++) rows.push({ at: k * 10, x: k });
+  const cur = createCursor(rows);
+  const b = cur.bracket(12345, 1);
+  check('cont-cursor', 4, b.a.at <= 12345 && b.b.at > 12345 && b.prev && b.next,
+    'the exported cursor must bracket a plain array too');
+  deck.dispose();
+}
+
+// --- 5c: info.next makes an interpolated reduce expressible ----------------
+{
+  const vr = sharedVR();
+  const { deck, ad } = makeContinuousDeck(vr);
+  const seen = [];
+  const spy = { ...ad, reduce(payloads, pos, info) {
+    seen.push({ pos, hasNext: !!info.next, nexts: info.nexts.length,
+                nextAt: info.next ? info.next.at : null, prefixN: payloads.length });
+    return ad.reduce(payloads, pos, info);
+  } };
+  deck.sched.registerAdapter('p', spy);
+  for (const t of [137.5, 1000.4, 3333.3, 4750.5]) {
+    const red = deck.reduceAt('p', t);
+    const smp = deck.sampleAt('p', t);
+    const info = seen[seen.length - 1];
+    check('cont-next', 0, info.hasNext && info.nextAt > t,
+      `info.next must be the first event with at > pos (${info.nextAt} vs pos ${t})`);
+    check('cont-next', 0, info.nexts === 2,
+      `info.nexts must carry 1 + caps.neighbourhood = 2 successors, got ${info.nexts}`);
+    check('cont-next', 0, red.method === 'catmull-rom',
+      `an INTERPOLATED reduce must be expressible now (method=${red.method})`);
+    check('cont-next', 0, Math.abs(red.x - smp.x) < 1e-9 && Math.abs(red.y - smp.y) < 1e-9,
+      `reduce(prefix + successor) must equal sampleAt at ${t}: (${red.x},${red.y}) vs (${smp.x},${smp.y})`);
+    const truth = curveAt(t);
+    check('cont-next', 0, Math.hypot(red.x - truth.x, red.y - truth.y) < 1.0,
+      `the interpolated reduce must land near analytic truth at ${t}`);
+  }
+  // seek routes through the same reducer, and past the end there IS no
+  // successor: the reducer degrades to hold and says so.
+  deck.seek(DUR + 10);
+  const tail = deck.reduceAt('p', DUR + 10);
+  check('cont-next', 1, tail.method === 'hold',
+    `past the last attested sample the successor is genuinely absent — hold, honestly (got ${tail.method})`);
+  deck.dispose();
+}
+
+// --- 5d: the caps are READ, and refusals are reported ----------------------
+{
+  const vr = sharedVR();
+  const { deck } = makeContinuousDeck(vr);
+  // a DISCRETE kind sampled between two events: zero-order hold + a report
+  const held = deck.sampleAt('d', 1500);
+  const dg = deck.degradations('d');
+  check('cont-caps', 0, held && held.v === 1 && dg.count > 0 && dg.reports[0].chose === 'hold' && dg.reports[0].degraded,
+    `sampling a discrete kind must hold AND report: ${JSON.stringify(dg.reports[0])}`);
+  const r1 = deck.request('p', { interpolate: 'bezier' });
+  check('cont-caps', 1, r1.degraded && r1.chose === 'catmull-rom' && /interpolators/.test(r1.reason),
+    `an unsupported interpolator must degrade honestly: ${JSON.stringify(r1)}`);
+  check('cont-caps', 1, !deck.request('p', { interpolate: 'catmull-rom' }).degraded,
+    'a supported interpolator must NOT report a degradation');
+  const r2 = deck.request('p', { neighbourhood: 3 });
+  check('cont-caps', 2, r2.degraded && r2.chose === 1 && /neighbourhood/.test(r2.reason),
+    `neighbourhood over caps must degrade: ${JSON.stringify(r2)}`);
+  const r3 = deck.request('d', { interpolate: true });
+  check('cont-caps', 3, r3.degraded && r3.chose === 'hold' && /discrete/.test(r3.reason),
+    `asking a discrete kind to interpolate must be refused in words: ${JSON.stringify(r3)}`);
+  const r4 = deck.request('p', { rate: 3 });
+  check('cont-caps', 4, r4.degraded && r4.chose === 4,
+    `rate 3 on a [0.25,0.5,1,2,4] lattice must pick the log-nearest (4): ${JSON.stringify(r4)}`);
+  const r5 = deck.request('p', { seek: true, swallowOriginal: true });
+  check('cont-caps', 5, r5.per.seek.degraded === false && r5.per.swallowOriginal.degraded === true && r5.degraded,
+    `a multi-key ask must answer per key: ${JSON.stringify(r5.per)}`);
+  // a claim the adapter cannot back is caught at REGISTRATION, not at 60 Hz
+  deck.sched.registerAdapter('liar', { caps: { continuous: true, followsTransport: true }, actuate() {} });
+  const lied = deck.degradations('liar');
+  check('cont-caps', 6, lied.count === 2 && lied.reports.some((r) => /interpolate/.test(r.reason)) &&
+    lied.reports.some((r) => /transport\(state\)/.test(r.reason)),
+    `caps.continuous / caps.followsTransport without the method must be reported at registerAdapter: ${JSON.stringify(lied.reports)}`);
+  deck.dispose();
+}
+
+// --- 5e: caps.followsTransport — play/pause/rate, never seek, never sync ----
+{
+  const vr = sharedVR();
+  const { deck, ad } = makeContinuousDeck(vr);
+  ad.stats.transport.length = 0;
+  deck.seek(1000);
+  check('cont-follow', 0, ad.stats.transport.length === 0,
+    'a SEEK must not arrive as a transport() call — seek is reduce + assertState');
+  deck.play(); deck.setRate(2); deck.pause();
+  check('cont-follow', 1, ad.stats.transport.join(',') === 'play,rate,pause',
+    `play/pause/rate must be delivered in order, got [${ad.stats.transport}]`);
+  ad.stats.transport.length = 0;
+  deck.sync(1200);
+  check('cont-follow', 2, ad.stats.transport.length === 0,
+    'a servo sync() must never cascade into adapters');
+  deck.play(); // an adapter WITHOUT the cap must get nothing
+  const quiet = { caps: { catchUp: 'burst' }, actuate() {}, transport() { failures++; } };
+  deck.sched.registerAdapter('quiet', quiet);
+  deck.pause();
+  deck.dispose();
+}
+
+// --- 5f: logdeck — the row's epoch-µs `at` must not clobber the injected one -
+{
+  const vr = sharedVR();
+  const T0 = 1_756_000_000_000_000;           // epoch µs, the shape every client stores
+  const rows = [{ at: T0, x: 1 }, { at: T0 + 250_000, x: 2 }, { at: T0 + 900_000, x: 3 }];
+  const deck = makeLogDeck({
+    lanes: [{ kind: 'k', rows, adapter: { caps: { catchUp: 'burst' }, actuate() {} } }],
+    leadInMs: 250, clock: vr.clock, tickHost: vr.newHost(), autoStart: false,
+  });
+  const pays = deck.items.filter((it) => it.kind === 'k');
+  check('logdeck-at', 0, pays.every((it) => it.payload.at === it.at),
+    `payload.at must be the POSITION-domain at the library injected: ${JSON.stringify(pays.map((p) => [p.at, p.payload.at]))}`);
+  check('logdeck-at', 0, pays[0].payload.at === 250 && pays[1].payload.at === 500 && pays[2].payload.at === 1150,
+    `position domain wrong: ${pays.map((p) => p.payload.at)}`);
+  check('logdeck-at', 0, pays.every((it, i) => it.payload.i === i && it.payload.atUs === rows[i].at),
+    'the row\'s own epoch stamp must survive as atUs, and `i` must not be clobbered either');
+  check('logdeck-at', 0, pays[2].payload.x === 3, 'the rest of the row must still spread through');
+  deck.dispose();
+}
+
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);
 if (failures) {
   console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams + nesting`);
@@ -672,3 +997,4 @@ if (failures) {
 console.log(`prop-test OK: ${basicRuns} basic + ${gymRuns} gymnastics seeds, 0 violations (reduce(<=t) === play(0->t))`);
 console.log(`seams OK: adapter registry / setRate!=play / worker default / wall->audio bridge / whole-prefix reduce (${seamRuns} freeze seeds) / non-destructive drift`);
 console.log('nesting OK: nested seek (reduce-on-seek runs in the child) / rate composition incl. honest degradation / nested pause / absence outside the span / follow+master servo / cycle + depth rejection');
+console.log('continuous OK: sampleAt vs analytic curve (hold > linear > catmull, C1 degrades to linear without a neighbourhood) / cursor O(1) forward + O(log n) on seek and random access / info.next makes an interpolated reduce expressible and it equals sampleAt / caps read + refusals reported / followsTransport (play,rate,pause; never seek, never sync) / logdeck at-clobber regression');

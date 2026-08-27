@@ -192,6 +192,20 @@ export function createNest(parent, {
       const sp = spans.get(p.ref);
       if (sp) assertSpan(sp, parent.position(), p.phase === 'enter');
     },
+    /** play / pause / rate are NOT seeks — nothing re-asserts on them, but the
+     *  child still has to follow the parent's transport (rule 4, follow half).
+     *  This used to be a hand-written `parent.transport.onState()` filter here;
+     *  since v0.4 the library reads `caps.followsTransport` and delivers exactly
+     *  play/pause/rate (never 'seek' — that is reduce+assertState — and never
+     *  'sync': a servo correction must not cascade). */
+    transport(st) {
+      const pos = st.pos;
+      for (const [, sp] of spans) {
+        if (!inSpan(sp, pos)) { if (sp.deck.playing()) sp.deck.pause(); continue; }
+        const r = applyRate(sp);
+        if (parent.playing() && r.chose > 0) sp.deck.play(); else sp.deck.pause();
+      }
+    },
     reduce(payloads, pos) {
       const present = new Set();
       for (const p of payloads) { if (p.phase === 'enter') present.add(p.ref); else present.delete(p.ref); }
@@ -207,18 +221,9 @@ export function createNest(parent, {
   };
   const unregister = parent.sched.registerAdapter(kind, adapter);
 
-  // play / pause / rate are NOT seeks — nothing re-asserts on them, but the
-  // child still has to follow the parent's transport (rule 4, follow half).
-  // 'sync' is deliberately ignored: a servo correction must not cascade.
-  const offState = parent.transport.onState((st) => {
-    if (st.reason !== 'play' && st.reason !== 'pause' && st.reason !== 'rate') return;
-    const pos = parent.position();
-    for (const [, sp] of spans) {
-      if (!inSpan(sp, pos)) { if (sp.deck.playing()) sp.deck.pause(); continue; }
-      const r = applyRate(sp);
-      if (parent.playing() && r.chose > 0) sp.deck.play(); else sp.deck.pause();
-    }
-  });
+  // (the play/pause/rate follower is adapter.transport() above — v0.4's
+  // caps.followsTransport, which is exactly this filter, written once.)
+  const offState = () => {};
 
   const nest = {
     kind, adapter, toleranceMs, hardSeekMs,

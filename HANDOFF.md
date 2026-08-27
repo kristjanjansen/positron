@@ -10,23 +10,22 @@ open work is (a) finishing three in-flight builds, (b) the continuous-kind
 seams the paths client exposed, (c) the nested-span primitive, (d) the DoD-A
 verdict.
 
-## In flight when the session ended (agents may not have reported)
+## In flight — NONE. All eight builds reported and are committed.
 
-| build | dir / port | what to check on resume |
-|---|---|---|
-| **DoD-A**: replay.html onto the lib | `proto/replay`, :8885 | **the gate verdict** vs 59/71 (content) and 77/95 ms (native) |
-| CC automation + slider-video revival | `proto/automation`, :8888 | 14-bit CC + pitch-bend round-trip; seek restores controller map |
-| Text performer (`beforeinput` semantic ops) | `proto/text`, :8889 | C2 on real text; selection restored on seek |
-| Continuous kinds first-class (`sampleAt`/`bracket`/`info.next`/caps read/logdeck fix) | `timeline/`, `proto/paths` :8887 | paths must hold 0.042 px seek + 0.036 px deviation **with its workarounds DELETED** |
+Session 6 closed with: nested spans · continuous kinds first-class (v0.4) ·
+DoD-A discharged · CC automation + slider-video · text performer · paths ·
+instrument session storage + gaps · 5 library clients.
 
-LANDED since the first handoff: **nested spans** (`timeline/nested.mjs`,
-16/16, transport.mjs unchanged — composition is just another kind; a degraded
-child cannot master; parent seek lands exact inside a nested session) and
-**proto/paths** (first continuous client; the six-seam report that drove the
-in-flight continuous-kinds work).
-
-Each was briefed to checkpoint its own NOTES.md — read those first; they
-survive even if the agent's report was lost.
+**Next action, and it is small: the EVIDENCE FIREWALL (~20 lines + one prop
+arm).** `info.policy` in reduce + `sampleAt(kind, pos, {evidence:'attested'})`.
+The machinery already exists (sampleAt IS the tier-1 reconstructor; caps.tier/
+method/evidence/deviates are read; `request()` already returns the firewall's
+`{wanted,chose,degraded,reason}`; `degradations()` is the ledger), and
+`proto/paths` proves it on day one at zero client cost — it already ships the
+evidence-only toggle, the hatching and the invented-percentage.
+Then, in order: provenance fields · fragment quotation (`in`/`out` on a nested
+span) · uncertainty-as-position · a real store · `mediaMaster()` helper
+(⚠️ replay-grid syncs unconditionally today and can re-open its own burst bug).
 
 ## Library: what's true and what's missing
 

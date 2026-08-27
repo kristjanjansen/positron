@@ -143,6 +143,12 @@ async function main() {
     `mean px error: hold ${d.hold.mean.toFixed(2)} > linear ${d.linear.mean.toFixed(3)} > catmull ${d.catmull.mean.toFixed(4)} (n=${d.hold.n})`);
 
   R.numbers.adapter = { fires: st.fires, reduceCalls: st.reduceCalls, interpCalls: st.interpCalls, renderAtMs: +st.renderAtMs.toFixed(4) };
+  // v0.4: what the LIBRARY served — the ask it answered, what it had to refuse,
+  // and the cursor's cost for every continuous read this session made.
+  R.numbers.continuous = { ask: st.ask, degradations: st.degradations, cursor: st.cursor };
+  const cur = st.cursor && st.cursor.cursor;
+  if (cur) console.log(`[cursor] sampleAt calls=${st.cursor.sampleCalls} bracket=${st.cursor.bracketCalls} · comparisons=${cur.comparisons} (${(cur.comparisons / Math.max(1, st.cursor.bracketCalls)).toFixed(2)}/call) · hits=${cur.hits} advances=${cur.advances} searches=${cur.searches}`);
+  console.log(`[request] ${st.ask && st.ask.degraded ? 'DEGRADED' : 'granted in full'} :: ${JSON.stringify(st.ask && st.ask.per)}`);
   check('F2 adapter-actuated', st.fires > 0 && st.interpCalls > st.fires,
     `attested fires=${st.fires}, interpolate() calls=${st.interpCalls}, reduce() calls=${st.reduceCalls}`);
 

@@ -25,9 +25,10 @@ never copied), `paths.html`, `paths.js` (capture + overlay + transport),
 `pointer-adapter.js` (the adapter + interpolators + deviation metric),
 `harness/{run-paths.mjs,cdp.mjs}`, `results/{verify.json,paths-verify.png}`.
 
-`timeline/*` was not modified. Two siblings own it and proto/{replay,remixer,
-instrument}; everything below that the library cannot do is worked around **in
-this client** and reported here.
+**Update 2026-08-28:** §3's seam report was written against library v0.3, where
+`timeline/*` was not modified and every gap was worked around in this client.
+Those gaps are now closed in the library (v0.4) and the workarounds here are
+**deleted** — §6 is the before/after.
 
 ---
 
@@ -62,7 +63,9 @@ caps: {
   continuous: true,            // state is defined BETWEEN samples, not only at them
   interpolate: true,
   interpolators: ['hold', 'linear', 'catmull-rom'],
-  neighbourhood: 2,            // samples of context each side interpolate() wants
+  neighbourhood: 1,            // v0.4: EXTRA samples each side of the bracketing
+                               // pair (0 = two-sample; 1 = one each side, which
+                               // is exactly what a Catmull-Rom needs)
   tier: 1,                     // §5b spectrum: interpolation, bounded by evidence
   method: 'catmull-rom',
   evidence: 'attested-endpoints',
@@ -87,6 +90,12 @@ truth where zero-order hold lands **38 px** away.
 ---
 
 ## 3. THE INTERPOLATE-SEAM REPORT (primary deliverable)
+
+> **CLOSED 2026-08-28 (library v0.4).** All six seams below are now first-class
+> in `timeline/*`, and this client's workarounds have been **deleted** — see §6
+> for what went and what the numbers did (nothing: they are identical to the
+> last digit). The report is kept verbatim because it is the evidence that
+> motivated the change.
 
 **Verdict: the library does not support continuous kinds. Its transport half
 needs nothing; its adapter half is missing four things, three of them small.**
@@ -244,3 +253,60 @@ derived lanes** with `source: reconstructor-catmull`, `method`, `confidence`,
 evidence policy. This client is the tier-1 proof and the UI; the provenance
 plumbing is a library change, and library changes are two siblings' territory
 right now.
+
+---
+
+## 6. THE SEAM CLOSED — what was deleted here (2026-08-28, library v0.4)
+
+§3 said every workaround "is code the next continuous client will write again".
+None of it survives. Each seam and the API line that replaced it:
+
+| seam | was, in this client | is, in the library |
+|---|---|---|
+| S1 `interpolate` never called, caps inert | the client called its own adapter | the deck calls it — 4 856 times in the verify run — and READS `continuous / interpolate / interpolators / neighbourhood / followsTransport` |
+| S2 no hook between two fires | client-owned bracketing + per-frame call | **`deck.sampleAt(kind, pos, opts)`**. Note the shape of the fix: **not** a library render tick (rendering cadence stays the client's, §6 of the brief and the vector's first law) but an O(1) positional READ the client pulls at whatever rate it paints |
+| S3 no bracket query; only read is O(n) | **`makeBracket()`, 27 lines**, deleted | **`deck.bracket(kind, pos)`** over a per-kind cursor; `createCursor(rows)` exported for a client's own un-logged lanes |
+| S4 `reduce()` cannot see the right bracket | the adapter held a **second handle on the log** (`adapter.lane`), deleted | **`info.next` / `info.nexts`** — and the guarantee is sharpened: prefix-purity for discrete kinds, *prefix + successor* for continuous ones |
+| S5 `interpolate(a,b,u)` under-specified | `ctx` was this client's private extension | **`interpolate(a, b, u, ctx)`** is the contract; `caps.neighbourhood` (now **1** here: one sample each side, which is exactly Catmull-Rom) is what the library gathers |
+| S6 logdeck's payload spread clobbered `at` | **`expand()` whose payload avoided the key `at`**, deleted | logdeck injects `{...payload, i, at}` — control fields last — and keeps the row's own stamp as `atUs` |
+
+Deleted from this client: `makeBracket()` (27 lines), the adapter's `lane`
+option and its two lane look-ups, the `expand()` hack (8 lines), and the
+client-side interpolate driving in `frame()`, `seekProbe()`, `deviations()` and
+both flatteners. Client **code** lines (comments/blank excluded):
+`paths.js` 413 → 405, `pointer-adapter.js` 187 → 161 — **600 → 566, −34 net**,
+and the replacement at every deleted site is one library call.
+
+What the adapter is now: `caps` + `actuate` + `interpolate(a,b,u,ctx)` +
+`reduce(payloads,pos,info)` + `assertState`. **It holds no reference to the log
+at all.** It also now ASKS, and is told:
+`deck.request('pointer', {continuous:true, interpolate:'catmull-rom', neighbourhood:1, seek:true})`
+→ *granted in full* (shown permanently in the caps panel; had it been refused,
+the words would be there instead).
+
+### Re-verification — 9 pass / 0 fail, numbers unchanged
+
+Same trace (Lissajous, 6 000 ms, 120 Hz ±2 ms jitter, 721 evidence → 59 stored).
+
+| assert | recorded 2026-08-28 (pre-v0.4) | after the deletions |
+|---|---|---|
+| A sample count | 59 = 59 = 59 = 59 | **identical** |
+| B seek ×3 vs analytic | 0.042 / 0.032 / 0.042 px | **0.042 / 0.032 / 0.042 px** |
+| B2 same seeks, zero-order hold | 38.31 / 45.55 / 27.03 px | **38.31 / 45.55 / 27.03 px** |
+| C pause holds | drift 0.000 ms | **0.000 ms** |
+| D rate 2× | 1.990× | **1.992×** (wall-clock arm) |
+| E four lanes ink | 4 690 / 5 529 / 18 652 / 7 203 px | **identical** — the geometry is bit-for-bit the same |
+| F deviation mean | hold 24.19 / linear 0.679 / **Catmull-Rom 0.036** px | **24.19 / 0.679 / 0.0357 px** |
+| F2 adapter actuated | 29 fires, 4 854 interpolate, 11 reduce | **29 / 4 856 / 11** |
+| G console | 0 errors | **0 errors** |
+
+New number, and the one that says the seam was worth closing: the library served
+**4 847 `sampleAt` calls at 2.05 comparisons per call** (4 577 cursor hits, 199
+linear advances, **5** binary searches). The O(n) `reduceAt` this replaces would
+have rescanned the event array on every one of them.
+
+Library-side proof: `timeline/lab/prop-test.mjs` suite 5 (`--seeds 30` and
+`--seeds 100`, 0 violations) — `sampleAt` against an analytic curve, the cursor's
+cost proved flat in *n*, `info.next`, caps degradation, `followsTransport`, and
+the logdeck `at` regression. No-regression run: `proto/remixer/compose-run.mjs`
+**16/16** (it exercises `makeLogDeck`, nested spans and media spans at once).

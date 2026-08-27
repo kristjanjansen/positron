@@ -148,6 +148,50 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### CONTINUOUS KINDS FIRST-CLASS (session 6w) — transport v0.4, all six seams closed
+| seam | API |
+|---|---|
+| no positional read (O(n) reduceAt) | **`deck.sampleAt(kind,pos,opts)`** — O(1) amortised, per-kind cursor |
+| no bracketing query | **`deck.bracket(kind,pos,opts)`** → prev/a/b/next/prevs/nexts/u/dtMs |
+| spline ≠ f(2 samples) | **`interpolate(a,b,u,ctx)`** + **`caps.neighbourhood`**; control fields injected AFTER the opts spread (the same law as the logdeck bug) |
+| reduce blind to successor | **`info.next` / `info.nexts`** via bisect on the sorted lane |
+| caps inert | library reads continuous/interpolate/interpolators/neighbourhood/followsTransport → **`adapter.transport(state)`** on play/pause/rate ONLY (never seek — that's reduce+assertState; never sync — a correction must not cascade) |
+| "degrade honestly" impossible | **`deck.request(kind,want)`** → `{wanted,chose,degraded,reason}` + `deck.degradations(kind)`; **unbacked caps claims caught at registerAdapter, not at 60 Hz** |
+- **Guarantee sharpened in-source**: discrete → `state(t)=f(prefix(≤t))`;
+  continuous → `f(prefix(≤t), successor(s))`. No render tick added — cadence
+  stays the client's. `prefixEvents` now bisects a per-kind lane.
+- logdeck fixed (`{...payload, i, at}`, row stamp survives as `atUs`).
+  nested.mjs's hand-written onState filter DELETED — it had been declaring
+  `followsTransport:true` into a library that ignored it.
+- **Proof by DELETION, not by new asserts**: paths' `makeBracket()` (27 lines),
+  its lane handles, the `expand()` no-`at` hack and all client-side interpolate
+  driving removed — **600 → 566 client lines, and the adapter now holds NO
+  reference to the log at all** — with numbers **bit-for-bit identical**
+  (seek 0.042/0.032/0.042 px, deviation 24.19/0.679/0.0357, per-lane ink
+  unchanged). Library served 4,847 `sampleAt` calls at **2.05 comparisons
+  each**; cursor measured **3.67 comparisons/call at n=2000 AND n=8000**
+  (rescan ≈1000).
+- prop-test 0 violations at 30 and 100 seeds, five suites, incl. **C3's
+  necessity**: with `{neighbourhood:0}` the C¹ interpolator returns exactly
+  linear and labels itself `linear-degraded`. No-regression: compose-run 16/16.
+- **Cheapest remaining gap = the EVIDENCE FIREWALL (~20 lines + one prop arm)**
+  — today's work built its machinery by accident: `sampleAt` IS the tier-1
+  reconstructor running inside the library; `caps.tier/method/evidence/deviates`
+  are declared and finally read; `request()` already has the firewall's exact
+  `{wanted,chose,degraded,reason}` shape and `degradations()` is the ledger for
+  "you asked attested-only and got restored"; prefixEvents bisects a lane so a
+  policy is a predicate over a slice. Concretely: `info.policy` in reduce +
+  `sampleAt(kind,pos,{evidence:'attested'})`. **And paths can prove it on day
+  one at zero client cost** — it already ships the evidence-only toggle, the
+  hatching and the invented-percentage. Ranking behind: provenance (nearly as
+  cheap but has no consumer until the firewall gives it one — a field nobody
+  reads is the `caps` mistake just fixed); fragment quotation (needs sub-range
+  spans + remapping, wants provenance first); uncertainty-as-position (changes
+  what an `at` IS — scalar → distribution — touching insertIdx, cursor,
+  horizon, reconcile and every reducer; v0.4 makes it thinkable, not cheap);
+  a real store (largest, but the cursor is now the ONLY positional reader, so a
+  paged/async backend has one interface to satisfy).
+
 ### TEXT PERFORMER (session 6v) — ✅ 12/12 (proto/text) — the adapter the lineage kept failing to write
 - **My briefed API was WRONG and it measured that**: `getTargetRanges()` returned
   EMPTY on **0 of 65** beforeinput events on <textarea> (spec-mandated — closed

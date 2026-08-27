@@ -30,6 +30,43 @@
 //      assert harness can coexist); drainDrift() stays for bounded memory.
 //   +  transport.sync(pos) slaves the vector to an external clock master (a
 //      media element) without seek semantics; createDeck() is the facade.
+//
+// v0.4 — CONTINUOUS KINDS are first-class. The first four clients were all
+// discrete (a note fires, a tile appears, a cue lands); proto/paths brought the
+// first kind whose state is defined BETWEEN samples and filed six seams
+// (proto/paths/NOTES.md §3). All six are closed here:
+//   C1. deck.sampleAt(kind, pos) — the interpolated value at ANY position,
+//       O(1) amortised through a per-kind CURSOR (binary search on seek, linear
+//       advance on play). Driving an interpolator from reduceAt() at 60 Hz would
+//       reproduce demo10's per-frame-recompute-over-an-unbounded-array defect
+//       inside the library; this is the read that does not.
+//   C2. deck.bracket(kind, pos) -> {prev, a, b, next, u, …} for clients that
+//       want the raw pair (and prevs/nexts for higher-order interpolators).
+//   C3. interpolate(a, b, u, ctx) with ctx = {prev, next, pos, dtMs, …}. A
+//       spline is NOT a function of two samples: the old 2-arg signature
+//       silently forced every C1 interpolator to degrade to linear.
+//       caps.neighbourhood = k asks for k extra samples EACH SIDE of the pair
+//       (0 = two-sample, 1 = one each side = Catmull-Rom, …).
+//   C4. info.next / info.nexts in reduce. PREFIX PURITY, SHARPENED: for a
+//       DISCRETE kind the reducer is a pure function of the prefix (SEAM 5,
+//       unchanged); for a CONTINUOUS kind the state at t is a function of the
+//       prefix PLUS THE SUCCESSOR — the sample straddling t on the right, which
+//       is by construction absent from the prefix. Without info.next an
+//       interpolated reduce is not expressible at all.
+//   C5. THE CAPS ARE ACTUALLY READ: continuous, interpolate, interpolators,
+//       neighbourhood and followsTransport. An adapter declaring
+//       caps.followsTransport gets adapter.transport({reason,playing,rate,…})
+//       on play/pause/rate (never on seek — seek is reduce+assertState — and
+//       never on sync — a correction must not cascade), which is the onState
+//       reason-filter three clients had each rewritten by hand.
+//   C6. DEGRADE HONESTLY, out loud: when a client asks for something the
+//       adapter's caps refuse, deck.request(kind, want) answers in nested.mjs's
+//       shape — {wanted, chose, degraded, reason} — and every implicit
+//       degradation is recorded in deck.degradations(kind).
+// NOT done, deliberately: the library does NOT own a render tick. Rendering
+// cadence belongs to the client; observePosition() already serves anyone who
+// wants a 60 Hz pull, and a library-owned rAF would be a second timer inside a
+// library whose first law is that the vector has no timers.
 
 // ---------------------------------------------------------------------------
 // Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
@@ -240,6 +277,91 @@ export function tickHostByKind(kind) {
 }
 
 // ---------------------------------------------------------------------------
+// THE CURSOR (v0.4, C1). "The pair of samples straddling pos" is the one read a
+// continuous kind makes constantly — once per rendered frame, per lane. Done by
+// rescanning it is O(n) per frame over an unbounded array: demo10's defect. Done
+// by a cursor it is O(1) amortised while playing forward (the index advances by
+// ~1 per frame), O(log n) on a seek, and it degrades to a binary search rather
+// than a walk on random access. The scheduler runs one of these per continuous
+// kind; it is exported because a client's OWN un-logged lanes (ground truth, an
+// analysis track) want exactly the same read and should not re-write it.
+//
+// `comparisons` counts every probe of a row's time — that is what makes
+// "this is not O(n)" an assertion in prop-test rather than a claim.
+// ---------------------------------------------------------------------------
+
+export function createCursor(rows, { key = (r) => r.at, linearWindow = 4 } = {}) {
+  let i = 0, comparisons = 0, searches = 0, advances = 0, hits = 0;
+  const at = (k) => { comparisons++; return key(rows[k]); };
+
+  /** largest k in [lo, hi] with at(k) <= pos; assumes at(lo) <= pos < at(hi) */
+  function bsearch(pos, lo, hi) {
+    while (lo < hi - 1) { const m = (lo + hi) >> 1; if (at(m) <= pos) lo = m; else hi = m; }
+    return lo;
+  }
+
+  /** index j such that rows[j] is the left member of the bracketing pair.
+   *  Two probes on a hit (the frame-after-frame case), one more per step of a
+   *  short forward advance (playing), a binary search otherwise (a seek). */
+  function locate(pos) {
+    const n = rows.length;
+    if (n < 2) return 0;
+    if (i > n - 2) i = n - 2;
+    if (pos >= at(i)) {
+      if (pos <= at(i + 1)) { hits++; return i; }
+      let j = i, steps = 0;
+      while (j < n - 2 && steps++ < linearWindow) { j++; if (pos <= at(j + 1)) { advances++; return (i = j); } }
+      if (j >= n - 2) { advances++; return (i = n - 2); }   // at or past the last pair
+      searches++;
+      return (i = Math.min(n - 2, bsearch(pos, j, n - 1)));
+    }
+    if (pos <= at(0)) return (i = 0);
+    searches++;
+    return (i = bsearch(pos, 0, i));
+  }
+
+  return {
+    rows,
+    reset() { i = 0; },
+    stats: () => ({ comparisons, searches, advances, hits, i }),
+    /** {i, u, pos, a, b, prev, next, prevs, nexts, aAt, bAt, dtMs} | null.
+     *  u is clamped to [0,1]: before the first sample and after the last one the
+     *  bracket degenerates to the terminal pair (u = 0 / u = 1), so a caller
+     *  never has to special-case the ends. */
+    bracket(pos, nbr = 0) {
+      const n = rows.length;
+      if (!n) return null;
+      if (n === 1) {
+        const t = key(rows[0]);
+        return { i: 0, u: 0, pos, a: rows[0], b: rows[0], aAt: t, bAt: t, dtMs: 0,
+                 prev: undefined, next: undefined, prevs: [], nexts: [] };
+      }
+      const j = locate(pos);
+      const a = rows[j], b = rows[j + 1];
+      const aAt = key(a), bAt = key(b), dt = bAt - aAt;
+      const u = dt > 0 ? Math.min(1, Math.max(0, (pos - aAt) / dt)) : (pos >= bAt ? 1 : 0);
+      const prevs = [], nexts = [];
+      for (let m = 0; m < nbr; m++) {
+        if (rows[j - 1 - m]) prevs.push(rows[j - 1 - m]);
+        if (rows[j + 2 + m]) nexts.push(rows[j + 2 + m]);
+      }
+      return { i: j, u, pos, a, b, aAt, bAt, dtMs: dt, prev: prevs[0], next: nexts[0], prevs, nexts };
+    },
+  };
+}
+
+/** nearest rate in LOG space on a declared lattice (the caps.rates read; the
+ *  same rule nested.mjs applies to composed rates). null lattice = anything. */
+function nearestRate(wanted, allowed) {
+  if (!wanted || !allowed || !allowed.length) return { chose: wanted, degraded: false, reason: null };
+  if (allowed.some((r) => Math.abs(r - wanted) < 1e-9)) return { chose: wanted, degraded: false, reason: null };
+  let best = allowed[0];
+  const d = (r) => Math.abs(Math.log(r / wanted));
+  for (const r of allowed) if (r > 0 && d(r) < d(best)) best = r;
+  return { chose: best, degraded: true, reason: `caps.rates lattice [${allowed}] cannot express ${wanted}` };
+}
+
+// ---------------------------------------------------------------------------
 // Wall-lane scheduler: lookahead loop, committed-vs-pending, per-kind catch-up
 // policies, first-class drift log, ADAPTER REGISTRY. Port of the timed-messages
 // crossing engine generalized per plan-timeline §1.
@@ -249,10 +371,15 @@ export function tickHostByKind(kind) {
 // the same dispatch/filter/policy-wiring block. registerAdapter() now lives
 // here:
 //     sched.registerAdapter(kind, {
-//       caps,                       // {catchUp, audio, rates, …} — declares behaviour
+//       caps,                       // {catchUp, audio, rates, continuous,
+//                                   //  interpolate, interpolators, neighbourhood,
+//                                   //  followsTransport, …} — declares behaviour
 //       actuate(payload, rec, when),// called ONLY for this kind
-//       reduce(payloads, pos, info),// catch-up + seek fold (whole prefix, SEAM 5)
+//       reduce(payloads, pos, info),// catch-up + seek fold (whole prefix, SEAM 5;
+//                                   //  + info.next/info.nexts, C4)
 //       assertState(state, info),   // idempotent state assertion
+//       interpolate(a, b, u, ctx),  // CONTINUOUS kinds only (C1/C3)
+//       transport(state),           // caps.followsTransport only (C5)
 //     }) -> unregister
 // caps.catchUp ('burst' | 'drop' | 'reduce') selects the per-kind policy, so a
 // client never touches setPolicy either. onFire stays, for HUDs and harnesses
@@ -269,9 +396,13 @@ export function createScheduler(transport, {
 } = {}) {
   const clock = transport.clock;
   const events = [];            // sorted by (at, seq); wrappers own status, log stays immutable
+  const byKind = new Map();     // kind -> the SAME wrappers, sorted, one lane per kind (C1)
+  const cursors = new Map();    // kind -> createCursor over that lane
+  const degraded = new Map();   // kind -> {kind, count, reports[]}  (C6)
   let seq = 0, gen = 0, firstLive = 0, running = false;
+  let sampleCalls = 0, bracketCalls = 0;
   const policies = new Map();   // kind -> 'burst' | 'drop' | 'reduce' | {reduce(batch, info)}
-  const adapters = new Map();   // kind -> {actuate, caps, reduce, assertState}
+  const adapters = new Map();   // kind -> {actuate, caps, reduce, assertState, interpolate, transport}
   const snapshots = new Map();  // kind -> {pos, state}  (SEAM 5: reduce's fromSnapshot)
   const fireCbs = new Set(), policyCbs = new Set(), driftCbs = new Set();
   const driftLog = [];
@@ -279,14 +410,42 @@ export function createScheduler(transport, {
   let busyMs = 0;               // accumulated scheduler+fire callback self-time
   let lastTickAt = null, maxTickGapMs = 0;
 
-  function insertIdx(at, s) {
-    let lo = 0, hi = events.length;
+  function insertInto(arr, at, s) {
+    let lo = 0, hi = arr.length;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      const e = events[mid];
+      const e = arr[mid];
       if (e.at < at || (e.at === at && e.seq < s)) lo = mid + 1; else hi = mid;
     }
     return lo;
+  }
+  const insertIdx = (at, s) => insertInto(events, at, s);
+  function laneOf(kind) {
+    let l = byKind.get(kind);
+    if (!l) byKind.set(kind, l = []);
+    return l;
+  }
+  /** first index of `lane` with at > pos (the successor boundary) */
+  function afterIdx(lane, pos) {
+    let lo = 0, hi = lane.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (lane[m].at <= pos) lo = m + 1; else hi = m; }
+    return lo;
+  }
+
+  /** C6: every honest degradation, recorded rather than swallowed. Consecutive
+   *  identical reports are folded (a 60 Hz caller must not grow memory). */
+  function noteDegraded(kind, rec) {
+    let d = degraded.get(kind);
+    if (!d) degraded.set(kind, d = { kind, count: 0, reports: [] });
+    d.count++;
+    const last = d.reports[d.reports.length - 1];
+    if (last && last.wanted === rec.wanted && last.chose === rec.chose && last.reason === rec.reason) {
+      last.n++; last.lastPos = rec.pos;
+      return d;
+    }
+    d.reports.push({ ...rec, n: 1 });
+    if (d.reports.length > 64) d.reports.shift();
+    return d;
   }
 
   /** SEAM 6: drift is a CHANNEL, not a mailbox — subscribers see every row and
@@ -434,9 +593,28 @@ export function createScheduler(transport, {
   // signature reduce(missedBatch, info) — the enriched info carries prefix/
   // since/from — so existing lab arms are untouched.
   // -------------------------------------------------------------------------
+  //
+  // C4 — THE GUARANTEE, SHARPENED. For a DISCRETE kind everything above holds
+  // unchanged: the reducer is a pure function of the prefix. For a CONTINUOUS
+  // kind it cannot be — the state at t is defined by the samples STRADDLING t,
+  // and the right one has at > pos, so it is by construction absent from the
+  // prefix. So the contract now reads:
+  //     discrete kind    : state(t) = f(prefix(<= t))
+  //     continuous kind  : state(t) = f(prefix(<= t), successor(s) of t)
+  // and `info.next` (first event of this kind with at > pos) plus `info.nexts`
+  // (1 + caps.neighbourhood of them) are supplied on every reduce call. They are
+  // a bisect over a lane the scheduler already keeps sorted — the two lines
+  // without which an interpolated reduce is inexpressible.
   function prefixEvents(kind, pos) {
+    const lane = byKind.get(kind);
+    if (!lane || !lane.length) return [];
+    return lane.slice(0, afterIdx(lane, pos));
+  }
+  function successorEvents(kind, pos, k = 1) {
+    const lane = byKind.get(kind);
+    if (!lane || !lane.length || k <= 0) return [];
     const out = [];
-    for (const ev of events) { if (ev.at > pos) break; if (ev.kind === kind) out.push(ev); }
+    for (let j = afterIdx(lane, pos); j < lane.length && out.length < k; j++) out.push(publicEv(lane[j]));
     return out;
   }
   function applyReduce(kind, missed, pos, now, reason) {
@@ -444,10 +622,12 @@ export function createScheduler(transport, {
     const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
     const prefix = prefixEvents(kind, pos).map(publicEv);
     const since = prefix.filter((e) => e.at > snap.pos);
+    const nexts = successorEvents(kind, pos, 1 + (((ad && ad.caps) || {}).neighbourhood || 0));
     const info = {
       kind, pos, reason, nowUs: Math.round(now * 1000),
       count: missed ? missed.length : prefix.length,
       missed: missed || [], prefix, since, from: { pos: snap.pos, state: snap.state },
+      next: nexts[0] || null, nexts,          // C4
     };
     const t = clock.now();
     if (ad && typeof ad.reduce === 'function') {
@@ -473,9 +653,142 @@ export function createScheduler(transport, {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // C1/C2/C3 — the CONTINUOUS reads. bracket() is the raw pair (plus its
+  // neighbourhood); sampleAt() is the interpolated value, which is what a
+  // renderer actually wants. Both go through the per-kind cursor: O(1) amortised
+  // playing forward, O(log n) on a seek. Neither is a render tick — the client
+  // calls them from whatever cadence it already runs (C-not-done).
+  // -------------------------------------------------------------------------
+  const payOf = (ev) => (ev ? ev.payload : undefined);
+
+  function cursorFor(kind) {
+    const lane = laneOf(kind);
+    let cur = cursors.get(kind);
+    if (!cur || cur.rows !== lane) cursors.set(kind, cur = createCursor(lane));
+    return cur;
+  }
+
+  function bracketAt(kind, pos, opts) {
+    const lane = byKind.get(kind);
+    if (!lane || !lane.length) return null;
+    const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
+    const nbr = opts && opts.neighbourhood !== undefined ? opts.neighbourhood : (caps.neighbourhood || 0);
+    const br = cursorFor(kind).bracket(pos, nbr);
+    if (!br) return null;
+    bracketCalls++;
+    return {
+      kind, pos, i: br.i, u: br.u, aAt: br.aAt, bAt: br.bAt, dtMs: br.dtMs,
+      a: payOf(br.a), b: payOf(br.b), prev: payOf(br.prev), next: payOf(br.next),
+      prevs: br.prevs.map(payOf), nexts: br.nexts.map(payOf),
+      ids: [br.a.id, br.b.id],
+    };
+  }
+
+  function sampleAt(kind, pos, opts) {
+    const br = bracketAt(kind, pos, opts);
+    if (!br) return null;
+    const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
+    const can = !!(ad && typeof ad.interpolate === 'function' && caps.continuous !== false && caps.interpolate !== false);
+    if (!can) {
+      // C6: a discrete kind sampled between two events is a zero-order HOLD —
+      // the honest answer, and the degradation is reported, not implied.
+      noteDegraded(kind, {
+        wanted: 'sampleAt(interpolated)', chose: 'hold', degraded: true, pos,
+        reason: !ad ? `no adapter registered for kind ${kind}`
+          : typeof ad.interpolate !== 'function' ? `adapter ${kind} implements no interpolate()`
+          : `adapter ${kind} caps refuse interpolation (continuous=${caps.continuous}, interpolate=${caps.interpolate})`,
+      });
+      return br.a === undefined ? null : br.a;
+    }
+    sampleCalls++;
+    const t = clock.now();
+    // NOTE the ordering: caller opts spread FIRST, control fields injected
+    // AFTER. This is §2's law ("payloads must not spread over control fields")
+    // applied to the ctx object — the same law logdeck was breaking.
+    const out = ad.interpolate(br.a, br.b, br.u, {
+      ...(opts || {}),
+      kind, pos, u: br.u, i: br.i, prev: br.prev, next: br.next,
+      prevs: br.prevs, nexts: br.nexts, aAt: br.aAt, bAt: br.bAt, dtMs: br.dtMs,
+    });
+    busyMs += clock.now() - t;
+    return out;
+  }
+
+  /** C6 — ASK, and be told honestly. Mirrors nested.mjs's rate report shape:
+   *  {wanted, chose, degraded, reason}. `want` keys understood specially:
+   *  interpolate (true | method name), neighbourhood (number), rate (number,
+   *  against caps.rates); anything else is treated as a boolean capability
+   *  claim and checked against caps[key]. */
+  function request(kind, want = {}) {
+    const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
+    const per = {};
+    let any = false;
+    for (const [k, v] of Object.entries(want)) {
+      let chose = v, deg = false, reason = null;
+      if (!ad) { chose = null; deg = true; reason = `no adapter registered for kind ${kind}`; }
+      else if (k === 'interpolate') {
+        const can = typeof ad.interpolate === 'function' && caps.interpolate !== false && caps.continuous === true;
+        if (v === false || v === undefined || v === null) chose = false;
+        else if (!can) {
+          chose = 'hold'; deg = true;
+          reason = `kind ${kind} is discrete (caps.continuous !== true) — zero-order hold is all it can honestly give`;
+        } else if (typeof v === 'string' && Array.isArray(caps.interpolators) && !caps.interpolators.includes(v)) {
+          chose = caps.method || caps.interpolators[caps.interpolators.length - 1];
+          deg = true; reason = `caps.interpolators [${caps.interpolators}] does not offer '${v}'`;
+        } else chose = typeof v === 'string' ? v : (caps.method || true);
+      } else if (k === 'neighbourhood') {
+        const have = Number(caps.neighbourhood || 0);
+        if (v > have) {
+          chose = have; deg = true;
+          reason = `caps.neighbourhood ${have} < ${v}: a C1 interpolator degrades to what ${have} samples each side can express`;
+        }
+      } else if (k === 'rate') {
+        const r = nearestRate(v, Array.isArray(caps.rates) && caps.rates.length ? caps.rates : null);
+        chose = r.chose; deg = r.degraded; reason = r.reason;
+      } else if (v === true && caps[k] !== true) {
+        chose = caps[k] === undefined ? false : caps[k];
+        deg = true; reason = `adapter ${kind} does not declare caps.${k}`;
+      }
+      per[k] = { wanted: v, chose, degraded: deg, reason };
+      if (deg) { any = true; noteDegraded(kind, { wanted: `${k}=${JSON.stringify(v)}`, chose, degraded: true, reason }); }
+    }
+    const keys = Object.keys(per);
+    // one-key asks answer FLAT, in nested.mjs's exact shape
+    return keys.length === 1
+      ? { kind, degraded: any, ...per[keys[0]], per }
+      : { kind, degraded: any, per };
+  }
+
+  /** C5 — caps.followsTransport. play/pause/rate are NOT seeks, so nothing
+   *  re-asserts on them (correctly: nothing should re-fire) — but a media
+   *  element still has to follow. Three clients had each written the same
+   *  onState reason-filter by hand; it lives here now. 'seek' is excluded (it
+   *  goes through reduce + assertState) and 'sync' is excluded on purpose: a
+   *  servo correction must never cascade. */
+  function followTransport(st) {
+    if (!adapters.size) return;
+    const base = {
+      reason: st.reason, playing: transport.rate !== 0, rate: transport.rate,
+      targetRate: transport.targetRate, pos: transport.position(), clockDomain: st.clockDomain,
+    };
+    for (const [kind, ad] of adapters) {
+      if (!ad.caps || ad.caps.followsTransport !== true) continue;
+      if (typeof ad.transport !== 'function') {
+        noteDegraded(kind, { wanted: 'followsTransport', chose: 'ignored', degraded: true,
+          reason: `adapter ${kind} declares caps.followsTransport but implements no transport(state)` });
+        continue;
+      }
+      const t = clock.now();
+      ad.transport({ ...base, kind });
+      busyMs += clock.now() - t;
+    }
+  }
+
   const unsubState = transport.onState((st) => {
     cancelCommitted();
     if (st.reason === 'seek') { reconcile(st.p0); assertAt(st.p0); }
+    else if (st.reason === 'play' || st.reason === 'pause' || st.reason === 'rate') followTransport(st);
     if (running && transport.rate > 0) scan(clock.now()); // re-arm immediately, don't wait a tick
   });
 
@@ -486,6 +799,8 @@ export function createScheduler(transport, {
     schedule({ at, kind = 'default', id, payload }) {
       const ev = { at, kind, id: id ?? `e${seq}`, seq: seq++, payload, status: 'pending', fires: 0, cancel: null };
       events.splice(insertIdx(at, ev.seq), 0, ev);
+      const lane = laneOf(kind);
+      lane.splice(insertInto(lane, at, ev.seq), 0, ev);   // C1: the per-kind lane the cursor rides
       if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
       return ev.id;
     },
@@ -497,6 +812,14 @@ export function createScheduler(transport, {
       const catchUp = caps.catchUp || 'burst';
       if (catchUp === 'reduce' && typeof adapter.reduce !== 'function')
         throw new Error(`adapter ${kind}: caps.catchUp 'reduce' needs reduce()`);
+      // C5/C6: the caps are READ at registration, and a claim the adapter cannot
+      // back is recorded now rather than discovered at 60 Hz.
+      if (caps.continuous === true && typeof adapter.interpolate !== 'function')
+        noteDegraded(kind, { wanted: 'caps.continuous', chose: 'hold', degraded: true,
+          reason: `adapter ${kind} declares caps.continuous but implements no interpolate()` });
+      if (caps.followsTransport === true && typeof adapter.transport !== 'function')
+        noteDegraded(kind, { wanted: 'caps.followsTransport', chose: 'ignored', degraded: true,
+          reason: `adapter ${kind} declares caps.followsTransport but implements no transport(state)` });
       adapters.set(kind, adapter);
       policies.set(kind, catchUp);
       return () => {
@@ -519,17 +842,42 @@ export function createScheduler(transport, {
       if (!ad || typeof ad.reduce !== 'function') return null;
       const prefix = prefixEvents(kind, pos).map(publicEv);
       const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
+      const nexts = successorEvents(kind, pos, 1 + ((ad.caps || {}).neighbourhood || 0));
       return ad.reduce(prefix.map((e) => e.payload), pos, {
         kind, pos, reason: 'query', count: prefix.length, nowUs: Math.round(clock.now() * 1000),
         missed: [], prefix, since: prefix.filter((e) => e.at > snap.pos), from: { pos: snap.pos, state: snap.state },
+        next: nexts[0] || null, nexts,          // C4
       });
+    },
+    /** C2: the raw straddling pair at pos, plus its neighbourhood.
+     *  -> {prev, a, b, next, u, prevs, nexts, i, aAt, bAt, dtMs, ids} (payloads). */
+    bracket: bracketAt,
+    /** C1: the INTERPOLATED value at any position — O(1) amortised. */
+    sampleAt,
+    /** C6: ask for a capability; get {wanted, chose, degraded, reason}. */
+    request,
+    /** C6: what this deck has silently had to refuse, per kind. */
+    degradations(kind) {
+      if (kind !== undefined) return degraded.get(kind) || { kind, count: 0, reports: [] };
+      return [...degraded.values()];
+    },
+    /** the ordered public events of ONE kind (the lane the cursor rides). */
+    eventsOf(kind) { return (byKind.get(kind) || []).map(publicEv); },
+    /** cursor + continuous-read counters, for harnesses proving O(1) */
+    cursorStats(kind) {
+      const c = cursors.get(kind);
+      return { kind, sampleCalls, bracketCalls, cursor: c ? c.stats() : null };
     },
     setPolicy(kind, policy) { policies.set(kind, policy); },
     onFire(cb) { fireCbs.add(cb); return () => fireCbs.delete(cb); },
     onPolicy(cb) { policyCbs.add(cb); return () => policyCbs.delete(cb); },
     start() { running = true; lastTickAt = null; host.start(tick, tickMs); },
     stop() { running = false; host.stop(); cancelCommitted(); },
-    clear() { cancelCommitted(); events.length = 0; firstLive = 0; snapshots.clear(); },
+    clear() {
+      cancelCommitted(); events.length = 0; firstLive = 0; snapshots.clear();
+      for (const lane of byKind.values()) lane.length = 0;
+      for (const c of cursors.values()) c.reset();
+    },
     /** SEAM 6: non-destructive drift reads. */
     onDrift(cb) { driftCbs.add(cb); return () => driftCbs.delete(cb); },
     peekDrift(fromTotal = 0) {
@@ -710,6 +1058,14 @@ export function createDeck({
     resetDrift() { sched.drainDrift(); drift = []; pendingRows = []; },
     reduceAt: (kind, pos) => sched.reduceAt(kind, pos),
     assertAt: (pos, kind) => sched.assertAt(pos, kind),
+    /** v0.4 CONTINUOUS KINDS — the interpolated value at any position (C1), the
+     *  raw straddling pair (C2), honest capability negotiation (C6). */
+    sampleAt: (kind, pos, opts) => sched.sampleAt(kind, pos, opts),
+    bracket: (kind, pos, opts) => sched.bracket(kind, pos, opts),
+    request: (kind, want) => sched.request(kind, want),
+    degradations: (kind) => sched.degradations(kind),
+    eventsOf: (kind) => sched.eventsOf(kind),
+    cursorStats: (kind) => sched.cursorStats(kind),
     caps: (kind) => sched.adapterCaps(kind),
     audit: () => sched.audit(),
     stats: () => sched.stats(),

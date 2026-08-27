@@ -48,7 +48,21 @@ export function makeLogDeck({
       for (const p of parts) {
         if (!p) continue;
         const at = p.atMs !== undefined ? p.atMs : toPos(p.atUs);
-        items.push({ at, kind: ln.kind, id: p.id ?? `${ln.kind}-${i}`, payload: { i, at, ...p.payload } });
+        // CONTROL FIELDS ARE INJECTED **AFTER** THE SPREAD. This used to read
+        // `{ i, at, ...p.payload }`, and p.payload defaults to the raw capture
+        // ROW — whose own `at` is in EPOCH µs. The spread therefore silently
+        // overwrote the position-domain `at` the library had just computed, in
+        // the field the library itself injected: §2's law ("untrusted payloads
+        // must not spread over control fields") broken inside the library that
+        // records it. Reported by the first continuous client
+        // (proto/paths/NOTES.md S6), which had to carry an `expand()` whose
+        // payload avoided the key `at` entirely. Both control fields now win,
+        // and the row's own stamp stays reachable as `atUs`.
+        const { at: rowAt, ...rest } = p.payload || {};
+        items.push({
+          at, kind: ln.kind, id: p.id ?? `${ln.kind}-${i}`,
+          payload: { ...rest, ...(rowAt !== undefined && rest.atUs === undefined ? { atUs: rowAt } : {}), i, at },
+        });
       }
     });
   }
