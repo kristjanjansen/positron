@@ -52,6 +52,16 @@ same engine band as ever; the anchor contributes nothing beyond noise.
 Live-vs-replay asymmetry reproduced exactly: "now" cues 0–1 ms vs the live
 burn (one 33 ms outlier), scheduled cues +31…+67 ms — identical to §11b.
 
+**RE-MEASURED 2026-08-28** on the same kept R2 show after `proto/replay/replay.html`
+was refactored onto `timeline/transport.mjs` (plan-studio DoD-A): same script,
+same native anchor, **7/7 green**, err `−7 −21 −7 −10 0 −4 11 1` →
+**p50 −4 ms / p95 11 ms (|err| p95 21)**, from 77/95. The anchor result is
+unchanged (content−native still −15 ms, burn decode 5116/5116) — what moved is
+the engine: the old 100 ms poll floor (69–110 ms lateness) became 0–9 ms, so
+`errMs` is now dominated by the ±1-frame quantization of the burned-clock
+ground truth itself. `artifacts/archive-report.json` holds the new run; the
+pre-adoption copy is in git at `HEAD~`. Details: `proto/replay/NOTES.md`.
+
 **Bounded disk: high-water mark 1.82 MB = 2 segments resident** (sampled 1 Hz,
 246 samples) against 40.2 MB total recorded — 4.4 %, and O(1) in show length:
 steady state is one closed segment in flight + one being written.

@@ -20,12 +20,12 @@
       "at": 1787737760258,
       "vodT": 11.892,
       "fired": true,
-      "errMs": 59,
-      "engineLateMs": 63,
+      "errMs": 25,
+      "engineLateMs": 6,
       "liveLateMs": 59,
       "liveFiredAtBurn": 1787737760317,
       "liveFiredAtTelemetry": 1787737760317,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -34
     },
     {
       "id": "CUE-02",
@@ -33,12 +33,12 @@
       "at": 1787737775257,
       "vodT": 26.891,
       "fired": true,
-      "errMs": 42,
-      "engineLateMs": 65,
+      "errMs": 9,
+      "engineLateMs": 9,
       "liveLateMs": 9,
       "liveFiredAtBurn": 1787737775266,
       "liveFiredAtTelemetry": 1787737775266,
-      "replayVsLiveMs": 33
+      "replayVsLiveMs": 0
     },
     {
       "id": "CUE-03",
@@ -46,12 +46,12 @@
       "at": 1787737790257,
       "vodT": 41.891,
       "fired": true,
-      "errMs": 56,
-      "engineLateMs": 67,
+      "errMs": 24,
+      "engineLateMs": 6,
       "liveLateMs": 56,
       "liveFiredAtBurn": 1787737790313,
       "liveFiredAtTelemetry": 1787737790313,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -32
     },
     {
       "id": "CUE-04",
@@ -59,12 +59,12 @@
       "at": 1787737805257,
       "vodT": 56.891,
       "fired": true,
-      "errMs": 71,
-      "engineLateMs": 63,
+      "errMs": 6,
+      "engineLateMs": 5,
       "liveLateMs": 6,
       "liveFiredAtBurn": 1787737805263,
       "liveFiredAtTelemetry": 1787737805263,
-      "replayVsLiveMs": 65
+      "replayVsLiveMs": 0
     },
     {
       "id": "CUE-05",
@@ -72,12 +72,12 @@
       "at": 1787737820257,
       "vodT": 71.891,
       "fired": true,
-      "errMs": 53,
-      "engineLateMs": 66,
+      "errMs": 21,
+      "engineLateMs": 2,
       "liveLateMs": 53,
       "liveFiredAtBurn": 1787737820310,
       "liveFiredAtTelemetry": 1787737820310,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -32
     },
     {
       "id": "CUE-06",
@@ -85,12 +85,12 @@
       "at": 1787737835257,
       "vodT": 86.891,
       "fired": true,
-      "errMs": 69,
-      "engineLateMs": 64,
+      "errMs": 34,
+      "engineLateMs": 1,
       "liveLateMs": 2,
       "liveFiredAtBurn": 1787737835259,
       "liveFiredAtTelemetry": 1787737835259,
-      "replayVsLiveMs": 67
+      "replayVsLiveMs": 32
     },
     {
       "id": "CUE-07",
@@ -98,12 +98,12 @@
       "at": 1787737850257,
       "vodT": 101.891,
       "fired": true,
-      "errMs": 49,
-      "engineLateMs": 68,
+      "errMs": 16,
+      "engineLateMs": 0,
       "liveLateMs": 49,
       "liveFiredAtBurn": 1787737850306,
       "liveFiredAtTelemetry": 1787737850306,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -33
     },
     {
       "id": "CUE-08",
@@ -111,12 +111,12 @@
       "at": 1787737865257,
       "vodT": 116.891,
       "fired": true,
-      "errMs": 65,
-      "engineLateMs": 68,
+      "errMs": 31,
+      "engineLateMs": 1,
       "liveLateMs": 31,
       "liveFiredAtBurn": 1787737865288,
       "liveFiredAtTelemetry": 1787737865288,
-      "replayVsLiveMs": 34
+      "replayVsLiveMs": 0
     },
     {
       "id": "CUE-09",
@@ -124,12 +124,12 @@
       "at": 1787737880266,
       "vodT": 131.9,
       "fired": true,
-      "errMs": 37,
-      "engineLateMs": 57,
+      "errMs": 5,
+      "engineLateMs": 6,
       "liveLateMs": 37,
       "liveFiredAtBurn": 1787737880303,
       "liveFiredAtTelemetry": 1787737880303,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -32
     },
     {
       "id": "CUE-10",
@@ -137,12 +137,12 @@
       "at": 1787737895257,
       "vodT": 146.891,
       "fired": true,
-      "errMs": 62,
-      "engineLateMs": 67,
+      "errMs": -4,
+      "engineLateMs": 7,
       "liveLateMs": 29,
       "liveFiredAtBurn": 1787737895286,
       "liveFiredAtTelemetry": 1787737895286,
-      "replayVsLiveMs": 33
+      "replayVsLiveMs": -33
     },
     {
       "id": "CUE-11",
@@ -150,12 +150,12 @@
       "at": 1787737910261,
       "vodT": 161.895,
       "fired": true,
-      "errMs": 41,
-      "engineLateMs": 62,
+      "errMs": 8,
+      "engineLateMs": 4,
       "liveLateMs": 41,
       "liveFiredAtBurn": 1787737910302,
       "liveFiredAtTelemetry": 1787737910302,
-      "replayVsLiveMs": 1
+      "replayVsLiveMs": -32
     },
     {
       "id": "CUE-12",
@@ -163,22 +163,22 @@
       "at": 1787737925257,
       "vodT": 176.891,
       "fired": true,
-      "errMs": 60,
-      "engineLateMs": 63,
+      "errMs": -6,
+      "engineLateMs": 9,
       "liveLateMs": 26,
       "liveFiredAtBurn": 1787737925283,
       "liveFiredAtTelemetry": 1787737925283,
-      "replayVsLiveMs": 34
+      "replayVsLiveMs": -32
     }
   ],
   "summary": {
     "n": 12,
-    "p50": 59,
-    "p95": 71,
-    "absP50": 59,
-    "absP95": 71,
-    "min": 37,
-    "max": 71
+    "p50": 16,
+    "p95": 34,
+    "absP50": 16,
+    "absP95": 34,
+    "min": -6,
+    "max": 34
   },
   "checks": [
     {
@@ -194,7 +194,7 @@
     {
       "name": "A-abs-p95-under-150ms",
       "ok": true,
-      "detail": "absP95=71ms"
+      "detail": "absP95=34ms"
     },
     {
       "name": "A-live-burn-decodes-match-telemetry",
@@ -214,7 +214,7 @@
     {
       "name": "B-next-cue-fires-normally",
       "ok": true,
-      "detail": "CUE-05 err=53ms late=97ms"
+      "detail": "CUE-05 err=21ms late=6.7ms"
     },
     {
       "name": "C-forward-seek-catchup",
@@ -224,7 +224,7 @@
     {
       "name": "C-cue-fires-after-forward-seek",
       "ok": true,
-      "detail": "CUE-11 err=41ms"
+      "detail": "CUE-11 err=-26ms"
     },
     {
       "name": "C-backward-seek-state-rewinds",
@@ -234,7 +234,7 @@
     {
       "name": "C-cue-refires-after-backward-seek",
       "ok": true,
-      "detail": "CUE-03 err=56ms"
+      "detail": "CUE-03 err=-9ms"
     }
   ],
   "liveVsReplay": {
@@ -242,69 +242,69 @@
       {
         "id": "CUE-01",
         "mode": "now",
-        "replayVsLiveMs": 0
+        "replayVsLiveMs": -34
       },
       {
         "id": "CUE-02",
         "mode": "scheduled",
-        "replayVsLiveMs": 33
+        "replayVsLiveMs": 0
       },
       {
         "id": "CUE-03",
         "mode": "now",
-        "replayVsLiveMs": 0
+        "replayVsLiveMs": -32
       },
       {
         "id": "CUE-04",
         "mode": "scheduled",
-        "replayVsLiveMs": 65
+        "replayVsLiveMs": 0
       },
       {
         "id": "CUE-05",
         "mode": "now",
-        "replayVsLiveMs": 0
+        "replayVsLiveMs": -32
       },
       {
         "id": "CUE-06",
         "mode": "scheduled",
-        "replayVsLiveMs": 67
+        "replayVsLiveMs": 32
       },
       {
         "id": "CUE-07",
         "mode": "now",
-        "replayVsLiveMs": 0
+        "replayVsLiveMs": -33
       },
       {
         "id": "CUE-08",
         "mode": "scheduled",
-        "replayVsLiveMs": 34
+        "replayVsLiveMs": 0
       },
       {
         "id": "CUE-09",
         "mode": "now",
-        "replayVsLiveMs": 0
+        "replayVsLiveMs": -32
       },
       {
         "id": "CUE-10",
         "mode": "scheduled",
-        "replayVsLiveMs": 33
+        "replayVsLiveMs": -33
       },
       {
         "id": "CUE-11",
         "mode": "now",
-        "replayVsLiveMs": 1
+        "replayVsLiveMs": -32
       },
       {
         "id": "CUE-12",
         "mode": "scheduled",
-        "replayVsLiveMs": 34
+        "replayVsLiveMs": -32
       }
     ],
     "note": "negative = replay fired EARLIER than the live burn (live pays transit+poll on 'now' cues; replay honors operator intent at fireAt). fireDelayMs param reproduces the live experience instead."
   },
   "rvfc": {
-    "samples": 5427,
-    "validClock": 5427,
-    "validCue": 5074
+    "samples": 5425,
+    "validClock": 5425,
+    "validCue": 5072
   }
 }
