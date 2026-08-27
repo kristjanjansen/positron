@@ -66,7 +66,10 @@ async function main() {
   await mkdir(join(ROOT, 'results'), { recursive: true });
   sh(`pkill -f 'auto-udd' 2>/dev/null`);
   sh(`pkill -f 'proto/automation/server.mjs' 2>/dev/null`);
-  await sleep(300);
+  // 300 ms was not enough: a leftover Chrome from a previous run is still
+  // listening on DBG, CDP.connect matches tabs BY URL, and the run silently
+  // attaches to the stale page. One flaky run cost more than this sleep.
+  await sleep(1200);
   spawnLogged('node', [join(ROOT, 'server.mjs')], 'server');
   for (let i = 0; i < 40; i++) { try { await fetch(BASE + '/time-local'); break; } catch { await sleep(250); } }
 
@@ -217,6 +220,15 @@ async function main() {
   const susAt = seekReport.map((s) => ({ pos: s.pos, gestureMs: s.gestureMs, sus: (s.per['cc:0:64'] || {}).fold }));
   const susOk = susAt.every((s) => (s.gestureMs < 1500 ? s.sus === undefined : s.sus === 127 * 128));
   check('switch state (sustain CC64) survives seek — and is absent before it was pressed', susOk, q(susAt));
+
+  // which channel supplied the successor sample for the interpolated assert:
+  // the library's C4 info.nexts, or the client's own series index?
+  const succ = await cdpX.eval('JSON.stringify(AUTO.successorStats())').then(JSON.parse);
+  REPORT.successor = succ;
+  const total = succ.viaLibrary + succ.viaClientIndex;
+  check('the library\'s own successor channel (info.nexts) covers a multi-series kind',
+        succ.viaLibrary > 0 && total > 0,
+        `${succ.viaLibrary}/${total} interpolated asserts served by info.nexts at caps.neighbourhood=8; ${succ.viaClientIndex} fell back to the client series index`);
 
   const dev = await cdpX.eval('JSON.stringify(AUTO.deviation())').then(JSON.parse);
   REPORT.deviation = dev;
