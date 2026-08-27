@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@moq/hang": "^0.4.2",
+    "@moq/net": "^0.3.3",
+    "esbuild-wasm": "^0.28.2"
+  },
+  "name": "elektron-moq-bundles",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node build.mjs --check"
+  }
+}
