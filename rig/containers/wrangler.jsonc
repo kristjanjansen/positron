@@ -1,0 +1,18 @@
+{
+  "name": "elektron-cnt-test",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "RepackTest",
+      "image": "./container/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "REPACK_TEST", "class_name": "RepackTest" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RepackTest"] }]
+}

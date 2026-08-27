@@ -1,0 +1,42 @@
+{
+ "show": "sync-20260827T093613",
+ "cpus": 1,
+ "cpuModel": "AMD EPYC",
+ "memTotalMB": 4170,
+ "p1": {
+  "mime": "video/webm;codecs=h264",
+  "chunks": 38,
+  "durationMs": 75100,
+  "inBytes": 7423325,
+  "manifestMs": 216,
+  "downloadMs": 4169,
+  "throughputMbps": 14.2,
+  "copy": {
+   "ffmpegMs": 282,
+   "files": 21,
+   "outBytes": 7432504,
+   "ratio": 0.0038
+  }
+ },
+ "p2": {
+  "mime": "video/webm;codecs=vp8",
+  "chunks": 38,
+  "durationMs": 75105,
+  "inBytes": 10842374,
+  "manifestMs": 71,
+  "downloadMs": 3692,
+  "throughputMbps": 23.5,
+  "transcode": {
+   "ffmpegMs": 62515,
+   "files": 21,
+   "outBytes": 3349134,
+   "ratio": 0.8324
+  }
+ },
+ "totalMs": 70947,
+ "loadavg": [
+  1.09,
+  0.5,
+  0.2
+ ]
+}
