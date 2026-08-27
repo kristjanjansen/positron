@@ -107,7 +107,12 @@ const server = http.createServer(async (req, res) => {
 
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   try {
-    const data = await readFile(join(ROOT, file));
+    // /timeline/* is aliased to the repo's SHARED timeline library — the same
+    // file timeline/lab measured and proto/jam, proto/selfrec and
+    // proto/instrument import. Loaded, never copied.
+    const base = file.startsWith('/timeline/') ? join(ROOT, '..', '..') : ROOT;
+    if (file.includes('..')) throw new Error('nope');
+    const data = await readFile(join(base, file));
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(data);
   } catch {

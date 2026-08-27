@@ -52,6 +52,15 @@
   .lrow .lab { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #dde; }
   .lrow .stat { color: #7a8; font-size: 10px; flex: none; }
   .lrow.err .stat { color: #e66; }
+  /* --- transport: ONE playhead over every layer --- */
+  #tbar { display: flex; align-items: center; gap: 8px; padding: 0 10px 6px; }
+  #tbar button { padding: 1px 9px; }
+  #tScrub { position: relative; flex: 1; height: 26px; background: #101016; border: 1px solid #26262e; cursor: pointer; }
+  #tScrub .sp { position: absolute; height: 5px; border-radius: 2px; opacity: .75; }
+  #tScrub .sp.audio { background: var(--au); } #tScrub .sp.video { background: var(--vi); }
+  #tPh { position: absolute; top: 0; width: 2px; height: 100%; background: #fff; z-index: 3; }
+  #tRate { min-width: 46px; text-align: center; color: #ffd479; }
+  #tRead { color: #778; white-space: pre; min-width: 300px; }
   #hud { padding: 5px 10px; display: flex; gap: 22px; flex-wrap: wrap; color: #99a; }
   #hud b { color: #fff; }
   #help { padding: 0 10px 8px; color: #667; }
@@ -69,6 +78,19 @@
 </div>
 
 <div id="stripWrap"><div id="strip"></div></div>
+
+<!-- ONE playhead over every layer (timeline/transport.mjs). Each archive item
+     is a media-span on a shared ARRANGEMENT timeline; the first playable layer
+     is the clock master and the library's vector is slaved to its currentTime,
+     every other layer servos to the library's position. -->
+<div id="tbar">
+  <button id="tPlay" title="space-bar is all-stop; this is the transport">▶</button>
+  <div id="tScrub"><div id="tPh"></div></div>
+  <button id="tSlower" title="slower">−</button>
+  <span id="tRate">1.00×</span>
+  <button id="tFaster" title="faster">+</button>
+  <span id="tRead">no layers</span>
+</div>
 
 <div id="main">
   <div>
@@ -99,8 +121,30 @@
 </div>
 
 <script src="hls.min.js"></script>
-<script>
+<script type="module">
 'use strict';
+// ============================================================================
+// The layers used to be N independent <audio>/<video> elements, hand-started in
+// one tick: the "1965 chord" was three players that happened to be pressed
+// together and then drifted for the rest of their lives. There was no playhead,
+// so there was nothing to pause, nothing to seek and no rate at all.
+//
+// They are now ONE timeline (timeline/transport.mjs). Each archive item is a
+// `media-span` — {at, dur, mediaRef:{type,slug}} — on a shared ARRANGEMENT
+// axis; one transport owns the playhead; the first playable layer is the CLOCK
+// MASTER and the library's vector is slaved to its currentTime via
+// transport.sync(), while every other layer servos to the library's position
+// inside a ±20 ms rate-nudge dead band. Same pattern as
+// proto/selfrec/replay-grid.html, on archive material instead of a show.
+//
+// HONESTY, and it matters here more than anywhere: ERR archive items carry no
+// internal timecode. Nothing in the metadata says how a 1965 radio broadcast
+// lines up with a 1965 newsreel. The `at` offsets are OUR ARRANGEMENT — a
+// composer's choice, defaulted to 0 so a chord starts together — NOT attested
+// synchronisation. The transport makes the chosen alignment exact and
+// re-seekable; it does not make it true.
+// ============================================================================
+import { createDeck } from '/timeline/transport.mjs';
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const QS = new URLSearchParams(location.search);
@@ -263,14 +307,17 @@ function ensureCtx() {
 function mkAudioLayer(i) {
   const el = new Audio();
   el.crossOrigin = 'anonymous'; el.preload = 'auto';
-  return { kind: 'audio', i, tag: 'A' + (i + 1), el, hls: null, item: null, gainNode: null, gainVal: 0.8, stats: {}, frames: 0 };
+  const L = { kind: 'audio', i, tag: 'A' + (i + 1), el, hls: null, item: null, gainNode: null, gainVal: 0.8, stats: {}, frames: 0, tlAt: 0, enabled: true, onTimeline: false };
+  el.addEventListener('durationchange', scheduleRebuild);
+  return L;
 }
 function mkVideoLayer(i) {
   const el = document.createElement('video');
   el.crossOrigin = 'anonymous'; el.muted = true; el.playsInline = true; el.preload = 'auto';
   el.style.zIndex = i;
   $('blendbox').appendChild(el);
-  const L = { kind: 'video', i, tag: 'V' + (i + 1), el, hls: null, item: null, stats: {}, frames: 0 };
+  const L = { kind: 'video', i, tag: 'V' + (i + 1), el, hls: null, item: null, stats: {}, frames: 0, tlAt: 0, enabled: true, onTimeline: false };
+  el.addEventListener('durationchange', scheduleRebuild);
   const cb = (_now, meta) => {
     L.frames = meta.presentedFrames;
     if (L.stats.t0 && L.stats.vttff == null) L.stats.vttff = performance.now() - L.stats.t0;
@@ -282,6 +329,209 @@ function mkVideoLayer(i) {
 const audioLayers = [0, 1, 2, 3].map(mkAudioLayer);
 const videoLayers = [0, 1].map(mkVideoLayer);
 const allLayers = () => [...audioLayers, ...videoLayers];
+
+// --- ONE timeline over every layer -----------------------------------------
+const SERVO_BAND_MS = 20;     // the skew budget: the master sits at 0 by
+                              // definition, so this band IS the inter-layer skew
+const HARD_RESYNC_MS = 150;   // past this, stop nudging and hard-seek
+const SYNC_TOL_MS = 40;       // don't churn the lookahead on frame quantization
+const RATES = [0.5, 0.75, 1, 1.5, 2];
+const TL = window.__timeline = {
+  deck: null, spans: new Map(), master: null, syncCorrections: [], syncCalls: 0, rebuilds: 0,
+  anchor: 'arrangement-offset (chosen, NOT attested sync — items carry no timecode)',
+};
+const layerDurMs = (L) => (Number.isFinite(L.el.duration) && L.el.duration > 0
+  ? Math.round(L.el.duration * 1000) : 20 * 60 * 1000);   // placeholder until metadata lands
+const onTimeline = (L) => L.item && L.onTimeline && L.enabled;
+
+// Put an element exactly where the playhead says it should be (what a seek
+// means). Absence is content: outside its span a layer is simply not playing.
+function assertLayer(sp, pos, present) {
+  const L = sp.L, u = pos - sp.at;
+  const absent = !present || u < 0 || u > sp.durMs;
+  if (absent) { if (!L.el.paused) L.el.pause(); return; }
+  const want = u / 1000;
+  if (Math.abs(L.el.currentTime - want) > HARD_RESYNC_MS / 1000) { try { L.el.currentTime = want; } catch {} }
+  L.el.playbackRate = TL.deck ? TL.deck.targetRate() : 1;
+  if (TL.deck && TL.deck.playing()) {
+    if (!L.stats.playT0) L.stats.playT0 = performance.now();
+    L.el.play().catch((e) => recErr(L.tag, 'play(): ' + e));
+  } else L.el.pause();
+}
+
+const spanAdapter = {
+  caps: {
+    kind: 'media-span', domain: 'arrangement', unit: 'ms',
+    seekable: true, reducible: true, clockMaster: true,
+    // an HTMLMediaElement is not a sample-accurate slave: an HLS seek lands on
+    // a segment/frame, and rate is only musically trustworthy near 1×
+    seekAccuracyMs: 40, rates: RATES, rateNudge: [0.94, 1.06],
+    servoBandMs: SERVO_BAND_MS, syncToleranceMs: SYNC_TOL_MS,
+    catchUp: 'reduce',          // a missed span boundary is re-asserted, never burst
+    anchor: 'arrangement-offset',
+  },
+  actuate(p) {
+    const sp = TL.spans.get(p.tag);
+    if (sp) assertLayer(sp, TL.deck ? TL.deck.position() : p.at, p.phase === 'enter');
+  },
+  reduce(payloads, pos) {
+    const present = new Set();
+    for (const p of payloads) { if (p.phase === 'enter') present.add(p.tag); else present.delete(p.tag); }
+    for (const tag of [...present]) {
+      const sp = TL.spans.get(tag), u = sp ? pos - sp.at : -1;
+      if (!sp || u < 0 || u > sp.durMs) present.delete(tag);
+    }
+    return present;
+  },
+  assertState(present, info) {
+    for (const [tag, sp] of TL.spans) assertLayer(sp, info.pos, present.has(tag));
+  },
+};
+
+let rebuildT = null;
+function scheduleRebuild() { clearTimeout(rebuildT); rebuildT = setTimeout(() => rebuildTimeline(), 120); }
+
+/** The layer set changed — rebuild the deck over the new spans, keeping the
+ *  playhead and the transport state. Cheap: a handful of items. */
+function rebuildTimeline() {
+  const prev = TL.deck
+    ? { pos: TL.deck.position(), rate: TL.deck.targetRate(), playing: TL.deck.playing() }
+    : { pos: 0, rate: 1, playing: false };
+  if (TL.deck) { TL.deck.pause(); TL.deck.dispose(); TL.deck = null; }
+  TL.spans.clear();
+  const items = [];
+  for (const L of allLayers()) {
+    if (!onTimeline(L)) continue;
+    const durMs = layerDurMs(L);
+    const at = L.tlAt || 0;
+    TL.spans.set(L.tag, { L, at, durMs });
+    const mediaRef = { type: L.item.type, slug: L.item.slug };
+    items.push({ at, kind: 'media-span', id: `sp-${L.tag}-in`, payload: { tag: L.tag, phase: 'enter', dur: durMs, mediaRef } });
+    items.push({ at: at + durMs, kind: 'media-span', id: `sp-${L.tag}-out`, payload: { tag: L.tag, phase: 'exit', dur: durMs, mediaRef } });
+  }
+  TL.rebuilds++;
+  if (!items.length) { paintTransport(); return null; }
+  const end = Math.max(...items.map((i) => i.at));
+  const deck = TL.deck = createDeck({
+    items, range: [0, end], adapters: { 'media-span': spanAdapter },
+    // worker tick host is the library default (the lab VERDICT): span
+    // boundaries keep landing when this tab is backgrounded.
+  });
+  // play / pause / rate are not seeks, so nothing re-asserts on them; the
+  // elements still have to follow the transport.
+  deck.transport.onState((st) => {
+    if (st.reason !== 'play' && st.reason !== 'pause' && st.reason !== 'rate') return;
+    for (const [, sp] of TL.spans) {
+      sp.L.el.playbackRate = deck.targetRate();
+      const u = deck.position() - sp.at;
+      if (deck.playing() && u >= 0 && u <= sp.durMs) {
+        if (!sp.L.stats.playT0) sp.L.stats.playT0 = performance.now();
+        sp.L.el.play().catch(() => {});
+      } else sp.L.el.pause();
+    }
+  });
+  deck.setRate(prev.rate);
+  deck.seek(Math.min(prev.pos, end));
+  if (prev.playing) deck.play();
+  buildScrubber();
+  paintTransport();
+  return deck;
+}
+
+// The master drives the library; the library drives everyone else.
+let masterAdvance = { t: null, wall: 0 };
+function driveFromMaster() {
+  if (!TL.deck || !TL.deck.playing()) return;
+  const usable = (sp) => sp && !sp.L.el.paused && sp.L.el.readyState >= 2;
+  let m = TL.master && TL.spans.get(TL.master);
+  if (!usable(m)) {
+    m = [...TL.spans.values()].find(usable) || null;
+    TL.master = m ? m.L.tag : null;
+    masterAdvance = { t: null, wall: 0 };
+  }
+  if (!m) return;
+  const mediaT = m.at + m.L.el.currentTime * 1000;
+  const now = performance.now();
+  if (masterAdvance.t !== null && mediaT === masterAdvance.t && now - masterAdvance.wall > 1000) {
+    TL.master = null; return;                    // master stalled: free-run on the wall clock
+  }
+  if (masterAdvance.t === null || mediaT !== masterAdvance.t) masterAdvance = { t: mediaT, wall: now };
+  m.L.el.playbackRate = TL.deck.targetRate();    // THE MASTER IS NEVER NUDGED
+  TL.syncCalls++;
+  const corr = TL.deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
+  if (corr) { TL.syncCorrections.push(+corr.toFixed(1)); if (TL.syncCorrections.length > 400) TL.syncCorrections.shift(); }
+}
+function servoLayers() {
+  if (!TL.deck) return;
+  const pos = TL.deck.position(), r = TL.deck.targetRate();
+  for (const [tag, sp] of TL.spans) {
+    if (tag === TL.master) continue;
+    const u = pos - sp.at;
+    if (u < 0 || u > sp.durMs) { if (!sp.L.el.paused) sp.L.el.pause(); continue; }
+    if (!TL.deck.playing()) continue;
+    if (sp.L.el.paused) { sp.L.el.play().catch(() => {}); continue; }
+    const errMs = sp.L.el.currentTime * 1000 - u;
+    if (Math.abs(errMs) > HARD_RESYNC_MS) { try { sp.L.el.currentTime = u / 1000; } catch {} continue; }
+    sp.L.el.playbackRate = r * (errMs > SERVO_BAND_MS ? 0.94 : errMs < -SERVO_BAND_MS ? 1.06 : 1);
+  }
+}
+
+// --- transport UI ----------------------------------------------------------
+function buildScrubber() {
+  const el = $('tScrub');
+  el.querySelectorAll('.sp').forEach((n) => n.remove());
+  if (!TL.deck) return;
+  const [a, b] = TL.deck.range, span = Math.max(1, b - a);
+  let row = 0;
+  for (const [, sp] of TL.spans) {
+    const d = document.createElement('div');
+    d.className = 'sp ' + sp.L.kind;
+    d.title = `${sp.L.tag} — ${sp.L.item.title}`;
+    d.style.left = ((sp.at - a) / span * 100).toFixed(3) + '%';
+    d.style.width = Math.max(0.4, sp.durMs / span * 100).toFixed(3) + '%';
+    d.style.top = (3 + (row++ % 4) * 6) + 'px';
+    el.insertBefore(d, $('tPh'));
+  }
+}
+function paintTransport() {
+  const d = TL.deck;
+  $('tPlay').textContent = d && d.playing() ? '❚❚' : '▶';
+  $('tRate').textContent = `${(d ? d.targetRate() : 1).toFixed(2)}×`;
+  if (!d) { $('tPh').style.left = '0'; $('tRead').textContent = 'no layers'; return; }
+  const [a, b] = d.range, pos = d.position();
+  $('tPh').style.left = `calc(${((pos - a) / Math.max(1, b - a) * 100).toFixed(3)}% - 1px)`;
+  const skew = [...TL.spans].filter(([t]) => t !== TL.master)
+    .map(([, sp]) => Math.abs(sp.L.el.currentTime * 1000 - (pos - sp.at)))
+    .filter((x) => Number.isFinite(x));
+  $('tRead').textContent =
+    `${(pos / 1000).toFixed(1)}s / ${(b / 1000).toFixed(1)}s  layers ${TL.spans.size}` +
+    `  master ${TL.master || 'wall'}  skew ${skew.length ? Math.round(Math.max(...skew)) : 0}ms` +
+    `  host ${d.hostName}`;
+}
+function tPlayPause() {
+  if (!TL.deck) return;
+  ensureCtx();
+  if (TL.deck.playing()) { TL.deck.pause(); for (const [, sp] of TL.spans) sp.L.el.pause(); }
+  else TL.deck.play();
+}
+function tSeek(pos) { return TL.deck ? TL.deck.seek(pos) : null; }
+function tBumpRate(dir) {
+  if (!TL.deck) return;
+  const cur = TL.deck.targetRate();
+  let i = RATES.findIndex((r) => r >= cur - 1e-6);
+  i = Math.max(0, Math.min(RATES.length - 1, (i < 0 ? 2 : i) + dir));
+  TL.deck.setRate(RATES[i]);                     // SEAM 2: arms, does not play
+}
+$('tPlay').onclick = tPlayPause;
+$('tSlower').onclick = () => tBumpRate(-1);
+$('tFaster').onclick = () => tBumpRate(1);
+$('tScrub').onclick = (e) => {
+  if (!TL.deck) return;
+  const r = $('tScrub').getBoundingClientRect();
+  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  tSeek(TL.deck.range[0] + f * (TL.deck.range[1] - TL.deck.range[0]));
+};
+requestAnimationFrame(function tick() { driveFromMaster(); servoLayers(); paintTransport(); requestAnimationFrame(tick); });
 
 function wireGain(L) {
   if (L.gainNode || L.kind !== 'audio') return;
@@ -313,7 +563,12 @@ function attach(L, src, { autoplay = true } = {}) {
     L.el.src = src.url;
   }
   S.plays++; $('plays').textContent = S.plays;
-  if (autoplay) { L.stats.playT0 = L.stats.t0; L.el.play().catch((e) => recErr(L.tag, 'play(): ' + e)); }
+  // The layer joins the ONE timeline; nothing is hand-started any more. Its
+  // span is placed at L.tlAt (default 0 — a chord starts together) and the
+  // transport, not this function, decides when a media element runs.
+  L.onTimeline = true;
+  rebuildTimeline();
+  if (autoplay && TL.deck) { L.stats.playT0 = L.stats.t0; TL.deck.play(); }
   updateLayerUI(L); renderStrip(); renderLists();
 }
 
@@ -321,6 +576,9 @@ async function loadItem(item, L, opts = {}) {
   S.userBusy++;
   try {
     L.item = item; L.state = 'resolving'; updateLayerUI(L);
+    // the arrangement offset — OUR choice, defaulted to 0. See the header note:
+    // archive items carry no internal timecode, so this is composition, not sync.
+    L.tlAt = opts.at !== undefined ? opts.at : 0;
     const t0 = performance.now();
     const c = await getContent(item.type, item.slug);
     L.stats && (L.stats.apiMs = Math.round(performance.now() - t0));
@@ -374,7 +632,7 @@ async function chord() {
   const layers = audioLayers.slice(0, 3);
   const armed = [];
   for (let i = 0; i < 3; i++) {                       // sequential: the 1/s gate
-    const L = layers[i]; L.item = picks[i]; L.state = 'resolving'; updateLayerUI(L);
+    const L = layers[i]; L.item = picks[i]; L.tlAt = 0; L.state = 'resolving'; updateLayerUI(L);
     const tc = performance.now();
     const c = await getContent(picks[i].type, picks[i].slug).catch((e) => (recErr('chord', String(e)), null));
     const apiMs = Math.round(performance.now() - tc);
@@ -384,7 +642,13 @@ async function chord() {
   }
   await Promise.all(armed.map((L) => waitReady(L, 12000)));
   const t = performance.now();
-  armed.forEach((L) => { L.stats.playT0 = t; L.el.play().catch((e) => recErr(L.tag, 'play(): ' + e)); });
+  armed.forEach((L) => { L.stats.playT0 = t; });
+  // ONE transport start, not N: seek the shared playhead to 0 and play. The
+  // library's statechange fans out to every span's element in one synchronous
+  // pass — the same "single play() tick" the old chord did by hand, except the
+  // layers now stay together afterwards instead of only starting together.
+  rebuildTimeline();
+  if (TL.deck) { TL.deck.seek(0); TL.deck.play(); }
   $('chordLed').textContent = `CHORD ×${armed.length} @ ${S.audioYear || S.year}`;
   status(`chord: ${armed.length} layers started together`);
   const iv = setInterval(() => {
@@ -406,7 +670,11 @@ async function shuffleLayer(L) {
   await loadItem(pick, L, { autoplay: !L.el.paused || !L.item });
 }
 function shuffleAll() { allLayers().filter((L) => L.item).forEach((L) => shuffleLayer(L)); }
-function allStop() { allLayers().forEach((L) => L.el.pause()); $('chordLed').textContent = ''; status('all stopped'); }
+function allStop() {
+  if (TL.deck) TL.deck.pause();                 // the playhead stops too, not just the elements
+  allLayers().forEach((L) => L.el.pause());
+  $('chordLed').textContent = ''; status('all stopped');
+}
 
 // --- year dial + split A/V -------------------------------------------------
 async function dialYear(y) {
@@ -425,7 +693,9 @@ async function dialYear(y) {
   $('counts').innerHTML = `${y}: <b>${S.counts.audio}</b> audio · <b>${S.counts.video}</b> video (showing ${S.hits.audio.length}+${S.hits.video.length})`;
   renderLists(); renderStrip();
   status(`year ${y} loaded`);
-  if (!AUTOTEST) trickle(token);
+  // `?trickle=0` suppresses the lazy per-item content resolver — a headless
+  // verification wants the two searches it actually needs, not 40 upstream GETs.
+  if (!AUTOTEST && QS.get('trickle') !== '0') trickle(token);
 }
 async function setAudioYear(y) {
   if (!y || y === S.year) { S.audioYear = null; S.audioHits = null; $('audioListNote').textContent = ''; renderLists(); return; }
@@ -516,11 +786,15 @@ function mkLayerRow(L) {
       : `<label>op <input type="range" class="op" min="0" max="1" step="0.01" value="${L.i ? 0.6 : 1}"></label>
          <select class="blend"><option>normal</option><option${L.i ? ' selected' : ''}>screen</option><option>multiply</option></select>`}
     <button class="shuf">⤨</button><span class="lab">(empty — click a list/strip item)</span><span class="stat"></span>`;
+  // per-layer button = is this layer IN the arrangement. With one shared
+  // playhead there is no longer such a thing as starting a single layer.
   row.querySelector('.pp').onclick = () => {
     ensureCtx();
     if (!L.item) return;
-    if (L.el.paused) { if (!L.stats.playT0) L.stats.playT0 = performance.now(); L.el.play().catch((e) => recErr(L.tag, String(e))); }
-    else L.el.pause();
+    L.enabled = !L.enabled;
+    if (!L.enabled) L.el.pause();
+    rebuildTimeline();
+    updateLayerUI(L);
   };
   row.querySelector('.shuf').onclick = () => shuffleLayer(L);
   if (L.kind === 'audio') {
@@ -582,6 +856,9 @@ addEventListener('keydown', (e) => {
   if (e.key === ' ') { e.preventDefault(); allStop(); }
   if (e.key.toLowerCase() === 'c') chord();
   if (e.key.toLowerCase() === 's') shuffleAll();
+  if (e.key.toLowerCase() === 'p') tPlayPause();          // the transport
+  if (e.key === '[') tBumpRate(-1);
+  if (e.key === ']') tBumpRate(1);
 });
 addEventListener('click', () => { if (actx) ensureCtx(); }, { capture: true });
 
@@ -687,6 +964,47 @@ async function playFromQuery() {
   if (yr >= 1908 && yr <= 2026 && yr !== S.year) dialYear(yr);   // dial to the item's year
   await loadItem(item, nextFree(type), { autoplay: true });
 }
+
+// The module scope is not the global scope — hand the driver (and a curious
+// console) exactly the handles it needs, and nothing else.
+window.__remix = {
+  S, TL, chord, allStop, shuffleAll, shuffleLayer, loadItem, dialYear, setAudioYear,
+  audioPool: () => audioPool(), layers: () => allLayers(),
+  play: (r) => (TL.deck ? (TL.deck.play(r), TL.deck.position()) : null),
+  pause: () => { allStop(); return TL.deck ? TL.deck.position() : null; },
+  seek: (p) => tSeek(p),
+  seekFrac: (f) => (TL.deck ? tSeek(TL.deck.range[0] + f * (TL.deck.range[1] - TL.deck.range[0])) : null),
+  setRate: (r) => { if (TL.deck) TL.deck.setRate(r); return TL.deck && TL.deck.targetRate(); },
+  pos: () => (TL.deck ? TL.deck.position() : null),
+  playing: () => !!(TL.deck && TL.deck.playing()),
+  /** every layer's own position, and how far it is from where the ONE playhead
+   *  says it should be — the number that did not exist before this adoption */
+  snapshot: () => {
+    const pos = TL.deck ? TL.deck.position() : null;
+    return {
+      pos, range: TL.deck ? TL.deck.range : null, playing: !!(TL.deck && TL.deck.playing()),
+      rate: TL.deck ? TL.deck.rate() : null, targetRate: TL.deck ? TL.deck.targetRate() : null,
+      master: TL.master, host: TL.deck ? TL.deck.hostName : null,
+      syncCalls: TL.syncCalls, syncCorrections: TL.syncCorrections.length,
+      lastCorrections: TL.syncCorrections.slice(-8), rebuilds: TL.rebuilds, anchor: TL.anchor,
+      caps: TL.deck ? TL.deck.caps() : null,
+      layers: [...TL.spans].map(([tag, sp]) => ({
+        tag, kind: sp.L.kind, slug: sp.L.item && sp.L.item.slug, at: sp.at, durMs: sp.durMs,
+        currentTimeMs: Math.round(sp.L.el.currentTime * 1000),
+        expectedMs: pos === null ? null : Math.round(pos - sp.at),
+        // absence is content: a layer whose span does not cover the playhead is
+        // not "drifting", it is simply not there, and its skew is meaningless
+        inSpan: pos !== null && pos >= sp.at && pos <= sp.at + sp.durMs,
+        skewMs: pos === null ? null : Math.round(sp.L.el.currentTime * 1000 - (pos - sp.at)),
+        paused: sp.L.el.paused, rate: +sp.L.el.playbackRate.toFixed(3),
+        readyState: sp.L.el.readyState, fmt: sp.L.stats.fmt || null,
+        advAt: sp.L.stats.advAt || null,
+      })),
+    };
+  },
+  chordSpread: () => chordSpread,
+  errors: () => S.errors, apiLog: () => S.apiLog, counts: () => S.counts,
+};
 
 if (AUTOTEST) autotest().catch((e) => { recErr('autotest', String(e) + '\n' + (e && e.stack)); fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fatal: String(e), stack: String(e && e.stack), errors: S.errors, apiCalls: S.apiLog }) }); document.title = 'REMIXER FAIL'; });
 else if (QS.get('play')) playFromQuery();

@@ -323,6 +323,117 @@ async function main() {
       currentTimeAdvancedS: rep2.advanced, offsetS: rep2.audioOffsetS });
 
   // ==========================================================================
+  // 8e. THE REPLAY TRANSPORT — timeline/transport.mjs, adopted (NOTES C12).
+  //     Storage replay used to be a per-event setTimeout fan-out: the graveyard
+  //     arm from research/timeline-own-prior-art-2026-08.md §2, with no
+  //     cancellation, no position, no pause, no seek, and a rate that only
+  //     scaled the notes and left the audio at 1×. Measured before replacing it:
+  //     firing p50 2.2 ms on a clean run, 116 ORPHAN fires when a replay was
+  //     restarted from the middle, and the recorded audio started 1075 ms AHEAD
+  //     of the first note. All three are library problems now, not page ones.
+  // ==========================================================================
+  const T = 'window.player.transport';
+  console.log('storage replay via the library:', q({
+    tickHost: rep2.tickHost, drift: rep2.drift, intentFired: rep2.intentFired,
+    intentNotes: rep2.intentNotes, syncCorrections: rep2.syncCorrections,
+    firstNoteMediaMs: rep2.firstNoteMediaMs, alignErrMs: rep2.alignErrMs }));
+
+  // --- the player-intent lane is a SECOND lane, rendered, never sounded ------
+  check('two note lanes on ONE timeline: host lane sounds, player-intent lane only renders',
+    rep2.fired === sHostMidi.length && rep2.intentNotes === sPlayerMidi.length && rep2.intentFired > 0,
+    { hostFired: rep2.fired, hostRows: sHostMidi.length,
+      intentFired: rep2.intentFired, intentRows: rep2.intentNotes });
+
+  // --- the audio is locked to the HOST lane, by construction ----------------
+  const expOffsetS = +((sHostMidi[0].at - (audSpans.concat(avSpans).find((e) => e.payload.phase === 'start'
+    && (e.payload.kind || 'audio') === rep2.mediaLane) || {}).at) / 1e6).toFixed(3);
+  check('the audio stays aligned to the host lane (offset = firstEvent.at − mediaSpanStart.at)',
+    Math.abs(rep2.audioOffsetS - expOffsetS) < 0.002 && rep2.alignErrMs !== null && Math.abs(rep2.alignErrMs) < 250,
+    { audioOffsetS: rep2.audioOffsetS, expectedOffsetS: expOffsetS,
+      mediaPosAtFirstNoteMs: rep2.firstNoteMediaMs, alignErrMs: rep2.alignErrMs,
+      wasBeforeAdoptionMs: 1075 });
+
+  // --- seek ×3: what is SOUNDING === reduce(prefix ≤ pos) -------------------
+  await cdpP.eval(`${T}.arm()`);
+  const onRows = sHostMidi.filter((e) => (e.raw[0] & 0xf0) === 0x90 && e.raw[2] > 0);
+  const seekTargets = [onRows[8], onRows[40], onRows[20]].filter(Boolean);   // fwd, fwd, BACK
+  const seeks = [];
+  for (const row of seekTargets) {
+    seeks.push(await cdpP.eval(`(async () => {
+      const T = window.player.transport;
+      const pos = T.seek(T.posOf(${row.at}) + 25);
+      await new Promise((r) => setTimeout(r, 200));
+      return { pos: +pos.toFixed(1), sounding: T.sounding(), expected: T.expectedSounding(pos),
+               intent: T.intentHeld(), expectedIntent: T.expectedIntent(pos), align: T.alignment() };
+    })()`, { awaitPromise: true }));
+  }
+  console.log('seeks:', q(seeks.map((s) => ({ pos: s.pos, sounding: s.sounding, expected: s.expected,
+    mediaErrMs: s.align && s.align.errMs }))));
+  check('seek ×3 (2 forward, 1 back): sounding === reduce(prefix ≤ pos), every time',
+    seeks.length === 3 && seeks.every((s) => q(s.sounding) === q(s.expected))
+      && seeks.some((s) => s.sounding.length > 0),
+    seeks.map((s) => ({ pos: s.pos, sounding: s.sounding, expected: s.expected })));
+  check('a seek moves the AUDIO with the notes — no re-fire, just a re-anchor',
+    seeks.every((s) => s.align && Math.abs(s.align.errMs) <= 80),
+    seeks.map((s) => s.align && { errMs: s.align.errMs, mediaMs: s.align.mediaMs, expected: s.align.expectedMediaMs }));
+
+  // --- pause holds ----------------------------------------------------------
+  const held = await cdpP.eval(`(async () => {
+    const T = window.player.transport;
+    T.seek(T.posOf(${onRows[12].at}) - 400); T.play(1);
+    await new Promise((r) => setTimeout(r, 900));
+    const f1 = T.fires(), a = T.pos();
+    T.pause();
+    const b = T.pos(), al1 = T.alignment();
+    await new Promise((r) => setTimeout(r, 800));
+    const c = T.pos(), f2 = T.fires(), al2 = T.alignment();
+    return { movedWhilePlayingMs: +(a - (T.posOf(${onRows[12].at}) - 400)).toFixed(0),
+             posAtPause: +b.toFixed(3), posAfterMs: +c.toFixed(3), heldMs: +(c - b).toFixed(3),
+             firesDuringPause: f2['midi-actuated'] - f1['midi-actuated'],
+             mediaPausedAt: al1 && al1.mediaMs, mediaAfter: al2 && al2.mediaMs,
+             mediaPaused: al2 ? al2.paused : null, sounding: T.sounding() };
+  })()`, { awaitPromise: true });
+  console.log('pause:', q(held));
+  check('pause holds the playhead exactly, fires nothing, and stops the audio with it',
+    held.heldMs === 0 && held.firesDuringPause === 0 && held.mediaPaused === true
+      && Math.abs(held.mediaAfter - held.mediaPausedAt) < 5 && held.sounding.length === 0,
+    held);
+
+  // --- rate 2× --------------------------------------------------------------
+  const r2 = await cdpP.eval(`(async () => {
+    const T = window.player.transport;
+    T.pause(); T.seek(T.posOf(${onRows[6].at}));
+    T.setRate(2);
+    const armedRate = T.targetRate(), rateWhilePaused = T.rate();   // SEAM 2
+    const p0 = T.pos(), m0 = T.alignment();
+    T.play();
+    await new Promise((r) => setTimeout(r, 1500));
+    const p1 = T.pos(), m1 = T.alignment();
+    T.pause();
+    return { armedRate, rateWhilePaused, playedRate: 2,
+             posAdvancedMs: +(p1 - p0).toFixed(0),
+             mediaAdvancedMs: m0 && m1 ? +(m1.mediaMs - m0.mediaMs).toFixed(0) : null,
+             mediaRate: m1 && m1.mediaRate };
+  })()`, { awaitPromise: true });
+  console.log('rate 2x:', q(r2));
+  check('setRate(2) arms while PAUSED (rate 0, targetRate 2) and 2× really runs at 2×',
+    r2.rateWhilePaused === 0 && r2.armedRate === 2 && r2.mediaRate === 2
+      && r2.posAdvancedMs > 1500 * 2 * 0.75 && r2.posAdvancedMs < 1500 * 2 * 1.3,
+    r2);
+
+  const tstats = await cdpP.eval(`${T}.stats()`);
+  console.log('deck:', q({ host: tstats.host, counts: tstats.stats.counts, armed: tstats.audit.armed,
+    caps: Object.keys(tstats.caps), drift: tstats.driftStats }));
+  check('one deck, three declared adapters, and pause cancels EVERY armed timer',
+    Object.keys(tstats.caps).length === 3 && tstats.caps['midi-actuated'].audible === true
+      && tstats.caps.midi.audible === false && tstats.caps['media-span'].clockMaster === true
+      && tstats.audit.armed === 0,
+    { kinds: Object.keys(tstats.caps), armedAfterPause: tstats.audit.armed,
+      note: 'the fan-out left 116 orphans ringing here' });
+  await shoot(cdpP, join(ROOT, 'results', 'instr-replay-transport.png'));
+  await cdpP.eval(`${T}.dispose()`);
+
+  // ==========================================================================
   // 8d. CONSENT MATRIX — audio+video (above), then audio, then off.
   // ==========================================================================
   await cdpH.eval('window.host.setConsent("audio")');

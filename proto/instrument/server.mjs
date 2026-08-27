@@ -5,6 +5,8 @@
 //   GET  /<path>                static from proto/instrument/
 //   GET  /jam/<path>            static from proto/jam/   — the onset worklet and
 //                               friends are LOADED, not copied
+//   GET  /timeline/<path>       static from the repo's timeline/ — the shared
+//                               transport library, likewise loaded, not copied
 //   GET  /time-local            {us} hrtime-anchored epoch µs — same-host truth
 //                               clock, so the harness measures transport and not
 //                               clock skew (the worker's /time is the real-world
@@ -78,7 +80,12 @@ const server = http.createServer(async (req, res) => {
     // the sibling's host-check.html (which asks for a root-relative
     // /host-check.js) run unmodified on this port too, without either rig
     // knowing about the other.
-    const tries = rel.startsWith('jam/') ? [join(JAM, rel.slice(4))] : [join(ROOT, rel), join(JAM, rel)];
+    // /timeline/* is aliased to the repo's SHARED timeline library (never
+    // copied) — the same file timeline/lab measured and proto/jam and
+    // proto/selfrec import. jam's server does the same.
+    const tries = rel.startsWith('timeline/') ? [join(ROOT, '..', '..', rel)]
+      : rel.startsWith('jam/') ? [join(JAM, rel.slice(4))]
+      : [join(ROOT, rel), join(JAM, rel)];
     for (const file of tries) {
       try {
         const data = await readFile(file);

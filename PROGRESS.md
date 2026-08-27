@@ -148,6 +148,50 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### TRANSPORT: 4 CLIENTS (session 6q) — instrument replay 61/61, remixer 11/11
+- **THIRD LATENT BUG (the pattern holds: every adoption finds one).** Instrument
+  `replayStored()` started the recorded audio **~1075 ms ahead of the first
+  note**: the offset itself was correct and correctly applied, then the function
+  slept 700 ms to prove `advanced > 0` and `replayEvents()` added its own 200 ms
+  lead-in, with nothing reconciling the clocks again. **The harness was
+  structurally blind** — its assert was `advanced > 0`, which a one-second-early
+  track passes perfectly. Same bug's other half: `speed` scaled notes but left
+  the media element at 1×, so at 6× note time and audio time diverged at 5×
+  real time. Post-adoption align error **+41 ms** (was +1075), media re-anchor
+  error **0 ms** on all 3 seeks.
+- Old path also: "forward seek" (a restart) produced **116 orphan fires**, 192
+  total where a transport does 64. Post: 0 armed timers after pause.
+- Instrument adapters (3): `midi-actuated` (host clock, audible, burst) ·
+  `midi` (player intent, **audible:false — a second VISIBLE lane that renders
+  but never times audio**) · `media-span` (A/V element = clock master via
+  sync()). 61/61 (was 54/54). Honest cost: firing p50 2.2→4.34, p95 4.8→8.64 ms
+  — bought with cancellation, seek, pause, rate, drift and a media master.
+- **Remixer: the chord became a timeline.** One `media-span` adapter, arrangement
+  domain; first playable layer masters, others servo in a ±20 ms dead band.
+  Start-together spread **0–43 ms → 0.1 ms**; ONE SEEK MOVES EVERY LAYER (skew
+  −1…−16 ms); pause holds all (playhead 0.000 ms); rate 2× arms while paused and
+  every element follows; 1169 sync() calls with **0** corrections over
+  tolerance; absence is content (past a span's end that layer goes absent while
+  others play). 11/11, 0 console/media errors, **6 upstream ERR calls** total.
+  NOTES states plainly: archive items carry no internal timecode, so offsets are
+  OUR arrangement, not attested sync.
+- **New: `timeline/logdeck.mjs` (76 lines)** — `makeLogDeck({lanes:[...]})`
+  because `makeDeck` is single-kind by construction and cannot express a log
+  with two note lanes plus a media lane; `makeDeck` is now the one-lane case;
+  `expand()` handles interval rows.
+- v0.2 needed no changes. Two seams found ABOVE it (~4 client lines each):
+  `caps.followsTransport` (every media client rewrites the same
+  play/pause/rate follow block — 3 of 4 clients have it) and `deck.setRange()`
+  (a client whose item set changes at runtime must dispose and rebuild).
+- **THE LAST STRUCTURAL GAP, after 4 clients**: composition ACROSS timelines.
+  `sync()` slaves the vector to exactly one external master and a deck's
+  position is a single scalar, so **a span that is itself a deck** (a stored
+  instrument session dropped into an arrangement beside a 1965 broadcast) has
+  no representation. Missing primitive: a **nested/offset span `{at, rate,
+  deck}`** — the same sync() contract pointed at a deck instead of a <video>.
+  Everything else in plan-timeline (reconstruction spectrum, archival client,
+  megatimeline) is content on top of that.
+
 ### TRANSPORT v0.2 — SIX SEAMS FIXED + 2 MORE ADOPTIONS (session 6p) — ✅ gate green
 Fixes (before → after): (1) **`registerAdapter(kind, {caps, actuate, reduce,
 assertState})`** with per-kind dispatch + policy derived from caps — plus
