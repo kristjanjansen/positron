@@ -148,6 +148,51 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### MoQ RIG FIXED + RETEST (session 6l) — ✅ VIDEO USABLE; BOTH HYPOTHESES REFUTED
+- **Video starvation was NOT group-per-frame.** The publisher already keyframed
+  every 30th frame and @moq/hang opens a group on that flag ⇒ video was on 1 s
+  groups, symmetric with audio. The C4 chord-loss finding does NOT transfer.
+  **Actual cause: a STALL, not a drop rate** — A's read loop parked in
+  `cons.next()` (CF d14 gives no death signal and never redelivers a closed
+  group, so a quiet track stays quiet forever), and/or a FATAL VideoDecoder
+  error (WebCodecs closes the decoder permanently; the rig had no way back).
+  ~3 of 6 sessions. Fix by construction: rebuildable decoder + keyframe resync,
+  `resubscribe()` + 1.5 s no-frame watchdog, budgeted 8 heals/run (subscribe
+  credits are finite, §13.4 — unbounded retries dig the hole deeper).
+- **Hybrid failure was NOT catalog/announce timing.** CF had subscribed
+  (used=true in 3 s); B simply published nothing. **Root cause is WebAudio:**
+  from the 2nd MoQ arm in a page onward, the pcm-capture worklet's `process()`
+  got an EMPTY input array while `ac.currentTime` advanced — Chrome latches a
+  bus it considers silent and hands `[]` instead of zero-filled buffers.
+  **Fix: a started ConstantSourceNode(offset 0) permanently on the synth bus**
+  — a *playing* source contributing exactly zero samples (no DC, no onset risk).
+  Plus: the realtime pacer <audio> is page-lifetime (teardown used to pause it,
+  leaving arm 2 with no puller) and the capture tap swaps only its consumer.
+- **Retest (floor 20 ms, p50/p95):**
+
+| run | n | key→ear | key→eye | A/V skew p50 | video pub/recv | audio loss | underruns |
+|---|---|---|---|---|---|---|---|
+| moq-av mixed | 332 | 45.29/51.46 | 56.1/86.8 | **+10.25** | 1608/1607 = 99.9% | 0.151% | 206 |
+| moq-av sparse | 317 | 45.79/54.97 | 64.7/90.1 | +19.04 | 2431/2430 = 100% | 0.109% | 303 |
+| **moq-hybrid mixed** | 338 | **40.65/50.26** | 57.8/80.5 | +14.86 | WebRTC video | **0.038%** | 46 |
+| moq-hybrid sparse | 318 | 43.28/48.89 | 58.0/81.6 | +14.68 | WebRTC video | 0.034% | 31 |
+
+  0 decode errors, 0 stalls, 0 heals needed, both subscribes live on attempt 1.
+  vs the 43.08/50.69 reference: **the video fix cost the audio path nothing**.
+- **No group-size curve exists** — group span isn't in the return path (the
+  playout floor is). One-sided datum: `groupMs:0` (~400 groups/s) threw
+  thousands of "Failed to create send stream" — **one MoQ group = one QUIC
+  uni-stream**, so group-per-frame exhausts stream credits outright.
+- Two carry-forward findings: **A/V skew FLIPPED SIGN** vs 6g — with a 45 ms
+  audio return the sound now arrives BEFORE the panel (+10…+19 ms) where
+  WebRTC's 78 ms return put video ~27 ms early; and **MoQ video transport is
+  faster than WebRTC's** (burn→visible 32.0 vs 41.1 ms, caveat: MoQ measured at
+  decode-out, ~1 vsync of that gap is method). **Best overall arm: hybrid
+  (MoQ audio + WebRTC video)** — lowest key→ear AND ~4× lower MoQ audio loss,
+  because moq-av's video shares the same QUIC connection.
+- Residue: 206–303 underruns/run at floor 20 (2.5–3.6 s inserted silence per
+  ~65 s) — bought off by the floor curve, not by the transport.
+
 ### REMOTE-INSTRUMENT PLATFORM (session 6j) — ✅ END-TO-END, 24/24 (proto/instrument, workers/instrument)
 The "play my synth" pattern as working software on our stack. Owner registers
 hardware → public catalog → player requests → owner accepts → DC MIDI up +

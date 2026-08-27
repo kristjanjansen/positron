@@ -240,6 +240,109 @@ research/music-jamming-2026-08.md — not touched here.
   - Cleanup: chrome (hostcheck-udd) + server killed, :8898 free, :8893 never
     touched.
 
+- **C10 (MoQ RETURN-PATH DEFECT FIX — video starvation + the hybrid arm that
+  never established; both diagnosed to a confirmed root cause, both hypotheses
+  from the brief REFUTED)**. Files touched: remote-synth.js, moq/src/moq-synth.js
+  (+ Docker-esbuild rebuild, RUNBOOK §6.3), harness/run-synth.mjs. Instrumentation
+  added and KEPT (it is the whole evidence trail): B-side `PUBHB` heartbeat
+  (published/vPublished/encQueue/`track.used`/renderDeficit/capture-message count/
+  encoder state/ac state+currentTime/pacer state), A-side `vgroup <seq> cont=<>`
+  per group transition + `VSTALL`/`VHEAL`, `CAPSTALL`/`CAPPROBE` guards, and
+  `console.warn` routed into the /log sink so the hang `Container.Consumer`'s own
+  group decisions ("skipping slow/old group", "buffer reset") are visible at all.
+  - **DEFECT 1 — MoQ video 198 published / 30 received. Hypothesis (one group per
+    frame; CF races back-to-back single-frame groups) REFUTED by reading the
+    publisher and the library**: the video track ALREADY emitted 1 s groups
+    (`vEnc.encode(vf, {keyFrame: vFrame % 30 === 0})` at 30 fps, and
+    `Legacy.Producer.encode` opens a new group on exactly the keyframe flag) — the
+    same 1 s cadence as audio's `groupMs:1000`. The two tracks were symmetric; group
+    size was never the variable, so the 2.9 %-chord-loss analogy from the C4 matrix
+    (which WAS a group-per-note case) does not transfer.
+  - **What it actually was: a STALL, not a drop rate.** Per-group instrumentation
+    shows the video track delivering 30/30 frames per group with sequential ids
+    whenever it runs at all; in the bad run A's read loop was still parked inside
+    `cons.next()` at teardown (the "loop end" line only fires on close), audio kept
+    flowing on the SAME session, and B kept writing 30 fps with `track.used===true`.
+    CF d14 has no downstream death signal and never redelivers a closed group
+    (RUNBOOK §13.4), so once the track goes quiet it stays quiet forever. Two
+    mechanisms can park it and neither is observable from outside: a Consumer
+    cursor waiting on a group sequence that never arrives, and a **fatal**
+    VideoDecoder error (WebCodecs closes the decoder permanently — the rig had no
+    path back). Intermittent (3 of ~6 sessions), so it was fixed by construction
+    rather than by reproduction:
+    - rebuildable VideoDecoder + `vGotKey` resync ⇒ a decode error costs ONE GOP,
+      not the arm;
+    - `subscriber().resubscribe(name)` in moq-synth.js (per-track slot, 3-attempt
+      ceiling) + a 1.5 s no-frame watchdog on A that drops the video subscription
+      and re-takes the live edge, budgeted at 8 heals/run and logged as `VHEAL`
+      (subscribe credits are finite per session, §13.4 — retrying forever digs the
+      hole deeper, so the watchdog is bounded on purpose).
+  - **DEFECT 2 — `moq-hybrid` "subscribe 'audio' dead after 15 attempts".
+    Hypothesis (catalog/announce timing, publish-before-subscribe) REFUTED**: the
+    namespace was fresh, CF HAD subscribed (`used=true` on 'audio' within 3 s), and
+    all 15 attempts were subscribe-OK-then-zero-groups because **B published
+    nothing at all** — `PUBHB a=0 v=0 encQ=0 cap=0 encState=configured
+    ac=running/<realtime>`. Root cause is WebAudio, not MoQ: from the SECOND MoQ arm
+    in a page onward the pcm-capture AudioWorkletNode's `process()` received an
+    **empty input array** for the entire arm, although `ac.currentTime` advanced at
+    exactly realtime and `synthBus→capNode` was connected. Chrome had latched the
+    synth bus as silent (nothing upstream had played since the previous arm's last
+    note) and hands a downstream worklet `[]` rather than a zero-filled buffer.
+    Rebuilding the node did not help; a page-lifetime node did not help. **Fix: a
+    started `ConstantSourceNode` with `offset = 0` permanently connected to
+    synthBus** — a *playing* source, so Chrome never marks the bus silent, that
+    contributes exactly zero samples, so there is no DC bias, no onset-detector
+    risk and no measurement change. Two supporting fixes in the same family, both
+    teardown residue: the realtime pacer `<audio>` (which pins B's headless context
+    to realtime) is now created ONCE and never paused — teardown used to pause and
+    detach it, leaving arm 2 with no puller — and the capture tap is likewise
+    page-lifetime with only the consumer callback swapped per arm.
+  - **RETEST (scale 1, floor 20 ms, session mtbxjyyo/mtbxmwvd; ms p50/p95, truth
+    clock, decoded-track level; +32 ms outputLatency to physical ears):**
+
+    | run | n | key→ear | leg1 | leg2 | leg3 | key→eye | A/V skew p50 (min…max) | video pub/recv/dec | MoQ audio loss | underruns |
+    |---|---|---|---|---|---|---|---|---|---|---|
+    | moq-av mixed | 332 | **45.29 / 51.46** | 0.72 | 0.43 | 43.90 | **56.1 / 86.8** | **+10.25** (−20.7…+67.8) | 1608 / 1607 / 1607 = **99.9 %** | 0.151 % (32/21219) | 206 (2547 ms) |
+    | moq-av sparse | 317 | 45.79 / 54.97 | 0.72 | 0.33 | 45.31 | 64.7 / 90.1 | +19.04 (−17.2…+64.1) | 2431 / 2430 / 2430 = **100.0 %** | 0.109 % (35/32080) | 303 (3624 ms) |
+    | moq-hybrid mixed | 338 | **40.65 / 50.26** | 0.62 | 0.30 | 39.89 | 57.8 / 80.5 | +14.86 (−37.7…+60.2) | WebRTC video | 0.038 % (8/21240) | 46 (664 ms) |
+    | moq-hybrid sparse | 318 | 43.28 / 48.89 | 0.62 | 0.40 | 41.71 | 58.0 / 81.6 | +14.68 (−36.6…+64.0) | WebRTC video | 0.034 % (11/32048) | 31 (341 ms) |
+
+    0 video decode errors, 0 `VSTALL`, 0 `VHEAL` needed, 0 encoder drops, 0 stale
+    (join-replay) chunks, 0 duplicate chunks, 0 page errors; both subscribes live on
+    attempt 1. Audio unchanged against the pre-fix reference (43.08/50.69 at floor
+    20): 45.29/51.46 — inside run-to-run noise, so the video fix cost the audio path
+    nothing.
+  - **No group-size tradeoff curve to report — group size was never the knob.** The
+    one datum that bears on it comes from the earlier `moq-gpc` arm (`groupMs:0`,
+    one group per 2.5 ms Opus chunk ≈ 400 groups/s): B threw *thousands* of
+    `Failed to create send stream` unhandled rejections, because one MoQ group = one
+    QUIC uni-stream and group-per-frame exhausts the stream credits outright. The
+    curve is therefore one-sided: 1 s groups are healthy (transit p50 19–20 ms) and
+    there is no latency to buy back by shrinking them — the group span does NOT sit
+    in the return-path latency, the playout floor does.
+  - **A/V skew flipped sign vs C7.** In the p2p-WebRTC arm the panel video landed
+    ~27 ms BEFORE its own sound (key→eye 50 vs key→ear 78). With the MoQ audio
+    return at ~44 ms the audio now arrives FIRST and video trails by +10…+19 ms
+    (p95 spread ~45 ms). Also note the MoQ video path's own transport is *faster*
+    than WebRTC's: burn→visible p50 **32.0 ms (MoQ) vs 41.1 ms (WebRTC)** on the
+    same rig — with the standing caveat that the MoQ number is taken at decode-out
+    (no display leg) while the WebRTC one uses `expectedDisplayTime`, so ~one vsync
+    of the gap is method, not transport.
+  - **Verdict — MoQ video IS now usable for the instrument-panel case.** 100 %
+    delivery over 4038 published frames, key→eye 56/87, and it is the audio, not the
+    video, that sets the feel: 45 ms key→ear puts the MoQ return inside the
+    "playable" band and ~33 ms under the p2p-WebRTC arm's 78 ms. The residue to
+    watch is the ring: 206–303 underruns/run at floor 20 (2.5–3.6 s of inserted
+    silence over a ~65 s run) — audible-grade artefacts that the floor curve, not
+    the transport, has to buy off. The hybrid arm (MoQ audio + WebRTC video) is the
+    best of the four on key→ear (40.7/50.3) and on MoQ loss (0.034–0.038 %, ~4×
+    lower than the moq-av arm, whose video shares the same QUIC connection).
+  - Artifacts: results/jam-synth-c8-retest.json, jam-synth-moq-{av,hybrid}-{mixed,
+    sparse}-f20.jsonl, jam-synth-moq-{av,hybrid}-{a,b}.png, results/synth-{a,b}.jsonl
+    (the PUBHB/vgroup/WARN evidence trail). Cleanup: jam-udd Chromes + server killed,
+    :8893 free; proto/instrument/ and workers/instrument/ untouched; d14 public relay
+    only, session-suffixed namespaces per run (§13.4).
+
 ## Layout (planned)
 
 - server.mjs — :8893 static + /time-local (µs, shared clock) + mailbox signaling + /log sink

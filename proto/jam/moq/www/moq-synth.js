@@ -21798,18 +21798,29 @@ async function publisher(relay, ns, { withVideo = false, latencyMax = 2e3 } = {}
   conn.publish(path_exports.from(ns), bc);
   const aTrack = bc.createTrack("audio", trackInfo({ latencyMax }));
   const aProd = new legacy_exports.Producer(aTrack);
-  let vProd = null;
+  let vProd = null, vTrack = null;
   if (withVideo) {
-    const vTrack = bc.createTrack("video", trackInfo({ latencyMax }));
+    vTrack = bc.createTrack("video", trackInfo({ latencyMax }));
     vProd = new legacy_exports.Producer(vTrack);
   }
   let closed = false;
   conn.closed?.then?.(() => {
     closed = true;
   });
+  const peek = (t) => {
+    try {
+      return t ? !!t.used.peek() : null;
+    } catch {
+      return null;
+    }
+  };
   return {
     version: conn.version,
     isClosed: () => closed,
+    // Track.used = "somebody (i.e. the relay) currently holds a subscription".
+    // The one publisher-side signal that separates "we never sent" from
+    // "we sent and it vanished downstream".
+    used: () => ({ audio: peek(aTrack), video: peek(vTrack) }),
     // key=true starts a new MoQ group (caller decides the grouping policy)
     audioWrite(payloadU8, tsUs, key) {
       aProd.encode(payloadU8, tsUs, key);
@@ -21837,9 +21848,9 @@ async function publisher(relay, ns, { withVideo = false, latencyMax = 2e3 } = {}
     }
   };
 }
-async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts) {
+async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts, slot, tries = 15) {
   let attempts = 0;
-  for (; attempts < 15 && !stopped.v; attempts++) {
+  for (; attempts < tries && !stopped.v; attempts++) {
     const sub = subOpts ? bc.subscribe(name, subOpts) : bc.subscribe(name);
     const cons = new Consumer5(sub, { format: new legacy_exports.Format(), latency: 0 });
     const first = await Promise.race([
@@ -21849,6 +21860,13 @@ async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts) {
     if (first && first !== "timeout") {
       log(`moq sub '${name}' live after ${attempts + 1} attempt(s)`);
       let r = first;
+      const closer = () => {
+        try {
+          cons.close();
+        } catch {
+        }
+      };
+      if (slot) slot.closer = closer;
       (async () => {
         while (r !== void 0 && !stopped.v) {
           if (r.frame) onFrame({ payload: r.frame.payload, tsUs: r.frame.timestamp, continuous: r.continuous, group: r.group });
@@ -21856,14 +21874,10 @@ async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts) {
         }
         log(`moq sub '${name}' loop end`);
       })().catch((e) => log(`moq sub '${name}' loop err: ${e && e.message}`));
-      stopped.closers.push(() => {
-        try {
-          cons.close();
-        } catch {
-        }
-      });
-      return;
+      stopped.closers.push(closer);
+      return true;
     }
+    log(`moq sub '${name}' attempt ${attempts + 1} got no group in 3000 ms`);
     try {
       cons.close();
     } catch {
@@ -21871,16 +21885,39 @@ async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts) {
     await sleep(700);
   }
   if (!stopped.v) throw new Error(`moq subscribe '${name}' dead after ${attempts} attempts`);
+  return false;
 }
 async function subscriber(relay, ns, { onAudio, onVideo, log = () => {
 }, subOpts = null } = {}) {
   const conn = await connection_exports.connect(new URL(relay), { websocket: { enabled: false } });
   const bc = conn.consume(path_exports.from(ns));
   const stopped = { v: false, closers: [] };
-  await subscribeLoop(bc, "audio", onAudio, log, stopped, subOpts);
-  if (onVideo) await subscribeLoop(bc, "video", onVideo, log, stopped, subOpts);
+  const slots = { audio: { cb: onAudio, closer: null }, video: { cb: onVideo, closer: null } };
+  await subscribeLoop(bc, "audio", onAudio, log, stopped, subOpts, slots.audio);
+  if (onVideo) await subscribeLoop(bc, "video", onVideo, log, stopped, subOpts, slots.video);
   return {
     version: conn.version,
+    // Re-arm ONE track's subscription on the SAME session. CF d14 never
+    // redelivers a closed group and gives no death signal (§13.4), so a track
+    // that goes quiet while its sibling still flows can only be recovered by
+    // dropping the subscription and taking the live edge again. Costs subscribe
+    // credits (§13.4 exhaustion), hence the caller's own retry budget and the
+    // short 3-attempt ceiling here.
+    async resubscribe(name) {
+      const slot = slots[name];
+      if (!slot || !slot.cb || stopped.v) return false;
+      if (slot.closer) {
+        slot.closer();
+        slot.closer = null;
+      }
+      log(`moq sub '${name}' RESUBSCRIBE`);
+      try {
+        return await subscribeLoop(bc, name, slot.cb, log, stopped, subOpts, slot, 3);
+      } catch (e) {
+        log(`moq sub '${name}' resubscribe failed: ${e && e.message}`);
+        return false;
+      }
+    },
     close() {
       stopped.v = true;
       for (const c of stopped.closers) c();
