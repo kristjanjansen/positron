@@ -48,6 +48,16 @@ function log(...a) {
 }
 window.addEventListener('error', (e) => log('PAGEERR', e.message));
 window.addEventListener('unhandledrejection', (e) => log('UNHANDLED', String(e.reason && e.reason.message || e.reason)));
+// @moq/hang's Container.Consumer narrates its own group decisions through
+// console.warn ("skipping old group" / "skipping slow group" / "buffer reset").
+// Those are the only view into why a track stalls, so route them into the log
+// sink (capped — a stuttering consumer can warn per group).
+let warnBudget = 60;
+const rawWarn = console.warn.bind(console);
+console.warn = (...a) => {
+  rawWarn(...a);
+  if (warnBudget-- > 0) log('WARN', a.map((x) => (typeof x === 'string' ? x : String(x))).join(' ').slice(0, 200));
+};
 
 // ---------------- truth clock (same method as bench.js) ----------------
 const epochUsRaw = () => (performance.timeOrigin + performance.now()) * 1000;
@@ -151,6 +161,16 @@ synthBus.gain.value = 1;
 const msDest = ac.createMediaStreamDestination();
 synthBus.connect(msDest);
 synthBus.connect(ac.destination); // audible monitor (headless: fake/silent is fine)
+// Bus keep-alive (C8 defect 2). A started ConstantSourceNode contributes
+// EXACTLY zero samples (offset 0) but counts as a playing source, so Chrome
+// never marks the bus silent and never hands a downstream AudioWorkletNode an
+// empty input array. Without it the pcm-capture tap saw no input at all from
+// the second MoQ arm onward — the encoder had nothing to encode, the audio
+// track carried zero groups, and A starved through every subscribe retry.
+const busKeepAlive = ac.createConstantSource();
+busKeepAlive.offset.value = 0;
+busKeepAlive.connect(synthBus);
+busKeepAlive.start();
 
 // percussive instant-attack voice: square (pitch) + click, velocity-scaled,
 // ~25 ms total so 25/s bursts leave ~15 ms of silence between onsets
@@ -304,6 +324,7 @@ function bBeginRun(runId) {
     runId,
     recs: new Map(), // seq -> {seq, tSendUs, recvUs, note, vel}
     matcher: makeMatcher({ minLatUs: -8000, maxLatUs: 500_000 }),
+    pub0: state.moqPub ? { a: state.moqPub.published, v: state.moqPub.vPublished, vDrop: state.moqPub.vDropped } : null,
   };
   return { ok: true, runId };
 }
@@ -320,6 +341,9 @@ function bEndRun() {
     runId: run.runId, recs, spuriousOnsets: run.matcher.spurious(),
     audio: { sampleRate: ac.sampleRate, baseLatency: ac.baseLatency, outputLatency: ac.outputLatency, ctOffUs: Math.round(acMap.off()) },
     moqPub: state.moqPub ? state.moqPub.stats() : undefined,
+    moqPubRun: state.moqPub && run.pub0
+      ? { aPublished: state.moqPub.published - run.pub0.a, vPublished: state.moqPub.vPublished - run.pub0.v, vDropped: state.moqPub.vDropped - run.pub0.vDrop }
+      : null,
   };
   bState.run = null;
   return out;
@@ -777,6 +801,37 @@ async function pickOpusConfig(preferUs = 0) {
   throw new Error('no opus AudioEncoder config supported');
 }
 
+// Page-lifetime realtime pull on B's MediaStream destination (see the call site).
+let pacerEl = null;
+function ensurePacer() {
+  if (!pacerEl) {
+    pacerEl = new Audio();
+    pacerEl.srcObject = msDest.stream;
+    pacerEl.muted = true;
+  }
+  if (pacerEl.paused) pacerEl.play().catch((e) => log('moq pacer play failed', e.message));
+  return pacerEl;
+}
+
+// Page-lifetime PCM capture tap on the synth bus (C8 defect 2, second half).
+// A capNode built fresh per arm and torn down with the arm NEVER received input
+// on the second build: ac stayed 'running' at realtime, the pacer kept pulling,
+// the encoder stayed 'configured', yet process() saw an empty input array
+// forever (cap=0 over 55 s). Building the tap ONCE and only swapping the
+// consumer per arm sidesteps the whole rebuild path; the node that works on arm
+// one is the node every later arm uses.
+let capNodeShared = null, capSinkShared = null, capConsumer = null;
+function ensureCapture() {
+  if (!capNodeShared) {
+    capNodeShared = new AudioWorkletNode(ac, 'pcm-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+    capSinkShared = ac.createGain(); capSinkShared.gain.value = 0;
+    capNodeShared.connect(capSinkShared).connect(ac.destination);
+    synthBus.connect(capNodeShared);
+    capNodeShared.port.onmessage = (e) => { if (capConsumer) capConsumer(e); };
+  }
+  return capNodeShared;
+}
+
 async function bStartMoqPublish({ withVideo, groupMs, frameUs = 0, tag }) {
   await import('/moq/www/moq-synth.js');
   const ns = `obsynth-${Date.now().toString(36)}-${tag}`; // §13.4 fresh-name discipline
@@ -833,18 +888,20 @@ async function bStartMoqPublish({ withVideo, groupMs, frameUs = 0, tag }) {
   // free-runs in bursts (observed: 0.2-2.9 s render stalls + catch-up bursts
   // -> A-side starve/trim thrash + early-biased ct map). A muted audio element
   // consuming msDest restores the realtime pull.
-  const pacer = new Audio();
-  pacer.srcObject = msDest.stream;
-  pacer.muted = true;
-  pacer.play().catch((e) => log('moq pacer play failed', e.message));
+  //
+  // ONE element for the page's whole life (C8 defect 2): a per-arm element that
+  // teardown paused + detached left the SECOND MoQ arm with no puller at all —
+  // B's context never advanced, the capture worklet never posted a quantum, the
+  // audio track carried zero groups, and A's subscriber (correctly) starved
+  // through all 15 retries. Never paused, never re-pointed.
+  const pacer = ensurePacer();
   // PCM capture: worklet tap on the synth bus, 128-frame quanta, epoch-µs
   // media timestamps anchored once (edge-median ct map) + exact sample count
-  const capNode = new AudioWorkletNode(ac, 'pcm-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
-  const capSink = ac.createGain(); capSink.gain.value = 0;
-  capNode.connect(capSink).connect(ac.destination);
-  synthBus.connect(capNode);
+  const capNode = ensureCapture();
   let anchorUs = null, samples = 0;
-  capNode.port.onmessage = (e) => {
+  mp.capMsgs = 0;
+  capConsumer = (e) => {
+    mp.capMsgs++;
     const { ct, pcm } = e.data;
     if (!pcm || enc.state !== 'configured') return;
     if (anchorUs === null) { anchorUs = acMap.ctUs(ct); samples = 0; }
@@ -863,7 +920,7 @@ async function bStartMoqPublish({ withVideo, groupMs, frameUs = 0, tag }) {
       ad.close();
     } catch (err) { mp.encErrors++; }
   };
-  mp.capNode = capNode; mp.capSink = capSink; mp.pacer = pacer;
+  mp.capNode = capNode; mp.pacer = pacer;
 
   if (withVideo) {
     const vEnc = new VideoEncoder({
@@ -891,6 +948,46 @@ async function bStartMoqPublish({ withVideo, groupMs, frameUs = 0, tag }) {
     }, 1000 / 30);
   }
 
+  // publisher heartbeat: separates "B never produced" from "B produced and the
+  // relay never asked" (track.used) from "B produced, relay subscribed, and it
+  // still did not arrive".
+  mp.diagTimer = setInterval(() => {
+    const u = pub.used ? pub.used() : null;
+    // capture-starvation guard: a context with nothing pulling it renders
+    // nothing, so the whole return path is silent with no error anywhere.
+    if (mp.capMsgs === (mp.lastCapMsgs || 0)) {
+      mp.capStalls = (mp.capStalls || 0) + 1;
+      if (mp.capStalls <= 5) {
+        log(`CAPSTALL cap=${mp.capMsgs} ac=${ac.state}/${ac.currentTime.toFixed(2)}`);
+        try { ac.resume(); } catch {} ensurePacer();
+        if (mp.capStalls === 2) { // last resort: rebuild the shared tap
+          try { synthBus.disconnect(capNodeShared); } catch {}
+          try { capNodeShared.disconnect(); capSinkShared.disconnect(); } catch {}
+          capNodeShared = null;
+          const c = capConsumer; ensureCapture(); capConsumer = c;
+          log('CAPSTALL rebuilt shared capture tap');
+        }
+        if (mp.capStalls === 3) {
+          // Decide it: a capture node fed by its OWN started oscillator. Posts
+          // => the worklet thread is alive and the synth bus is the silent one;
+          // silent => the AudioWorklet scope itself is dead.
+          try {
+            const n = new AudioWorkletNode(ac, 'pcm-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+            const g = ac.createGain(); g.gain.value = 0;
+            n.connect(g).connect(ac.destination);
+            const o = ac.createOscillator(); o.frequency.value = 440; o.connect(n); o.start();
+            let got = 0; n.port.onmessage = () => { got++; };
+            setTimeout(() => { log(`CAPPROBE isolated-source msgs=${got}`); try { o.stop(); o.disconnect(); n.disconnect(); g.disconnect(); } catch {} }, 1000);
+          } catch (e) { log('CAPPROBE failed', e.message); }
+        }
+      }
+    } else mp.capStalls = 0;
+    mp.lastCapMsgs = mp.capMsgs;
+    log(`PUBHB a=${mp.published} v=${mp.vPublished} vDrop=${mp.vDropped} encQ=${enc.encodeQueueSize}`
+      + ` used=${u ? `${u.audio}/${u.video}` : '?'} closed=${pub.isClosed()} deficit=${mp.renderDeficitMs}`
+      + ` cap=${mp.capMsgs} encState=${enc.state} ac=${ac.state}/${ac.currentTime.toFixed(2)} pacer=${pacer.paused ? 'paused' : 'playing'}`);
+  }, 3000);
+
   await Promise.race([firstOut, sleep(3000)]);
   state.moqPub = mp;
   return {
@@ -913,6 +1010,7 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
     recvTotal: 0, decodedTotal: 0, decErrors: 0, gapInsertMsTotal: 0, discontTotal: 0,
     staleDropped: 0, // join-replay chunks (apparent transit > 400 ms) never fed to the ring
     vRecv: 0, vDecoded: 0, vDecErrors: 0,
+    vGroups: 0, vLastGroup: null, vLastRecvUs: 0, vDiscont: 0, vStalls: 0,
     worklet: { latest: null },
     run: null,
     setFloor(ms, adapt = false) {
@@ -925,6 +1023,7 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
         seqs: new Set(), seqMin: Infinity, seqMax: -1, dup: 0,
         gap0: this.gapInsertMsTotal, dec0: this.decErrors, disc0: this.discontTotal,
         stale0: this.staleDropped,
+        v0: { recv: this.vRecv, dec: this.vDecoded, decErr: this.vDecErrors, groups: this.vGroups, resubs: this.vResubs || 0, stalls: this.vStalls, disc: this.vDiscont },
         starves: [],
         w0: this.worklet.latest ? { ...this.worklet.latest } : null,
       };
@@ -951,6 +1050,12 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
         trimEvents: w1 && r.w0 && w1.trimEvents !== undefined ? w1.trimEvents - (r.w0.trimEvents || 0) : null,
         gapInsertMs: +(this.gapInsertMsTotal - r.gap0).toFixed(1),
         staleDropped: this.staleDropped - r.stale0,
+        video: {
+          recv: this.vRecv - r.v0.recv, decoded: this.vDecoded - r.v0.dec,
+          decErrors: this.vDecErrors - r.v0.decErr, groups: this.vGroups - r.v0.groups,
+          discont: this.vDiscont - r.v0.disc, stalls: this.vStalls - r.v0.stalls,
+          resubs: (this.vResubs || 0) - r.v0.resubs,
+        },
         starveCount: r.starves.length,
         starvesTop: [...r.starves].sort((x, y) => y.durMs - x.durMs).slice(0, 5),
         decErrors: this.decErrors - r.dec0,
@@ -1011,9 +1116,13 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
   dec.configure(adcfg);
   ma.dec = dec;
 
-  let vDec = null, vGotKey = false;
-  if (withVideo) {
-    vDec = new VideoDecoder({
+  // VideoDecoder errors are FATAL (the decoder closes and never emits again), so
+  // a single bad chunk would otherwise end the eye measurement for the run.
+  // Rebuildable decoder + "wait for a keyframe" flag = one lost GOP, not the arm.
+  let vDec = null;
+  ma.vGotKey = false;
+  const makeVDec = () => {
+    const d = new VideoDecoder({
       output: (vf) => {
         aState.vFrames++;
         ma.vDecoded++;
@@ -1025,11 +1134,16 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
         } catch { /* scan blip */ }
         vf.close();
       },
-      error: (e) => { ma.vDecErrors++; if (ma.vDecErrors < 5) log('moq vdec err', e.message); },
+      error: (e) => {
+        ma.vDecErrors++;
+        if (ma.vDecErrors < 6) log('moq vdec err', e.message);
+        ma.vGotKey = false; // resync on the next keyframe with a fresh decoder
+      },
     });
-    vDec.configure({ codec: 'vp8', optimizeForLatency: true });
-    ma.vDec = vDec;
-  }
+    d.configure({ codec: 'vp8', optimizeForLatency: true });
+    return d;
+  };
+  if (withVideo) { vDec = makeVDec(); ma.vDec = vDec; }
 
   const sub = await window.MoqSynth.subscriber(MOQ_RELAY, ns, {
     log: (l) => log(l),
@@ -1058,16 +1172,48 @@ async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
         dec.decode(new EncodedAudioChunk({ type: 'key', timestamp: tsUs, data: payload.subarray(12) }));
       } catch (e) { inQ.pop(); ma.decErrors++; }
     },
-    onVideo: withVideo ? ({ payload, tsUs }) => {
+    onVideo: withVideo ? ({ payload, tsUs, group, continuous }) => {
       ma.vRecv++;
+      ma.vLastRecvUs = nowUs();
+      if (group !== ma.vLastGroup) { ma.vGroups++; ma.vLastGroup = group; if (ma.vGroups <= 40) log(`vgroup ${group} cont=${continuous} at v=${ma.vRecv}`); }
+      if (!continuous) ma.vDiscont++;
       const key = payload[0] === 1;
-      if (!vGotKey) { if (!key) return; vGotKey = true; }
+      if (vDec.state === 'closed') { vDec = makeVDec(); ma.vDec = vDec; ma.vGotKey = false; }
+      if (!ma.vGotKey) { if (!key) return; ma.vGotKey = true; }
       try {
         vDec.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: tsUs, data: payload.subarray(1) }));
       } catch (e) { ma.vDecErrors++; }
     } : undefined,
   });
   ma.sub = sub;
+  if (withVideo) {
+    // Video-stall watchdog + self-heal. CF d14 gives no death signal (§13.4) and
+    // never redelivers a closed group, so a video track that goes quiet while
+    // audio still flows stays quiet forever: the only recovery is dropping the
+    // subscription and taking the live edge again. Budgeted (subscribe credits
+    // are finite per session, §13.4) and logged so a heal is visible in the run.
+    ma.vLastRecvUs = nowUs();
+    ma.vResubs = 0;
+    ma.healing = false;
+    ma.diagTimer = setInterval(() => {
+      const gapMs = (nowUs() - ma.vLastRecvUs) / 1000;
+      if (gapMs <= 1500 || ma.healing) return;
+      if (ma.vStalls < 20) {
+        ma.vStalls++;
+        log(`VSTALL ${gapMs.toFixed(0)}ms  vRecv=${ma.vRecv} vDec=${ma.vDecoded} vDecErr=${ma.vDecErrors}`
+          + ` vGroups=${ma.vGroups} lastGroup=${ma.vLastGroup} vDiscont=${ma.vDiscont} | aRecv=${ma.recvTotal} aDec=${ma.decodedTotal}`);
+      }
+      if (ma.vResubs >= 8 || !ma.sub.resubscribe) return;
+      ma.healing = true;
+      ma.vResubs++;
+      ma.vGotKey = false;
+      if (ma.vDec.state === 'closed') { vDec = makeVDec(); ma.vDec = vDec; }
+      ma.sub.resubscribe('video')
+        .then((ok) => log(`VHEAL #${ma.vResubs} ${ok ? 'ok' : 'FAILED'}`))
+        .catch((e) => log(`VHEAL #${ma.vResubs} err ${e && e.message}`))
+        .finally(() => { ma.vLastRecvUs = nowUs(); ma.healing = false; });
+    }, 500);
+  }
   state.moqA = ma;
   log('moq sub live', ns, 'floor', floorMs, 'adaptive', String(adaptive));
   return ma;
@@ -1096,18 +1242,18 @@ function teardown() {
   if (state.moqPub) {
     const mp = state.moqPub;
     try { mp.vTimer && clearInterval(mp.vTimer); } catch {}
-    try { mp.capNode.port.onmessage = null; } catch {}
-    try { synthBus.disconnect(mp.capNode); } catch {}
-    try { mp.capNode.disconnect(); } catch {}
-    try { mp.capSink.disconnect(); } catch {}
+    try { mp.diagTimer && clearInterval(mp.diagTimer); } catch {}
+    // capture tap is page-lifetime (ensureCapture) — detach the consumer only
+    capConsumer = null;
     try { mp.enc.close(); } catch {}
     try { mp.vEnc && mp.vEnc.close(); } catch {}
     try { mp.pub.close(); } catch {}
-    try { if (mp.pacer) { mp.pacer.pause(); mp.pacer.srcObject = null; } } catch {}
+    // pacer deliberately left running — see ensurePacer()
     delete state.moqPub;
   }
   if (state.moqA) {
     const ma = state.moqA;
+    try { ma.diagTimer && clearInterval(ma.diagTimer); } catch {}
     try { ma.sub.close(); } catch {}
     try { ma.dec.close(); } catch {}
     try { ma.vDec && ma.vDec.close(); } catch {}
@@ -1223,7 +1369,8 @@ window.rig = {
   setGroupMs: (ms) => { if (!state.moqPub) throw new Error('no moq pub'); state.moqPub.setGroupMs(ms); return { ok: true, ms }; },
   moqInfo: () => ({
     pub: state.moqPub ? state.moqPub.stats() : null,
-    sub: state.moqA ? { ns: state.moqA.ns, recv: state.moqA.recvTotal, decoded: state.moqA.decodedTotal, decErrors: state.moqA.decErrors, gapInsertMs: +state.moqA.gapInsertMsTotal.toFixed(1), worklet: state.moqA.worklet.latest, vRecv: state.moqA.vRecv, vDecoded: state.moqA.vDecoded } : null,
+    sub: state.moqA ? { ns: state.moqA.ns, recv: state.moqA.recvTotal, decoded: state.moqA.decodedTotal, decErrors: state.moqA.decErrors, gapInsertMs: +state.moqA.gapInsertMsTotal.toFixed(1), worklet: state.moqA.worklet.latest, vRecv: state.moqA.vRecv, vDecoded: state.moqA.vDecoded, vDecErrors: state.moqA.vDecErrors, vGroups: state.moqA.vGroups, vDiscont: state.moqA.vDiscont, vStalls: state.moqA.vStalls } : null,
+    pubUsed: state.moqPub && state.moqPub.pub.used ? state.moqPub.pub.used() : null,
   }),
   beginRun: bBeginRun,
   endRun: bEndRun,

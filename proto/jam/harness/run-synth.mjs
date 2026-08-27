@@ -133,12 +133,14 @@ async function measureRun({ runId, arm, cfg, hint, shots, sched = 'mixed' }) {
     hintApplied: aRes.hintApplied || null,
     moq: aRes.moq || null,
     moqPub: (bRes && bRes.moqPub) || null,
+    moqPubRun: (bRes && bRes.moqPubRun) || null,
     audioA: aRes.audio, audioB: bRes && bRes.audio,
     videoStats: aRes.video,
   };
   summary.push(row);
   console.log(`  ${runId}: n=${row.earMatched}/${row.sent} total p50=${row.total?.p50} (1:${row.leg1?.p50} 2:${row.leg2?.p50} 3:${row.leg3?.p50}) eye p50=${row.eye?.p50} av=${row.avSkew?.p50} jb=${row.jbAudio?.avgJbMs}`
-    + (row.moq ? `\n    moq: loss=${row.moq.lostPct}% (${row.moq.lostChunks}/${row.moq.expectedChunks}) transit=${row.moq.transitMs?.p50}/${row.moq.transitMs?.p95} dec=${row.moq.decodeMs?.p50} ring=${row.moq.ringBufferedMs?.p50} floorEnd=${row.moq.floorMsEnd} underruns=${row.moq.underruns} (${row.moq.underrunMs}ms) gapIns=${row.moq.gapInsertMs}ms disc=${row.moq.discontinuities}` : ''));
+    + (row.moq ? `\n    moq: loss=${row.moq.lostPct}% (${row.moq.lostChunks}/${row.moq.expectedChunks}) transit=${row.moq.transitMs?.p50}/${row.moq.transitMs?.p95} dec=${row.moq.decodeMs?.p50} ring=${row.moq.ringBufferedMs?.p50} floorEnd=${row.moq.floorMsEnd} underruns=${row.moq.underruns} (${row.moq.underrunMs}ms) gapIns=${row.moq.gapInsertMs}ms disc=${row.moq.discontinuities}` : '')
+    + (row.moq && row.moq.video && row.moqPubRun ? `\n    video: pub=${row.moqPubRun.vPublished} recv=${row.moq.video.recv} dec=${row.moq.video.decoded} (${row.moqPubRun.vPublished ? (100 * row.moq.video.recv / row.moqPubRun.vPublished).toFixed(1) : '—'}% delivered) groups=${row.moq.video.groups} decErr=${row.moq.video.decErrors} stalls=${row.moq.video.stalls} heals=${row.moq.video.resubs} vDrop=${row.moqPubRun.vDropped}` : ''));
   return row;
 }
 
