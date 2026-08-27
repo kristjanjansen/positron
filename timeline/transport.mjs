@@ -11,6 +11,25 @@
 //   - The log is immutable; cursor/status state lives here, never on stored
 //     payloads (statuses live on scheduler-private wrappers).
 // Measured defaults (tick 25 ms / horizon 100 ms) validated by timeline/lab.
+//
+// v0.2 — the six API seams the first two clients (proto/jam, proto/selfrec)
+// hit, all closed in-library (see proto/jam/NOTES.md C11 for the field report):
+//   1. registerAdapter(kind, {actuate, caps, reduce, assertState}) + dispatch —
+//      clients no longer filter onFire or wire setPolicy themselves.
+//   2. setRate() no longer doubles as play(); .targetRate exposes the resume
+//      rate so a PAUSED ui can display 0.5× instead of 0.00×.
+//   3. createScheduler defaults to the WORKER tick host — the lab VERDICT —
+//      with main/raf as explicit opt-ins (hostKind or an explicit host).
+//   4. caps.audio = {ctx, leadMs} gives actuate() a third `when` argument
+//      carrying the fire's instant in AudioContext seconds: sample-accurate
+//      voices scheduled straight from the wall lane.
+//   5. reduce() is handed the WHOLE ordered prefix (plus an explicit
+//      {from:{pos,state}, since} pair), not one scan's missed events — correct
+//      for non-commutative reducers.
+//   6. onDrift()/peekDrift() read the drift channel non-destructively (HUD and
+//      assert harness can coexist); drainDrift() stays for bounded memory.
+//   +  transport.sync(pos) slaves the vector to an external clock master (a
+//      media element) without seek semantics; createDeck() is the facade.
 
 // ---------------------------------------------------------------------------
 // Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
@@ -52,6 +71,15 @@ export function audioClock(ctx) {
 // ---------------------------------------------------------------------------
 // Transport vector. State is exactly {p0, t0, rate}; position is pure math.
 // rate === 0 means paused; play() restores the last nonzero rate.
+//
+// SEAM 2 (client feedback C11.2): setRate() used to double as play() — there
+// was no set-rate-while-paused and `lastRate` was private, so a paused UI could
+// only ever display 0.00×. Now:
+//   setRate(r)  sets the rate WITHOUT starting playback (paused stays paused);
+//               setRate(0) is still an explicit pause.
+//   play(r?)    is the only thing that starts motion (optionally at rate r).
+//   .rate       current effective rate (0 while paused) — unchanged.
+//   .targetRate the rate play() would resume at — what a paused UI displays.
 // ---------------------------------------------------------------------------
 
 export function createTransport({ clock = wallClock() } = {}) {
@@ -62,13 +90,16 @@ export function createTransport({ clock = wallClock() } = {}) {
   /** Clock time at which position reaches pos (null while paused). */
   function timeAt(pos) { return rate === 0 ? null : t0 + (pos - p0) / rate; }
 
+  function emit(reason) {
+    const ev = { type: 'statechange', reason, p0, t0, rate, targetRate: lastRate, clockDomain: clock.domain };
+    for (const cb of [...listeners]) cb(ev);
+  }
   function update(newRate, newPos, reason) {
     const now = clock.now();
     const pos = newPos !== undefined ? newPos : position(now);
     p0 = pos; t0 = now;
     if (newRate !== undefined) { rate = newRate; if (newRate !== 0) lastRate = newRate; }
-    const ev = { type: 'statechange', reason, p0, t0, rate, clockDomain: clock.domain };
-    for (const cb of [...listeners]) cb(ev);
+    emit(reason);
   }
 
   return {
@@ -76,13 +107,38 @@ export function createTransport({ clock = wallClock() } = {}) {
     position, timeAt,
     get vector() { return { p0, t0, rate }; },
     get rate() { return rate; },
+    /** the rate play() resumes at; === rate while playing (SEAM 2) */
+    get targetRate() { return rate !== 0 ? rate : lastRate; },
     get playing() { return rate !== 0; },
-    play() { if (rate === 0) update(lastRate, undefined, 'play'); },
+    play(r) {
+      if (r !== undefined) {
+        if (!(r > 0)) throw new Error('play(rate) needs a positive rate');
+        lastRate = r;
+      }
+      if (rate !== lastRate) update(lastRate, undefined, 'play');
+    },
     pause() { if (rate !== 0) update(0, undefined, 'pause'); },
     seek(pos) { update(undefined, pos, 'seek'); },
+    /** Slave the vector to an EXTERNAL clock master (a media element, a remote
+     *  peer) — re-anchor {p0,t0} onto an observed position WITHOUT seek
+     *  semantics: no status reconcile, no re-assert, nothing re-fires; only
+     *  committed timers are re-armed against the new anchor. Corrections
+     *  smaller than toleranceMs are ignored (don't churn the lookahead).
+     *  Returns the correction actually applied, in ms. */
+    sync(pos, { toleranceMs = 0 } = {}) {
+      const now = clock.now();
+      const d = pos - position(now);
+      if (!(Math.abs(d) > toleranceMs)) return 0;
+      p0 = pos; t0 = now;
+      emit('sync');
+      return d;
+    },
+    /** Set the rate. Does NOT start playback (SEAM 2); setRate(0) pauses. */
     setRate(r) {
       if (r < 0) throw new Error('negative rate unsupported in v0');
-      update(r, undefined, r === 0 ? 'pause' : 'rate');
+      if (r === 0) return this.pause();
+      if (rate === 0) { lastRate = r; emit('rate'); return; }  // paused: arm it, stay paused
+      update(r, undefined, 'rate');
     },
     /** Subscribe to state changes; returns unsubscribe (law: on() returns off). */
     onState(cb) { listeners.add(cb); return () => listeners.delete(cb); },
@@ -95,7 +151,9 @@ export function createTransport({ clock = wallClock() } = {}) {
 // and its host — which is what makes the virtual runtime (below) possible.
 // ---------------------------------------------------------------------------
 
-/** (a) main-thread setTimeout/setInterval host — the plain default. */
+/** (a) main-thread setTimeout/setInterval host — tightest in the foreground
+ *  (6.4 ms p95 measured) but dies to the 1 Hz clamp in a hidden tab; an
+ *  explicit opt-in since v0.2 (SEAM 3). */
 export function mainTickHost() {
   let iv = null;
   return {
@@ -165,24 +223,59 @@ export function rafTickHost() {
   };
 }
 
+/** SEAM 3: the SHIPPING default host. The lab VERDICT is worker (the only host
+ *  that survives a hidden tab: 8.5 ms p95 hidden vs main ~1 s, rAF 9.2 s), so
+ *  the code default is worker wherever Worker exists, and main is an explicit
+ *  opt-in (`host: mainTickHost()` or `hostKind: 'main'`) for foreground-
+ *  critical precision (6.4 vs 15.3 ms p95, measured). Outside a browser there
+ *  is no Worker — fall back to the main-thread host. */
+export function defaultTickHost() {
+  return typeof Worker === 'function' ? workerTickHost() : mainTickHost();
+}
+export function tickHostByKind(kind) {
+  if (kind === 'main') return mainTickHost();
+  if (kind === 'raf') return rafTickHost();
+  if (kind === 'worker') return workerTickHost();
+  return defaultTickHost();
+}
+
 // ---------------------------------------------------------------------------
 // Wall-lane scheduler: lookahead loop, committed-vs-pending, per-kind catch-up
-// policies, first-class drift log. Port of the timed-messages crossing engine
-// generalized per plan-timeline §1.
+// policies, first-class drift log, ADAPTER REGISTRY. Port of the timed-messages
+// crossing engine generalized per plan-timeline §1.
+//
+// SEAM 1 — adapter registry. Clients think in per-kind adapters; the library
+// used to offer only unfiltered onFire + setPolicy, so every client re-wrote
+// the same dispatch/filter/policy-wiring block. registerAdapter() now lives
+// here:
+//     sched.registerAdapter(kind, {
+//       caps,                       // {catchUp, audio, rates, …} — declares behaviour
+//       actuate(payload, rec, when),// called ONLY for this kind
+//       reduce(payloads, pos, info),// catch-up + seek fold (whole prefix, SEAM 5)
+//       assertState(state, info),   // idempotent state assertion
+//     }) -> unregister
+// caps.catchUp ('burst' | 'drop' | 'reduce') selects the per-kind policy, so a
+// client never touches setPolicy either. onFire stays, for HUDs and harnesses
+// that want every kind.
 // ---------------------------------------------------------------------------
 
 export function createScheduler(transport, {
   tickMs = 25,
   horizonMs = 100,
   lateGraceMs = 150,   // late fires within grace are ordinary jitter, not a catch-up event
-  host = mainTickHost(),
+  hostKind,            // 'worker' | 'main' | 'raf' — explicit opt-in shorthand
+  host = tickHostByKind(hostKind),   // SEAM 3: worker by default (lab VERDICT)
+  driftLimit = 20000,  // retained drift rows when nobody drains (SEAM 6)
 } = {}) {
   const clock = transport.clock;
   const events = [];            // sorted by (at, seq); wrappers own status, log stays immutable
   let seq = 0, gen = 0, firstLive = 0, running = false;
-  const policies = new Map();   // kind -> 'burst' | 'drop' | {reduce(batch, info)}
-  const fireCbs = new Set(), policyCbs = new Set();
+  const policies = new Map();   // kind -> 'burst' | 'drop' | 'reduce' | {reduce(batch, info)}
+  const adapters = new Map();   // kind -> {actuate, caps, reduce, assertState}
+  const snapshots = new Map();  // kind -> {pos, state}  (SEAM 5: reduce's fromSnapshot)
+  const fireCbs = new Set(), policyCbs = new Set(), driftCbs = new Set();
   const driftLog = [];
+  let driftTotal = 0, driftDropped = 0;
   let busyMs = 0;               // accumulated scheduler+fire callback self-time
   let lastTickAt = null, maxTickGapMs = 0;
 
@@ -194,6 +287,38 @@ export function createScheduler(transport, {
       if (e.at < at || (e.at === at && e.seq < s)) lo = mid + 1; else hi = mid;
     }
     return lo;
+  }
+
+  /** SEAM 6: drift is a CHANNEL, not a mailbox — subscribers see every row and
+   *  peekDrift() is non-destructive, so a HUD and an assert harness can both
+   *  observe the same fires. drainDrift() stays, for bounded memory; the
+   *  retained buffer is also capped at driftLimit so a peek-only client cannot
+   *  grow it without bound (drops are counted, never silent). */
+  function logDrift(rec) {
+    driftLog.push(rec); driftTotal++;
+    if (driftLog.length > driftLimit) driftDropped += driftLog.splice(0, driftLog.length - driftLimit).length;
+    for (const cb of driftCbs) cb(rec);
+  }
+
+  /** SEAM 4: wall -> audio bridge. The wall lane hands actuate() an instant;
+   *  an adapter that declares caps.audio = {ctx, leadMs?} additionally gets a
+   *  `when` object carrying that instant in AudioContext seconds, so a
+   *  sample-accurate voice can be start()ed FROM THE WALL LANE. The conversion
+   *  is free: the drift record already knows how early/late this fire is
+   *  (deltaMs), and ctx.currentTime sampled at the same instant is the audio
+   *  domain's "now" — so intended-in-audio = ctx.currentTime - deltaMs/1000.
+   *  A negative delta (fired early, the normal lookahead case) leaves positive
+   *  headroom: `when.earlyMs`. Opt-in per adapter; nothing else pays for it. */
+  function audioWhen(ad, rec) {
+    const cfg = ad && ad.caps && ad.caps.audio;
+    if (!cfg || !cfg.ctx || rec.deltaMs === null) return null;
+    const ctx = cfg.ctx, leadMs = cfg.leadMs || 0;
+    const ctxTime = ctx.currentTime;
+    const earlyMs = -rec.deltaMs;
+    const audioTime = ctxTime + (earlyMs + leadMs) / 1000;
+    rec.audioTime = +audioTime.toFixed(6);
+    rec.earlyMs = +earlyMs.toFixed(3);
+    return { ctx, ctxTime, audioTime, earlyMs: rec.earlyMs, leadMs, late: audioTime < ctxTime };
   }
 
   function fire(ev, origin) {
@@ -208,9 +333,13 @@ export function createScheduler(transport, {
       origin, // 'commit' | 'tick-late' | 'burst' | 'overdub'
       tag: ev.payload && ev.payload.tag,
     };
-    driftLog.push(rec);
+    const ad = adapters.get(ev.kind);
+    const when = audioWhen(ad, rec);
+    logDrift(rec);
     const t0 = clock.now();
-    for (const cb of fireCbs) cb(ev.payload ? { ...publicEv(ev) } : publicEv(ev), rec);
+    const pub = publicEv(ev);
+    if (ad && typeof ad.actuate === 'function') ad.actuate(ev.payload, rec, when);
+    for (const cb of fireCbs) cb(pub, rec);
     busyMs += clock.now() - t0;
   }
   const publicEv = (ev) => ({ id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload });
@@ -262,9 +391,10 @@ export function createScheduler(transport, {
         const lateMs = (pos - ev.at) / rate;
         if (lateMs <= lateGraceMs) { fire(ev, 'tick-late'); continue; }
         const pol = policies.get(ev.kind) || 'burst';
-        if (pol === 'burst') fire(ev, 'burst');
-        else if (pol === 'drop') { ev.status = 'dropped'; ev.cancel = null; }
-        else if (pol && typeof pol.reduce === 'function') {
+        const isReduce = (pol && typeof pol.reduce === 'function') ||
+                         (pol === 'reduce' && adapters.has(ev.kind));
+        if (pol === 'drop') { ev.status = 'dropped'; ev.cancel = null; }
+        else if (isReduce) {
           ev.status = 'reduced';
           let b = reduceBatches.get(ev.kind);
           if (!b) reduceBatches.set(ev.kind, b = []);
@@ -279,23 +409,78 @@ export function createScheduler(transport, {
         });
       }
     }
-    for (const [kind, batch] of reduceBatches) {
-      const info = { kind, count: batch.length, pos, nowUs: Math.round(now * 1000) };
-      const pol = policies.get(kind);
-      const t = clock.now();
-      pol.reduce(batch, info);
-      busyMs += clock.now() - t;
-      for (const cb of policyCbs) cb({ policy: 'reduce', ...info });
+    for (const [kind, batch] of reduceBatches) applyReduce(kind, batch, pos, now, 'catch-up');
+  }
+
+  // -------------------------------------------------------------------------
+  // SEAM 5 — the reduce policy's INPUT. It used to see only the events one scan
+  // happened to miss, which is fine for a commutative fold (held notes) and
+  // WRONG for a non-commutative one (a counter, a cue state machine): the
+  // reducer cannot know what came before the window.
+  //
+  // GUARANTEE NOW: a reducer is always handed the COMPLETE ORDERED PREFIX of
+  // its kind — every event with at <= pos in (at, seq) order — so `reduce` is a
+  // pure function of the prefix and `assertState` is an absolute (idempotent)
+  // assertion. That makes it exactly the C2 property in miniature:
+  //     assertState(reduce(prefix(<=t)))  ===  state after play(0 -> t)
+  // for ANY reducer, commutative or not. Reducers that prefer to fold forward
+  // get the explicit alternative in the same call: info.from = {pos, state}
+  // (the last reduce boundary and the state it returned) plus info.since (the
+  // events in (from.pos, pos]) — so `fold(info.from.state, info.since)` is
+  // equally available and equally correct. info.missed keeps the old one-scan
+  // batch for diagnostics.
+  //
+  // The raw setPolicy(kind, {reduce}) escape hatch keeps its historical
+  // signature reduce(missedBatch, info) — the enriched info carries prefix/
+  // since/from — so existing lab arms are untouched.
+  // -------------------------------------------------------------------------
+  function prefixEvents(kind, pos) {
+    const out = [];
+    for (const ev of events) { if (ev.at > pos) break; if (ev.kind === kind) out.push(ev); }
+    return out;
+  }
+  function applyReduce(kind, missed, pos, now, reason) {
+    const ad = adapters.get(kind), pol = policies.get(kind);
+    const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
+    const prefix = prefixEvents(kind, pos).map(publicEv);
+    const since = prefix.filter((e) => e.at > snap.pos);
+    const info = {
+      kind, pos, reason, nowUs: Math.round(now * 1000),
+      count: missed ? missed.length : prefix.length,
+      missed: missed || [], prefix, since, from: { pos: snap.pos, state: snap.state },
+    };
+    const t = clock.now();
+    if (ad && typeof ad.reduce === 'function') {
+      const state = ad.reduce(prefix.map((e) => e.payload), pos, info);
+      snapshots.set(kind, { pos, state });
+      if (typeof ad.assertState === 'function') ad.assertState(state, info);
+    } else if (pol && typeof pol.reduce === 'function') {
+      const state = pol.reduce(info.missed, info);
+      snapshots.set(kind, { pos, state: state === undefined ? snap.state : state });
+    }
+    busyMs += clock.now() - t;
+    for (const cb of policyCbs) cb({ policy: 'reduce', kind, pos, count: info.count, reason, nowUs: info.nowUs });
+  }
+
+  /** Re-fold and re-assert a reducible kind at `pos` (what seek does). */
+  function assertAt(pos, kind) {
+    const kinds = kind ? [kind] : [...adapters.keys()];
+    for (const k of kinds) {
+      const ad = adapters.get(k);
+      if (!ad || typeof ad.reduce !== 'function' || typeof ad.assertState !== 'function') continue;
+      if (ad.caps && ad.caps.assertOnSeek === false && !kind) continue;
+      applyReduce(k, [], pos, clock.now(), kind ? 'assert' : 'seek');
     }
   }
 
   const unsubState = transport.onState((st) => {
     cancelCommitted();
-    if (st.reason === 'seek') reconcile(st.p0);
+    if (st.reason === 'seek') { reconcile(st.p0); assertAt(st.p0); }
     if (running && transport.rate > 0) scan(clock.now()); // re-arm immediately, don't wait a tick
   });
 
   return {
+    hostName: host.name,
     /** Add an event {at, kind, id?, payload?}. During playback, an event at or
      *  behind the playhead fires immediately (overdub law, steal #11). */
     schedule({ at, kind = 'default', id, payload }) {
@@ -304,13 +489,57 @@ export function createScheduler(transport, {
       if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
       return ev.id;
     },
+    /** SEAM 1: register a per-kind adapter. Returns unregister. The library
+     *  filters onFire for you and derives the catch-up policy from caps. */
+    registerAdapter(kind, adapter) {
+      if (!adapter || typeof adapter.actuate !== 'function') throw new Error(`adapter ${kind}: actuate() required`);
+      const caps = adapter.caps || {};
+      const catchUp = caps.catchUp || 'burst';
+      if (catchUp === 'reduce' && typeof adapter.reduce !== 'function')
+        throw new Error(`adapter ${kind}: caps.catchUp 'reduce' needs reduce()`);
+      adapters.set(kind, adapter);
+      policies.set(kind, catchUp);
+      return () => {
+        if (adapters.get(kind) !== adapter) return;
+        adapters.delete(kind); policies.delete(kind); snapshots.delete(kind);
+      };
+    },
+    adapterCaps(kind) {
+      if (kind !== undefined) { const a = adapters.get(kind); return a ? a.caps || {} : null; }
+      const out = {};
+      for (const [k, a] of adapters) out[k] = a.caps || {};
+      return out;
+    },
+    /** Re-fold + re-assert reducible kinds at pos (seek does this for you). */
+    assertAt,
+    /** reduce(prefix <= pos) for one kind, without asserting — the expected
+     *  state a harness compares against (the C2 left-hand side). */
+    reduceAt(kind, pos) {
+      const ad = adapters.get(kind);
+      if (!ad || typeof ad.reduce !== 'function') return null;
+      const prefix = prefixEvents(kind, pos).map(publicEv);
+      const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
+      return ad.reduce(prefix.map((e) => e.payload), pos, {
+        kind, pos, reason: 'query', count: prefix.length, nowUs: Math.round(clock.now() * 1000),
+        missed: [], prefix, since: prefix.filter((e) => e.at > snap.pos), from: { pos: snap.pos, state: snap.state },
+      });
+    },
     setPolicy(kind, policy) { policies.set(kind, policy); },
     onFire(cb) { fireCbs.add(cb); return () => fireCbs.delete(cb); },
     onPolicy(cb) { policyCbs.add(cb); return () => policyCbs.delete(cb); },
     start() { running = true; lastTickAt = null; host.start(tick, tickMs); },
     stop() { running = false; host.stop(); cancelCommitted(); },
-    clear() { cancelCommitted(); events.length = 0; firstLive = 0; },
-    /** Drain the drift channel (every fire's {intendedUs, firedUs, deltaMs}). */
+    clear() { cancelCommitted(); events.length = 0; firstLive = 0; snapshots.clear(); },
+    /** SEAM 6: non-destructive drift reads. */
+    onDrift(cb) { driftCbs.add(cb); return () => driftCbs.delete(cb); },
+    peekDrift(fromTotal = 0) {
+      const skip = Math.max(0, fromTotal - (driftTotal - driftLog.length));
+      return driftLog.slice(skip);
+    },
+    driftStats() { return { total: driftTotal, retained: driftLog.length, dropped: driftDropped, limit: driftLimit }; },
+    /** Drain the drift channel (every fire's {intendedUs, firedUs, deltaMs}).
+     *  Destructive by design — the bounded-memory path. Observers should use
+     *  onDrift()/peekDrift() so draining does not blind them. */
     drainDrift() { return driftLog.splice(0); },
     stats() {
       const counts = { pending: 0, committed: 0, fired: 0, passed: 0, dropped: 0, reduced: 0 };
@@ -404,6 +633,88 @@ export function observePosition(transport, cb, { hz = 60, useRaf = typeof reques
   }
   const iv = setInterval(() => cb({ pos: transport.position(), nowUs: Math.round(transport.clock.now() * 1000) }), 1000 / hz);
   return () => { live = false; clearInterval(iv); };
+}
+
+// ---------------------------------------------------------------------------
+// createDeck — the batteries-included facade the first client had to write by
+// hand (proto/jam/jam-timeline.js). Transport + scheduler + adapter registry +
+// position observable + accumulated drift, one object, with the measured
+// defaults already applied. This is the whole of what a client needs:
+//
+//   const deck = createDeck({
+//     items: [{at, kind, id, payload}, …],
+//     adapters: { midi: {caps, actuate, reduce, assertState} },
+//     range: [0, durationMs], onPosition, onDrift,
+//   });
+//   deck.play(); deck.setRate(0.5); deck.seek(t); deck.pause();
+//
+// `range` is the seekable window in the position domain (absolute wall ms is
+// as legal as 0-based ms — replay-grid uses the former, jam the latter).
+// ---------------------------------------------------------------------------
+
+export function createDeck({
+  clock,                       // ClockSource — default wall
+  items = [],                  // [{at, kind, id?, payload}]
+  adapters = {},               // kind -> adapter (SEAM 1)
+  range,                       // [min, max] position window; default [0, lastAt + tailMs]
+  tailMs = 0,
+  tickHost = undefined,        // 'worker' (default) | 'main' | 'raf' | TickHost object
+  tickMs = 25, horizonMs = 100, lateGraceMs = 150,
+  onPosition, onDrift, driftFlushMs = 100, positionHz = 60,
+  autoStart = true,
+} = {}) {
+  const host = tickHost && typeof tickHost === 'object' ? tickHost : tickHostByKind(tickHost);
+  const transport = createTransport({ clock });
+  const sched = createScheduler(transport, { tickMs, horizonMs, lateGraceMs, host });
+  for (const [kind, ad] of Object.entries(adapters)) sched.registerAdapter(kind, ad);
+  for (const it of items) sched.schedule(it);
+
+  const lastAt = items.length ? Math.max(...items.map((i) => i.at)) : 0;
+  const span = range && range.length === 2 ? [range[0], range[1]] : [0, lastAt + tailMs];
+  const durationMs = span[1] - span[0];
+
+  // SEAM 6 in action: the deck SUBSCRIBES to drift instead of draining it, so
+  // a harness can still peek/drain the library's own buffer independently.
+  let drift = [], pendingRows = [];
+  const offDrift = sched.onDrift((rec) => { drift.push(rec); pendingRows.push(rec); });
+  const flush = () => {
+    if (!pendingRows.length) return drift.length;
+    const rows = pendingRows; pendingRows = [];
+    onDrift && onDrift(rows, drift);
+    return drift.length;
+  };
+  const flushIv = driftFlushMs > 0 && onDrift ? setInterval(flush, driftFlushMs) : null;
+  const offPos = onPosition
+    ? observePosition(transport, (s) => onPosition(s.pos, durationMs, s), { hz: positionHz })
+    : () => {};
+
+  if (autoStart) sched.start();   // rate is 0 -> nothing fires until play()
+
+  const clamp = (p) => Math.max(span[0], Math.min(span[1], p));
+  return {
+    transport, sched, items, adapters, durationMs, range: span, hostName: host.name,
+    play(r) { transport.play(r); },
+    pause() { transport.pause(); flush(); },
+    setRate(r) { transport.setRate(r); },         // SEAM 2: does not start playback
+    seek(p) { const q = clamp(p); transport.seek(q); flush(); return q; },
+    /** slave the deck to an external clock master (SEAM: media-element master) */
+    sync(p, opts) { return transport.sync(clamp(p), opts); },
+    position: () => transport.position(),
+    rate: () => transport.rate,
+    targetRate: () => transport.targetRate,       // SEAM 2: what a paused UI shows
+    playing: () => transport.playing,
+    schedule(item) { return sched.schedule(item); },
+    /** every fire's {intendedUs, firedUs, deltaMs, origin} — the drift channel */
+    drift: () => (flush(), drift.slice()),
+    fireCount: () => flush(),
+    resetDrift() { sched.drainDrift(); drift = []; pendingRows = []; },
+    reduceAt: (kind, pos) => sched.reduceAt(kind, pos),
+    assertAt: (pos, kind) => sched.assertAt(pos, kind),
+    caps: (kind) => sched.adapterCaps(kind),
+    audit: () => sched.audit(),
+    stats: () => sched.stats(),
+    dispose() { if (flushIv) clearInterval(flushIv); offDrift(); offPos(); sched.dispose(); },
+  };
 }
 
 // ---------------------------------------------------------------------------

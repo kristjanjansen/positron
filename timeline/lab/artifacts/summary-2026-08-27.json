@@ -1,7 +1,777 @@
 {
-  "at": "2026-08-27T17:06:21.091Z",
+  "at": "2026-08-27T20:52:20.275Z",
   "node": "v25.9.0",
   "arms": {
+    "A": {
+      "main": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 1.3,
+          "p95": 6.9,
+          "p99": 7.6,
+          "min": -0.9,
+          "max": 10.1
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 1.1,
+            "p95": 2.1,
+            "p99": 2.1,
+            "min": 0.1,
+            "max": 2.2
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 1.3,
+            "p95": 6.9,
+            "p99": 7.1,
+            "min": -0.9,
+            "max": 7.2
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 0.9,
+            "p95": 8.2,
+            "p99": 9.2,
+            "min": -0.9,
+            "max": 10.1
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.1,
+          "max": 4
+        },
+        "obsHz": {
+          "n": 7282,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.6
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 31.79,
+          "maxTickGapMs": 27
+        }
+      },
+      "worker": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 4.3,
+          "p95": 15.1,
+          "p99": 17.6,
+          "min": -0.7,
+          "max": 18.3
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 6.2,
+            "p95": 12.5,
+            "p99": 13.2,
+            "min": 2.8,
+            "max": 13.3
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 4,
+            "p95": 15.8,
+            "p99": 17.8,
+            "min": -0.6,
+            "max": 18.3
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 1.8,
+            "p95": 13.9,
+            "p99": 15.8,
+            "min": -0.7,
+            "max": 16.8
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.3,
+          "max": 7
+        },
+        "obsHz": {
+          "n": 7292,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.5
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 43.3,
+          "maxTickGapMs": 35.3
+        }
+      },
+      "raf": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 4.1,
+          "p95": 7.7,
+          "p99": 9.3,
+          "min": 0,
+          "max": 10.3
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 4.2,
+            "p95": 6.1,
+            "p99": 6.3,
+            "min": 2.6,
+            "max": 6.3
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 4,
+            "p95": 7.7,
+            "p99": 9.4,
+            "min": 0,
+            "max": 10.3
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 4,
+            "p95": 8.1,
+            "p99": 8.5,
+            "min": 0,
+            "max": 9.2
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.2,
+          "max": 4
+        },
+        "obsHz": {
+          "n": 7294,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 11.2
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 55.9,
+          "maxTickGapMs": 11.1
+        }
+      },
+      "fanout": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 1.7,
+          "p95": 2.8,
+          "p99": 3,
+          "min": 0.1,
+          "max": 3.6
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 1.2,
+            "p95": 1.6,
+            "p99": 1.7,
+            "min": 0.1,
+            "max": 1.8
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 1.8,
+            "p95": 2.9,
+            "p99": 3.1,
+            "min": 0.2,
+            "max": 3.6
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 1.6,
+            "p95": 2.4,
+            "p99": 2.9,
+            "min": 0.9,
+            "max": 3
+          }
+        },
+        "origins": {
+          "fanout": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.1,
+          "max": 4
+        },
+        "obsHz": {
+          "n": 7292,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.6
+        },
+        "schedStats": null
+      }
+    },
+    "D": {
+      "policies": {
+        "mode": "policies",
+        "stopUs": 1787850635992000,
+        "contUs": 1787850639048000,
+        "wakes": [
+          {
+            "wakeUs": 1787850639101305,
+            "gapMs": 3070.9
+          }
+        ],
+        "byKind": {
+          "b": {
+            "total": 300,
+            "fired": 300,
+            "dropped": 0,
+            "reduced": 0,
+            "passed": 0
+          },
+          "d": {
+            "total": 300,
+            "fired": 272,
+            "dropped": 28,
+            "reduced": 0,
+            "passed": 0
+          },
+          "r": {
+            "total": 300,
+            "fired": 272,
+            "dropped": 0,
+            "reduced": 28,
+            "passed": 0
+          }
+        },
+        "stats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 844,
+            "passed": 0,
+            "dropped": 28,
+            "reduced": 28
+          },
+          "total": 900,
+          "busyMs": 39.6,
+          "maxTickGapMs": 3038.9
+        },
+        "burstIn100ms": 32,
+        "burstIn500ms": 36,
+        "dropLost": 28,
+        "dropFiredIn100ms": 3,
+        "reduceCalls": [
+          {
+            "kind": "r",
+            "count": 28,
+            "tUs": 1787850639101805,
+            "pos": 13122.5
+          }
+        ],
+        "reduceState": 300,
+        "reduceExpected": 300,
+        "reduceConsistentMs": 0.5
+      },
+      "fanout": {
+        "mode": "fanout",
+        "stopUs": 1787850666759000,
+        "contUs": 1787850669820000,
+        "wakes": [
+          {
+            "wakeUs": 1787850669873405,
+            "gapMs": 3075.7
+          }
+        ],
+        "byKind": {
+          "f": {
+            "total": 899,
+            "fired": 899,
+            "dropped": 0,
+            "reduced": 0,
+            "passed": 0
+          }
+        },
+        "stats": null,
+        "fanoutIn100ms": 94,
+        "fanoutIn500ms": 106
+      }
+    },
+    "E": {
+      "h100": {
+        "nScheduled": 191,
+        "nDetected": 191,
+        "missedDetections": 0,
+        "laneStats": {
+          "rendered": 191,
+          "passed": 5
+        },
+        "driftPpm": 4983.9,
+        "renderDeltaMs": {
+          "n": 191,
+          "p50": 0.01,
+          "p95": 0.04,
+          "p99": 0.04,
+          "min": 0,
+          "max": 0.04
+        },
+        "wallMappedDeltaMs": {
+          "n": 191,
+          "p50": -21.31,
+          "p95": 22.81,
+          "p99": 27,
+          "min": -70.47,
+          "max": 27.01
+        },
+        "busyWindow": {
+          "clicks": 7,
+          "missing": 0,
+          "renderDeltaMs": {
+            "n": 7,
+            "p50": 0.01,
+            "p95": 0.04,
+            "p99": 0.04,
+            "min": 0,
+            "max": 0.04
+          }
+        },
+        "wallLane": {
+          "overall": {
+            "n": 200,
+            "p50": 8,
+            "p95": 12.8,
+            "p99": 401,
+            "min": 1,
+            "max": 501
+          },
+          "duringBusy": {
+            "n": 12,
+            "p50": 12.6,
+            "p95": 501,
+            "p99": 501,
+            "min": 1,
+            "max": 501
+          }
+        }
+      },
+      "h500": {
+        "nScheduled": 195,
+        "nDetected": 195,
+        "missedDetections": 0,
+        "laneStats": {
+          "rendered": 195,
+          "passed": 1
+        },
+        "driftPpm": 1974.1,
+        "renderDeltaMs": {
+          "n": 195,
+          "p50": 0.01,
+          "p95": 0.04,
+          "p99": 0.04,
+          "min": 0,
+          "max": 0.04
+        },
+        "wallMappedDeltaMs": {
+          "n": 195,
+          "p50": 10.27,
+          "p95": 27.77,
+          "p99": 29.27,
+          "min": -10.77,
+          "max": 29.67
+        },
+        "busyWindow": {
+          "clicks": 11,
+          "missing": 0,
+          "renderDeltaMs": {
+            "n": 11,
+            "p50": 0,
+            "p95": 0.01,
+            "p99": 0.01,
+            "min": 0,
+            "max": 0.01
+          }
+        },
+        "wallLane": {
+          "overall": {
+            "n": 200,
+            "p50": 2.9,
+            "p95": 7.4,
+            "p99": 401.6,
+            "min": 0.1,
+            "max": 501.5
+          },
+          "duringBusy": {
+            "n": 12,
+            "p50": 5.3,
+            "p95": 501.5,
+            "p99": 501.5,
+            "min": 1.6,
+            "max": 501.5
+          }
+        }
+      }
+    },
+    "BG": {
+      "main": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850729289905,
+            "state": "visible"
+          },
+          {
+            "t": 1787850734307405,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850744365705,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 575.7,
+          "p95": 980.7,
+          "p99": 994.2,
+          "min": 79.9,
+          "max": 994.2
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 2.4,
+          "p95": 3,
+          "p99": 3.1,
+          "min": 0.2,
+          "max": 3.1
+        }
+      },
+      "worker": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850755463505,
+            "state": "visible"
+          },
+          {
+            "t": 1787850760481905,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850770544805,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 7.7,
+          "p95": 8.5,
+          "p99": 17.8,
+          "min": 5.8,
+          "max": 17.8
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 12.8,
+          "p95": 15.9,
+          "p99": 16.2,
+          "min": 6.1,
+          "max": 16.6
+        }
+      },
+      "raf": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850781642905,
+            "state": "visible"
+          },
+          {
+            "t": 1787850786658505,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850796717505,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 5074.7,
+          "p95": 9174.6,
+          "p99": 9574.6,
+          "min": 574.8,
+          "max": 9574.6
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 1.6,
+          "p95": 3.5,
+          "p99": 3.7,
+          "min": 0.2,
+          "max": 3.9
+        }
+      }
+    },
+    "C_propTest": {
+      "cmd": "node timeline/lab/prop-test.mjs",
+      "verdict": "OK",
+      "seeds": {
+        "basic": 30,
+        "gymnastics": 15,
+        "extended_run": "100+50 also green"
+      },
+      "violations": 0,
+      "property": "reduce(events<=t) === state after play(0->t); gymnastics adds random seek/pause/resume/rate(0.5-3x) with reduce-on-seek; exactly-once fire audit; pause position-hold assert"
+    },
+    "F_midi": {
+      "verdict": "SKIPPED",
+      "reason": "native midi.node dlopen mmap EPERM on this host (see artifacts/midi-2026-08-27.json); harness complete for a capable host"
+    },
+    "B": {
+      "main": {
+        "mech": "main",
+        "checks": [
+          {
+            "name": "rate2-halves-intervals",
+            "pass": true,
+            "detail": "median inter-fire 50.3 ms (expect ~50)"
+          },
+          {
+            "name": "pause-holds-position",
+            "pass": true,
+            "detail": "moved 0.000 ms while paused"
+          },
+          {
+            "name": "pause-no-fires",
+            "pass": true,
+            "detail": "0 fires during 2 s pause (expect 0)"
+          },
+          {
+            "name": "backseek-replays-once",
+            "pass": true,
+            "detail": "refires per event: {\"12600\":1,\"12700\":1,\"12800\":1,\"12900\":1,\"13000\":1} (expect each of 12600,12700,12800,12900,13000 exactly 1)"
+          },
+          {
+            "name": "no-orphan-timers-at-clear",
+            "pass": true,
+            "detail": "0 timers still armed right after clear() (expect 0)"
+          },
+          {
+            "name": "clear-cancels-all",
+            "pass": true,
+            "detail": "0 fires after clear() (expect 0)"
+          },
+          {
+            "name": "seek-no-skipped-fires",
+            "pass": true,
+            "detail": "0 fires from skipped window after seek (expect 0)"
+          }
+        ],
+        "totalFires": 93
+      },
+      "worker": {
+        "mech": "worker",
+        "checks": [
+          {
+            "name": "rate2-halves-intervals",
+            "pass": true,
+            "detail": "median inter-fire 50.1 ms (expect ~50)"
+          },
+          {
+            "name": "pause-holds-position",
+            "pass": true,
+            "detail": "moved 0.000 ms while paused"
+          },
+          {
+            "name": "pause-no-fires",
+            "pass": true,
+            "detail": "0 fires during 2 s pause (expect 0)"
+          },
+          {
+            "name": "backseek-replays-once",
+            "pass": true,
+            "detail": "refires per event: {\"12600\":1,\"12700\":1,\"12800\":1,\"12900\":1,\"13000\":1} (expect each of 12600,12700,12800,12900,13000 exactly 1)"
+          },
+          {
+            "name": "no-orphan-timers-at-clear",
+            "pass": true,
+            "detail": "0 timers still armed right after clear() (expect 0)"
+          },
+          {
+            "name": "clear-cancels-all",
+            "pass": true,
+            "detail": "0 fires after clear() (expect 0)"
+          },
+          {
+            "name": "seek-no-skipped-fires",
+            "pass": true,
+            "detail": "0 fires from skipped window after seek (expect 0)"
+          }
+        ],
+        "totalFires": 94
+      },
+      "raf": {
+        "mech": "raf",
+        "checks": [
+          {
+            "name": "rate2-halves-intervals",
+            "pass": true,
+            "detail": "median inter-fire 50.0 ms (expect ~50)"
+          },
+          {
+            "name": "pause-holds-position",
+            "pass": true,
+            "detail": "moved 0.000 ms while paused"
+          },
+          {
+            "name": "pause-no-fires",
+            "pass": true,
+            "detail": "0 fires during 2 s pause (expect 0)"
+          },
+          {
+            "name": "backseek-replays-once",
+            "pass": true,
+            "detail": "refires per event: {\"12600\":1,\"12700\":1,\"12800\":1,\"12900\":1,\"13000\":1} (expect each of 12600,12700,12800,12900,13000 exactly 1)"
+          },
+          {
+            "name": "no-orphan-timers-at-clear",
+            "pass": true,
+            "detail": "0 timers still armed right after clear() (expect 0)"
+          },
+          {
+            "name": "clear-cancels-all",
+            "pass": true,
+            "detail": "0 fires after clear() (expect 0)"
+          },
+          {
+            "name": "seek-no-skipped-fires",
+            "pass": true,
+            "detail": "0 fires from skipped window after seek (expect 0)"
+          }
+        ],
+        "totalFires": 94
+      },
+      "fanout": {
+        "mech": "fanout",
+        "checks": [
+          {
+            "name": "rate2-halves-intervals",
+            "pass": false,
+            "detail": "median inter-fire null ms (expect ~50)"
+          },
+          {
+            "name": "pause-holds-position",
+            "pass": true,
+            "detail": "moved 0.000 ms while paused"
+          },
+          {
+            "name": "pause-no-fires",
+            "pass": false,
+            "detail": "20 fires during 2 s pause (expect 0)"
+          },
+          {
+            "name": "backseek-replays-once",
+            "pass": false,
+            "detail": "refires per event: {} (expect each of 12600,12700,12800,12900,13000 exactly 1)"
+          },
+          {
+            "name": "no-orphan-timers-at-clear",
+            "pass": false,
+            "detail": "50 timers still armed right after clear() (expect 0)"
+          },
+          {
+            "name": "clear-cancels-all",
+            "pass": false,
+            "detail": "50 fires after clear() (expect 0)"
+          },
+          {
+            "name": "seek-no-skipped-fires",
+            "pass": false,
+            "detail": "50 fires from skipped window after seek (expect 0)"
+          }
+        ],
+        "totalFires": 150
+      }
+    }
+  },
+  "clock": {
+    "offLocalUs": -729.75,
+    "minRttLocalUs": 300
+  },
+  "recommendation": {
+    "verdict": "vector + lookahead + committed-vs-pending HOLDS; per-event fan-out reproducibly fails seek/pause/rate/cancel",
+    "defaults": {
+      "wallTickMs": 25,
+      "wallHorizonMs": 100,
+      "lateGraceMs": 150,
+      "audioTickMs": 25,
+      "audioHorizonMs": ">= worst expected main-thread stall; 500 rode through a 500 ms stall, 100 lost 5 clicks"
+    },
+    "tickHost": "worker as library default (p95 15 ms foreground, 8.5 ms hidden - only host that survives background tabs); main host optional for foreground-critical paths (p95 6.4 ms); rAF never (9.2 s p95 hidden); fan-out never",
+    "caveats": [
+      "audio-vs-wall drift 1900-5200 ppm measured on headless fake output device - re-measure anchor quality on real hardware",
+      "wall->audio mapping p95 ~25 ms in headless; use getOutputTimestamp pairs + periodic reanchor"
+    ]
+  },
+  "libraryVersion": "v0.2 (six API seams closed)",
+  "rerun": {
+    "arms": [
+      "A",
+      "B",
+      "E"
+    ],
+    "at": "2026-08-27T20:52:20.275Z",
+    "carriedForwardFrom": "2026-08-27T17:06:21.091Z",
+    "carriedArms": [
+      "D",
+      "BG",
+      "C_propTest",
+      "F_midi"
+    ]
+  },
+  "armsPreV02": {
     "A": {
       "main": {
         "n": 1270,
@@ -252,93 +1022,6 @@
         "schedStats": null
       }
     },
-    "D": {
-      "policies": {
-        "mode": "policies",
-        "stopUs": 1787850635992000,
-        "contUs": 1787850639048000,
-        "wakes": [
-          {
-            "wakeUs": 1787850639101305,
-            "gapMs": 3070.9
-          }
-        ],
-        "byKind": {
-          "b": {
-            "total": 300,
-            "fired": 300,
-            "dropped": 0,
-            "reduced": 0,
-            "passed": 0
-          },
-          "d": {
-            "total": 300,
-            "fired": 272,
-            "dropped": 28,
-            "reduced": 0,
-            "passed": 0
-          },
-          "r": {
-            "total": 300,
-            "fired": 272,
-            "dropped": 0,
-            "reduced": 28,
-            "passed": 0
-          }
-        },
-        "stats": {
-          "counts": {
-            "pending": 0,
-            "committed": 0,
-            "fired": 844,
-            "passed": 0,
-            "dropped": 28,
-            "reduced": 28
-          },
-          "total": 900,
-          "busyMs": 39.6,
-          "maxTickGapMs": 3038.9
-        },
-        "burstIn100ms": 32,
-        "burstIn500ms": 36,
-        "dropLost": 28,
-        "dropFiredIn100ms": 3,
-        "reduceCalls": [
-          {
-            "kind": "r",
-            "count": 28,
-            "tUs": 1787850639101805,
-            "pos": 13122.5
-          }
-        ],
-        "reduceState": 300,
-        "reduceExpected": 300,
-        "reduceConsistentMs": 0.5
-      },
-      "fanout": {
-        "mode": "fanout",
-        "stopUs": 1787850666759000,
-        "contUs": 1787850669820000,
-        "wakes": [
-          {
-            "wakeUs": 1787850669873405,
-            "gapMs": 3075.7
-          }
-        ],
-        "byKind": {
-          "f": {
-            "total": 899,
-            "fired": 899,
-            "dropped": 0,
-            "reduced": 0,
-            "passed": 0
-          }
-        },
-        "stats": null,
-        "fanoutIn100ms": 94,
-        "fanoutIn500ms": 106
-      }
-    },
     "E": {
       "h100": {
         "nScheduled": 191,
@@ -452,141 +1135,6 @@
           }
         }
       }
-    },
-    "BG": {
-      "main": {
-        "hiddenSeen": true,
-        "visLog": [
-          {
-            "t": 1787850729289905,
-            "state": "visible"
-          },
-          {
-            "t": 1787850734307405,
-            "state": "hidden"
-          },
-          {
-            "t": 1787850744365705,
-            "state": "visible"
-          }
-        ],
-        "hiddenWindowDelta": {
-          "n": 91,
-          "p50": 575.7,
-          "p95": 980.7,
-          "p99": 994.2,
-          "min": 79.9,
-          "max": 994.2
-        },
-        "foregroundDelta": {
-          "n": 134,
-          "p50": 2.4,
-          "p95": 3,
-          "p99": 3.1,
-          "min": 0.2,
-          "max": 3.1
-        }
-      },
-      "worker": {
-        "hiddenSeen": true,
-        "visLog": [
-          {
-            "t": 1787850755463505,
-            "state": "visible"
-          },
-          {
-            "t": 1787850760481905,
-            "state": "hidden"
-          },
-          {
-            "t": 1787850770544805,
-            "state": "visible"
-          }
-        ],
-        "hiddenWindowDelta": {
-          "n": 91,
-          "p50": 7.7,
-          "p95": 8.5,
-          "p99": 17.8,
-          "min": 5.8,
-          "max": 17.8
-        },
-        "foregroundDelta": {
-          "n": 134,
-          "p50": 12.8,
-          "p95": 15.9,
-          "p99": 16.2,
-          "min": 6.1,
-          "max": 16.6
-        }
-      },
-      "raf": {
-        "hiddenSeen": true,
-        "visLog": [
-          {
-            "t": 1787850781642905,
-            "state": "visible"
-          },
-          {
-            "t": 1787850786658505,
-            "state": "hidden"
-          },
-          {
-            "t": 1787850796717505,
-            "state": "visible"
-          }
-        ],
-        "hiddenWindowDelta": {
-          "n": 91,
-          "p50": 5074.7,
-          "p95": 9174.6,
-          "p99": 9574.6,
-          "min": 574.8,
-          "max": 9574.6
-        },
-        "foregroundDelta": {
-          "n": 134,
-          "p50": 1.6,
-          "p95": 3.5,
-          "p99": 3.7,
-          "min": 0.2,
-          "max": 3.9
-        }
-      }
-    },
-    "C_propTest": {
-      "cmd": "node timeline/lab/prop-test.mjs",
-      "verdict": "OK",
-      "seeds": {
-        "basic": 30,
-        "gymnastics": 15,
-        "extended_run": "100+50 also green"
-      },
-      "violations": 0,
-      "property": "reduce(events<=t) === state after play(0->t); gymnastics adds random seek/pause/resume/rate(0.5-3x) with reduce-on-seek; exactly-once fire audit; pause position-hold assert"
-    },
-    "F_midi": {
-      "verdict": "SKIPPED",
-      "reason": "native midi.node dlopen mmap EPERM on this host (see artifacts/midi-2026-08-27.json); harness complete for a capable host"
     }
-  },
-  "clock": {
-    "offLocalUs": -195.5,
-    "minRttLocalUs": 300
-  },
-  "recommendation": {
-    "verdict": "vector + lookahead + committed-vs-pending HOLDS; per-event fan-out reproducibly fails seek/pause/rate/cancel",
-    "defaults": {
-      "wallTickMs": 25,
-      "wallHorizonMs": 100,
-      "lateGraceMs": 150,
-      "audioTickMs": 25,
-      "audioHorizonMs": ">= worst expected main-thread stall; 500 rode through a 500 ms stall, 100 lost 5 clicks"
-    },
-    "tickHost": "worker as library default (p95 15 ms foreground, 8.5 ms hidden - only host that survives background tabs); main host optional for foreground-critical paths (p95 6.4 ms); rAF never (9.2 s p95 hidden); fan-out never",
-    "caveats": [
-      "audio-vs-wall drift 1900-5200 ppm measured on headless fake output device - re-measure anchor quality on real hardware",
-      "wall->audio mapping p95 ~25 ms in headless; use getOutputTimestamp pairs + periodic reanchor"
-    ]
   }
 }

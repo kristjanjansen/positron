@@ -7,6 +7,11 @@
   #hud { white-space: pre; background: #151d12; border: 1px solid #2c352a; padding: 10px 14px; margin: 10px 0; min-height: 130px; }
   #controls { margin: 8px 0; }
   select, button { font: inherit; background: #222c22; color: #eee; border: 1px solid #444; padding: 3px 8px; }
+  #deck { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #151d12;
+          border: 1px solid #2c352a; padding: 6px 10px; margin: 8px 0; }
+  #deck .lbl { color: #b6ff7f; }
+  #deck button.on { background: #2f4a2c; }
+  #scrub { flex: 1; min-width: 220px; }
   #flash { display: flex; flex-direction: column; gap: 2px; }
   .note { padding: 1px 8px; }
   .note.local { color: #9fe89f; }
@@ -21,6 +26,17 @@ any link slower than ~beat/2 becomes musically playable. Beat grid is epoch-anch
 <div id="controls">
   transport <select id="tsel"><option value="dc">DC-direct</option><option value="do">DO relay</option><option value="moq">MoQ d14</option></select>
   <button id="replayBtn">replay session</button>
+</div>
+<div id="deck">
+  <span class="lbl">transport</span>
+  <button id="playBtn">▶ play</button>
+  <button id="pauseBtn">⏸ pause</button>
+  <input id="scrub" type="range" min="0" max="1000" step="1" value="0">
+  <span id="pos">0.00 / 0.00 s</span>
+  <span class="lbl">rate</span>
+  <button class="rate" data-r="0.5">0.5×</button>
+  <button class="rate on" data-r="1">1×</button>
+  <button class="rate" data-r="2">2×</button>
 </div>
 <div id="hud">booting…</div>
 <div id="flash"></div>
@@ -40,11 +56,40 @@ const jam = makeJam({
   tempoBpm: +(params.get('bpm') || 100),
 });
 document.getElementById('replayBtn').onclick = () => jam.replay();
+
+// ---- ADOPTION 2 of timeline/transport.mjs, and it really is free: the deck is
+// already built by jam-core (same engine as jam.html), so the whole cost here
+// is wiring four buttons and a range input to play/pause/seek/setRate. Note
+// setRate no longer implies play (library seam 2) and the readout shows
+// targetRate, so a PAUSED interval session reads "0.50×" honestly. ----
+const $ = (id) => document.getElementById(id);
+const scrub = $('scrub'), posEl = $('pos');
+let dragging = false;
+const withDeck = (fn) => { const d = jam.deck(); if (d) fn(d); };   // builds on demand
+
+$('playBtn').onclick = () => withDeck((d) => { if (d.position() >= d.durationMs) d.seek(0); d.play(); });
+$('pauseBtn').onclick = () => withDeck((d) => d.pause());
+scrub.oninput = () => { dragging = true; withDeck((d) => d.seek(+scrub.value / 1000 * d.durationMs)); };
+scrub.onchange = () => { dragging = false; };
+for (const b of document.querySelectorAll('button.rate')) b.onclick = () => {
+  withDeck((d) => d.setRate(+b.dataset.r));
+  for (const o of document.querySelectorAll('button.rate')) o.classList.toggle('on', o === b);
+};
+setInterval(() => {
+  const d = jam.deckIfAny();                       // peek — never builds a deck
+  if (!d) { posEl.textContent = 'no recording yet'; return; }
+  if (!dragging) scrub.value = Math.round(d.durationMs ? d.position() / d.durationMs * 1000 : 0);
+  posEl.textContent = `${(d.position() / 1000).toFixed(2)} / ${(d.durationMs / 1000).toFixed(2)} s  ${d.targetRate().toFixed(2)}×`;
+  $('playBtn').classList.toggle('on', d.playing());
+}, 100);
+
 window.jam = jam;
 window.jamStats = () => jam.stats();
 window.jamLog = () => jam.log();
 window.jamReplay = () => jam.replay();
 window.jamAuto = (ms) => jam.autoPlay(ms);
+window.jamDeck = () => jam.deck();
+window.jamSounding = () => jam.soundingNotes();
 await jam.start();
 window.jamReady = true;
 </script>

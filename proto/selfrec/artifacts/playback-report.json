@@ -5,32 +5,32 @@
     "V2": {
       "samples": [
         {
-          "atS": 15.03,
+          "atS": 15.05,
           "clockA": 1787823391280,
-          "clockB": 1787823391247,
-          "interTileSkewMs": 33,
-          "tileErrA": -45,
-          "tileErrB": -78
+          "clockB": 1787823391314,
+          "interTileSkewMs": 34,
+          "tileErrA": -64,
+          "tileErrB": -30
         },
         {
-          "atS": 35.04,
+          "atS": 35.05,
           "clockA": 1787823411283,
-          "clockB": 1787823411279,
-          "interTileSkewMs": 4,
-          "tileErrA": -52,
-          "tileErrB": -56
+          "clockB": 1787823411312,
+          "interTileSkewMs": 29,
+          "tileErrA": -58,
+          "tileErrB": -29
         },
         {
           "atS": 65.05,
           "clockA": 1787823441279,
           "clockB": 1787823441279,
           "interTileSkewMs": 0,
-          "tileErrA": -64,
-          "tileErrB": -64
+          "tileErrA": -68,
+          "tileErrB": -68
         }
       ],
-      "p50": 4,
-      "max": 33,
+      "p50": 29,
+      "max": 34,
       "targetMs": 100
     },
     "V3": {
@@ -126,7 +126,7 @@
       {
         "name": "V2-inter-tile-skew-new-path",
         "ok": true,
-        "detail": "p50=4 max=33 (0,4,33)"
+        "detail": "p50=29 max=34 (0,29,34)"
       },
       {
         "name": "V3-scrubber-seeks",
@@ -140,7 +140,7 @@
       }
     ]
   },
-  "updatedAt": "2026-08-27T10:26:18.762Z",
+  "updatedAt": "2026-08-27T21:03:34.268Z",
   "masters_mse": {
     "show": "sync-20260827T093613",
     "participants": {

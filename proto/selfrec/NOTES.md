@@ -420,6 +420,72 @@ ARE span time). verify-masters.mjs, split verdict:
   workers/selfrec/src/index.js. Reports: artifacts/playback-report.json,
   results/selfrec-playback.jsonl, logs/playback-*.png.
 
+## Checkpoint — replay-grid adopts timeline/transport.mjs (2026-08-28)
+
+replay-grid.html's hand-rolled replay is GONE; the playhead is now the shared
+library's (`timeline/transport.mjs` v0.2, the same file timeline/lab measures —
+collector.mjs aliases `/timeline/*` to the repo, never a copy). This is the
+library's SECOND kind mix, and the one that mattered: media spans + a cue lane,
+with per-tile `<video>` elements as clock masters.
+
+- **Two adapters, no glue.** `media-span` — `actuate` = seek/play a tile
+  element; `caps` declare the honest limits of an HTMLMediaElement slave
+  (`seekAccuracyMs: 40`, `rates: [1]`, `rateNudge: [0.94, 1.06]`,
+  `clockMaster: true`, `catchUp: 'reduce'`); `reduce(payloads, pos)` = the set
+  of tiles PRESENT at pos; `assertState` = hard-seek every tile to u(pos).
+  `cue` — `actuate` = fire + decode both tiles, `catchUp: 'burst'` (a cue is a
+  note, never silently dropped), `reduce` = the fired set ≤ t, `assertState` =
+  `firedIds` (the rewind semantics, previously hand-rolled).
+- **Master clock stays the media element.** The first present tile is the clock
+  master, is never rate-nudged, and the library's vector is SLAVED to its
+  `currentTime` via the new `transport.sync(pos, {toleranceMs})` — a re-anchor
+  with NO seek semantics (no reconcile, no re-assert, nothing re-fires; only
+  committed timers are re-armed). Every other tile servos to the library's
+  position. A stalled master (no `currentTime` advance for 1 s) releases the
+  role and the deck free-runs on the wall clock. Slaving is enabled only for
+  the `linear` mapping — `anchored`/`blocks` are not invertible T→u.
+- The rAF loop is now PURELY the video servo + paint. The cue lane runs on the
+  library's worker tick host, so it survives a backgrounded tab — the old rAF
+  cue engine could not (lab: rAF p95 9.2 s hidden).
+
+**Verification — `node verify-replay.mjs`, 5/5 PASS (was 5/5).**
+- **V3 scrubber seeks: IDENTICAL, to the millisecond.** 30 s (px quant −49 ms):
+  p1 −49 / p2 −51; 70 s (quant 0): p1 −65 / p2 −41. Same as the pre-adoption
+  run. Seek accuracy is a property of the media element, and the library did
+  not touch it.
+- **V2 inter-tile skew MOVED: p50 4 → 29 ms, max 33 → 34 ms** (samples 0/29/34
+  vs 33/4/0), target ≤100 ms, still passing. The mechanism is real and worth
+  recording: under the old wall-clock playhead BOTH tiles chased the same
+  external clock, so their errors were *correlated* (old tileErr −45…−78 ms on
+  both) and their mutual skew was smaller than either's absolute error. With a
+  media-element master, p1 sits at zero by definition and the ±40 ms rate-nudge
+  dead band IS the skew budget. Tightening the band to ±20 ms (`SERVO_BAND_MS`)
+  brought max back to 34 ms = ONE 30 fps frame, which is the physical floor.
+  Absolute tile error improved on the slave (p2 −29…−68 vs −56…−78 before).
+- V1 boot and V4 (linear vs cluster- vs block-anchored at the 73 s tail:
+  linear p1 −64 / p2 −69, cluster −100/−99, blocks −64/−99, linear still wins)
+  are unchanged — the mapping arithmetic was not touched.
+
+**SECOND LATENT BUG FOUND (the jam finding repeats).** Measuring the old path
+before replacing it, per the jam lesson:
+- *Firing offset:* the rAF cue engine fired one frame LATE — +0.2 / +15.5 /
+  +14.7 ms on the three cues (it fires on the first frame at/after `c.at`, so
+  the error is 0…16.7 ms, unbounded on a dropped frame and infinite in a hidden
+  tab). The library's drift channel now reports +1.9 / +2.5 / +1.2 ms for the
+  same cues, and reports it AT ALL, which the old path never did.
+- *Forward seek burst (the real bug):* `__seekWall` rebuilt `firedIds` from
+  `S.fires` — records of what had ALREADY fired — instead of from `S.cues ≤ T`.
+  On a fresh page nothing has fired, so `firedIds` was empty and a forward seek
+  past cues made every skipped cue fire at once. Measured on a fresh boot,
+  seek past all three then play: **3 cues burst, 45.0 s / 25.0 s / 5.0 s late.**
+  That is exactly the lab's `seek-no-skipped-fires` assert — the one the
+  fan-out graveyard arm fails — live in a shipped demo. Post-adoption, same
+  test: **0 fires** (the library's `reconcile()` marks the skipped window
+  `passed`).
+- Files: MODIFIED replay-grid.html (−1 hand-rolled transport, +2 adapters),
+  collector.mjs (+`/timeline/*` route). Cleanup: :8894 free, no selfrec
+  processes, scratch UDDs removed.
+
 ## Plan of record
 
 1. participant.html — canvas 1280x720 + captureStream(30), burned binary
