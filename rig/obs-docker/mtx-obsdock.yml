@@ -1,0 +1,17 @@
+# Local RTMP sink for obsdock (NO Cloudflare). OBS publishes rtmp path
+# "obsdock"; the grabber reads the same path back. "feed" is the RTSP path a
+# local ffmpeg publishes into, which the OBS media source pulls (network-fed
+# second input). API/HLS/WebRTC/SRT all off — nothing but what the test needs.
+logLevel: info
+rtmp: yes
+rtmpAddress: :1935
+rtsp: yes
+rtspAddress: :8554
+hls: no
+webrtc: no
+srt: no
+moq: no
+api: no
+paths:
+  obsdock:
+  feed:

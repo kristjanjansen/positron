@@ -77,6 +77,47 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   selfrecsync-20260827T093613 in the DO. New: repackage.mjs, indexer.mjs,
   replay-grid.html, run-sync.mjs.
 
+### OBS-IN-DOCKER + CF CONTAINERS (session 6d) — both measured ✅
+- **CF Containers** (research/cf-containers-2026-08.md; account IS Workers Paid,
+  the "free plan" note was stale): wake 3.7 s; copy-remux 282–386 ms for 75 s
+  (4× local, fine) → 54-part 2 h show ≈ **$0.20 cloud repackage**; vp8
+  transcode **50× local** (0.8× realtime) → h264-first now has local+mobile+
+  cloud economics aligned. Outbound net WIDE OPEN measured (arbitrary TCP:
+  RTMP to live.cloudflare.com:1935 in 16 ms; raw UDP works); inbound =
+  Worker-fetch only. Traps: sleepAfter livelock (lib 0.0.28), node-PID-1
+  ignores SIGTERM (15 min billed to SIGKILL — handler mandatory), wrangler
+  tail shows no container stdout. Always-on lite ≈ $1.77/mo.
+- **OBS in Docker** (rig/obs-docker): ubuntu24 + PPA OBS 32.2 (only apt
+  source with CEF), 1.08 GB image, amd64-under-Rosetta on OrbStack. Full
+  studio setup from zero over obs-websocket in **189 ms**; RTTs sub-ms except
+  SetCurrentProgramScene 4.6 ms. Browser-source pipeline **p50 182.5 ms**
+  page→glass — but TRAP OF THE SESSION: simple output mode silently ignores
+  x264Settings → default lookahead/B-frames = **1226 ms (6.7× cliff)**; fix
+  needs Advanced mode + streamEncoder.json profile FILE (unreachable via
+  websocket). Scene switch cmd→glass p50 198 ms (Cut; Fade adds its 300 ms).
+  BrowserHWAccel=false or browser sources render black; OBS rewrites ini on
+  exit (stop→edit→start). ~2 host cores streaming (Rosetta+llvmpipe tax).
+  Resilience: sink-death → RECONNECTING event 77 ms; docker-restart
+  cold→pixels 7.7 s. **ThreatLocker verified**: Linux OBS + fresh unsigned
+  plugin ran 90 min in the VM on the machine that kills macOS OBS.
+- **obs-moq WORKS, both drafts**: built from source (moq-dev/moq@5ddaed0,
+  libmoq 0.5.11 speaks IETF 14–19; libsimde-dev + -DBUILD_PLUGIN=ON;
+  48 MB .so loads into stock PPA OBS). d14→CF: connected 399 ms, deployed
+  player LIVE 30 fps 0 errors, **g2g p50 185 ms** (= the local RTMP chain —
+  the CF hop is free). d16: token-in-path, **moq-transport-16 in 164 ms,
+  g2g p50 149 / p95 161 ms — fastest chain of the day**. NEW INTEROP TRAP:
+  d16 does NOT replay the pre-join catalog group → late-joining players
+  stall at catalog forever; obs-moq publishes its catalog ONCE (d14's
+  open-group replay masked it) → until the plugin republishes catalog (§7's
+  2 s hack) or the relay grows FETCH, **d16 viewers must subscribe before
+  StartStream**. Dual RTMP+MoQ not reachable via websocket (no output
+  instance without the Qt dock); service flips remotely in one call.
+- ⚠️ OPEN CONTRADICTION to resolve: the containers agent MEASURED raw
+  outbound UDP working from CF Containers; the OBS agent's verdict assumed
+  no-UDP and ruled out MoQ egress from CF. If outbound QUIC really works,
+  OBS/moq publishers COULD live in CF Containers. One direct test decides
+  (QUIC handshake to the relay from a container).
+
 ### PLAYBACK LAYER (session 6c) — postshow runner, reconcile, masters replay: ✅ COMPLETE
 - **postshow.mjs** (the engine.mjs seed; worker v381acbe8 adds POST /show, GET
   /list, delete-tombstone): cuelog∪listing discovery → repackage → index →
