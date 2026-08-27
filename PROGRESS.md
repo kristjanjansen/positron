@@ -148,6 +148,61 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### TEXT PERFORMER (session 6v) — ✅ 12/12 (proto/text) — the adapter the lineage kept failing to write
+- **My briefed API was WRONG and it measured that**: `getTargetRanges()` returned
+  EMPTY on **0 of 65** beforeinput events on <textarea> (spec-mandated — closed
+  shadow tree) and 0 of 2 on contenteditable=plaintext-only under real CDP keys.
+  So the range comes from the DOCUMENT: beforeinput snapshots value+selection,
+  input reads the new value, and the minimal contiguous replacement is
+  disambiguated by the **post-edit caret** (prefix/suffix diff alone is
+  ambiguous on repeated characters — exactly what corrupts a cursor). 64/64
+  content ops resolved caret-anchored, 0 fallbacks. Two numbers naming the
+  ancestors' bug: pre-edit selection was wrong for 1 insert, and for **7/7
+  deletes the range HAD to be derived** (a backspace's pre-edit selection is a
+  collapsed caret that tells you nothing).
+- Op schema `{at µs (from ev.timeStamp — never re-stamped), kind:'text-op',
+  op:{type:insert|delete|select, range:[s,e], text?, dir?, inputType, anchor},
+  meta}`; `reduce(prefix ≤ t) → {text, selection, dir}`. **There is no modifier
+  field and there cannot be one** — the log stores resulting characters, so the
+  shift double-application bug (demo2/demo12/demo-timeline-component) is
+  *unrepresentable*, not merely fixed.
+- inputTypes: handled is an OPEN set by construction (any plain-text content
+  change arrives as a value diff — incl. historyUndo/Redo folding out as
+  ordinary diffs, where keyboard2 recorded Cmd+Z as a literal "z"); **not
+  handled is a CLOSED 21-entry set in `caps.unhandledInputTypes`** (every
+  format*, list, hr) — counted, never silently dropped.
+- Results (78 ops / 9.49 s, real CDP input): replay **character-for-character**
+  identical incl. selection; **C2 on real text 3/3** at the widest silences
+  (text AND selection); selection restored on seek 3/3; pause 0.000 ms; rate
+  1.997×; jsonl round-trip exact; **two lanes: 529 frame samples, 0
+  divergences** — the first run's 3 mismatches were a bug in the CHECK (a
+  position-domain settling window applied to a wall-clock quantity, 3× too
+  narrow at 3×), now rate-scaled and residuals classified rather than tolerated.
+- IME honestly: `imeSetComposition` produced 3 insertCompositionText ops that
+  folded and replayed correctly; a real platform IME with a candidate window is
+  **not testable headlessly**. Structurally it cannot be wrong (composition is
+  value diffs); the open question is policy — current default keeps each
+  composition step as its own op, because in a performance the hesitation IS
+  the content.
+- Performance half: keyboard2's typography ported intact; **audio rebuilt from
+  scratch** because the survey corrected the record — keyboard2 has no
+  oscillator, it fetches an untrimmed freesound MP3 through a bare BufferSource
+  with `start(0)` and NO gain node (hence no velocity, no scheduling, unbounded
+  voices). Here each op is a synthesised click scheduled at `when.audioTime`
+  via `caps.audio` — **SEAM 4 worked unmodified for a non-musical kind** —
+  velocity derived from the log by index, never stored; 24-voice cap.
+- **Transport is out-of-band STRUCTURALLY, not by filter**: capture listens to
+  beforeinput, which non-editing keys never fire; demo12 had to hand-exclude
+  its own Ctrl+Space/Ctrl+Enter and keyboard2 records Cmd+A/V/S/Z as letters.
+- Seams: **independently re-found the logdeck `at` clobber** (every row in this
+  lineage names its µs stamp `at`); `reduce()` has no declared return shape
+  (three kinds now return a scalar, a Set and a document); `caps.stateful`
+  should be library vocabulary making reduce+assertState mandatory; **SEAM 5's
+  whole-prefix guarantee is load-bearing — a text fold is strictly
+  non-commutative and would have been impossible at v0.1**; no backward-seek
+  fast path (text ops are trivially invertible ⇒ the natural place to prototype
+  the undo-log seek strategy).
+
 ### DoD-A DISCHARGED (session 6u) — ✅ replay.html ON THE LIBRARY, both suites PASS
 plan-studio §5's named gate: "replay.html REFACTORED onto the lib and the
 existing measurement suite passes" — **PASS, and the numbers improved 3–4×.**
