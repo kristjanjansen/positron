@@ -148,6 +148,32 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### MoQ AUDIO RETURN (session 6i) — ⚠️ PARTIAL (agent killed by usage-credit exhaustion mid-run)
+**The headline landed before it died: the ~35 ms projection HELD.** Key→ear via
+WebCodecs-Opus → MoQ d14 → FIFO-mapped decode → minimal ring playout, vs the
+WebRTC row's 77.7 ms:
+
+| cfg | key→ear p50/p95 | leg1 MIDI | leg2 synth | leg3 return | underruns | chunk loss |
+|---|---|---|---|---|---|---|
+| floor 10 ms, sparse | **35.8 / 41.0** | 0.67 | ~−1.3 | 36.6 | 31 | **0 / 3778** |
+| floor 10 ms, mixed | **37.6 / 40.6** | 0.67 | ~−2.1 | 38.9 | 21 | 0 / 2221 |
+| adaptive from 10 ms | 40.3 / 57.6 | 0.77 | −0.5 | 39.6 | 5 | 0 / 3104 |
+| floor 40 ms, sparse | 66.3 / 72.5 | 0.77 | −1.3 | 66.1 | 3 | 0 / 3879 |
+
+- **2.2× better than WebRTC's 77.7 ms** — confirms the diagnosis that NetEQ's
+  un-hintable buffer (not the wire) owned that number.
+- **Buffer/underrun curve is the finding**: playout floor maps ~1:1 into
+  latency (10 → 36 ms, 40 → 66 ms); adaptive-from-10 is the sane default
+  (40 ms p50, 5 underruns) — pick the floor per tolerance, unlike WebRTC
+  where the buffer cannot be hinted at all.
+- **Zero chunk loss across all runs** (0 of 2221–3879) — the jam matrix's
+  note-granular group-racing (2.9%) does NOT bite continuous audio streams.
+- ⚠️ NOT MEASURED (agent died here): the A/V combination arms — MoQ+MoQ-video,
+  MoQ-audio+WebRTC-video hybrid, MoQ A/V skew, and the coupling verdict
+  (does video move audio numbers on MoQ as it did on WebRTC?). eyeMatched=0
+  in every salvaged run. Rig is built and ready in proto/jam/remote-synth.*;
+  rerun cost is small.
+
 ### TIMELINE TRANSPORT CORE (session 6h) — built + measured ✅ (timeline/)
 - **timeline/transport.mjs is library-grade**: {p0,t0,rate} vector over
   pluggable ClockSource (zero timers in the vector), lookahead wall lane

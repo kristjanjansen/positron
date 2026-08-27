@@ -25,6 +25,10 @@ const args = process.argv.slice(2);
 const opt = (n, d) => (args.includes('--' + n) ? args[args.indexOf('--' + n) + 1] : d);
 const SCALE = +opt('scale', 1);
 const ONLY = String(opt('only', '')).split(',').filter(Boolean);
+const SUMMARY = String(opt('summary', 'jam-synth-summary.json'));
+const FLOOR0 = +opt('floor', 10);          // moq playout prebuffer start (ms)
+const SWEEP = String(opt('sweep', '20,40,80')).split(',').filter(Boolean).map(Number);
+const FLOORAV = +opt('floorav', 20);       // floor for the av/hybrid arms
 const SESSION = Math.random().toString(36).slice(2, 8);
 const want = (x) => !ONLY.length || ONLY.includes(x);
 const q = JSON.stringify;
@@ -127,11 +131,14 @@ async function measureRun({ runId, arm, cfg, hint, shots, sched = 'mixed' }) {
     jbAudio: jbDelta(aRes.statsBefore, aRes.statsAfter, 'audio'),
     jbVideo: jbDelta(aRes.statsBefore, aRes.statsAfter, 'video'),
     hintApplied: aRes.hintApplied || null,
+    moq: aRes.moq || null,
+    moqPub: (bRes && bRes.moqPub) || null,
     audioA: aRes.audio, audioB: bRes && bRes.audio,
     videoStats: aRes.video,
   };
   summary.push(row);
-  console.log(`  ${runId}: n=${row.earMatched}/${row.sent} total p50=${row.total?.p50} (1:${row.leg1?.p50} 2:${row.leg2?.p50} 3:${row.leg3?.p50}) eye p50=${row.eye?.p50} av=${row.avSkew?.p50} jb=${row.jbAudio?.avgJbMs}`);
+  console.log(`  ${runId}: n=${row.earMatched}/${row.sent} total p50=${row.total?.p50} (1:${row.leg1?.p50} 2:${row.leg2?.p50} 3:${row.leg3?.p50}) eye p50=${row.eye?.p50} av=${row.avSkew?.p50} jb=${row.jbAudio?.avgJbMs}`
+    + (row.moq ? `\n    moq: loss=${row.moq.lostPct}% (${row.moq.lostChunks}/${row.moq.expectedChunks}) transit=${row.moq.transitMs?.p50}/${row.moq.transitMs?.p95} dec=${row.moq.decodeMs?.p50} ring=${row.moq.ringBufferedMs?.p50} floorEnd=${row.moq.floorMsEnd} underruns=${row.moq.underruns} (${row.moq.underrunMs}ms) gapIns=${row.moq.gapInsertMs}ms disc=${row.moq.discontinuities}` : ''));
   return row;
 }
 
@@ -258,12 +265,84 @@ async function main() {
     await teardownBoth();
   }
 
+  // ---------- (c) MoQ d14 return: DC-direct midi up + MoQ Opus audio back ----------
+  // C8 arms. Same-session WebRTC anchor first (direct A/B on the same rig).
+  if (want('p2p-anchor')) {
+    try {
+      await setupBoth('p2p', { withVideo: true, tag: 'anchor' });
+      await sleep(1500);
+      await measureRun({ runId: 'moq-anchor-p2p-av', arm: 'p2p', cfg: 'av-default same-session anchor', hint: null });
+    } catch (e) { console.log('ARM FAIL p2p-anchor:', e.message); summary.push({ arm: 'p2p-anchor', error: e.message }); }
+    await teardownBoth();
+  }
+
+  const setFloor = async (ms, adaptive = false) => {
+    await ev(cdpA, `window.rig.setFloor(${ms}, ${adaptive})`, 10000);
+    await sleep(1500); // ring re-arms at the new floor
+  };
+  const moqInfo = async () => {
+    const [ia, ib] = await Promise.all([ev(cdpA, 'window.rig.moqInfo()', 10000), ev(cdpB, 'window.rig.moqInfo()', 10000)]);
+    return { a: ia, b: ib };
+  };
+
+  if (want('moq-audio')) {
+    try {
+      await setupBoth('moq', { video: 'none', floorMs: FLOOR0, groupMs: 1000, tag: 'moq-audio' });
+      await sleep(2500); // stream + prebuffer settle
+      console.log('moq state:', JSON.stringify(await moqInfo()));
+      await measureRun({ runId: `moq-audio-mixed-f${FLOOR0}`, arm: 'moq-audio', cfg: `floor${FLOOR0} groupMs1000`, hint: null, shots: 'moq-audio' });
+      await measureRun({ runId: `moq-audio-sparse-f${FLOOR0}`, arm: 'moq-audio', cfg: `floor${FLOOR0} groupMs1000 sparse`, hint: null, sched: 'sparse' });
+      // latency-vs-underrun curve: same session, same stream, floor swept
+      for (const f of SWEEP) {
+        await setFloor(f);
+        await measureRun({ runId: `moq-audio-sparse-f${f}`, arm: 'moq-audio', cfg: `floor${f} groupMs1000 sparse (curve)`, hint: null, sched: 'sparse' });
+      }
+      // adaptive floor: start back at the minimum, let underruns grow it
+      await setFloor(FLOOR0, true);
+      await measureRun({ runId: 'moq-audio-mixed-adaptive', arm: 'moq-audio', cfg: `adaptive from ${FLOOR0}ms`, hint: null });
+    } catch (e) { console.log('ARM FAIL moq-audio:', e.message); summary.push({ arm: 'moq-audio', error: e.message }); }
+    await teardownBoth();
+  }
+
+  // single-frame-group probe: does the jam-matrix 2.9% group race bite a
+  // continuous evenly-spaced audio stream?
+  if (want('moq-gpc')) {
+    try {
+      await setupBoth('moq', { video: 'none', floorMs: FLOORAV, groupMs: 0, frameUs: 20000, tag: 'moq-gpc' });
+      await sleep(2500);
+      await measureRun({ runId: `moq-gpc-sparse-f${FLOORAV}`, arm: 'moq-gpc', cfg: `group-per-chunk floor${FLOORAV} sparse`, hint: null, sched: 'sparse' });
+    } catch (e) { console.log('ARM FAIL moq-gpc:', e.message); summary.push({ arm: 'moq-gpc', error: e.message }); }
+    await teardownBoth();
+  }
+
+  if (want('moq-av')) {
+    try {
+      await setupBoth('moq', { video: 'moq', floorMs: FLOORAV, groupMs: 1000, tag: 'moq-av' });
+      await sleep(2500);
+      console.log('moq state:', JSON.stringify(await moqInfo()));
+      await measureRun({ runId: `moq-av-mixed-f${FLOORAV}`, arm: 'moq-av', cfg: `moq video + audio floor${FLOORAV}`, hint: null, shots: 'moq-av' });
+      await measureRun({ runId: `moq-av-sparse-f${FLOORAV}`, arm: 'moq-av', cfg: `moq video + audio floor${FLOORAV} sparse`, hint: null, sched: 'sparse' });
+    } catch (e) { console.log('ARM FAIL moq-av:', e.message); summary.push({ arm: 'moq-av', error: e.message }); }
+    await teardownBoth();
+  }
+
+  if (want('moq-hybrid')) {
+    try {
+      await setupBoth('moq', { video: 'webrtc', floorMs: FLOORAV, groupMs: 1000, tag: 'moq-hyb' });
+      await sleep(2500);
+      await measureRun({ runId: `moq-hybrid-mixed-f${FLOORAV}`, arm: 'moq-hybrid', cfg: `webrtc video + moq audio floor${FLOORAV}`, hint: null, shots: 'moq-hybrid' });
+      await measureRun({ runId: `moq-hybrid-sparse-f${FLOORAV}`, arm: 'moq-hybrid', cfg: `webrtc video + moq audio floor${FLOORAV} sparse`, hint: null, sched: 'sparse' });
+    } catch (e) { console.log('ARM FAIL moq-hybrid:', e.message); summary.push({ arm: 'moq-hybrid', error: e.message }); }
+    await teardownBoth();
+  }
+
   // final screenshots (HUD with cumulative stats)
-  await cdpA.screenshot(join(JAM, 'results', 'jam-synth-a.png')).catch(() => {});
-  await cdpB.screenshot(join(JAM, 'results', 'jam-synth-b.png')).catch(() => {});
+  const shotSuffix = SUMMARY.includes('moq') ? 'moq-final-' : '';
+  await cdpA.screenshot(join(JAM, 'results', `jam-synth-${shotSuffix}a.png`)).catch(() => {});
+  await cdpB.screenshot(join(JAM, 'results', `jam-synth-${shotSuffix}b.png`)).catch(() => {});
 
   const out = { session: SESSION, at: new Date().toISOString(), scale: SCALE, clocks, ac: { a: acA, b: acB }, runs: summary };
-  await writeFile(join(JAM, 'results', 'jam-synth-summary.json'), JSON.stringify(out, null, 2));
+  await writeFile(join(JAM, 'results', SUMMARY), JSON.stringify(out, null, 2));
 
   console.log('\n=== PLAY-A-SYNTH (ms, truth clock; audio at decoded-track level) ===');
   console.log('run                  n    key->ear        leg1   leg2   leg3    key->eye      avSkew   jb-avg');
