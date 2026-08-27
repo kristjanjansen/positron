@@ -1,0 +1,23 @@
+{
+ "central": {
+  "file": "b1n8-A-g1.webm",
+  "bytes": 5025857,
+  "decoded": "2612/2612",
+  "meanContrast": 255.0,
+  "minContrast": 255.0
+ },
+ "source": {
+  "file": "b1n8-A-src.webm",
+  "bytes": 5187133,
+  "decoded": "2910/2910",
+  "meanContrast": 255.0,
+  "minContrast": 255.0
+ },
+ "matchedFrames": 60,
+ "psnrCentralVsSource": {
+  "p5": 52.55,
+  "p50": 54.68,
+  "p95": 56.23,
+  "min": 37.03
+ }
+}

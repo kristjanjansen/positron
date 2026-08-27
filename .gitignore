@@ -5,6 +5,7 @@ node_modules/
 results/
 *.mp4
 *.nut
+*.webm
 src/.last-input
 auto.crt
 auto.key

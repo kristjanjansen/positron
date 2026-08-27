@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron selfrec participant</title>
+<style>
+html,body{margin:0;padding:0;background:#000;overflow:hidden}
+#stage{display:block;width:1280px;height:720px}
+</style>
+</head>
+<body>
+<canvas id="stage" width="1280" height="720"></canvas>
+<script>
+// ============================================================================
+// PROTO A participant page — the participant's own browser records its own
+// stream (canvas.captureStream stand-in for the camera: the OS camera is
+// wedged, and the burned wall clock IS the point — ground truth in pixels).
+//
+//   canvas 30 fps (burned 64-block binary clock row, same geometry as
+//   proto/replay/show.html, PID byte 'P')
+//     -> MediaRecorder vp8, timeslice 2000 ms
+//        (chunk 0 carries the ONLY webm header; the chunk sequence is ONE
+//         logical byte stream — each blob still ships as its own R2 object)
+//     -> POST /chunk/<show>/<participant>/<seq> (Bearer token, X-Chunk-Sha256
+//        verified server-side by R2) -> HEAD pub URL (content-length) = OK
+//     -> on failure/offline: blob -> IndexedDB, drained on reconnect with
+//        exponential backoff. NOTHING is ever dropped silently.
+//
+// Metrics: per-chunk {seq, bytes, closeT, postOkT, uploadOkT, attempts}
+// beaconed to the local collector via fetch POST (NEVER sendBeacon — 64 KB
+// quota burned this project twice); beacons buffer in memory while offline.
+// ONE clock domain for metrics + burned pixels: Date.now(). T0 additionally
+// stamped as performance.timeOrigin+performance.now() (spec) — both recorded.
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const SHOW = q.get("show") || "selfrec-dev";
+const PART = q.get("participant") || "p1";
+const DURATION_S = parseInt(q.get("duration") || "90", 10);
+const TIMESLICE = parseInt(q.get("timeslice") || "2000", 10);
+const TOKEN = q.get("token") || "";
+const BASE = q.get("base") || "https://elektron-selfrec.kristjan-jansen.workers.dev";
+const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const COLLECTOR = q.get("collector") || (location.origin + "/beacon");
+const KBPS = parseInt(q.get("kbps") || "1200", 10);
+
+// row geometry — shared contract with proto/replay (do not change one side)
+const NB = 64, BW = 12, RX = 32;
+const CLOCK_Y = 600, CLOCK_H = 48;
+const PID_BYTE = "P".charCodeAt(0);
+
+const M = window.__metrics = {
+  show: SHOW, participant: PART, timeslice: TIMESLICE, kbps: KBPS,
+  phase: "init", recState: "-", drawFrames: 0, drawFps: 0,
+  T0recStartPerf: null, T0recStartDate: null,
+  T0firstDataPerf: null, T0firstDataDate: null,
+  mimeType: null, rows: [], chunkCount: 0, bytesTotal: 0,
+  queueBytes: 0, queueHwmBytes: 0, idbBytes: 0, idbHwmBytes: 0, idbHwmChunks: 0,
+  memHwmBytes: 0, storageUsageHwm: 0,
+  offlineFailures: 0, onlineAt: null, offlineAt: null, drainedAt: null,
+  degraded: false, finalized: false, manifestKey: null, done: false, error: null,
+};
+function wall() { return Date.now(); }
+function perfWall() { return performance.timeOrigin + performance.now(); }
+
+// ---- beacons (fetch only; buffer while unreachable) -------------------------
+const pendingBeacons = [];
+let beaconBusy = false;
+function beacon(row) {
+  pendingBeacons.push({ t: wall(), show: SHOW, participant: PART, ...row });
+  flushBeacons();
+}
+async function flushBeacons() {
+  if (beaconBusy) return;
+  beaconBusy = true;
+  while (pendingBeacons.length) {
+    const batch = pendingBeacons.slice(0, 50);
+    try {
+      const r = await fetch(COLLECTOR, { method: "POST",
+        headers: { "content-type": "application/json" }, body: JSON.stringify(batch) });
+      if (!r.ok) break;
+      pendingBeacons.splice(0, batch.length);
+    } catch { break; }   // collector unreachable (e.g. CDP offline) — retry later
+  }
+  beaconBusy = false;
+}
+setInterval(flushBeacons, 2000);
+
+// ---- IndexedDB buffer (never drop) ------------------------------------------
+let idb = null;
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("selfrec-" + SHOW + "-" + PART, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("chunks", { keyPath: "seq" });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbPut(rec) {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction("chunks", "readwrite");
+    tx.objectStore("chunks").put(rec);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+function idbDelete(seq) {
+  return new Promise((res, rej) => {
+    const tx = idb.transaction("chunks", "readwrite");
+    tx.objectStore("chunks").delete(seq);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+function idbAll() {
+  return new Promise((res, rej) => {
+    const r = idb.transaction("chunks", "readonly").objectStore("chunks").getAll();
+    r.onsuccess = () => res(r.result.sort((a, b) => a.seq - b.seq));
+    r.onerror = () => rej(r.error);
+  });
+}
+function idbAccounting(all) {
+  M.idbBytes = all.reduce((s, r) => s + r.bytes, 0);
+  if (M.idbBytes > M.idbHwmBytes) { M.idbHwmBytes = M.idbBytes; M.idbHwmChunks = all.length; }
+}
+
+// ---- upload pipeline --------------------------------------------------------
+// rows[seq] = {seq, bytes, closeT, postOkT, uploadOkT, attempts, verified, via}
+const rowBySeq = new Map();
+const memQueue = [];           // {seq, blob} — direct path, one in flight
+let uploaderBusy = false, drainTimer = null, backoffMs = 500;
+const BACKOFF_MAX = 8000;
+
+async function sha256Hex(blob) {
+  const d = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function tryUpload(seq, blob, row) {
+  row.attempts++;
+  const sum = await sha256Hex(blob);
+  row.sha256 = sum;
+  const key = "selfrec/" + SHOW + "/" + PART + "/chunk-" + String(seq).padStart(5, "0") + ".webm";
+  const r = await fetch(BASE + "/chunk/" + SHOW + "/" + PART + "/" + seq, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "video/webm",
+               "X-Chunk-Sha256": sum },
+    body: blob,
+  });
+  if (!r.ok) throw new Error("post " + r.status + " " + (await r.text()).slice(0, 120));
+  const j = await r.json();
+  if (!j.ok || j.size !== blob.size) throw new Error("post size mismatch " + j.size + "!=" + blob.size);
+  row.postOkT = wall();
+  // availability proof, proto/archive style: HEAD the public URL
+  const h = await fetch(PUB + "/" + key, { method: "HEAD" });
+  if (!h.ok) throw new Error("head " + h.status);
+  const len = parseInt(h.headers.get("content-length") || "-1", 10);
+  if (len !== blob.size) throw new Error("head length " + len + "!=" + blob.size);
+  row.uploadOkT = wall();
+  row.verified = true;
+  row.lagMs = row.uploadOkT - row.closeT;
+  beacon({ kind: "chunk-verified", seq, bytes: row.bytes, closeT: row.closeT,
+           postOkT: row.postOkT, uploadOkT: row.uploadOkT, attempts: row.attempts,
+           lagMs: row.lagMs, via: row.via });
+}
+
+async function pumpQueue() {
+  if (uploaderBusy) return;
+  uploaderBusy = true;
+  while (memQueue.length) {
+    const { seq, blob } = memQueue[0];
+    const row = rowBySeq.get(seq);
+    if (!navigator.onLine) {
+      await bufferToIdb(seq, blob, row, "navigator offline");
+      memQueue.shift();
+      continue;
+    }
+    try {
+      row.via = "direct";
+      await tryUpload(seq, blob, row);
+      memQueue.shift();
+    } catch (e) {
+      M.offlineFailures++;
+      await bufferToIdb(seq, blob, row, String(e && e.message || e));
+      memQueue.shift();
+    }
+    M.queueBytes = memQueue.reduce((s, x) => s + x.blob.size, 0);
+  }
+  M.queueBytes = 0;
+  uploaderBusy = false;
+}
+let hadBacklog = false;
+async function bufferToIdb(seq, blob, row, why) {
+  await idbPut({ seq, bytes: blob.size, closeT: row.closeT, blob });
+  row.buffered = true;
+  hadBacklog = true;
+  const all = await idbAll();
+  idbAccounting(all);
+  beacon({ kind: "chunk-buffered", seq, bytes: blob.size, attempts: row.attempts,
+           idbBytes: M.idbBytes, idbChunks: all.length, why: why.slice(0, 160) });
+  scheduleDrain();
+}
+function scheduleDrain() {
+  if (drainTimer) return;
+  drainTimer = setTimeout(async () => {
+    drainTimer = null;
+    await drainIdb();
+  }, backoffMs);
+}
+let draining = false;
+async function drainIdb() {
+  if (draining) { scheduleDrain(); return; }
+  draining = true;
+  try {
+    const all = await idbAll();
+    idbAccounting(all);
+    if (!all.length) { draining = false; return; }
+    if (!navigator.onLine) { backoffMs = Math.min(BACKOFF_MAX, backoffMs * 2); scheduleDrain(); draining = false; return; }
+    for (const rec of all) {
+      const row = rowBySeq.get(rec.seq);
+      try {
+        row.via = "idb-drain";
+        await tryUpload(rec.seq, rec.blob, row);
+        await idbDelete(rec.seq);
+        idbAccounting(await idbAll());
+        backoffMs = 500;
+      } catch (e) {
+        backoffMs = Math.min(BACKOFF_MAX, backoffMs * 2);
+        beacon({ kind: "drain-retry-fail", seq: rec.seq, attempts: row.attempts,
+                 backoffMs, why: String(e && e.message || e).slice(0, 160) });
+        scheduleDrain();
+        draining = false;
+        return;
+      }
+    }
+    const left = await idbAll();
+    if (!left.length && hadBacklog && !M.drainedAt) {
+      M.drainedAt = wall();
+      beacon({ kind: "backlog-drained", drainedAt: M.drainedAt, onlineAt: M.onlineAt,
+               drainMsFromOnline: M.onlineAt ? M.drainedAt - M.onlineAt : null,
+               idbHwmBytes: M.idbHwmBytes, idbHwmChunks: M.idbHwmChunks });
+    }
+  } finally { draining = false; }
+}
+window.addEventListener("online", () => {
+  M.onlineAt = wall(); backoffMs = 500;
+  beacon({ kind: "net-online", onlineAt: M.onlineAt });
+  // cancel any long-backoff timer scheduled while offline — drain NOW
+  if (drainTimer) { clearTimeout(drainTimer); drainTimer = null; }
+  drainIdb(); pumpQueue();
+});
+window.addEventListener("offline", () => {
+  M.offlineAt = wall();
+  pendingBeacons.push({ t: wall(), show: SHOW, participant: PART, kind: "net-offline", offlineAt: M.offlineAt });
+});
+
+// ---- recorder ---------------------------------------------------------------
+let recorder = null, stopResolve = null;
+function startRecorder(stream) {
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+    ? "video/webm;codecs=vp8" : "video/webm";
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: KBPS * 1000 });
+  M.mimeType = recorder.mimeType;
+  let seq = 0;
+  recorder.ondataavailable = (ev) => {
+    const closeT = wall();
+    if (M.T0firstDataPerf == null) {
+      M.T0firstDataPerf = perfWall(); M.T0firstDataDate = closeT;
+      beacon({ kind: "first-data", T0firstDataPerf: M.T0firstDataPerf, T0firstDataDate: closeT });
+    }
+    if (!ev.data || !ev.data.size) return;
+    const mySeq = seq++;
+    const row = { seq: mySeq, bytes: ev.data.size, closeT, postOkT: null, uploadOkT: null,
+                  attempts: 0, verified: false, buffered: false, via: null, lagMs: null };
+    rowBySeq.set(mySeq, row);
+    M.rows.push(row);
+    M.chunkCount = seq; M.bytesTotal += ev.data.size;
+    beacon({ kind: "chunk-closed", seq: mySeq, bytes: ev.data.size, closeT });
+    memQueue.push({ seq: mySeq, blob: ev.data });
+    M.queueBytes += ev.data.size;
+    if (M.queueBytes > M.queueHwmBytes) M.queueHwmBytes = M.queueBytes;
+    pumpQueue();
+  };
+  recorder.onstop = () => { M.recState = "stopped"; if (stopResolve) stopResolve(); };
+  recorder.onerror = (e) => { M.error = "recorder: " + (e.error && e.error.message || e); };
+  M.T0recStartPerf = perfWall();
+  M.T0recStartDate = wall();
+  recorder.start(TIMESLICE);
+  M.recState = recorder.state;
+  beacon({ kind: "rec-start", T0recStartPerf: M.T0recStartPerf, T0recStartDate: M.T0recStartDate,
+           mimeType: M.mimeType, timeslice: TIMESLICE, kbps: KBPS });
+}
+
+// ---- finalize ---------------------------------------------------------------
+async function finalizeShow() {
+  M.phase = "finalizing";
+  // wait for queue + idb to drain (bounded)
+  const tWait = wall();
+  for (;;) {
+    const idbLeft = await idbAll();
+    idbAccounting(idbLeft);
+    if (!memQueue.length && !uploaderBusy && !idbLeft.length && !draining) break;
+    if (wall() - tWait > 120000) break;                 // bounded wait; degraded below
+    scheduleDrain();
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  const rows = [...rowBySeq.values()].sort((a, b) => a.seq - b.seq);
+  const verified = rows.filter((r) => r.verified);
+  const missing = rows.filter((r) => !r.verified).map((r) => ({ seq: r.seq, bytes: r.bytes, attempts: r.attempts }));
+  M.degraded = missing.length > 0;
+  const manifest = {
+    show: SHOW, participant: PART, mimeType: M.mimeType, timesliceMs: TIMESLICE,
+    T0recStartPerf: M.T0recStartPerf, T0recStartDate: M.T0recStartDate,
+    T0firstDataPerf: M.T0firstDataPerf, T0firstDataDate: M.T0firstDataDate,
+    durationMs: (rows.length ? rows[rows.length - 1].closeT : M.T0recStartDate) - M.T0recStartDate,
+    chunkCount: verified.length, bytesTotal: verified.reduce((s, r) => s + r.bytes, 0),
+    degraded: M.degraded, missing,
+    chunks: verified.map((r) => ({ seq: r.seq, key: "selfrec/" + SHOW + "/" + PART + "/chunk-" + String(r.seq).padStart(5, "0") + ".webm",
+                                   bytes: r.bytes, sha256: r.sha256, closeT: r.closeT, uploadOkT: r.uploadOkT, attempts: r.attempts })),
+    finalizedAt: wall(),
+  };
+  for (let a = 1; a <= 3; a++) {
+    try {
+      const r = await fetch(BASE + "/finalize/" + SHOW + "/" + PART, {
+        method: "POST", headers: { "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify(manifest),
+      });
+      if (r.ok) { M.finalized = true; M.manifestKey = (await r.json()).key; break; }
+    } catch {}
+    await new Promise((res) => setTimeout(res, 1000 * a));
+  }
+  beacon({ kind: "finalized", ok: M.finalized, degraded: M.degraded, manifestKey: M.manifestKey,
+           chunkCount: manifest.chunkCount, bytesTotal: manifest.bytesTotal,
+           missing: manifest.missing, durationMs: manifest.durationMs });
+  M.phase = "done"; M.done = true;
+  await flushBeacons();
+}
+
+// ---- samplers ---------------------------------------------------------------
+setInterval(async () => {
+  if (performance.memory && performance.memory.usedJSHeapSize > M.memHwmBytes)
+    M.memHwmBytes = performance.memory.usedJSHeapSize;
+  try {
+    const est = await navigator.storage.estimate();
+    if (est.usage > M.storageUsageHwm) M.storageUsageHwm = est.usage;
+  } catch {}
+}, 1000);
+
+// ---- stage ------------------------------------------------------------------
+const cv = document.getElementById("stage");
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+function drawRow(ms48, lastByte, y, h) {
+  const bytes = []; let v = ms48;
+  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+  bytes.push(lastByte & 0xff);
+  let ck = 0; for (const b of bytes) ck ^= b;
+  const bits = [];
+  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  ctx.fillStyle = "#fff";
+  for (let i = 0; i < NB; i++) if (bits[i]) ctx.fillRect(RX + i * BW, y, BW, h);
+}
+let frames = 0; const win = []; let boxX = 100, boxY = 120, dx = 4.2, dy = 3.1;
+function draw() {
+  const now = wall();
+  // moving content so vp8 has honest work (a static frame would encode to ~0)
+  ctx.fillStyle = "#101418"; ctx.fillRect(0, 0, 1280, 720);
+  const g = ctx.createLinearGradient((now / 20) % 1280, 0, ((now / 20) % 1280) + 640, 400);
+  g.addColorStop(0, "#1b2a3a"); g.addColorStop(1, "#3a2a1b");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1280, 560);
+  boxX += dx; boxY += dy;
+  if (boxX < 0 || boxX > 1180) dx = -dx;
+  if (boxY < 0 || boxY > 440) dy = -dy;
+  ctx.fillStyle = "#e8b44a"; ctx.fillRect(boxX, boxY, 100, 100);
+  ctx.fillStyle = "#dfe5ec"; ctx.font = "bold 64px monospace";
+  const d = new Date(now);
+  ctx.fillText(d.toISOString().slice(11, 23), 80, 260);
+  ctx.font = "20px monospace"; ctx.fillStyle = "#8a93a0";
+  ctx.fillText("selfrec " + SHOW + " / " + PART + " · epoch " + now, 80, 300);
+  ctx.fillText("rec=" + M.recState + " chunks=" + M.chunkCount +
+               " q=" + (M.queueBytes / 1024 | 0) + "K idb=" + (M.idbBytes / 1024 | 0) + "K" +
+               " online=" + navigator.onLine, 80, 330);
+  // black bed + binary clock row (decoder contract)
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 585, 1280, 135);
+  drawRow(Math.round(now), PID_BYTE, CLOCK_Y, CLOCK_H);
+  ctx.fillStyle = "#3d4550"; ctx.font = "12px monospace";
+  ctx.fillText("clock row: 48-bit ms + 'P' + ck", 32, 712);
+  frames++; M.drawFrames = frames;
+  const p = performance.now();
+  win.push(p); while (win.length && p - win[0] > 5000) win.shift();
+  M.drawFps = Math.round(win.length / 5);
+}
+setInterval(draw, 33);
+
+// ---- main -------------------------------------------------------------------
+(async () => {
+  try {
+    idb = await idbOpen();
+    // clear stale chunks from a previous crashed run of the SAME show/participant
+    for (const rec of await idbAll()) await idbDelete(rec.seq);
+    M.phase = "warmup";
+    await new Promise((r) => setTimeout(r, 700));       // let the draw loop settle
+    const stream = cv.captureStream(30);
+    startRecorder(stream);
+    M.phase = "recording";
+    const stopAt = M.T0recStartDate + DURATION_S * 1000;
+    const stopped = new Promise((r) => { stopResolve = r; });
+    const tick = setInterval(() => {
+      if (wall() >= stopAt && recorder.state === "recording") {
+        clearInterval(tick);
+        recorder.stop();                                 // simulates publish-stop
+      }
+    }, 100);
+    await stopped;
+    beacon({ kind: "rec-stop", stopAt: wall() });
+    await finalizeShow();
+  } catch (e) {
+    M.error = String(e && e.message || e);
+    M.phase = "error"; M.done = true;
+    beacon({ kind: "fatal", error: M.error });
+  }
+})();
+</script>
+</body>
+</html>

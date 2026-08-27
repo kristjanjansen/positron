@@ -1,0 +1,964 @@
+{
+ "label": "b6h",
+ "meta": {
+  "scenario": "b2",
+  "n": 8,
+  "durS": 45,
+  "room": "centralrec-b6h-mtbaem3y",
+  "rid": "h",
+  "ids": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "G",
+   "H"
+  ]
+ },
+ "downlink": {
+  "totalPayloadMbps": 1.972,
+  "transportMbps": 2.069,
+  "perTrackMbps": {
+   "A": 0.243,
+   "B": 0.257,
+   "C": 0.241,
+   "D": 0.246,
+   "E": 0.247,
+   "F": 0.246,
+   "G": 0.246,
+   "H": 0.245
+  },
+  "windowS": 46.0
+ },
+ "tileQuality": {
+  "A": {
+   "fpsP50": 30,
+   "fpsMin": 21,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1333,
+   "framesDropped": 4,
+   "packetsLost": 0
+  },
+  "B": {
+   "fpsP50": 30,
+   "fpsMin": 25,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1401,
+   "framesDropped": 2,
+   "packetsLost": 0
+  },
+  "C": {
+   "fpsP50": 30,
+   "fpsMin": 24,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1443,
+   "framesDropped": 3,
+   "packetsLost": 0
+  },
+  "D": {
+   "fpsP50": 30,
+   "fpsMin": 24,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1336,
+   "framesDropped": 6,
+   "packetsLost": 0
+  },
+  "E": {
+   "fpsP50": 30,
+   "fpsMin": 26,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1398,
+   "framesDropped": 0,
+   "packetsLost": 0
+  },
+  "F": {
+   "fpsP50": 30,
+   "fpsMin": 23,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1352,
+   "framesDropped": 4,
+   "packetsLost": 0
+  },
+  "G": {
+   "fpsP50": 30,
+   "fpsMin": 26,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1422,
+   "framesDropped": 1,
+   "packetsLost": 0
+  },
+  "H": {
+   "fpsP50": 30,
+   "fpsMin": 24,
+   "res": "320x180",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 1393,
+   "framesDropped": 2,
+   "packetsLost": 0
+  }
+ },
+ "cpu": {
+  "rec": {
+   "p50": 16.8,
+   "max": 19.5
+  },
+  "pub": {
+   "p50": 93.8,
+   "max": 103.1
+  },
+  "victim": {
+   "p50": 0,
+   "max": 0
+  },
+  "nodeSrv": {
+   "p50": 0.3,
+   "max": 1.3
+  },
+  "nodeDrv": {
+   "p50": 0.3,
+   "max": 1.5
+  },
+  "recRssMb": {
+   "p50": 836.3,
+   "max": 850.5
+  },
+  "pubRssMb": {
+   "p50": 2689.9,
+   "max": 2740.5
+  }
+ },
+ "publishers": {
+  "A": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.836
+  },
+  "B": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.821
+  },
+  "C": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.785
+  },
+  "D": {
+   "fpsP50": 29,
+   "qlr": {
+    "none": 25
+   },
+   "uplinkMbps": 0.766
+  },
+  "E": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.82
+  },
+  "F": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.829
+  },
+  "G": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.81
+  },
+  "H": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 24
+   },
+   "uplinkMbps": 0.813
+  }
+ },
+ "recFiles": {
+  "b6h-A-g1": {
+   "chunks": 23,
+   "bytes": 1343887,
+   "firstT": 1787820918898,
+   "lastT": 1787820962556,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 320,
+    "height": 180,
+    "bytes": 1343887
+   },
+   "effectiveKbps": 235.5,
+   "burn": {
+    "frames": 1262,
+    "decodeOk": 1262,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "A": 1262
+    },
+    "firstMs": 1787820918025,
+    "lastMs": 1787820962476,
+    "spanS": 44.45,
+    "effFps": 28.39,
+    "interFrameP50": 33,
+    "interFrameP95": 63,
+    "interFrameMax": 72,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-B-g1": {
+   "chunks": 24,
+   "bytes": 1404009,
+   "firstT": 1787820917084,
+   "lastT": 1787820962553,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1404009
+   },
+   "effectiveKbps": 236.6,
+   "burn": {
+    "frames": 1330,
+    "decodeOk": 1330,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "B": 1330
+    },
+    "firstMs": 1787820915122,
+    "lastMs": 1787820962507,
+    "spanS": 47.38,
+    "effFps": 28.07,
+    "interFrameP50": 33,
+    "interFrameP95": 59,
+    "interFrameMax": 523,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-C-g1": {
+   "chunks": 24,
+   "bytes": 1502886,
+   "firstT": 1787820916602,
+   "lastT": 1787820962552,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1502886
+   },
+   "effectiveKbps": 250.7,
+   "burn": {
+    "frames": 1372,
+    "decodeOk": 1372,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "C": 1372
+    },
+    "firstMs": 1787820914613,
+    "lastMs": 1787820962494,
+    "spanS": 47.88,
+    "effFps": 28.65,
+    "interFrameP50": 33,
+    "interFrameP95": 60,
+    "interFrameMax": 74,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-D-g1": {
+   "chunks": 23,
+   "bytes": 1311305,
+   "firstT": 1787820919395,
+   "lastT": 1787820962554,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1311305
+   },
+   "effectiveKbps": 232.3,
+   "burn": {
+    "frames": 1265,
+    "decodeOk": 1265,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "D": 1265
+    },
+    "firstMs": 1787820917436,
+    "lastMs": 1787820962483,
+    "spanS": 45.05,
+    "effFps": 28.08,
+    "interFrameP50": 33,
+    "interFrameP95": 62,
+    "interFrameMax": 464,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-E-g1": {
+   "chunks": 23,
+   "bytes": 1446557,
+   "firstT": 1787820918477,
+   "lastT": 1787820962556,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1446557
+   },
+   "effectiveKbps": 251.1,
+   "burn": {
+    "frames": 1329,
+    "decodeOk": 1329,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "E": 1329
+    },
+    "firstMs": 1787820916489,
+    "lastMs": 1787820962486,
+    "spanS": 46.0,
+    "effFps": 28.89,
+    "interFrameP50": 33,
+    "interFrameP95": 42,
+    "interFrameMax": 71,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-F-g1": {
+   "chunks": 23,
+   "bytes": 1429996,
+   "firstT": 1787820919348,
+   "lastT": 1787820962554,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1429996
+   },
+   "effectiveKbps": 253.1,
+   "burn": {
+    "frames": 1283,
+    "decodeOk": 1283,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "F": 1283
+    },
+    "firstMs": 1787820917375,
+    "lastMs": 1787820962486,
+    "spanS": 45.11,
+    "effFps": 28.44,
+    "interFrameP50": 33,
+    "interFrameP95": 62,
+    "interFrameMax": 99,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-G-g1": {
+   "chunks": 24,
+   "bytes": 1487722,
+   "firstT": 1787820917625,
+   "lastT": 1787820962553,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1487722
+   },
+   "effectiveKbps": 253.6,
+   "burn": {
+    "frames": 1353,
+    "decodeOk": 1353,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "G": 1353
+    },
+    "firstMs": 1787820915658,
+    "lastMs": 1787820962451,
+    "spanS": 46.79,
+    "effFps": 28.91,
+    "interFrameP50": 33,
+    "interFrameP95": 42,
+    "interFrameMax": 72,
+    "gapsOver1s": []
+   }
+  },
+  "b6h-H-g1": {
+   "chunks": 23,
+   "bytes": 1382774,
+   "firstT": 1787820918258,
+   "lastT": 1787820962555,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 320,
+    "height": 180,
+    "bytes": 1382774
+   },
+   "effectiveKbps": 238.9,
+   "burn": {
+    "frames": 1325,
+    "decodeOk": 1325,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "H": 1325
+    },
+    "firstMs": 1787820916213,
+    "lastMs": 1787820962476,
+    "spanS": 46.26,
+    "effFps": 28.64,
+    "interFrameP50": 33,
+    "interFrameP95": 60,
+    "interFrameMax": 73,
+    "gapsOver1s": []
+   }
+  }
+ },
+ "timeline": [
+  {
+   "kind": "pubs-running",
+   "t": 1787820912317,
+   "id": null,
+   "pids": null
+  },
+  {
+   "kind": "rec-ready",
+   "t": 1787820917429,
+   "id": null,
+   "pids": null
+  }
+ ],
+ "events": [
+  {
+   "t": 1787820913859.9,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "H",
+   "mid": "0",
+   "muted": true
+  },
+  {
+   "t": 1787820914157.2,
+   "who": "REC",
+   "name": "pulled",
+   "from": "H",
+   "mid": "0",
+   "cause": "roster",
+   "durMs": 1104,
+   "renego": true
+  },
+  {
+   "t": 1787820914438.0999,
+   "who": "REC",
+   "name": "track-rearrived-ignored",
+   "from": "H",
+   "mid": "0"
+  },
+  {
+   "t": 1787820914438.2998,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "C",
+   "mid": "1",
+   "muted": true
+  },
+  {
+   "t": 1787820914573,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "C",
+   "mid": "1"
+  },
+  {
+   "t": 1787820914573.7998,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "C",
+   "gen": 1,
+   "file": "b6h-C-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820914578.9,
+   "who": "REC",
+   "name": "pulled",
+   "from": "C",
+   "mid": "1",
+   "cause": "roster",
+   "durMs": 422,
+   "renego": true
+  },
+  {
+   "t": 1787820914922.4,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "B",
+   "mid": "2",
+   "muted": true
+  },
+  {
+   "t": 1787820915070.7,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "B",
+   "mid": "2"
+  },
+  {
+   "t": 1787820915071,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "B",
+   "gen": 1,
+   "file": "b6h-B-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820915077.7998,
+   "who": "REC",
+   "name": "pulled",
+   "from": "B",
+   "mid": "2",
+   "cause": "roster",
+   "durMs": 499,
+   "renego": true
+  },
+  {
+   "t": 1787820915482.0999,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "G",
+   "mid": "3",
+   "muted": true
+  },
+  {
+   "t": 1787820915599.7,
+   "who": "REC",
+   "name": "pulled",
+   "from": "G",
+   "mid": "3",
+   "cause": "roster",
+   "durMs": 522,
+   "renego": true
+  },
+  {
+   "t": 1787820915611.2,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "G",
+   "mid": "3"
+  },
+  {
+   "t": 1787820915611.5999,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "G",
+   "gen": 1,
+   "file": "b6h-G-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820915901.2,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "D",
+   "mid": "4",
+   "muted": true
+  },
+  {
+   "t": 1787820916009.7,
+   "who": "REC",
+   "name": "pulled",
+   "from": "D",
+   "mid": "4",
+   "cause": "roster",
+   "durMs": 410,
+   "renego": true
+  },
+  {
+   "t": 1787820916243.2,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "H",
+   "mid": "0"
+  },
+  {
+   "t": 1787820916243.7,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "H",
+   "gen": 1,
+   "file": "b6h-H-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820916312.7998,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "E",
+   "mid": "5",
+   "muted": true
+  },
+  {
+   "t": 1787820916444,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "E",
+   "mid": "5"
+  },
+  {
+   "t": 1787820916444.5,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "E",
+   "gen": 1,
+   "file": "b6h-E-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820916473,
+   "who": "REC",
+   "name": "pulled",
+   "from": "E",
+   "mid": "5",
+   "cause": "roster",
+   "durMs": 463,
+   "renego": true
+  },
+  {
+   "t": 1787820916599.5,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "C",
+   "gen": 1,
+   "file": "b6h-C-g1",
+   "ms": 2026
+  },
+  {
+   "t": 1787820916737,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "A",
+   "mid": "6",
+   "muted": true
+  },
+  {
+   "t": 1787820916879.5999,
+   "who": "REC",
+   "name": "pulled",
+   "from": "A",
+   "mid": "6",
+   "cause": "roster",
+   "durMs": 406,
+   "renego": true
+  },
+  {
+   "t": 1787820916893.4,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "A",
+   "mid": "6"
+  },
+  {
+   "t": 1787820916893.7998,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "A",
+   "gen": 1,
+   "file": "b6h-A-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820917082,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "B",
+   "gen": 1,
+   "file": "b6h-B-g1",
+   "ms": 2011
+  },
+  {
+   "t": 1787820917181.2,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "F",
+   "mid": "7",
+   "muted": true
+  },
+  {
+   "t": 1787820917337.2998,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "F",
+   "mid": "7"
+  },
+  {
+   "t": 1787820917337.7998,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "F",
+   "gen": 1,
+   "file": "b6h-F-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820917338.4,
+   "who": "REC",
+   "name": "pulled",
+   "from": "F",
+   "mid": "7",
+   "cause": "roster",
+   "durMs": 459,
+   "renego": true
+  },
+  {
+   "t": 1787820917390.7,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "D",
+   "mid": "4"
+  },
+  {
+   "t": 1787820917391.2998,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "D",
+   "gen": 1,
+   "file": "b6h-D-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787820917623.0999,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "G",
+   "gen": 1,
+   "file": "b6h-G-g1",
+   "ms": 2012
+  },
+  {
+   "t": 1787820918254.9,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "H",
+   "gen": 1,
+   "file": "b6h-H-g1",
+   "ms": 2011
+  },
+  {
+   "t": 1787820918473.4,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "E",
+   "gen": 1,
+   "file": "b6h-E-g1",
+   "ms": 2029
+  },
+  {
+   "t": 1787820918894.4,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "A",
+   "gen": 1,
+   "file": "b6h-A-g1",
+   "ms": 2001
+  },
+  {
+   "t": 1787820919344.7998,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "F",
+   "gen": 1,
+   "file": "b6h-F-g1",
+   "ms": 2007
+  },
+  {
+   "t": 1787820919393.5,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "D",
+   "gen": 1,
+   "file": "b6h-D-g1",
+   "ms": 2003
+  },
+  {
+   "t": 1787820962547.7,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "C",
+   "gen": 1,
+   "file": "b6h-C-g1",
+   "reason": "run-end",
+   "chunks": 23,
+   "bytes": 1463449
+  },
+  {
+   "t": 1787820962548.4,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "B",
+   "gen": 1,
+   "file": "b6h-B-g1",
+   "reason": "run-end",
+   "chunks": 23,
+   "bytes": 1371574
+  },
+  {
+   "t": 1787820962548.5999,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "G",
+   "gen": 1,
+   "file": "b6h-G-g1",
+   "reason": "run-end",
+   "chunks": 23,
+   "bytes": 1470500
+  },
+  {
+   "t": 1787820962549.0999,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "H",
+   "gen": 1,
+   "file": "b6h-H-g1",
+   "reason": "run-end",
+   "chunks": 22,
+   "bytes": 1323710
+  },
+  {
+   "t": 1787820962549.5999,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "E",
+   "gen": 1,
+   "file": "b6h-E-g1",
+   "reason": "run-end",
+   "chunks": 22,
+   "bytes": 1397861
+  },
+  {
+   "t": 1787820962549.9,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "A",
+   "gen": 1,
+   "file": "b6h-A-g1",
+   "reason": "run-end",
+   "chunks": 22,
+   "bytes": 1313557
+  },
+  {
+   "t": 1787820962550.5999,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "F",
+   "gen": 1,
+   "file": "b6h-F-g1",
+   "reason": "run-end",
+   "chunks": 22,
+   "bytes": 1403889
+  },
+  {
+   "t": 1787820962550.9,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "D",
+   "gen": 1,
+   "file": "b6h-D-g1",
+   "reason": "run-end",
+   "chunks": 22,
+   "bytes": 1292827
+  },
+  {
+   "t": 1787820966112.7998,
+   "who": "REC",
+   "name": "left-received",
+   "id": "D"
+  },
+  {
+   "t": 1787820966152.4,
+   "who": "REC",
+   "name": "left-received",
+   "id": "A"
+  },
+  {
+   "t": 1787820966152.7,
+   "who": "REC",
+   "name": "left-received",
+   "id": "B"
+  },
+  {
+   "t": 1787820966152.7998,
+   "who": "REC",
+   "name": "left-received",
+   "id": "C"
+  },
+  {
+   "t": 1787820966187.9,
+   "who": "REC",
+   "name": "left-received",
+   "id": "G"
+  }
+ ]
+}

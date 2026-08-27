@@ -1,0 +1,1 @@
+selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-a1.jsonl
