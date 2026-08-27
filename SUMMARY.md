@@ -82,3 +82,34 @@ polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
 3. ThreatLocker approval for OBS (else Option C relay path stands); camera
    still wedged (sudo killall or reboot); eyeball src/demo.html.
 4. Two-clock house-sound policy = first human rehearsal decision.
+
+## Session 6 (2026-08-27) — archive instruments, participant pipeline, networked music
+
+**Participant archive** — self-recording beat central by measurement (upload lag 483 ms, 25 s
+offline = zero loss, tab-kill 790 ms, anchor +20 ms; central = 8.6× the grid budget at N=54 and
+cuts 130–172 ms gaps into every sibling's file on any join/leave). Sync leg proven: inter-tile
+skew p50 4–29 ms, cue crossing in band, postshow runner + `--reconcile` (engine can start
+anytime; R2 is the memory), h264 copy-remux 80 ms local / 282 ms cloud ($0.20/show), masters+MSE
+frame-exact for vp8 but MSE refuses h264-in-WebM.
+
+**ERR archives opened** — live feeds carry PDT + 2 h DVR + CORS clear; arhiiv API is open and
+year-searchable to 1908 (census: 448k items in 119 requests). Three instruments built: channel
+flipper (10–12 ms flips), archive remixer (1965 chords, 0–43 ms start spread), and the
+megatimeline (p95 9.7 ms flying 1908→2026, series query-lanes, honest precision smears).
+plan-megatimeline.md on the EKA/sitemap-vis basis.
+
+**Timeline transport core** — `timeline/transport.mjs` + lab: vector+lookahead holds; worker tick
+is the default host (8.5 ms hidden vs main's 981 ms); audio lane sample-accurate (10 µs) and holds
+through main-thread stalls; the per-event fan-out graveyard fails 5/7 transport asserts and is now
+a fixture; C2 property gate green and runnable.
+
+**Networked music** — see [[networked-music-findings]]: DC 1 ms floor, SFU-DC 16 ms, MoQ audio
+return 36 ms vs WebRTC's 78 (jitter buffer = 98.6%), hybrid arm best. Remote-instrument platform
+deployed end-to-end (registry worker, host/player pages, session-as-timeline-log, owner self-test).
+
+**Infrastructure** — CF Containers measured (QUIC egress works; cloud repackage $0.20/show; vp8
+50× slower); OBS in Docker and in a CF Container both proven, obs-moq publishes on d14 and d16
+(149 ms — fastest chain measured); dual MoQ+RTMP from one OBS.
+
+**Open**: 4 secret rotations (SECRETS-ROTATION.md), elektron.studio purchase, iPhone capture
+probe, Web MIDI precision (needs IAC toggle), hardware jam/instrument run.
