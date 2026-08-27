@@ -1,0 +1,84 @@
+# elektron — compact summary (start → 2026-08-27)
+
+One paragraph: a measured live-streaming + performance platform on Cloudflare
+(LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
+built and numbers-proven in ~3 days by parallel agent sessions — now converging
+on ONE substrate: a universal timeline ("save anything, play anything back"),
+with an operator studio app as its first build and cultural-heritage archives
+(ERR; Radio Tallinn 1965) as its horizon.
+
+## Arc
+
+- **08-25→26, sessions 1–5** — the measurement campaign. Everything below is
+  ✅ measured, not believed (PROGRESS.md is the journal, plan.md the reference).
+- **08-26 evening** — planning wave: plan-m2m → plan-studio → plan-timeline
+  (+ 9-amendment self-critique) → prior-art research (technical + artistic).
+- **08-27** — own prior-art mine (5 repos of previous experiments) +
+  Radio Tallinn 1965 theses = the first named client.
+
+## The stack, with its numbers
+
+| Layer | Verdict |
+|---|---|
+| Stage (RTMPS→LL-HLS) | 2.4–2.5 s tuned; v6 player fixes the park (recovery 2.4–4.3× v5); CF edge holds parts ~1 s/segment → ~2 s player floor |
+| Grid (Realtime SFU) | 74–96 ms glass-to-glass; no ceiling through N=54 media / 1003 sessions @40/s; deployed `elektron-rtc` Worker: RtcRoom DO, kill→`left` 38–126 ms |
+| Fast tier (MoQ) | 26–33 ms browser↔browser; full device scorecard ✅ (Chromium/Safari/iPhone-4G ~31 ms/4K30 47 ms/audio skew −4 ms); draft-16 relay: auth + namespace push work |
+| Cues | DO relay 27 ms; cue→video sync p50 65–98 ms; VOD replay p50 59 ms with seeks green |
+| Archive | LOCAL segmented + native T₀ (−15 ms from truth) → R2; O(1) disk, ~25× cheaper than Stream; grid archive = per-participant self-recording + event log |
+| Show control | JSON score conducts the grid: 88/88 asserts, drift p50 0 ms; composite recording without OBS (CDP→ffmpeg→RTMPS, 0 dropped frames) |
+
+Platform truths that cost real work: encoder socket close mints a NEW video UID
+(gapless relay/splicer built to hide it); stock hls.js parks nondeterministically
+(v6 exists because of it); Stream API `created` is −6.2 s from truth (anchor on
+content T₀, never metadata); WHIP ingest records NOTHING; DOs freeze Date.now();
+polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
+(→ web console + node CLI architecture); background tabs lie to instruments.
+
+## The plans
+
+- **plan.md** — streaming stack reference (transports, players, traps, mysteries
+  solved).
+- **plan-m2m.md** — hybrid: SFU grid + stage stream + RtcRoom DO; MoQ as
+  auto-upgrade tier; phases 1–3 COMPLETE, phase-4 backlog.
+- **plan-studio.md** — ThreatLocker-proof operator app: deployed web console +
+  `node engine.mjs`; ~three buttons; MERGED V0 = timeline lib is the engine's
+  event backbone (Sessions A/B/C; DoD: one command + one URL runs a show with a
+  replay link, measurement suite stays green).
+- **plan-timeline.md** — THE substrate. Six-function transport + the missing
+  four (seek/pause/rate/window); Event + Span on one append-only log; reducers
+  (`reduce(events≤t)`, property-tested vs play); adapters {capture, actuate,
+  reducer, interpolate, caps}; laws: stamp at source, absolute ms, one render
+  path, R2 by reference, tombstones+compaction (C6), per-kind versioning (C7),
+  trace-vs-authoring boundary (C10), reconstruction tiers with a forced
+  evidence policy + tratteggio legibility (§5b).
+
+## Research shelf
+
+- **External prior art**: not invented as a whole; steal list adopted — MCAP
+  container shape, Rerun multi-timeline indexing, W3C Timing Object transport
+  vector. Artistic canon deep (Zenph, Marclay, Morrison, Hsieh…), shared
+  infrastructure EMPTY — that gap is the project.
+- **Own prior art** (research/timeline-own-prior-art-2026-08.md): lineage is
+  5+ generations since elektron 2020 (map: visualia/plans/lineage.md). Steal
+  list: pre-roll ring buffer, command-sourcing + undoable commands (cheap
+  backward seek), per-kind quantization, ACT/DISPLAY split, drift channel,
+  gate() recognizer, loopback ordering, wall-clock-in-frame test pattern.
+  Failure-hardened laws: lookahead scheduling mandatory (3 repos died without
+  it), never re-stamp at handler time, ids minted at capture, {t0, duration}
+  as session header, text needs semantic ops.
+- **Origin & clients**: the idea comes from cultural-heritage work (PhD circle;
+  Kurenniemi case study; ERR horizon). **Radio Tallinn 1965** (same circle) is
+  the first named client — slots = score of spans, live = playhead-at-now,
+  thesis 30 = the tratteggio overlay as programming, thesis 17 = tier-0
+  attested-only evidence policy (even mastering is a declared derived lane).
+
+## Open items
+
+1. **Rotate secrets**: CF API token pasted in chat (session 1); draft-16 relay
+   tokens (transited chat/logs); token + RTMPS key in public `studio` repo;
+   token in `maria_old` git history (was also client-side).
+2. Build MERGED V0 (plan-studio §5): timeline lib → engine.mjs → console
+   (~3 sessions; replay-page refactor is the regression gate).
+3. ThreatLocker approval for OBS (else Option C relay path stands); camera
+   still wedged (sudo killall or reboot); eyeball src/demo.html.
+4. Two-clock house-sound policy = first human rehearsal decision.
