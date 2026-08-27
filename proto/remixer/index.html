@@ -1,0 +1,672 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>remixer — ERR archive year chords</title>
+<style>
+  :root { color-scheme: dark; --au: #3ec9ba; --vi: #e8a54b; }
+  body { margin: 0; background: #0a0a0c; color: #ccd; font: 12px/1.45 ui-monospace, monospace; }
+  #top { display: flex; gap: 14px; align-items: baseline; padding: 8px 10px 4px; flex-wrap: wrap; }
+  #top h1 { font-size: 13px; margin: 0; color: #fff; letter-spacing: 1px; }
+  input[type=number] { width: 62px; background: #16161c; color: #ffd479; border: 1px solid #333; font: inherit; padding: 2px 4px; }
+  button { background: #1c1c26; color: #cde; border: 1px solid #444; font: inherit; padding: 2px 10px; cursor: pointer; }
+  button:hover { background: #2a2a3a; }
+  button.hot { border-color: #e33; color: #ffb0b0; }
+  select { background: #16161c; color: #cde; border: 1px solid #333; font: inherit; }
+  #counts { color: #889; } #counts b { color: #fff; }
+  /* --- year strip --- */
+  #stripWrap { padding: 2px 10px 6px; }
+  #strip { position: relative; height: 78px; background: #101016; border: 1px solid #26262e; overflow: hidden; }
+  .mgrid { position: absolute; top: 0; bottom: 0; width: 1px; background: #22222c; }
+  .mlab { position: absolute; bottom: 1px; color: #556; font-size: 9px; transform: translateX(2px); }
+  .zoneLab { position: absolute; left: 4px; font-size: 9px; color: #445; }
+  .it { position: absolute; cursor: pointer; }
+  .it.audio { background: var(--au); } .it.video { background: var(--vi); }
+  .it.day { width: 2px; height: 11px; }
+  .it.month { height: 5px; opacity: .42; }
+  .it.year { left: 1px; right: 1px; height: 3px; opacity: .16; }
+  .it:hover { outline: 1px solid #fff; opacity: 1; z-index: 5; }
+  .it.inlayer { outline: 1px solid #fff; box-shadow: 0 0 6px #fff8; opacity: 1; z-index: 4; }
+  /* --- main columns --- */
+  #main { display: grid; grid-template-columns: minmax(430px, 1fr) minmax(520px, 1.1fr); gap: 10px; padding: 0 10px; }
+  .listBox { border: 1px solid #26262e; background: #0e0e13; overflow-y: auto; max-height: 275px; }
+  .listBox h2 { font-size: 10px; margin: 0; padding: 3px 6px; position: sticky; top: 0; background: #14141b; letter-spacing: 1px; }
+  .listBox h2.a { color: var(--au); } .listBox h2.v { color: var(--vi); }
+  .row { display: flex; gap: 6px; padding: 1px 6px; cursor: pointer; white-space: nowrap; align-items: baseline; }
+  .row:hover { background: #1b1b26; }
+  .row.inlayer { background: #222236; }
+  .row .idx { color: #667; width: 20px; text-align: right; flex: none; }
+  .row .title { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .row .dur { color: #889; flex: none; }
+  .badge { flex: none; font-size: 10px; padding: 0 4px; border-radius: 2px; background: #223; color: #9ec5ff; }
+  .badge.p-year { background: #3a2a10; color: #ffd479; }   /* year-only: the widest smear */
+  .badge.p-month { background: #2a2a10; color: #e5e08a; }
+  .badge.heur { opacity: .66; font-style: italic; }        /* not yet content-confirmed */
+  /* --- rack --- */
+  #rack { display: flex; flex-direction: column; gap: 6px; }
+  #blendbox { position: relative; background: #000; aspect-ratio: 16/7.2; border: 1px solid #26262e; }
+  #blendbox video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .lrow { display: flex; gap: 6px; align-items: center; border: 1px solid #22222a; background: #0e0e13; padding: 2px 6px; }
+  .lrow .tag { font-weight: bold; width: 22px; flex: none; }
+  .lrow.a .tag { color: var(--au); } .lrow.v .tag { color: var(--vi); }
+  .lrow button { padding: 0 7px; }
+  .lrow input[type=range] { width: 90px; }
+  .lrow .lab { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #dde; }
+  .lrow .stat { color: #7a8; font-size: 10px; flex: none; }
+  .lrow.err .stat { color: #e66; }
+  #hud { padding: 5px 10px; display: flex; gap: 22px; flex-wrap: wrap; color: #99a; }
+  #hud b { color: #fff; }
+  #help { padding: 0 10px 8px; color: #667; }
+  kbd { background: #223; padding: 0 4px; border-radius: 3px; color: #cde; }
+</style>
+
+<div id="top">
+  <h1>ERR ARCHIVE REMIXER</h1>
+  <label>year <input type="number" id="yearIn" min="1908" max="2026" value="1965"></label>
+  <label title="split A/V: audio layers draw from this year instead">audio yr <input type="number" id="audioYearIn" min="1908" max="2026" placeholder="same"></label>
+  <button id="chordBtn" class="hot">CHORD</button>
+  <button id="stopBtn">STOP</button>
+  <button id="shufBtn">SHUFFLE ALL</button>
+  <span id="counts">–</span>
+</div>
+
+<div id="stripWrap"><div id="strip"></div></div>
+
+<div id="main">
+  <div>
+    <div class="listBox" id="audioListBox"><h2 class="a">AUDIO <span id="audioListNote"></span></h2><div id="audioList"></div></div>
+    <div style="height:8px"></div>
+    <div class="listBox" id="videoListBox"><h2 class="v">VIDEO</h2><div id="videoList"></div></div>
+  </div>
+  <div id="rack">
+    <div id="blendbox"></div>
+    <div id="vrows"></div>
+    <div id="arows"></div>
+  </div>
+</div>
+
+<div id="hud">
+  <span>api last <b id="apiLast">–</b> ms · avg <b id="apiAvg">–</b> (n=<span id="apiN">0</span>)</span>
+  <span>plays <b id="plays">0</b>/8-ish</span>
+  <span>errors <b id="errN">0</b></span>
+  <span id="chordLed"></span>
+  <span id="status"></span>
+</div>
+<div id="help">
+  <kbd>1–9</kbd> audio item → free layer · <kbd>⇧1–9</kbd> video item → free layer ·
+  <kbd>space</kbd> all-stop · <kbd>c</kbd> chord · <kbd>s</kbd> shuffle-all ·
+  badges: <span class="badge p-year">1965</span> year-only (synthesized 07-15 / audio month:null) ·
+  <span class="badge p-month">1965-03</span> month-only (day-15) · <span class="badge">1965-03-22</span> day ·
+  <i>italic</i> = heuristic (date-only), solid = confirmed from content record
+</div>
+
+<script src="hls.min.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const QS = new URLSearchParams(location.search);
+const AUTOTEST = !!QS.get('autotest');
+
+// --- state -----------------------------------------------------------------
+const S = {
+  year: null, audioYear: null,          // audioYear null => same as year
+  hits: { audio: [], video: [] },       // normalized items for S.year
+  audioHits: null,                      // items for audioYear (audio), or null
+  counts: { audio: 0, video: 0 },
+  searchCache: new Map(),               // "type:year" -> {items, count, ms}
+  contentCache: new Map(),              // slug -> content record
+  dialToken: 0, userBusy: 0, plays: 0,
+  apiLog: [],                           // {kind, ms}
+  errors: [],                           // {at, where, detail}
+};
+const recErr = (where, detail) => { S.errors.push({ at: new Date().toISOString(), where, detail }); $('errN').textContent = S.errors.length; console.warn('[remixer err]', where, detail); };
+const status = (m) => { $('status').textContent = m; console.log('[remixer]', m); };
+
+// --- API layer: ONE shared gate, >=1000 ms between any archive API calls ---
+let lastApiAt = 0, apiChain = Promise.resolve();
+function gated(fn) {
+  const p = apiChain.then(async () => {
+    const wait = Math.max(0, lastApiAt + 1000 - Date.now());
+    if (wait) await sleep(wait);
+    lastApiAt = Date.now();
+    return fn();
+  });
+  apiChain = p.catch(() => {});
+  return p;
+}
+function logApi(kind, ms) {
+  S.apiLog.push({ kind, ms: Math.round(ms) });
+  $('apiLast').textContent = Math.round(ms);
+  const a = S.apiLog.reduce((s, x) => s + x.ms, 0) / S.apiLog.length;
+  $('apiAvg').textContent = Math.round(a);
+  $('apiN').textContent = S.apiLog.length;
+}
+
+function normHit(h) {
+  return { type: h.archiveType, slug: h.url, title: h.heading, dateISO: h.date, lead: h.lead || '' };
+}
+
+async function searchRaw(body, kind) {
+  return gated(async () => {
+    const t0 = performance.now();
+    const r = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    logApi(kind, performance.now() - t0);
+    if (!r.ok) throw new Error('search ' + r.status);
+    return j;
+  });
+}
+// sortOption 'abc' (not 'old'): a 20-item page 1 sorted 'old' is all January;
+// alphabetical order scatters dates across the whole year -> honest strip.
+function yearBody(type, y, limit) {
+  return { queryParams: { phrase: '*', type, sortOption: 'abc', page: 1, limit,
+    timeRange: 'custom', timeRangeFrom: Date.UTC(y, 0, 1) / 1000, timeRangeTo: Date.UTC(y + 1, 0, 1) / 1000 - 1,
+    includeTranscription: false, advancedParams: [] } };
+}
+async function searchYear(type, y) {           // cached; page of 20 (respect: small pages)
+  const key = type + ':' + y;
+  if (S.searchCache.has(key)) return S.searchCache.get(key);
+  const j = await searchRaw(yearBody(type, y, 20), `search ${type} ${y}`);
+  const al = j.activeList || {};
+  const group = (al.data || []).find((g) => !g.type || g.type === type) || (al.data || [])[0] || { data: [] };
+  const out = { items: (group.data || []).map(normHit).filter((x) => x.type === type),
+    count: type === 'audio' ? al.audioCount : al.videoCount };
+  S.searchCache.set(key, out);
+  return out;
+}
+async function searchRangeVideo(fromY, toY) {  // cross-decade nearest hunt (one call)
+  const body = { queryParams: { phrase: '*', type: 'video', sortOption: 'old', page: 1, limit: 100,
+    timeRange: 'custom', timeRangeFrom: Date.UTC(fromY, 0, 1) / 1000, timeRangeTo: Date.UTC(toY + 1, 0, 1) / 1000 - 1,
+    includeTranscription: false, advancedParams: [] } };
+  const j = await searchRaw(body, `search video ${fromY}-${toY}`);
+  const al = j.activeList || {};
+  const group = (al.data || []).find((g) => !g.type || g.type === 'video') || (al.data || [])[0] || { data: [] };
+  return { items: (group.data || []).map(normHit).filter((x) => x.type === 'video'), count: al.videoCount };
+}
+async function getContent(type, slug) {
+  if (S.contentCache.has(slug)) return S.contentCache.get(slug);
+  const c = await gated(async () => {
+    const t0 = performance.now();
+    const r = await fetch(`https://arhiiv.err.ee/api/v1/content/${type}/${slug}`);
+    const j = await r.json();
+    logApi('content ' + type, performance.now() - t0);
+    if (!r.ok) throw new Error('content ' + r.status);
+    return j;
+  });
+  S.contentCache.set(slug, c);
+  refreshItemUI(slug);
+  return c;
+}
+
+// --- precision decode (the honest date badge) ------------------------------
+// Convention measured in research/err-archives-2026-08.md:
+//   year-only  -> synthesized date YYYY-07-15 and content month === null
+//   month-only -> day 15 (mid-month), no day-precise Eetrikuupäev in metadata
+//   day        -> everything agrees, usually a second source (Eetrikuupäev)
+function decodeDate(item) {
+  const d = item.dateISO.slice(0, 10);
+  const [Y, M, D] = d.split('-').map(Number);
+  const c = S.contentCache.get(item.slug);
+  if (c && c.info) {
+    // measured here: video items can carry month:null WITH a day-precise date
+    // (AK chronicle, dateCombined "Esmaeeter 4. jaanuar 1965") — so month:null
+    // means year-only for AUDIO only; video precision comes from the
+    // synthesized 07-15 / day-15 patterns + the "Esmaeeter" first-air prefix.
+    const month = c.info.month;
+    const tech = (c.metadata && c.metadata.technical) || [];
+    const hasAirDay = tech.some((t) => /eetrikuupäev|esmaeeter|võttekuupäev/i.test(t.label || '') && /\d{1,2}\.\d{1,2}\.\d{4}/.test(t.value || ''));
+    const esmaeeter = /^\s*esmaeeter/i.test(c.info.dateCombined || '');
+    const dayEvidence = hasAirDay || esmaeeter;
+    if (item.type === 'audio' && (month === null || month === 0)) return { prec: 'year', text: String(Y), conf: true, Y, M, D };
+    if (M === 7 && D === 15 && !dayEvidence) return { prec: 'year', text: String(Y), conf: true, Y, M, D };
+    if (D === 15 && !dayEvidence) return { prec: 'month', text: `${Y}-${String(M).padStart(2, '0')}`, conf: true, Y, M, D };
+    return { prec: 'day', text: d, conf: true, Y, M, D };
+  }
+  // heuristic from the search hit's date alone
+  if (M === 7 && D === 15) return { prec: 'year', text: String(Y), conf: false, Y, M, D };
+  if (D === 15) return { prec: 'month', text: `${Y}-${String(M).padStart(2, '0')}`, conf: false, Y, M, D };
+  return { prec: 'day', text: d, conf: false, Y, M, D };
+}
+function durOf(item) {
+  const c = S.contentCache.get(item.slug);
+  const tech = (c && c.metadata && c.metadata.technical) || [];
+  const k = tech.find((t) => (t.label || '').toLowerCase() === 'kestus');
+  if (k) return k.value;
+  const layer = allLayers().find((l) => l.item && l.item.slug === item.slug);
+  if (layer && isFinite(layer.el.duration) && layer.el.duration > 0) {
+    const s = Math.round(layer.el.duration);
+    return `${String((s / 3600) | 0).padStart(2, '0')}:${String(((s / 60) | 0) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }
+  return null;
+}
+function badgeHTML(item) {
+  const b = decodeDate(item);
+  return `<span class="badge p-${b.prec}${b.conf ? '' : ' heur'}" title="precision: ${b.prec}${b.conf ? ' (confirmed from content record)' : ' (heuristic from date convention)'}">${b.text}</span>`;
+}
+
+// --- media resolution ------------------------------------------------------
+const absUrl = (u) => (u && u.startsWith('//') ? 'https:' + u : u);
+function mediaSrc(c) {
+  const src = (c && c.media && c.media.src) || {};
+  if (src.hls) return { kind: 'hls', url: absUrl(src.hls) };
+  if (src.file) return { kind: 'file', url: absUrl(src.file) };
+  if (c && c.info && c.info.downloadUrl) return { kind: 'file', url: absUrl(c.info.downloadUrl) };
+  return null;
+}
+const fmtName = (s) => (s.kind === 'hls' ? 'HLS' : (s.url.split('?')[0].split('.').pop() || 'file').toUpperCase());
+
+// --- layers ----------------------------------------------------------------
+let actx = null;
+function ensureCtx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+}
+function mkAudioLayer(i) {
+  const el = new Audio();
+  el.crossOrigin = 'anonymous'; el.preload = 'auto';
+  return { kind: 'audio', i, tag: 'A' + (i + 1), el, hls: null, item: null, gainNode: null, gainVal: 0.8, stats: {}, frames: 0 };
+}
+function mkVideoLayer(i) {
+  const el = document.createElement('video');
+  el.crossOrigin = 'anonymous'; el.muted = true; el.playsInline = true; el.preload = 'auto';
+  el.style.zIndex = i;
+  $('blendbox').appendChild(el);
+  const L = { kind: 'video', i, tag: 'V' + (i + 1), el, hls: null, item: null, stats: {}, frames: 0 };
+  const cb = (_now, meta) => {
+    L.frames = meta.presentedFrames;
+    if (L.stats.t0 && L.stats.vttff == null) L.stats.vttff = performance.now() - L.stats.t0;
+    el.requestVideoFrameCallback(cb);
+  };
+  el.requestVideoFrameCallback(cb);
+  return L;
+}
+const audioLayers = [0, 1, 2, 3].map(mkAudioLayer);
+const videoLayers = [0, 1].map(mkVideoLayer);
+const allLayers = () => [...audioLayers, ...videoLayers];
+
+function wireGain(L) {
+  if (L.gainNode || L.kind !== 'audio') return;
+  ensureCtx();
+  const srcNode = actx.createMediaElementSource(L.el);
+  L.gainNode = actx.createGain();
+  L.gainNode.gain.value = L.gainVal;
+  srcNode.connect(L.gainNode).connect(actx.destination);
+}
+
+function attach(L, src, { autoplay = true } = {}) {
+  if (L.hls) { L.hls.destroy(); L.hls = null; }
+  L.el.pause();
+  L.frames = 0;  // rVFC presentedFrames resets per media source — rebase the counter
+  L.stats = { t0: performance.now(), buf: null, ttff: null, vttff: null, playT0: null, fmt: fmtName(src), framesAt0: 0, ok: false };
+  if (L.kind === 'audio') wireGain(L);
+  L.el.onerror = () => recErr(L.tag + ' ' + (L.item ? L.item.slug : '?'), 'element error code=' + (L.el.error && L.el.error.code));
+  L.el.oncanplay = () => { if (L.stats.buf == null) L.stats.buf = performance.now() - L.stats.t0; updateLayerUI(L); };
+  if (src.kind === 'hls' && window.Hls && Hls.isSupported()) {
+    const hls = new Hls({ maxBufferLength: 20, backBufferLength: 10 });
+    L.hls = hls;
+    hls.on(Hls.Events.ERROR, (_, d) => {
+      const code = d.response && d.response.code;
+      if (d.fatal || code === 403) recErr(L.tag + ' ' + (L.item ? L.item.slug : '?'), `hls ${d.fatal ? 'FATAL ' : ''}${d.type}/${d.details}${code ? ' http=' + code : ''}`);
+    });
+    hls.loadSource(src.url);
+    hls.attachMedia(L.el);
+  } else {
+    L.el.src = src.url;
+  }
+  S.plays++; $('plays').textContent = S.plays;
+  if (autoplay) { L.stats.playT0 = L.stats.t0; L.el.play().catch((e) => recErr(L.tag, 'play(): ' + e)); }
+  updateLayerUI(L); renderStrip(); renderLists();
+}
+
+async function loadItem(item, L, opts = {}) {
+  S.userBusy++;
+  try {
+    L.item = item; L.state = 'resolving'; updateLayerUI(L);
+    const t0 = performance.now();
+    const c = await getContent(item.type, item.slug);
+    L.stats && (L.stats.apiMs = Math.round(performance.now() - t0));
+    const src = mediaSrc(c);
+    if (!src) { L.state = 'no-media'; recErr(L.tag, 'no media src for ' + item.slug); updateLayerUI(L); return null; }
+    L.state = 'loaded';
+    const apiMs = Math.round(performance.now() - t0);
+    attach(L, src, opts);
+    L.stats.apiMs = apiMs;
+    updateLayerUI(L);
+    return c;
+  } catch (e) {
+    L.state = 'error'; recErr(L.tag, String(e)); updateLayerUI(L); return null;
+  } finally { S.userBusy--; }
+}
+
+const rr = { audio: 0, video: 0 };            // round-robin when all layers busy
+function nextFree(kind) {
+  const pool = kind === 'audio' ? audioLayers : videoLayers;
+  return pool.find((l) => !l.item) || pool[rr[kind]++ % pool.length];
+}
+function loadNext(item) {
+  loadItem(item, nextFree(item.type), { autoplay: true });
+}
+
+function waitReady(L, timeoutMs) {
+  return new Promise((res) => {
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (L.el.readyState >= 3 || Date.now() - t0 > timeoutMs) { clearInterval(iv); res(L.el.readyState >= 3); }
+    }, 60);
+  });
+}
+
+// --- the instrument moves --------------------------------------------------
+const pickN = (arr, n, avoid = new Set()) => {
+  const pool = arr.filter((x) => !avoid.has(x.slug));
+  const out = [];
+  while (out.length < n && pool.length) out.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+  return out;
+};
+const audioPool = () => S.audioHits || S.hits.audio;
+
+let chordSpread = null;
+async function chord() {
+  const pool = audioPool();
+  if (pool.length < 3) return status('chord needs >=3 audio items in pool');
+  ensureCtx();
+  $('chordLed').textContent = 'CHORD arming…';
+  const picks = pickN(pool, 3);
+  const layers = audioLayers.slice(0, 3);
+  const armed = [];
+  for (let i = 0; i < 3; i++) {                       // sequential: the 1/s gate
+    const L = layers[i]; L.item = picks[i]; L.state = 'resolving'; updateLayerUI(L);
+    const tc = performance.now();
+    const c = await getContent(picks[i].type, picks[i].slug).catch((e) => (recErr('chord', String(e)), null));
+    const apiMs = Math.round(performance.now() - tc);
+    const src = c && mediaSrc(c);
+    if (src) { attach(L, src, { autoplay: false }); L.stats.apiMs = apiMs; L.state = 'loaded'; armed.push(L); }
+    else { L.state = 'no-media'; updateLayerUI(L); }
+  }
+  await Promise.all(armed.map((L) => waitReady(L, 12000)));
+  const t = performance.now();
+  armed.forEach((L) => { L.stats.playT0 = t; L.el.play().catch((e) => recErr(L.tag, 'play(): ' + e)); });
+  $('chordLed').textContent = `CHORD ×${armed.length} @ ${S.audioYear || S.year}`;
+  status(`chord: ${armed.length} layers started together`);
+  const iv = setInterval(() => {
+    const adv = armed.filter((L) => L.stats.advAt);
+    if (adv.length === armed.length) {
+      chordSpread = Math.max(...adv.map((L) => L.stats.advAt)) - Math.min(...adv.map((L) => L.stats.advAt));
+      $('chordLed').textContent += ` spread ${chordSpread.toFixed(0)}ms`;
+      clearInterval(iv);
+    }
+  }, 100);
+  return armed;
+}
+
+async function shuffleLayer(L) {
+  const pool = L.kind === 'audio' ? audioPool() : S.hits.video;
+  const used = new Set(allLayers().filter((x) => x.item).map((x) => x.item.slug));
+  const pick = pickN(pool, 1, used)[0] || pickN(pool, 1, new Set(L.item ? [L.item.slug] : []))[0];
+  if (!pick) return status('shuffle: pool empty');
+  await loadItem(pick, L, { autoplay: !L.el.paused || !L.item });
+}
+function shuffleAll() { allLayers().filter((L) => L.item).forEach((L) => shuffleLayer(L)); }
+function allStop() { allLayers().forEach((L) => L.el.pause()); $('chordLed').textContent = ''; status('all stopped'); }
+
+// --- year dial + split A/V -------------------------------------------------
+async function dialYear(y) {
+  y = Math.max(1908, Math.min(2026, y | 0));
+  $('yearIn').value = y;
+  S.year = y;
+  const token = ++S.dialToken;
+  status(`searching ${y}…`);
+  const a = await searchYear('audio', y).catch((e) => (recErr('search audio', String(e)), { items: [], count: 0 }));
+  if (token !== S.dialToken) return;
+  S.hits.audio = a.items; S.counts.audio = a.count || 0;
+  renderLists(); renderStrip();
+  const v = await searchYear('video', y).catch((e) => (recErr('search video', String(e)), { items: [], count: 0 }));
+  if (token !== S.dialToken) return;
+  S.hits.video = v.items; S.counts.video = v.count || 0;
+  $('counts').innerHTML = `${y}: <b>${S.counts.audio}</b> audio · <b>${S.counts.video}</b> video (showing ${S.hits.audio.length}+${S.hits.video.length})`;
+  renderLists(); renderStrip();
+  status(`year ${y} loaded`);
+  if (!AUTOTEST) trickle(token);
+}
+async function setAudioYear(y) {
+  if (!y || y === S.year) { S.audioYear = null; S.audioHits = null; $('audioListNote').textContent = ''; renderLists(); return; }
+  S.audioYear = y;
+  const a = await searchYear('audio', y).catch((e) => (recErr('search audio-year', String(e)), { items: [] }));
+  S.audioHits = a.items;
+  $('audioListNote').textContent = ` — SPLIT: from ${y} (${a.count || a.items.length} in year)`;
+  renderLists(); renderStrip();
+}
+// lazy duration/precision resolver: strictly inside the shared 1/s gate,
+// yields to user actions, cancelled by re-dial. Disabled under autotest.
+async function trickle(token) {
+  const queue = [...S.hits.audio, ...S.hits.video];
+  for (const h of queue) {
+    if (token !== S.dialToken) return;
+    if (S.contentCache.has(h.slug)) continue;
+    while (S.userBusy > 0) { await sleep(400); if (token !== S.dialToken) return; }
+    await getContent(h.type, h.slug).catch(() => {});
+    await sleep(1200);
+  }
+}
+
+// --- rendering -------------------------------------------------------------
+function dayFrac(b) {
+  const start = Date.UTC(b.Y, 0, 1), end = Date.UTC(b.Y + 1, 0, 1);
+  return (Date.UTC(b.Y, b.M - 1, b.D) - start) / (end - start);
+}
+function monthFrac(b, edge) {
+  const start = Date.UTC(b.Y, 0, 1), end = Date.UTC(b.Y + 1, 0, 1);
+  return (Date.UTC(b.Y, b.M - 1 + edge, 1) - start) / (end - start);
+}
+function renderStrip() {
+  const el = $('strip');
+  el.innerHTML = '';
+  for (let m = 0; m < 12; m++) {
+    const f = (Date.UTC(2001, m, 1) - Date.UTC(2001, 0, 1)) / (Date.UTC(2002, 0, 1) - Date.UTC(2001, 0, 1));
+    el.insertAdjacentHTML('beforeend', `<div class="mgrid" style="left:${(f * 100).toFixed(2)}%"></div><span class="mlab" style="left:${(f * 100).toFixed(2)}%">${'JFMAMJJASOND'[m]}</span>`);
+  }
+  el.insertAdjacentHTML('beforeend', `<span class="zoneLab" style="top:2px;color:var(--au)">audio ${S.audioYear ? '(' + S.year + ' — split audio comes from ' + S.audioYear + ')' : ''}</span><span class="zoneLab" style="top:38px;color:var(--vi)">video</span>`);
+  const inLayer = new Set(allLayers().filter((L) => L.item).map((L) => L.item.slug));
+  const place = (items, zoneTop) => {
+    items.forEach((it, i) => {
+      const b = decodeDate(it);
+      const d = document.createElement('div');
+      d.className = `it ${it.type} ${b.prec}${inLayer.has(it.slug) ? ' inlayer' : ''}`;
+      d.title = `${b.text} [${b.prec}${b.conf ? '' : '?'}] ${it.title}`;
+      if (b.prec === 'year') d.style.top = zoneTop + 1 + (i % 2) * 4 + 'px';
+      else if (b.prec === 'month') {
+        d.style.left = (monthFrac(b, 0) * 100).toFixed(2) + '%';
+        d.style.width = ((monthFrac(b, 1) - monthFrac(b, 0)) * 100).toFixed(2) + '%';
+        d.style.top = zoneTop + 6 + (i % 3) * 6 + 'px';
+      } else {
+        d.style.left = (dayFrac(b) * 100).toFixed(2) + '%';
+        d.style.top = zoneTop + 6 + (i % 3) * 7 + 'px';
+      }
+      d.onclick = () => loadNext(it);
+      el.appendChild(d);
+    });
+  };
+  place(S.hits.audio, 10);
+  place(S.hits.video, 44);
+}
+function rowHTML(it, n) {
+  const inLayer = allLayers().some((L) => L.item && L.item.slug === it.slug);
+  const dur = durOf(it);
+  return `<div class="row${inLayer ? ' inlayer' : ''}" data-slug="${it.slug}" data-type="${it.type}" title="${(it.lead || '').replace(/"/g, '&quot;').slice(0, 300)}">
+    <span class="idx">${n}</span>${badgeHTML(it)}<span class="title">${it.title}</span><span class="dur">${dur || '–:–'}</span></div>`;
+}
+function renderLists() {
+  $('audioList').innerHTML = audioPool().map((it, i) => rowHTML(it, i + 1)).join('');
+  $('videoList').innerHTML = S.hits.video.map((it, i) => rowHTML(it, i + 1)).join('');
+  document.querySelectorAll('.row').forEach((r) => {
+    r.onclick = () => {
+      const list = r.dataset.type === 'audio' ? audioPool() : S.hits.video;
+      const it = list.find((x) => x.slug === r.dataset.slug);
+      if (it) loadNext(it);
+    };
+  });
+}
+function refreshItemUI(slug) { renderLists(); renderStrip(); allLayers().filter((L) => L.item && L.item.slug === slug).forEach(updateLayerUI); }
+
+function mkLayerRow(L) {
+  const row = document.createElement('div');
+  row.className = 'lrow ' + (L.kind === 'audio' ? 'a' : 'v');
+  row.innerHTML = `<span class="tag">${L.tag}</span><button class="pp">▶</button>
+    ${L.kind === 'audio'
+      ? '<label>gain <input type="range" class="gain" min="0" max="1" step="0.01" value="0.8"></label>'
+      : `<label>op <input type="range" class="op" min="0" max="1" step="0.01" value="${L.i ? 0.6 : 1}"></label>
+         <select class="blend"><option>normal</option><option${L.i ? ' selected' : ''}>screen</option><option>multiply</option></select>`}
+    <button class="shuf">⤨</button><span class="lab">(empty — click a list/strip item)</span><span class="stat"></span>`;
+  row.querySelector('.pp').onclick = () => {
+    ensureCtx();
+    if (!L.item) return;
+    if (L.el.paused) { if (!L.stats.playT0) L.stats.playT0 = performance.now(); L.el.play().catch((e) => recErr(L.tag, String(e))); }
+    else L.el.pause();
+  };
+  row.querySelector('.shuf').onclick = () => shuffleLayer(L);
+  if (L.kind === 'audio') {
+    row.querySelector('.gain').oninput = (e) => { L.gainVal = +e.target.value; if (L.gainNode) L.gainNode.gain.value = L.gainVal; };
+  } else {
+    L.el.style.opacity = L.i ? 0.6 : 1;
+    L.el.style.mixBlendMode = L.i ? 'screen' : 'normal';
+    row.querySelector('.op').oninput = (e) => { L.el.style.opacity = e.target.value; };
+    row.querySelector('.blend').onchange = (e) => { L.el.style.mixBlendMode = e.target.value; };
+  }
+  L.row = row;
+  (L.kind === 'audio' ? $('arows') : $('vrows')).appendChild(row);
+}
+audioLayers.forEach(mkLayerRow); videoLayers.forEach(mkLayerRow);
+
+function updateLayerUI(L) {
+  if (!L.row) return;
+  const st = L.stats || {};
+  L.row.querySelector('.pp').textContent = L.el.paused ? '▶' : '❚❚';
+  L.row.classList.toggle('err', L.state === 'error' || L.state === 'no-media');
+  if (L.item) {
+    L.row.querySelector('.lab').innerHTML = `${badgeHTML(L.item)} ${L.item.title}`;
+    const bits = [];
+    if (L.state === 'resolving') bits.push('resolving…');
+    if (st.fmt) bits.push(st.fmt);
+    if (st.apiMs != null) bits.push('api ' + st.apiMs + 'ms');
+    if (st.buf != null) bits.push('buf ' + st.buf.toFixed(0) + 'ms');
+    if (st.ttff != null) bits.push('ttff ' + st.ttff.toFixed(0) + 'ms');
+    if (L.kind === 'video' && st.framesAt0 != null) bits.push((L.frames - st.framesAt0) + 'f');
+    if (L.state === 'no-media') bits.push('NO MEDIA');
+    if (L.state === 'error') bits.push('ERR');
+    L.row.querySelector('.stat').textContent = bits.join(' · ');
+  }
+}
+
+// fine-grained TTFF poller (currentTime advancing) + periodic UI refresh
+setInterval(() => {
+  allLayers().forEach((L) => {
+    const st = L.stats;
+    if (st && st.t0 && st.ttff == null && !L.el.paused && L.el.currentTime > 0.02) {
+      st.ttff = performance.now() - (st.playT0 || st.t0);
+      st.advAt = performance.now(); st.ok = true;
+      updateLayerUI(L);
+    }
+  });
+}, 50);
+setInterval(() => allLayers().forEach(updateLayerUI), 1000);
+
+// --- keys ------------------------------------------------------------------
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.repeat) return;
+  ensureCtx();
+  const n = parseInt(e.key, 10) || parseInt(e.code.replace('Digit', ''), 10);
+  if (n >= 1 && n <= 9) {
+    const list = e.shiftKey ? S.hits.video : audioPool();
+    if (list[n - 1]) loadNext(list[n - 1]);
+    return;
+  }
+  if (e.key === ' ') { e.preventDefault(); allStop(); }
+  if (e.key.toLowerCase() === 'c') chord();
+  if (e.key.toLowerCase() === 's') shuffleAll();
+});
+addEventListener('click', () => { if (actx) ensureCtx(); }, { capture: true });
+
+$('yearIn').onchange = (e) => dialYear(+e.target.value);
+$('audioYearIn').onchange = (e) => setAudioYear(+e.target.value || null);
+$('chordBtn').onclick = () => { ensureCtx(); chord(); };
+$('stopBtn').onclick = allStop;
+$('shufBtn').onclick = shuffleAll;
+
+// --- autotest --------------------------------------------------------------
+// ?autotest=1: phase 1 = 1965 chord(3 audio) + 1 video, 30 s observation.
+// phase 2 = cross-decade: video from 1938-or-nearest under one 1965 audio.
+// Budget: 6 items played, every API call through the shared 1/s gate.
+async function autotest() {
+  const R = { at: new Date().toISOString(), ua: navigator.userAgent, phases: {}, items: [], badges: [], errors: S.errors, apiCalls: S.apiLog };
+  const itemRow = (L, phase) => ({
+    phase, layer: L.tag, type: L.kind, slug: L.item && L.item.slug, title: L.item && L.item.title,
+    format: L.stats.fmt || null, apiMs: L.stats.apiMs ?? null,
+    bufMs: L.stats.buf != null ? +L.stats.buf.toFixed(0) : null,
+    ttffMs: L.stats.ttff != null ? +L.stats.ttff.toFixed(0) : null,
+    playedOk: !!(L.stats.ok && !L.el.paused && L.el.currentTime > 1),
+    curT: +L.el.currentTime.toFixed(1),
+    frames: L.kind === 'video' ? L.frames - (L.stats.framesAt0 || 0) : null,
+    badge: L.item ? decodeDate(L.item) : null,
+  });
+
+  ensureCtx();
+  // ---- phase 1: the 1965 chord ----
+  const t0 = performance.now();
+  await dialYear(1965);
+  R.phases.p1 = { counts: { ...S.counts }, listed: { audio: S.hits.audio.length, video: S.hits.video.length }, searchMs: S.apiLog.filter((x) => x.kind.startsWith('search')).map((x) => x.ms) };
+  const armed = (await chord()) || [];
+  if (S.hits.video[0]) await loadItem(S.hits.video[0], videoLayers[0], { autoplay: true });
+  document.title = 'REMIXER P1';
+  const framesMark = videoLayers[0].frames;
+  await sleep(30000);                                   // observation window
+  R.phases.p1.chordSpreadMs = chordSpread != null ? +chordSpread.toFixed(0) : null;
+  R.phases.p1.videoFramesIn30s = videoLayers[0].frames - framesMark;
+  R.phases.p1.errorsDuring = S.errors.length;
+  [...audioLayers.slice(0, 3), videoLayers[0]].forEach((L) => R.items.push(itemRow(L, 'p1')));
+  R.phases.p1.wallMs = +(performance.now() - t0).toFixed(0);
+
+  // badge examples: everything content-confirmed so far + heuristics from lists
+  const seen = new Set();
+  const pushBadge = (it) => { if (it && !seen.has(it.slug)) { seen.add(it.slug); const b = decodeDate(it); R.badges.push({ slug: it.slug, date: it.dateISO.slice(0, 10), badge: b.text, precision: b.prec, confirmed: b.conf }); } };
+  allLayers().forEach((L) => pushBadge(L.item));
+  [...S.hits.audio, ...S.hits.video].forEach((it) => { const b = decodeDate(it); if (b.prec !== 'day') pushBadge(it); });
+
+  // ---- phase 2: cross-decade (1938-or-nearest video under 1965 audio) ----
+  allStop();
+  const t2 = performance.now();
+  await dialYear(1938);
+  let pick = S.hits.video[0] || null, via = 'exact-year';
+  if (!pick) {
+    // measured: archive video starts 1958-07-11 (AK filmikroonika); hunt the
+    // whole pre-1965 span sorted old and take the closest date to mid-1938.
+    const wide = await searchRangeVideo(1908, 1964).catch((e) => (recErr('wide search', String(e)), { items: [] }));
+    const mid = Date.UTC(1938, 6, 1);
+    pick = wide.items.sort((a, b) => Math.abs(Date.parse(a.dateISO) - mid) - Math.abs(Date.parse(b.dateISO) - mid))[0] || null;
+    via = 'nearest-in-1908-1964';
+  }
+  R.phases.p2 = { videoCount1938: S.counts.video, via, videoPick: pick && { slug: pick.slug, date: pick.dateISO.slice(0, 10), title: pick.title } };
+  await setAudioYear(1965);
+  if (pick) await loadItem(pick, videoLayers[0], { autoplay: true });
+  const aPick = pickN(audioPool(), 1, new Set(audioLayers.map((L) => L.item && L.item.slug).filter(Boolean)))[0];
+  if (aPick) await loadItem(aPick, audioLayers[0], { autoplay: true });
+  document.title = 'REMIXER P2';
+  await sleep(15000);
+  if (pick) { pushBadge(pick); R.items.push(itemRow(videoLayers[0], 'p2')); }
+  if (aPick) { pushBadge(aPick); R.items.push(itemRow(audioLayers[0], 'p2')); }
+  R.phases.p2.wallMs = +(performance.now() - t2).toFixed(0);
+
+  // ---- verdict + report ----
+  R.playsTotal = S.plays;
+  R.apiAvgMs = Math.round(S.apiLog.reduce((s, x) => s + x.ms, 0) / Math.max(1, S.apiLog.length));
+  const p1ok = R.items.filter((x) => x.phase === 'p1' && x.playedOk).length === 4;
+  const p2v = R.items.find((x) => x.phase === 'p2' && x.type === 'video');
+  const p2a = R.items.find((x) => x.phase === 'p2' && x.type === 'audio');
+  const p2ok = !!(p2v && p2v.playedOk && p2a && p2a.playedOk);
+  const clean = !S.errors.some((e) => /FATAL|error code|403/.test(e.detail));
+  R.verdict = { p1ok, p2ok, mediaErrorFree: clean };
+  await fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(R, null, 1) });
+  document.title = 'REMIXER ' + (p1ok && p2ok && clean ? 'OK' : 'PARTIAL');
+}
+
+if (AUTOTEST) autotest().catch((e) => { recErr('autotest', String(e) + '\n' + (e && e.stack)); fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fatal: String(e), stack: String(e && e.stack), errors: S.errors, apiCalls: S.apiLog }) }); document.title = 'REMIXER FAIL'; });
+else dialYear(+QS.get('year') || 1965);
+</script>
