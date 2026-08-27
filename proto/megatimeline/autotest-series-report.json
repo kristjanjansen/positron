@@ -1,0 +1,361 @@
+{
+ "at": "2026-08-27T15:36:09.812Z",
+ "steps": {
+  "decadesInSeriesView": {
+   "tier": "decades",
+   "zx": 0.03497066605314621,
+   "view": "series",
+   "laneCount": 3,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 0,
+   "imgsLoaded": 0,
+   "imgsTotal": 0,
+   "apiSearch": 0,
+   "apiItem": 0,
+   "yearDataKeys": [],
+   "itemsLoaded": 0,
+   "metrics": {
+    "imgLoadedEvents": 0,
+    "mounts": []
+   }
+  },
+  "dive": {
+   "tier": "days",
+   "zx": 4.164383561643834,
+   "view": "series",
+   "laneCount": 8,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 27,
+   "imgsLoaded": 27,
+   "imgsTotal": 27,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 27,
+    "mounts": [
+     {
+      "newCards": 27,
+      "mountMs": 1.4,
+      "firstImgMs": 10
+     }
+    ]
+   }
+  },
+  "series1965": {
+   "tier": "days",
+   "zx": 4.164383561643834,
+   "view": "series",
+   "laneCount": 8,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 27,
+   "imgsLoaded": 27,
+   "imgsTotal": 27,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 27,
+    "mounts": [
+     {
+      "newCards": 27,
+      "mountMs": 1.4,
+      "firstImgMs": 10
+     }
+    ]
+   }
+  },
+  "flight": {
+   "frames": 483,
+   "p50": 8.3,
+   "p95": 9.2,
+   "max": 10.3
+  },
+  "dive2": {
+   "tier": "days",
+   "zx": 4.164383561643835,
+   "view": "series",
+   "laneCount": 8,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 27,
+   "imgsLoaded": 27,
+   "imgsTotal": 27,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 54,
+    "mounts": [
+     {
+      "newCards": 27,
+      "mountMs": 1.4,
+      "firstImgMs": 10
+     },
+     {
+      "newCards": 27,
+      "mountMs": 0.6,
+      "firstImgMs": 7
+     }
+    ]
+   }
+  },
+  "final": {
+   "tier": "days",
+   "zx": 4.164383561643835,
+   "view": "series",
+   "laneCount": 8,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 27,
+   "imgsLoaded": 27,
+   "imgsTotal": 27,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 54,
+    "mounts": [
+     {
+      "newCards": 27,
+      "mountMs": 1.4,
+      "firstImgMs": 10
+     },
+     {
+      "newCards": 27,
+      "mountMs": 0.6,
+      "firstImgMs": 7
+     }
+    ]
+   }
+  },
+  "toggleHide": {
+   "hidden": true,
+   "laneCount": 7
+  },
+  "toggleAfterZoom": {
+   "stillHidden": true,
+   "laneCount": 7
+  },
+  "toggleRestore": {
+   "restored": true
+  },
+  "viewSwitch": {
+   "typeMode": "type",
+   "typeLanes": 3,
+   "backMode": "series",
+   "backLanes": 8
+  }
+ },
+ "consoleErrors": [],
+ "asserts": {
+  "censusLoaded": true,
+  "seriesMode": true,
+  "namedSeriesLanes6plus": true,
+  "itemsDistributed": true,
+  "thumbsLoaded": true,
+  "cardsWithinCap": true,
+  "zeroUpstream": true,
+  "consoleClean": true,
+  "frameP50Sane": true,
+  "togglesWork": true,
+  "viewSwitchWorks": true
+ },
+ "statsBefore": {
+  "startedAt": "2026-08-27T15:36:09.899Z",
+  "upstreamSearch": 0,
+  "upstreamContent": 0,
+  "cacheHitSearch": 0,
+  "cacheHitItem": 0,
+  "upstreamTotal": 0
+ },
+ "laneReport": {
+  "mode": "series",
+  "view": "series",
+  "lanes": [
+   {
+    "key": "series:AK filmikroonika 1958-1991",
+    "kind": "series",
+    "label": "AK filmikroonika 1958-1991",
+    "count": 282,
+    "inView": 282,
+    "y": 40,
+    "h": 104
+   },
+   {
+    "key": "series:Päevakaja",
+    "kind": "series",
+    "label": "Päevakaja",
+    "count": 95,
+    "inView": 95,
+    "y": 150,
+    "h": 72
+   },
+   {
+    "key": "series:Kuuldemäng",
+    "kind": "series",
+    "label": "Kuuldemäng",
+    "count": 43,
+    "inView": 43,
+    "y": 228,
+    "h": 72
+   },
+   {
+    "key": "series:Head und, mudilased!",
+    "kind": "series",
+    "label": "Head und, mudilased!",
+    "count": 37,
+    "inView": 37,
+    "y": 306,
+    "h": 72
+   },
+   {
+    "key": "series:Soomekeelne saade",
+    "kind": "series",
+    "label": "Soomekeelne saade",
+    "count": 24,
+    "inView": 24,
+    "y": 384,
+    "h": 72
+   },
+   {
+    "key": "series:Kristall",
+    "kind": "series",
+    "label": "Kristall",
+    "count": 19,
+    "inView": 19,
+    "y": 462,
+    "h": 72
+   },
+   {
+    "key": "series:Näitlejad esitavad oma lemmikteoseid",
+    "kind": "series",
+    "label": "Näitlejad esitavad oma lemmikteoseid",
+    "count": 10,
+    "inView": 10,
+    "y": 540,
+    "h": 72
+   },
+   {
+    "key": "series:__muu",
+    "kind": "series",
+    "label": "muu / other",
+    "count": 299,
+    "inView": 299,
+    "y": 618,
+    "h": 104
+   }
+  ]
+ },
+ "laneReportFinal": {
+  "mode": "series",
+  "view": "series",
+  "lanes": [
+   {
+    "key": "series:AK filmikroonika 1958-1991",
+    "kind": "series",
+    "label": "AK filmikroonika 1958-1991",
+    "count": 282,
+    "inView": 282,
+    "y": 40,
+    "h": 104
+   },
+   {
+    "key": "series:Päevakaja",
+    "kind": "series",
+    "label": "Päevakaja",
+    "count": 95,
+    "inView": 95,
+    "y": 150,
+    "h": 72
+   },
+   {
+    "key": "series:Kuuldemäng",
+    "kind": "series",
+    "label": "Kuuldemäng",
+    "count": 43,
+    "inView": 43,
+    "y": 228,
+    "h": 72
+   },
+   {
+    "key": "series:Head und, mudilased!",
+    "kind": "series",
+    "label": "Head und, mudilased!",
+    "count": 37,
+    "inView": 37,
+    "y": 306,
+    "h": 72
+   },
+   {
+    "key": "series:Soomekeelne saade",
+    "kind": "series",
+    "label": "Soomekeelne saade",
+    "count": 24,
+    "inView": 24,
+    "y": 384,
+    "h": 72
+   },
+   {
+    "key": "series:Kristall",
+    "kind": "series",
+    "label": "Kristall",
+    "count": 19,
+    "inView": 19,
+    "y": 462,
+    "h": 72
+   },
+   {
+    "key": "series:Näitlejad esitavad oma lemmikteoseid",
+    "kind": "series",
+    "label": "Näitlejad esitavad oma lemmikteoseid",
+    "count": 10,
+    "inView": 10,
+    "y": 540,
+    "h": 72
+   },
+   {
+    "key": "series:__muu",
+    "kind": "series",
+    "label": "muu / other",
+    "count": 299,
+    "inView": 299,
+    "y": 618,
+    "h": 104
+   }
+  ]
+ },
+ "statsAfter": {
+  "startedAt": "2026-08-27T15:36:09.899Z",
+  "upstreamSearch": 0,
+  "upstreamContent": 0,
+  "cacheHitSearch": 9,
+  "cacheHitItem": 0,
+  "upstreamTotal": 0
+ },
+ "upstreamDelta": 0,
+ "ok": true
+}

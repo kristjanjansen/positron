@@ -24,6 +24,29 @@
   .trackLab { position: absolute; left: 8px; letter-spacing: 2px; font-size: 11px;
     opacity: .75; text-shadow: 0 0 4px #000; }
   .trackSub { position: absolute; left: 8px; color: #556; font-size: 10px; }
+  .laneLab { letter-spacing: 0; font-size: 10px; opacity: 1; background: #0a0a0cd0;
+    padding: 1px 5px; border-radius: 2px; max-width: 320px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .laneLab .laneCount { color: #778; }
+  /* track panel (tracks-are-queries UI) */
+  #panel { position: fixed; right: 8px; top: 36px; z-index: 6; min-width: 210px;
+    max-width: 280px; background: #101016ec; border: 1px solid #2a2a34;
+    border-radius: 3px; font-size: 11px; backdrop-filter: blur(2px); }
+  #panelHead { padding: 5px 9px; cursor: pointer; color: #aab; letter-spacing: 1px;
+    user-select: none; }
+  #panelHead .chev { float: right; color: #667; }
+  #panel.closed #panelBody { display: none; }
+  #panelBody { padding: 5px 9px 9px; border-top: 1px solid #22222a; }
+  .pv { display: flex; gap: 4px; margin: 2px 0 8px; }
+  .pv button { flex: 1; background: #16161e; color: #99a; border: 1px solid #2a2a34;
+    font: inherit; font-size: 11px; padding: 3px 0; cursor: pointer; border-radius: 2px; }
+  .pv button.on { background: #26263a; color: #fff; border-color: #4a4a5e; }
+  .laneRow { display: flex; align-items: center; gap: 6px; padding: 2px 0;
+    cursor: pointer; color: #bbc; }
+  .laneRow input { accent-color: #556; margin: 0; flex: none; }
+  .laneRow .ln { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .laneRow .lc { margin-left: auto; color: #667; flex: none; }
+  .pnote { margin-top: 7px; color: #556; font-size: 10px; line-height: 1.35; }
   /* thumbnail cards */
   #cards { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; z-index: 2; }
   .card { position: absolute; left: 0; top: 0; will-change: transform; cursor: pointer; }
@@ -56,6 +79,7 @@
   <div id="ruler"><div id="rulerInner"></div></div>
 </div>
 <div id="hover"></div>
+<div id="panel"><div id="panelHead">TRACKS <span class="chev">▾</span></div><div id="panelBody"></div></div>
 <div id="hud">loading census…</div>
 <div id="help">wheel = zoom · drag = pan · dbl-click a year = dive · click item = play (remixer :8891)</div>
 
@@ -93,13 +117,28 @@ const REMIXER = 'http://localhost:8891';
 const MAX_CARDS = 300;
 const PAGE_CAP = 5;            // max pages of 100 per (year, type)
 
+// series lanes (tracks-are-queries, plan §4): top-N series by loaded item
+// count within the visible years, the rest pooled in one "muu / other" lane.
+const SERIES_N = 7;
+const SL_TOP = 40;             // first lane y (matches type view)
+const SL_GAP = 6;
+const SL_THUMB_H = 104;        // lane with video/photo cards (71px card fits)
+const SL_AUDIO_H = 72;         // audio-only lane (40px waveform strip fits)
+
 // ─── state ──────────────────────────────────────────────────────────────────
 const S = {
   census: null, censusMax: { audio: 1, video: 1, photo: 1 },
+  censusTotal: { audio: 0, video: 0, photo: 0 },
   yearData: new Map(),         // 'type:year' -> {items, bySlug, total, pagesLoaded, status}
   contentCache: new Map(),     // slug -> content record
   apiSearch: 0, apiItem: 0,    // client-issued API-layer fetches
   consoleClean: true,
+  view: 'type',                // 'type' | 'series' (master switch; decades tier
+                               // always renders the type census — series data
+                               // does not exist at census granularity)
+  hidden: new Set(),           // lane keys toggled off ('type:video', 'series:…')
+  seriesDerived: [],           // settle-derived [{name,label,count,types,hasThumbs,color,muu}]
+  dataVersion: 0,              // bumped per landed page → re-derive trigger
 };
 const metrics = {
   settleAt: 0, imgLoaded: 0,
@@ -136,13 +175,18 @@ async function fetchPage(type, year, page) {
       yd.bySlug.add(h.url);
       let wf = null;
       if (t === 'audio' && h.waveform) { try { wf = JSON.parse(h.waveform); } catch {} }
+      // series nav link (measured shape: navigationLinks[{type:'series',data:[{name,url}]}])
+      const serNav = (h.navigationLinks || []).find((n) => n.type === 'series');
+      const ser = (serNav && serNav.data && serNav.data[0]) || null;
       yd.items.push({ type: t, slug: h.url, title: h.heading, iso: h.date,
-        d: Date.parse(h.date) / MS_DAY, photoUrl: h.photoUrl || '', wf, lead: h.lead || '' });
+        d: Date.parse(h.date) / MS_DAY, photoUrl: h.photoUrl || '', wf, lead: h.lead || '',
+        series: ser ? ser.name : '', seriesUrl: ser ? ser.url : '' });
     }
   }
   yd.items.sort((a, b) => a.d - b.d);
   yd.pagesLoaded = Math.max(yd.pagesLoaded, page);
   yd.status = 'ready';
+  S.dataVersion++;
 }
 
 async function ensureContent(item) {
@@ -242,6 +286,137 @@ function durOf(it) {
   return k ? k.value : null;
 }
 
+// ─── tracks are queries (plan §4): series lanes ─────────────────────────────
+// deriveSeries runs on SETTLE only (never per pan/zoom frame): group the
+// loaded items of the visible years by their series nav link, top SERIES_N by
+// count become lanes, everything else (incl. series-less items) pools into
+// "muu / other". Zero upstream cost — it reads what the tile loader already
+// fetched. Decades tier is untouched: census has no series dimension.
+let seriesDeriveKey = '';
+function domColor(types) {
+  const best = ['video', 'audio', 'photo'].reduce((a, b) => (types[b] > types[a] ? b : a));
+  return trackOf[best].color;
+}
+function deriveSeries() {
+  if (S.view !== 'series' || tierOf(viewport.zx) === 'decades') return;
+  const [d0, d1] = visibleX();
+  const y0 = Math.max(1908, yearOfDay(d0)), y1 = Math.min(2026, yearOfDay(d1));
+  const key = `${y0}-${y1}|v${S.dataVersion}`;
+  if (key === seriesDeriveKey) return;
+  seriesDeriveKey = key;
+  const counts = new Map();    // series name ('' = none) -> {count, types}
+  for (const t of ['video', 'audio', 'photo']) {
+    for (let y = y0; y <= y1; y++) {
+      const yd = S.yearData.get(t + ':' + y);
+      if (!yd) continue;
+      for (const it of yd.items) {
+        let c = counts.get(it.series);
+        if (!c) counts.set(it.series, (c = { count: 0, types: { video: 0, audio: 0, photo: 0 } }));
+        c.count++; c.types[t]++;
+      }
+    }
+  }
+  const named = [...counts].filter(([n]) => n).sort((a, b) => b[1].count - a[1].count);
+  const top = named.slice(0, SERIES_N);
+  const muu = { count: 0, types: { video: 0, audio: 0, photo: 0 } };
+  const rest = named.slice(SERIES_N).map(([, c]) => c);
+  if (counts.has('')) rest.push(counts.get(''));
+  for (const c of rest) {
+    muu.count += c.count;
+    for (const t in muu.types) muu.types[t] += c.types[t];
+  }
+  S.seriesDerived = top.map(([name, c]) => ({
+    name, label: name, count: c.count, types: c.types,
+    hasThumbs: c.types.video + c.types.photo > 0, color: domColor(c.types), muu: false,
+  }));
+  if (muu.count) S.seriesDerived.push({
+    name: '__muu', label: 'muu / other', count: muu.count, types: muu.types,
+    hasThumbs: muu.types.video + muu.types.photo > 0, color: '#8890a0', muu: true,
+  });
+  layoutCache.sig = '';        // lane geometry changed → relayout
+}
+
+// per-lane render geometry. Type lanes keep the v0 constants exactly; series
+// lanes shrink to fit (the "track heights may shrink" call).
+function typeGeom(t) {
+  return {
+    tickY: 14, tickRows: 3, tickStep: 9, tickH: 12,
+    monthY: 30, monthStep: 7, monthH: 5, yearY: t.h - 20, yearH: 7,
+    wf: t.id === 'audio' ? { y: 34, h: 46, lanes: 2, alpha: 0.75 } : null,
+    cards: t.id === 'video' || t.id === 'photo' ? { y: 26 } : null,
+  };
+}
+function seriesGeom(h, hasThumbs) {
+  return {
+    tickY: 8, tickRows: 2, tickStep: 7, tickH: 9,
+    monthY: h - 26, monthStep: 5, monthH: 4, yearY: h - 9, yearH: 4,
+    // mixed lanes draw strips faint UNDER the DOM cards; audio-only lanes get
+    // the strip as the main visual
+    wf: hasThumbs ? { y: 30, h: h - 44, lanes: 1, alpha: 0.4 }
+                  : { y: 26, h: h - 32, lanes: 1, alpha: 0.75 },
+    cards: hasThumbs ? { y: 28 } : null,
+  };
+}
+
+// layoutLanes: cheap, cached by signature; safe to call per frame. Modes:
+// 'census' (decades tier — ALWAYS the three type tracks, unchanged),
+// 'type' (toggleable type lanes, reflowed), 'series' (derived lanes).
+let layoutCache = { sig: null, lanes: [], byName: new Map(), byType: {}, muu: null, mode: 'census' };
+function layoutLanes() {
+  const tier = tierOf(viewport.zx);
+  const mode = tier === 'decades' ? 'census' : S.view;
+  const sig = mode + '|' + seriesDeriveKey + '|' + [...S.hidden].join(',');
+  if (layoutCache.sig === sig) return layoutCache;
+  const lanes = [];
+  const byName = new Map();
+  const byType = {};
+  let muu = null;
+  if (mode === 'census') {
+    for (const t of TRACKS) {
+      lanes.push({ key: 'type:' + t.id, kind: 'type', label: t.label, sub: t.sub,
+        color: t.color, y: t.y, h: t.h, censusType: t.id, count: S.censusTotal[t.id], geom: typeGeom(t) });
+    }
+    setWorldHeight(620);
+  } else if (mode === 'type') {
+    let y = SL_TOP;
+    for (const t of TRACKS) {
+      if (S.hidden.has('type:' + t.id)) continue;
+      const lane = { key: 'type:' + t.id, kind: 'type', label: t.label, sub: t.sub,
+        color: t.color, y, h: t.h, censusType: t.id, count: S.censusTotal[t.id], geom: typeGeom(t) };
+      byType[t.id] = lane;
+      lanes.push(lane);
+      y += t.h + 20;           // reproduces the v0 y positions when none hidden
+    }
+    setWorldHeight(Math.max(300, y - 20 + 12));
+  } else {                     // series
+    let y = SL_TOP;
+    for (const sd of S.seriesDerived) {
+      const key = 'series:' + sd.name;
+      if (S.hidden.has(key)) {
+        if (!sd.muu) byName.set(sd.name, null);   // hidden: items vanish, not into muu
+        continue;
+      }
+      const h = sd.hasThumbs ? SL_THUMB_H : SL_AUDIO_H;
+      const lane = { key, kind: 'series', label: sd.label, count: sd.count,
+        color: sd.color, y, h, geom: seriesGeom(h, sd.hasThumbs) };
+      if (sd.muu) muu = lane; else byName.set(sd.name, lane);
+      lanes.push(lane);
+      y += h + SL_GAP;
+    }
+    setWorldHeight(Math.max(300, y - SL_GAP + 12));
+  }
+  layoutCache = { sig, lanes, byName, byType, muu, mode };
+  return layoutCache;
+}
+// item → lane (null = not rendered under current view/toggles)
+function laneFor(L, it) {
+  if (L.mode === 'series') {
+    const v = L.byName.get(it.series);
+    return v === undefined ? L.muu : v;
+  }
+  return L.byType[it.type] || null;
+}
+
 // ─── canvas field layer ─────────────────────────────────────────────────────
 const canvas = $('field');
 const ctx = canvas.getContext('2d');
@@ -265,86 +440,98 @@ function draw() {
   hitRects = [];
   const [d0, d1] = visibleX();
   const tier = tierOf(viewport.zx);
+  const L = layoutLanes();
   const yOff = worldToScreenY(0);            // world y0 in screen coords
 
-  // track backgrounds
-  for (const t of TRACKS) {
+  // lane backgrounds
+  for (const l of L.lanes) {
     ctx.fillStyle = '#101016';
-    ctx.fillRect(0, yOff + t.y, w, t.h);
+    ctx.fillRect(0, yOff + l.y, w, l.h);
     ctx.fillStyle = '#26262e';
-    ctx.fillRect(0, yOff + t.y + t.h, w, 1);
+    ctx.fillRect(0, yOff + l.y + l.h, w, 1);
   }
 
-  // decades histogram (census) — always drawn, faint above the decades tier
+  // census histogram — decades tier fully; faint above it on type lanes only
+  // (series lanes have no census dimension — honest absence, plan §4 + rule 3)
   if (S.census) {
     const alpha = tier === 'decades' ? 0.85 : 0.16;
-    for (const t of TRACKS) {
-      ctx.fillStyle = t.color;
+    for (const l of L.lanes) {
+      if (!l.censusType) continue;
+      ctx.fillStyle = l.color;
       ctx.globalAlpha = alpha;
-      const max = S.censusMax[t.id];
+      const max = S.censusMax[l.censusType];
       const y0v = Math.max(1908, yearOfDay(d0) - 1), y1v = Math.min(2026, yearOfDay(d1) + 1);
       for (let y = y0v; y <= y1v; y++) {
-        const n = censusCount(t.id, y);
+        const n = censusCount(l.censusType, y);
         if (!n) continue;
         const x0 = worldToScreenX(dayUTC(y)), x1 = worldToScreenX(dayUTC(y + 1));
-        const bh = Math.max(1, (t.h - 24) * Math.sqrt(n / max));
-        ctx.fillRect(x0, yOff + t.y + t.h - bh, Math.max(1, x1 - x0 - 0.6), bh);
+        const bh = Math.max(1, (l.h - 24) * Math.sqrt(n / max));
+        ctx.fillRect(x0, yOff + l.y + l.h - bh, Math.max(1, x1 - x0 - 0.6), bh);
       }
       ctx.globalAlpha = 1;
     }
   }
 
-  // years tier + days tier: ticks and precision bands from loaded items
+  // years tier + days tier: ticks and precision bands, item routed to its lane
   if (tier !== 'decades') {
     const y0v = Math.max(1908, yearOfDay(d0)), y1v = Math.min(2026, yearOfDay(d1));
-    for (const t of TRACKS) {
-      const ty = yOff + t.y;
-      const yearOnly = new Map();   // year -> count (aggregate the faint band)
+    const yearAgg = new Map();   // lane -> Map(year -> count) for the faint bands
+    for (const trk of ['video', 'audio', 'photo']) {
+      const color = trackOf[trk].color;      // item keeps its TYPE color in any lane
       for (let y = y0v; y <= y1v; y++) {
-        const yd = S.yearData.get(t.id + ':' + y);
+        const yd = S.yearData.get(trk + ':' + y);
         if (!yd || !yd.items.length) continue;
         for (let i = 0; i < yd.items.length; i++) {
           const it = yd.items[i];
           if (it.d < d0 - 40 || it.d > d1 + 40) continue;
+          const lane = laneFor(L, it);
+          if (!lane) continue;
+          const g = lane.geom, ty = yOff + lane.y;
           const b = decodeItem(it);
-          const x = worldToScreenX(it.d);
-          if (b.prec === 'year') { yearOnly.set(b.Y, (yearOnly.get(b.Y) || 0) + 1); continue; }
+          if (b.prec === 'year') {
+            let m = yearAgg.get(lane);
+            if (!m) yearAgg.set(lane, (m = new Map()));
+            m.set(b.Y, (m.get(b.Y) || 0) + 1);
+            continue;
+          }
           if (b.prec === 'month') {
             const mx0 = worldToScreenX(dayUTC(b.Y, b.M - 1, 1));
             const mx1 = worldToScreenX(dayUTC(b.Y, b.M, 1));
-            ctx.fillStyle = t.color;
+            ctx.fillStyle = color;
             ctx.globalAlpha = 0.16;
-            const my = ty + 30 + (b.M % 2) * 7;
-            ctx.fillRect(mx0, my, mx1 - mx0, 5);
+            const my = ty + g.monthY + (b.M % 2) * g.monthStep;
+            ctx.fillRect(mx0, my, mx1 - mx0, g.monthH);
             ctx.globalAlpha = 1;
-            hitRects.push({ x: mx0, y: my - 3, w: mx1 - mx0, h: 11, item: it });
+            hitRects.push({ x: mx0, y: my - 3, w: mx1 - mx0, h: g.monthH + 6, item: it });
           } else {
-            ctx.fillStyle = t.color;
+            const x = worldToScreenX(it.d);
+            ctx.fillStyle = color;
             ctx.globalAlpha = 0.9;
-            const tyk = ty + 14 + (i % 3) * 9;
-            ctx.fillRect(x - 1, tyk, 2, 12);
+            const tyk = ty + g.tickY + (i % g.tickRows) * g.tickStep;
+            ctx.fillRect(x - 1, tyk, 2, g.tickH);
             ctx.globalAlpha = 1;
-            hitRects.push({ x: x - 4, y: tyk - 2, w: 8, h: 16, item: it });
+            hitRects.push({ x: x - 4, y: tyk - 2, w: 8, h: g.tickH + 4, item: it });
           }
         }
       }
-      // aggregated year-only bands: one faint full-year band, alpha by count
-      for (const [Y, n] of yearOnly) {
+    }
+    // aggregated year-only bands per lane: one faint full-year band, alpha by count
+    for (const [lane, m] of yearAgg) {
+      const g = lane.geom;
+      ctx.fillStyle = lane.color;
+      for (const [Y, n] of m) {
         const x0 = worldToScreenX(dayUTC(Y)), x1 = worldToScreenX(dayUTC(Y + 1));
-        ctx.fillStyle = t.color;
         ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n);
-        ctx.fillRect(x0, ty + t.h - 20, x1 - x0, 7);
-        ctx.globalAlpha = 1;
+        ctx.fillRect(x0, yOff + lane.y + g.yearY, x1 - x0, g.yearH);
       }
+      ctx.globalAlpha = 1;
     }
   }
 
   // days tier: audio waveform strips (free arrays from search hits — no media)
   if (tier === 'days') {
-    const t = trackOf.audio;
-    const ty = yOff + t.y;
-    const stripW = 140, stripH = 46;
-    const lanes = [-Infinity, -Infinity];
+    const stripW = 140;
+    const occ = new Map();       // lane -> x-occupancy slots
     const y0v = Math.max(1908, yearOfDay(d0)), y1v = Math.min(2026, yearOfDay(d1));
     let drawn = 0;
     for (let y = y0v; y <= y1v && drawn < 200; y++) {
@@ -352,21 +539,26 @@ function draw() {
       if (!yd) continue;
       for (const it of yd.items) {
         if (it.d < d0 - 10 || it.d > d1 + 10 || !it.wf || !it.wf.length) continue;
+        const lane = laneFor(L, it);
+        if (!lane || !lane.geom.wf) continue;
+        const g = lane.geom.wf;
+        let slots = occ.get(lane);
+        if (!slots) occ.set(lane, (slots = new Array(g.lanes).fill(-Infinity)));
         const x = worldToScreenX(it.d);
-        let lane = lanes.findIndex((end) => x > end - 40);
-        if (lane === -1) continue;                     // overlap — canvas tick already shows it
-        lanes[lane] = x + stripW;
-        const sy = ty + 34 + lane * (stripH + 10);
+        const slot = slots.findIndex((end) => x > end - 40);
+        if (slot === -1) continue;                     // overlap — the tick already shows it
+        slots[slot] = x + stripW;
+        const sy = yOff + lane.y + g.y + slot * (g.h + 10);
         const max = Math.max(...it.wf, 1);
         const bw = stripW / it.wf.length;
-        ctx.fillStyle = t.color;
-        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = trackOf.audio.color;
+        ctx.globalAlpha = g.alpha;
         for (let k = 0; k < it.wf.length; k++) {
-          const bh = Math.max(1, (it.wf[k] / max) * stripH);
-          ctx.fillRect(x + k * bw, sy + (stripH - bh) / 2, Math.max(1, bw - 0.4), bh);
+          const bh = Math.max(1, (it.wf[k] / max) * g.h);
+          ctx.fillRect(x + k * bw, sy + (g.h - bh) / 2, Math.max(1, bw - 0.4), bh);
         }
         ctx.globalAlpha = 1;
-        hitRects.push({ x, y: sy, w: stripW, h: stripH, item: it });
+        hitRects.push({ x, y: sy, w: stripW, h: g.h, item: it });
         drawn++;
       }
     }
@@ -401,24 +593,30 @@ function mountCards() {
   const span = d1 - d0;
   const keep = new Set();
   if (tier === 'days') {
+    const L = layoutLanes();
     const candidates = [];
+    const occ = new Map();       // lane -> x-occupancy slots (shared video+photo in muu)
     for (const trk of ['video', 'photo']) {
-      const t = trackOf[trk];
       const cardW = trk === 'video' ? 126 : 64, cardH = trk === 'video' ? 71 : 64;
-      const laneN = Math.max(1, Math.floor((t.h - 30) / (cardH + 8)));
-      const lanes = new Array(laneN).fill(-Infinity);
       const y0v = Math.max(1908, yearOfDay(d0 - span / 2)), y1v = Math.min(2026, yearOfDay(d1 + span / 2));
       for (let y = y0v; y <= y1v; y++) {
         const yd = S.yearData.get(trk + ':' + y);
         if (!yd) continue;
         for (const it of yd.items) {
           if (!it.photoUrl || it.d < d0 - span / 2 || it.d > d1 + span / 2) continue;
+          const lane = laneFor(L, it);
+          if (!lane || !lane.geom.cards) continue;
+          const laneN = lane.kind === 'type'
+            ? Math.max(1, Math.floor((lane.h - 30) / (cardH + 8)))   // v0 numbers kept
+            : 1;                                                     // series lanes: one film strip
+          let slots = occ.get(lane);
+          if (!slots) occ.set(lane, (slots = new Array(laneN).fill(-Infinity)));
           const x = worldToScreenX(it.d);
-          let lane = -1;
-          for (let l = 0; l < laneN; l++) if (x > lanes[l] - cardW * 0.35) { lane = l; break; }
-          if (lane === -1) continue;               // too dense at this zoom — the tick shows it
-          lanes[lane] = x + cardW;
-          candidates.push({ it, x, y: t.y + 26 + lane * (cardH + 8), trk,
+          let slot = -1;
+          for (let l = 0; l < slots.length; l++) if (x > slots[l] - cardW * 0.35) { slot = l; break; }
+          if (slot === -1) continue;               // too dense at this zoom — the tick shows it
+          slots[slot] = x + cardW;
+          candidates.push({ it, x, y: lane.y + lane.geom.cards.y + slot * (cardH + 8), trk,
             dist: Math.abs(it.d - (d0 + d1) / 2) });
         }
       }
@@ -512,14 +710,86 @@ $('ruler').addEventListener('dblclick', (e) => {
   if (isFinite(a) && isFinite(b)) animateFitX(a, b, 900, markDirty);
 });
 
-// ─── furniture (track labels) ───────────────────────────────────────────────
+// ─── furniture (lane labels — DOM, rebuilt on settle when layout changed) ───
+let furnSig = null;
 function buildFurniture() {
-  const f = $('furniture');
-  f.innerHTML = TRACKS.map((t) =>
-    `<div class="trackLab" style="top:${t.y + 6}px;color:${t.color}">${t.label}</div>` +
-    `<div class="trackSub" style="top:${t.y + 22}px">${t.sub}</div>`
-  ).join('');
+  const L = layoutLanes();
+  if (L.sig === furnSig) return;
+  furnSig = L.sig;
+  const rows = L.lanes.map((l) => {
+    if (l.kind === 'series') {
+      return `<div class="trackLab laneLab" style="top:${l.y + 4}px;color:${l.color}">` +
+        `${escapeHtml(l.label)} <span class="laneCount">· ${l.count}</span></div>`;
+    }
+    return `<div class="trackLab" style="top:${l.y + 6}px;color:${l.color}">${l.label}</div>` +
+      `<div class="trackSub" style="top:${l.y + 22}px">${l.sub}</div>`;
+  });
+  if (S.view === 'series' && L.mode === 'census') {
+    rows.push(`<div class="trackSub" style="top:${620 + 8}px">seeriad ilmuvad aastavaates — zoom into a year for series lanes (census has no series dimension)</div>`);
+  }
+  if (L.mode === 'series' && !L.lanes.length) {
+    rows.push(`<div class="trackSub" style="top:${SL_TOP + 8}px">deriving series lanes from loaded items…</div>`);
+  }
+  $('furniture').innerHTML = rows.join('');
 }
+
+// ─── track panel (collapsible; lanes-are-queries toggles) ───────────────────
+let panelLanes = [];
+let panelSig = null;
+function buildPanel(force) {
+  const lanes = [];
+  if (S.view === 'type') {
+    for (const t of TRACKS) lanes.push({ key: 'type:' + t.id, label: t.label.toLowerCase(), count: S.censusTotal[t.id], color: t.color });
+  } else {
+    for (const sd of S.seriesDerived) lanes.push({ key: 'series:' + sd.name, label: sd.label, count: sd.count, color: sd.color });
+  }
+  const sig = S.view + '|' + lanes.map((l) => l.key + '=' + l.count).join(',') + '|' + [...S.hidden].join(',');
+  if (!force && sig === panelSig) return;
+  panelSig = sig;
+  panelLanes = lanes;
+  const rows = lanes.map((l, i) =>
+    `<label class="laneRow"><input type="checkbox" data-i="${i}"${S.hidden.has(l.key) ? '' : ' checked'}>` +
+    `<span class="ln" style="color:${l.color}">${escapeHtml(l.label)}</span><span class="lc">${l.count ?? ''}</span></label>`);
+  if (S.view === 'series' && !lanes.length) {
+    rows.push('<div class="pnote">zoom into a year — series lanes derive from the loaded items in view</div>');
+  }
+  $('panelBody').innerHTML =
+    `<div class="pv"><button data-v="type"${S.view === 'type' ? ' class="on"' : ''}>liigid / types</button>` +
+    `<button data-v="series"${S.view === 'series' ? ' class="on"' : ''}>seeriad / series</button></div>` +
+    rows.join('') +
+    (S.view === 'series' && lanes.length
+      ? '<div class="pnote">top series of the visible years (re-derived on zoom settle); decades tier keeps the type census</div>' : '');
+}
+function setView(v) {
+  if (S.view === v) return;
+  S.view = v;
+  seriesDeriveKey = '';        // force re-derive for the visible window
+  layoutCache.sig = null;
+  furnSig = null;
+  deriveSeries();
+  buildPanel(true);
+  buildFurniture();
+  mountCards();
+  markDirty();
+  scheduleSettleWork();
+}
+$('panel').addEventListener('click', (e) => {
+  if (e.target.closest('#panelHead')) return $('panel').classList.toggle('closed');
+  const b = e.target.closest('button[data-v]');
+  if (b) setView(b.dataset.v);
+});
+$('panel').addEventListener('change', (e) => {
+  const l = panelLanes[+e.target.dataset.i];
+  if (!l) return;
+  if (e.target.checked) S.hidden.delete(l.key); else S.hidden.add(l.key);
+  layoutCache.sig = null;
+  furnSig = null;
+  buildPanel(true);
+  buildFurniture();
+  mountCards();
+  markDirty();
+  scheduleSettleWork();
+});
 
 // ─── hover card ─────────────────────────────────────────────────────────────
 let hoverItem = null, dwellTimer = null;
@@ -528,7 +798,7 @@ function showHover(item, cx, cy) {
   const el = $('hover');
   const dur = durOf(item);
   el.innerHTML = `<div class="ht">${badgeHTML(item)} ${escapeHtml(item.title)}</div>` +
-    `<div class="hm">${item.type} · ${dur || 'duration —'}${item.lead ? '<br>' + escapeHtml(item.lead.slice(0, 180)) : ''}</div>`;
+    `<div class="hm">${item.type}${item.series ? ' · ' + escapeHtml(item.series) : ''} · ${dur || 'duration —'}${item.lead ? '<br>' + escapeHtml(item.lead.slice(0, 180)) : ''}</div>`;
   el.style.display = 'block';
   el.style.left = Math.min(cx + 14, innerWidth - 400) + 'px';
   el.style.top = Math.min(cy + 14, innerHeight - 90) + 'px';
@@ -589,9 +859,12 @@ function scheduleSettleWork() {
 }
 function onSettle() {
   metrics.settleAt = performance.now();
+  deriveSeries();              // series lanes re-derive on SETTLE only (no pan-frame churn)
   computeWanted();
   mountCards();
   buildRuler();
+  buildFurniture();
+  buildPanel();
   updateHud();
 }
 function frame(t) {
@@ -610,6 +883,7 @@ function updateHud() {
   const [d0, d1] = visibleX();
   const fmt = (d) => new Date(d * MS_DAY).toISOString().slice(0, 10);
   $('hud').innerHTML = `<b>${fmt(d0)}</b> → <b>${fmt(d1)}</b> · tier <b>${tierOf(viewport.zx)}</b>` +
+    ` · view <b>${S.view}</b> · lanes <b>${layoutLanes().lanes.length}</b>` +
     ` · zx ${viewport.zx.toFixed(3)} px/day · cards <b>${live.size}</b>` +
     ` · api search ${S.apiSearch} item ${S.apiItem}` +
     (S.census ? '' : ' · <span style="color:#e66">NO CENSUS — run census.mjs</span>');
@@ -618,6 +892,7 @@ function updateHud() {
 // ─── boot ───────────────────────────────────────────────────────────────────
 resize();
 buildFurniture();
+buildPanel(true);
 attachGestures($('stage'), markDirty);
 
 async function boot() {
@@ -626,8 +901,11 @@ async function boot() {
     if (r.ok) {
       S.census = await r.json();
       for (const t of ['audio', 'video', 'photo']) {
-        S.censusMax[t] = Math.max(1, ...Object.values(S.census.years).map((y) => y[t]));
+        const cols = Object.values(S.census.years).map((y) => y[t]);
+        S.censusMax[t] = Math.max(1, ...cols);
+        S.censusTotal[t] = cols.reduce((s, n) => s + n, 0);
       }
+      buildPanel(true);
     }
   } catch {}
   fitX(T0, T1);
@@ -639,6 +917,27 @@ async function boot() {
 window.__mt = {
   ready: false, S, viewport, metrics, live,
   tier: () => tierOf(viewport.zx),
+  setView,
+  laneReport: () => {          // lanes + how many loaded in-view items land in each
+    const L = layoutLanes();
+    const [d0, d1] = visibleX();
+    const per = new Map(L.lanes.map((l) => [l, 0]));
+    const y0 = Math.max(1908, yearOfDay(d0)), y1 = Math.min(2026, yearOfDay(d1));
+    for (const t of ['video', 'audio', 'photo']) {
+      for (let y = y0; y <= y1; y++) {
+        const yd = S.yearData.get(t + ':' + y);
+        if (!yd) continue;
+        for (const it of yd.items) {
+          if (it.d < d0 || it.d > d1) continue;
+          const lane = laneFor(L, it);
+          if (lane) per.set(lane, per.get(lane) + 1);
+        }
+      }
+    }
+    return { mode: L.mode, view: S.view, lanes: L.lanes.map((l) => ({
+      key: l.key, kind: l.kind, label: l.label, count: l.count ?? null,
+      inView: per.get(l) || 0, y: l.y, h: l.h })) };
+  },
   fitAll: () => { fitX(T0, T1); markDirty(); },
   panBy: (viewFractions) => {                 // world-pan by a fraction of the view width
     viewport.panX -= (viewFractions * innerWidth) / viewport.zx;
@@ -671,6 +970,7 @@ function snapshot() {
   const imgs = [...cardsEl.querySelectorAll('img')];
   return {
     tier: tierOf(viewport.zx), zx: viewport.zx,
+    view: S.view, laneCount: layoutLanes().lanes.length,
     censusLoaded: !!S.census, censusYears: S.census ? Object.keys(S.census.years).length : 0,
     liveCards: live.size,
     imgsLoaded: imgs.filter((i) => i.naturalWidth > 0).length,

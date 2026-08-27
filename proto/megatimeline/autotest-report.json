@@ -1,9 +1,11 @@
 {
- "at": "2026-08-27T10:18:22.628Z",
+ "at": "2026-08-27T15:34:45.055Z",
  "steps": {
   "boot": {
    "tier": "decades",
    "zx": 0.03497066605314621,
+   "view": "type",
+   "laneCount": 3,
    "censusLoaded": true,
    "censusYears": 119,
    "liveCards": 0,
@@ -22,11 +24,13 @@
    "frames": 603,
    "p50": 8.3,
    "p95": 9.8,
-   "max": 10.4
+   "max": 10.3
   },
   "dive": {
    "tier": "days",
    "zx": 4.164383561643834,
+   "view": "type",
+   "laneCount": 3,
    "censusLoaded": true,
    "censusYears": 119,
    "liveCards": 36,
@@ -45,8 +49,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.7,
-      "firstImgMs": 12
+      "mountMs": 2.1,
+      "firstImgMs": 160
      }
     ]
    }
@@ -54,6 +58,8 @@
   "months": {
    "tier": "days",
    "zx": 4.164383561643834,
+   "view": "type",
+   "laneCount": 3,
    "censusLoaded": true,
    "censusYears": 119,
    "liveCards": 36,
@@ -72,8 +78,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.7,
-      "firstImgMs": 12
+      "mountMs": 2.1,
+      "firstImgMs": 160
      }
     ]
    }
@@ -81,6 +87,8 @@
   "deep": {
    "tier": "days",
    "zx": 16.888888888888886,
+   "view": "type",
+   "laneCount": 3,
    "censusLoaded": true,
    "censusYears": 119,
    "liveCards": 44,
@@ -99,13 +107,13 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.7,
-      "firstImgMs": 12
+      "mountMs": 2.1,
+      "firstImgMs": 160
      },
      {
       "newCards": 33,
-      "mountMs": 0.8,
-      "firstImgMs": 12
+      "mountMs": 0.7,
+      "firstImgMs": 44
      }
     ]
    }
@@ -113,6 +121,8 @@
   "deepAfter": {
    "tier": "days",
    "zx": 16.888888888888886,
+   "view": "type",
+   "laneCount": 3,
    "censusLoaded": true,
    "censusYears": 119,
    "liveCards": 44,
@@ -131,13 +141,13 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.7,
-      "firstImgMs": 12
+      "mountMs": 2.1,
+      "firstImgMs": 160
      },
      {
       "newCards": 33,
-      "mountMs": 0.8,
-      "firstImgMs": 12
+      "mountMs": 0.7,
+      "firstImgMs": 44
      }
     ]
    }
@@ -152,7 +162,7 @@
   "consoleClean": true
  },
  "serverStats": {
-  "startedAt": "2026-08-27T10:18:22.712Z",
+  "startedAt": "2026-08-27T15:34:45.142Z",
   "upstreamSearch": 0,
   "upstreamContent": 0,
   "cacheHitSearch": 9,
