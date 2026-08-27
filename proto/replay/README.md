@@ -15,8 +15,10 @@ Cloudflare Stream live input (recording automatic)   RtcRoom DO cue-log
         ↓ ~12 s after stream end                     GET /room/{name}/cuelog
 VOD asset (de39bf19…, 200.02 s)                               │
         └────────────► replay.html ◄──────────────────────────┘
-                        hls.js VOD + src/timed-messages.js UNCHANGED,
-                        fed a fake `hls.playingDate` = T0 + currentTime·1000
+                        hls.js VOD + timeline/transport.mjs: one `cue`
+                        adapter on a deck whose vector is SLAVED to
+                        T0 + video.currentTime·1000 (the video is the
+                        clock master) — see "the replay engine" below
 ```
 
 ## The one hard fact this design hangs on
@@ -53,40 +55,67 @@ lower renditions exist), and enables self-calibrating replay plus periodic
 re-anchoring across mid-stream ingest gaps (a gap shifts PTS vs wall clock;
 re-deriving T0 every few seconds would absorb it — not exercised here).
 
-## The replay engine is the live engine
+## The replay engine is the timeline library (since 2026-08-28, DoD-A)
 
-`replay.html` imports `createTimedMessages` from `src/timed-messages.js`
-**unchanged** and hands it a fake player:
+`replay.html` used to import `createTimedMessages` from
+`src/timed-messages.js` and hand it a fake player whose `hls.playingDate` was
+`T0 + video.currentTime*1000` — a 100 ms poll, destroyed and rebuilt from the
+whole cue log on every `seeked`. It is now ONE deck from
+`timeline/transport.mjs` with ONE adapter:
 
 ```js
-{ hls: { get playingDate() { return new Date(T0 + video.currentTime * 1000); } } }
+const cueAdapter = {
+  caps: { kind:'cue', domain:'wall', unit:'ms', seekable:true, reducible:true,
+          catchUp:'burst' },                       // a cue is a note
+  actuate(p, rec) { deliver(p, rec); },            // = the page's render path
+  reduce(payloads) { return new Set(payloads.map(p => p.id)); },  // fired set ≤ t
+  assertState(set, info) { /* behind the playhead = caught-up, never re-animated */ },
+};
 ```
 
-Crossing rule, ordering, `pastWindow` catch-up — all the live code. Seeks
-follow the repo's rebuild-never-patch rule: on `seeked` the engine is
-destroyed and rebuilt from the full cue log; the first tick fires the newest
-past cues and routes older ones through `onMissed` as caught-up (rendered
-grey "CAUGHT UP", never re-animated). Backward seeks therefore rewind state
-for free, and the cues ahead become pending again and re-fire on the way up.
+- Position domain is **absolute wall ms** — a cue's `at` *is* its position.
+- **The video element is the clock master**: `deck.sync(T0 + currentTime*1000)`
+  every rAF (tolerance 10 ms), with `timeupdate` as the hidden-tab backstop. A
+  paused or stalled master pauses the deck — cues cannot run ahead of the
+  picture. A discontinuity > 400 ms is routed to `seek()`, never `sync()`
+  (syncing across a jump would leave the skipped cues pending and burst them).
+- **Seek is a fold, not a rebuild**: the library reconciles statuses (behind →
+  passed, ahead → pending) and re-runs `reduce`/`assertState`, so backward
+  seeks rewind for free and the cues ahead re-fire on the way up — same
+  semantics as before, without replaying the log. `pastWindow` survives as the
+  rule that downgrades a *burst-late* delivery (a real stall) to caught-up.
+- Fires ride a **worker** tick host with a committed one-shot timer per cue:
+  no poll floor, and no 1 Hz clamp when the tab is backgrounded.
+
+Full adoption record, the pre-adoption measurement and the library seams:
+`NOTES.md`.
 
 ## Measured (VOD de39bf1916469a4bc8b18e73a8726762, 12 cues, all checks green)
 
 Per-cue error = decoded burned wall-clock on the glass at the fire moment −
 `fireAt` (content-referenced, so this is pure engine error):
 
-| cue | mode | err ms | | cue | mode | err ms |
-|---|---|---|---|---|---|---|
-| CUE-01 | now | 59 | | CUE-07 | now | 49 |
-| CUE-02 | sched | 42 | | CUE-08 | sched | 65 |
-| CUE-03 | now | 56 | | CUE-09 | now | 37 |
-| CUE-04 | sched | 71 | | CUE-10 | sched | 62 |
-| CUE-05 | now | 53 | | CUE-11 | now | 41 |
-| CUE-06 | sched | 69 | | CUE-12 | sched | 60 |
+| cue | mode | err ms (lib) | err ms (old) | | cue | mode | err ms (lib) | err ms (old) |
+|---|---|---|---|---|---|---|---|---|
+| CUE-01 | now | **25** | 59 | | CUE-07 | now | **16** | 49 |
+| CUE-02 | sched | **9** | 42 | | CUE-08 | sched | **31** | 65 |
+| CUE-03 | now | **24** | 56 | | CUE-09 | now | **5** | 37 |
+| CUE-04 | sched | **6** | 71 | | CUE-10 | sched | **−4** | 62 |
+| CUE-05 | now | **21** | 53 | | CUE-11 | now | **8** | 41 |
+| CUE-06 | sched | **34** | 69 | | CUE-12 | sched | **−6** | 60 |
 
-**p50 = 59 ms, p95 = 71 ms, range 37–71 ms** — inside the live engine's own
-65–98 ms band and comfortably under the 150 ms target. (Components: ≤100 ms
-poll + ~33 ms frame quantization; the tight clustering is partly aliasing —
-cues every 15.000 s against the 100 ms poll grid lock phase.)
+**p50 = 16 ms, p95 = 34 ms, range −6…34** (11/11 checks green) — down from
+**p50 59 / p95 71** on the hand-rolled engine, whose error was one poll
+interval: engine lateness went p50 52 ms → **5.5 ms**. A negative err is not an
+early fire (engine lateness never went below 0); it means the frame drawn at
+the fire moment is the one before the cue's — at this accuracy the ground
+truth's own 33 ms frame grid is the dominant term.
+
+The old table was also **phase-locked, not sampled**: re-run two days later it
+reproduced all twelve values bit-identically (cues every 15.000 s = 150 poll
+periods). Its honest spec was 0–100 ms + quantization, worst case ~133 ms
+against the 150 ms target; proto/archive read 129 ms at a locked worst-case
+phase. The library number has no such phase.
 
 Seek tests (all asserted programmatically, 11/11 checks pass): late join at
 +65 s shows CUE-04 immediately as caught-up with zero re-fires, CUE-05 then
@@ -99,12 +128,14 @@ re-fires at 56 ms error.
 The cue row in the pixels records when each cue fired **live**; comparing
 replay fire moments against it:
 
-- **"now" cues** (sent at the fire moment): replay − live = **0…1 ms**. Live
-  pays WS transit + draw tick (37–59 ms measured); replay pays engine poll +
-  frame quantization (37–71 ms). The two delays happen to cancel here.
-- **scheduled cues** (delivered 2 s early): replay − live = **+33…+67 ms**.
-  The live stage had them queued and fired within 2–31 ms; replay still pays
-  its poll floor.
+- **"now" cues** (sent at the fire moment): replay − live = **−32…−34 ms**.
+  Live pays WS transit + draw tick (37–59 ms measured); replay now pays only
+  frame quantization. *(Before the library adoption this read 0…1 ms and the
+  README called the two delays "cancelling" — they were: live transit ≈ replay
+  poll floor. Removing the poll floor exposed the real offset.)*
+- **scheduled cues** (delivered 2 s early): replay − live = **0…+32 ms** (was
+  +33…+67 ms). The live stage had them queued and fired within 2–31 ms; replay
+  now fires at intent.
 
 So replay does NOT reproduce the live experience exactly — it honors
 **operator intent** (`fireAt`). `replay.html?fireDelayMs=N` shifts every fire
@@ -118,7 +149,9 @@ a cue's content-referenced fire from +53 ms to +581 ms). Default 0 = intent.
 - `operator.mjs` — sends the cue schedule with sender-side stamps.
 - `run-record.mjs` — p3b pipeline driver (screencast → ffmpeg → RTMPS),
   stamps T0 candidates, polls the VOD, saves cuelog + live-fire telemetry.
-- `replay.html` — hls.js VOD + the live cue engine in replay mode (above).
+- `replay.html` — hls.js VOD + the timeline library's cue lane (above).
+- `NOTES.md` — the DoD-A adoption record: old-path measurement, what replaced
+  it, the gate numbers on both anchors, library seams found.
 - `run-measure.mjs` — the measurement: straight-through, late join, seeks.
 - `replay-server.py` — static server (project root) + `/collect`, port 8885.
 - `artifacts/` — run meta, cuelog, live fires, per-cue report
@@ -149,9 +182,10 @@ http://127.0.0.1:8885/proto/replay/replay.html?src=<VOD m3u8>&room=replay-test&t
 - **Mid-stream ingest gaps**: Stream splices them out of the VOD; a single T0
   is then wrong after the gap. Periodic re-anchoring from the timecode strip
   (or a segment-map you record yourself) is required for gap-crossing cues.
-- **Cue revisions/cancels in the log**: the cuelog stores every frame; replay
-  currently applies same-id revision by replay order (engine `add` semantics).
-  A production log should be compacted (last revision wins, cancels honored).
+- **Cue revisions/cancels in the log**: the cuelog stores every frame;
+  `loadCues()` now compacts it explicitly — **last record per id wins**, cancel
+  records (`{kind:'cancel', id}`) drop the cue — instead of leaning on engine
+  `add()` ordering. Producer-side compaction is still the better place for it.
 - **DRM/signed URLs**: this VOD is public; signed playback changes nothing in
   the design (the anchor is in the pixels) but the cuelog fetch needs auth.
 - **UI**: the overlay here is a test harness; a show player would route

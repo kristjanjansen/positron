@@ -148,6 +148,54 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### DoD-A DISCHARGED (session 6u) — ✅ replay.html ON THE LIBRARY, both suites PASS
+plan-studio §5's named gate: "replay.html REFACTORED onto the lib and the
+existing measurement suite passes" — **PASS, and the numbers improved 3–4×.**
+- `run-measure.mjs` (content anchor): **11/11**, p50 **16** / p95 **34 ms**
+  (was 59/71); engine lateness p50 **5.5**, max 9 (was 52).
+- `run-measure-archive.mjs` (native T₀, kept R2 show): **7/7**, p50 **−4** /
+  p95 **11 ms** (was 77/95); anchor delta unchanged at −15 ms. Negative errs
+  are NOT early fires — the burned-clock ground truth's own 33 ms frame grid is
+  now the dominant term.
+- **THE METHODOLOGICAL FINDING (correct the record): the project's most-quoted
+  latency figure was ONE DETERMINISTIC PHASE SAMPLE, not a distribution.** The
+  old path's twelve errors came back BIT-IDENTICAL two days later on a fresh
+  browser — impossible for a 100 ms poll unless the phase is locked, and it
+  was: cues every 15.000 s = exactly 150 poll periods. Honest old spec was
+  0–100 ms + quantization, worst case ~133 ms against a 150 ms target
+  (proto/archive read 129 ms at a locked worst-case phase). **Real margin ~11 %,
+  presented as 60 %.** Measurement cadences must be de-aliased forever (the
+  fractional-offset rule from proto/archive, now mandatory everywhere).
+- Old path had NO correctness bug (12/12 once, 0 re-fires on seek, 0 fires
+  during pause — rebuild-on-`seeked` + onMissed already handled what bit
+  replay-grid; playhead-driven so instrument's pause bug is absent). The
+  hidden-tab arm could NOT be produced headlessly (never reported `hidden`
+  under bringToFront or Target.activateTarget) — the 981 ms clamp stays
+  lab-measured, not claimed here.
+- Written: one `cue` adapter (burst/seekable/reducible; reduce = fired-set ≤ t;
+  assertState = the late-join/seek fold) on a deck whose **position domain is
+  absolute wall ms** (a cue's `at` IS its position); video element masters via
+  `deck.sync(T0 + currentTime*1000, {toleranceMs:10})` per rAF with
+  `timeupdate` as the hidden-tab backstop; **a discontinuity >400 ms routes to
+  `seek()`, NOT `sync()`** — syncing across a jump leaves skipped cues pending
+  and bursts them. Seek is now a fold, not a rebuild. URL contract preserved.
+- Consequence to record: README's "replay − live = 0…1 ms" was two errors
+  cancelling; with the poll floor gone, "now" cues replay **32–34 ms earlier**
+  than the live burn — true intent semantics; `fireDelayMs` buys the live feel.
+- **⚠️ ACTIONABLE: `replay-grid.html` syncs UNCONDITIONALLY with no jump→seek
+  discrimination**, so an external scrub or an hls.js recovery jump can re-open
+  the burst-every-skipped-cue bug its own adoption fixed. Two divergent copies
+  of the media-master block now exist ⇒ **`mediaMaster(deck, el, {toleranceMs,
+  jumpMs, stallMs})` should land in `timeline/` before Session C.**
+- Other seams: `createDeck({at})` (an absolute-domain client must seek() before
+  play(), conflating "place the playhead" with "assert past state");
+  `caps.staleMs` (the pastWindow policy is client code though the drift record
+  already knows).
+- **Merged-v0 unblocked**: Sessions B/C can build on the lib; the SHOW panel's
+  strip should read the deck's drift channel (audit()/driftStats() gave this
+  gate its legibility for free); plan-studio's "59 ms proven" row must be
+  restated as 16 ms p50 — and never again as a single locked phase.
+
 ### CC AUTOMATION + slider-video REVIVED (session 6t) — ✅ 20/20 (proto/automation)
 - **The distinction that shapes everything: `midi` is EDGE-valued (a lost
   note-off wedges the instrument), `cc` is LEVEL-valued (every message is a

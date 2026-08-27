@@ -19,10 +19,10 @@
       "at": 1787745045512,
       "vodT": 15.001,
       "fired": true,
-      "errMs": 92,
-      "engineLateMs": 80,
+      "errMs": -7,
+      "engineLateMs": 3,
       "liveLateMs": 59,
-      "replayVsLiveMs": 33
+      "replayVsLiveMs": -66
     },
     {
       "id": "CUE-02",
@@ -30,10 +30,10 @@
       "at": 1787745066811,
       "vodT": 36.3,
       "fired": true,
-      "errMs": 77,
-      "engineLateMs": 80,
+      "errMs": -21,
+      "engineLateMs": 2,
       "liveLateMs": 12,
-      "replayVsLiveMs": 65
+      "replayVsLiveMs": -33
     },
     {
       "id": "CUE-03",
@@ -41,10 +41,10 @@
       "at": 1787745088213,
       "vodT": 57.702,
       "fired": true,
-      "errMs": 59,
-      "engineLateMs": 75,
+      "errMs": -7,
+      "engineLateMs": 1,
       "liveLateMs": 59,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -66
     },
     {
       "id": "CUE-04",
@@ -52,10 +52,10 @@
       "at": 1787745108611,
       "vodT": 78.1,
       "fired": true,
-      "errMs": 54,
-      "engineLateMs": 73,
+      "errMs": -10,
+      "engineLateMs": 5,
       "liveLateMs": 23,
-      "replayVsLiveMs": 31
+      "replayVsLiveMs": -33
     },
     {
       "id": "CUE-05",
@@ -63,10 +63,10 @@
       "at": 1787745130413,
       "vodT": 99.902,
       "fired": true,
-      "errMs": 67,
-      "engineLateMs": 71,
+      "errMs": 0,
+      "engineLateMs": 1,
       "liveLateMs": 67,
-      "replayVsLiveMs": 0
+      "replayVsLiveMs": -67
     },
     {
       "id": "CUE-06",
@@ -74,10 +74,10 @@
       "at": 1787745150911,
       "vodT": 120.4,
       "fired": true,
-      "errMs": 95,
-      "engineLateMs": 76,
+      "errMs": -4,
+      "engineLateMs": 8,
       "liveLateMs": 28,
-      "replayVsLiveMs": 67
+      "replayVsLiveMs": -32
     },
     {
       "id": "CUE-07",
@@ -85,10 +85,10 @@
       "at": 1787745172114,
       "vodT": 141.603,
       "fired": true,
-      "errMs": 78,
-      "engineLateMs": 76,
+      "errMs": 11,
+      "engineLateMs": 3,
       "liveLateMs": 78,
-      "replayVsLiveMs": 1
+      "replayVsLiveMs": -66
     },
     {
       "id": "CUE-08",
@@ -96,20 +96,20 @@
       "at": 1787745193311,
       "vodT": 162.8,
       "fired": true,
-      "errMs": 66,
-      "engineLateMs": 79,
+      "errMs": 1,
+      "engineLateMs": 6,
       "liveLateMs": 1,
-      "replayVsLiveMs": 65
+      "replayVsLiveMs": 0
     }
   ],
   "summary": {
     "n": 8,
-    "p50": 77,
-    "p95": 95,
-    "absP50": 77,
-    "absP95": 95,
-    "min": 54,
-    "max": 95
+    "p50": -4,
+    "p95": 11,
+    "absP50": 7,
+    "absP95": 21,
+    "min": -21,
+    "max": 11
   },
   "checks": [
     {
@@ -135,7 +135,7 @@
     {
       "name": "abs-p95-under-150ms",
       "ok": true,
-      "detail": "absP95=95ms"
+      "detail": "absP95=21ms"
     },
     {
       "name": "native-anchor-within-1-frame-of-content",
@@ -145,13 +145,13 @@
     {
       "name": "burn-decode-rate",
       "ok": true,
-      "detail": "5116/5117"
+      "detail": "5116/5116"
     }
   ],
   "rvfc": {
-    "samples": 5117,
+    "samples": 5116,
     "validClock": 5116,
-    "validCue": 4668
+    "validCue": 4667
   },
   "previousContentAnchoredRun": {
     "p50": 59,
