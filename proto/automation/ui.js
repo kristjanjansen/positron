@@ -48,11 +48,17 @@ export function makeStrip(canvas, { range = [0, 1000], height = 120 } = {}) {
         g.stroke();
       }
     }
-    // RECONSTRUCTION: the logged knots and the interpolated line between them
+    // RECONSTRUCTION: the logged knots and the line replay actually plays
+    // between them — a STAIRCASE for switch series, which hold rather than ramp
     for (const [key, s] of series) {
       const c = colors[key] || '#79b8ff';
       g.strokeStyle = c; g.lineWidth = 1.5 * dpr; g.beginPath();
-      s.pts.forEach((p, i) => (i ? g.lineTo(xOf(p.t), yOf(p.v)) : g.moveTo(xOf(p.t), yOf(p.v))));
+      s.pts.forEach((p, i) => {
+        if (!i) return g.moveTo(xOf(p.t), yOf(p.v));
+        if (s.step) g.lineTo(xOf(p.t), yOf(s.pts[i - 1].v));
+        g.lineTo(xOf(p.t), yOf(p.v));
+      });
+      if (s.step && s.pts.length) g.lineTo(canvas.width, yOf(s.pts[s.pts.length - 1].v));
       g.stroke();
       if (showKnots) {
         g.fillStyle = c;

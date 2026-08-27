@@ -263,6 +263,9 @@ window.AUTO = {
   resolveAt: (key, p) => resolveAt(key, p),
   /** the controller map assertState last WROTE TO THE WIRE, folded back. */
   assertedMap: () => [...CC.foldRows(assertRows).values()].map((e) => ({ key: e.key, bits: e.bits, value14: e.value14 })),
+  /** where the successor sample came from: the library's info.nexts (C4) or
+   *  the client-side series index. The multi-series question, measured. */
+  successorStats: () => ({ ...adapter.successorStats }),
   digestAt: (p) => CC.ccDigest(deck.reduceAt('cc', p)),
   deviation: () => deviation(series, rawByKey),
   /** round-trip a value through frame bytes and back, in the BROWSER (node does

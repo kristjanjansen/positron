@@ -382,7 +382,9 @@ export function seriesFromRows(rows, toMs) {
     else { st.msb = r.d2; st.lsb = 0; st.bits = 7; }
     const v = st.bits === 14 ? dec14(st.msb, st.lsb) : st.msb << 7;
     let s = out.get(key);
-    if (!s) out.set(key, s = { key, bits: st.bits, label: r.label || labelOf(r.status, r.d1), pts: [] });
+    // `step` rides on the series, so drawing, valueAt() and the deviation
+    // metric cannot disagree about whether a pedal ramps.
+    if (!s) out.set(key, s = { key, bits: st.bits, step: !isInterpolableKey(key), label: r.label || labelOf(r.status, r.d1), pts: [] });
     const t = toMs ? toMs(r.at) : r.at / 1000;
     const prev = s.pts[s.pts.length - 1];
     if (prev && Math.abs(prev.t - t) < 1e-9) prev.v = v;   // MSB+LSB share a timestamp
@@ -399,6 +401,7 @@ export function valueAt(series, t) {
   if (t >= p[p.length - 1].t) return p[p.length - 1].v;
   let lo = 0, hi = p.length - 1;
   while (hi - lo > 1) { const m = (lo + hi) >> 1; if (p[m].t <= t) lo = m; else hi = m; }
+  if (series.step) return p[lo].v;              // switches hold, never ramp
   const a = p[lo], b = p[hi];
   const u = b.t === a.t ? 0 : (t - a.t) / (b.t - a.t);
   return a.v + (b.v - a.v) * u;
@@ -425,13 +428,24 @@ export function valueAt(series, t) {
  *   assertState refines the fold with it. Measured: ~30x closer to the curve.
  */
 export function makeCcAdapter({ send, resetAllControllers = true, channels = [0], resolveAt = null, onAssert, onActuate } = {}) {
+  // which channel supplied the successor sample: the library's own info.nexts
+  // (C4, the sanctioned path) or the client's series index (the workaround).
+  const stats = { viaLibrary: 0, viaClientIndex: 0 };
   return {
+    successorStats: stats,
     caps: {
       kind: 'cc', domain: 'wall', unit: 'ms',
       // --- what makes this kind CONTINUOUS ---
       continuous: true,
       interpolate: true,
+      interpolators: ['linear'], method: 'linear',
       series: (p) => p.key || keyOf(p.status, p.d1),   // series identity within the kind
+      // The library hands reduce()/assertState() `info.nexts` = 1 +
+      // caps.neighbourhood successors OF THE KIND. A multi-series kind has to
+      // over-ask to be sure a successor of THIS controller is among them: with
+      // S interleaved series you need ~S. 8 covers the demos; it is a guess,
+      // which is precisely seam S1's cost.
+      neighbourhood: 8,
       resolution: 14,
       range: [0, 16383],
       // --- transport behaviour ---
@@ -470,8 +484,20 @@ export function makeCcAdapter({ send, resetAllControllers = true, channels = [0]
       const pos = info && info.pos;
       for (const e of map.values()) {
         let entry = e;
-        if (resolveAt && pos !== undefined) {
-          const v = resolveAt(e.key, pos);
+        if (pos !== undefined && isInterpolableKey(e.key)) {
+          // PREFERRED: the library's own successor channel (info.nexts), which
+          // is what C4 added for continuous kinds. Filter it to THIS series —
+          // the library groups by kind, not by controller.
+          let v = null;
+          const succ = (info.nexts || (info.next ? [info.next] : []))
+            .map((ev) => ev && ev.payload).filter(Boolean)
+            .find((p) => (p.key || keyOf(p.status, p.d1)) === e.key);
+          const sAt = succ && (succ.atMs !== undefined ? succ.atMs : succ.at);
+          if (succ && e.atMs !== undefined && sAt > e.atMs) {
+            const vb = valueOfRow(succ);
+            v = e.value14 + (vb - e.value14) * Math.max(0, Math.min(1, (pos - e.atMs) / (sAt - e.atMs)));
+            stats.viaLibrary++;
+          } else if (resolveAt) { v = resolveAt(e.key, pos); if (v !== null) stats.viaClientIndex++; }
           if (v !== null && v !== undefined && Number.isFinite(v)) {
             const v14 = clamp14(Math.round(e.bits === 14 ? v : Math.round(v / 128) * 128));
             entry = { ...e, msb: msbOf(v14), lsb: e.bits === 14 ? lsbOf(v14) : 0 };

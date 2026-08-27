@@ -99,9 +99,19 @@ function resolveAt(key, posMs) {
   return CC.valueAt(s, posMs);
 }
 
+let lastFireLog = 0;
 const ccAdapter = CC.makeCcAdapter({
   channels: [CH], resolveAt,
-  send: (raw, info) => { if (info && info.reassert) assertCount++; else replayCount++; send(raw, info); },
+  send: (raw, info) => {
+    if (info && info.reassert) assertCount++;
+    else {
+      replayCount++;
+      const t = performance.now();
+      if (t - lastFireLog > 120) { lastFireLog = t; logLine(logEl, `${(deck ? deck.position() : 0).toFixed(0)}ms  ${CC.labelOf(raw[0], raw[1])} = ${raw[2]}`); }
+    }
+    send(raw, info);
+  },
+  onAssert: (map, info) => logLine(logEl, `assert @${info.pos.toFixed(0)}ms — ${map.size} controllers re-stated after CC121 (${info.reason})`, 're'),
 });
 
 /** the media-span lane. Its actuator OWNS the element: start/stop, currentTime
@@ -184,7 +194,7 @@ function buildDeck() {
   tbar = transportBar($('#tbar'), deck, { onSeek: (p) => { writeMedia(p); paint(p); } });
   $('#m1').textContent = `(pos − ${LEAD_IN}) / 1000`;
   $('#m2').textContent = `${LEAD_IN} + ct × 1000`;
-  $('#m4').textContent = `(atUs − ${clipStartUs}) / 1000 + ${LEAD_IN}`;
+  $('#m4').textContent = `(atUs − originUs) / 1000 + ${LEAD_IN}`;
   if (wasPlaying) { deck.seek(pos); deck.play(rate); } else { deck.setRate(rate); deck.seek(pos); }
   return deck;
 }

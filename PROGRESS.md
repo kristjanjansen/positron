@@ -148,6 +148,50 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### CC AUTOMATION + slider-video REVIVED (session 6t) — ✅ 20/20 (proto/automation)
+- **The distinction that shapes everything: `midi` is EDGE-valued (a lost
+  note-off wedges the instrument), `cc` is LEVEL-valued (every message is a
+  complete statement, last-writer-wins).** So catchUp is `reduce` not `burst`;
+  `reduce(prefix ≤ t)` = last value PER CONTROLLER, keyed `cc:<ch>:<coarse>` /
+  `pb:<ch>` so a fine/coarse pair folds to ONE key and restores a coherent
+  14-bit value; `assertState` sends **CC 121 per channel then re-states every
+  entry, MSB before LSB** — the reset is what makes seek ABSOLUTE.
+- **Bug the smoke test caught, not theory: switches are STEP series.**
+  Interpolating sustain-down@1.5 s against sustain-up@3.0 s returns "half
+  pressed" at 2.2 s. CC 64–69/120–127 are now excluded from interpolation, the
+  value index, and the strip.
+- 14-bit CC pair **16384/16384 exact**; pitch bend **16384/16384 exact**; same
+  16-B frame as jam-core, byte 0 discriminates (`note`/`vel` are really d1/d2).
+- Seek ×3: library fold === independent node-side fold, **error 0** all three.
+  Against the analytic curve, interpolated assert beats knot-only fold:
+  max 128 (0.78 %) vs 1152 (7.03 %) · 9 (0.05 %) vs 512 · 21 (0.13 %) vs 1408.
+- Throttle 6408 raw → 409 rows (15.7:1) with reconstruction error ≤1.25 %
+  (7-bit) / ≤0.23 % (14-bit). Automation-lane drift |max| 7.70 / p95 7.11 ms
+  over a 5-target scrub, 0 sync corrections. Replay 409/409, rate 1.997×.
+- **slider-video revived**: it died at the missing
+  `transportPosition ↔ mediaCurrentTime ↔ pixel` mapping (gen-1's onProgress
+  supplied half of it and was deleted as "noise"). The page names all four
+  mappings in one place; media masters while playing (sync, 8 ms tol),
+  transport masters while scrubbing, crossover 250 ms; the media clock is read
+  **edge-extrapolated** — sampling currentTime raw measures its own
+  granularity and calls it drift.
+- Folding into proto/instrument (not edited): add CC 121 beside 120/123 and
+  keep the explicit sustain-off (121 is vendor-dependent); **frame needs no
+  layout change** (note/vel → d1/d2 + a `status & 0xF0` switch, so recorded
+  shows stay readable); storage needs nothing new — `cc` is a third lane on the
+  same makeLogDeck; keyframes go out-of-band as a sidecar (derived state —
+  logging them would double-count on replay).
+- Seams: the sibling's library rewrite **closed two mid-build** (prefix-only
+  reduce → `info.next`/`info.nexts`; payload.at shadowing → spread-order fix);
+  16/16 interpolated asserts now served by the sanctioned successor channel.
+  Still open: **bracketing groups by KIND, not series** (`caps.series` is
+  declared and not read) so interpolate must defend against cross-controller
+  pairs and only works by over-asking `neighbourhood: 8` — with more
+  controllers it degrades to last-knot QUIETLY; the overdub law is right for
+  notes and wrong for levels (a curve authored behind the playhead must not
+  move the current value); no sync-vs-seek threshold policy; caps not
+  serialisable.
+
 ### NESTED SPANS — COMPOSITION ACROSS TIMELINES (session 6s) — ✅ 16/16
 `timeline/nested.mjs` (~300 lines): `createNest(parentDeck).add({id, at, rate,
 deck, master})` + `servo()`. **transport.mjs needed ZERO changes** — a nested
