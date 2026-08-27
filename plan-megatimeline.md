@@ -29,46 +29,53 @@ report, distilled in §2), plan-timeline §−1 (precision smears, Span model).
 - **Waveforms are free**: every audio search hit ships a waveform array — an
   entire audio-track visual with zero media loads.
 - **Thumbnails**: arhiiv-images.err.ee / s.err.ee serve previews with NO ACAO —
-  fine in <img>, taints canvas, and WebGL refuses tainted uploads. Canvas
-  rendering therefore REQUIRES the image proxy (workshop
-  server/api/image-proxy.get.ts is the production-grade reference with
-  loopback blocking; visualia's proxyResolver + vite/media-proxy.ts is the
-  seam pattern). Proxy caches aggressively (2-day upstream cache headers) —
-  politeness preserved.
+  fine in <img>, taints canvas, and WebGL refuses tainted uploads. **The EKA
+  basis (§2) renders thumbs as DOM <img> — no proxy needed in v0.** The image
+  proxy (workshop server/api/image-proxy.get.ts is the production reference)
+  is required only if/when thumbs move onto canvas (v2 escalation).
 - Item = the timeline's Span: `{at: airdate (midnight — time-of-day is
   DERIVED), dur: Kestus, precision, mediaRef: {type, slug}, provenance}`.
 
-## 2. Renderer decision — hand-rolled 2D-canvas field + DOM furniture
+## 2. Renderer decision — the EKA lineage is the basis (user call 2026-08-27)
 
-Assessed: visualia engine (WebGL2 HTML-in-canvas), sitemap-vis,
-eka-web-structure, time/demo strips. **Verdict: steal from visualia, don't
-build on it.** The engine's five disqualifiers, in order:
+Basis: **eka-web-structure → eka-sitemap → sitemap-vis** — the user's own
+DOM-cards-under-one-transform hybrid, proven three times (~2300 cards). NOT
+visualia's engine (assessed and rejected: mounts a live wrapper for every doc
+node, one GL draw per texture with no atlas, flag-gated fast path, isotropic
+zoom baked into shaders, 400× range vs our ~5000×). Visualia contributes only
+its LOD discipline and, later, spare parts (below).
 
-1. ContentLayer mounts a live DOM wrapper for EVERY node in the doc
-   (content-layer.ts:56-78) — 43k thumbnails = 43k live divs; fixing it
-   rewrites the engine's central contract.
-2. One draw call per textured node, no atlas (passes/content.ts:57-72) —
-   thousands of visible thumbs at decade zoom is exactly the case it can't do.
-3. The GL path needs Chrome flags (#canvas-draw-element); everyone else falls
-   back to DOM. A flag-gated fast path is a non-starter.
-4. Zoom is a single isotropic scalar baked into the shaders — a timeline needs
-   x-zoom with fixed track heights.
-5. MIN_Z/MAX_Z give 400× range; we need ~5000× (plus a CPU-side
-   camera-relative rebase: float32 world coords jitter ~0.5 px at day zoom).
-
-**Lift list (wholesale, with file refs):**
-- `visualia/packages/engine/src/camera/camera.ts` (64 lines) — split z into
-  zx/zy, widen clamps; `camera-anim.ts` (fly-to); `input/wheel.ts` (the
-  trackpad-vs-mouse zoom coefficients are hard-won tuning).
-- `sitemap-vis/src/input/gesture.ts` (202 lines) — snapshot pointer + pinch.
-- `texture-cache.ts` budget+LRU-protect-visible pattern → the thumbnail cache.
-- `renderer.ts contentAlpha` + eka-sitemap's z-threshold class switching —
-  cross-fade-don't-pop LOD discipline.
-- **Back pocket**: RectsPass instanced SDF rects (+ its shaders) as the WebGL
-  escape hatch IF 2D canvas tops out — it maps perfectly onto smears/bands/
-  ticks. Escalate only on measured jank.
-- DOM stays for furniture: axis ruler, track labels, hover cards, scrubber
-  (the eka-web-structure/sitemap-vis convergence: canvas field, DOM chrome).
+**The EKA architecture, applied:**
+- **Viewport**: `sitemap-vis/src/viewport.ts` (141 lines, dependency-free —
+  screenToWorld, anchor-preserving zoomAt, fitRect, animateZoomAt/
+  animateFitRect with easing). Split scale into zx/zy (x zooms, track heights
+  fixed), widen MIN/MAX for ~5000×; keep layout math in float64 on the CPU
+  and position everything camera-relative (float32 jitter guard).
+- **Gestures**: `sitemap-vis/src/input/gesture.ts` (202 lines, snapshot
+  pointer + pinch); wheel tuning may borrow visualia's trackpad-vs-mouse
+  coefficients (input/wheel.ts) — hard-won numbers, 38 lines.
+- **The hybrid split** (eka-web-structure's pattern, kept): 2D-canvas layers
+  under the cards for the FIELD graphics — density histograms, precision
+  bands, ticks, waveform strips (drawn from the free waveform arrays, no
+  images involved, no taint) — and **DOM <img> cards for thumbnails**,
+  positioned per-node with translate/scale like vis.js:597. DOM chrome for
+  ruler, labels, hover cards, scrubber.
+- **The one thing the EKA generations never had, added: virtualization.**
+  vis.js mounts all ~2300 cards; we mount ONLY the viewport's visible set
+  (plus margin), keyed off the same tile loader that fetches data — cards
+  mount on camera settle, unmount when far, LRU-capped (a few hundred live
+  DOM nodes max, which is where aggregation (§3) keeps us anyway).
+  sitemap-vis's own constraint note applies: don't per-frame-redraw card
+  content; transform a stable layer.
+- **Why DOM cards win here**: no CORS proxy (ERR previews load untainted in
+  <img>), free async decode + native lazy loading, and at month/day zoom the
+  visible card count is dozens–hundreds — comfortably inside the EKA
+  lineage's proven envelope. The known weakness (re-rasterize jank under
+  CONTINUOUS zoom) is mitigated by transforming the shared layer during the
+  gesture and re-laying-out on settle (the will-change promote/demote trick).
+- **Escalation path (v2, only on measured jank)**: move the thumbnail field
+  onto canvas behind the image proxy; visualia's texture-cache LRU pattern
+  and RectsPass instanced rects are the spare parts shelf.
 
 ## 3. Zoom semantics — aggregation IS the scaling strategy
 
@@ -110,16 +117,17 @@ that makes "tracks are queries, not containers" visibly true at archive scale.
 
 ## 6. Phases
 
-- **v0 (~1 week)**: lifted camera/gestures/wheel + time→x layout; census
-  histogram (run once, commit the JSON); year/month tiers with thumbnails via
-  a cache-backed image proxy (extend the remixer's server.mjs); waveform
-  strips; DOM furniture; precision bands. Proof: smooth 1908→2026 flight,
-  decade→day dive into 1965, thumbs loading lazily, zero API hammering.
+- **v0 (~1 week)**: sitemap-vis viewport+gestures lifted (zx/zy split) +
+  time→x layout; census histogram (run once, commit the JSON); canvas field
+  layers (histogram/bands/ticks/waveforms) + virtualized DOM <img> thumbnail
+  cards — no proxy needed; DOM furniture; precision bands. Proof: smooth
+  1908→2026 flight, decade→day dive into 1965, thumbs loading lazily, zero
+  API hammering.
 - **v1**: click-to-remixer handoff; series/query tracks; aggregation smears
   pre-rendered per tier; elektron's own shows as a track (the archive and the
   live platform on ONE surface — the §−1 continuum made visible).
-- **v2 (only on measured jank)**: RectsPass WebGL port for bands/ticks;
-  thumbnail atlas.
+- **v2 (only on measured jank)**: thumbnail field onto canvas behind the
+  image proxy; visualia RectsPass/texture-cache as spare parts.
 
 ## 7. Boundaries
 
