@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>obsdock burned clock</title>
+<style>html,body{margin:0;padding:0;background:#404040;overflow:hidden}</style>
+</head>
+<body>
+<canvas id="cv" width="1280" height="720"></canvas>
+<script>
+"use strict";
+// Burned-row geometry — byte-identical to rig/whep/publish.html.
+// 48-bit HOST epoch ms (MSB first) + 8-bit XOR checksum, 56 blocks of 20 px.
+// HOST clock: this page runs inside the container's CEF, whose VM clock can be
+// wrong (moq runbook: Docker VM woke 8.5 h behind once). So the page NTP-syncs
+// against the serving host via /now (min-RTT estimator, the house pattern) and
+// burns host-clock ms. Offset + rtt are beaconed to /collect for the record.
+const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
+
+let offset = null; // hostMs - pageMs
+let offsetRtt = null;
+
+async function syncOffset(n) {
+  const samples = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      const t0 = performance.now();
+      const r = await fetch("/now", { cache: "no-store" });
+      const srv = await r.json();
+      const t1 = performance.now();
+      samples.push({ off: srv - (performance.timeOrigin + (t0 + t1) / 2), rtt: t1 - t0 });
+    } catch (e) {}
+  }
+  if (!samples.length) return;
+  samples.sort((a, b) => a.rtt - b.rtt);
+  offset = samples[0].off;
+  offsetRtt = samples[0].rtt;
+  try {
+    fetch("/collect", { method: "POST", body: JSON.stringify({
+      kind: "clock-offset", offMs: offset, rttMs: offsetRtt, n: samples.length, t: Date.now() }) });
+  } catch (e) {}
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+let frameCounter = 0;
+
+function draw() {
+  ctx.fillStyle = "#404040";
+  ctx.fillRect(0, 0, 1280, 720);
+  if (offset !== null) {
+    const ms = Math.round(performance.timeOrigin + performance.now() + offset);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(ROW_X - 20, ROW_Y - 20, NBLOCKS * BLOCK_W + 40, ROW_H + 40);
+    const bytes = [];
+    let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    let ck = 0;
+    for (const b of bytes) ck ^= b;
+    const bits = [];
+    for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+    ctx.font = "bold 64px monospace";
+    ctx.fillText(String(ms), 60, 320);
+    ctx.font = "bold 48px monospace";
+    ctx.fillText(new Date(ms).toISOString().slice(11, 23) + "  f" + frameCounter, 60, 400);
+    ctx.font = "bold 32px monospace";
+    ctx.fillText("off " + offset.toFixed(1) + " ms  rtt " + offsetRtt.toFixed(1), 60, 460);
+  } else {
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 64px monospace";
+    ctx.fillText("clock sync...", 60, 320);
+  }
+  // motion so the encoder never starves/dedupes — kept away from sample points
+  const x = (frameCounter * 7) % 1100;
+  ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",80%,60%)";
+  ctx.fillRect(40 + x, 560, 80, 80);
+  frameCounter++;
+  requestAnimationFrame(draw);
+}
+
+syncOffset(15).then(() => requestAnimationFrame(draw));
+setInterval(() => syncOffset(7), 10000);
+</script>
+</body>
+</html>

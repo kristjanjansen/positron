@@ -1,0 +1,15 @@
+# Local RTMP sink for the dual-output test (NO Cloudflare). Path obsdockrec
+# receives the OBS RECORDING slot's Custom-FFmpeg-Output flv publish while the
+# STREAM slot publishes MoQ to the d14 relay. Everything else off.
+logLevel: info
+rtmp: yes
+rtmpAddress: :1935
+rtsp: no
+hls: no
+webrtc: no
+srt: no
+moq: no
+api: no
+paths:
+  obsdock:
+  obsdockrec:
