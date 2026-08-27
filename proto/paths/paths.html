@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>paths — continuous kind / interpolate seam</title>
+<link rel="icon" href="data:," />
+<style>
+  :root {
+    --bg: #07080c; --panel: #10131b; --line: #232838; --ink: #e6e9f2; --dim: #8b93a8;
+    --evidence: #ffffff; --stored: #ffb020; --linear: #ff3d8b; --smooth: #3fe0ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  header { padding: 14px 18px 10px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 15px; letter-spacing: .04em; font-weight: 600; }
+  header p { margin: 4px 0 0; color: var(--dim); font-size: 12px; max-width: 100ch; }
+  .wrap { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 14px; padding: 14px 18px; align-items: start; }
+  .stage { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #0b0d12; }
+  .stage canvas { display: block; width: 100%; height: auto; }
+  #cursors { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
+  .panel h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: right; padding: 3px 2px; border-bottom: 1px solid #1a1e2a; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--dim); font-weight: 500; font-size: 11px; }
+  td i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 12px; margin: 0 18px 16px;
+         background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+  button { background: #1b2130; color: var(--ink); border: 1px solid #2c3446; border-radius: 4px;
+           padding: 5px 11px; font: inherit; cursor: pointer; }
+  button:hover { background: #253046; }
+  button.rate { padding: 5px 8px; min-width: 40px; }
+  #scrub { flex: 1 1 260px; min-width: 200px; accent-color: var(--smooth); }
+  .kv { color: var(--dim); }
+  .kv b { color: var(--ink); font-weight: 600; }
+  .dim { color: var(--dim); }
+  label.tog { display: flex; align-items: center; gap: 7px; padding: 2px 0; cursor: pointer; }
+  label.tog i { width: 22px; height: 3px; border-radius: 2px; display: inline-block; }
+  pre { margin: 0; font-size: 11px; color: var(--dim); white-space: pre-wrap; word-break: break-word; }
+  .note { font-size: 11px; color: var(--dim); }
+  .note b { color: #cbd3e6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>paths — the first CONTINUOUS timeline kind</h1>
+  <p>demo10's four overlaid paths, rebuilt on <code>timeline/</code>: evidence (full rate) + the stored 100 ms log +
+     two reconstructions produced by the adapter's <code>interpolate()</code>. Lower fidelity is drawn wider and fainter
+     so it reads <i>under</i> higher fidelity; reconstruction is hatched — seamless at a glance, distinguishable on inspection.
+     Drag on the canvas to record your own path, or press <i>synthesize</i>.</p>
+</header>
+
+<div class="bar">
+  <button id="synth">synthesize path</button>
+  <button id="clear">clear</button>
+  <span style="width:10px"></span>
+  <button id="rewind">⏮</button>
+  <button id="play">▶ play</button>
+  <button id="pause">⏸ pause</button>
+  <input id="scrub" type="range" min="0" max="1000" value="0" step="1" />
+  <span id="rates" style="display:flex;gap:4px"></span>
+</div>
+
+<div class="wrap">
+  <div>
+    <div class="stage" style="margin-bottom:12px">
+      <canvas id="paths" width="1000" height="620"></canvas>
+      <canvas id="cursors" width="1000" height="620"></canvas>
+    </div>
+    <div class="panel" style="display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:center">
+      <canvas id="inset" width="632" height="380" style="width:100%;height:auto;border-radius:4px;background:#0b0d12"></canvas>
+      <div>
+        <h2>tratteggio — 14× at the playhead</h2>
+        <p class="note" style="margin:0">The overlay above is <b>seamless</b>: at 1× the two reconstructions sit
+          inside the evidence stroke. Magnified at the playhead they <b>separate</b> — the wide pink ribbon is the
+          linear chord cutting the corner, the hatched cyan is the Catmull-Rom hugging the white evidence line,
+          and the amber dots are the only positions actually <b>attested</b> by the log.</p>
+        <p class="note" style="margin:8px 0 0">Fresco restoration's rule, made operable: infill is invisible at
+          viewing distance and unmistakable on inspection. Nothing here is hidden and nothing here is disguised.</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>lanes</h2>
+      <label class="tog"><input type="checkbox" id="t-evidence" checked><i style="background:var(--evidence)"></i>evidence — full rate, never decimated</label>
+      <label class="tog"><input type="checkbox" id="t-stored" checked><i style="background:var(--stored)"></i>stored — 100 ms wall-clock log</label>
+      <label class="tog"><input type="checkbox" id="t-linear" checked><i style="background:var(--linear)"></i>linear interpolation (tier 1)</label>
+      <label class="tog"><input type="checkbox" id="t-smooth" checked><i style="background:var(--smooth)"></i>Catmull-Rom (tier 1)</label>
+      <div style="margin-top:8px"><button id="evonly">evidence only</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>deviation from evidence (px)</h2>
+      <table>
+        <thead><tr><th>reconstruction</th><th>mean</th><th>p95</th><th>max</th></tr></thead>
+        <tbody id="dev"></tbody>
+      </table>
+      <p class="note" style="margin:8px 0 0">Each reconstruction is evaluated at every evidence sample's own timestamp.
+         This is the honest “how much did we invent” number.</p>
+    </div>
+
+    <div class="panel">
+      <h2>evidence vs restored</h2>
+      <div id="counts" class="kv"></div>
+    </div>
+
+    <div class="panel">
+      <h2>live</h2>
+      <div class="kv">position <b id="pos">–</b></div>
+      <div class="kv">rate <b id="rate">–</b></div>
+      <div class="kv">attested fires <b id="fires">0</b></div>
+      <div class="kv">interp cursor <b id="livepos">–</b></div>
+      <div class="kv">cursor vs evidence <b id="liveerr">–</b></div>
+    </div>
+
+    <div class="panel">
+      <h2>adapter caps</h2>
+      <pre id="caps"></pre>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./paths.js"></script>
+</body>
+</html>
