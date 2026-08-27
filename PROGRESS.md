@@ -148,6 +148,59 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### PATHS: THE FIRST CONTINUOUS CLIENT (session 6r) — ✅ 9/9 (proto/paths)
+demo10 + draw/drag ported forward as a `pointer` kind — and the first client to
+exercise plan-timeline's `interpolate` seam.
+- **Every documented ancestor defect fixed and marked FIX-n in the source**:
+  destructive sampler → two append-only lanes (evidence never consumed — which
+  is WHY deviation numbers are possible at all; demo10 could not measure its
+  own comparison because its sampler ate the ground truth); frame-count →
+  wall-clock decimation; dropped first/last segments → reflected phantom
+  endpoints; fixed t+=0.2 → pixel-budget subdivision with integer stepping;
+  per-frame recompute → per-segment cache (render 0.02 ms); PLUS beyond brief:
+  uniform-knot Catmull-Rom → **time-knotted Hermite** over real timestamps
+  (synthetic trace carries ±2 ms jitter to exercise it).
+- **Numbers**: seek ×3 vs analytic truth **0.042 / 0.032 / 0.042 px** with the
+  interpolating reducer vs **38.3 / 45.6 / 27.0 px** with zero-order hold —
+  ~900×, and proof `reduce()` really interpolates. Deviation from evidence
+  (721 samples): hold mean 24.19 / linear 0.679 / **Catmull-Rom 0.036 px**.
+  **59 attested samples, 896 drawn → 93.4 % of the rendered path is invented,
+  at 0.036 px mean cost** — the §5b invention figure, permanently on screen.
+  Pause drift 0.000 ms; rate 1.990×; 0 console errors.
+- **THE INTERPOLATE-SEAM REPORT — the library does NOT support continuous
+  kinds** (transport half fine; adapter half missing four things):
+  1. **`interpolate` is never called** — the word appears nowhere in
+     transport/logdeck; registerAdapter validates only `actuate`; of caps the
+     library reads only catchUp/audio/assertOnSeek. `caps:{continuous,
+     interpolate}` is documentation, so C3's "degrade honestly" cannot happen.
+  2. **No adapter hook between two fires**: measured **59 attested fires vs
+     4,854 interpolate() calls — 98.8 % of rendered motion came from client
+     code the library knows nothing about**. Fix: drive continuous adapters
+     off the position observable the deck already runs.
+  3. **No bracketing query; the only positional read is O(n)** (`reduceAt`
+     re-scans from 0) — driving an interpolator from it at 60 Hz would
+     **reproduce demo10's per-frame-recompute defect INSIDE the library**.
+     Fix: `sched.bracket(kind, pos)`.
+  4. **`reduce()` structurally cannot see the right bracket**: it gets
+     `prefix ≤ pos`, so the successor is by construction absent ⇒ an
+     interpolated reduce is NOT expressible in the contract. Seam 5's
+     "pure function of the prefix" is right for discrete kinds and WRONG for
+     continuous ones. Fix: `info.next` (two lines; the array is already there).
+  5. `interpolate(a,b,u)` under-specified for any C¹ interpolator (a spline is
+     not a function of two samples) → add neighbourhood + caps.neighbourhood.
+  6. **LIBRARY BUG**: logdeck's `payload: {i, at, ...p.payload}` lets the raw
+     row's epoch-µs `at` **silently clobber the position-domain `at` the
+     library just injected** — §2's "payloads must not spread over control
+     fields" law broken inside the library that records it. Fix: inject last.
+- **Verdict: it IS the honest tratteggio UI** — seamless at 1×, hatched under
+  inspection, a 14× playhead inset showing the linear chord cutting corners
+  while the spline hugs the evidence, amber dots on attested positions only,
+  and an evidence-only toggle (§5b's firewall in miniature). Still missing and
+  it belongs to the library: reconstructions are computed on the fly rather
+  than **appended as derived lanes** (`source: reconstructor-*`, method,
+  confidence, tier, refs), and reduce()/window() still lack the
+  `attested | restored(tier ≤ n) | all` evidence policy.
+
 ### TRANSPORT: 4 CLIENTS (session 6q) — instrument replay 61/61, remixer 11/11
 - **THIRD LATENT BUG (the pattern holds: every adoption finds one).** Instrument
   `replayStored()` started the recorded audio **~1075 ms ahead of the first
