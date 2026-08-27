@@ -1,0 +1,18 @@
+{
+  "name": "elektron-obscloud",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "ObsCloud",
+      "image": "../obs/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard-4"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "OBS_CLOUD", "class_name": "ObsCloud" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ObsCloud"] }]
+}

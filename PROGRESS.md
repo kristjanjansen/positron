@@ -112,11 +112,38 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   2 s hack) or the relay grows FETCH, **d16 viewers must subscribe before
   StartStream**. Dual RTMP+MoQ not reachable via websocket (no output
   instance without the Qt dock); service flips remotely in one call.
-- ⚠️ OPEN CONTRADICTION to resolve: the containers agent MEASURED raw
-  outbound UDP working from CF Containers; the OBS agent's verdict assumed
-  no-UDP and ruled out MoQ egress from CF. If outbound QUIC really works,
-  OBS/moq publishers COULD live in CF Containers. One direct test decides
-  (QUIC handshake to the relay from a container).
+- ~~OPEN CONTRADICTION~~ → **RESOLVED (session 6e, direct measurement):
+  QUIC/MoQ egress from CF Containers WORKS.** moq clock publisher inside
+  fra20 connected to the d14 relay in 55 ms; 25/25 ticks received on this
+  Mac. The obs-docker "no UDP" verdict was a stale doc assumption. Inbound
+  QUIC (relay-in-container) stays dead — no public IP.
+
+### OBS-IN-CLOUD + DUAL OUTPUT (session 6e) — ✅ ALL PROVEN (rig/obs-cloud)
+- **OBS ran in a CF Container (standard-4) publishing MoQ**: g2g cloud→d14→
+  local viewer ≈195/210 ms corrected — statistically identical to the local
+  chain; the move to CF costs ~nothing. CPU 52% of standard-4 streaming
+  (native amd64 sheds the Rosetta tax); cold wake→audience pixels **11.6 s**;
+  version-swap cold boot 126 s. control.mjs drove cloud OBS UNCHANGED via a
+  Worker WS proxy (p50 ~65 ms/cmd, full setup 1.5 s).
+- **TRAP: CF Firecracker guests have no /dev/shm** → CEF browser sources
+  crash-loop FATAL; fix = `mkdir -p /dev/shm && chmod 1777` before
+  supervisord (baked in start-cloud.sh). WS-through-Worker does NOT survive
+  sleep/wake — fresh instance + fresh disk; driver must reconnect + re-setup.
+- **DUAL OUTPUT PROVEN (locally)**: stream slot = obs-moq (d14), recording
+  slot = Custom Output (FFmpeg) → rtmp, baked in basic.ini, both started
+  via websocket. Simultaneous: MoQ g2g 172/188 ms UNHARMED; RTMP leg
+  437/446 ms (ffmpeg/flv path buffers ~255 ms more — fine for the stage/
+  archive leg); second encode +30% of a core; StopRecord→StartRecord 6 ms.
+  Cloud-side RTMPS untested by design (no Stream inputs created).
+- **Radio Tallinn cron-broadcast**: every stage after cron→start() measured
+  (wake→OBS-ready 7.4 s, setup 1.5 s, StartStream→MoQ 0.4 s, ~$0.5 raw per
+  2 h standard-4 show). Still needed: scheduled() Worker driver w/ reconnect
+  + 207-retry, egress decision (d14 caveats vs RTMPS), R2 content pull at
+  boot, restart watchdog. NOTE (design review, same day): the automated
+  station likely needs NO OBS at all — programme-as-web-page + Route B +
+  in-page WebCodecs MoQ is the page-native engine; OBS remains the
+  human-mixed-show option. Session cost $0.04 raw / $0.00 net; all cloud
+  resources deleted + verified.
 
 ### PLAYBACK LAYER (session 6c) — postshow runner, reconcile, masters replay: ✅ COMPLETE
 - **postshow.mjs** (the engine.mjs seed; worker v381acbe8 adds POST /show, GET

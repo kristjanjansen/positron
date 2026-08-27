@@ -1,0 +1,7 @@
+{
+  "bitrate": 2500,
+  "keyint_sec": 2,
+  "preset": "veryfast",
+  "rate_control": "CBR",
+  "tune": "zerolatency"
+}
