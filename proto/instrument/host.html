@@ -10,136 +10,126 @@
   }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
-  header { display:flex; align-items:baseline; gap:14px; padding:10px 16px;
-           border-bottom:1px solid var(--line); background:var(--panel); }
-  header h1 { font-size:13px; margin:0; letter-spacing:.14em; text-transform:uppercase; }
-  header .sub { color:var(--dim); }
-  header a { color:var(--hot); }
-  main { display:grid; grid-template-columns: 380px 1fr; gap:14px; padding:14px 16px; align-items:start; }
-  section { background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:11px 12px; margin-bottom:14px; }
-  h2 { font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--dim);
-       margin:0 0 9px; font-weight:600; }
-  label { display:block; color:var(--dim); margin:7px 0 2px; }
-  input, select, button, textarea {
-    font:inherit; background:#0b0d0f; color:var(--ink); border:1px solid var(--line);
-    border-radius:3px; padding:5px 7px; width:100%;
-  }
+         font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  header { display:flex; align-items:center; gap:12px; padding:8px 14px;
+           border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header h1 { font-size:12px; margin:0; letter-spacing:.14em; text-transform:uppercase; }
+  header a { color:var(--hot); text-decoration:none; }
+  main { display:grid; grid-template-columns: minmax(300px,360px) 1fr; gap:12px;
+         padding:12px 14px; align-items:start; }
+  @media (max-width:900px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:5px;
+          padding:9px 10px; margin-bottom:10px; }
+  h2 { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--dim);
+       margin:0 0 7px; font-weight:600; }
+  input, select, button { font:inherit; background:#0b0d0f; color:var(--ink);
+    border:1px solid var(--line); border-radius:3px; padding:4px 6px; width:100%; }
   ::placeholder { color:#4a525a; }
-  button { cursor:pointer; background:#1d232a; }
+  button { cursor:pointer; background:#1d232a; white-space:nowrap; }
   button:hover:not(:disabled) { background:#26303a; border-color:#3a4753; }
   button:disabled { opacity:.4; cursor:not-allowed; }
   button.go { background:#1e3a2a; border-color:#2f5f45; color:var(--ok); }
   button.stop { background:#3a1f1e; border-color:#5f302f; color:var(--bad); }
-  .row { display:flex; gap:7px; }
+  header button { width:auto; padding:3px 9px; }
+  .row { display:flex; gap:6px; margin-top:6px; }
   .row > * { flex:1; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .field { display:flex; align-items:center; gap:6px; margin-top:6px; }
+  .field > span { color:var(--dim); flex:0 0 62px; }
+  .field > input, .field > select { flex:1; }
+  /* stats as chips, not a ten-row table */
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { border:1px solid var(--line); border-radius:3px; padding:3px 7px; background:#0b0d0f; }
+  .chip b { font-weight:600; color:var(--dim); font-size:10px; letter-spacing:.08em;
+            text-transform:uppercase; margin-right:5px; }
   table { width:100%; border-collapse:collapse; }
-  td { padding:2px 0; vertical-align:top; }
-  td.k { color:var(--dim); width:150px; }
+  td { padding:1px 0; vertical-align:top; }
+  td.k { color:var(--dim); width:132px; }
   .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)} .dim{color:var(--dim)}
-  .pill { display:inline-block; padding:1px 7px; border-radius:9px; border:1px solid var(--line); }
-  .pill.on { color:var(--ok); border-color:#2f5f45; }
-  .pill.off { color:var(--dim); }
-  .pill.busy { color:var(--warn); border-color:#5f4c2f; }
-  canvas { width:100%; max-width:520px; aspect-ratio:16/9; background:#000;
-           border:1px solid var(--line); border-radius:4px; display:block; }
-  #reqbox { border:1px solid #5f4c2f; background:#241f13; border-radius:4px; padding:9px 10px; margin-bottom:9px; }
-  #feed { height:190px; overflow-y:auto; font-size:11px; }
+  canvas { width:100%; aspect-ratio:16/9; background:#000; border:1px solid var(--line);
+           border-radius:4px; display:block; }
+  #reqbox { border:1px solid #5f4c2f; background:#241f13; border-radius:4px;
+            padding:7px 9px; margin-bottom:8px; }
+  #feed { height:120px; overflow-y:auto; font-size:11px; }
   #feed div { border-bottom:1px solid #1c2126; padding:1px 0; }
-  #log { height:150px; overflow-y:auto; white-space:pre-wrap; font-size:11px; color:var(--dim); }
-  .big { font-size:20px; letter-spacing:.02em; }
-  .hint { color:var(--dim); font-size:11px; margin-top:6px; }
+  #log { height:110px; overflow-y:auto; white-space:pre-wrap; font-size:11px; color:var(--dim); }
+  .hint { color:var(--dim); font-size:10px; margin-top:5px; }
+  details > summary { cursor:pointer; color:var(--dim); font-size:10px;
+                      letter-spacing:.13em; text-transform:uppercase; }
+  details[open] > summary { margin-bottom:7px; }
 </style>
 </head>
 <body>
 <header>
   <h1>Instrument host</h1>
-  <span class="sub">expose your synth · <span id="hstate">booting</span></span>
-  <span style="margin-left:auto"><a id="checkrig" href="/host-check.html" target="_blank">Check my rig ↗</a></span>
+  <span class="dim" id="hstate">booting</span>
+  <span style="flex:1"></span>
+  <button id="b-panic" class="stop">Panic</button>
+  <button id="b-end" class="stop" disabled>End session</button>
+  <a id="checkrig" href="/host-check.html" target="_blank">Check my rig ↗</a>
 </header>
 
 <main>
 <div>
-  <section>
-    <h2>1 · The instrument</h2>
-    <label for="f-name">Name</label><input id="f-name" placeholder="Kurenniemi DIMI-A">
-    <label for="f-model">Model</label><input id="f-model" placeholder="Roland SE-02">
-    <label for="f-loc">Location</label><input id="f-loc" placeholder="Tallinn, EE">
-    <label for="f-id">Registry id</label><input id="f-id" placeholder="dimi-a">
-    <div class="row" style="margin-top:9px">
+  <div class="card">
+    <h2>Instrument</h2>
+    <div class="grid2">
+      <input id="f-name" placeholder="Name — Kurenniemi DIMI-A">
+      <input id="f-model" placeholder="Model — SE-02">
+      <input id="f-loc" placeholder="Location — Tallinn, EE">
+      <input id="f-id" placeholder="Registry id — dimi-a">
+    </div>
+    <div class="row">
       <button id="b-register">Register</button>
       <button id="b-online" class="go" disabled>Go online</button>
       <button id="b-unlist" class="stop">Unlist</button>
     </div>
-    <div class="hint" id="reghint">Saved in localStorage. Registration needs INSTRUMENT_TOKEN.</div>
-  </section>
+    <div class="hint" id="reghint">Saved locally · registration needs INSTRUMENT_TOKEN.</div>
+  </div>
 
-  <section>
-    <h2>2 · MIDI out</h2>
-    <select id="midiout"><option value="">— synthetic synth (WebAudio stand-in) —</option></select>
-    <label for="lead">Playout lead (ms) — 0 = actuate on arrival</label>
-    <input id="lead" type="number" value="0" min="0" max="200" step="5">
-    <div class="hint">Incoming stamps are epoch-µs on the shared clock; the lead is
-      added after skew mapping into this machine's <code>performance.now()</code>
-      and handed to <code>output.send(bytes, at)</code>.</div>
-  </section>
+  <div class="card">
+    <h2>Signal chain</h2>
+    <div class="field"><span>MIDI out</span><select id="midiout"><option value="">— synthetic stand-in —</option></select></div>
+    <div class="field"><span>Audio in</span><select id="audioin"><option value="">— default —</option></select><button id="b-open" style="flex:0 0 auto">Open</button></div>
+    <div class="field"><span>Camera</span><select id="videoin"><option value="">— none (panel only) —</option></select><button id="b-cam" style="flex:0 0 auto">Use</button></div>
+    <div class="field"><span>Lead ms</span><input id="lead" type="number" value="0" min="0" max="200" step="5"></div>
+    <table id="constraints" style="margin-top:7px"><tr><td class="dim">audio not opened</td></tr></table>
+    <div class="hint">Processing must read PASS or the return is a phone call, not an
+      instrument. Camera rides the panel background — switch it live, no reconnect.</div>
+  </div>
 
-  <section>
-    <h2>3 · Audio in</h2>
-    <select id="audioin"><option value="">— default device —</option></select>
-    <div class="row" style="margin-top:7px">
-      <button id="b-open">Open audio input</button>
-    </div>
-    <table id="constraints" style="margin-top:8px"><tr><td class="dim">not opened</td></tr></table>
-    <div class="hint">Processing must be OFF or the return is a phone call, not an
-      instrument.</div>
-    <h2 style="margin-top:14px">3b · Camera <span class="dim">(optional)</span></h2>
-    <select id="videoin"><option value="">— no camera (panel only) —</option></select>
-    <div class="row" style="margin-top:7px">
-      <button id="b-cam">Use this camera</button>
-    </div>
-    <div class="hint">Point it at the instrument. The camera becomes the panel
-      background; the clock and note flash stay on top, so switching cameras
-      mid-session needs no reconnection.</div>
-  </section>
+  <details class="card">
+    <summary>Log</summary>
+    <div id="log"></div>
+  </details>
 </div>
 
 <div>
-  <section>
-    <h2>Session</h2>
+  <div class="card">
     <div id="reqbox" style="display:none"></div>
-    <table>
-      <tr><td class="k">registry</td><td id="s-reg" class="dim">not registered</td></tr>
-      <tr><td class="k">signal socket</td><td id="s-ws" class="dim">closed</td></tr>
-      <tr><td class="k">peer connection</td><td id="s-pc" class="dim">—</td></tr>
-      <tr><td class="k">player</td><td id="s-player" class="dim">—</td></tr>
-      <tr><td class="k">clock</td><td id="s-clock" class="dim">—</td></tr>
-      <tr><td class="k">midi received</td><td id="s-midi" class="big">0</td></tr>
-      <tr><td class="k">one-way (last / p50)</td><td id="s-ow" class="dim">—</td></tr>
-      <tr><td class="k">actuation</td><td id="s-act" class="dim">—</td></tr>
-      <tr><td class="k">notes held</td><td id="s-held" class="dim">0</td></tr>
-      <tr><td class="k">safety</td><td id="s-safe" class="dim">armed</td></tr>
-    </table>
-    <div class="row" style="margin-top:9px">
-      <button id="b-panic" class="stop">All notes off (panic)</button>
-      <button id="b-end" class="stop" disabled>End session</button>
+    <div class="chips">
+      <span class="chip"><b>registry</b><span id="s-reg" class="dim">—</span></span>
+      <span class="chip"><b>socket</b><span id="s-ws" class="dim">closed</span></span>
+      <span class="chip"><b>pc</b><span id="s-pc" class="dim">—</span></span>
+      <span class="chip"><b>player</b><span id="s-player" class="dim">—</span></span>
+      <span class="chip"><b>clock</b><span id="s-clock" class="dim">—</span></span>
+      <span class="chip"><b>midi</b><span id="s-midi">0</span></span>
+      <span class="chip"><b>one-way</b><span id="s-ow" class="dim">—</span></span>
+      <span class="chip"><b>actuation</b><span id="s-act" class="dim">—</span></span>
+      <span class="chip"><b>held</b><span id="s-held" class="dim">0</span></span>
+      <span class="chip"><b>safety</b><span id="s-safe" class="dim">armed</span></span>
     </div>
-  </section>
+  </div>
 
-  <section>
+  <div class="card">
     <h2>Panel — what the player sees</h2>
     <canvas id="panel" width="640" height="360"></canvas>
-  </section>
+  </div>
 
-  <section>
-    <h2>Incoming</h2>
+  <details class="card">
+    <summary>Incoming notes</summary>
     <div id="feed"></div>
-  </section>
-
-  <section>
-    <h2>Log</h2>
-    <div id="log"></div>
-  </section>
+  </details>
 </div>
 </main>
 
