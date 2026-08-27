@@ -73,38 +73,15 @@ export function catmullSample(p0, p1, p2, p3, u) {
 }
 
 // ---------------------------------------------------------------------------
-// Bracketing cursor. A continuous kind needs "the pair straddling pos", which
-// the library does not expose (see NOTES.md, THE INTERPOLATE SEAM). O(1)
-// amortized while playing forward, O(log n) on a seek — never O(n) per frame.
+// [DELETED 2026-08-28] `makeBracket(lane)` — 27 lines of client-side bracketing
+// cursor (binary search on seek, linear advance on play) that existed only
+// because the library exposed no positional read but the O(n) `reduceAt`. It is
+// now `deck.bracket(kind, pos)` / `deck.sampleAt(kind, pos)` in
+// timeline/transport.mjs (v0.4 C1/C2), riding a cursor the scheduler keeps per
+// kind. For a client's OWN un-logged lanes (here: the full-rate evidence lane,
+// which is ground truth and deliberately not in the log) the same cursor is
+// exported as `createCursor(rows)` — used, not re-written.
 // ---------------------------------------------------------------------------
-
-export function makeBracket(lane) {
-  let i = 0;
-  return {
-    reset() { i = 0; },
-    /** -> {a, b, u, i} | null */
-    at(pos) {
-      const n = lane.length;
-      if (n === 0) return null;
-      if (n === 1) return { a: lane[0], b: lane[0], u: 0, i: 0 };
-      if (pos <= lane[0].at) { i = 0; return { a: lane[0], b: lane[1], u: 0, i: 0 }; }
-      if (pos >= lane[n - 1].at) { i = n - 2; return { a: lane[n - 2], b: lane[n - 1], u: 1, i: n - 2 }; }
-      if (i > n - 2) i = n - 2;
-      if (pos < lane[i].at || pos > lane[i + 1].at) {
-        if (pos > lane[i + 1].at && pos <= (lane[i + 4] || lane[n - 1]).at) {
-          while (i < n - 2 && pos > lane[i + 1].at) i++;       // forward play: linear advance
-        } else {
-          let lo = 0, hi = n - 1;                               // seek: binary search
-          while (lo < hi - 1) { const m = (lo + hi) >> 1; if (lane[m].at <= pos) lo = m; else hi = m; }
-          i = lo;
-        }
-      }
-      const a = lane[i], b = lane[i + 1];
-      const h = b.at - a.at;
-      return { a, b, u: h > 0 ? Math.min(1, Math.max(0, (pos - a.at) / h)) : 0, i };
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Incrementally cached flattening (FIX-5). Segment k spans lane[k]..lane[k+1]
@@ -162,17 +139,20 @@ export function makeFlattener(lane, interp) {
 // ---------------------------------------------------------------------------
 
 /**
- * @param opts.lane   array of stored samples {i, at(position ms), x, y, pressure}
- *                    — SET AFTER deck construction from deck.items (the library
- *                    owns the log; the adapter needs random access to it, which
- *                    is the workaround documented in NOTES.md).
  * @param opts.mode   'catmull' | 'linear' | 'hold' — the reconstruction the
  *                    adapter uses when the caller does not name one.
  * @param opts.onActuate(sample, rec) — the attested fire (sparse).
+ *
+ * [DELETED 2026-08-28] `opts.lane` — the adapter used to hold its own reference
+ * to the log, because `interpolate` was handed two samples and `reduce` was
+ * handed a prefix that structurally cannot contain the right-hand bracket. That
+ * second handle on the log defeated "the library owns the log". It is gone: the
+ * neighbourhood arrives in `interpolate`'s ctx and the successor arrives as
+ * `info.next` (v0.4 C3/C4). This adapter now knows nothing but the samples it
+ * is given.
  */
-export function makePointerAdapter({ lane = [], mode = 'catmull', onActuate = null, source = 'pointer' } = {}) {
+export function makePointerAdapter({ mode = 'catmull', onActuate = null, source = 'pointer' } = {}) {
   const adapter = {
-    lane,
     mode,
     source,
     fires: 0,
@@ -185,7 +165,9 @@ export function makePointerAdapter({ lane = [], mode = 'catmull', onActuate = nu
       continuous: true,          // state is defined BETWEEN samples, not only at them
       interpolate: true,         // interpolate(a, b, u) is implemented and meaningful
       interpolators: ['hold', 'linear', 'catmull-rom'],
-      neighbourhood: 2,          // samples of context each side that interpolate() wants
+      neighbourhood: 1,          // v0.4: extra samples EACH SIDE of the bracketing
+                                 // pair (0 = two-sample; 1 = one each side, which
+                                 // is exactly what a Catmull-Rom needs)
       // --- plan-timeline §5b provenance ---
       tier: 1,                   // reconstruction spectrum: interpolation (bounded by evidence)
       method: 'catmull-rom',
@@ -201,27 +183,27 @@ export function makePointerAdapter({ lane = [], mode = 'catmull', onActuate = nu
       swallowOriginal: false,
     },
 
-    /** The wall lane fires SPARSE attested samples. This is the only callback
-     *  the library makes; everything between two fires is the client's job
-     *  (see NOTES.md — THE INTERPOLATE SEAM). */
+    /** The wall lane fires SPARSE attested samples — the moments the log
+     *  actually attests. Everything BETWEEN two fires is now a library read
+     *  (`deck.sampleAt`), pulled at whatever cadence the client renders at. */
     actuate(payload, rec) {
       adapter.fires++;
       adapter.lastFire = payload;
       onActuate && onActuate(payload, rec);
     },
 
-    /** THE seam under test. The library's contract is interpolate(a, b, u).
-     *  A C¹ spline is NOT a function of two samples — it needs a neighbourhood
-     *  — so with only (a, b, u) we degrade HONESTLY to linear and say so in the
-     *  returned `method`. `ctx` is this client's extension: {mode, prev, next}. */
+    /** The library's contract, v0.4: interpolate(a, b, u, ctx) with
+     *  ctx = {prev, next, pos, dtMs, prevs, nexts, …}. A C¹ spline is NOT a
+     *  function of two samples; the neighbourhood the adapter declared
+     *  (caps.neighbourhood = 1) is now handed to it. With NO neighbourhood at
+     *  all we still degrade honestly to linear and say so in `method`. */
     interpolate(a, b, u, ctx) {
       adapter.interpCalls++;
       const m = (ctx && ctx.mode) || adapter.mode;
       if (m === 'hold') return holdSample(a);
       if (m === 'linear') return lerpSample(a, b, u);
-      const prev = ctx && 'prev' in ctx ? ctx.prev : adapter.lane[a.i - 1];
-      const next = ctx && 'next' in ctx ? ctx.next : adapter.lane[b.i + 1];
-      if (prev === undefined && next === undefined && !adapter.lane.length) return lerpSample(a, b, u);
+      const prev = ctx && ctx.prev, next = ctx && ctx.next;
+      if (prev === undefined && next === undefined) return lerpSample(a, b, u);
       return catmullSample(prev || null, a, b, next || null, u);
     },
 
@@ -229,19 +211,24 @@ export function makePointerAdapter({ lane = [], mode = 'catmull', onActuate = nu
      *  the state at t is the interpolation between the samples BRACKETING t,
      *  not merely the last one before it.
      *
-     *  SEAM: `payloads` only ever contains events with at <= pos, so the RIGHT
-     *  bracket is structurally absent from reduce()'s inputs. We recover it
-     *  from the client-held lane by index — the workaround, reported. */
-    reduce(payloads, pos) {
+     *  `payloads` only ever contains events with at <= pos, so the RIGHT
+     *  bracket is by construction absent from the prefix — which is why the
+     *  library now supplies `info.next` (the successor) and `info.nexts` (1 +
+     *  caps.neighbourhood of them). The adapter no longer holds the log. */
+    reduce(payloads, pos, info) {
       adapter.reduceCalls++;
       if (!payloads.length) return null;
       const a = payloads[payloads.length - 1];
-      const b = adapter.lane[a.i + 1];
+      const b = info && info.next && info.next.payload;
       if (!b) return holdSample(a);
       const h = b.at - a.at;
       if (!(h > 0)) return holdSample(a);
       const u = Math.min(1, Math.max(0, (pos - a.at) / h));
-      return adapter.interpolate(a, b, u);
+      return adapter.interpolate(a, b, u, {
+        prev: payloads[payloads.length - 2],
+        next: info.nexts && info.nexts[1] ? info.nexts[1].payload : undefined,
+        pos, dtMs: h,
+      });
     },
 
     /** Idempotent absolute assertion: put the pointer exactly there. */
@@ -260,20 +247,19 @@ export function makePointerAdapter({ lane = [], mode = 'catmull', onActuate = nu
 // reconstruction at that sample's own time and measure the euclidean error.
 // ---------------------------------------------------------------------------
 
-export function deviations(evidence, lane, adapter) {
+export function deviations(evidence, lane, deck, kind = 'pointer') {
   const out = {};
   if (lane.length < 2 || !evidence.length) return out;
   const t0 = lane[0].at, t1 = lane[lane.length - 1].at;
   const modes = ['hold', 'linear', 'catmull'];
   for (const m of modes) { out[m] = { n: 0, sum: 0, max: 0, mean: 0, p95: 0 }; }
   const errs = { hold: [], linear: [], catmull: [] };
-  const br = makeBracket(lane);
   for (const e of evidence) {
     if (e.at < t0 || e.at > t1) continue;
-    const b = br.at(e.at);
-    if (!b) continue;
     for (const m of modes) {
-      const s = adapter.interpolate(b.a, b.b, b.u, { mode: m });
+      // the LIBRARY's read: bracket + neighbourhood + interpolate, one call
+      const s = deck.sampleAt(kind, e.at, { mode: m });
+      if (!s) continue;
       const d = Math.hypot(s.x - e.x, s.y - e.y);
       const o = out[m];
       o.n++; o.sum += d; if (d > o.max) o.max = d;

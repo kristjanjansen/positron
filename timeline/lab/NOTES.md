@@ -316,3 +316,75 @@ virtual host holds a single `tickCb` — so it is fanned out (`sharedVR`), with
 
 Composed-demo results (the motivating case) live in `proto/remixer/NOTES.md`
 Step 6 — 16/16 headless, 0 upstream calls.
+
+## Checkpoint 7 — v0.4: CONTINUOUS KINDS ARE FIRST-CLASS (2026-08-28)
+
+Four clients were **discrete** (a note fires, a tile appears, a cue lands).
+proto/paths brought the first kind whose state is defined **between** samples and
+filed six seams (proto/paths/NOTES.md §3). All six are closed in-library. The
+transport half still needed nothing; every change is in the adapter half.
+
+| # | seam | the API line that closes it |
+|---|---|---|
+| C1 | no positional read but the O(n) `reduceAt` | **`deck.sampleAt(kind, pos, opts)`** → the interpolated value at any position, O(1) amortised through a per-kind **cursor** |
+| C2 | no bracketing-pair query | **`deck.bracket(kind, pos, opts)`** → `{prev, a, b, next, prevs, nexts, u, i, aAt, bAt, dtMs}` |
+| C3 | `interpolate(a,b,u)` under-specified for any C¹ interpolator | **`interpolate(a, b, u, ctx)`**, `ctx = {prev, next, pos, dtMs, prevs, nexts, u, i, kind}` + **`caps.neighbourhood`** (0 = two-sample, 1 = one each side = Catmull-Rom, …) |
+| C4 | `reduce()` structurally cannot see the right bracket | **`info.next` / `info.nexts`** in every reduce call (1 + `caps.neighbourhood` successors) |
+| C5 | the caps were inert; three clients each hand-wrote the same `onState` filter | the library now READS `continuous`, `interpolate`, `interpolators`, `neighbourhood`, **`followsTransport`** → **`adapter.transport(state)`** on play/pause/rate |
+| C6 | C3's "degrade honestly" could not happen | **`deck.request(kind, want)`** → `{wanted, chose, degraded, reason}` (nested.mjs's shape) + **`deck.degradations(kind)`** for implicit refusals |
+| L1 | logdeck's `payload:{i, at, ...p.payload}` let a row's epoch-µs `at` clobber the injected position-domain `at` | control fields injected **after** the spread; the row's own stamp survives as `atUs` |
+
+Plus `createCursor(rows)` exported (a client's own un-logged lanes get the same
+cursor instead of a second implementation), `sched.eventsOf(kind)`,
+`sched.cursorStats(kind)`, and `prefixEvents` now bisects a per-kind lane
+instead of scanning every kind from index 0.
+
+**THE GUARANTEE, SHARPENED.** SEAM 5 said "the reducer is a pure function of the
+prefix". That is exactly right for a discrete kind and exactly wrong for a
+continuous one: the state at *t* is defined by the samples **straddling** *t*,
+and the right one has `at > pos`. So:
+
+    discrete kind    : state(t) = f(prefix(<= t))
+    continuous kind  : state(t) = f(prefix(<= t), successor(s) of t)
+
+Without `info.next` an interpolated reduce is not merely awkward — it is
+**inexpressible**, which is why the first continuous client had to keep a second
+handle on the log.
+
+**NOT done, deliberately: the library does not own a render tick.** Rendering
+cadence belongs to the client; `observePosition()` already serves a 60 Hz pull
+and a library-owned rAF would be a second timer inside a library whose first law
+is that the vector has none.
+
+**`caps.followsTransport` is real, and nested.mjs proves it**: its hand-written
+`parent.transport.onState()` play/pause/rate filter was deleted and replaced by
+the `adapter.transport(st)` method the library now calls (nested had been
+*declaring* `followsTransport: true` into a library that ignored it). Suite 4
+stays green unchanged; proto/instrument and proto/remixer still carry the same
+filter by hand and can now delete it.
+
+### prop-test: suite 5, green at 30 AND 100 seeds
+
+`node timeline/lab/prop-test.mjs --seeds 100` → **0 violations**, all five suites
+(100 basic + 50 gymnastics + 34 freeze + nesting + continuous).
+
+| arm | what it asserts | measured |
+|---|---|---|
+| `cont-sample` | `sampleAt` vs an **analytic** Lissajous at 7.3 ms probes; ordering; on-sample identity; end clamping | mean px error **hold 21.87 · linear 0.623 · catmull 0.0232** |
+| `cont-sample` | **C3's necessity**: the same adapter asked with `{neighbourhood: 0}` returns *exactly* the linear answer and labels itself `linear-degraded` | equal to 1e-9 |
+| `cont-cursor` | not O(n): forward sweep cost per frame must not grow with n | **3.67 cmp/call at n=2000 and 3.67 at n=8000** (a rescan would be 4×; ~1000/call) |
+| `cont-cursor` | backward sweep and random access stay inside the binary-search bound, and BOTH cursor paths get used | backward **11.97**, random **14.25**, `log2(2000) ≈ 11` |
+| `cont-next` | `info.next` is the first event with `at > pos`; `info.nexts.length === 1 + caps.neighbourhood`; the interpolated reduce **equals `sampleAt` to 1e-9**; past the last sample the successor is genuinely absent → hold, honestly | 4 probe positions |
+| `cont-caps` | discrete kind sampled → hold **+ a report**; unsupported interpolator → nearest offered; `neighbourhood` over caps → clipped; rate off `caps.rates` → log-nearest; multi-key asks answer per key; **a `caps.continuous` claim with no `interpolate()` is caught at `registerAdapter`** | |
+| `cont-follow` | play/pause/rate delivered in order; a **seek** is not delivered (it is reduce+assertState); a **sync** never cascades; an adapter without the cap gets nothing | `play,rate,pause` |
+| `logdeck-at` | a row's epoch-µs `at` must not clobber the injected position `at`; `i` survives; `atUs` preserved; the rest of the row still spreads | 250 / 500 / 1150 ms |
+
+### The client-side cost this removes
+
+proto/paths deleted its `makeBracket()` (27 lines), its adapter's second handle
+on the log, and its `expand()` no-`at` hack, and re-verified **9/9 with the
+numbers unchanged to the last digit** (seek ×3 = 0.042/0.032/0.042 px, deviation
+Catmull-Rom mean 0.036 px, per-lane ink identical). In that run the library
+served **4 847 `sampleAt` calls at 2.05 comparisons each** (4 577 cursor hits,
+199 linear advances, 5 binary searches) — the number the O(n) `reduceAt` would
+have turned into a per-frame rescan.

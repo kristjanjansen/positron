@@ -7,9 +7,8 @@
 // Both append-only. Decimation never touches the evidence buffer.
 
 import { makeLogDeck } from '/timeline/logdeck.mjs';
-import {
-  makePointerAdapter, makeBracket, makeFlattener, deviations,
-} from './pointer-adapter.js';
+import { createCursor } from '/timeline/transport.mjs';
+import { makePointerAdapter, makeFlattener, deviations } from './pointer-adapter.js';
 
 const STORE_MS = 100;                 // the lineage's stored-lane throttle
 const W = 1000, H = 620;
@@ -34,8 +33,8 @@ const S = {
   evidencePos: [],     // evidence mapped into the position domain
   flatLinear: null,
   flatSmooth: null,
-  brLane: null,
-  brEvidence: null,
+  curEvidence: null,   // library cursor over the un-logged ground-truth lane
+  ask: null,           // the deck's answer to what this client asked for (C6)
   dev: {},
   pos: 0,
   dur: 0,
@@ -175,45 +174,45 @@ function build() {
   if (S.deck) { S.deck.dispose(); S.deck = null; }
 
   const adapter = makePointerAdapter({
-    lane: [],
     mode: 'catmull',
     onActuate: (payload) => { S.live.fire = payload; },
   });
   S.adapter = adapter;
 
+  // No `expand` any more: logdeck injects its control fields AFTER the payload
+  // spread since v0.4, so a raw row's epoch-µs `at` can no longer clobber the
+  // position-domain `at` the library computed. The row goes in as it stands and
+  // comes back as {x, y, pressure, at: posMs, atUs: the row's own stamp, i}.
   const deck = makeLogDeck({
-    lanes: [{
-      kind: 'pointer',
-      rows: S.stored,
-      adapter,
-      // expand() so our payload carries NO `at` key: logdeck builds
-      // `payload: {i, at, ...rowPayload}` and a row's own `at` (µs) would
-      // clobber the injected position-domain `at`. See NOTES.md (SEAM L1).
-      expand: (row, i, toPos) => [{
-        atUs: row.at,
-        payload: { x: row.x, y: row.y, pressure: row.pressure, atUs: row.at, posMs: toPos(row.at) },
-      }],
-    }],
+    lanes: [{ kind: 'pointer', rows: S.stored, adapter }],
     leadInMs: 250, tailMs: 250,
     onPosition: (pos, dur) => frame(pos, dur),
   });
   S.deck = deck;
 
-  // The adapter needs RANDOM ACCESS to the lane (the library gives reduce() only
-  // the prefix, and interpolate() only a pair). Take it from the library's own
-  // item list so there is exactly one copy of the truth.
-  S.lane = deck.items.filter((it) => it.kind === 'pointer').map((it) => it.payload);
-  adapter.lane = S.lane;
+  // ASK, and be told (C6). Nothing here is a workaround: if the adapter could
+  // not honour the ask, `S.ask.degraded` would say so, in words, on screen.
+  S.ask = deck.request('pointer', { continuous: true, interpolate: 'catmull-rom', neighbourhood: 1, seek: true });
+
+  // The lane, read from the library's own per-kind ordered lane — for DRAWING
+  // (the stored polyline and its dots) and for segment indexing. Interpolation
+  // no longer needs it: that is deck.sampleAt's job.
+  S.lane = deck.eventsOf('pointer').map((e) => e.payload);
 
   S.evidencePos = S.evidence.map((e) => ({ at: deck.toPos(e.at), x: e.x, y: e.y, pressure: e.pressure }));
-  S.brLane = makeBracket(S.lane);
-  S.brEvidence = makeBracket(S.evidencePos);
+  // the evidence lane is ground truth and deliberately NOT in the log, so it
+  // gets the library's exported cursor rather than a second implementation.
+  S.curEvidence = createCursor(S.evidencePos);
 
-  S.flatLinear = makeFlattener(S.lane, (k, u) => adapter.interpolate(S.lane[k], S.lane[k + 1], u, { mode: 'linear' }));
-  S.flatSmooth = makeFlattener(S.lane, (k, u) => adapter.interpolate(S.lane[k], S.lane[k + 1], u, { mode: 'catmull' }));
+  // Flattening asks the DECK for each subdivision point: one call, which
+  // brackets, gathers the neighbourhood and interpolates. u = 1 of segment k
+  // lands exactly on sample k+1, so segments still join exactly (FIX-4).
+  const posOf = (k, u) => S.lane[k].at + (S.lane[k + 1].at - S.lane[k].at) * u;
+  S.flatLinear = makeFlattener(S.lane, (k, u) => deck.sampleAt('pointer', posOf(k, u), { mode: 'linear' }));
+  S.flatSmooth = makeFlattener(S.lane, (k, u) => deck.sampleAt('pointer', posOf(k, u), { mode: 'catmull' }));
   S.flatLinear.rebuildAll(); S.flatSmooth.rebuildAll();
 
-  S.dev = deviations(S.evidencePos, S.lane, adapter);
+  S.dev = deviations(S.evidencePos, S.lane, deck);
   S.dur = deck.durationMs;
   S.pos = 0;
   deck.seek(0);
@@ -323,26 +322,24 @@ function drawInset() {
 }
 
 // ---------------------------------------------------------------------------
-// the per-frame render — THE SEAM. The library fires sparse samples and offers
-// a 60 Hz POSITION stream, but it never asks the adapter for a value between
-// two fires. So the client drives the interpolator itself, off onPosition.
+// the per-frame render. The RENDER CADENCE is the client's — deliberately: the
+// library owns no render tick, it owns the position observable and an O(1)
+// positional read. So this is `deck.sampleAt()` at whatever rate we paint, and
+// the bracketing cursor, the neighbourhood and the interpolator call all live
+// behind that one line.
 // ---------------------------------------------------------------------------
 
 function frame(pos, dur) {
   S.pos = pos; S.dur = dur;
   const t0 = performance.now();
   if (S.lane.length >= 2) {
-    const b = S.brLane.at(pos);
-    if (b) {
-      // ONE adapter, two interpolators — the same function that generated the
-      // static overlay geometry also produces the live cursor. One code path,
-      // live and replay (the lineage law).
-      S.live.linear = S.adapter.interpolate(b.a, b.b, b.u, { mode: 'linear' });
-      S.live.smooth = S.adapter.interpolate(b.a, b.b, b.u, { mode: 'catmull' });
-    }
+    // ONE code path, live and replay: the same deck.sampleAt() that generated
+    // the static overlay geometry produces the live cursor (the lineage law).
+    S.live.linear = S.deck.sampleAt('pointer', pos, { mode: 'linear' });
+    S.live.smooth = S.deck.sampleAt('pointer', pos, { mode: 'catmull' });
   }
   if (S.evidencePos.length >= 2) {
-    const e = S.brEvidence.at(pos);
+    const e = S.curEvidence.bracket(pos);
     if (e) S.live.evidence = { x: e.a.x + (e.b.x - e.a.x) * e.u, y: e.a.y + (e.b.y - e.a.y) * e.u };
   }
   S.perFrame.renderAt = performance.now() - t0;
@@ -390,7 +387,10 @@ function readout() {
     `<div><b>${drawn}</b> points drawn on the Catmull-Rom lane → ` +
     `<b>${drawn ? (100 * (drawn - attested) / drawn).toFixed(1) : '0'}%</b> of the rendered path is <i>invented</i></div>` +
     `<div class="dim">header: t0=${S.header ? S.header.t0Us : '–'} µs · duration=${S.header ? S.header.durationMs.toFixed(0) : '–'} ms · ${S.header ? S.header.source : '–'}</div>`;
-  $('caps').textContent = JSON.stringify(S.deck ? S.deck.caps('pointer') : {}, null, 1);
+  $('caps').textContent = JSON.stringify(S.deck ? S.deck.caps('pointer') : {}, null, 1) +
+    (S.ask ? `\n\nrequest -> ${S.ask.degraded ? 'DEGRADED' : 'granted in full'}\n` +
+      Object.entries(S.ask.per).map(([k, v]) =>
+        ` ${k}: ${JSON.stringify(v.chose)}${v.degraded ? `  (wanted ${JSON.stringify(v.wanted)} — ${v.reason})` : ''}`).join('\n') : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +459,9 @@ window.paths = {
       reduceCalls: S.adapter ? S.adapter.reduceCalls : 0,
       interpCalls: S.adapter ? S.adapter.interpCalls : 0,
       caps: S.deck ? S.deck.caps('pointer') : null,
+      ask: S.ask,
+      degradations: S.deck ? S.deck.degradations('pointer') : null,
+      cursor: S.deck ? S.deck.cursorStats('pointer') : null,
       dev: S.dev,
       flatSmooth: S.flatSmooth ? S.flatSmooth.flat().length : 0,
       flatLinear: S.flatLinear ? S.flatLinear.flat().length : 0,
@@ -472,9 +475,8 @@ window.paths = {
     S.deck.seek(pos);
     const reduced = S.deck.reduceAt('pointer', pos);
     const truth = analyticAt(pos);
-    const b = S.brLane.at(pos);
-    const hold = b ? S.adapter.interpolate(b.a, b.b, b.u, { mode: 'hold' }) : null;
-    const lin = b ? S.adapter.interpolate(b.a, b.b, b.u, { mode: 'linear' }) : null;
+    const hold = S.deck.sampleAt('pointer', pos, { mode: 'hold' });
+    const lin = S.deck.sampleAt('pointer', pos, { mode: 'linear' });
     const err = (p) => (p && truth ? +Math.hypot(p.x - truth.x, p.y - truth.y).toFixed(3) : null);
     return {
       pos, truth, reduced, method: reduced && reduced.method,
