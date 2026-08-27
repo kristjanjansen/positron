@@ -43,8 +43,8 @@ const TRANSPORT_VERIFY = `(async () => {
   // fires twice (double-fires).
   for (const f of [0.2, 0.5, 0.8]) {
     const p = d.durationMs * f;
-    // NB order: setRate() doubles as play() in the library (there is no
-    // set-rate-while-paused), so the rate goes first and pause() last.
+    // setRate() no longer starts playback (library seam 2), so this order is
+    // now merely conventional: arm the rate, park, seek.
     d.setRate(1); d.pause(); d.seek(p); await sleep(90);
     const expected = d.expectedHeld(p), sounding = window.jamSounding();
     d.resetDrift(); d.play(); await sleep(1200); d.pause(); await sleep(80);

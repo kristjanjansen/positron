@@ -36,9 +36,25 @@ html,body{margin:0;padding:0;background:#0b0e12;color:#dfe5ec;font:13px monospac
 <div id="cueinfo"></div>
 <div id="bar">loading…</div>
 <script src="/hls.min.js"></script>
-<script>
+<script type="module">
+import { createDeck } from "/timeline/transport.mjs";
 // ============================================================================
 // Composed replay — the v1 grid-archive DoD shape: N tiles, ONE playhead.
+//
+// THE PLAYHEAD IS THE TIMELINE LIBRARY'S (timeline/transport.mjs). What used to
+// live here — `playAnchorT + (performance.now() - playAnchorPerf)`, a rAF cue
+// engine, and a `firedIds` set rebuilt by hand on every seek — is the same
+// hand-rolled replay shape four generations of this repo have rebuilt. It is
+// now two adapters over the library's vector + lookahead lane:
+//   kind `media-span` — actuate = seek/play a tile element; reduce = the set of
+//                       tiles present at t; assertState = hard-seek every tile
+//   kind `cue`        — actuate = fire the cue (decode both tiles); reduce =
+//                       the fired set <= t; assertState = firedIds (rewind)
+// MASTER CLOCK STAYS THE MEDIA ELEMENT (the proven pattern): the first present
+// tile is the clock master, is never rate-nudged, and the library's vector is
+// SLAVED to its currentTime via transport.sync(); every other tile servos to
+// the library's position. If the master stalls the playhead stalls with it —
+// cues and pixels cannot drift apart.
 //
 // TWO BOOT MODES:
 //   ?show=<id>  (the promoted path) — selfrec/<show>/show.json (written by
@@ -84,6 +100,7 @@ const S = window.__grid = {
   spans: {}, cues: [], fires: [],
   playheadT: 0, playing: false, mapping: "linear",
   tiles: {}, rangeT: [0, 0],
+  masterPid: null, syncCorrections: [], hostName: null,
 };
 
 // ---- burned-row decoder (contract: NB=64 BW=12 RX=32 y=600 h=48) -----------
@@ -177,28 +194,18 @@ window.__mapInfo = (T) => {
   return out;
 };
 
-// ---- transport: one playhead ------------------------------------------------
-let playAnchorPerf = 0, playAnchorT = 0;
-function setPlayhead(T) { S.playheadT = T; }
-function currentT() {
-  return S.playing ? playAnchorT + (performance.now() - playAnchorPerf) : S.playheadT;
-}
-window.__seekWall = (T) => {
-  S.playheadT = T;
-  if (S.playing) { playAnchorT = T; playAnchorPerf = performance.now(); }
-  // rewind semantics for the cue lane (proto/replay pattern): fired set rebuilt
-  firedIds = new Set(S.fires.filter((f) => f.at <= T).map((f) => f.id));
-  for (const t of Object.values(S.tiles)) syncTile(t, T, true);
-};
-window.__play = () => {
-  if (S.playing) return;
-  S.playing = true; playAnchorT = S.playheadT; playAnchorPerf = performance.now();
-};
+// ---- transport: one playhead, and it is the library's ------------------------
+let deck = null, firedIds = new Set();
+const currentT = () => (deck ? deck.position() : S.playheadT);
+
+window.__seekWall = (T) => { if (deck) S.playheadT = deck.seek(T); };
+window.__play = () => { deck && deck.play(); };
 window.__pause = () => {
-  if (!S.playing) return;
-  S.playheadT = currentT(); S.playing = false;
+  if (!deck) return;
+  deck.pause();
   for (const t of Object.values(S.tiles)) t.video.pause();
 };
+window.__setRate = (r) => { deck && deck.setRate(r); };   // library seam 2: does not play
 window.__setMapping = (m) => { S.mapping = m; window.__seekWall(currentT()); };
 window.__decodeNow = () => {
   const T = currentT();
@@ -212,38 +219,106 @@ window.__decodeNow = () => {
   return out;
 };
 
-function syncTile(t, T, hard) {
+// hard assert (a seek landed here): put the element exactly at u(T)
+function assertTile(t, T, present) {
+  const u = mapT(t, T);
+  const absent = !present || !t.ready || u < 0 || u > t.mediaDurMs;
+  if (absent !== t.absent) { t.absent = absent; t.el.classList.toggle("absent", absent); }
+  if (absent) { if (!t.video.paused) t.video.pause(); return; }
+  t.video.currentTime = u / 1000;
+  t.video.playbackRate = 1;
+  t.lastHardSeek = performance.now();
+  if (deck && deck.playing()) t.video.play().catch(() => {}); else t.video.pause();
+}
+// soft servo (running): the same 150 ms hard-resync law, but the rate-nudge
+// dead band is now the SKEW BUDGET and it is explicit. Under the old wall-clock
+// playhead both tiles drifted together, so a wide (±40 ms) band was invisible;
+// with a media-element master the master sits at zero by definition and the
+// band IS the inter-tile skew. One 30 fps frame is 33 ms, so 20 ms is the
+// tightest band that still means something.
+const SERVO_BAND_MS = 20;
+function servoTile(t, T) {
   const u = mapT(t, T);
   const absent = u < 0 || u > t.mediaDurMs || !t.ready;
   if (absent !== t.absent) { t.absent = absent; t.el.classList.toggle("absent", absent); }
   if (absent) { if (!t.video.paused) t.video.pause(); return; }
-  const targetS = u / 1000;
   const errMs = t.video.currentTime * 1000 - u;
-  if (hard || Math.abs(errMs) > 150) {
-    t.video.currentTime = targetS;
-    t.video.playbackRate = 1;
-    t.lastHardSeek = performance.now();
-    if (S.playing) t.video.play().catch(() => {});
-    else t.video.pause();
-    return;
-  }
-  if (S.playing) {
-    if (t.video.paused) t.video.play().catch(() => {});
-    t.video.playbackRate = errMs > 40 ? 0.94 : errMs < -40 ? 1.06 : 1;
-  } else if (!t.video.paused) t.video.pause();
+  if (Math.abs(errMs) > 150) return assertTile(t, T, true);
+  if (t.video.paused) t.video.play().catch(() => {});
+  t.video.playbackRate = errMs > SERVO_BAND_MS ? 0.94 : errMs < -SERVO_BAND_MS ? 1.06 : 1;
 }
 
-// ---- cue lane ---------------------------------------------------------------
-let firedIds = new Set();
-function cueEngine(T) {
-  for (const c of S.cues) {
-    if (c.at <= T && !firedIds.has(c.id)) {
-      firedIds.add(c.id);
-      const decs = window.__decodeNow();
-      S.fires.push({ id: c.id, at: c.at, firedT: T, wallNow: Date.now(),
-                     decoded: decs.tiles, lateMs: +(T - c.at).toFixed(1) });
+// ---- adapters (the library's {caps, actuate, reduce, assertState} shape) -----
+const spanAdapter = {
+  caps: {
+    kind: "media-span", domain: "wall", unit: "ms",
+    seekable: true, reducible: true,
+    // an HTMLMediaElement is not a sample-accurate slave: seeks land on a frame
+    // and rate is only trustworthy at 1x (0.94/1.06 is the servo, not playback)
+    seekAccuracyMs: 40, rates: [1], rateNudge: [0.94, 1.06],
+    clockMaster: true,             // this kind OWNS the clock; see the sync loop
+    catchUp: "reduce",             // a missed span boundary is re-asserted, never burst
+  },
+  actuate(p) {
+    const t = S.tiles[p.pid];
+    if (t) assertTile(t, currentT(), p.phase === "enter");
+  },
+  // the set of tiles that should be PRESENT at pos — absence is content
+  reduce(payloads, pos) {
+    const present = new Set();
+    for (const p of payloads) { if (p.phase === "enter") present.add(p.pid); else present.delete(p.pid); }
+    for (const pid of [...present]) {
+      const t = S.tiles[pid], u = t ? mapT(t, pos) : -1;
+      if (!t || u < 0 || u > t.mediaDurMs) present.delete(pid);
     }
+    return present;
+  },
+  assertState(present, info) {
+    for (const [pid, t] of Object.entries(S.tiles)) assertTile(t, info.pos, present.has(pid));
+  },
+};
+
+const cueAdapter = {
+  caps: { kind: "cue", domain: "wall", unit: "ms", seekable: true, reducible: true,
+          catchUp: "burst" },      // a cue is a note: never silently dropped
+  actuate(p, rec) {
+    firedIds.add(p.id);
+    const decs = window.__decodeNow();
+    S.fires.push({ id: p.id, at: p.at, firedT: decs.T, wallNow: Date.now(),
+                   decoded: decs.tiles, origin: rec.origin,
+                   // the LIBRARY's drift number (intended vs actual instant),
+                   // not "how far past the cue the rAF loop happened to look"
+                   lateMs: rec.deltaMs === null ? null : +rec.deltaMs.toFixed(1),
+                   posLateMs: +(decs.T - p.at).toFixed(1) });
+  },
+  reduce(payloads) { return new Set(payloads.map((p) => p.id)); },   // fired set <= t
+  assertState(set) { firedIds = set; },                              // rewind semantics
+};
+
+// ---- clock master: the media element drives the library, not the wall --------
+const SYNC_TOL_MS = 40;            // don't churn the lookahead on frame quantization
+let masterAdvance = { t: null, wall: 0 };
+function driveFromMaster(T) {
+  if (S.mapping !== "linear") return null;   // T->u is only invertible for linear
+  let m = S.masterPid && S.tiles[S.masterPid];
+  const usable = (t) => t && t.ready && !t.absent && !t.video.paused &&
+                        mapT(t, T) >= 0 && mapT(t, T) <= t.mediaDurMs;
+  if (!usable(m)) {
+    m = Object.values(S.tiles).find(usable) || null;
+    S.masterPid = m ? m.pid : null;
+    masterAdvance = { t: null, wall: 0 };
   }
+  if (!m) return null;
+  const mediaT = m.linearAnchor + m.video.currentTime * 1000;   // the master's wall instant
+  const now = performance.now();
+  if (masterAdvance.t !== null && mediaT === masterAdvance.t && now - masterAdvance.wall > 1000) {
+    S.masterPid = null; return null;          // master stalled: free-run on the wall clock
+  }
+  if (masterAdvance.t === null || mediaT !== masterAdvance.t) masterAdvance = { t: mediaT, wall: now };
+  m.video.playbackRate = 1;                   // THE MASTER IS NEVER NUDGED
+  const corr = deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
+  if (corr) S.syncCorrections.push(+corr.toFixed(1));
+  return corr;
 }
 
 // ---- scrubber / transport UI ------------------------------------------------
@@ -294,19 +369,35 @@ function updateTransport(T) {
 }
 
 // ---- main loop --------------------------------------------------------------
+// No cue engine here any more: cues are the library's lookahead lane, on a
+// worker tick that survives a hidden tab. The rAF loop is now PURELY the video
+// servo + paint, which is what rAF is actually for.
 function loop() {
-  const T = currentT();
+  S.playing = deck ? deck.playing() : false;
+  let T = currentT();
   if (S.playing) {
-    for (const t of Object.values(S.tiles)) syncTile(t, T, false);
-    cueEngine(T);
+    driveFromMaster(T);                     // media element -> library vector
+    T = currentT();
+    for (const t of Object.values(S.tiles)) if (t.pid !== S.masterPid) servoTile(t, T);
+    if (S.masterPid && S.tiles[S.masterPid]) servoPresence(S.tiles[S.masterPid], T);
     if (T > S.rangeT[1]) window.__pause();
   }
+  S.playheadT = T;
   updateTransport(T);
   const tileTxt = Object.values(S.tiles).map((t) =>
-    `${t.pid}:${t.absent ? "absent" : (t.video.currentTime).toFixed(2) + "s"}`).join("  ");
+    `${t.pid}:${t.absent ? "absent" : (t.video.currentTime).toFixed(2) + "s"}${t.pid === S.masterPid ? "*" : ""}`).join("  ");
   document.getElementById("bar").textContent =
-    `mode=${S.mode}  map=${S.mapping}  ${tileTxt}  fires=${S.fires.length}/${S.cues.length}`;
+    `mode=${S.mode}  map=${S.mapping}  ${tileTxt}  fires=${S.fires.length}/${S.cues.length}` +
+    `  master=${S.masterPid || "wall"}  host=${S.hostName}`;
   requestAnimationFrame(loop);
+}
+// the master's absence bookkeeping only — never its rate, never its currentTime
+function servoPresence(t, T) {
+  const u = mapT(t, T);
+  const absent = u < 0 || u > t.mediaDurMs || !t.ready;
+  if (absent !== t.absent) { t.absent = absent; t.el.classList.toggle("absent", absent); }
+  if (absent && !t.video.paused) t.video.pause();
+  else if (!absent && t.video.paused) t.video.play().catch(() => {});
 }
 
 // ---- boot -------------------------------------------------------------------
@@ -394,7 +485,34 @@ function reduceCuelog(log, wantSpans) {
       });
     }
     buildScrubber();
-    setPlayhead(S.rangeT[0]);
+
+    // ---- the library's deck: two kinds, one playhead ----------------------
+    // Position domain is ABSOLUTE WALL MS (unchanged) — the library's range is
+    // just [rangeT0, rangeT1]. media-span boundaries and cues are ordinary
+    // scheduled events; the adapters above are the only glue.
+    const items = [];
+    for (const t of Object.values(S.tiles)) {
+      items.push({ at: t.linearAnchor, kind: "media-span", id: `span-${t.pid}-in`,
+                   payload: { pid: t.pid, phase: "enter" } });
+      items.push({ at: t.linearAnchor + t.mediaDurMs, kind: "media-span", id: `span-${t.pid}-out`,
+                   payload: { pid: t.pid, phase: "exit" } });
+    }
+    for (const c of S.cues) items.push({ at: c.at, kind: "cue", id: c.id, payload: { id: c.id, at: c.at, data: c.data } });
+    deck = window.__deck = createDeck({
+      items, range: S.rangeT,
+      adapters: { "media-span": spanAdapter, cue: cueAdapter },
+      // worker tick host is the library default (lab VERDICT): the cue lane
+      // keeps firing when this tab is backgrounded, which the old rAF engine
+      // could not do at all.
+      onPosition: (pos) => { S.playheadT = pos; },
+    });
+    S.hostName = deck.hostName;
+    window.__drift = () => deck.drift();
+    window.__deckStats = () => ({ stats: deck.stats(), audit: deck.audit(),
+                                  drift: deck.drift(), driftStats: deck.sched.driftStats(),
+                                  caps: deck.caps(), syncCorrections: S.syncCorrections.slice(),
+                                  master: S.masterPid, host: deck.hostName,
+                                  rate: deck.rate(), targetRate: deck.targetRate() });
     window.__seekWall(S.rangeT[0]);
     S.phase = "running";
     loop();

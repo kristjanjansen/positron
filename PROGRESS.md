@@ -148,6 +148,53 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### TRANSPORT v0.2 — SIX SEAMS FIXED + 2 MORE ADOPTIONS (session 6p) — ✅ gate green
+Fixes (before → after): (1) **`registerAdapter(kind, {caps, actuate, reduce,
+assertState})`** with per-kind dispatch + policy derived from caps — plus
+createDeck/adapterCaps/assertAt/reduceAt/reduce-on-seek all lifted upstream;
+(2) `setRate()` now ARMS the rate and stays paused, `play(r?)` is the only mover,
+`.targetRate` public (a paused UI shows 0.50×, not 0.00×); (3) default host is
+now **worker** (matching the measured verdict), main/raf explicit opt-ins;
+(4) **wall→audio bridge**: `actuate(payload, rec, when)` with `caps.audio={ctx,
+leadMs}` → `when.audioTime` — an early fire's earliness IS the headroom;
+(5) **the reducer now gets the COMPLETE ORDERED PREFIX** (not one scan's
+misses) — guarantee stated: `assertState(reduce(prefix ≤ t))` == state after
+`play(0→t)` for ANY reducer, commutative or not; (6) `onDrift/peekDrift/
+driftStats` beside a capped `drainDrift`. Bonus seam the media client needed:
+**`transport.sync(pos, {toleranceMs})`** — slave the vector to an external clock
+master with no seek semantics (nothing re-fires).
+- **Gate green, nothing moved**: prop-test at 30 and 100 seeds + a new third
+  suite asserting all six seams, incl. a seam-5 witness check that the OLD
+  one-scan input gives a different answer. Firing arms within noise
+  (main 1.3/6.9, worker 4.3/15.1, raf 4.1/7.7, fanout 1.7/2.8; 1270/1270 each).
+  **CORRECTION: the fan-out arm fails 6 of 7 asserts, not 5** — earlier prose
+  miscounted; the recorded data says 6 (unchanged run to run).
+- **jam-timeline.js 105 → 39 lines (−63%)** — only the jam-shaped µs→ms mapping
+  survives. jam-interval.html adoption: **+45 lines, 0 deletions** (confirmed
+  free). replay-grid.html: +216, two adapters (`media-span` w/ caps
+  seekAccuracyMs 40, rates [1], rateNudge, clockMaster, catchUp reduce; `cue`
+  w/ catchUp burst). Media element stays clock master; library slaved via
+  sync(); rAF demoted to pure video servo; the cue lane runs on the worker host
+  and survives a hidden tab.
+- **verify-replay 5/5**: scrubber seeks **bit-identical** (−49/−51, −65/−41).
+  Inter-tile skew moved p50 4→29, max 33→34 ms — mechanism understood and
+  honest: the OLD wall-clock playhead let both tiles drift TOGETHER (correlated
+  error −45…−78 on both), so mutual skew flattered itself; with a real media
+  master p1 sits at zero and the rate-nudge dead band IS the skew budget
+  (tightened ±40→±20 ms ⇒ max 34 ms = one 30 fps frame, the physical floor).
+  Slave's ABSOLUTE error improved (−29…−68 vs −56…−78).
+- **SECOND LATENT BUG, worse than the jam one**: replay-grid's rAF cue engine
+  fired one frame late (+0.2/+15.5/+14.7 ms, unbounded on a dropped frame,
+  infinite in a hidden tab) — but the real defect was `__seekWall` rebuilding
+  `firedIds` from what had ALREADY fired instead of from cues ≤ T, so on a
+  fresh page **a forward seek fired every skipped cue at once: 3 cues burst,
+  45.0/25.0/5.0 s late**. That is precisely the `seek-no-skipped-fires` assert
+  the fan-out graveyard arm fails — live in a shipped demo. Post-adoption:
+  **0 fires**, library firing +1.9/+2.5/+1.2 ms.
+- Third adoption now ≈ caps + actuate (+reduce/assertState if seek should mean
+  anything) handed to createDeck: 20–40 lines per kind; the only per-client
+  chore left is serving `/timeline/*` (one route).
+
 ### INSTRUMENT SESSION GAPS CLOSED (session 6o) — ✅ 54/54 (was 42/42)
 - **A/V lane**: consent is now off / audio / audio+video (still default-off,
   never persisted). At the top rung a SECOND recorder runs on
@@ -390,7 +437,7 @@ WebRTC row's 77.7 ms:
   committed nodes, deterministic virtual runtime for CI.
 - **Firing error (foreground, n=1270)**: main 1.0/6.4 ms p50/p95; worker
   5.0/15.3; raf 3.7/8.6; fan-out 1.6/2.7 — the graveyard arm is the TIGHTEST
-  on clean runs (why it survived 3 generations) and **fails 5/7 correctness
+  on clean runs (why it survived 3 generations) and **fails 6/7 correctness
   asserts** (seek orphans ring, fires during pause, rate no-op, clear leaves
   50 armed timers). Reproducible, not folklore.
 - **C2 property test GREEN**: reduce(≤t) ≡ play(0→t), 45 seeds (also 150),

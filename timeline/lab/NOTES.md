@@ -126,3 +126,108 @@ consistent state 0.5 ms after wake from a 3 s freeze; burst is the
 machine-gun made policy (30 fires < 0.5 ms); drop loses exactly the frozen
 window. Full numbers: artifacts/summary-2026-08-27.json; raw rows in
 results/*.jsonl (gitignored by design).
+
+## Checkpoint 5 — v0.2: the six client API seams closed (2026-08-28)
+
+proto/jam was the library's first real client and filed six API gaps
+(proto/jam/NOTES.md C11). All six are now fixed IN THE LIBRARY, and the fixes
+are proven by two further adoptions (proto/jam/jam-interval.html,
+proto/selfrec/replay-grid.html).
+
+1. **Adapter registry.** `sched.registerAdapter(kind, {caps, actuate, reduce,
+   assertState})` + per-kind dispatch inside `fire()`; `caps.catchUp` derives
+   the policy, so a client touches neither `onFire` filtering nor `setPolicy`.
+   `onFire` stays for HUDs/harnesses that want every kind. Also
+   `adapterCaps()`, `assertAt(pos)`, `reduceAt(kind, pos)`, and `createDeck()`
+   — the whole transport+scheduler+observable+drift facade the first client had
+   to hand-write. **jam-timeline.js went 105 → 39 lines.**
+2. **`setRate()` no longer plays.** `setRate(r)` while paused arms the rate and
+   stays paused; `play(r?)` is the only thing that starts motion; `.targetRate`
+   exposes the resume rate so a paused UI shows `0.50×` instead of `0.00×`.
+   `setRate(0)` is still an explicit pause.
+3. **The coded default is now the measured VERDICT: WORKER.**
+   `createScheduler` used to default to `mainTickHost()` while this file's
+   verdict shipped worker — the code and the doc disagreed. Now
+   `host = tickHostByKind(hostKind)` → `defaultTickHost()` → `workerTickHost()`
+   wherever `Worker` exists, falling back to `mainTickHost()` outside a browser
+   (node has no global Worker). Main is an explicit opt-in
+   (`hostKind: 'main'` or an explicit `host`) for foreground-critical
+   precision: **6.4 ms p95 main vs 15.3 ms worker**, against worker's
+   **8.5 ms p95 hidden vs main's ~1 s**. That is the whole trade, and it is now
+   the *documented* default rather than an accident. No measured number moved:
+   every lab arm and prop-test passes its host explicitly.
+4. **Wall → audio bridge.** An adapter declaring `caps.audio = {ctx, leadMs}`
+   gets a third `when` argument on `actuate(payload, rec, when)` carrying the
+   fire's instant in AudioContext seconds — `ctx.currentTime` sampled at the
+   fire, corrected by the drift record's own `deltaMs`
+   (`audioTime = ctxTime + (-deltaMs + leadMs)/1000`), so an EARLY fire leaves
+   exactly its earliness as scheduling headroom (`when.earlyMs`). Opt-in per
+   adapter; `when === null` otherwise. The converted instant is also written
+   into the drift row (`audioTime`, `earlyMs`).
+5. **`reduce` sees the WHOLE PREFIX.** It used to see only the events one scan
+   happened to miss — fine for a commutative held-note fold, wrong for a
+   non-commutative reducer, which cannot know what came before the window.
+   **The guarantee now: a reducer is always handed the complete ordered prefix
+   of its kind (every event with `at <= pos`, in `(at, seq)` order), so
+   `reduce` is a pure function of the prefix and `assertState` is an absolute,
+   idempotent assertion — i.e. `assertState(reduce(prefix ≤ t))` equals the
+   state after `play(0 → t)` for ANY reducer, commutative or not.** The
+   explicit alternative ships in the same call for reducers that prefer to fold
+   forward: `info.from = {pos, state}` (the last reduce boundary and the state
+   it returned) plus `info.since` (events in `(from.pos, pos]`);
+   `fold(from.state, since)` is equally correct. `info.missed` keeps the old
+   one-scan batch for diagnostics. The raw `setPolicy(kind, {reduce})` escape
+   hatch keeps its historical `reduce(missed, info)` signature with the
+   enriched `info`, so arm D is untouched. Seek now re-folds and re-asserts
+   through the same reducer with no client code.
+6. **Drift is a channel, not a mailbox.** `onDrift(cb)` subscribes,
+   `peekDrift()` reads non-destructively, `driftStats()` reports
+   `{total, retained, dropped, limit}`; a HUD and an assert harness can now
+   both observe the same fires. `drainDrift()` stays for bounded memory, and
+   the retained buffer is capped (`driftLimit`, default 20 000) so a peek-only
+   client cannot grow it silently.
+- Bonus seam the media client needed: **`transport.sync(pos, {toleranceMs})`**
+  — slave the vector to an EXTERNAL clock master (a media element, a peer)
+  by re-anchoring `{p0,t0}` with no seek semantics: no reconcile, no
+  re-assert, nothing re-fires, only committed timers re-armed.
+
+**prop-test: still green, and now proves the seams.** `node
+timeline/lab/prop-test.mjs` → OK at 30 seeds (30 basic + 15 gymnastics) AND at
+100 (100 + 50), 0 violations, plus a third suite asserting all six seams
+deterministically on the virtual runtime. The seam-5 arm deserves a note: it
+reproduces a SIGSTOP-shaped freeze with a wrapper TickHost that swallows ticks
+for 3 s and defers timers to wake, over an add/mul-only (deliberately
+`set`-free, so a batch-only fold can never resynchronize by luck)
+non-commutative trace, and checks three things — the asserted state equals the
+whole-prefix fold, `fold(from.state, since)` agrees with it, and **the old
+one-scan input gives a DIFFERENT answer**, i.e. the test is a real witness that
+would have failed against the pre-v0.2 library.
+
+**Regression re-run (arms A, B, E; D/BG/F carried forward in the artifact).**
+Nothing moved beyond run-to-run noise:
+
+| arm | metric | before | after |
+|---|---|---|---|
+| A main   | p50 / p95 ms | 1.0 / 6.4 | **1.3 / 6.9** |
+| A worker | p50 / p95 ms | 5.0 / 15.3 | **4.3 / 15.1** |
+| A raf    | p50 / p95 ms | 3.7 / 8.6 | **4.1 / 7.7** |
+| A fanout | p50 / p95 ms | 1.6 / 2.7 | **1.7 / 2.8** |
+| B main / worker / raf | asserts | 7/7 | **7/7** |
+| B fanout | asserts | 1/7 | **1/7** |
+| E audio  | render delta p50 / p95 | 0.01 / 0.04 ms | **0.01 / 0.04 ms** |
+
+All four A arms fired 1270/1270. Arm E is identical to the digit, including the
+lane counts (h100 191 rendered / 5 passed, h500 195 / 1) — the 10–40 µs
+sample-accuracy result stands.
+- **Correction to Checkpoint 2's prose:** it recorded the fan-out arm as
+  "FAILS 5/7 … only the two pure vector-math checks pass". The recorded data
+  (results/asserts.jsonl, both runs) says **6 of 7 fail and exactly ONE passes**
+  (`pause-holds-position` — there is only one pure vector check, not two). The
+  numbers are unchanged run to run; the earlier sentence was a miscount.
+  Failure detail is byte-identical: 50 skipped-window fires after seek, 20
+  fires during the 2 s pause, rate 2× has no effect (median null), backward
+  seek replays nothing, 50 timers still armed after `clear()`.
+
+Next client's cost: a new kind is now `caps` + `actuate` (+ `reduce` /
+`assertState` if it wants seek to mean anything) handed to `createDeck` —
+no transport, no scheduler wiring, no drift plumbing, no reduce-on-seek.

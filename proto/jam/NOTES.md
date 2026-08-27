@@ -414,6 +414,28 @@ research/music-jamming-2026-08.md — not touched here.
   - Cleanup: jam-udd Chromes + server killed, :8893 free; sibling's :8899 /
     proto/instrument / workers/instrument never touched.
 
+- **C12 (the six seams above are CLOSED upstream; jam is now a thin client)**.
+  All six items of C11's "API feedback" are fixed in `timeline/transport.mjs`
+  v0.2 — adapter registry + dispatch, `setRate()` separated from `play()` with
+  `.targetRate`, worker as the coded default host, an opt-in wall→audio bridge
+  on `caps.audio`, whole-prefix `reduce`, and a non-destructive drift channel
+  (`onDrift`/`peekDrift`). Details + the regression table: timeline/lab/NOTES.md
+  Checkpoint 5.
+  - `registerAdapter()` and the entire deck moved upstream as
+    `sched.registerAdapter()` / `createDeck()`. **jam-timeline.js: 105 → 39
+    lines** — all that is left is the jam-shaped part, mapping a `{at µs}`
+    capture log into the library's `{at ms}` item domain with the 250 ms
+    lead-in. The deck's public surface is unchanged, so jam-core.js, jam.html
+    and harness/run-demo.mjs keep working against it.
+  - Two behaviour changes to know: `replay()` now needs an explicit `d.play()`
+    after `d.setRate(1)` (seam 2), and the HUD reads `deck.targetRate()` so a
+    paused deck shows `0.50×` instead of `0.00×` — the red assert C11 item (2)
+    complained about.
+  - jam-interval.html adopted the deck too (**+45 lines, 0 deletions**): it was
+    reported as "free" because it already runs on jam-core, and it was — the
+    entire cost was wiring play/pause/scrubber/rate buttons to the deck that
+    jam-core already builds. Same engine, second UI.
+
 ## Layout (planned)
 
 - server.mjs — :8893 static + /time-local (µs, shared clock) + mailbox signaling + /log sink

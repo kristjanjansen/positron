@@ -132,7 +132,9 @@ export function makeJam(opts) {
       `log ${log.length} events   replay fired ${stats.replayFired}`,
       // transport deck: the timeline library's own numbers — position from the
       // {p0,t0,rate} vector, error from the drift channel (NOT the live owMs)
-      deck ? `TRANSPORT  ${deck.playing() ? 'PLAY' : 'PAUSE'} ${deck.rate().toFixed(2)}×  pos ${(deck.position() / 1000).toFixed(2)} / ${(deck.durationMs / 1000).toFixed(2)} s  host=${deck.hostName}` : '',
+      // targetRate (not rate) so a PAUSED deck reads 0.50×, not 0.00× — the
+      // library's seam-2 fix; rate() is still 0 while paused, as it must be.
+      deck ? `TRANSPORT  ${deck.playing() ? 'PLAY' : 'PAUSE'} ${deck.targetRate().toFixed(2)}×  pos ${(deck.position() / 1000).toFixed(2)} / ${(deck.durationMs / 1000).toFixed(2)} s  host=${deck.hostName}` : '',
       deck && stats.drift ? `drift (library channel)  p50 ${stats.drift.p50} ms  p95 ${stats.drift.p95} ms  max ${stats.drift.max} ms  n ${stats.drift.n}` : '',
       deck ? `sounding ${soundingNotes().join(' ') || '—'}` : '',
       extra,
@@ -342,7 +344,7 @@ export function makeJam(opts) {
     const logBefore = log.length;
     d.resetDrift(); stats.drift = null; stats.replayFired = 0;
     silenceAll();
-    d.pause(); d.seek(0); d.setRate(1);   // setRate() is also play() in the library
+    d.pause(); d.seek(0); d.setRate(1); d.play();   // seam 2: setRate no longer plays
     const deadline = performance.now() + d.durationMs + 15000;
     while (d.fireCount() < d.items.length && performance.now() < deadline) await sleep(50);
     await sleep(150);
