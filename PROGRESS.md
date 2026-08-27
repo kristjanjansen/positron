@@ -148,6 +148,44 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### INSTRUMENT SESSION GAPS CLOSED (session 6o) — ✅ 54/54 (was 42/42)
+- **A/V lane**: consent is now off / audio / audio+video (still default-off,
+  never persisted). At the top rung a SECOND recorder runs on
+  `new MediaStream([audioTrack, panelVideoTrack])` — one webm, both tracks —
+  chunked to `instrument/<sid>/av/` with its own media-span carrying
+  `payload.kind:'av'`, so lanes are distinguishable without opening a file.
+  **Codec probe: h264+opus supported and PREFERRED** (a later repackage becomes
+  a remux, not a transcode; vp8,opus fallback). Replay prefers the A/V span:
+  plain <video> fed Blob-concatenated chunks, no MSE, verified 640×360 with
+  currentTime advancing.
+- **IndexedDB backstop on all four lanes** (player events, host events, audio
+  chunks, A/V chunks) via a generalized `makeBackstop({name, send})`. **The rule
+  selfrec never needed: ORDER IS CORRECTNESS** — the DO's monotonic per-source
+  seq would turn an overtaking batch into a silent duplicate-rejection of the
+  parked one, so once anything parks, everything later parks and the drain is
+  the only sender. Still-parked at manifest time ⇒ named `missing`,
+  `degraded:true`.
+  15 s CDP offline mid-session (which also kills signaling, so the session ends
+  and the recorder finalizes while offline): **zero lost on every lane** —
+  80/80 player events, 80/80 actuations, 9/9 audio and 9/9 A/V chunks in R2,
+  degraded:false. Drain from reconnect: events 657–840 ms, audio 2.5 s, A/V
+  3.2 s; high water 396 KB.
+- **Capability tokens (trimmed per user)**: two 128-bit hex tokens minted at
+  accept, written to the session row before either party learns the id, each
+  party gets only its own, sent as X-Session-Token, constant-time compared.
+  Enforced on exactly three routes (media upload, player delete, owner delete);
+  reads and event appends deliberately ungated. Matrix green (absent/wrong 403,
+  right 200); **tombstone beats a valid token** (410); tokens never echoed by a
+  read (`guarded:true` only).
+- Worker redeployed `6473040f`. R2 kept: 978 KB in one proof session.
+- **Operational trap worth keeping: a Durable Object keeps running its OLD
+  class code after a deploy until the instance is evicted (~1 min)** — the
+  worker routed new /av paths while the DO still answered "no such session op".
+  A smoke test run straight after `wrangler deploy` will lie to you.
+- Unbuilt: no av-only rung (A/V duplicates audio by design), no token expiry/
+  rotation/revocation short of deletion, no real camera in the run (fake device
+  ⇒ the panel canvas was encoded), no compaction job.
+
 ### TRANSPORT ADOPTED IN A DEMO (session 6n) — ✅ 14/14 (proto/jam + timeline/)
 `timeline/transport.mjs` has its first real client: jam.html's replay is now
 vector + lookahead + worker tick feeding the EXISTING actuate(). New seam

@@ -100,17 +100,21 @@
 
   <div class="card">
     <h2>Session storage</h2>
-    <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer">
-      <input id="rec-consent" type="checkbox" style="width:auto;margin-top:5px">
-      <span>Record this session's audio<br>
-        <span class="dim" style="font-size:11px">Off by default. Your instrument, your call.</span></span>
-    </label>
+    <div class="field"><span>Record</span><select id="rec-mode">
+      <option value="off">off — nothing is recorded</option>
+      <option value="audio">audio only</option>
+      <option value="audio+video">audio + panel/camera video</option>
+    </select></div>
+    <div class="hint" style="margin-top:5px">Off by default, never remembered between page loads.
+      Your instrument, your room, your call — and a camera is a bigger ask than a microphone,
+      so it is its own choice.</div>
     <div class="hint">
       The player's notes are always written to the session log — that is their playing, and
       <b>they can delete it</b>. This page also logs what the instrument actually did, stamped in
       <b>this machine's clock</b>, which is the clock the audio recording uses.
-      <b>You can delete any session on your instrument</b>, notes and audio together — that needs
-      your INSTRUMENT_TOKEN, because it is a claim to own the hardware.
+      <b>You can delete any session on your instrument</b>, notes and media together — with that
+      session's owner token (handed to this page when you accepted it) or your INSTRUMENT_TOKEN,
+      which is a claim to own the hardware itself.
     </div>
     <div class="row">
       <input id="f-delsid" placeholder="session id (blank = the last one)">

@@ -250,6 +250,138 @@ export function makeMatcher({ minLatUs = 2000, maxLatUs = 2_000_000, chordUs = 1
   };
 }
 
+// ---------------- IndexedDB backstop (proto/selfrec/participant.html) --------
+// selfrec's proven "never drop" buffer, generalised from one media chunk to any
+// unit of work, so the SAME shape guards both lanes: the event batches and the
+// media chunks. Park on failure, drain oldest-first on reconnect, track a
+// high-water mark, and never lose an item silently — what cannot be sent by
+// finalize time is REPORTED, not forgotten.
+//
+// ORDER IS PART OF CORRECTNESS here, which is the one thing selfrec did not
+// have to care about: the session DO enforces a monotonic `seq` per (session,
+// source), so a batch that overtook a parked one would be rejected as a
+// duplicate and the parked one lost forever. Hence the rule: **once anything is
+// parked, everything later is parked too, and the drain is the only sender.**
+export function makeBackstop({ name, store = 'q', send, log = () => {} }) {
+  let db = null, k = 0, draining = false, timer = null, backoffMs = 400;
+  const BACKOFF_MAX = 5000;
+  const M = {
+    name, ready: false, parked: 0, items: 0, bytes: 0, hwmItems: 0, hwmBytes: 0,
+    sentDirect: 0, sentDrained: 0, failures: 0, exhausted: 0,
+    firstParkAt: null, onlineAt: null, drainedAt: null, drainMs: null,
+  };
+  const write = (fn) => new Promise((res, rej) => {
+    const t = db.transaction(store, 'readwrite');
+    fn(t.objectStore(store));
+    t.oncomplete = res; t.onerror = () => rej(t.error);
+  });
+
+  async function all() {
+    const rows = await new Promise((res, rej) => {
+      const r = db.transaction(store, 'readonly').objectStore(store).getAll();
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    return rows.sort((a, b) => a.k - b.k);
+  }
+  async function account(rows) {
+    rows = rows || await all();
+    M.items = rows.length;
+    M.bytes = rows.reduce((n, r) => n + (r.bytes || 0), 0);
+    if (M.items > M.hwmItems) M.hwmItems = M.items;
+    if (M.bytes > M.hwmBytes) M.hwmBytes = M.bytes;
+    return rows;
+  }
+  async function park(rec, why) {
+    await write((s) => s.put({ ...rec, k: ++k, parkedAt: Date.now() }));
+    M.parked++;
+    if (M.firstParkAt === null) M.firstParkAt = Date.now();
+    await account();
+    log(`backstop parked ${rec.label || ''} — ${M.items} items / ${M.bytes} B — ${String(why).slice(0, 100)}`);
+    schedule();
+  }
+  function schedule() {
+    if (timer) return;
+    timer = setTimeout(() => { timer = null; drain().catch(() => {}); }, backoffMs);
+  }
+  async function drain() {
+    if (draining || !M.ready) return M;
+    draining = true;
+    try {
+      const rows = await account();
+      if (!rows.length) return M;
+      if (!navigator.onLine) { backoffMs = Math.min(BACKOFF_MAX, backoffMs * 2); schedule(); return M; }
+      for (const r of rows) {                       // OLDEST FIRST — see above
+        try {
+          await send(r);
+          M.sentDrained++;
+          await write((s) => s.delete(r.k));
+          await account();
+          backoffMs = 400;
+        } catch (e) {
+          M.failures++;
+          backoffMs = Math.min(BACKOFF_MAX, backoffMs * 2);
+          log(`backstop drain retry in ${backoffMs} ms — ${String(e && e.message || e).slice(0, 100)}`);
+          schedule();
+          return M;
+        }
+      }
+      if (M.firstParkAt !== null && !M.items && M.drainedAt === null) {
+        M.drainedAt = Date.now();
+        M.drainMs = M.drainedAt - (M.onlineAt || M.firstParkAt);
+        log(`backstop drained: ${M.sentDrained} items in ${M.drainMs} ms (high water ${M.hwmItems} items / ${M.hwmBytes} B)`);
+      }
+      return M;
+    } finally { draining = false; }
+  }
+
+  // THE ONLY ENTRY POINT. Direct when the queue is empty and the network is
+  // believed up; parked otherwise. `send` must throw to mean "not delivered".
+  async function offer(rec) {
+    if (!M.ready) { try { const r = await send(rec); M.sentDirect++; return { ok: true, result: r }; } catch (e) { return { ok: false, lost: true, error: e }; } }
+    if (M.items || draining || !navigator.onLine) {
+      await park(rec, navigator.onLine ? 'backstop queue not empty (order)' : 'navigator offline');
+      return { ok: false, parked: true };
+    }
+    try { const r = await send(rec); M.sentDirect++; return { ok: true, result: r }; }
+    catch (e) { M.failures++; await park(rec, e && e.message || e); return { ok: false, parked: true }; }
+  }
+
+  // bounded wait used at finalize: what is still parked afterwards is the
+  // DEGRADED set and must be named in the manifest, never dropped quietly.
+  async function settle(ms = 45000) {
+    const t0 = Date.now();
+    for (;;) {
+      const rows = await account();
+      if (!rows.length && !draining) return { drained: true, left: 0, rows: [] };
+      if (Date.now() - t0 > ms) { M.exhausted = rows.length; return { drained: false, left: rows.length, rows }; }
+      schedule();
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  async function open() {
+    db = await new Promise((res, rej) => {
+      const r = indexedDB.open(name, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(store, { keyPath: 'k' });
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    // rows left by a crashed previous run of the same name belong to a dead
+    // session; replaying them into this one would corrupt it (selfrec §main)
+    await write((s) => s.clear());
+    M.ready = true;
+    return M;
+  }
+  addEventListener('online', () => {
+    M.onlineAt = Date.now();
+    backoffMs = 400;
+    if (timer) { clearTimeout(timer); timer = null; }
+    drain().catch(() => {});
+  });
+  addEventListener('offline', () => { M.offlineAt = Date.now(); });
+
+  return { open, offer, drain, settle, all, stats: () => ({ ...M }), pending: () => M.items };
+}
+
 // ---------------- stats ------------------------------------------------------
 export function dist(vals) {
   if (!vals || !vals.length) return null;

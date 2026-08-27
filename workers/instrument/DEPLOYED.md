@@ -1,9 +1,10 @@
 # elektron-instrument — DEPLOYED
 
 **URL:** `https://elektron-instrument.kristjan-jansen.workers.dev`
-**Deployed:** 2026-08-27 (version 7b04db74). Status: **live and verified** —
-**42/42** end-to-end checks green from `proto/instrument/harness/run-instrument.mjs`
-(one headless Chrome, three tabs, real WebRTC, real audio return, real R2).
+**Deployed:** 2026-08-27 (version `6473040f-b035-433e-a928-126815e8de6d`).
+Status: **live and verified** — **54/54** end-to-end checks green from
+`proto/instrument/harness/run-instrument.mjs` (one headless Chrome, three tabs,
+real WebRTC, real audio+video return, real R2, a real 15 s network outage).
 
 The control plane for the remote-instrument platform (`proto/instrument/`): a
 public catalog of physical instruments plus 1:1 WebRTC signaling between exactly
@@ -67,7 +68,8 @@ needs a jurisdiction.
 
 ```sql
 sessions(id TEXT PRIMARY KEY, instrument, playerId, startedAt, endedAt,
-         noteCount, audioPrefix, deletedBy, deletedAt)
+         noteCount, audioPrefix, avPrefix, playerToken, ownerToken,
+         deletedBy, deletedAt)
 events(sessionId TEXT, seq INTEGER, at INTEGER /* epoch µs */, kind TEXT,
        source TEXT, raw BLOB, display TEXT, ref INTEGER, payload TEXT)
 CREATE INDEX events_by_time ON events(sessionId, at)
@@ -93,8 +95,32 @@ both still **one row per event**:
 | `player` | `midi` | play.js | the **player's** clock — their intent |
 | `player` | `audio-span` | play.js | player clock; what they *received* |
 | `instrument` | `midi-actuated` | host.js | the **host's** clock — what the hardware actually did |
-| `instrument` | `media-span` | host.js | host clock; `phase:'start'|'end'` + `mediaRef` |
+| `instrument` | `media-span` | host.js | host clock; `phase:'start'|'end'` + `kind:'audio'|'av'` + `mediaRef` |
 | `worker` | `session` | play.js | session lifecycle |
+
+### Two media lanes: `audio` and `av`
+
+The owner's consent has three rungs — **off · audio · audio+video** — and the
+top rung runs **two** `MediaRecorder`s off the very tracks already on the wire:
+
+| lane | recorder input | R2 prefix | `media-span` `kind` |
+|---|---|---|---|
+| `audio` | `[audioTrack]` | `instrument/<id>/audio/` | `audio` |
+| `av` | `new MediaStream([audioTrack, panelVideoTrack])` — **one** webm with both | `instrument/<id>/av/` | `av` |
+
+The `av` lane is the panel the player was actually watching (camera composited
+in as background when one is selected), muxed with the instrument's sound in a
+single file, so nothing has to be re-synced later. Measured codec on this
+machine: **`video/webm;codecs=h264,opus`** — the probe reports
+h264/avc1/vp8/vp9+opus all supported, and h264 is preferred because it makes any
+later repackage a pure remux rather than a transcode. `vp8,opus` is the
+fallback. 800 kb/s video + 64 kb/s audio, 2 s timeslice.
+
+Each lane writes its **own** `media-span` start/end pair carrying
+`payload.kind`, so a consumer tells an audio-only span from an A/V span without
+opening a file. `play.js` **prefers the A/V span** on replay — a plain
+`<video>` element fed the Blob-concatenated chunks (no MSE; only chunk 0 carries
+the webm header, exactly as in the audio lane) — and falls back to audio-only.
 
 Host actuation rows and the host's audio recording share one clock on one
 machine, so **replay from storage uses the host lane as master** and needs no
@@ -108,11 +134,11 @@ cross-machine skew correction; the player's lane is rendered as intent.
 | POST | `/session/<id>/end` | none | `{endedAt?}` → stamps `endedAt`, recounts `noteCount`. |
 | GET | `/session/<id>?from=&limit=` | none | `{session, lanes, from, limit, count, total, events[]}` ordered by `(at, seq)`. `from` is a row offset; `limit` ≤ 20000, default 5000. |
 | GET | `/sessions?instrument=` | none | `{count, sessions[], jurisdiction, euPinned, euId, unpinnedId}`, newest first, tombstones included. |
-| POST | `/session/<id>/delete` | `by:'owner'` needs token | `{by:'player'|'owner'}` → tombstone. |
-| POST | `/session/<id>/audio/<seq>` | token | raw webm chunk → `instrument/<id>/audio/chunk-<5d>.webm`. `X-Chunk-Sha256` is verified **server-side by R2 during the put** — a truncated body fails the put. ≤ 16 MB. |
-| POST | `/session/<id>/audio/manifest` | token | → `instrument/<id>/audio/manifest.json`; sets `audioPrefix`. |
-| GET | `/session/<id>/audio` | none | what actually landed: `{prefix,count,bytes,objects[]}` — this is the client's verify step. |
-| GET | `/session/<id>/audio/<seq>` | none | one chunk, streamed. Replay fetches these in order and Blob-concats them. |
+| POST | `/session/<id>/delete` | **capability** | `{by:'player'|'owner'}` → tombstone. `player` needs `playerToken`; `owner` needs `ownerToken` **or** `INSTRUMENT_TOKEN`. |
+| POST | `/session/<id>/{audio,av}/<seq>` | **capability** | raw webm chunk → `instrument/<id>/<lane>/chunk-<5d>.webm`. Needs `ownerToken` or `INSTRUMENT_TOKEN`. `X-Chunk-Sha256` is verified **server-side by R2 during the put** — a truncated body fails the put. ≤ 16 MB. |
+| POST | `/session/<id>/{audio,av}/manifest` | **capability** | → `instrument/<id>/<lane>/manifest.json`; sets `audioPrefix` / `avPrefix`. |
+| GET | `/session/<id>/{audio,av}` | none | what actually landed: `{prefix,lane,count,bytes,objects[]}` — this is the client's verify step. |
+| GET | `/session/<id>/{audio,av}/<seq>` | none | one chunk, streamed. Replay fetches these in order and Blob-concats them. |
 
 ### Tombstones (plan-timeline C6)
 
@@ -125,25 +151,74 @@ drops every event row**, and — if `audioPrefix` is set — sweeps the whole
   delete cannot resurrect the session (verified);
 - an audio chunk POST is 410 — a draining recorder cannot re-fill the prefix.
 
-**Who may delete what, honestly:** the player deletes with the session id alone
-(v0: **the unguessable id minted by the hub at accept IS the capability** —
-there are no accounts, so anyone holding the id can delete as the player; this
-is a stated v0 limit, and it fails *safe*, toward deletion). The owner deletes
-with `INSTRUMENT_TOKEN`, because owner-deleting is a claim to own the hardware.
-Both are verified in the harness, including the tokenless owner-delete → 403.
+**Who may delete what:** player-delete needs that session's `playerToken`,
+owner-delete needs its `ownerToken` **or** `INSTRUMENT_TOKEN`. All four
+outcomes (absent → 403, wrong → 403, right → 200, and INSTRUMENT_TOKEN still
+200) are verified in the harness — as is the rule that **a tombstone outranks a
+perfectly valid token**: a media upload to a deleted session is 410 even with
+the correct `ownerToken`.
 
-### Session ids
+### Session ids and capability tokens
 
-Minted **in the Hub, on `accept`**, and sent to *both* parties on the
-`{type:'session',state:'accepted'}` frame (`sid`), plus on the `ended` frame.
-That is what makes the player's notes and the owner's audio agree on one id
-without either side guessing or a side channel.
+Minted **in the Hub, on `accept`**: one `sid`, sent to *both* parties on the
+`{type:'session',state:'accepted'}` frame, plus **two 128-bit hex tokens** —
+`playerToken` and `ownerToken` — written to the session row before either party
+is told the session exists, and then handed out **one each**, on that party's
+own copy of the frame. The player never sees the owner's token and vice versa.
+Reads never echo them back; `/session/<id>` reports only `guarded: true`.
+
+Clients send theirs as `X-Session-Token: <hex>` (or `?st=`); the worker
+forwards it and the DO does a constant-time compare against the stored row.
+
+**What this defends against, and what it does not.** These are **capabilities,
+not identities** — there are still no accounts, no logins, nobody's name on
+anything. What changed is that holding the session id is no longer the whole
+capability: a share link, a screenshot, a log line or a URL in someone's history
+now lets you *read* a session but not delete it and not upload media into it,
+and the two parties' powers are separated from each other. What it does **not**
+defend against: anyone who obtains the token string itself gets the full power
+of that party (there is no binding to a device, a session cookie or an IP);
+there is no expiry, no rotation and no revocation short of deleting the session;
+a token leaked into a screenshot is as good as the original; `INSTRUMENT_TOKEN`
+remains a master key over every session on the instrument; reads stay open by
+design; and a session row created by a bare `events` POST that never went
+through `accept` has no tokens at all (`guarded:false`) and keeps the old
+id-is-the-capability rule. This closes the "anyone with the id can do anything"
+hole. It is not an authentication system and does not pretend to be one.
+
+### Durability: the IndexedDB backstop (both lanes)
+
+Event batches and media chunks that fail to POST are parked in **IndexedDB** and
+drained **oldest-first** on reconnect — `proto/selfrec`'s proven buffer, lifted
+into `instrument-core.js` as `makeBackstop({name, send})` and used four times
+(player events, host events, host audio chunks, host A/V chunks).
+
+One rule selfrec did not need: **order is part of correctness here.** The DO
+enforces a monotonic `seq` per `(session, source)`, so a batch that overtook a
+parked one would be rejected as a duplicate and the parked one lost. Therefore
+*once anything is parked, everything later is parked too, and the drain is the
+only sender.* A chunk that is still parked when the manifest is written is named
+there in `missing` with `degraded:true` — never dropped quietly.
+
+Verified against a real 15 s outage (CDP `Network.emulateNetworkConditions`,
+`offline:true`, both tabs) mid-session:
+
+| lane | parked | drained | high water | drain time from reconnect |
+|---|---|---|---|---|
+| player events | 9 | 9 | 9 items / 6,925 B | **840 ms** |
+| host events | 7 | 7 | 7 items / 7,708 B | **657 ms** |
+| host audio chunks | 8 | 8 | 8 items / 123,859 B | **2,545 ms** |
+| host A/V chunks | 8 | 8 | 8 items / 396,137 B | **3,208 ms** |
+
+**80 player events logged → 80 stored. 80 actuations → 80 stored. 9 audio
+chunks → 9 in R2, 9 A/V chunks → 9 in R2, `degraded:false` on both.** Zero lost
+either way.
 
 ### CORS
 
-`Access-Control-Allow-Headers` must list **`X-Chunk-Sha256`** or the audio chunk
-POST dies in preflight and the browser reports only a bare `Failed to fetch`.
-Cost one harness run to find.
+`Access-Control-Allow-Headers` must list **`X-Chunk-Sha256`** (and now
+**`X-Session-Token`**) or the chunk POST dies in preflight and the browser
+reports only a bare `Failed to fetch`. Cost one harness run to find.
 
 ## Auth
 
@@ -151,11 +226,13 @@ Cost one harness run to find.
 Constant-time compare, **fails closed**. Required for registration, heartbeat,
 unlist, and the **host** WS.
 
-**Players need no token in v0: the catalog is public and playing is public.**
-That is a deliberate, stated v0 limit, not an oversight — there is no account
+**Players need no token to play: the catalog is public and playing is public.**
+That is a deliberate, stated limit, not an oversight — there is no account
 system, no rate limit on session requests, and no way for an owner to allowlist
 a player beyond pressing Accept. An owner exposing real hardware to the open
-internet should treat the Accept button as the entire access-control system.
+internet should treat the Accept button as the entire access-control system for
+the *instrument*. The per-session capability tokens above govern only what
+happens to the *recording* afterwards.
 
 ## WS frames (all JSON; the worker never parses SDP)
 
@@ -177,7 +254,9 @@ internet should treat the Accept button as the entire access-control system.
 {type:'hello', role, pid, instrument, online, busy, serverNow}   on connect
 {type:'request', player:{pid,name}}                              → host
 {type:'requested'}                                               → player, ack
-{type:'session', state:'accepted', since, player?, name?, instrument?}
+{type:'session', state:'accepted', since, sid, token, player?, name?, instrument?}
+      `token` is THIS party's capability: playerToken to the player, ownerToken
+      to the host, on their own copy of the frame. Never both to one party.
 {type:'session', state:'ended', reason, player?}
       reason ∈ 'host ended' | 'player ended' | 'player disconnected' |
                'host disconnected' | 'instrument unlisted'

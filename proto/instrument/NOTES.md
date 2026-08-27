@@ -4,21 +4,24 @@
 anywhere browses a catalog, asks for it, plays it, hears and sees it come back;
 the session lands on the timeline as a flat event log with an audio span.
 
-Built 2026-08-27. **42/42 end-to-end checks green**
+Built 2026-08-27. **54/54 end-to-end checks green**
 (`results/instr-verify.json`, one headless Chrome, three tabs, real WebRTC,
-real R2). Sessions are **durable**: notes as SQLite rows in an EU-pinned DO,
-audio in R2 behind an owner consent toggle, both deletable by either party.
+real R2, a real 15 s network outage). Sessions are **durable**: notes as SQLite
+rows in an EU-pinned DO, audio *and the panel video the player actually saw* in
+R2 behind a three-rung owner consent toggle, an IndexedDB backstop on both
+lanes so an outage loses nothing, and per-session capability tokens so holding
+the id is no longer the whole permission system.
 
 ## Files
 
 | file | what |
 |---|---|
 | `server.mjs` | rig server on **:8899**. Static + `/time-local` (hrtime-anchored epoch µs, same-host truth) + `/env.json` + result sink. Serves `proto/instrument/` first, then falls back to `proto/jam/` — which is how the sibling's `host-check.html` runs unmodified on this port too. |
-| `instrument-core.js` | the carried primitives: 16-B frame codec, dedupe, min-RTT skew clock, MIDI hygiene + all-notes-off, signaling client, WebRTC helpers, ct→epoch edge-median map, onset tap, adaptive onset↔note matcher, the percussive synthetic voice, percentiles. |
+| `instrument-core.js` | the carried primitives: 16-B frame codec, dedupe, min-RTT skew clock, MIDI hygiene + all-notes-off, signaling client, WebRTC helpers, ct→epoch edge-median map, onset tap, adaptive onset↔note matcher, the percussive synthetic voice, percentiles — **plus `makeBackstop`, selfrec's IndexedDB never-drop buffer generalised to any unit of work**. |
 | `host.html` / `host.js` | the owner: register, go online, accept, actuate MIDI onto hardware, publish audio + panel video, safety — plus the **host lane** of the session log (what the instrument actually did, host clock) and the consent-gated **audio recording** into R2. |
 | `play.html` / `play.js` | the player: browse, request, play, hear, HUD, record, download, replay — plus the **batched append** of their own lane to the session store, **load a stored session by id** and replay it (with its audio) through the same send path, and **delete**. |
 | `harness/run-instrument.mjs` | the verification run. |
-| `results/instr-verify.json` | the numbers + all 24 checks. |
+| `results/instr-verify.json` | the numbers + all 54 checks. |
 | `results/instr-session.jsonl` | a real session recording. |
 | `results/instr-host.png`, `instr-play.png` | both pages, live session. |
 
@@ -41,6 +44,12 @@ Worker: `workers/instrument/` → `elektron-instrument`, see its `DEPLOYED.md`.
   (0x80) rides the identical frame; the layout is otherwise unchanged.
 - From `workers/selfrec`: the tokenless rate-guarded `/time` endpoint and its
   min-RTT client protocol.
+- From `proto/selfrec/participant.html`: the **IndexedDB park-and-drain buffer**
+  and the **codec probe table**. Reimplemented as `makeBackstop` in
+  `instrument-core.js` rather than imported — `participant.html` is one inline
+  script bound to its own show/participant/collector shape and was off limits to
+  edit — but the shape is its: bounded, oldest-first, high-water tracked, and
+  what cannot be sent is *reported* in the manifest, never dropped.
 - From `workers/rtc` (read only, never touched): the room/roster/token shapes
   and above all the **`left` pattern** — socket close is the death detector.
 - From `workers/jam`: the hibernation DO + constant-time token skeleton.
@@ -138,13 +147,15 @@ stamped in. So:
 
 | thing | value |
 |---|---|
-| stored rows, one 64-note session | **390** (128 player `midi`, 256 host `midi-actuated`, 2 `media-span`, 1 `audio-span`, 3 `session`) |
+| stored rows, one 64-note session | **392** (128 player `midi`, 256 host `midi-actuated`, **4** `media-span` — two lanes × start/end, 1 `audio-span`, 3 `session`) |
 | append rejections | 0 |
 | audio chunks in R2 / verified | **12 / 12**, `audio/webm;codecs=opus`, 2 s timeslice |
-| audio bytes (12 chunks + manifest) | **291,029 B** for ~24 s |
-| replay from storage | **256 fired**, master `host`, audio offset 1.94 s, 288,594 B pulled back and decoded |
-| consent OFF session | 20 rows stored, **0** R2 objects, `audioPrefix` null |
-| delete by player | 2 rows dropped, **1 R2 object purged**, read → 410, re-append → 410 |
+| A/V chunks in R2 / verified | **12 / 12**, **`video/webm;codecs=h264,opus`**, 2 s timeslice |
+| bytes kept, the one proof session | **978,255 B** — 290,720 audio + 687,535 A/V (incl. both manifests), ~24 s |
+| replay from storage | **256 fired**, master `host`, media lane **`av`**, offset 1.79 s, `<video>` 640×360, `currentTime` advanced 0.65 s in 0.7 s |
+| consent matrix | `audio+video` → 12 audio + 12 av · `audio` → 3 audio + **0** av · `off` → 19 rows, **0** objects, no `media-span` at all |
+| 15 s offline window | 80/80 player events, 80/80 actuations, 9/9 audio chunks, 9/9 A/V chunks — nothing lost, nothing degraded |
+| delete by player | rows dropped, R2 purged, read → 410, re-append → 410, upload with a valid token → 410 |
 
 The host lane holds 256 rows to the player's 128 because the harness *replays*
 the session once mid-run and the instrument really was actuated a second time.
@@ -163,25 +174,98 @@ feature working.
   finalizing the previous session cannot restart at 0 and collide.
 - **Reject per event, not per batch.** A retried batch is then idempotent (its
   events are already ≤ max and drop out individually) instead of a hard failure.
+- **A backstop that reorders is a backstop that loses data.** The very same
+  monotonic-seq guard that makes a retry idempotent turns an *overtaking* batch
+  into a silent loss: the fresh batch lands, the parked one comes back later and
+  every event in it is ≤ max, so it is "rejected as a duplicate" and gone. The
+  fix is one rule — *once anything is parked, everything later is parked too* —
+  and it is the reason `makeBackstop` has a single `offer()` entry point rather
+  than a send-with-fallback.
+- **A Durable Object keeps running its OLD class code after a deploy** until the
+  instance is evicted. The worker routed the new `/av` paths immediately while
+  the `Sessions` DO still answered `no such session op`; ~1 minute later it
+  picked up the new code by itself. Not a bug — but "deployed" and "the DO is
+  running it" are two different moments, and a smoke test right after a deploy
+  can lie to you.
+- **`Network.emulateNetworkConditions({offline:true})` also kills the signaling
+  WebSocket**, so the session really ends mid-outage. That made the durability
+  test harsher than designed (the recorder finalises *while still offline* and
+  its `settle()` has to outlast the outage) and it is the better test for it.
 
-### What session storage does NOT do
+## The three gaps, closed (2026-08-27, third pass)
 
-- **No panel/camera video is recorded.** Audio was the priority and a
-  video+audio webm would change the replay path from `<audio>` to a muxed
-  element for no measured gain. The seam is one `MediaStream` constructor away.
-- **No player auth.** The session id (minted by the hub at accept) is the whole
-  capability: anyone holding it can read the session or delete it *as the
-  player*. It fails toward deletion, which is the right direction, but it is not
-  an access-control system.
-- **No IndexedDB backstop for the notes.** selfrec buffers chunks to IDB when
-  the network dies; the note lane only retries in memory, so a tab killed during
-  an outage loses its unflushed ≤1 s tail. The audio lane has no IDB backstop
-  either — a failed chunk retries 3× and is then recorded as `missing` in the
-  manifest (`degraded:true`), which is honest but not durable.
+### 1. Video capture — the panel the player actually saw
+
+Consent has three rungs now (**off · audio · audio+video**, still defaulting off
+and still never persisted). At the top rung the page runs **two** recorders off
+the very tracks already on the wire: the old audio-only one, and a second on
+`new MediaStream([audioTrack, panelVideoTrack])` — **one** webm carrying both,
+chunked to `instrument/<sid>/av/`, with its **own** `media-span` pair carrying
+`payload.kind:'av'`. Chosen codec on this machine: **`video/webm;codecs=h264,opus`**
+(the probe found h264, avc1, vp8 and vp9 all available with opus; h264 wins
+because it makes a later repackage a remux rather than a transcode — selfrec's
+reasoning, carried).
+
+Replay **prefers the A/V span** and falls back to audio-only: a plain `<video>`
+fed the Blob-concatenated chunks, no MSE, because only chunk 0 carries the webm
+header — the same fact the audio lane already relied on. Verified live: 640×360,
+`currentTime` advanced 0.65 s in a 0.7 s window.
+
+### 2. The IndexedDB backstop, on BOTH lanes
+
+`instrument-core.js` now exports `makeBackstop({name, send})` — selfrec's buffer
+generalised from "a media chunk" to "a unit of work" — used four times: player
+events, host events, host audio chunks, host A/V chunks. Park on failure, drain
+oldest-first on reconnect, high-water tracked, and whatever is still parked when
+a manifest is written is named there as `missing`/`degraded:true`.
+
+**One rule selfrec never needed: order is correctness.** The DO enforces a
+monotonic `seq` per `(session, source)`, so a batch that overtook a parked one
+would be rejected as a *duplicate* and the parked one lost silently. Hence:
+once anything is parked, everything later is parked, and the drain is the only
+sender.
+
+Verified with a real 15 s CDP `Network.emulateNetworkConditions({offline:true})`
+window mid-session on both tabs (this also kills the signaling socket, so the
+session really does end mid-outage — a harsher test than intended, and it
+passes):
+
+| lane | parked | drained | high water | drain from reconnect |
+|---|---|---|---|---|
+| player events | 9 | 9 | 9 / 6,925 B | 840 ms |
+| host events | 7 | 7 | 7 / 7,708 B | 657 ms |
+| host audio | 8 | 8 | 8 / 123,859 B | 2,545 ms |
+| host A/V | 8 | 8 | 8 / 396,137 B | 3,208 ms |
+
+### 3. Access control that is not just "hold the id"
+
+The Hub mints **two 128-bit hex tokens** with the session id at `accept`, writes
+them on the session row *before* either party is told the id exists, and hands
+each party only its own. Enforced on exactly three things: player-delete needs
+`playerToken`, owner-delete needs `ownerToken` **or** `INSTRUMENT_TOKEN`, media
+upload needs `ownerToken` or `INSTRUMENT_TOKEN`. Reads stay open (a session id
+is a share link) and per-lane event appends stay open (the two-lane `ref` join
+makes a forged lane obvious). **A tombstone still outranks a valid token.**
+
+These are capabilities, not identities — see DEPLOYED.md for the full honest
+statement of what they do and do not defend against.
+
+### What session storage still does NOT do
+
 - **No compaction job.** C6's tombstones are here; the "sweep tombstoned media
   later" job is not, because delete purges R2 inline today.
-- **`audioPrefix` is a convenience index, not the truth.** The `media-span` rows
-  are. Nothing yet enforces that they agree if a manifest write fails.
+- **`audioPrefix`/`avPrefix` are convenience indexes, not the truth.** The
+  `media-span` rows are. Nothing yet enforces that they agree if a manifest
+  write fails.
+- **No token expiry, rotation or revocation** short of deleting the session, and
+  no binding of a token to a device or a socket.
+- **The A/V lane duplicates the audio.** At `audio+video` both recorders run, so
+  the instrument's sound is stored twice (290 kB + 688 kB for 24 s). That is
+  deliberate — an audio-only consumer should not have to demux video — but a
+  future rung could record `av` alone.
+- **No hardware camera in the verification run.** The panel canvas (with the
+  camera compositing path exercised but no real device attached under
+  `--use-fake-device-for-media-stream`) is what got encoded.
 
 ## The MoQ seam (deliberately not taken in v0)
 
@@ -211,9 +295,10 @@ both `/host-check.html` (12162 B) and its root-relative `/host-check.js`
   is rejected with `reason:'busy'` plus who holds it and since when. `waiting` is
   a real count, so a queue is addable without a protocol change — but v0 promises
   nobody a turn.
-- **No auth for players, no accounts, no payments.** The catalog is public and
-  playing is public; the owner's Accept button is the entire access-control
-  system. No rate limit on session requests.
+- **No accounts, no identities, no payments.** The catalog is public and playing
+  is public; the owner's Accept button is the entire access-control system for
+  the *instrument*. Per-session capability tokens govern what happens to the
+  *recording* afterwards — see §3 above. No rate limit on session requests.
 - **No TURN, and NAT traversal is untested.** The pages default to
   `stun:stun.cloudflare.com:3478`; the verification run used `ice=none` because
   both peers were on one machine. A symmetric-NAT owner will need a TURN server
@@ -224,6 +309,8 @@ both `/host-check.html` (12162 B) and its root-relative `/host-check.js`
   of whatever 3-byte messages arrive; MIDI realtime is dropped by design.
 - ~~No persistence of the session log~~ — **done, see "Session storage" above.**
   Still not joined to the megatimeline.
+- ~~No video recorded, no durability backstop, no access control beyond the id~~
+  — **all three done, see "The three gaps, closed" above.**
 - **No reconnect.** A dropped signaling socket ends the session; the player must
   request again.
 

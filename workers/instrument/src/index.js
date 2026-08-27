@@ -41,13 +41,31 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   // X-Chunk-Sha256 must be listed or the audio chunk POST fails its preflight
   // and the browser reports a bare "Failed to fetch" (found the hard way).
-  'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Chunk-Sha256',
+  'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Chunk-Sha256,X-Session-Token',
   'Access-Control-Max-Age': '86400',
 };
 const j = (status, obj) => new Response(JSON.stringify(obj), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
 });
 const ID = /^[\w.-]{1,64}$/;
+
+// ---- per-session CAPABILITY tokens -----------------------------------------
+// 128 bits of randomness, minted by the Hub on `accept` and handed to exactly
+// one party each. They are CAPABILITIES, not identities: whoever holds the
+// string can act as that party. See DEPLOYED.md for what that does and does
+// not defend against.
+const hex128 = () => [...crypto.getRandomValues(new Uint8Array(16))]
+  .map((b) => b.toString(16).padStart(2, '0')).join('');
+function ctEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+const sessionsStub = (env) => {
+  const ns = env.SESSIONS.jurisdiction('eu');
+  return ns.get(ns.idFromName('log'));
+};
 
 export class Hub {
   constructor(state, env) {
@@ -233,9 +251,19 @@ export class Hub {
         // recording agree on — and it is minted by the party that knows the
         // session exists, not guessed by either side.
         const sid = 's' + since.toString(36) + Math.random().toString(36).slice(2, 8);
+        // TWO capability tokens, minted with the id and stored on the session
+        // row BEFORE either party is told the id exists. Each party is handed
+        // only its own — the player never sees ownerToken, the owner never sees
+        // playerToken. Holding the id alone is no longer enough to delete.
+        const playerToken = hex128(), ownerToken = hex128();
+        try {
+          await sessionsStub(this.env).fetch(new Request(
+            `https://s/do/mint?id=${sid}&instrument=${encodeURIComponent(inst)}`,
+            { method: 'POST', body: JSON.stringify({ playerToken, ownerToken, playerId: target.a.name }) }));
+        } catch { /* mint failed: the session still works, it is just id-capability only */ }
         this.patch(target.ws, target.a, { active: true, since, sid });
-        this.send(target.ws, { type: 'session', state: 'accepted', since, instrument: inst, sid });
-        this.send(ws, { type: 'session', state: 'accepted', since, player: target.a.pid, name: target.a.name, sid, instrument: inst });
+        this.send(target.ws, { type: 'session', state: 'accepted', since, instrument: inst, sid, token: playerToken });
+        this.send(ws, { type: 'session', state: 'accepted', since, player: target.a.pid, name: target.a.name, sid, instrument: inst, token: ownerToken });
         return;
       }
 
@@ -334,7 +362,21 @@ export class Sessions {
       const cols = this.sql.exec('PRAGMA table_info(events)').toArray().map((c) => c.name);
       if (!cols.includes('ref')) this.sql.exec('ALTER TABLE events ADD COLUMN ref INTEGER');
       if (!cols.includes('payload')) this.sql.exec('ALTER TABLE events ADD COLUMN payload TEXT');
+      // three more nullable columns on `sessions`:
+      //   playerToken / ownerToken — the per-session capabilities (see hex128)
+      //   avPrefix                 — the A/V media lane, next to audioPrefix
+      const sc = this.sql.exec('PRAGMA table_info(sessions)').toArray().map((c) => c.name);
+      if (!sc.includes('playerToken')) this.sql.exec('ALTER TABLE sessions ADD COLUMN playerToken TEXT');
+      if (!sc.includes('ownerToken')) this.sql.exec('ALTER TABLE sessions ADD COLUMN ownerToken TEXT');
+      if (!sc.includes('avPrefix')) this.sql.exec('ALTER TABLE sessions ADD COLUMN avPrefix TEXT');
     });
+  }
+
+  // the capability check. NEVER returns the tokens themselves (meta() omits
+  // them), and a session with no minted token falls back to INSTRUMENT_TOKEN.
+  tokenOk(request, s, which) {
+    const want = s && (which === 'player' ? s.playerToken : s.ownerToken);
+    return !!want && ctEq(request.headers.get('x-session-token') || '', want);
   }
 
   row(id) { return this.sql.exec('SELECT * FROM sessions WHERE id=?', id).toArray()[0] || null; }
@@ -354,7 +396,10 @@ export class Sessions {
     return {
       id: s.id, instrument: s.instrument, playerId: s.playerId,
       startedAt: s.startedAt, endedAt: s.endedAt, noteCount: s.noteCount,
-      audioPrefix: s.audioPrefix || null,
+      audioPrefix: s.audioPrefix || null, avPrefix: s.avPrefix || null,
+      // tokens are never echoed back: they leave the worker exactly once, on
+      // the accept frame, to the party they belong to.
+      guarded: !!(s.playerToken || s.ownerToken),
       deletedBy: s.deletedBy || null, deletedAt: s.deletedAt || null,
       eventRows: this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE sessionId=?', s.id).toArray()[0].n,
     };
@@ -363,7 +408,13 @@ export class Sessions {
     return j(410, { deleted: true, tombstone: true, id: s.id, instrument: s.instrument,
       deletedBy: s.deletedBy, deletedAt: s.deletedAt, error: 'session deleted' });
   }
-  audioPrefixOf(id) { return `instrument/${id}/audio/`; }
+  // TWO media lanes under one session prefix: `audio/` (opus only, the v0 lane)
+  // and `av/` (one webm carrying BOTH the instrument's audio and the panel the
+  // player was watching). They are separate R2 prefixes and separate
+  // `media-span` rows, so a consumer can tell an audio-only span from an A/V
+  // one without opening a file.
+  mediaPrefixOf(id, lane) { return `instrument/${id}/${lane}/`; }
+  audioPrefixOf(id) { return this.mediaPrefixOf(id, 'audio'); }
 
   async purgeAudio(id) {
     const prefix = `instrument/${id}/`;
@@ -382,7 +433,21 @@ export class Sessions {
     const op = url.pathname.replace('/do/', '');
     const id = url.searchParams.get('id') || '';
     const owner = request.headers.get('x-owner') === '1';
+    const lane = url.searchParams.get('lane') === 'av' ? 'av' : 'audio';
     if (op !== 'list' && !ID.test(id)) return j(400, { error: 'bad session id' });
+
+    // ---- POST /do/mint — the Hub, on accept, before either party has the id -
+    if (op === 'mint') {
+      const b = await request.json().catch(() => ({}));
+      const s = this.ensure(id, url.searchParams.get('instrument'), b && b.playerId, Date.now() * 1000);
+      if (s.deletedAt) return this.gone(s);
+      // first mint wins — a re-accept never rotates a live session's tokens
+      if (!s.playerToken && !s.ownerToken) {
+        this.sql.exec('UPDATE sessions SET playerToken=?, ownerToken=? WHERE id=?',
+          String(b.playerToken || '').slice(0, 64), String(b.ownerToken || '').slice(0, 64), id);
+      }
+      return j(200, { ok: true, id, guarded: true });
+    }
 
     // ---- GET /sessions?instrument= ----------------------------------------
     if (op === 'list') {
@@ -473,16 +538,26 @@ export class Sessions {
     if (op === 'delete') {
       const b = await request.json().catch(() => ({}));
       const by = b && b.by === 'owner' ? 'owner' : 'player';
-      if (by === 'owner' && !owner) return j(403, { error: 'owner delete needs INSTRUMENT_TOKEN' });
       const s = this.row(id);
       if (!s) return j(404, { error: 'no such session' });
+      // THE CAPABILITY CHECK. Owner-delete: this session's ownerToken, or
+      // INSTRUMENT_TOKEN (which is a claim to own the hardware itself).
+      // Player-delete: this session's playerToken. A session with no minted
+      // token (created by a bare events POST rather than a hub accept) keeps
+      // the v0 rule — the id is the capability — and says so via `guarded`.
+      if (by === 'owner' && !owner && !this.tokenOk(request, s, 'owner')) {
+        return j(403, { error: 'owner delete needs this session\'s ownerToken or INSTRUMENT_TOKEN' });
+      }
+      if (by === 'player' && s.playerToken && !this.tokenOk(request, s, 'player')) {
+        return j(403, { error: 'player delete needs this session\'s playerToken' });
+      }
       if (s.deletedAt) return j(200, { ok: true, already: true, id, deletedBy: s.deletedBy, deletedAt: s.deletedAt, eventsDropped: 0, audioObjectsPurged: 0 });
       const dropped = this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE sessionId=?', id).toArray()[0].n;
       this.sql.exec('DELETE FROM events WHERE sessionId=?', id);
       const deletedAt = Date.now();
       this.sql.exec('UPDATE sessions SET deletedBy=?, deletedAt=?, noteCount=0 WHERE id=?', by, deletedAt, id);
       let purged = 0;
-      if (s.audioPrefix) {
+      if (s.audioPrefix || s.avPrefix) {
         purged = await this.purgeAudio(id);
         // the R2-side tombstone: a late chunk upload for a deleted session is
         // refused by the DO, and anything scanning the bucket sees the marker.
@@ -493,48 +568,53 @@ export class Sessions {
       return j(200, { ok: true, id, deletedBy: by, deletedAt, eventsDropped: dropped, audioObjectsPurged: purged });
     }
 
-    // ---- audio (media BY REFERENCE) ---------------------------------------
-    // POST /session/<id>/audio/<seq>   owner token   raw webm blob
-    if (op === 'audio-put') {
+    // ---- media BY REFERENCE, two lanes: audio | av ------------------------
+    // WRITES need the owner's capability: this session's ownerToken, or
+    // INSTRUMENT_TOKEN. READS are ungated — the id is a share link, and a
+    // tombstone beats every token.
+    const mediaCol = lane === 'av' ? 'avPrefix' : 'audioPrefix';
+    const mediaType = lane === 'av' ? 'video/webm' : 'audio/webm';
+    const chunkKey = (seq) => `${this.mediaPrefixOf(id, lane)}chunk-${String(seq).padStart(5, '0')}.webm`;
+
+    if (op === 'media-put' || op === 'media-manifest') {
       const s = this.row(id);
       if (s && s.deletedAt) return this.gone(s);
-      const seq = parseInt(url.searchParams.get('seq') || '', 10);
-      if (!Number.isInteger(seq) || seq < 0 || seq > 999999) return j(400, { error: 'bad seq' });
-      const bytes = await request.arrayBuffer();
-      if (!bytes.byteLength) return j(411, { error: 'empty chunk' });
-      if (bytes.byteLength > 16 * 1024 * 1024) return j(413, { error: 'chunk too large' });
-      const key = `instrument/${id}/audio/chunk-${String(seq).padStart(5, '0')}.webm`;
-      const sha256 = request.headers.get('x-chunk-sha256') || undefined;
-      let obj;
-      try {
-        obj = await this.env.ARCHIVE.put(key, bytes, {
-          httpMetadata: { contentType: 'audio/webm' }, ...(sha256 ? { sha256 } : {}),
-        });
-      } catch (e) { return j(400, { error: 'put failed: ' + (e && e.message || e) }); }
+      if (!owner && !this.tokenOk(request, s, 'owner')) {
+        return j(403, { error: 'media upload needs this session\'s ownerToken or INSTRUMENT_TOKEN' });
+      }
+      let key, extra = {};
+      if (op === 'media-manifest') {
+        const body = await request.text();
+        if (body.length > 2 * 1024 * 1024) return j(413, { error: 'manifest too large' });
+        try { JSON.parse(body); } catch { return j(400, { error: 'manifest not json' }); }
+        key = `${this.mediaPrefixOf(id, lane)}manifest.json`;
+        await this.env.ARCHIVE.put(key, body, { httpMetadata: { contentType: 'application/json' } });
+      } else {
+        const seq = parseInt(url.searchParams.get('seq') || '', 10);
+        if (!Number.isInteger(seq) || seq < 0 || seq > 999999) return j(400, { error: 'bad seq' });
+        const bytes = await request.arrayBuffer();
+        if (!bytes.byteLength) return j(411, { error: 'empty chunk' });
+        if (bytes.byteLength > 16 * 1024 * 1024) return j(413, { error: 'chunk too large' });
+        key = chunkKey(seq);
+        const sha256 = request.headers.get('x-chunk-sha256') || undefined;
+        let obj;
+        try {
+          obj = await this.env.ARCHIVE.put(key, bytes, {
+            httpMetadata: { contentType: mediaType }, ...(sha256 ? { sha256 } : {}),
+          });
+        } catch (e) { return j(400, { error: 'put failed: ' + (e && e.message || e) }); }
+        extra = { size: obj.size, etag: obj.httpEtag };
+      }
       if (!s) this.ensure(id, url.searchParams.get('instrument'), null, Date.now() * 1000);
-      this.sql.exec('UPDATE sessions SET audioPrefix=? WHERE id=?', this.audioPrefixOf(id), id);
-      return j(200, { ok: true, key, size: obj.size, etag: obj.httpEtag, audioPrefix: this.audioPrefixOf(id) });
+      this.sql.exec(`UPDATE sessions SET ${mediaCol}=? WHERE id=?`, this.mediaPrefixOf(id, lane), id);
+      return j(200, { ok: true, key, lane, ...extra, prefix: this.mediaPrefixOf(id, lane), audioPrefix: this.audioPrefixOf(id) });
     }
 
-    // POST /session/<id>/audio/manifest  owner token  JSON
-    if (op === 'audio-manifest') {
+    // GET /session/<id>/{audio|av} — what is actually stored (the verify step)
+    if (op === 'media-list') {
       const s = this.row(id);
       if (s && s.deletedAt) return this.gone(s);
-      const body = await request.text();
-      if (body.length > 2 * 1024 * 1024) return j(413, { error: 'manifest too large' });
-      try { JSON.parse(body); } catch { return j(400, { error: 'manifest not json' }); }
-      const key = `instrument/${id}/audio/manifest.json`;
-      await this.env.ARCHIVE.put(key, body, { httpMetadata: { contentType: 'application/json' } });
-      if (!s) this.ensure(id, url.searchParams.get('instrument'), null, Date.now() * 1000);
-      this.sql.exec('UPDATE sessions SET audioPrefix=? WHERE id=?', this.audioPrefixOf(id), id);
-      return j(200, { ok: true, key, audioPrefix: this.audioPrefixOf(id) });
-    }
-
-    // GET /session/<id>/audio — what is actually stored (the verify step)
-    if (op === 'audio-list') {
-      const s = this.row(id);
-      if (s && s.deletedAt) return this.gone(s);
-      const prefix = this.audioPrefixOf(id);
+      const prefix = this.mediaPrefixOf(id, lane);
       const objects = [];
       let cursor;
       do {
@@ -543,19 +623,17 @@ export class Sessions {
         cursor = r.truncated ? r.cursor : null;
       } while (cursor);
       objects.sort((a, b) => a.key.localeCompare(b.key));
-      return j(200, { prefix, count: objects.length, bytes: objects.reduce((n, o) => n + o.size, 0), objects });
+      return j(200, { prefix, lane, count: objects.length, bytes: objects.reduce((n, o) => n + o.size, 0), objects });
     }
 
-    // GET /session/<id>/audio/<seq> — one chunk, streamed back
-    if (op === 'audio-get') {
+    // GET /session/<id>/{audio|av}/<seq> — one chunk, streamed back
+    if (op === 'media-get') {
       const s = this.row(id);
       if (s && s.deletedAt) return this.gone(s);
-      const seq = parseInt(url.searchParams.get('seq') || '', 10);
-      const key = `instrument/${id}/audio/chunk-${String(seq).padStart(5, '0')}.webm`;
-      const obj = await this.env.ARCHIVE.get(key);
+      const obj = await this.env.ARCHIVE.get(chunkKey(parseInt(url.searchParams.get('seq') || '', 10)));
       if (!obj) return j(404, { error: 'no such chunk' });
       return new Response(obj.body, {
-        headers: { 'content-type': 'audio/webm', 'content-length': String(obj.size), 'cache-control': 'no-store', ...CORS },
+        headers: { 'content-type': mediaType, 'content-length': String(obj.size), 'cache-control': 'no-store', ...CORS },
       });
     }
 
@@ -617,7 +695,7 @@ export default {
     // keeps (someone's playing, someone's instrument audio), so its DO is
     // pinned to `.jurisdiction('eu')`. The signaling Hub is a separate class
     // and deliberately untouched — see DEPLOYED.md for the migration note.
-    const sess = () => env.SESSIONS.jurisdiction('eu').get(env.SESSIONS.jurisdiction('eu').idFromName('log'));
+    const sess = () => sessionsStub(env);
     const toDO = (op, id, extra, init) => {
       const u = new URL('https://s/do/' + op);
       if (id) u.searchParams.set('id', id);
@@ -641,38 +719,47 @@ export default {
       if (!ID.test(sid)) return j(400, { error: 'bad session id' });
       const tail = parts.slice(2);
       const owner = authorized(request, url, env);
-      const hdr = { 'x-owner': owner ? '1' : '0' };
+      // the per-session capability rides its own header, forwarded verbatim;
+      // the DO does the constant-time compare against the stored row.
+      const hdr = {
+        'x-owner': owner ? '1' : '0',
+        'x-session-token': (request.headers.get('x-session-token') || url.searchParams.get('st') || '').slice(0, 64),
+      };
 
+      // READS are ungated on purpose: the id is a share link, and a tombstone
+      // beats any token. Writes are where the capabilities bite.
       if (request.method === 'GET' && tail.length === 0) {
         return toDO('get', sid, { from: url.searchParams.get('from'), limit: url.searchParams.get('limit') }, { method: 'GET' });
       }
       if (request.method === 'POST' && tail.length === 1 && (tail[0] === 'events' || tail[0] === 'end' || tail[0] === 'delete')) {
-        // tokenless in v0 — the unguessable session id (minted by the hub at
-        // accept) IS the capability. Owner-scoped delete is the exception and
-        // is checked inside the DO against the x-owner header.
+        // events/end stay tokenless: the two-lane `ref` join makes a forged
+        // lane obvious and the id is scoped to one live session. `delete` is
+        // the one that needs a capability, checked inside the DO.
         return toDO(tail[0], sid, null, { method: 'POST', body: await request.text(), headers: hdr });
       }
-      if (request.method === 'GET' && tail[0] === 'audio' && tail.length === 1) {
-        return toDO('audio-list', sid, null, { method: 'GET' });
-      }
-      if (request.method === 'GET' && tail[0] === 'audio' && tail.length === 2 && /^\d{1,6}$/.test(tail[1])) {
-        return toDO('audio-get', sid, { seq: tail[1] }, { method: 'GET' });
-      }
-      // audio WRITES are the owner's: they are the owner's instrument's sound.
-      if (request.method === 'POST' && tail[0] === 'audio' && tail.length === 2) {
-        if (!owner) return j(403, { error: 'recording the instrument needs INSTRUMENT_TOKEN' });
-        if (tail[1] === 'manifest') {
-          return toDO('audio-manifest', sid, { instrument: url.searchParams.get('instrument') },
-            { method: 'POST', body: await request.text(), headers: hdr });
+      const MEDIA = { audio: 'audio', av: 'av' };
+      if (MEDIA[tail[0]]) {
+        const lane = MEDIA[tail[0]];
+        if (request.method === 'GET' && tail.length === 1) return toDO('media-list', sid, { lane }, { method: 'GET' });
+        if (request.method === 'GET' && tail.length === 2 && /^\d{1,6}$/.test(tail[1])) {
+          return toDO('media-get', sid, { lane, seq: tail[1] }, { method: 'GET' });
         }
-        if (/^\d{1,6}$/.test(tail[1])) {
-          return toDO('audio-put', sid, { seq: tail[1], instrument: url.searchParams.get('instrument') },
-            { method: 'POST', body: await request.arrayBuffer(), headers: { ...hdr, 'x-chunk-sha256': request.headers.get('x-chunk-sha256') || '' } });
+        // media WRITES are the owner's: it is the owner's instrument's sound
+        // and the owner's room on camera.
+        if (request.method === 'POST' && tail.length === 2) {
+          if (tail[1] === 'manifest') {
+            return toDO('media-manifest', sid, { lane, instrument: url.searchParams.get('instrument') },
+              { method: 'POST', body: await request.text(), headers: hdr });
+          }
+          if (/^\d{1,6}$/.test(tail[1])) {
+            return toDO('media-put', sid, { lane, seq: tail[1], instrument: url.searchParams.get('instrument') },
+              { method: 'POST', body: await request.arrayBuffer(), headers: { ...hdr, 'x-chunk-sha256': request.headers.get('x-chunk-sha256') || '' } });
+          }
         }
       }
-      return j(404, { error: 'session routes: GET /session/<id> · POST /session/<id>/{events,end,delete} · GET|POST /session/<id>/audio[/<seq>|/manifest]' });
+      return j(404, { error: 'session routes: GET /session/<id> · POST /session/<id>/{events,end,delete} · GET|POST /session/<id>/{audio,av}[/<seq>|/manifest]' });
     }
 
-    return j(404, { error: 'routes: /time /instruments /instruments/{register,heartbeat,unlist} /ws /sessions /session/<id>[/events|/end|/delete|/audio]' });
+    return j(404, { error: 'routes: /time /instruments /instruments/{register,heartbeat,unlist} /ws /sessions /session/<id>[/events|/end|/delete|/audio|/av]' });
   },
 };
