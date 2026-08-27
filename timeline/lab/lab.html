@@ -1,0 +1,329 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tlab — timeline transport lab</title>
+<body style="font:12px monospace"><pre id="log">tlab</pre>
+<script type="module">
+import {
+  createTransport, createScheduler, createFanoutScheduler,
+  mainTickHost, workerTickHost, rafTickHost,
+  observePosition, createAudioLane, wallClock,
+} from '/transport.mjs';
+
+const logEl = document.getElementById('log');
+const log = (...a) => { logEl.textContent += '\n' + a.join(' '); };
+
+// ---------------- truth clock (jam method: min-RTT vs local /time-local) ----
+const epochUsRaw = () => (performance.timeOrigin + performance.now()) * 1000;
+const clockCal = { offLocalUs: 0, minRttLocalUs: 0 };
+async function calibrate() {
+  let best = { rtt: Infinity, off: 0 };
+  for (let i = 0; i < 40; i++) {
+    const a = epochUsRaw();
+    const j = await (await fetch('/time-local', { cache: 'no-store' })).json();
+    const b = epochUsRaw();
+    const rtt = b - a;
+    if (rtt < best.rtt) best = { rtt, off: j.us + rtt / 2 - b };
+  }
+  clockCal.offLocalUs = best.off; clockCal.minRttLocalUs = Math.round(best.rtt);
+  return { ...clockCal };
+}
+const truthUs = () => epochUsRaw() + clockCal.offLocalUs;
+
+// ---------------- traces ----------------
+function mixedTrace() { // 60 s, 1270 events: sparse 2/s + 8 dense 50/s bursts + 30 1-ms clusters
+  const evs = [];
+  for (let t = 250; t < 60000; t += 500) evs.push({ at: t, tag: 'sparse' });
+  for (let b = 0; b < 8; b++) { const s = 4000 + b * 7000; for (let t = s; t < s + 2500; t += 20) evs.push({ at: t, tag: 'dense' }); }
+  for (let c = 0; c < 30; c++) { const s = 1500 + c * 1870 + (c % 7) * 37; for (let j = 0; j < 5; j++) evs.push({ at: s + j, tag: 'cluster' }); }
+  return evs;
+}
+const gridTrace = (stepMs, endMs, kind, offset = 0) => {
+  const evs = [];
+  for (let t = stepMs + offset; t <= endMs + offset; t += stepMs) evs.push({ at: t, kind });
+  return evs;
+};
+
+// ---------------- rig ----------------
+const hostFor = (mech) => mech === 'worker' ? workerTickHost() : mech === 'raf' ? rafTickHost() : mainTickHost();
+
+function mkRig(mech, opts = {}) {
+  const transport = createTransport();
+  if (mech === 'fanout') {
+    const sched = createFanoutScheduler(transport);
+    return {
+      transport, sched, mech,
+      begin() { transport.seek(0); sched.play(); },
+      end() {},
+      seek: (p) => sched.seek(p), pause: () => sched.pause(), resume: () => transport.play(),
+      rate: (r) => sched.setRate(r), clear: () => sched.clear(),
+      armed: () => sched.armedCount(),
+    };
+  }
+  const sched = createScheduler(transport, { tickMs: opts.tickMs ?? 25, horizonMs: opts.horizonMs ?? 100, host: hostFor(mech) });
+  return {
+    transport, sched, mech,
+    begin() { sched.start(); transport.seek(0); transport.play(); },
+    end() { sched.dispose(); },
+    seek: (p) => transport.seek(p), pause: () => transport.pause(), resume: () => transport.play(),
+    rate: (r) => transport.setRate(r), clear: () => sched.clear(),
+    armed: () => sched.audit().armed,
+  };
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitPos(transport, pos, pollMs = 20) {
+  while (transport.position() < pos) await sleep(pollMs);
+}
+
+// ---------------- A: firing precision, mixed densities ----------------
+async function runPrecision(mech) {
+  const rig = mkRig(mech);
+  for (const e of mixedTrace()) rig.sched.schedule({ at: e.at, kind: 'p', payload: { tag: e.tag } });
+  // position observable cadence (~60 Hz, rAF-driven)
+  const obsDeltas = []; let lastObs = 0;
+  const unobs = observePosition(rig.transport, ({ nowUs }) => {
+    if (lastObs) obsDeltas.push((nowUs - lastObs) / 1000);
+    lastObs = nowUs;
+  });
+  const t0 = performance.now();
+  rig.begin();
+  await waitPos(rig.transport, 60600, 200);
+  unobs();
+  const rows = rig.sched.drainDrift();
+  const stats = rig.sched.stats ? rig.sched.stats() : null;
+  const audit = rig.sched.audit();
+  rig.end();
+  obsDeltas.sort((a, b) => a - b);
+  const q = (arr, p) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(p / 100 * arr.length))] : null;
+  return {
+    mech, wallMs: +(performance.now() - t0).toFixed(0),
+    n: rows.length, scheduled: audit.fires.length,
+    truthOffUs: Math.round(clockCal.offLocalUs),
+    rows: rows.map((r) => ({ tag: r.tag, deltaMs: r.deltaMs, origin: r.origin, at: r.at, firedUs: Math.round(r.firedUs + clockCal.offLocalUs) })),
+    stats,
+    obs: { n: obsDeltas.length, p50: q(obsDeltas, 50), p95: q(obsDeltas, 95), max: obsDeltas[obsDeltas.length - 1] },
+  };
+}
+
+// ---------------- B: seek/pause/rate/cancel asserts ----------------
+async function runAsserts(mech) {
+  const rig = mkRig(mech);
+  const fires = []; // {at, posAtFire, wallMs, phase}
+  let phase = 'run';
+  rig.sched.onFire((ev) => fires.push({ at: ev.at, pos: rig.transport.position(), wallMs: performance.now(), phase }));
+  for (const e of gridTrace(100, 15000, 'grid')) rig.sched.schedule({ at: e.at, kind: 'grid' });
+  const checks = [];
+  const check = (name, pass, detail) => checks.push({ name, pass: !!pass, detail });
+
+  const beginWall = performance.now();
+  rig.begin();
+  await waitPos(rig.transport, 3000);
+  phase = 'post-seek';
+  const seekWall = performance.now();
+  rig.seek(8000);
+  await waitPos(rig.transport, 9000);
+
+  phase = 'rate2'; rig.rate(2);
+  await waitPos(rig.transport, 12000);
+  const r2 = fires.filter((f) => f.phase === 'rate2' && f.at > 9000 && f.at <= 12000).sort((a, b) => a.at - b.at);
+  const deltas = r2.slice(1).map((f, i) => f.wallMs - r2[i].wallMs).sort((a, b) => a - b);
+  const med = deltas.length ? deltas[deltas.length >> 1] : null;
+  check('rate2-halves-intervals', med !== null && med > 40 && med < 60, `median inter-fire ${med && med.toFixed(1)} ms (expect ~50)`);
+
+  phase = 'paused'; rig.pause();
+  const posAtPause = rig.transport.position();
+  const firesBefore = fires.length;
+  await sleep(2000);
+  const posAfterWait = rig.transport.position();
+  check('pause-holds-position', Math.abs(posAfterWait - posAtPause) < 2, `moved ${(posAfterWait - posAtPause).toFixed(3)} ms while paused`);
+  check('pause-no-fires', fires.length === firesBefore, `${fires.length - firesBefore} fires during 2 s pause (expect 0)`);
+  phase = 'resumed'; rig.rate(1); rig.resume();
+
+  await waitPos(rig.transport, 13000);
+  phase = 'post-backseek'; rig.seek(12500);
+  await waitPos(rig.transport, 13200);
+  const refires = fires.filter((f) => f.phase === 'post-backseek' && f.at > 12500 && f.at <= 13000);
+  const refireByAt = {};
+  for (const f of refires) refireByAt[f.at] = (refireByAt[f.at] || 0) + 1;
+  const expected = [12600, 12700, 12800, 12900, 13000];
+  const onceEach = expected.every((at) => refireByAt[at] === 1);
+  check('backseek-replays-once', onceEach, `refires per event: ${JSON.stringify(refireByAt)} (expect each of ${expected} exactly 1)`);
+
+  await waitPos(rig.transport, 14000);
+  phase = 'post-clear'; rig.clear();
+  const firesAtClear = fires.length;
+  const orphansAtClear = rig.armed();
+  check('no-orphan-timers-at-clear', orphansAtClear === 0, `${orphansAtClear} timers still armed right after clear() (expect 0)`);
+  // wait past the LAST originally-armed fan-out deadline (wall t_begin+15 s),
+  // so orphan timers that survive clear() get their chance to ring on record
+  const waitMs = Math.max(1600, 15300 - (performance.now() - beginWall));
+  await sleep(waitMs);
+  const postClear = fires.length - firesAtClear;
+  check('clear-cancels-all', postClear === 0, `${postClear} fires after clear() (expect 0)`);
+  // (1, evaluated at end) no event from the seek-skipped window (3000,8000]
+  // may EVER fire after the seek moment — catches orphans ringing at their
+  // original wall deadlines long after phases moved on
+  const skipped = fires.filter((f) => f.wallMs > seekWall && f.at > 3000 && f.at <= 8000);
+  check('seek-no-skipped-fires', skipped.length === 0, `${skipped.length} fires from skipped window after seek (expect 0)`);
+  rig.pause(); rig.end();
+  return { mech, checks, totalFires: fires.length };
+}
+
+// ---------------- D: freeze / catch-up policies ----------------
+const FZ = { running: false, done: false, report: null };
+async function startFreeze(mode) {
+  FZ.running = true; FZ.done = false; FZ.report = null;
+  const transport = createTransport();
+  const fires = []; const policyEvents = []; const wakes = [];
+  // wake watchdog: 50 ms heartbeat; gap > 500 ms = we were frozen
+  let lastBeat = performance.now();
+  const wd = setInterval(() => {
+    const now = performance.now();
+    if (now - lastBeat > 500) wakes.push({ wakeUs: Math.round(truthUs()), gapMs: +(now - lastBeat).toFixed(1) });
+    lastBeat = now;
+  }, 50);
+
+  let sched, reduceState = 0;
+  if (mode === 'fanout') {
+    sched = createFanoutScheduler(transport);
+    for (const e of gridTrace(33.34, 30000, 'f')) sched.schedule({ at: e.at, kind: 'f' }); // ~30/s single kind
+    sched.onFire((ev) => fires.push({ kind: ev.kind, at: ev.at, tUs: Math.round(truthUs()) }));
+    transport.seek(0); sched.play();
+  } else {
+    sched = createScheduler(transport, { host: workerTickHost() });
+    for (const e of gridTrace(100, 30000, 'b', 0)) sched.schedule({ at: e.at, kind: 'b' });
+    for (const e of gridTrace(100, 30000, 'd', 33)) sched.schedule({ at: e.at, kind: 'd' });
+    for (const e of gridTrace(100, 30000, 'r', 66)) sched.schedule({ at: e.at, kind: 'r' });
+    sched.setPolicy('b', 'burst');
+    sched.setPolicy('d', 'drop');
+    sched.setPolicy('r', { reduce: (batch, info) => {
+      reduceState += batch.length;
+      policyEvents.push({ kind: 'r', count: batch.length, tUs: Math.round(truthUs()), pos: +info.pos.toFixed(1) });
+    } });
+    sched.onFire((ev, rec) => { if (ev.kind === 'r') reduceState++; fires.push({ kind: ev.kind, at: ev.at, tUs: Math.round(truthUs()), origin: rec.origin }); });
+    sched.start(); transport.seek(0); transport.play();
+  }
+
+  (async () => {
+    await waitPos(transport, 30600, 250);
+    clearInterval(wd);
+    const stats = sched.stats ? sched.stats() : null;
+    const audit = sched.audit();
+    const byKind = {};
+    for (const f of audit.fires) {
+      const k = byKind[f.kind] || (byKind[f.kind] = { total: 0, fired: 0, dropped: 0, reduced: 0, passed: 0 });
+      k.total++; if (f.status in k) k[f.status]++;
+    }
+    // reduce-kind consistency: reduceState must equal total r events fired+reduced
+    FZ.report = {
+      mode, wakes, fires, policyEvents, stats, byKind, reduceState,
+      posEnd: +transport.position().toFixed(1),
+    };
+    if (mode !== 'fanout') sched.dispose();
+    transport.pause();
+    FZ.done = true; FZ.running = false;
+  })();
+  return { started: true, mode };
+}
+
+// ---------------- E: audio lane ----------------
+async function runAudio({ horizonMs = 100, busyAtMs = 10000, busyMs = 500, durMs = 20000 } = {}) {
+  const ctx = new AudioContext({ sampleRate: 48000 });
+  await ctx.resume();
+  await ctx.audioWorklet.addModule('/lab/click-worklet.js');
+  const det = new AudioWorkletNode(ctx, 'click-detect');
+  det.connect(ctx.destination);
+
+  const transport = createTransport();
+  const lane = createAudioLane(transport, ctx, { horizonMs, host: workerTickHost() });
+  lane.bus.connect(det);
+  // wall lane on the SAME transport (the two-lane doctrine, measured together)
+  const wall = createScheduler(transport, { host: workerTickHost() });
+  const wallFires = [];
+  wall.onFire((ev, rec) => wallFires.push({ at: ev.at, deltaMs: rec.deltaMs }));
+  for (const e of gridTrace(100, durMs, 'w')) wall.schedule({ at: e.at, kind: 'w' });
+  for (let t = 500; t <= durMs; t += 100) lane.schedule({ at: t, kind: 'click' });
+
+  // two-point wall<->audio anchor for drift-aware mapping of detections
+  const sampleAnchor = () => {
+    const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
+    if (ts && ts.performanceTime) return { wallUs: (performance.timeOrigin + ts.performanceTime) * 1000, audio: ts.contextTime };
+    return { wallUs: epochUsRaw(), audio: ctx.currentTime };
+  };
+  const anchorStart = sampleAnchor();
+
+  const busyLog = {};
+  setTimeout(() => {
+    busyLog.startUs = Math.round(truthUs());
+    const s = performance.now();
+    while (performance.now() - s < busyMs) { /* main thread blocked */ }
+    busyLog.endUs = Math.round(truthUs());
+  }, busyAtMs);
+
+  wall.start(); lane.start(); transport.seek(0); transport.play();
+  await waitPos(transport, durMs + 600, 200);
+  transport.pause(); lane.stop(); wall.stop();
+  const anchorEnd = sampleAnchor();
+
+  const detections = await new Promise((res) => {
+    det.port.onmessage = (e) => res(e.data);
+    det.port.postMessage('drain');
+  });
+  const scheduled = lane.scheduled();
+  // pair each scheduled click with nearest detection (window 60 ms)
+  const pairs = [];
+  for (const s of scheduled) {
+    let best = null;
+    for (const d of detections) {
+      const dUs = (d - s.intendedAudioT) * 1e6;
+      if (Math.abs(dUs) < 60000 && (!best || Math.abs(dUs) < Math.abs(best.dUs))) best = { dUs, d };
+    }
+    pairs.push({ at: s.at, intendedUs: s.intendedUs, intendedAudioT: s.intendedAudioT, renderDeltaUs: best ? +best.dUs.toFixed(1) : null, detected: best ? best.d : null });
+  }
+  // drift-aware audio->wall mapping (two-point linear)
+  const spanAudio = anchorEnd.audio - anchorStart.audio;
+  const spanWallUs = anchorEnd.wallUs - anchorStart.wallUs;
+  const audioToWallUs = (a) => anchorStart.wallUs + (a - anchorStart.audio) / spanAudio * spanWallUs;
+  for (const p of pairs) {
+    if (p.detected !== null) p.wallDeltaUs = +(audioToWallUs(p.detected) + clockCal.offLocalUs - (p.intendedUs + clockCal.offLocalUs)).toFixed(1);
+  }
+  const driftPpm = +((spanWallUs / 1000 / (spanAudio * 1000) - 1) * 1e6).toFixed(1);
+  ctx.close();
+  return {
+    horizonMs, nScheduled: scheduled.length, nDetected: detections.length,
+    missed: pairs.filter((p) => p.renderDeltaUs === null).length,
+    laneStats: lane.stats(), busyLog, driftPpm,
+    pairs: pairs.map((p) => ({ at: p.at, renderDeltaUs: p.renderDeltaUs, wallDeltaUs: p.wallDeltaUs ?? null })),
+    wallFires,
+  };
+}
+
+// ---------------- background-tab probe ----------------
+const BG = { done: false, report: null };
+async function startBackground(mech) {
+  BG.done = false; BG.report = null;
+  const visLog = [{ t: Math.round(truthUs()), state: document.visibilityState }];
+  const onVis = () => visLog.push({ t: Math.round(truthUs()), state: document.visibilityState });
+  document.addEventListener('visibilitychange', onVis);
+  const rig = mkRig(mech);
+  for (const e of gridTrace(100, 25000, 'g')) rig.sched.schedule({ at: e.at, kind: 'g' });
+  rig.begin();
+  (async () => {
+    await waitPos(rig.transport, 25600, 400);
+    const rows = rig.sched.drainDrift();
+    document.removeEventListener('visibilitychange', onVis);
+    rig.pause(); rig.end();
+    BG.report = { mech, visLog, rows: rows.map((r) => ({ at: r.at, deltaMs: r.deltaMs, origin: r.origin })) };
+    BG.done = true;
+  })();
+  return { started: true };
+}
+
+window.tlab = {
+  calibrate, runPrecision, runAsserts, startFreeze,
+  freezeDone: () => FZ.done, freezeReport: () => FZ.report,
+  runAudio, startBackground, bgDone: () => BG.done, bgReport: () => BG.report,
+  truthUs: () => Math.round(truthUs()),
+};
+log('tlab ready');
+</script>

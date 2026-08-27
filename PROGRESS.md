@@ -148,6 +148,39 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### TIMELINE TRANSPORT CORE (session 6h) — built + measured ✅ (timeline/)
+- **timeline/transport.mjs is library-grade**: {p0,t0,rate} vector over
+  pluggable ClockSource (zero timers in the vector), lookahead wall lane
+  (committed-vs-pending + cancel, generation-guarded, per-kind catch-up,
+  first-class drift log + 60 Hz position observable), 3 tick hosts + the
+  fan-out graveyard as a fixture, Chris-Wilson audio lane with cancellable
+  committed nodes, deterministic virtual runtime for CI.
+- **Firing error (foreground, n=1270)**: main 1.0/6.4 ms p50/p95; worker
+  5.0/15.3; raf 3.7/8.6; fan-out 1.6/2.7 — the graveyard arm is the TIGHTEST
+  on clean runs (why it survived 3 generations) and **fails 5/7 correctness
+  asserts** (seek orphans ring, fires during pause, rate no-op, clear leaves
+  50 armed timers). Reproducible, not folklore.
+- **C2 property test GREEN**: reduce(≤t) ≡ play(0→t), 45 seeds (also 150),
+  seek/pause/rate gymnastics, exactly-once audit — deterministic, exits
+  nonzero. `node timeline/lab/prop-test.mjs` = the CI gate, exists today.
+- **Freeze (SIGSTOP 3 s)**: burst = 32 fires in 100 ms (machine-gun, now
+  chosen not suffered); drop = 28 dropped cleanly; **reduce = ONE reducer
+  call 0.5 ms after wake, state 300/300 correct**. Background tab (real
+  visibilitychange): main p95 981 ms (1 Hz clamp), **worker HOLDS 8.5 ms**,
+  raf 9175 ms (starved). → **worker tick is the default host**.
+- **Audio lane: sample-accurate** (render error p50 10 µs / max 40 µs =
+  1–2 samples @48 kHz); already-committed audio holds through a 500 ms
+  main-thread busy-loop while the wall lane stutters (two-lane doctrine
+  measured). Audio horizon must exceed worst stall (200–500 ms; safe because
+  committed nodes are cancellable — the exact capability the oscillator
+  corpse lacked). ⚠️ wall↔audio anchor ±25 ms in headless fake-audio —
+  re-measure on hardware w/ getOutputTimestamp + periodic reanchor.
+- Ship defaults: wall 25/100/150 ms (tick/horizon/lateGrace), worker host
+  default, main-thread opt-in (6.4 p95), rAF/fan-out never; catch-up
+  per-kind: reduce (stateful) / drop (ephemeral) / burst (idempotent only).
+- MIDI arm env-blocked: `midi` native module dlopen mmap errno=1 (EPERM —
+  ThreatLocker suspect); harness ships ready for a capable host.
+
 ### REMOTE-SYNTH / PLAY-A-SYNTH CASE (session 6g) — first measured key→ear ✅ (proto/jam)
 - MIDI up + synthesized AUDIO+VIDEO back, per-leg, sample-accurate onsets
   (AudioWorklet), burned panel video. **P2P key→ear 77.7/80.3 ms** (decoded

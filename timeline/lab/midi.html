@@ -1,0 +1,60 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tlab midi</title>
+<body style="font:12px monospace"><pre id="log">tlab midi</pre>
+<script>
+const logEl = document.getElementById('log');
+const log = (...a) => { logEl.textContent += '\n' + a.join(' '); };
+const epochUsRaw = () => (performance.timeOrigin + performance.now()) * 1000;
+let offLocalUs = 0;
+async function calibrate() {
+  let best = { rtt: Infinity, off: 0 };
+  for (let i = 0; i < 40; i++) {
+    const a = epochUsRaw();
+    const j = await (await fetch('/time-local', { cache: 'no-store' })).json();
+    const b = epochUsRaw();
+    if (b - a < best.rtt) best = { rtt: b - a, off: j.us + (b - a) / 2 - b };
+  }
+  offLocalUs = best.off;
+  return { offLocalUs: Math.round(best.off), minRttUs: Math.round(best.rtt) };
+}
+
+// Sends `n` noteOn messages to the tlab-midi virtual port.
+// mode 'queue': one batch of timestamped sends, MIDI stack does the timing.
+// mode 'fire':  send immediately when a plain setTimeout-per-event fires (the
+//               baseline: JS-timer timing + stack latency).
+async function runMidi({ n = 600, stepMs = 20, leadMs = 200, mode = 'queue' } = {}) {
+  const cal = await calibrate();
+  const access = await navigator.requestMIDIAccess({ sysex: false });
+  let out = null;
+  for (const o of access.outputs.values()) if (o.name && o.name.includes('tlab-midi')) out = o;
+  if (!out) return { error: 'tlab-midi port not found', ports: [...access.outputs.values()].map((o) => o.name) };
+  await out.open();
+  const sends = [];
+  const base = performance.now() + leadMs;
+  if (mode === 'queue') {
+    for (let i = 0; i < n; i++) {
+      const ts = base + i * stepMs;
+      out.send([0x90, i % 128, ((i / 128) | 0) % 128], ts);
+      sends.push({ seq: i, intendedUs: Math.round((performance.timeOrigin + ts) * 1000 + offLocalUs) });
+    }
+    await new Promise((r) => setTimeout(r, leadMs + n * stepMs + 500));
+  } else {
+    await new Promise((done) => {
+      let fired = 0;
+      for (let i = 0; i < n; i++) {
+        const ts = base + i * stepMs;
+        setTimeout(() => {
+          out.send([0x90, i % 128, ((i / 128) | 0) % 128]);
+          sends.push({ seq: i, intendedUs: Math.round((performance.timeOrigin + ts) * 1000 + offLocalUs) });
+          if (++fired === n) done();
+        }, ts - performance.now());
+      }
+    });
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return { mode, n, cal, sends };
+}
+window.tmidi = { runMidi };
+log('tmidi ready');
+</script>

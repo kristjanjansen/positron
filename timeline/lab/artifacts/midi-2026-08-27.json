@@ -1,0 +1,6 @@
+{
+  "arm": "F (Web MIDI timestamped send -> node virtual port)",
+  "verdict": "SKIPPED - environment, not design",
+  "detail": "npm `midi` (RtMidi native) installs and node-gyp builds clean on node v25.9.0, but dlopen of the built midi.node fails with mmap errno=1 (EPERM) on this Darwin 25.6 host - persists through ad-hoc codesign (--force -s -), quarantine strip, and outside the tool sandbox. The virtual-port receiver therefore never opens, and headless Chrome enumerates zero MIDI outputs (Web MIDI permission grant itself works via Browser.grantPermissions with origin + midi/midiSysex - that part is proven). Harness is complete and ready: midi-recv.mjs + midi.html + run-midi.mjs; re-run on a host that can load native MIDI.",
+  "harness": ["timeline/lab/midi-recv.mjs", "timeline/lab/midi.html", "timeline/lab/run-midi.mjs"]
+}
