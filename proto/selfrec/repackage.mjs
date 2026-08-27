@@ -19,8 +19,11 @@
 // fps. `-fps_mode vfr` on the output keeps the real timestamps. (-c copy
 // passes timestamps through untouched — no fps_mode needed there.)
 //
-// Usage: SHOW=<show> PID=<pid> [MODE=auto|copy|transcode] [KEEP_LOCAL=1]
-//        node repackage.mjs
+// MODULE + CLI (postshow.mjs imports repackageParticipant; run-sync.mjs still
+// spawns the CLI):
+//   CLI:    SHOW=<show> PID=<pid> [MODE=auto|copy|transcode] [KEEP_LOCAL=1]
+//           node repackage.mjs
+//   module: await repackageParticipant({ show, pid, mode?, results?, keepLocal? })
 // Emits a JSON report on stdout (last line) + appends to results jsonl.
 // ============================================================================
 import fs from "fs";
@@ -31,28 +34,25 @@ const HERE = `${ROOT}/proto/selfrec`;
 const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
 const BASE = "https://elektron-selfrec.kristjan-jansen.workers.dev";
 const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
-const SHOW = process.env.SHOW, PID = process.env.PID;
-const MODE = process.env.MODE || "auto";
-const RESULTS = process.env.RESULTS || `${ROOT}/results/selfrec-sync.jsonl`;
-if (!SHOW || !PID) { console.error("SHOW and PID required"); process.exit(1); }
-const TOKEN = fs.readFileSync(`${HERE}/.env.selfrec`, "utf8").trim().split("=")[1];
 
 function ts() { return new Date().toISOString().slice(11, 23); }
 function say(...a) { console.log(ts(), "rpk|", ...a); }
-function jsonl(row) { fs.appendFileSync(RESULTS, JSON.stringify({ t: Date.now(), kind: "repackage", show: SHOW, pid: PID, ...row }) + "\n"); }
 
-const work = `${SCRATCH}/rpk-${SHOW}-${PID}`;
-fs.rmSync(work, { recursive: true, force: true });
-fs.mkdirSync(`${work}/hls`, { recursive: true });
+export async function repackageParticipant({ show, pid, mode: modeOpt = "auto",
+    results = `${ROOT}/results/selfrec-sync.jsonl`, keepLocal = false } = {}) {
+  if (!show || !pid) throw new Error("show and pid required");
+  const TOKEN = fs.readFileSync(`${HERE}/.env.selfrec`, "utf8").trim().split("=")[1];
+  const work = `${SCRATCH}/rpk-${show}-${pid}`;
+  fs.rmSync(work, { recursive: true, force: true });
+  fs.mkdirSync(`${work}/hls`, { recursive: true });
 
-const run = async () => {
   const tAll = Date.now();
   // ---- 1. manifest + chunk download (public URL, egress free) --------------
-  const man = await (await fetch(`${PUB}/selfrec/${SHOW}/${PID}/manifest.json`)).json();
+  const man = await (await fetch(`${PUB}/selfrec/${show}/${pid}/manifest.json`)).json();
   const recDurMs = man.durationMs;
   const isH264 = /h264|avc/i.test(man.mimeType || "");
-  const mode = MODE === "auto" ? (isH264 ? "copy" : "transcode") : MODE;
-  say(`${SHOW}/${PID}: ${man.chunkCount} chunks, ${recDurMs} ms, mime=${man.mimeType} -> mode=${mode}`);
+  const mode = modeOpt === "auto" ? (isH264 ? "copy" : "transcode") : modeOpt;
+  say(`${show}/${pid}: ${man.chunkCount} chunks, ${recDurMs} ms, mime=${man.mimeType} -> mode=${mode}`);
   const concat = `${work}/concat.webm`;
   const t0 = Date.now();
   const out = fs.createWriteStream(concat);
@@ -105,7 +105,7 @@ const run = async () => {
   for (const f of files) {
     const body = fs.readFileSync(`${work}/hls/${f}`);
     for (let a = 1; a <= 3; a++) {
-      const r = await fetch(`${BASE}/derived/${SHOW}/${PID}/hls/${f}`, {
+      const r = await fetch(`${BASE}/derived/${show}/${pid}/hls/${f}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": ctFor(f) },
         body,
@@ -117,7 +117,7 @@ const run = async () => {
   }
   const uploadMs = Date.now() - t2;
   // spot-verify the playlist is publicly readable
-  const plCheck = await fetch(`${PUB}/selfrec/${SHOW}/${PID}/derived/hls/index.m3u8`);
+  const plCheck = await fetch(`${PUB}/selfrec/${show}/${pid}/derived/hls/index.m3u8`);
   if (!plCheck.ok) throw new Error("derived playlist not readable on pub URL");
 
   const report = {
@@ -128,12 +128,22 @@ const run = async () => {
     downloadMs, ffmpegMs, uploadMs, totalMs: Date.now() - tAll,
     ffmpegRatio: +(ffmpegMs / recDurMs).toFixed(4),     // THE number: wall/media
     totalRatio: +((Date.now() - tAll) / recDurMs).toFixed(4),
-    derivedPrefix: `selfrec/${SHOW}/${PID}/derived/hls/`,
+    derivedPrefix: `selfrec/${show}/${pid}/derived/hls/`,
   };
-  jsonl(report);
+  fs.appendFileSync(results, JSON.stringify({ t: Date.now(), kind: "repackage", show, pid, ...report }) + "\n");
   say(`DONE mode=${mode}: ffmpeg ${ffmpegMs} ms for ${recDurMs} ms media ` +
       `(ratio ${report.ffmpegRatio}), total ${report.totalMs} ms, ${files.length} files ${(outBytes / 1048576).toFixed(1)} MB`);
-  if (!process.env.KEEP_LOCAL) fs.rmSync(work, { recursive: true, force: true });
-  console.log("REPORT " + JSON.stringify(report));
-};
-run().catch((e) => { console.error(ts(), "rpk FATAL:", e.message || e); process.exit(1); });
+  if (!keepLocal) fs.rmSync(work, { recursive: true, force: true });
+  return report;
+}
+
+// ---- CLI (run-sync.mjs spawns this) ----------------------------------------
+if (process.argv[1] && process.argv[1].endsWith("repackage.mjs")) {
+  repackageParticipant({
+    show: process.env.SHOW, pid: process.env.PID,
+    mode: process.env.MODE || "auto",
+    results: process.env.RESULTS || `${ROOT}/results/selfrec-sync.jsonl`,
+    keepLocal: !!process.env.KEEP_LOCAL,
+  }).then((report) => console.log("REPORT " + JSON.stringify(report)))
+    .catch((e) => { console.error(ts(), "rpk FATAL:", e.message || e); process.exit(1); });
+}

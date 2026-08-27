@@ -77,6 +77,34 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   selfrecsync-20260827T093613 in the DO. New: repackage.mjs, indexer.mjs,
   replay-grid.html, run-sync.mjs.
 
+### PLAYBACK LAYER (session 6c) — postshow runner, reconcile, masters replay: ✅ COMPLETE
+- **postshow.mjs** (the engine.mjs seed; worker v381acbe8 adds POST /show, GET
+  /list, delete-tombstone): cuelog∪listing discovery → repackage → index →
+  show.json {pid, T0, skewEst, dur, hls, masters, index}. Idempotent: skip-all
+  1.5 s; full pipeline 37.7 s on the proof show (ffmpeg itself 0.2–1.2 s; the
+  rest is R2 transfer — repackage+indexer double-download ~9 s, engine.mjs
+  should share one download).
+- **--reconcile** ("studio doesn't always run"): masters-only settle clock
+  (10 min quiescence), synthesize-manifest for abandoned participants
+  (EBML-sniffed mime, finalized:false), late-chunk extend+re-derive
+  (lateSeqs), tombstone = resurrection-blocked re-delete NEVER derive.
+  Proven: sweep 1.04 s / one 331 ms listing when quiet (0 actions twice);
+  every rule exercised live on a demo copy, then purged.
+- **replay-grid ?show=**: boots from show.json + cuelog alone; scrubber with
+  cue ticks + span bars; R1 through the new path **p50 4 / max 33 ms**;
+  scrubber seeks −41…−65 ms (pixel quantization ~140 ms/px measured apart).
+- **Masters/MSE verdict — SPLIT, decision-grade:** vp8 masters play via
+  cluster-index+Range+MSE **frame-exact (+5…+11 ms — beats hls.js) at
+  1.1–2 MB per seek (10–19 % of file)**; but **h264-in-webm is REFUSED by
+  MSE** (isTypeSupported false, all variants) though <video> plays it. THE
+  CODEC TRADEOFF: h264 capture = 80 ms copy-remux + universal HLS but NO
+  engine-free masters replay; vp8 capture = engine-free desktop replay but
+  15× transcode cost for the iPhone HLS. Both paths real; choose per show.
+- **SimpleBlock index closes R3**: 2591 blocks == ffprobe's 2591 frames;
+  +1 ms parse, ~1.8 MB/media-hour; mapping divergence ±33–72 → 15–22 ms.
+  Verdict: linear+skew wins ≤~2–3 min; block anchoring overtakes once drift
+  clears ~50 ms — the hour-scale mechanism, validated.
+
 ### VERDICT — plan-studio's baked decision is now measured, not argued
 Self-recording wins on every axis that matters: bandwidth lands distributed +
 elastic instead of 8×-concentrated + real-time; source quality vs inherited SFU
