@@ -28,12 +28,21 @@
  *   POST /instruments/heartbeat      host liveness refresh      INSTRUMENT_TOKEN
  *   WS   /ws?instrument=&role=host   host signaling socket      INSTRUMENT_TOKEN
  *   WS   /ws?instrument=&role=player player signaling socket    tokenless (v0)
+ *
+ * SESSION STORAGE (second DO class, `Sessions`, EU-pinned) — see below and
+ * DEPLOYED.md. Notes live as SQLite ROWS (plan-timeline C4: rows, never a JSON
+ * blob), audio lives in R2 by reference, and either party can delete with
+ * tombstone semantics (C6). The log is an explicit, consented POST from the
+ * client — the worker still never sees a MIDI byte in transit.
  */
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization,Content-Type',
+  // X-Chunk-Sha256 must be listed or the audio chunk POST fails its preflight
+  // and the browser reports a bare "Failed to fetch" (found the hard way).
+  'Access-Control-Allow-Headers': 'Authorization,Content-Type,X-Chunk-Sha256',
+  'Access-Control-Max-Age': '86400',
 };
 const j = (status, obj) => new Response(JSON.stringify(obj), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...CORS },
@@ -86,9 +95,10 @@ export class Hub {
     const h = this.host(inst);
     const p = this.activePlayer(inst);
     if (!p) return false;
+    const sid = p.a.sid || null;
     this.patch(p.ws, p.a, { active: false, since: null });
-    this.send(p.ws, { type: 'session', state: 'ended', reason });
-    if (h) this.send(h.ws, { type: 'session', state: 'ended', reason, player: p.a.pid });
+    this.send(p.ws, { type: 'session', state: 'ended', reason, sid });
+    if (h) this.send(h.ws, { type: 'session', state: 'ended', reason, player: p.a.pid, sid });
     return true;
   }
 
@@ -218,9 +228,14 @@ export class Hub {
         if (!target) return this.send(ws, { type: 'error', of: 'accept', error: 'player gone' });
         if (player && player.a.pid !== m.player) return this.send(ws, { type: 'error', of: 'accept', error: 'busy' });
         const since = Date.now();
-        this.patch(target.ws, target.a, { active: true, since });
-        this.send(target.ws, { type: 'session', state: 'accepted', since, instrument: inst });
-        this.send(ws, { type: 'session', state: 'accepted', since, player: target.a.pid, name: target.a.name });
+        // ONE session id, minted here and handed to BOTH parties on the accept
+        // frame. It is what the player's event log and the owner's audio
+        // recording agree on — and it is minted by the party that knows the
+        // session exists, not guessed by either side.
+        const sid = 's' + since.toString(36) + Math.random().toString(36).slice(2, 8);
+        this.patch(target.ws, target.a, { active: true, since, sid });
+        this.send(target.ws, { type: 'session', state: 'accepted', since, instrument: inst, sid });
+        this.send(ws, { type: 'session', state: 'accepted', since, player: target.a.pid, name: target.a.name, sid, instrument: inst });
         return;
       }
 
@@ -279,6 +294,275 @@ export class Hub {
   async webSocketError(ws) { await this.close(ws); }
 }
 
+/**
+ * Sessions — the DURABLE SESSION LOG. One DO instance ('log'), EU-pinned.
+ *
+ * plan-timeline C4: the notes are SQLite ROWS, never a JSON blob. A row per
+ * event is what makes `?from=&limit=` paging, ordering by `at`, and a
+ * per-source monotonic-seq guard cost nothing — and it is what a later
+ * megatimeline join needs. Heavy payload (audio) is BY REFERENCE: R2 under
+ * `instrument/<sessionId>/audio/`, only the prefix in the row.
+ *
+ * plan-timeline C6: delete is a TOMBSTONE, not a hole. The session row stays
+ * with {deletedBy, deletedAt}; the event rows are physically dropped; the R2
+ * prefix is swept and a `deleted.marker` written there. A read of a deleted
+ * session is 410 + the tombstone, and an append to it is REJECTED — a late
+ * flush from a tab that did not hear about the delete cannot resurrect it.
+ */
+export class Sessions {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    this.sql = state.storage.sql;
+    state.blockConcurrencyWhile(async () => {
+      this.sql.exec(`CREATE TABLE IF NOT EXISTS sessions(
+        id TEXT PRIMARY KEY, instrument TEXT, playerId TEXT,
+        startedAt INTEGER, endedAt INTEGER, noteCount INTEGER DEFAULT 0,
+        audioPrefix TEXT, deletedBy TEXT, deletedAt INTEGER)`);
+      this.sql.exec(`CREATE TABLE IF NOT EXISTS events(
+        sessionId TEXT NOT NULL, seq INTEGER NOT NULL, at INTEGER NOT NULL,
+        kind TEXT, source TEXT, raw BLOB, display TEXT, ref INTEGER, payload TEXT)`);
+      this.sql.exec(`CREATE INDEX IF NOT EXISTS events_by_time ON events(sessionId, at)`);
+      // two columns beyond the base shape, both nullable, both still ONE ROW
+      // PER EVENT (the C4 rule is rows-not-a-session-blob, not four columns):
+      //   ref     — the seq this row points at in ANOTHER source's lane. A
+      //             host `midi-actuated` row refs the player's note seq, so
+      //             (hostAt − playerAt) per note is queryable: the two lanes
+      //             together ARE the drift channel, never averaged into one.
+      //   payload — small JSON detail for marker rows (media-span phase +
+      //             mediaRef). Never used for midi rows.
+      const cols = this.sql.exec('PRAGMA table_info(events)').toArray().map((c) => c.name);
+      if (!cols.includes('ref')) this.sql.exec('ALTER TABLE events ADD COLUMN ref INTEGER');
+      if (!cols.includes('payload')) this.sql.exec('ALTER TABLE events ADD COLUMN payload TEXT');
+    });
+  }
+
+  row(id) { return this.sql.exec('SELECT * FROM sessions WHERE id=?', id).toArray()[0] || null; }
+  ensure(id, instrument, playerId, startedAt) {
+    const s = this.row(id);
+    if (s) return s;
+    this.sql.exec('INSERT INTO sessions(id,instrument,playerId,startedAt,noteCount) VALUES(?,?,?,?,0)',
+      id, String(instrument || '').slice(0, 64) || null, String(playerId || '').slice(0, 64) || null, startedAt);
+    return this.row(id);
+  }
+  recount(id) {
+    const n = this.sql.exec("SELECT COUNT(*) AS n FROM events WHERE sessionId=? AND kind='midi'", id).toArray()[0].n;
+    this.sql.exec('UPDATE sessions SET noteCount=? WHERE id=?', n, id);
+    return n;
+  }
+  meta(s) {
+    return {
+      id: s.id, instrument: s.instrument, playerId: s.playerId,
+      startedAt: s.startedAt, endedAt: s.endedAt, noteCount: s.noteCount,
+      audioPrefix: s.audioPrefix || null,
+      deletedBy: s.deletedBy || null, deletedAt: s.deletedAt || null,
+      eventRows: this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE sessionId=?', s.id).toArray()[0].n,
+    };
+  }
+  gone(s) {
+    return j(410, { deleted: true, tombstone: true, id: s.id, instrument: s.instrument,
+      deletedBy: s.deletedBy, deletedAt: s.deletedAt, error: 'session deleted' });
+  }
+  audioPrefixOf(id) { return `instrument/${id}/audio/`; }
+
+  async purgeAudio(id) {
+    const prefix = `instrument/${id}/`;
+    let deleted = 0, cursor;
+    do {
+      const r = await this.env.ARCHIVE.list({ prefix, cursor, limit: 500 });
+      const keys = r.objects.map((o) => o.key);
+      if (keys.length) { await this.env.ARCHIVE.delete(keys); deleted += keys.length; }
+      cursor = r.truncated ? r.cursor : null;
+    } while (cursor);
+    return deleted;
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    const op = url.pathname.replace('/do/', '');
+    const id = url.searchParams.get('id') || '';
+    const owner = request.headers.get('x-owner') === '1';
+    if (op !== 'list' && !ID.test(id)) return j(400, { error: 'bad session id' });
+
+    // ---- GET /sessions?instrument= ----------------------------------------
+    if (op === 'list') {
+      const inst = url.searchParams.get('instrument') || '';
+      const rows = inst
+        ? this.sql.exec('SELECT * FROM sessions WHERE instrument=? ORDER BY startedAt DESC LIMIT 200', inst).toArray()
+        : this.sql.exec('SELECT * FROM sessions ORDER BY startedAt DESC LIMIT 200').toArray();
+      return j(200, { count: rows.length, sessions: rows.map((s) => this.meta(s)) });
+    }
+
+    // ---- POST /session/<id>/events — batched append ------------------------
+    if (op === 'events') {
+      const b = await request.json().catch(() => null);
+      if (!b || !Array.isArray(b.events)) return j(400, { error: 'expected {events:[...]}' });
+      if (b.events.length > 2000) return j(413, { error: 'batch too large (max 2000)' });
+      const existing = this.row(id);
+      if (existing && existing.deletedAt) return this.gone(existing);   // no resurrection
+      const first = b.events[0];
+      const s = existing || this.ensure(id, b.instrument, b.playerId,
+        first && Number.isFinite(first.at) ? Math.trunc(first.at) : Date.now() * 1000);
+      if (!s.instrument && b.instrument) this.sql.exec('UPDATE sessions SET instrument=? WHERE id=?', String(b.instrument).slice(0, 64), id);
+      if (!s.playerId && b.playerId) this.sql.exec('UPDATE sessions SET playerId=? WHERE id=?', String(b.playerId).slice(0, 64), id);
+
+      // monotonic seq PER SOURCE. A retried batch is therefore idempotent (its
+      // events are already <= max and get rejected individually), and an
+      // out-of-order flush cannot interleave garbage into the log.
+      const maxBySource = new Map();
+      for (const r of this.sql.exec('SELECT source, MAX(seq) AS m FROM events WHERE sessionId=? GROUP BY source', id).toArray()) {
+        maxBySource.set(r.source, r.m);
+      }
+      let appended = 0, rejected = 0;
+      for (const e of b.events) {
+        if (!e || typeof e !== 'object') { rejected++; continue; }
+        const source = String(e.source || 'unknown').slice(0, 32);
+        const prev = maxBySource.get(source);
+        const seq = Number.isFinite(e.seq) ? Math.trunc(e.seq) : (prev === undefined ? 0 : prev + 1);
+        if (prev !== undefined && seq <= prev) { rejected++; continue; }
+        const raw = Array.isArray(e.raw) ? new Uint8Array(e.raw.slice(0, 16).map((x) => x & 0xff)) : null;
+        const payload = e.payload === undefined || e.payload === null ? null : JSON.stringify(e.payload).slice(0, 2000);
+        this.sql.exec('INSERT INTO events(sessionId,seq,at,kind,source,raw,display,ref,payload) VALUES(?,?,?,?,?,?,?,?,?)',
+          id, seq, Number.isFinite(e.at) ? Math.trunc(e.at) : 0,
+          String(e.kind || 'event').slice(0, 32), source, raw,
+          e.display === undefined || e.display === null ? null : String(e.display).slice(0, 240),
+          Number.isFinite(e.ref) ? Math.trunc(e.ref) : null, payload);
+        maxBySource.set(source, seq);
+        appended++;
+      }
+      const notes = this.recount(id);
+      const total = this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE sessionId=?', id).toArray()[0].n;
+      return j(200, { ok: true, id, appended, rejected, total, noteCount: notes });
+    }
+
+    // ---- POST /session/<id>/end -------------------------------------------
+    if (op === 'end') {
+      const s = this.row(id);
+      if (!s) return j(404, { error: 'no such session' });
+      if (s.deletedAt) return this.gone(s);
+      const b = await request.json().catch(() => ({}));
+      const endedAt = Number.isFinite(b && b.endedAt) ? Math.trunc(b.endedAt) : Date.now() * 1000;
+      this.sql.exec('UPDATE sessions SET endedAt=? WHERE id=?', endedAt, id);
+      this.recount(id);
+      return j(200, { ok: true, session: this.meta(this.row(id)) });
+    }
+
+    // ---- GET /session/<id>?from=&limit= -----------------------------------
+    if (op === 'get') {
+      const s = this.row(id);
+      if (!s) return j(404, { error: 'no such session' });
+      if (s.deletedAt) return this.gone(s);
+      const from = Math.max(0, parseInt(url.searchParams.get('from') || '0', 10) || 0);
+      const limit = Math.min(20000, Math.max(1, parseInt(url.searchParams.get('limit') || '5000', 10) || 5000));
+      const rows = this.sql.exec(
+        'SELECT seq,at,kind,source,raw,display,ref,payload FROM events WHERE sessionId=? ORDER BY at, seq LIMIT ? OFFSET ?',
+        id, limit, from).toArray();
+      const events = rows.map((r) => ({
+        at: r.at, kind: r.kind, source: r.source, seq: r.seq,
+        ...(r.raw ? { raw: [...new Uint8Array(r.raw)] } : {}),
+        display: r.display,
+        ...(r.ref === null || r.ref === undefined ? {} : { ref: r.ref }),
+        ...(r.payload ? { payload: JSON.parse(r.payload) } : {}),
+      }));
+      const meta = this.meta(s);
+      const lanes = this.sql.exec('SELECT source, kind, COUNT(*) AS n FROM events WHERE sessionId=? GROUP BY source, kind', id).toArray();
+      return j(200, { session: meta, lanes, from, limit, count: events.length, total: meta.eventRows, events });
+    }
+
+    // ---- POST /session/<id>/delete {by} — TOMBSTONE (C6) -------------------
+    if (op === 'delete') {
+      const b = await request.json().catch(() => ({}));
+      const by = b && b.by === 'owner' ? 'owner' : 'player';
+      if (by === 'owner' && !owner) return j(403, { error: 'owner delete needs INSTRUMENT_TOKEN' });
+      const s = this.row(id);
+      if (!s) return j(404, { error: 'no such session' });
+      if (s.deletedAt) return j(200, { ok: true, already: true, id, deletedBy: s.deletedBy, deletedAt: s.deletedAt, eventsDropped: 0, audioObjectsPurged: 0 });
+      const dropped = this.sql.exec('SELECT COUNT(*) AS n FROM events WHERE sessionId=?', id).toArray()[0].n;
+      this.sql.exec('DELETE FROM events WHERE sessionId=?', id);
+      const deletedAt = Date.now();
+      this.sql.exec('UPDATE sessions SET deletedBy=?, deletedAt=?, noteCount=0 WHERE id=?', by, deletedAt, id);
+      let purged = 0;
+      if (s.audioPrefix) {
+        purged = await this.purgeAudio(id);
+        // the R2-side tombstone: a late chunk upload for a deleted session is
+        // refused by the DO, and anything scanning the bucket sees the marker.
+        await this.env.ARCHIVE.put(`instrument/${id}/deleted.marker`,
+          JSON.stringify({ deletedAt, deletedBy: by, purgedObjects: purged }),
+          { httpMetadata: { contentType: 'application/json' } });
+      }
+      return j(200, { ok: true, id, deletedBy: by, deletedAt, eventsDropped: dropped, audioObjectsPurged: purged });
+    }
+
+    // ---- audio (media BY REFERENCE) ---------------------------------------
+    // POST /session/<id>/audio/<seq>   owner token   raw webm blob
+    if (op === 'audio-put') {
+      const s = this.row(id);
+      if (s && s.deletedAt) return this.gone(s);
+      const seq = parseInt(url.searchParams.get('seq') || '', 10);
+      if (!Number.isInteger(seq) || seq < 0 || seq > 999999) return j(400, { error: 'bad seq' });
+      const bytes = await request.arrayBuffer();
+      if (!bytes.byteLength) return j(411, { error: 'empty chunk' });
+      if (bytes.byteLength > 16 * 1024 * 1024) return j(413, { error: 'chunk too large' });
+      const key = `instrument/${id}/audio/chunk-${String(seq).padStart(5, '0')}.webm`;
+      const sha256 = request.headers.get('x-chunk-sha256') || undefined;
+      let obj;
+      try {
+        obj = await this.env.ARCHIVE.put(key, bytes, {
+          httpMetadata: { contentType: 'audio/webm' }, ...(sha256 ? { sha256 } : {}),
+        });
+      } catch (e) { return j(400, { error: 'put failed: ' + (e && e.message || e) }); }
+      if (!s) this.ensure(id, url.searchParams.get('instrument'), null, Date.now() * 1000);
+      this.sql.exec('UPDATE sessions SET audioPrefix=? WHERE id=?', this.audioPrefixOf(id), id);
+      return j(200, { ok: true, key, size: obj.size, etag: obj.httpEtag, audioPrefix: this.audioPrefixOf(id) });
+    }
+
+    // POST /session/<id>/audio/manifest  owner token  JSON
+    if (op === 'audio-manifest') {
+      const s = this.row(id);
+      if (s && s.deletedAt) return this.gone(s);
+      const body = await request.text();
+      if (body.length > 2 * 1024 * 1024) return j(413, { error: 'manifest too large' });
+      try { JSON.parse(body); } catch { return j(400, { error: 'manifest not json' }); }
+      const key = `instrument/${id}/audio/manifest.json`;
+      await this.env.ARCHIVE.put(key, body, { httpMetadata: { contentType: 'application/json' } });
+      if (!s) this.ensure(id, url.searchParams.get('instrument'), null, Date.now() * 1000);
+      this.sql.exec('UPDATE sessions SET audioPrefix=? WHERE id=?', this.audioPrefixOf(id), id);
+      return j(200, { ok: true, key, audioPrefix: this.audioPrefixOf(id) });
+    }
+
+    // GET /session/<id>/audio — what is actually stored (the verify step)
+    if (op === 'audio-list') {
+      const s = this.row(id);
+      if (s && s.deletedAt) return this.gone(s);
+      const prefix = this.audioPrefixOf(id);
+      const objects = [];
+      let cursor;
+      do {
+        const r = await this.env.ARCHIVE.list({ prefix, cursor, limit: 500 });
+        for (const o of r.objects) objects.push({ key: o.key, size: o.size, etag: o.httpEtag, uploaded: o.uploaded });
+        cursor = r.truncated ? r.cursor : null;
+      } while (cursor);
+      objects.sort((a, b) => a.key.localeCompare(b.key));
+      return j(200, { prefix, count: objects.length, bytes: objects.reduce((n, o) => n + o.size, 0), objects });
+    }
+
+    // GET /session/<id>/audio/<seq> — one chunk, streamed back
+    if (op === 'audio-get') {
+      const s = this.row(id);
+      if (s && s.deletedAt) return this.gone(s);
+      const seq = parseInt(url.searchParams.get('seq') || '', 10);
+      const key = `instrument/${id}/audio/chunk-${String(seq).padStart(5, '0')}.webm`;
+      const obj = await this.env.ARCHIVE.get(key);
+      if (!obj) return j(404, { error: 'no such chunk' });
+      return new Response(obj.body, {
+        headers: { 'content-type': 'audio/webm', 'content-length': String(obj.size), 'cache-control': 'no-store', ...CORS },
+      });
+    }
+
+    return j(404, { error: 'no such session op' });
+  }
+}
+
 // ---- token auth: constant-time, fails closed (jam/cues pattern) ------------
 function authorized(request, url, env) {
   if (!env.INSTRUMENT_TOKEN) return false;
@@ -328,6 +612,67 @@ export default {
       return hub().fetch(new Request(u, request));
     }
 
-    return j(404, { error: 'routes: /time /instruments /instruments/register /instruments/heartbeat /instruments/unlist /ws' });
+    // ---- SESSION STORAGE ---------------------------------------------------
+    // EU JURISDICTION: the session log is the only personal data this platform
+    // keeps (someone's playing, someone's instrument audio), so its DO is
+    // pinned to `.jurisdiction('eu')`. The signaling Hub is a separate class
+    // and deliberately untouched — see DEPLOYED.md for the migration note.
+    const sess = () => env.SESSIONS.jurisdiction('eu').get(env.SESSIONS.jurisdiction('eu').idFromName('log'));
+    const toDO = (op, id, extra, init) => {
+      const u = new URL('https://s/do/' + op);
+      if (id) u.searchParams.set('id', id);
+      for (const [k, v] of Object.entries(extra || {})) if (v !== null && v !== undefined) u.searchParams.set(k, v);
+      return sess().fetch(new Request(u, init));
+    };
+    const parts = p.split('/').filter(Boolean);
+
+    if (request.method === 'GET' && parts.length === 1 && parts[0] === 'sessions') {
+      const r = await toDO('list', null, { instrument: url.searchParams.get('instrument') }, { method: 'GET' });
+      const body = await r.json();
+      // proof, not a claim: the EU-pinned id differs from the unpinned one, so
+      // the object really lives in the jurisdiction-restricted namespace.
+      const eu = env.SESSIONS.jurisdiction('eu').idFromName('log').toString();
+      const plain = env.SESSIONS.idFromName('log').toString();
+      return j(200, { ...body, jurisdiction: 'eu', euPinned: eu !== plain, euId: eu, unpinnedId: plain });
+    }
+
+    if (parts[0] === 'session' && parts.length >= 2) {
+      const sid = parts[1];
+      if (!ID.test(sid)) return j(400, { error: 'bad session id' });
+      const tail = parts.slice(2);
+      const owner = authorized(request, url, env);
+      const hdr = { 'x-owner': owner ? '1' : '0' };
+
+      if (request.method === 'GET' && tail.length === 0) {
+        return toDO('get', sid, { from: url.searchParams.get('from'), limit: url.searchParams.get('limit') }, { method: 'GET' });
+      }
+      if (request.method === 'POST' && tail.length === 1 && (tail[0] === 'events' || tail[0] === 'end' || tail[0] === 'delete')) {
+        // tokenless in v0 — the unguessable session id (minted by the hub at
+        // accept) IS the capability. Owner-scoped delete is the exception and
+        // is checked inside the DO against the x-owner header.
+        return toDO(tail[0], sid, null, { method: 'POST', body: await request.text(), headers: hdr });
+      }
+      if (request.method === 'GET' && tail[0] === 'audio' && tail.length === 1) {
+        return toDO('audio-list', sid, null, { method: 'GET' });
+      }
+      if (request.method === 'GET' && tail[0] === 'audio' && tail.length === 2 && /^\d{1,6}$/.test(tail[1])) {
+        return toDO('audio-get', sid, { seq: tail[1] }, { method: 'GET' });
+      }
+      // audio WRITES are the owner's: they are the owner's instrument's sound.
+      if (request.method === 'POST' && tail[0] === 'audio' && tail.length === 2) {
+        if (!owner) return j(403, { error: 'recording the instrument needs INSTRUMENT_TOKEN' });
+        if (tail[1] === 'manifest') {
+          return toDO('audio-manifest', sid, { instrument: url.searchParams.get('instrument') },
+            { method: 'POST', body: await request.text(), headers: hdr });
+        }
+        if (/^\d{1,6}$/.test(tail[1])) {
+          return toDO('audio-put', sid, { seq: tail[1], instrument: url.searchParams.get('instrument') },
+            { method: 'POST', body: await request.arrayBuffer(), headers: { ...hdr, 'x-chunk-sha256': request.headers.get('x-chunk-sha256') || '' } });
+        }
+      }
+      return j(404, { error: 'session routes: GET /session/<id> · POST /session/<id>/{events,end,delete} · GET|POST /session/<id>/audio[/<seq>|/manifest]' });
+    }
+
+    return j(404, { error: 'routes: /time /instruments /instruments/{register,heartbeat,unlist} /ws /sessions /session/<id>[/events|/end|/delete|/audio]' });
   },
 };

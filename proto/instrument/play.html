@@ -111,10 +111,32 @@
       <span class="chip"><b>onsets</b><span id="h-ons" class="dim">0</span></span>
       <span class="chip"><b>clock</b><span id="h-clock" class="dim">—</span></span>
       <span class="chip"><b>log</b><span id="h-log" class="dim">0 events</span></span>
+      <span class="chip"><b>stored</b><span id="h-saved" class="dim">not saving (no session)</span></span>
+      <span class="chip"><b>session id</b><span id="h-sid" class="dim">—</span></span>
     </div>
     <div class="row" style="margin-top:7px">
       <button id="b-dl">Download session</button>
       <button id="b-replay">Replay same path</button>
+      <button id="b-del" class="stop" disabled>Delete this session</button>
+    </div>
+    <div class="hint">Your notes are saved to the session store as you play (batched, ~1 s).
+      <b>You can delete this session</b> — notes and any audio go together.
+      The owner can delete it too: it is your playing and their instrument.
+      Audio is only recorded if the owner switched it on.</div>
+  </div>
+
+  <div class="card">
+    <h2>Load a stored session</h2>
+    <div class="row">
+      <input id="f-sid" placeholder="session id — s1a2b3c…"
+             style="font:inherit;background:#0b0d0f;color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:5px 7px">
+      <button id="b-load" style="flex:0 0 auto">Load</button>
+    </div>
+    <div id="loadstate" class="hint">Reads the notes back out of the store and replays them through the same send path.</div>
+    <audio id="sessaudio" controls style="display:none;width:100%;margin-top:8px"></audio>
+    <div class="row" style="margin-top:7px">
+      <button id="b-replay-stored" disabled>Replay from storage</button>
+      <button id="b-del-stored" class="stop" disabled>Delete it</button>
     </div>
   </div>
 
