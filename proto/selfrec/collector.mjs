@@ -27,6 +27,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store", ...cors });
     return res.end(fs.readFileSync(`${HERE}/participant.html`));
   }
+  if (req.method === "GET" && req.url.startsWith("/replay-grid.html")) {
+    res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store", ...cors });
+    return res.end(fs.readFileSync(`${HERE}/replay-grid.html`));
+  }
+  if (req.method === "GET" && req.url === "/hls.min.js") {   // vendored (proto/flipper), 1.7.1
+    res.writeHead(200, { "content-type": "text/javascript", ...cors });
+    return res.end(fs.readFileSync("/Users/s32863/personal/elektron/proto/flipper/hls.min.js"));
+  }
   if (req.method === "POST" && req.url === "/beacon") {
     const chunks = [];
     req.on("data", (d) => chunks.push(d));

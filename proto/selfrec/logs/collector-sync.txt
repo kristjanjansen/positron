@@ -1,0 +1,3 @@
+selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-sync.jsonl
+selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-sync.jsonl
+selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-sync.jsonl

@@ -1,0 +1,369 @@
+{
+  "count": 21,
+  "cues": [
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-start-0",
+        "at": 1787823376294,
+        "sentAt": 1787823376294,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "start",
+          "source": "p1",
+          "at": 1787823376294,
+          "skewEst": 42,
+          "rttMin": 24,
+          "mediaRef": "selfrec/sync-20260827T093613/p1/",
+          "mimeType": "video/webm;codecs=h264",
+          "timesliceMs": 2000
+        },
+        "serverAt": 1787823376354
+      },
+      "doRecvTs": 1787823376354
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-start-0",
+        "at": 1787823383116,
+        "sentAt": 1787823383116,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "start",
+          "source": "p2",
+          "at": 1787823383116,
+          "skewEst": 41.5,
+          "rttMin": 27,
+          "mediaRef": "selfrec/sync-20260827T093613/p2/",
+          "mimeType": "video/webm;codecs=vp8",
+          "timesliceMs": 2000
+        },
+        "serverAt": 1787823383174
+      },
+      "doRecvTs": 1787823383174
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-1",
+        "at": 1787823386299,
+        "sentAt": 1787823386299,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 0
+        },
+        "serverAt": 1787823386361
+      },
+      "doRecvTs": 1787823386361
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-1",
+        "at": 1787823393120,
+        "sentAt": 1787823393120,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 0
+        },
+        "serverAt": 1787823393185
+      },
+      "doRecvTs": 1787823393185
+    },
+    {
+      "from": "sync-op",
+      "cue": {
+        "id": "RCUE-20",
+        "at": 1787823396294,
+        "sentAt": 1787823396294,
+        "data": {
+          "text": "RCUE-20",
+          "mode": "now"
+        },
+        "serverAt": 1787823396352
+      },
+      "doRecvTs": 1787823396352
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-2",
+        "at": 1787823396296,
+        "sentAt": 1787823396296,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 1
+        },
+        "serverAt": 1787823396356
+      },
+      "doRecvTs": 1787823396356
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-2",
+        "at": 1787823403117,
+        "sentAt": 1787823403117,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 1
+        },
+        "serverAt": 1787823403179
+      },
+      "doRecvTs": 1787823403179
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-3",
+        "at": 1787823406293,
+        "sentAt": 1787823406293,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 2
+        },
+        "serverAt": 1787823406359
+      },
+      "doRecvTs": 1787823406359
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-3",
+        "at": 1787823413120,
+        "sentAt": 1787823413120,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 2
+        },
+        "serverAt": 1787823413190
+      },
+      "doRecvTs": 1787823413190
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-4",
+        "at": 1787823416296,
+        "sentAt": 1787823416296,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 3
+        },
+        "serverAt": 1787823416354
+      },
+      "doRecvTs": 1787823416354
+    },
+    {
+      "from": "sync-op",
+      "cue": {
+        "id": "RCUE-40",
+        "at": 1787823416296,
+        "sentAt": 1787823416296,
+        "data": {
+          "text": "RCUE-40",
+          "mode": "now"
+        },
+        "serverAt": 1787823416359
+      },
+      "doRecvTs": 1787823416359
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-4",
+        "at": 1787823423115,
+        "sentAt": 1787823423115,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 3
+        },
+        "serverAt": 1787823423175
+      },
+      "doRecvTs": 1787823423175
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-5",
+        "at": 1787823426296,
+        "sentAt": 1787823426296,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 4
+        },
+        "serverAt": 1787823426385
+      },
+      "doRecvTs": 1787823426385
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-5",
+        "at": 1787823433119,
+        "sentAt": 1787823433119,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 4
+        },
+        "serverAt": 1787823433184
+      },
+      "doRecvTs": 1787823433184
+    },
+    {
+      "from": "sync-op",
+      "cue": {
+        "id": "RCUE-60",
+        "at": 1787823436296,
+        "sentAt": 1787823436296,
+        "data": {
+          "text": "RCUE-60",
+          "mode": "now"
+        },
+        "serverAt": 1787823436365
+      },
+      "doRecvTs": 1787823436365
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-6",
+        "at": 1787823436297,
+        "sentAt": 1787823436297,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 5
+        },
+        "serverAt": 1787823436365
+      },
+      "doRecvTs": 1787823436365
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-6",
+        "at": 1787823443119,
+        "sentAt": 1787823443119,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 5
+        },
+        "serverAt": 1787823443177
+      },
+      "doRecvTs": 1787823443177
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-7",
+        "at": 1787823446291,
+        "sentAt": 1787823446291,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 6
+        },
+        "serverAt": 1787823446350
+      },
+      "doRecvTs": 1787823446350
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-end-8",
+        "at": 1787823452149,
+        "sentAt": 1787823452149,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "end",
+          "source": "p1",
+          "at": 1787823452149,
+          "dur": 75100,
+          "chunkCount": 38,
+          "degraded": false
+        },
+        "serverAt": 1787823452211
+      },
+      "doRecvTs": 1787823452211
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-beat-7",
+        "at": 1787823453120,
+        "sentAt": 1787823453120,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p2",
+          "seq": 6
+        },
+        "serverAt": 1787823453190
+      },
+      "doRecvTs": 1787823453190
+    },
+    {
+      "from": "p2",
+      "cue": {
+        "id": "p2-span-end-8",
+        "at": 1787823459208,
+        "sentAt": 1787823459208,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "end",
+          "source": "p2",
+          "at": 1787823459208,
+          "dur": 75105,
+          "chunkCount": 38,
+          "degraded": false
+        },
+        "serverAt": 1787823459289
+      },
+      "doRecvTs": 1787823459289
+    }
+  ]
+}

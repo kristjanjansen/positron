@@ -50,6 +50,33 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   renegotiations (dedupe per mid); inbound-rtp bytesReceived RESETS on every
   renegotiation (transport counters are renegotiation-proof).
 
+### SYNC LEG (session 6b) — participant recordings ↔ central timeline: ✅ 14/14 REGRESSION GREEN
+- `/time` skew endpoint (elektron-selfrec v9f7e7a01) + min-RTT-of-5 client
+  estimator: real-world grade is **±50 ms** (bias = edge/worker asymmetry, not
+  jitter) — C5's "±25 ms" revised.
+- media-span markers ride CUE PASSTHROUGH on the deployed room DO (choreography
+  precedent): start/beat/end per participant, 9/9 echo-acks, `start.at ==
+  T₀-rec-start` exactly; un-echoed markers resend once, reducer dedupes.
+- ✅ **MediaRecorder records H.264** (webm;codecs=h264, ffprobe-verified) →
+  repackage is COPY-REMUX: **80 ms ffmpeg wall for 75 s media (0.0011×)** vs
+  vp8→libx264 1226 ms (0.016×). TRAP: libx264 default B-frames shift the fMP4
+  timeline (+66 ms first-pts) → constant −125 ms seek bias hls.js doesn't
+  compensate — **`-bf 0` mandatory** for repackaged MediaRecorder streams.
+- Pure-JS EBML cluster indexer (the no-ffmpeg CF path): 10–11 ms/MB, 0 false
+  positives; whole-show parse fits PAID worker cron ~300× over (not free-tier
+  10 ms); per-chunk incremental (~3 ms) fits even free tier at finalize.
+- **Regression (2 staggered participants, burned clocks, composed replay):**
+  R1 inter-tile skew p50 29 / max 34 ms (target ≤100). R2 seeks −29…−65 ms,
+  absent-participant tiles render EMPTY (absence is content). R4 cues all in
+  the 150 ms band (engine +3–5 ms; residual −30…−70 ms = skewEst-on-zero-skew
+  minus anchor delta — constituents known). R3 drift CONFIRMED 33–56 ms at the
+  73 s tail, but the per-chunk re-anchor's cluster-byte interpolation noise
+  (±100–270 ms) EXCEEDS the drift it corrects at minute scale — **linear+skew
+  is the default mapping; hour-scale shows want a SimpleBlock-level index**.
+- Proof show kept: selfrec/sync-20260827T093613 (27.7 MB) + room cuelog
+  selfrecsync-20260827T093613 in the DO. New: repackage.mjs, indexer.mjs,
+  replay-grid.html, run-sync.mjs.
+
 ### VERDICT — plan-studio's baked decision is now measured, not argued
 Self-recording wins on every axis that matters: bandwidth lands distributed +
 elastic instead of 8×-concentrated + real-time; source quality vs inherited SFU

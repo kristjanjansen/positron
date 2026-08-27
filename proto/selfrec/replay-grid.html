@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>elektron selfrec composed replay</title>
+<style>
+html,body{margin:0;padding:0;background:#0b0e12;color:#dfe5ec;font:13px monospace}
+#tiles{display:flex;gap:8px;padding:8px}
+.tile{position:relative;width:640px;height:360px;background:#000;border:1px solid #2a3340}
+.tile video{width:640px;height:360px;display:block}
+.tile .label{position:absolute;left:6px;top:4px;color:#8a93a0;z-index:2}
+.tile.absent video{visibility:hidden}
+.tile.absent::after{content:"— absent —";position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;color:#3d4550;font-size:20px}
+#bar{padding:4px 8px;color:#8a93a0;white-space:pre}
+</style>
+</head>
+<body>
+<div id="tiles"></div>
+<div id="bar">loading…</div>
+<script src="/hls.min.js"></script>
+<script>
+// ============================================================================
+// Composed replay — the v1 grid-archive DoD shape: N tiles, ONE playhead.
+//
+// Sources of truth (nothing here is invented):
+//   room cuelog  (deployed elektron-rtc)  -> media-span events reduce to spans
+//                                            {source, at=T0, skewEst, mediaRef}
+//                                            + the plain cue lane for replay
+//   manifest.json (per participant)       -> per-chunk closeT wall stamps
+//   derived/index.json (indexer.mjs)      -> cluster {tMs, byteOffset} pairs
+//   derived/hls/index.m3u8 (repackage.mjs)-> the playable fMP4 rendition
+//
+// Playhead T is ABSOLUTE WALL MS (the timeline substrate's clock). Per tile:
+//   u(T) = T - anchor, two mappings:
+//     linear:   anchor = span.at + skewEst   (T0 at recorder.start, corrected)
+//     anchored: per-chunk re-anchor — chunk k's closeT is a fresh wall stamp
+//               for the media position at the end of chunk k (media position
+//               interpolated from the cluster index by byte offset), so
+//               anchor_k = closeT_k - mediaEnd_k. Piecewise; kills clock
+//               drift at the cost of trusting closeT jitter (~encoder flush).
+//   u < 0 or u > mediaDur  =>  the tile is EMPTY. Absence is content.
+//
+// Ground truth = the burned 64-block clock row in the pixels (decoded from
+// the video element at full 1280x720 via an offscreen canvas — same geometry
+// contract as proto/replay). Cues fire when T crosses cue.at; at each fire
+// both tiles are decoded immediately (the R4 measurement).
+// ============================================================================
+const q = new URLSearchParams(location.search);
+const ROOM = q.get("room");
+const TOKEN = q.get("token") || "";
+const RTCBASE = q.get("rtcbase") || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+// Default mapping is LINEAR (span.at + skewEst), not per-chunk re-anchored:
+// measured on the sync regression, the re-anchor's byte->time interpolation
+// noise (clusters every ~3.5 s, VBR bytes) is ±100-270 ms — BIGGER than the
+// ~30-50 ms/90 s clock drift it corrects. Re-anchoring only pays at hour
+// scale, and then wants a SimpleBlock-level index. Both mappings stay
+// implemented; R3 measures them against each other.
+const S = window.__grid = {
+  phase: "init", error: null, spans: {}, cues: [], fires: [],
+  playheadT: 0, playing: false, mapping: "linear",
+  tiles: {}, rangeT: [0, 0],
+};
+
+// ---- burned-row decoder (contract: NB=64 BW=12 RX=32 y=600 h=48) -----------
+const dec = document.createElement("canvas");
+dec.width = 1280; dec.height = 720;
+const dctx = dec.getContext("2d", { willReadFrequently: true });
+function decodeVideoClock(video) {
+  if (!video.videoWidth) return { ok: false, why: "no frame" };
+  try { dctx.drawImage(video, 0, 0, 1280, 720); } catch { return { ok: false, why: "draw" }; }
+  const img = dctx.getImageData(0, 592, 1280, 64).data;   // rows 592..655
+  const lum = (x, y) => { const i = ((y - 592) * 1280 + x) * 4; return 0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2]; };
+  const bits = [];
+  for (let i = 0; i < 64; i++) {
+    const cx = 32 + i * 12 + 6;
+    let s = 0, n = 0;
+    for (const dy of [-8, 0, 8]) for (const dx of [-2, 0, 2]) { s += lum(cx + dx, 624 + dy); n++; }
+    bits.push(s / n > 110 ? 1 : 0);
+  }
+  const bytes = [];
+  for (let b = 0; b < 8; b++) { let v = 0; for (let i = 0; i < 8; i++) v = (v << 1) | bits[b * 8 + i]; bytes.push(v); }
+  let ck = 0; for (let i = 0; i < 7; i++) ck ^= bytes[i];
+  if (ck !== bytes[7]) return { ok: false, why: "checksum" };
+  let ms = 0; for (let i = 0; i < 6; i++) ms = ms * 256 + bytes[i];
+  return { ok: true, ms, pid: String.fromCharCode(bytes[6]) };
+}
+
+// ---- per-tile machinery -----------------------------------------------------
+function makeTile(pid, span) {
+  const el = document.createElement("div");
+  el.className = "tile absent";
+  el.innerHTML = `<span class="label">${pid}</span><video muted playsinline></video>`;
+  document.getElementById("tiles").appendChild(el);
+  const video = el.querySelector("video");
+  const t = { pid, span, el, video, hls: null, mediaDurMs: 0, absent: true,
+              chunkAnchors: [], linearAnchor: span.at + (span.skewEst || 0),
+              lastHardSeek: 0, ready: false };
+  S.tiles[pid] = t;
+  return t;
+}
+// Build per-chunk anchors from manifest closeT + cluster index byte offsets.
+function buildAnchors(t, manifest, index) {
+  const cl = index.clusters;
+  const totalBytes = manifest.chunks.reduce((s, c) => s + c.bytes, 0);
+  const bytesPerMs = totalBytes / Math.max(1, manifest.durationMs);
+  const mediaAtByte = (b) => {
+    if (!cl.length) return null;
+    if (b <= cl[0].byteOffset) return cl[0].tMs;
+    for (let i = cl.length - 1; i >= 0; i--) {
+      if (cl[i].byteOffset <= b) {
+        if (i === cl.length - 1) return cl[i].tMs + (b - cl[i].byteOffset) / bytesPerMs;
+        const [a, z] = [cl[i], cl[i + 1]];
+        return a.tMs + (b - a.byteOffset) / (z.byteOffset - a.byteOffset) * (z.tMs - a.tMs);
+      }
+    }
+    return cl[0].tMs;
+  };
+  // NOTE domain consistency: closeT is a CLIENT stamp; both mappings correct
+  // client stamps into the playhead's (server) domain with +skewEst, so the
+  // R3 linear-vs-anchored divergence is pure drift, not a domain mismatch.
+  let acc = 0;
+  for (const c of manifest.chunks) {
+    acc += c.bytes;
+    const mediaEnd = mediaAtByte(acc);
+    t.chunkAnchors.push({ seq: c.seq, closeT: c.closeT, mediaEnd,
+                          anchor: c.closeT + (t.span.skewEst || 0) - mediaEnd });
+  }
+  t.mediaDurMs = manifest.durationMs;
+}
+function mapT(t, T, mode) {
+  const m = mode || S.mapping;
+  if (m === "linear" || !t.chunkAnchors.length) return T - t.linearAnchor;
+  const ca = t.chunkAnchors;
+  let k = ca.findIndex((c) => c.closeT >= T);
+  if (k === -1) k = ca.length - 1;
+  return T - ca[k].anchor;
+}
+window.__mapInfo = (T) => {
+  const out = {};
+  for (const [pid, t] of Object.entries(S.tiles))
+    out[pid] = { linear: mapT(t, T, "linear"), anchored: mapT(t, T, "anchored"),
+                 divergenceMs: +(mapT(t, T, "linear") - mapT(t, T, "anchored")).toFixed(1) };
+  return out;
+};
+
+// ---- transport: one playhead ------------------------------------------------
+let playAnchorPerf = 0, playAnchorT = 0;
+function setPlayhead(T) { S.playheadT = T; }
+function currentT() {
+  return S.playing ? playAnchorT + (performance.now() - playAnchorPerf) : S.playheadT;
+}
+window.__seekWall = (T) => {
+  S.playheadT = T;
+  if (S.playing) { playAnchorT = T; playAnchorPerf = performance.now(); }
+  // rewind semantics for the cue lane (proto/replay pattern): fired set rebuilt
+  firedIds = new Set(S.fires.filter((f) => f.at <= T).map((f) => f.id));
+  for (const t of Object.values(S.tiles)) syncTile(t, T, true);
+};
+window.__play = () => {
+  if (S.playing) return;
+  S.playing = true; playAnchorT = S.playheadT; playAnchorPerf = performance.now();
+};
+window.__pause = () => {
+  if (!S.playing) return;
+  S.playheadT = currentT(); S.playing = false;
+  for (const t of Object.values(S.tiles)) t.video.pause();
+};
+window.__setMapping = (m) => { S.mapping = m; window.__seekWall(currentT()); };
+window.__decodeNow = () => {
+  const T = currentT();
+  const out = { T, mapping: S.mapping, tiles: {} };
+  for (const [pid, t] of Object.entries(S.tiles)) {
+    const d = t.absent ? { ok: false, why: "absent" } : decodeVideoClock(t.video);
+    out.tiles[pid] = { absent: t.absent, mediaU: mapT(t, T),
+                       videoTimeMs: Math.round(t.video.currentTime * 1000),
+                       clock: d.ok ? d.ms : null, pidByte: d.ok ? d.pid : null, why: d.why || null };
+  }
+  return out;
+};
+
+function syncTile(t, T, hard) {
+  const u = mapT(t, T);
+  const absent = u < 0 || u > t.mediaDurMs;
+  if (absent !== t.absent) { t.absent = absent; t.el.classList.toggle("absent", absent); }
+  if (absent) { if (!t.video.paused) t.video.pause(); return; }
+  const targetS = u / 1000;
+  const errMs = t.video.currentTime * 1000 - u;
+  if (hard || Math.abs(errMs) > 150) {
+    t.video.currentTime = targetS;
+    t.video.playbackRate = 1;
+    t.lastHardSeek = performance.now();
+    if (S.playing) t.video.play().catch(() => {});
+    else t.video.pause();
+    return;
+  }
+  if (S.playing) {
+    if (t.video.paused) t.video.play().catch(() => {});
+    t.video.playbackRate = errMs > 40 ? 0.94 : errMs < -40 ? 1.06 : 1;
+  } else if (!t.video.paused) t.video.pause();
+}
+
+// ---- cue lane ---------------------------------------------------------------
+let firedIds = new Set();
+function cueEngine(T) {
+  for (const c of S.cues) {
+    if (c.at <= T && !firedIds.has(c.id)) {
+      firedIds.add(c.id);
+      const decs = window.__decodeNow();
+      S.fires.push({ id: c.id, at: c.at, firedT: T, wallNow: Date.now(),
+                     decoded: decs.tiles, lateMs: +(T - c.at).toFixed(1) });
+    }
+  }
+}
+
+// ---- main loop --------------------------------------------------------------
+function loop() {
+  const T = currentT();
+  if (S.playing) {
+    for (const t of Object.values(S.tiles)) syncTile(t, T, false);
+    cueEngine(T);
+  }
+  const tileTxt = Object.values(S.tiles).map((t) =>
+    `${t.pid}:${t.absent ? "absent" : (t.video.currentTime).toFixed(2) + "s"}`).join("  ");
+  document.getElementById("bar").textContent =
+    `T=${Math.round(T)}  play=${S.playing}  map=${S.mapping}  ${tileTxt}  fires=${S.fires.length}/${S.cues.length}`;
+  requestAnimationFrame(loop);
+}
+
+// ---- boot: cuelog -> spans -> tiles ----------------------------------------
+(async () => {
+  try {
+    if (!ROOM) throw new Error("room param required");
+    const r = await fetch(`${RTCBASE}/room/${ROOM}/cuelog?token=${encodeURIComponent(TOKEN)}`);
+    if (!r.ok) throw new Error("cuelog " + r.status);
+    const log = await r.json();
+    // reduce media-span events (first occurrence per id wins — resend dedupe)
+    const seen = new Set();
+    for (const e of log.cues) {
+      const cue = e.cue;
+      if (!cue || seen.has(cue.id)) continue;
+      seen.add(cue.id);
+      const p = (cue.data && cue.data.kind === "media-span") ? cue.data
+              : (cue.kind === "media-span" ? cue : null);
+      if (p) {
+        const s = S.spans[p.source] || (S.spans[p.source] = { source: p.source, beats: [] });
+        if (p.phase === "start") Object.assign(s, { at: p.at, skewEst: p.skewEst, rttMin: p.rttMin,
+                                                    mediaRef: p.mediaRef, mimeType: p.mimeType });
+        else if (p.phase === "beat") s.beats.push({ at: cue.at, seq: p.seq });
+        else if (p.phase === "end") Object.assign(s, { endAt: cue.at, dur: p.dur,
+                                                       chunkCount: p.chunkCount, degraded: p.degraded });
+      } else {
+        S.cues.push({ id: cue.id, at: cue.at, sentAt: cue.sentAt, data: cue.data });
+      }
+    }
+    S.cues.sort((a, b) => a.at - b.at);
+    const spans = Object.values(S.spans).filter((s) => s.at != null);
+    if (!spans.length) throw new Error("no media-span starts in cuelog");
+    spans.sort((a, b) => a.at - b.at);
+    S.rangeT = [Math.min(...spans.map((s) => s.at)) - 2000,
+                Math.max(...spans.map((s) => (s.endAt || s.at + (s.dur || 0))))];
+    // build tiles
+    for (const span of spans) {
+      const t = makeTile(span.source, span);
+      const manifest = await (await fetch(`${PUB}/${span.mediaRef}manifest.json`)).json();
+      const index = await (await fetch(`${PUB}/${span.mediaRef}derived/index.json`)).json();
+      buildAnchors(t, manifest, index);
+      await new Promise((resolve, reject) => {
+        const hls = new Hls({ enableWorker: false });
+        t.hls = hls;
+        hls.loadSource(`${PUB}/${span.mediaRef}derived/hls/index.m3u8`);
+        hls.attachMedia(t.video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { t.ready = true; resolve(); });
+        hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) reject(new Error("hls " + d.type + "/" + d.details)); });
+        setTimeout(() => reject(new Error("hls manifest timeout")), 15000);
+      });
+    }
+    setPlayhead(S.rangeT[0]);
+    window.__seekWall(S.rangeT[0]);
+    S.phase = "running";
+    loop();
+  } catch (e) {
+    S.error = String(e && e.message || e);
+    S.phase = "failed";
+    document.getElementById("bar").textContent = "FAILED: " + S.error;
+  }
+})();
+</script>
+</body>
+</html>

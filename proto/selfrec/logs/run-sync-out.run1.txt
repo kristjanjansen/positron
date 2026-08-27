@@ -1,0 +1,25 @@
+09:26:12.189 sync| SHOW=sync-20260827T092612 ROOM=selfrecsync-20260827T092612 results=/Users/s32863/personal/elektron/results/selfrec-sync.jsonl
+09:26:15.061 sync| p1 T0=1787822774634 mime=video/webm;codecs=h264 skewEst=22 rttMin=22
+09:26:19.995 sync| p2 T0=1787822779846 (stagger 5212 ms) mime=video/webm;codecs=vp8 skewEst=25
+09:26:34.638 sync| cue RCUE-20 sent at=1787822794637 (T0+20.00s)
+09:26:54.634 sync| cue RCUE-40 sent at=1787822814634 (T0+40.00s)
+09:27:14.635 sync| cue RCUE-60 sent at=1787822834635 (T0+60.00s)
+09:27:35.947 sync| PASS  rec-both-finalized-clean  p1 38 chunks, p2 38 chunks
+09:27:35.947 sync| PASS  rec-mimes  video/webm;codecs=h264 / video/webm;codecs=vp8
+09:27:35.947 sync| PASS  skew-est-sane  p1 22 ms (rttMin 22), p2 25 ms (rttMin 28)
+09:27:36.074 sync| PASS  markers-round-trip  {"p1":{"start":1,"beat":7,"end":1},"p2":{"start":1,"beat":7,"end":1}}
+09:27:36.074 sync| PASS  marker-start-at-is-T0  p1 1787822774634==1787822774634, p2 1787822779846==1787822779846
+09:27:36.074 sync| PASS  marker-end-payload  dur=75004 chunks=38
+09:27:52.600 sync| 09:27:52.577 rpk| DONE mode=copy: ffmpeg 75 ms for 75004 ms media (ratio 0.001), total 16424 ms, 21 files 7.1 MB
+09:28:12.491 sync| 09:28:12.438 rpk| DONE mode=transcode: ffmpeg 1635 ms for 75003 ms media (ratio 0.0218), total 19750 ms, 21 files 3.1 MB
+09:28:12.492 sync| PASS  repackage-modes  p1=copy (75 ms), p2=transcode (1635 ms)
+09:28:16.986 sync| 09:28:16.971 idx| DONE 22 clusters from 7.0 MB in 58 ms (8.23 ms/MB), span 73592 ms vs manifest 75004 ms, falsePos=0
+09:28:22.237 sync| 09:28:22.220 idx| DONE 22 clusters from 10.3 MB in 103 ms (9.99 ms/MB), span 74813 ms vs manifest 75003 ms, falsePos=0
+09:28:22.237 sync| PASS  indexer-plausible  p1 22 clusters 8.23 ms/MB, p2 22 clusters 9.99 ms/MB
+09:28:23.817 sync| PASS  grid-two-spans-three-cues  spans=p1,p2 cues=RCUE-20,RCUE-40,RCUE-60
+09:29:27.341 sync| PASS  R1-inter-tile-skew  p50=92 max=189 (85,92,189)
+09:29:27.346 sync| FAIL  R4-cues-fire-in-band  RCUE-20:A136/B-121 RCUE-40:A207/B-81 RCUE-60:A136/B44
+09:29:32.395 sync| FAIL  R2-seek-absence-and-accuracy  p2-absent: p1 -20ms / p2 absent | mid-30s: p1 108ms / p2 -213ms | late-70s: p1 273ms / p2 -83ms | p1-absent: p1 absent / p2 -79ms
+09:29:34.841 sync| PASS  R3-measured  divergence tail p1=-89.2 p2=131.7 ms; decoded err anchored p1=73 vs linear p1=-29 ms
+09:29:35.058 sync| PASS  budget-under-100MB  27.5 MB, 122 objects
+09:29:35.061 sync| REPORT written — checks 12/14 pass, R2 27.5 MB
