@@ -1,13 +1,27 @@
 {
   // elektron-instrument — registry + 1:1 WebRTC signaling for remote
-  // instruments (proto/instrument). Control plane only: no media, no storage
-  // of media, no SFU. Does NOT touch elektron-rtc or elektron-jam.
+  // instruments (proto/instrument), PLUS the durable session log.
+  // Signaling is still control-plane only: no media, no SFU, and the worker
+  // never sees a MIDI byte in transit. The session log is a separate,
+  // EU-pinned DO class the client POSTs to explicitly.
   "name": "elektron-instrument",
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
   "durable_objects": {
-    "bindings": [{ "name": "HUB", "class_name": "Hub" }]
+    "bindings": [
+      { "name": "HUB", "class_name": "Hub" },
+      { "name": "SESSIONS", "class_name": "Sessions" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Hub"] },
+    { "tag": "v2", "new_sqlite_classes": ["Sessions"] }
+  ],
+  // session AUDIO by reference: elektron-archive-test under the instrument/
+  // prefix. Same bucket proto/selfrec proved the chunk path on; selfrec/ and
+  // instrument/ never overlap and workers/selfrec is untouched.
+  "r2_buckets": [
+    { "binding": "ARCHIVE", "bucket_name": "elektron-archive-test" }
+  ],
   "observability": { "enabled": true }
 }

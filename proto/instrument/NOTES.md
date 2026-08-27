@@ -4,8 +4,10 @@
 anywhere browses a catalog, asks for it, plays it, hears and sees it come back;
 the session lands on the timeline as a flat event log with an audio span.
 
-Built 2026-08-27. **24/24 end-to-end checks green**
-(`results/instr-verify.json`, one headless Chrome, three tabs, real WebRTC).
+Built 2026-08-27. **42/42 end-to-end checks green**
+(`results/instr-verify.json`, one headless Chrome, three tabs, real WebRTC,
+real R2). Sessions are **durable**: notes as SQLite rows in an EU-pinned DO,
+audio in R2 behind an owner consent toggle, both deletable by either party.
 
 ## Files
 
@@ -13,8 +15,8 @@ Built 2026-08-27. **24/24 end-to-end checks green**
 |---|---|
 | `server.mjs` | rig server on **:8899**. Static + `/time-local` (hrtime-anchored epoch µs, same-host truth) + `/env.json` + result sink. Serves `proto/instrument/` first, then falls back to `proto/jam/` — which is how the sibling's `host-check.html` runs unmodified on this port too. |
 | `instrument-core.js` | the carried primitives: 16-B frame codec, dedupe, min-RTT skew clock, MIDI hygiene + all-notes-off, signaling client, WebRTC helpers, ct→epoch edge-median map, onset tap, adaptive onset↔note matcher, the percussive synthetic voice, percentiles. |
-| `host.html` / `host.js` | the owner: register, go online, accept, actuate MIDI onto hardware, publish audio + panel video, safety. |
-| `play.html` / `play.js` | the player: browse, request, play, hear, HUD, record, download, replay. |
+| `host.html` / `host.js` | the owner: register, go online, accept, actuate MIDI onto hardware, publish audio + panel video, safety — plus the **host lane** of the session log (what the instrument actually did, host clock) and the consent-gated **audio recording** into R2. |
+| `play.html` / `play.js` | the player: browse, request, play, hear, HUD, record, download, replay — plus the **batched append** of their own lane to the session store, **load a stored session by id** and replay it (with its audio) through the same send path, and **delete**. |
 | `harness/run-instrument.mjs` | the verification run. |
 | `results/instr-verify.json` | the numbers + all 24 checks. |
 | `results/instr-session.jsonl` | a real session recording. |
@@ -96,6 +98,91 @@ Reproduces PROGRESS 6f (DC-direct 1.0 ms floor) and 6i (WebRTC audio return
 - The panel canvas draws on a 33 ms `setInterval`, **not** rAF: a background tab
   stops rAF and the captured video track would freeze mid-session.
 
+## Session storage (2026-08-27, second pass)
+
+Sessions used to end as a client-side `.jsonl` download and the audio was
+ephemeral. Now:
+
+- **Notes** → batched POST to `elektron-instrument`'s new **`Sessions` DO**
+  (SQLite **rows**, plan-timeline C4; EU jurisdiction). Flush every 1 s or 200
+  events — the same throttle-at-capture rule the HUD uses, never one request
+  per note. Full schema + routes in `workers/instrument/DEPLOYED.md`.
+- **Audio** → the owner's `MediaRecorder` on the *same audio track the player is
+  hearing*, timeslice 2 s, chunk → POST → R2 `instrument/<sid>/audio/` →
+  server-side sha256 verify → retry ×3 → list-and-compare → manifest. That is
+  `proto/selfrec`'s proven shape, reused; `workers/selfrec` was not touched.
+- **Consent** is the owner's, defaults **OFF**, and is **not persisted** — a
+  checkbox remembered from last week is not consent for today.
+- **Delete** is a tombstone: rows dropped, R2 prefix swept, `deleted.marker`
+  written, reads 410, appends 410. Player deletes with the session id; owner
+  deletes with `INSTRUMENT_TOKEN`.
+
+### TWO LANES, NEVER ONE — do not "fix" this by averaging
+
+The player logs what they **meant**, in the player's clock. The host logs what
+the instrument **actually did** (`kind:'midi-actuated'`, `ref` → the player's
+note seq), in the **host's** clock — which is the clock its audio recording is
+stamped in. So:
+
+- **Replay from storage uses the HOST lane as master.** Actuations and audio are
+  natively aligned (one machine, sub-ms); the audio's offset into the file is
+  `firstEvent.at − mediaSpanStart.at`, a subtraction, not a skew guess. The
+  player's lane is their intent, rendered as a second lane, and is **never** the
+  audio's timing source.
+- **The pair of lanes IS the drift channel.** Verified: joining them on `ref`
+  reproduced the live one-way MIDI number exactly — **p50 0.48 ms from storage
+  vs 0.48 ms live**, n=128. Averaging the lanes into one would destroy that
+  measurement, which is the whole reason both are stored.
+
+### Storage numbers from the verification run
+
+| thing | value |
+|---|---|
+| stored rows, one 64-note session | **390** (128 player `midi`, 256 host `midi-actuated`, 2 `media-span`, 1 `audio-span`, 3 `session`) |
+| append rejections | 0 |
+| audio chunks in R2 / verified | **12 / 12**, `audio/webm;codecs=opus`, 2 s timeslice |
+| audio bytes (12 chunks + manifest) | **291,029 B** for ~24 s |
+| replay from storage | **256 fired**, master `host`, audio offset 1.94 s, 288,594 B pulled back and decoded |
+| consent OFF session | 20 rows stored, **0** R2 objects, `audioPrefix` null |
+| delete by player | 2 rows dropped, **1 R2 object purged**, read → 410, re-append → 410 |
+
+The host lane holds 256 rows to the player's 128 because the harness *replays*
+the session once mid-run and the instrument really was actuated a second time.
+The host lane logs what happened, not what was intended — that asymmetry is the
+feature working.
+
+### Things learned the hard way
+
+- **`X-Chunk-Sha256` must be in `Access-Control-Allow-Headers`** or the chunk
+  POST dies in preflight and the browser says only `Failed to fetch`. One whole
+  harness run to find; selfrec had it right and it did not get carried over.
+- **One seq counter per (session, source).** Actuations and `media-span` markers
+  share the `instrument` source, so they must share the monotonic sequence — a
+  span marker taking seq 0 makes the first actuation's seq 0 a *rejected*
+  duplicate. The counter is keyed by session id, not global, so a recorder still
+  finalizing the previous session cannot restart at 0 and collide.
+- **Reject per event, not per batch.** A retried batch is then idempotent (its
+  events are already ≤ max and drop out individually) instead of a hard failure.
+
+### What session storage does NOT do
+
+- **No panel/camera video is recorded.** Audio was the priority and a
+  video+audio webm would change the replay path from `<audio>` to a muxed
+  element for no measured gain. The seam is one `MediaStream` constructor away.
+- **No player auth.** The session id (minted by the hub at accept) is the whole
+  capability: anyone holding it can read the session or delete it *as the
+  player*. It fails toward deletion, which is the right direction, but it is not
+  an access-control system.
+- **No IndexedDB backstop for the notes.** selfrec buffers chunks to IDB when
+  the network dies; the note lane only retries in memory, so a tab killed during
+  an outage loses its unflushed ≤1 s tail. The audio lane has no IDB backstop
+  either — a failed chunk retries 3× and is then recorded as `missing` in the
+  manifest (`degraded:true`), which is honest but not durable.
+- **No compaction job.** C6's tombstones are here; the "sweep tombstoned media
+  later" job is not, because delete purges R2 inline today.
+- **`audioPrefix` is a convenience index, not the truth.** The `media-span` rows
+  are. Nothing yet enforces that they agree if a manifest write fails.
+
 ## The MoQ seam (deliberately not taken in v0)
 
 The return path is WebRTC only. `@moq/net` needs a Docker-esbuild bundle, which
@@ -135,8 +222,8 @@ both `/host-check.html` (12162 B) and its root-relative `/host-check.js`
   stand-in and Chrome's fake audio device. See below.
 - **No sysex, no NRPN-aware handling, no program changes** beyond raw pass-through
   of whatever 3-byte messages arrive; MIDI realtime is dropped by design.
-- **No persistence of the session log** anywhere but the player's download. It is
-  not pushed to R2 and not joined to the megatimeline yet.
+- ~~No persistence of the session log~~ — **done, see "Session storage" above.**
+  Still not joined to the megatimeline.
 - **No reconnect.** A dropped signaling socket ends the session; the player must
   request again.
 

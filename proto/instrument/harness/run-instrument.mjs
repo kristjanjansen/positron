@@ -17,7 +17,7 @@
 // Kills only its own: the `instr-` process prefix and the instr-udd profile.
 
 import { spawn, execSync } from 'node:child_process';
-import { writeFile, mkdir, readdir } from 'node:fs/promises';
+import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { openSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,10 @@ const opt = (n, d) => (args.includes('--' + n) ? args[args.indexOf('--' + n) + 1
 const NOTES = +opt('notes', 64);
 const INST = 'verify-' + Math.random().toString(36).slice(2, 7);
 const DL = join(SCRATCH, 'instr-downloads');
+// the owner token, for the harness's own owner-side calls (audio put, the
+// tokenless-vs-token delete comparison). Same source the rig server uses.
+const TOKEN = ((await readFile(join(ROOT, '..', '..', '.env'), 'utf8').catch(() => ''))
+  .match(/^INSTRUMENT_TOKEN=(.*)$/m) || [, ''])[1].trim();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sh = (c) => { try { return execSync(c, { encoding: 'utf8' }); } catch (e) { return (e.stdout || '') + ''; } };
@@ -94,9 +98,12 @@ async function main() {
   // targets are not supported in headless mode") — the other two tabs are
   // opened afterwards through the DevTools /json/new endpoint, same browser.
   const common = `clock=local&ice=none`;
+  // rec=1 turns the OWNER's audio-recording consent on for this run. The page
+  // default is OFF and is never persisted; the second session below turns it
+  // back off and proves the absence.
   spawnLogged(CHROME, [
     ...flags,
-    `${BASE}/host.html?${common}&instrument=${INST}&name=${encodeURIComponent('Verification DIMI')}&auto=1`,
+    `${BASE}/host.html?${common}&instrument=${INST}&name=${encodeURIComponent('Verification DIMI')}&auto=1&rec=1`,
   ], 'chrome');
 
   cdpH = await new CDP().connect(DBG, 'host.html');
@@ -209,6 +216,166 @@ async function main() {
   check('instrument returns to free in the registry',
     !(await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json()).instruments.find((i) => i.id === INST).busy);
 
+  // ==========================================================================
+  // 8b. SESSION STORAGE — the notes are durable, the audio is in R2, and both
+  //     are deletable by either party.
+  // ==========================================================================
+  const WK = 'https://elektron-instrument.kristjan-jansen.workers.dev';
+  const SID = await cdpP.eval('window.player.sid()');
+  console.log('session id =', SID);
+  // let the last flush + /end + the host's recorder finalize land
+  for (let i = 0; i < 40; i++) {
+    const st = await cdpP.eval('window.player.state()');
+    const hr = await cdpH.eval('window.host.state()');
+    if (st.store.ended && !st.store.pending && hr.rec.state === 'done' && !hr.hostLog.pending) break;
+    await sleep(500);
+  }
+  const pstore = (await cdpP.eval('window.player.state()')).store;
+  const hstore = await cdpH.eval('window.host.state()');
+  console.log('player store:', q(pstore), '\nhost rec:', q(hstore.rec), '\nhost log:', q(hstore.hostLog));
+
+  const stored = await (await fetch(`${WK}/session/${SID}?limit=20000`)).json();
+  const sEvents = stored.events;
+  const sPlayerMidi = sEvents.filter((e) => e.kind === 'midi' && e.source === 'player');
+  const sHostMidi = sEvents.filter((e) => e.kind === 'midi-actuated' && e.source === 'instrument');
+  const sSpans = sEvents.filter((e) => e.kind === 'media-span');
+
+  check('session events persisted — every logged note reached the DO',
+    sPlayerMidi.length === midiRows.length && pstore.rejected === 0,
+    { sentByPage: midiRows.length, storedRows: sPlayerMidi.length, appended: pstore.appended, rejected: pstore.rejected });
+  check('session end is stamped in the DO', !!stored.session.endedAt && stored.session.endedAt > stored.session.startedAt,
+    { startedAt: stored.session.startedAt, endedAt: stored.session.endedAt, noteCount: stored.session.noteCount });
+  check('GET /session returns the events in time order',
+    sEvents.every((e, i) => i === 0 || e.at >= sEvents[i - 1].at),
+    { rows: stored.total, lanes: stored.lanes });
+  check('host lane present: the instrument logged what it ACTUALLY did',
+    sHostMidi.length >= sPlayerMidi.length * 0.98 && sHostMidi.every((e) => Number.isFinite(e.ref)),
+    { hostActuated: sHostMidi.length, playerNotes: sPlayerMidi.length, sample: sHostMidi[0] });
+  // the two lanes ARE the drift channel: pair on ref, subtract, and you have
+  // the one-way latency again — from storage, without any live telemetry.
+  const bySeq = new Map(sPlayerMidi.map((e) => [e.seq, e.at]));
+  const paired = sHostMidi.filter((e) => bySeq.has(e.ref)).map((e) => (e.at - bySeq.get(e.ref)) / 1000);
+  paired.sort((a, b) => a - b);
+  const pairedP50 = paired.length ? +paired[Math.floor(paired.length / 2)].toFixed(2) : null;
+  check('the two lanes pair on `ref` — stored logs reproduce one-way latency',
+    paired.length >= sPlayerMidi.length * 0.9 && pairedP50 !== null && Math.abs(pairedP50) < 50,
+    { paired: paired.length, p50ms: pairedP50, liveP50ms: ps.oneWayMidiMs && ps.oneWayMidiMs.p50 });
+
+  // ---- audio: consent was ON for this session ----
+  const audio = await (await fetch(`${WK}/session/${SID}/audio`)).json();
+  const audioChunks = (audio.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key));
+  check('audio manifest + chunks present in R2 when consent is ON',
+    !!stored.session.audioPrefix && audioChunks.length > 0 && audio.objects.some((o) => o.key.endsWith('manifest.json')) && hstore.rec.finalized,
+    { audioPrefix: stored.session.audioPrefix, chunks: audioChunks.length, bytes: audio.bytes, verified: hstore.rec.verified, mime: hstore.rec.mime });
+  check('media-span start AND end markers are on the log (media by reference)',
+    sSpans.some((e) => e.payload && e.payload.phase === 'start' && e.payload.mediaRef)
+    && sSpans.some((e) => e.payload && e.payload.phase === 'end' && Number.isFinite(e.payload.durUs)),
+    sSpans.map((e) => e.payload && e.payload.phase));
+
+  // ---- replay FROM STORAGE, through the same actuate path ----
+  const rBefore = (await cdpH.eval('window.host.state()')).midiRecv;
+  const loaded = await cdpP.eval(`window.player.loadSession(${q(SID)})`);
+  console.log('loaded:', q(loaded));
+  const rep2 = await cdpP.eval('window.player.replayStored(6)');
+  await sleep(900);
+  const rAfter = (await cdpH.eval('window.host.state()')).midiRecv;
+  console.log('replay from storage:', q(rep2), 'host midiRecv', rBefore, '→', rAfter);
+  check('replay FROM STORAGE fires the stored events through the same send path',
+    rep2.fired === sHostMidi.length && rep2.master === 'host',
+    { fired: rep2.fired, storedHostLane: sHostMidi.length, master: rep2.master });
+  check('storage replay drives off the HOST lane and pulls the audio with it',
+    rep2.master === 'host' && rep2.audio > 0 && rep2.audioOffsetS !== null,
+    { master: rep2.master, audioBytes: rep2.audio, audioOffsetS: rep2.audioOffsetS, lane: rep2.lane });
+  check('the concatenated R2 chunks decode as one audio stream',
+    loaded.audio && loaded.audio.readyState >= 1 && loaded.audio.bytes > 0,
+    loaded.audio);
+
+  // ---- a SECOND session with consent OFF: nothing is recorded ----
+  await cdpH.eval('window.host.setConsent(false)');
+  await cdpB.eval(`window.player.select(${q(INST)}); window.player.requestSession()`);
+  await waitFor(cdpB, 'window.player.state().ch === "open"', 'bob midi channel open', 60);
+  await cdpB.eval('window.player.autoPlay(4, 200, 80)');
+  const SID2 = await cdpB.eval('window.player.sid()');
+  await cdpB.eval('window.player.end()');
+  await sleep(2500);
+  const stored2 = await (await fetch(`${WK}/session/${SID2}?limit=5000`)).json();
+  const audio2 = await (await fetch(`${WK}/session/${SID2}/audio`)).json();
+  console.log('session 2 (consent OFF):', SID2, q(stored2.lanes), 'audio objects', audio2.count);
+  check('consent OFF: notes still stored, NO audio prefix and NO R2 objects',
+    stored2.total > 0 && !stored2.session.audioPrefix && audio2.count === 0,
+    { id: SID2, rows: stored2.total, audioPrefix: stored2.session.audioPrefix, audioObjects: audio2.count });
+  check('a second, separate session id was minted for the second player',
+    SID2 && SID2 !== SID, { first: SID, second: SID2 });
+
+  // ---- delete by PLAYER: rows go, R2 goes, nothing can re-append ----
+  // done on a purpose-built session (with one audio object) so the real one
+  // above survives as the kept proof.
+  const SID3 = 'verifydel-' + Math.random().toString(36).slice(2, 8);
+  await fetch(`${WK}/session/${SID3}/events`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ instrument: INST, playerId: 'alice', events: [
+      { seq: 0, at: 1_000_000, kind: 'midi', source: 'player', raw: [144, 60, 100], display: 'C4 on' },
+      { seq: 1, at: 1_200_000, kind: 'midi', source: 'player', raw: [128, 60, 0], display: 'C4 off' },
+    ] }),
+  });
+  await fetch(`${WK}/session/${SID3}/audio/0`, {
+    method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN, 'content-type': 'audio/webm' },
+    body: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]),
+  });
+  const beforeDel = await (await fetch(`${WK}/session/${SID3}`)).json();
+  const delR = await fetch(`${WK}/session/${SID3}/delete`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ by: 'player' }),
+  });
+  const delJ = await delR.json();
+  const afterR = await fetch(`${WK}/session/${SID3}`);
+  const afterJ = await afterR.json();
+  const reapp = await fetch(`${WK}/session/${SID3}/events`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ events: [{ seq: 9, at: 9_000_000, kind: 'midi', source: 'player', raw: [144, 62, 90], display: 'D4' }] }),
+  });
+  const delAudio = await (await fetch(`${WK}/session/${SID3}/audio`)).status;
+  check('delete by PLAYER drops the event rows and purges the R2 audio',
+    delR.ok && delJ.eventsDropped === beforeDel.total && delJ.audioObjectsPurged >= 1,
+    { before: beforeDel.total, dropped: delJ.eventsDropped, purged: delJ.audioObjectsPurged });
+  check('a deleted session reads as a TOMBSTONE, not as data',
+    afterR.status === 410 && afterJ.tombstone === true && afterJ.deletedBy === 'player' && !afterJ.events,
+    { status: afterR.status, body: afterJ });
+  check('a deleted session cannot be resurrected by a later append',
+    reapp.status === 410, { status: reapp.status });
+
+  // ---- delete by OWNER: needs the token, and the token is the whole claim ----
+  const ownerNoTok = await fetch(`${WK}/session/${SID2}/delete`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ by: 'owner' }),
+  });
+  const ownerDel = await cdpH.eval(`window.host.deleteSession(${q(SID2)})`);
+  const after2 = await fetch(`${WK}/session/${SID2}`);
+  check('owner delete refuses without INSTRUMENT_TOKEN, works with it',
+    ownerNoTok.status === 403 && ownerDel.ok === true && ownerDel.deletedBy === 'owner' && after2.status === 410,
+    { tokenless: ownerNoTok.status, withToken: ownerDel, readAfter: after2.status });
+
+  // ---- the catalog-level view ----
+  const slist = await (await fetch(`${WK}/sessions?instrument=${INST}`)).json();
+  check('GET /sessions lists this instrument\'s sessions, tombstones included',
+    slist.count >= 2 && slist.sessions.some((s) => s.id === SID && !s.deletedAt)
+      && slist.sessions.some((s) => s.id === SID2 && s.deletedBy === 'owner'),
+    { count: slist.count, ids: slist.sessions.map((s) => s.id) });
+  check('the session store is pinned to the EU jurisdiction',
+    slist.jurisdiction === 'eu' && slist.euPinned === true,
+    { jurisdiction: slist.jurisdiction, euPinned: slist.euPinned, euId: slist.euId, unpinnedId: slist.unpinnedId });
+
+  const STORAGE = {
+    sessionId: SID, secondSessionId: SID2, deletedProbeId: SID3,
+    playerLaneRows: sPlayerMidi.length, hostLaneRows: sHostMidi.length,
+    storedTotalRows: stored.total, lanes: stored.lanes,
+    endedAt: stored.session.endedAt,
+    pairedOneWayMs: { n: paired.length, p50: pairedP50 },
+    audio: { prefix: stored.session.audioPrefix, chunks: audioChunks.length, bytes: audio.bytes,
+      mime: hstore.rec.mime, verified: hstore.rec.verified, manifest: hstore.rec.manifestKey },
+    replayFromStorage: rep2,
+    consentOff: { id: SID2, rows: stored2.total, audioObjects: audio2.count },
+    euJurisdiction: { pinned: slist.euPinned, euId: slist.euId, unpinnedId: slist.unpinnedId },
+  };
+
   // ---- 9. owner offline -> auto-offline via socket close ----
   await cdpH.eval('window.host.goOffline()');
   await sleep(1200);
@@ -221,9 +388,11 @@ async function main() {
   const gone = (await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json()).instruments;
   check('unlist removes it from the public catalog', !gone.find((i) => i.id === INST), { remaining: gone.length });
 
-  // ---- 11. console cleanliness ----
-  check('no page errors on the host', hEnd.errors.length === 0, hEnd.errors.slice(0, 3));
-  check('no page errors on the player', ps.errors.length === 0, ps.errors.slice(0, 3));
+  // ---- 11. console cleanliness (read AFTER everything, including storage) ----
+  const hFinal = await cdpH.eval('window.host.state()');
+  const pFinal = await cdpP.eval('window.player.state()');
+  check('no page errors on the host', hFinal.errors.length === 0, hFinal.errors.slice(0, 3));
+  check('no page errors on the player', pFinal.errors.length === 0, pFinal.errors.slice(0, 3));
 
   const summary = {
     at: new Date().toISOString(), instrument: INST, notes: NOTES,
@@ -235,6 +404,7 @@ async function main() {
     hostActuation: { late: hs.late, filteredRealtime: hs.filtered, dupDropped: hs.dup, watchdogFired: hs.watchdogFired, panics: hEnd.panics },
     micSettings: hs.micSettings, usingSyntheticSynth: hs.usingSynthetic,
     playerClock: ps.clock, hostClock: hs.clock,
+    storage: STORAGE,
     notes: NOTES_OUT,
     checks: CHECKS,
     pass: CHECKS.every((c) => c.ok),

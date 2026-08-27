@@ -67,8 +67,70 @@ const S = {
   midiAccess: null, midiOut: null, micStream: null, micSettings: null,
   midiRecv: 0, actuated: 0, lateNotes: 0, dropped: 0, filtered: 0, watchdogFired: 0,
   ow: [], lastOw: null, lastActMs: null, held: new Map(), panics: 0, setupMs: null,
+  sid: null, actSeq: 0, lastSid: null,
 };
 const isDup = makeDedupe(30000);
+
+// ============================================================================
+// SESSION LOG — the HOST's lane.
+//
+// The player logs what they MEANT, stamped in the player's clock. We log what
+// the instrument ACTUALLY DID, stamped in ours — the same clock the audio
+// recording below is stamped in. That is the whole point: audio and actuation
+// are natively aligned (one machine, sub-ms), so replaying a stored session
+// needs no cross-machine skew correction at all. The two lanes are stored side
+// by side and NEVER reconciled into one: `hostActuatedAt − playerSentAt` per
+// note (paired through `ref`) IS the measured one-way latency, i.e. the pair of
+// lanes is the drift channel. Averaging them would destroy the measurement.
+// ============================================================================
+const HPEND = [];
+const HSTORE = { appended: 0, rejected: 0, total: 0, errors: 0, flushing: false, deleted: null };
+const perfToEpochUs = (perfMs) => Math.round((perfMs + performance.timeOrigin) * 1000 + clock.offUs());
+
+// Which session a host-side event belongs to: the live one, or — during the
+// post-teardown drain — the one the recorder was finalizing. Every pending row
+// carries its own sid so a fast next session can never inherit the last one's
+// tail.
+const curSid = () => S.sid || REC.sid || S.lastSid;
+const LANESEQ = new Map();      // sid -> next seq in this session's `instrument` lane
+function hlog(at, kind, raw, disp, extra) {
+  const sid = (extra && extra._sid) || curSid();
+  if (!sid || HSTORE.deleted) return;
+  // ONE seq counter PER SESSION for the whole `instrument` lane — actuations
+  // and span markers share a source, so they must share the monotonic sequence
+  // the DO enforces, and a recorder still finalizing the PREVIOUS session must
+  // not restart at 0. A note's link to the player's lane is `ref`, not `seq`.
+  const n = LANESEQ.get(sid) || 0;
+  LANESEQ.set(sid, n + 1);
+  S.actSeq++;
+  HPEND.push({ _sid: sid, seq: n, at: Math.round(at), kind, source: 'instrument', ...(raw ? { raw } : {}), display: disp, ...(extra || {}) });
+  if (HPEND.length >= 200) hflush().catch(() => {});
+}
+async function hflush() {
+  if (HSTORE.flushing || !HPEND.length || HSTORE.deleted) return null;
+  HSTORE.flushing = true;
+  const sid = HPEND[0]._sid;
+  const batch = [];
+  for (let i = 0; i < HPEND.length && batch.length < 500;) {
+    if (HPEND[i]._sid === sid) batch.push(HPEND.splice(i, 1)[0]); else i++;
+  }
+  try {
+    const r = await fetch(`${WORKER}/session/${sid}/events`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ instrument: S.inst ? S.inst.id : null, events: batch.map(({ _sid, ...e }) => e) }),
+    });
+    const jj = await r.json().catch(() => ({}));
+    if (r.status === 410) { HSTORE.deleted = jj.deletedBy || 'someone'; HPEND.length = 0; return jj; }
+    if (!r.ok) throw new Error(r.status + ' ' + JSON.stringify(jj).slice(0, 120));
+    HSTORE.appended += jj.appended; HSTORE.rejected += jj.rejected; HSTORE.total = jj.total;
+    return jj;
+  } catch (e) {
+    HPEND.unshift(...batch); HSTORE.errors++;
+    log('host log flush failed:', e.message);
+    return null;
+  } finally { HSTORE.flushing = false; }
+}
+setInterval(() => { hflush().catch(() => {}); }, 1000);
 
 // ---------------- registration form ------------------------------------------
 const FIELDS = ['name', 'model', 'loc', 'id'];
@@ -305,7 +367,13 @@ function actuate(f) {
   if (lead > 0 && want <= now) S.lateNotes++;
   sendToInstrument([status, f.note, f.vel], at);
   S.actuated++;
-  S.lastActMs = +((at === 0 ? now : want) - perfFromEpochUs(f.tUs)).toFixed(2);
+  const actPerfMs = at === 0 ? now : want;
+  S.lastActMs = +(actPerfMs - perfFromEpochUs(f.tUs)).toFixed(2);
+  // the host lane: when the instrument was actually driven, in HOST epoch µs —
+  // the same clock domain as the audio recording, and `ref` back to the
+  // player's own note seq so the two lanes stay pairable.
+  hlog(perfToEpochUs(actPerfMs), 'midi-actuated', [status, f.note, f.vel],
+    display(status, f.note, f.vel), { ref: f.seq });
   const kind = status & 0xf0;
   if (kind === 0x90 && f.vel > 0) {
     S.held.set(f.note, { at: now, ch: status & 0x0f });
@@ -359,6 +427,164 @@ setInterval(() => {
 }, 500);
 window.addEventListener('beforeunload', () => { panic('page unload'); if (S.sig) S.sig.send({ type: 'end' }); });
 
+// ============================================================================
+// SESSION AUDIO — the proven selfrec chunk path, pointed at instrument/<sid>/.
+//
+// MediaRecorder(timeslice 2 s) on the SAME audio track the player is hearing.
+// The chunk sequence is ONE logical webm byte stream (only chunk 0 carries the
+// header); each chunk is its own R2 object, so a mid-session death loses at
+// most one timeslice. Upload = POST → R2 server-side sha256 verify → retry;
+// finalize = list what actually landed, compare, then write the manifest.
+//
+// CONSENT: default OFF, and it is the OWNER's switch. It is their instrument
+// and their room; nobody else gets to turn on a microphone in it.
+// ============================================================================
+const REC = {
+  consent: false, state: 'idle', mime: null, sid: null, t0: null,
+  chunks: 0, bytes: 0, uploaded: 0, failed: 0, attempts: 0,
+  verified: 0, verifiedBytes: 0, finalized: false, manifestKey: null, error: null, rows: [],
+};
+let recorder = null, recStop = null;
+const REC_MIMES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+
+async function sha256Hex(blob) {
+  const d = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+async function putChunk(seq, blob) {
+  const sum = await sha256Hex(blob);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    REC.attempts++;
+    try {
+      const r = await fetch(`${WORKER}/session/${REC.sid}/audio/${seq}`, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + ENV.INSTRUMENT_TOKEN, 'content-type': 'audio/webm', 'X-Chunk-Sha256': sum },
+        body: blob,
+      });
+      const jj = await r.json().catch(() => ({}));
+      // a delete landed mid-recording: stop feeding R2, but never re-enter
+      // stopRec() from inside a chunk it is already awaiting
+      if (r.status === 410) {
+        REC.error = 'session deleted — upload abandoned';
+        try { if (recorder) recorder.stop(); } catch {}
+        return null;
+      }
+      if (!r.ok) throw new Error(r.status + ' ' + (jj.error || ''));
+      if (jj.size !== blob.size) throw new Error(`size mismatch ${jj.size}!=${blob.size}`);
+      REC.uploaded++;
+      return { seq, key: jj.key, bytes: blob.size, sha256: sum, attempts: attempt };
+    } catch (e) {
+      if (attempt === 3) { REC.failed++; REC.error = String(e.message).slice(0, 120); log('chunk', seq, 'FAILED', e.message); return null; }
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
+  }
+  return null;
+}
+
+function startRec(track) {
+  if (!REC.consent || !S.sid || recorder) return null;
+  const mime = REC_MIMES.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+  try {
+    recorder = new MediaRecorder(new MediaStream([track]), mime ? { mimeType: mime } : {});
+  } catch (e) { REC.error = 'MediaRecorder: ' + e.message; log('recorder failed', e.message); return null; }
+  REC.sid = S.sid; REC.mime = recorder.mimeType || mime; REC.state = 'recording';
+  REC.chunks = 0; REC.bytes = 0; REC.uploaded = 0; REC.failed = 0; REC.attempts = 0;
+  REC.verified = 0; REC.verifiedBytes = 0; REC.finalized = false; REC.manifestKey = null; REC.error = null; REC.rows = [];
+  let seq = 0;
+  const pending = [];
+  recorder.ondataavailable = (ev) => {
+    if (!ev.data || !ev.data.size) return;
+    const mySeq = seq++;
+    REC.chunks++; REC.bytes += ev.data.size;
+    pending.push(putChunk(mySeq, ev.data).then((row) => { if (row) REC.rows.push(row); }));
+  };
+  recorder.onerror = (e) => { REC.error = 'recorder: ' + (e.error && e.error.message || e); };
+  recorder.onstop = () => { REC.state = 'stopped'; if (recStop) recStop(Promise.all(pending)); };
+  REC.t0 = Math.round(nowUs());
+  recorder.start(2000);
+  // media-span START on the log: the media is BY REFERENCE, and the marker on
+  // the timeline — not the audioPrefix column — is what makes this a recording
+  // of a session rather than a row with a file bolted to it.
+  hlog(REC.t0, 'media-span', null, `instrument audio recording started (${REC.mime})`, {
+    payload: { phase: 'start', mediaRef: { prefix: `instrument/${S.sid}/audio/`, mime: REC.mime, timesliceMs: 2000 } },
+  });
+  log('recording session audio →', `instrument/${S.sid}/audio/`, REC.mime);
+  paintRec();
+  return REC.mime;
+}
+
+async function stopRec(why = 'session end') {
+  if (!recorder) return null;
+  const r = recorder; recorder = null;
+  const drained = new Promise((res) => { recStop = res; });
+  try { r.stop(); } catch {}
+  await (await drained);                       // every in-flight chunk settled
+  REC.state = 'draining';
+  const durUs = Math.round(nowUs()) - REC.t0;
+  // VERIFY: what is actually in R2, compared to what we think we sent.
+  let list = { count: 0, objects: [], bytes: 0 };
+  try { list = await (await fetch(`${WORKER}/session/${REC.sid}/audio`, { cache: 'no-store' })).json(); } catch (e) { REC.error = 'list: ' + e.message; }
+  const stored = new Map((list.objects || []).map((o) => [o.key, o.size]));
+  REC.verified = REC.rows.filter((row) => stored.get(row.key) === row.bytes).length;
+  REC.verifiedBytes = REC.rows.reduce((n, row) => n + (stored.get(row.key) === row.bytes ? row.bytes : 0), 0);
+  const missing = REC.rows.filter((row) => stored.get(row.key) !== row.bytes).map((row) => row.seq);
+  const manifest = {
+    sessionId: REC.sid, instrument: S.inst ? S.inst.id : null, mime: REC.mime, timesliceMs: 2000,
+    t0: REC.t0, durUs, clock: clock.info(), why,
+    chunkCount: REC.chunks, uploaded: REC.uploaded, verified: REC.verified,
+    bytes: REC.verifiedBytes, missing, degraded: missing.length > 0 || REC.failed > 0,
+    chunks: REC.rows.sort((a, b) => a.seq - b.seq),
+    finalizedAt: Math.round(nowUs()),
+  };
+  try {
+    const rr = await fetch(`${WORKER}/session/${REC.sid}/audio/manifest`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + ENV.INSTRUMENT_TOKEN, 'content-type': 'application/json' },
+      body: JSON.stringify(manifest),
+    });
+    if (rr.ok) { REC.finalized = true; REC.manifestKey = (await rr.json()).key; }
+  } catch (e) { REC.error = 'finalize: ' + e.message; }
+  // media-span END: duration and what actually landed
+  hlog(REC.t0 + durUs, 'media-span', null,
+    `instrument audio recording ended (${(durUs / 1e6).toFixed(1)} s, ${REC.verified} chunks, ${REC.verifiedBytes} B)`, {
+      _sid: REC.sid,   // the session this recording belongs to, even if a new one already started
+      payload: { phase: 'end', durUs, chunkCount: REC.chunks, verified: REC.verified, bytes: REC.verifiedBytes, degraded: manifest.degraded, manifestKey: REC.manifestKey },
+    });
+  await hflush();
+  REC.state = 'done';
+  log('recording finalized —', REC.verified, '/', REC.chunks, 'chunks verified,', REC.verifiedBytes, 'B', REC.manifestKey || '(no manifest)');
+  paintRec();
+  return manifest;
+}
+
+function paintRec() {
+  const el = $('s-rec');
+  if (!el) return;
+  if (!REC.consent) { el.textContent = 'off — nothing is recorded'; el.className = 'dim'; return; }
+  el.textContent = REC.state === 'idle' ? 'armed — will record the next session'
+    : `${REC.state} · ${REC.verified || REC.uploaded}/${REC.chunks} chunks · ${(REC.bytes / 1024).toFixed(0)} kB`
+      + (REC.finalized ? ' · manifest ✓' : '') + (REC.error ? ' · ' + REC.error : '');
+  el.className = REC.error ? 'bad' : REC.finalized ? 'ok' : 'warn';
+}
+
+// The owner's half of the consent story: delete a session outright — the
+// player's notes AND the audio this page recorded. Needs INSTRUMENT_TOKEN,
+// because it is a claim to own the instrument, not just to have played it.
+async function deleteSession(id = S.lastSid) {
+  if (!id) return { error: 'no session id' };
+  const r = await fetch(`${WORKER}/session/${id}/delete`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + ENV.INSTRUMENT_TOKEN, 'content-type': 'application/json' },
+    body: JSON.stringify({ by: 'owner' }),
+  });
+  const jj = await r.json().catch(() => ({}));
+  if (r.ok && id === S.sid) { HSTORE.deleted = 'owner'; HPEND.length = 0; }
+  const el = $('s-rec');
+  if (el && r.ok) { el.textContent = `session ${id} deleted (${jj.eventsDropped} rows, ${jj.audioObjectsPurged} audio objects)`; el.className = 'warn'; }
+  log('owner delete', id, '→', JSON.stringify(jj));
+  return jj;
+}
+
 // ---------------- WebRTC (host = answerer) ------------------------------------
 async function buildPeer(offer) {
   const t0 = performance.now();
@@ -387,6 +613,9 @@ async function buildPeer(offer) {
     if (kind === 'audio' && audioTrack) { await tx.sender.replaceTrack(audioTrack); tx.direction = 'sendonly'; }
     if (kind === 'video' && videoTrack) { await tx.sender.replaceTrack(videoTrack); tx.direction = 'sendonly'; }
   }
+  // record EXACTLY what the player is hearing — the same track object, not a
+  // second capture. Only if the owner said yes.
+  if (REC.consent && audioTrack) startRec(audioTrack);
   await pc.setLocalDescription(await pc.createAnswer());
   S.sig.send({ type: 'signal', kind: 'answer', payload: { sdp: pc.localDescription.sdp } });
   await pcConnected(pc);
@@ -396,8 +625,10 @@ async function buildPeer(offer) {
 
 function teardown(why) {
   panic(why);
+  stopRec(why).catch((e) => log('stopRec failed', e.message));
+  hflush().catch(() => {});
   if (S.pc) { try { S.pc.close(); } catch {} S.pc = null; }
-  S.ch = null; S.player = null; S.sessionSince = null;
+  S.ch = null; S.player = null; S.sessionSince = null; S.sid = null;
   $('b-end').disabled = true;
   $('s-player').textContent = '—'; $('s-player').className = 'dim';
   $('s-pc').textContent = '—'; $('s-pc').className = 'dim';
@@ -424,10 +655,15 @@ function onFrame(m) {
   }
   if (m.type === 'session' && m.state === 'accepted') {
     S.player = m.name; S.sessionSince = m.since;
+    S.sid = m.sid || null; S.lastSid = S.sid || S.lastSid; S.actSeq = 0;
+    HSTORE.deleted = null; HSTORE.appended = 0; HSTORE.rejected = 0; HSTORE.total = 0;
     $('s-player').textContent = `${m.name} · since ${new Date(m.since).toISOString().slice(11, 19)}`;
     $('s-player').className = 'ok';
     $('b-end').disabled = false;
     $('reqbox').style.display = 'none';
+    if ($('s-sid')) $('s-sid').textContent = S.sid || '—';
+    if ($('b-delsess')) $('b-delsess').disabled = !S.sid;
+    paintRec();
     return;
   }
   if (m.type === 'session' && m.state === 'ended') { log('session ended:', m.reason); teardown('session ended: ' + m.reason); return; }
@@ -480,6 +716,25 @@ $('b-cam').onclick = () => openCamera().catch((e) => log('openCamera failed', e.
 // Live switch: changing the picker mid-session swaps the background only — the
 // published track is the canvas, so there is nothing to renegotiate.
 $('videoin').onchange = () => { if (S.camStream || $('videoin').value) openCamera().catch(() => {}); };
+// consent: OFF unless the owner says otherwise, every page load. Not persisted
+// — a checkbox remembered from last week is not consent for today.
+$('rec-consent').checked = P.get('rec') === '1';
+REC.consent = $('rec-consent').checked;
+$('rec-consent').onchange = () => {
+  REC.consent = $('rec-consent').checked;
+  if (!REC.consent && recorder) stopRec('owner switched recording off').catch(() => {});
+  if (REC.consent && S.pc && S.sid) {
+    const t = S.pc.getSenders().map((s) => s.track).find((t) => t && t.kind === 'audio');
+    if (t) startRec(t);
+  }
+  log('audio recording consent:', REC.consent ? 'ON' : 'OFF');
+  paintRec();
+};
+$('b-delsess').onclick = () => {
+  const id = ($('f-delsid').value || '').trim() || S.lastSid;
+  if (!id || !confirm(`Delete session ${id}? Notes and audio both go.`)) return;
+  deleteSession(id).catch((e) => log('delete failed', e.message));
+};
 
 setInterval(() => {
   $('s-midi').textContent = S.midiRecv;
@@ -489,6 +744,10 @@ setInterval(() => {
   $('s-act').textContent = S.lastActMs === null ? '—'
     : `+${S.lastActMs} ms after stamp · late ${S.lateNotes} · filtered ${S.filtered} · dup ${S.dropped}`;
   $('s-held').textContent = `${S.held.size}${S.watchdogFired ? ` (watchdog fired ${S.watchdogFired}×)` : ''}`;
+  $('s-hlog').textContent = S.sid || S.lastSid
+    ? `${HSTORE.total} rows${HPEND.length ? ` · ${HPEND.length} pending` : ''}${HSTORE.deleted ? ' · DELETED' : ''}`
+    : '—';
+  paintRec();
   const c = clock.info();
   $('s-clock').textContent = c.source ? `${c.source} · min-RTT ${c.minRttMs} ms · off ${(c.offUs / 1000).toFixed(1)} ms` : '—';
 }, 400);
@@ -497,9 +756,18 @@ setInterval(() => {
 window.host = {
   register, goOnline, goOffline, panic, openAudio, listAudioIn, openCamera, listCameras, unlist,
   accept: (pid) => accept(pid),
+  deleteSession, stopRec, hflush,
+  setConsent: (on) => { $('rec-consent').checked = !!on; $('rec-consent').onchange(); return REC.consent; },
+  sid: () => S.sid || S.lastSid,
+  rec: () => ({ ...REC, rows: REC.rows.length }),
   end: () => { S.sig.send({ type: 'end' }); teardown('owner ended'); },
   state: () => ({
     registered: S.registered, online: S.online, player: S.player, since: S.sessionSince,
+    sid: S.sid, lastSid: S.lastSid,
+    hostLog: { ...HSTORE, pending: HPEND.length, laneRowsLogged: S.actSeq },
+    rec: { consent: REC.consent, state: REC.state, mime: REC.mime, chunks: REC.chunks, bytes: REC.bytes,
+      uploaded: REC.uploaded, verified: REC.verified, verifiedBytes: REC.verifiedBytes,
+      finalized: REC.finalized, manifestKey: REC.manifestKey, failed: REC.failed, error: REC.error },
     pc: S.pc ? S.pc.connectionState : null, ch: S.ch ? S.ch.readyState : null,
     midiRecv: S.midiRecv, actuated: S.actuated, late: S.lateNotes, filtered: S.filtered,
     dup: S.dropped, held: S.held.size, watchdogFired: S.watchdogFired, panics: S.panics,

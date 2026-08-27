@@ -148,6 +148,40 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### INSTRUMENT SESSION STORAGE (session 6m) — ✅ 42/42 (workers/instrument, proto/instrument)
+Sessions are now durable: notes as ROWS in a DO SQLite (C4), audio in R2 by
+reference (C6-deletable), both lanes on one log.
+- **EU jurisdiction VERIFIED pinned** (not merely requested): the `Sessions` DO
+  from `jurisdiction('eu').idFromName('log')` has a different id than unpinned.
+  Signaling Hub deliberately untouched so the registry didn't move.
+- Schema: `sessions(id, instrument, playerId, startedAt, endedAt, noteCount,
+  audioPrefix, deletedBy, deletedAt)` + `events(sessionId, seq, at µs, kind,
+  source, raw BLOB, display, ref, payload)` idx (sessionId, at). `ref` = the
+  cross-lane pointer (host actuation → player note seq); `payload` = marker
+  detail (media-span phase + mediaRef). One row per event, never a blob.
+- **Session id minted in the Hub on accept** and handed to BOTH parties — one
+  id, no side channel, no guessing.
+- **TWO LANES (the sync fix)**: player logs intent in the player's clock; host
+  logs `midi-actuated` (with `ref`) in the HOST's clock — the same clock its
+  audio is stamped in. Replay uses the **host lane as master**; audio offset is
+  `firstEvent.at − mediaSpanStart.at`, a subtraction, not a skew guess.
+  **The two lanes joined on `ref` reproduce the live latency EXACTLY: p50
+  0.48 ms from storage vs 0.48 ms live (n=128) — the lane pair IS the drift
+  channel.** NOTES warns: never "fix" this by averaging the lanes.
+- Verified: 390 rows / 0 append rejections; audio 12/12 chunks in R2, replay
+  Blob-concatenates and decodes (no MSE needed), offset 1.94 s; consent OFF →
+  20 rows, 0 R2 objects, null prefix; delete by player → rows dropped, R2
+  object purged, read 410 tombstone, re-append 410 (resurrection blocked);
+  owner delete needs INSTRUMENT_TOKEN.
+- Two bugs worth knowing: `X-Chunk-Sha256` missing from
+  Access-Control-Allow-Headers killed every chunk POST in preflight (selfrec
+  had it right — carry CORS headers when copying a pipeline); and seq counters
+  must be keyed BY SESSION (a span marker at seq 0 collided with the first
+  actuation).
+- Unbuilt: panel/camera video recording (seam is one MediaStream away), player
+  auth (the session id IS the capability — fails toward deletion, not access
+  control), IndexedDB backstop on either lane, compaction job, megatimeline join.
+
 ### MoQ RIG FIXED + RETEST (session 6l) — ✅ VIDEO USABLE; BOTH HYPOTHESES REFUTED
 - **Video starvation was NOT group-per-frame.** The publisher already keyframed
   every 30th frame and @moq/hang opens a group on that flag ⇒ video was on 1 s

@@ -1,15 +1,19 @@
 # elektron-instrument — DEPLOYED
 
 **URL:** `https://elektron-instrument.kristjan-jansen.workers.dev`
-**Deployed:** 2026-08-27 (version 71c48f45). Status: **live and verified** —
-24/24 end-to-end checks green from `proto/instrument/harness/run-instrument.mjs`
-(one headless Chrome, three tabs, real WebRTC, real audio return).
+**Deployed:** 2026-08-27 (version 7b04db74). Status: **live and verified** —
+**42/42** end-to-end checks green from `proto/instrument/harness/run-instrument.mjs`
+(one headless Chrome, three tabs, real WebRTC, real audio return, real R2).
 
 The control plane for the remote-instrument platform (`proto/instrument/`): a
 public catalog of physical instruments plus 1:1 WebRTC signaling between exactly
-one owner and one player. **No media ever touches this worker** — MIDI goes up a
-DataChannel and audio/video come back on the same PeerConnection, peer to peer.
-It does not touch `elektron-rtc`, `elektron-jam`, or `elektron-selfrec`.
+one owner and one player, **plus the durable session log**. **No media ever
+touches this worker in transit** — MIDI goes up a DataChannel and audio/video
+come back on the same PeerConnection, peer to peer. The session log is a
+separate thing: an explicit, consented POST from the two pages *after* the fact,
+never a tap on the wire. It does not touch `elektron-rtc`, `elektron-jam`, or
+`elektron-selfrec` (it reuses selfrec's chunk-upload *shape*, not its code, and
+writes to a different prefix of the same bucket).
 
 ## Shape
 
@@ -41,6 +45,105 @@ all-notes-off reliable.
 
 A literal `"ping"` on either socket gets `"pong"` by hibernation autoresponse —
 pure network RTT, no DO wake (same as cues/jam).
+
+## Session storage (`Sessions` DO — SQLite rows + R2 by reference)
+
+A **second DO class**, one instance (`idFromName('log')`), **pinned to the EU
+jurisdiction**. Verified pinned, not merely requested: `/sessions` returns
+`euPinned:true` because `SESSIONS.jurisdiction('eu').idFromName('log')` and the
+unpinned `SESSIONS.idFromName('log')` are different object ids
+(`2d70bf43…` vs `ce73643a…`).
+
+**Migration implication:** `Sessions` is a new class + new binding + migration
+tag `v2`; the signaling `Hub` was deliberately **not** moved, so the instrument
+registry did not move and no existing data was disturbed. If the Hub is ever
+EU-pinned too, `jurisdiction('eu')` changes its id — the registry starts empty
+and every owner must re-register. That was judged not worth doing here: the
+registry holds instrument metadata the owner publishes on purpose; the session
+log holds someone's playing and someone's room audio, which is the part that
+needs a jurisdiction.
+
+### Schema (rows, never a JSON blob — plan-timeline C4)
+
+```sql
+sessions(id TEXT PRIMARY KEY, instrument, playerId, startedAt, endedAt,
+         noteCount, audioPrefix, deletedBy, deletedAt)
+events(sessionId TEXT, seq INTEGER, at INTEGER /* epoch µs */, kind TEXT,
+       source TEXT, raw BLOB, display TEXT, ref INTEGER, payload TEXT)
+CREATE INDEX events_by_time ON events(sessionId, at)
+```
+
+`ref` and `payload` are the two columns beyond the base shape, both nullable,
+both still **one row per event**:
+
+- **`ref`** — the `seq` this row points at in *another source's lane*. A host
+  `midi-actuated` row refs the player's note `seq`, so `hostAt − playerAt` per
+  note is a SQL join away. **The two lanes are the drift channel and are never
+  reconciled into one.** Verified: pairing the stored lanes on `ref` reproduces
+  the live one-way MIDI figure exactly (**p50 0.48 ms stored vs 0.48 ms live**,
+  n=128).
+- **`payload`** — small JSON detail for *marker* rows only (`media-span`
+  phase + `mediaRef`). Never used for `midi` rows. This is not the C4 anti-
+  pattern: C4 forbids one blob per *session*, not a detail field per row.
+
+### Lanes
+
+| source | kind | written by | clock |
+|---|---|---|---|
+| `player` | `midi` | play.js | the **player's** clock — their intent |
+| `player` | `audio-span` | play.js | player clock; what they *received* |
+| `instrument` | `midi-actuated` | host.js | the **host's** clock — what the hardware actually did |
+| `instrument` | `media-span` | host.js | host clock; `phase:'start'|'end'` + `mediaRef` |
+| `worker` | `session` | play.js | session lifecycle |
+
+Host actuation rows and the host's audio recording share one clock on one
+machine, so **replay from storage uses the host lane as master** and needs no
+cross-machine skew correction; the player's lane is rendered as intent.
+
+### Routes
+
+| method | path | auth | purpose |
+|---|---|---|---|
+| POST | `/session/<id>/events` | none | batched append `{instrument,playerId,events:[{at,kind,source,seq,raw,display,ref,payload}]}` → `{appended,rejected,total,noteCount}`. **Monotonic `seq` per (session, source)**: an event whose `seq` ≤ the stored max for its source is rejected *individually*, which makes a retried batch idempotent instead of fatal. Missing `seq` is auto-assigned `max+1`. Batch ≤ 2000. |
+| POST | `/session/<id>/end` | none | `{endedAt?}` → stamps `endedAt`, recounts `noteCount`. |
+| GET | `/session/<id>?from=&limit=` | none | `{session, lanes, from, limit, count, total, events[]}` ordered by `(at, seq)`. `from` is a row offset; `limit` ≤ 20000, default 5000. |
+| GET | `/sessions?instrument=` | none | `{count, sessions[], jurisdiction, euPinned, euId, unpinnedId}`, newest first, tombstones included. |
+| POST | `/session/<id>/delete` | `by:'owner'` needs token | `{by:'player'|'owner'}` → tombstone. |
+| POST | `/session/<id>/audio/<seq>` | token | raw webm chunk → `instrument/<id>/audio/chunk-<5d>.webm`. `X-Chunk-Sha256` is verified **server-side by R2 during the put** — a truncated body fails the put. ≤ 16 MB. |
+| POST | `/session/<id>/audio/manifest` | token | → `instrument/<id>/audio/manifest.json`; sets `audioPrefix`. |
+| GET | `/session/<id>/audio` | none | what actually landed: `{prefix,count,bytes,objects[]}` — this is the client's verify step. |
+| GET | `/session/<id>/audio/<seq>` | none | one chunk, streamed. Replay fetches these in order and Blob-concats them. |
+
+### Tombstones (plan-timeline C6)
+
+`POST /session/<id>/delete` marks the row `{deletedBy, deletedAt}`, **physically
+drops every event row**, and — if `audioPrefix` is set — sweeps the whole
+`instrument/<id>/` R2 prefix and writes a `deleted.marker` there. Afterwards:
+
+- a read is **410 + the tombstone**, never data;
+- an **append is 410** — a late flush from a tab that never heard about the
+  delete cannot resurrect the session (verified);
+- an audio chunk POST is 410 — a draining recorder cannot re-fill the prefix.
+
+**Who may delete what, honestly:** the player deletes with the session id alone
+(v0: **the unguessable id minted by the hub at accept IS the capability** —
+there are no accounts, so anyone holding the id can delete as the player; this
+is a stated v0 limit, and it fails *safe*, toward deletion). The owner deletes
+with `INSTRUMENT_TOKEN`, because owner-deleting is a claim to own the hardware.
+Both are verified in the harness, including the tokenless owner-delete → 403.
+
+### Session ids
+
+Minted **in the Hub, on `accept`**, and sent to *both* parties on the
+`{type:'session',state:'accepted'}` frame (`sid`), plus on the `ended` frame.
+That is what makes the player's notes and the owner's audio agree on one id
+without either side guessing or a side channel.
+
+### CORS
+
+`Access-Control-Allow-Headers` must list **`X-Chunk-Sha256`** or the audio chunk
+POST dies in preflight and the browser reports only a bare `Failed to fetch`.
+Cost one harness run to find.
 
 ## Auth
 

@@ -98,6 +98,26 @@
       instrument. Camera rides the panel background — switch it live, no reconnect.</div>
   </div>
 
+  <div class="card">
+    <h2>Session storage</h2>
+    <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer">
+      <input id="rec-consent" type="checkbox" style="width:auto;margin-top:5px">
+      <span>Record this session's audio<br>
+        <span class="dim" style="font-size:11px">Off by default. Your instrument, your call.</span></span>
+    </label>
+    <div class="hint">
+      The player's notes are always written to the session log — that is their playing, and
+      <b>they can delete it</b>. This page also logs what the instrument actually did, stamped in
+      <b>this machine's clock</b>, which is the clock the audio recording uses.
+      <b>You can delete any session on your instrument</b>, notes and audio together — that needs
+      your INSTRUMENT_TOKEN, because it is a claim to own the hardware.
+    </div>
+    <div class="row">
+      <input id="f-delsid" placeholder="session id (blank = the last one)">
+      <button id="b-delsess" class="stop" style="flex:0 0 auto" disabled>Delete</button>
+    </div>
+  </div>
+
   <details class="card">
     <summary>Log</summary>
     <div id="log"></div>
@@ -118,6 +138,9 @@
       <span class="chip"><b>actuation</b><span id="s-act" class="dim">—</span></span>
       <span class="chip"><b>held</b><span id="s-held" class="dim">0</span></span>
       <span class="chip"><b>safety</b><span id="s-safe" class="dim">armed</span></span>
+      <span class="chip"><b>session</b><span id="s-sid" class="dim">—</span></span>
+      <span class="chip"><b>host log</b><span id="s-hlog" class="dim">—</span></span>
+      <span class="chip"><b>audio rec</b><span id="s-rec" class="dim">off — nothing is recorded</span></span>
     </div>
   </div>
 
