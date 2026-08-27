@@ -1,0 +1,631 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>COMPOSE — a timeline inside a timeline</title>
+<style>
+  :root { --bg:#0b0c10; --fg:#dfe3ea; --dim:#7a8291; --au:#4fb0c6; --nest:#ffd479; --note:#ff7ba9; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-monospace,Menlo,monospace; }
+  h1 { font-size:15px; letter-spacing:.16em; margin:0; }
+  #top { padding:10px 12px; border-bottom:1px solid #1c2028; display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  #top .sub { color:var(--dim); font-size:11px; }
+  .box { border:1px solid #1c2028; margin:10px 12px; padding:10px 12px; }
+  .box h2 { font-size:11px; letter-spacing:.18em; color:var(--dim); margin:0 0 8px; font-weight:400; }
+  button { background:#161a22; color:var(--fg); border:1px solid #2a3040; padding:3px 10px; font:inherit; cursor:pointer; }
+  button.hot { background:#2a2010; border-color:#5a4a20; color:var(--nest); }
+  #tbar { display:flex; gap:10px; align-items:center; padding:8px 12px; border-bottom:1px solid #1c2028; }
+  #arr { position:relative; height:150px; background:#0f1117; border:1px solid #1c2028; }
+  .lane { position:absolute; height:20px; border-radius:2px; }
+  .lane .lbl { position:absolute; left:5px; top:1px; font-size:10px; color:#04121a; letter-spacing:.1em; }
+  .arch { background:var(--au); }
+  #nestbox { position:absolute; border:1px solid var(--nest); background:rgba(255,212,121,.10); }
+  #nestbox .hdr { font-size:10px; letter-spacing:.14em; color:var(--nest); padding:1px 5px; }
+  #childlanes { position:absolute; left:0; right:0; top:16px; bottom:2px; }
+  .cnote { position:absolute; height:5px; background:var(--note); border-radius:1px; }
+  .cmedia { position:absolute; height:9px; background:#3a6f80; border-radius:2px; }
+  #ph { position:absolute; top:0; bottom:0; width:2px; background:#fff; z-index:5; }
+  #cph { position:absolute; top:0; bottom:0; width:3px; margin-left:-1px; background:var(--nest); box-shadow:0 0 8px 2px var(--nest); z-index:6; }
+  #keys { display:flex; gap:2px; margin-top:8px; }
+  #keys div { width:15px; height:34px; background:#161a22; border:1px solid #232936; border-radius:0 0 2px 2px; }
+  #keys div.lit { background:var(--note); border-color:var(--note); }
+  table { border-collapse:collapse; font-size:11px; }
+  td { padding:1px 12px 1px 0; vertical-align:top; }
+  td.k { color:var(--dim); }
+  b { color:#fff; }
+  .ok { color:#7fd18c; } .bad { color:#ff6b6b; }
+  pre { font-size:10.5px; color:#8b93a3; white-space:pre-wrap; margin:0; max-height:230px; overflow:auto; }
+</style>
+
+<div id="top">
+  <h1>COMPOSE — A TIMELINE INSIDE A TIMELINE</h1>
+  <span class="sub">a stored instrument session is ONE SPAN in an arrangement, beside archive layers</span>
+</div>
+
+<div id="tbar">
+  <button id="play">▶</button>
+  <button id="slow">−</button><span id="rate">1.00×</span><button id="fast">+</button>
+  <button id="toNest" class="hot">seek into the session</button>
+  <button id="outside">seek outside it</button>
+  <span id="read" style="color:var(--dim)"></span>
+</div>
+
+<div class="box">
+  <h2>ARRANGEMENT (parent domain, ms) — click to seek</h2>
+  <div id="arr"><div id="ph"></div></div>
+  <div id="keys"></div>
+</div>
+
+<div class="box"><h2>NUMBERS</h2><table id="hud"></table></div>
+<div class="box"><h2>VERIFICATION</h2><pre id="verdict">not run</pre></div>
+
+<script type="module">
+'use strict';
+// ============================================================================
+// THE COMPOSED DEMO — the case that motivated timeline/nested.mjs.
+//
+// Parent: an ARRANGEMENT deck (the remixer's own domain and its `media-span`
+// adapter, trimmed) carrying two archive layers.
+// Nested:  ONE SPAN THAT IS ITSELF A DECK — the instrument rig's KEPT PROOF
+// SESSION (proto/instrument/results/instr-session.jsonl, 128 real MIDI rows in
+// epoch µs), rebuilt here through makeLogDeck with the instrument's own three-
+// lane shape: an audible note lane (held-note reduce) and a media-span whose
+// element is the CLOCK MASTER *inside the session*.
+//
+// The rule that makes it composable (nested.mjs rule 4): that inner master
+// governs ONLY WITHIN THE CHILD. The parent slaves to the CHILD'S POSITION —
+// never to the element — so the two masters cannot fight.
+//
+// HONESTY, twice over:
+//  1. The archive neighbours here are SYNTHETIC generated tones, not ERR items.
+//     The real-1965 case is already proven by index.html (11/11, 6 upstream
+//     calls); this page is about the nesting primitive and deliberately makes
+//     ZERO upstream calls. Same adapter, same domain, honest stand-in material.
+//  2. The stored session's *audio return* is not in the repo (it lives in the
+//     rig's IndexedDB), so the child's media-span element is likewise a
+//     generated tone of the session's own recorded duration, anchored at the
+//     session's own `audio-span` timestamp. The TIMING is real — it comes out
+//     of the log; the SOUND is not.
+// ============================================================================
+import { createDeck } from '/timeline/transport.mjs';
+import { makeLogDeck, pstats } from '/timeline/logdeck.mjs';
+import { createNest, nestedDrift } from '/timeline/nested.mjs';
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ERRORS = [];
+window.addEventListener('error', (e) => ERRORS.push(String(e.message)));
+
+// --- synthetic media --------------------------------------------------------
+function toneWav(seconds, freq, sr = 8000) {
+  const n = Math.round(seconds * sr), buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+  const wr = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  wr(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); wr(8, 'WAVEfmt '); dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, sr, true);
+  dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  wr(36, 'data'); dv.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr, env = 0.22 * (0.6 + 0.4 * Math.sin(2 * Math.PI * 0.25 * t));
+    dv.setInt16(44 + i * 2, Math.round(env * 32767 * Math.sin(2 * Math.PI * freq * t)), true);
+  }
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function mkAudio(url) {
+  const el = document.createElement('audio');
+  el.src = url; el.preload = 'auto'; el.volume = 0.35;
+  document.body.appendChild(el);
+  return el;
+}
+const ready = (el) => new Promise((res) => {
+  if (el.readyState >= 1) return res();
+  el.addEventListener('loadedmetadata', res, { once: true });
+  el.addEventListener('error', res, { once: true });
+  setTimeout(res, 4000);
+});
+
+// ============================================================================
+// THE CHILD — the stored instrument session, as its own deck.
+// Adapters are a trimmed copy of proto/instrument/play.js's three lanes.
+// ============================================================================
+const CH = { deck: null, spans: {}, master: null, fires: { 'midi-actuated': 0, 'media-span': 0 },
+             syncCalls: 0, syncCorrections: [], voices: new Set(), notes: [], mediaRestarts: 0 };
+let ac = null, gain = null;
+try { ac = new (window.AudioContext || window.webkitAudioContext)(); gain = ac.createGain(); gain.gain.value = 0.12; gain.connect(ac.destination); ac.resume().catch(() => {}); } catch {}
+const OSC = new Map();
+function voiceOn(raw) {
+  const [st, n, v] = raw;
+  const on = (st & 0xf0) === 0x90 && v > 0;
+  if (on) CH.voices.add(n); else CH.voices.delete(n);
+  if (ac) try {
+    if (on && !OSC.has(n)) {
+      const o = ac.createOscillator(); o.type = 'triangle';
+      o.frequency.value = 440 * Math.pow(2, (n - 69) / 12); o.connect(gain); o.start(); OSC.set(n, o);
+    } else if (!on && OSC.has(n)) { OSC.get(n).stop(); OSC.delete(n); }
+  } catch {}
+  paintKeys();
+}
+function silenceAll() { for (const n of [...CH.voices]) voiceOn([0x80, n, 0]); CH.voices.clear(); paintKeys(); }
+const heldFold = (payloads) => {
+  const held = new Map();
+  for (const p of payloads) { const [s, n, v] = p.raw; if ((s & 0xf0) === 0x90 && v > 0) held.set(n, p); else held.delete(n); }
+  return held;
+};
+const actuatedAdapter = {
+  caps: { kind: 'midi-actuated', domain: 'wall', unit: 'ms', lane: 'host (instrument clock)',
+          seekable: true, reducible: true, audible: true, rates: [0.25, 0.5, 1, 2, 4], catchUp: 'burst' },
+  actuate(p) { CH.fires['midi-actuated']++; voiceOn(p.raw); },
+  reduce: heldFold,
+  assertState(held) { silenceAll(); for (const p of held.values()) voiceOn(p.raw); },
+};
+function assertChildSpan(sp, pos, present) {
+  const u = pos - sp.pos0;
+  if (!present || u < 0 || (sp.durMs && u > sp.durMs)) { if (!sp.el.paused) sp.el.pause(); return; }
+  const want = u / 1000;
+  if (Math.abs(sp.el.currentTime - want) > 0.05) { try { sp.el.currentTime = want; } catch {} }
+  sp.el.playbackRate = Math.max(0.0625, Math.min(16, CH.deck ? CH.deck.targetRate() : 1));
+  if (CH.deck && CH.deck.playing()) sp.el.play().catch(() => {}); else sp.el.pause();
+}
+const childSpanAdapter = {
+  caps: { kind: 'media-span', domain: 'wall', unit: 'ms', seekable: true, reducible: true,
+          clockMaster: true, seekAccuracyMs: 40, rates: [0.25, 0.5, 1, 2, 4], syncToleranceMs: 40, catchUp: 'reduce' },
+  actuate(p) { CH.fires['media-span']++; const sp = CH.spans[p.lane]; if (sp) assertChildSpan(sp, CH.deck ? CH.deck.position() : p.at, p.phase === 'enter'); },
+  reduce(payloads, pos) {
+    const present = new Set();
+    for (const p of payloads) { if (p.phase === 'enter') present.add(p.lane); else present.delete(p.lane); }
+    for (const lane of [...present]) { const sp = CH.spans[lane], u = sp ? pos - sp.pos0 : -1; if (!sp || u < 0 || (sp.durMs && u > sp.durMs)) present.delete(lane); }
+    return present;
+  },
+  assertState(present, info) { for (const [lane, sp] of Object.entries(CH.spans)) assertChildSpan(sp, info.pos, present.has(lane)); },
+};
+// the CHILD's own clock master — governs INSIDE the child only (nested rule 4)
+let chAdvance = { t: null, wall: 0 };
+function childDriveFromMaster() {
+  const m = CH.master;
+  if (!CH.deck || !CH.deck.playing() || !m || m.el.paused) return;
+  const mediaT = m.pos0 + m.el.currentTime * 1000;
+  const now = performance.now();
+  if (chAdvance.t !== null && mediaT === chAdvance.t && now - chAdvance.wall > 1000) return;  // stalled: free-run
+  if (chAdvance.t === null || mediaT !== chAdvance.t) chAdvance = { t: mediaT, wall: now };
+  CH.syncCalls++;
+  const c = CH.deck.sync(mediaT, { toleranceMs: 40 });
+  if (c) { CH.syncCorrections.push(+c.toFixed(1)); if (CH.syncCorrections.length > 400) CH.syncCorrections.shift(); }
+}
+
+async function buildChild() {
+  const txt = await (await fetch('/instrument/results/instr-session.jsonl')).text();
+  const rows = txt.trim().split('\n').map((l) => JSON.parse(l));
+  const midi = rows.filter((e) => (e.kind === 'midi' || e.kind === 'midi-actuated') && Array.isArray(e.raw));
+  // THE HOST CLOCK IS MASTER when replaying from storage (play.js masterLane()).
+  // This kept session stored no `midi-actuated` lane, so the player's own rows
+  // are the master lane and the audio alignment is skew-limited — stated, not
+  // hidden.
+  const host = midi.filter((e) => e.kind === 'midi-actuated');
+  const masterRows = (host.length ? host : midi.filter((e) => e.kind === 'midi')).slice().sort((a, b) => a.at - b.at);
+  const audioSpan = rows.find((e) => e.kind === 'audio-span');
+  const atUs = audioSpan ? audioSpan.at : masterRows[0].at;
+  const durMs = Math.round((masterRows[masterRows.length - 1].at - atUs) / 1000) + 1500;
+  const el = mkAudio(toneWav(durMs / 1000, 196));
+  await ready(el);
+  CH.spans.audio = { lane: 'audio', el, durMs, pos0: 0 };
+
+  const deck = CH.deck = makeLogDeck({
+    lanes: [
+      { kind: 'midi-actuated', rows: masterRows, adapter: actuatedAdapter },
+      { kind: 'media-span', rows: [{ at: atUs, lane: 'audio' }], adapter: childSpanAdapter,
+        expand: (row) => [
+          { atUs: row.at, id: 'span-audio-in', payload: { lane: 'audio', phase: 'enter' } },
+          { atUs: row.at + durMs * 1000, id: 'span-audio-out', payload: { lane: 'audio', phase: 'exit' } },
+        ] },
+    ],
+    leadInMs: 250, tailMs: 500, tickHost: 'main',
+  });
+  CH.spans.audio.pos0 = deck.toPos(atUs);
+  CH.master = CH.spans.audio;
+  deck.transport.onState((st) => {
+    if (st.reason !== 'play' && st.reason !== 'pause' && st.reason !== 'rate') return;
+    const r = Math.max(0.0625, Math.min(16, deck.targetRate()));
+    for (const sp of Object.values(CH.spans)) {
+      sp.el.playbackRate = r;
+      const u = deck.position() - sp.pos0;
+      if (deck.playing() && u >= 0 && u <= sp.durMs) sp.el.play().catch(() => {}); else sp.el.pause();
+    }
+  });
+  // note intervals, for drawing and for choosing meaningful probe positions
+  const openN = new Map();
+  for (const r of masterRows) {
+    const [s, n, v] = r.raw, p = deck.toPos(r.at);
+    if ((s & 0xf0) === 0x90 && v > 0) openN.set(n, p);
+    else if (openN.has(n)) { CH.notes.push({ n, on: openN.get(n), off: p }); openN.delete(n); }
+  }
+  deck.seek(deck.range[0]);
+  return { deck, notes: masterRows.length, atUs, durMs, sessionRows: rows.length };
+}
+
+// ============================================================================
+// THE PARENT — the arrangement (the remixer's media-span adapter, trimmed)
+// ============================================================================
+const PA = { deck: null, layers: new Map(), nest: null, syncCalls: 0 };
+const SERVO_BAND_MS = 20, HARD_RESYNC_MS = 150;
+function assertLayer(L, pos, present) {
+  const u = pos - L.at;
+  if (!present || u < 0 || u > L.durMs) { if (!L.el.paused) L.el.pause(); return; }
+  const want = u / 1000;
+  if (Math.abs(L.el.currentTime - want) > HARD_RESYNC_MS / 1000) { try { L.el.currentTime = want; } catch {} }
+  L.el.playbackRate = PA.deck ? PA.deck.targetRate() : 1;
+  if (PA.deck && PA.deck.playing()) L.el.play().catch(() => {}); else L.el.pause();
+}
+const archAdapter = {
+  caps: { kind: 'media-span', domain: 'arrangement', unit: 'ms', seekable: true, reducible: true,
+          clockMaster: false, seekAccuracyMs: 40, rates: [0.5, 0.75, 1, 1.5, 2],
+          servoBandMs: SERVO_BAND_MS, syncToleranceMs: 40, catchUp: 'reduce', anchor: 'arrangement-offset' },
+  actuate(p) { const L = PA.layers.get(p.tag); if (L) assertLayer(L, PA.deck ? PA.deck.position() : p.at, p.phase === 'enter'); },
+  reduce(payloads, pos) {
+    const present = new Set();
+    for (const p of payloads) { if (p.phase === 'enter') present.add(p.tag); else present.delete(p.tag); }
+    for (const tag of [...present]) { const L = PA.layers.get(tag), u = L ? pos - L.at : -1; if (!L || u < 0 || u > L.durMs) present.delete(tag); }
+    return present;
+  },
+  assertState(present, info) { for (const [tag, L] of PA.layers) assertLayer(L, info.pos, present.has(tag)); },
+};
+function servoArchive() {
+  if (!PA.deck || !PA.deck.playing()) return;
+  const pos = PA.deck.position(), r = PA.deck.targetRate();
+  for (const [, L] of PA.layers) {
+    const u = pos - L.at;
+    if (u < 0 || u > L.durMs) { if (!L.el.paused) L.el.pause(); continue; }
+    if (L.el.paused) { L.el.play().catch(() => {}); continue; }
+    const errMs = L.el.currentTime * 1000 - u;
+    if (Math.abs(errMs) > HARD_RESYNC_MS) { try { L.el.currentTime = u / 1000; } catch {} continue; }
+    L.el.playbackRate = r * (errMs > SERVO_BAND_MS ? 0.94 : errMs < -SERVO_BAND_MS ? 1.06 : 1);
+  }
+}
+
+const ARR_END = 75000, NEST_AT = 30000;
+const LAYOUT = [
+  { tag: 'A1', at: 0, durMs: 75000, freq: 110 },
+  { tag: 'A2', at: 10000, durMs: 40000, freq: 147 },
+];
+
+async function build() {
+  const child = await buildChild();
+  const items = [];
+  for (const L of LAYOUT) {
+    const el = mkAudio(toneWav(L.durMs / 1000, L.freq));
+    await ready(el);
+    PA.layers.set(L.tag, { ...L, el });
+    items.push({ at: L.at, kind: 'media-span', id: `sp-${L.tag}-in`, payload: { tag: L.tag, phase: 'enter' } });
+    items.push({ at: L.at + L.durMs, kind: 'media-span', id: `sp-${L.tag}-out`, payload: { tag: L.tag, phase: 'exit' } });
+  }
+  const deck = PA.deck = createDeck({
+    items, range: [0, ARR_END], adapters: { 'media-span': archAdapter }, tickHost: 'main',
+  });
+  deck.transport.onState((st) => {
+    if (st.reason !== 'play' && st.reason !== 'pause' && st.reason !== 'rate') return;
+    for (const [, L] of PA.layers) {
+      L.el.playbackRate = deck.targetRate();
+      const u = deck.position() - L.at;
+      if (deck.playing() && u >= 0 && u <= L.durMs) L.el.play().catch(() => {}); else L.el.pause();
+    }
+  });
+  // ---- THE NESTED SPAN. One line of client code, and it is a deck. ----------
+  PA.nest = createNest(deck, { kind: 'deck-span', toleranceMs: 40, hardSeekMs: 250 });
+  PA.nest.add({ id: 'sess', at: NEST_AT, rate: 1, deck: child.deck, master: true });
+  deck.seek(0);
+  drawArrangement();
+  return child;
+}
+
+// The `caps.followsTransport` seam, one level down: an element that is asked to
+// play() while the transport is mid-boundary can silently stay paused (measured:
+// the child's audio started on one headless run and not the next). Every media
+// client in this repo re-writes this repair; here it is once, and it makes the
+// child's master self-healing — the element is never NUDGED (it is the child's
+// clock), only re-started if it is in-span and idle.
+function followChildMedia() {
+  const sp = CH.spans.audio;
+  if (!CH.deck || !sp) return;
+  const u = CH.deck.position() - sp.pos0;
+  const inSp = u >= 0 && u <= sp.durMs;
+  if (!CH.deck.playing() || !inSp) { if (!sp.el.paused) sp.el.pause(); return; }
+  if (sp.el.paused) {
+    CH.mediaRestarts++;
+    try { sp.el.currentTime = u / 1000; } catch {}
+    sp.el.playbackRate = Math.max(0.0625, Math.min(16, CH.deck.targetRate()));
+    sp.el.play().catch(() => {});
+  }
+}
+
+// --- servo loop: the child's master, then the nest, then the archive layers --
+function loop() {
+  followChildMedia();
+  childDriveFromMaster();
+  if (PA.nest) PA.nest.servo();
+  servoArchive();
+  paint();
+  requestAnimationFrame(loop);
+}
+
+// --- drawing ----------------------------------------------------------------
+function drawArrangement() {
+  const arr = $('arr');
+  arr.querySelectorAll('.lane,#nestbox').forEach((n) => n.remove());
+  const pct = (ms) => (ms / ARR_END * 100).toFixed(3) + '%';
+  let row = 0;
+  for (const [tag, L] of PA.layers) {
+    const d = document.createElement('div');
+    d.className = 'lane arch';
+    d.style.left = pct(L.at); d.style.width = pct(L.durMs); d.style.top = (8 + row++ * 26) + 'px';
+    d.innerHTML = `<span class="lbl">${tag} · archive stand-in ${(L.durMs / 1000) | 0}s</span>`;
+    arr.insertBefore(d, $('ph'));
+  }
+  const sp = PA.nest.span('sess');
+  const box = document.createElement('div');
+  box.id = 'nestbox';
+  box.style.left = pct(sp.at); box.style.width = pct(sp.parentDur);
+  box.style.top = (8 + row * 26) + 'px'; box.style.height = '78px';
+  box.innerHTML = `<div class="hdr">NESTED DECK · instrument session · ${CH.notes.length} notes</div>
+                   <div id="childlanes"><div id="cph"></div></div>`;
+  arr.insertBefore(box, $('ph'));
+  const cl = $('childlanes'), [c0, c1] = CH.deck.range, cspan = c1 - c0;
+  const cp = (p) => ((p - c0) / cspan * 100).toFixed(3) + '%';
+  const m = CH.spans.audio;
+  const md = document.createElement('div');
+  md.className = 'cmedia'; md.style.left = cp(m.pos0); md.style.width = ((m.durMs / cspan) * 100).toFixed(3) + '%';
+  md.style.top = '2px'; cl.appendChild(md);
+  for (const nt of CH.notes) {
+    const d = document.createElement('div');
+    d.className = 'cnote';
+    d.style.left = cp(nt.on); d.style.width = Math.max(0.35, (nt.off - nt.on) / cspan * 100).toFixed(3) + '%';
+    d.style.top = (16 + ((nt.n - 60) % 8) * 5) + 'px';
+    cl.appendChild(d);
+  }
+  const kb = $('keys');
+  kb.innerHTML = '';
+  for (let n = 60; n <= 72; n++) { const d = document.createElement('div'); d.dataset.n = n; kb.appendChild(d); }
+}
+function paintKeys() {
+  const kb = $('keys');
+  for (const d of kb.children) d.classList.toggle('lit', CH.voices.has(+d.dataset.n));
+}
+function paint() {
+  const d = PA.deck; if (!d) return;
+  const pos = d.position();
+  $('ph').style.left = (Math.max(0, Math.min(1, pos / ARR_END)) * 100).toFixed(3) + '%';
+  $('play').textContent = d.playing() ? '❚❚' : '▶';
+  $('rate').textContent = d.targetRate().toFixed(2) + '×';
+  const present = PA.nest.present('sess');
+  const cph = $('cph');
+  if (cph) {
+    const [c0, c1] = CH.deck.range;
+    cph.style.display = present ? '' : 'none';
+    cph.style.left = (((CH.deck.position() - c0) / (c1 - c0)) * 100).toFixed(3) + '%';
+  }
+  $('read').textContent = `parent ${(pos / 1000).toFixed(2)}s · session ${present ? (CH.deck.position() / 1000).toFixed(2) + 's' : 'ABSENT'}`;
+  const rr = PA.nest.rateReport('sess');
+  $('hud').innerHTML = [
+    ['parent pos / rate', `${(pos / 1000).toFixed(3)} s · ${d.rate().toFixed(2)}× (target ${d.targetRate().toFixed(2)}×)`],
+    ['nested span', `at ${(NEST_AT / 1000)} s · rate 1 · ${(PA.nest.span('sess').parentDur / 1000).toFixed(2)} s of parent time · master=${PA.nest.masterId()}`],
+    ['child pos / rate', present ? `${(CH.deck.position() / 1000).toFixed(3)} s · ${CH.deck.rate().toFixed(2)}× (target ${CH.deck.targetRate().toFixed(2)}×)` : 'ABSENT — outside the span'],
+    ['rate composition', rr ? `wanted ${rr.wanted}× → chose ${rr.chose}×${rr.degraded ? ' <span class="bad">DEGRADED</span>' : ' <span class="ok">exact</span>'} · child lattice [${rr.allowed}]` : '–'],
+    ['child fires', `midi-actuated ${CH.fires['midi-actuated']} · media-span ${CH.fires['media-span']} · held [${[...CH.voices].sort((a, b) => a - b)}]`],
+    ['child master (inner)', `${CH.syncCalls} sync() calls, ${CH.syncCorrections.length} corrections > 40 ms`],
+    ['nest servo (outer)', `${PA.nest.driftStats().spans[0].parentCorrections.n} parent corrections from the CHILD'S position`],
+  ].map(([k, v]) => `<tr><td class="k">${k}</td><td>${v}</td></tr>`).join('');
+}
+
+// --- controls ---------------------------------------------------------------
+$('play').onclick = () => (PA.deck.playing() ? PA.deck.pause() : PA.deck.play());
+$('slow').onclick = () => PA.deck.setRate(Math.max(0.25, PA.deck.targetRate() / 2));
+$('fast').onclick = () => PA.deck.setRate(Math.min(4, PA.deck.targetRate() * 2));
+$('toNest').onclick = () => PA.deck.seek(NEST_AT + 9000);
+$('outside').onclick = () => PA.deck.seek(60000);
+$('arr').onclick = (e) => {
+  const r = $('arr').getBoundingClientRect();
+  PA.deck.seek((e.clientX - r.left) / r.width * ARR_END);
+};
+
+// ============================================================================
+// VERIFICATION — headless-drivable; the driver calls __compose.run()
+// ============================================================================
+const CHECKS = [];
+const chk = (name, ok, detail) => { CHECKS.push({ name, ok: !!ok, detail }); return ok; };
+const held = () => [...CH.voices].sort((a, b) => a - b);
+const wantHeld = (u) => CH.deck.reducedKeys('midi-actuated', u);
+
+async function run() {
+  const R = { checks: CHECKS, seeks: [], probes: [] };
+
+  // 1 — structure
+  const pc = PA.deck.caps();
+  R.parentKinds = Object.keys(pc); R.childKinds = Object.keys(CH.deck.caps());
+  chk('one parent deck carries a media-span AND a deck-span adapter',
+    R.parentKinds.includes('media-span') && R.parentKinds.includes('deck-span'), R.parentKinds.join(','));
+  chk('the nested adapter never masters the parent by default (rule 4)',
+    pc['deck-span'].nested === true && pc['deck-span'].clockMaster === false, JSON.stringify({ nested: pc['deck-span'].nested, clockMaster: pc['deck-span'].clockMaster }));
+  chk('the child is a real 3-lane instrument deck (notes + its own media master)',
+    R.childKinds.includes('midi-actuated') && R.childKinds.includes('media-span') && CH.deck.caps('media-span').clockMaster === true, R.childKinds.join(','));
+  const ds0 = PA.nest.driftStats();
+  R.depth = ds0.depth;
+  chk('nesting depth is 2 and the span is the declared master', ds0.depth === 2 && PA.nest.masterId() === 'sess', `depth ${ds0.depth}`);
+
+  // 2 — cycles rejected on the LIVE decks
+  let cyc = null;
+  try { PA.nest.add({ id: 'boom', deck: PA.deck }); } catch (e) { cyc = e.message; }
+  let cyc2 = null;
+  try { createNest(CH.deck, { kind: 'cyc' }).add({ id: 'boom2', deck: PA.deck }); } catch (e) { cyc2 = e.message; }
+  R.cycle = { self: cyc, back: cyc2 };
+  chk('a deck containing itself is rejected', /cannot contain itself/.test(cyc || ''), cyc);
+  chk('child -> parent (closing the loop) is rejected', /cycle/.test(cyc2 || ''), cyc2);
+
+  // 3 — plays in its arrangement slot
+  PA.deck.seek(NEST_AT - 2000);
+  const f0 = CH.fires['midi-actuated'];
+  PA.deck.play(1);
+  await sleep(7000);
+  const posIn = PA.deck.position(), cIn = CH.deck.position();
+  R.playsInSlot = { parentS: +(posIn / 1000).toFixed(3), childS: +(cIn / 1000).toFixed(3),
+    mapErrMs: +(cIn - (posIn - NEST_AT)).toFixed(1), fires: CH.fires['midi-actuated'] - f0,
+    mediaCurrentTimeS: +CH.spans.audio.el.currentTime.toFixed(3),
+    mediaReadyState: CH.spans.audio.el.readyState, mediaPaused: CH.spans.audio.el.paused,
+    mediaRestarts: CH.mediaRestarts, childSpanFires: CH.fires['media-span'],
+    innerSyncCalls: CH.syncCalls, innerCorrections: CH.syncCorrections.length,
+    outerCorrections: PA.nest.driftStats().spans[0].parentCorrections.n };
+  chk('the session PLAYS in its arrangement slot (notes fire, its own audio runs)',
+    R.playsInSlot.fires > 0 && R.playsInSlot.mediaCurrentTimeS > 0.5, JSON.stringify(R.playsInSlot));
+  chk('child position tracks the parent mapping while the CHILD masters',
+    Math.abs(R.playsInSlot.mapErrMs) < 60, `map error ${R.playsInSlot.mapErrMs} ms`);
+  PA.deck.pause();
+  await sleep(200);
+
+  // 4 — parent seek lands INSIDE the session; the held-note reduce is correct
+  const mids = CH.notes.filter((n) => n.off - n.on > 40).map((n) => (n.on + n.off) / 2);
+  const gaps = [];
+  for (let i = 1; i < CH.notes.length; i++) { const g = (CH.notes[i - 1].off + CH.notes[i].on) / 2; if (CH.notes[i].on - CH.notes[i - 1].off > 20) gaps.push(g); }
+  const probes = [];
+  for (let i = 0; i < 8; i++) probes.push(mids[Math.floor(i * mids.length / 8)]);
+  for (let i = 0; i < 6; i++) probes.push(gaps[Math.floor(i * gaps.length / 6)]);
+  let exact = 0, withNote = 0;
+  for (const u of probes) {
+    if (!Number.isFinite(u)) continue;
+    PA.deck.seek(NEST_AT + u);
+    await sleep(60);
+    const got = held(), want = wantHeld(u);
+    const posErr = +(CH.deck.position() - u).toFixed(3);
+    const ok = String(got) === String(want) && Math.abs(posErr) < 1;
+    if (ok) exact++;
+    if (want.length) withNote++;
+    R.probes.push({ parentMs: +(NEST_AT + u).toFixed(1), childMs: +u.toFixed(1), childPosErrMs: posErr, got, want, ok });
+  }
+  R.probeSummary = { n: R.probes.length, exact, withNoteHeld: withNote,
+    maxPosErrMs: Math.max(...R.probes.map((p) => Math.abs(p.childPosErrMs))) };
+  chk('a parent seek lands EXACTLY inside the nested session (position + held-note reduce)',
+    exact === R.probes.length && withNote > 0, JSON.stringify(R.probeSummary));
+
+  // 5 — parent pause stops everything
+  PA.deck.seek(NEST_AT + 6000);
+  PA.deck.play(1);
+  await sleep(1200);
+  PA.deck.pause();
+  await sleep(150);
+  const p0 = PA.deck.position(), c0 = CH.deck.position(), m0 = CH.spans.audio.el.currentTime;
+  const a0 = [...PA.layers.values()].map((L) => L.el.currentTime);
+  await sleep(1500);
+  R.pause = {
+    parentDriftMs: +(PA.deck.position() - p0).toFixed(3),
+    childDriftMs: +(CH.deck.position() - c0).toFixed(3),
+    childMediaDriftMs: +((CH.spans.audio.el.currentTime - m0) * 1000).toFixed(1),
+    archiveDriftMs: [...PA.layers.values()].map((L, i) => +((L.el.currentTime - a0[i]) * 1000).toFixed(1)),
+    childPlaying: CH.deck.playing(), childMediaPaused: CH.spans.audio.el.paused,
+    archivePaused: [...PA.layers.values()].map((L) => L.el.paused),
+  };
+  chk('parent pause stops EVERYTHING, one and two levels down',
+    R.pause.parentDriftMs === 0 && R.pause.childDriftMs === 0 && !R.pause.childPlaying &&
+    R.pause.childMediaPaused && R.pause.archivePaused.every(Boolean), JSON.stringify(R.pause));
+
+  // 6 — parent rate 2x composes with the child
+  PA.deck.setRate(2);
+  const armed = { parentRate: PA.deck.rate(), parentTarget: PA.deck.targetRate(),
+    childTarget: CH.deck.targetRate(), report: PA.nest.rateReport('sess') };
+  R.rate = { armed };
+  chk('setRate(2) ARMS while paused and composes 2x1 into the child (no degradation)',
+    armed.parentRate === 0 && armed.parentTarget === 2 && armed.childTarget === 2 &&
+    armed.report.wanted === 2 && armed.report.chose === 2 && armed.report.degraded === false, JSON.stringify(armed));
+  const rp0 = PA.deck.position(), rc0 = CH.deck.position();
+  const t0 = performance.now();
+  PA.deck.play();
+  await sleep(3000);
+  const wall = performance.now() - t0;
+  R.rate.run = { wallMs: Math.round(wall),
+    parentAdvancedMs: Math.round(PA.deck.position() - rp0),
+    childAdvancedMs: Math.round(CH.deck.position() - rc0),
+    childMediaRate: CH.spans.audio.el.playbackRate,
+    archiveRates: [...PA.layers.values()].map((L) => +L.el.playbackRate.toFixed(2)) };
+  R.rate.run.parentRatio = +(R.rate.run.parentAdvancedMs / wall).toFixed(3);
+  R.rate.run.childRatio = +(R.rate.run.childAdvancedMs / wall).toFixed(3);
+  PA.deck.pause();
+  chk('rate 2x composes: parent AND nested child both advance ~2x wall, child media at 2.00x',
+    R.rate.run.parentRatio > 1.7 && R.rate.run.childRatio > 1.7 && R.rate.run.childMediaRate === 2, JSON.stringify(R.rate.run));
+  // and a rate the child CANNOT honour degrades HONESTLY: 1.5x is a legal
+  // ARCHIVE rate ([0.5,0.75,1,1.5,2]) and is NOT on the instrument child's
+  // lattice ([0.25,0.5,1,2,4]). The child rounds to 2x, says so, and — because
+  // it is now running at a rate the parent did not ask for — its mastering is
+  // suspended, so the arrangement does not silently inherit 2x.
+  const dp0 = PA.deck.position(), dc0 = CH.deck.position(), dt0 = performance.now();
+  PA.deck.play(1.5);
+  await sleep(2500);
+  const dwall = performance.now() - dt0;
+  PA.deck.pause();
+  const deg = PA.nest.rateReport('sess'), dss = PA.nest.driftStats().spans[0];
+  R.rate.degrade = { ...deg, childLattice: CH.deck.caps('midi-actuated').rates,
+    archiveLattice: PA.deck.caps('media-span').rates, childTarget: CH.deck.targetRate(),
+    masterSuspended: dss.masterSuspended, childCorrections: dss.childCorrections.n,
+    parentRatio: +((PA.deck.position() - dp0) / dwall).toFixed(3),
+    childMapErrMs: +(CH.deck.position() - (PA.deck.position() - NEST_AT)).toFixed(1),
+    childAdvancedMs: Math.round(CH.deck.position() - dc0), wallMs: Math.round(dwall),
+    // the price, stated: the child's INNER media master now runs at 2x while the
+    // outer servo holds the child on the parent's 1.5x mapping — the outer servo
+    // wins every frame and the element drifts by exactly the difference.
+    childMediaOffsetMs: Math.round(CH.spans.audio.el.currentTime * 1000 - (CH.deck.position() - CH.spans.audio.pos0)) };
+  chk('a composed rate off the child lattice DEGRADES HONESTLY (chose it, said so, suspended mastering)',
+    deg.wanted === 1.5 && deg.chose === 2 && deg.degraded === true && CH.deck.targetRate() === 2 &&
+    R.rate.degrade.masterSuspended > 0 && Math.abs(R.rate.degrade.parentRatio - 1.5) < 0.2 &&
+    Math.abs(R.rate.degrade.childMapErrMs) < 250, JSON.stringify(R.rate.degrade));
+  PA.deck.setRate(1);
+
+  // 7 — absence is content: outside the span the session is gone, archive plays
+  PA.deck.seek(60000);
+  await sleep(150);
+  const beforeFires = CH.fires['midi-actuated'];
+  const cAbs = CH.deck.position();
+  const ct0 = [...PA.layers.values()].map((L) => L.el.currentTime);
+  PA.deck.play(1);
+  await sleep(2500);
+  // read the neighbours WHILE THE PARENT IS STILL PLAYING — `paused` after a
+  // pause is trivially true and would make this check vacuous
+  const archive = [...PA.layers.entries()].map(([tag, L], i) => ({
+    tag, inSpan: 60000 >= L.at && 60000 <= L.at + L.durMs,
+    paused: L.el.paused, ct: +L.el.currentTime.toFixed(2),
+    advancedMs: Math.round((L.el.currentTime - ct0[i]) * 1000),
+  }));
+  R.absence = {
+    present: PA.nest.present('sess'), childPlaying: CH.deck.playing(),
+    childPosDriftMs: +(CH.deck.position() - cAbs).toFixed(3),
+    childHeld: held(), childMediaPaused: CH.spans.audio.el.paused,
+    childFiresWhileAbsent: CH.fires['midi-actuated'] - beforeFires,
+    archive, parentAdvancedMs: Math.round(PA.deck.position() - 60000),
+  };
+  PA.deck.pause();
+  const a1 = R.absence.archive.find((x) => x.tag === 'A1');
+  const a2 = R.absence.archive.find((x) => x.tag === 'A2');
+  chk('outside the span the session is ABSENT (silent, paused, frozen) while an archive layer keeps playing',
+    !R.absence.present && !R.absence.childPlaying && R.absence.childHeld.length === 0 &&
+    R.absence.childMediaPaused && R.absence.childFiresWhileAbsent === 0 &&
+    !a1.paused && a1.advancedMs > 1500 && a2.paused && a2.advancedMs === 0 &&
+    R.absence.parentAdvancedMs > 1500, JSON.stringify(R.absence));
+
+  // 8 — nested drift, not flattened
+  PA.deck.seek(NEST_AT + 4000);
+  R.drift = PA.nest.driftStats();
+  R.childDrift = nestedDrift(CH.deck);
+  chk('drift NESTS: the child channel stays in the child domain',
+    !!(R.drift.spans[0].child && R.drift.spans[0].child.kinds && R.drift.spans[0].child.kinds['midi-actuated']),
+    Object.keys(R.drift.spans[0].child.kinds || {}).join(','));
+
+  R.errors = ERRORS;
+  R.mediaErrors = [...PA.layers.values()].concat([CH.spans.audio]).filter((L) => L.el.error).length;
+  chk('no page errors, no media errors', ERRORS.length === 0 && R.mediaErrors === 0, `${ERRORS.length} / ${R.mediaErrors}`);
+
+  R.pass = CHECKS.filter((c) => c.ok).length; R.total = CHECKS.length;
+  $('verdict').textContent = `${R.pass}/${R.total}\n` + CHECKS.map((c) => `${c.ok ? 'PASS' : 'FAIL'}  ${c.name}\n      ${c.detail}`).join('\n');
+  document.title = R.pass === R.total ? 'COMPOSE OK' : 'COMPOSE FAIL';
+  return R;
+}
+
+// --- boot -------------------------------------------------------------------
+const sess = await build();
+requestAnimationFrame(loop);
+const summary = { notes: sess.notes, sessionRows: sess.sessionRows, audioAtUs: sess.atUs,
+  audioDurMs: sess.durMs, childRange: CH.deck.range, childHost: CH.deck.hostName,
+  parentRange: PA.deck.range, nestAt: NEST_AT, nestParentDurMs: +PA.nest.span('sess').parentDur.toFixed(1),
+  noteIntervals: CH.notes.length };
+window.__compose = { run, PA, CH, nest: () => PA.nest, session: sess, summary, checks: CHECKS };
+$('verdict').textContent = `built. child = ${sess.notes} real MIDI rows from proto/instrument/results/instr-session.jsonl (${sess.sessionRows} log rows), child range ${JSON.stringify(CH.deck.range)} ms, nested at ${NEST_AT} ms. call __compose.run().`;
+</script>

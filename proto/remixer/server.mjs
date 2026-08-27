@@ -28,6 +28,7 @@ const MIME = {
   '.json': 'application/json',
   '.png': 'image/png',
   '.css': 'text/css',
+  '.jsonl': 'application/x-ndjson',
 };
 
 // --- upstream search, serialized + spaced >= 1 s ---------------------------
@@ -110,7 +111,12 @@ const server = http.createServer(async (req, res) => {
     // /timeline/* is aliased to the repo's SHARED timeline library — the same
     // file timeline/lab measured and proto/jam, proto/selfrec and
     // proto/instrument import. Loaded, never copied.
-    const base = file.startsWith('/timeline/') ? join(ROOT, '..', '..') : ROOT;
+    // /instrument/* is aliased READ-ONLY to proto/instrument — compose.html
+    // nests that rig's KEPT PROOF SESSION (results/instr-session.jsonl) as one
+    // span inside this arrangement. Loaded, never copied.
+    const base = file.startsWith('/timeline/') || file.startsWith('/instrument/')
+      ? join(ROOT, '..', '..') : ROOT;
+    if (file.startsWith('/instrument/')) file = '/proto' + file;
     if (file.includes('..')) throw new Error('nope');
     const data = await readFile(join(base, file));
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });

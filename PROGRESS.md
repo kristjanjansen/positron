@@ -148,6 +148,61 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### NESTED SPANS — COMPOSITION ACROSS TIMELINES (session 6s) — ✅ 16/16
+`timeline/nested.mjs` (~300 lines): `createNest(parentDeck).add({id, at, rate,
+deck, master})` + `servo()`. **transport.mjs needed ZERO changes** — a nested
+deck is an ordinary adapter (`kind:'deck-span'`), which is seam 1 (the adapter
+registry) paying off: composition is just another kind.
+- Rules chosen: child pos = `clamp(c0 + (parentPos−at)·rate)`; outside the span
+  the child pauses AND is asserted at the boundary it left through (absence is
+  content one level down). Rate composes multiplicatively against the
+  intersection of the child's adapter lattices, off-lattice → nearest in LOG
+  space with `{wanted, chose, degraded, reason}`. A parent seek is a real
+  `child.seek()` (so reduce-on-seek runs INSIDE), `sync()` reserved for the
+  servo. **A nested child never masters unless asked, and a DEGRADED child
+  cannot master** (it runs a rate the parent didn't ask for → mastering
+  suspends rather than silently imposing 2× on the arrangement). Cycles
+  rejected at add(), depth capped 8, drift nests rather than flattens.
+- prop-test green at 30 and 100 seeds with a new suite 4 (nest-span/seek/pause/
+  rate/absent/servo/master/cycle/depth); needed a fan-out of the virtual host
+  (two decks want two metronomes on one clock).
+- **Composed demo `proto/remixer/compose.html` — the motivating case, 16/16,
+  0 upstream calls**: the REAL kept instrument session (128 MIDI rows) nested at
+  30 s inside an arrangement beside archive spans. Parent 34.91 s → child
+  4.91 s, **map error 0.0 ms**; **parent seek into the middle: 14/14 probes
+  exact, max child position error 0.000 ms, held set === reduce(≤childPos)**;
+  pause holds every layer at 0.000; rate 2× → 5987 ms parent AND child in
+  3007 ms wall (1.99×), child media exactly 2.00×; 1.5× parent → child chose 2×,
+  degraded, **mastering suspended 300 ticks** while the arrangement still ran
+  1.50×; at 60 s the session is absent/frozen while the archive layer keeps
+  playing +2497 ms.
+- **Fourth latent bug, pattern holds**: the child's media element was asked to
+  play() at span entry and silently stayed paused for a whole pass — fixed via
+  `caps.followsTransport`, a seam now filed by THREE clients.
+- **Closing analysis — what plan-timeline still promises that the library
+  cannot express** (nesting sharpened 1–2 rather than solving them):
+  1. **Quotation of a FRAGMENT**: `{at, rate, deck}` has no `in`/`out`, so a
+     nested span plays the child's WHOLE range — but §−1's mission is quoting
+     *pieces*. Trim drags in the rest of v3 (move/mute/solo-by-query/re-time),
+     none of which exist because `range` is fixed at construction.
+  2. **Uncertainty as position**: "1971, probably spring" has no
+     representation — `at` and `position()` are exact scalars and the scheduler
+     cannot fire "approximately". Nesting made a SPAN a deck; it did not make
+     an INSTANT an interval with a distribution. The founding heritage
+     requirement, and the library is silent on it.
+  3. **The evidence firewall**: reduce/window still take no
+     `attested | restored(tier ≤ n) | all` policy — reconstructor lanes would
+     WORK today; the discipline that makes them honest does not exist.
+  4. **Provenance/rights**: payload is opaque by design, so nothing is
+     enforced — and pointedly `nest.add()` takes no provenance, so the
+     library's own quotation primitive cannot record what it quotes or under
+     what rights.
+  5. **A store**: v0 promised memory/DO/JSONL-R2 backends; the library is an
+     in-memory array with a linear-scan prefix. Decades of ERR cannot be a JS
+     array and no client has had to find out yet.
+  (Smaller: negative rate/reverse scrub explicitly unsupported; the strip
+  visualizer is still promised as a component and was hand-drawn again today.)
+
 ### PATHS: THE FIRST CONTINUOUS CLIENT (session 6r) — ✅ 9/9 (proto/paths)
 demo10 + draw/drag ported forward as a `pointer` kind — and the first client to
 exercise plan-timeline's `interpolate` seam.

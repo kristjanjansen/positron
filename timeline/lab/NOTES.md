@@ -231,3 +231,88 @@ sample-accuracy result stands.
 Next client's cost: a new kind is now `caps` + `actuate` (+ `reduce` /
 `assertState` if it wants seek to mean anything) handed to `createDeck` —
 no transport, no scheduler wiring, no drift plumbing, no reduce-on-seek.
+
+## Checkpoint 6 — v0.3: COMPOSITION ACROSS TIMELINES (2026-08-28)
+
+The last structural gap after four clients (PROGRESS 6q): every client could put
+*media* on a timeline; none could put a *timeline* on a timeline. `sync()`
+slaves a vector to exactly one external master and a deck's position is a single
+scalar, so "a stored instrument session dropped into an arrangement beside a
+1965 broadcast" had no representation.
+
+**New file `timeline/nested.mjs` (~300 lines).** The whole API a client touches:
+
+```js
+const nest = createNest(parentDeck, { toleranceMs: 40, hardSeekMs: 250 });
+nest.add({ id, at, rate, deck: childDeck, master: false });   // a span that IS a deck
+nest.servo();                                                  // from the rAF loop you already run
+```
+
+plus `nest.span/spans/childPos/parentPos/present/rateReport/masterId/driftStats/
+dispose`, and free functions `rateLattice(deck)`, `composeRate(pr, sr, allowed)`,
+`checkNestable(parent, child)`, `nestedDrift(deck)`, `MAX_NEST_DEPTH = 8`.
+It is a normal adapter (`kind: 'deck-span'`, `caps.catchUp: 'reduce'`) — the
+library needed **no changes to transport.mjs at all**. That is the seam-1
+registry paying off: composition is just another kind.
+
+### The six rules, and why each is that way
+
+1. **Domains do not mix.** `childPos = clamp(child.range, child.range[0] +
+   (parentPos − at) × rate)`; the span occupies `childDur/rate` of PARENT time.
+   Outside it the child is **absent** — paused and asserted at the boundary it
+   left through (`c0` before, `c1` after), so its reducer states the edge.
+   Absence is content, one level down too.
+2. **Rate composes multiplicatively and degrades OUT LOUD.** Effective =
+   `parentRate × span.rate`. The child's rate lattice is the INTERSECTION of its
+   adapters' `caps.rates`; off-lattice we pick the nearest **in log space** and
+   report `{wanted, chose, degraded, allowed, reason}`. Rate 0 (pause) is always
+   expressible and never degrades.
+3. **Seek in the parent is a real `seek()` in the child** (never a `sync()`), so
+   reduce-on-seek runs INSIDE the nested span and `assertState(reduce(prefix ≤ t))`
+   still holds one level down. `sync()` is reserved for the servo — a correction
+   must never re-fire.
+4. **A nested child never masters the parent** unless the span declares
+   `master: true`, and at most one span per parent may. Default is *follow*
+   (parent leads, child slaved: `sync()` inside the dead band, a real `seek()`
+   past `hardSeekMs`). With `master: true` the direction reverses and the
+   important half applies: **if the child contains its own clock master (a media
+   element), that master governs ONLY WITHIN THE CHILD and the parent slaves to
+   the CHILD'S POSITION, never to the element.** One indirection, and the two
+   masters cannot fight. **Corollary found while building: a DEGRADED child
+   cannot master** — it is running at a rate the parent did not ask for, and
+   letting it drive the clock would silently impose that rate on the whole
+   arrangement. Mastering SUSPENDS for the duration and the suspension is
+   counted (`masterSuspended`), not hidden.
+5. **Drift nests, never flattens.** `nest.driftStats()` is a span table with each
+   child's own drift channel (and ITS nest, recursively) hanging off it. A p95
+   averaged across two position domains would be a number about nothing.
+6. **Cycles rejected at `add()` time**, not discovered at play time: a deck may
+   not contain itself nor any ancestor (a deck appearing twice in a DAG *is*
+   legal). Depth capped at **8 decks in a chain** — seek and assert recurse the
+   chain synchronously.
+
+No timers live in nested.mjs (the vector law): `servo()` is called from the
+client's existing rAF/interval loop, exactly like the media servo every media
+client already runs.
+
+### prop-test: suite 4, and still green everywhere
+
+`node timeline/lab/prop-test.mjs` → **OK at 30 seeds (30 basic + 15 gymnastics +
+10 freeze) AND at 100 (100 + 50 + 34), 0 violations.** Suite 4 needed one
+harness trick: two decks want two tick metronomes on ONE virtual clock, and the
+virtual host holds a single `tickCb` — so it is fanned out (`sharedVR`), with
+`setTimer` passing straight through so commit ordering stays exact.
+
+| arm | what it asserts |
+|---|---|
+| `nest-span` | span length in parent time = childDur/rate; lattice = the child's caps.rates; adapter declares `nested:true, clockMaster:false` |
+| `nest-seek` | 5 nested seeks (incl. `u=0` and `u=3999`): child position exact to 1e-6, held-note set === `reduce(<= u)`, a `reason:'seek'` assert really ran IN THE CHILD, and `child.reduceAt()` agrees |
+| `nest-pause` | parent pause stops the child; both positions frozen over 3 s of virtual time; the servo corrects nothing while paused |
+| `nest-rate` | 2×1 composes exactly; `setRate` still ARMS while paused one level down; 6× on a [0.25,0.5,1,2,4] lattice → **4×, degraded**; 0.3× → 0.25× (log-nearest); pause never degrades; a child with no declared rates takes any rate; the degraded child is re-anchored by the servo and the degradation is COUNTED |
+| `nest-absent` | before the span: paused, parked at `c0`, nothing held. After it: parked at `c1`, nothing held, does not advance while the parent plays past it and the parent's own kind keeps firing |
+| `nest-servo` | a 60 ms shove is pulled back with **`sync()`, 0 re-fires** |
+| `nest-master` | master span corrects the PARENT and does not drag the child back; parent lands exactly on `toParent(childPos)`; a paused parent is never synced by its child; **a degraded child stops mastering and flips back to follow** |
+| `nest-cycle` / `nest-depth` | self-containment, `c → a` closing an `a → b → c` loop, and duplicate ids all rejected; `a → c` (a DAG diamond) allowed; a chain of 8 legal, 9 rejected |
+
+Composed-demo results (the motivating case) live in `proto/remixer/NOTES.md`
+Step 6 — 16/16 headless, 0 upstream calls.

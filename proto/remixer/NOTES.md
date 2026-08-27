@@ -160,3 +160,81 @@ Evidence: `timeline-transport.png` (chord playing under the AK filmikroonika
 `index.html`'s script is now `type="module"` (it imports the library). Module
 scope is not global, so the driver handles are exported deliberately as
 `window.__remix` / `window.__timeline` rather than by accident.
+
+## Step 6 — a timeline INSIDE the arrangement: `compose.html` (2026-08-28)
+
+Step 5 made the rack one playhead. This step answers the next question the rack
+asks and could not express: **what if one of the layers is itself a session?**
+`timeline/nested.mjs` (v0.3 of the library — see `timeline/lab/NOTES.md`
+Checkpoint 6 for the primitive and its rules) adds a **nested/offset span
+`{at, rate, deck}`**: one transport drives another DECK's position instead of an
+element's `currentTime`, through the same `sync()` contract.
+
+`compose.html` is the motivating case, built as a NEW page so `index.html`'s
+autotest is untouched:
+
+- **Parent** — an arrangement deck with the same `media-span` adapter this page
+  already ships (arrangement domain, ±20 ms servo band, hard resync 150 ms),
+  carrying two archive layers: `A1` 0–75 s and `A2` 10–50 s.
+- **Nested child** — the instrument rig's **kept proof session**,
+  `proto/instrument/results/instr-session.jsonl` (131 log rows, **128 real MIDI
+  rows in epoch µs**), rebuilt through `makeLogDeck` with the instrument's own
+  lane shape: an audible `midi-actuated` lane (held-note reduce, `catchUp:
+  'burst'`) plus a `media-span` whose element is the **clock master inside the
+  session**. Child range `[0, 18644]` ms; placed at **30 s, rate 1**, so it
+  occupies 30–48.64 s of the arrangement, declared `master: true`.
+- The server now aliases `/instrument/*` read-only to `proto/instrument/` — the
+  session file is **loaded, never copied**, exactly as `/timeline/*` is.
+
+### HONESTY — what is real here and what is a stand-in
+
+- The **nested deck is real**: real MIDI rows, real inter-onset timing, real
+  µs stamps from the instrument rig's own recording.
+- The **archive neighbours are synthetic generated tones**, not ERR items. This
+  page makes **ZERO upstream calls** by construction. The real-1965 case is
+  already proven by `index.html` (Step 5, 11/11, 6 upstream calls); repeating it
+  here would buy nothing and cost the archive.
+- The session's **audio return is not in the repo** (it lives in the rig's
+  IndexedDB), so the child's `media-span` element is likewise a generated tone
+  of the session's *own recorded duration* (17.894 s), anchored at the session's
+  *own* `audio-span` timestamp. **The timing comes out of the log; the sound
+  does not.**
+- This kept session stored no `midi-actuated` lane, so — per `play.js`'s
+  `masterLane()` — the player's own rows are the master lane and the audio
+  alignment is skew-limited. Stated, not hidden.
+
+### Verification (headless, `node proto/remixer/compose-run.mjs`) — 16/16
+
+| check | number |
+|---|---|
+| one parent deck, two adapters | `['media-span','deck-span']`; the nested adapter declares `nested:true`, **`clockMaster:false`** |
+| the child is a real 3-lane deck | `['midi-actuated','media-span']`, child media `clockMaster:true`, nesting **depth 2**, `masterId='sess'` |
+| **it plays in its slot** | parent 34.91 s → child **4.91 s**, **map error 0.0 ms**, 23 notes fired, the session's own audio at 4.657 s, readyState 4 |
+| the two masters do not fight | child's INNER master: **570 `sync()` calls, 2 corrections** > 40 ms · nest's OUTER servo: **2 parent corrections, taken from the CHILD'S position** |
+| **a parent seek lands inside the session** | **14/14 probes exact** (8 landing mid-note, 6 in gaps): max child position error **0.000 ms**, and the held-note set equals `reduce(<= childPos)` on every one |
+| parent pause stops everything | parent drift **0.000 ms**, child drift **0.000 ms**, child media drift **0.0 ms**, both archive layers 0.0 ms; child + its media + both archive elements all paused |
+| **rate 2× composes** | armed while paused (`rate` 0 / `targetRate` 2 / child target 2, `degraded:false`); playing: **5987 ms parent AND 5987 ms child in 3007 ms wall (1.99×)**, child media element at exactly **2.00×**, archive elements 2.00× |
+| rate degrades HONESTLY | parent 1.5× (a legal ARCHIVE rate) is **not** on the child's `[0.25,0.5,1,2,4]` lattice → child **chose 2×, `degraded:true`**, mastering **suspended 300 servo ticks**, 206 child corrections; the arrangement still ran at **1.50×** (not silently 2×) and the child held the mapping to **4.1 ms**. Price stated: the child's inner element drifts **158 ms** ahead while the outer servo wins each frame. |
+| **absence is content, one level down** | at 60 s: nested span absent, child paused, **0 notes held, 0 fires, position frozen 0.000 ms**, its media paused — while **A1 keeps playing (+2497 ms in 2.5 s)** and A2, past its own span, is correctly absent too |
+| cycles rejected on the LIVE decks | `nest.add(parent)` → *"a deck cannot contain itself"*; child → parent → *"the child already contains this parent"* |
+| drift nests | `driftStats().spans[0].child.kinds` = `{media-span, midi-actuated}` — the child's channel stays in the child's domain |
+| errors | **0** page errors, **0** console errors, **0** media errors |
+
+Run twice back to back, both 16/16.
+
+**One real bug this adoption found (the pattern holds — every adoption finds
+one), and it is the `caps.followsTransport` seam again.** On one headless run the
+child's media element was asked to `play()` at the exact instant the nested span
+entered and silently stayed paused for the whole pass (`innerSyncCalls: 0`,
+`currentTime: 0`) — the deck was correct, the element just never started. Every
+media client in this repo re-writes some version of this repair; `compose.html`
+now has it once (`followChildMedia()`: if the child is playing and in-span and
+its element is idle, restart it — never *nudge* it, it is the child's clock).
+The counter `mediaRestarts` is in the report: **0 on one run, 1 on the next**,
+both 16/16. This is the second time this exact seam has been filed from a client
+(PROGRESS 6q listed it after four adoptions); nesting makes it three.
+
+Evidence: `compose-nested.png` — the parent playhead at 40.29 s crossing the
+nested deck's own note lane, the child's playhead glowing at 10.29 s inside it,
+and key **C5 lit because a parent seek landed in the middle of that note and the
+child's reducer re-asserted it**. Report: `compose-report.json`.
