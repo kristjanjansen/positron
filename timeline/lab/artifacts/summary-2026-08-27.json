@@ -1,0 +1,592 @@
+{
+  "at": "2026-08-27T17:06:21.091Z",
+  "node": "v25.9.0",
+  "arms": {
+    "A": {
+      "main": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 1,
+          "p95": 6.4,
+          "p99": 7.3,
+          "min": -0.9,
+          "max": 9.1
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 1.1,
+            "p95": 1.5,
+            "p99": 1.6,
+            "min": 0.1,
+            "max": 1.7
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 1,
+            "p95": 6.4,
+            "p99": 6.6,
+            "min": -0.9,
+            "max": 6.8
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 0.7,
+            "p95": 8,
+            "p99": 9,
+            "min": -0.7,
+            "max": 9.1
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 209,
+          "mean": 0.9,
+          "max": 11
+        },
+        "obsHz": {
+          "n": 7279,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.5
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 29.4,
+          "maxTickGapMs": 26.8
+        }
+      },
+      "worker": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 5,
+          "p95": 15.3,
+          "p99": 17.3,
+          "min": -0.7,
+          "max": 18.5
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 8.9,
+            "p95": 12.6,
+            "p99": 12.9,
+            "min": 3.2,
+            "max": 13.3
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 4.6,
+            "p95": 15.5,
+            "p99": 17.4,
+            "min": -0.7,
+            "max": 18.5
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 2.9,
+            "p95": 11.4,
+            "p99": 14,
+            "min": -0.7,
+            "max": 15
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.1,
+          "max": 5
+        },
+        "obsHz": {
+          "n": 7290,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.6
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 35.6,
+          "maxTickGapMs": 35.2
+        }
+      },
+      "raf": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 3.7,
+          "p95": 8.6,
+          "p99": 9.1,
+          "min": 0,
+          "max": 10.4
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 0.8,
+            "p95": 8.7,
+            "p99": 8.9,
+            "min": 0,
+            "max": 8.9
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 3.7,
+            "p95": 8.6,
+            "p99": 9,
+            "min": 0,
+            "max": 10.4
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 4.6,
+            "p95": 8.5,
+            "p99": 9.6,
+            "min": 0,
+            "max": 9.8
+          }
+        },
+        "origins": {
+          "commit": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1,
+          "max": 4
+        },
+        "obsHz": {
+          "n": 7292,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.6
+        },
+        "schedStats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 1270,
+            "passed": 0,
+            "dropped": 0,
+            "reduced": 0
+          },
+          "total": 1270,
+          "busyMs": 33.7,
+          "maxTickGapMs": 10.6
+        }
+      },
+      "fanout": {
+        "n": 1270,
+        "scheduled": 1270,
+        "all": {
+          "n": 1270,
+          "p50": 1.6,
+          "p95": 2.7,
+          "p99": 3.1,
+          "min": 0.1,
+          "max": 3.5
+        },
+        "byTag": {
+          "sparse": {
+            "n": 120,
+            "p50": 1,
+            "p95": 2,
+            "p99": 2.2,
+            "min": 0.1,
+            "max": 2.3
+          },
+          "dense": {
+            "n": 1000,
+            "p50": 1.7,
+            "p95": 2.7,
+            "p99": 3.1,
+            "min": 0.1,
+            "max": 3.5
+          },
+          "cluster": {
+            "n": 150,
+            "p50": 1.5,
+            "p95": 2.5,
+            "p99": 2.9,
+            "min": 0.7,
+            "max": 2.9
+          }
+        },
+        "origins": {
+          "fanout": 1270
+        },
+        "cpu": {
+          "n": 180,
+          "mean": 1.1,
+          "max": 4
+        },
+        "obsHz": {
+          "n": 7294,
+          "p50": 8.3,
+          "p95": 10.3,
+          "max": 10.6
+        },
+        "schedStats": null
+      }
+    },
+    "D": {
+      "policies": {
+        "mode": "policies",
+        "stopUs": 1787850635992000,
+        "contUs": 1787850639048000,
+        "wakes": [
+          {
+            "wakeUs": 1787850639101305,
+            "gapMs": 3070.9
+          }
+        ],
+        "byKind": {
+          "b": {
+            "total": 300,
+            "fired": 300,
+            "dropped": 0,
+            "reduced": 0,
+            "passed": 0
+          },
+          "d": {
+            "total": 300,
+            "fired": 272,
+            "dropped": 28,
+            "reduced": 0,
+            "passed": 0
+          },
+          "r": {
+            "total": 300,
+            "fired": 272,
+            "dropped": 0,
+            "reduced": 28,
+            "passed": 0
+          }
+        },
+        "stats": {
+          "counts": {
+            "pending": 0,
+            "committed": 0,
+            "fired": 844,
+            "passed": 0,
+            "dropped": 28,
+            "reduced": 28
+          },
+          "total": 900,
+          "busyMs": 39.6,
+          "maxTickGapMs": 3038.9
+        },
+        "burstIn100ms": 32,
+        "burstIn500ms": 36,
+        "dropLost": 28,
+        "dropFiredIn100ms": 3,
+        "reduceCalls": [
+          {
+            "kind": "r",
+            "count": 28,
+            "tUs": 1787850639101805,
+            "pos": 13122.5
+          }
+        ],
+        "reduceState": 300,
+        "reduceExpected": 300,
+        "reduceConsistentMs": 0.5
+      },
+      "fanout": {
+        "mode": "fanout",
+        "stopUs": 1787850666759000,
+        "contUs": 1787850669820000,
+        "wakes": [
+          {
+            "wakeUs": 1787850669873405,
+            "gapMs": 3075.7
+          }
+        ],
+        "byKind": {
+          "f": {
+            "total": 899,
+            "fired": 899,
+            "dropped": 0,
+            "reduced": 0,
+            "passed": 0
+          }
+        },
+        "stats": null,
+        "fanoutIn100ms": 94,
+        "fanoutIn500ms": 106
+      }
+    },
+    "E": {
+      "h100": {
+        "nScheduled": 191,
+        "nDetected": 191,
+        "missedDetections": 0,
+        "laneStats": {
+          "rendered": 191,
+          "passed": 5
+        },
+        "driftPpm": 5237.5,
+        "renderDeltaMs": {
+          "n": 191,
+          "p50": 0.01,
+          "p95": 0.04,
+          "p99": 0.04,
+          "min": 0,
+          "max": 0.04
+        },
+        "wallMappedDeltaMs": {
+          "n": 191,
+          "p50": -24.23,
+          "p95": 21.91,
+          "p99": 26.79,
+          "min": -77.13,
+          "max": 27.92
+        },
+        "busyWindow": {
+          "clicks": 7,
+          "missing": 0,
+          "renderDeltaMs": {
+            "n": 7,
+            "p50": 0.01,
+            "p95": 0.04,
+            "p99": 0.04,
+            "min": 0,
+            "max": 0.04
+          }
+        },
+        "wallLane": {
+          "overall": {
+            "n": 200,
+            "p50": 8.8,
+            "p95": 12.8,
+            "p99": 400.5,
+            "min": 0.6,
+            "max": 500.6
+          },
+          "duringBusy": {
+            "n": 12,
+            "p50": 11.1,
+            "p95": 500.6,
+            "p99": 500.6,
+            "min": 0.6,
+            "max": 500.6
+          }
+        }
+      },
+      "h500": {
+        "nScheduled": 195,
+        "nDetected": 195,
+        "missedDetections": 0,
+        "laneStats": {
+          "rendered": 195,
+          "passed": 1
+        },
+        "driftPpm": 1949.3,
+        "renderDeltaMs": {
+          "n": 195,
+          "p50": 0.01,
+          "p95": 0.04,
+          "p99": 0.04,
+          "min": 0,
+          "max": 0.04
+        },
+        "wallMappedDeltaMs": {
+          "n": 195,
+          "p50": 10.32,
+          "p95": 27.31,
+          "p99": 31.15,
+          "min": -10.41,
+          "max": 31.45
+        },
+        "busyWindow": {
+          "clicks": 11,
+          "missing": 0,
+          "renderDeltaMs": {
+            "n": 11,
+            "p50": 0.01,
+            "p95": 0.04,
+            "p99": 0.04,
+            "min": 0,
+            "max": 0.04
+          }
+        },
+        "wallLane": {
+          "overall": {
+            "n": 200,
+            "p50": 2.4,
+            "p95": 6,
+            "p99": 401.2,
+            "min": -0.5,
+            "max": 501.1
+          },
+          "duringBusy": {
+            "n": 12,
+            "p50": 4.4,
+            "p95": 501.1,
+            "p99": 501.1,
+            "min": -0.4,
+            "max": 501.1
+          }
+        }
+      }
+    },
+    "BG": {
+      "main": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850729289905,
+            "state": "visible"
+          },
+          {
+            "t": 1787850734307405,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850744365705,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 575.7,
+          "p95": 980.7,
+          "p99": 994.2,
+          "min": 79.9,
+          "max": 994.2
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 2.4,
+          "p95": 3,
+          "p99": 3.1,
+          "min": 0.2,
+          "max": 3.1
+        }
+      },
+      "worker": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850755463505,
+            "state": "visible"
+          },
+          {
+            "t": 1787850760481905,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850770544805,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 7.7,
+          "p95": 8.5,
+          "p99": 17.8,
+          "min": 5.8,
+          "max": 17.8
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 12.8,
+          "p95": 15.9,
+          "p99": 16.2,
+          "min": 6.1,
+          "max": 16.6
+        }
+      },
+      "raf": {
+        "hiddenSeen": true,
+        "visLog": [
+          {
+            "t": 1787850781642905,
+            "state": "visible"
+          },
+          {
+            "t": 1787850786658505,
+            "state": "hidden"
+          },
+          {
+            "t": 1787850796717505,
+            "state": "visible"
+          }
+        ],
+        "hiddenWindowDelta": {
+          "n": 91,
+          "p50": 5074.7,
+          "p95": 9174.6,
+          "p99": 9574.6,
+          "min": 574.8,
+          "max": 9574.6
+        },
+        "foregroundDelta": {
+          "n": 134,
+          "p50": 1.6,
+          "p95": 3.5,
+          "p99": 3.7,
+          "min": 0.2,
+          "max": 3.9
+        }
+      }
+    },
+    "C_propTest": {
+      "cmd": "node timeline/lab/prop-test.mjs",
+      "verdict": "OK",
+      "seeds": {
+        "basic": 30,
+        "gymnastics": 15,
+        "extended_run": "100+50 also green"
+      },
+      "violations": 0,
+      "property": "reduce(events<=t) === state after play(0->t); gymnastics adds random seek/pause/resume/rate(0.5-3x) with reduce-on-seek; exactly-once fire audit; pause position-hold assert"
+    },
+    "F_midi": {
+      "verdict": "SKIPPED",
+      "reason": "native midi.node dlopen mmap EPERM on this host (see artifacts/midi-2026-08-27.json); harness complete for a capable host"
+    }
+  },
+  "clock": {
+    "offLocalUs": -195.5,
+    "minRttLocalUs": 300
+  },
+  "recommendation": {
+    "verdict": "vector + lookahead + committed-vs-pending HOLDS; per-event fan-out reproducibly fails seek/pause/rate/cancel",
+    "defaults": {
+      "wallTickMs": 25,
+      "wallHorizonMs": 100,
+      "lateGraceMs": 150,
+      "audioTickMs": 25,
+      "audioHorizonMs": ">= worst expected main-thread stall; 500 rode through a 500 ms stall, 100 lost 5 clicks"
+    },
+    "tickHost": "worker as library default (p95 15 ms foreground, 8.5 ms hidden - only host that survives background tabs); main host optional for foreground-critical paths (p95 6.4 ms); rAF never (9.2 s p95 hidden); fan-out never",
+    "caveats": [
+      "audio-vs-wall drift 1900-5200 ppm measured on headless fake output device - re-measure anchor quality on real hardware",
+      "wall->audio mapping p95 ~25 ms in headless; use getOutputTimestamp pairs + periodic reanchor"
+    ]
+  }
+}
