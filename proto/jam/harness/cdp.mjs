@@ -2,7 +2,7 @@
 import { writeFile } from 'node:fs/promises';
 
 export class CDP {
-  constructor() { this.id = 0; this.pending = new Map(); }
+  constructor() { this.id = 0; this.pending = new Map(); this.errors = []; }
   async connect(port, urlMatch) {
     for (let i = 0; i < 60; i++) {
       try {
@@ -13,8 +13,12 @@ export class CDP {
           await new Promise((res, rej) => { this.ws.onopen = res; this.ws.onerror = rej; });
           this.ws.onmessage = (e) => {
             const m = JSON.parse(e.data);
-            if (m.id && this.pending.has(m.id)) { this.pending.get(m.id)(m); this.pending.delete(m.id); }
+            if (m.id && this.pending.has(m.id)) { this.pending.get(m.id)(m); this.pending.delete(m.id); return; }
+            // page/console errors — "0 errors" has to be observed, not assumed
+            if (m.method === 'Runtime.exceptionThrown') this.errors.push('exception: ' + (m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text || '').slice(0, 200));
+            if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') this.errors.push('console.error: ' + JSON.stringify(m.params.args?.map((a) => a.value ?? a.description)).slice(0, 200));
           };
+          await this.send('Runtime.enable');
           return this;
         }
       } catch {}

@@ -13,9 +13,14 @@
 //  - the jam IS a timeline recording: flat event log {at, kind:'midi', source,
 //    raw, display}; replay re-feeds the SAME actuate path (overdub semantics
 //    §1.11: replay-fired events are marked and never re-enter the log)
+//  - REPLAY IS THE LIBRARY'S: timeline/transport.mjs drives it (vector +
+//    lookahead lane + drift channel), via jam-timeline.js. The live path is
+//    untouched — it still runs on the 25 ms/120 ms audio-lookahead loop below.
+
+import { makeDeck, pstats } from '/jam-timeline.js';
 
 export function makeJam(opts) {
-  const { mode, transportName, role, session, tempoBpm = 100 } = opts;
+  const { mode, transportName, role, session, tempoBpm = 100, tickHost = 'worker' } = opts;
   const other = role === 'a' ? 'b' : 'a';
   const SRC = { a: 1, b: 2 };
 
@@ -35,7 +40,12 @@ export function makeJam(opts) {
   }
 
   // ---------- synth (WebAudio, immediate local monitor) ----------
+  // Voices are TRACKED (note -> live nodes + envelope end) so that seek can do
+  // the honest thing: silence everything, then re-assert what should be
+  // sounding. Without a voice registry there is no held-note state to reduce to.
   const ac = new AudioContext();
+  const VOICE_MS = 400;                    // this instrument's one-shot envelope
+  const voices = new Map();                // note -> {osc, gain, untilMs}
   function playNote(note, vel, whenAcTime = 0, detuneCents = 0) {
     const t = whenAcTime || ac.currentTime;
     const osc = ac.createOscillator();
@@ -49,6 +59,22 @@ export function makeJam(opts) {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
     osc.connect(gain).connect(ac.destination);
     osc.start(t); osc.stop(t + 0.4);
+    const v = { osc, gain, untilMs: performance.now() + (t - ac.currentTime) * 1000 + VOICE_MS };
+    voices.set(note, v);                   // retrigger: newest voice owns the slot
+    osc.onended = () => { if (voices.get(note) === v) voices.delete(note); };
+  }
+  /** kill every live voice now (seek / panic). */
+  function silenceAll() {
+    for (const v of voices.values()) {
+      try { v.gain.gain.cancelScheduledValues(ac.currentTime); v.gain.gain.setValueAtTime(0, ac.currentTime); v.osc.stop(ac.currentTime); } catch {}
+    }
+    voices.clear();
+  }
+  /** the actually-sounding note set — the observable side of the reducer. */
+  function soundingNotes() {
+    const now = performance.now();
+    for (const [n, v] of voices) if (v.untilMs <= now) voices.delete(n);
+    return [...voices.keys()].sort((a, b) => a - b);
   }
 
   // ---------- payload (same 16-B frame as the bench) ----------
@@ -87,7 +113,7 @@ export function makeJam(opts) {
 
   // ---------- HUD ----------
   const owWindow = []; // rolling one-way ms for remote notes
-  const stats = { sentLocal: 0, recvRemote: 0, dupDropped: 0, replayFired: 0, waitMsLast: 0 };
+  const stats = { sentLocal: 0, recvRemote: 0, dupDropped: 0, replayFired: 0, waitMsLast: 0, drift: null };
   const hudEl = document.getElementById('hud');
   const flashEl = document.getElementById('flash');
   function rollP50() {
@@ -104,6 +130,11 @@ export function makeJam(opts) {
       `remote one-way p50 ${p50 === null ? '—' : p50.toFixed(1) + ' ms'}  (rolling ${owWindow.length})`,
       mode === 'interval' ? `last quantize wait ${stats.waitMsLast.toFixed(0)} ms` : '',
       `log ${log.length} events   replay fired ${stats.replayFired}`,
+      // transport deck: the timeline library's own numbers — position from the
+      // {p0,t0,rate} vector, error from the drift channel (NOT the live owMs)
+      deck ? `TRANSPORT  ${deck.playing() ? 'PLAY' : 'PAUSE'} ${deck.rate().toFixed(2)}×  pos ${(deck.position() / 1000).toFixed(2)} / ${(deck.durationMs / 1000).toFixed(2)} s  host=${deck.hostName}` : '',
+      deck && stats.drift ? `drift (library channel)  p50 ${stats.drift.p50} ms  p95 ${stats.drift.p95} ms  max ${stats.drift.max} ms  n ${stats.drift.n}` : '',
+      deck ? `sounding ${soundingNotes().join(' ') || '—'}` : '',
       extra,
     ].filter(Boolean).join('\n');
   }
@@ -258,27 +289,74 @@ export function makeJam(opts) {
     if (i >= 0) noteOn(PENTA[i]);
   });
 
-  // ---------- replay: re-feed the log through the SAME actuate path ----------
-  async function replay() {
-    if (!log.length) return { fired: 0, logged: 0 };
-    const events = [...log].sort((x, y) => x.at - y.at);
-    const t0 = events[0].at;
-    const startUs = nowUs() + 300000; // 300 ms lead-in
-    let fired = 0;
-    const done = new Promise((res) => {
-      for (const ev of events) {
-        scheduleAt(startUs + (ev.at - t0), (acT) => {
-          // replay-fired events are marked (tag) and never re-enter the log
-          actuate(ev.raw, ev.source, acT, { tag: `replay:${ev.source}` });
-          stats.replayFired = ++fired;
-          drawHud('REPLAY RUNNING');
-          if (fired === events.length) res();
-        });
+  // ---------- replay: the TIMELINE LIBRARY drives the SAME actuate path ------
+  // The `midi` adapter in the library's shape. reduce() is the C2 reducer in
+  // miniature: fold note-on/note-off (plus this instrument's one-shot envelope
+  // expiry) over events ≤ t to get the sounding set; assertState() is what
+  // makes seek meaningful — silence everything, re-assert what should be held.
+  const midiAdapter = {
+    caps: {
+      kind: 'midi', domain: 'wall', unit: 'ms',
+      seekable: true, reducible: true, rates: [0.5, 1, 2],
+      catchUp: 'burst',            // musical: never silently drop a note
+    },
+    actuate(p) { actuate(p.raw, p.source, 0, { tag: `replay:${p.source}` }); },
+    reduce(payloads, posMs) {
+      const held = new Map();
+      for (const p of payloads) {
+        const [status, note, vel] = p.raw;
+        if ((status & 0xf0) === 0x90 && vel > 0) held.set(note, p); else held.delete(note);
       }
-    });
-    await done;
+      for (const [note, p] of held) if (posMs - p.at >= VOICE_MS) held.delete(note);
+      return held;
+    },
+    assertState(held) {
+      silenceAll();
+      for (const p of held.values()) actuate(p.raw, p.source, 0, { tag: 'reassert' });
+    },
+  };
+
+  let deck = null, deckLogLen = -1;
+  /** the deck is a view of a log SNAPSHOT; rebuild it when the log has grown. */
+  function ensureDeck() {
+    if (deck && deckLogLen === log.length) return deck;
+    if (deck) deck.dispose();
+    deckLogLen = log.length;
+    let lastHud = 0;
+    deck = log.length ? makeDeck({
+      log, adapter: midiAdapter, kind: 'midi', tickHost,
+      // the position observable drives the HUD, throttled to ~10 Hz: a 60 Hz
+      // redraw is main-thread work that would show up in the firing error
+      onPosition: () => { const t = performance.now(); if (t - lastHud > 100) { lastHud = t; drawHud(); } },
+      onDrift: (rows, all) => { stats.drift = pstats(all.map((r) => r.deltaMs)); stats.replayFired = all.length; },
+    }) : null;
+    return deck;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** full-session replay at 1× — same signature the harness has always used. */
+  async function replay() {
+    const d = ensureDeck();
+    if (!d) return { fired: 0, logged: 0 };
+    const logBefore = log.length;
+    d.resetDrift(); stats.drift = null; stats.replayFired = 0;
+    silenceAll();
+    d.pause(); d.seek(0); d.setRate(1);   // setRate() is also play() in the library
+    const deadline = performance.now() + d.durationMs + 15000;
+    while (d.fireCount() < d.items.length && performance.now() < deadline) await sleep(50);
+    await sleep(150);
+    d.pause();
+    const rows = d.drift();
     drawHud('REPLAY DONE');
-    return { fired, logged: log.length };
+    return {
+      fired: rows.length, logged: log.length, scheduled: d.items.length,
+      logGrewBy: log.length - logBefore, host: d.hostName,
+      drift: pstats(rows.map((r) => r.deltaMs)),
+      origins: rows.reduce((a, r) => (a[r.origin] = (a[r.origin] || 0) + 1, a), {}),
+      audit: d.audit().fires.reduce((a, f) => (a[f.fires] = (a[f.fires] || 0) + 1, a), {}),
+      armedAfter: d.audit().armed,
+    };
   }
 
   // ---------- auto driver (headless verification): a musical 60 s duet ------
@@ -317,5 +395,9 @@ export function makeJam(opts) {
     start, noteOn, replay, autoPlay, nowUs,
     stats: () => ({ ...stats, p50: rollP50(), logged: log.length, offLocalUs }),
     log: () => log,
+    // transport deck (library-driven) + the reducer's observable side.
+    // deck() builds it from the current log snapshot; deckIfAny() never builds
+    // (the UI polls with it, so the live jam never spins up a worker).
+    deck: ensureDeck, deckIfAny: () => deck, soundingNotes, silenceAll, drawHud,
   };
 }

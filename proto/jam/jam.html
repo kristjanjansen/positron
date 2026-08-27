@@ -12,6 +12,12 @@
   .note.local { color: #9fe89f; }
   .note.remote { color: #ffb86b; }
   .hint { color: #777; }
+  #deck { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #16161d;
+          border: 1px solid #2a2a35; padding: 8px 12px; margin: 10px 0; }
+  #deck .lbl { color: #7fd4ff; }
+  #scrub { flex: 1 1 320px; min-width: 220px; accent-color: #7fd4ff; }
+  #pos { color: #9fe89f; min-width: 130px; }
+  button.on { background: #7fd4ff; color: #111; border-color: #7fd4ff; }
 </style>
 </head>
 <body>
@@ -20,6 +26,17 @@
 <div id="controls">
   transport <select id="tsel"><option value="dc">DC-direct</option><option value="do">DO relay</option><option value="moq">MoQ d14</option></select>
   <button id="replayBtn">replay session</button>
+</div>
+<div id="deck">
+  <span class="lbl">transport</span>
+  <button id="playBtn">▶ play</button>
+  <button id="pauseBtn">⏸ pause</button>
+  <input id="scrub" type="range" min="0" max="1000" step="1" value="0">
+  <span id="pos">0.00 / 0.00 s</span>
+  <span class="lbl">rate</span>
+  <button class="rate" data-r="0.5">0.5×</button>
+  <button class="rate on" data-r="1">1×</button>
+  <button class="rate" data-r="2">2×</button>
 </div>
 <div id="hud">booting…</div>
 <div id="flash"></div>
@@ -36,13 +53,40 @@ const jam = makeJam({
   transportName: transport,
   role: params.get('peer') || 'a',
   session: params.get('session') || 'local',
+  tickHost: params.get('tickhost') || 'worker',   // library ship-default (lab verdict)
 });
 document.getElementById('replayBtn').onclick = () => jam.replay();
+
+// ---- transport controls over the recorded session (the four operations the
+// four prior generations never had), all straight onto the library's deck ----
+const $ = (id) => document.getElementById(id);
+const scrub = $('scrub'), posEl = $('pos');
+let dragging = false;
+const withDeck = (fn) => { const d = jam.deck(); if (d) fn(d); };   // builds on demand
+
+$('playBtn').onclick = () => withDeck((d) => { if (d.position() >= d.durationMs) d.seek(0); d.play(); });
+$('pauseBtn').onclick = () => withDeck((d) => d.pause());
+scrub.oninput = () => { dragging = true; withDeck((d) => d.seek(+scrub.value / 1000 * d.durationMs)); };
+scrub.onchange = () => { dragging = false; };
+for (const b of document.querySelectorAll('button.rate')) b.onclick = () => {
+  withDeck((d) => d.setRate(+b.dataset.r));
+  for (const o of document.querySelectorAll('button.rate')) o.classList.toggle('on', o === b);
+};
+setInterval(() => {
+  const d = jam.deckIfAny();                       // peek — never builds a deck
+  if (!d) { posEl.textContent = 'no recording yet'; return; }
+  if (!dragging) scrub.value = Math.round(d.durationMs ? d.position() / d.durationMs * 1000 : 0);
+  posEl.textContent = `${(d.position() / 1000).toFixed(2)} / ${(d.durationMs / 1000).toFixed(2)} s`;
+  $('playBtn').classList.toggle('on', d.playing());
+}, 100);
+
 window.jam = jam;
 window.jamStats = () => jam.stats();
 window.jamLog = () => jam.log();
 window.jamReplay = () => jam.replay();
 window.jamAuto = (ms) => jam.autoPlay(ms);
+window.jamDeck = () => jam.deck();
+window.jamSounding = () => jam.soundingNotes();
 await jam.start();
 window.jamReady = true;
 </script>
