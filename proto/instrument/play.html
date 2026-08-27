@@ -66,6 +66,22 @@
   #feed { height:150px; overflow-y:auto; font-size:11px; }
   #log { height:140px; }
   video { width:100%; aspect-ratio:16/9; background:#000; border:1px solid var(--line); border-radius:4px; display:block; }
+
+  /* ---- replay transport (timeline/transport.mjs) ---- */
+  #rt-bar { margin-top:10px; border-top:1px solid var(--line); padding-top:9px; }
+  .rt { display:flex; align-items:center; gap:8px; }
+  .rt button { width:auto; flex:0 0 auto; padding:3px 10px; }
+  #rt-scrub { position:relative; flex:1; height:20px; background:#0b0d0f;
+              border:1px solid var(--line); border-radius:3px; cursor:pointer; }
+  #rt-ph { position:absolute; top:0; width:2px; height:100%; background:var(--hot); }
+  #rt-rate { flex:0 0 auto; min-width:46px; text-align:center; color:var(--hot); }
+  #rt-read { color:var(--dim); font-size:11px; white-space:pre; margin-top:5px; }
+  .lanes { display:flex; flex-direction:column; gap:5px; margin-top:8px; }
+  .lanetag { font-size:10px; letter-spacing:.06em; text-transform:uppercase; }
+  .lane { display:flex; gap:2px; margin-top:3px; }
+  .lane i { flex:1; height:13px; background:#12151a; border:1px solid var(--line); border-radius:2px; }
+  .lane i.lit { background:#1e3a2a; border-color:#2f5f45; }
+  .lane.intent i.lit { background:#3a331e; border-color:#5f542f; }
 </style>
 </head>
 <body>
@@ -138,8 +154,31 @@
     <audio id="sessaudio" controls style="display:none;width:100%;margin-top:8px"></audio>
     <video id="sessvideo" controls playsinline style="display:none;width:100%;margin-top:8px"></video>
     <div class="row" style="margin-top:7px">
+      <button id="b-arm-stored" disabled>Arm transport</button>
       <button id="b-replay-stored" disabled>Replay from storage</button>
       <button id="b-del-stored" class="stop" disabled>Delete it</button>
+    </div>
+
+    <!-- ONE playhead over the whole stored session: the host note lane, the
+         player-intent lane, and the recorded media — timeline/transport.mjs. -->
+    <div id="rt-bar" style="display:none">
+      <div class="rt">
+        <button id="rt-play">▶</button>
+        <div id="rt-scrub"><div id="rt-ph"></div></div>
+        <button id="rt-stepdn" title="slower">−</button>
+        <span id="rt-rate">1.00×</span>
+        <button id="rt-stepup" title="faster">+</button>
+      </div>
+      <div id="rt-read"></div>
+      <div class="lanes">
+        <div class="lanebox"><span class="lanetag ok">host · instrument clock — SOUNDS, and times the audio</span>
+          <div id="lane-host" class="lane"></div></div>
+        <div class="lanebox"><span class="lanetag warn">player · their clock, their intent — renders, never sounds</span>
+          <div id="lane-intent" class="lane intent"></div></div>
+      </div>
+      <div class="hint">Two lanes, never averaged: the gap between them is the one-way
+        latency the session measured. The media element is the clock master — the playhead
+        is slaved to it, so notes and audio cannot drift apart.</div>
     </div>
   </div>
 

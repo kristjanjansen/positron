@@ -330,3 +330,110 @@ both `/host-check.html` (12162 B) and its root-relative `/host-check.js`
    into stable timing, and the "late" counter finally means something.
 4. **Real key→ear over a real path**, which is the number the platform lives or
    dies by and the one playasynth.com has never published.
+
+## C12 — the replay is the timeline library now (2026-08-28)
+
+`proto/instrument` is the **third** client of `timeline/transport.mjs` (after
+`proto/jam` and `proto/selfrec/replay-grid.html`), and the first one on the
+LIVE-PERFORMANCE side of the claim. Replay-from-storage — which drove off the
+host lane with a hand-rolled loop — is now three adapters and one deck.
+
+### The old path, measured before it was replaced
+
+The loop it replaced was the graveyard arm from
+`research/timeline-own-prior-art-2026-08.md` §2, verbatim: one `setTimeout` per
+event armed against `performance.now() + 200`, no cancellation, no position, no
+pause, no seek. Measured in a real page (128 events, 64 note pairs at 220 ms,
+the shape `autoPlay()` produces):
+
+| what | number |
+|---|---|
+| firing offset vs the recorded `at`, speed 1 | p50 **2.2** p95 **4.8** max 5.5 ms |
+| same, speed 6 | p50 **2.37** p95 **4.8** max 5.57 ms |
+| "forward seek" (restart from the middle; the nearest thing that existed) | **116 orphan fires** from the abandoned run — 192 fires where a transport does 64 |
+| audio position when the first note fired | **2.575 s**, where the offset says **1.500 s** |
+
+Two of those were already known corpses. The third was not, and it is the
+**third latent bug in a row that an adoption measurement has found**:
+
+> **`replayStored()` started the recorded audio ~1075 ms AHEAD of the first
+> note.** The offset itself was right — `firstEvent.at − mediaSpanStart.at`,
+> a subtraction, not a guess — and it was applied correctly to
+> `el.currentTime`. Then the function slept **700 ms** to prove `advanced > 0`,
+> and `replayEvents()` added its own **200 ms** lead-in, and nothing ever
+> reconciled the two clocks again. The harness could not see it: its check was
+> `advanced > 0`, which a 1-second-early audio track passes perfectly. The
+> second half of the same bug: `speed` scaled the notes and left the media
+> element at 1×, so at the 6× the harness runs, note time and audio time
+> diverged at 5× real time.
+
+### What replaced it
+
+Three adapters (`caps` verbatim from the code):
+
+| kind | caps | actuate | reduce / assertState |
+|---|---|---|---|
+| `midi-actuated` | `{domain:'wall', unit:'ms', lane:'host (instrument clock)', seekable, reducible, audible:true, rates:[0.25…4], catchUp:'burst'}` | the existing `sendRaw(..., {replay:true})` | held-note fold / silence-all + re-assert (jam's shape) |
+| `midi` | `{lane:'player (intent)', audible:**false**, catchUp:'reduce'}` | paints the second lane | held set / repaint |
+| `media-span` | `{seekAccuracyMs:40, rates:[0.25…4], clockMaster:true, syncToleranceMs:40, catchUp:'reduce'}` | seek/play the recorded element | present set / hard-assert the element |
+
+The A/V element (audio-only as fallback) is the **clock master**: the library's
+vector is slaved to `el.currentTime` through `transport.sync(pos, {toleranceMs:
+40})` in a rAF servo, exactly as `proto/selfrec/replay-grid.html` does it. That
+is what kills the 1075 ms bug *structurally* — the audio is not "started at an
+offset and hoped for", it IS the clock, and the notes are scheduled against it.
+
+The two note lanes are on ONE timeline and are **never averaged**: the host lane
+sounds and times the audio; the player lane renders and does nothing else. That
+is the DEPLOYED.md rule made visible instead of merely written down.
+
+Transport controls landed in the UI: play/pause, click-to-seek scrubber with
+per-layer span bars, rate ±, a live readout, and the two note lanes as lit
+strips. Pause silences (a real instrument cannot be left holding a note) and
+play re-asserts via `assertAt(pos, 'midi-actuated')` — so pause/resume across a
+held note is lossless without this page knowing anything about notes twice.
+
+### Verification — 61/61 (was 54/54; 7 new checks)
+
+`node proto/instrument/harness/run-instrument.mjs`, one Chrome, three tabs, real
+WebRTC, real R2, real 15 s outage. All previous checks unchanged and green.
+
+| new check | number |
+|---|---|
+| host lane fires === stored rows | **256/256**; intent lane **128/128**, audible **false** |
+| audio offset | computed **2.172 s** === `firstEvent.at − span.at` **2.172 s** |
+| media position when the first note fired | **2213 ms** vs expected 2172 — **align error +41 ms** (was **+1075 ms**) |
+| seek ×3 (2 forward, 1 backward) | `sounding === reduce(prefix ≤ pos)` **3/3**, media re-anchor error **0 ms ×3** |
+| pause | playhead held **0.000 ms**, **0** fires, media stopped (drift 0.0 ms), nothing left sounding |
+| rate 2× | armed while paused (`rate` 0 / `targetRate` 2), advanced **2865 ms in 1500 ms** = 1.91×, element rate 2 |
+| armed timers after pause | **0** (the fan-out left 116 orphans ringing here) |
+| firing error, `hostKind:'main'` | p50 **4.34** p95 **8.64** max 9.96 ms, n=256 |
+
+Note the honest cost: firing error went from p50 2.2 / p95 4.8 ms (fan-out, idle
+page) to p50 4.34 / p95 8.64 ms (lookahead, main tick host, live page). That is
+the lab's arm A number reproduced (main p50 1.0–1.3 / p95 6.4–6.9) plus this
+page's own load, and it buys cancellation, seek, pause, rate, a drift channel
+and a media master. `?tickhost=worker` switches to the library default; `main`
+is the documented foreground-critical opt-in (6.4 vs 15.3 ms p95) and is what
+this page ships, because a replay is watched, not backgrounded.
+
+### API feedback for the library
+
+Nothing in v0.2 had to change. One thing was **missing above it**: `proto/jam`'s
+39-line seam (`jam-timeline.js`) is single-`kind` by construction — `makeDeck
+({log, adapter, kind})` cannot express a log with two note lanes and a media
+lane. So the seam moved up rather than being copied: **`timeline/logdeck.mjs`**
+(new, ~60 lines) — `makeLogDeck({lanes:[{kind, rows, adapter, expand?}],
+originUs, leadInMs})` — flat epoch-µs rows to the library's `{at ms}` item
+domain, one origin, one lead-in, N lanes, plus `expand()` for a row that is an
+*interval* rather than an instant (a media span is a start/end pair). `makeDeck`
+is exactly `makeLogDeck({lanes:[one]})`; `proto/jam` was left alone this session.
+`pstats` moved with it.
+
+Two smaller notes from the field, both worked around in four lines each:
+1. `play`/`pause`/`rate` are (correctly) not seeks, so no adapter re-asserts on
+   them. A media element still has to follow them, so every media client writes
+   the same `transport.onState` filter. A `caps.followsTransport` that made the
+   library call `assertState` on rate/play/pause would remove it.
+2. `createDeck`'s `range` is fixed at construction, so a client whose item set
+   changes (the remixer) rebuilds the deck instead of scheduling into it.

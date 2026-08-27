@@ -26,6 +26,9 @@ import {
   makeClock, buildBin, display, noteName, connectSignal, iceComplete, pcConnected,
   makeAcMap, makeOnsetTap, makeMatcher, isRealtime, dist, makeBackstop,
 } from '/instrument-core.js';
+// the SHARED timeline library, served from the repo (never copied) — the same
+// file timeline/lab measured and proto/jam + proto/selfrec import.
+import { makeLogDeck, pstats } from '/timeline/logdeck.mjs';
 
 const P = new URLSearchParams(location.search);
 const CLOCK = P.get('clock') === 'local' ? 'local' : 'worker';
@@ -458,28 +461,241 @@ function download() {
   a.click();
   return LOG.length;
 }
-// Replay: same sendRaw() the keys use. Timing comes from the log's own `at`
-// deltas, so a replay is the performance again, not a re-render of it.
-// ONE actuate path, fed from two sources: the in-memory log, or rows read back
-// out of the session store. Nothing below knows which.
+// ============================================================================
+// REPLAY — the shared timeline library drives it (timeline/transport.mjs +
+// timeline/logdeck.mjs), not a hand-rolled setTimeout fan-out.
+//
+// What used to be here was the graveyard arm from
+// research/timeline-own-prior-art-2026-08.md §2, verbatim: `play()` armed ONE
+// setTimeout per event against `performance.now() + 200`, with no cancellation
+// path, no position, no pause, no seek and no rate that meant anything. It was
+// measured before it was replaced (proto/instrument/NOTES.md C12): tight on a
+// clean run (p50 2.2 ms) and catastrophic the moment anything moved — a restart
+// from the middle left **116 orphan fires** ringing from the abandoned run, and
+// the stored-audio path put the recording **1075 ms ahead** of the first note.
+//
+// Three adapters, one deck, one playhead:
+//   `midi-actuated`  the HOST lane (instrument clock). AUDIBLE — this is the
+//                    lane that drives the notes and the audio alignment.
+//                    reduce = held-note fold; assertState = silence + re-assert.
+//   `midi`           the PLAYER lane (player clock, intent). A SECOND VISIBLE
+//                    lane; it renders, it never sounds and it never times the
+//                    audio. The difference between the lanes is the
+//                    measurement — see DEPLOYED.md; do not average them.
+//   `media-span`     the recorded audio / A/V. Its element is the CLOCK MASTER:
+//                    the library's vector is SLAVED to el.currentTime through
+//                    transport.sync(), exactly as proto/selfrec/replay-grid.html
+//                    does it. If the file stalls, the playhead stalls with it,
+//                    so notes and audio cannot drift apart.
+// ============================================================================
+const TICKHOST = P.get('tickhost') || 'main';   // foreground-critical: the lab's
+                                                // documented opt-in (6.4 vs 15.3 ms p95)
+const SYNC_TOL_MS = 40;                         // don't churn the lookahead on frame quantization
+
+// the notes this page believes it is currently sounding on the instrument
+const VOICES = new Set();
+function replaySend(raw) {
+  sendRaw(raw[0], raw[1], raw[2], { replay: true });
+  if ((raw[0] & 0xf0) === 0x90 && raw[2] > 0) VOICES.add(raw[1]); else VOICES.delete(raw[1]);
+}
+function silenceAll() {
+  for (const n of [...VOICES]) sendRaw(0x80, n, 0, { replay: true });
+  VOICES.clear();
+}
+const heldFold = (payloads) => {
+  const held = new Map();
+  for (const p of payloads) {
+    const [status, note, vel] = p.raw;
+    if ((status & 0xf0) === 0x90 && vel > 0) held.set(note, p); else held.delete(note);
+  }
+  return held;
+};
+
+const RS = window.__replay = {          // replay-transport state, for the HUD + harness
+  deck: null, kinds: [], fires: { 'midi-actuated': 0, midi: 0, 'media-span': 0 },
+  intentHeld: [], master: null, syncCorrections: [], firstNoteMediaMs: null,
+  audioOffsetS: null, spanPos0: null, hostName: null, from: null,
+};
+
+// ---- lane 1: the HOST lane. The only audible one. ---------------------------
+const actuatedAdapter = {
+  caps: {
+    kind: 'midi-actuated', domain: 'wall', unit: 'ms', lane: 'host (instrument clock)',
+    seekable: true, reducible: true, audible: true, rates: [0.25, 0.5, 1, 2, 4],
+    catchUp: 'burst',            // musical: a note is never silently dropped
+  },
+  actuate(p) {
+    RS.fires['midi-actuated']++;
+    if (RS.firstNoteMediaMs === null && RS.master && RS.master.el)
+      RS.firstNoteMediaMs = Math.round(RS.master.el.currentTime * 1000);
+    replaySend(p.raw);
+  },
+  reduce: heldFold,
+  assertState(held) { silenceAll(); for (const p of held.values()) replaySend(p.raw); },
+};
+
+// ---- lane 2: the PLAYER lane. Rendered, never sounded. ----------------------
+const intentAdapter = {
+  caps: {
+    kind: 'midi', domain: 'wall', unit: 'ms', lane: 'player (intent)',
+    seekable: true, reducible: true, audible: false, rates: [0.25, 0.5, 1, 2, 4],
+    catchUp: 'reduce',           // cosmetic: a missed window is re-folded, not machine-gunned
+  },
+  actuate(p) {
+    RS.fires.midi++;
+    const [status, note, vel] = p.raw;
+    const s = new Set(RS.intentHeld);
+    if ((status & 0xf0) === 0x90 && vel > 0) s.add(note); else s.delete(note);
+    paintIntent(s);
+  },
+  reduce(payloads) { return new Set(heldFold(payloads).keys()); },
+  assertState(set) { paintIntent(set); },
+};
+function paintIntent(heldish) {
+  const keys = heldish instanceof Set ? [...heldish] : [...heldish.keys()];
+  RS.intentHeld = keys.slice().sort((a, b) => a - b);
+  const el = $('lane-intent');
+  if (el) for (const d of el.children) d.classList.toggle('lit', keys.includes(+d.dataset.n));
+}
+
+// ---- lane 3: the recorded media. CLOCK MASTER via transport.sync(). ---------
+function assertSpan(sp, pos, present) {
+  const u = pos - sp.pos0;
+  const absent = !present || u < 0 || (sp.durMs && u > sp.durMs);
+  if (absent) { if (!sp.el.paused) sp.el.pause(); return; }
+  const want = u / 1000;
+  if (Math.abs(sp.el.currentTime - want) > 0.05) { try { sp.el.currentTime = want; } catch {} }
+  sp.el.playbackRate = Math.max(0.0625, Math.min(16, RS.deck ? RS.deck.targetRate() : 1));
+  if (RS.deck && RS.deck.playing()) sp.el.play().catch(() => {}); else sp.el.pause();
+}
+const spanAdapter = {
+  caps: {
+    kind: 'media-span', domain: 'wall', unit: 'ms',
+    seekable: true, reducible: true, clockMaster: true,
+    // an HTMLMediaElement is not a sample-accurate slave: seeks land on a frame
+    seekAccuracyMs: 40, rates: [0.25, 0.5, 1, 2, 4], syncToleranceMs: SYNC_TOL_MS,
+    catchUp: 'reduce',           // a missed span boundary is re-asserted, never burst
+  },
+  actuate(p) {
+    RS.fires['media-span']++;
+    const sp = RS.spans[p.lane];
+    if (sp) assertSpan(sp, RS.deck ? RS.deck.position() : p.at, p.phase === 'enter');
+  },
+  reduce(payloads, pos) {
+    const present = new Set();
+    for (const p of payloads) { if (p.phase === 'enter') present.add(p.lane); else present.delete(p.lane); }
+    for (const lane of [...present]) {
+      const sp = RS.spans[lane], u = sp ? pos - sp.pos0 : -1;
+      if (!sp || u < 0 || (sp.durMs && u > sp.durMs)) present.delete(lane);
+    }
+    return present;
+  },
+  assertState(present, info) {
+    for (const [lane, sp] of Object.entries(RS.spans || {})) assertSpan(sp, info.pos, present.has(lane));
+  },
+};
+
+// The master drives the library, never the other way round. A rAF loop is the
+// right place for this: it is a servo + paint, not an event engine.
+let masterAdvance = { t: null, wall: 0 };
+function driveFromMaster() {
+  const m = RS.master;
+  if (!RS.deck || !RS.deck.playing() || !m || !m.el || m.el.paused) return;
+  const mediaT = m.pos0 + m.el.currentTime * 1000;
+  const now = performance.now();
+  if (masterAdvance.t !== null && mediaT === masterAdvance.t && now - masterAdvance.wall > 1000) return; // stalled: free-run
+  if (masterAdvance.t === null || mediaT !== masterAdvance.t) masterAdvance = { t: mediaT, wall: now };
+  const corr = RS.deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
+  if (corr) { RS.syncCorrections.push(+corr.toFixed(1)); if (RS.syncCorrections.length > 400) RS.syncCorrections.shift(); }
+}
+
+// ---- building the deck ------------------------------------------------------
+function disposeDeck() {
+  if (RS.deck) { RS.deck.pause(); silenceAll(); RS.deck.dispose(); }
+  RS.deck = null; RS.spans = {}; RS.master = null; RS.intentPayloads = null;
+  RS.fires = { 'midi-actuated': 0, midi: 0, 'media-span': 0 };
+  RS.firstNoteMediaMs = null; RS.syncCorrections = []; masterAdvance = { t: null, wall: 0 };
+}
+
+/** Build the one deck. `hostRows` are audible; `intentRows` render only;
+ *  `media` (optional) is {lane, el, atUs, durMs} — the clock master. */
+function buildDeck({ hostRows, intentRows = [], media = null, from }) {
+  disposeDeck();
+  const lanes = [{ kind: 'midi-actuated', rows: hostRows, adapter: actuatedAdapter }];
+  if (intentRows.length) lanes.push({ kind: 'midi', rows: intentRows, adapter: intentAdapter });
+  if (media) {
+    RS.spans[media.lane] = { lane: media.lane, el: media.el, durMs: media.durMs, pos0: 0, atUs: media.atUs };
+    lanes.push({
+      kind: 'media-span', rows: [{ at: media.atUs, lane: media.lane }], adapter: spanAdapter,
+      // one row, TWO items: a span is an interval, not an instant
+      expand: (row) => [
+        { atUs: row.at, id: `span-${row.lane}-in`, payload: { lane: row.lane, phase: 'enter' } },
+        { atUs: row.at + (media.durMs || 0) * 1000, id: `span-${row.lane}-out`,
+          payload: { lane: row.lane, phase: 'exit' } },
+      ],
+    });
+  }
+  const deck = makeLogDeck({
+    lanes, leadInMs: 250, tailMs: 500, tickHost: TICKHOST,
+    onPosition: (pos) => { RS.pos = pos; },
+  });
+  RS.deck = deck;
+  RS.from = from;
+  RS.hostName = deck.hostName;
+  RS.kinds = Object.keys(deck.caps());
+  if (media) {
+    const sp = RS.spans[media.lane];
+    sp.pos0 = deck.toPos(media.atUs);
+    RS.spanPos0 = sp.pos0;
+    RS.master = sp;
+    RS.audioOffsetS = hostRows.length ? +((hostRows[0].at - media.atUs) / 1e6).toFixed(3) : null;
+  } else { RS.master = null; RS.spanPos0 = null; RS.audioOffsetS = null; }
+  // play / pause / rate are NOT seeks, so the library does not re-assert on
+  // them (correctly — nothing should re-fire). The media element still has to
+  // follow the transport, so it is followed here, once, per state change.
+  deck.transport.onState((st) => {
+    if (st.reason !== 'play' && st.reason !== 'pause' && st.reason !== 'rate') return;
+    const r = Math.max(0.0625, Math.min(16, deck.targetRate()));
+    for (const sp of Object.values(RS.spans)) {
+      sp.el.playbackRate = r;
+      const u = deck.position() - sp.pos0;
+      if (deck.playing() && u >= 0 && (!sp.durMs || u <= sp.durMs)) sp.el.play().catch(() => {});
+      else sp.el.pause();
+    }
+  });
+  deck.seek(deck.range[0]);
+  paintTransport();
+  return deck;
+}
+
+/** Play the armed deck from the top and resolve when the audible lane is done.
+ *  Same return shape the harness has always seen. */
+async function runDeck(deck, speed, from, expectFires) {
+  const before = LOG.length;
+  deck.seek(deck.range[0]);
+  deck.play(speed);
+  await new Promise((res) => {
+    const iv = setInterval(() => {
+      if (!RS.deck || RS.deck !== deck) { clearInterval(iv); return res(); }
+      if (!deck.playing()) return;                                  // paused by a human
+      if (RS.fires['midi-actuated'] >= expectFires || deck.position() >= deck.range[1]) { clearInterval(iv); res(); }
+    }, 20);
+  });
+  deck.pause();
+  silenceAll();
+  if (RS.master) RS.master.el.pause();
+  return { from, fired: RS.fires['midi-actuated'], logged: before,
+    logAfter: LOG.length, grew: LOG.length - before };
+}
+
+// Replay: same sendRaw() the keys use. ONE actuate path, fed from two sources —
+// the in-memory log, or rows read back out of the session store.
 async function replayEvents(evs, speed = 1, from = 'memory') {
   evs = evs.filter((e) => (e.kind === 'midi' || e.kind === 'midi-actuated')
     && Array.isArray(e.raw) && e.raw.length >= 3).sort((a, b) => a.at - b.at);
   if (!evs.length) return { from, fired: 0, logged: LOG.length, grew: 0 };
-  const before = LOG.length;
-  const t0 = evs[0].at;
-  const start = performance.now() + 200;
-  let fired = 0;
-  await new Promise((res) => {
-    for (const e of evs) {
-      const at = start + ((e.at - t0) / 1000) / speed;
-      setTimeout(() => {
-        sendRaw(e.raw[0], e.raw[1], e.raw[2], { replay: true });
-        if (++fired === evs.length) res();
-      }, Math.max(0, at - performance.now()));
-    }
-  });
-  return { from, fired, logged: before, logAfter: LOG.length, grew: LOG.length - before };
+  const deck = buildDeck({ hostRows: evs, from });
+  return runDeck(deck, speed, from, evs.length);
 }
 const replay = (speed = 1) => replayEvents(LOG.slice(), speed, 'memory');
 
@@ -512,6 +728,7 @@ async function loadSession(id) {
     el.className = 'hint';
   }
   if ($('b-replay-stored')) $('b-replay-stored').disabled = !lane.events.length;
+  if ($('b-arm-stored')) $('b-arm-stored').disabled = !lane.events.length;
   if ($('b-del-stored')) $('b-del-stored').disabled = false;
   S.loadedAudio = null;
   // PREFER THE A/V SPAN. If the owner consented to video, the `av` lane holds
@@ -582,34 +799,127 @@ function masterLane(events) {
     events: events.filter((e) => e.kind === 'midi' && Array.isArray(e.raw)), master: 'player',
   };
 }
-async function replayStored(speed = 1) {
+/** Arm ONE deck over the stored session: host lane (audible) + player-intent
+ *  lane (visible) + the recorded media span (clock master). Idempotent per
+ *  loaded session; the transport controls drive this same deck. */
+function armStored() {
   if (!S.loaded) return { error: 'nothing loaded' };
   const lane = masterLane(S.loaded.events);
-  const evs = lane.events.slice().sort((a, b) => a.at - b.at);
+  const hostRows = lane.events.slice().sort((a, b) => a.at - b.at);
+  if (!hostRows.length) return { error: 'no notes in the master lane' };
+  // the player's intent lane is a SECOND lane — never the same rows twice
+  const intentRows = lane.master === 'host'
+    ? S.loaded.events.filter((e) => e.kind === 'midi' && Array.isArray(e.raw)).sort((a, b) => a.at - b.at)
+    : [];
   const mediaLane = S.loadedAudio ? S.loadedAudio.lane : null;
   const el = mediaLane ? mediaEl(mediaLane) : null;
-  let audioOffsetS = null, advanced = null;
-  if (el && S.loadedAudio && evs.length) {
+  let media = null;
+  if (el && S.loadedAudio) {
     // the media-span START marker for THIS lane is the file's t=0, in the same
     // clock as the master lane — so the offset into it is a subtraction, not a
     // guess. `payload.kind` is what tells the two lanes' spans apart.
     const spans = S.loaded.events.filter((e) => e.kind === 'media-span' && e.payload && e.payload.phase === 'start');
     const span = spans.find((e) => (e.payload.kind || 'audio') === mediaLane) || spans[0];
-    audioOffsetS = span ? Math.max(0, (evs[0].at - span.at) / 1e6) : 0;
-    try {
-      el.currentTime = audioOffsetS;
-      await el.play();
-      const t0 = el.currentTime;
-      await new Promise((r) => setTimeout(r, 700));
-      advanced = +(el.currentTime - t0).toFixed(3);      // proof it is PLAYING
-    } catch (e) { log('media play', e.message); }
+    const end = S.loaded.events.find((e) => e.kind === 'media-span' && e.payload && e.payload.phase === 'end'
+      && (e.payload.kind || 'audio') === mediaLane);
+    if (span) {
+      const durMs = end && Number.isFinite(end.payload.durUs) ? Math.round(end.payload.durUs / 1000)
+        : (Number.isFinite(el.duration) && el.duration > 0 ? Math.round(el.duration * 1000) : 0);
+      media = { lane: mediaLane, el, atUs: span.at, durMs };
+    }
   }
-  const r = await replayEvents(evs, speed, 'storage');
-  return { ...r, master: lane.master, lane: lane.name, audioOffsetS,
-    mediaLane, advanced,
+  const deck = buildDeck({ hostRows, intentRows, media, from: 'storage' });
+  return { armed: true, master: lane.master, lane: lane.name, mediaLane,
+    hostNotes: hostRows.length, intentNotes: intentRows.length,
+    audioOffsetS: RS.audioOffsetS, spanPos0: RS.spanPos0,
+    range: deck.range, durationMs: Math.round(deck.durationMs), tickHost: deck.hostName };
+}
+
+async function replayStored(speed = 1) {
+  const a = armStored();
+  if (a.error) return a;
+  const deck = RS.deck;
+  const r = await runDeck(deck, speed, 'storage', a.hostNotes);
+  // `advanced` used to be a 700 ms sleep BEFORE the notes started, which is
+  // precisely what put the audio 1075 ms ahead of them (NOTES C12). It is now
+  // read off the master's own progress during the replay — no lead, no sleep.
+  const advanced = RS.master ? +(RS.master.el.currentTime - (RS.audioOffsetS || 0)).toFixed(3) : null;
+  return { ...r, master: a.master, lane: a.lane, audioOffsetS: a.audioOffsetS,
+    mediaLane: a.mediaLane, advanced,
+    intentFired: RS.fires.midi, intentNotes: a.intentNotes,
+    firstNoteMediaMs: RS.firstNoteMediaMs,
+    alignErrMs: RS.firstNoteMediaMs === null || a.audioOffsetS === null
+      ? null : Math.round(RS.firstNoteMediaMs - a.audioOffsetS * 1000),
+    syncCorrections: RS.syncCorrections.length,
+    drift: pstats(deck.drift().filter((d) => d.kind === 'midi-actuated').map((d) => d.deltaMs)),
+    tickHost: deck.hostName,
     videoWidth: S.loadedAudio ? S.loadedAudio.videoWidth : 0,
     videoHeight: S.loadedAudio ? S.loadedAudio.videoHeight : 0,
     audio: S.loadedAudio ? S.loadedAudio.bytes : 0 };
+}
+
+// ---------------- transport UI (play / pause / scrubber / rate) ---------------
+const RATES = [0.25, 0.5, 1, 2, 4];
+function paintTransport() {
+  const bar = $('rt-bar'); if (!bar) return;
+  const d = RS.deck;
+  bar.style.display = d ? '' : 'none';
+  if (!d) return;
+  const pos = d.position(), r0 = d.range[0], r1 = d.range[1];
+  const frac = Math.max(0, Math.min(1, (pos - r0) / Math.max(1, r1 - r0)));
+  $('rt-ph').style.left = `calc(${(frac * 100).toFixed(3)}% - 1px)`;
+  $('rt-play').textContent = d.playing() ? '❚❚' : '▶';
+  $('rt-rate').textContent = `${d.targetRate().toFixed(2)}×`;
+  $('rt-read').textContent =
+    `${((pos - r0) / 1000).toFixed(1)}s / ${((r1 - r0) / 1000).toFixed(1)}s` +
+    `  host ${RS.fires['midi-actuated']}  intent ${RS.fires.midi}` +
+    (RS.master ? `  media ${RS.master.el.currentTime.toFixed(2)}s` : '  (no media)') +
+    `  ${RS.hostName}`;
+  const host = $('lane-host');
+  if (host) for (const el of host.children) el.classList.toggle('lit', VOICES.has(+el.dataset.n));
+}
+function wireTransport() {
+  const scrub = $('rt-scrub');
+  if (!scrub) return;
+  for (const id of ['lane-host', 'lane-intent']) {
+    const el = $(id);
+    if (el) el.innerHTML = [...new Set(PENTA.concat(PENTA.map((n) => n + 12)))].sort((a, b) => a - b)
+      .map((n) => `<i data-n="${n}" title="${noteName(n)}"></i>`).join('');
+  }
+  $('rt-play').onclick = () => { if (!RS.deck) return; RS.deck.playing() ? pauseReplay() : playReplay(); };
+  $('rt-stepdn').onclick = () => bumpRate(-1);
+  $('rt-stepup').onclick = () => bumpRate(1);
+  scrub.onclick = (e) => {
+    if (!RS.deck) return;
+    const r = scrub.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    RS.deck.seek(RS.deck.range[0] + f * (RS.deck.range[1] - RS.deck.range[0]));
+  };
+  requestAnimationFrame(function loop() { driveFromMaster(); paintTransport(); requestAnimationFrame(loop); });
+}
+// Pause SILENCES (a real instrument cannot be left holding a note), and play
+// re-asserts what the reducer says should be held at the current position —
+// both through the library's own assertState, so pause/resume across a held
+// note is lossless without this page knowing anything about notes twice.
+function pauseReplay() {
+  if (!RS.deck) return;
+  RS.deck.pause();
+  silenceAll();
+  if (RS.master) RS.master.el.pause();
+}
+function playReplay(r) {
+  if (!RS.deck) return null;
+  RS.deck.assertAt(RS.deck.position(), 'midi-actuated');
+  RS.deck.play(r);
+  return RS.deck.position();
+}
+function bumpRate(dir) {
+  if (!RS.deck) return;
+  const cur = RS.deck.targetRate();
+  let i = RATES.findIndex((r) => r >= cur - 1e-6);
+  i = Math.max(0, Math.min(RATES.length - 1, (i < 0 ? 2 : i) + dir));
+  RS.deck.setRate(RATES[i]);                       // SEAM 2: arms, does not play
+  if (RS.master) RS.master.el.playbackRate = RATES[i];
 }
 
 // ---------------- feed / HUD ---------------------------------------------------
@@ -647,6 +957,8 @@ $('b-del').onclick = () => {
 };
 $('b-load').onclick = () => loadSession($('f-sid').value).catch((e) => log('load failed', e.message));
 $('b-replay-stored').onclick = () => replayStored().then((r) => log('replay from storage', JSON.stringify(r)));
+$('b-arm-stored').onclick = () => { const a = armStored(); log('armed', JSON.stringify(a)); if (!a.error) playReplay(); };
+wireTransport();
 $('b-del-stored').onclick = () => {
   const id = ($('f-sid').value || '').trim();
   if (!id || !confirm(`Delete session ${id}?`)) return;
@@ -667,9 +979,50 @@ async function autoPlay(n = 64, gapMs = 220, holdMs = 90) {
   S.matcher.flush();
   return { sent: S.sent, onsets: S.onsets, acks: S.acks };
 }
+// The replay TRANSPORT, exposed as the deck it is: play / pause / seek / rate
+// over the same three-lane timeline the UI drives. Every number below comes out
+// of timeline/transport.mjs, not out of this page.
+const transport = {
+  arm: () => armStored(),
+  play: (r) => playReplay(r),
+  pause: () => { pauseReplay(); return transport.pos(); },
+  seek: (p) => (RS.deck ? RS.deck.seek(p) : null),
+  /** position (ms) of a stored row's epoch-µs stamp — the log→timeline map */
+  posOf: (atUs) => (RS.deck ? RS.deck.toPos(atUs) : null),
+  seekFrac: (f) => (RS.deck ? RS.deck.seek(RS.deck.range[0] + f * (RS.deck.range[1] - RS.deck.range[0])) : null),
+  setRate: (r) => { if (!RS.deck) return null; RS.deck.setRate(r); if (RS.master) RS.master.el.playbackRate = r; return RS.deck.targetRate(); },
+  pos: () => (RS.deck ? RS.deck.position() : null),
+  range: () => (RS.deck ? RS.deck.range : null),
+  playing: () => (RS.deck ? RS.deck.playing() : false),
+  rate: () => (RS.deck ? RS.deck.rate() : null),
+  targetRate: () => (RS.deck ? RS.deck.targetRate() : null),
+  /** what the instrument is ACTUALLY sounding right now */
+  sounding: () => [...VOICES].sort((a, b) => a - b),
+  /** C2's left-hand side: reduce(prefix <= pos) through the library's reducer */
+  expectedSounding: (pos) => (RS.deck ? RS.deck.reducedKeys('midi-actuated', pos === undefined ? RS.deck.position() : pos) : null),
+  intentHeld: () => RS.intentHeld.slice(),
+  expectedIntent: (pos) => (RS.deck ? RS.deck.reducedKeys('midi', pos === undefined ? RS.deck.position() : pos) : null),
+  /** the audio's own position vs where the playhead says it should be */
+  alignment: () => {
+    if (!RS.deck || !RS.master) return null;
+    const pos = RS.deck.position();
+    const mediaMs = RS.master.el.currentTime * 1000;
+    const expected = pos - RS.master.pos0;
+    return { pos: +pos.toFixed(1), mediaMs: +mediaMs.toFixed(1), expectedMediaMs: +expected.toFixed(1),
+      errMs: +(mediaMs - expected).toFixed(1), spanPos0: RS.spanPos0, audioOffsetS: RS.audioOffsetS,
+      mediaRate: RS.master.el.playbackRate, paused: RS.master.el.paused };
+  },
+  fires: () => ({ ...RS.fires }),
+  drift: (kind = 'midi-actuated') => pstats(RS.deck ? RS.deck.drift().filter((d) => d.kind === kind).map((d) => d.deltaMs) : []),
+  stats: () => (RS.deck ? { stats: RS.deck.stats(), audit: RS.deck.audit(), caps: RS.deck.caps(),
+    host: RS.deck.hostName, syncCorrections: RS.syncCorrections.slice(-20),
+    driftStats: RS.deck.sched.driftStats() } : null),
+  dispose: () => disposeDeck(),
+};
+
 window.player = {
   refresh, select, requestSession, autoPlay, replay, download,
-  sessionJsonl,
+  sessionJsonl, transport,
   flush, endStore, deleteSession, loadSession, replayStored, loadMedia,
   sid: () => S.store.sid,
   token: (id) => (id ? S.tokens[id] : S.store.token) || null,

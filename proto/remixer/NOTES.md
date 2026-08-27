@@ -84,3 +84,79 @@ arhiiv.err.ee (recipes from research/err-archives-2026-08.md).
 - Findings doc written: research/err-remixer-2026-08.md.
 - Cleanup: server killed, no stray Chrome (drive.mjs Browser.close each run),
   port 8891 free, server.pid removed.
+
+## Step 5 — one playhead: the timeline library adopted (2026-08-28)
+
+Until now the rack was **N independent players**. The "1965 chord" was three
+`<audio>` elements and one `<video>`, hand-started in a single tick, and that
+was the whole of the synchronisation: they started together (0–43 ms measured)
+and then drifted for the rest of their lives. There was no playhead, so there
+was nothing to pause, nothing to seek, and rate did not exist at all.
+
+The rack is now ONE timeline — `timeline/transport.mjs`, the same file
+`timeline/lab` measured and `proto/jam`, `proto/selfrec` and `proto/instrument`
+import (server aliases `/timeline/*` to the repo; nothing is copied). The
+remixer is the **fourth** client and the second archive-domain one.
+
+- Each archive item is a **`media-span`**: `{at, dur, mediaRef:{type, slug}}` on
+  a shared arrangement axis. One row, two items (enter/exit) — a span is an
+  interval, not an instant.
+- **One adapter**, `media-span`, caps:
+  `{domain:'arrangement', unit:'ms', seekable, reducible, clockMaster:true,
+    seekAccuracyMs:40, rates:[0.5,0.75,1,1.5,2], rateNudge:[0.94,1.06],
+    servoBandMs:20, syncToleranceMs:40, catchUp:'reduce',
+    anchor:'arrangement-offset'}`.
+  `actuate` seeks/plays a layer's element; `reduce` is the set of layers present
+  at `t`; `assertState` hard-asserts every element (what a seek means).
+- The **first playable layer is the clock master**: it is never rate-nudged, and
+  the library's vector is slaved to its `currentTime` via
+  `transport.sync(pos, {toleranceMs: 40})`. Every other layer servos to the
+  library's position inside a ±20 ms dead band (0.94/1.06 nudge), hard-resync
+  past 150 ms. Master stall for >1 s → free-run on the wall clock.
+- Transport UI under the year strip: play/pause, click-to-seek scrubber with one
+  bar per layer, rate ±, and a readout carrying the live inter-layer skew.
+  Keys `p` transport, `[`/`]` rate; `space`/`c`/`s` and the year dial, strip,
+  badges, shuffle and cross-decade behaviour are untouched.
+- The per-layer ▶ now means "is this layer in the arrangement" — with one shared
+  playhead there is no longer such a thing as starting a single layer.
+
+### HONESTY: the alignment is ours, not the archive's
+
+ERR archive items **carry no internal timecode**. Nothing in the metadata says
+how a 1965 radio broadcast lines up with a 1965 newsreel; `Eetrikuupäev` is a
+date, at best a day, and the badge work in Step 1 exists precisely because even
+the *date* is often synthesized. So the `at` offsets on this timeline are an
+**arrangement — a composer's choice, defaulted to 0 so a chord starts together —
+NOT attested synchronisation.** What the transport buys is that the chosen
+alignment is now exact, seekable and repeatable. It does not make it true, and
+no amount of servo precision will turn it into a fact about 1965.
+
+### Verification (headless, 1965: 3 audio + 1 video) — 11/11
+
+| check | number |
+|---|---|
+| 1965 counts | **543 audio / 298 video** (unchanged from Step 3) |
+| one deck, 4 layers, one adapter | caps `['media-span']`, `clockMaster:true`, tick host **worker** |
+| clock master | `A3`/`A1`, **1169 `sync()` calls**, **0** corrections over the 40 ms tolerance — the vector tracked the master inside the dead band the whole run |
+| chord start-together spread | **0.1 ms** (recorded before: 0–43 ms) |
+| inter-layer skew while playing | max **17 ms** (audio layers ≤5 ms) |
+| **ONE seek moves EVERY layer** | seek to 120.000 s → A1 122.502 / A2 122.501 / A3 122.502 / V1 122.487 s; skew **−1, −2, −1, −16 ms** |
+| absence is content | seek past V1's 181 s span → V1 paused and out-of-span, the three audio layers keep playing at skew ≤4 ms |
+| rate 2× | armed while paused (`rate` 0 / `targetRate` 2); **7961 ms advanced in 4000 ms**; every element rate 2.00; skew ≤16 ms |
+| pause | playhead held **0.000 ms**, every layer paused, per-layer drift **0 ms** |
+| errors | **0** console errors, **0** media errors |
+
+Respect: the run used `?trickle=0` (new flag — suppresses the lazy per-item
+content resolver, which would otherwise be 40 upstream GETs a verification does
+not need), so upstream traffic was **6 calls total** — 2 searches + 4 content
+GETs — every one through the page's own ≥1 s gate. No media proxied, nothing
+cached to disk.
+
+Evidence: `timeline-transport.png` (chord playing under the AK filmikroonika
+1 May newsreel, transport bar and span lanes visible).
+
+### Note on the script tag
+
+`index.html`'s script is now `type="module"` (it imports the library). Module
+scope is not global, so the driver handles are exported deliberately as
+`window.__remix` / `window.__timeline` rather than by accident.
