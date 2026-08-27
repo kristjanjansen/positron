@@ -346,3 +346,29 @@ sound (Ableton Link); unordered+maxRetransmits:0 shipped precedent
 (Carot). Anti-patterns: cloud-only loop store (Endlesss †); NINJAM-over-TCP's
 irrelevance trick does NOT license TCP for the sub-30 ms band; BLE hops
 inside the timing path.
+
+## Addendum: Play-a-Synth (user-recalled "play my synth" site; verified 2026-08-27)
+
+📄 **playasynth.com** — the remembered platform, real and alive: play hardware
+synths remotely from any browser or via free VST/AU plugins. MIDI in through
+Web MIDI (full implementations — NRPN, CC, program changes), audio back over
+WebRTC/Opus "optimized for musical content" with adaptive buffering; owners
+run a host application (audio interface + MIDI + wired internet); connections
+are "WebRTC and other peer-to-peer techniques". Marketplace: free tier + paid
+sessions, platform takes 40 % (SEPA only). MIDI.org Innovation Award entry,
+submitted by Jonna Laaksonen. Catalog right now: six units, ALL in Finland —
+DeepMind 12, Reface DX, SE-02, Pulse 2, OB-6, Minilogue — all online.
+
+- **No published latency numbers anywhere** — the load-bearing gap. The
+  playability loop is command→sound ROUND trip (player's key → remote synth →
+  audio back), so their budget is our jam budget doubled; our measured pieces
+  (DC notes ~1 ms floor, MoQ audio 32.6 ms one-way) suggest a measured
+  implementation could beat/inform it.
+- **The pattern for our stack**: a remote instrument = an actuator adapter at
+  a distance — midi kind in, an audio span back; the session is a timeline
+  recording by construction (the jam log + the returned audio as a span).
+- **Heritage resonance**: rare synths as remotely playable objects is the
+  Kurenniemi DIMI dream in commercial miniature (all six current units are in
+  Finland, fittingly). A museum instrument as a networked actuator — playable
+  from a Radio Tallinn programme, its performances landing on the timeline —
+  is this pattern pointed at the archive.
