@@ -153,9 +153,11 @@
       <div id="eq" class="verdict ok">–</div>
       <p class="note">Lane A is built by <b>actuate()</b> applying one op at a time; lane B is folded independently by
         <b>reduce()</b> over the whole prefix. Nothing copies one into the other while the transport is running. If the
-        reducer were wrong they would drift apart on screen. Samples taken within ±40 ms of an op are skipped as
-        <i>settling</i> (scheduler jitter, not disagreement) and counted separately.</p>
-      <div class="kv" style="margin-top:6px">compares <b id="cmp">0</b> · mismatches <b id="mis">0</b> · settling skips <b id="skp">0</b></div>
+        reducer were wrong they would drift apart on screen. Samples within <b>40 wall-ms × rate</b> of an op are skipped as
+        <i>settling</i> — the exclusion window is dispatch jitter, a wall-clock quantity, so it must be converted into the
+        position domain by the rate. Any remaining mismatch is classified: <i>dispatch lag</i> (lane A equals the fold one
+        dispatch either side) or a real <b>divergence</b> — the only number that would mean the reducer is wrong.</p>
+      <div class="kv" style="margin-top:6px">compares <b id="cmp">0</b> · divergences <b id="mis">0</b> · settling skips <b id="skp">0</b></div>
     </div>
 
     <div class="panel">
