@@ -148,6 +148,29 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### REMOTE-SYNTH / PLAY-A-SYNTH CASE (session 6g) — first measured key→ear ✅ (proto/jam)
+- MIDI up + synthesized AUDIO+VIDEO back, per-leg, sample-accurate onsets
+  (AudioWorklet), burned panel video. **P2P key→ear 77.7/80.3 ms** (decoded
+  track; physical ears +32 ms outputLatency) = upper piano-action band,
+  playable. Legs: MIDI 0.56 ms, synthesis 0.67 ms, **audio return 76.6 ms —
+  the WebRTC jitter buffer is 98.6% of the round trip** (NetEQ ~20 ms floor
+  + 20 ms Opus framing + adaptation).
+- **jitterBufferTarget=0 / playoutDelayHint=0 NEVER helps, often hurts**
+  (verified applied; NetEQ clamps at 20 ms; forcing destabilizes — SFU
+  116→235 ms). The buffer cannot be hinted away.
+- **INVERTED lip-sync finding: the video track STABILIZES the audio jitter
+  buffer** — A/V held 77 ms across all runs; audio-only wandered 72→310 ms.
+  Panel video lands ~27 ms BEFORE its own sound (avSkew −27). key→eye
+  50/73 ms P2P.
+- SFU both ways: 116/210 ms sparse (crosses the >100 ms sluggish line);
+  at 25 notes/s ~7% of percussive attacks concealment-merged (0 packet
+  loss) — audible degradation latency numbers don't show.
+- Projections: real deployment P2P ≈ 95–110 ms (browser Opus/NetEQ stack
+  dominates, not the wire); **MoQ audio return ≈ 35 ms key→ear (paper, from
+  measured 32.6 ms g2g) — the beat-Play-a-Synth candidate**, arm skipped
+  in-box (needs new bundle). Play-a-Synth itself publishes no numbers; ours
+  is the first measured figure for the pattern.
+
 ### OBS-IN-CLOUD + DUAL OUTPUT (session 6e) — ✅ ALL PROVEN (rig/obs-cloud)
 - **OBS ran in a CF Container (standard-4) publishing MoQ**: g2g cloud→d14→
   local viewer ≈195/210 ms corrected — statistically identical to the local
