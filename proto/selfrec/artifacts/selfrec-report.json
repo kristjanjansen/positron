@@ -27,7 +27,7 @@
     "T0firstDataPerf": 1787819772586.8,
     "mimeType": "video/webm;codecs=vp8"
   },
-  "updatedAt": "2026-08-27T08:47:01.793Z",
+  "updatedAt": "2026-08-27T09:39:40.274Z",
   "a1_baseline": {
     "show": "a1-20260827T083642",
     "durationS": 90,
@@ -165,20 +165,203 @@
   "comparison_proto_a": {
     "uplink_cost": {
       "archiveMbps_measured": 1.167,
-      "onTopOf_nominalLiveMbps": 1.0,
+      "onTopOf_nominalLiveMbps": 1,
       "totalParticipantUplinkMbps": 2.17,
       "drainBurstMbps_afterOfflineWindow": 4.64,
       "note": "steady-state archive adds ~1.17 Mbps (kbps=1200 requested); after a 25 s offline window the IDB drain briefly adds ~4.6 Mbps until the backlog clears (6.8 s for 13 chunks)"
     },
     "source_quality": "encoded ONCE from the raw local stream (VP8 direct from captureStream, no transcode); A5: 45/45 chunks md5==R2 etag, 2591/2591 frames decode the burned row (100%)",
-    "failure_isolation": "A3 SIGKILL hurt only that participant: 0 closed chunks lost, 790 ms of media (the accumulating timeslice) \u2014 no other component involved",
+    "failure_isolation": "A3 SIGKILL hurt only that participant: 0 closed chunks lost, 790 ms of media (the accumulating timeslice) — no other component involved",
     "consent_story": "delete = one R2 prefix: POST /delete/<show> proven 5x during cleanup (list+batch-delete, 404-verified); per-participant granularity = the same call on selfrec/<show>/<participant>/ (list route already supports it)",
-    "anchor": "T0 at recorder.start() (Date + perf domains agree to 0.3 ms); first burned frame - T0recStart = +20 ms; T0 at first ondataavailable is -1989 ms off (one timeslice late) \u2014 never anchor on it"
+    "anchor": "T0 at recorder.start() (Date + perf domains agree to 0.3 ms); first burned frame - T0recStart = +20 ms; T0 at first ondataavailable is -1989 ms off (one timeslice late) — never anchor on it"
   },
   "kept_resources": {
     "worker": "elektron-selfrec @ https://elektron-selfrec.kristjan-jansen.workers.dev (version 57d220f0, secret SELFREC_TOKEN)",
-    "proof_prefix": "r2://elektron-archive-test/selfrec/a1-20260827T083642/p1/ \u2014 46 objects (45 chunks + manifest.json), 13,144,496 B",
+    "proof_prefix": "r2://elektron-archive-test/selfrec/a1-20260827T083642/p1/ — 46 objects (45 chunks + manifest.json), 13,144,496 B",
     "pub_manifest": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/selfrec/a1-20260827T083642/p1/manifest.json",
-    "debris_deleted": "smoke-20260827T083609 (11), a2-20260827T084122 (46), a2-20260827T084335 (46), a3-20260827T084522 (22), a4-20260827T084626 (16) \u2014 all 404-verified"
+    "debris_deleted": "smoke-20260827T083609 (11), a2-20260827T084122 (46), a2-20260827T084335 (46), a3-20260827T084522 (22), a4-20260827T084626 (16) — all 404-verified"
+  },
+  "sync_leg": {
+    "show": "sync-20260827T093613",
+    "room": "selfrecsync-20260827T093613",
+    "staggerMs": 6822,
+    "skew": {
+      "p1": 42,
+      "p2": 41.5,
+      "rttMin": [
+        24,
+        27
+      ]
+    },
+    "markerProof": {
+      "room": "selfrecsync-20260827T093613",
+      "cuelogCount": 21,
+      "spanEvents": {
+        "p1": {
+          "start": 1,
+          "beat": 7,
+          "end": 1
+        },
+        "p2": {
+          "start": 1,
+          "beat": 7,
+          "end": 1
+        }
+      },
+      "acks": {
+        "p1": "9/9",
+        "p2": "9/9"
+      }
+    },
+    "repackage": {
+      "p1_copy": {
+        "mode": "copy",
+        "mimeIn": "video/webm;codecs=h264",
+        "codecOut": "h264",
+        "recDurMs": 75100,
+        "chunkCount": 38,
+        "inBytes": 7423325,
+        "outBytes": 7432502,
+        "files": 21,
+        "outDurS": 74.725,
+        "downloadMs": 9427,
+        "ffmpegMs": 80,
+        "uploadMs": 7271,
+        "totalMs": 17267,
+        "ffmpegRatio": 0.0011,
+        "totalRatio": 0.2299,
+        "derivedPrefix": "selfrec/sync-20260827T093613/p1/derived/hls/"
+      },
+      "p2_transcode": {
+        "mode": "transcode",
+        "mimeIn": "video/webm;codecs=vp8",
+        "codecOut": "h264",
+        "recDurMs": 75105,
+        "chunkCount": 38,
+        "inBytes": 10842374,
+        "outBytes": 3356245,
+        "files": 21,
+        "outDurS": 74.966667,
+        "downloadMs": 10161,
+        "ffmpegMs": 1226,
+        "uploadMs": 7675,
+        "totalMs": 19595,
+        "ffmpegRatio": 0.0163,
+        "totalRatio": 0.2609,
+        "derivedPrefix": "selfrec/sync-20260827T093613/p2/derived/hls/"
+      },
+      "copyVsTranscodeFfmpegRatio": 15.3
+    },
+    "indexerMsPerMB": [
+      11.02,
+      9.96
+    ],
+    "R1": {
+      "p50": 29,
+      "max": 34
+    },
+    "R2": [
+      {
+        "name": "p2-absent",
+        "p1": {
+          "absent": false,
+          "clock": 1787823379235,
+          "errMs": -59
+        },
+        "p2": {
+          "absent": true,
+          "clock": null,
+          "errMs": null
+        }
+      },
+      {
+        "name": "mid-30s",
+        "p1": {
+          "absent": false,
+          "clock": 1787823406230,
+          "errMs": -64
+        },
+        "p2": {
+          "absent": false,
+          "clock": 1787823406262,
+          "errMs": -32
+        }
+      },
+      {
+        "name": "late-70s",
+        "p1": {
+          "absent": false,
+          "clock": 1787823446229,
+          "errMs": -65
+        },
+        "p2": {
+          "absent": false,
+          "clock": 1787823446253,
+          "errMs": -41
+        }
+      },
+      {
+        "name": "p1-absent",
+        "p1": {
+          "absent": true,
+          "clock": null,
+          "errMs": null
+        },
+        "p2": {
+          "absent": false,
+          "clock": 1787823455265,
+          "errMs": -29
+        }
+      }
+    ],
+    "R3": {
+      "defaultMapping": "linear",
+      "note": "anchored = per-chunk re-anchor from manifest closeT + cluster-index byte interpolation; divergence>drift at this timescale",
+      "tailAtS": 73,
+      "divergenceMsAtTail": {
+        "p1": 55.9,
+        "p2": 32.8
+      },
+      "divergenceMsAtHead": {
+        "p1": 56.4,
+        "p2": -71.7
+      },
+      "decodedErrAnchored": {
+        "p1": -100,
+        "p2": -99
+      },
+      "decodedErrLinear": {
+        "p1": -64,
+        "p2": -69
+      }
+    },
+    "R4": [
+      {
+        "id": "RCUE-20",
+        "at": 1787823396294,
+        "fired": true,
+        "engineLateMs": 4.7,
+        "errA": -64,
+        "errB": -64
+      },
+      {
+        "id": "RCUE-40",
+        "at": 1787823416296,
+        "fired": true,
+        "engineLateMs": 2.9,
+        "errA": -33,
+        "errB": -68
+      },
+      {
+        "id": "RCUE-60",
+        "at": 1787823436296,
+        "fired": true,
+        "engineLateMs": 2.6,
+        "errA": -68,
+        "errB": -40
+      }
+    ],
+    "checksPass": "14/14",
+    "r2Bytes": 29075611
   }
 }

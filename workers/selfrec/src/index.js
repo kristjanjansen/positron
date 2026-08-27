@@ -16,6 +16,10 @@
 //     GET  /list/<show>[/<participant>]        -> {count, objects:[...]}
 //     POST /delete/<show>                      -> deletes selfrec/<show>/*
 //        (the consent story: forget a participant/show = one prefix delete)
+//     GET  /time                               -> {now: epoch ms} — TOKENLESS
+//        skew endpoint (rate-guarded, no storage ops; see comment below)
+//     POST /derived/<show>/<participant>/<...> -> derived artifacts (fMP4 HLS,
+//        index.json) under selfrec/<show>/<participant>/derived/
 //
 // Auth: every route needs Bearer SELFREC_TOKEN (or ?token=). Objects are
 // publicly READABLE via the bucket's r2.dev URL (already enabled for
@@ -38,11 +42,36 @@ function j(status, obj) {
   });
 }
 
+// ---- /time rate guard (in-isolate, no storage ops) --------------------------
+// Tokenless by design (a participant needs the clock BEFORE any auth dance),
+// so keep it abuse-safe: zero storage/binding work per hit + a per-isolate
+// sliding window (120 req / 10 s → 429). Global abuse is bounded by CF's own
+// per-account request limits; this guard only keeps a hot loop from burning
+// CPU. Isolate-local state is best-effort (one bucket per isolate) — fine for
+// a rate CEILING, never used for correctness.
+let timeHits = [];
+
 export default {
   async fetch(req, env) {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const url = new URL(req.url);
     const parts = url.pathname.split("/").filter(Boolean);
+
+    // ---- GET /time — skew endpoint (TOKENLESS, rate-guarded) ---------------
+    // Client protocol (participant.html): sample 5×; per sample
+    //   offset = serverNow + rtt/2 − clientRecvT ; keep the min-RTT sample.
+    if (req.method === "GET" && parts.length === 1 && parts[0] === "time") {
+      const nowMs = Date.now();
+      timeHits = timeHits.filter((t) => nowMs - t < 10000);
+      if (timeHits.length >= 120) {
+        return j(429, { error: "rate", retryAfterMs: 10000 - (nowMs - timeHits[0]) });
+      }
+      timeHits.push(nowMs);
+      return new Response(JSON.stringify({ now: nowMs }), {
+        status: 200,
+        headers: { "content-type": "application/json", "cache-control": "no-store", ...CORS },
+      });
+    }
 
     const auth = req.headers.get("authorization") || "";
     const tok = auth.startsWith("Bearer ") ? auth.slice(7) : (url.searchParams.get("token") || "");
@@ -80,6 +109,30 @@ export default {
       const key = `selfrec/${show}/${part}/manifest.json`;
       const obj = await env.ARCHIVE.put(key, body, { httpMetadata: { contentType: "application/json" } });
       return j(200, { ok: true, key, size: obj.size });
+    }
+
+    // ---- POST /derived/<show>/<participant>/<...path> ----------------------
+    // Upload lane for ENGINE-side derived artifacts (repackaged fMP4 HLS,
+    // cluster index.json): body streams to
+    //   selfrec/<show>/<participant>/derived/<path>
+    // Same auth as /chunk; path segments are ID-safe; content-type taken from
+    // the request header. Lives under the participant prefix so the one-call
+    // consent delete (POST /delete/<show>) sweeps derived artifacts too.
+    if (req.method === "POST" && parts[0] === "derived" && parts.length >= 4) {
+      const [, show, part, ...rest] = parts;
+      if (!ID.test(show) || !ID.test(part) || !rest.every((p) => ID.test(p))) return j(400, { error: "bad path" });
+      const len = parseInt(req.headers.get("content-length") || "0", 10);
+      if (!len) return j(411, { error: "length required" });
+      if (len > MAX_CHUNK) return j(413, { error: "too large" });
+      const key = `selfrec/${show}/${part}/derived/${rest.join("/")}`;
+      const ct = req.headers.get("content-type") || "application/octet-stream";
+      let obj;
+      try {
+        obj = await env.ARCHIVE.put(key, req.body, { httpMetadata: { contentType: ct } });
+      } catch (e) {
+        return j(400, { error: "put failed: " + (e && e.message || e) });
+      }
+      return j(200, { ok: true, key, size: obj.size, etag: obj.httpEtag });
     }
 
     // ---- GET /list/<show>[/<participant>] ----------------------------------

@@ -42,11 +42,19 @@ const BASE = q.get("base") || "https://elektron-selfrec.kristjan-jansen.workers.
 const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
 const COLLECTOR = q.get("collector") || (location.origin + "/beacon");
 const KBPS = parseInt(q.get("kbps") || "1200", 10);
+// SYNC leg params (all optional — page still runs standalone as in PROTO A):
+//   room/roomtoken/rtcbase — deployed elektron-rtc room for media-span markers
+//   pidbyte — burned pid byte (default 'P'; sync scenario burns '1'/'2')
+//   mime    — preferred MediaRecorder mime (falls back down PROBE_MIMES)
+const ROOM = q.get("room") || "";
+const ROOM_TOKEN = q.get("roomtoken") || "";
+const RTCBASE = q.get("rtcbase") || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const MIME_PREF = q.get("mime") || "";
 
 // row geometry — shared contract with proto/replay (do not change one side)
 const NB = 64, BW = 12, RX = 32;
 const CLOCK_Y = 600, CLOCK_H = 48;
-const PID_BYTE = "P".charCodeAt(0);
+const PID_BYTE = (q.get("pidbyte") || "P").charCodeAt(0);
 
 const M = window.__metrics = {
   show: SHOW, participant: PART, timeslice: TIMESLICE, kbps: KBPS,
@@ -58,6 +66,8 @@ const M = window.__metrics = {
   memHwmBytes: 0, storageUsageHwm: 0,
   offlineFailures: 0, onlineAt: null, offlineAt: null, drainedAt: null,
   degraded: false, finalized: false, manifestKey: null, done: false, error: null,
+  skewEst: null, rttMin: null, skewSamples: [], codecProbe: {},
+  roomWs: "off", spanEventsSent: 0, spanAcksSeen: 0,
 };
 function wall() { return Date.now(); }
 function perfWall() { return performance.timeOrigin + performance.now(); }
@@ -250,11 +260,124 @@ window.addEventListener("offline", () => {
   pendingBeacons.push({ t: wall(), show: SHOW, participant: PART, kind: "net-offline", offlineAt: M.offlineAt });
 });
 
+// ---- clock skew vs the worker (/time, tokenless) ----------------------------
+// 5 sequential samples; per sample offset = serverNow + rtt/2 − clientRecvT.
+// The MIN-RTT sample is the estimate (least queueing → tightest bound on the
+// half-RTT symmetry assumption). Raw samples kept for the report.
+async function sampleSkew(n = 5) {
+  const samples = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      const t0 = wall();
+      const r = await fetch(BASE + "/time", { cache: "no-store" });
+      const t1 = wall();
+      if (!r.ok) continue;
+      const { now } = await r.json();
+      samples.push({ rtt: t1 - t0, offset: now + (t1 - t0) / 2 - t1, serverT: now, t0, t1 });
+    } catch {}
+  }
+  M.skewSamples = samples;
+  if (samples.length) {
+    const best = samples.reduce((a, b) => (b.rtt < a.rtt ? b : a));
+    M.skewEst = Math.round(best.offset * 10) / 10;
+    M.rttMin = best.rtt;
+  }
+  beacon({ kind: "skew-est", skewEst: M.skewEst, rttMin: M.rttMin, samples });
+}
+
+// ---- room WS — media-span markers via cue passthrough -----------------------
+// The deployed elektron-rtc room accepts {type:'cue', cue:{...}} verbatim and
+// persists every cue frame to the room cuelog (GET /room/{name}/cuelog) — the
+// choreography precedent. Span markers ride that: cue.kind='media-span',
+// payload duplicated in cue.data for consumers that only look there.
+// The DO broadcasts cues to ALL sockets (sender included) — the self-echo is
+// our ack; markers never echoed get RE-SENT once on reconnect (same id;
+// consumers dedupe by id / reducers take the first occurrence).
+let roomWs = null, roomJoined = false, roomBackoff = 500;
+const spanOutbox = [];          // {cue, sentOnOpenSocket:bool, acked:bool}
+let spanSeq = 0;
+function roomConnect() {
+  if (!ROOM) return;
+  M.roomWs = "connecting";
+  const ws = new WebSocket(RTCBASE.replace("https", "wss") + "/room/" + ROOM + "/ws?token=" + encodeURIComponent(ROOM_TOKEN));
+  roomWs = ws;
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "join", participantId: PART, name: PART, role: "performer" }));
+  };
+  ws.onmessage = (m) => {
+    let f; try { f = JSON.parse(m.data); } catch { return; }
+    if (f.type === "roster") {
+      roomJoined = true; roomBackoff = 500; M.roomWs = "joined";
+      beacon({ kind: "room-joined", room: ROOM, selfId: f.self && f.self.id, role: f.self && f.self.role });
+      flushSpans(true);          // resend anything not yet echoed back
+      return;
+    }
+    if (f.type === "cue" && f.cue && f.from === PART && !f.backlog) {
+      const e = spanOutbox.find((x) => x.cue.id === f.cue.id);
+      if (e && !e.acked) { e.acked = true; M.spanAcksSeen++; }
+    }
+  };
+  const dead = () => {
+    if (roomWs !== ws) return;
+    roomJoined = false; M.roomWs = "reconnecting";
+    roomBackoff = Math.min(8000, roomBackoff * 2);
+    setTimeout(roomConnect, roomBackoff);
+  };
+  ws.onclose = dead; ws.onerror = dead;
+}
+function sendSpan(phase, fields) {
+  if (!ROOM) return;
+  const payload = { kind: "media-span", phase, source: PART, ...fields };
+  const cue = {
+    id: PART + "-span-" + phase + "-" + (spanSeq++),
+    at: fields.at != null ? fields.at : wall(),
+    sentAt: wall(),
+    kind: "media-span",
+    data: payload,
+  };
+  spanOutbox.push({ cue, sentOnOpenSocket: false, acked: false });
+  flushSpans(false);
+}
+function flushSpans(isReconnect) {
+  if (!roomWs || roomWs.readyState !== 1 || !roomJoined) return;
+  for (const e of spanOutbox) {
+    if (e.acked) continue;
+    if (e.sentOnOpenSocket && !isReconnect) continue;   // await echo; resend only on reconnect
+    try {
+      roomWs.send(JSON.stringify({ type: "cue", cue: e.cue }));
+      e.sentOnOpenSocket = true;
+      M.spanEventsSent++;
+    } catch {}
+  }
+}
+
 // ---- recorder ---------------------------------------------------------------
-let recorder = null, stopResolve = null;
+let recorder = null, stopResolve = null, beatTimer = null;
+// Codec preference: h264-in-webm (if this Chrome encodes it) makes the ENGINE
+// repackage a pure remux (-c copy); vp8 forces a transcode. Probe results are
+// reported either way (the "what does the repackaging" question).
+const PROBE_MIMES = [
+  "video/webm;codecs=h264",
+  "video/webm;codecs=avc1",
+  "video/webm;codecs=avc1.42E01E",
+  "video/x-matroska;codecs=avc1",
+  "video/mp4;codecs=avc1.42E01E",
+  "video/webm;codecs=vp9",
+  "video/webm;codecs=vp8",
+  "video/webm",
+];
+function pickMime() {
+  for (const m of PROBE_MIMES) M.codecProbe[m] = MediaRecorder.isTypeSupported(m);
+  beacon({ kind: "codec-probe", probe: M.codecProbe });
+  if (MIME_PREF && MediaRecorder.isTypeSupported(MIME_PREF)) return MIME_PREF;
+  // auto-pick: h264-in-webm if the encoder exists (remux-only repackage),
+  // else vp8 (the PROTO A baseline; repackage transcodes)
+  const auto = ["video/webm;codecs=h264", "video/webm;codecs=avc1",
+                "video/webm;codecs=avc1.42E01E", "video/webm;codecs=vp8", "video/webm"];
+  return auto.find((m) => M.codecProbe[m]) || "video/webm";
+}
 function startRecorder(stream) {
-  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-    ? "video/webm;codecs=vp8" : "video/webm";
+  const mime = pickMime();
   recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: KBPS * 1000 });
   M.mimeType = recorder.mimeType;
   let seq = 0;
@@ -285,6 +408,14 @@ function startRecorder(stream) {
   M.recState = recorder.state;
   beacon({ kind: "rec-start", T0recStartPerf: M.T0recStartPerf, T0recStartDate: M.T0recStartDate,
            mimeType: M.mimeType, timeslice: TIMESLICE, kbps: KBPS });
+  // media-span START marker: at = T0 (the archive anchor, recorder.start stamp)
+  sendSpan("start", { at: M.T0recStartDate, skewEst: M.skewEst, rttMin: M.rttMin,
+                      mediaRef: "selfrec/" + SHOW + "/" + PART + "/", mimeType: M.mimeType,
+                      timesliceMs: TIMESLICE });
+  let beatSeq = 0;
+  beatTimer = setInterval(() => {
+    if (recorder && recorder.state === "recording") sendSpan("beat", { seq: beatSeq++ });
+  }, 10000);
 }
 
 // ---- finalize ---------------------------------------------------------------
@@ -328,6 +459,13 @@ async function finalizeShow() {
   beacon({ kind: "finalized", ok: M.finalized, degraded: M.degraded, manifestKey: M.manifestKey,
            chunkCount: manifest.chunkCount, bytesTotal: manifest.bytesTotal,
            missing: manifest.missing, durationMs: manifest.durationMs });
+  // media-span END marker (after the drain: chunkCount/degraded are final)
+  if (beatTimer) { clearInterval(beatTimer); beatTimer = null; }
+  sendSpan("end", { at: wall(), dur: manifest.durationMs, chunkCount: manifest.chunkCount,
+                    degraded: M.degraded });
+  // give the echo-ack a moment before the driver reads spanAcksSeen
+  for (let i = 0; i < 20 && spanOutbox.some((e) => !e.acked); i++)
+    await new Promise((r) => setTimeout(r, 250));
   M.phase = "done"; M.done = true;
   await flushBeacons();
 }
@@ -394,6 +532,11 @@ setInterval(draw, 33);
     // clear stale chunks from a previous crashed run of the SAME show/participant
     for (const rec of await idbAll()) await idbDelete(rec.seq);
     M.phase = "warmup";
+    await sampleSkew(5);                                // join-time skew estimate
+    roomConnect();                                      // media-span marker channel
+    if (ROOM) {                                         // bounded wait for the join
+      for (let i = 0; i < 40 && !roomJoined; i++) await new Promise((r) => setTimeout(r, 250));
+    }
     await new Promise((r) => setTimeout(r, 700));       // let the draw loop settle
     const stream = cv.captureStream(30);
     startRecorder(stream);

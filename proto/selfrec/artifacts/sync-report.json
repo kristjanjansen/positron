@@ -1,0 +1,465 @@
+{
+  "show": "sync-20260827T093613",
+  "room": "selfrecsync-20260827T093613",
+  "T0p1": 1787823376294,
+  "T0p2": 1787823383116,
+  "staggerMs": 6822,
+  "durS": 75,
+  "skew": {
+    "p1": {
+      "skewEst": 42,
+      "rttMin": 24,
+      "samples": [
+        {
+          "rtt": 83,
+          "offset": 69.5,
+          "serverT": 1787823374667,
+          "t0": 1787823374556,
+          "t1": 1787823374639
+        },
+        {
+          "rtt": 24,
+          "offset": 42,
+          "serverT": 1787823374693,
+          "t0": 1787823374639,
+          "t1": 1787823374663
+        },
+        {
+          "rtt": 57,
+          "offset": 54.5,
+          "serverT": 1787823374746,
+          "t0": 1787823374663,
+          "t1": 1787823374720
+        },
+        {
+          "rtt": 47,
+          "offset": 52.5,
+          "serverT": 1787823374796,
+          "t0": 1787823374720,
+          "t1": 1787823374767
+        },
+        {
+          "rtt": 65,
+          "offset": 56.5,
+          "serverT": 1787823374857,
+          "t0": 1787823374768,
+          "t1": 1787823374833
+        }
+      ]
+    },
+    "p2": {
+      "skewEst": 41.5,
+      "rttMin": 27,
+      "samples": [
+        {
+          "rtt": 27,
+          "offset": 41.5,
+          "serverT": 1787823381934,
+          "t0": 1787823381879,
+          "t1": 1787823381906
+        },
+        {
+          "rtt": 51,
+          "offset": 55.5,
+          "serverT": 1787823381994,
+          "t0": 1787823381913,
+          "t1": 1787823381964
+        },
+        {
+          "rtt": 55,
+          "offset": 56.5,
+          "serverT": 1787823382048,
+          "t0": 1787823381964,
+          "t1": 1787823382019
+        },
+        {
+          "rtt": 74,
+          "offset": 65,
+          "serverT": 1787823382122,
+          "t0": 1787823382020,
+          "t1": 1787823382094
+        },
+        {
+          "rtt": 63,
+          "offset": 60.5,
+          "serverT": 1787823382187,
+          "t0": 1787823382095,
+          "t1": 1787823382158
+        }
+      ]
+    },
+    "note": "same-machine truth is 0 ms — skewEst IS the method error (server+net asymmetry)"
+  },
+  "markerProof": {
+    "room": "selfrecsync-20260827T093613",
+    "cuelogCount": 21,
+    "spanEvents": {
+      "p1": {
+        "start": 1,
+        "beat": 7,
+        "end": 1
+      },
+      "p2": {
+        "start": 1,
+        "beat": 7,
+        "end": 1
+      }
+    },
+    "acks": {
+      "p1": "9/9",
+      "p2": "9/9"
+    }
+  },
+  "codecProbe": {
+    "video/webm;codecs=h264": true,
+    "video/webm;codecs=avc1": true,
+    "video/webm;codecs=avc1.42E01E": true,
+    "video/x-matroska;codecs=avc1": true,
+    "video/mp4;codecs=avc1.42E01E": true,
+    "video/webm;codecs=vp9": true,
+    "video/webm;codecs=vp8": true,
+    "video/webm": true
+  },
+  "repackage": {
+    "p1_copy": {
+      "mode": "copy",
+      "mimeIn": "video/webm;codecs=h264",
+      "codecOut": "h264",
+      "recDurMs": 75100,
+      "chunkCount": 38,
+      "inBytes": 7423325,
+      "outBytes": 7432502,
+      "files": 21,
+      "outDurS": 74.725,
+      "downloadMs": 9427,
+      "ffmpegMs": 80,
+      "uploadMs": 7271,
+      "totalMs": 17267,
+      "ffmpegRatio": 0.0011,
+      "totalRatio": 0.2299,
+      "derivedPrefix": "selfrec/sync-20260827T093613/p1/derived/hls/"
+    },
+    "p2_transcode": {
+      "mode": "transcode",
+      "mimeIn": "video/webm;codecs=vp8",
+      "codecOut": "h264",
+      "recDurMs": 75105,
+      "chunkCount": 38,
+      "inBytes": 10842374,
+      "outBytes": 3356245,
+      "files": 21,
+      "outDurS": 74.966667,
+      "downloadMs": 10161,
+      "ffmpegMs": 1226,
+      "uploadMs": 7675,
+      "totalMs": 19595,
+      "ffmpegRatio": 0.0163,
+      "totalRatio": 0.2609,
+      "derivedPrefix": "selfrec/sync-20260827T093613/p2/derived/hls/"
+    },
+    "copyVsTranscodeFfmpegRatio": 15.3
+  },
+  "indexer": {
+    "p1": {
+      "kind": "indexer",
+      "show": "sync-20260827T093613",
+      "pid": "p1",
+      "bytes": 7423325,
+      "mb": 7.08,
+      "clusters": 22,
+      "falsePositives": 0,
+      "headerBytes": 151,
+      "spanMs": 74714,
+      "manifestDurMs": 75100,
+      "parseMs": 78,
+      "msPerMB": 11.02,
+      "fetchMs": 4343,
+      "indexBytes": 1832,
+      "workerCronFit": {
+        "freeTier10ms": false,
+        "paidTier30s": true
+      }
+    },
+    "p2": {
+      "kind": "indexer",
+      "show": "sync-20260827T093613",
+      "pid": "p2",
+      "bytes": 10842374,
+      "mb": 10.34,
+      "clusters": 22,
+      "falsePositives": 0,
+      "headerBytes": 145,
+      "spanMs": 74290,
+      "manifestDurMs": 75105,
+      "parseMs": 103,
+      "msPerMB": 9.96,
+      "fetchMs": 4607,
+      "indexBytes": 1838,
+      "workerCronFit": {
+        "freeTier10ms": false,
+        "paidTier30s": true
+      }
+    }
+  },
+  "regression": {
+    "R1": {
+      "samples": [
+        {
+          "atS": 15.05,
+          "clockA": 1787823391280,
+          "clockB": 1787823391314,
+          "interTileSkewMs": 34,
+          "tileErrA": -68,
+          "tileErrB": -34
+        },
+        {
+          "atS": 35.04,
+          "clockA": 1787823411283,
+          "clockB": 1787823411279,
+          "interTileSkewMs": 4,
+          "tileErrA": -56,
+          "tileErrB": -60
+        },
+        {
+          "atS": 65.06,
+          "clockA": 1787823441308,
+          "clockB": 1787823441279,
+          "interTileSkewMs": 29,
+          "tileErrA": -42,
+          "tileErrB": -71
+        }
+      ],
+      "p50": 29,
+      "max": 34,
+      "targetMs": 100
+    },
+    "R2": {
+      "rows": [
+        {
+          "name": "p2-absent",
+          "T": 1787823379294,
+          "expectAbsent": {
+            "p1": false,
+            "p2": true
+          },
+          "tiles": {
+            "p1": {
+              "absent": false,
+              "clock": 1787823379235,
+              "errMs": -59
+            },
+            "p2": {
+              "absent": true,
+              "clock": null,
+              "errMs": null
+            }
+          }
+        },
+        {
+          "name": "mid-30s",
+          "T": 1787823406294,
+          "expectAbsent": {
+            "p1": false,
+            "p2": false
+          },
+          "tiles": {
+            "p1": {
+              "absent": false,
+              "clock": 1787823406230,
+              "errMs": -64
+            },
+            "p2": {
+              "absent": false,
+              "clock": 1787823406262,
+              "errMs": -32
+            }
+          }
+        },
+        {
+          "name": "late-70s",
+          "T": 1787823446294,
+          "expectAbsent": {
+            "p1": false,
+            "p2": false
+          },
+          "tiles": {
+            "p1": {
+              "absent": false,
+              "clock": 1787823446229,
+              "errMs": -65
+            },
+            "p2": {
+              "absent": false,
+              "clock": 1787823446253,
+              "errMs": -41
+            }
+          }
+        },
+        {
+          "name": "p1-absent",
+          "T": 1787823455294,
+          "expectAbsent": {
+            "p1": true,
+            "p2": false
+          },
+          "tiles": {
+            "p1": {
+              "absent": true,
+              "clock": null,
+              "errMs": null
+            },
+            "p2": {
+              "absent": false,
+              "clock": 1787823455265,
+              "errMs": -29
+            }
+          }
+        }
+      ],
+      "bandMs": 150
+    },
+    "R3": {
+      "defaultMapping": "linear",
+      "note": "anchored = per-chunk re-anchor from manifest closeT + cluster-index byte interpolation; divergence>drift at this timescale",
+      "tailAtS": 73,
+      "divergenceMsAtTail": {
+        "p1": 55.9,
+        "p2": 32.8
+      },
+      "divergenceMsAtHead": {
+        "p1": 56.4,
+        "p2": -71.7
+      },
+      "decodedErrAnchored": {
+        "p1": -100,
+        "p2": -99
+      },
+      "decodedErrLinear": {
+        "p1": -64,
+        "p2": -69
+      }
+    },
+    "R4": {
+      "rows": [
+        {
+          "id": "RCUE-20",
+          "at": 1787823396294,
+          "fired": true,
+          "engineLateMs": 4.7,
+          "errA": -64,
+          "errB": -64
+        },
+        {
+          "id": "RCUE-40",
+          "at": 1787823416296,
+          "fired": true,
+          "engineLateMs": 2.9,
+          "errA": -33,
+          "errB": -68
+        },
+        {
+          "id": "RCUE-60",
+          "at": 1787823436296,
+          "fired": true,
+          "engineLateMs": 2.6,
+          "errA": -68,
+          "errB": -40
+        }
+      ],
+      "bandMs": 150
+    }
+  },
+  "cuesSent": [
+    {
+      "id": "RCUE-20",
+      "at": 1787823396294,
+      "offS": 20
+    },
+    {
+      "id": "RCUE-40",
+      "at": 1787823416296,
+      "offS": 40
+    },
+    {
+      "id": "RCUE-60",
+      "at": 1787823436296,
+      "offS": 60
+    }
+  ],
+  "checks": [
+    {
+      "name": "rec-both-finalized-clean",
+      "ok": true,
+      "detail": "p1 38 chunks, p2 38 chunks"
+    },
+    {
+      "name": "rec-mimes",
+      "ok": true,
+      "detail": "video/webm;codecs=h264 / video/webm;codecs=vp8"
+    },
+    {
+      "name": "skew-est-sane",
+      "ok": true,
+      "detail": "p1 42 ms (rttMin 24), p2 41.5 ms (rttMin 27)"
+    },
+    {
+      "name": "markers-round-trip",
+      "ok": true,
+      "detail": "{\"p1\":{\"start\":1,\"beat\":7,\"end\":1},\"p2\":{\"start\":1,\"beat\":7,\"end\":1}}"
+    },
+    {
+      "name": "marker-start-at-is-T0",
+      "ok": true,
+      "detail": "p1 1787823376294==1787823376294, p2 1787823383116==1787823383116"
+    },
+    {
+      "name": "marker-end-payload",
+      "ok": true,
+      "detail": "dur=75100 chunks=38"
+    },
+    {
+      "name": "repackage-modes",
+      "ok": true,
+      "detail": "p1=copy (80 ms), p2=transcode (1226 ms)"
+    },
+    {
+      "name": "indexer-plausible",
+      "ok": true,
+      "detail": "p1 22 clusters 11.02 ms/MB, p2 22 clusters 9.96 ms/MB"
+    },
+    {
+      "name": "grid-two-spans-three-cues",
+      "ok": true,
+      "detail": "spans=p1,p2 cues=RCUE-20,RCUE-40,RCUE-60"
+    },
+    {
+      "name": "R1-inter-tile-skew",
+      "ok": true,
+      "detail": "p50=29 max=34 (4,29,34)"
+    },
+    {
+      "name": "R4-cues-fire-in-band",
+      "ok": true,
+      "detail": "RCUE-20:A-64/B-64 RCUE-40:A-33/B-68 RCUE-60:A-68/B-40"
+    },
+    {
+      "name": "R2-seek-absence-and-accuracy",
+      "ok": true,
+      "detail": "p2-absent: p1 -59ms / p2 absent | mid-30s: p1 -64ms / p2 -32ms | late-70s: p1 -65ms / p2 -41ms | p1-absent: p1 absent / p2 -29ms"
+    },
+    {
+      "name": "R3-measured",
+      "ok": true,
+      "detail": "divergence tail p1=55.9 p2=32.8 ms; decoded err anchored p1=-100 vs linear p1=-64 ms"
+    },
+    {
+      "name": "budget-under-100MB",
+      "ok": true,
+      "detail": "27.7 MB, 122 objects"
+    }
+  ],
+  "r2": {
+    "objects": 122,
+    "bytes": 29075611
+  }
+}
