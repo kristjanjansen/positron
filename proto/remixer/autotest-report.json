@@ -1,0 +1,287 @@
+{
+ "at": "2026-08-27T09:26:38.290Z",
+ "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+ "phases": {
+  "p1": {
+   "counts": {
+    "audio": 543,
+    "video": 298
+   },
+   "listed": {
+    "audio": 20,
+    "video": 20
+   },
+   "searchMs": [
+    1457,
+    903
+   ],
+   "chordSpreadMs": 0,
+   "videoFramesIn30s": 740,
+   "errorsDuring": 0,
+   "wallMs": 35583
+  },
+  "p2": {
+   "videoCount1938": 0,
+   "via": "nearest-in-1908-1964",
+   "videoPick": {
+    "slug": "ak-filmikroonika-1958-1991-2-uliopilaslaulupidu-riias",
+    "date": "1958-07-11",
+    "title": "AK filmikroonika 1958-1991: 1 | 2 ÜLIÕPILASLAULUPIDU RIIAS"
+   },
+   "wallMs": 19651
+  }
+ },
+ "items": [
+  {
+   "phase": "p1",
+   "layer": "A1",
+   "type": "audio",
+   "slug": "allmaasaalides",
+   "title": "Allmaasaalides",
+   "format": "HLS",
+   "apiMs": 218,
+   "bufMs": 266,
+   "ttffMs": 40,
+   "playedOk": true,
+   "curT": 30.9,
+   "frames": null,
+   "badge": {
+    "prec": "day",
+    "text": "1965-08-29",
+    "conf": true,
+    "Y": 1965,
+    "M": 8,
+    "D": 29
+   }
+  },
+  {
+   "phase": "p1",
+   "layer": "A2",
+   "type": "audio",
+   "slug": "branislav-nusic-jumalik-komoodia",
+   "title": "Branislav Nušic. Jumalik komöödia",
+   "format": "HLS",
+   "apiMs": 938,
+   "bufMs": 13,
+   "ttffMs": 40,
+   "playedOk": true,
+   "curT": 30.9,
+   "frames": null,
+   "badge": {
+    "prec": "day",
+    "text": "1965-10-31",
+    "conf": true,
+    "Y": 1965,
+    "M": 10,
+    "D": 31
+   }
+  },
+  {
+   "phase": "p1",
+   "layer": "A3",
+   "type": "audio",
+   "slug": "arkadi-avertsenko-professionaali-mured",
+   "title": "Arkadi Avertšenko - Professionaali mured",
+   "format": "HLS",
+   "apiMs": 1001,
+   "bufMs": 169,
+   "ttffMs": 40,
+   "playedOk": true,
+   "curT": 30.9,
+   "frames": null,
+   "badge": {
+    "prec": "year",
+    "text": "1965",
+    "conf": true,
+    "Y": 1965,
+    "M": 6,
+    "D": 11
+   }
+  },
+  {
+   "phase": "p1",
+   "layer": "V1",
+   "type": "video",
+   "slug": "ak-filmikroonika-1958-1991-1-mai-demonstratsioon-kohtla-jarvel",
+   "title": "AK filmikroonika 1958-1991: 1 | 1. MAI DEMONSTRATSIOON KOHTLA-JÄRVEL",
+   "format": "HLS",
+   "apiMs": 864,
+   "bufMs": 302,
+   "ttffMs": 325,
+   "playedOk": true,
+   "curT": 29.7,
+   "frames": 740,
+   "badge": {
+    "prec": "day",
+    "text": "1965-05-01",
+    "conf": true,
+    "Y": 1965,
+    "M": 5,
+    "D": 1
+   }
+  },
+  {
+   "phase": "p2",
+   "layer": "V1",
+   "type": "video",
+   "slug": "ak-filmikroonika-1958-1991-2-uliopilaslaulupidu-riias",
+   "title": "AK filmikroonika 1958-1991: 1 | 2 ÜLIÕPILASLAULUPIDU RIIAS",
+   "format": "HLS",
+   "apiMs": 62,
+   "bufMs": 123,
+   "ttffMs": 149,
+   "playedOk": true,
+   "curT": 15.9,
+   "frames": 395,
+   "badge": {
+    "prec": "day",
+    "text": "1958-07-11",
+    "conf": true,
+    "Y": 1958,
+    "M": 7,
+    "D": 11
+   }
+  },
+  {
+   "phase": "p2",
+   "layer": "A1",
+   "type": "audio",
+   "slug": "20-aastat-tagasi-paevakaja-erisaade",
+   "title": "20 AASTAT TAGASI. Päevakaja erisaade",
+   "format": "HLS",
+   "apiMs": 1027,
+   "bufMs": 136,
+   "ttffMs": 171,
+   "playedOk": true,
+   "curT": 14.9,
+   "frames": null,
+   "badge": {
+    "prec": "day",
+    "text": "1965-04-20",
+    "conf": true,
+    "Y": 1965,
+    "M": 4,
+    "D": 20
+   }
+  }
+ ],
+ "badges": [
+  {
+   "slug": "allmaasaalides",
+   "date": "1965-08-29",
+   "badge": "1965-08-29",
+   "precision": "day",
+   "confirmed": true
+  },
+  {
+   "slug": "branislav-nusic-jumalik-komoodia",
+   "date": "1965-10-31",
+   "badge": "1965-10-31",
+   "precision": "day",
+   "confirmed": true
+  },
+  {
+   "slug": "arkadi-avertsenko-professionaali-mured",
+   "date": "1965-06-11",
+   "badge": "1965",
+   "precision": "year",
+   "confirmed": true
+  },
+  {
+   "slug": "ak-filmikroonika-1958-1991-1-mai-demonstratsioon-kohtla-jarvel",
+   "date": "1965-05-01",
+   "badge": "1965-05-01",
+   "precision": "day",
+   "confirmed": true
+  },
+  {
+   "slug": "a-omre-angerjas-karris",
+   "date": "1965-02-15",
+   "badge": "1965-02",
+   "precision": "month",
+   "confirmed": false
+  },
+  {
+   "slug": "a-omre-kosimine",
+   "date": "1965-02-15",
+   "badge": "1965-02",
+   "precision": "month",
+   "confirmed": false
+  },
+  {
+   "slug": "ak-filmikroonika-1958-1991-aianduse-mesinduse-naitus",
+   "date": "1965-09-15",
+   "badge": "1965-09",
+   "precision": "month",
+   "confirmed": false
+  },
+  {
+   "slug": "ak-filmikroonika-1958-1991-2-uliopilaslaulupidu-riias",
+   "date": "1958-07-11",
+   "badge": "1958-07-11",
+   "precision": "day",
+   "confirmed": true
+  },
+  {
+   "slug": "20-aastat-tagasi-paevakaja-erisaade",
+   "date": "1965-04-20",
+   "badge": "1965-04-20",
+   "precision": "day",
+   "confirmed": true
+  }
+ ],
+ "errors": [],
+ "apiCalls": [
+  {
+   "kind": "search audio 1965",
+   "ms": 1457
+  },
+  {
+   "kind": "search video 1965",
+   "ms": 903
+  },
+  {
+   "kind": "content audio",
+   "ms": 119
+  },
+  {
+   "kind": "content audio",
+   "ms": 63
+  },
+  {
+   "kind": "content audio",
+   "ms": 64
+  },
+  {
+   "kind": "content video",
+   "ms": 113
+  },
+  {
+   "kind": "search audio 1938",
+   "ms": 1310
+  },
+  {
+   "kind": "search video 1938",
+   "ms": 835
+  },
+  {
+   "kind": "search video 1908-1964",
+   "ms": 1240
+  },
+  {
+   "kind": "content video",
+   "ms": 61
+  },
+  {
+   "kind": "content audio",
+   "ms": 91
+  }
+ ],
+ "playsTotal": 6,
+ "apiAvgMs": 569,
+ "verdict": {
+  "p1ok": true,
+  "p2ok": true,
+  "mediaErrorFree": true
+ }
+}
