@@ -178,6 +178,68 @@ research/music-jamming-2026-08.md — not touched here.
     (merged, perPhase, caveats), screenshots jam-synth-{p2p,sfu,sfu-sparse,
     a,b}*.png. Cleanup verified: no jam-udd/server processes, :8893/:8895 free.
 
+- **C9 (HOST SELF-TEST — host-check.html + host-check.js + measure-core.js +
+  harness/run-hostcheck.mjs, own server on :8898)**: the C7 rig packaged as a
+  ONE-PAGE tool a synth owner runs ALONE with their real hardware. No partner,
+  no second machine, no build. Answers "what will the player actually feel?"
+  - **measure-core.js** = the measurement kernel extracted (edge-median ct→epoch
+    map, adaptive onset↔note matcher with negative minLat, pdist, 16-B frame,
+    percussive stand-in voice). remote-synth.js NOT modified (sibling MoQ run
+    owns it + :8893); the rig can import measure-core.js when that run lands.
+  - **THE DEFAULT THAT MAKES IT HONEST**: the host monitors the RETURN path
+    (encoded→decoded), never the source. Direct monitoring is why hosts ship
+    rigs that feel fine to them and unplayable to everyone else. Toggle exists
+    only to A/B; label flips to "DIRECT monitoring — you are lying to yourself".
+  - **Constraint checks are the other classic ruiner**: getUserMedia asks for
+    `echoCancellation:false, autoGainControl:false, noiseSuppression:false,
+    48 kHz, mono` and the page DISPLAYS `getSettings()` back as pass/fail, plus
+    sampleRate / baseLatency / outputLatency / `settings.latency` (interface
+    input buffer, in samples). Verified live: Chrome's fake device honours all
+    three DSP flags but returns a **44.1 kHz** track against a 48 kHz context —
+    the sample-rate check fired on the very first real run.
+  - **Tests**: A hardware floor (MIDI out → onset on the return; key→sound
+    p50/p95 + send jitter, no network) · B network echo to the deployed
+    elektron-jam relay (echoes to sender — the partnerless RTT; C0's loopback
+    property is what makes this test possible at all) · C full loop = TWO
+    PeerConnections in one page, MIDI up an unordered DC, the real synth's
+    audio back over Opus, THREE simultaneous onset taps (capture tap = leg 2,
+    return tap = total) so legs decompose without arithmetic: leg1 wire /
+    leg2 instrument+interface / leg3 return, with the jitter-buffer share read
+    from `getStats` jitterBufferDelay÷EmittedCount · D simulated distance
+    (DelayNode on the return, 0/10/30/60/100 ms) — playable, not a measurement,
+    plus a "measure at this distance" that proves the delay is really there.
+  - C carries the C7 finding forward as a host-facing checkbox: a **video sync
+    anchor pins the audio jitter buffer** (audio-only p2p wandered 72→310 ms
+    across runs; with video, dead stable 3/3). Default ON.
+  - Report: per-leg bar + table, dropped counts per arm, 60 s stuck-note soak
+    (on/off pairs, RMS 300 ms after each note-off, CC123 panic + silence check),
+    a floor→latency projection anchored on the host's OWN measured non-buffer
+    legs (rig slope 1:1, 10→36 / 40→66 ms), verdict band (≤45 instrument /
+    45–70 playable / 70–100 audible / >100 sluggish) and a remedy that names
+    the dominant leg — e.g. buffer at N samples → "try 128", or for a
+    return-dominated rig the measured fact that jitterBufferTarget=0 makes it
+    WORSE (77.7→211) and only a fixed-floor transport (MoQ 35.8 at floor 10)
+    actually moves it. Computer keys play notes through whatever path is live.
+  - **Headless verification, 18/18** (ONE Chrome, fake media device + granted
+    permissions via CDP `Browser.grantPermissions` — `--use-fake-ui-for-media-
+    devices` alone is NOT enough under headless=new, getUserMedia is denied and
+    the constraint panel has nothing to report; that was the one real trap):
+    A 20.6/22.6 (stand-in voice through a MediaStream, 0 dropped) · B relay RTT
+    36.4/40.2 → one-way 18.2, 0 lost · C total 67.7/71.0 = leg1 0.5 + leg2 20.8
+    + leg3 46.9 (buffer 30.0 = 64 %, codec+wire 16.9), 0 dropped, conceal 0.00 %
+    · D deltas 29.7 ms @30 and 60.2 ms @60 (±5 ms gate) · soak 19 notes, 0 stuck,
+    0 dropped, silent after panic · 0 page errors, 0 console errors.
+    results/hostcheck-{report.json,report.png,verify.json}.
+  - Headless is WEAKER than a real run in exactly four places, all documented
+    on the page: no MIDI wire (stand-in is a function call, real USB-MIDI adds
+    ~1–3 ms), no converter/interface buffer on the return (real ADC + driver
+    adds 3–15 ms), the stand-in's note-on is sample-exact where a real synth's
+    is 2–10 ms, and the loopback WebRTC has zero wire time so leg 3 is a pure
+    codec+NetEQ floor. The floor is the point: 46.9 ms of return with NO network
+    at all is what a real host is fighting.
+  - Cleanup: chrome (hostcheck-udd) + server killed, :8898 free, :8893 never
+    touched.
+
 ## Layout (planned)
 
 - server.mjs — :8893 static + /time-local (µs, shared clock) + mailbox signaling + /log sink
