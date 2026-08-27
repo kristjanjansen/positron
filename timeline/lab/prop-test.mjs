@@ -16,9 +16,10 @@
 // separately (exactly-once per pass).
 
 import {
-  createTransport, createScheduler, createVirtualRuntime,
+  createTransport, createScheduler, createVirtualRuntime, createDeck,
   defaultTickHost, tickHostByKind,
 } from '../transport.mjs';
+import { createNest, composeRate, rateLattice, MAX_NEST_DEPTH } from '../nested.mjs';
 
 const args = process.argv.slice(2);
 const NSEEDS = +(args.includes('--seeds') ? args[args.indexOf('--seeds') + 1] : 30);
@@ -358,10 +359,316 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
     'reduceAt() (the C2 left-hand side, queryable) disagrees with the fold');
 }
 
+// ---------------------------------------------------------------------------
+// suite 4: NESTING — a span that is itself a deck (timeline/nested.mjs).
+// Nested seek (reduce-on-seek must run INSIDE the child), rate composition
+// (incl. honest degradation against the child's caps.rates lattice), nested
+// pause, absence outside the span, and cycle/depth rejection.
+//
+// Two decks need two tick metronomes on ONE clock: the virtual host holds a
+// single tickCb, so it is fanned out here (setTimer passes straight through, so
+// commit ordering is still exact).
+// ---------------------------------------------------------------------------
+function sharedVR(startMs = 1_000_000) {
+  const vr = createVirtualRuntime(startMs);
+  const cbs = new Set();
+  let started = false;
+  vr.newHost = () => {
+    let mine = null;
+    return {
+      name: 'virtual',
+      start(cb, ms) {
+        mine = cb; cbs.add(cb);
+        if (!started) { started = true; vr.host.start(() => { for (const c of [...cbs]) c(); }, ms || 25); }
+      },
+      stop() { if (mine) cbs.delete(mine); },
+      setTimer: (d, f) => vr.host.setTimer(d, f),
+    };
+  };
+  return vr;
+}
+
+const NOTES = [
+  { n: 60, on: 100, off: 400 }, { n: 62, on: 500, off: 1200 },
+  { n: 64, on: 900, off: 2500 }, { n: 67, on: 1500, off: 3800 },
+  { n: 72, on: 2600, off: 3000 },
+];
+const CHILD_END = 4000;
+const heldAt = (t) => NOTES.filter((x) => x.on <= t && x.off > t).map((x) => x.n).sort((a, b) => a - b);
+const CHILD_RATES = [0.25, 0.5, 1, 2, 4];
+
+function makeChild(vr, sink) {
+  const items = [];
+  for (const x of NOTES) {
+    items.push({ at: x.on, kind: 'note', payload: { raw: [144, x.n, 90] } });
+    items.push({ at: x.off, kind: 'note', payload: { raw: [128, x.n, 0] } });
+  }
+  return createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), items, range: [0, CHILD_END],
+    adapters: {
+      note: {
+        caps: { catchUp: 'reduce', rates: CHILD_RATES, reducible: true, seekable: true },
+        actuate(p) { const [s, n] = p.raw; if ((s & 0xf0) === 0x90) sink.live.add(n); else sink.live.delete(n); sink.fires++; },
+        reduce(payloads) {
+          const held = new Map();
+          for (const p of payloads) { const [s, n, v] = p.raw; if ((s & 0xf0) === 0x90 && v > 0) held.set(n, p); else held.delete(n); }
+          return held;
+        },
+        assertState(held, info) {
+          sink.live = new Set(held.keys());
+          sink.asserts.push({ pos: +info.pos.toFixed(3), reason: info.reason, keys: [...held.keys()].sort((a, b) => a - b) });
+        },
+      },
+    },
+  });
+}
+const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
+
+// --- 4a: nested seek, nested pause, absence, rate composition --------------
+{
+  const vr = sharedVR();
+  const sink = { live: new Set(), asserts: [], fires: 0 };
+  const child = makeChild(vr, sink);
+  const marks = [];
+  const parent = createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), range: [0, 20000],
+    items: [{ at: 1000, kind: 'mark', payload: { v: 'a' } }, { at: 9000, kind: 'mark', payload: { v: 'b' } }],
+    adapters: { mark: { caps: { catchUp: 'burst' }, actuate: (p) => marks.push(p.v) } },
+  });
+  const nest = createNest(parent, { toleranceMs: 5, hardSeekMs: 200 });
+  const AT = 3000;
+  const sp = nest.add({ id: 'sess', at: AT, rate: 1, deck: child });
+
+  check('nest-span', 0, Math.abs(sp.parentDur - CHILD_END) < 1e-9,
+    `span length in parent domain ${sp.parentDur} !== child duration ${CHILD_END} at rate 1`);
+  check('nest-span', 0, String(rateLattice(child)) === String(CHILD_RATES),
+    `rate lattice ${rateLattice(child)} !== child caps.rates`);
+  check('nest-span', 0, parent.caps('deck-span').nested === true && parent.caps('deck-span').clockMaster === false,
+    'the nested adapter must declare nested:true and clockMaster:false (rule 4)');
+
+  // --- absence BEFORE the span: the child is absent, and absence is content
+  parent.seek(500);
+  check('nest-absent', 0, nest.present('sess') === false && !child.playing(),
+    `child must be absent+paused before the span (present=${nest.present('sess')})`);
+  check('nest-absent', 0, heldNow(sink).length === 0, `child held ${heldNow(sink)} while absent`);
+  check('nest-absent', 0, child.position() === 0, `absent-before must park the child at its range start, got ${child.position()}`);
+
+  // --- NESTED SEEK: a parent seek into the middle of the span is a seek in
+  //     the child, and the child's reduce-on-seek runs (assertState holds)
+  for (const u of [0, 700, 1500, 2600, 3999]) {
+    sink.asserts.length = 0;
+    parent.seek(AT + u);
+    check('nest-seek', u, Math.abs(child.position() - u) < 1e-6,
+      `parent seek to ${AT + u} put the child at ${child.position()}, want ${u}`);
+    const want = heldAt(u);
+    check('nest-seek', u, String(heldNow(sink)) === String(want),
+      `held after nested seek = [${heldNow(sink)}], reduce(<=${u}) = [${want}]`);
+    const mine = sink.asserts.filter((a) => a.reason === 'seek');
+    check('nest-seek', u, mine.length >= 1 && Math.abs(mine[mine.length - 1].pos - u) < 1e-6,
+      `reduce-on-seek did not run IN THE CHILD at ${u} (${JSON.stringify(sink.asserts)})`);
+    check('nest-seek', u, String(child.reduceAt('note', u) ? [...child.reduceAt('note', u).keys()].sort((a, b) => a - b) : []) === String(want),
+      'child reduceAt disagrees with the fold — nesting broke the C2 left-hand side');
+  }
+
+  // --- NESTED PAUSE: pause the parent, everything stops and holds
+  parent.seek(AT + 1000);
+  parent.play();
+  check('nest-play', 0, child.playing(), 'parent play must propagate into the child');
+  vr.advanceTo(vr.now() + 500);
+  nest.servo();
+  check('nest-play', 0, Math.abs(parent.position() - (AT + 1500)) < 1e-6 && Math.abs(child.position() - 1500) < 1e-6,
+    `1x: parent ${parent.position()} child ${child.position()} after 500 ms (want ${AT + 1500} / 1500)`);
+  parent.pause();
+  check('nest-pause', 0, !child.playing() && !parent.playing(), 'parent pause must stop the child');
+  const heldParent = parent.position(), heldChild = child.position();
+  vr.advanceTo(vr.now() + 3000);
+  check('nest-pause', 0, parent.position() === heldParent && child.position() === heldChild,
+    `positions moved while paused: parent ${parent.position()} child ${child.position()}`);
+  check('nest-pause', 0, nest.servo() === 0, 'the servo must not correct anything while the parent is paused');
+
+  // --- RATE COMPOSES multiplicatively (and setRate still arms while paused)
+  parent.setRate(2);
+  check('nest-rate', 0, !parent.playing() && !child.playing(), 'setRate must not start either deck (seam 2, one level down)');
+  check('nest-rate', 0, child.targetRate() === 2, `child targetRate ${child.targetRate()} !== parentRate 2 x spanRate 1`);
+  parent.play();
+  vr.advanceTo(vr.now() + 1000);
+  nest.servo();
+  check('nest-rate', 0, Math.abs(parent.position() - (heldParent + 2000)) < 1e-6,
+    `parent at 2x advanced ${parent.position() - heldParent} ms in 1000 ms wall`);
+  check('nest-rate', 0, Math.abs(child.position() - (heldChild + 2000)) < 1e-6,
+    `child at composed 2x advanced ${child.position() - heldChild} ms (mapping and child transport disagree)`);
+  parent.pause();
+
+  // --- ABSENCE OUTSIDE the span while the parent's own layers keep playing
+  marks.length = 0;
+  parent.setRate(1);
+  parent.seek(8000);
+  check('nest-absent', 1, nest.present('sess') === false && !child.playing(),
+    'past the span end the child must be absent');
+  check('nest-absent', 1, heldNow(sink).length === 0, `child still holding ${heldNow(sink)} past the span end`);
+  check('nest-absent', 1, child.position() === CHILD_END,
+    `absent-after must park the child at its range end, got ${child.position()}`);
+  parent.play();
+  vr.advanceTo(vr.now() + 1500);
+  check('nest-absent', 1, marks.join(',') === 'b', `parent layers must keep playing outside the span (marks=[${marks}])`);
+  check('nest-absent', 1, !child.playing() && child.position() === CHILD_END,
+    'the absent child must not advance while the parent plays past it');
+  parent.pause();
+
+  // --- the FOLLOW servo pulls a drifted child back with sync(), not a re-fire
+  parent.seek(AT + 2000);
+  parent.play();
+  const firesBefore = sink.fires;
+  child.transport.sync(child.position() + 60);          // shove the child out of band
+  const n = nest.servo();
+  check('nest-servo', 0, n === 1 && Math.abs(child.position() - 2000) < 1e-6,
+    `servo corrections ${n}, child at ${child.position()} (want 2000)`);
+  check('nest-servo', 0, sink.fires === firesBefore, 'a servo correction must not re-fire anything (sync, not seek)');
+  parent.pause();
+
+  const ds = nest.driftStats();
+  check('nest-stats', 0, ds.spans.length === 1 && ds.spans[0].child && ds.spans[0].child.kinds,
+    'driftStats must NEST the child channel, not flatten it');
+  check('nest-stats', 0, ds.spans[0].childRange[1] === CHILD_END && ds.depth === 2,
+    `nested depth/range wrong: ${JSON.stringify({ d: ds.depth, r: ds.spans[0].childRange })}`);
+
+  nest.dispose(); parent.dispose(); child.dispose();
+}
+
+// --- 4b: rate composition against a child that CANNOT honour it ------------
+{
+  check('nest-rate', 1, composeRate(2, 1, CHILD_RATES).chose === 2 && !composeRate(2, 1, CHILD_RATES).degraded, 'exact composed rate must not degrade');
+  check('nest-rate', 1, composeRate(2, 3, CHILD_RATES).chose === 4 && composeRate(2, 3, CHILD_RATES).degraded,
+    `6x on a [${CHILD_RATES}] lattice must degrade to 4, got ${JSON.stringify(composeRate(2, 3, CHILD_RATES))}`);
+  check('nest-rate', 1, composeRate(1, 0.3, CHILD_RATES).chose === 0.25,
+    `0.3x must pick the nearest in LOG space (0.25), got ${composeRate(1, 0.3, CHILD_RATES).chose}`);
+  check('nest-rate', 1, composeRate(0, 3, CHILD_RATES).chose === 0 && !composeRate(0, 3, CHILD_RATES).degraded,
+    'pause must always be expressible and never degrade');
+  check('nest-rate', 1, composeRate(1, 7, null).chose === 7, 'a child declaring no rates accepts any composed rate');
+
+  const vr = sharedVR();
+  const sink = { live: new Set(), asserts: [], fires: 0 };
+  const child = makeChild(vr, sink);
+  const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 20000], items: [] });
+  const nest = createNest(parent, { toleranceMs: 5 });
+  nest.add({ id: 'fast', at: 0, rate: 3, deck: child });   // 3x span: 4000 ms child -> 1333 ms parent
+  check('nest-rate', 2, Math.abs(nest.span('fast').parentDur - CHILD_END / 3) < 1e-9,
+    `a 3x span must occupy childDur/3 of parent time, got ${nest.span('fast').parentDur}`);
+  parent.seek(0);
+  parent.setRate(2);                                       // wanted 6x, lattice tops out at 4x
+  const r = nest.rateReport('fast');
+  check('nest-rate', 2, r.wanted === 6 && r.chose === 4 && r.degraded === true,
+    `composition must degrade HONESTLY: ${JSON.stringify(r)}`);
+  check('nest-rate', 2, child.targetRate() === 4, `child must run at the rate it CHOSE (4), got ${child.targetRate()}`);
+  check('nest-rate', 2, nest.driftStats().spans[0].degradations === 1, 'a degradation must be counted, not swallowed');
+  // and the servo pays for it in corrections rather than lying about position
+  parent.play();
+  vr.advanceTo(vr.now() + 200);
+  const corr = nest.servo();
+  check('nest-rate', 2, corr === 1 && Math.abs(child.position() - 1200) < 1e-6,
+    `the degraded child must be re-anchored to the mapping (${child.position()}, want 1200, corrections ${corr})`);
+  parent.pause();
+  nest.dispose(); parent.dispose(); child.dispose();
+}
+
+// --- 4c: cycles and the depth limit ---------------------------------------
+{
+  const vr = sharedVR();
+  const mk = () => createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 1000], items: [], autoStart: false });
+  const threw = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+
+  const a = mk(), b = mk(), c = mk();
+  const na = createNest(a), nb = createNest(b), nc = createNest(c);
+  check('nest-cycle', 0, /cannot contain itself/.test(threw(() => na.add({ id: 'self', deck: a })) || ''),
+    'a deck containing ITSELF must be rejected');
+  na.add({ id: 'b', deck: b });
+  nb.add({ id: 'c', deck: c });
+  check('nest-cycle', 0, /cycle/.test(threw(() => nc.add({ id: 'a', deck: a })) || ''),
+    'c -> a closes the a -> b -> c cycle and must be rejected');
+  check('nest-cycle', 0, threw(() => na.add({ id: 'c', deck: c })) === null,
+    'a -> c is a DAG edge (a deck appearing twice in the tree), not a cycle: it must be allowed');
+  check('nest-cycle', 0, /already exists/.test(threw(() => na.add({ id: 'b', deck: b })) || ''),
+    'duplicate span id must be rejected');
+
+  // depth: a chain of MAX_NEST_DEPTH decks is legal, one more is not
+  const chain = [], nests = [];
+  for (let i = 0; i < MAX_NEST_DEPTH + 1; i++) chain.push(mk());
+  let err = null;
+  for (let i = 0; i < MAX_NEST_DEPTH; i++) {
+    const n = createNest(chain[i]); nests.push(n);
+    const e = threw(() => n.add({ id: 'k', deck: chain[i + 1] }));
+    if (e) { err = { i, e }; break; }
+  }
+  check('nest-depth', 0, err !== null && err.i === MAX_NEST_DEPTH - 1 && /depth/.test(err.e),
+    `chain of ${MAX_NEST_DEPTH} must be legal and ${MAX_NEST_DEPTH + 1} rejected; got ${JSON.stringify(err)}`);
+
+  // exactly one clock master per parent (rule 4)
+  const d = mk(), e2 = mk(), nd = createNest(d);
+  nd.add({ id: 'm1', deck: e2, master: true });
+  check('nest-master', 0, nd.masterId() === 'm1', 'the declared master must be recorded');
+  check('nest-master', 0, /master already claimed/.test(threw(() => nd.add({ id: 'm2', deck: mk(), master: true })) || ''),
+    'a second nested clock master must be rejected');
+
+  for (const n of [na, nb, nc, nd, ...nests]) n.dispose();
+  for (const dk of [a, b, c, d, e2, ...chain]) dk.dispose();
+}
+
+// --- 4d: the MASTER direction — the parent slaves to the CHILD'S POSITION,
+//     never to whatever masters the child (rule 4, the important half).
+{
+  const vr = sharedVR();
+  const sink = { live: new Set(), asserts: [], fires: 0 };
+  const child = makeChild(vr, sink);
+  const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 20000], items: [] });
+  const nest = createNest(parent, { toleranceMs: 5 });
+  const AT = 2000;
+  nest.add({ id: 'sess', at: AT, rate: 0.5, deck: child, master: true });  // 0.5x: 4000 child -> 8000 parent
+  parent.seek(AT + 1000);
+  check('nest-master', 1, Math.abs(child.position() - 500) < 1e-6,
+    `a 0.5x span maps parent+1000 to child 500, got ${child.position()}`);
+  parent.play();
+  vr.advanceTo(vr.now() + 400);
+  // something INSIDE the child (its own media master) shoves the child forward.
+  // The parent must follow the CHILD'S POSITION, and the child must not be
+  // dragged back by the parent.
+  const cBefore = child.position();
+  child.transport.sync(cBefore + 90);
+  const n = nest.servo();
+  check('nest-master', 1, n === 1, `master span must correct the PARENT (corrections ${n})`);
+  check('nest-master', 1, Math.abs(child.position() - (cBefore + 90)) < 1e-6,
+    `the parent must not drag its master child back (child ${child.position()})`);
+  check('nest-master', 1, Math.abs(parent.position() - (AT + (cBefore + 90) / 0.5)) < 1e-6,
+    `parent must land on toParent(childPos) = ${AT + (cBefore + 90) / 0.5}, got ${parent.position()}`);
+  parent.pause();
+  check('nest-master', 1, nest.servo() === 0, 'a paused parent must not be synced by its child');
+
+  // A DEGRADED CHILD CANNOT MASTER: at parent 1.5x the composed rate 0.75x is
+  // off the child's lattice, so the child runs at a rate the parent did not ask
+  // for. Mastering must SUSPEND (else that rate is silently imposed on the whole
+  // arrangement) and the direction flip back to follow.
+  parent.setRate(1.5);
+  const rep = nest.rateReport('sess');
+  check('nest-master', 2, rep.wanted === 0.75 && rep.chose === 1 && rep.degraded,
+    `1.5 x 0.5 = 0.75 must round onto the lattice: ${JSON.stringify(rep)}`);
+  parent.play();
+  vr.advanceTo(vr.now() + 300);
+  const pBefore = parent.position();
+  const n2 = nest.servo();
+  check('nest-master', 2, n2 === 1 && parent.position() === pBefore,
+    `a degraded child must NOT drive the parent (corrections ${n2}, parent moved ${parent.position() - pBefore})`);
+  check('nest-master', 2, Math.abs(child.position() - (parent.position() - AT) * 0.5) < 1e-6,
+    `the degraded child must be re-anchored to the parent's mapping, got ${child.position()}`);
+  check('nest-master', 2, nest.driftStats().spans[0].masterSuspended > 0,
+    'the suspension must be counted, not hidden');
+  parent.pause();
+  nest.dispose(); parent.dispose(); child.dispose();
+}
+
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);
 if (failures) {
-  console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams`);
+  console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams + nesting`);
   process.exit(1);
 }
 console.log(`prop-test OK: ${basicRuns} basic + ${gymRuns} gymnastics seeds, 0 violations (reduce(<=t) === play(0->t))`);
 console.log(`seams OK: adapter registry / setRate!=play / worker default / wall->audio bridge / whole-prefix reduce (${seamRuns} freeze seeds) / non-destructive drift`);
+console.log('nesting OK: nested seek (reduce-on-seek runs in the child) / rate composition incl. honest degradation / nested pause / absence outside the span / follow+master servo / cycle + depth rejection');
