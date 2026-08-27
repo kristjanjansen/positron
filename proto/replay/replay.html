@@ -35,31 +35,51 @@ h1{font-size:14px;margin:0 0 10px}
 </div>
 <script type="module">
 // ============================================================================
-// VOD REPLAY WITH CUES — plain hls.js VOD playback + the LIVE cue engine
-// (src/timed-messages.js, imported unchanged) running in REPLAY MODE.
+// VOD REPLAY WITH CUES — plain hls.js VOD playback + the TIMELINE LIBRARY
+// (timeline/transport.mjs) as the cue engine.
 //
-// Cloudflare Stream VOD manifests carry NO PROGRAM-DATE-TIME (measured), so
-// hls.playingDate is null on a VOD and the live engine would never tick. The
-// adapter below hands the engine a fake player whose `hls.playingDate` is
-//        T0 + video.currentTime * 1000
-// — the one line that turns the live engine into a replay engine. Everything
-// else (crossing rule, ordering, pastWindow catch-up for late joins/seeks) is
-// the battle-tested live code, reused verbatim.
+// WAS: src/timed-messages.js (the live engine) handed a fake player whose
+// `hls.playingDate` was T0 + video.currentTime*1000, polled every 100 ms, and
+// destroyed+rebuilt from the whole cue log on every `seeked`.
+// IS:  ONE deck from the library —
+//        · position domain = ABSOLUTE WALL MS (a cue's `at` IS its position)
+//        · the VIDEO ELEMENT IS THE CLOCK MASTER: the vector is slaved to
+//          T0 + video.currentTime*1000 via transport.sync(), so the playhead
+//          can never drift away from the picture; if the video stalls the
+//          playhead stalls with it.
+//        · kind `cue` — one adapter: actuate = the page's render path
+//          (overlay / subtitle / metadata, unchanged), caps.catchUp='burst'
+//          (a cue is a note, never silently dropped), reduce = the FIRED SET
+//          ≤ t, assertState = the late-join/seek fold.
+//      Seek is no longer a rebuild: the library reconciles statuses (behind →
+//      passed, ahead → pending) and re-folds through reduce/assertState. The
+//      lookahead lane commits a precise one-shot timer per cue on a WORKER
+//      tick, so the 100 ms poll floor — and the hidden-tab 1 Hz clamp that
+//      came with a main-thread setInterval — are both gone.
+//
+// Cloudflare Stream VOD manifests carry NO PROGRAM-DATE-TIME (measured), so a
+// VOD has no wall clock of its own: T0 is the anchor that turns media time
+// into wall time, and it is the only thing this page needs to be a replay.
 //
 // T0 anchor (three candidates, PRIMARY = content):
 //   content — decoded from the burned wall-clock row in the VOD pixels:
 //             T0 = median(decodedMs_i − mediaTime_i·1000) over the first N
 //             presented frames. Self-calibrating: immune to publisher cold
 //             start (RTMPS connect, keyframe wait, head trim).
-//   stamp   — the publisher's own Date.now() at first-frame-sent (query param).
+//   stamp   — the publisher's own Date.now() at first-frame-sent (query param;
+//             proto/archive's native T₀ path uses this: anchor=stamp&t0=…).
 //   api     — Stream asset metadata `created` (driver-side cross-check).
 //
 // Fire semantics flag: fireDelayMs=0 (default) honors OPERATOR INTENT (fire at
 // cue.at). Set fireDelayMs≈live p50 lateness to REPRODUCE THE LIVE EXPERIENCE
 // (live viewers see "now" cues transit+poll late; replay would otherwise run
 // ahead of the live burn — the measured asymmetry).
+//
+// URL contract (unchanged — the measurement scripts drive it):
+//   src, room, token, remote, anchor, t0, startAt, pastWindow, fireDelayMs,
+//   anchorN
 // ============================================================================
-import { createTimedMessages } from "/src/timed-messages.js";
+import { createDeck } from "/timeline/transport.mjs";
 
 const q = new URLSearchParams(location.search);
 const SRC        = q.get("src");
@@ -78,14 +98,23 @@ const NBLOCKS = 64;
 const ROW_CLOCK = { x: 32, yc: 624, bw: 12, lo: 4, hi: 9 };
 const ROW_CUE   = { x: 32, yc: 674, bw: 12, lo: 4, hi: 9 };
 
+// Clock-master law (proven in proto/selfrec/replay-grid.html): the media
+// element owns the clock; the library's vector is SLAVED to it.
+const SYNC_TOL_MS = 10;    // ignore corrections smaller than this (frame noise)
+const JUMP_MS     = 400;   // a discontinuity bigger than this is a SEEK, not a
+                           // sync — syncing across it would leave every skipped
+                           // cue `pending` and the lane would burst them all
+                           // (exactly the bug found in replay-grid)
+
 const S = window.__state = {
   phase: "boot", error: null,
   t0: { used: null, mode: null, content: null, stamp: T0_PARAM, spreadMs: null, estimates: [] },
   fires: [], missed: [], cueStates: {}, currentCue: null,
   rvfc: { samples: 0, validClock: 0, validCue: 0, last: null },
   liveBurns: {},           // seq -> first frame where the cue-row showed it
-  engineEvents: [],        // engine lifecycle: start / rebuild-on-seek
+  engineEvents: [],        // lane lifecycle: start / seek / resync-jump
   levels: null, level: null, cuesLoaded: 0, ended: false,
+  hostName: null, playheadWall: null, syncCorrections: [], stalls: 0,
 };
 const vid = document.getElementById("vid");
 const hudEl = document.getElementById("hud");
@@ -136,9 +165,15 @@ async function loadCues() {
   // The log may carry cancel records ({kind:'cancel', id}): a cancelled cue
   // must NOT fire in replay, and cancel rows themselves have no .cue.
   const cancelled = new Set(j.cues.filter(e => e.kind === "cancel").map(e => e.id));
+  // Revision: same id sent twice — LAST record in the log wins (the log is
+  // append-only and ordered; compaction is the producer's job).
+  const byId = new Map();
+  for (const e of j.cues) {
+    if (!e.cue || cancelled.has(e.cue.id)) continue;
+    byId.set(e.cue.id, { id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt ?? null, data: e.cue.data });
+  }
   // sender stamps only (at, sentAt travel verbatim; serverAt/doRecvTs untrusted)
-  return j.cues.filter(e => e.cue && !cancelled.has(e.cue.id))
-    .map(e => ({ id: e.cue.id, at: e.cue.at, sentAt: e.cue.sentAt ?? null, data: e.cue.data }));
+  return [...byId.values()].sort((a, b) => a.at - b.at || (a.id > b.id ? 1 : -1));
 }
 
 // ---- hls VOD ----------------------------------------------------------------
@@ -208,56 +243,193 @@ function onFrame(_now, meta) {
 }
 vid.requestVideoFrameCallback(onFrame);
 
-// ---- cue engine in replay mode ---------------------------------------------
-let engine = null, cues = [], T0 = null, catchupUntil = 0;
-function makeFakePlayer() {
-  return { hls: { get playingDate() {
-    return vid.readyState >= 2 ? new Date(T0 + vid.currentTime * 1000) : null;
-  } } };
+// ---- render path (UNCHANGED semantics; the adapter's actuate calls this) ----
+// Default = this page's overlay. The two renderers that used to live in
+// src/timed-messages.js ride along, selected per cue by data.render:
+//   'subtitle' — a native TextTrack cue (browser styling, iOS CC button)
+//   'metadata' — a hidden metadata track cue (frame-accurate side effects)
+// Both map the cue's wall-clock `at` onto the media timeline at delivery time,
+// exactly as before; nothing is scheduled unless a cue asks for it.
+let subTrack = null, metaTrack = null;
+function subtitleTrack() {
+  if (!subTrack) { subTrack = vid.addTextTrack("subtitles", "Subtitles", "en"); subTrack.mode = "showing"; }
+  return subTrack;
 }
-function onMessage(cue, { lateMs }) {
+function metadataTrack() {
+  if (!metaTrack) { metaTrack = vid.addTextTrack("metadata", "events"); metaTrack.mode = "hidden"; }
+  return metaTrack;
+}
+function renderCue(p) {
+  const data = p.data || {};
+  const how = data.render;
+  const now = playheadWall();
+  if (how === "subtitle" && data.text != null && now != null) {
+    const start = vid.currentTime + (p.at - now) / 1000;
+    const dur = ((data.until ?? p.at + 5000) - p.at) / 1000;
+    try { subtitleTrack().addCue(new VTTCue(Math.max(0, start), Math.max(0.5, start + dur), data.text)); } catch {}
+  } else if (how === "metadata" && now != null) {
+    const start = Math.max(0, vid.currentTime + (p.at - now) / 1000);
+    try {
+      const vc = new VTTCue(start, start + 0.5, JSON.stringify(data ?? null));
+      vc.onenter = () => window.__onMetaCue && window.__onMetaCue(p);
+      metadataTrack().addCue(vc);
+    } catch { window.__onMetaCue && window.__onMetaCue(p); }
+  }
+  renderOverlay();               // the page's own overlay, always
+}
+
+// ---- the cue lane: ONE adapter over the library -----------------------------
+let deck = null, cues = [], T0 = null, firedIds = new Set();
+const playheadWall = () => (deck ? deck.position() : (T0 == null ? null : T0 + vid.currentTime * 1000));
+
+/** A cue fired for real (lookahead commit, tick-late, or burst catch-up). */
+function deliver(p, rec) {
+  const pos = playheadWall();
+  const lateMs = pos - p.at;
+  // Late-joiner policy, preserved verbatim from the old engine: a delivery more
+  // than `pastWindow` behind the playhead is NOT animated — it is surfaced as
+  // caught-up. (Under the library this only happens after a real stall, since
+  // seek/late-join go through the fold below instead of firing at all.)
+  if (lateMs > PAST_WIN) return markCaughtUp(p, lateMs, rec.origin);
   const d = decodeNow();                                    // frame on glass NOW
-  // Classification: the engine delivers via onMessage whenever lateMs <=
-  // pastWindow — those are real fires (lateMs recorded). 'caught-up' is
-  // reserved for catch-up deliveries: the engine's first tick right after a
-  // (re)build on join/seek, which sweeps up already-past cues. The engine
-  // itself doesn't flag the path, so classify by build recency + lateness.
-  const kind = (performance.now() < catchupUntil && lateMs > 250) ? "caught-up" : "fired";
-  S.cueStates[cue.id] = kind;
-  S.currentCue = { id: cue.id, kind, lateMs: Math.round(lateMs) };
+  S.cueStates[p.id] = "fired";
+  S.currentCue = { id: p.id, kind: "fired", lateMs: Math.round(lateMs) };
+  firedIds.add(p.id);
   S.fires.push({
-    id: cue.id, at: cue.at, kind, lateMs: Math.round(lateMs * 10) / 10,
-    currentTime: vid.currentTime, playheadWall: T0 + vid.currentTime * 1000,
+    id: p.id, at: p.at, kind: "fired", lateMs: Math.round(lateMs * 10) / 10,
+    currentTime: vid.currentTime, playheadWall: pos,
     decOk: d.ok, decClockMs: d.clockMs, decCueSeq: d.cueSeq, decCueFiredAt: d.cueFiredAt,
     t: Date.now(),
+    // the LIBRARY's own drift number (intended instant vs actual), and where
+    // the fire came from — commit timer, late tick, burst, or overdub
+    driftMs: rec && rec.deltaMs === null ? null : +(rec ? rec.deltaMs : 0).toFixed(1),
+    origin: rec ? rec.origin : null,
   });
+  renderCue(p);
+}
+function markCaughtUp(p, lateMs, why) {
+  S.cueStates[p.id] = "caught-up";
+  S.currentCue = { id: p.id, kind: "caught-up", lateMs: Math.round(lateMs) };
+  S.missed.push({ id: p.id, at: p.at, lateMs: Math.round(lateMs),
+                  currentTime: vid.currentTime, t: Date.now(), why: why || "fold" });
   renderOverlay();
 }
-function onMissed(cue, { lateMs }) {
-  S.cueStates[cue.id] = "caught-up";
-  S.currentCue = { id: cue.id, kind: "caught-up", lateMs: Math.round(lateMs) };
-  S.missed.push({ id: cue.id, at: cue.at, lateMs: Math.round(lateMs), currentTime: vid.currentTime, t: Date.now() });
-  renderOverlay();
+
+const cueAdapter = {
+  caps: {
+    kind: "cue", domain: "wall", unit: "ms", seekable: true, reducible: true,
+    catchUp: "burst",            // a cue is a note: never silently dropped
+  },
+  actuate(p, rec) { deliver(p, rec); },
+  /** the FIRED SET ≤ pos — the whole state a replayed cue lane has */
+  reduce(payloads) { return new Set(payloads.map(p => p.id)); },
+  /** seek / late join: everything behind the playhead is already-happened.
+   *  It is shown (latest one on the overlay) and NEVER re-animated — the
+   *  `onMissed` half of the old engine, now a pure fold. */
+  assertState(set, info) {
+    firedIds = set;
+    let latest = null;
+    for (const c of cues) {
+      if (!set.has(c.id)) continue;
+      latest = c;
+      if (S.cueStates[c.id] === "fired") continue;
+      if (S.cueStates[c.id] !== "caught-up") {
+        S.missed.push({ id: c.id, at: c.at, lateMs: Math.round(info.pos - c.at),
+                        currentTime: vid.currentTime, t: Date.now(), why: info.reason });
+      }
+      S.cueStates[c.id] = "caught-up";
+    }
+    S.currentCue = latest
+      ? { id: latest.id, kind: S.cueStates[latest.id], lateMs: Math.round(info.pos - latest.at) }
+      : null;
+    renderOverlay();
+  },
+};
+
+function buildDeck(reason) {
+  const items = cues.map(c => ({
+    at: c.at + FIRE_DELAY, kind: "cue", id: c.id,
+    payload: { id: c.id, at: c.at + FIRE_DELAY, data: c.data },
+  }));
+  const durMs = Number.isFinite(vid.duration) ? vid.duration * 1000 : 0;
+  const lastAt = items.length ? Math.max(...items.map(i => i.at)) : T0;
+  deck = window.__deck = createDeck({
+    items,
+    // position domain = absolute wall ms; the seekable window is the VOD
+    range: [T0, Math.max(T0 + durMs, lastAt + 10000)],
+    adapters: { cue: cueAdapter },
+    // tick host: the library default (WORKER) — the cue lane keeps its
+    // deadlines in a backgrounded tab, which a 100 ms setInterval cannot.
+  });
+  S.hostName = deck.hostName;
+  S.engineEvents.push({ reason, t: Date.now(), mediaTime: vid.currentTime,
+                        pending: deck.stats().counts.pending });
 }
-function buildEngine(reason) {
-  if (engine) engine.destroy();
-  catchupUntil = performance.now() + 350;   // first tick (≤100 ms poll) + margin
-  engine = createTimedMessages(makeFakePlayer(), vid, { onMessage, onMissed, pastWindow: PAST_WIN });
-  for (const c of cues) engine.add({ id: c.id, at: c.at + FIRE_DELAY, data: c.data });
-  S.engineEvents.push({ reason, t: Date.now(), mediaTime: vid.currentTime, pending: engine.pending });
+
+// ---- clock master: the video element drives the library ---------------------
+// The vector is re-anchored to T0 + currentTime*1000 every frame. Consequences,
+// all of them deliberate:
+//   · a stalled/paused video stalls the playhead — cues cannot run ahead of the
+//     picture (the failure mode a wall-clock playhead has by construction);
+//   · a DISCONTINUITY (user seek, hls.js recovery jump, gap) is routed to
+//     seek(), which reconciles statuses and re-folds, instead of sync(), which
+//     would leave every skipped cue pending and burst them all at once.
+let lastMediaT = null, lastMediaWall = 0;
+function syncFromMaster() {
+  if (!deck || T0 == null || vid.readyState < 1 || vid.seeking) return;
+  const mediaT = T0 + vid.currentTime * 1000;
+  const now = performance.now();
+  if (vid.paused || vid.ended) {
+    if (deck.playing()) deck.pause();
+    deck.sync(mediaT);
+    lastMediaT = null;
+    return;
+  }
+  const d = mediaT - deck.position();
+  if (Math.abs(d) > JUMP_MS) {                 // discontinuity => seek, not sync
+    S.engineEvents.push({ reason: "resync-jump", t: Date.now(), mediaTime: vid.currentTime,
+                          jumpMs: Math.round(d) });
+    deck.seek(mediaT);
+    lastMediaT = mediaT; lastMediaWall = now;
+    return;
+  }
+  if (lastMediaT !== null && mediaT === lastMediaT && now - lastMediaWall > 1000) {
+    if (deck.playing()) { deck.pause(); S.stalls++; }   // master stalled: hold
+  } else if (!deck.playing()) deck.play();
+  if (lastMediaT === null || mediaT !== lastMediaT) { lastMediaT = mediaT; lastMediaWall = now; }
+  const corr = deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
+  if (corr) {
+    S.syncCorrections.push(+corr.toFixed(1));
+    if (S.syncCorrections.length > 500) S.syncCorrections.shift();
+  }
 }
+function syncLoop() {
+  requestAnimationFrame(syncLoop);
+  syncFromMaster();
+  S.playheadWall = playheadWall();
+}
+// rAF dies in a hidden tab; `timeupdate` (~4 Hz) does not — it is the backstop
+// that keeps the master honest when nobody is looking at the picture.
+vid.addEventListener("timeupdate", syncFromMaster);
+
 window.__seekTo = (sec) => {
-  // Seek = rebuild, never patch (the repo's own reconnect philosophy): state
-  // rewinds/forwards by replaying the whole cue log against the new playhead —
-  // first tick fires the newest past cues (≤ pastWindow) and routes older ones
-  // through onMissed as caught-up.
+  // Seek: state is REBUILT BY FOLD, never patched. The library reconciles
+  // statuses against the new playhead (behind -> passed, ahead -> pending) and
+  // re-runs reduce/assertState, so backward seeks rewind for free and the cues
+  // ahead become pending again and re-fire on the way up.
   S.cueStates = {}; S.currentCue = null;
   vid.currentTime = sec;
 };
 vid.addEventListener("seeked", () => {
-  if (T0 != null) { S.cueStates = {}; S.currentCue = null; buildEngine("seek@" + vid.currentTime.toFixed(2)); renderOverlay(); }
+  if (!deck || T0 == null) return;
+  S.cueStates = {}; S.currentCue = null;
+  lastMediaT = null;
+  deck.seek(T0 + vid.currentTime * 1000);
+  S.engineEvents.push({ reason: "seek@" + vid.currentTime.toFixed(2), t: Date.now(),
+                        mediaTime: vid.currentTime, pending: deck.stats().counts.pending });
+  renderOverlay();
 });
-vid.addEventListener("ended", () => { S.ended = true; });
+vid.addEventListener("ended", () => { S.ended = true; if (deck) deck.pause(); });
 
 // ---- UI ---------------------------------------------------------------------
 function renderOverlay() {
@@ -272,6 +444,7 @@ function renderOverlay() {
   }).join("");
 }
 setInterval(() => {
+  const corr = S.syncCorrections;
   hudEl.textContent =
     `phase ${S.phase}  ct ${vid.currentTime.toFixed(2)}s  level ${S.level} of [${S.levels}]\n` +
     `T0 ${S.t0.mode}: ${S.t0.used ? Math.round(S.t0.used) : "…"}  (content ${S.t0.content ? Math.round(S.t0.content) : "…"}` +
@@ -279,6 +452,8 @@ setInterval(() => {
     `anchor spread ${S.t0.spreadMs} ms over ${ANCHOR_N} frames\n` +
     `rvfc ${S.rvfc.samples} samples · clock ${S.rvfc.validClock} · cue ${S.rvfc.validCue}\n` +
     `fires ${S.fires.length} · caught-up ${S.missed.length} · fireDelay ${FIRE_DELAY} ms (${FIRE_DELAY ? "live-experience" : "intent"})\n` +
+    `lane ${S.hostName || "…"} tick · master=video · sync ${corr.length}` +
+    (corr.length ? ` (last ${corr[corr.length - 1]} ms)` : "") + ` · stalls ${S.stalls}\n` +
     (S.rvfc.last ? `frame clock ${S.rvfc.last.clockMs} cueSeq ${S.rvfc.last.cueSeq}\n` : "") +
     (S.error ? `ERROR ${S.error}` : "");
 }, 250);
@@ -307,13 +482,26 @@ setInterval(() => {
       T0 = S.t0.content; S.t0.mode = "content";
     }
     S.t0.used = T0;
-    buildEngine("start");
+    buildDeck("start");
+    // the FIRST fold: whatever is already behind the playhead (a late join) is
+    // caught up here, before the lane is ever allowed to fire.
+    deck.seek(T0 + vid.currentTime * 1000);
+    deck.play();
+    syncLoop();
     S.phase = "running";
     renderOverlay();
   } catch (e) {
     S.phase = "failed"; S.error = String(e.message || e);
   }
 })();
+
+// diagnostics for the measurement drivers
+window.__deckStats = () => (deck ? {
+  stats: deck.stats(), audit: deck.audit(), driftStats: deck.sched.driftStats(),
+  drift: deck.drift(), caps: deck.caps(), host: deck.hostName,
+  rate: deck.rate(), targetRate: deck.targetRate(), range: deck.range,
+  syncCorrections: S.syncCorrections.slice(-50), stalls: S.stalls,
+} : null);
 </script>
 </body>
 </html>

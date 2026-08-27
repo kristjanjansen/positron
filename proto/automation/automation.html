@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>automation lane over a media clip — slider-video, completed</title>
+<link rel="stylesheet" href="./style.css">
+<style>
+  #lane { height:190px; touch-action:none; cursor:crosshair; }
+  #ruler { height:26px; }
+  #mediaBox { display:flex; gap:12px; align-items:center; }
+  #mediaBox video { width:220px; aspect-ratio:16/9; background:#000; border:1px solid var(--line); border-radius:4px; }
+  #drift td.v { text-align:right; color:var(--hot); }
+  .tool { font-size:11px; }
+  .banner { border-left:2px solid #5f4c2f; padding:8px 11px; background:#191712; color:var(--dim);
+            font-size:11px; line-height:1.65; border-radius:0 4px 4px 0; }
+  .banner b { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>automation lane × media clip</h1>
+  <span class="sub">the 2025 <code>slider-video.vue</code> experiment, completed — the curve's x-axis IS transport position</span>
+  <span class="sub"><a href="./xy.html">← XY pad</a></span>
+</header>
+
+<main>
+  <div>
+    <section>
+      <div class="banner">
+        <b>What this is.</b> The final commit of the 2025 demo repo was an automation
+        lane bound to a media clip by <code>clipId</code>. It died at one missing
+        mapping: <b>absolute epoch ms → a foreign media element's normalized
+        position → pixels</b>. There was no transport that owned a position domain,
+        so the slider knew where it was on screen and the video knew where it was in
+        itself, and nothing converted between them. The library has both halves now —
+        <code>makeLogDeck</code>'s <code>toPos/toAtUs</code> and
+        <code>transport.sync()</code> — so here it is, running.
+      </div>
+    </section>
+
+    <section>
+      <h2>the three mappings that were missing</h2>
+      <table>
+        <tr><td class="k">pos → media</td><td class="hot" id="m1">—</td></tr>
+        <tr><td class="k">media → pos</td><td class="hot" id="m2">—</td></tr>
+        <tr><td class="k">pos → px</td><td class="hot" id="m3">—</td></tr>
+        <tr><td class="k">epoch µs → pos</td><td class="hot" id="m4">—</td></tr>
+      </table>
+      <div class="hint">One transport owns the position domain. The media element is the
+        clock <em>master</em> while it plays (<code>transport.sync()</code>); the transport
+        is master while you scrub (<code>seek()</code> → <code>currentTime</code>).</div>
+    </section>
+
+    <section>
+      <h2>media clip</h2>
+      <div id="mediaBox"></div>
+      <div class="row" style="margin-top:9px">
+        <span class="pill" id="mPill">loading</span>
+        <span class="pill" id="masterPill">master: —</span>
+      </div>
+      <div class="hint">Generated 20 s WAV by default so the demo carries no binary
+        asset — its own internal clock is the only property that matters here. Pass
+        <code>?media=/media/a1-concat.webm</code> for a real file; identical code path.</div>
+    </section>
+
+    <section>
+      <h2>media ↔ transport drift</h2>
+      <table id="drift"></table>
+      <div class="hint">Sampled every frame <em>before</em> the sync correction: how far
+        the automation lane and the media got apart. Corrections under the tolerance are
+        ignored so the lookahead does not churn.</div>
+    </section>
+
+    <section>
+      <h2>controller map at the playhead</h2>
+      <table id="map"></table>
+      <div class="row" style="margin-top:8px"><span class="pill" id="digPill">digest —</span></div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>automation lane — CC74 cutoff over the clip</h2>
+      <canvas id="ruler"></canvas>
+      <canvas id="lane"></canvas>
+      <div class="row" style="margin-top:10px">
+        <button id="pencil" class="on tool">pencil (x = position)</button>
+        <button id="write" class="tool">write (live, x = playhead)</button>
+        <button id="clear" class="tool">clear lane</button>
+        <select id="ctlSel">
+          <option value="74">CC74 cutoff</option>
+          <option value="7">CC7 volume</option>
+          <option value="71">CC71 resonance</option>
+        </select>
+      </div>
+      <div class="hint">Drag across the lane to draw the curve. Capture is throttled to
+        100 ms wall-clock with the endpoint always kept; the thin line with knots is what
+        is stored, the faint thick line is the full-rate evidence.</div>
+    </section>
+
+    <section id="tbar">
+      <h2>one transport</h2>
+      <div class="row">
+        <button data-t="play" class="go">play</button>
+        <button data-t="pause">pause</button>
+        <button data-rate="0.5">×0.5</button>
+        <button data-rate="1" class="on">×1</button>
+        <button data-rate="2">×2</button>
+        <span data-t="pos" class="dim">—</span>
+        <span class="pill" id="valPill">CC74 = —</span>
+      </div>
+      <input type="range" data-t="scrub" style="margin-top:10px">
+      <div class="hint">Scrub and the curve, the playhead and the media move together;
+        the control value under the playhead drives the filter on the clip's own audio.</div>
+    </section>
+
+    <section>
+      <h2>fire log</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module" src="./automation.js"></script>
+</body>
+</html>

@@ -14,10 +14,16 @@ verdict.
 
 | build | dir / port | what to check on resume |
 |---|---|---|
-| Nested spans `{at, rate, deck}` + composed demo | `timeline/`, `proto/remixer/compose.html`, :8891/:8899 | did the primitive land? prop-test green? |
 | **DoD-A**: replay.html onto the lib | `proto/replay`, :8885 | **the gate verdict** vs 59/71 (content) and 77/95 ms (native) |
 | CC automation + slider-video revival | `proto/automation`, :8888 | 14-bit CC + pitch-bend round-trip; seek restores controller map |
 | Text performer (`beforeinput` semantic ops) | `proto/text`, :8889 | C2 on real text; selection restored on seek |
+| Continuous kinds first-class (`sampleAt`/`bracket`/`info.next`/caps read/logdeck fix) | `timeline/`, `proto/paths` :8887 | paths must hold 0.042 px seek + 0.036 px deviation **with its workarounds DELETED** |
+
+LANDED since the first handoff: **nested spans** (`timeline/nested.mjs`,
+16/16, transport.mjs unchanged — composition is just another kind; a degraded
+child cannot master; parent seek lands exact inside a nested session) and
+**proto/paths** (first continuous client; the six-seam report that drove the
+in-flight continuous-kinds work).
 
 Each was briefed to checkpoint its own NOTES.md — read those first; they
 survive even if the agent's report was lost.

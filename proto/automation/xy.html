@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>XY pad — continuous control as a timeline kind</title>
+<link rel="stylesheet" href="./style.css">
+<style>
+  #pad { height:280px; touch-action:none; cursor:crosshair; }
+  .ctl { display:grid; grid-template-columns:96px 1fr 68px; gap:9px; align-items:center; font-size:11px; }
+  .ctl .nm { color:var(--dim); }
+  .ctl .val { text-align:right; color:var(--hot); }
+  #map td, #dev td { white-space:nowrap; font-size:12px; }
+  #map td.k, #dev td.k { width:auto; padding-right:10px; }
+  #map td.v, #dev td.v { text-align:right; color:var(--hot); width:62px; }
+  #map td.d, #dev td.d { text-align:right; color:var(--dim); padding-left:10px; }
+  thead td { color:var(--dim); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+             border-bottom:1px solid var(--line); padding-bottom:3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>XY pad → CC</h1>
+  <span class="sub">the same continuous machinery as the pointer client, a different actuator:
+    pointer position → MIDI CC → a WebAudio voice's filter</span>
+  <span class="sub"><a href="./automation.html">automation lane →</a></span>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>capture</h2>
+      <div class="row fill">
+        <button id="rec" class="go">record</button>
+        <button id="stop" class="stop" disabled>stop</button>
+        <button id="clear">clear</button>
+      </div>
+      <div class="row" style="margin-top:9px">
+        <span class="pill" id="recPill">idle</span>
+        <span class="pill" id="nPill">0 rows</span>
+        <span class="pill" id="rawPill">0 raw</span>
+      </div>
+      <div class="hint">
+        Throttle <b id="thr">100</b> ms wall-clock, per controller key. A knob sweep
+        emits 100–400 msg/s; the log keeps ~10/s plus every gesture endpoint plus every
+        switch, and replay interpolates. Frame decimation is never used — it dies on
+        120 Hz displays and throttled tabs.
+      </div>
+    </section>
+
+    <section>
+      <h2>controller map — reduce(prefix ≤ playhead)</h2>
+      <table id="map"></table>
+      <div class="hint">
+        This map <em>is</em> the seek story. The reducer folds the whole prefix to the
+        last value <b>per controller number</b>; <code>assertState</code> sends CC&nbsp;121
+        then re-states every row, so jumping mid-performance restores cutoff, mod wheel,
+        pitch bend and sustain instead of leaving the synth stale.
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="pill" id="digPill">digest —</span>
+        <span class="pill" id="kfPill">0 keyframes</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>throttle cost — reconstruction vs evidence</h2>
+      <table id="dev"></table>
+      <div class="hint">Error of the interpolated replay against the full-rate lane the
+        capture actually saw, in 14-bit units (0–16383).</div>
+    </section>
+
+    <section>
+      <h2>output</h2>
+      <div class="row fill">
+        <button id="midiBtn">bind Web MIDI out</button>
+      </div>
+      <div class="row" style="margin-top:8px"><span class="pill" id="outPill">synthetic voice</span></div>
+      <div class="hint"><code>actuate</code> is <code>output.send(raw)</code> when a port is
+        bound, and the synthetic voice's filter/gain otherwise. Same raw bytes either way.</div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>pad — x: CC74 cutoff · y: CC71 resonance</h2>
+      <canvas id="pad"></canvas>
+      <div class="ctl" style="margin-top:12px">
+        <span class="nm">CC1+33 mod (14-bit)</span>
+        <input type="range" id="fine" min="0" max="16383" value="0">
+        <span class="val" id="fineV">0</span>
+      </div>
+      <div class="ctl">
+        <span class="nm">pitch bend</span>
+        <input type="range" id="bend" min="0" max="16383" value="8192">
+        <span class="val" id="bendV">8192</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="sus">sustain CC64: off</button>
+        <span class="sub dim">switches are never throttled — a dropped pedal-down is the CC analogue of a stuck note</span>
+      </div>
+    </section>
+
+    <section id="tbar">
+      <h2>replay through the timeline library</h2>
+      <div class="row">
+        <button data-t="play" class="go">play</button>
+        <button data-t="pause">pause</button>
+        <button data-rate="0.5">×0.5</button>
+        <button data-rate="1" class="on">×1</button>
+        <button data-rate="2">×2</button>
+        <button data-rate="4">×4</button>
+        <span data-t="pos" class="dim">—</span>
+      </div>
+      <input type="range" data-t="scrub" style="margin-top:10px">
+      <div class="lanes" style="margin-top:12px">
+        <div class="lane-h"><span>lanes — evidence (thick, faint) vs reconstruction (thin, knots)</span>
+          <span class="legend"><i style="background:#79b8ff"></i>CC74 <i style="background:#7fd18a"></i>CC71
+            <i style="background:#e0b862"></i>CC1 <i style="background:#c58ae0"></i>bend
+            <i style="background:#e2726e"></i>CC64</span></div>
+        <canvas id="strip"></canvas>
+      </div>
+    </section>
+
+    <section>
+      <h2>fire log</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module" src="./xy.js"></script>
+</body>
+</html>
