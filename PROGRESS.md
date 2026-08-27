@@ -168,7 +168,23 @@ WebRTC row's 77.7 ms:
   where the buffer cannot be hinted at all.
 - **Zero chunk loss across all runs** (0 of 2221–3879) — the jam matrix's
   note-granular group-racing (2.9%) does NOT bite continuous audio streams.
-- ⚠️ NOT MEASURED (agent died here): the A/V combination arms — MoQ+MoQ-video,
+- **A/V ARMS (rerun 2026-08-27 21:5x, main session)**: `moq-av` (MoQ audio +
+  MoQ video) **key→ear 43.08/50.69 ms mixed, 43.37/51.4 sparse at floor 20 ms**
+  (legs 0.68 MIDI / 0.4–0.53 synth / 41–42 return). Compare the audio-only
+  floor curve (10→36, 40→66 ⇒ 20≈46): **adding video costs the audio path
+  NOTHING — MoQ tracks are independent, no lip-sync coupling** (the opposite
+  of WebRTC, where video *stabilized* audio). Audio loss 0.017–0.036%
+  (3/17860, 11/30885), transit 19.4/32.4, ring 18.2 ms, underruns high at
+  floor 20 (104–159).
+  ⚠️ **MoQ VIDEO RETURN IS STARVED**: 198 frames published → **30 received**
+  (~85% missing; the earlier partial run got 93/93 — so it's unstable, not a
+  fixed rate) ⇒ **key→eye and A/V skew remain UNMEASURABLE**. Suspect the
+  §13.4/§7 group-racing pathology at video-frame granularity (same family as
+  the 2.9% chord-note loss). Needs group batching or an ordered subscription
+  before MoQ video is usable for the instrument-panel case.
+  ⚠️ `moq-hybrid` (MoQ audio + WebRTC video) **FAILED to establish**: "moq
+  subscribe 'audio' dead after 15 attempts" — the arm never ran.
+- ⚠️ STILL NOT MEASURED: the hybrid combination — MoQ+MoQ-video,
   MoQ-audio+WebRTC-video hybrid, MoQ A/V skew, and the coupling verdict
   (does video move audio numbers on MoQ as it did on WebRTC?). eyeMatched=0
   in every salvaged run. Rig is built and ready in proto/jam/remote-synth.*;

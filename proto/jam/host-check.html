@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Host self-test — what will the player actually feel?</title>
+<style>
+  :root {
+    --bg: #0e1013; --panel: #171a1f; --panel2: #1e222a; --line: #2c323c;
+    --ink: #e6e9ee; --dim: #949cab; --dimmer: #6d7684;
+    --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --accent: #7dd3fc;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--dim); margin: 0 0 22px; font-size: 13px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim);
+       margin: 0 0 10px; font-weight: 600; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px 18px; margin-bottom: 14px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .row > label { color: var(--dim); font-size: 12px; }
+  select, button, input[type=number] {
+    background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; font: inherit; font-size: 13px;
+  }
+  select { min-width: 220px; max-width: 100%; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: #4a5563; background: #262b34; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: #1d3b52; border-color: #2f6183; color: #cfe9fb; }
+  button.primary:hover:not(:disabled) { background: #24506e; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; }
+  th, td { text-align: left; padding: 5px 10px 5px 0; border-bottom: 1px solid #22262e; }
+  th { color: var(--dimmer); font-weight: 500; font-size: 11px; text-transform: uppercase;
+       letter-spacing: 0.06em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 18px; }
+  .chk { font-family: var(--mono); font-size: 12.5px; display: flex; gap: 8px;
+         padding: 3px 0; align-items: baseline; }
+  .chk .mark { width: 14px; flex: none; }
+  .pass .mark { color: var(--ok); } .fail .mark { color: var(--bad); }
+  .warnc .mark { color: var(--warn); } .info .mark { color: var(--dimmer); }
+  .chk .lbl { flex: 1; color: var(--dim); }
+  .chk .val { color: var(--ink); }
+  .fail .val { color: var(--bad); } .pass .val { color: var(--ok); }
+  .note { color: var(--dim); font-size: 12.5px; margin: 8px 0 0; }
+  .hint { color: var(--dimmer); font-size: 12px; }
+  .status { font-family: var(--mono); font-size: 12px; color: var(--accent); min-height: 18px; }
+  .big { font-family: var(--mono); font-size: 30px; font-variant-numeric: tabular-nums;
+         letter-spacing: -0.02em; }
+  .unit { font-size: 14px; color: var(--dim); }
+  .verdict { border-radius: 10px; padding: 18px; border: 1px solid var(--line); }
+  .v-inst { background: #10291b; border-color: #1f5c39; }
+  .v-play { background: #2a2410; border-color: #6b5416; }
+  .v-slug { background: #2c1414; border-color: #6f2626; }
+  .toggle { display: flex; align-items: center; gap: 9px; font-size: 13px; cursor: pointer; }
+  .pill { font-family: var(--mono); font-size: 11px; padding: 2px 7px; border-radius: 20px;
+          border: 1px solid var(--line); color: var(--dim); }
+  .pill.on { color: var(--ok); border-color: #2c5a3f; background: #10251a; }
+  .keys { font-family: var(--mono); font-size: 12px; color: var(--dimmer); }
+  #kbd { display: flex; gap: 3px; margin-top: 8px; flex-wrap: wrap; }
+  #kbd .k { width: 34px; height: 40px; border: 1px solid var(--line); border-radius: 5px;
+            background: var(--panel2); display: flex; align-items: flex-end; justify-content: center;
+            font-family: var(--mono); font-size: 10px; color: var(--dimmer); padding-bottom: 3px;
+            user-select: none; cursor: pointer; }
+  #kbd .k.lit { background: #2f6183; color: #eaf6ff; border-color: #4b8fbd; }
+  input[type=range] { width: 100%; accent-color: #4b8fbd; }
+  .slidermarks { display: flex; justify-content: space-between; font-family: var(--mono);
+                 font-size: 11px; color: var(--dimmer); margin-top: 2px; }
+  .bar { height: 9px; background: #22262e; border-radius: 5px; overflow: hidden; display: flex; }
+  .bar span { display: block; height: 100%; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--dim);
+            font-family: var(--mono); margin-top: 6px; }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .remedy { border-left: 3px solid var(--accent); padding: 2px 0 2px 12px; margin-top: 10px;
+            color: var(--ink); font-size: 13px; }
+  code { font-family: var(--mono); background: #22262e; padding: 1px 5px; border-radius: 4px;
+         font-size: 12px; }
+  .muted { color: var(--dimmer); }
+  details summary { cursor: pointer; color: var(--dim); font-size: 12.5px; }
+  .curve { font-family: var(--mono); font-size: 12px; }
+  .curve .track { display: inline-block; height: 8px; background: #2f6183; border-radius: 4px;
+                  vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Host self-test</h1>
+  <p class="sub">Your synth, your interface, no partner. Answers one question: <strong>what will the
+  player on the other end actually feel when they press a key?</strong></p>
+
+  <!-- ---------------- SETUP ---------------- -->
+  <div class="card">
+    <h2>1 · Setup</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button id="btnEnable" class="primary">Enable audio &amp; devices</button>
+      <span id="setupStatus" class="status"></span>
+    </div>
+    <div class="grid2">
+      <div>
+        <div class="row" style="margin-bottom:8px">
+          <label style="width:130px">MIDI out → synth</label>
+          <select id="midiOut"><option value="">(not enabled)</option></select>
+        </div>
+        <div class="row">
+          <label style="width:130px">Audio in ← synth</label>
+          <select id="audioIn"><option value="">(not enabled)</option></select>
+        </div>
+        <p class="hint" style="margin-top:8px">MIDI goes out to the instrument's MIDI IN; its audio
+        comes back through your interface. Pick both.</p>
+      </div>
+      <div>
+        <div id="checks"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------- MONITORING ---------------- -->
+  <div class="card">
+    <h2>2 · Monitoring — the setting that makes this honest</h2>
+    <label class="toggle"><input type="checkbox" id="monReturn" checked>
+      <span><strong>Monitor the return path</strong> — hear only the encoded → decoded audio,
+      the same thing the player hears</span></label>
+    <p class="note">Direct monitoring lies to you. Your fingers land on a synth you hear instantly,
+    while the player hears it a full round-trip later. With return-path monitoring on, you are
+    sitting in the player's chair: every millisecond of the tests below is a millisecond you feel.
+    <span class="muted">Turn it off only to A/B the two, and turn it straight back on.</span></p>
+    <div class="row" style="margin-top:8px">
+      <span id="monPill" class="pill on">return-path monitoring</span>
+      <label style="width:auto">monitor level</label>
+      <input type="range" id="monLevel" min="0" max="100" value="80" style="width:160px">
+    </div>
+  </div>
+
+  <!-- ---------------- TESTS ---------------- -->
+  <div class="card">
+    <h2>3 · Tests</h2>
+
+    <div style="margin-bottom:16px">
+      <div class="row">
+        <button id="btnA" disabled>A · Hardware floor</button>
+        <span class="hint">no network — your instrument's fixed tax</span>
+        <span id="statusA" class="status"></span>
+      </div>
+      <div id="outA"></div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="row">
+        <button id="btnB" disabled>B · Network echo</button>
+        <span class="hint">notes out to the relay and back — no partner needed</span>
+        <span id="statusB" class="status"></span>
+      </div>
+      <div id="outB"></div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="row">
+        <button id="btnC" disabled>C · Full loop (self-play)</button>
+        <label class="toggle" style="margin-left:4px"><input type="checkbox" id="vAnchor" checked>
+          <span class="hint">video sync anchor</span></label>
+        <span id="statusC" class="status"></span>
+      </div>
+      <div class="hint" style="margin-top:4px">MIDI up over WebRTC → your real synth → Opus back,
+        all inside this page. The whole chain with your hardware in it.</div>
+      <div id="outC"></div>
+    </div>
+
+    <div>
+      <div class="row">
+        <button id="btnSoak" disabled>Stuck-note soak</button>
+        <label style="width:auto">seconds</label>
+        <input type="number" id="soakSec" value="60" min="4" max="600" style="width:80px">
+        <span id="statusSoak" class="status"></span>
+      </div>
+      <div id="outSoak"></div>
+    </div>
+  </div>
+
+  <!-- ---------------- DISTANCE ---------------- -->
+  <div class="card">
+    <h2>4 · Play at a distance</h2>
+    <p class="note" style="margin-top:0">Not a measurement — an instrument. Add delay to the return
+    and <em>play</em>. Find the point where your patch stops working: long attacks survive
+    distance, tight percussive ones do not.</p>
+    <input type="range" id="dist" min="0" max="4" step="1" value="0" list="distTicks">
+    <datalist id="distTicks"><option value="0"><option value="1"><option value="2"><option value="3"><option value="4"></datalist>
+    <div class="slidermarks"><span>0 ms<br><span class="muted">same room</span></span>
+      <span>10<br><span class="muted">next street</span></span>
+      <span>30<br><span class="muted">same country</span></span>
+      <span>60<br><span class="muted">across Europe</span></span>
+      <span>100<br><span class="muted">transatlantic</span></span></div>
+    <div class="row" style="margin-top:12px">
+      <span class="big" id="distNow">0<span class="unit"> ms added</span></span>
+      <button id="btnD">Measure at this distance</button>
+      <span id="statusD" class="status"></span>
+    </div>
+    <div id="outD"></div>
+  </div>
+
+  <!-- ---------------- KEYBOARD ---------------- -->
+  <div class="card">
+    <h2>5 · Play it</h2>
+    <p class="hint" style="margin-top:0">Computer keys work as a controller — no hardware keyboard
+    needed. Click here first, then play. Notes go through whatever path is currently live.</p>
+    <div id="kbd"></div>
+    <div class="keys" style="margin-top:8px">row <code>a s d f g h j k</code> · octave up
+      <code>q w e r t y u i</code> · panic (all notes off) <code>space</code></div>
+  </div>
+
+  <!-- ---------------- REPORT ---------------- -->
+  <div class="card">
+    <h2>6 · The report</h2>
+    <div class="row" style="margin-bottom:12px">
+      <button id="btnReport" class="primary">Build report</button>
+      <span id="statusR" class="status"></span>
+    </div>
+    <div id="report"><p class="hint">Run A (and B / C if you can) then build the report.</p></div>
+  </div>
+
+  <details class="card">
+    <summary>Log</summary>
+    <pre id="log" style="font-size:11px;color:#7d8694;white-space:pre-wrap;max-height:300px;overflow:auto;margin:8px 0 0"></pre>
+  </details>
+
+</div>
+<audio id="remoteAudio" autoplay playsinline></audio>
+<canvas id="anchor" width="64" height="64" style="display:none"></canvas>
+<script type="module" src="/host-check.js"></script>
+</body>
+</html>
