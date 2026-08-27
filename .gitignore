@@ -18,3 +18,4 @@ rig/moq/spike/logs/
 __pycache__/
 *.log
 .wrangler/
+proto/megatimeline/*-cache.jsonl
