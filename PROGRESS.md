@@ -1,6 +1,64 @@
-# Progress log — 2026-08-25 → 26
+# Progress log — 2026-08-25 → 27
 
-## Session 5 dispatch (2026-08-26) — heavier WebRTC tests (user request)
+## Session 6 (2026-08-27) — grid-archive A/B: self-recording vs central (user: "build 2 protos")
+
+Two agents, one per architecture, both against the deployed elektron-rtc worker
+(unmodified), fake canvas media w/ burned wall-clock (camera still wedged).
+
+### PROTO A — participant self-recording (proto/selfrec + workers/selfrec) — ✅ ALL 5 SCENARIOS
+- NEW worker `elektron-selfrec` (workers.dev): POST /chunk streaming into R2
+  binding (bucket elektron-archive-test, prefix selfrec/), bearer SELFREC_TOKEN,
+  X-Chunk-Sha256 server-side reject of truncated puts; POST /finalize manifest;
+  POST /delete/<show> = one-prefix consent deletion (proven 5×, 404-verified).
+- ✅ Upload lag p50 483 / p95 636 ms (chunk close → HEAD-verified) — ~11× faster
+  than the wrangler-CLI engine path. Uplink cost: +1.17 Mbps over the ~1 Mbps
+  live publish; drain bursts ~4.6 Mbps only post-outage.
+- ✅ 25 s offline (CDP): ZERO loss — 13 chunks buffered in IndexedDB (hwm 4 MB),
+  drained 6.8 s after restore. Bug found+fixed: stale backoff timer delayed the
+  drain (online handler must cancel pending timers; CDP offline flips
+  navigator.onLine so no fetch ever "fails").
+- ✅ Tab SIGKILL: 790 ms media lost = exactly the accumulating timeslice; all
+  closed chunks already in R2 (0.5 s lag beats the 2 s cadence).
+- ✅ Anchor: first burned frame − T₀-at-recorder.start = +20 ms (never anchor on
+  first ondataavailable — it's one full timeslice late). Concat plays 2591/2591;
+  durations agree within 30–50 ms/90 s ⚠️ → possible clock drift ~1–2 s/2 h;
+  per-chunk close wall-times in the manifest give a free piecewise re-anchor.
+- Decode trap: MediaRecorder webm has a 1 kHz timebase — ffmpeg needs
+  `-fps_mode passthrough/vfr` or it CFR-duplicates to ~1000 fps.
+
+### PROTO B — central per-participant recording (proto/centralrec) — ✅ MEASURED, LOSES
+- Pull-only SFU session works (lazy session at first pull); one recorder page,
+  MediaRecorder per remote track. N=8 pristine: 4.1 Mbps studio downlink,
+  rec CPU ~30% of a core, 100% burned-row decode.
+- ✅ Downlink perfectly linear 0.507 Mbps/participant → extrapolated (flagged)
+  N=54 ≈ 57–60 Mbps camera-class = **8.1–8.6× the tiered-grid live budget**
+  (~7 Mbps); every wall-tier head becomes a 1+ Mbps continuous pull + a
+  decoder slot. One-page ceiling bites between N=8 and N=12: at N=12 one
+  archive file carries a real 3.1 s hole — sharded recorder pages needed.
+- ✅ Sibling coupling: EVERY join/leave renegotiation cuts a 130–172 ms frame
+  gap into EVERY other participant's archive file (the unpull-burst lesson,
+  now in the archive). Self-recording is structurally immune.
+- ✅ Disconnect: `left` at recorder +95 ms, clean file end, no corrupt tail;
+  rejoin gap ~2.9 s structural. Double encode: PSNR p50 54.7 dB on synthetic
+  (visually lossless) BUT SFU freezes are inherited verbatim into the archive;
+  camera noise would pay real generation loss.
+- Simulcast arm: rid=h halves studio cost (2.07 Mbps, 16.8% CPU) but pushes
+  ~0.97 Mbps extra uplink onto every publisher — nearly A's 1.17 Mbps for
+  320×180 instead of source quality. TRAP: preferredRid naming a missing layer
+  (q from 360p) silently falls back to f — full cost, zero error surface.
+- Chrome traps: ontrack re-fires for an already-associated mid on later
+  renegotiations (dedupe per mid); inbound-rtp bytesReceived RESETS on every
+  renegotiation (transport counters are renegotiation-proof).
+
+### VERDICT — plan-studio's baked decision is now measured, not argued
+Self-recording wins on every axis that matters: bandwidth lands distributed +
+elastic instead of 8×-concentrated + real-time; source quality vs inherited SFU
+freezes; churn isolation vs everyone's-archive-glitches; consent deletion
+proven. Central's only real wins (clean `left`-signaled file ends, zero
+participant storage) don't outweigh. HYBRID kept: the studio already pulls
+featured/live tiles for the show — recording THOSE is downlink-free and stays
+as the derived backup lane (composite path). Grid-archive = A for masters,
+B-machinery only for what the grid already pulls.
 
 Two agents on proto/m2m, machine idle/32 GB/AC at dispatch:
 - **Heavy media** (owns room.html, run-heavy.mjs, port 8897, results/m2m-heavy-*):

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>centralrec publisher</title>
+<style>body{background:#111;color:#ddd;font:13px monospace}#log{white-space:pre-wrap}</style>
+</head>
+<body>
+<h3 id="hdr">centralrec pub</h3>
+<canvas id="cv" width="640" height="360" style="width:320px;height:180px;border:1px solid #263"></canvas>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+// PROTO B synthetic participant — publish-only page against the DEPLOYED
+// elektron-rtc Worker. Machinery lifted from the proven proto/m2m/grid.html:
+// canvas source with burned wall-clock+pid binary row, WS signaling (Worker
+// protocol), cf() via the Worker /cf/ proxy, publishWithRetry with jittered
+// backoff (the rmain-1 lockstep-retry lesson). No pulls, no tiles.
+// ?selfrec=1 -> B4 reference arm: a source-side MediaRecorder on the SAME
+// canvas stream, SAME codec/bitrate/timeslice as the central recorder, so
+// central-vs-source differences isolate the SFU hop + double encode.
+const q = new URLSearchParams(location.search);
+const MY_ID    = (q.get("id") || "X").slice(0, 8);
+const MY_NAME  = q.get("name") || ("pub-" + MY_ID);
+const ROOM     = q.get("room") || "centralrec-dev";
+const TOKEN    = q.get("token") || "";
+const REMOTE   = (q.get("remote") || "").replace(/\/$/, "");
+const HOLD     = q.get("hold") === "1";
+const KBPS     = parseInt(q.get("kbps") || "1200", 10);
+const FPS      = parseInt(q.get("fps") || "30", 10);
+const SELFREC  = q.get("selfrec") === "1";
+const SIMUL    = q.get("simul") === "1";   // optional arm: publish simulcast f/h/q
+const LABEL    = q.get("label") || "dev";
+const CONNECT_TIMEOUT_MS = 8000, MAX_PUB_ATTEMPTS = 3;
+const SIG_BASE = REMOTE.replace(/^http/, "ws") + "/room/" + ROOM + "/ws";
+const CF_API   = REMOTE + "/cf";
+const COLLECT  = "/collect";
+const TRACK_NAME = MY_ID + "/cam";
+const REC_MIME = "video/webm;codecs=vp8";
+const REC_BPS  = 1200000;
+const REC_SLICE_MS = 2000;
+
+document.getElementById("hdr").textContent = "centralrec pub " + MY_ID + " room " + ROOM;
+document.title = "crec-pub " + MY_ID;
+window.__state = { phase: "init", error: null, id: MY_ID, frames: 0, framesSent: 0,
+                   pubAttempts: 0, sigState: "closed", selfrec: SELFREC, selfrecChunks: 0 };
+
+const logEl = document.getElementById("log");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function wallClock() { return performance.timeOrigin + performance.now(); }
+function post(obj) { fetch(COLLECT, { method: "POST", body: JSON.stringify(obj) }).catch(() => {}); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name, t: wallClock() }, extra || {}));
+}
+
+// ---- binary row geometry (rig/whep pattern; identical to grid.html) --------
+const NBLOCKS = 64, BLOCK_W = 9, ROW_X = 32, ROW_Y = 40, ROW_H = 56;
+
+// ---- source: canvas synthesis ONLY (camera OS-wedged — never getUserMedia) --
+function makeSyntheticSource() {
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d", { alpha: false, desynchronized: true });
+  const PID_BYTE = MY_ID.charCodeAt(0) & 0xff;
+  let frameCounter = 0;
+  function drawFrame() {
+    const ms = Math.round(wallClock());
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#404040"; ctx.fillRect(0, 0, 640, 360);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(ROW_X - 12, ROW_Y - 12, NBLOCKS * BLOCK_W + 24, ROW_H + 24);
+    const bytes = []; let v = ms;
+    for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
+    bytes.push(PID_BYTE);
+    let ck = 0; for (const b of bytes) ck ^= b;
+    const bits = [];
+    for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+    ctx.fillStyle = "#fff";
+    for (let i = 0; i < NBLOCKS; i++)
+      if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
+    ctx.font = "bold 110px monospace"; ctx.fillText(MY_ID, 40, 240);
+    ctx.font = "bold 26px monospace";
+    ctx.fillText(MY_NAME, 160, 180);
+    ctx.fillText(String(ms), 160, 215);
+    ctx.fillText(new Date(ms).toISOString().slice(11, 23), 160, 250);
+    const x = (frameCounter * 5) % 560;
+    ctx.fillStyle = "hsl(" + (frameCounter % 360) + ",70%,55%)";
+    ctx.fillRect(20 + x, 290, 50, 50);
+    frameCounter++; window.__state.frames = frameCounter;
+  }
+  // setInterval, not rAF: co-tenanted/occluded pages must keep drawing
+  setInterval(drawFrame, Math.round(1000 / FPS));
+  const stream = cv.captureStream(FPS);
+  const track = stream.getVideoTracks()[0];
+  track.contentHint = "motion";
+  return { track, stream };
+}
+const source = makeSyntheticSource();
+
+// ---- B4 reference arm: source-side MediaRecorder (identical settings) ------
+let selfChain = Promise.resolve(), selfSeq = 0, selfRec = null;
+function startSelfRec() {
+  const file = LABEL + "-" + MY_ID + "-src";
+  selfRec = new MediaRecorder(source.stream, { mimeType: REC_MIME, videoBitsPerSecond: REC_BPS });
+  selfRec.ondataavailable = (e) => {
+    if (!e.data || !e.data.size) return;
+    const seq = selfSeq++;
+    window.__state.selfrecChunks = selfSeq;
+    selfChain = selfChain.then(() =>
+      fetch("/chunk/" + file + "?seq=" + seq, { method: "POST", body: e.data })
+    ).catch(() => {});
+  };
+  selfRec.onstop = () => {
+    selfChain = selfChain.then(() => fetch("/end/" + file + "?reason=stop", { method: "POST" })).catch(() => {});
+  };
+  selfRec.start(REC_SLICE_MS);
+  event("selfrec-start", { file });
+}
+window.__stopSelfRec = () => { try { if (selfRec && selfRec.state !== "inactive") selfRec.stop(); } catch (e) {} };
+
+// ---- signaling (Worker protocol, DEPLOYED.md) ------------------------------
+const handlers = {};
+function on(type, fn) { handlers[type] = fn; }
+let ws = null, sigWantOpen = true;
+function sigUrl() { return SIG_BASE + (TOKEN ? "?token=" + encodeURIComponent(TOKEN) : ""); }
+function sigSend(frame) {
+  if (ws && ws.readyState === 1) { ws.send(JSON.stringify(frame)); return true; }
+  return false;
+}
+function sigConnect() {
+  ws = new WebSocket(sigUrl());
+  ws.onopen = () => {
+    window.__state.sigState = "open";
+    sigSend({ type: "join", participantId: MY_ID, name: MY_NAME, role: "performer" });
+  };
+  ws.onmessage = (e) => {
+    let f; try { f = JSON.parse(e.data); } catch (_) { return; }
+    const h = handlers[f.type];
+    if (h) h(f);
+  };
+  ws.onclose = () => {
+    window.__state.sigState = "closed";
+    if (sigWantOpen) setTimeout(sigConnect, 1000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+on("roster", (f) => {
+  window.__state.selfRole = f.self && f.self.role;
+  // reconnect case: re-announce (rebuild-never-patch)
+  if (SID && window.__state.phase === "running") sendPublishFrame();
+});
+on("error", (f) => { event("sig-error", f); log("SIG ERROR " + JSON.stringify(f)); });
+
+// ---- SFU client ------------------------------------------------------------
+async function cf(method, subpath, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const resp = await fetch(CF_API + "/" + subpath, {
+    method, headers, body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode)
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  return obj;
+}
+function waitIceGathering(pc_) {
+  return new Promise(res => {
+    if (pc_.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc_.onicegatheringstatechange = () => {
+      if (pc_.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+let pc = null, SID = null, sendTx = null;
+function teardownPc(old) {
+  if (!old) return;
+  try {
+    old.onconnectionstatechange = null; old.oniceconnectionstatechange = null;
+    old.onicegatheringstatechange = null; old.ontrack = null; old.close();
+  } catch (e) {}
+}
+async function attemptPublish(track, attempt) {
+  const t0 = performance.now();
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState, attempt });
+  pc.onconnectionstatechange = () => event("pc", { state: pc.connectionState, attempt });
+  const sess = await cf("POST", "sessions/new");
+  SID = sess.sessionId;
+  window.__state.sessionId = SID;
+  log("attempt " + attempt + ": session " + SID.slice(0, 12) + "…");
+  sendTx = SIMUL
+    ? pc.addTransceiver(track, { direction: "sendonly", sendEncodings: [
+        { rid: "f", maxBitrate: KBPS * 1000 },
+        { rid: "h", maxBitrate: Math.round(KBPS * 1000 / 2), scaleResolutionDownBy: 2 },
+        { rid: "q", maxBitrate: 250000, scaleResolutionDownBy: 4 },
+      ] })
+    : pc.addTransceiver(track, { direction: "sendonly" });
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+  const resp = await cf("POST", "sessions/" + SID + "/tracks/new", {
+    sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+    tracks: [{ location: "local", mid: sendTx.mid, trackName: TRACK_NAME }]
+  });
+  await pc.setRemoteDescription(resp.sessionDescription);
+  const myPc = pc;
+  await new Promise((res, rej) => {
+    if (myPc.connectionState === "connected") return res();
+    const t = setTimeout(() => rej(new Error(
+      "connect-timeout " + CONNECT_TIMEOUT_MS + "ms (pc=" + myPc.connectionState +
+      " ice=" + myPc.iceConnectionState + ")")), CONNECT_TIMEOUT_MS);
+    myPc.addEventListener("connectionstatechange", function h() {
+      if (myPc.connectionState === "connected") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h); res();
+      } else if (myPc.connectionState === "failed") {
+        clearTimeout(t); myPc.removeEventListener("connectionstatechange", h);
+        rej(new Error("pc-failed during connect"));
+      }
+    });
+  });
+  if (!SIMUL) {
+    try {
+      const par = sendTx.sender.getParameters();
+      if (!par.encodings || !par.encodings.length) par.encodings = [{}];
+      par.encodings[0].maxBitrate = KBPS * 1000;
+      await sendTx.sender.setParameters(par);
+    } catch (e) { event("setparams-failed", { error: String(e).slice(0, 200) }); }
+  }
+  return Math.round(performance.now() - t0);
+}
+async function publishWithRetry(track) {
+  for (let attempt = 1; attempt <= MAX_PUB_ATTEMPTS; attempt++) {
+    window.__state.pubAttempts = attempt;
+    try {
+      const connectMs = await attemptPublish(track, attempt);
+      event("publish-ok", { attempt, connectMs, sessionId: SID });
+      log("publish ok attempt " + attempt + " in " + connectMs + " ms");
+      return;
+    } catch (e) {
+      teardownPc(pc); pc = null;
+      const reason = String(e && e.message || e).slice(0, 200);
+      event("publish-retry", { attempt, reason, willRetry: attempt < MAX_PUB_ATTEMPTS });
+      log("publish attempt " + attempt + " FAILED: " + reason);
+      if (attempt >= MAX_PUB_ATTEMPTS)
+        throw new Error("publish exhausted after " + attempt + " attempts: " + reason);
+      // jittered backoff — deterministic backoff resynchronizes failing legs (rmain-1)
+      await new Promise(r => setTimeout(r,
+        1000 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 1500)));
+    }
+  }
+}
+function sendPublishFrame() { sigSend({ type: "publish", sessionId: SID, trackNames: [TRACK_NAME] }); }
+
+// ---- stats every 2 s -------------------------------------------------------
+function startStats() {
+  setInterval(async () => {
+    if (!pc) return;
+    try {
+      const st = await pc.getStats();
+      const row = { kind: "stats", who: MY_ID, role: "pub", t: wallClock(),
+                    vis: document.visibilityState };
+      row.layers = [];
+      st.forEach(s => {
+        if (s.type === "outbound-rtp" && s.kind === "video") {
+          // simulcast: one outbound-rtp per rid — AGGREGATE (a starved layer
+          // reading last froze the driver's framesSent>0 gate at 6/8)
+          row.framesEncoded = (row.framesEncoded || 0) + (s.framesEncoded || 0);
+          row.framesSent = (row.framesSent || 0) + (s.framesSent || 0);
+          row.bytesSent = (row.bytesSent || 0) + (s.bytesSent || 0);
+          if (s.framesPerSecond != null) row.fps = Math.max(row.fps || 0, s.framesPerSecond);
+          if (!row.qualityLimitationReason || s.qualityLimitationReason !== "none")
+            row.qualityLimitationReason = s.qualityLimitationReason;
+          row.targetBitrate = (row.targetBitrate || 0) + (s.targetBitrate || 0);
+          row.encoderImplementation = s.encoderImplementation;
+          if ((s.frameWidth || 0) >= (row.outWidth || 0)) {
+            row.outWidth = s.frameWidth; row.outHeight = s.frameHeight;
+          }
+          row.layers.push({ rid: s.rid || null, bytesSent: s.bytesSent, fps: s.framesPerSecond,
+                            w: s.frameWidth, h: s.frameHeight, framesSent: s.framesSent });
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated)
+          row.rtt = s.currentRoundTripTime;
+      });
+      window.__state.fps = row.fps;
+      window.__state.framesSent = row.framesSent;
+      window.__state.qlr = row.qualityLimitationReason;
+      post(row);
+    } catch (e) {}
+  }, 2000);
+}
+
+setInterval(() => {
+  document.getElementById("hud").textContent =
+    "phase=" + window.__state.phase + " frames=" + window.__state.frames +
+    " sent=" + (window.__state.framesSent || 0) + " fps=" + (window.__state.fps || 0) +
+    (SELFREC ? " selfChunks=" + window.__state.selfrecChunks : "");
+}, 1000);
+
+// ---- main ------------------------------------------------------------------
+(async () => {
+  if (HOLD) {
+    window.__state.phase = "held";
+    await new Promise(res => {
+      const t = setInterval(() => { if (window.__go) { clearInterval(t); res(); } }, 25);
+    });
+  }
+  window.__state.phase = "connecting";
+  sigConnect();
+  await publishWithRetry(source.track);
+  sendPublishFrame();
+  if (SELFREC) startSelfRec();
+  window.__state.phase = "running";
+  window.__state.t_running = wallClock();
+  event("running", { sessionId: SID });
+  startStats();
+})().catch(e => {
+  window.__state.phase = "failed";
+  window.__state.error = String(e && e.stack || e);
+  log("FATAL", window.__state.error);
+  event("fatal", { error: String(e).slice(0, 500) });
+});
+</script>
+</body>
+</html>

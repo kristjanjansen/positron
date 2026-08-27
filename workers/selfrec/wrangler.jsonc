@@ -1,0 +1,13 @@
+{
+	// elektron-selfrec — PROTO A ingest worker: participant-side MediaRecorder
+	// chunks stream straight into R2 (bucket elektron-archive-test, prefix
+	// selfrec/). Auth = Bearer SELFREC_TOKEN (worker secret, never in code).
+	// Does NOT touch elektron-rtc (workers/rtc) in any way.
+	"name": "elektron-selfrec",
+	"main": "src/index.js",
+	"compatibility_date": "2026-08-01",
+	"r2_buckets": [
+		{ "binding": "ARCHIVE", "bucket_name": "elektron-archive-test" }
+	],
+	"observability": { "enabled": true }
+}

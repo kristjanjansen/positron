@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>centralrec studio recorder</title>
+<style>body{background:#111;color:#ddd;font:13px monospace}#log{white-space:pre-wrap}</style>
+</head>
+<body>
+<h3 id="hdr">centralrec recorder</h3>
+<div id="hud"></div>
+<div id="log"></div>
+<script>
+"use strict";
+// PROTO B studio recorder — ONE headless-Chrome session that pulls EVERY
+// participant's track through the deployed elektron-rtc Worker (the m2m puller
+// pattern: serialized pull chain, midToPid BEFORE setRemoteDescription) and runs
+// a MediaRecorder PER REMOTE TRACK (vp8 1.2 Mbps, timeslice 2000 ms), chunks to
+// the local driver server (:8893 /chunk). This records what the SFU DELIVERS.
+// PULL-ONLY session: no published track; the SFU session is created lazily at
+// the first pull (so the 5 s connect window starts when media is imminent);
+// the first tracks/new returns the SFU's offer -> answer via renegotiate.
+// Death lifecycle (DEPLOYED.md): on 'left' stop that recorder + tracks/close the
+// pull; a re-'published' with a new sessionId = fresh pull + NEW file (gen++).
+// NO <video> elements: the only per-track cost here is decode + re-encode —
+// that IS the central-recording cost being measured.
+const q = new URLSearchParams(location.search);
+const MY_ID    = (q.get("id") || "REC").slice(0, 8);
+const ROOM     = q.get("room") || "centralrec-dev";
+const TOKEN    = q.get("token") || "";
+const REMOTE   = (q.get("remote") || "").replace(/\/$/, "");
+const LABEL    = q.get("label") || "dev";
+const RID      = q.get("rid") || "";           // optional simulcast preferredRid
+const SIG_BASE = REMOTE.replace(/^http/, "ws") + "/room/" + ROOM + "/ws";
+const CF_API   = REMOTE + "/cf";
+const COLLECT  = "/collect";
+const REC_MIME = "video/webm;codecs=vp8";
+const REC_BPS  = 1200000;
+const REC_SLICE_MS = 2000;
+
+document.getElementById("hdr").textContent = "centralrec recorder — room " + ROOM;
+document.title = "crec-rec";
+window.__state = { phase: "init", error: null, id: MY_ID, sigState: "closed",
+                   pulled: 0, recording: 0, recFiles: {}, rosterCount: 0 };
+
+const logEl = document.getElementById("log");
+function log(...a) { const s = a.join(" "); logEl.textContent += s + "\n"; console.log(s); }
+function wallClock() { return performance.timeOrigin + performance.now(); }
+function post(obj) { fetch(COLLECT, { method: "POST", body: JSON.stringify(obj) }).catch(() => {}); }
+function event(name, extra) {
+  post(Object.assign({ kind: "event", who: MY_ID, name, t: wallClock() }, extra || {}));
+}
+
+// ---- signaling (Worker protocol) -------------------------------------------
+const handlers = {};
+function on(type, fn) { handlers[type] = fn; }
+let ws = null, sigWantOpen = true;
+function sigUrl() { return SIG_BASE + (TOKEN ? "?token=" + encodeURIComponent(TOKEN) : ""); }
+function sigConnect() {
+  ws = new WebSocket(sigUrl());
+  ws.onopen = () => {
+    window.__state.sigState = "open";
+    ws.send(JSON.stringify({ type: "join", participantId: MY_ID, name: "studio-recorder", role: "audience" }));
+  };
+  ws.onmessage = (e) => {
+    let f; try { f = JSON.parse(e.data); } catch (_) { return; }
+    const h = handlers[f.type];
+    if (h) h(f);
+  };
+  ws.onclose = () => {
+    window.__state.sigState = "closed";
+    if (sigWantOpen) setTimeout(sigConnect, 1000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+
+// ---- SFU client ------------------------------------------------------------
+async function cf(method, subpath, body) {
+  const headers = { "Content-Type": "application/json" };
+  if (TOKEN) headers["Authorization"] = "Bearer " + TOKEN;
+  const resp = await fetch(CF_API + "/" + subpath, {
+    method, headers, body: body !== undefined ? JSON.stringify(body) : null
+  });
+  const txt = await resp.text();
+  let obj; try { obj = JSON.parse(txt); } catch (e) { obj = { raw: txt }; }
+  if (!resp.ok || obj.errorCode)
+    throw new Error(method + " /" + subpath + " -> HTTP " + resp.status + " " + txt.slice(0, 300));
+  return obj;
+}
+function waitIceGathering(pc_) {
+  return new Promise(res => {
+    if (pc_.iceGatheringState === "complete") return res();
+    const t = setTimeout(res, 3000);
+    pc_.onicegatheringstatechange = () => {
+      if (pc_.iceGatheringState === "complete") { clearTimeout(t); res(); }
+    };
+  });
+}
+let pc = null, SID = null, everConnected = false;
+const midToPid = new Map();
+function ensurePc() {
+  if (pc) return pc;
+  pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
+    bundlePolicy: "max-bundle"
+  });
+  window.__pc = pc;
+  pc.oniceconnectionstatechange = () => event("ice", { state: pc.iceConnectionState });
+  pc.onconnectionstatechange = () => {
+    event("pc", { state: pc.connectionState });
+    if (pc.connectionState === "connected") everConnected = true;
+    if (pc.connectionState === "failed") { window.__state.phase = "failed"; window.__state.error = "pc failed"; }
+  };
+  pc.ontrack = (e) => {
+    if (e.track.kind !== "video") return;
+    const pid = midToPid.get(e.transceiver.mid);
+    if (!pid) { event("ontrack-unmapped", { mid: e.transceiver.mid }); return; }
+    onRemoteTrack(pid, e.track, e.transceiver.mid);
+  };
+  return pc;
+}
+
+// ---- room model + pull engine (grid.html pattern, recorder-simplified) ------
+const parts = new Map();      // pid -> {id, sessionId, trackName, alive}
+const pullState = new Map();  // pid -> {state, attempts, mid, sessionId}
+let pullChain = Promise.resolve();
+function chain(fn) { pullChain = pullChain.then(fn).catch(() => {}); return pullChain; }
+
+function considerPull(pid, cause) {
+  const p = parts.get(pid);
+  if (!p || !p.alive || !p.sessionId || !p.trackName) return;
+  const st = pullState.get(pid);
+  if (st && (st.state === "queued" || st.state === "pulling" || st.state === "done")) return;
+  pullState.set(pid, { state: "queued", attempts: st ? st.attempts : 0 });
+  chain(() => pullTrack(p, cause));
+}
+
+async function pullTrack(p, cause) {
+  const pid = p.id;
+  const st = pullState.get(pid);
+  if (!st || st.state !== "queued") return;
+  if (!p.alive) { pullState.delete(pid); return; }
+  st.state = "pulling"; st.attempts++;
+  const t0 = performance.now();
+  try {
+    ensurePc();
+    if (!SID) {
+      const sess = await cf("POST", "sessions/new");
+      SID = sess.sessionId;
+      window.__state.sessionId = SID;
+      event("session-created", { sessionId: SID });
+    }
+    const want = { location: "remote", sessionId: p.sessionId, trackName: p.trackName };
+    if (RID) want.simulcast = { preferredRid: RID };
+    const resp = await cf("POST", "sessions/" + SID + "/tracks/new", { tracks: [want] });
+    const tr = (resp.tracks || [])[0] || {};
+    if (tr.errorCode) throw new Error("pull " + pid + ": " + tr.errorCode + " " + (tr.errorDescription || ""));
+    if (!tr.mid) throw new Error("pull " + pid + ": no mid in response");
+    midToPid.set(tr.mid, pid);            // BEFORE setRemoteDescription
+    if (resp.requiresImmediateRenegotiation) {
+      await pc.setRemoteDescription(resp.sessionDescription);   // SFU's offer
+      const ans = await pc.createAnswer();
+      await pc.setLocalDescription(ans);
+      if (!everConnected) await waitIceGathering(pc);   // first exchange on a pull-only PC
+      await cf("PUT", "sessions/" + SID + "/renegotiate", {
+        sessionDescription: { type: "answer", sdp: pc.localDescription.sdp }
+      });
+    }
+    st.state = "done"; st.mid = tr.mid; st.sessionId = p.sessionId;
+    window.__state.pulled++;
+    event("pulled", { from: pid, mid: tr.mid, cause,
+                      durMs: Math.round(performance.now() - t0),
+                      renego: !!resp.requiresImmediateRenegotiation });
+  } catch (e) {
+    st.state = "failed";
+    event("pull-failed", { from: pid, attempt: st.attempts, cause, error: String(e.message).slice(0, 300) });
+    log("pull " + pid + " failed: " + e.message);
+    if (st.attempts < 5) setTimeout(() => considerPull(pid, cause + "-retry"), 1500);
+  }
+}
+
+async function unpullTrack(pid, why) {
+  const st = pullState.get(pid);
+  const mid = st && st.mid;
+  try {
+    if (!mid) throw new Error("no mid for " + pid);
+    const tx = pc.getTransceivers().find(t => t.mid === mid);
+    if (tx) tx.stop();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const resp = await cf("PUT", "sessions/" + SID + "/tracks/close", {
+      tracks: [{ mid }],
+      sessionDescription: { type: "offer", sdp: pc.localDescription.sdp },
+      force: false
+    });
+    if (resp.sessionDescription) await pc.setRemoteDescription(resp.sessionDescription);
+    event("unpulled", { from: pid, mid, why });
+  } catch (e) {
+    event("unpull-error", { from: pid, mid: mid || null, why, error: String(e && e.message || e).slice(0, 300) });
+  } finally {
+    if (mid) { midToPid.delete(mid); handledMids.delete(mid); }
+    if (st) { st.state = "unpulled"; st.mid = null; }
+  }
+}
+
+// ---- per-track MediaRecorder ------------------------------------------------
+// recs: pid -> {gen, mr, seq, chain, file, chunks, bytes, tStart, tFirstChunk}
+const recs = new Map();
+const gens = new Map();       // pid -> next generation number
+
+function startRecording(pid, track) {
+  const gen = (gens.get(pid) || 0) + 1;
+  gens.set(pid, gen);
+  const file = LABEL + "-" + pid + "-g" + gen;
+  const r = { gen, seq: 0, chain: Promise.resolve(), file, chunks: 0, bytes: 0,
+              tStart: wallClock(), tFirstChunk: null, stopped: false };
+  let mr;
+  try {
+    mr = new MediaRecorder(new MediaStream([track]), { mimeType: REC_MIME, videoBitsPerSecond: REC_BPS });
+  } catch (e) {
+    event("rec-create-failed", { from: pid, error: String(e).slice(0, 200) });
+    return;
+  }
+  r.mr = mr;
+  mr.ondataavailable = (e) => {
+    if (!e.data || !e.data.size) return;
+    const seq = r.seq++;
+    r.chunks++; r.bytes += e.data.size;
+    if (r.tFirstChunk == null) {
+      r.tFirstChunk = wallClock();
+      event("rec-first-chunk", { from: pid, gen, file, ms: Math.round(r.tFirstChunk - r.tStart) });
+    }
+    r.chain = r.chain.then(() =>
+      fetch("/chunk/" + file + "?seq=" + seq, { method: "POST", body: e.data })
+    ).catch(() => {});
+    window.__state.recFiles[file] = { chunks: r.chunks, bytes: r.bytes };
+  };
+  mr.onstop = () => {
+    r.chain = r.chain.then(() => fetch("/end/" + file + "?reason=" + (r.stopReason || "stop"), { method: "POST" }))
+                     .catch(() => {});
+  };
+  mr.onerror = (e) => event("rec-error", { from: pid, gen, error: String(e.error || e).slice(0, 200) });
+  mr.start(REC_SLICE_MS);
+  recs.set(pid, r);
+  window.__state.recording = [...recs.values()].filter(x => !x.stopped).length;
+  event("rec-start", { from: pid, gen, file, trackMuted: track.muted });
+}
+
+function stopRecording(pid, reason) {
+  const r = recs.get(pid);
+  if (!r || r.stopped) return;
+  r.stopped = true; r.stopReason = reason;
+  try { if (r.mr && r.mr.state !== "inactive") r.mr.stop(); } catch (e) {}
+  window.__state.recording = [...recs.values()].filter(x => !x.stopped).length;
+  event("rec-stop", { from: pid, gen: r.gen, file: r.file, reason,
+                      chunks: r.chunks, bytes: r.bytes });
+}
+
+// DEDUPE (smoke finding): Chrome RE-FIRES ontrack for an already-associated
+// transceiver during a LATER pull's setRemoteDescription (A's mid=0 arrived
+// again inside B's renegotiation and double-started A's recorder). One
+// handling per mid; the mid is released on unpull (rejoin = new mid).
+const handledMids = new Set();
+function onRemoteTrack(pid, track, mid) {
+  if (handledMids.has(mid)) { event("track-rearrived-ignored", { from: pid, mid }); return; }
+  handledMids.add(mid);
+  const t = wallClock();
+  event("track-arrived", { from: pid, mid, muted: track.muted, t });
+  const begin = () => {
+    event("track-unmuted", { from: pid, mid });
+    startRecording(pid, track);
+  };
+  if (!track.muted) begin();
+  else track.addEventListener("unmute", begin, { once: true });
+  track.addEventListener("ended", () => event("track-ended", { from: pid, mid }));
+}
+
+// ---- roster / lifecycle -----------------------------------------------------
+on("roster", (f) => {
+  window.__state.selfRole = f.self && f.self.role;
+  window.__state.rosterCount = (f.participants || []).length;
+  for (const p of f.participants || []) {
+    if (p.id === MY_ID) continue;
+    const camTrack = (p.trackNames || []).find(n => n.endsWith("/cam"));
+    parts.set(p.id, { id: p.id, sessionId: p.sessionId, trackName: camTrack || null, alive: true });
+    if (camTrack) considerPull(p.id, "roster");
+  }
+});
+on("joined", (f) => {
+  const p = f.participant;
+  if (!p || p.id === MY_ID) return;
+  const camTrack = (p.trackNames || []).find(n => n.endsWith("/cam"));
+  parts.set(p.id, { id: p.id, sessionId: p.sessionId, trackName: camTrack || null, alive: true });
+  if (camTrack) considerPull(p.id, "joined");
+});
+on("published", (f) => {
+  const pid = f.participantId;
+  if (pid === MY_ID) return;
+  const prev = parts.get(pid);
+  const oldSid = prev && prev.sessionId;
+  const camTrack = (f.trackNames || []).find(n => n.endsWith("/cam"));
+  parts.set(pid, { id: pid, sessionId: f.sessionId, trackName: camTrack || null, alive: true });
+  event("published-received", { id: pid, sessionId: f.sessionId, rejoin: !!(oldSid && oldSid !== f.sessionId) });
+  if (oldSid && oldSid !== f.sessionId) {
+    // rejoin: close any stale pull, then pull the NEW track -> NEW recording gen
+    const st = pullState.get(pid);
+    chain(async () => {
+      stopRecording(pid, "rejoin");
+      if (st && st.mid) await unpullTrack(pid, "rejoin");
+      pullState.set(pid, { state: "queued", attempts: 0 });
+      await pullTrack(parts.get(pid), "rejoin");
+    });
+  } else if (camTrack) {
+    considerPull(pid, "published");
+  }
+});
+on("left", (f) => {
+  const pid = f.participantId;
+  const p = parts.get(pid);
+  if (!p) return;
+  p.alive = false;
+  const tLeft = wallClock();
+  event("left-received", { id: pid, t: tLeft });
+  stopRecording(pid, "left");           // close the file the moment the room says dead
+  const st = pullState.get(pid);
+  if (st && st.mid) chain(() => unpullTrack(pid, "left"));
+  else pullState.delete(pid);
+});
+on("error", (f) => { event("sig-error", f); });
+
+// ---- driver hooks -----------------------------------------------------------
+window.__stopAll = async () => {
+  for (const pid of recs.keys()) stopRecording(pid, "run-end");
+  // wait for every upload chain (incl. the /end markers queued by onstop)
+  await new Promise(r => setTimeout(r, 500));       // let onstop fire + queue
+  await Promise.all([...recs.values()].map(r => r.chain));
+  event("stop-all-complete", {});
+  return true;
+};
+
+// ---- getStats every 2 s -----------------------------------------------------
+function startStats() {
+  setInterval(async () => {
+    if (!pc) return;
+    try {
+      const st = await pc.getStats();
+      const row = { kind: "stats", who: MY_ID, role: "rec", t: wallClock(),
+                    vis: document.visibilityState, inbound: [] };
+      st.forEach(s => {
+        if (s.type === "inbound-rtp" && s.kind === "video") {
+          row.inbound.push({
+            from: midToPid.get(s.mid) || s.mid,
+            bytesReceived: s.bytesReceived,
+            framesDecoded: s.framesDecoded,
+            framesReceived: s.framesReceived,
+            framesDropped: s.framesDropped,
+            fps: s.framesPerSecond,
+            frameWidth: s.frameWidth, frameHeight: s.frameHeight,
+            packetsLost: s.packetsLost,
+            freezeCount: s.freezeCount,
+            totalFreezesDuration: s.totalFreezesDuration,
+            jitterBufferDelay: s.jitterBufferDelay,
+            jitterBufferEmittedCount: s.jitterBufferEmittedCount,
+            decoderImplementation: s.decoderImplementation
+          });
+        }
+        if (s.type === "transport") {
+          row.transportBytesReceived = s.bytesReceived;
+          row.transportBytesSent = s.bytesSent;
+        }
+        if (s.type === "candidate-pair" && s.state === "succeeded" && s.nominated)
+          row.rtt = s.currentRoundTripTime;
+      });
+      window.__state.inboundCount = row.inbound.length;
+      post(row);
+    } catch (e) {}
+  }, 2000);
+}
+
+setInterval(() => {
+  const rs = [...recs.entries()].map(([pid, r]) =>
+    pid + ":g" + r.gen + (r.stopped ? "(stopped)" : "") + " " + Math.round(r.bytes / 1024) + "KB/" + r.chunks);
+  document.getElementById("hud").textContent =
+    "phase=" + window.__state.phase + " pulled=" + window.__state.pulled +
+    " recording=" + window.__state.recording + " | " + rs.join(" · ");
+}, 1000);
+
+// ---- main -------------------------------------------------------------------
+window.__state.phase = "connecting";
+sigConnect();
+startStats();
+window.__state.phase = "running";
+event("recorder-up", { room: ROOM, rid: RID || null });
+</script>
+</body>
+</html>

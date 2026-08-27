@@ -1,0 +1,338 @@
+{
+ "label": "smoke",
+ "meta": {
+  "scenario": "smoke",
+  "n": 2,
+  "durS": 20,
+  "room": "centralrec-smoke-mtb9s8fz",
+  "rid": null,
+  "ids": [
+   "A",
+   "B"
+  ]
+ },
+ "downlink": {
+  "totalPayloadMbps": 1.058,
+  "transportMbps": 1.084,
+  "perTrackMbps": {
+   "A": 0.545,
+   "B": 0.513
+  },
+  "windowS": 20.0
+ },
+ "tileQuality": {
+  "A": {
+   "fpsP50": 30,
+   "fpsMin": 24,
+   "res": "640x360",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 650,
+   "framesDropped": 2,
+   "packetsLost": 0
+  },
+  "B": {
+   "fpsP50": 30,
+   "fpsMin": 24,
+   "res": "640x360",
+   "freezeCount": 0,
+   "totalFreezesDuration": 0,
+   "framesDecoded": 639,
+   "framesDropped": 2,
+   "packetsLost": 0
+  }
+ },
+ "cpu": {
+  "rec": {
+   "p50": 17.2,
+   "max": 17.5
+  },
+  "pub": {
+   "p50": 33.4,
+   "max": 35.4
+  },
+  "victim": {
+   "p50": 0,
+   "max": 0
+  },
+  "nodeSrv": {
+   "p50": 0.3,
+   "max": 0.7
+  },
+  "nodeDrv": {
+   "p50": 0.3,
+   "max": 0.6
+  },
+  "recRssMb": {
+   "p50": 770.6,
+   "max": 773.1
+  },
+  "pubRssMb": {
+   "p50": 960.6,
+   "max": 964.6
+  }
+ },
+ "publishers": {
+  "A": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 12
+   },
+   "uplinkMbps": 0.542
+  },
+  "B": {
+   "fpsP50": 30,
+   "qlr": {
+    "none": 12
+   },
+   "uplinkMbps": 0.509
+  }
+ },
+ "recFiles": {
+  "smoke-A-g1": {
+   "chunks": 11,
+   "bytes": 1231401,
+   "firstT": 1787819868578,
+   "lastT": 1787819887359,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1231401
+   },
+   "effectiveKbps": 474.0,
+   "burn": {
+    "frames": 597,
+    "decodeOk": 597,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "A": 597
+    },
+    "firstMs": 1787819866598,
+    "lastMs": 1787819887293,
+    "spanS": 20.7,
+    "effFps": 28.85,
+    "interFrameP50": 33,
+    "interFrameP95": 57,
+    "interFrameMax": 73,
+    "gapsOver1s": []
+   }
+  },
+  "smoke-A-src": {
+   "chunks": 13,
+   "bytes": 1316119,
+   "firstT": 1787819864493,
+   "lastT": 1787819887868,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "stop",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1316119
+   },
+   "effectiveKbps": 414.9,
+   "burn": {
+    "frames": 733,
+    "decodeOk": 733,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "A": 733
+    },
+    "firstMs": 1787819862442,
+    "lastMs": 1787819887855,
+    "spanS": 25.41,
+    "effFps": 28.84,
+    "interFrameP50": 33,
+    "interFrameP95": 57,
+    "interFrameMax": 73,
+    "gapsOver1s": []
+   }
+  },
+  "smoke-B-g1": {
+   "chunks": 11,
+   "bytes": 1152164,
+   "firstT": 1787819869080,
+   "lastT": 1787819887360,
+   "seqGaps": 0,
+   "cleanEnd": true,
+   "endReason": "run-end",
+   "probe": {
+    "codec_name": "vp8",
+    "width": 640,
+    "height": 360,
+    "bytes": 1152164
+   },
+   "effectiveKbps": 454.5,
+   "burn": {
+    "frames": 586,
+    "decodeOk": 586,
+    "decodeRate": 1.0,
+    "checksumFail": 0,
+    "contrastFail": 0,
+    "pids": {
+     "B": 586
+    },
+    "firstMs": 1787819867093,
+    "lastMs": 1787819887296,
+    "spanS": 20.2,
+    "effFps": 29.01,
+    "interFrameP50": 33,
+    "interFrameP95": 42,
+    "interFrameMax": 67,
+    "gapsOver1s": []
+   }
+  }
+ },
+ "timeline": [
+  {
+   "kind": "pubs-running",
+   "t": 1787819864619,
+   "id": null,
+   "pids": null
+  },
+  {
+   "kind": "rec-ready",
+   "t": 1787819867247,
+   "id": null,
+   "pids": null
+  }
+ ],
+ "events": [
+  {
+   "t": 1787819866172,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "A",
+   "mid": "0",
+   "muted": true
+  },
+  {
+   "t": 1787819866502.2002,
+   "who": "REC",
+   "name": "pulled",
+   "from": "A",
+   "mid": "0",
+   "cause": "roster",
+   "durMs": 1140,
+   "renego": true
+  },
+  {
+   "t": 1787819866562.6,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "A",
+   "mid": "0"
+  },
+  {
+   "t": 1787819866563.4001,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "A",
+   "gen": 1,
+   "file": "smoke-A-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787819866879.7002,
+   "who": "REC",
+   "name": "track-rearrived-ignored",
+   "from": "A",
+   "mid": "0"
+  },
+  {
+   "t": 1787819866880,
+   "who": "REC",
+   "name": "track-arrived",
+   "from": "B",
+   "mid": "1",
+   "muted": true
+  },
+  {
+   "t": 1787819867040.9001,
+   "who": "REC",
+   "name": "pulled",
+   "from": "B",
+   "mid": "1",
+   "cause": "roster",
+   "durMs": 538,
+   "renego": true
+  },
+  {
+   "t": 1787819867066.7002,
+   "who": "REC",
+   "name": "track-unmuted",
+   "from": "B",
+   "mid": "1"
+  },
+  {
+   "t": 1787819867067.2002,
+   "who": "REC",
+   "name": "rec-start",
+   "from": "B",
+   "gen": 1,
+   "file": "smoke-B-g1",
+   "trackMuted": false
+  },
+  {
+   "t": 1787819868576.3,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "A",
+   "gen": 1,
+   "file": "smoke-A-g1",
+   "ms": 2013
+  },
+  {
+   "t": 1787819869077.6,
+   "who": "REC",
+   "name": "rec-first-chunk",
+   "from": "B",
+   "gen": 1,
+   "file": "smoke-B-g1",
+   "ms": 2011
+  },
+  {
+   "t": 1787819887361.9001,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "A",
+   "gen": 1,
+   "file": "smoke-A-g1",
+   "reason": "run-end",
+   "chunks": 10,
+   "bytes": 1195056
+  },
+  {
+   "t": 1787819887362.4001,
+   "who": "REC",
+   "name": "rec-stop",
+   "from": "B",
+   "gen": 1,
+   "file": "smoke-B-g1",
+   "reason": "run-end",
+   "chunks": 10,
+   "bytes": 1149111
+  },
+  {
+   "t": 1787819890907.5,
+   "who": "REC",
+   "name": "left-received",
+   "id": "B"
+  },
+  {
+   "t": 1787819890935,
+   "who": "REC",
+   "name": "left-received",
+   "id": "A"
+  }
+ ]
+}
