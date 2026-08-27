@@ -119,6 +119,65 @@ research/music-jamming-2026-08.md — not touched here.
   jam-* containers removed. elektron-jam worker KEPT (see workers/jam/
   DEPLOYED.md). Kept resources: results/*.json(l)+png, moq/www bundle.
 
+- **C7 (PLAY-A-SYNTH CASE — remote-synth.html + onset-worklet.js +
+  harness/run-synth.mjs)**: key→ear round trip A(player)→B(synth host)→A,
+  per leg, first measured figure for the pattern (playasynth.com publishes
+  none). B: percussive instant-attack voice (square+click, velocity-scaled)
+  → MediaStreamAudioDestination → WebRTC Opus back; canvas synth panel
+  (house 48-bit burned-ms row + 16-bit per-note seq bits + flash) → video
+  track back. A: sample-accurate AudioWorklet onset detect on the decoded
+  remote track + rVFC pixel decode for key→eye. Chromes REAL AudioContext
+  (no --mute-audio), sr 48000, base 5.3 ms, outputLatency 32 ms reported.
+  - **Method traps found (both probe-verified):** (1) rolling-MIN ct→epoch
+    mapping is poisoned by headless render-ahead bursts (~60 ms prebuffer at
+    context start) — maps onsets 60 ms early; fixed with EDGE-MEDIAN mapping
+    (sample offset only when currentTime steps, rolling median, ±3 ms).
+    (2) worklet+voice are sample-exact (future-scheduled onset err 0.021 ms;
+    immediate osc.start(currentTime) starts at exactly that frame). (3) an
+    onset that maps <0 ms before its note must NOT be dropped as spurious or
+    the order-zip shifts one note forever (the +40 ms burst artifact); local/B
+    matchers allow −8 ms. (4) through the SFU, 25/s burst attacks get
+    concealment-merged (~7 %) — order matching derails; adaptive
+    nearest-to-rolling-median matching heals in one onset, and the SFU
+    headline uses a sparse-only run (240 ms singles, n=315 clean).
+  - **RESULTS (scale 1, n=340 matched/arm mixed, 315–317 sparse; ms p50/p95,
+    truth clock, decoded-track level; +32 ms outputLatency to physical ears):**
+    - local baseline (A key→own WebAudio onset): **0.0 p50 / 2.6 p95** — the
+      reference feel; synth scheduling is free (leg2 ≈ 0.5 ms at B too).
+    - **p2p A+V: total 77.7 / 80.3** = leg1 (DC midi) 0.56 + leg2 0.67 +
+      leg3 (Opus return: encode+transport+NetEQ+decode) 76.6. Dead stable
+      across all phases AND both hint configs. key→eye 50/73 — the panel
+      video lands ~27 ms BEFORE its own sound.
+    - **p2p audio-only: UNSTABLE** — 72 (burst) → 135 (sparse) → 210–310 in
+      other runs/configs; NetEQ wanders without the video sync anchor. The
+      lip-sync question INVERTED: video does not delay audio here, the video
+      track *pins* the audio jitter buffer (3 of 3 full runs).
+    - **SFU both ways (sparse, clean): total 116 / 210** = leg1 16.6 (matches
+      matrix SFU-DC 16.2) + leg2 0.5 + leg3 102. key→eye 127/161, A/V skew
+      ±15–50 ms. avg jitterBufferDelay 68–180 ms across runs (adaptation
+      wanders); concealment 0.1–0.7 %.
+    - **jitterBufferTarget=0 + playoutDelayHint=0: never helps, often hurts**
+      (p2p-audio 72→211, sfu-sparse 116→235, sfu-av mixed also worse;
+      p2p A+V unchanged). Readback confirms the properties set; NetEQ target
+      floor stays 20 ms and forcing it destabilizes adaptation upward. The
+      jitter buffer IS the product: it cannot be hinted away.
+    - MoQ arm (c) skipped inside its 30-min box: hang/WebCodecs Opus spike
+      exists (rig/moq/spike pub/play-audio, 32.6 ms g2g measured with own
+      cushion buffer) but needs a fresh Docker-esbuild bundle + AudioData
+      bridges both ends. Paper projection: 1 (DC) + 1 (synth) + ~33 (MoQ
+      return) ≈ **35 ms key→ear** — the beat-Play-a-Synth candidate.
+  - **Verdict vs playability bands** (research §1: ≤30 ≈ local acoustic
+    action, piano actions being 30–100 ms; 30–60 playable; >100 sluggish):
+    p2p 78 ms sits INSIDE the acoustic-instrument band (a heavy piano
+    action); SFU 116 ms is at the sluggish edge. Real deployment adds
+    hardware synth MIDI-in→audio-out 5–15 ms and replaces ~0 ms loopback
+    legs with real network: same-city P2P ≈ 78 + 10 (synth hw) + 2×RTT/2
+    (~10) ≈ **~95–100 ms key→ear** honest projection; the browser stack
+    itself (Opus + NetEQ floor ~75 ms of it) dominates, not the wire.
+  - results/jam-synth-*.jsonl (per-note, per-leg), jam-synth-summary.json
+    (merged, perPhase, caveats), screenshots jam-synth-{p2p,sfu,sfu-sparse,
+    a,b}*.png. Cleanup verified: no jam-udd/server processes, :8893/:8895 free.
+
 ## Layout (planned)
 
 - server.mjs — :8893 static + /time-local (µs, shared clock) + mailbox signaling + /log sink

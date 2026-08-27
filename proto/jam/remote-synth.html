@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>play-a-synth case</title>
+<style>
+  body { font: 12px/1.4 monospace; background: #111; color: #ddd; margin: 12px; }
+  #hud { white-space: pre; margin-bottom: 10px; }
+  canvas, video { border: 1px solid #444; background: #000; display: block; }
+  .panelwrap { display: flex; gap: 12px; }
+</style>
+</head>
+<body>
+<div id="hud">play-a-synth rig loading…</div>
+<div class="panelwrap">
+  <canvas id="panel" width="640" height="360" style="width:640px;height:360px"></canvas>
+  <video id="vid" width="640" height="360" autoplay playsinline></video>
+</div>
+<script type="module" src="/remote-synth.js"></script>
+</body>
+</html>
