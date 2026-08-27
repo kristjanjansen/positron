@@ -102,6 +102,7 @@ function parseBin(buf) {
 // ---------------- audio graph ----------------
 const ac = new AudioContext();
 await ac.audioWorklet.addModule('/onset-worklet.js');
+await ac.audioWorklet.addModule('/playout-worklet.js'); // C8: MoQ return path
 
 // ct->epoch mapping, EDGE-MEDIAN method (probe-verified): sample the offset
 // (nowUs − ct·1e6) only at the instant currentTime CHANGES (a 1 ms poll
@@ -318,6 +319,7 @@ function bEndRun() {
   const out = {
     runId: run.runId, recs, spuriousOnsets: run.matcher.spurious(),
     audio: { sampleRate: ac.sampleRate, baseLatency: ac.baseLatency, outputLatency: ac.outputLatency, ctOffUs: Math.round(acMap.off()) },
+    moqPub: state.moqPub ? state.moqPub.stats() : undefined,
   };
   bState.run = null;
   return out;
@@ -419,6 +421,23 @@ function flashLit() {
   for (let i = 0; i < 40; i++) s += img[i * 4 + 1];
   return s / 40 > 120;
 }
+// shared panel scan (post-draw): burned clock row + note flash+seq bits.
+// dispUs = when this frame is considered visible, truth-clock µs.
+function scanPanel(dispUs) {
+  const run = aState.run;
+  const ms = decodeClock();
+  if (ms !== null) {
+    aState.vDecoded++;
+    if (run) run.burnedOwMs.push(+(dispUs / 1000 - ms).toFixed(2));
+  }
+  if (flashLit()) {
+    const seq = decodeSeq();
+    if (seq !== null && run && !run.video.has(seq)) {
+      run.video.set(seq, Math.round(dispUs));
+      aState.vFlashSeen++;
+    }
+  }
+}
 let vDecodeStarted = false;
 let lastPresented = -1;
 function startVideoDecode() {
@@ -431,20 +450,7 @@ function startVideoDecode() {
     aState.vFrames++;
     try {
       wctx.drawImage(vid, 0, 0, 640, 360);
-      const dispUs = (performance.timeOrigin + meta.expectedDisplayTime) * 1000 + clock.offLocalUs;
-      const run = aState.run;
-      const ms = decodeClock();
-      if (ms !== null) {
-        aState.vDecoded++;
-        if (run) run.burnedOwMs.push(+(dispUs / 1000 - ms).toFixed(2));
-      }
-      if (flashLit()) {
-        const seq = decodeSeq();
-        if (seq !== null && run && !run.video.has(seq)) {
-          run.video.set(seq, Math.round(dispUs));
-          aState.vFlashSeen++;
-        }
-      }
+      scanPanel((performance.timeOrigin + meta.expectedDisplayTime) * 1000 + clock.offLocalUs);
     } catch (e) { /* decode blip — skip frame */ }
   };
   vid.requestVideoFrameCallback(onFrame);
@@ -526,6 +532,7 @@ async function aRunRemote({ runId, hint = null, scale = 1, sched = 'mixed' }) {
   aState.run = run;
   remoteOnsetSink.fn = (us) => { run.matcher.onset(us); };
   const statsBefore = await rtpSnapshot(state.pc);
+  if (state.moqA) state.moqA.beginRun();
   const sent = await playSchedule((seq, note, vel, phase) => {
     const tUs = nowUs();
     run.recs.set(seq, { seq, tUs, phase, note, vel });
@@ -536,6 +543,7 @@ async function aRunRemote({ runId, hint = null, scale = 1, sched = 'mixed' }) {
   await sleep(2500); // audio/video return tail
   run.matcher.flush();
   const statsAfter = await rtpSnapshot(state.pc);
+  const moqRun = state.moqA ? state.moqA.endRun() : null;
   remoteOnsetSink.fn = null;
   aState.run = null;
   const recs = [];
@@ -552,6 +560,7 @@ async function aRunRemote({ runId, hint = null, scale = 1, sched = 'mixed' }) {
     spuriousOnsets: run.matcher.spurious(),
     burnedOwMs: run.burnedOwMs,
     hintApplied,
+    moq: moqRun,
     statsBefore, statsAfter,
     audio: { sampleRate: ac.sampleRate, baseLatency: ac.baseLatency, outputLatency: ac.outputLatency, ctOffUs: Math.round(acMap.off()) },
     video: { frames: aState.vFrames, decoded: aState.vDecoded, flashSeen: aState.vFlashSeen },
@@ -605,14 +614,14 @@ const pcConnected = (pc, ms = 20000) => new Promise((res, rej) => {
   pc.addEventListener('connectionstatechange', check); check();
 });
 
-async function setupP2P({ withVideo = true, tag = 'x' }) {
+async function setupP2P({ withVideo = true, withAudio = true, tag = 'x' }) {
   const pc = new RTCPeerConnection({ iceServers: [] });
   state.pc = pc;
   const sig = `synth-sig-${SESSION}-${tag}`;
   if (ROLE === 'a') {
     const ch = pc.createDataChannel('midi', { ordered: false, maxRetransmits: 0 });
     ch.binaryType = 'arraybuffer';
-    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (withAudio) pc.addTransceiver('audio', { direction: 'recvonly' });
     if (withVideo) pc.addTransceiver('video', { direction: 'recvonly' });
     pc.ontrack = (e) => onRemoteTrack(e.track);
     const opened = new Promise((r) => { ch.onopen = r; if (ch.readyState === 'open') r(); });
@@ -624,7 +633,7 @@ async function setupP2P({ withVideo = true, tag = 'x' }) {
     await pcConnected(pc);
     await opened;
     state.send = (buf) => ch.readyState === 'open' && ch.send(buf);
-    return { label: `p2p ${withVideo ? 'A+V' : 'audio-only'} return, DC-unordered midi` };
+    return { label: `p2p ${withAudio ? (withVideo ? 'A+V' : 'audio-only') : (withVideo ? 'video-only' : 'DC-only')} return, DC-unordered midi` };
   }
   // B: answerer; sends synth audio (+ video) back on the same PC
   pc.ondatachannel = (e) => {
@@ -633,11 +642,11 @@ async function setupP2P({ withVideo = true, tag = 'x' }) {
   };
   const off = await waitFor(reader(sig), (m) => m.kind === 'offer');
   await pc.setRemoteDescription({ type: 'offer', sdp: off.sdp });
-  const audioTrack = msDest.stream.getAudioTracks()[0];
+  const audioTrack = withAudio ? msDest.stream.getAudioTracks()[0] : null;
   const videoTrack = withVideo ? panel.captureStream(30).getVideoTracks()[0] : null;
   for (const tx of pc.getTransceivers()) {
     const kind = tx.receiver.track && tx.receiver.track.kind;
-    if (kind === 'audio') { await tx.sender.replaceTrack(audioTrack); tx.direction = 'sendonly'; }
+    if (kind === 'audio' && audioTrack) { await tx.sender.replaceTrack(audioTrack); tx.direction = 'sendonly'; }
     if (kind === 'video' && videoTrack) { await tx.sender.replaceTrack(videoTrack); tx.direction = 'sendonly'; }
   }
   await pc.setLocalDescription(await pc.createAnswer());
@@ -724,9 +733,388 @@ async function setupSFU({ withVideo = true, tag = 'x' }) {
   return { label: 'SFU synth host', sid: state.sid };
 }
 
+// ---------------- (c) MoQ d14 audio(/video) return path (C8) ----------------
+// B: synth bus -> pcm-capture worklet (128-frame quanta) -> AudioEncoder Opus
+//    low-delay -> 12-B header {seq u32, sendUs f64} + opus bytes -> hang legacy
+//    frame (media-ts µs on the truth clock) -> MoQ track 'audio', new group per
+//    groupMs of media time (groupMs=0 -> single-frame group per chunk).
+//    Optional 'video': panel canvas 30 fps -> VP8 realtime -> 1-B keyflag +
+//    bytes -> MoQ track 'video', group per keyframe (1 s GOP).
+// A: subscribe (Container.Consumer latency 0) -> FIFO-mapped AudioDecoder
+//    (§10.2 trap: decoder output timestamps are fiction — the 12-B header +
+//    encoded-chunk ts ride a FIFO through the decoder) -> pcm-playout worklet
+//    ring buffer (minimal prebuffer floor, underrun accounting, optional
+//    adaptive growth) -> same onset worklet as the WebRTC arms -> destination.
+const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
+const pdist = (vals) => {
+  if (!vals.length) return null;
+  const s = [...vals].sort((x, y) => x - y);
+  const pick = (p) => +s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))].toFixed(2);
+  return { n: s.length, p50: pick(50), p95: pick(95), p99: pick(99), min: +s[0].toFixed(2), max: +s[s.length - 1].toFixed(2) };
+};
+
+async function pickOpusConfig(preferUs = 0) {
+  const base = { codec: 'opus', sampleRate: 48000, numberOfChannels: 1, bitrate: 64000 };
+  const cands = [
+    ...(preferUs ? [
+      { ...base, opus: { frameDuration: preferUs, application: 'lowdelay', useinbandfec: false, usedtx: false } },
+      { ...base, opus: { frameDuration: preferUs } },
+    ] : []),
+    { ...base, opus: { frameDuration: 2500, application: 'lowdelay', useinbandfec: false, usedtx: false } },
+    { ...base, opus: { frameDuration: 5000, application: 'lowdelay', useinbandfec: false, usedtx: false } },
+    { ...base, opus: { frameDuration: 2500 } },
+    { ...base, opus: { frameDuration: 5000 } },
+    { ...base, opus: { frameDuration: 10000 } },
+    { ...base, opus: { frameDuration: 20000 } },
+    { ...base },
+  ];
+  for (const c of cands) {
+    try {
+      const s = await AudioEncoder.isConfigSupported(c);
+      if (s.supported) return { cfg: c, normalized: s.config || c };
+    } catch { /* unsupported member/value — next */ }
+  }
+  throw new Error('no opus AudioEncoder config supported');
+}
+
+async function bStartMoqPublish({ withVideo, groupMs, frameUs = 0, tag }) {
+  await import('/moq/www/moq-synth.js');
+  const ns = `obsynth-${Date.now().toString(36)}-${tag}`; // §13.4 fresh-name discipline
+  const pub = await window.MoqSynth.publisher(MOQ_RELAY, ns, { withVideo });
+  log('moq pub connected', ns, 'version', pub.version || '?');
+  const { cfg, normalized } = await pickOpusConfig(frameUs);
+  const frameDurUs = (cfg.opus && cfg.opus.frameDuration) || 20000;
+  const mp = {
+    ns, pub, seq: 0, published: 0, bytes: 0, vPublished: 0, vDropped: 0,
+    groupMsUs: groupMs * 1000, frameDurUs, encCfg: cfg, encCfgNorm: normalized,
+    aDesc: null, groupStart: null, vEnc: null, vTimer: null, encErrors: 0,
+    setGroupMs(ms) { this.groupMsUs = ms * 1000; },
+    stats() {
+      return {
+        ns: this.ns, published: this.published, bytes: this.bytes, encQueue: this.enc ? this.enc.encodeQueueSize : null,
+        vPublished: this.vPublished, vDropped: this.vDropped, encErrors: this.encErrors,
+        groupMs: this.groupMsUs / 1000, frameDurUs: this.frameDurUs,
+        renderDeficitMs: this.renderDeficitMs, maxRenderDeficitMs: this.maxRenderDeficitMs,
+      };
+    },
+  };
+  let firstOutResolve;
+  const firstOut = new Promise((r) => (firstOutResolve = r));
+  const enc = new AudioEncoder({
+    output: (chunk, meta) => {
+      try {
+        if (mp.aDesc === null) {
+          const d = meta && meta.decoderConfig && meta.decoderConfig.description;
+          if (d) {
+            const u8 = d instanceof ArrayBuffer ? new Uint8Array(d) : new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
+            mp.aDesc = btoa(String.fromCharCode(...u8));
+          } else mp.aDesc = '';
+          firstOutResolve();
+        }
+        const sendUs = nowUs();
+        const payload = new Uint8Array(12 + chunk.byteLength);
+        const dv = new DataView(payload.buffer);
+        dv.setUint32(0, mp.seq, true);
+        dv.setFloat64(4, sendUs, true);
+        chunk.copyTo(payload.subarray(12));
+        const key = mp.groupStart === null || mp.groupMsUs === 0 || chunk.timestamp - mp.groupStart >= mp.groupMsUs;
+        if (key) mp.groupStart = chunk.timestamp;
+        pub.audioWrite(payload, chunk.timestamp, key);
+        mp.seq++; mp.published++; mp.bytes += payload.byteLength;
+      } catch (e) { mp.encErrors++; if (mp.encErrors < 5) log('moq audioWrite err', e.message); }
+    },
+    error: (e) => log('moq aenc err', e.message),
+  });
+  enc.configure(cfg);
+  mp.enc = enc;
+
+  // realtime pacing pin: in the WebRTC arms the PC pulls msDest and keeps B's
+  // context rendering realtime; without a consumer the headless context
+  // free-runs in bursts (observed: 0.2-2.9 s render stalls + catch-up bursts
+  // -> A-side starve/trim thrash + early-biased ct map). A muted audio element
+  // consuming msDest restores the realtime pull.
+  const pacer = new Audio();
+  pacer.srcObject = msDest.stream;
+  pacer.muted = true;
+  pacer.play().catch((e) => log('moq pacer play failed', e.message));
+  // PCM capture: worklet tap on the synth bus, 128-frame quanta, epoch-µs
+  // media timestamps anchored once (edge-median ct map) + exact sample count
+  const capNode = new AudioWorkletNode(ac, 'pcm-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+  const capSink = ac.createGain(); capSink.gain.value = 0;
+  capNode.connect(capSink).connect(ac.destination);
+  synthBus.connect(capNode);
+  let anchorUs = null, samples = 0;
+  capNode.port.onmessage = (e) => {
+    const { ct, pcm } = e.data;
+    if (!pcm || enc.state !== 'configured') return;
+    if (anchorUs === null) { anchorUs = acMap.ctUs(ct); samples = 0; }
+    const ts = anchorUs + (samples / 48000) * 1e6;
+    samples += pcm.length;
+    // render-deficit diagnostic: how far B's context lags wall-clock realtime
+    const deficitMs = (nowUs() - (anchorUs + (samples / 48000) * 1e6)) / 1000;
+    mp.renderDeficitMs = +deficitMs.toFixed(1);
+    if (deficitMs > (mp.maxRenderDeficitMs || 0)) mp.maxRenderDeficitMs = +deficitMs.toFixed(1);
+    try {
+      const ad = new AudioData({
+        format: 'f32-planar', sampleRate: 48000, numberOfFrames: pcm.length,
+        numberOfChannels: 1, timestamp: Math.round(ts), data: pcm,
+      });
+      enc.encode(ad);
+      ad.close();
+    } catch (err) { mp.encErrors++; }
+  };
+  mp.capNode = capNode; mp.capSink = capSink; mp.pacer = pacer;
+
+  if (withVideo) {
+    const vEnc = new VideoEncoder({
+      output: (chunk) => {
+        try {
+          const p = new Uint8Array(1 + chunk.byteLength);
+          p[0] = chunk.type === 'key' ? 1 : 0;
+          chunk.copyTo(p.subarray(1));
+          pub.videoWrite(p, chunk.timestamp, chunk.type === 'key');
+          mp.vPublished++;
+        } catch (e) { if (mp.vPublished < 3) log('moq videoWrite err', e.message); }
+      },
+      error: (e) => log('moq venc err', e.message),
+    });
+    vEnc.configure({ codec: 'vp8', width: 640, height: 360, framerate: 30, bitrate: 2_000_000, latencyMode: 'realtime' });
+    let vFrame = 0;
+    mp.vEnc = vEnc;
+    mp.vTimer = setInterval(() => {
+      if (vEnc.state !== 'configured') return;
+      if (vEnc.encodeQueueSize > 3) { mp.vDropped++; return; }
+      const vf = new VideoFrame(panel, { timestamp: Math.round(nowUs()) });
+      vEnc.encode(vf, { keyFrame: vFrame % 30 === 0 });
+      vf.close();
+      vFrame++;
+    }, 1000 / 30);
+  }
+
+  await Promise.race([firstOut, sleep(3000)]);
+  state.moqPub = mp;
+  return {
+    ns,
+    acfg: {
+      codec: 'opus', sampleRate: 48000, numberOfChannels: 1,
+      desc: mp.aDesc || null, frameDurUs, groupMs, encCfg: { bitrate: cfg.bitrate, opus: cfg.opus || null }, encCfgNorm: normalized,
+    },
+  };
+}
+
+async function aStartMoqSubscribe({ ns, acfg, withVideo, floorMs, adaptive }) {
+  await import('/moq/www/moq-synth.js');
+  const playNode = new AudioWorkletNode(ac, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+  remoteTap = makeOnsetTap('moq-remote', (us, d) => { if (remoteOnsetSink.fn) remoteOnsetSink.fn(us, d); });
+  playNode.connect(remoteTap);
+  playNode.connect(ac.destination); // audible monitor (headless: fake sink)
+  const ma = {
+    ns, playNode, floorMs, adaptive,
+    recvTotal: 0, decodedTotal: 0, decErrors: 0, gapInsertMsTotal: 0, discontTotal: 0,
+    staleDropped: 0, // join-replay chunks (apparent transit > 400 ms) never fed to the ring
+    vRecv: 0, vDecoded: 0, vDecErrors: 0,
+    worklet: { latest: null },
+    run: null,
+    setFloor(ms, adapt = false) {
+      this.floorMs = ms; this.adaptive = adapt;
+      playNode.port.postMessage({ cmd: 'floor', ms, adaptive: adapt, maxMs: 250 });
+    },
+    beginRun() {
+      this.run = {
+        transit: [], decodeMs: [], buffered: [], floorSeen: [],
+        seqs: new Set(), seqMin: Infinity, seqMax: -1, dup: 0,
+        gap0: this.gapInsertMsTotal, dec0: this.decErrors, disc0: this.discontTotal,
+        stale0: this.staleDropped,
+        starves: [],
+        w0: this.worklet.latest ? { ...this.worklet.latest } : null,
+      };
+    },
+    endRun() {
+      const r = this.run; this.run = null;
+      if (!r) return null;
+      const w1 = this.worklet.latest;
+      const expected = r.seqMax >= r.seqMin ? r.seqMax - r.seqMin + 1 : 0;
+      const recv = r.seqs.size;
+      return {
+        ns: this.ns, floorMsSet: this.floorMs, adaptive: this.adaptive,
+        recvChunks: recv, expectedChunks: expected,
+        lostChunks: Math.max(0, expected - recv),
+        lostPct: expected ? +((100 * (expected - recv)) / expected).toFixed(3) : null,
+        dupChunks: r.dup,
+        discontinuities: this.discontTotal - r.disc0,
+        transitMs: pdist(r.transit), decodeMs: pdist(r.decodeMs),
+        ringBufferedMs: pdist(r.buffered),
+        floorMsEnd: r.floorSeen.length ? r.floorSeen[r.floorSeen.length - 1] : this.floorMs,
+        underruns: w1 && r.w0 ? w1.underruns - r.w0.underruns : null,
+        underrunMs: w1 && r.w0 ? +(w1.underrunMs - r.w0.underrunMs).toFixed(1) : null,
+        trimmedMs: w1 && r.w0 && w1.trimmedMs !== undefined ? +(w1.trimmedMs - (r.w0.trimmedMs || 0)).toFixed(1) : null,
+        trimEvents: w1 && r.w0 && w1.trimEvents !== undefined ? w1.trimEvents - (r.w0.trimEvents || 0) : null,
+        gapInsertMs: +(this.gapInsertMsTotal - r.gap0).toFixed(1),
+        staleDropped: this.staleDropped - r.stale0,
+        starveCount: r.starves.length,
+        starvesTop: [...r.starves].sort((x, y) => y.durMs - x.durMs).slice(0, 5),
+        decErrors: this.decErrors - r.dec0,
+      };
+    },
+  };
+  playNode.port.onmessage = (e) => {
+    if (e.data.stats) {
+      ma.worklet.latest = e.data.stats;
+      if (ma.run) {
+        ma.run.buffered.push(+e.data.stats.bufferedMs.toFixed(2));
+        ma.run.floorSeen.push(+e.data.stats.floorMs.toFixed(1));
+      }
+    }
+    if (e.data.starve && ma.run) {
+      ma.run.starves.push({ atUs: Math.round(acMap.ctUs(e.data.starve.ct)), durMs: +e.data.starve.durMs.toFixed(1) });
+      if (ma.run.starves.length > 300) ma.run.starves.shift();
+    }
+  };
+  ma.setFloor(floorMs, adaptive);
+
+  const adcfg = { codec: acfg.codec, sampleRate: acfg.sampleRate, numberOfChannels: acfg.numberOfChannels };
+  if (acfg.desc) adcfg.description = Uint8Array.from(atob(acfg.desc), (c) => c.charCodeAt(0));
+  const inQ = []; // §10.2: FIFO of encoded-chunk metadata through the decoder
+  let lastEndTs = null;
+  const dec = new AudioDecoder({
+    output: (ad) => {
+      const decUs = nowUs();
+      const meta = inQ.shift();
+      ma.decodedTotal++;
+      // gap insert: keep the ring aligned with source time across lost chunks
+      if (meta) {
+        if (lastEndTs !== null && meta.tsUs - lastEndTs > 1000) {
+          const gapUs = Math.min(meta.tsUs - lastEndTs, 500000);
+          const n = Math.round((gapUs / 1e6) * 48000);
+          playNode.port.postMessage({ silence: n });
+          ma.gapInsertMsTotal += gapUs / 1000;
+        }
+        lastEndTs = meta.tsUs + acfg.frameDurUs;
+      }
+      const pcm = new Float32Array(ad.numberOfFrames);
+      try {
+        ad.copyTo(pcm, { planeIndex: 0, format: 'f32-planar' });
+      } catch {
+        const inter = new Float32Array(ad.numberOfFrames * ad.numberOfChannels);
+        ad.copyTo(inter, { planeIndex: 0 });
+        for (let i = 0; i < ad.numberOfFrames; i++) pcm[i] = inter[i * ad.numberOfChannels];
+      }
+      playNode.port.postMessage({ pcm }, [pcm.buffer]);
+      if (meta && ma.run) {
+        ma.run.transit.push((meta.recvUs - meta.sendUs) / 1000);
+        ma.run.decodeMs.push((decUs - meta.recvUs) / 1000);
+      }
+      ad.close();
+    },
+    error: (e) => { ma.decErrors++; if (ma.decErrors < 5) log('moq adec err', e.message); },
+  });
+  dec.configure(adcfg);
+  ma.dec = dec;
+
+  let vDec = null, vGotKey = false;
+  if (withVideo) {
+    vDec = new VideoDecoder({
+      output: (vf) => {
+        aState.vFrames++;
+        ma.vDecoded++;
+        try {
+          wctx.drawImage(vf, 0, 0, 640, 360);
+          // decode-out time = "visible" here (no display leg; ~1 vsync
+          // optimistic vs the WebRTC arms' expectedDisplayTime — noted)
+          scanPanel(nowUs());
+        } catch { /* scan blip */ }
+        vf.close();
+      },
+      error: (e) => { ma.vDecErrors++; if (ma.vDecErrors < 5) log('moq vdec err', e.message); },
+    });
+    vDec.configure({ codec: 'vp8', optimizeForLatency: true });
+    ma.vDec = vDec;
+  }
+
+  const sub = await window.MoqSynth.subscriber(MOQ_RELAY, ns, {
+    log: (l) => log(l),
+    onAudio: ({ payload, tsUs, continuous }) => {
+      const recvUs = nowUs();
+      ma.recvTotal++;
+      if (!continuous && ma.recvTotal > 1) ma.discontTotal++;
+      if (payload.byteLength < 13) return;
+      const dv = new DataView(payload.buffer, payload.byteOffset, 12);
+      const seq = dv.getUint32(0, true);
+      const sendUs = dv.getFloat64(4, true);
+      // join-replay filter: with 1 s groups the OPEN group replays from its
+      // start on subscribe (§3.6) — chunks already >400 ms old are useless for
+      // playout and would flood the ring; drop pre-decode, count separately.
+      if (recvUs - sendUs > 400_000) { ma.staleDropped++; return; }
+      if (ma.run) {
+        if (ma.run.seqs.has(seq)) ma.run.dup++;
+        else {
+          ma.run.seqs.add(seq);
+          if (seq < ma.run.seqMin) ma.run.seqMin = seq;
+          if (seq > ma.run.seqMax) ma.run.seqMax = seq;
+        }
+      }
+      inQ.push({ seq, sendUs, recvUs, tsUs });
+      try {
+        dec.decode(new EncodedAudioChunk({ type: 'key', timestamp: tsUs, data: payload.subarray(12) }));
+      } catch (e) { inQ.pop(); ma.decErrors++; }
+    },
+    onVideo: withVideo ? ({ payload, tsUs }) => {
+      ma.vRecv++;
+      const key = payload[0] === 1;
+      if (!vGotKey) { if (!key) return; vGotKey = true; }
+      try {
+        vDec.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: tsUs, data: payload.subarray(1) }));
+      } catch (e) { ma.vDecErrors++; }
+    } : undefined,
+  });
+  ma.sub = sub;
+  state.moqA = ma;
+  log('moq sub live', ns, 'floor', floorMs, 'adaptive', String(adaptive));
+  return ma;
+}
+
+// arm (c): DC-direct MIDI up (unchanged) + MoQ d14 return.
+// video: 'none' (audio-only) | 'moq' (VP8 over MoQ) | 'webrtc' (P2P video-only
+// PC — the hybrid combo). floorMs = playout ring prebuffer; groupMs = MoQ
+// group span (0 = single-frame group per chunk).
+async function setupMoq({ video = 'none', floorMs = 20, adaptive = false, groupMs = 1000, frameUs = 0, tag = 'moq' }) {
+  const p2p = await setupP2P({ withVideo: video === 'webrtc', withAudio: false, tag });
+  const sig2 = `synth-moq-${SESSION}-${tag}`;
+  if (ROLE === 'b') {
+    const { ns, acfg } = await bStartMoqPublish({ withVideo: video === 'moq', groupMs, frameUs, tag });
+    await post(sig2, { kind: 'moq-ns', ns, acfg });
+    return { label: `moq synth host ns=${ns} (${video} video), ${p2p.label}`, ns, acfg };
+  }
+  const m = await waitFor(reader(sig2), (x) => x.kind === 'moq-ns', 60000);
+  await aStartMoqSubscribe({ ns: m.ns, acfg: m.acfg, withVideo: video === 'moq', floorMs, adaptive });
+  return { label: `moq return (${video} video) floor=${floorMs}ms + ${p2p.label}`, ns: m.ns, acfg: m.acfg };
+}
+
 function teardown() {
   try { state.pc && state.pc.close(); } catch {}
   delete state.pc; delete state.send; delete state.sid;
+  if (state.moqPub) {
+    const mp = state.moqPub;
+    try { mp.vTimer && clearInterval(mp.vTimer); } catch {}
+    try { mp.capNode.port.onmessage = null; } catch {}
+    try { synthBus.disconnect(mp.capNode); } catch {}
+    try { mp.capNode.disconnect(); } catch {}
+    try { mp.capSink.disconnect(); } catch {}
+    try { mp.enc.close(); } catch {}
+    try { mp.vEnc && mp.vEnc.close(); } catch {}
+    try { mp.pub.close(); } catch {}
+    try { if (mp.pacer) { mp.pacer.pause(); mp.pacer.srcObject = null; } } catch {}
+    delete state.moqPub;
+  }
+  if (state.moqA) {
+    const ma = state.moqA;
+    try { ma.sub.close(); } catch {}
+    try { ma.dec.close(); } catch {}
+    try { ma.vDec && ma.vDec.close(); } catch {}
+    try { ma.playNode.port.onmessage = null; } catch {}
+    try { ma.playNode.disconnect(); } catch {}
+    delete state.moqA;
+  }
   // reset A's remote plumbing so the next arm re-attaches cleanly
   for (const t of remoteStream.getTracks()) remoteStream.removeTrack(t);
   vid.srcObject = null;
@@ -744,9 +1132,18 @@ function drawHud() {
   if (ROLE === 'b') {
     lines.push(`midi recv ${bStats.midiRecv}   synth onsets ${bStats.synthOnsets}`);
     lines.push(`last leg1(midi) ${bStats.lastLeg1.toFixed(1)} ms`);
+    if (state.moqPub) {
+      const s = state.moqPub.stats();
+      lines.push(`MOQ PUB ${s.ns}  chunks ${s.published}  q ${s.encQueue}  vframes ${s.vPublished}  groupMs ${s.groupMs}  frameDur ${(s.frameDurUs / 1000).toFixed(1)}ms`);
+    }
   } else {
     const run = a.run;
     lines.push(`video frames ${a.vFrames}  clock-decoded ${a.vDecoded}  note-flashes ${a.vFlashSeen}`);
+    if (state.moqA) {
+      const w = state.moqA.worklet.latest;
+      lines.push(`MOQ SUB ${state.moqA.ns}  recv ${state.moqA.recvTotal}  dec ${state.moqA.decodedTotal}  decErr ${state.moqA.decErrors}  gapIns ${state.moqA.gapInsertMsTotal.toFixed(0)}ms`);
+      if (w) lines.push(`MOQ RING buf ${w.bufferedMs.toFixed(1)}ms  floor ${w.floorMs.toFixed(1)}ms  underruns ${w.underruns} (${w.underrunMs.toFixed(0)}ms)  ${w.started ? 'playing' : 'prebuffering'}`);
+    }
     if (run) lines.push(`RUN ${run.runId}: sent ${run.recs.size}  ear-matched ${[...run.recs.keys()].filter((s) => run.matcher.get(s)?.status === 'matched').length}  eye ${run.video.size}`);
   }
   const keep = hudLines.slice(-14);
@@ -820,8 +1217,14 @@ window.rig = {
   probe,
   clock: () => clock,
   calibrate: async () => { await calibrate(); return clock; },
-  setup: async (arm, opts) => (arm === 'p2p' ? setupP2P(opts) : setupSFU(opts)),
+  setup: async (arm, opts) => (arm === 'p2p' ? setupP2P(opts) : arm === 'moq' ? setupMoq(opts) : setupSFU(opts)),
   teardown,
+  setFloor: (ms, adaptive = false) => { if (!state.moqA) throw new Error('no moq sub'); state.moqA.setFloor(ms, adaptive); return { ok: true, ms, adaptive }; },
+  setGroupMs: (ms) => { if (!state.moqPub) throw new Error('no moq pub'); state.moqPub.setGroupMs(ms); return { ok: true, ms }; },
+  moqInfo: () => ({
+    pub: state.moqPub ? state.moqPub.stats() : null,
+    sub: state.moqA ? { ns: state.moqA.ns, recv: state.moqA.recvTotal, decoded: state.moqA.decodedTotal, decErrors: state.moqA.decErrors, gapInsertMs: +state.moqA.gapInsertMsTotal.toFixed(1), worklet: state.moqA.worklet.latest, vRecv: state.moqA.vRecv, vDecoded: state.moqA.vDecoded } : null,
+  }),
   beginRun: bBeginRun,
   endRun: bEndRun,
   runRemote: aRunRemote,
