@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>jam-interval — beat-quantized duet (NINJAM strategy)</title>
+<style>
+  body { font: 13px/1.5 monospace; background: #0d1109; color: #e8e8e8; margin: 0; padding: 18px; }
+  h1 { font-size: 15px; margin: 0 0 4px; color: #b6ff7f; }
+  #hud { white-space: pre; background: #151d12; border: 1px solid #2c352a; padding: 10px 14px; margin: 10px 0; min-height: 130px; }
+  #controls { margin: 8px 0; }
+  select, button { font: inherit; background: #222c22; color: #eee; border: 1px solid #444; padding: 3px 8px; }
+  #flash { display: flex; flex-direction: column; gap: 2px; }
+  .note { padding: 1px 8px; }
+  .note.local { color: #9fe89f; }
+  .note.remote { color: #ffb86b; }
+  .hint { color: #777; }
+</style>
+</head>
+<body>
+<h1>jam-interval.html — remote notes quantized to the next beat</h1>
+<div class="hint">the NINJAM strategy: your notes sound immediately, the peer's notes wait for the beat boundary —
+any link slower than ~beat/2 becomes musically playable. Beat grid is epoch-anchored: both peers share phase with zero negotiation.</div>
+<div id="controls">
+  transport <select id="tsel"><option value="dc">DC-direct</option><option value="do">DO relay</option><option value="moq">MoQ d14</option></select>
+  <button id="replayBtn">replay session</button>
+</div>
+<div id="hud">booting…</div>
+<div id="flash"></div>
+<script type="module" src="/moq/www/moq-jam.js"></script>
+<script type="module">
+import { makeJam } from '/jam-core.js';
+const params = new URLSearchParams(location.search);
+const transport = params.get('transport') || 'do';
+const sel = document.getElementById('tsel');
+sel.value = transport;
+sel.onchange = () => { params.set('transport', sel.value); location.search = params.toString(); };
+const jam = makeJam({
+  mode: 'interval',
+  transportName: transport,
+  role: params.get('peer') || 'a',
+  session: params.get('session') || 'local',
+  tempoBpm: +(params.get('bpm') || 100),
+});
+document.getElementById('replayBtn').onclick = () => jam.replay();
+window.jam = jam;
+window.jamStats = () => jam.stats();
+window.jamLog = () => jam.log();
+window.jamReplay = () => jam.replay();
+window.jamAuto = (ms) => jam.autoPlay(ms);
+await jam.start();
+window.jamReady = true;
+</script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+// proto/jam/jam-core.js — shared engine for jam.html (live duet) and
+// jam-interval.html (NINJAM-strategy beat-quantized duet).
+//
+// Rules carried from the timeline lineage (research/timeline-own-prior-art):
+//  - stamp at the source, epoch-µs from the monotonic-anchored clock (§1.8);
+//    the relay/peer never re-stamps (§2)
+//  - payload = actuatable form (raw MIDI bytes) + display form; on the 16-B
+//    wire frame display is derived deterministically from raw at the receiver,
+//    the LOG carries both (§3 payload rule)
+//  - dedupe(keyFn, windowMs) with bounded GC (§2, built twice before)
+//  - LOCAL MONITOR immediate: your own notes never wait for the network;
+//    the network copy is for the peer (and the log's remote half)
+//  - the jam IS a timeline recording: flat event log {at, kind:'midi', source,
+//    raw, display}; replay re-feeds the SAME actuate path (overdub semantics
+//    §1.11: replay-fired events are marked and never re-enter the log)
+
+export function makeJam(opts) {
+  const { mode, transportName, role, session, tempoBpm = 100 } = opts;
+  const other = role === 'a' ? 'b' : 'a';
+  const SRC = { a: 1, b: 2 };
+
+  // ---------- clock (same-host truth: local server min-RTT) ----------
+  const epochUsRaw = () => (performance.timeOrigin + performance.now()) * 1000;
+  let offLocalUs = 0;
+  const nowUs = () => epochUsRaw() + offLocalUs;
+  async function calibrate() {
+    let best = { rtt: Infinity, off: 0 };
+    for (let i = 0; i < 25; i++) {
+      const a = epochUsRaw();
+      const j = await (await fetch('/time-local', { cache: 'no-store' })).json();
+      const b = epochUsRaw();
+      if (b - a < best.rtt) best = { rtt: b - a, off: j.us + (b - a) / 2 - b };
+    }
+    offLocalUs = best.off;
+  }
+
+  // ---------- synth (WebAudio, immediate local monitor) ----------
+  const ac = new AudioContext();
+  function playNote(note, vel, whenAcTime = 0, detuneCents = 0) {
+    const t = whenAcTime || ac.currentTime;
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = 440 * Math.pow(2, (note - 69) / 12);
+    osc.detune.value = detuneCents;
+    const g = 0.12 * (vel / 127);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(g, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(t); osc.stop(t + 0.4);
+  }
+
+  // ---------- payload (same 16-B frame as the bench) ----------
+  function buildBin(seq, note, vel, src, tUs) {
+    const buf = new ArrayBuffer(16);
+    const dv = new DataView(buf);
+    dv.setUint8(0, 0x90); dv.setUint8(1, note); dv.setUint8(2, vel); dv.setUint8(3, src);
+    dv.setUint32(4, seq, true); dv.setFloat64(8, tUs, true);
+    return buf;
+  }
+  function parseBin(buf) {
+    const dv = new DataView(buf);
+    return { status: dv.getUint8(0), note: dv.getUint8(1), vel: dv.getUint8(2), src: dv.getUint8(3), seq: dv.getUint32(4, true), tUs: dv.getFloat64(8, true) };
+  }
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const disp = (note) => NOTE_NAMES[note % 12] + (Math.floor(note / 12) - 1);
+
+  // ---------- dedupe(keyFn, windowMs) — the lineage primitive ----------
+  function makeDedupe(windowMs) {
+    const seen = new Map(); // key -> tMs
+    return (key) => {
+      const t = performance.now();
+      if (seen.has(key) && t - seen.get(key) < windowMs) return true;
+      seen.set(key, t);
+      if (seen.size > 4096) for (const [k, v] of seen) { if (t - v > windowMs) seen.delete(k); }
+      return false;
+    };
+  }
+  const isDup = makeDedupe(30000);
+
+  // ---------- the event log (the jam IS a timeline recording) ----------
+  const log = []; // {at(µs), kind:'midi', source, raw:[s,n,v], display, owMs?}
+  function record(at, source, raw, display, owMs) {
+    log.push({ at: Math.round(at), kind: 'midi', source, raw, display, ...(owMs !== undefined ? { owMs: +owMs.toFixed(2) } : {}) });
+  }
+
+  // ---------- HUD ----------
+  const owWindow = []; // rolling one-way ms for remote notes
+  const stats = { sentLocal: 0, recvRemote: 0, dupDropped: 0, replayFired: 0, waitMsLast: 0 };
+  const hudEl = document.getElementById('hud');
+  const flashEl = document.getElementById('flash');
+  function rollP50() {
+    if (!owWindow.length) return null;
+    const s = [...owWindow].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  }
+  function drawHud(extra = '') {
+    const p50 = rollP50();
+    hudEl.textContent = [
+      `peer ${role.toUpperCase()}  transport=${transportName}  mode=${mode}${mode === 'interval' ? ` tempo=${tempoBpm}bpm beat=${beatMs()}ms` : ''}`,
+      `local notes sent   ${stats.sentLocal}`,
+      `remote notes recv  ${stats.recvRemote}  (dups dropped ${stats.dupDropped})`,
+      `remote one-way p50 ${p50 === null ? '—' : p50.toFixed(1) + ' ms'}  (rolling ${owWindow.length})`,
+      mode === 'interval' ? `last quantize wait ${stats.waitMsLast.toFixed(0)} ms` : '',
+      `log ${log.length} events   replay fired ${stats.replayFired}`,
+      extra,
+    ].filter(Boolean).join('\n');
+  }
+  function flash(text, remote) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    d.className = remote ? 'note remote' : 'note local';
+    flashEl.prepend(d);
+    while (flashEl.children.length > 24) flashEl.lastChild.remove();
+  }
+
+  // ---------- beat grid (interval mode): epoch-anchored, so both peers share
+  // phase with zero negotiation — the beat boundary is a property of the wall
+  // clock, not of either peer ----------
+  const beatMs = () => 60000 / tempoBpm;
+  function nextBeatUs(afterUs) {
+    const b = beatMs() * 1000;
+    return Math.ceil(afterUs / b) * b;
+  }
+
+  // ---------- lookahead scheduler (tracker's tight-lane loop: a 25 ms timer
+  // schedules everything inside a 120 ms horizon at sample accuracy) ----------
+  const pending = []; // {fireUs, fn}
+  setInterval(() => {
+    const horizon = nowUs() + 120000;
+    for (let i = pending.length - 1; i >= 0; i--) {
+      if (pending[i].fireUs <= horizon) {
+        const { fireUs, fn } = pending.splice(i, 1)[0];
+        const inS = Math.max(0, (fireUs - nowUs()) / 1e6);
+        fn(ac.currentTime + inS);
+      }
+    }
+  }, 25);
+  function scheduleAt(fireUs, fn) { pending.push({ fireUs, fn }); }
+
+  // ---------- actuate: ONE render path for live-local, live-remote, replay ----
+  function actuate(raw, source, whenAcTime = 0, meta = {}) {
+    playNote(raw[1], raw[2], whenAcTime, source === role ? 0 : 6);
+    flash(`${meta.tag || (source === role ? 'you' : 'peer')}  ${disp(raw[1])}  ${meta.note || ''}`, source !== role);
+    drawHud();
+  }
+
+  // ---------- transports ----------
+  let seq = 0;
+  let sendRaw = null; // (ArrayBuffer) => void
+  async function post(box, msg) { await fetch('/msg/' + box, { method: 'POST', body: JSON.stringify(msg) }); }
+  function reader(box) {
+    let cursor = 0;
+    return async (waitMs = 20000) => {
+      const r = await fetch(`/msg/${box}?after=${cursor}&wait=${waitMs}`, { cache: 'no-store' });
+      const j = await r.json();
+      cursor = j.next; return j.msgs;
+    };
+  }
+  async function waitFor(read, pred, timeoutMs = 20000) {
+    const t0 = performance.now();
+    while (performance.now() - t0 < timeoutMs) {
+      for (const m of await read(5000)) if (pred(m)) return m;
+    }
+    throw new Error('signal timeout');
+  }
+
+  function onWire(buf) {
+    const f = parseBin(buf);
+    if (f.src === SRC[role]) return;            // own echo (DO loopback) — monitor already played
+    if (isDup(f.src + ':' + f.seq)) { stats.dupDropped++; return; }
+    const recvUs = nowUs();
+    const owMs = (recvUs - f.tUs) / 1000;
+    owWindow.push(owMs);
+    if (owWindow.length > 50) owWindow.shift();
+    stats.recvRemote++;
+    const raw = [f.status, f.note, f.vel];
+    if (mode === 'interval') {
+      const fireUs = nextBeatUs(recvUs);
+      stats.waitMsLast = (fireUs - recvUs) / 1000;
+      scheduleAt(fireUs, (acT) => actuate(raw, other, acT, { note: `ow ${owMs.toFixed(1)}ms +q${stats.waitMsLast.toFixed(0)}ms` }));
+      record(fireUs, other, raw, disp(f.note) + ' on', owMs); // logged at its MUSICAL time
+    } else {
+      actuate(raw, other, 0, { note: `ow ${owMs.toFixed(1)}ms` });
+      record(recvUs, other, raw, disp(f.note) + ' on', owMs);
+    }
+  }
+
+  const transports = {
+    async dc() {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      const sig = `demo-sig-${session}-${mode}`;
+      let ch;
+      const ready = new Promise((res, rej) => {
+        const t = setTimeout(() => rej(new Error('dc timeout')), 10000);
+        const arm = (c) => {
+          c.binaryType = 'arraybuffer';
+          c.onmessage = (e) => onWire(e.data);
+          c.onopen = () => { clearTimeout(t); res(c) };
+          if (c.readyState === 'open') { clearTimeout(t); res(c); }
+        };
+        if (role === 'a') arm(ch = pc.createDataChannel('duet', { ordered: false, maxRetransmits: 0 }));
+        else pc.ondatachannel = (e) => arm(ch = e.channel);
+      });
+      if (role === 'a') {
+        await pc.setLocalDescription(await pc.createOffer());
+        await new Promise((r) => { if (pc.iceGatheringState === 'complete') r(); pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); });
+        await post(sig, { kind: 'offer', sdp: pc.localDescription.sdp });
+        const ans = await waitFor(reader(sig), (m) => m.kind === 'answer');
+        await pc.setRemoteDescription({ type: 'answer', sdp: ans.sdp });
+      } else {
+        const off = await waitFor(reader(sig), (m) => m.kind === 'offer');
+        await pc.setRemoteDescription({ type: 'offer', sdp: off.sdp });
+        await pc.setLocalDescription(await pc.createAnswer());
+        await new Promise((r) => { if (pc.iceGatheringState === 'complete') r(); pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); });
+        await post(sig, { kind: 'answer', sdp: pc.localDescription.sdp });
+      }
+      const c = await ready;
+      return { send: (buf) => c.readyState === 'open' && c.send(buf), label: 'dc-direct (unordered, maxRetransmits:0)' };
+    },
+    async do() {
+      const env = await (await fetch('/env.json')).json();
+      const ws = new WebSocket(`wss://elektron-jam.kristjan-jansen.workers.dev/room/duet-${session}-${mode}/ws?token=${env.JAM_TOKEN}`);
+      ws.binaryType = 'arraybuffer';
+      await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('do ws failed')); });
+      ws.onmessage = (e) => { if (e.data instanceof ArrayBuffer) onWire(e.data); };
+      return { send: (buf) => ws.readyState === 1 && ws.send(buf), label: 'DO relay (elektron-jam, binary)' };
+    },
+    async moq() {
+      if (!window.MoqJam) throw new Error('MoqJam bundle missing');
+      const relay = 'https://draft-14.cloudflare.mediaoverquic.com';
+      const pub = await window.MoqJam.publisher(relay, `duet-${session}-${mode}-${role}`);
+      const sub = await window.MoqJam.subscriber(relay, `duet-${session}-${mode}-${other}`);
+      sub.onMessage((p) => onWire(p.buffer.slice(p.byteOffset, p.byteOffset + p.byteLength)));
+      return { send: (buf) => pub.send(buf), label: 'MoQ d14 (one group per note)' };
+    },
+  };
+
+  // ---------- local note entry (keyboard or auto driver) ----------
+  function noteOn(note, vel = 96) {
+    if (ac.state === 'suspended') ac.resume();
+    const tUs = nowUs();
+    actuate([0x90, note, vel], role, 0, {});          // LOCAL MONITOR — immediate
+    record(tUs, role, [0x90, note, vel], disp(note) + ' on');
+    stats.sentLocal++;
+    if (sendRaw) sendRaw(buildBin(seq, note, vel, SRC[role], tUs));
+    seq++;
+    drawHud();
+  }
+
+  // keyboard: home row = pentatonic (the "row = pentatonic" rule)
+  const KEYS = 'asdfghjkl;';
+  const PENTA = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81];
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const i = KEYS.indexOf(e.key);
+    if (i >= 0) noteOn(PENTA[i]);
+  });
+
+  // ---------- replay: re-feed the log through the SAME actuate path ----------
+  async function replay() {
+    if (!log.length) return { fired: 0, logged: 0 };
+    const events = [...log].sort((x, y) => x.at - y.at);
+    const t0 = events[0].at;
+    const startUs = nowUs() + 300000; // 300 ms lead-in
+    let fired = 0;
+    const done = new Promise((res) => {
+      for (const ev of events) {
+        scheduleAt(startUs + (ev.at - t0), (acT) => {
+          // replay-fired events are marked (tag) and never re-enter the log
+          actuate(ev.raw, ev.source, acT, { tag: `replay:${ev.source}` });
+          stats.replayFired = ++fired;
+          drawHud('REPLAY RUNNING');
+          if (fired === events.length) res();
+        });
+      }
+    });
+    await done;
+    drawHud('REPLAY DONE');
+    return { fired, logged: log.length };
+  }
+
+  // ---------- auto driver (headless verification): a musical 60 s duet ------
+  function autoPlay(durationMs = 60000) {
+    const line = role === 'a' ? [0, 2, 4, 2, 5, 4, 2, 0] : [7, 5, 4, 5, 2, 4, 5, 7];
+    let i = 0;
+    const t0 = performance.now();
+    return new Promise((res) => {
+      const iv = setInterval(() => {
+        if (performance.now() - t0 > durationMs) { clearInterval(iv); res(stats); return; }
+        noteOn(PENTA[line[i % line.length]]);
+        if (i % 8 === 7) noteOn(PENTA[(line[i % line.length] + 2) % 10]); // occasional dyad
+        i++;
+      }, 400 + (role === 'b' ? 35 : 0)); // slight phase offset so peers interleave
+    });
+  }
+
+  // ---------- boot ----------
+  async function start() {
+    await calibrate();
+    let t;
+    try {
+      t = await transports[transportName]();
+    } catch (e) {
+      if (transportName !== 'do') {
+        drawHud(`transport ${transportName} FAILED (${e.message}) — falling back to DO relay`);
+        t = await transports.do();
+      } else throw e;
+    }
+    sendRaw = t.send;
+    drawHud(`ready — ${t.label}`);
+    return t.label;
+  }
+
+  return {
+    start, noteOn, replay, autoPlay, nowUs,
+    stats: () => ({ ...stats, p50: rollP50(), logged: log.length, offLocalUs }),
+    log: () => log,
+  };
+}

@@ -118,10 +118,53 @@ cardsWithinCap, apiBudget, consoleClean}):
   9 s mark, 0 errors, year dial followed to 1965.
 - Cleanup after every run: Chrome closed, servers killed, 8891/8892 freed.
 
+## Step 5 — QUERY TRACKS: series lanes (plan §4 pulled into v0) ✅ (2026-08-27)
+
+The "tracks are queries" doctrine made visible: at years/days tiers a
+**series view** replaces the three type tracks with lanes derived from the
+loaded items' series nav links (search hits carry
+`navigationLinks[{type:'series'}]` — measured; audio-only `seriesTitle` lives
+in content records, the nav link is on every hit type). Zero new data layer:
+lanes group what the tile loader already fetched.
+
+- **Design calls**: REPLACE not nest (vertical space at year zoom is scarce;
+  item TYPE stays legible as color — amber video ticks/cards, teal waveforms,
+  violet photos — so a series lane shows its media mix for free). Adaptive
+  lane heights: 104 px lanes with thumbnails, 72 px audio-only (SL_* consts);
+  type view keeps the v0 constants byte-identical. Decades tier UNCHANGED in
+  either view — census has no series dimension (honest absence; furniture
+  says so when series view is zoomed out).
+- **Derivation**: on SETTLE only (no pan-frame churn) — group visible years'
+  loaded items by series name, top 7 by count become lanes, everything else
+  (incl. series-less items) pools into "muu / other", cached by
+  `(years, dataVersion)` key. `layoutLanes()` is the one signature-cached
+  lane-geometry source draw/mountCards/furniture/panel all read; per-lane
+  geom object parameterizes tick rows/bands/waveform strips/card rows so both
+  views share one render path.
+- **Track panel** (DOM, top-right, collapsible): master switch liigid/seeriad
+  + per-lane checkboxes with counts. Hidden state keyed by lane name in a
+  Set — survives zoom/re-derive; hidden named series vanish (not into muu).
+- **Verified headless** (autotest-series.mjs, ONE Chrome via CDP, 2 runs all
+  11 asserts green): 1965 series view = **8 lanes, 809 items routed** — AK
+  filmikroonika 282 · Päevakaja 95 · Kuuldemäng 43 · Head und, mudilased! 37 ·
+  Soomekeelne saade 24 · Kristall 19 · Näitlejad esitavad oma lemmikteoseid
+  10 · muu/other 299. **Upstream ERR calls: 0** (all 9 pages from
+  search-cache.jsonl — the politeness architecture paying out). Series-view
+  zoom flight **p50 8.3 ms · p95 9.2 · max 10.3** — identical to the type-view
+  baseline (lane routing is one Map get per item per frame). Cards 27 ≤ 300
+  cap; console clean; toggle hide→zoom→persists→restore + view round-trip
+  asserted. Screenshot: autotest-1965-series.png.
+- Original autotest.mjs re-run after the refactor: all 5 asserts still green,
+  p50 8.3 (type view unregressed), 0 upstream.
+- Hover card now shows the series name; muu lane draws its waveform strips
+  faint under the DOM cards (mixed-lane compromise, fine for a catch-all).
+
 ## Files
 
 viewport.mjs, gesture.mjs (the lift), census.mjs + census.json (committed
-cache), server.mjs (:8892), index.html (the surface), autotest.mjs +
-autotest-report.json + autotest-decades.png + autotest-1965.png (evidence),
-search-cache.jsonl + items-cache.jsonl (local politeness caches).
+cache), server.mjs (:8892), index.html (the surface; step 5 added series
+lanes/panel/unified lane layout), autotest.mjs + autotest-report.json +
+autotest-decades.png + autotest-1965.png (evidence), autotest-series.mjs +
+autotest-series-report.json + autotest-1965-series.png (query-tracks
+evidence), search-cache.jsonl + items-cache.jsonl (local politeness caches).
 proto/remixer/index.html gained the ?play= boot path (~25 lines).

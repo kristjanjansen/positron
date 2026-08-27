@@ -118,6 +118,36 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   Mac. The obs-docker "no UDP" verdict was a stale doc assumption. Inbound
   QUIC (relay-in-container) stays dead — no public IP.
 
+### MUSIC JAMMING (session 6f) — latency matrix + 2 demos ✅ (proto/jam, workers/jam)
+- Truth clock: both Chromes min-RTT-calibrated over loopback (±0.15 ms; skew
+  drift 7 µs/25 min). n=550/config, musical rates (bursts/sparse/chords).
+- **Matrix (one-way p50/p95)**: DC-direct P2P **1.0/1.5 ms** (ordered ≈
+  unordered on clean net); **CF SFU DataChannel 16.2/30 ms** — EXISTS, works,
+  datachannel-only session accepted (tracks/new refuses; sessions/new takes a
+  DC-only offer), accepts unreliable flags without echoing them; DO relay
+  elektron-jam 34.5/47 (cues' parse+restamp costs p95 78 — the only visible
+  software cost); legacy relay 51/73; MoQ d14 21.6/33 but **2.9% loss = 100%
+  chord notes** (single-frame-group racing; datagram mode confirmed DEAD on
+  d14); local ws relay 0.9 ms ≈ DC — **relay software never matters, network
+  does**. **JSON tax at MIDI sizes: ZERO** (16 B vs 130 B: no measurable
+  delta; binary earns nothing until ~100× rates).
+- **Loss verdict (real netem 2%, CDP packetLoss is a NO-OP in Chrome 151 —
+  documented)**: reliable modes stall 200 ms (TCP min-RTO) – 412 ms (SCTP
+  T3-RTO) in consecutive-note runs, WORST on sparse traffic (phrase gaps);
+  unordered+maxRtx:0 converts all of it to ~2% vanished notes with p95 2.5 ms.
+  Dropped > late: unreliable wins for live ears; the log path stays reliable.
+- **Demos verified** (60 s duets, replay 321/321 count-match, flat timeline
+  logs {at µs, kind midi, source, raw}): jam.html — live duet, local monitor
+  immediate, remote p50 1.6–1.9 ms over DC; jam-interval.html — NINJAM
+  strategy with EPOCH-ANCHORED beat grid (zero-negotiation shared phase): a
+  38 ms DO link playing musically on-grid — any link ≲ beat/2 is playable.
+- **Recommendation**: same-city = DC-direct unordered (fallback SFU-DC 16 ms,
+  no TURN needed); distant = same transport + interval strategy; DO relay =
+  ordering point + recorder feed; MoQ not yet right for notes. Timeline needs:
+  jam-room cuelog persistence, owMs into the drift channel, lift dedupe+µs
+  conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
+  echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
+
 ### OBS-IN-CLOUD + DUAL OUTPUT (session 6e) — ✅ ALL PROVEN (rig/obs-cloud)
 - **OBS ran in a CF Container (standard-4) publishing MoQ**: g2g cloud→d14→
   local viewer ≈195/210 ms corrected — statistically identical to the local
