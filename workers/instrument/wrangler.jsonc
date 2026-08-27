@@ -1,0 +1,13 @@
+{
+  // elektron-instrument — registry + 1:1 WebRTC signaling for remote
+  // instruments (proto/instrument). Control plane only: no media, no storage
+  // of media, no SFU. Does NOT touch elektron-rtc or elektron-jam.
+  "name": "elektron-instrument",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "durable_objects": {
+    "bindings": [{ "name": "HUB", "class_name": "Hub" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }],
+  "observability": { "enabled": true }
+}

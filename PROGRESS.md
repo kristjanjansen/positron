@@ -148,6 +148,45 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### REMOTE-INSTRUMENT PLATFORM (session 6j) — ✅ END-TO-END, 24/24 (proto/instrument, workers/instrument)
+The "play my synth" pattern as working software on our stack. Owner registers
+hardware → public catalog → player requests → owner accepts → DC MIDI up +
+WebRTC audio/panel-video back → session recorded as a timeline log → replay
+through the SAME send path. Deployed: `elektron-instrument` (hibernating DO;
+online/busy DERIVED from live sockets, never stored flags — the rtc `left`
+pattern, so a closed lid fires all-notes-off).
+- **one-way MIDI player→instrument p50 0.65 / p95 0.95 ms** (n=128; across
+  runs p50 wandered 0.25–0.65 — at this scale the two tabs' independent clock
+  calibration error ≈ the measurement: honest resolution floor, stated).
+- **key→ear 69.9 / 72.1 ms** (WebRTC Opus return — reproduces 6i's 77.7 band);
+  0 frames lost/dup/late; replay 128/128 with log growth 0 (overdub rule held).
+- Setup: request click → playable **611 ms**; offer → MIDI channel open 203 ms;
+  answer → PC connected 53 ms.
+- Second player REJECTED honestly (told who holds it, since when); `waiting` is
+  a real count so a queue needs no protocol change.
+- Host self-test (session 6k below) linked as "Check my rig ↗"; server falls
+  back across proto dirs so it runs unmodified on both ports.
+- v0 gaps stated: no MoQ return (seam = play.js onTrack, worth ~35 ms per 6i),
+  no multi-player, no player auth/payments/rate limit (Accept is the whole
+  access control), TURN/NAT untested (ice=none, one machine), no hardware run,
+  no sysex/NRPN, no reconnect.
+
+### HOST SELF-TEST (session 6k) — ✅ 18/18 (proto/jam/host-check.*)
+Owner answers "what will the player experience?" alone. A hardware floor
+(21.6/23.4 ms) · B partnerless relay echo (RTT 40.3 → one-way 20.2) · C full
+loop with THREE onset taps giving legs directly, not by subtraction (73.7 =
+wire 0.5 + instrument 21.7 + return 51.3; buffer share 37.5 = 73% read from
+getStats) · D playable DelayNode distance slider (verified 29.1 ms @30,
+60.2 @60). Stuck-note soak + CC123 panic + silence check. **Defaults to
+RETURN-PATH monitoring** (flipping it relabels the toggle "DIRECT monitoring —
+you are lying to yourself"); getSettings() readback of EC/AGC/NS/sampleRate as
+pass/fail caught Chrome's fake device handing back 44.1 kHz vs a 48 kHz context
+on run one. **Finding: 51 ms of return leg with ZERO network** — the browser
+audio stack is the fight before the internet is involved. Trap:
+--use-fake-ui-for-media-devices is NOT enough under headless=new (getUserMedia
+denied; needs CDP Browser.grantPermissions). Extracted `measure-core.js` (the
+C7 kernel) as a shared module.
+
 ### MoQ AUDIO RETURN (session 6i) — ⚠️ PARTIAL (agent killed by usage-credit exhaustion mid-run)
 **The headline landed before it died: the ~35 ms projection HELD.** Key→ear via
 WebCodecs-Opus → MoQ d14 → FIFO-mapped decode → minimal ring playout, vs the
