@@ -133,7 +133,10 @@
       <button id="b-load" style="flex:0 0 auto">Load</button>
     </div>
     <div id="loadstate" class="hint">Reads the notes back out of the store and replays them through the same send path.</div>
+    <!-- two elements, one lane each: the A/V webm wins when the owner
+         consented to video, the audio-only one is the fallback -->
     <audio id="sessaudio" controls style="display:none;width:100%;margin-top:8px"></audio>
+    <video id="sessvideo" controls playsinline style="display:none;width:100%;margin-top:8px"></video>
     <div class="row" style="margin-top:7px">
       <button id="b-replay-stored" disabled>Replay from storage</button>
       <button id="b-del-stored" class="stop" disabled>Delete it</button>

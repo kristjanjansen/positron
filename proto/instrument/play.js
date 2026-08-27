@@ -24,7 +24,7 @@
 
 import {
   makeClock, buildBin, display, noteName, connectSignal, iceComplete, pcConnected,
-  makeAcMap, makeOnsetTap, makeMatcher, isRealtime, dist,
+  makeAcMap, makeOnsetTap, makeMatcher, isRealtime, dist, makeBackstop,
 } from '/instrument-core.js';
 
 const P = new URLSearchParams(location.search);
@@ -62,6 +62,9 @@ const S = {
   ow: [], ear: [], audioSpan: null,
   matcher: makeMatcher({ minLatUs: 2000, maxLatUs: 2_000_000, adaptive: true }),
   held: new Map(),
+  // per-session PLAYER capabilities this page has been handed, by session id.
+  // They never leave this tab and are never shown in the UI.
+  tokens: {},
 };
 
 // ---------------- the timeline log --------------------------------------------
@@ -78,7 +81,7 @@ function record(at, kind, source, raw, disp, extra) {
 // Batch rule: flush on a 1 s timer OR at 200 pending events, whichever comes
 // first — throttle at capture, never one request per note.
 const FLUSH_MS = 1000, FLUSH_AT = 200, BATCH_MAX = 500;
-S.store = { sid: null, appended: 0, rejected: 0, total: 0, ended: false, deleted: null, errors: 0, flushing: false };
+S.store = { sid: null, token: null, appended: 0, rejected: 0, total: 0, ended: false, deleted: null, errors: 0, flushing: false };
 function store(e) {
   if (!S.store.sid || S.store.deleted) return;
   PEND.push(e);
@@ -89,17 +92,20 @@ const wire = (e) => ({
   ...(e.raw ? { raw: e.raw } : {}), ...(Number.isFinite(e.seq) ? { seq: e.seq } : {}),
   ...(e.payload ? { payload: e.payload } : {}),
 });
-async function flush() {
-  if (!S.store.sid || S.store.flushing || !PEND.length || S.store.deleted) return null;
-  S.store.flushing = true;
-  const batch = PEND.splice(0, BATCH_MAX);
-  try {
-    const r = await fetch(`${WORKER}/session/${S.store.sid}/events`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ instrument: S.selected, playerId: MYNAME, events: batch.map(wire) }),
+// THE DURABILITY BACKSTOP. A batch that cannot be POSTed is written to
+// IndexedDB and drained oldest-first when the network returns — selfrec's
+// proven buffer, so a tab killed during an outage loses at most the ≤1 s that
+// had not been batched yet, instead of the whole outage. Order matters: the DO
+// enforces a monotonic seq per (session, source), so an overtaking batch would
+// make the parked one a silent duplicate. See makeBackstop.
+const PBACK = makeBackstop({
+  name: 'instr-play-events', log,
+  send: async (item) => {
+    const r = await fetch(`${WORKER}/session/${item.sid}/events`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: item.body,
     });
     const jj = await r.json().catch(() => ({}));
-    if (r.status === 410) {                        // tombstoned while we buffered
+    if (r.status === 410) {                        // a tombstone is a FINAL answer
       S.store.deleted = jj.deletedBy || 'someone';
       PEND.length = 0;
       log('session store: deleted by', S.store.deleted, '— nothing more will be written');
@@ -108,18 +114,31 @@ async function flush() {
     if (!r.ok) throw new Error(r.status + ' ' + JSON.stringify(jj).slice(0, 120));
     S.store.appended += jj.appended; S.store.rejected += jj.rejected; S.store.total = jj.total;
     return jj;
-  } catch (e) {
-    PEND.unshift(...batch);                        // keep them; the next tick retries
-    S.store.errors++;
-    log('session store flush failed:', e.message);
-    return null;
+  },
+});
+async function flush() {
+  if (!S.store.sid || S.store.flushing || S.store.deleted) return null;
+  if (!PEND.length) { if (PBACK.pending()) await PBACK.drain(); return null; }
+  S.store.flushing = true;
+  const batch = PEND.splice(0, BATCH_MAX);
+  try {
+    const body = JSON.stringify({ instrument: S.selected, playerId: MYNAME, events: batch.map(wire) });
+    const r = await PBACK.offer({ sid: S.store.sid, body, bytes: body.length, count: batch.length,
+      label: `${batch.length} player events` });
+    if (r.parked) S.store.errors++;
+    if (!r.ok && !r.parked) { PEND.unshift(...batch); S.store.errors++; }   // backstop not open yet
+    return r.result || null;
   } finally { S.store.flushing = false; }
 }
 setInterval(() => { flush().catch(() => {}); }, FLUSH_MS);
 
 async function endStore(endAtUs) {
   if (!S.store.sid || S.store.deleted) return null;
+  // drain BOTH the memory tail and anything parked in IndexedDB before
+  // stamping the end — an outage that ran into the last second must not turn
+  // into a truncated session.
   for (let i = 0; i < 4 && PEND.length; i++) await flush();
+  if (PBACK.pending()) await PBACK.settle(20000).catch(() => null);
   const r = await fetch(`${WORKER}/session/${S.store.sid}/end`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ endedAt: Math.round(endAtUs) }),
@@ -133,10 +152,15 @@ async function endStore(endAtUs) {
 // Delete: the player's half of the consent story. It is a TOMBSTONE — the row
 // stays marked deleted, the event rows go, the audio prefix (if the owner
 // recorded any) is swept, and nothing can append to it afterwards.
-async function deleteSession(by = 'player', id = S.store.sid) {
+// The playerToken is what makes this MY delete rather than anyone-with-the-id's.
+// It was handed to this page alone on the accept frame; a session loaded by id
+// from someone else's link has no token here, and the delete is refused.
+async function deleteSession(by = 'player', id = S.store.sid, token) {
   if (!id) return { error: 'no session' };
+  const tok = token !== undefined ? token : (id === S.store.sid ? S.store.token : S.tokens[id]) || '';
   const r = await fetch(`${WORKER}/session/${id}/delete`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ by }),
+    method: 'POST', headers: { 'content-type': 'application/json', 'X-Session-Token': tok },
+    body: JSON.stringify({ by }),
   });
   const jj = await r.json().catch(() => ({}));
   if (r.ok && id === S.store.sid) { S.store.deleted = by; PEND.length = 0; }
@@ -361,6 +385,10 @@ function onFrame(m) {
     // the hub minted the session id and gave it to BOTH parties on this frame:
     // our notes and the owner's (optional) audio land under the same id
     S.store.sid = m.sid || null;
+    // …along with OUR half of the capability pair. The owner got a different
+    // token on their own copy of this frame; neither party sees the other's.
+    S.store.token = m.token || null;
+    if (S.store.sid && S.store.token) S.tokens[S.store.sid] = S.store.token;
     S.store.appended = 0; S.store.rejected = 0; S.store.total = 0;
     S.store.ended = false; S.store.deleted = null; S.store.errors = 0;
     if ($('b-del')) $('b-del').disabled = !S.store.sid;
@@ -486,46 +514,59 @@ async function loadSession(id) {
   if ($('b-replay-stored')) $('b-replay-stored').disabled = !lane.events.length;
   if ($('b-del-stored')) $('b-del-stored').disabled = false;
   S.loadedAudio = null;
-  if (jj.session.audioPrefix) await loadAudio(id).catch((e) => log('loadAudio failed', e.message));
+  // PREFER THE A/V SPAN. If the owner consented to video, the `av` lane holds
+  // one webm with both the instrument's sound and the panel the player was
+  // watching — that is the fuller record, so it wins. Audio-only is the
+  // fallback, not the default.
+  if (jj.session.avPrefix) await loadMedia(id, 'av').catch((e) => log('loadMedia av failed', e.message));
+  if (!S.loadedAudio && jj.session.audioPrefix) await loadMedia(id, 'audio').catch((e) => log('loadMedia audio failed', e.message));
   return { id, count: jj.count, master: lane.master, laneNotes: lane.events.length,
     playerNotes: jj.events.filter((e) => e.kind === 'midi').length, session: jj.session, audio: S.loadedAudio };
 }
 
 // The chunk sequence is ONE logical webm byte stream (only chunk 0 carries the
 // header) — exactly selfrec's shape — so a plain Blob concat in chunk order is
-// the whole "concatenation" step. No MSE needed for an opus-only webm.
-async function loadAudio(id) {
-  const list = await (await fetch(`${WORKER}/session/${id}/audio`, { cache: 'no-store' })).json();
+// the whole "concatenation" step. No MSE needed, for the opus-only webm OR for
+// the muxed vp8/h264+opus one: the same concat feeds a <video> element.
+async function loadMedia(id, lane = 'audio') {
+  const list = await (await fetch(`${WORKER}/session/${id}/${lane}`, { cache: 'no-store' })).json();
   const chunks = (list.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key))
     .sort((a, b) => a.key.localeCompare(b.key));
   if (!chunks.length) return null;
   const parts = [];
   for (const o of chunks) {
     const seq = +o.key.match(/chunk-(\d+)\.webm$/)[1];
-    parts.push(await (await fetch(`${WORKER}/session/${id}/audio/${seq}`)).blob());
+    parts.push(await (await fetch(`${WORKER}/session/${id}/${lane}/${seq}`)).blob());
   }
-  const blob = new Blob(parts, { type: 'audio/webm' });
-  const el = $('sessaudio');
+  const type = lane === 'av' ? 'video/webm' : 'audio/webm';
+  const blob = new Blob(parts, { type });
+  const el = mediaEl(lane);
   const url = URL.createObjectURL(blob);
-  S.loadedAudio = { chunks: chunks.length, bytes: blob.size, url, readyState: 0, duration: null };
+  S.loadedAudio = { lane, chunks: chunks.length, bytes: blob.size, url, readyState: 0,
+    duration: null, videoWidth: 0, videoHeight: 0 };
   if (el) {
+    // only one element visible at a time — whichever lane won
+    $('sessaudio').style.display = lane === 'audio' ? '' : 'none';
+    $('sessvideo').style.display = lane === 'av' ? '' : 'none';
     el.src = url;
-    el.style.display = '';
     await new Promise((res) => {
       const done = () => res();
       el.addEventListener('loadedmetadata', done, { once: true });
       el.addEventListener('error', done, { once: true });
-      setTimeout(done, 4000);
+      setTimeout(done, 5000);
     });
     S.loadedAudio.readyState = el.readyState;
     // MediaRecorder webm carries no duration in its header: a live-recorded
     // stream reads back as Infinity until it has been played through. That is
     // the format, not a broken file — readyState >= 1 is the real proof.
     S.loadedAudio.duration = Number.isFinite(el.duration) ? +el.duration.toFixed(2) : String(el.duration);
+    if (lane === 'av') { S.loadedAudio.videoWidth = el.videoWidth; S.loadedAudio.videoHeight = el.videoHeight; }
   }
-  log('audio loaded:', S.loadedAudio.chunks, 'chunks,', S.loadedAudio.bytes, 'bytes, readyState', S.loadedAudio.readyState);
+  log(lane, 'media loaded:', S.loadedAudio.chunks, 'chunks,', S.loadedAudio.bytes, 'bytes, readyState',
+    S.loadedAudio.readyState, lane === 'av' ? `${S.loadedAudio.videoWidth}x${S.loadedAudio.videoHeight}` : '');
   return S.loadedAudio;
 }
+const mediaEl = (lane) => $(lane === 'av' ? 'sessvideo' : 'sessaudio');
 
 // THE HOST CLOCK IS MASTER when replaying from storage.
 // The host's `midi-actuated` rows and the audio it recorded are stamped by the
@@ -545,17 +586,30 @@ async function replayStored(speed = 1) {
   if (!S.loaded) return { error: 'nothing loaded' };
   const lane = masterLane(S.loaded.events);
   const evs = lane.events.slice().sort((a, b) => a.at - b.at);
-  const el = $('sessaudio');
-  let audioOffsetS = null;
+  const mediaLane = S.loadedAudio ? S.loadedAudio.lane : null;
+  const el = mediaLane ? mediaEl(mediaLane) : null;
+  let audioOffsetS = null, advanced = null;
   if (el && S.loadedAudio && evs.length) {
-    // the media-span START marker is the audio's t=0, in the same clock as the
-    // master lane — so the offset into the file is a subtraction, not a guess
-    const span = S.loaded.events.find((e) => e.kind === 'media-span' && e.payload && e.payload.phase === 'start');
+    // the media-span START marker for THIS lane is the file's t=0, in the same
+    // clock as the master lane — so the offset into it is a subtraction, not a
+    // guess. `payload.kind` is what tells the two lanes' spans apart.
+    const spans = S.loaded.events.filter((e) => e.kind === 'media-span' && e.payload && e.payload.phase === 'start');
+    const span = spans.find((e) => (e.payload.kind || 'audio') === mediaLane) || spans[0];
     audioOffsetS = span ? Math.max(0, (evs[0].at - span.at) / 1e6) : 0;
-    try { el.currentTime = audioOffsetS; await el.play(); } catch (e) { log('audio play', e.message); }
+    try {
+      el.currentTime = audioOffsetS;
+      await el.play();
+      const t0 = el.currentTime;
+      await new Promise((r) => setTimeout(r, 700));
+      advanced = +(el.currentTime - t0).toFixed(3);      // proof it is PLAYING
+    } catch (e) { log('media play', e.message); }
   }
   const r = await replayEvents(evs, speed, 'storage');
-  return { ...r, master: lane.master, lane: lane.name, audioOffsetS, audio: S.loadedAudio ? S.loadedAudio.bytes : 0 };
+  return { ...r, master: lane.master, lane: lane.name, audioOffsetS,
+    mediaLane, advanced,
+    videoWidth: S.loadedAudio ? S.loadedAudio.videoWidth : 0,
+    videoHeight: S.loadedAudio ? S.loadedAudio.videoHeight : 0,
+    audio: S.loadedAudio ? S.loadedAudio.bytes : 0 };
 }
 
 // ---------------- feed / HUD ---------------------------------------------------
@@ -616,8 +670,11 @@ async function autoPlay(n = 64, gapMs = 220, holdMs = 90) {
 window.player = {
   refresh, select, requestSession, autoPlay, replay, download,
   sessionJsonl,
-  flush, endStore, deleteSession, loadSession, replayStored,
+  flush, endStore, deleteSession, loadSession, replayStored, loadMedia,
   sid: () => S.store.sid,
+  token: (id) => (id ? S.tokens[id] : S.store.token) || null,
+  backstop: () => PBACK.stats(),
+  settle: (ms) => PBACK.settle(ms),
   end: () => { if (S.sig) S.sig.send({ type: 'end' }); endLocal('driver ended'); },
   state: () => ({
     selected: S.selected, session: !!S.session, rejected: S.rejected || null,
@@ -626,15 +683,20 @@ window.player = {
     replayFired: S.replayFired, logged: LOG.length,
     oneWayMidiMs: dist(S.ow), keyToEarMs: dist(S.ear),
     audioSpan: S.audioSpan, clock: clock.info(), catalog: S.catalog.length, errors,
-    store: { ...S.store, pending: PEND.length },
+    store: { ...S.store, token: S.store.token ? 'held' : null, pending: PEND.length, backstop: PBACK.stats() },
+    // what the page BELIEVES it logged, for the "zero events lost" comparison
+    loggedMidi: LOG.filter((e) => e.kind === 'midi').length,
     loaded: S.loaded ? { id: S.loaded.session.id, count: S.loaded.count, session: S.loaded.session } : null,
-    loadedAudio: S.loadedAudio ? { chunks: S.loadedAudio.chunks, bytes: S.loadedAudio.bytes, readyState: S.loadedAudio.readyState, duration: S.loadedAudio.duration } : null,
+    loadedAudio: S.loadedAudio ? { lane: S.loadedAudio.lane, chunks: S.loadedAudio.chunks, bytes: S.loadedAudio.bytes,
+      readyState: S.loadedAudio.readyState, duration: S.loadedAudio.duration,
+      videoWidth: S.loadedAudio.videoWidth, videoHeight: S.loadedAudio.videoHeight } : null,
   }),
   log: () => LOG,
 };
 
 // ---------------- go -----------------------------------------------------------
 await clock.calibrate(CLOCK, WORKER);
+await PBACK.open().catch((e) => log('event backstop unavailable:', e.message));
 await initMidiIn();
 if (ac.state === 'suspended') await ac.resume();
 await refresh();

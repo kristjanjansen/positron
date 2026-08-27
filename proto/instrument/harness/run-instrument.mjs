@@ -98,12 +98,13 @@ async function main() {
   // targets are not supported in headless mode") — the other two tabs are
   // opened afterwards through the DevTools /json/new endpoint, same browser.
   const common = `clock=local&ice=none`;
-  // rec=1 turns the OWNER's audio-recording consent on for this run. The page
-  // default is OFF and is never persisted; the second session below turns it
-  // back off and proves the absence.
+  // rec=av arms the OWNER's consent at its widest rung (audio + panel video)
+  // for the first session. The page default is OFF and is never persisted; the
+  // sessions below step it down to audio and then to off, which is the consent
+  // matrix.
   spawnLogged(CHROME, [
     ...flags,
-    `${BASE}/host.html?${common}&instrument=${INST}&name=${encodeURIComponent('Verification DIMI')}&auto=1&rec=1`,
+    `${BASE}/host.html?${common}&instrument=${INST}&name=${encodeURIComponent('Verification DIMI')}&auto=1&rec=av`,
   ], 'chrome');
 
   cdpH = await new CDP().connect(DBG, 'host.html');
@@ -115,6 +116,9 @@ async function main() {
   await cdpP.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: DL }).catch((e) => console.log('dl behavior:', e.message));
   await cdpH.send('Browser.grantPermissions', { origin: BASE, permissions: ['audioCapture', 'videoCapture', 'midi'] })
     .catch((e) => console.log('grantPermissions:', e.message));
+  // Network domain on both pages: the durability test cuts the wire with
+  // Network.emulateNetworkConditions({offline:true}) mid-session.
+  for (const c of [cdpH, cdpP, cdpB]) await c.send('Network.enable').catch((e) => console.log('Network.enable:', e.message));
 
   await waitFor(cdpH, 'window.hostReady === true', 'hostReady');
   await waitFor(cdpP, 'window.playerReady === true', 'playerReady(alice)');
@@ -266,7 +270,7 @@ async function main() {
   const audioChunks = (audio.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key));
   check('audio manifest + chunks present in R2 when consent is ON',
     !!stored.session.audioPrefix && audioChunks.length > 0 && audio.objects.some((o) => o.key.endsWith('manifest.json')) && hstore.rec.finalized,
-    { audioPrefix: stored.session.audioPrefix, chunks: audioChunks.length, bytes: audio.bytes, verified: hstore.rec.verified, mime: hstore.rec.mime });
+    { audioPrefix: stored.session.audioPrefix, chunks: audioChunks.length, bytes: audio.bytes, verified: hstore.rec.audio.verified, mime: hstore.rec.audio.mime });
   check('media-span start AND end markers are on the log (media by reference)',
     sSpans.some((e) => e.payload && e.payload.phase === 'start' && e.payload.mediaRef)
     && sSpans.some((e) => e.payload && e.payload.phase === 'end' && Number.isFinite(e.payload.durUs)),
@@ -286,93 +290,257 @@ async function main() {
   check('storage replay drives off the HOST lane and pulls the audio with it',
     rep2.master === 'host' && rep2.audio > 0 && rep2.audioOffsetS !== null,
     { master: rep2.master, audioBytes: rep2.audio, audioOffsetS: rep2.audioOffsetS, lane: rep2.lane });
-  check('the concatenated R2 chunks decode as one audio stream',
+  check('the concatenated R2 chunks decode as one media stream',
     loaded.audio && loaded.audio.readyState >= 1 && loaded.audio.bytes > 0,
     loaded.audio);
 
-  // ---- a SECOND session with consent OFF: nothing is recorded ----
-  await cdpH.eval('window.host.setConsent(false)');
+  // ==========================================================================
+  // 8c. VIDEO CAPTURE — the panel/camera the player actually saw, recorded in
+  //     ONE MediaRecorder alongside the audio, as its own lane with its own
+  //     media-span. Consent for this run was 'audio+video', so BOTH lanes ran.
+  // ==========================================================================
+  const av = await (await fetch(`${WK}/session/${SID}/av`)).json();
+  const avChunks = (av.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key));
+  const avSpans = sSpans.filter((e) => e.payload && e.payload.kind === 'av');
+  const audSpans = sSpans.filter((e) => e.payload && (e.payload.kind || 'audio') === 'audio');
+  const avRec = hstore.rec.av;
+  console.log('A/V lane:', q({ mime: avRec.mime, chunks: avChunks.length, bytes: av.bytes, probe: avRec.probe }));
+  check('A/V recorded: one webm carrying BOTH tracks, chunked into R2 under instrument/<sid>/av/',
+    !!stored.session.avPrefix && avChunks.length > 0 && av.objects.some((o) => o.key.endsWith('manifest.json'))
+      && avRec.finalized && /video\/webm/.test(avRec.mime || '') && /opus/.test(avRec.mime || ''),
+    { avPrefix: stored.session.avPrefix, chunks: avChunks.length, bytes: av.bytes,
+      mime: avRec.mime, verified: avRec.verified, degraded: avRec.degraded });
+  check('the A/V span is a SECOND media-span, distinguishable from the audio-only one by `kind`',
+    avSpans.length === 2 && audSpans.length === 2
+      && avSpans.every((e) => e.payload.mediaRef ? /\/av\/$/.test(e.payload.mediaRef.prefix) : true)
+      && avSpans.some((e) => e.payload.phase === 'start' && e.payload.mediaRef
+        && (e.payload.mediaRef.tracks || []).includes('video')),
+    { avSpans: avSpans.map((e) => e.payload.phase), audioSpans: audSpans.map((e) => e.payload.phase),
+      avRef: (avSpans.find((e) => e.payload.phase === 'start') || {}).payload });
+  check('replay PREFERS the A/V span: a <video> element with real dimensions, and time advances',
+    rep2.mediaLane === 'av' && rep2.videoWidth > 0 && rep2.videoHeight > 0 && rep2.advanced > 0,
+    { mediaLane: rep2.mediaLane, w: rep2.videoWidth, h: rep2.videoHeight,
+      currentTimeAdvancedS: rep2.advanced, offsetS: rep2.audioOffsetS });
+
+  // ==========================================================================
+  // 8d. CONSENT MATRIX — audio+video (above), then audio, then off.
+  // ==========================================================================
+  await cdpH.eval('window.host.setConsent("audio")');
   await cdpB.eval(`window.player.select(${q(INST)}); window.player.requestSession()`);
   await waitFor(cdpB, 'window.player.state().ch === "open"', 'bob midi channel open', 60);
-  await cdpB.eval('window.player.autoPlay(4, 200, 80)');
+  await cdpB.eval('window.player.autoPlay(6, 200, 80)');
   const SID2 = await cdpB.eval('window.player.sid()');
+  const TOK2 = await cdpB.eval('window.player.token()');
   await cdpB.eval('window.player.end()');
-  await sleep(2500);
+  for (let i = 0; i < 30; i++) {
+    if ((await cdpH.eval('window.host.state()')).rec.state === 'done') break;
+    await sleep(500);
+  }
   const stored2 = await (await fetch(`${WK}/session/${SID2}?limit=5000`)).json();
   const audio2 = await (await fetch(`${WK}/session/${SID2}/audio`)).json();
-  console.log('session 2 (consent OFF):', SID2, q(stored2.lanes), 'audio objects', audio2.count);
-  check('consent OFF: notes still stored, NO audio prefix and NO R2 objects',
-    stored2.total > 0 && !stored2.session.audioPrefix && audio2.count === 0,
-    { id: SID2, rows: stored2.total, audioPrefix: stored2.session.audioPrefix, audioObjects: audio2.count });
+  const av2 = await (await fetch(`${WK}/session/${SID2}/av`)).json();
+  console.log('session 2 (consent audio):', SID2, 'audio', audio2.count, 'av', av2.count);
+  check('consent AUDIO: the audio lane records, the A/V lane does NOT',
+    !!stored2.session.audioPrefix && audio2.count > 0 && !stored2.session.avPrefix && av2.count === 0
+      && stored2.events.filter((e) => e.kind === 'media-span' && e.payload && e.payload.kind === 'av').length === 0,
+    { id: SID2, audioObjects: audio2.count, avObjects: av2.count, avPrefix: stored2.session.avPrefix });
   check('a second, separate session id was minted for the second player',
     SID2 && SID2 !== SID, { first: SID, second: SID2 });
 
-  // ---- delete by PLAYER: rows go, R2 goes, nothing can re-append ----
-  // done on a purpose-built session (with one audio object) so the real one
-  // above survives as the kept proof.
-  const SID3 = 'verifydel-' + Math.random().toString(36).slice(2, 8);
-  await fetch(`${WK}/session/${SID3}/events`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ instrument: INST, playerId: 'alice', events: [
-      { seq: 0, at: 1_000_000, kind: 'midi', source: 'player', raw: [144, 60, 100], display: 'C4 on' },
-      { seq: 1, at: 1_200_000, kind: 'midi', source: 'player', raw: [128, 60, 0], display: 'C4 off' },
-    ] }),
-  });
-  await fetch(`${WK}/session/${SID3}/audio/0`, {
-    method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN, 'content-type': 'audio/webm' },
-    body: new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4]),
-  });
-  const beforeDel = await (await fetch(`${WK}/session/${SID3}`)).json();
-  const delR = await fetch(`${WK}/session/${SID3}/delete`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ by: 'player' }),
-  });
-  const delJ = await delR.json();
-  const afterR = await fetch(`${WK}/session/${SID3}`);
+  await cdpH.eval('window.host.setConsent("off")');
+  await cdpB.eval('window.player.requestSession()');
+  await waitFor(cdpB, 'window.player.state().ch === "open"', 'bob midi channel open (3)', 60);
+  await cdpB.eval('window.player.autoPlay(4, 200, 80)');
+  const SID3 = await cdpB.eval('window.player.sid()');
+  await cdpB.eval('window.player.end()');
+  await sleep(2500);
+  const stored3 = await (await fetch(`${WK}/session/${SID3}?limit=5000`)).json();
+  const audio3 = await (await fetch(`${WK}/session/${SID3}/audio`)).json();
+  const av3 = await (await fetch(`${WK}/session/${SID3}/av`)).json();
+  console.log('session 3 (consent OFF):', SID3, q(stored3.lanes), 'audio', audio3.count, 'av', av3.count);
+  check('consent OFF: notes still stored, NO prefixes and NO R2 objects in either lane',
+    stored3.total > 0 && !stored3.session.audioPrefix && !stored3.session.avPrefix
+      && audio3.count === 0 && av3.count === 0
+      && stored3.events.filter((e) => e.kind === 'media-span').length === 0,
+    { id: SID3, rows: stored3.total, audioObjects: audio3.count, avObjects: av3.count });
+
+  // ==========================================================================
+  // 8e. ACCESS CONTROL — per-session capability tokens (see DEPLOYED.md).
+  //     Right token passes, wrong/absent token is refused, on the three routes
+  //     that carry a capability: player-delete, owner-delete, media upload.
+  //     And a tombstone still beats a perfectly valid token.
+  // ==========================================================================
+  const OTOK3 = await cdpH.eval('window.host.token()');           // owner's, session 3
+  const WRONG = '0'.repeat(32);
+  const post = (u, h, b) => fetch(u, { method: 'POST', headers: { 'content-type': 'application/json', ...h }, body: b });
+
+  // (a) media upload: no token / wrong token refused, ownerToken accepted
+  const upNone = await post(`${WK}/session/${SID3}/av/0`, {}, new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2]));
+  const upWrong = await post(`${WK}/session/${SID3}/av/0`, { 'X-Session-Token': WRONG }, new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2]));
+  const upRight = await post(`${WK}/session/${SID3}/av/0`, { 'X-Session-Token': OTOK3 }, new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2]));
+  const upBearer = await post(`${WK}/session/${SID3}/av/0`, { Authorization: 'Bearer ' + TOKEN }, new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2]));
+  check('media upload: absent 403 · wrong token 403 · ownerToken 200 · INSTRUMENT_TOKEN still 200',
+    upNone.status === 403 && upWrong.status === 403 && upRight.status === 200 && upBearer.status === 200,
+    { absent: upNone.status, wrong: upWrong.status, ownerToken: upRight.status, instrumentToken: upBearer.status });
+
+  // (b) player delete: the id alone is NO LONGER enough
+  const pdNone = await post(`${WK}/session/${SID2}/delete`, {}, q({ by: 'player' }));
+  const pdWrong = await post(`${WK}/session/${SID2}/delete`, { 'X-Session-Token': WRONG }, q({ by: 'player' }));
+  const before2 = await (await fetch(`${WK}/session/${SID2}`)).json();
+  const pdRight = await post(`${WK}/session/${SID2}/delete`, { 'X-Session-Token': TOK2 }, q({ by: 'player' }));
+  const pdJ = await pdRight.json();
+  const afterR = await fetch(`${WK}/session/${SID2}`);
   const afterJ = await afterR.json();
-  const reapp = await fetch(`${WK}/session/${SID3}/events`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ events: [{ seq: 9, at: 9_000_000, kind: 'midi', source: 'player', raw: [144, 62, 90], display: 'D4' }] }),
-  });
-  const delAudio = await (await fetch(`${WK}/session/${SID3}/audio`)).status;
-  check('delete by PLAYER drops the event rows and purges the R2 audio',
-    delR.ok && delJ.eventsDropped === beforeDel.total && delJ.audioObjectsPurged >= 1,
-    { before: beforeDel.total, dropped: delJ.eventsDropped, purged: delJ.audioObjectsPurged });
+  const reapp = await post(`${WK}/session/${SID2}/events`, {},
+    q({ events: [{ seq: 9999, at: 9_000_000, kind: 'midi', source: 'player', raw: [144, 62, 90], display: 'D4' }] }));
+  check('player delete: absent 403 · wrong token 403 · this session\'s playerToken 200',
+    pdNone.status === 403 && pdWrong.status === 403 && pdRight.status === 200,
+    { absent: pdNone.status, wrong: pdWrong.status, right: pdRight.status });
+  check('delete by PLAYER drops the event rows and purges the R2 media',
+    pdJ.eventsDropped === before2.total && pdJ.audioObjectsPurged >= 1,
+    { before: before2.total, dropped: pdJ.eventsDropped, purged: pdJ.audioObjectsPurged });
   check('a deleted session reads as a TOMBSTONE, not as data',
     afterR.status === 410 && afterJ.tombstone === true && afterJ.deletedBy === 'player' && !afterJ.events,
-    { status: afterR.status, body: afterJ });
+    { status: afterR.status, body: { deletedBy: afterJ.deletedBy, tombstone: afterJ.tombstone } });
   check('a deleted session cannot be resurrected by a later append',
     reapp.status === 410, { status: reapp.status });
 
-  // ---- delete by OWNER: needs the token, and the token is the whole claim ----
-  const ownerNoTok = await fetch(`${WK}/session/${SID2}/delete`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ by: 'owner' }),
-  });
-  const ownerDel = await cdpH.eval(`window.host.deleteSession(${q(SID2)})`);
-  const after2 = await fetch(`${WK}/session/${SID2}`);
-  check('owner delete refuses without INSTRUMENT_TOKEN, works with it',
-    ownerNoTok.status === 403 && ownerDel.ok === true && ownerDel.deletedBy === 'owner' && after2.status === 410,
-    { tokenless: ownerNoTok.status, withToken: ownerDel, readAfter: after2.status });
+  // (c) owner delete: ownerToken alone works, tokenless does not — and
+  //     INSTRUMENT_TOKEN still works, because owning the hardware is a claim
+  //     over every session on it.
+  const odNone = await post(`${WK}/session/${SID3}/delete`, {}, q({ by: 'owner' }));
+  const odWrong = await post(`${WK}/session/${SID3}/delete`, { 'X-Session-Token': WRONG }, q({ by: 'owner' }));
+  const odRight = await post(`${WK}/session/${SID3}/delete`, { 'X-Session-Token': OTOK3 }, q({ by: 'owner' }));
+  const odJ = await odRight.json();
+  check('owner delete: absent 403 · wrong token 403 · this session\'s ownerToken 200 (no INSTRUMENT_TOKEN needed)',
+    odNone.status === 403 && odWrong.status === 403 && odRight.status === 200 && odJ.deletedBy === 'owner',
+    { absent: odNone.status, wrong: odWrong.status, right: odRight.status, body: odJ });
+  // (d) the tombstone outranks the capability
+  const tombUp = await post(`${WK}/session/${SID3}/av/1`, { 'X-Session-Token': OTOK3 }, new Uint8Array([1, 2, 3, 4]));
+  const tombDel = await post(`${WK}/session/${SID3}/delete`, { 'X-Session-Token': OTOK3 }, q({ by: 'owner' }));
+  const tombRead = await fetch(`${WK}/session/${SID3}`);
+  check('the TOMBSTONE still wins over a perfectly valid token',
+    tombUp.status === 410 && tombRead.status === 410 && (await tombDel.json()).already === true,
+    { uploadWithValidToken: tombUp.status, read: tombRead.status });
+  check('tokens are never echoed back by a read — only the fact that they exist',
+    afterJ.playerToken === undefined && afterJ.ownerToken === undefined
+      && stored.session.playerToken === undefined && stored.session.guarded === true,
+    { guarded: stored.session.guarded });
+
+  // ==========================================================================
+  // 8f. DURABILITY — cut the wire mid-session with CDP for ~15 s. Nothing that
+  //     was logged or recorded may be lost: the IndexedDB backstop parks it and
+  //     drains it oldest-first on reconnect.
+  // ==========================================================================
+  const OFFLINE_MS = 15000;
+  await cdpH.eval('window.host.setConsent("audio+video")');
+  if (!(await cdpH.eval('window.host.state()')).online) { await cdpH.eval('window.host.goOnline()'); await sleep(800); }
+  // both counters are cumulative over the page's life — snapshot them so the
+  // "nothing lost" comparison is about THIS session only
+  const actBefore = (await cdpH.eval('window.host.state()')).actuated;
+  const loggedBefore = (await cdpP.eval('window.player.state()')).loggedMidi;
+  await cdpP.eval(`window.player.select(${q(INST)}); window.player.requestSession()`);
+  await waitFor(cdpP, 'window.player.state().ch === "open"', 'alice midi channel open (offline run)', 60);
+  const SID4 = await cdpP.eval('window.player.sid()');
+  console.log('durability session', SID4, '— playing, then cutting the network for', OFFLINE_MS, 'ms');
+  await cdpP.eval('window.__auto = window.player.autoPlay(40, 220, 90)', { awaitPromise: false });
+  await waitFor(cdpP, 'window.player.state().sent >= 20', 'first notes sent', 40);
+  await sleep(3000);                                    // let a media chunk or two land first
+  const offAt = Date.now();
+  for (const c of [cdpH, cdpP]) {
+    await c.send('Network.emulateNetworkConditions',
+      { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 }).catch((e) => console.log('offline:', e.message));
+  }
+  await sleep(OFFLINE_MS);
+  for (const c of [cdpH, cdpP]) {
+    await c.send('Network.emulateNetworkConditions',
+      { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 }).catch((e) => console.log('online:', e.message));
+  }
+  const onAt = Date.now();
+  console.log('network restored after', onAt - offAt, 'ms');
+  await cdpP.eval('window.__auto').catch(() => null);   // the play loop finishes
+  await cdpP.eval('window.player.end()').catch(() => null);
+  await cdpH.eval('window.host.stopRec("durability run")').catch(() => null);
+  for (let i = 0; i < 90; i++) {
+    const ps4 = await cdpP.eval('window.player.state()');
+    const hs4 = await cdpH.eval('window.host.state()');
+    if (!ps4.store.pending && !ps4.store.backstop.items && !hs4.hostLog.pending
+        && !hs4.hostLog.backstop.items && hs4.rec.state === 'done') break;
+    await cdpP.eval('window.player.flush()').catch(() => {});
+    await sleep(500);
+  }
+  const ps4 = await cdpP.eval('window.player.state()');
+  const hs4 = await cdpH.eval('window.host.state()');
+  const bks = await cdpH.eval('window.host.backstops()');
+  const stored4 = await (await fetch(`${WK}/session/${SID4}?limit=20000`)).json();
+  const s4player = stored4.events.filter((e) => e.kind === 'midi' && e.source === 'player').length;
+  const s4host = stored4.events.filter((e) => e.kind === 'midi-actuated').length;
+  const audio4 = await (await fetch(`${WK}/session/${SID4}/audio`)).json();
+  const av4 = await (await fetch(`${WK}/session/${SID4}/av`)).json();
+  const a4c = (audio4.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key)).length;
+  const v4c = (av4.objects || []).filter((o) => /chunk-\d+\.webm$/.test(o.key)).length;
+  const playerLogged = ps4.loggedMidi - loggedBefore;
+  const hostActuated = hs4.actuated - actBefore;
+  const OFFLINE = {
+    sessionId: SID4, offlineMs: onAt - offAt,
+    events: { playerLogged, playerStored: s4player, hostActuated, hostStored: s4host },
+    chunks: { audioProduced: hs4.rec.audio.chunks, audioInR2: a4c, avProduced: hs4.rec.av.chunks, avInR2: v4c,
+      audioDegraded: hs4.rec.audio.degraded, avDegraded: hs4.rec.av.degraded,
+      audioMissing: hs4.rec.audio.missing, avMissing: hs4.rec.av.missing },
+    backstops: {
+      playerEvents: ps4.store.backstop, hostEvents: bks.events, hostAudio: bks.audio, hostAv: bks.av,
+    },
+  };
+  console.log('OFFLINE WINDOW:', JSON.stringify(OFFLINE, null, 2));
+  check('offline window: ZERO player events lost — everything logged reached the DO',
+    playerLogged > 0 && s4player === playerLogged,
+    { logged: playerLogged, stored: s4player, parked: ps4.store.backstop.parked, drained: ps4.store.backstop.sentDrained });
+  check('offline window: ZERO host-lane events lost — the instrument lane is whole too',
+    s4host > 0 && s4host === hostActuated,
+    { actuated: hostActuated, stored: s4host, parked: bks.events.parked, drained: bks.events.sentDrained });
+  check('offline window: ZERO media chunks lost, on BOTH lanes, nothing degraded',
+    hs4.rec.audio.chunks > 0 && a4c === hs4.rec.audio.chunks && !hs4.rec.audio.degraded
+      && hs4.rec.av.chunks > 0 && v4c === hs4.rec.av.chunks && !hs4.rec.av.degraded,
+    OFFLINE.chunks);
+  check('the IndexedDB backstop actually took the load (parked > 0) and drained it',
+    (ps4.store.backstop.parked + bks.events.parked + bks.audio.parked + bks.av.parked) > 0
+      && ps4.store.backstop.items === 0 && bks.events.items === 0 && bks.audio.items === 0 && bks.av.items === 0,
+    { parked: { player: ps4.store.backstop.parked, hostEvents: bks.events.parked, audio: bks.audio.parked, av: bks.av.parked },
+      drainMs: { player: ps4.store.backstop.drainMs, hostEvents: bks.events.drainMs, audio: bks.audio.drainMs, av: bks.av.drainMs },
+      hwm: { playerBytes: ps4.store.backstop.hwmBytes, audioBytes: bks.audio.hwmBytes, avBytes: bks.av.hwmBytes } });
+
+  // reclaim the durability run's R2 bytes: the first session is the kept proof
+  const cleanup4 = await cdpH.eval(`window.host.deleteSession(${q(SID4)})`).catch(() => null);
+  console.log('durability session purged:', q(cleanup4));
 
   // ---- the catalog-level view ----
   const slist = await (await fetch(`${WK}/sessions?instrument=${INST}`)).json();
   check('GET /sessions lists this instrument\'s sessions, tombstones included',
     slist.count >= 2 && slist.sessions.some((s) => s.id === SID && !s.deletedAt)
-      && slist.sessions.some((s) => s.id === SID2 && s.deletedBy === 'owner'),
+      && slist.sessions.some((s) => s.id === SID3 && s.deletedBy === 'owner'),
     { count: slist.count, ids: slist.sessions.map((s) => s.id) });
   check('the session store is pinned to the EU jurisdiction',
     slist.jurisdiction === 'eu' && slist.euPinned === true,
     { jurisdiction: slist.jurisdiction, euPinned: slist.euPinned, euId: slist.euId, unpinnedId: slist.unpinnedId });
 
   const STORAGE = {
-    sessionId: SID, secondSessionId: SID2, deletedProbeId: SID3,
+    sessionId: SID, consentAudioId: SID2, consentOffId: SID3, durabilityId: SID4,
     playerLaneRows: sPlayerMidi.length, hostLaneRows: sHostMidi.length,
     storedTotalRows: stored.total, lanes: stored.lanes,
     endedAt: stored.session.endedAt,
     pairedOneWayMs: { n: paired.length, p50: pairedP50 },
     audio: { prefix: stored.session.audioPrefix, chunks: audioChunks.length, bytes: audio.bytes,
-      mime: hstore.rec.mime, verified: hstore.rec.verified, manifest: hstore.rec.manifestKey },
+      mime: hstore.rec.audio.mime, verified: hstore.rec.audio.verified, manifest: hstore.rec.audio.manifestKey },
+    avLane: { prefix: stored.session.avPrefix, chunks: avChunks.length, bytes: av.bytes,
+      mime: avRec.mime, codecProbe: avRec.probe, verified: avRec.verified, manifest: avRec.manifestKey,
+      spans: avSpans.map((e) => e.payload.phase) },
     replayFromStorage: rep2,
-    consentOff: { id: SID2, rows: stored2.total, audioObjects: audio2.count },
+    consentMatrix: {
+      'audio+video': { id: SID, audio: audioChunks.length, av: avChunks.length },
+      audio: { id: SID2, audio: audio2.count, av: av2.count },
+      off: { id: SID3, rows: stored3.total, audio: audio3.count, av: av3.count },
+    },
+    offlineWindow: OFFLINE,
     euJurisdiction: { pinned: slist.euPinned, euId: slist.euId, unpinnedId: slist.unpinnedId },
   };
 
