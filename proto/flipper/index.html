@@ -1,0 +1,217 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>flipper — ERR remix station</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0a0a0c; color: #ddd; font: 13px/1.4 ui-monospace, monospace; }
+  #stage { display: grid; grid-template-columns: 3fr 1fr; gap: 8px; padding: 8px; height: calc(100vh - 120px); box-sizing: border-box; }
+  #featuredWrap { position: relative; background: #000; }
+  #tiles { display: grid; grid-template-rows: repeat(3, 1fr); gap: 8px; }
+  .tile { position: relative; background: #000; cursor: pointer; }
+  video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+  .tile.featured { outline: 2px solid #e33; }
+  .tile.audiosrc::after { content: "AUDIO"; position: absolute; top: 4px; right: 4px; color: #3e3; font-size: 10px; }
+  .label { position: absolute; top: 4px; left: 6px; color: #fff; text-shadow: 0 0 4px #000; z-index: 2; }
+  .fc { position: absolute; bottom: 4px; right: 6px; color: #9ab; text-shadow: 0 0 4px #000; z-index: 2; font-size: 11px; }
+  #hud { padding: 6px 10px; display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; }
+  #hud b { color: #fff; } .big { font-size: 18px; color: #ffd479 !important; }
+  #help { padding: 2px 10px 8px; color: #778; }
+  kbd { background: #223; padding: 0 4px; border-radius: 3px; color: #cde; }
+</style>
+
+<div id="stage">
+  <div id="featuredWrap" class="tile featured"><span class="label" id="featLabel"></span><span class="fc" id="featFc"></span></div>
+  <div id="tiles"></div>
+</div>
+<div id="hud">
+  <span>flip <b class="big" id="flipMs">–</b> ms <span id="flipStats"></span></span>
+  <span>audio <b id="audioSrc">featured</b> <span id="nowPlaying"></span></span>
+  <span>clock (PDT) <b id="pdtClock">–</b></span>
+  <span>DVR <b id="dvrPos">live</b></span>
+  <span>downlink ≈ <b id="downlink">–</b> Mbps</span>
+  <span id="stutterLed"></span>
+</div>
+<div id="help">
+  <kbd>1–3</kbd> flip channel · <kbd>Q</kbd> audio=featured · <kbd>A/S/D</kbd> audio=ETV/ETV2/ETV+ ·
+  <kbd>V/R/K/F/T</kbd> radio audio (Viker/R2/Klassika/R4/Tallinn) ·
+  <kbd>←/→</kbd> hold = scrub DVR (2 h) · <kbd>L</kbd> live edge · <kbd>X</kbd> hold = 2 s stutter
+</div>
+
+<script src="hls.min.js"></script>
+<script>
+'use strict';
+// --- config ---------------------------------------------------------------
+const TV = [
+  { key: '1', id: 'etv',      name: 'ETV',  url: 'https://live.err.ee/live/etv.m3u8' },
+  { key: '2', id: 'etv2',     name: 'ETV2', url: 'https://live.err.ee/live/etv2.m3u8' },
+  { key: '3', id: 'etvpluss', name: 'ETV+', url: 'https://live.err.ee/live/etvpluss.m3u8' },
+];
+const RADIO = {
+  v: { mount: 'vikerraadio.mp3',   name: 'Vikerraadio' },
+  r: { mount: 'raadio2.mp3',       name: 'Raadio 2' },
+  k: { mount: 'klassikaraadio.mp3',name: 'Klassikaraadio' },
+  f: { mount: 'raadio4.mp3',       name: 'Raadio 4' },
+  t: { mount: 'raadiotallinn.mp3', name: 'Raadio Tallinn' },
+};
+const $ = (id) => document.getElementById(id);
+
+// --- tiles ----------------------------------------------------------------
+// All 3 tiles stay attached (downlink at level-0 cap ≈ 0.7 Mbps each — cheap).
+// Featured tile gets the ABR ladder up to 720p; background tiles pinned to level 0.
+const tiles = TV.map((ch, i) => {
+  const el = document.createElement('video');
+  el.muted = true; el.autoplay = true; el.playsInline = true;
+  const hls = new Hls({ maxBufferLength: 12, backBufferLength: 4, liveSyncDurationCount: 3 });
+  hls.loadSource(ch.url);
+  hls.attachMedia(el);
+  hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal) log(`hls fatal ${ch.id}: ${d.type}/${d.details}`); errors.push(`${ch.id}:${d.details}`); });
+  const t = { ...ch, el, hls, frames: 0, lastFrameAt: 0 };
+  const count = (_now, meta) => { t.frames = meta.presentedFrames; t.lastFrameAt = performance.now(); el.requestVideoFrameCallback(count); };
+  el.requestVideoFrameCallback(count);
+  return t;
+});
+const errors = [];
+const log = (m) => console.log('[flipper]', m);
+
+// --- layout ---------------------------------------------------------------
+let featured = 0;
+const tilesBox = $('tiles');
+function layout() {
+  const fw = $('featuredWrap');
+  tiles.forEach((t, i) => {
+    const isFeat = i === featured;
+    if (isFeat) { fw.appendChild(t.el); $('featLabel').textContent = `${t.name} (${t.key})`; }
+    else {
+      let slot = tilesBox.querySelector(`[data-i="${i}"]`);
+      if (!slot) {
+        slot = document.createElement('div'); slot.className = 'tile'; slot.dataset.i = i;
+        slot.innerHTML = `<span class="label">${t.name} (${t.key})</span><span class="fc"></span>`;
+        slot.addEventListener('click', () => flip(i));
+        tilesBox.appendChild(slot);
+      }
+      slot.insertBefore(t.el, slot.querySelector('.fc'));
+    }
+    // ABR policy: featured up to 720p (level 2), tiles pinned to 180p (level 0)
+    t.hls.autoLevelCapping = isFeat ? 2 : 0;
+  });
+  [...tilesBox.children].sort((a, b) => a.dataset.i - b.dataset.i).forEach((n) => tilesBox.appendChild(n));
+  tilesBox.querySelectorAll('.tile').forEach((n) => n.style.display = n.dataset.i == featured ? 'none' : '');
+  applyAudio();
+}
+
+// --- FLIP + measurement ---------------------------------------------------
+const flipTimes = [];
+function flip(i, keydownTs) {
+  if (i === featured || !tiles[i]) return;
+  const t0 = keydownTs ?? performance.now();
+  featured = i; layout();
+  tiles[i].el.requestVideoFrameCallback(() => {
+    const ms = performance.now() - t0;
+    flipTimes.push(ms);
+    $('flipMs').textContent = ms.toFixed(0);
+    const s = [...flipTimes].sort((a, b) => a - b);
+    $('flipStats').textContent = `(n=${s.length} med=${s[(s.length / 2) | 0].toFixed(0)} max=${s[s.length - 1].toFixed(0)})`;
+  });
+}
+
+// --- SPLIT A/V ------------------------------------------------------------
+let audioMode = { type: 'featured' }; // {type:'featured'} | {type:'tv',i} | {type:'radio',key}
+const radioEl = new Audio(); radioEl.crossOrigin = null; radioEl.preload = 'none';
+let icyTimer = null;
+function applyAudio() {
+  const audioTileIdx = audioMode.type === 'tv' ? audioMode.i : audioMode.type === 'featured' ? featured : -1;
+  tiles.forEach((t, i) => { t.el.muted = i !== audioTileIdx; });
+  document.querySelectorAll('.audiosrc').forEach((n) => n.classList.remove('audiosrc'));
+  if (audioMode.type === 'radio') {
+    const r = RADIO[audioMode.key];
+    if (radioEl.dataset.mount !== r.mount) {
+      radioEl.src = 'https://icecast.err.ee/' + r.mount; radioEl.dataset.mount = r.mount; radioEl.play().catch((e) => log('radio play: ' + e));
+    }
+    $('audioSrc').textContent = r.name;
+    clearInterval(icyTimer);
+    const poll = async () => {
+      try { const j = await (await fetch('/icy/' + r.mount)).json(); $('nowPlaying').textContent = j.title ? `♪ ${j.title}` : ''; } catch {}
+    };
+    poll(); icyTimer = setInterval(poll, 15000);
+  } else {
+    radioEl.pause(); radioEl.removeAttribute('src'); radioEl.dataset.mount = ''; clearInterval(icyTimer);
+    $('nowPlaying').textContent = '';
+    $('audioSrc').textContent = audioMode.type === 'featured' ? `featured (${tiles[featured].name})` : tiles[audioMode.i].name;
+    const slot = tilesBox.querySelector(`[data-i="${audioTileIdx}"]`);
+    if (audioTileIdx !== featured && slot) slot.classList.add('audiosrc');
+  }
+}
+
+// --- SAMPLER (DVR scrub + stutter) ---------------------------------------
+let scrub = 0, stutter = null;
+setInterval(() => {
+  const t = tiles[featured], v = t.el;
+  if (scrub) {
+    const target = v.currentTime + scrub * 0.75; // held key ≈ 5x rewind/ff
+    const start = v.buffered.length ? Math.max(t.hls.liveSyncPosition - 7180, 0) : 0;
+    v.currentTime = Math.max(start, Math.min(target, t.hls.liveSyncPosition ?? v.duration));
+  }
+  if (stutter !== null && v.currentTime >= stutter + 2) v.currentTime = stutter;
+}, 150);
+
+// --- HUD ------------------------------------------------------------------
+setInterval(() => {
+  const t = tiles[featured];
+  const pd = t.hls.playingDate;
+  $('pdtClock').textContent = pd ? pd.toISOString().slice(11, 19) + 'Z' : '(no PDT yet)';
+  const behind = t.hls.liveSyncPosition != null ? t.hls.liveSyncPosition - t.el.currentTime : 0;
+  $('dvrPos').textContent = behind > 3 ? `-${behind.toFixed(0)}s` : 'live';
+  const mbps = tiles.reduce((s, x) => s + ((x.hls.levels?.[x.hls.currentLevel]?.bitrate || 0) / 1e6), 0);
+  $('downlink').textContent = mbps.toFixed(1);
+  tiles.forEach((x, i) => {
+    const fc = i === featured ? $('featFc') : tilesBox.querySelector(`[data-i="${i}"] .fc`);
+    if (fc) fc.textContent = `${x.frames}f ${x.hls.levels?.[x.hls.currentLevel]?.height || '?'}p`;
+  });
+}, 500);
+
+// --- keys -----------------------------------------------------------------
+addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  const n = parseInt(k, 10);
+  if (n >= 1 && n <= 9) return flip(n - 1, performance.now());
+  if (k === 'q') { audioMode = { type: 'featured' }; return applyAudio(); }
+  if (k === 'a') { audioMode = { type: 'tv', i: 0 }; return applyAudio(); }
+  if (k === 's') { audioMode = { type: 'tv', i: 1 }; return applyAudio(); }
+  if (k === 'd') { audioMode = { type: 'tv', i: 2 }; return applyAudio(); }
+  if (RADIO[k]) { audioMode = { type: 'radio', key: k }; return applyAudio(); }
+  if (k === 'arrowleft') scrub = -1;
+  if (k === 'arrowright') scrub = 1;
+  if (k === 'l') { const t = tiles[featured]; if (t.hls.liveSyncPosition) t.el.currentTime = t.hls.liveSyncPosition; }
+  if (k === 'x') { const v = tiles[featured].el; stutter = Math.max(0, v.currentTime - 2); v.currentTime = stutter; $('stutterLed').textContent = 'STUTTER'; }
+});
+addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft' || k === 'arrowright') scrub = 0;
+  if (k === 'x') { stutter = null; $('stutterLed').textContent = ''; }
+});
+
+layout();
+
+// --- autotest (?autotest=1): scripted flips, report to server -------------
+if (new URLSearchParams(location.search).get('autotest')) {
+  const marks = [];
+  const seq = [[6000, 1], [9000, 2], [12000, 0], [14000, 1]];
+  seq.forEach(([at, ch]) => setTimeout(() => { flip(ch, performance.now()); }, at));
+  setTimeout(async () => {
+    const t = tiles[featured];
+    const report = {
+      at: new Date().toISOString(),
+      flips: flipTimes.map((x) => +x.toFixed(1)),
+      framesPerTile: tiles.map((x) => ({ id: x.id, presentedFrames: x.frames, level: x.hls.currentLevel, height: x.hls.levels?.[x.hls.currentLevel]?.height })),
+      playingDate: t.hls.playingDate ? t.hls.playingDate.toISOString() : null,
+      liveSyncPosition: t.hls.liveSyncPosition,
+      latency: t.hls.latency,
+      errors,
+      icy: await fetch('/icy/raadio2.mp3').then((r) => r.json()).catch((e) => ({ error: String(e) })),
+    };
+    await fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report) });
+    document.title = 'FLIPPER ' + (flipTimes.length >= 3 && tiles.every((x) => x.frames > 0) ? 'OK' : 'PARTIAL');
+  }, 17000);
+}
+</script>
