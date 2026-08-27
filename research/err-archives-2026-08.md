@@ -196,3 +196,35 @@ explicit per span, and ERR's own channel for that exists and answers in a week.
    MP4 + explicit `restrictions.{drm,geoBlock}` flags — but must extract
    original air year from prose ⚠️; treat Jupiter as a delivery tier, arhiiv as
    the date authority.
+
+## Addendum — megatimeline census + payload probe (2026-08-27) ✅
+
+New platform facts measured while building proto/megatimeline (census.json +
+4-request payload probe; details in proto/megatimeline/NOTES.md):
+
+- **Search-hit thumbnail field: `photoUrl`** — a RELATIVE path
+  (`thumbnails/1965/ERR-Fototeek-00053174_THUMB.jpg`), served from
+  **`https://arhiiv-images.err.ee/`** (200 image/jpeg, ~34 kB for a photo
+  THUMB). Video hits carry it too (`thumbnails/{year}/{YYYY0000}_…_
+  {timestamp}.jpg`); audio hits have `photoUrl: ""`. Companion fields:
+  `photoUrlCropType: "file"`, `imageFolder: "{year}"`. No ACAO (as measured
+  before) — fine as DOM `<img>`, taints canvas.
+- **Audio search-hit `waveform` is a JSON-stringified array** — a ~100-sample
+  string `"[5, 6, 4, …]"`, not an object like the content record's
+  `media.waveform.data`. JSON.parse it. Video/photo hits: `waveform: ""`.
+- **Every search response carries ALL THREE per-type counts** —
+  `activeList.{audioCount,videoCount,photoCount}` reflect the time-filtered
+  query regardless of the `type` param. Consequence: a whole-archive per-year
+  census costs ONE request per year (119 total, ~2.2 min at 1.1 s spacing),
+  not one per year×type.
+- **Count fields saturate at exactly 10 000** (Elasticsearch-style
+  track-total-hits cap): photoCount reads 10000 for 1969, 2023 and 2024.
+  Treat 10000 as "10 000+"; sums over years are lower bounds.
+- **Whole-archive census** (per-type sums over 1908–2026, census.json,
+  committed): **audio 133 718 · video 79 422 · photo 234 478** (photo a
+  lower bound per the cap). First video year confirmed at whole-archive
+  scale: **1958 (6 items), zero video 1908–1957**. Peaks: audio 2020
+  (6 808), video 2023 (2 980), photo 1969 (10 000+).
+- Photo hits say `archiveType: "foto"` (Estonian) while the search `type`
+  param and count field use "photo"; item pages live at `/foto/{slug}`, and
+  photo slugs end in the numeric fileId (`ants-varavas-133720`).

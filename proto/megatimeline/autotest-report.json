@@ -1,0 +1,163 @@
+{
+ "at": "2026-08-27T10:18:22.628Z",
+ "steps": {
+  "boot": {
+   "tier": "decades",
+   "zx": 0.03497066605314621,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 0,
+   "imgsLoaded": 0,
+   "imgsTotal": 0,
+   "apiSearch": 0,
+   "apiItem": 0,
+   "yearDataKeys": [],
+   "itemsLoaded": 0,
+   "metrics": {
+    "imgLoadedEvents": 0,
+    "mounts": []
+   }
+  },
+  "flight": {
+   "frames": 603,
+   "p50": 8.3,
+   "p95": 9.8,
+   "max": 10.4
+  },
+  "dive": {
+   "tier": "days",
+   "zx": 4.164383561643834,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 36,
+   "imgsLoaded": 36,
+   "imgsTotal": 36,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 36,
+    "mounts": [
+     {
+      "newCards": 36,
+      "mountMs": 2.7,
+      "firstImgMs": 12
+     }
+    ]
+   }
+  },
+  "months": {
+   "tier": "days",
+   "zx": 4.164383561643834,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 36,
+   "imgsLoaded": 36,
+   "imgsTotal": 36,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 36,
+    "mounts": [
+     {
+      "newCards": 36,
+      "mountMs": 2.7,
+      "firstImgMs": 12
+     }
+    ]
+   }
+  },
+  "deep": {
+   "tier": "days",
+   "zx": 16.888888888888886,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 44,
+   "imgsLoaded": 41,
+   "imgsTotal": 44,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 66,
+    "mounts": [
+     {
+      "newCards": 36,
+      "mountMs": 2.7,
+      "firstImgMs": 12
+     },
+     {
+      "newCards": 33,
+      "mountMs": 0.8,
+      "firstImgMs": 12
+     }
+    ]
+   }
+  },
+  "deepAfter": {
+   "tier": "days",
+   "zx": 16.888888888888886,
+   "censusLoaded": true,
+   "censusYears": 119,
+   "liveCards": 44,
+   "imgsLoaded": 41,
+   "imgsTotal": 44,
+   "apiSearch": 9,
+   "apiItem": 0,
+   "yearDataKeys": [
+    "video:1965",
+    "audio:1965",
+    "photo:1965"
+   ],
+   "itemsLoaded": 809,
+   "metrics": {
+    "imgLoadedEvents": 66,
+    "mounts": [
+     {
+      "newCards": 36,
+      "mountMs": 2.7,
+      "firstImgMs": 12
+     },
+     {
+      "newCards": 33,
+      "mountMs": 0.8,
+      "firstImgMs": 12
+     }
+    ]
+   }
+  }
+ },
+ "consoleErrors": [],
+ "asserts": {
+  "censusLoaded": true,
+  "thumbLoaded": true,
+  "cardsWithinCap": true,
+  "apiBudget": true,
+  "consoleClean": true
+ },
+ "serverStats": {
+  "startedAt": "2026-08-27T10:18:22.712Z",
+  "upstreamSearch": 0,
+  "upstreamContent": 0,
+  "cacheHitSearch": 9,
+  "cacheHitItem": 0,
+  "upstreamTotal": 0
+ },
+ "ok": true
+}

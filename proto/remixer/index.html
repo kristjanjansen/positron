@@ -667,6 +667,28 @@ async function autotest() {
   document.title = 'REMIXER ' + (p1ok && p2ok && clean ? 'OK' : 'PARTIAL');
 }
 
+// ?play={type}:{slug} — the megatimeline handoff: load one archive item into
+// the first free layer on boot (megatimeline navigates, remixer performs).
+// Autoplay is attempted; browser policy may hold audio until the first click.
+async function playFromQuery() {
+  const spec = QS.get('play');
+  if (!spec) return;
+  const i = spec.indexOf(':');
+  const type = spec.slice(0, i), slug = spec.slice(i + 1);
+  if (!/^(audio|video)$/.test(type) || !/^[a-z0-9-]+$/.test(slug)) return;
+  const item = { type, slug, title: slug, dateISO: '1900-01-01T00:00:00Z', lead: '' };
+  status(`play from query: ${type}:${slug}`);
+  const c = await getContent(type, slug).catch(() => null);
+  if (c && c.info) {
+    item.title = c.info.title || slug;
+    if (c.info.date) item.dateISO = c.info.date;
+  }
+  const yr = parseInt(item.dateISO, 10);
+  if (yr >= 1908 && yr <= 2026 && yr !== S.year) dialYear(yr);   // dial to the item's year
+  await loadItem(item, nextFree(type), { autoplay: true });
+}
+
 if (AUTOTEST) autotest().catch((e) => { recErr('autotest', String(e) + '\n' + (e && e.stack)); fetch('/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fatal: String(e), stack: String(e && e.stack), errors: S.errors, apiCalls: S.apiLog }) }); document.title = 'REMIXER FAIL'; });
+else if (QS.get('play')) playFromQuery();
 else dialYear(+QS.get('year') || 1965);
 </script>
