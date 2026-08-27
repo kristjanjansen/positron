@@ -179,6 +179,46 @@ async function openAudio() {
   return got;
 }
 
+// ---------------- camera (optional): the instrument itself --------------------
+// The camera becomes the panel's BACKGROUND rather than a second track: the
+// published stream stays panel.captureStream(), so switching cameras mid-session
+// needs no renegotiation and no replaceTrack, and the burned clock + note flash
+// stay composited on top (they are what makes latency measurable).
+const camVideo = document.createElement('video');
+camVideo.muted = true; camVideo.playsInline = true;
+async function listCameras() {
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+  const sel = $('videoin');
+  if (!sel) return 0;
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">— no camera (panel only) —</option>';
+  for (const d of devs) {
+    const o = document.createElement('option');
+    o.value = d.deviceId; o.textContent = d.label || `camera ${d.deviceId.slice(0, 8)}`;
+    sel.appendChild(o);
+  }
+  if (keep) sel.value = keep;
+  return devs.length;
+}
+async function openCamera() {
+  const sel = $('videoin');
+  const deviceId = sel ? sel.value : '';
+  if (S.camStream) { for (const t of S.camStream.getTracks()) t.stop(); S.camStream = null; }
+  if (!deviceId) { camVideo.srcObject = null; log('camera off — panel only'); return null; }
+  // No audio here: the instrument's sound comes from the interface, never the
+  // camera mic (a camera mic would be room sound with AGC and EC applied).
+  S.camStream = await navigator.mediaDevices.getUserMedia({
+    video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 30 } },
+    audio: false,
+  });
+  camVideo.srcObject = S.camStream;
+  await camVideo.play().catch(() => {});
+  const s = S.camStream.getVideoTracks()[0].getSettings();
+  await listCameras();  // labels appear only after a grant
+  log('camera open —', JSON.stringify({ w: s.width, h: s.height, fps: s.frameRate }));
+  return s;
+}
+
 // ---------------- the panel (what the player watches) -------------------------
 const panel = $('panel');
 const pctx = panel.getContext('2d', { alpha: false, desynchronized: true });
@@ -187,6 +227,14 @@ let frames = 0;
 function drawPanel() {
   const t = nowUs();
   pctx.fillStyle = '#0b0d0f'; pctx.fillRect(0, 0, 640, 360);
+  // camera as background, aspect-preserving cover; overlay text stays legible
+  if (S.camStream && camVideo.readyState >= 2 && camVideo.videoWidth) {
+    const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+    const s = Math.max(640 / vw, 360 / vh);
+    const dw = vw * s, dh = vh * s;
+    pctx.drawImage(camVideo, (640 - dw) / 2, (360 - dh) / 2, dw, dh);
+    pctx.fillStyle = 'rgba(11,13,15,0.45)'; pctx.fillRect(0, 0, 640, 180);
+  }
   pctx.fillStyle = '#7d8791'; pctx.font = 'bold 15px monospace';
   pctx.fillText((S.inst ? S.inst.name : 'unregistered').toUpperCase(), 24, 36);
   pctx.font = '13px monospace';
@@ -428,6 +476,10 @@ $('b-unlist').onclick = () => unlist().catch((e) => log('unlist failed', e.messa
 $('b-panic').onclick = () => panic('manual');
 $('b-end').onclick = () => { S.sig.send({ type: 'end' }); teardown('owner ended'); };
 $('audioin').onchange = () => { if (S.micStream) openAudio().catch(() => {}); };
+$('b-cam').onclick = () => openCamera().catch((e) => log('openCamera failed', e.message));
+// Live switch: changing the picker mid-session swaps the background only — the
+// published track is the canvas, so there is nothing to renegotiate.
+$('videoin').onchange = () => { if (S.camStream || $('videoin').value) openCamera().catch(() => {}); };
 
 setInterval(() => {
   $('s-midi').textContent = S.midiRecv;
@@ -443,7 +495,7 @@ setInterval(() => {
 
 // ---------------- driver API for the harness ---------------------------------
 window.host = {
-  register, goOnline, goOffline, panic, openAudio, listAudioIn, unlist,
+  register, goOnline, goOffline, panic, openAudio, listAudioIn, openCamera, listCameras, unlist,
   accept: (pid) => accept(pid),
   end: () => { S.sig.send({ type: 'end' }); teardown('owner ended'); },
   state: () => ({
@@ -462,6 +514,7 @@ await clock.calibrate(CLOCK, WORKER);
 $('s-clock').textContent = JSON.stringify(clock.info());
 await initMidi();
 await listAudioIn().catch(() => 0);
+await listCameras().catch(() => 0);
 if (ac.state === 'suspended') await ac.resume();
 $('hstate').textContent = 'ready';
 log('ready — worker', WORKER, '| clock', CLOCK, JSON.stringify(clock.info()));
