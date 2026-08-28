@@ -11,9 +11,16 @@ Marks: ✅ read directly from source · 📄 from a README/comment/payload ·
 ⚠️ inferred or unverified.
 
 Clones (read-only, shallow, in scratchpad — nothing touched in `~/personal`):
-`elektronstudio/{archive,lab,v3,v4,ws}`. Local survivors already on disk:
-`~/personal/{foyer,foyer2,wakeup-foyer}` (none of them relevant — no `strapi`
-or `data.elektron.art` hits).
+`elektronstudio/{archive,lab,v3,v4,ws}`, plus `elektron-nuxt` read over the GitHub
+API. Local survivors already on disk: `~/personal/{foyer,foyer2,wakeup-foyer}`
+(none relevant — no `strapi` or `data.elektron.art` hits). Thesis PDF and extracted
+text in scratchpad as `thesis.pdf` / `thesis.txt`.
+
+The org has 43 repos. The relevant spine is
+**`v1`→`v2`→`v3`→`v4`→`elektron-nuxt`** (clients), **`ws`** (the relay),
+**`strapi4`** (described in its own GitHub blurb as "data.elektron.art"), **`lab`**
+(the research app) and **`archive`** (a graveyard monorepo containing `logger/` and
+an older `strapi/`).
 
 ---
 
@@ -32,6 +39,22 @@ the three T₀ strategies we have now measured**, by an order of magnitude: the
 filename stamp is a *transcode-completion* time, quantised to 1 s, anchored at the
 **end** of the file, and it disagrees with itself by **17 s across the five
 renditions of a single recording** — of which the code arbitrarily takes `files[0]`.
+
+**The thesis is real and freshly defended.** Taavet Jansen, *Kehata kohalolu:
+voogteatri kontseptuaalne ja praktiline kaardistus*, EKA 2026 (defence 18.05.2026).
+It names elektron.art as its research instrument throughout, thanks the author of
+this codebase by name for the interaction concepts — and contains **no schema
+document, no dataset, and no log-to-video synchronisation method**, naming that
+absence as future work. `timeline/` is the answer to a gap stated in a defended
+dissertation.
+
+**Two findings reframe the whole survey.** First: the platform never had a discrete
+control kind, so a button press was shipped as **two level messages, `value: 10`
+then `value: 0`** — an edge faked as a zero-width pulse, which any reducer erases.
+Second: measured against the surviving corpus, the slider signal has a **median
+inter-sample gap of 20.2 s** and **no gap below 0.25 s** — the 200 ms debounce made
+visible in the data, drawn by the research app as a straight line across a
+20-second void.
 
 ---
 
@@ -235,11 +258,76 @@ unattributed movement. `props.private` (`Controls.vue:105, 237`) is *not* a
 data-protection flag despite the name — it only gates which subset of controls is
 rendered.
 
+### The button, as finally shipped: an edge faked with a level pulse ✅
+
+The Memento buttons the thesis describes are
+**`elektronstudio/elektron-nuxt/components/MementoButtons.vue`** (used by
+`pages/projects/memento/[event_slug]/live.vue`). The parser is the *same*
+`parseControls`, with exactly one line changed — `control: chunk.control ? chunk.control : "slider"`,
+so arbitrary kinds now pass through. **The `---` / `key: value` Strapi-textarea DSL
+survived three generations unchanged: v3 (2021) → v4 (2022) → elektron-nuxt
+(2023–25).**
+
+The press handler is the single most instructive fragment in the whole survey:
+
+```js
+const handleClick = useThrottleFn((channel: string, type: string) => {
+  sendMessage.value({ channel, type, value: 10, userid: userId.value, username: userName.value });
+  sendMessage.value({ channel, type, value: 0,  userid: userId.value, username: userName.value });
+}, 3000);
+```
+
+**A button press is two level-valued messages — 10 then 0, back to back.** Having no
+discrete kind, they synthesised an edge as a zero-width pulse on the level channel.
+This is a note-on/note-off pair in `cc` clothing, and it is precisely the
+distinction our adapter draws with `SWITCHES` and `catchUp: 'reduce'`. Four
+consequences, all of which our design already forecloses:
+
+- ⚠️ **A reducer would erase every press.** Last-value-per-control is *always 0*
+  after a pulse. Seek to any moment and the room reads as unanimous silence. Our
+  cc-core comment — *"edge-valued: no amount of 'current state' can recreate an
+  attack you missed"* — is the exact failure mode, met head-on in production
+  theatre.
+- ⚠️ **The pulse has no width and no order.** Both messages are stamped
+  `new Date().toISOString()` in the same tick, frequently the same millisecond, with
+  `id: randomString()` and **no sequence number**. Any sort-by-`datetime` is a coin
+  flip; reconstruct the pair inverted and you get a **stuck-on** button. Our 16-byte
+  frame carries a `u32 seq` for exactly this.
+- ⚠️ **The rate limit is client-side, and the thesis misdescribes it.** The thesis
+  says *"mitte rohkem kui üks hääl **IP-aadressi** kohta 3 sekundi jooksul"* (no more
+  than one vote per IP per 3 s), added after the platform hung on opening night.
+  The code is `useThrottleFn(…, 3000)` — **in the browser**, per client, trivially
+  bypassable, with no server-side counterpart anywhere in `ws/index.js`. For a
+  dissertation reporting vote proportions (61 % / 28.9 % / 9.9 %), the ballot has no
+  integrity guarantee. This is the one place where a documentation error in the
+  thesis touches a published number.
+- ✅ **`value: 10` reuses the slider domain.** Buttons are sliders pinned to the
+  endpoints — confirming that the platform never had a non-level kind at all.
+
+Two further mechanisms with no analogue on our side, both worth taking seriously:
+
+- **The schema is mutable mid-performance.** `UPDATE_BUTTON` messages carry a
+  space-separated `"index label color"` triple (spaces inside labels encoded as
+  apostrophes, `.replace(/'/g, " ")`), and `UPDATE_QUESTION` pushes the prompt text.
+  The interaction-dramaturg re-labels the buttons live. ⚠️ **`type` stays `DATA_1`
+  while the question it answers changes.** Any analysis grouping by control `type`
+  across a performance is silently pooling heterogeneous questions — and Figure 10
+  in the thesis is built on exactly this data. **A research timeline must version
+  control identity: a control is `(type, schema_epoch)`, not `type`.**
+- **`UPDATE_BUTTON_NR`** broadcasts live tallies (`"2 212"` = button 2, count 212).
+  The aggregate is computed operator-side and pushed, never derived from the log —
+  so the displayed count and the stored rows are two independent artefacts that can
+  disagree, with no way to reconcile them after the fact.
+- ⚠️ **`store: false` is per-message** and set by the client. The persisted record is
+  incomplete by design, and completeness is a client-side decision.
+
 ### Versus our `cc` adapter
 
 | | elektron controls | our `cc` adapter (`proto/automation/cc-core.js`) |
 |---|---|---|
-| kinds | `slider`, `text` — **all level-valued** | level-valued CCs **and** `SWITCHES` (64–69, 120–127) that are edge-valued |
+| kinds | `slider`, `text`, later `button` — **all level-valued**; edges faked as a 10→0 pulse | level-valued CCs **and** `SWITCHES` (64–69, 120–127) that are genuinely edge-valued |
+| ordering | `id: randomString()`, no sequence — same-ms pairs unorderable | `u32 seq` in the 16-byte frame |
+| control identity | `type` only — **re-labelled live, silently** | `keyOf()` stable for the session |
 | series identity | `type` (`DATA_1`), grouped in the view | `caps.series = (p) => p.key \|\| keyOf(p.status, p.d1)` — folds 14-bit MSB/LSB onto one key |
 | capture rate-limit | **`debouncedWatch(…, { deep: true, debounce: 200 })`** | `makeCcCapture({ throttleMs: 100, keyframeMs: 500 })`, gate tagged `'throttle' \| 'endpoint' \| 'switch'` |
 | switches exempt from thinning | **n/a — no switches exist** | yes, explicitly: *"a dropped sustain-pedal-down is the CC analogue of a stuck note"* |
@@ -423,8 +511,14 @@ Nothing in the current client set exercises the research shape. Concretely:
   quantile-envelope of all participant series at the playhead. This is the thing
   `lab` most conspicuously lacked, and it is a *derived* lane — it needs no
   capture, only `reduceAt` over a set of series plus a fold.
+- **A genuinely edge-valued participant kind**, so a button press is not a 10→0
+  pulse on a level channel. This is `SWITCHES` generalised: `catchUp` must be
+  `'replay'`, not `'reduce'`, or every press disappears on seek.
 - **A `marker` / annotation kind.** Researchers code video. Time-ranged labels with
-  a coder identity, so two coders' passes are two lanes.
+  a coder identity, so two coders' passes are two lanes. The thesis codes everything
+  thematically by hand (9 themes for `/imagine`, 5 for `/whisper`, 6 for
+  `/remember`, 5 for the survey motivations) — that is the workload a marker lane
+  removes.
 
 **API gaps**
 - **`valueAt` must be public and seek-exact.** The whole research question is "what
@@ -442,8 +536,16 @@ Nothing in the current client set exercises the research shape. Concretely:
   `gate` (`throttle|endpoint|switch`) is what lets an analyst *undo* the sampling
   bias that killed the 2022 corpus — you cannot correct for a debounce you cannot
   see.
+- **Versioned control identity.** `(type, schema_epoch)`, not `type` — because
+  `UPDATE_BUTTON` re-labels controls mid-show and the thesis's own figures pool
+  across those changes.
+- **A sequence number on every row.** Two events in the same millisecond must have a
+  defined order or an edge pair can be reconstructed inverted.
 - **Session as a first-class object.** Three capture sessions in one corpus, loaded
   and compared side by side, is the minimum for a study.
+- **An aggregate that is reconcilable with the log.** `UPDATE_BUTTON_NR` broadcast a
+  tally computed elsewhere; the displayed number and the stored rows could never be
+  checked against each other. A derived lane must be *derived*, not pushed.
 
 ---
 
@@ -488,6 +590,200 @@ and it hands it to us by not having it.
 
 ---
 
+## 6. The thesis — Taavet Jansen, EKA 2026 ✅
+
+**Found, full text retrieved and read.**
+
+> **Taavet Jansen, *Kehata kohalolu: voogteatri kontseptuaalne ja praktiline
+> kaardistus*** / *Disembodied Presence: A Conceptual and Practical Mapping of
+> Streamed Theatre*. Eesti Kunstiakadeemia, 2026. 162 pp., Estonian with English
+> summary. Dissertationes Academiae Artium Estoniae **50**, ISSN 1736-2261,
+> ISBN 978-9916-740-75-0 (PDF). Supervisor dr **Anu Allas**; pre-reviewers dr Raivo
+> Kelomees (EKA), dr Ott Karulin (TÜ); opponent dr Ott Karulin. Defence
+> **18.05.2026**, EKA Põhja pst 7, room A101.
+
+- Record: <https://eka.access.preservica.com/uncategorized/SO_a6bc1ac6-daf6-46f7-adda-7c805426b832/>
+- PDF: <https://eka.access.preservica.com/download/file/IO_bbeb983d-b6c2-45b3-bb2e-2255f7b23dd0>
+- Defence: <https://www.artun.ee/et/kalender/taavet-janseni-doktoritoo-kaitsmine/>
+
+⚠️ `digikogu.artun.ee` does not resolve; EKA's repository is **EKA Digivaramu** on
+Preservica. A `teater.ee` citation still lists the 2025 pre-defence manuscript.
+
+**It names the platform, and it names the author of this codebase.** 23 mentions of
+elektron; `elektron.live` once; **`data.elektron.art` zero times**.
+
+> *"„Memento“ digitaalne etendusruum loodi elektron.arti veebilehele
+> erilahendusena, kus lisaks tavalisele video- ja vestlusaknale lisati
+> eksperimentaalseks kasutamiseks eraldi funktsioon – **interaktsiooninupud**."*
+> — Memento's digital performance space was built as a bespoke solution on the
+> elektron.art website, where alongside the usual video and chat windows a separate
+> function was added for experimental use — **the interaction buttons**.
+
+> *"Vestlusaken kasutas elektron.arti backend'i, kus vestlusaknas toimuvad
+> sissekanded kasutavad **WebSocketi protokolli arhiveerimiseks**."*
+> — The chat window used elektron.art's backend, where chat entries use the
+> WebSocket protocol for archiving.
+
+And the general instrument claim, English summary p.147 — this is the sentence to
+cite when justifying `timeline/`'s research affordances:
+
+> "Streaming platforms, custom web solutions, interaction interfaces, and
+> media-routing setups were designed, adjusted, and sometimes reconfigured during
+> production. **These technical components were treated as research instruments**
+> because they defined what kinds of audience actions were available, how those
+> actions were filtered or aggregated, and how their consequences became visible to
+> performers and other spectators."
+
+> *"Käesoleva uurimistöö raames oli võimalik teha koostööd organisatsiooniga
+> elektron.art, kelle tehnilist platvormi saime kasutada piiranguteta."* (p.127)
+
+And in the acknowledgments (p.5):
+
+> *"Tänan **Kristjan Jansenit**, kes on interaktsioonidisainerina ja
+> veebiarendajana loonud veebilahendused kõikidele mu siinkirjeldatud projektidele.
+> Väga paljud interaktsioone puudutavad kontseptsioonid minu projektides on
+> Kristjanilt pärit."*
+
+### What was actually collected
+
+Three practice-led experiments (Benford's *research-in-the-wild*), setup frozen
+across runs:
+
+| project | when | audience | data |
+|---|---|---|---|
+| **Hundid** | 05.2021, 11.2021, 02.2022 | — | chat words + names → DB → actor's teleprompter; 10-person test group |
+| **Memento** | 6 shows, 13–22.02.2023, UT Viljandi | **180 physical, 1592 online** | **142** web survey responses (Google Forms, 6 Q, link dropped in chat); **111** paper responses (2 Q); button votes |
+| **Inimeses hoitud** | 21.08–13.09.2023, EKA Gallery + SAAL Biennaal | — | chat-command tallies: **`/imagine` 589, `/remember` 253, `/whisper` 190**; Max8 level-triggered **15 s** auto-recordings (~40 % deliberate input) |
+
+Headline results: **61 % always voted, 28.9 % sometimes, 9.9 % never**; **20 %
+reported a feeling of control over the actors**, and those reported higher
+engagement. Figure 10 (chart by **Aleksander Väljamäe**) plots triads A/B/C on a
+0–5 scale, control vs no-control, shows 1–3 vs 4–6. Two items borrowed from
+Freeman (2000)'s cross-media presence questionnaire.
+
+⚠️ **Method: thematic coding plus descriptive percentages. No inferential
+statistics anywhere** — no n-tables, no test statistics, no significance values,
+not even under the Väljamäe figure. Stated explicitly in the English summary:
+
+> "This material was not treated as a basis for statistical generalisation but as
+> evidence of how participants interpreted liveness, presence, and agency under
+> specific conditions."
+
+⚠️ Internal inconsistency: "1500-st vaatajast vastas 142" against a stated 1592.
+
+### No schema document, no dataset, no sync method — and he says so ⚠️
+
+There is **no appendix, no code listing, no deposited data**. The button taxonomy
+(§4.5) is prose: three categories, **nupud / liugurid / vestlusaken**. Memento's
+buttons were **arrow-up, arrow-down, heart**, grey when inactive and coloured when
+active, semantics deliberately unlabelled, repeat-pressable, with a live leading-choice
+visualisation in the corner of the video, opened and closed live by the author as
+*interaktsioonidramaturg*.
+
+The §4.5 taxonomy is worth quoting because it is an argument for the **aggregate
+lane**: buttons give binary/collective choices *"quantitatively measurable"*, while
+sliders give *"**hajusa kollektiivse tundekaardi**"* — a diffuse collective map of
+feeling — over a continuous spectrum. A collective feeling-map is precisely a
+mean-plus-envelope across N participant series, and it is the one view `lab` could
+not draw.
+
+**Sliders were never used in the three documented experiments.** The single slider
+sentence in the whole thesis (p.120) is a side experiment, otherwise unwritten-up:
+
+> *"Katsetasin **liuguriga** näiteks abstraktseid valikuid („punane" vs. „sinine")
+> ning vaatajate reaktsioonid näitasid, et just ebamäärasus võib osutuda
+> kaasavamaks kui selgevalikuline küsimus."*
+> — I experimented with a slider on abstract choices ("red" vs "blue"), and viewers'
+> reactions showed that vagueness can be more engaging than a clear-cut question.
+
+✅ **That resolves the surviving corpus.** The 2022 slider data in
+`lab/src/data/data.ts` — `DATA_1`, 0–10 floats, ~20 participants, channel
+`voogteater` (10.06.2022) — is almost certainly that red/blue experiment, and it
+predates Memento by eight months. **`lab` holds unpublished pilot data, not the
+dissertation's evidence base.** The interaction-log schema, the timestamps and any
+video sync exist only in the code and the corpus, never in the thesis.
+
+⚠️ Channel `liisi-tuba` ("Liisi's room", 03.06.2022) is not in the thesis, but
+**Liis Vares** is Jansen's principal collaborator and the *voog-dramaturg* (stream
+dramaturg) of *Hundid* — most likely a rehearsal channel rather than a public show.
+`eestiteatriauhinnad` (the token in `lab`'s source) is outside the thesis's scope
+entirely.
+
+One logged Memento chat line quoted in the thesis is a direct artefact of the
+vote-load crash — no stress test was ever run:
+
+> *"system crash, ärge hääletage nii palju"* — system crash, don't vote so much.
+
+On log↔video synchronisation the thesis has **nothing**, and names the absence:
+
+> *"Minu jaoks on uurimistöö käigus olnud väga suur väljakutse see, **kuidas
+> kogunevaid andmeid salvestada, süstematiseerida ja vahel isegi ära tunda**.
+> Andmed varieeruvad vaatajate tagasiside kogumisest ja nende interaktsiooni
+> logidest **etenduste salvestisteni**…"* (p. 35)
+> — A very great challenge has been how to record, systematise and sometimes even
+> *recognise* the accumulating data. It ranges from audience feedback and their
+> interaction logs to **performance recordings**…
+
+> *"Järgmise sammuna näen väga suurt potentsiaali digitaalset vahendatust kasutava
+> andmekogumise **reaalajas analüüsimises**."*
+> — As a next step I see great potential in real-time analysis of digitally
+> mediated data collection.
+
+**That is our gap, stated as future work in a defended dissertation.** The thesis is
+now a citable statement of need for exactly what `timeline/` does.
+
+### Ethics — one and a half pages of principle, no protocol ⚠️
+
+§ "Eetilised küsimused", pp. 40–41. **No ethics committee approval mentioned. No
+GDPR reference, no retention period, no data-management plan.** "Andmekaitse"
+appears once as a general obligation. The honest self-assessment:
+
+> *"Kokkuvõttes võib öelda, et minu eksperimendid olid rajatud **anonümiseeritud
+> andmete kogumisele** ning osalejate teavitamisele andmete kasutamise eesmärkidest,
+> kuid autobiograafiline ja protsessipõhine uurimisviis **ei võimaldanud alati
+> vaatajatele täielikult ette selgitada, milles nende osalus seisneb**, kuna paljud
+> nüansid selgusid alles töö käigus. Edaspidi on vaja olla tähelepanelikum
+> otseülekande ja publiku sisendi kasutamise puhul, sest **teadliku nõusoleku raamid
+> ja kunstilised eesmärgid võivad praktikas vastuollu sattuda**."*
+> — In sum my experiments were built on collecting anonymised data and on informing
+> participants of the purposes of use, but the process-based approach did not always
+> allow viewers to be told in full in advance what their participation consisted of,
+> since many nuances only became clear during the work. In future one must be more
+> attentive with live broadcast and audience input, because **the frames of informed
+> consent and artistic aims can come into conflict in practice**.
+
+⚠️ **The claim of anonymisation is not supported by the code.** The store keeps
+`userid` *and* self-chosen `username`, and the surviving corpus is committed to a
+public repository with nicknames intact (§5 above). Pseudonymisation was reached
+for; anonymisation was not implemented.
+
+§4.5 further documents that the operator sees, in real time, **geolocation, device,
+chosen name, join/leave times and dwell duration** — framed as a dramaturgical
+resource, *"nähtamatu andmekiht"* (an invisible data layer) — with the ethics
+deferred to §4.7, which calls for *"selgeid eetilisi juhiseid ja regulatsioone"*
+(clear ethical guidelines and regulations) should personal data, emotional
+reactions or biodata be used.
+
+**This is the strongest possible brief for making consent a first-class timeline
+concern.** The instrument's own dissertation says the consent frame broke against
+the artistic practice, and asks for guidelines. A timeline that carries
+per-row provenance, scope and erasability is a direct answer.
+
+---
+
+## 7. Funding and lineage 📄
+
+Named in the thesis: the experimental-development project **"INDEX – Voogteater kui
+uurimistööriist"** at the University of Tartu built the audience-feedback collection
+software used in *Hundid* and developed further afterwards
+(<https://loovuurimus.ee/projektid/index-digitaalse-publiku-uhendamine-loojatega-online-sundmusel>);
+a Ministry of Culture creative-research grant funded Memento's real-time feedback
+UI; Creative Europe's **ACuTe** funded *Inimeses hoitud*. So the interaction stack
+was, from the start, funded as a **research tool** — not as a side effect of making
+shows. That is the frame `timeline/` inherits.
+
+---
+
 ## Steal list
 
 1. ✅ **Anchor-travels-with-the-artefact.** Right instinct, wrong sample. Keep the
@@ -498,21 +794,18 @@ and it hands it to us by not having it.
    after a seek.
 4. ✅ **Paste-in CSV ingest.** Zero-ceremony data loading for an analysis view.
 5. ✅ **Per-participant lanes on one shared wall-clock axis**, with solo-by-click.
-6. ⚠️ **Do not debounce a research signal.** Throttle, tag the gate, and export the
-   tag.
-7. ⚠️ **Never hand-roll CSV.** 123 corrupted cells in the surviving corpus.
-8. ⚠️ **Subject-keyed erasure or no personal data.** `redis.del(*)` is not a
-   retention policy.
+6. ✅ **The `---` / `key: value` textarea DSL.** Unchanged across v3 → v4 →
+   elektron-nuxt (2021–2025), authored by non-programmers in a CMS field, and it
+   outlived three frontend rewrites. A control schema should be text a dramaturg can
+   edit, not a typed config a developer must deploy.
+7. ⚠️ **Do not debounce a research signal.** Throttle, tag the gate
+   (`throttle|endpoint|switch`), and export the tag.
+8. ⚠️ **Never encode an edge as a level pulse.** The 10→0 button is the whole
+   argument for a discrete kind, made in production.
+9. ⚠️ **Never hand-roll CSV.** 123 corrupted cells in the surviving corpus.
+10. ⚠️ **Rate-limit on the server or don't report proportions.** A client-side
+    `useThrottleFn` is a UX affordance, not a ballot control.
+11. ⚠️ **Subject-keyed erasure or no personal data.** `redis.del(*)` is not a
+    retention policy.
 
 ---
-
-## 6. The thesis — Taavet Jansen, "voogteater" (EKA)
-
-*(pending — parallel search in flight at time of writing; see the appended section
-below or the agent report.)*
-
-The code side already establishes the link: the channel name in the surviving 10 Jun
-2022 capture is literally **`voogteater`** (`lab/src/data/data.ts`, `sliderData`),
-alongside `eksperiment` and `liisi-tuba`. Whatever the thesis says, the instrument
-it describes is the one documented above, and the corpus it drew on is
-`elektronstudio/lab`.
