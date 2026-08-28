@@ -173,3 +173,54 @@ uses (`createDeck`, `registerAdapter` via `adapters:`, `sync`, `reduce` /
   `HEAD~`; the numbers are quoted above and in both READMEs).
 - Ports: 8885 only (this rig's own). One headless Chrome at a time. No CF
   resources created; no `run-record.mjs` run; `timeline/` untouched.
+
+## 8. The media-master block moved into the library (v0.5)
+
+`syncFromMaster()` — the ~30 lines that made the `<video>` the clock master —
+was hand-written here, and two sibling clients had their own copies of the same
+laws. One of them (`proto/selfrec/replay-grid.html`) had **lost the jump/sync
+discrimination**, which re-opened the burst-every-skipped-cue bug on its master
+path. So the block is now **`timeline/media-master.mjs`**, and this page calls
+it instead of carrying it:
+
+```js
+mmaster = mediaMaster(deck, vid, {
+  anchorMs: () => T0, toleranceMs: SYNC_TOL_MS, jumpMs: JUMP_MS, stallMs: 1000,
+  stallPolicy: "hold",          // ONE video: a stall must stall the playhead
+  autoPlayPause: true, attachTimeupdate: true,
+  onCorrection: …, onEvent: e => { stall -> S.stalls; jump -> engineEvents },
+});
+```
+
+Behaviour is unchanged by construction — the helper's laws are this page's laws
+(L1 never nudge the master · L2 sync inside tolerance, SEEK past `jumpMs` ·
+L3 stall → hold · L4 `timeupdate` backstop · L5 paused/ended/seeking is not a
+clock). What is gone is the duplication, and what is new is that the laws are
+now property-tested in node (`timeline/lab/prop-nested.mjs`, suite 8, including
+a negative control that reproduces the replay-grid burst).
+
+### Re-run of the gate — `node ../archive/run-measure-archive.mjs`: **7/7 PASS**, twice
+
+| | pre-adoption (NOTES §4) | run 1 | run 2 |
+|---|---|---|---|
+| checks | 7/7 | **7/7** | **7/7** |
+| per-cue err (native anchor) | `−7 −21 −7 −10 0 −4 11 1` | `−42 −21 −7 −10 0 −37 11 −32` | `−7 −21 −7 −10 0 −4 11 1` |
+| p50 / p95 | −4 / 11 | −10 / 11 | **−4 / 11** |
+| abs p95 (gate ≤150 ms) | — | 42 ms | **21 ms** |
+| content−native anchor delta | — | −15 ms | −15 ms (spread 38 ms / 15 frames) |
+| burn decode rate | — | 5112/5112 | 5118/5118 |
+| cues fired / caught up | 8 / 0 | 8 / 0 | 8 / 0 |
+
+**Run 2 reproduces the pre-adoption table to the last digit** — `−7 −21 −7 −10
+0 −4 11 1`, p50 −4 / p95 11. The helper did not move the gate.
+
+Run 1 is kept in the table because it is the honest measurement of what these
+numbers are: three of its eight cues sat ~33 ms out — **one video frame at
+30 fps** — and then came back on the next fetch. That is decoded-frame
+quantisation on a fresh VOD pull, not the fire path, and it is why §2 of this
+file already says a per-cue table is one deterministic phase sample and not a
+distribution. p95 was 11 ms in both runs and every threshold held with a 3.5-7×
+margin.
+
+`__deckStats().mediaMaster` now exposes the helper's counters (syncs, jumps,
+stalls, corrections, and the laws it is running under).

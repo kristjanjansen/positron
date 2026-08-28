@@ -214,7 +214,54 @@ const run = async () => {
     `tail err linear p1=${decoded.linear.p1}/p2=${decoded.linear.p2}, cluster-anchored p1=${decoded.anchored.p1}/p2=${decoded.anchored.p2}, ` +
     `BLOCKS p1=${decoded.blocks.p1}/p2=${decoded.blocks.p2} — winner ${better.join(" ")}`);
 
-  const report = { show: SHOW, T0, V2, V3, V4, checks };
+  // ---- V5: an EXTERNAL master jump must FOLD, never BURST -----------------
+  // The regression the mediaMaster adoption exists to prevent. This page's cue
+  // kind is `catchUp: "burst"` (a cue is a note, never silently dropped), and
+  // the old hand-rolled master block here called deck.sync() UNCONDITIONALLY.
+  // Sync across a discontinuity leaves every skipped cue `pending`, so the
+  // lookahead fires all of them at once — the exact bug the SEEK path had
+  // already been fixed for. timeline/media-master.mjs L2 routes |err| > jumpMs
+  // to deck.seek() instead, which reconciles statuses and re-folds.
+  await gSeek(rp, T0 + 2000);
+  await new Promise((r) => setTimeout(r, 1200));
+  await rp.evaluate(() => window.__play());
+  await new Promise((r) => setTimeout(r, 1800));
+  const mi0 = await rp.evaluate(() => window.__masterInfo());
+  const gPre = await grid(rp);
+  const lastCue = gPre.cues[gPre.cues.length - 1];
+  let jump = null;
+  for (const pad of [5000, 3000, 1500, 600]) {
+    jump = await rp.evaluate((t) => window.__jumpMaster(t), lastCue.at + pad);
+    if (jump.ok) break;
+  }
+  const posPre = gPre.playheadT;
+  const firesPre = gPre.fires.length;
+  await new Promise((r) => setTimeout(r, 2600));
+  await rp.evaluate(() => window.__pause());
+  const mi1 = await rp.evaluate(() => window.__masterInfo());
+  const gPost = await grid(rp);
+  const skipped = gPre.cues.filter((c) => c.at > posPre && c.at <= (jump.ok ? jump.targetT : -Infinity));
+  const newFires = gPost.fires.slice(firesPre);
+  const jumpEvents = mi1.events.filter((e) => e.reason === "jump");
+  const V5 = {
+    masterPid: mi0.pid, jump, posPre: Math.round(posPre), posPost: Math.round(gPost.playheadT),
+    skippedCueIds: skipped.map((c) => c.id),
+    firesPre, firesPost: gPost.fires.length, newFireIds: newFires.map((f) => f.id),
+    jumpEvents: jumpEvents.map((e) => ({ jumpMs: e.jumpMs, mediaTime: +e.mediaTime.toFixed(2) })),
+    firedIdsAfter: mi1.firedIds,
+    mediaMasterStats: mi1.stats && { syncs: mi1.stats.syncs, jumps: mi1.stats.jumps,
+                                     stalls: mi1.stats.stalls, corrections: mi1.stats.corrections,
+                                     laws: mi1.stats.laws },
+  };
+  mergeReport("grid_master_jump", V5);
+  check("V5-master-jump-folds-not-bursts",
+    jump.ok && skipped.length >= 1 && newFires.length === 0 &&
+    jumpEvents.length >= 1 && skipped.every((c) => mi1.firedIds.includes(c.id)) &&
+    Math.abs(gPost.playheadT - jump.targetT) < 4000,
+    `master ${V5.masterPid} jumped ${jumpEvents.map((e) => e.jumpMs + "ms").join(",")} over cues [${V5.skippedCueIds}] — ` +
+    `BURST fires ${newFires.length} (must be 0), folded fired set [${mi1.firedIds}], playhead ${V5.posPre}->${V5.posPost} (target ${jump.targetT})`);
+
+  const report = { show: SHOW, T0, V2, V3, V4, V5, checks };
   mergeReport("grid_promoted", report);
   fs.appendFileSync(RESULTS, JSON.stringify({ t: Date.now(), kind: "verify-replay", checksPass: checks.filter((c) => c.ok).length, checksTotal: checks.length }) + "\n");
   say(`DONE — checks ${checks.filter((c) => c.ok).length}/${checks.length} pass`);

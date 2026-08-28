@@ -499,3 +499,69 @@ before replacing it, per the jam lesson:
    scratchpad `selfrec-udd*`), scenarios A1..A5, CDP
    Network.emulateNetworkConditions for A2, ps-by-udd-prefix SIGKILL for A3
    (kills ONLY selfrec-udd processes).
+
+## replay-grid: the clock-master block is now the library's — and it had a bug
+
+**A live bug, found by review and fixed here.** `replay-grid.html`'s
+hand-written clock-master block called `deck.sync()` **unconditionally**:
+
+```js
+const corr = deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });   // no jump check
+```
+
+There is no jump-vs-drift discrimination in that line. The cue kind on this page
+is `catchUp: "burst"` (a cue is a note, never silently dropped), so any
+**discontinuity** in the master tile's `currentTime` — an external scrub of the
+`<video>`, an hls.js recovery jump, a gap skip — slid the vector across every
+cue in between with a `sync()`, leaving them all `pending`, and the lookahead
+fired ALL of them at once on the next tick. That is exactly the
+burst-every-skipped-cue bug this page's own adoption of the library had already
+fixed for the SEEK path (`__seekWall` → `deck.seek` → reduce + assertState). It
+was still open on the MASTER path, because that path was hand-written.
+
+`proto/replay/replay.html` had the fix (`if (Math.abs(d) > JUMP_MS) deck.seek()`).
+Two copies of one law, one of which had lost half of it — so the law moved into
+the library as **`timeline/media-master.mjs`** and both pages now call it:
+
+```js
+mmaster = mediaMaster(deck, () => { … pick the usable tile … return {el, pos, key}; }, {
+  toleranceMs: 40, jumpMs: 250, stallMs: 1000,
+  stallPolicy: "release",     // N tiles: free the role, re-pick / free-run
+  autoPlayPause: false,       // this page owns play/pause (the scrubber does)
+});
+function loop() { …; driveFromMaster(); …; requestAnimationFrame(loop); }
+```
+
+Laws (L1 never nudge the master · L2 sync inside tolerance, **SEEK past
+`jumpMs`** · L3 a stall releases the role · L4 `timeupdate` is the hidden-tab
+backstop · L5 a paused/ended/seeking element is not a clock). `proto/replay`
+uses the same helper with `stallPolicy: "hold"` — one video, so a stall must
+stall the playhead rather than release the role.
+
+### `node proto/selfrec/verify-replay.mjs` — **6/6** (was 5/5)
+
+V1–V4 unchanged and passing (boot 2 spans + 3 cues; inter-tile skew p50 **0 ms**;
+scrubber seeks p1 −49/−65 ms, p2 −51/−41 ms inside the ±150 ms band; block
+anchoring re-measured at the 73 s tail). The new one is the regression this
+chore exists to prevent:
+
+**V5-master-jump-folds-not-bursts** — `window.__jumpMaster(T)` (new test hook)
+sets the MASTER tile's `currentTime` discontinuously, without telling the deck:
+exactly what an external scrub or an hls.js recovery jump looks like from here.
+
+| | measured |
+|---|---|
+| jump | master `p1`, **+61 189 ms**, over all three cues (`RCUE-20, RCUE-40, RCUE-60`) |
+| burst fires | **0** (the assertion; the pre-adoption code bursts here) |
+| folded fired set | `RCUE-20, RCUE-40, RCUE-60` — the skipped cues are *state*, not *events* |
+| reported | one `{reason:"jump", jumpMs:61189}` in `S.masterEvents` (`__masterInfo()`, `__deckStats().mediaMaster`) |
+| playhead | landed within 2.6 s of the jump target |
+
+The library-level negative control is in `timeline/lab/prop-nested.mjs`
+(`media-master/control`): on a virtual clock, `deck.sync()` across a 9 s gap
+bursts **9 of 10** cues on a `catchUp:'burst'` lane; `mediaMaster()` on the
+identical gap bursts **0** and folds all 9. That is the bug, reproduced and
+fixed, deterministically, in node.
+
+New page hooks: `window.__jumpMaster(T)`, `window.__masterInfo()`,
+`S.masterEvents`, and `mediaMaster` stats inside `__deckStats()`.

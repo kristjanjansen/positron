@@ -80,6 +80,7 @@ h1{font-size:14px;margin:0 0 10px}
 //   anchorN
 // ============================================================================
 import { createDeck } from "/timeline/transport.mjs";
+import { mediaMaster } from "/timeline/media-master.mjs";
 
 const q = new URLSearchParams(location.search);
 const SRC        = q.get("src");
@@ -362,6 +363,7 @@ function buildDeck(reason) {
     // deadlines in a backgrounded tab, which a 100 ms setInterval cannot.
   });
   S.hostName = deck.hostName;
+  buildMaster();                    // the library's media-element master law
   S.engineEvents.push({ reason, t: Date.now(), mediaTime: vid.currentTime,
                         pending: deck.stats().counts.pending });
 }
@@ -374,43 +376,41 @@ function buildDeck(reason) {
 //   · a DISCONTINUITY (user seek, hls.js recovery jump, gap) is routed to
 //     seek(), which reconciles statuses and re-folds, instead of sync(), which
 //     would leave every skipped cue pending and burst them all at once.
-let lastMediaT = null, lastMediaWall = 0;
+// ADOPTED (v0.5): this block WAS hand-written here, and two sibling clients had
+// their own copies of the same laws — one of which (proto/selfrec/replay-grid)
+// had silently lost the jump/sync discrimination. It is now
+// timeline/media-master.mjs, called once. `stallPolicy: "hold"` is this page's
+// half of L3: there is exactly one video, so a stall must stall the playhead
+// rather than release the role.
+let mmaster = null;
+function buildMaster() {
+  if (mmaster) mmaster.dispose();            // never two timeupdate backstops
+  mmaster = window.__mmaster = mediaMaster(deck, vid, {
+    anchorMs: () => T0,
+    toleranceMs: SYNC_TOL_MS, jumpMs: JUMP_MS, stallMs: 1000,
+    stallPolicy: "hold", autoPlayPause: true, attachTimeupdate: true,   // L4 backstop
+    onCorrection: (c) => {
+      S.syncCorrections.push(c);
+      if (S.syncCorrections.length > 500) S.syncCorrections.shift();
+    },
+    onEvent: (e) => {
+      if (e.reason === "stall") S.stalls++;
+      if (e.reason === "jump")
+        S.engineEvents.push({ reason: "resync-jump", t: e.t, mediaTime: e.mediaTime, jumpMs: e.jumpMs });
+    },
+  });
+}
 function syncFromMaster() {
-  if (!deck || T0 == null || vid.readyState < 1 || vid.seeking) return;
-  const mediaT = T0 + vid.currentTime * 1000;
-  const now = performance.now();
-  if (vid.paused || vid.ended) {
-    if (deck.playing()) deck.pause();
-    deck.sync(mediaT);
-    lastMediaT = null;
-    return;
-  }
-  const d = mediaT - deck.position();
-  if (Math.abs(d) > JUMP_MS) {                 // discontinuity => seek, not sync
-    S.engineEvents.push({ reason: "resync-jump", t: Date.now(), mediaTime: vid.currentTime,
-                          jumpMs: Math.round(d) });
-    deck.seek(mediaT);
-    lastMediaT = mediaT; lastMediaWall = now;
-    return;
-  }
-  if (lastMediaT !== null && mediaT === lastMediaT && now - lastMediaWall > 1000) {
-    if (deck.playing()) { deck.pause(); S.stalls++; }   // master stalled: hold
-  } else if (!deck.playing()) deck.play();
-  if (lastMediaT === null || mediaT !== lastMediaT) { lastMediaT = mediaT; lastMediaWall = now; }
-  const corr = deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
-  if (corr) {
-    S.syncCorrections.push(+corr.toFixed(1));
-    if (S.syncCorrections.length > 500) S.syncCorrections.shift();
-  }
+  if (!mmaster || T0 == null) return;
+  mmaster.tick();
 }
 function syncLoop() {
   requestAnimationFrame(syncLoop);
   syncFromMaster();
   S.playheadWall = playheadWall();
 }
-// rAF dies in a hidden tab; `timeupdate` (~4 Hz) does not — it is the backstop
-// that keeps the master honest when nobody is looking at the picture.
-vid.addEventListener("timeupdate", syncFromMaster);
+// (the `timeupdate` hidden-tab backstop is L4 inside the helper — rAF dies in a
+// hidden tab, `timeupdate` at ~4 Hz does not.)
 
 window.__seekTo = (sec) => {
   // Seek: state is REBUILT BY FOLD, never patched. The library reconciles
@@ -501,6 +501,7 @@ window.__deckStats = () => (deck ? {
   drift: deck.drift(), caps: deck.caps(), host: deck.hostName,
   rate: deck.rate(), targetRate: deck.targetRate(), range: deck.range,
   syncCorrections: S.syncCorrections.slice(-50), stalls: S.stalls,
+  mediaMaster: mmaster ? mmaster.stats() : null,
 } : null);
 </script>
 </body>

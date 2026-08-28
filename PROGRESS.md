@@ -148,6 +148,54 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### FRAGMENT QUOTATION + mediaMaster (session 6z) — ✅ 128 + 20/20 + 6/6 + 7/7
+- **`nest.add({id, at, rate, deck, in, out, master})`** — `in`/`out` default to
+  `deck.range`, so **the whole-range case IS the default case** and rules 1–6
+  are untouched. Rule 7: span occupies `(out−in)/rate`; **entry seeks the child
+  to `in` and ASSERTS there** (a quotation opening mid-note opens with that note
+  sounding); `out` IS the child's end for this quotation; a parent seek maps
+  `in + (parentPos−at)·rate` — same affine map, different origin, so exactness
+  is inherited (**1e-9 in prop, 0.000 ms in the client**); out-of-range clamps
+  and REPORTS `{wanted, chose, clamped, quotedFraction, reason}`; `in>=out`
+  rejected; **trim never mutates the child** (the fragment lives on the span).
+- **Twice-quoting one deck works — and forced two real library bugs out**:
+  (1) an absent span used to seek+pause the SHARED child even when a sibling
+  quotation was present (the second quotation would have played zero ms);
+  (2) the park sat inside a present→absent transition check, so play-past-then-
+  seek-before left the child at the wrong edge — **absence is a POSITION, not
+  an edge event**. Overlapping quotations of one deck are rejected at add()
+  (arithmetic, not policy) with the workaround named in the error.
+- `deck.setRange([min,max] | 'auto')` — additive; `deck.range` mutated in place
+  so identity survives; a playhead left outside is moved with a **real seek**
+  (reduce + assertState), never a silent clamp; cursor arm proves `sampleAt`
+  stays exact and ~O(1) across a range change.
+- **`timeline/media-master.mjs`**: L1 never nudge the master · **L2 drift is
+  `sync()`, a discontinuity > jumpMs is `seek()`** · L3 a stall gives up the
+  role (hold | release) · L4 `timeupdate` is the hidden-tab backstop · L5
+  paused/ended/not-ready/**seeking** is not a clock.
+- **THE LIVE BUG, REPRODUCED THEN FIXED**: `replay-grid.html` called
+  `deck.sync()` unconditionally on a page whose cue kind is `catchUp:'burst'`,
+  so any scrub or hls.js recovery jump left every skipped cue pending and burst
+  them. **Negative control (deterministic, in node): `deck.sync()` across a 9 s
+  gap bursts 9 of 10 cues; `mediaMaster()` on the identical gap bursts 0 and
+  folds all 9.** Adopted in replay-grid (release) and replay.html (hold,
+  duplicate removed).
+- Verification: prop-test green 30/100 · **prop-nested 128/0** · compose-run
+  **20/20** (fragment seek 6/6 exact, 0.000 ms; a 20 s ask on an 18.6 s session
+  clamps and reports) · verify-replay **6/6** (master jumped +61,189 ms over 3
+  cues → **0 burst fires**, all folded) · run-measure-archive **7/7 twice**,
+  run 2 reproducing the pre-adoption table to the last digit (p50 −4 / p95 11).
+- **What "timelines referencing timelines" still needs**: (1) no way to SILENCE
+  a quotation at its edges — parking asserts whatever in/out cut, so a MIDI
+  actuator holds edge notes while absent (needs `caps.absentState`/`silence()`
+  so the nest never has to know what a note is); (2) **no content addressing** —
+  in/out are numbers, "from the third chorus" needs the child's own marks as an
+  addressable lane; (3) **a quotation is not yet a VALUE** — `nest.add()`
+  mutates a nest and there is no serialisable `{deck, in, out, rate}` a stored
+  score can carry, **which is the actual C10 ask**; (4) overlapping quotations
+  are rejected, not solved (a canon/delay needs an instancing seam);
+  (5) driftStats double-reports a twice-quoted child (reporting only).
+
 ### EVIDENCE FIREWALL + PROVENANCE (session 6y) — ✅ transport v0.5, §5b's doctrine is now code
 - API: `createDeck({evidence})` / `setEvidence` (`'attested' | {restored:{maxTier:n}} | 'all'`);
   `sampleAt/reduceAt/window/bracket` all take `{evidence}`;
