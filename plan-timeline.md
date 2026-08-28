@@ -512,3 +512,75 @@ content type, not by item**; a throttled aggregator answers **200 with zero
 results** (the first ingest shipped an empty spine and reported success); and
 **the custodian is the one you cannot reach** — what plays is on an aggregator,
 uploaded by strangers, which is why provenance confidence must be first-class.
+
+## 8. LOOPS — the smallest program that quotes a trace (2026-08-28)
+
+### 8.1 Where a loop belongs
+C10 says the timeline is a TRACE and never an authoring format. A loop is
+authoring by definition — "do this again" is an instruction, not an observation —
+so **a loop is a SCORE concept, never a log concept.** The log of a looped
+performance contains N repetitions at N different timestamps, because that is
+what happened. The loop lives in `score.mjs` beside `{ref, in, out, rate}`, as
+`repeat`. This resolves cleanly and is the whole design: **a loop is a quotation
+with repetition**, which makes it the smallest possible program that quotes a
+trace — §−1's mission in one field.
+
+### 8.2 The mechanism already exists
+`nested.mjs` maps `childPos = clamp(c0 + (parentPos − at)·rate)`. A loop is the
+same map with **modulo instead of clamp**:
+`childPos = in + ((parentPos − at)·rate) mod (out − in)`.
+Everything else — reduce-on-seek, assertState, the servo, drift, absence —
+follows unchanged. A parent seek into the 7th repetition maps into the child
+exactly as it does into a single pass.
+
+### 8.3 The reducer question, and why the CC work already answered it
+What is state at time t inside repetition N? **The edge/level distinction
+decides it, per kind:**
+- **Level-valued** state (CC, filter cutoff, gain, roster, camera selection)
+  PERSISTS across the loop boundary — a filter sweep set in repetition 3 is
+  still there in repetition 4. Reduce folds the whole prefix, loop or not.
+- **Edge-valued** state (note-on/off, cues) is RE-ASSERTED per iteration —
+  each repetition sounds its own notes; a note-on from repetition 1 must not
+  still be held in repetition 3.
+This is exactly `caps` we already carry, so a loop needs no new adapter
+vocabulary — only a boundary event the adapter can hear (`loop-wrap`), so an
+edge kind can silence-and-rearm the way `caps.absentState` already does at a
+quotation edge.
+
+### 8.4 What the lineage already knew
+`tracker`'s loops are the reference: **per-loop `startBeat` + `len`, so nothing
+shares a master bar** — polymetric by construction, "any beat can be beat 0",
+and **relaunch = re-basing the origin to now, not seeking a cursor**. That is
+`{at, in, out, repeat}` with `at` rewritten on retrigger. Also from the mine:
+length snapping to whole BEATS not bars, and abort-if-empty on a toggle.
+
+### 8.5 Two pieces the score layer gets for free
+- **Phasing.** We already proved "the same deck quoted twice at different
+  fragments". Quote it twice at **rate 1.0 and 1.002** and that is Reich's
+  *It's Gonna Rain* — the phase drift is arithmetic, not a feature. The
+  twice-quoted-deck test was a phasing rig without knowing it.
+- **Disintegration.** A loop whose Nth repetition applies one more tier of
+  reconstruction is **Basinski's *Disintegration Loops* as an evidence
+  gradient**: iteration 1 is attested, iteration 12 is mostly dreamed, and the
+  strip's hatching shows it happening. That is §5b's doctrine as a piece of
+  music rather than an argument — and the honest inverse of restoration, since
+  here the reconstruction is the composition.
+
+### 8.6 Loop as an ANALYTICAL instrument, not only a musical one
+The heritage case for a loop is close listening: scrubbing a 2-second fragment
+repeatedly is how a researcher hears what is on a tape. A loop with the
+evidence firewall on is a *auditing* instrument — loop the fragment, toggle
+attested-only, and hear exactly what the archive contains versus what we
+supplied. Taavet Jansen's thesis names "how to recognise the accumulating data"
+as future work; a loop with an evidence toggle is a direct answer.
+
+### 8.7 Open questions to settle in the build
+- Is `repeat` a count, a duration, or infinite-until-stopped? (Probably all
+  three: `{repeat: n | {untilMs} | 'infinite'}`.)
+- Does a loop RE-FIRE its events or re-seek the child? (Re-seek, so
+  reduce-on-seek runs and edges re-arm — consistent with everything else.)
+- What does a loop mean for the STORE (an infinite loop over a paged log must
+  not pin pages forever) and for the RENDERER (an infinite loop cannot be
+  rendered — `renderDeck` must refuse or require a bound).
+- Crossfade at the wrap point, or hard cut? (Hard cut by default; a crossfade
+  is a reconstruction and should be declared as one.)
