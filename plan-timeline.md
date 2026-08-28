@@ -354,6 +354,49 @@ attested. Two absences, two axes.**
   adding a spatial axis is not in scope), the trapezoid interior, non-contiguous
   brackets, Monte Carlo, competing authorities, transaction time, `when` on spans.
 
+
+### 7.9 Uncertainty-as-position — BUILT (transport v0.6), and what the archive said back
+The design of §7.4 shipped: `when` is optional, **frozen per row, never interned**;
+`at = when.earliest` always, reported as an `'anchored'` degradation; `rule` is
+enforced as `<name>@<int>` (only `hand`/`unknown` may be unversioned); zero-width
+brackets are refused in words. **Nothing in the transport's ordering moved** —
+the crisp fast path is structural (a lane's `maxSpan` is 0 until a `when` row
+lands, and `window()` branches on that).
+- **`certainty` defaults to `'possible'`, and the asymmetry with the evidence
+  policy is the point**: silence about evidence can FABRICATE (dreamed data in
+  an archival answer) so it throws; silence about certainty merely widens the
+  net, so it defaults. `implicit` still distinguishes a default from a choice.
+- **The brief was wrong: `necessary` has THREE answers, not two.** Literal
+  `Y ⊇ inner` deletes a true one — an ERR year-only row (outer [1965,1966), no
+  inner) IS certainly in 1965. So: ordered inner pair → inner containment; else
+  **outer containment, sound but incomplete**; else **undecidable → excluded AND
+  reported** (`chose:'unanswerable'`, naming the rule). That third state is why
+  the inner bracket is not decoration.
+- **`caps.series` was silently wrong and is now measured**: one lane with
+  controllers 1 and 74 interleaved returned **150 — a value belonging to neither
+  controller** — in silence; now it reports `series-ambiguous` and `{series:n}`
+  answers from per-series cursors.
+- **Two-phase seek**: locate is immediate, only the roll waits, **fails open**
+  naming the laggard, a locate mid-barrier supersedes and inherits the true
+  rolling state.
+- **Kurenniemi re-expressed, 8/8, and NO number moved** (`at`/`bandMs`/
+  `precision` bit-identical, derived from `when`; the client now passes **no
+  `at` at all**, so it *cannot* pad a position because it never writes one).
+  New numbers, and they are the point: **22/22 rows are a smear — this archive
+  holds no crisply positioned row at all** — and by rule **41 % come from
+  `corpus-range@1`**: forty-one percent of the spine positioned by one guess
+  about a compilation title. All `ignorance`, none `vagueness`; `innerFrom/To`
+  null on all 22, so "certainly in 1966" is answerable here only by the
+  sound-but-incomplete outer path.
+- **Still owed by §−1**: the RENDERER (ambiguation settled and unbuilt; the
+  megatimeline aggregate is still the miscomputed `+1`-per-item sum; `when.kind`
+  is stored and nothing draws a different edge — **the transport can now say
+  what it does not know; the strip still cannot show it**), deep time
+  (regime-swapping ticks read, not built; ms spans are useless at 13.8 Gyr),
+  `when` on spans, non-contiguous brackets, **competing authorities (one `when`
+  per row — the deferral most likely to be regretted)**, transaction time, the
+  aoristic sum as a statistic, and space.
+
 ### 7.5 Honest positioning — what we thought was novel, and what actually is
 An adversarial survey refuted two of three uniqueness claims and complicated
 the third:

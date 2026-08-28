@@ -1,12 +1,15 @@
 // proto/kurenniemi/verify.mjs — one headless Chrome, one pass, hard asserts.
 //
-//   node proto/kurenniemi/verify.mjs            (serves on :8894, port is ours)
+//   node proto/kurenniemi/verify.mjs            (serves on :8896, port is ours)
 //
 // What it proves, in order:
-//   V1  the corpus loaded and every item carries a band, a precision and a
-//       provenance block with a named rights ASSERTER;
-//   V2  no item's `at` is a synthesized midpoint (the ERR trap) — `at` is
-//       always the band's lower bound;
+//   V1  the corpus loaded and every item carries a `when` bracket (nine fields,
+//       a VERSIONED rule, an ignorance/vagueness kind) and a provenance block
+//       with a named rights ASSERTER;
+//   V2  no item's `at` is a synthesized midpoint (the ERR trap) — `at` is the
+//       bracket's lower bound, ON EVERY DECK ROW, because the client passes no
+//       `at` at all and the library anchors it (v0.6 U2), and the anchoring is
+//       on the record as an 'anchored' degradation;
 //   V3  the evidence firewall BITES: sampleAt('certainty') with no policy
 //       throws EVIDENCE_POLICY_REQUIRED, because the adapter declares tier 1;
 //   V4  'attested' and restored(tier<=1) give DIFFERENT curves, and the
@@ -27,7 +30,7 @@ import { spawn } from 'node:child_process';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
-const PORT = 8894;
+const PORT = 8896;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MIME = { '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css' };
 
@@ -42,7 +45,7 @@ const server = createServer(async (req, res) => {
 await new Promise((r) => server.listen(PORT, r));
 
 const prof = join(HERE, '.chrome-verify');
-const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9334',
+const chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=9336',
   `--user-data-dir=${prof}`, '--no-first-run', '--disable-gpu', '--autoplay-policy=no-user-gesture-required',
   '--window-size=1600,1100', 'about:blank'], { stdio: 'ignore' });
 
@@ -51,7 +54,7 @@ await sleep(2500);
 
 let ws, id = 0; const waits = new Map();
 {
-  const list = await (await fetch('http://127.0.0.1:9334/json/list')).json();
+  const list = await (await fetch('http://127.0.0.1:9336/json/list')).json();
   ws = new WebSocket(list.find((t) => t.type === 'page').webSocketDebuggerUrl);
   await new Promise((r) => { ws.onopen = r; });
   ws.onmessage = (e) => { const m = JSON.parse(e.data); if (waits.has(m.id)) { waits.get(m.id)(m); waits.delete(m.id); } };
@@ -72,21 +75,46 @@ await sleep(3500);
 
 // ---- V1 corpus integrity ---------------------------------------------------
 const v1 = await ev(`(() => { const c = window.__corpus, i = c.items;
-  const bad = i.filter(x => !(x.bandMs > 0) || !x.precision || !x.prov?.rightsAsserter);
-  return { n: i.length, bad: bad.length, sources: [...new Set(i.map(x => x.prov.source))],
+  const KEYS = 'verbatim,edtf,earliest,latest,innerFrom,innerTo,rule,kind,note';
+  const VERS = /^[A-Za-z0-9][A-Za-z0-9._\\/-]*@\\d+$/;
+  const bad = i.filter(x => !x.when || Object.keys(x.when).join(',') !== KEYS
+    || !(x.when.latest > x.when.earliest) || !VERS.test(x.when.rule)
+    || !['ignorance','vagueness'].includes(x.when.kind)
+    || x.bandMs !== x.when.latest - x.when.earliest
+    || !x.prov?.rightsAsserter);
+  const pa = window.__deck.positionAccounting(['record','tape']);
+  return { n: i.length, bad: bad.length, badIds: bad.slice(0,3).map(x=>x.id),
+    sources: [...new Set(i.map(x => x.prov.source))],
+    rules: Object.fromEntries(Object.values(pa.byRule).map(r => [r.rule, +(r.fraction*100).toFixed(0)])),
+    smeared: pa.smeared, total: pa.total, inner: pa.withInner,
+    kinds: [...new Set(i.map(x => x.when.kind))],
     low: i.filter(x => x.prov.rightsConfidence === 'LOW').length,
     playable: i.filter(x => x.media?.type === 'audio/mpeg').length }; })()`);
-ok('V1 corpus: every item has band+precision+rights asserter', v1.bad === 0,
-  `${v1.n} items, ${v1.sources.length} sources, ${v1.playable} playable, ${v1.low} LOW-rights`);
+ok('V1 corpus: every item carries a nine-field `when` with a VERSIONED rule + rights asserter', v1.bad === 0,
+  `${v1.n} items, ${v1.sources.length} sources, ${v1.playable} playable, ${v1.low} LOW-rights; ` +
+  `${v1.smeared}/${v1.total} smeared, ${v1.inner} with an inner bracket, kinds [${v1.kinds}]${v1.bad ? ' BAD ' + v1.badIds : ''}`);
+R.push(`      positioned by: ${Object.entries(v1.rules).map(([r, p]) => `${p}% ${r}`).join(' · ')}`);
 
 // ---- V2 no synthesized midpoints ------------------------------------------
-const v2 = await ev(`(() => { const i = window.__corpus.items;
-  const mid = i.filter(x => { const d = new Date(x.at);
-    return x.precision === 'year' && (d.getUTCMonth() !== 0 || d.getUTCDate() !== 1); });
-  const notLower = i.filter(x => x.at !== x.dateEvidence.at);
-  return { mid: mid.length, notLower: notLower.length }; })()`);
-ok('V2 no ERR-style midpoint padding: at == band lower bound', v2.mid === 0 && v2.notLower === 0,
-  `${v2.mid} mid-year, ${v2.notLower} off-band`);
+const v2 = await ev(`(() => { const i = window.__corpus.items, d = window.__deck;
+  const mid = i.filter(x => { const dt = new Date(x.when.earliest);
+    return x.precision === 'year' && (dt.getUTCMonth() !== 0 || dt.getUTCDate() !== 1); });
+  const notLower = i.filter(x => x.at !== x.when.earliest);
+  // THE FIRING RULE, checked on the LIBRARY's rows, not the client's: the page
+  // passes no \`at\` at all, so every anchor here was resolved by U2.
+  const rows = [...d.eventsOf('record'), ...d.eventsOf('tape')];
+  const offAnchor = rows.filter(r => !r.when || r.at !== r.when.earliest);
+  const sorted = rows.slice().sort((a,b) => a.at - b.at);
+  const anch = [...d.degradations('record').reports, ...d.degradations('tape').reports]
+    .filter(r => r.chose === 'anchored');
+  return { mid: mid.length, notLower: notLower.length, rows: rows.length,
+    offAnchor: offAnchor.length, anchored: anch.length,
+    anchorReason: (anch[0] || {}).reason || null,
+    lanesSorted: d.eventsOf('record').every((r,k,a) => k === 0 || a[k-1].at <= r.at)
+      && d.eventsOf('tape').every((r,k,a) => k === 0 || a[k-1].at <= r.at) }; })()`);
+ok('V2 no ERR-style midpoint padding: at == when.earliest on every DECK row, and the anchoring is reported',
+  v2.mid === 0 && v2.notLower === 0 && v2.offAnchor === 0 && v2.anchored > 0 && v2.lanesSorted,
+  `${v2.mid} mid-year, ${v2.notLower} off-band, ${v2.offAnchor}/${v2.rows} deck rows off their anchor, ${v2.anchored} 'anchored' reports, lanes sorted ${v2.lanesSorted}`);
 
 // ---- V3 the evidence firewall bites ---------------------------------------
 const v3 = await ev(`(() => { try { window.__deck.sampleAt('certainty', ${Date.UTC(1968, 0, 1)});
@@ -116,8 +144,12 @@ await ev(`(() => { const d = window.__deck; d.resetDrift(); d.seek(${Date.UTC(19
 await sleep(12000);
 const v5 = await ev(`(() => { const d = window.__deck; d.pause();
   const deg = d.degradations('tape');
-  return { pos: d.position(), fires: d.fireCount(), tapeRefusals: deg.count,
-    reason: (deg.reports.at(-1) || {}).reason || null,
+  // count only the RATE refusals: since v0.6 the same ledger also holds the
+  // 'anchored' rows, which are a statement about position, not a refusal.
+  const rate = deg.reports.filter(r => /lattice/.test(r.reason || ''));
+  return { pos: d.position(), fires: d.fireCount(),
+    tapeRefusals: rate.reduce((a, r) => a + r.n, 0),
+    reason: (rate.at(-1) || {}).reason || null,
     audioStarted: !document.querySelector('#au').src }; })()`);
 ok('V5 sweep at 1 yr/s: tapes refused ON THE RECORD, no audio started',
   v5.tapeRefusals > 0 && v5.audioStarted,

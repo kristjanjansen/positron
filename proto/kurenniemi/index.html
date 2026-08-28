@@ -124,16 +124,23 @@ const corpus = await (await fetch('./corpus.json')).json();
 const items = corpus.items;
 
 // ---------------------------------------------------------------------------
-// The position domain IS calendar time. No re-basing, no synthetic clock: an
-// item's `at` is the epoch-ms START of the interval its evidence supports
-// (never a midpoint — ERR's YYYY-07-15 is exactly the lie this avoids), and
-// `bandMs` is how wide that interval really is.
+// The position domain IS calendar time. No re-basing, no synthetic clock.
+//
+// v0.6: the band is no longer an ad hoc `{at, bandMs, precision}` triple — it is
+// the library's own `when = {verbatim, edtf, earliest, latest, innerFrom,
+// innerTo, rule, kind, note}`, and the client no longer computes `at` at all.
+// Every item is handed to the deck with ONLY its `when`; the library resolves
+// `at = when.earliest` by U2's firing rule and records the anchoring. What the
+// corpus independently discovered ("a start is at least a LOWER BOUND that is
+// true") is now the transport's own theorem, and the rule that produced each
+// bracket is versioned and ON THE ROW — so `deck.positionAccounting()` can say
+// "41 % of this archive is positioned by corpus-range@1" out loud.
 // ---------------------------------------------------------------------------
 const T0 = Date.UTC(1941, 0, 1), T1 = Date.UTC(2018, 0, 1);
 const SPAN = T1 - T0;
 const KIND_OF = (i) => (i.kind === 'audio' ? 'tape' : 'record');
-const DERIVED = (i) => i.dateEvidence.how === 'derived-from-corpus-range'
-  || i.dateEvidence.how === 'wikidata-title-match';
+const DERIVED = (i) => i.when.rule === 'corpus-range@1' || i.when.rule === 'wikidata-title-match@1';
+const SPAN_OF = (i) => i.when.latest - i.when.earliest;
 
 // ---- lanes -----------------------------------------------------------------
 const LANES = ['life', 'work', 'instrument', 'film', 'audio'];
@@ -155,18 +162,18 @@ for (const k of LANES) {
   const mine = items.filter((i) => i.kind === k);
   const rows = [];
   for (const it of mine) {
-    const lo = it.at, hi = it.at + it.bandMs;
+    const lo = it.when.earliest, hi = it.when.latest;
     let r = rows.findIndex((end) => lo >= end);
     if (r < 0) { r = rows.length; rows.push(0); }
     rows[r] = hi;
     const b = document.createElement('div');
     b.className = 'it' + (DERIVED(it) ? ' derived' : '')
       + (it.prov.rightsConfidence === 'LOW' ? ' lowrights' : '');
-    b.style.left = pctL(it.at) + '%';
-    b.style.width = Math.max(0.12, (it.bandMs / SPAN) * 100) + '%';
+    b.style.left = pctL(it.when.earliest) + '%';
+    b.style.width = Math.max(0.12, (SPAN_OF(it) / SPAN) * 100) + '%';
     b.style.top = (4 + r * 11) + 'px';
     b.style.background = COLOR[k];
-    b.title = `${it.title}\n${it.precision} — ${it.dateEvidence.how}`;
+    b.title = `${it.title}\n${it.when.edtf} (${it.precision}) — positioned by ${it.when.rule}`;
     b.onclick = (e) => { e.stopPropagation(); focus(it); };
     laneEl(k).append(b);
     elOf.set(it.id, b);
@@ -223,6 +230,7 @@ const tapeAdapter = {
 // The value is 1 / log-band-width: how sharply the archive knows *where* it is.
 // ---------------------------------------------------------------------------
 const certainty = (bandMs) => 1 - Math.min(1, Math.log10(bandMs / 864e5 + 1) / Math.log10(4000));
+const BAND_OF = (i) => SPAN_OF(i);
 const certAdapter = {
   caps: { continuous: true, tier: 1, neighbourhood: 1, interpolators: ['linear', 'catmull'], method: 'catmull' },
   actuate() {},
@@ -235,10 +243,13 @@ const certAdapter = {
 };
 
 // ---------------------------------------------------------------------------
+// NO `at` IS PASSED. The library anchors every row at `when.earliest` and puts
+// the anchoring on the record — the client cannot accidentally pad a position
+// because it never writes one.
 const deckItems = [];
-for (const it of items) deckItems.push({ at: it.at, kind: KIND_OF(it), id: it.id, payload: it });
-for (const it of items) deckItems.push({ at: it.at, kind: 'certainty', id: 'c:' + it.id,
-  payload: { v: certainty(it.bandMs), at: it.at } });
+for (const it of items) deckItems.push({ kind: KIND_OF(it), id: it.id, payload: it, when: it.when });
+for (const it of items) deckItems.push({ kind: 'certainty', id: 'c:' + it.id, when: it.when,
+  payload: { v: certainty(BAND_OF(it)), at: it.when.earliest } });
 
 const deck = createDeck({
   items: deckItems,
@@ -262,13 +273,19 @@ function light(id) {
   const b = elOf.get(id); if (b) b.classList.add('on');
 }
 function render(p) {
-  const e = p.dateEvidence, pr = p.prov;
+  const e = p.dateEvidence, pr = p.prov, w = p.when;
   const low = pr.rightsConfidence === 'LOW';
   $('#prov').innerHTML = `
     <dt>title</dt><dd>${esc(p.title)}</dd>
-    <dt>when</dt><dd>${stamp(p.at)} &rarr; ${stamp(p.at + p.bandMs)} &nbsp;<b>${p.precision}</b>
-      (${(p.bandMs / 864e5).toFixed(0)} d wide)</dd>
-    <dt>evidence</dt><dd>${esc(e.how)}${e.raw ? ' &larr; <code>' + esc(String(e.raw)) + '</code>' : ''}${
+    <dt>when</dt><dd>[${stamp(w.earliest)}, ${stamp(w.latest)}) &nbsp;<b>${esc(w.edtf)}</b>
+      (${(SPAN_OF(p) / 864e5).toFixed(0)} d wide, closed-open) &middot;
+      <span style="color:var(--dim)">inner bracket: ${w.innerFrom === null ? 'none (CRM P81 not instantiated)' : stamp(w.innerFrom) + '&ndash;' + stamp(w.innerTo)}</span></dd>
+    <dt>positioned by</dt><dd><code>${esc(w.rule)}</code> &middot; ${esc(w.kind)} &mdash;
+      <span style="color:var(--dim)">${w.kind === 'ignorance'
+        ? 'a real moment the catalogue lost; narrowing this is a REPAIR'
+        : 'no fact of the matter; narrowing this would be a FALSIFICATION'}</span>
+      ${w.note ? '<br><span style="color:var(--dim)">' + esc(w.note) + '</span>' : ''}</dd>
+    <dt>evidence</dt><dd>${esc(e.how)}${w.verbatim ? ' &larr; verbatim <code>' + esc(String(w.verbatim)) + '</code>' : ''}${
       e.wdPrecision !== undefined ? ' &nbsp;wd precision=' + e.wdPrecision : ''}${
       e.why ? '<br><span style="color:var(--dim)">' + esc(e.why) + '</span>' : ''}</dd>
     <dt>source</dt><dd>${esc(pr.source)} &middot; <code>${esc(pr.sourceId)}</code></dd>
@@ -289,11 +306,11 @@ function load(p) {
   au.play().catch(() => {});
   // L1: the tape is never nudged; the vector bends to it. anchorMs = the item's
   // band start, so deck position = when-this-was-recorded + elapsed-in-tape.
-  mm = mediaMaster(deck, au, { anchorMs: p.at, toleranceMs: 40, jumpMs: 250, stallPolicy: 'hold' });
+  mm = mediaMaster(deck, au, { anchorMs: p.when.earliest, toleranceMs: 40, jumpMs: 250, stallPolicy: 'hold' });
   (function loop() { if (mm && dwelling === p) { requestAnimationFrame(loop); mm.tick(); } })();
 }
 function focus(it) {
-  deck.pause(); deck.setRate(1); deck.seek(it.at);
+  deck.pause(); deck.setRate(1); deck.seek(it.when.earliest);
   current = it; light(it.id); render(it);
   if (KIND_OF(it) === 'tape') load(it); else { au.pause(); dwelling = null; }
   paint();
@@ -364,6 +381,13 @@ function status() {
     `fires      ${deck.fireCount()}\n` +
     `cursor     ${c.comparisons ?? 0} cmp / ${c.hits ?? 0} hits / ${c.searches ?? 0} bisects\n` +
     `caps.tape  ${JSON.stringify(deck.caps('tape'))}\n` +
+    // U4 — the POSITION-axis accounting, beside the evidence one and never
+    // multiplied into it. This is the number NSSDA's discipline demands.
+    (() => { const pa = deck.positionAccounting(['record', 'tape']);
+      return `position   ${pa.smeared}/${pa.total} rows are a SMEAR (${(pa.smearedFraction * 100).toFixed(0)} %), ` +
+        `median band ${(pa.medianSpanMs / 864e5).toFixed(0)} d, widest ${(pa.maxSpanMs / 864e5).toFixed(0)} d\n` +
+        Object.values(pa.byRule).sort((a, b) => b.n - a.n)
+          .map((r) => `  ${(r.fraction * 100).toFixed(0).padStart(3)} %  ${r.rule}  (${r.n} rows, median ${(r.medianSpanMs / 864e5).toFixed(0)} d, inner ${r.withInner})`).join('\n') + '\n'; })() +
     (m ? `master     syncs ${m.syncs} · corrections ${m.corrections} · jumps ${m.jumps}\n` +
          `           last correction ${m.lastCorrectionMs?.toFixed?.(1) ?? '—'} ms · driving ${m.driving}`
        : 'master     — (no tape mastering the deck)');
@@ -406,5 +430,9 @@ $('#sub').innerHTML =
   `<b>${nAud}</b> playable tapes (streamed from their origin, nothing copied) &middot; ` +
   `<b>${nDer}</b> dates DERIVED, not attested &middot; ` +
   `precision: ${Object.entries(items.reduce((a, i) => (a[i.precision] = (a[i.precision] || 0) + 1, a), {}))
-    .map(([k, v]) => `${v}&thinsp;${k}`).join(' · ')}`;
+    .map(([k, v]) => `${v}&thinsp;${k}`).join(' · ')}<br>` +
+  `<span style="color:var(--dim)">every row is a smear — ` +
+  Object.values(deck.positionAccounting(['record', 'tape']).byRule).sort((a, b) => b.n - a.n)
+    .map((r) => `<b>${(r.fraction * 100).toFixed(0)}&thinsp;%</b> positioned by <code>${r.rule}</code>`).join(' · ') +
+  ` · no row carries an inner bracket, so &ldquo;certainly in 1966&rdquo; is answerable only by outer containment</span>`;
 </script>
