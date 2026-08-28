@@ -1,0 +1,335 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>loops — a quotation with repetition (plan-timeline §8)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--bg:#0b0d12;--panel:#11151d;--line:#1e2430;--ink:#c9d2e4;--dim:#7a8291;
+        --hot:#ff9f43;--a:#4cc2ff;--b:#ff6b9d;--ok:#5ad38a;--t1:#8fd3ff;--t2:#c9a0ff;--t3:#ff8a8a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:18px 20px 40px}
+  h1{font-size:15px;margin:0 0 2px;letter-spacing:.02em}
+  h1 small{color:var(--dim);font-weight:400;letter-spacing:0}
+  .sub{color:var(--dim);margin:0 0 16px;max-width:76ch}
+  .tabs{display:flex;gap:6px;margin-bottom:16px}
+  .tabs button{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+    padding:7px 14px;border-radius:5px;font:inherit;cursor:pointer}
+  .tabs button[aria-selected=true]{color:var(--bg);background:var(--ink);border-color:var(--ink)}
+  .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+  .bar button,.bar label{background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    padding:6px 12px;border-radius:5px;font:inherit;cursor:pointer}
+  .bar button:hover{border-color:var(--dim)}
+  .bar .note{border:0;background:none;color:var(--dim);padding:0;cursor:default}
+  section[hidden]{display:none}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:11px 13px;margin-bottom:14px}
+  .card h2{font-size:12px;margin:0 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:500}
+  /* an explicit CSS height: a <canvas width=N height=M> with only width:100%
+     keeps its intrinsic aspect ratio and blows up to ~1300 px tall */
+  canvas{width:100%;display:block;border-radius:5px;background:#0b0d12}
+  #p-plot{height:230px}
+  #p-strip-a,#p-strip-b{height:74px}
+  #d-bars{height:150px}
+  #d-strip{height:330px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{text-align:right;padding:3px 7px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:500}
+  td:first-child,th:first-child{text-align:left}
+  .big{font-size:22px;line-height:1.2}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 14px}
+  .kv b{color:var(--dim);font-weight:400}
+  .kv span{text-align:right;font-variant-numeric:tabular-nums}
+  .t0{color:var(--ok)}.t1{color:var(--t1)}.t2{color:var(--t2)}.t3{color:var(--t3)}
+  .swA{color:var(--a)}.swB{color:var(--b)}
+  code{color:var(--hot)}
+</style>
+
+<h1>loops <small>— a quotation with repetition · plan-timeline §8</small></h1>
+<p class="sub">A loop is <code>{ref, at, rate, in, out, repeat}</code> and the fragment map with <b>modulo instead of clamp</b>.
+Both pieces below are that one field. Neither needed new machinery.</p>
+
+<div class="tabs" role="tablist">
+  <button role="tab" id="tab-p" aria-selected="true">PHASING · Reich</button>
+  <button role="tab" id="tab-d" aria-selected="false">DISINTEGRATION · Basinski</button>
+</div>
+
+<!-- ==================== PHASING ==================== -->
+<section id="sec-p">
+  <div class="bar">
+    <button id="p-play">play</button>
+    <button id="p-mute">sound: off</button>
+    <span class="note">one tape, <span class="swA">two decks</span> <span class="swB">·</span>
+      rate <b>1.000</b> and <b>1.002</b> · both <code>repeat:'infinite'</code> · origin epoch-anchored to the 2 s grid</span>
+  </div>
+  <div class="card">
+    <h2>drift — measured against (rate−1)·elapsed</h2>
+    <canvas id="p-plot" height="220"></canvas>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h2>the number</h2>
+      <div class="big" id="p-drift">0.0 ms</div>
+      <div class="kv" id="p-kv"></div>
+    </div>
+    <div class="card">
+      <h2>the two tapes — lanes are queries</h2>
+      <canvas id="p-strip-a" height="66"></canvas>
+      <div style="height:6px"></div>
+      <canvas id="p-strip-b" height="66"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== DISINTEGRATION ==================== -->
+<section id="sec-d" hidden>
+  <div class="bar">
+    <button id="d-play">play</button>
+    <button id="d-mute">sound: off</button>
+    <button id="d-ev">evidence: all</button>
+    <button id="d-reset">reset</button>
+    <span class="note"><code>repeat:12</code> · each wrap runs one more registered reconstructor · the attested lane is never touched</span>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h2>invented, per repetition</h2>
+      <div class="big" id="d-pct">0%</div>
+      <div class="kv" id="d-kv"></div>
+      <canvas id="d-bars" height="150" style="margin-top:10px"></canvas>
+    </div>
+    <div class="card">
+      <h2>the tape — attested solid, reconstruction hatched by tier</h2>
+      <canvas id="d-strip" height="300"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <h2>the evidence ledger</h2>
+    <table id="d-table"><thead><tr><th>rep</th><th>tier</th><th>method</th><th>confidence</th>
+      <th>attested</th><th>derived</th><th>invented</th></tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<script type="module">
+import { wallClock, workerTickHost } from '../../timeline/transport.mjs';
+import { createStrip, hatchFor } from '../../timeline/strip.mjs';
+import { buildPhasing, buildDisintegration, LOOP_MS, RATE_B, DIS_ITERS, METHOD, TAPE } from './loops.mjs';
+
+const $ = (s) => document.querySelector(s);
+const clock = wallClock();
+const newHost = () => workerTickHost();
+
+// --- audio: one short blip per event, nothing clever ------------------------
+let actx = null, muted = true;
+function blip(f, gain = 0.14, dur = 0.09, tier = 0) {
+  if (muted || !actx) return;
+  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  o.type = tier === 0 ? 'triangle' : tier === 3 ? 'sawtooth' : 'sine';
+  o.frequency.value = f;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+}
+const unmute = (btn, label) => {
+  muted = !muted;
+  if (!muted && !actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx && actx.state === 'suspended') actx.resume();
+  btn.textContent = `sound: ${muted ? 'off' : 'on'}`;
+};
+
+// ===========================================================================
+// PHASING
+// ===========================================================================
+// THE GATE'S OWN LOG: every onset, its wall instant, and how late it fired
+// against the instant the transport intended. The wrap must not show up in it.
+const hits = { a: [], b: [] };
+const ph = buildPhasing({ clock, newHost, originEpochMs: Date.now() + 400,
+  onHit: (name, p, rec) => {
+    const L = hits[name];
+    L.push({ i: p.i, t: rec.firedUs / 1000, late: (rec.firedUs - rec.intendedUs) / 1000 });
+    if (L.length > 4000) L.shift();
+    blip(p.f * (name === 'b' ? 1.005 : 1), 0.1, 0.08);
+  } });
+
+const rows = [];
+const stripA = createStrip($('#p-strip-a'), ph.decks.a, {
+  lanes: [{ id: 'tape-a', kind: 'hit', label: 'tape-a · rate 1.000', height: 34, as: 'ticks', color: '#4cc2ff' }],
+  gutter: 108, follow: false, evidence: 'all',
+});
+const stripB = createStrip($('#p-strip-b'), ph.decks.b, {
+  lanes: [{ id: 'tape-b', kind: 'hit', label: `tape-b · rate ${RATE_B}`, height: 34, as: 'ticks', color: '#ff6b9d' }],
+  gutter: 108, follow: false, evidence: 'all',
+});
+stripA.fit(0, LOOP_MS); stripB.fit(0, LOOP_MS);
+
+$('#p-play').onclick = () => {
+  if (ph.parent.playing()) { ph.parent.pause(); $('#p-play').textContent = 'play'; }
+  else { if (ph.parent.position() < ph.at) ph.parent.seek(ph.at); ph.parent.play(1); $('#p-play').textContent = 'pause'; }
+};
+$('#p-mute').onclick = () => unmute($('#p-mute'));
+
+function drawPlot() {
+  const c = $('#p-plot'), dpr = devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== w * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h); g.fillStyle = '#0b0d12'; g.fillRect(0, 0, w, h);
+  const pad = { l: 54, r: 12, t: 12, b: 22 };
+  const W = w - pad.l - pad.r, H = h - pad.t - pad.b;
+  const tMax = Math.max(20000, rows.length ? rows[rows.length - 1].elapsed : 0);
+  // scale to the DATA, not to the loop: at 0.2 % the drift needs 1000 s to
+  // reach one loop length, and a fixed 2 s axis shows a flat line for the first
+  // several minutes of an effect whose whole point is that it accumulates.
+  const dMax = Math.max(50, (RATE_B - 1) * tMax * 1.15);
+  const X = (t) => pad.l + (t / tMax) * W, Y = (d) => pad.t + H - (d / dMax) * H;
+  // grid + the loop length, which is where the phase returns to unison
+  g.strokeStyle = '#1a1f2b'; g.lineWidth = 1; g.font = '10px ui-monospace,monospace';
+  for (let i = 0; i <= 4; i++) {
+    const d = (dMax / 4) * i;
+    g.beginPath(); g.moveTo(pad.l, Y(d)); g.lineTo(w - pad.r, Y(d)); g.stroke();
+    g.fillStyle = '#5b6474'; g.fillText(d >= 1000 ? `${(d / 1000).toFixed(2)}s` : `${d.toFixed(0)}ms`, 6, Y(d) + 3);
+  }
+  if (LOOP_MS <= dMax) {
+    g.strokeStyle = '#3a4356'; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(pad.l, Y(LOOP_MS)); g.lineTo(w - pad.r, Y(LOOP_MS)); g.stroke();
+    g.setLineDash([]); g.fillStyle = '#7a8291'; g.fillText('one loop — back to unison', pad.l + 6, Y(LOOP_MS) - 5);
+  }
+  // the ANALYTIC line, drawn first and thick, so the measurement sits on it
+  g.strokeStyle = '#3d4a63'; g.lineWidth = 5;
+  g.beginPath(); g.moveTo(X(0), Y(0)); g.lineTo(X(tMax), Y((RATE_B - 1) * tMax)); g.stroke();
+  // the MEASUREMENT
+  g.strokeStyle = '#ff9f43'; g.lineWidth = 1.6; g.beginPath();
+  rows.forEach((r, i) => (i ? g.lineTo(X(r.elapsed), Y(r.drift)) : g.moveTo(X(r.elapsed), Y(r.drift))));
+  g.stroke();
+  g.fillStyle = '#5b6474';
+  g.fillText(`0s`, pad.l, h - 7); g.fillText(`${(tMax / 1000).toFixed(0)}s`, w - pad.r - 24, h - 7);
+  g.fillStyle = '#3d4a63'; g.fillText('predicted  (rate−1)·elapsed', pad.l + 6, pad.t + 12);
+  g.fillStyle = '#ff9f43'; g.fillText('measured', pad.l + 6, pad.t + 26);
+}
+
+function tickPhasing() {
+  ph.nest.servo();
+  const s = ph.sample();
+  if (s.elapsed >= 0 && (!rows.length || s.elapsed - rows[rows.length - 1].elapsed > 250)) rows.push(s);
+  const fit = rows.length > 8 ? ph.fit(rows) : null;
+  $('#p-drift').innerHTML = `${s.drift.toFixed(1)} ms <span style="color:#7a8291;font-size:13px">drift</span>`;
+  $('#p-kv').innerHTML = [
+    ['predicted (rate−1)·elapsed', `${s.predicted.toFixed(1)} ms`],
+    ['residual', `${s.residual.toFixed(2)} ms`],
+    ['fit slope', fit ? fit.slope.toExponential(5) : '—'],
+    ['expected slope', (RATE_B - 1).toExponential(5)],
+    ['slope error', fit ? `${fit.slopeErrorPpm.toFixed(1)} ppm` : '—'],
+    ['residual p95 / max', fit ? `${fit.residualP95.toFixed(2)} / ${fit.residualMax.toFixed(2)} ms` : '—'],
+    ['phase inside the loop', `${s.phaseMs.toFixed(0)} / ${LOOP_MS} ms`],
+    ['wraps A / B', `${s.wrapsA} / ${s.wrapsB}`],
+    ['back to unison in', `${Math.max(0, s.unisonInMs / 1000).toFixed(0)} s`],
+    ['samples', String(rows.length)],
+  ].map(([k, v]) => `<b>${k}</b><span>${v}</span>`).join('');
+  drawPlot();
+}
+
+// ===========================================================================
+// DISINTEGRATION
+// ===========================================================================
+let dis = null, dStrip = null;
+function buildDis() {
+  if (dis) { dis.dispose(); }
+  dis = buildDisintegration({ clock, newHost,
+    onTone: (p) => blip(p.f, 0.09 * (p.g ?? 1), 0.16, p.tier ?? 0) });
+  dis.nest.onWrap(() => { syncLanes(); renderDis(); });
+  if (dStrip) dStrip.dispose();
+  dStrip = createStrip($('#d-strip'), dis.child, { gutter: 128, follow: false, evidence: 'all', loop: true });
+  syncLanes();
+  dStrip.fit(0, dis.loopMs);
+  $('#d-ev').textContent = 'evidence: all';
+  renderDis();
+}
+function syncLanes() {
+  const ls = dis.lanes().map((k, i) => {
+    const p = dis.child.provenanceOf(k) || {};
+    const tier = p.tier || 0;
+    return { id: k, kind: k, as: 'ticks', height: i === 0 ? 30 : 22,
+      label: i === 0 ? 'tone · attested' : `${k.replace('tone~', '')} · t${tier}`,
+      color: tier === 0 ? '#5ad38a' : tier === 1 ? '#8fd3ff' : tier === 2 ? '#c9a0ff' : '#ff8a8a',
+      dash: hatchFor(tier), alpha: tier ? 0.62 : 0.95 };
+  });
+  dStrip.setLanes(ls);
+  dStrip.fit(0, dis.loopMs);
+}
+function renderDis() {
+  const per = dis.perIteration, last = per[per.length - 1];
+  $('#d-pct').innerHTML = `${last.inventedPct}% <span style="color:#7a8291;font-size:13px">invented · repetition ${last.repetition}/${dis.iters}</span>`;
+  const a = dis.accounting();
+  $('#d-kv').innerHTML = [
+    ['attested rows (never moves)', String(a.attested)],
+    ['derived rows', String(a.restored)],
+    ['tier 1 · interpolation', String(a.byTier[1] || 0)],
+    ['tier 2 · inpainting', String(a.byTier[2] || 0)],
+    ['tier 3 · generative', String(a.byTier[3] || 0)],
+    ['derived lanes', String(dis.lanes().length - 1)],
+    ['wraps', String(dis.nest.loop('D').wraps)],
+    ['evidence policy', (dis.evidence() || {}).label || '—'],
+  ].map(([k, v]) => `<b>${k}</b><span>${v}</span>`).join('');
+  $('#d-table').tBodies[0].innerHTML = per.map((r) => `<tr>
+    <td>${r.repetition}</td><td class="t${r.tier}">${r.tier}</td><td>${r.method}</td>
+    <td>${r.confidence}</td><td>${r.attested}</td><td>${r.restored}</td>
+    <td class="t${r.tier}">${r.inventedPct}%</td></tr>`).join('');
+  // the bars
+  const c = $('#d-bars'), dpr = devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== w * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const n = dis.iters, bw = w / n;
+  for (let i = 0; i < n; i++) {
+    const r = per[i];
+    const x = i * bw + 1.5, bwi = bw - 3;
+    g.fillStyle = '#171d28'; g.fillRect(x, 0, bwi, h - 14);
+    if (!r) continue;
+    const hh = (h - 14) * r.inventedFraction;
+    g.fillStyle = ['#5ad38a', '#8fd3ff', '#c9a0ff', '#ff8a8a'][r.tier];
+    g.globalAlpha = r.tier ? 0.72 : 0.95;
+    g.fillRect(x, h - 14 - hh, bwi, hh);
+    g.globalAlpha = 1;
+    g.fillStyle = '#7a8291'; g.font = '9px ui-monospace,monospace';
+    g.fillText(String(r.repetition), x + bwi / 2 - 3, h - 3);
+  }
+  g.fillStyle = '#5b6474'; g.font = '10px ui-monospace,monospace';
+  g.fillText('invented fraction, per repetition — colour is §5b tier', 4, 11);
+}
+$('#d-play').onclick = () => {
+  if (dis.parent.playing()) { dis.parent.pause(); $('#d-play').textContent = 'play'; }
+  else { dis.parent.play(1); $('#d-play').textContent = 'pause'; }
+};
+$('#d-mute').onclick = () => unmute($('#d-mute'));
+$('#d-ev').onclick = () => {
+  const now = (dis.evidence() || {}).mode;
+  const next = now === 'attested' ? 'all' : 'attested';
+  dis.setEvidence(next); dStrip.setEvidence(next);
+  $('#d-ev').textContent = `evidence: ${next}`;
+  renderDis();
+};
+$('#d-reset').onclick = () => { buildDis(); $('#d-play').textContent = 'play'; };
+
+// ===========================================================================
+let mode = 'p';
+const setMode = (m) => {
+  mode = m;
+  $('#tab-p').ariaSelected = String(m === 'p'); $('#tab-d').ariaSelected = String(m === 'd');
+  $('#sec-p').hidden = m !== 'p'; $('#sec-d').hidden = m !== 'd';
+  if (m === 'p') { stripA.invalidate(); stripB.invalidate(); } else { dStrip.fit(0, dis.loopMs); }
+};
+$('#tab-p').onclick = () => setMode('p');
+$('#tab-d').onclick = () => setMode('d');
+
+buildDis();
+setInterval(() => { tickPhasing(); dis.nest.servo(); }, 40);
+// the servo is only the BACKSTOP now — the wrap itself is a committed one-shot
+// on the worker tick host — but rAF keeps the position servo tight anyway.
+(function raf(){ ph.nest.servo(); dis && dis.nest.servo(); requestAnimationFrame(raf); })();
+// the tape's own spacing per onset index — what an inter-onset interval SHOULD
+// be, so the wrap's interval is compared against the real figure and not an
+// average. index 0's nominal gap is (loop end - last onset) + 0.
+const NOMINAL = TAPE.map((t, i) => (i === 0 ? LOOP_MS - TAPE[TAPE.length - 1].at : t.at - TAPE[i - 1].at));
+window.__hits = hits;
+window.__loops = { ph, rows, get dis() { return dis; }, tickPhasing, LOOP_MS, RATE_B, DIS_ITERS, NOMINAL, TAPE };
+</script>

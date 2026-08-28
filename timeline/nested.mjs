@@ -109,12 +109,51 @@
 //
 // No timers live in here (the vector law): `servo()` is called by the client's
 // existing rAF/interval loop, exactly like the media servo every media client
-// already runs.
+// already runs. ONE EXCEPTION, added by rule 10 and only for loops: the wrap
+// boundary is COMMITTED as a cancellable one-shot on a caller-supplied TickHost
+// — the same mechanism transport.mjs uses to commit every event. The vector law
+// is untouched: `position()` is still pure, and the timer actuates, it does not
+// integrate.
 //
 // Plain ESM, browser+node, no deps beyond the library itself.
 
+// 10. A LOOP IS A QUOTATION WITH REPETITION (plan-timeline §8). `add({… repeat})`
+//     — a count, `{untilMs}`, or `'infinite'` — and rule 7d's affine map takes
+//     **modulo instead of clamp** (§8.2):
+//         childPos = in + ((parentPos − at)·rate) mod (out − in)
+//     Everything else follows unchanged, which is the whole claim. What the
+//     build had to settle (§8.7) is here and nowhere else:
+//
+//     a. THE WRAP RE-SEEKS, IT DOES NOT RE-FIRE. At the boundary the nest calls
+//        a real `child.seek(in)` — so reduce-on-seek runs one level down, and
+//        every EDGE-valued lane re-arms from the fragment's entry state. A
+//        note-on from repetition 1 cannot be held in repetition 3, because
+//        repetition 3 began by asserting what is held at `in`. That is rule 3
+//        applied to a boundary the parent generates instead of the user.
+//     b. LEVEL-VALUED LANES CARRY (§8.3). A lane declaring `caps.loopState:
+//        'carry'` (or `caps.valued: 'level'`) is re-asserted AFTER the re-seek
+//        with `reduce(prefix ≤ out)` — the level the iteration ENDED in. A
+//        filter sweep set in repetition 3 is still there in repetition 4; a
+//        note is not. §8.3 said this needs "no new adapter vocabulary"; it
+//        needs exactly one word, because transport.mjs has no edge/level flag
+//        (`absentState` is the nearest thing and it is about ABSENCE). The
+//        default is 'rearm' — the safe direction, matching `absentState:'hold'`.
+//     c. A WRAP IS NOT AN EVENT IN THE LOG. `nest.onWrap(cb)` and the optional
+//        `adapter.loopWrap(info)` are CALLBACKS. Appending a `loop-wrap` row
+//        would make an infinite loop an infinite log, which is §8.7's store
+//        question answered by refusing to create it.
+//     d. AN UNBOUNDED LOOP IS BOUND AT add() TIME to the parent's own range,
+//        and says so (`span.unbounded`, `nest.loop(id).boundedTo`). It cannot
+//        be RENDERED: `nest.renderBound()` throws `LOOP_UNBOUNDED` rather than
+//        handing renderDeck a window nothing in the score justifies.
+//     e. HARD CUT AT THE WRAP. There is no crossfade here at all, because a
+//        crossfade across a splice is §5b tier 1 — a reconstruction — and a
+//        reconstruction is an appended lane with a tier, not a nest parameter.
+//        `nest.loop(id).joint` says `'cut'` and names the alternative.
+
 import { pstats } from './logdeck.mjs';
-import { isQuotation, quotation, score, deckRef, refDeck, resolveAddress, isMarkAddress, normalizeProvenance } from './score.mjs';
+import { isQuotation, quotation, score, deckRef, refDeck, resolveAddress, isMarkAddress, normalizeProvenance,
+         normalizeRepeat, repeatGeometry, loopPhase } from './score.mjs';
 
 // --- the nesting graph (rule 6) --------------------------------------------
 const CHILDREN = new WeakMap();   // deck -> Set<deck>
@@ -194,16 +233,43 @@ export function createNest(parent, {
   epsMs = 0.5,
   resolve = null,          // rule 8: (ref, quotation) -> deck, for score loading
   markKind = 'mark',       // rule 8: the child lane a {mark:'id'} address reads
+  // rule 10a: how late a wrap may still play the head of its pass. The default
+  // IS transport.mjs's `lateGraceMs`, deliberately — one constant, one meaning.
+  wrapGraceMs = 150,
+  // rule 10a: THE WRAP IS COMMITTED, NOT POLLED. A TickHost (the same object
+  // `createDeck({tickHost})` takes) whose `setTimer` the nest arms one-shot for
+  // the exact instant of the next loop boundary — the identical mechanism the
+  // scheduler uses to commit every event, so a wrap-adjacent event has the same
+  // firing-error distribution as any other event and not a worse one.
+  // Without it the boundary is discovered by `servo()` instead, which is
+  // correct but late by up to one client-loop period, and the nest SAYS SO
+  // (`nest.loop(id).boundary === 'polled'`) rather than quietly stuttering.
+  tickHost = null,
 } = {}) {
+  const boundaryHost = tickHost && typeof tickHost.setTimer === 'function' ? tickHost : null;
+  const clockNow = () => parent.transport.clock.now();
   const spans = new Map();     // id -> span record
   let masterId = null, servoTicks = 0, disposed = false;
+  const wrapCbs = new Set();   // rule 10c
 
-  const parentDurOf = (sp) => (sp.c1 - sp.c0) / sp.rate;
+  const parentDurOf = (sp) => sp.parentDur;
   const inSpan = (sp, pos) => pos >= sp.at - epsMs && pos <= sp.at + sp.parentDur + epsMs;
   // rule 7d: the fragment map. c0 IS `in`, so this is the whole-range map with
   // a different origin — and it stays exact because it is still one multiply.
-  const toChild = (sp, pos) => Math.max(sp.c0, Math.min(sp.c1, sp.c0 + (pos - sp.at) * sp.rate));
-  const toParent = (sp, cpos) => sp.at + (cpos - sp.c0) / sp.rate;
+  // rule 10 / §8.2: a LOOPING span is the same map with MODULO instead of
+  // clamp. `loopPhase` lives in score.mjs so the nest, the property arms and a
+  // client all phrase the loop with one function.
+  const phaseOf = (sp, pos) => loopPhase((pos - sp.at) * sp.rate, sp.c1 - sp.c0, sp.childTotal);
+  const toChild = (sp, pos) => (sp.loop
+    ? sp.c0 + phaseOf(sp, pos).off
+    : Math.max(sp.c0, Math.min(sp.c1, sp.c0 + (pos - sp.at) * sp.rate)));
+  const iterAt = (sp, pos) => (sp.loop ? phaseOf(sp, pos).iter : 0);
+  /** The inverse. A loop has MANY parent positions per child position — one per
+   *  repetition — so the caller must say which, and the default is the span's
+   *  current one. Getting this wrong is how a mastering loop would teleport the
+   *  parent back one iteration on every wrap. */
+  const toParent = (sp, cpos, iter = sp.iter || 0) =>
+    sp.at + ((cpos - sp.c0) + (sp.loop ? iter * (sp.c1 - sp.c0) : 0)) / sp.rate;
 
   /** rule 7g: is some OTHER span quoting the SAME deck present right now? If so
    *  this span's absence is not the child's absence, and must not touch it. */
@@ -232,13 +298,15 @@ export function createNest(parent, {
    *  to be silent. `deck.adapters` is the constructor-registered map that
    *  transport.mjs already exposes.
    *
-   *  ⚠ SEAM: an adapter registered AFTER construction (`deck.sched
-   *  .registerAdapter(...)`) lives in the scheduler's private map and is not
-   *  reachable from here. transport.mjs is owned by a sibling this cycle, so the
-   *  hook it wants — `sched.adapter(kind)` or a `deck.silence()` that fans out
-   *  internally — is NOT added here. Until it exists, such an adapter is
-   *  reported as `unreachable` rather than silently skipped. */
-  const adaptersOf = (deck) => (deck && deck.adapters && typeof deck.adapters === 'object' ? deck.adapters : {});
+   *  ✔ SEAM CLOSED (transport v0.6): the hook this note asked for — `deck
+   *  .adapter(kind)` reading the scheduler's own map, and a `deck.silence()`
+   *  that fans out internally — now exists, so an adapter registered AFTER
+   *  construction is reachable. The fallback below is kept for a deck that
+   *  predates it (logdeck, a hand-rolled facade); rule 10's `loopLanes()` uses
+   *  the closed seam directly. */
+  const adaptersOf = (deck) => (typeof deck.adapter === 'function'
+    ? new Proxy({}, { get: (_, k) => deck.adapter(String(k)), has: (_, k) => !!deck.adapter(String(k)) })
+    : (deck && deck.adapters && typeof deck.adapters === 'object' ? deck.adapters : {}));
 
   /** Ask every lane of the child that declared `caps.absentState:'silence'` to
    *  be silent. The nest passes a reason and a position and learns nothing about
@@ -273,6 +341,207 @@ export function createNest(parent, {
     return rep;
   }
 
+  // --- rule 10a/10b: THE WRAP BOUNDARY ---------------------------------------
+
+  /** Split the child's lanes into the ones that RE-ARM at a wrap and the ones
+   *  that CARRY across it (§8.3's edge/level distinction, per kind).
+   *
+   *  transport.mjs carries no edge/level flag — the survey is unambiguous — so
+   *  this reads `caps.loopState: 'rearm' | 'carry'`, accepting `caps.valued:
+   *  'level' | 'edge'` (proto/automation/NOTES.md's own words) as a synonym.
+   *  The DEFAULT IS 'rearm', for the same reason `absentState` defaults to
+   *  'hold': a silent wrong guess about state that survives a boundary is worse
+   *  than a lane that has to say what it is. Declaring 'carry' on a lane the
+   *  transport cannot re-fold is a reported degradation, never a guess. */
+  function loopLanes(deck) {
+    const caps = typeof deck.caps === 'function' ? (deck.caps() || {}) : {};
+    const carry = [], rearm = [], degraded = [];
+    for (const [k, c] of Object.entries(caps)) {
+      const declared = (c && c.loopState) || (c && c.valued === 'level' ? 'carry' : c && c.valued === 'edge' ? 'rearm' : null);
+      if (!declared || declared === 'rearm') { rearm.push(k); continue; }
+      if (declared !== 'carry') {
+        degraded.push({ kind: k, wanted: declared, chose: 'rearm', degraded: true,
+          reason: `caps.loopState '${declared}' is not a mode this nest knows — use 'carry' | 'rearm'` });
+        continue;
+      }
+      // `deck.adapter(k)` reaches adapters registered AFTER construction too
+      // (transport v0.6). The seam noted at silenceChild() below is CLOSED.
+      const ad = typeof deck.adapter === 'function' ? deck.adapter(k) : (deck.adapters || {})[k];
+      if (!ad || typeof ad.reduce !== 'function' || typeof ad.assertState !== 'function') {
+        degraded.push({ kind: k, wanted: 'carry', chose: 'rearm', degraded: true,
+          reason: `lane '${k}' declares caps.loopState 'carry' but has no reduce()+assertState() — there is nothing to carry, so the wrap re-arms it like an edge` });
+        continue;
+      }
+      carry.push(k);
+    }
+    return { carry, rearm, degraded };
+  }
+
+  /**
+   * §8.7, answered: a loop RE-SEEKS the child, it does not re-fire its events.
+   * The archaeology settles it three independent ways
+   * (research/loops-prior-art-2026-08.md): tracker has no re-fire operation to
+   * have; `time/timeline-emitter.js` stored `played:true` ON THE EVENT, so a
+   * second pass needed a hand-unwind — mutable per-event cursor state makes a
+   * loop structurally unbuildable; and proto/remixer already replaced
+   * N×`play()` with one `seek(0); play()` because the layers then STAY together
+   * instead of only starting together.
+   *
+   * Order matters and this is the order:
+   *   1. tell the adapters that ASKED for the boundary (`loopWrap`) — before,
+   *      so a real MIDI lane can flush ahead of the fold rather than after it;
+   *   2. `child.seek(in)` — a REAL seek, so reduce+assertState runs one level
+   *      down and every edge-valued lane re-arms from what is held at `in`;
+   *   3. re-assert the CARRY lanes at `out` — the level the iteration ended in.
+   *
+   * Step 1 IS OPT-IN, and that is the archaeology's headline: **the wrap is not
+   * an event, it is the absence of one.** tracker's loop is `(((beat −
+   * startBeat) % len) + len) % len` with NO wrap handler, and it rings notes
+   * across the boundary on purpose, because a fire-and-forget envelope has no
+   * held state to leak. A lane opts in by implementing `loopWrap()`; a lane
+   * with no reducer is not even touched by step 2 (transport's assertAt skips
+   * it), so it rings across the wrap exactly as tracker's does.
+   *
+   * Step 2 is what makes "no stuck notes, ever" structural rather than
+   * disciplinary, for the lanes that DO hold state: repetition N does not
+   * inherit repetition N−1's state, it states its own.
+   */
+  /**
+   * WHERE THE WRAP SEEKS, and it is not quite `in`.
+   *
+   * `deck.seek(p)` reconciles: everything at `at <= p` becomes `passed`. So a
+   * seek to exactly `in` FOLDS an event sitting exactly on `in` instead of
+   * firing it — which is right for a fragment (rule 7b: entry asserts at `in`)
+   * and wrong for a loop, where that event is the downbeat and the tape has
+   * come round to play it. A quotation is `[in, out)`, half-open, so the
+   * wrap seeks a hair BEFORE `in`: the fold is still the state strictly before
+   * the downbeat, and the downbeat is still pending and commits immediately.
+   *
+   * The one case the library cannot fix from here is `in === deck.range[0]`,
+   * where the seek clamps and the hair is lost. That is REPORTED, not hidden.
+   */
+  const WRAP_LEAD_MS = 1e-6;
+  function wrapSeekTarget(sp) {
+    const want = sp.c0 - WRAP_LEAD_MS;
+    const got = Math.max(sp.deckRange[0], want);
+    if (got !== want && !sp.leadClamped) {
+      sp.leadClamped = true;
+      sp.loopDegradations.push({ kind: '*', wanted: 'wrap-lead', chose: 'clamped', degraded: true,
+        reason: `this quotation's \`in\` (${sp.c0}) IS the child's range start, so the wrap cannot seek before it — ` +
+          'an event sitting exactly on `in` is FOLDED at every wrap instead of firing (a lost downbeat). ' +
+          'Move `in` inside the child\'s range, or widen the child\'s range by one unit.' });
+    }
+    return got;
+  }
+
+  function wrapSpan(sp, toIter, pos, reason = 'wrap') {
+    const from = sp.iter;
+    // A WRAP ALWAYS SEEKS TO THE TOP OF THE PASS, never to `toChild(pos)`.
+    // Two reasons, and the second is the one that was measured:
+    //   · a committed one-shot may fire a hair EARLY, and `toChild` would then
+    //     read the last microsecond of the OLD iteration off the map;
+    //   · a backstopped wrap is late by however long the client's loop took,
+    //     and seeking to `in + off` would deliberately SKIP that much of the
+    //     new pass — a lost downbeat, which is exactly the artefact. Seeking to
+    //     the top instead fires it, `off` ms late, which is what lateGrace is
+    //     for; the servo's next sync closes the position error without
+    //     re-firing anything.
+    //
+    // …UP TO A POINT, and the point is the transport's own `lateGraceMs`. That
+    // constant is already the library's answer to *how late may an event still
+    // fire?*, so it is also the answer to *how late may a wrap still play the
+    // head of its pass?* Past it — a 30 s blurred tab — the material was
+    // genuinely missed, and the child lands where the clock says instead of
+    // playing a head it would immediately have to jump out of.
+    // SIGNED distance from the boundary, in child ms — negative when a
+    // committed one-shot fires a hair early. Reading `phaseOf(pos).off` here
+    // instead was a real bug: an early timer saw off ≈ L, decided it was a
+    // 2-second-late catch-up, and seeked to the END of the pass it was about
+    // to play. 141 of 2400 onsets vanished before this line existed.
+    const lateMs = (pos - (sp.at + toIter * sp.onePassMs)) * sp.rate;
+    const want = lateMs <= wrapGraceMs ? wrapSeekTarget(sp)
+      : sp.c0 + Math.min(sp.c1 - sp.c0, lateMs);
+    const lanes = sp.loopLanes || (sp.loopLanes = loopLanes(sp.deck));
+    const info = {
+      span: sp.id, ref: deckRef(sp.deck) || null, reason,
+      from, to: toIter, wraps: sp.wraps + 1, iterations: sp.iterations,
+      parentPos: pos, childPos: want, in: sp.c0, out: sp.c1, lengthMs: sp.c1 - sp.c0,
+      carry: lanes.carry, rearm: lanes.rearm, joint: 'cut',
+    };
+    const ads = typeof sp.deck.adapter === 'function' ? (k) => sp.deck.adapter(k) : (k) => (sp.deck.adapters || {})[k];
+    const caps = typeof sp.deck.caps === 'function' ? (sp.deck.caps() || {}) : {};
+    info.heard = [];
+    for (const k of [...lanes.rearm, ...lanes.carry]) {
+      const ad = ads(k), c = caps[k] || {};
+      if (ad && typeof ad.loopWrap === 'function') {
+        try { ad.loopWrap({ ...info, kind: k }); info.heard.push(k); } catch (e) { sp.wrapErrors.push(String(e.message)); }
+      } else if (c.loopWrap) {
+        // symmetric with rule 9: a declared capability that is not implemented
+        // is a DEGRADATION, never a silent skip.
+        sp.loopDegradations.push({ kind: k, wanted: 'loopWrap', chose: 'none', degraded: true,
+          reason: `adapter '${k}' declares caps.loopWrap but implements no loopWrap(info) — the wrap still re-seeks, but this lane is never told` });
+      }
+    }
+    sp.deck.seek(want);                                    // 2 — the re-seek
+    for (const k of lanes.carry) sp.deck.assertAt(sp.c1, k);  // 3 — the carry
+    sp.iter = toIter; sp.wraps++; sp.lastWrap = info;
+    if (lanes.degraded.length) for (const d of lanes.degraded) if (!sp.loopDegradations.some((x) => x.kind === d.kind && x.wanted === d.wanted)) sp.loopDegradations.push(d);
+    for (const cb of [...wrapCbs]) { try { cb(info); } catch (e) { sp.wrapErrors.push(String(e.message)); } }
+    armWrap(sp);                                   // roll to the next boundary
+    return info;
+  }
+
+  // --- THE COMMITTED BOUNDARY -------------------------------------------------
+  //
+  // The gate: *loops stay in time and do not lag on re-seek.* Two things keep
+  // that true, and they are deliberately separate:
+  //
+  //   POSITION IS ARITHMETIC AND NEVER PAUSES. `toChild` is re-derived from the
+  //   parent's vector every call — never integrated, never "add one loop
+  //   length" — so the timing error at wrap 500 is the error at wrap 1. There
+  //   is nothing to accumulate because nothing accumulates.
+  //
+  //   THE RE-SEEK IS A STATE OPERATION, NOT A TRANSPORT ONE. `deck.seek()`
+  //   re-anchors the vector and re-folds; it does not stop the transport, does
+  //   not move the rate, and does not re-issue play(). transport.mjs's own seek
+  //   handler ends with `scan(now)` — *"re-arm immediately, don't wait a tick"* —
+  //   so the next iteration's lookahead is committed inside the same call.
+  //
+  // What was missing was WHEN. A boundary discovered by polling `servo()` is
+  // late by up to one client-loop period, and everything in that window is
+  // folded rather than fired: a 40 ms hole in the head of every pass. So the
+  // boundary is COMMITTED, exactly as an event is — one cancellable one-shot
+  // per span, re-armed from the ITERATION INDEX (`at + k·onePass`) and never
+  // from the last boundary, so it cannot drift either.
+  function disarmWrap(sp) { if (sp.timerCancel) { try { sp.timerCancel(); } catch {} sp.timerCancel = null; } sp.armedFor = null; }
+
+  function armWrap(sp) {
+    disarmWrap(sp);
+    if (disposed || !boundaryHost || !sp.loop) return;
+    if (!parent.playing()) return;
+    const r = sp.rateReport;
+    if (!r || !(r.chose > 0)) return;
+    const pos = parent.position();
+    if (!inSpan(sp, pos)) return;
+    // MONOTONIC BY CONSTRUCTION. A one-shot is allowed to fire a hair early, so
+    // `phaseOf(pos).iter` can still read the OLD repetition just after a wrap;
+    // taking the max with `iter + 1` is what stops that from re-arming the
+    // boundary we just took, forever. (It did, once. This line is that bug.)
+    const next = Math.max(phaseOf(sp, pos).iter + 1, sp.iter + 1);
+    if (Number.isFinite(sp.iterations) && next >= sp.iterations) return;   // the last pass has no wrap
+    const at = sp.at + next * sp.onePassMs;                                // FROM THE INDEX
+    if (at > sp.at + sp.parentDur + epsMs) return;
+    const delay = parent.transport.timeAt(at) - clockNow();
+    sp.armedFor = next;
+    sp.timerCancel = boundaryHost.setTimer(Math.max(0, delay), () => {
+      sp.timerCancel = null; sp.armedFor = null;
+      if (disposed || !parent.playing() || !inSpan(sp, parent.position())) return;
+      if (next <= sp.iter) return;                         // already taken (a seek beat us)
+      wrapSpan(sp, next, parent.position(), 'boundary');
+    });
+  }
+  const armAll = () => { for (const [, sp] of spans) if (sp.loop) armWrap(sp); };
+
   function applyRate(sp) {
     const r = composeRate(parent.targetRate(), sp.rate, sp.allowed);
     if (r.degraded && (!sp.rateReport || sp.rateReport.chose !== r.chose)) sp.degradations++;
@@ -287,6 +556,7 @@ export function createNest(parent, {
   function assertSpan(sp, parentPos, present) {
     const inside = present && inSpan(sp, parentPos);
     if (!inside) {
+      if (sp.loop) disarmWrap(sp);
       // rule 7g: a sibling quotation of the same deck owns the child right now.
       // Parking would drag it out from under the span that IS present.
       if (otherPresentOn(sp, parentPos)) {
@@ -304,7 +574,11 @@ export function createNest(parent, {
       // to BEFORE it, and the child stayed at `out` because the transition had
       // already been spent. Absence is a POSITION, not an edge event, so the
       // park is now driven by where the child actually is.
-      const park = parentPos < sp.at ? sp.c0 : sp.c1;
+      // rule 10: "the edge you actually left through" is not always `out` for a
+      // loop. `repeat:{untilMs}` may CUT the last pass, and the child then left
+      // through the cut — parking it at `out` would assert a state the
+      // performance never reached. `endPark` is that position, computed once.
+      const park = parentPos < sp.at ? sp.c0 : sp.endPark;
       if (parksIt(sp, parentPos)) {
         if (sp.deck.position() !== park) { sp.deck.seek(park); sp.silencedAt = null; }
         // RULE 9: the park ASSERTED the edge — whatever `in`/`out` cut is now
@@ -316,7 +590,17 @@ export function createNest(parent, {
       return;
     }
     applyRate(sp);
-    sp.deck.seek(toChild(sp, parentPos));
+    // rule 10: `in` IS INCLUSIVE ON EVERY PASS, INCLUDING THE FIRST. Rule 7b
+    // says entry seeks to `in` and asserts there — which folds an event sitting
+    // exactly on `in` rather than firing it. For a single pass that is right
+    // (you started there). For a loop it would make pass 1 the only pass
+    // missing its downbeat, so entry takes the same hair-before-`in` lead a
+    // wrap takes, and every repetition sounds identical.
+    sp.deck.seek(sp.loop && phaseOf(sp, parentPos).off === 0 ? wrapSeekTarget(sp) : toChild(sp, parentPos));
+    // rule 10a: a SEEK is a seek, at any depth and into any repetition. It
+    // lands in whichever iteration the arithmetic says and folds there; it does
+    // NOT wrap, so nothing carries — you jumped, you did not arrive.
+    if (sp.loop) { sp.iter = iterAt(sp, parentPos); armWrap(sp); }
     sp.silencedAt = null;                    // present again: the fold re-asserts
     if (sp.present !== true) { sp.present = true; sp.enters++; }
     if (parent.playing() && sp.rateReport.chose > 0) sp.deck.play(); else sp.deck.pause();
@@ -351,6 +635,9 @@ export function createNest(parent, {
         }
         const r = applyRate(sp);
         if (parent.playing() && r.chose > 0) sp.deck.play(); else sp.deck.pause();
+        // play/pause/rate move the boundary's WALL time without moving its
+        // POSITION, so the committed one-shot has to be re-armed here.
+        if (sp.loop) armWrap(sp);
       }
     },
     reduce(payloads, pos) {
@@ -401,7 +688,7 @@ export function createNest(parent, {
         if (!d) throw new Error(`nest.add: quotation names ref '${qval.ref}' and no resolver supplied a deck for it — ` +
           'pass createNest(parent, {resolve}) or nest.add(q, {resolve}) (a quotation names its source by IDENTITY, never by object)');
         opts = { id: qval.id === null ? undefined : qval.id, at: qval.at, rate: qval.rate, deck: d,
-                 master: !!qval.master, in: qval.in, out: qval.out,
+                 master: !!qval.master, in: qval.in, out: qval.out, repeat: qval.repeat,
                  provenance: qval.provenance, meta: qval.meta, ref: qval.ref };
       }
       const { at = 0, rate = 1, deck, master = false } = opts;
@@ -445,9 +732,31 @@ export function createNest(parent, {
         reason: clamped ? `in/out clamped to the child's range [${d0}, ${d1}]` : null,
       };
 
+      // --- rule 10 / §8: REPEAT. The geometry is score.mjs's, so the value and
+      // the live span cannot disagree about how long a loop is. -------------
+      const repeat = normalizeRepeat(opts.repeat, `nest.add('${id}').repeat`);
+      const geom = repeatGeometry({ in: c0, out: c1, rate, repeat });
+      let parentDur = geom.parentDurMs, boundedTo = null;
+      if (geom.unbounded) {
+        // 10d — an unbounded loop still has to enter a schedule, and a schedule
+        // is made of finite instants. It is bound to the PARENT'S OWN RANGE,
+        // which is the only end this arrangement can honestly name, and the
+        // binding is reported rather than pretended away.
+        const hi = parent.range && parent.range[1];
+        if (!Number.isFinite(hi))
+          throw new Error(`nest.add('${id}'): repeat:'infinite' needs the parent to have a finite range — ` +
+            'an unbounded loop is bound to the parent\'s end, and this parent has none. ' +
+            'Give the parent a range, or use a bounded repeat (a count or {untilMs}).');
+        if (!(hi > at))
+          throw new Error(`nest.add('${id}'): repeat:'infinite' at ${at} is at or past the parent's end (${hi}) — nothing would ever play`);
+        boundedTo = hi; parentDur = hi - at;
+      }
+
       // 7g: one deck has ONE position — two quotations of it may not be present
       // at the same parent instant. That is arithmetic, not policy.
-      const parentDur = (c1 - c0) / rate;
+      // rule 10: and a LOOP is present for all N repetitions, so the window the
+      // overlap test uses is the whole run. Two loops of one deck collide
+      // immediately, which is right — a deck has one position.
       for (const [oid, o] of spans) {
         if (o.deck !== deck) continue;
         if (at < o.at + o.parentDur - epsMs && o.at < at + parentDur - epsMs)
@@ -465,7 +774,13 @@ export function createNest(parent, {
         // rule 8: the ADDRESSES as authored (a mark stays a mark), so toScore()
         // gives back what was written and not what it happened to resolve to.
         marks, quotation: qval,
-        quoted: { at, rate, master: !!master, in: opts.in, out: opts.out,
+        // rule 10
+        repeat, loop: geom.loop, iterations: geom.iterations, childTotal: geom.childTotal,
+        onePassMs: geom.onePassMs, partialLast: geom.partialLast,
+        unbounded: geom.unbounded, boundedTo,
+        iter: 0, wraps: 0, lastWrap: null, wrapErrors: [], loopLanes: null, loopDegradations: [],
+        timerCancel: null, armedFor: null, leadClamped: false,
+        quoted: { at, rate, master: !!master, in: opts.in, out: opts.out, repeat,
                   // normalised HERE so a bad @locus / tier is a rejection at add()
                   // time, not a surprise at export time.
                   provenance: normalizeProvenance(opts.provenance, `nest.add('${id}')`),
@@ -473,7 +788,10 @@ export function createNest(parent, {
         // rule 9
         absent: null, silencedAt: null, silences: 0, absentDegradations: 0,
       };
-      sp.parentDur = parentDurOf(sp);
+      sp.parentDur = parentDur;
+      sp.endPark = geom.loop && Number.isFinite(geom.childTotal)
+        ? c0 + loopPhase(geom.childTotal, c1 - c0, geom.childTotal).off
+        : c1;
       spans.set(id, sp);
       if (master) masterId = id;
 
@@ -486,13 +804,16 @@ export function createNest(parent, {
       // one span, TWO items — a span is an interval, not an instant
       parent.schedule({ at, kind, id: `${kind}-${id}-in`,
         payload: { ref: id, phase: 'enter', at, rate, parentDur: sp.parentDur, childRange: [c0, c1],
-                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1] } });
+                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1],
+                   repeat: repeat ?? null, iterations: geom.iterations, unbounded: geom.unbounded } });
       parent.schedule({ at: at + sp.parentDur, kind, id: `${kind}-${id}-out`,
         payload: { ref: id, phase: 'exit', at, rate, parentDur: sp.parentDur, childRange: [c0, c1],
-                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1] } });
+                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1],
+                   repeat: repeat ?? null, iterations: geom.iterations, unbounded: geom.unbounded } });
 
       applyRate(sp);
       if (!otherPresentOn(sp, parent.position())) sp.deck.pause();   // rule 7g
+      if (sp.loop) armWrap(sp);
       return sp;
     },
 
@@ -505,6 +826,24 @@ export function createNest(parent, {
       let n = 0;
       for (const [, sp] of spans) {
         if (!inSpan(sp, pos)) continue;
+        // rule 10a — THE WRAP, detected as arithmetic and collapsed by it.
+        // The iteration index is a pure function of the parent's position, so a
+        // 30-second tab blur under a 2-second loop is ONE re-seek into the
+        // iteration we actually landed in, never fifteen replayed passes.
+        // (research/loops-prior-art-2026-08.md's wrap-artefact catalogue:
+        // "tab-blur burst is unbounded under an infinite loop" — that defect
+        // has no way in here, because nothing counts wraps to know where it is.)
+        // THE BACKSTOP, and only that: with a boundary host armed, the wrap has
+        // already happened at the instant and `it === sp.iter` here. This path
+        // catches the cases a committed one-shot cannot: no host supplied, a
+        // throttled/blurred tab, a clock that jumped. Only FORWARD — a boundary
+        // timer is allowed to fire a hair early, and bouncing back would be the
+        // stutter this whole mechanism exists to remove.
+        if (sp.loop && parent.playing() && sp.rateReport && sp.rateReport.chose > 0) {
+          const it = iterAt(sp, pos);
+          if (it > sp.iter) { wrapSpan(sp, it, pos, boundaryHost ? 'late' : 'polled'); n++; continue; }
+          if (!sp.timerCancel) armWrap(sp);
+        }
         // A DEGRADED CHILD CANNOT MASTER. If the composed rate had to be
         // rounded onto the child's lattice, the child is running at a rate the
         // parent did not ask for — letting it drive the parent's clock would
@@ -546,6 +885,81 @@ export function createNest(parent, {
     /** every span quoting this deck — the "one timeline, many quotations" read */
     quotationsOf: (deck) => [...spans.values()].filter((sp) => sp.deck === deck),
 
+    // --- rule 10 / §8: THE LOOP --------------------------------------------
+
+    /** Everything a loop is, reported rather than inferred: what `repeat` said,
+     *  how long one pass is in both domains, where the playhead is inside the
+     *  repetition, how many wraps have happened, which lanes carry, and — the
+     *  §8.7 answers — whether it is bounded and what the joint at the wrap is. */
+    loop(id) {
+      const sp = spans.get(id);
+      if (!sp) return null;
+      return {
+        id: sp.id, repeat: sp.repeat ?? null, loop: sp.loop,
+        iterations: sp.iterations, lengthMs: sp.c1 - sp.c0,
+        onePassParentMs: sp.onePassMs, parentDurMs: sp.parentDur,
+        partialLast: sp.partialLast,
+        unbounded: sp.unbounded, boundedTo: sp.boundedTo,
+        iter: sp.iter, wraps: sp.wraps, lastWrap: sp.lastWrap,
+        // the gate's answer: is the wrap COMMITTED at the instant, or discovered
+        // by the client's loop one period late?
+        boundary: boundaryHost ? 'lookahead' : 'polled',
+        armedFor: sp.armedFor, leadClamped: sp.leadClamped,
+        lanes: sp.loopLanes || (sp.loop ? (sp.loopLanes = loopLanes(sp.deck)) : null),
+        degradations: sp.loopDegradations, errors: sp.wrapErrors.slice(),
+        // §8.7's fourth question. There is no crossfade parameter, on purpose:
+        // a blend across a splice is §5b tier 1 and belongs in a declared
+        // reconstruction lane (or, per the archaeology, on the SOURCE — the
+        // lineage's only blend is Tone.GrainPlayer's grain `overlap`, a
+        // property of the player, not of the loop).
+        joint: 'cut',
+        jointNote: 'hard cut. A crossfade at the wrap is INTERPOLATION ACROSS A SPLICE — §5b tier 1 — and must be appended as a derived lane with {tier, method, confidence} or declared on the source adapter, never configured here.',
+      };
+    },
+    /** rule 10c: the wrap is a CALLBACK, never a row. Appending a `loop-wrap`
+     *  event would make an infinite loop an infinite log — §8.7's store
+     *  question answered by not creating the problem. */
+    onWrap(cb) { wrapCbs.add(cb); return () => wrapCbs.delete(cb); },
+    /** the current repetition index (0-based) of a looping span */
+    iteration: (id) => { const sp = spans.get(id); return sp ? (sp.loop ? iterAt(sp, parent.position()) : 0) : null; },
+    /** the parent position at which repetition `iter` of `id` begins */
+    iterationAt: (id, iter) => { const sp = spans.get(id); return sp ? sp.at + iter * sp.onePassMs : null; },
+
+    /**
+     * §8.7, THE RENDERER: an infinite loop cannot be rendered, so ASKING FOR
+     * THE WINDOW is where the refusal lives — not inside renderDeck, which is
+     * handed two numbers and has no way to know one of them was invented.
+     *
+     *     const {from, to} = nest.renderBound();          // throws if unbounded
+     *     renderDeck(parent, {from, to, fps: 30});
+     *
+     * `renderDeck` already refuses a non-finite `to` ("needs finite {from, to}"),
+     * which is the same refusal one level down; this one can name the SPAN.
+     * @throws {Error} code LOOP_UNBOUNDED
+     */
+    renderBound({ until } = {}) {
+      const un = [...spans.values()].filter((sp) => sp.unbounded);
+      if (un.length && until === undefined) {
+        const e = new Error(
+          `renderBound: span(s) [${un.map((s) => s.id).join(', ')}] carry repeat:'infinite'. ` +
+          'An offline render has no "until someone stops it" — it is a fixed number of frames by construction. ' +
+          'Pass {until: <parent ms>} to name the end yourself, or give the quotation a bounded repeat ' +
+          '(a count, or {untilMs}). The relay reached the same conclusion from the other side: there is no ' +
+          '-stream_loop anywhere in the lineage, because a source that must never end is GENERATED, not repeated.');
+        e.code = 'LOOP_UNBOUNDED';
+        e.spans = un.map((s) => s.id);
+        throw e;
+      }
+      const all = [...spans.values()];
+      if (!all.length) return { from: parent.range[0], to: parent.range[1], spans: 0, unbounded: [] };
+      const from = Math.min(...all.map((sp) => sp.at));
+      const to = until !== undefined ? Number(until)
+        : Math.max(...all.map((sp) => sp.at + sp.parentDur));
+      if (!Number.isFinite(from) || !Number.isFinite(to) || !(to >= from))
+        throw new Error(`renderBound: derived a non-finite window [${from}, ${to}]`);
+      return { from, to, spans: all.length, unbounded: un.map((s) => s.id), until: until ?? null };
+    },
+
     // --- rule 8: a quotation is a VALUE ------------------------------------
 
     /** The serialisable quotation VALUE for one span — `{ref, at, rate, in,
@@ -563,6 +977,7 @@ export function createNest(parent, {
       return quotation({
         id: sp.id, ref, at: sp.quoted.at, rate: sp.quoted.rate, master: sp.quoted.master,
         in: stamp(sp.quoted.in, sp.marks && sp.marks.in), out: stamp(sp.quoted.out, sp.marks && sp.marks.out),
+        repeat: sp.quoted.repeat,                                   // rule 10
         provenance: sp.quoted.provenance, meta: sp.quoted.meta,
       });
     },
@@ -586,6 +1001,7 @@ export function createNest(parent, {
           id: sp.id, at: sp.at, rate: sp.rate, master: sp.master,
           parentDurMs: +sp.parentDur.toFixed(3), childRange: [sp.c0, sp.c1],
           fragment: sp.trim.fragment ? [sp.c0, sp.c1] : null, deckRange: sp.deckRange, trim: sp.trim,
+          loop: sp.loop ? nest.loop(sp.id) : null,
           marks: sp.marks, absent: sp.absent, silences: sp.silences,
           absentDegradations: sp.absentDegradations,
           present: sp.present, enters: sp.enters, exits: sp.exits,
@@ -606,6 +1022,7 @@ export function createNest(parent, {
         const cs = CHILDREN.get(parent); if (cs) cs.delete(sp.deck);
         const ps = PARENTS.get(sp.deck); if (ps) ps.delete(parent);
       }
+      for (const [, sp] of spans) disarmWrap(sp);
       spans.clear(); masterId = null;
       NESTS.delete(parent);
     },

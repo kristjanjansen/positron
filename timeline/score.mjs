@@ -206,6 +206,102 @@ function normProvenance(p, where) {
   return Object.keys(out).length ? out : null;
 }
 
+// --- §8: REPEAT — the smallest program that quotes a trace -----------------
+//
+// plan-timeline §8.1: a loop is AUTHORING ("do this again" is an instruction,
+// not an observation), so it is a SCORE concept and never a log concept. The
+// log of a looped performance holds N repetitions at N timestamps, because that
+// is what happened. The loop lives HERE, beside {ref, in, out, rate}, as one
+// more field of the quotation value — which makes a loop *a quotation with
+// repetition*, the smallest possible program that quotes a trace.
+//
+// §8.7 asked "count, duration, or infinite?" and guessed "probably all three".
+// All three, with one canonical spelling each:
+//     repeat: 7               a COUNT — 7 passes of [in, out)
+//     repeat: {untilMs: n}    a DURATION in PARENT ms; the last pass may be CUT
+//     repeat: 'infinite'      until something stops it — and §8.7's other two
+//                             questions (the store, the renderer) are entirely
+//                             about this value.
+// `repeat: 1` is "played once", which is the absence of a loop, so it
+// normalises AWAY: quotation({…, repeat: 1}) and quotation({…}) are the same
+// value and compare equal. That keeps `repeat` a field that appears only when
+// it changes something.
+
+/** 'infinite' | positive integer | {untilMs} -> the canonical stored form. */
+export function normalizeRepeat(r, where = 'quotation.repeat') { return normRepeat(r, where); }
+function normRepeat(r, where) {
+  if (r === undefined || r === null || r === false) return undefined;
+  if (r === 'infinite' || r === Infinity || r === true) return 'infinite';
+  if (typeof r === 'number' || (typeof r === 'string' && /^\d+$/.test(r))) {
+    const n = Number(r);
+    if (!Number.isInteger(n) || n < 1)
+      throw new Error(`${where}: a COUNT must be an integer >= 1 (1 = played once, i.e. no loop) — got ${JSON.stringify(r)}`);
+    return n === 1 ? undefined : n;
+  }
+  if (typeof r === 'object' && r.untilMs !== undefined) {
+    const u = Number(r.untilMs);
+    if (!Number.isFinite(u) || !(u > 0))
+      throw new Error(`${where}: {untilMs} is a positive, finite duration in PARENT ms — got ${JSON.stringify(r.untilMs)}`);
+    return { untilMs: u };
+  }
+  throw new Error(`${where}: must be a positive integer count, {untilMs:n}, or 'infinite' — got ${JSON.stringify(r)}`);
+}
+
+/**
+ * §8.2, THE MAP: `childPos = in + ((parentPos − at)·rate) mod (out − in)` —
+ * the fragment map with **modulo instead of clamp**. One function, exported, so
+ * the nest, the tests and a client all phrase the loop the same way.
+ *
+ * @param x           (parentPos − at) · rate — elapsed in the CHILD's domain
+ * @param L           out − in, the loop length in the child's domain
+ * @param childTotal  the child-domain total this loop is allowed to consume
+ *                    (iterations·L, or Infinity)
+ * @returns {{iter, off, x, past}} `off` ∈ [0, L]; `iter` is 0-based.
+ *
+ * The one non-obvious clause: at the very END (x = childTotal, an exact
+ * multiple of L) the modulo says 0, which would park the child at `in` after
+ * its last pass. Rule 7c says `out` IS the child's end, so the final instant
+ * resolves to (iter = n−1, off = L) instead — the loop leaves through the same
+ * door a single pass leaves through.
+ */
+export function loopPhase(x, L, childTotal = Infinity) {
+  if (!(L > 0)) throw new Error(`loopPhase: the loop length (out - in) must be positive, got ${L}`);
+  if (!(x > 0)) return { iter: 0, off: 0, x: 0, past: x < 0 };
+  const past = x > childTotal;
+  const xx = past ? childTotal : x;
+  const q = xx / L;
+  let iter = Math.floor(q);
+  if (q - iter > 1 - 1e-9) iter += 1;              // snap a float that fell just short
+  let off = Math.min(L, Math.max(0, xx - iter * L));
+  if (off <= 0 && iter > 0 && xx >= childTotal) { iter -= 1; off = L; }   // rule 7c at the end
+  return { iter, off, x: xx, past };
+}
+
+/**
+ * The PARENT-time geometry a `repeat` implies. Everything the nest, the
+ * renderer and the store need to answer §8.7 is one call.
+ * @returns {{loop, L, onePassMs, iterations, parentDurMs, childTotal,
+ *            unbounded, partialLast}}
+ */
+export function repeatGeometry({ in: cin = 0, out: cout, rate = 1, repeat } = {}) {
+  const L = Number(cout) - Number(cin);
+  if (!(L > 0)) throw new Error(`repeatGeometry: out (${cout}) must be strictly after in (${cin})`);
+  if (!(rate > 0)) throw new Error('repeatGeometry: rate must be positive');
+  const onePassMs = L / rate;
+  const r = normRepeat(repeat, 'repeatGeometry({repeat})');
+  const base = { loop: false, L, onePassMs, iterations: 1, parentDurMs: onePassMs,
+                 childTotal: L, unbounded: false, partialLast: false, repeat: r ?? null };
+  if (r === undefined) return base;
+  if (r === 'infinite')
+    return { ...base, loop: true, iterations: Infinity, parentDurMs: Infinity, childTotal: Infinity, unbounded: true };
+  if (typeof r === 'number')
+    return { ...base, loop: true, iterations: r, parentDurMs: r * onePassMs, childTotal: r * L };
+  const parentDurMs = r.untilMs;
+  const childTotal = parentDurMs * rate;
+  return { ...base, loop: true, iterations: Math.ceil(childTotal / L - 1e-9),
+           parentDurMs, childTotal, partialLast: Math.abs(childTotal / L - Math.round(childTotal / L)) > 1e-9 };
+}
+
 function normAddress(a, where) {
   if (a === undefined) return undefined;
   if (typeof a === 'number') {
@@ -224,10 +320,12 @@ function normAddress(a, where) {
 /**
  * Build a quotation VALUE. Frozen; no live references; JSON-safe.
  *
- * @param spec {id?, ref, at?, rate?, in?, out?, master?, provenance?, meta?}
+ * @param spec {id?, ref, at?, rate?, in?, out?, repeat?, master?, provenance?, meta?}
  *        `ref`  names the quoted deck by IDENTITY (a string), never by object.
  *        `in`/`out` are numbers in the child's domain, or `{mark:'id'}`.
  *        `at`   is the placement in the PARENT's domain.
+ *        `repeat` is §8: a count, `{untilMs}`, or `'infinite'`. Omitted (or 1)
+ *               is one pass, i.e. no loop, and the field does not appear.
  *        Omitting `in`/`out` quotes the child's whole range — rule 1 is still
  *        the special case of rule 7.
  */
@@ -243,10 +341,15 @@ export function quotation(spec = {}) {
   if (!(rate > 0)) throw new Error('quotation: `rate` must be positive');
   const q = clean({
     v: SCORE_VERSION,
-    id: spec.id === undefined ? null : String(spec.id),
+    // `== null` on purpose: an ABSENT id and a null id are the same absence,
+    // and `String(null)` is the string "null" — which round-tripped an
+    // anonymous quotation into one named "null" and broke byte-identity on the
+    // second pass. Found by the §8 repeat round-trip; the bug predates it.
+    id: spec.id == null ? null : String(spec.id),
     ref, at, rate,
     in: normAddress(spec.in, 'quotation.in'),
     out: normAddress(spec.out, 'quotation.out'),
+    repeat: normRepeat(spec.repeat, 'quotation.repeat'),      // §8
     master: spec.master ? true : undefined,
     provenance: normProvenance(spec.provenance, 'quotation'),
     meta: spec.meta ?? null,
@@ -280,7 +383,7 @@ export function score(spec = {}) {
   }
   return deepFreeze(clean({
     v: SCORE_VERSION,
-    id: spec.id === undefined ? null : String(spec.id),
+    id: spec.id == null ? null : String(spec.id),      // see quotation(): "null" is not an id
     quotations: qs,
     meta: spec.meta ?? null,
   }));
@@ -425,6 +528,12 @@ export function provenanceRows(subject, { markKind = 'mark', resolve } = {}) {
         asserter: p.asserter || null, certainty: p.certainty || [],
         confidence: identityCert(p.certainty), kind: 'quotation',
         marks: sp.marks || null, trim: sp.trim || null,
+        // §8: a repeated quotation claims N × the fragment's worth of parent
+        // time, and an UNBOUNDED one claims a time range with no end — which is
+        // exactly what none of the three carriers can say (see the caveats).
+        repeat: sp.repeat === undefined ? undefined : sp.repeat,
+        iterations: sp.loop ? sp.iterations : undefined,
+        unbounded: sp.unbounded || undefined,
       });
     });
   }
@@ -437,9 +546,18 @@ export function provenanceRows(subject, { markKind = 'mark', resolve } = {}) {
       const ci = a ? a.at : (typeof q.in === 'number' ? q.in : null);
       const co = b ? b.at : (typeof q.out === 'number' ? q.out : null);
       const p = q.provenance || {};
+      // §8: the parent window a repeat implies. An 'infinite' repeat has no
+      // end, so the row reports ONE pass and flags itself `unbounded` rather
+      // than inventing a finish nothing in the file supports.
+      const g = ci !== null && co !== null
+        ? repeatGeometry({ in: ci, out: co, rate: q.rate, repeat: q.repeat }) : null;
       return clean({
         id: q.id || `q${i}`, ref: q.ref,
-        parentIn: q.at, parentOut: ci !== null && co !== null ? q.at + (co - ci) / q.rate : null,
+        parentIn: q.at,
+        parentOut: g ? q.at + (g.unbounded ? g.onePassMs : g.parentDurMs) : null,
+        repeat: q.repeat,
+        iterations: g && g.loop ? g.iterations : undefined,
+        unbounded: g && g.unbounded ? true : undefined,
         childIn: ci, childOut: co, rate: q.rate,
         tier: p.tier || 0, method: p.method || null, source: p.source || null,
         asserter: p.asserter || null, certainty: p.certainty || [],
@@ -570,6 +688,7 @@ function c2paDoc(rows, opts) {
       description: r.kind === 'reconstruction' ? `reconstruction of lane ${r.lane}` : `quotation of ${r.ref}`,
       parameters: { [ns]: clean({
         ref: r.ref, in: r.childIn, out: r.childOut, rate: r.rate, at: r.parentIn,
+        repeat: r.repeat, iterations: r.iterations, unbounded: r.unbounded,
         unit: 'ms', tier: r.tier, method: r.method, asserter: r.asserter,
         // the TEI model, carried WHOLE in our namespace because no C2PA field
         // can hold it. This is the part a reader of ours gets back losslessly.
@@ -643,6 +762,7 @@ const C2PA_CAVEATS = [
   'NOTHING IN THE ECOSYSTEM WILL READ THE TIME RANGES. contentauth/verify-site has zero `temporal` code paths; c2pa-org/conformance-public never tests `regionOfInterest`; the only c2pa-rs fixture emits an EMPTY time map (= whole asset). Adobe Premiere marks generated frames in its own UI and its exported credential collapses to per-clip. If we emit these we are first, and only our own client renders them.',
   'c2pa-rs `TimeType` currently has only `Npt` — no wallClock, no endInclusivity. We emit npt seconds only, and omit endInclusivity (spec default: end EXCLUSIVE, which matches our half-open ranges and Media Fragments).',
   'reviewRatings is a 1-5 integer and is the ONLY confidence number in a shipping media standard. Our TEI-shaped certainty (@cert/@resp/@locus) does not survive it: locus is lost, resp is lost, the probability is quantised to five buckets. The unquantised original is carried verbatim under parameters["' + NS + '"].certainty, which only our reader understands.',
+  'REPEAT DOES NOT SURVIVE (§8). A loop is a program, and C2PA describes an asset: there is no field for "and then again". The temporal region we emit is the FIRST pass for an unbounded loop and the whole run for a bounded one; `repeat`/`iterations`/`unbounded` are carried verbatim under parameters["' + NS + '"] and only our reader gets them back. A tool reading this sees a clip, not a loop.',
   'Live assets: C2PA 2.3 handles an undefined end time (the range extends forward until updated). We emit explicit ends; a live encoder should omit `end` instead.',
 ];
 
@@ -672,6 +792,11 @@ function hlsDoc(rows, opts) {
       [`${pfx}-RATE`, num(r.rate)],
       [`${pfx}-TIER`, num(r.tier || 0)],
     ];
+    // §8: a loop is authoring, and no carrier has a word for it. HLS is the one
+    // that CAN say "this never ends" natively — END-ON-NEXT — and we still do
+    // not use it, because our repeat is a parent-domain program, not a playlist
+    // boundary. The X- attribute is the honest spelling.
+    if (r.repeat !== undefined) a.push([`${pfx}-REPEAT`, typeof r.repeat === 'object' ? qs(`untilMs:${r.repeat.untilMs}`) : qs(String(r.repeat))]);
     if (r.method) a.push([`${pfx}-METHOD`, qs(r.method)]);
     if (r.source) a.push([`${pfx}-SOURCE`, qs(r.source)]);
     if (r.asserter) a.push([`${pfx}-ASSERTER`, qs(r.asserter)]);
@@ -735,6 +860,7 @@ function otioDoc(rows, opts) {
       })),
       metadata: { [NS]: clean({
         ref: r.ref, at: r.parentIn, rate: r.rate, in: r.childIn, out: r.childOut, unit: 'ms',
+        repeat: r.repeat, iterations: r.iterations, unbounded: r.unbounded,
         tier: r.tier, method: r.method, source: r.source, asserter: r.asserter,
         certainty: r.certainty && r.certainty.length ? r.certainty : undefined,
         confidence: r.confidence === null ? undefined : r.confidence,

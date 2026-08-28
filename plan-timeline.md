@@ -584,3 +584,64 @@ as future work; a loop with an evidence toggle is a direct answer.
   rendered — `renderDeck` must refuse or require a bound).
 - Crossfade at the wrap point, or hard cut? (Hard cut by default; a crossfade
   is a reconstruction and should be declared as one.)
+
+### 8.8 BUILT (2026-08-29) — and the gate answered
+`repeat: n | {untilMs} | 'infinite'` on a quotation; `repeat: 1` normalises AWAY
+("played once" is the absence of a loop); all three round-trip byte-identically.
+- **THE GATE — "loops stay in time and do not lag on re-seek": PASSED, and
+  inverted.** Firing lateness **wrap-adjacent p50 0.10 / p95 0.70 ms** vs all
+  other events **p50 4.50 / p95 14.60 ms** — **the lag number is −13.9 ms: the
+  loop point is the MOST precisely timed instant in the loop**, because the
+  re-seek's immediate `scan()` commits it instead of waiting for the next 25 ms
+  tick. 13 downbeats for 12 wraps; across-wrap IOI spread 14.30 ms vs 13.90 ms
+  within a pass; **accumulation over 600 wraps: slope 0.000e+0 ms/wrap**; every
+  wrap survived 40×500 ms main-thread stalls.
+- **The gate forced the design change the archaeology did not predict**: the
+  boundary is a **committed one-shot on a TickHost, not polled by `servo()`**.
+  Polling is late by one client loop and `reconcile` folds everything in that
+  window — measured, **one lost downbeat per wrap (2100/2400 onsets)**. The wrap
+  also seeks a hair before `in`, else the downbeat sitting exactly on `in` is
+  folded. `servo()` survives only as the backstop, which is what collapses a
+  30 s blur to ONE wrap rather than fifteen.
+- **§8.3 was wrong that this needs no new vocabulary.** Transport has no
+  edge/level flag, so: **`caps.loopState: 'rearm' | 'carry'`, defaulting to
+  `'rearm'`**, with `adapter.loopWrap()` opt-in per the archaeology. Proven over
+  55 reps: held notes peak at 2 and never accumulate across 54 wraps; a CC
+  survives every wrap while the same lane declared `'rearm'` folds back; a
+  reducer-less lane rings across the boundary exactly as tracker's does.
+- **Store answer inverted the worry**: 1000 wraps over a 40,000-row store =
+  **one resident page set, 0 evictions**, 999/1000 ensures on the fast path. The
+  constraint that bites is the reverse — **a wrap must never APPEND a row**, or
+  an infinite loop is an infinite log. Hence `loop-wrap` is a callback, never an
+  event. `renderBound()` throws `LOOP_UNBOUNDED`; a bounded loop renders
+  byte-identically twice.
+- **Hard cut, no parameter to change it** — `joint === 'cut'`; a blend across a
+  splice is §5b tier 1 (an appended lane with tier/method/confidence) or a
+  property of the source adapter.
+- **PHASING: §8.5 was almost right — and the abstraction reproduced physics.**
+  Rule 7g forbids two overlapping quotations of one deck ("a deck has one
+  position"), so phasing needs TWO DECKS. **Reich needed two tape machines for
+  the same reason.** Origin is epoch-anchored (jam-core's school, not
+  tracker's), so phase is reproducible across processes. Virtual drift slope
+  0.002000000 vs 0.002000000 analytic, **−0.000 ppm, residual max 0.0001 ms**;
+  wall-clock residual p95 4.34 ms — and that staircase riding the analytic line
+  IS the servo's dead band. Unison returns at L/(rate−1) = 1000 s.
+- **DISINTEGRATION: §5b as a piece of music, measured.** `repeat: 12`, each wrap
+  running one more registered reconstructor with real tier/method/confidence/
+  refs. `inventedFraction` climbs monotonically **0 → 46.7 → … → 90.6 %**,
+  tiers 1→2→3, and **the attested count NEVER MOVES** (8 rows throughout, 77
+  dreamed beside them). `strip.inkOf()` paints **294 px under 'all', 0 px under
+  'attested'** — tratteggio measured in pixels.
+- Two bugs found in already-green code: `score.mjs` turned a null quotation id
+  into the string `"null"` (broke byte-identity on the SECOND round-trip);
+  nested's "adapter registered after construction is unreachable" seam is closed
+  by v0.6's `deck.adapter`/`deck.silence`.
+- **Seams still open**: the evidence firewall is **read-side only** — nothing
+  stops a derived lane from FIRING under `'attested'`, so an evidence-only
+  performance is the adapter's job (wants `fire()` gating or
+  `caps.evidenceGated`); no `deck.assertState(kind, state, info)`; `renderDeck`
+  cannot see a nest.
+- **Loops still cannot express**: retrigger without remove-and-re-add; a shared
+  bar to be polymetric AGAINST; addressing an inner loop's repetitions from an
+  outer score; and a wrap the SCORE can branch on — a score quotes traces, it
+  does not branch.
