@@ -148,6 +148,60 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### UNCERTAINTY-AS-POSITION — DESIGN SETTLED (session 6ab) — research/spatiotemporal-uncertainty-2026-08.md (985 lines)
+**The verdict overturns Checkpoint 7's cost estimate: do NOT turn `at` into a
+distribution.** Keep the scalar; add one optional frozen sibling
+`when = {verbatim, edtf, earliest, latest, innerFrom, innerTo, rule, kind, note}`
+(bracket closed-open; `rule` a VERSIONED named rule à la DarwinCore's
+`georeferenceProtocol`, e.g. `err-july15-padding@1`), resolved ONCE at ingest.
+**Absence of `when` is the crisp fast path — mirroring the firewall, where
+absence of `provenance` means attested. Two absences, two axes.**
+- **THE FIRING RULE: `at = when.earliest`, always.** Anchor at the bracket's
+  lower bound, fire once, carry `when` as metadata, add an `'anchored'`
+  degradation literal. Reasons in order of force: (1) it gives the EXISTING
+  comparison a true semantics — `ev.at <= pos` becomes exactly "possibly
+  already occurred by pos", the *possible* half of Allen, computed free by code
+  that already exists; a midpoint makes that comparison mean nothing; (2) it is
+  **one-sided sound** (`earliest ≤ true position` is a theorem) — and
+  proto/kurenniemi's ingest had already reached this empirically from data:
+  "a midpoint is indistinguishable from an attested 15 July; a start is at
+  least a LOWER BOUND that is true"; (3) **nothing in the transport moves**
+  (insertInto, afterIdx, bsearch, and scan's early exit all keep the scalar and
+  the sort); (4) render-only REJECTED on contract grounds — prefixEvents folds
+  every row with `at <= pos`, so a non-firing row hands a reducer a positionless
+  payload, and a row kept out of the lane **vanishes from evidenceAccounting(),
+  silently shrinking the archive under exactly the query the firewall
+  protects**; (5) per-kind caps policy REJECTED — the transport has one
+  ordering key, so per-lane anchors make window() across lanes ill-defined.
+- Position uncertainty gets its OWN query knob — `window(..., {certainty:
+  'possible'|'necessary'})` = Postgres `&&` vs `<@`, one GiST scan each — and
+  its own accounting (`positionAccounting()`, reported BY RULE, so "43 % of this
+  lane is positioned by a padding artefact" is a visible number). Unlike
+  EVIDENCE_POLICY_REQUIRED the certainty knob DEFAULTS rather than throws:
+  silence there over-includes, it does not fabricate.
+- Strip: keep the flat per-row band; **fix the per-lane aggregate, which is
+  currently a miscomputed aoristic sum**. (PeriodO explicitly rejected fuzzy
+  curves — "natural language is already a compact and easily indexable way to
+  represent imprecision… rather than imposing an arbitrary mapping to
+  parameterized curves" — so an aoristic curve is not obviously the honest form.)
+- Deferred explicitly: space, the trapezoid interior, non-contiguous brackets,
+  Monte Carlo, competing authorities, transaction time, `when` on spans.
+- **Three things the spatial tradition knows that the temporal one keeps
+  re-learning**: (1) **a coordinate without a stated uncertainty is not a
+  georeference** — DarwinCore enforces it and *zero is not a valid value*;
+  every timeline tool surveyed accepts a bare date and asks nothing. (2)
+  **Padding is the universal bug and it is always the same line of code** —
+  GBIF's `3°20′ → 3.33333`, TimelineJS's `{year:1850} → new Date(1850,0,1)`,
+  Palladio's `padYear(s)+"-01-01"`, ERR's `YYYY-07-15`. Space diagnosed it,
+  named it *false precision*, and standardised the fix; time re-implements it
+  every few years in a new framework. (3) **A record with no geometry is still
+  a first-class record** (Pleiades: "places are entirely abstract, conceptual
+  entities"; Linked Places ships `"geometry": null` as legal and meaningful) —
+  whereas TimeLineCurator quarantines vague events off-axis and does not export
+  them, and PeriodO's own renderer discards two of its four fuzzy values.
+  **Identity does not depend on the quality of the coordinates — which is
+  exactly why an uncertain ATTESTED row must survive an attested-only query.**
+
 ### KURENNIEMI CORPUS (session 6aa) — ✅ Tier A, 8/8 (proto/kurenniemi) — the SECOND institution
 The PhD case study at the project's origin, now a real client: position domain
 IS calendar time (1941→2018), 22 items / 3 sources / **12 playable** MP3s.

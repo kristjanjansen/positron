@@ -395,8 +395,6 @@ is". Keep hatching for the categorical case (this region is *inferred*, §5b's
 tratteggio), and reserve alpha for density, because alpha is already spoken for
 in our strip.
 
-
-
 ## 6. Doing it in software
 
 ### 6.1 The storage layer already exists and is boring
@@ -656,8 +654,6 @@ existing flat full-year band is **already ahead of the field**, and the open
 question is not whether a band beats a dot (settled, it does) but whether an
 aoristic curve beats a band.
 
-
-
 ## 7. Ignorance vs vagueness — one paragraph, and why the UI cares
 
 📄 Fisher's taxonomy (after Klir & Yuan) splits **uncertainty** first by whether
@@ -703,4 +699,287 @@ so I bounded it". Both are the system declining to fabricate silently. The
 difference is which coordinate is missing — the payload or the `at` — and that is
 exactly why they need separate marks and separate policies (§8.3).
 
-<!--RECOMMENDATION-->
+## 8. THE RECOMMENDATION
+
+Six decisions, in implementation order. ⚠️ Pointer correction for whoever picks
+this up: the Checkpoint-7 backlog paragraph quoted in the header is in
+`PROGRESS.md:331-334`, not `timeline/lab/NOTES.md` (Checkpoint 7 there is
+"v0.4: CONTINUOUS KINDS ARE FIRST-CLASS", `NOTES.md:320-403`).
+
+### 8.1 The row shape
+
+`at` stays a scalar `number` in transport-position ms. Add **one optional
+sibling**, `when`, frozen at ingest, never interned (§3's CRM trap: a shared
+uncertainty object asserts simultaneity):
+
+```js
+when = {
+  verbatim,          // string — EXACTLY what the source said: 'Esmaeeter 4. jaanuar 1965',
+                     //   'sometime that spring', '1965-07-15'. Never normalised, never dropped.
+  edtf,              // string | null — the honest re-expression: '1965', '1971-21?'. Level 1 suffices.
+  earliest, latest,  // number, number — CLOSED-OPEN transport ms. THE indexed pair. Always present.
+  innerFrom,         // number | null — CRM P81a. null = no known inner bound.
+  innerTo,           // number | null — CRM P81b. innerFrom > innerTo is LEGAL, not a bug (§3).
+  rule,              // string — the NAMED RULE that produced `at` and the bracket, e.g.
+                     //   'err-july15-padding@1' | 'err-audio-month-null@1' | 'edtf-l1@1' | 'hand'.
+                     //   This is DarwinCore's `georeferenceProtocol`. Non-optional. Versioned.
+  kind,              // 'ignorance' | 'vagueness' — §7. Drives edge rendering and affordances.
+  note               // string | null — DarwinCore's `georeferenceRemarks`: the assumption made.
+}
+```
+
+Four rules that make this shape work:
+
+1. **Absence is meaningful, and it is the fast path.** A crisp row has **no
+   `when` key**. This mirrors the firewall exactly — an attested row has no
+   `provenance` key (`transport.mjs:583-588`). ✅ Two absences, two axes, and the
+   hot loops (`insertInto` `:481`, `afterIdx` `:497`, `createCursor`'s `bsearch`
+   `:330`) never touch either. §6.2's PeriodO census — 6.5% fuzzy — says this is
+   the right default by a factor of fifteen.
+2. **`earliest`/`latest` are closed-open** (SQL:2011, §6.1), so `1965` is
+   `[Date.UTC(1965,0,1), Date.UTC(1966,0,1))` and adjacent years never
+   double-count in an aoristic sum.
+3. **`verbatim` is never discarded**, even when `edtf` parses cleanly — PeriodO's
+   rejection of parameterised curves and Yale's "retained the original date
+   expression value" are the same discipline (§6.2, §6.3). The verbatim string is
+   the evidence that the rule fired.
+4. **It sits *beside* §5b provenance, not inside it.** `provenance` answers "who
+   made this payload up, and from what"; `when` answers "how well is this row
+   positioned". A row may have both (a tier-1 interpolation between two
+   year-precise attestations, itself smeared), either, or neither. They share no
+   field and no code path. ⚠️ The one thing to resist: putting `confidence` in
+   `when`. `provenance.confidence` is a number in [0,1] about *fabrication*;
+   position uncertainty is a bracket, not a scalar, and §1 records that no mature
+   standard emits a confidence number for it.
+
+### 8.2 THE FIRING RULE — anchor at `earliest`, always
+
+> **`at = when.earliest`. Deterministically, at ingest, by the named rule. The
+> event fires exactly once, at the bracket's lower bound, with `when` carried as
+> metadata on the fire callback and in `info`.**
+
+Rejected alternatives and why:
+
+- **Representative point / midpoint — rejected.** This is the `07-15` disease
+  with our name on it. A midpoint is indistinguishable from an attestation on
+  inspection (§5.1), it is not a bound so it supports no inference, and it makes
+  `ev.at <= pos` mean nothing in particular. `proto/kurenniemi/ingest.mjs:59-71`
+  already found this by measurement: "a midpoint is indistinguishable from an
+  attested 15 July. A start is at least a LOWER BOUND that is true."
+- **Inner-bracket start (`P81a`) — rejected.** It is frequently `null` (CRM Issue
+  288: "It is also correct not to instantiate P81"), so it cannot be the primary
+  key, and where it exists it is a *stronger* claim than the outer bound —
+  anchoring on it would omit rows that possibly occurred.
+- **Render-only, never fire — rejected, and this is the important one.** The
+  deck's contract is `state(t) = f(prefix(≤ t))` (`transport.mjs:726-732`), and
+  `prefixEvents(kind, pos)` (`:737`) folds *every* row with `at <= pos`. A row in
+  a lane that never fires would hand a reducer a payload with no position; a row
+  kept out of the lane would be invisible to `deck.evidenceAccounting()`
+  (`:1159-1171`), so the archive would silently shrink under exactly the query
+  the firewall exists to protect. Both failure modes are the ones §5b was built
+  to prevent.
+- **A per-kind `caps` policy — rejected.** The transport has *one* ordering key.
+  A per-lane anchor means two lanes disagree about what `at <= pos` means, and
+  `window()` across lanes stops being well-defined. §5b's precedent is a forced
+  choice **at the query** (`EVIDENCE_POLICY_REQUIRED`, `transport.mjs:836-843`),
+  not a configurable meaning for the index. Uncertainty belongs on the query
+  axis, not the index axis — see below.
+
+The justification, positively stated:
+
+1. **Nothing in the transport moves.** Every positional read bottoms out in
+   `insertInto` (`:481`), `afterIdx` (`:497`) and `createCursor`'s `bsearch`
+   (`:330`); all three compare one scalar plus the `seq` tiebreak. The lookahead
+   `scan(now)` (`:660`) needs `ev.at` scalar *and* the lane sorted by it, because
+   `if (ev.at > horizonPos) break;` (`:676`) is an early exit over a sorted
+   prefix, not a filter. `reconcile(pos)` (`:649`) is pure scalar comparison.
+   All untouched.
+2. **It gives the existing comparisons a true semantics instead of a fictional
+   one.** With `at = earliest`, `ev.at <= pos` means exactly "**possibly** already
+   occurred by `pos`" — the *possible* half of §3's pair, computed for free by
+   code that already exists. `prefixEvents(kind, pos)` becomes "everything that
+   possibly happened by `pos`", which is a defensible default for a fold: you
+   never omit something that did happen.
+3. **It is one-sided sound.** `earliest ≤ true position` is a theorem, not an
+   estimate. The row never asserts anything it cannot support — which is the same
+   property §5b's tratteggio buys on the payload axis.
+4. **The strict reading is one extra sorted key, not a redesign.** "Certainly by
+   `pos`" is `when.latest <= pos`, obtained by a second `createCursor` over the
+   same lane keyed on `r.when?.latest ?? r.at` (`createCursor` already takes
+   `{key}`, `:326`). Opt-in, O(log n), no change to the default path.
+5. **The firing is *marked*, not suppressed.** The consumer that must not act on
+   a guess reads `ev.when` on the callback and in `info`; and
+   `deck.degradations(kind)` gains a fourth literal, `'anchored'`, beside
+   `'attested-hold'` / `'attested-fold'` / `'excluded'`, recording that a row
+   fired at a bound rather than at a fact.
+
+⚠️ Two edge cases to name now. **(a)** A bracket wider than the lookahead
+(`when.latest - when.earliest > horizonMs * rate`) fires correctly but its true
+span is never covered by one `scan` — fine for scheduling, misleading if anyone
+reasons about the horizon as "what might happen next". Document, do not fix.
+**(b)** `when.kind === 'vagueness'` fires by the same rule; the difference is
+purely in the UI (§8.4), never in the schedule. A vague event still has to sort.
+
+### 8.3 Composition with the evidence firewall
+
+**Two knobs, orthogonal, and the orthogonality is structural.** The evidence
+policy (`'attested'` | `{restored:{maxTier:n}}` | `'all'`,
+`normalizeEvidence` `transport.mjs:414-424`) governs *fabrication of the
+payload*. The new certainty policy governs *width of the position*. §6.3's 2×2 is
+fully populated; no cell is empty and none is a synonym for another.
+
+- **An uncertain ATTESTED row is tier 0.** A 1965 broadcast with a year-wide
+  bracket has no `provenance` key, so `evExcludes` (`:860-868`) never sees it.
+  This is the finding that costs something, and the code already enforces it:
+  `evExcludes` reads only `laneTier(kind)`, and the firewall's O(1) property
+  rests on lane purity (`:592-616`). **A per-row `when` cannot reach the firewall
+  predicate even by a careless patch.** ✅ Design for free.
+- **A precise RESTORED row is tier 1 with `when` absent.** An interpolated sample
+  sits at an exact position and is entirely invented. It must be excluded by
+  `evidence:'attested'` and included by any certainty query.
+- **The new query knob**, mirroring §5b's forced choice in shape but *not* in
+  strictness: `window(kind, a, b, {certainty})` where `certainty` is `'possible'`
+  (default — bracket overlaps `[a,b)`) or `'necessary'` (bracket contained in
+  `[a,b)`). ⚠️ **Do not make this one throw.** `EVIDENCE_POLICY_REQUIRED` exists
+  because a silent default there mixes *dreamed data* into an archival answer.
+  Here the default is sound in the inclusive direction — `'possible'` never
+  omits a real row — so a default is honest and a throw would be ceremony. The
+  asymmetry is the point: forced choice where silence fabricates, safe default
+  where silence merely over-includes.
+- **`deck.evidenceAccounting()` gains a sibling, not a field.** Add
+  `deck.positionAccounting(kind?)` → `{crisp, smeared, total, smearedFraction,
+  byRule: {…}, medianSpanMs, maxSpanMs}`. Reporting by **rule** is the point:
+  it makes "43% of this lane is positioned by `err-july15-padding@1`" a number
+  someone can see, which is NSSDA's discipline (§5.2) — publish the accuracy
+  statement or declare it untested.
+- ⚠️ **Never multiply the two into one score.** A "trust" number that folds tier
+  and span is the exact collapse §7 and the VERDICT warn against, and it deletes
+  the pre-1960 archive from any attested-only view.
+
+### 8.4 What the strip should draw
+
+**Per row: keep the flat band. Per lane: replace alpha-stacking with a real
+aoristic sum.** Concretely, against the current implementation in
+`proto/megatimeline/index.html`:
+
+1. ✅ **The flat full-year band is correct and stays** (`:518-527`, width =
+   `worldToScreenX(Jan 1 Y+1) − worldToScreenX(Jan 1 Y)`, the true calendar year
+   in world space). §4's epistemics: individually every item is a flat smear that
+   claims nothing. §6.2: PeriodO explicitly rejected per-record curves rather
+   than impose "an arbitrary mapping from natural language to parameterized
+   curves". §6.4: four of five surveyed tools cannot draw this at all. **An
+   aoristic curve on a single row would be inventing the shape we refused to
+   invent in §8.1.**
+2. ⚠️ **The aggregate is where the curve belongs, and ours is currently
+   miscomputed.** `globalAlpha = Math.min(0.4, 0.05 + 0.02 * n)` (`:520`) is an
+   aoristic sum in disguise, with two of §4's named pathologies baked in: it adds
+   **`+1` per item regardless of span** (overlapping-precision bias — a
+   day-precise and a decade-precise item contribute equally), and it **clips at
+   0.4** (silent truncation, Ratcliffe's CRAN clamp in a different costume).
+   Fix: weight `1/span_in_bins` per item so every item contributes total mass 1
+   (`aoristAAR`'s three lines, §4), and render the sum as **height**, not alpha,
+   because height does not clip. PeriodO's `FrequencyPath.js` step function
+   (§6.4) is the reference: sort endpoints, count coverage per inter-endpoint
+   interval, one path.
+3. **Inner bracket = solid core, outer = hatched skirt** — the encoding PeriodO
+   has the data for and has never drawn (§6.4). Where `innerFrom`/`innerTo` are
+   null (the common case) the whole band is skirt, which is honest and needs no
+   special case.
+4. **Edge treatment carries `when.kind`** (§7, §5.5). `'ignorance'` → hard band
+   edges + a "narrow this" affordance linking to `verbatim` and `rule`: the smear
+   is a *defect record* and finding the day is a repair. `'vagueness'` → feathered
+   / gradient edges (📄 MacEachren: fuzziness ranked most intuitive) and **no
+   narrowing affordance at all**. ⚠️ Keep hatching for §5b's tratteggio
+   (inferred *payload*) so the two axes never share an ink; reserve alpha for
+   density, since it is already spoken for.
+5. **Never dash for uncertainty.** ChronoZoom's `setLineDash([6,3])` encodes a
+   boolean while the geometry stays exact (§6.4) — decoration standing in for
+   magnitude. If the edge is soft, move the edge.
+
+### 8.5 The ERR ingest rule, concretely
+
+The two detection sites already exist and are correct
+(`proto/megatimeline/index.html:268-269`, mirrored at
+`proto/remixer/index.html:264,269`):
+
+```js
+if (it.type === 'audio' && (month === null || month === 0)) …   // :268 — CONFIRMED year-only
+if (M === 7 && D === 15 && !dayEv)                              // :269 — HEURISTIC year-only
+```
+
+The adapter emits, for a record with `month:null` and a synthesised `1965-07-15`:
+
+```js
+{
+  at:   Date.UTC(1965, 0, 1),                 // the anchor. NOT 07-15, NOT a midpoint.
+  kind: 'err/audio',
+  payload: { … },                             // NO `provenance` key — the broadcast is attested
+  when: {
+    verbatim:  '1965-07-15',                  // ERR's field, byte for byte
+    edtf:      '1965',
+    earliest:  Date.UTC(1965, 0, 1),
+    latest:    Date.UTC(1966, 0, 1),          // closed-open
+    innerFrom: null, innerTo: null,           // no known inner bound
+    rule:      'err-audio-month-null@1',      // or 'err-july15-padding@1' for the heuristic path
+    kind:      'ignorance',                   // a real broadcast on a real day, badly catalogued
+    note:      'ERR month field null on an audio record; 07-15 is a database padding artefact.'
+  }
+}
+```
+
+Five rules the adapter follows:
+
+- **`07-15` is never written to `at`, and never deleted.** It survives in
+  `verbatim` because it is the evidence that the rule fired — and because if ERR
+  ever publishes a genuine 15 July record we need to be able to re-audit which
+  rows we reinterpreted.
+- **The two paths get different `rule` strings**, because one is confirmed and
+  one is a heuristic that a future catalogue fix will invalidate. The existing
+  `conf: true|false` distinction (`:269` vs `:273`) maps onto the rule id, not
+  onto a confidence float. `@1` is a version: when the heuristic changes, the
+  string changes and the affected rows are a `WHERE rule = …` away.
+- **Day-precise and month-precise records emit no `when` at all** when the
+  bracket is a single day, and a month bracket otherwise. The day-evidence
+  overrides already implemented (`Eetrikuupäev` / `Võttekuupäev` / an
+  `Esmaeeter` prefix on `dateCombined`, `:264-267`) suppress the heuristic before
+  it runs, as now.
+- ⚠️ **`month:null` on a VIDEO record is not a year-only signal.** This was
+  measured — AK chronicle items carry `month:null` with a day-precise
+  `dateCombined` ("Esmaeeter 4. jaanuar 1965") (`proto/remixer/index.html:254-257`).
+  The audio-only guard on `:268` is load-bearing; do not generalise it.
+- **No `provenance` key, ever, from this adapter.** ERR ingest is tier 0 by
+  construction. If a reconstructor later fills a gap between two ERR rows, it
+  writes to its own lane (§5b, item 4) and that lane carries `provenance`.
+
+### 8.6 What to defer, explicitly
+
+- **Space. Entirely.** No coordinates, no `where`, no geometry, no gazetteer
+  binding. §5 is read for the temporal problem and nothing in §8 emits a spatial
+  field. ⚠️ If a place is ever needed, the settled answer is already in §5.4 —
+  Linked Places' `"geometry": null` plus IIIF `navPlace`'s disclaimer — and it is
+  a different document.
+- **The trapezoid interior.** `innerFrom`/`innerTo` are stored (they are two
+  numbers and CRM's merge rules need them) but **nothing reads them except the
+  renderer's core/skirt split**. No membership functions, no fuzzified Allen
+  relations, no degrees. §3: the crisp bracket pair buys the useful 90%.
+- **Non-contiguous brackets** — EDTF's `[1821,1822,1830..1832]` and `1984-X1`
+  (§2, finding 3). Postgres multiranges are the right primitive (§6.1) but
+  nothing in the ERR corpus needs them. ⚠️ Record the limitation explicitly in
+  the `when` docstring so nobody assumes contiguity is a guarantee.
+- **Open vs unknown ends** — keep the distinction *representable* (`latest:
+  null` for open, absent `when` for crisp, and a `rule` of `'unknown'` for
+  genuinely unbounded) but do not build query semantics for it yet. §6.3: the
+  primitive is free, the discipline is the work.
+- **Monte Carlo resampling** (§4) and any inferential use of the aoristic sum.
+  📄 Crema 2025: "at its best a descriptive rather than an inferential
+  statistic". Draw the curve, do not test hypotheses on it.
+- **Multiple competing brackets per row** — PeriodO's authority model, where
+  disagreement is represented by co-existence with no merge (§1). One `when` per
+  row for now. ⚠️ This is the one deferral most likely to be regretted; when a
+  second cataloguer disagrees with ERR, the shape is `when: [ …, … ]` with an
+  authority id, and the migration is additive.
+- **Transaction time** — SQL:2011's second axis (§6.1), "the catalogue said 1965
+  until the 2019 re-dating". A third axis, real, and not this quarter's problem.
+- **`when` on spans.** `Span {at, dur}` does not exist in code (planned at
+  `plan-timeline.md:142-144`); a smeared *duration* is a genuinely harder object
+  than a smeared instant and should not be designed before the span type is real.
