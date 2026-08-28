@@ -1628,3 +1628,130 @@ attested 15 July; a start is at least a LOWER BOUND that is true"). What changed
    temporal problem*; not one spatial field is emitted, and if a place is ever
    needed the settled answer (Linked Places' `"geometry": null` + IIIF
    `navPlace`'s disclaimer) is a different document.
+
+---
+
+# LOOPS — `repeat` on a quotation (plan-timeline §8, session 6ac)
+
+`node timeline/lab/prop-nested.mjs` — **389 checks**, suite 14 added.
+Demos, gate and browser proof: `proto/loops/` (NOTES there carry the numbers).
+
+## The API
+
+```js
+quotation({ ref, at, rate, in, out, repeat })      // score.mjs
+nest.add({ …, repeat })                            // nested.mjs rule 10
+repeat:  7  |  {untilMs: 5000}  |  'infinite'      // count | duration | forever
+```
+
+`repeat: 1` normalises AWAY — "played once" is the absence of a loop, so
+`quotation({…, repeat:1})` and `quotation({…})` are the same value. Round-trips
+byte-identically through `toScore`/`JSON`/`parseScore`/`loadScore` like every
+other field, in all three forms.
+
+New exports in `score.mjs`, so the nest, the property arms and a client all
+phrase a loop with one function:
+
+| | |
+|---|---|
+| `normalizeRepeat(r)` | the canonical stored form |
+| `loopPhase(x, L, childTotal)` | §8.2's map: `{iter, off, x, past}` |
+| `repeatGeometry({in,out,rate,repeat})` | `{loop, L, onePassMs, iterations, parentDurMs, childTotal, unbounded, partialLast}` |
+
+New on the nest: `nest.loop(id)`, `nest.onWrap(cb)`, `nest.iteration(id)`,
+`nest.iterationAt(id, k)`, `nest.renderBound({until})`, and
+`createNest(parent, {tickHost, wrapGraceMs})`.
+
+## §8.7's four questions, as built
+
+1. **count | duration | infinite?** All three. `{untilMs}` is PARENT ms and may
+   CUT the last pass; the child then parks *where the loop was cut*, not at
+   `out` (`span.endPark`) — parking at `out` would assert a state the
+   performance never reached.
+2. **Re-fire or re-seek?** Re-seek, and the archaeology settles it three ways.
+   The wrap seeks a hair before `in` (a quotation is `[in, out)`), so
+   reduce-on-seek runs, edge lanes re-arm, and the downbeat still fires.
+   **The boundary is COMMITTED on a TickHost, not polled** — see the gate below;
+   polling it costs one lost downbeat per wrap.
+3. **The store and the renderer.** `nest.renderBound()` throws `LOOP_UNBOUNDED`
+   naming the span; `renderDeck` already refuses a non-finite `to`, which is the
+   same refusal one level down without the ability to name it. A bounded loop
+   still renders byte-identically twice. For the store: a loop re-seeks a FIXED
+   fragment, so it is **one bounded window query, forever** — 1000 wraps over a
+   40 000-row jsonl store gave **1 resident page set, 0 evictions, each page
+   loaded once, 999/1000 ensures on the synchronous fast path**. The constraint
+   that does bite is the other direction: **a wrap must never append a row**, or
+   an infinite loop is an infinite log (store.mjs's `tail` is never evicted). So
+   `loop-wrap` is a callback and `adapter.loopWrap()`, never an event.
+4. **Crossfade or cut?** Cut. `nest.loop(id).joint === 'cut'` and there is no
+   parameter to change it: a blend across a splice is §5b tier 1 and must be an
+   appended lane with `{tier, method, confidence}` or a property of the source
+   adapter. Zero `crossfade` hits org-wide agrees.
+
+## §8.3's edge/level rule — and the one word §8.3 was wrong about
+
+§8.3 says a loop "needs no new adapter vocabulary" because the edge/level split
+"is exactly `caps` we already carry". **It is not.** transport.mjs has no
+edge/level flag; the nearest thing is `absentState`, which is about ABSENCE.
+So rule 10 reads **`caps.loopState: 'rearm' | 'carry'`**, accepting
+`caps.valued: 'level' | 'edge'` (proto/automation/NOTES.md's own words) as a
+synonym. **Default `'rearm'`** — the safe direction, matching `absentState`
+defaulting to `'hold'`; a lane must say that its state survives a boundary.
+
+At a wrap: optional `adapter.loopWrap(info)` (opt-in, per the archaeology's
+headline that *the wrap is the absence of an event*) → **`seek(in − ε)`**, which
+re-arms every edge lane from the fragment's entry state → **`assertAt(out, k)`**
+for each `carry` lane, which is the level the iteration ENDED in.
+
+Proven, with negative controls, over 55 repetitions:
+- a note-on held at `out` is **never** carried into the next pass; held-note
+  count peaks at 2 across 54 wraps and never accumulates;
+- a CC set at child 1000 (inside the loop) is **still set** at the top of every
+  following repetition — and the SAME lane declared `'rearm'` folds back to its
+  pre-`in` value, which is what proves the carry is the cap and not the fold;
+- a lane with no reducer (`ping`) is not touched by the re-seek at all and rings
+  across the boundary exactly as tracker's does;
+- `caps.loopWrap` declared without `loopWrap()` is a reported degradation.
+
+## Timing invariants (the acceptance gate)
+
+- **Position is derived, never integrated.** Accumulation slope over 600 wraps:
+  **0.000e+0 ms/wrap.**
+- **The wrap is a state operation.** The transport does not stop, the rate does
+  not move, `play()` is not re-issued.
+- **A blur COLLAPSES.** 30 s stall under a 2 s loop = **one** re-seek into the
+  repetition the clock says, not fifteen replayed passes. The wrap-artefact
+  catalogue's "tab-blur burst is unbounded under an infinite loop" has no way in,
+  because nothing counts wraps to know where it is.
+- **`repeat: n` stops exactly.** n−1 wraps, then absent and parked; a lane
+  declaring `absentState:'silence'` is silenced and 5 s later 0 events have
+  escaped. (The lineage's one hard datum about stopping was a ~1.6 s tail.)
+
+## Two bugs this work found in code that was already green
+
+- **`score.mjs` round-trip**: `id: spec.id === undefined ? null : String(spec.id)`
+  turned a null id into the string `"null"` on the second pass, so an anonymous
+  quotation did not round-trip byte-identically. `== null` now. Pre-dates §8.
+- **`nested.mjs`'s "adapter registered after construction is unreachable" seam
+  is CLOSED** by transport v0.6 (`deck.adapter(kind)`, `deck.silence(info)`).
+  The note is corrected and rule 10 uses the closed seam.
+
+## suite 14 arms
+
+| arm | what it pins |
+|---|---|
+| `repeat-value` | three forms normalise, round-trip byte-identically, `repeat:1` vanishes, 9 rejections name the field, geometry in parent ms |
+| `loop-map` / `loop-phase` | exact against `in + ((parentPos−at) mod L)` at repetitions 0/1/2/6/7/49 × 6 offsets; the end parks at `out`; before parks at `in` |
+| `loop-lead` | landing on a boundary parks 1e-6 ms before `in` — why a loop keeps its downbeat |
+| `loop-seek7` | a parent seek into the MIDDLE of repetition 7 lands at `in + L/2` |
+| `loop-until` | `{untilMs}` cuts the last pass and parks at the cut |
+| `loop-rate` | rate composes with the loop unchanged |
+| `loop-wrap` / `loop-reseek` / `loop-nofire` | 55 reps = 54 wraps, in order, each a fold at `in`; every repetition fires the same events |
+| `loop-stuck` | no stuck notes across 54 wraps |
+| `loop-level` | a level carries; the same lane as `'rearm'` does not |
+| `loop-stop` | the exact stop, with and without `silence()` |
+| `loop-blur` | a 30 s stall collapses to one wrap |
+| `loop-render` | `renderBound()` refuses `LOOP_UNBOUNDED` by name; `{until}` accepted; `renderDeck` refuses a non-finite window; a bounded loop renders byte-identically twice |
+| `loop-store` | 1000 wraps = 1 resident page set, 0 evictions, 999 fast ensures |
+| `loop-optin` | only the lane implementing `loopWrap()` hears it; a reducer-less lane is untouched; a declared-not-implemented cap is reported |
+| `loop-score` | `repeat` survives toScore→JSON→loadScore in a fresh runtime and a seek into repetition 7 of the LOADED score lands identically; C2PA / EXT-X-DATERANGE / OTIO each carry it, with the caveat that no carrier has a word for a loop |

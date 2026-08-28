@@ -23,7 +23,14 @@ import { mediaMaster } from '../media-master.mjs';
 import {
   quotation, isQuotation, quotationEquals, score, parseScore, scoreToJSON, scoreRefs,
   loadScore, refDeck, deckRef, marksOf, exportProvenance, validateProvenance, npt, toReviewRating,
+  // suite 14 (§8): a loop is a quotation with repetition
+  normalizeRepeat, repeatGeometry, loopPhase, provenanceRows, NS,
 } from '../score.mjs';
+import { renderDeck, offlineDeck, createRenderRuntime } from '../render.mjs';
+import { buildJsonlIndex, jsonlStore } from '../store.mjs';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const VERBOSE = process.argv.includes('--verbose');
 let failures = 0, checks = 0;
@@ -1105,6 +1112,491 @@ function arrangement(make) {
   check('export-deck', 0, h.validation.ok && /X-ORG-ELEKTRON-TIER=1/.test(h.tags[0]),
     `…and onto the live lane as an X- attribute: ${h.tags[0]}`);
   deck.dispose();
+}
+
+// ===========================================================================
+// suite 14 — LOOPS (plan-timeline §8; nested.mjs rule 10).
+//
+// A loop is a QUOTATION WITH REPETITION, so every arm below is the fragment
+// suite's arm with `repeat` added and nothing else changed. That is the claim
+// being tested: §8.2 says the mechanism already exists and a loop is the same
+// affine map with MODULO instead of CLAMP. If any of these needed new
+// machinery, the claim was wrong.
+//
+// The archaeology (research/loops-prior-art-2026-08.md) supplies three of the
+// arms directly: the wrap is opt-in (14i), the stop must be exact or `repeat:n`
+// lies (14e), and a blur must collapse rather than burst (14f).
+// ===========================================================================
+
+// a child with THREE kinds, because the whole of §8.3 is that they behave
+// differently at the wrap:
+//   `note`  EDGE-valued  — re-arms per iteration (caps.valued:'edge')
+//   `cc`    LEVEL-valued — carries across the wrap (caps.valued:'level')
+//   `ping`  fire-and-forget, NO reducer — tracker's case: nothing to leak, so
+//           the wrap does not touch it and it rings across the boundary
+const LNOTES = [{ n: 60, on: 100, off: 400 }, { n: 62, on: 800, off: 1200 }, { n: 64, on: 1500, off: 3800 }];
+function makeLoopChild(vr, sink, { absentState, silence, ccLoopState, wrapHeard } = {}) {
+  const items = [];
+  for (const x of LNOTES) {
+    items.push({ at: x.on, kind: 'note', payload: { raw: [144, x.n, 90] } });
+    items.push({ at: x.off, kind: 'note', payload: { raw: [128, x.n, 0] } });
+  }
+  items.push({ at: 50, kind: 'cc', payload: { key: 74, v: 10 } });     // BEFORE `in`
+  items.push({ at: 1000, kind: 'cc', payload: { key: 74, v: 99 } });   // INSIDE the loop
+  items.push({ at: 900, kind: 'ping', payload: { tag: 'p' } });
+  return createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), items, range: [0, CHILD_END],
+    adapters: {
+      note: {
+        caps: { catchUp: 'reduce', reducible: true, seekable: true, rates: CHILD_RATES,
+                valued: 'edge', ...(absentState ? { absentState } : {}), ...(wrapHeard ? { loopWrap: true } : {}) },
+        ...(silence ? { silence } : {}),
+        ...(wrapHeard ? { loopWrap: (i) => sink.wraps.push({ kind: i.kind, from: i.from, to: i.to, joint: i.joint, held: [...sink.live] }) } : {}),
+        actuate(p) { const [s, n] = p.raw; if ((s & 0xf0) === 0x90) sink.live.add(n); else sink.live.delete(n); sink.fires++; sink.firedAt.push(+p.at); },
+        reduce(payloads) { const h = new Map(); for (const p of payloads) { const [s, n, v] = p.raw; if ((s & 0xf0) === 0x90 && v > 0) h.set(n, p); else h.delete(n); } return h; },
+        assertState(h, info) { sink.live = new Set(h.keys()); sink.asserts.push({ pos: +info.pos.toFixed(3), reason: info.reason, keys: [...h.keys()].sort((a, b) => a - b) }); },
+      },
+      cc: {
+        caps: { catchUp: 'reduce', reducible: true, seekable: true, rates: CHILD_RATES,
+                ...(ccLoopState ? { loopState: ccLoopState } : { valued: 'level' }) },
+        actuate(p) { sink.cc.set(p.key, p.v); sink.ccFires++; },
+        reduce(payloads) { const m = new Map(); for (const p of payloads) m.set(p.key, p.v); return m; },
+        assertState(m) { sink.cc = new Map(m); sink.ccAsserts++; },
+      },
+      ping: { caps: { rates: CHILD_RATES }, actuate() { sink.pings++; } },
+    },
+  });
+}
+const newLoopSink = () => ({ live: new Set(), asserts: [], fires: 0, firedAt: [], cc: new Map(), ccFires: 0, ccAsserts: 0, pings: 0, wraps: [] });
+function loopRig(opts = {}) {
+  const vr = sharedVR();
+  const sink = newLoopSink();
+  const child = makeLoopChild(vr, sink, opts);
+  const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 400000], items: [] });
+  const nest = createNest(parent, { toleranceMs: 5, hardSeekMs: 200 });
+  refDeck(child, opts.ref || 'tape');
+  return { vr, sink, child, parent, nest };
+}
+/** run the virtual clock forward `ms` of PARENT time, servoing like a client */
+function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { vr.advanceTo(vr.now() + step); nest.servo(); } }
+
+// --- 14a — `repeat` IS A FIELD OF THE VALUE ---------------------------------
+{
+  const cases = [
+    ['count', 7, 7], ['until', { untilMs: 5000 }, { untilMs: 5000 }], ['infinite', 'infinite', 'infinite'],
+    ['one-is-no-loop', 1, undefined], ['absent', undefined, undefined],
+  ];
+  for (const [label, given, want] of cases) {
+    const q = quotation({ ref: 'tape', at: 5000, in: 700, out: 2700, rate: 1, repeat: given });
+    check('repeat-value', 0, JSON.stringify(q.repeat) === JSON.stringify(want),
+      `${label}: repeat normalised to ${JSON.stringify(q.repeat)}, wanted ${JSON.stringify(want)}`);
+    // THE ROUND TRIP, byte-identical — the same guarantee every other field has
+    const j = JSON.stringify(q);
+    const back = quotation(JSON.parse(j));
+    check('repeat-value', 0, JSON.stringify(back) === j && quotationEquals(back, q),
+      `${label}: quotation -> JSON -> quotation is not byte-identical\n  ${j}\n  ${JSON.stringify(back)}`);
+    const s = score({ id: 's', quotations: [q] });
+    const sj = scoreToJSON(s);
+    check('repeat-value', 0, scoreToJSON(parseScore(sj)) === sj,
+      `${label}: score -> JSON -> parseScore is not byte-identical`);
+  }
+  // `repeat: 1` and no repeat are THE SAME VALUE — a loop of one is not a loop
+  check('repeat-value', 0, quotationEquals(quotation({ ref: 'a', repeat: 1 }), quotation({ ref: 'a' })),
+    'repeat:1 must normalise away — "played once" is the absence of a loop');
+  // and the rejections name the field
+  for (const bad of [0, -1, 2.5, {}, { untilMs: 0 }, { untilMs: -1 }, 'forever', [], { count: 3 }]) {
+    const m = throws(() => quotation({ ref: 'a', repeat: bad }));
+    check('repeat-value', 0, m && /repeat/.test(m), `repeat: ${JSON.stringify(bad)} must be rejected by name, got ${m}`);
+  }
+  // geometry: the three forms, in parent ms
+  const g1 = repeatGeometry({ in: 700, out: 2700, rate: 1, repeat: 7 });
+  check('repeat-value', 0, g1.iterations === 7 && g1.parentDurMs === 14000 && g1.childTotal === 14000 && !g1.unbounded,
+    `count geometry wrong: ${JSON.stringify(g1)}`);
+  const g2 = repeatGeometry({ in: 0, out: 2000, rate: 2, repeat: { untilMs: 5000 } });
+  check('repeat-value', 0, g2.parentDurMs === 5000 && g2.childTotal === 10000 && g2.iterations === 5 && !g2.partialLast,
+    `{untilMs} geometry must be PARENT ms and compose with rate: ${JSON.stringify(g2)}`);
+  const g3 = repeatGeometry({ in: 0, out: 2000, rate: 1, repeat: 'infinite' });
+  check('repeat-value', 0, g3.unbounded && g3.iterations === Infinity && g3.parentDurMs === Infinity,
+    `infinite geometry wrong: ${JSON.stringify(g3)}`);
+}
+
+// --- 14b — THE MAP: modulo instead of clamp, exact ---------------------------
+{
+  const { vr, child, parent, nest } = loopRig();
+  const AT = 5000, IN = 700, OUT = 2700, L = OUT - IN, N = 50;
+  const sp = nest.add({ id: 'q', at: AT, rate: 1, deck: child, in: IN, out: OUT, repeat: N });
+  check('loop-map', 0, sp.parentDur === N * L, `a repeated span occupies N*(out-in)/rate of parent time: ${sp.parentDur} !== ${N * L}`);
+  check('loop-map', 0, nest.loop('q').iterations === N && nest.loop('q').lengthMs === L,
+    `nest.loop() must report the geometry: ${JSON.stringify(nest.loop('q'))}`);
+
+  // THE ANALYTIC EXPECTATION. Not "what the code did" — what §8.2's formula says.
+  // The one deliberate exception is the WRAP LEAD: landing exactly on a
+  // boundary parks the child a hair (1e-6 ms) BEFORE `in`, so the event sitting
+  // exactly on `in` is still pending and fires instead of being folded. Every
+  // other position is exact to the float.
+  const LEAD = 1e-6;
+  const analytic = (pos) => IN + ((pos - AT) % L);
+  for (const k of [0, 1, 2, 6, 7, 49]) {
+    for (const d of [0, 1, 123, 999.5, L - 1, L - 0.5]) {
+      const pos = AT + k * L + d;
+      parent.seek(pos);
+      const want = analytic(pos);
+      const tol = d === 0 ? LEAD + 1e-9 : 1e-9;
+      check('loop-map', k, Math.abs(child.position() - want) <= tol,
+        `repetition ${k} +${d}ms: childPos ${child.position()} !== in + ((parentPos-at) mod L) = ${want} (tol ${tol})`);
+      check('loop-map', k, nest.iteration('q') === k, `repetition index at +${d} of rep ${k} is ${nest.iteration('q')}`);
+    }
+  }
+  // the MIDDLE of repetition 7 (1-based: index 6), the arm named in the brief
+  // the LEAD itself, stated as a property: at a boundary the child sits exactly
+  // one lead before `in`, and that is why a loop keeps its downbeat.
+  parent.seek(AT + 3 * L);
+  check('loop-lead', 0, Math.abs(child.position() - (IN - LEAD)) < 1e-12,
+    `landing on a boundary parks the child ${LEAD} ms before IN so the event ON \`in\` is still pending: ${child.position()}`);
+  const mid = AT + 6 * L + L / 2;
+  parent.seek(mid);
+  check('loop-seek7', 0, child.position() === IN + L / 2 && nest.iteration('q') === 6,
+    `a parent seek into the middle of repetition 7 must land at in+L/2=${IN + L / 2}: got ${child.position()} in iteration ${nest.iteration('q')}`);
+  // rule 7c still holds at the very end: `out` IS the child's end, not `in`
+  parent.seek(AT + N * L);
+  check('loop-map', 0, child.position() === OUT,
+    `the final instant of the last repetition parks at OUT (${OUT}), not back at IN — got ${child.position()}`);
+  parent.seek(AT + N * L + 5000);
+  check('loop-map', 0, child.position() === OUT && nest.present('q') === false,
+    `past the last repetition the span is ABSENT and parked at OUT: pos=${child.position()} present=${nest.present('q')}`);
+  parent.seek(AT - 1);
+  check('loop-map', 0, child.position() === IN, `before the loop the child parks at IN: ${child.position()}`);
+  // loopPhase is the one definition — the nest may not have its own
+  for (const k of [0, 1, 2, 7, 50]) {
+    const ph = loopPhase(k * L, L, N * L);
+    const wantIter = k >= N ? N - 1 : k, wantOff = k >= N ? L : 0;
+    check('loop-phase', k, ph.iter === wantIter && ph.off === wantOff,
+      `loopPhase(${k}L) = {iter:${ph.iter}, off:${ph.off}}, wanted {iter:${wantIter}, off:${wantOff}}`);
+  }
+  // {untilMs} CUTS the last pass, and the cut is where the arithmetic says
+  const { child: c2, parent: p2, nest: n2 } = loopRig({ ref: 'tape2' });
+  n2.add({ id: 'u', at: 0, rate: 1, deck: c2, in: 0, out: 2000, repeat: { untilMs: 5000 } });
+  check('loop-until', 0, n2.span('u').parentDur === 5000 && n2.loop('u').partialLast === true,
+    `{untilMs:5000} over a 2000 ms loop is 5000 ms of parent time with a partial last pass: ${JSON.stringify(n2.loop('u'))}`);
+  p2.seek(4999);
+  check('loop-until', 0, Math.abs(c2.position() - 999) < 1e-9, `the cut pass maps normally: ${c2.position()}`);
+  p2.seek(5000);
+  check('loop-until', 0, c2.position() === 1000, `at {untilMs} the child parks WHERE THE LOOP WAS CUT (1000), not at out: ${c2.position()}`);
+  // rate composes with the loop exactly as it does with a fragment
+  const { child: c3, parent: p3, nest: n3 } = loopRig({ ref: 'tape3' });
+  n3.add({ id: 'r', at: 1000, rate: 2, deck: c3, in: 0, out: 2000, repeat: 4 });
+  check('loop-rate', 0, n3.span('r').parentDur === 4000, `rate 2 halves each pass: ${n3.span('r').parentDur} !== 4000`);
+  p3.seek(1000 + 2500);
+  check('loop-rate', 0, c3.position() === 1000 && n3.iteration('r') === 2,
+    `at parent+2500 with rate 2 the child is 5000 child-ms in = repetition 2, offset 1000: got ${c3.position()} rep ${n3.iteration('r')}`);
+}
+
+// --- 14c/14d — THE WRAP: re-seek, edges re-arm, levels carry ----------------
+{
+  const { vr, sink, child, parent, nest } = loopRig();
+  const AT = 1000, IN = 700, OUT = 2700, L = 2000, N = 55;
+  nest.add({ id: 'q', at: AT, rate: 1, deck: child, in: IN, out: OUT, repeat: N });
+  const seen = [];
+  nest.onWrap((i) => seen.push(i));
+  check('loop-lanes', 0, String(nest.loop('q').lanes.carry) === 'cc' && nest.loop('q').lanes.rearm.includes('note'),
+    `§8.3: cc is level-valued and CARRIES, note is edge-valued and RE-ARMS: ${JSON.stringify(nest.loop('q').lanes)}`);
+
+  parent.seek(AT); parent.play(1);
+  // note 64 is on at child 1500 and off at 3800 — i.e. it is STILL HELD at
+  // `out`. That is the stuck-note generator: without a re-arm it accumulates.
+  const held = [], ccAt = [];
+  let maxHeld = 0, everStuckFrom = null;
+  const perIterFires = [];
+  let lastIter = 0, firesAtIterStart = 0;
+  for (let t = 0; t < N * L + 200; t += 5) {
+    vr.advanceTo(vr.now() + 5); nest.servo();
+    const it = nest.iteration('q');
+    if (it !== lastIter) { perIterFires.push(sink.fires - firesAtIterStart); firesAtIterStart = sink.fires; lastIter = it; }
+    maxHeld = Math.max(maxHeld, sink.live.size);
+    if (sink.live.size > 2) everStuckFrom = everStuckFrom ?? it;
+  }
+  check('loop-wrap', 0, seen.length === N - 1 && nest.loop('q').wraps === N - 1,
+    `${N} repetitions is exactly ${N - 1} wraps — got ${seen.length} callbacks / ${nest.loop('q').wraps} counted`);
+  check('loop-wrap', 0, seen.every((w, i) => w.to === i + 1 && w.from === i),
+    'every wrap reports the repetition it left and the one it entered, in order');
+  check('loop-wrap', 0, seen.every((w) => Math.abs(w.childPos - IN) <= 1e-6 + 1e-9 && w.in === IN && w.out === OUT && w.joint === 'cut'),
+    `a wrap lands at IN (less the wrap lead), names the fragment, and declares a HARD CUT: ${JSON.stringify(seen[0])}`);
+
+  // NO STUCK NOTES, EVER, ACROSS 50+ WRAPS. The child holds at most the notes
+  // the reducer says are held at that position — never an accumulation.
+  check('loop-stuck', 0, maxHeld <= 2 && everStuckFrom === null,
+    `held-note count peaked at ${maxHeld} across ${N - 1} wraps (first over-hold in repetition ${everStuckFrom}) — ` +
+    'a note-on from an earlier repetition is being retained across the boundary');
+  // and the RE-SEEK is what did it: every wrap left a fold in the assert log
+  const wrapAsserts = sink.asserts.filter((a) => a.pos === IN && a.reason === 'seek');
+  check('loop-reseek', 0, wrapAsserts.length >= N - 1,
+    `each wrap must run reduce-on-seek AT IN (§8.7: re-seek, not re-fire) — ${wrapAsserts.length} folds at ${IN} for ${N - 1} wraps`);
+  // NOT a re-fire: each repetition fires the SAME number of events, and the
+  // count does not grow. (A re-firing loop replays the prefix and the count
+  // climbs; that is the timeline-emitter `played:true` failure inverted.)
+  const uniq = [...new Set(perIterFires)];
+  check('loop-nofire', 0, uniq.length <= 2 && Math.max(...perIterFires) === Math.min(...perIterFires.slice(1)),
+    `every repetition must fire the same events: per-iteration fire counts ${JSON.stringify(perIterFires.slice(0, 6))}…`);
+
+  // §8.3 LEVEL: cc=99 is set at child 1000, INSIDE the loop. A plain re-seek to
+  // `in` would fold it back to 10 (the value at child 50, before `in`). The
+  // carry is the whole difference, and this is the sample that shows it.
+  const ccJustAfterWrap = [];
+  parent.seek(AT); parent.play(1);
+  sink.cc = new Map();
+  let prev = 0;
+  for (let t = 0; t < 8 * L; t += 5) {
+    vr.advanceTo(vr.now() + 5); nest.servo();
+    const it = nest.iteration('q');
+    if (it !== prev) { ccJustAfterWrap.push({ it, cc: sink.cc.get(74) }); prev = it; }
+  }
+  check('loop-level', 0, ccJustAfterWrap.length >= 3 && ccJustAfterWrap.every((r) => r.cc === 99),
+    `§8.3: a LEVEL set in repetition N is still set at the top of repetition N+1 — ` +
+    `saw ${JSON.stringify(ccJustAfterWrap.slice(0, 4))} (10 = the pre-\`in\` value, i.e. the carry did not happen)`);
+
+  // …and the NEGATIVE CONTROL: the same lane declared 'rearm' loses it, which
+  // is what proves the carry is the cap and not an accident of the fold.
+  {
+    const r = loopRig({ ref: 'tape-rearm', ccLoopState: 'rearm' });
+    r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 8 });
+    r.parent.seek(AT); r.parent.play(1);
+    const rows = []; let p = 0;
+    for (let t = 0; t < 5 * L; t += 5) { r.vr.advanceTo(r.vr.now() + 5); r.nest.servo(); const it = r.nest.iteration('q'); if (it !== p) { rows.push(r.sink.cc.get(74)); p = it; } }
+    check('loop-level', 0, rows.length >= 3 && rows.every((v) => v === 10),
+      `NEGATIVE CONTROL: caps.loopState:'rearm' must NOT carry — the level folds back to the pre-\`in\` value: ${JSON.stringify(rows)}`);
+    check('loop-level', 0, String(r.nest.loop('q').lanes.carry) === '',
+      `…and the lane is reported as re-arming, not carrying: ${JSON.stringify(r.nest.loop('q').lanes)}`);
+  }
+}
+
+// --- 14e — THE EXACT STOP (the archaeology's ~1.6 s tail) -------------------
+{
+  // "repeat was only ever infinite in the entire lineage; the one hard datum
+  // about stopping is that it left a ~1.6 s audio tail because committed events
+  // had no cancel path." So: assert the stop, do not assume it.
+  const silenced = [];
+  const r = loopRig({ ref: 'tape-stop', absentState: 'silence', silence: (i) => { silenced.push(i.reason); r.sink.live = new Set(); } });
+  const AT = 500, IN = 700, OUT = 2700, L = 2000, N = 4;
+  r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: N });
+  r.parent.seek(AT); r.parent.play(1);
+  runFor(r.vr, r.nest, N * L + 3000);
+  check('loop-stop', 0, r.nest.loop('q').wraps === N - 1,
+    `repeat:${N} is exactly ${N - 1} wraps and then it STOPS: ${r.nest.loop('q').wraps}`);
+  check('loop-stop', 0, r.nest.present('q') === false && r.child.position() === OUT,
+    `after the last repetition the span is absent, parked at OUT: present=${r.nest.present('q')} pos=${r.child.position()}`);
+  check('loop-stop', 0, r.sink.live.size === 0 && silenced.length > 0,
+    `THE EXACT STOP: nothing may ring after the last repetition. held=${[...r.sink.live]} silence()=${silenced.length} calls. ` +
+    'Without this, repeat:4 sounds like "four and a bit" — the lineage measured that tail at ~1.6 s.');
+  const before = r.sink.fires;
+  runFor(r.vr, r.nest, 5000);
+  check('loop-stop', 0, r.sink.fires === before,
+    `and nothing fires afterwards: ${r.sink.fires - before} events escaped past the end of the loop`);
+  // the default (no absentState) HOLDS the edge — rule 9 is unchanged by loops
+  const h = loopRig({ ref: 'tape-hold' });
+  h.nest.add({ id: 'q', at: AT, rate: 1, deck: h.child, in: IN, out: OUT, repeat: N });
+  h.parent.seek(AT); h.parent.play(1);
+  runFor(h.vr, h.nest, N * L + 500);
+  check('loop-stop', 0, h.sink.live.size === 1,
+    `the DEFAULT still holds whatever \`out\` cut (rule 9's 'hold'), loop or not: ${[...h.sink.live]}`);
+}
+
+// --- 14f — the blur collapses, it does not burst ----------------------------
+{
+  // wrap-artefact catalogue: "tab-blur burst is unbounded under an infinite
+  // loop". It cannot happen here, because the iteration index is a pure
+  // function of the parent's position and nothing counts wraps to know where
+  // it is. A 30 s stall under a 2 s loop is ONE re-seek.
+  const r = loopRig({ ref: 'tape-blur' });
+  const AT = 0, IN = 0, OUT = 2000, L = 2000;
+  r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 'infinite' });
+  r.parent.seek(0); r.parent.play(1);
+  runFor(r.vr, r.nest, 500);
+  const w0 = r.nest.loop('q').wraps;
+  r.vr.advanceTo(r.vr.now() + 30000);          // the blur: no servo tick for 30 s
+  r.nest.servo();                              // …and one tick when it comes back
+  const w1 = r.nest.loop('q').wraps;
+  check('loop-blur', 0, w1 - w0 === 1,
+    `a 30 s stall under a 2 s loop must collapse to ONE wrap, not 15: ${w1 - w0}`);
+  check('loop-blur', 0, r.nest.iteration('q') === 15 && r.child.position() === IN + ((30500) % L),
+    `…and it lands in the repetition the clock says (15), at the right offset: rep ${r.nest.iteration('q')} pos ${r.child.position()}`);
+  check('loop-blur', 0, r.sink.live.size <= 2, `…with nothing left ringing from the fifteen passes nobody heard: ${[...r.sink.live]}`);
+}
+
+// --- 14g — THE RENDERER refuses an unbounded loop ---------------------------
+{
+  const r = loopRig({ ref: 'tape-render' });
+  r.nest.add({ id: 'bounded', at: 0, deck: r.child, in: 0, out: 2000, repeat: 4 });
+  const b = r.nest.renderBound();
+  check('loop-render', 0, b.from === 0 && b.to === 8000 && b.unbounded.length === 0,
+    `a BOUNDED loop names its own render window: ${JSON.stringify(b)}`);
+
+  const u = loopRig({ ref: 'tape-inf' });
+  u.nest.add({ id: 'forever', at: 0, deck: u.child, in: 0, out: 2000, repeat: 'infinite' });
+  let err = null;
+  try { u.nest.renderBound(); } catch (e) { err = e; }
+  check('loop-render', 0, err && err.code === 'LOOP_UNBOUNDED' && err.spans.join() === 'forever',
+    `§8.7: renderBound() must REFUSE an unbounded loop by name, not hang. got ${err && err.code}`);
+  check('loop-render', 0, /repeat:'infinite'/.test(err.message) && /\{until/.test(err.message),
+    'the refusal must say what to do instead (pass {until}, or bound the repeat)');
+  const withUntil = u.nest.renderBound({ until: 6000 });
+  check('loop-render', 0, withUntil.to === 6000 && withUntil.unbounded.join() === 'forever',
+    `…and an EXPLICIT bound is accepted, still reporting which spans were unbounded: ${JSON.stringify(withUntil)}`);
+  // one level down: renderDeck itself already refuses a non-finite window, which
+  // is the same refusal without the ability to name the span.
+  const od = offlineDeck({ items: [{ at: 0, kind: 'k', payload: {} }], range: [0, 1000], adapters: { k: { caps: { deterministic: true }, actuate() {} } } });
+  const m = throws(() => renderDeck(od, { from: 0, to: Infinity, fps: 30 }));
+  check('loop-render', 0, m && /finite/.test(m), `renderDeck must refuse a non-finite window: ${m}`);
+  od.dispose();
+
+  // A BOUNDED loop must still RENDER, and render REPRODUCIBLY — a loop may not
+  // cost determinism. Two renders of the same looped arrangement, byte-identical.
+  const hashes = [];
+  for (let pass = 0; pass < 2; pass++) {
+  const rt = createRenderRuntime(0);      // a FRESH runtime per pass — a render
+                                          // is reproducible from time zero, not
+                                          // from wherever the last one stopped
+  const mkChild = () => createDeck({ clock: rt.clock, tickHost: rt.newHost(), range: [0, 2000],
+    items: [{ at: 100, kind: 'n', id: 'a', payload: { v: 1 } }, { at: 900, kind: 'n', id: 'b', payload: { v: 2 } }],
+    adapters: { n: { caps: { catchUp: 'reduce', reducible: true, seekable: true, deterministic: true },
+      actuate() {}, reduce(ps) { return ps.length; }, assertState() {} } } });
+  {
+    const ch = mkChild();
+    const par = createDeck({ clock: rt.clock, tickHost: rt.newHost(), range: [0, 20000], items: [] });
+    par.renderRuntime = rt;
+    const ne = createNest(par);
+    ne.add({ id: 'q', at: 0, deck: ch, in: 0, out: 1000, repeat: 5 });
+    const bound = ne.renderBound();
+    const res = renderDeck(par, { ...bound, fps: 50, runtime: rt });
+    hashes.push(res.traceHash);
+    ne.dispose(); ch.dispose(); par.dispose();
+  }
+  }
+  check('loop-render', 0, hashes[0] === hashes[1],
+    `a bounded loop must render byte-identically twice: ${hashes[0]} vs ${hashes[1]}`);
+}
+
+// --- 14h — THE STORE: a loop is a BOUNDED WINDOW QUERY ----------------------
+{
+  // §8.7 feared an infinite loop would pin pages forever. It cannot: a loop
+  // re-seeks a FIXED fragment, so the window it asks for is the same window
+  // every pass. What has to be measured is that the loop resolves to a bounded
+  // WINDOW QUERY and never a full scan — the resident set is then constant
+  // whatever `repeat` says.
+  const rows = [];
+  for (let i = 0; i < 40000; i++) rows.push({ at: i * 10, kind: 'n', id: `e${i}`, payload: { i } });
+  const tmp = join(tmpdir(), `loop-store-${process.pid}.jsonl`);
+  writeFileSync(tmp, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  const idx = await buildJsonlIndex(tmp, { pageRows: 512 });
+  const reader = await jsonlStore({ path: tmp, index: idx.index, pageRows: 512, maxPages: 8 }).open();
+  const IN = 120000, OUT = 122000;                     // a 2 s fragment, 200 rows
+  const want = reader.pagesForWindow(IN, OUT);
+  await reader.ensure(IN, OUT);
+  const first = reader.resident();
+  const seenPageSets = new Set();
+  for (let wrap = 0; wrap < 1000; wrap++) {
+    // one pass of the loop, as the servo would drive it: re-seek to `in`, read
+    // the fragment, arrive at `out`.
+    await reader.ensure(IN, OUT);
+    reader.slice(IN, OUT);
+    seenPageSets.add(reader.resident().pages.join(','));
+  }
+  const last = reader.resident();
+  check('loop-store', 0, last.pages.length === first.pages.length && last.pages.length <= reader.pageRows && last.pages.length <= 8,
+    `1000 wraps must not grow the resident set: ${first.pages.length} -> ${last.pages.length} pages`);
+  check('loop-store', 0, seenPageSets.size === 1,
+    `…and the resident set must be the SAME set every pass (a loop is one bounded window query): ${seenPageSets.size} distinct sets`);
+  check('loop-store', 0, want.length <= 2 && last.pinned.join(',') === want.join(','),
+    `the fragment is ${want.length} page(s) and stays pinned: want=${want} pinned=${last.pinned}`);
+  const st = reader.stats();
+  check('loop-store', 0, st.loads <= want.length + 2 && st.evictions === 0,
+    `1000 wraps over one fragment must load each page ONCE and evict nothing: loads=${st.loads} evictions=${st.evictions}`);
+  check('loop-store', 0, st.ensureFast >= 999,
+    `…so 999 of the 1000 ensures are the synchronous fast path: ${st.ensureFast}`);
+  reader.close(); unlinkSync(tmp);
+}
+
+// --- 14i — the wrap is OPT-IN (the archaeology's headline) ------------------
+{
+  // tracker schedules `(((beat - startBeat) % len) + len) % len` and has NO
+  // wrap handler: nothing is reset, re-armed, silenced or faded at pos 0, and
+  // notes ring across the boundary ON PURPOSE. A lane with no held state must
+  // not be given a boundary it never asked for.
+  const r = loopRig({ ref: 'tape-optin', wrapHeard: true });
+  const AT = 0, IN = 0, OUT = 2000, L = 2000;
+  r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 6 });
+  r.parent.seek(0); r.parent.play(1);
+  runFor(r.vr, r.nest, 6 * L);
+  check('loop-optin', 0, r.sink.wraps.length === 5 && r.sink.wraps.every((w) => w.kind === 'note'),
+    `only the lane that IMPLEMENTS loopWrap() hears the boundary: ${JSON.stringify(r.sink.wraps.map((w) => w.kind))}`);
+  check('loop-optin', 0, r.nest.loop('q').lastWrap.heard.join() === 'note',
+    `…and the wrap report names exactly who heard it: ${JSON.stringify(r.nest.loop('q').lastWrap.heard)}`);
+  // `ping` has no reduce/assertState at all — transport's assertAt skips it, so
+  // the re-seek never touches it and it behaves exactly as tracker's does.
+  check('loop-optin', 0, r.sink.pings === 6,
+    `a fire-and-forget lane fires once per repetition and is otherwise untouched by the wrap: ${r.sink.pings}`);
+
+  // declaring the cap without implementing it is a reported DEGRADATION
+  const d = loopRig({ ref: 'tape-degraded' });
+  // re-declare the note lane's cap without the function
+  const bad = createDeck({ clock: d.vr.clock, tickHost: d.vr.newHost(), range: [0, 4000],
+    items: [{ at: 100, kind: 'note', payload: { raw: [144, 60, 90] } }],
+    adapters: { note: { caps: { loopWrap: true, catchUp: 'reduce', reducible: true, rates: CHILD_RATES },
+      actuate() {}, reduce(ps) { return ps.length; }, assertState() {} } } });
+  d.nest.add({ id: 'b', at: 0, deck: bad, in: 0, out: 2000, repeat: 3 });
+  d.parent.seek(0); d.parent.play(1);
+  runFor(d.vr, d.nest, 2 * 2000 + 100);
+  const degs = d.nest.loop('b').degradations;
+  check('loop-optin', 0, degs.some((x) => x.kind === 'note' && x.wanted === 'loopWrap' && /implements no loopWrap/.test(x.reason)),
+    `caps.loopWrap declared but not implemented must be REPORTED, not silently skipped: ${JSON.stringify(degs)}`);
+  bad.dispose();
+}
+
+// --- 14j — a loop SURVIVES THE DOOR (score round trip, live) ----------------
+{
+  const r = loopRig({ ref: 'tape-score' });
+  r.nest.add({ id: 'q', at: 3000, rate: 1, deck: r.child, in: 700, out: 2700, repeat: 9 });
+  r.nest.add({ id: 'u', at: 40000, rate: 1, deck: r.child, in: 0, out: 1000, repeat: { untilMs: 3000 } });
+  const s = r.nest.toScore({ id: 'loops' });
+  const j = scoreToJSON(s);
+  check('loop-score', 0, s.quotations[0].repeat === 9 && JSON.stringify(s.quotations[1].repeat) === '{"untilMs":3000}',
+    `toScore() must carry repeat: ${j}`);
+  check('loop-score', 0, scoreToJSON(parseScore(j)) === j, 'a score with loops round-trips byte-identically');
+
+  // load it in a FRESH runtime that has only the bytes and a resolver
+  const vr2 = sharedVR(2_000_000);
+  const sink2 = newLoopSink();
+  const child2 = makeLoopChild(vr2, sink2);
+  const parent2 = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 400000], items: [] });
+  const { nest: n2 } = loadScore(j, () => child2, { parent: parent2, toleranceMs: 5, hardSeekMs: 200 });
+  check('loop-score', 0, n2.loop('q').iterations === 9 && n2.span('q').parentDur === 18000,
+    `the loaded arrangement loops exactly as the live one did: ${JSON.stringify(n2.loop('q'))}`);
+  parent2.seek(3000 + 6 * 2000 + 1000);
+  check('loop-score', 0, child2.position() === 1700 && n2.iteration('q') === 6,
+    `…and a seek into repetition 7 of the LOADED score lands identically: ${child2.position()} rep ${n2.iteration('q')}`);
+  check('loop-score', 0, scoreToJSON(n2.toScore({ id: 'loops' })) === j,
+    'toScore(loadScore(x)) === x, with repeat');
+
+  // the three provenance carriers each say something about the repeat
+  const rows = provenanceRows(r.nest);
+  check('loop-score', 0, rows[0].repeat === 9 && rows[0].iterations === 9 && rows[0].parentOut === 3000 + 18000,
+    `provenanceRows must claim N passes' worth of parent time: ${JSON.stringify(rows[0])}`);
+  const c2 = exportProvenance(r.nest, { carrier: 'c2pa' });
+  check('loop-score', 0, c2.validation.ok && c2.doc.assertions[0].data.actions[0].parameters[NS].repeat === 9,
+    `C2PA carries repeat in our namespace and still validates: ${JSON.stringify(c2.validation.errors)}`);
+  check('loop-score', 0, c2.caveats.some((x) => /REPEAT DOES NOT SURVIVE/.test(x)),
+    'and says out loud that no carrier has a word for a loop');
+  const hl = exportProvenance(r.nest, { carrier: 'hls', anchor: 0 });
+  check('loop-score', 0, hl.validation.ok && /X-ORG-ELEKTRON-REPEAT="9"/.test(hl.tags[0]), `HLS X- attribute: ${hl.tags[0]}`);
+  const ot = exportProvenance(r.nest, { carrier: 'otio' });
+  check('loop-score', 0, ot.validation.ok && ot.doc.tracks.children[0].children.find((c) => c.name === 'q').metadata[NS].repeat === 9,
+    'OTIO namespaced metadata carries it verbatim (and no OTIO tool will act on it)');
+
+  // an UNBOUNDED loop still exports, and is flagged rather than given a fake end
+  const u = loopRig({ ref: 'tape-inf2' });
+  u.nest.add({ id: 'f', at: 0, deck: u.child, in: 0, out: 2000, repeat: 'infinite' });
+  const ur = provenanceRows(score({ quotations: [u.nest.quotation('f')] }), { resolve: () => u.child });
+  check('loop-score', 0, ur[0].unbounded === true && ur[0].parentOut === 2000,
+    `an unbounded quotation reports ONE pass and flags itself, rather than inventing an end: ${JSON.stringify(ur[0])}`);
 }
 
 if (failures) {
