@@ -1,0 +1,288 @@
+{
+  "t": 1787905285751,
+  "runId": "studio-20260828T081827",
+  "room": "studio-20260828T081827",
+  "replayUrl": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260828T081827%2Findex.m3u8&room=studio-20260828T081827&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1787905110334",
+  "headline": {
+    "timeToLiveMs": 2992,
+    "stopClickToReplayLinkMs": 20898,
+    "uploadLagMs": {
+      "p50": 5000,
+      "p95": 6082,
+      "min": 2339,
+      "max": 6424
+    },
+    "diskHighWater": {
+      "bytes": 1877447,
+      "segments": 2,
+      "samples": 109
+    },
+    "segments": 20,
+    "durationMs": 82412,
+    "cueEngineDriftMs": {
+      "n": 5,
+      "p50": 1.116,
+      "p95": 1.478,
+      "max": 1.478
+    },
+    "replayCueErrMs": {
+      "n": 5,
+      "p50": -37,
+      "p95": -5,
+      "absP50": 37,
+      "absP95": 39,
+      "min": -39,
+      "max": -5
+    },
+    "contentMinusNativeMs": -45.3,
+    "timelineRows": {
+      "rows": 119,
+      "pages": 1,
+      "indexBytes": 173
+    }
+  },
+  "perCue": [
+    {
+      "id": "CUE-20662",
+      "at": 1787905120813,
+      "fired": true,
+      "errMs": -5,
+      "engineLateMs": 5
+    },
+    {
+      "id": "CUE-33070",
+      "at": 1787905133220,
+      "fired": true,
+      "errMs": -37,
+      "engineLateMs": 2
+    },
+    {
+      "id": "CUE-45469",
+      "at": 1787905145620,
+      "fired": true,
+      "errMs": -29,
+      "engineLateMs": 2
+    },
+    {
+      "id": "CUE-59270",
+      "at": 1787905159421,
+      "fired": true,
+      "errMs": -39,
+      "engineLateMs": 5
+    },
+    {
+      "id": "CUE-72670",
+      "at": 1787905172821,
+      "fired": true,
+      "errMs": -39,
+      "engineLateMs": 4
+    }
+  ],
+  "checks": [
+    {
+      "name": "engine-one-command",
+      "ok": true,
+      "detail": "http://127.0.0.1:8899 up in 268 ms"
+    },
+    {
+      "name": "console-one-url",
+      "ok": true,
+      "detail": "http://127.0.0.1:8899/ shows phase=idle"
+    },
+    {
+      "name": "go-live",
+      "ok": true,
+      "detail": "T0=1787905110334 native, click→live 2992 ms"
+    },
+    {
+      "name": "legs-up",
+      "ok": true,
+      "detail": "room:up record:up source:up archive:up"
+    },
+    {
+      "name": "strip-reads-drift-channel",
+      "ok": true,
+      "detail": "deck.drift() n=5 · driftStats {\"total\":5,\"retained\":5,\"dropped\":0,\"limit\":20000}"
+    },
+    {
+      "name": "replay-link-appears-at-stop",
+      "ok": true,
+      "detail": "after 20898 ms"
+    },
+    {
+      "name": "reconcile-green",
+      "ok": true,
+      "detail": "playlist-in-r2:ok playlist-ended:ok every-segment-present:ok sidecar-timeline.jsonl:ok sidecar-timeline.idx.json:ok sidecar-show.json:ok"
+    },
+    {
+      "name": "timeline-jsonl-indexed-and-readable",
+      "ok": true,
+      "detail": "119 rows, 173 B sidecar"
+    },
+    {
+      "name": "timeline-uploaded-beside-show",
+      "ok": true,
+      "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/timeline.jsonl"
+    },
+    {
+      "name": "cuelog-has-every-cue",
+      "ok": true,
+      "detail": "5/5"
+    },
+    {
+      "name": "all-cues-fired-in-replay",
+      "ok": true,
+      "detail": "all 5"
+    },
+    {
+      "name": "all-fire-frames-decoded",
+      "ok": true,
+      "detail": "decOk on every fire"
+    },
+    {
+      "name": "cue-abs-p95-under-150ms",
+      "ok": true,
+      "detail": "absP95=39 ms"
+    },
+    {
+      "name": "native-anchor-within-one-frame",
+      "ok": false,
+      "detail": "content−native=-45.3 ms"
+    },
+    {
+      "name": "burn-decode-rate",
+      "ok": true,
+      "detail": "2114/2114"
+    }
+  ],
+  "show": {
+    "v": 1,
+    "runId": "studio-20260828T081827",
+    "room": "studio-20260828T081827",
+    "bucket": "elektron-archive-test",
+    "prefix": "shows/studio-20260828T081827",
+    "pubBase": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev",
+    "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/index.m3u8",
+    "timelineUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/timeline.jsonl",
+    "T0native": 1787905110334,
+    "t0Exact": true,
+    "tGoPressed": 1787905107687,
+    "tStop": 1787905192746,
+    "timeToLiveMs": 2647,
+    "durationMs": 82412,
+    "source": "page",
+    "audio": "silent",
+    "score": null,
+    "segments": 20,
+    "cues": 5,
+    "cueDriftMs": {
+      "n": 5,
+      "p50": 1.116,
+      "p95": 1.478,
+      "max": 1.478
+    },
+    "cueList": [
+      {
+        "id": "CUE-20662",
+        "at": 1787905120813,
+        "sentAt": 1787905120814,
+        "lateMs": 1,
+        "label": null
+      },
+      {
+        "id": "CUE-33070",
+        "at": 1787905133220,
+        "sentAt": 1787905133222,
+        "lateMs": 2,
+        "label": null
+      },
+      {
+        "id": "CUE-45469",
+        "at": 1787905145620,
+        "sentAt": 1787905145622,
+        "lateMs": 2,
+        "label": null
+      },
+      {
+        "id": "CUE-59270",
+        "at": 1787905159421,
+        "sentAt": 1787905159422,
+        "lateMs": 1,
+        "label": null
+      },
+      {
+        "id": "CUE-72670",
+        "at": 1787905172821,
+        "sentAt": 1787905172823,
+        "lateMs": 2,
+        "label": null
+      }
+    ],
+    "timeline": {
+      "rows": 119,
+      "pages": 1,
+      "indexBytes": 173
+    },
+    "uploader": {
+      "segments": 21,
+      "allVerified": true,
+      "degraded": false,
+      "lagMs": {
+        "p50": 5000,
+        "p95": 6082,
+        "min": 2339,
+        "max": 6424
+      },
+      "diskHighWater": {
+        "bytes": 1877447,
+        "segments": 2,
+        "samples": 109
+      },
+      "totalBytes": 18667802
+    },
+    "cuelogCount": 5,
+    "replay": {
+      "anchor": "stamp",
+      "t0": 1787905110334,
+      "url": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260828T081827%2Findex.m3u8&room=studio-20260828T081827&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1787905110334"
+    },
+    "reconcile": {
+      "prefix": "shows/studio-20260828T081827",
+      "checks": [
+        {
+          "name": "playlist-in-r2",
+          "ok": true,
+          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/index.m3u8"
+        },
+        {
+          "name": "playlist-ended",
+          "ok": true,
+          "detail": "21 segments"
+        },
+        {
+          "name": "every-segment-present",
+          "ok": true,
+          "detail": "21/21, 17.8 MB"
+        },
+        {
+          "name": "sidecar-timeline.jsonl",
+          "ok": true
+        },
+        {
+          "name": "sidecar-timeline.idx.json",
+          "ok": true
+        },
+        {
+          "name": "sidecar-show.json",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "t": 1787905207607,
+      "segments": 21,
+      "bytes": 18667084,
+      "missing": []
+    },
+    "stopToReplayMs": 20872
+  }
+}
