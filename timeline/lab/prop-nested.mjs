@@ -535,11 +535,138 @@ function burstDeck(vr, fired, folded) {
   mm2.dispose(); deckD.pause(); deckD.dispose();
 }
 
+// ===========================================================================
+// suite 9 — L4b: requestVideoFrameCallback.mediaTime as the servo's SENSOR.
+//
+// The measured reason this law is shaped the way it is (timeline/lab/
+// run-sensor.mjs, real headless playback): read as a BARE NUMBER, `mediaTime`
+// sits 0.22-0.90 frame AHEAD of `currentTime` — that is display latency, not
+// error, and swapping sensors tick-by-tick on it made the servo strictly WORSE
+// (corrections 9 -> 380 at a 20 ms band). Carried onto `now` through
+// `expectedDisplayTime` — which is what the spec ships the pair for — the same
+// playback corrects 365 -> 18 times at a 5 ms band. So the law is: CARRY IT,
+// and fall back to currentTime whenever the frame sample cannot be trusted.
+// ===========================================================================
+function fakeVideo(t0 = 0) {
+  const o = fakeMedia(t0);
+  o.frameCbs = [];
+  o.requestVideoFrameCallback = (cb) => { o.frameCbs.push(cb); return o.frameCbs.length; };
+  /** deliver one presented frame: mediaTime seconds, shown at `edtOffset` ms
+   *  from now in the performance.now() timebase (rVFC's expectedDisplayTime is
+   *  in the FUTURE when the callback runs — that is the whole point). */
+  o.presentFrame = (mediaTime, edtOffset = 0) => {
+    const cbs = o.frameCbs.splice(0);
+    const now = performance.now();
+    for (const cb of cbs) cb(now, { mediaTime, expectedDisplayTime: now + edtOffset,
+      presentationTime: now, presentedFrames: 1, width: 4, height: 4 });
+  };
+  return o;
+}
+{
+  const vr = sharedVR();
+  const anchor = 0;
+
+  // --- N1: NO rVFC (Firefox < 132, every <audio>) — nothing changes at all
+  {
+    const fired = [], folded = {};
+    const deck = burstDeck(vr, fired, folded);
+    const el = fakeMedia(1.0);                        // plain element: no rVFC
+    const mm = mediaMaster(deck, el, { anchorMs: anchor, toleranceMs: 40, stallMs: -1 });
+    deck.seek(1000);
+    const r = mm.tick();
+    check('rvfc', 'N1', mm.stats().rvfc.supported === false && mm.stats().rvfc.frames === 0,
+      `an element without requestVideoFrameCallback must report supported=false (${JSON.stringify(mm.stats().rvfc)})`);
+    check('rvfc', 'N1', Math.abs(r.pos - 1000) < 1e-9,
+      `…and the position must be exactly anchor + currentTime*1000 (${r.pos})`);
+    check('rvfc', 'N1', mm.sensorStats().n === 0, 'and no disagreement rows are collected');
+    mm.dispose(); deck.dispose();
+  }
+
+  // --- N2: a fresh frame IS carried onto now, and the servo sees mediaTime
+  {
+    const fired = [], folded = {};
+    const deck = burstDeck(vr, fired, folded);
+    const el = fakeVideo(1.0);
+    const mm = mediaMaster(deck, el, { anchorMs: anchor, toleranceMs: 5, stallMs: -1 });
+    deck.seek(1000);
+    mm.tick();                                        // registers the callback
+    check('rvfc', 'N2', mm.stats().rvfc.supported === true && el.frameCbs.length === 1,
+      `a video element must get exactly one armed frame callback (${el.frameCbs.length})`);
+    el.presentFrame(1.020, 0);                        // the frame on the glass is 20 ms ahead
+    const r = mm.tick();
+    check('rvfc', 'N2', r.pos > 1015 && r.pos < 1030,
+      `the servo must read the PRESENTED frame's mediaTime carried onto now (~1020, got ${r.pos})`);
+    check('rvfc', 'N2', mm.stats().rvfc.used >= 1 && mm.stats().rvfc.frames === 1,
+      `the frame sample must be USED and counted (${JSON.stringify(mm.stats().rvfc)})`);
+    check('rvfc', 'N2', el.frameCbs.length === 1, 'the one-shot callback must be re-armed for the next frame');
+    const s = mm.sensorStats();
+    check('rvfc', 'N2', s.raw.n >= 1 && Math.abs(s.raw.signedMax - 20) < 3 && Math.abs(s.carried.signedMax - 20) < 3,
+      `both the RAW and the CARRIED disagreement must be recorded (${JSON.stringify({ raw: s.raw.signedMax, carried: s.carried.signedMax })})`);
+    // and pos() agrees with tick() without touching the accounting
+    const usedBefore = mm.stats().rvfc.used;
+    check('rvfc', 'N2', Math.abs(mm.pos() - r.pos) < 3 && mm.stats().rvfc.used === usedBefore,
+      'pos() must apply the same correction and change no counter');
+    mm.dispose(); deck.dispose();
+  }
+
+  // --- N3: a STALE frame sample is not a sample. This is the hidden-tab and
+  //     stalled-decoder path: rVFC stops, `timeupdate` does not.
+  {
+    const fired = [], folded = {};
+    const deck = burstDeck(vr, fired, folded);
+    const el = fakeVideo(1.0);
+    const mm = mediaMaster(deck, el, { anchorMs: anchor, toleranceMs: 5, stallMs: -1, rvfcStaleMs: -1 });
+    deck.seek(1000);
+    mm.tick(); el.presentFrame(1.020, 0);
+    const r = mm.tick();
+    check('rvfc', 'N3', Math.abs(r.pos - 1000) < 1e-9 && mm.stats().rvfc.stale >= 1 && mm.stats().rvfc.used === 0,
+      `a stale frame must fall back to currentTime and be counted (pos ${r.pos}, ${JSON.stringify(mm.stats().rvfc)})`);
+    mm.dispose(); deck.dispose();
+  }
+
+  // --- N4: a frame sample from BEFORE a discontinuity must never be carried
+  //     across it — otherwise the sensor could change which branch L2 takes.
+  {
+    const fired = [], folded = {};
+    const deck = burstDeck(vr, fired, folded);
+    const el = fakeVideo(1.0);
+    const mm = mediaMaster(deck, el, { anchorMs: anchor, toleranceMs: 5, jumpMs: 250, stallMs: -1 });
+    deck.seek(1000);
+    mm.tick(); el.presentFrame(1.020, 0); mm.tick();
+    el.currentTime = 9.5;                             // AN EXTERNAL SCRUB; the last frame is stale news
+    const r = mm.tick();
+    check('rvfc', 'N4', mm.stats().rvfc.rejected >= 1,
+      `a frame sample disagreeing by more than jumpMs must be REJECTED (${JSON.stringify(mm.stats().rvfc)})`);
+    check('rvfc', 'N4', r.reason === 'jump' && Math.abs(r.pos - 9500) < 1e-9,
+      `…and L2 must still see the raw currentTime and SEEK there (reason ${r.reason}, pos ${r.pos})`);
+    check('rvfc', 'N4', String(folded.set) === String(['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']),
+      `…folding the skipped cues exactly as before the sensor changed: ${folded.set}`);
+    mm.dispose(); deck.dispose();
+  }
+
+  // --- N5/N6: both opt-outs really opt out (Remotion excludes VFR sources)
+  for (const [label, opts] of [['N5', { useRvfc: false }], ['N6', { variableFps: true }]]) {
+    const fired = [], folded = {};
+    const deck = burstDeck(vr, fired, folded);
+    const el = fakeVideo(1.0);
+    const mm = mediaMaster(deck, el, { anchorMs: anchor, toleranceMs: 5, stallMs: -1, ...opts });
+    deck.seek(1000);
+    mm.tick();
+    el.presentFrame(1.020, 0);
+    const r = mm.tick();
+    check('rvfc', label, el.frameCbs.length === 0 && mm.stats().rvfc.frames === 0 &&
+                         mm.stats().rvfc.supported === false && Math.abs(r.pos - 1000) < 1e-9,
+      `${JSON.stringify(opts)} must register NO callback and leave the currentTime path untouched (pos ${r.pos}, cbs ${el.frameCbs.length})`);
+    mm.dispose(); deck.dispose();
+  }
+}
+
 if (failures) {
   console.error(`prop-nested: ${failures} VIOLATION(S) in ${checks} checks`);
   process.exit(1);
 }
 console.log(`prop-nested OK: ${checks} checks, 0 violations`);
 console.log('fragment OK: (out-in)/rate span length / entry seeks+asserts at `in` / `out` is the child\'s end / parent seek maps exact / clamp reported / in>=out + wholly-outside + overlapping-quotation rejected / THE SAME DECK QUOTED TWICE, both playing correctly, child range untouched');
+console.log('rVFC (L4b) OK: an element without requestVideoFrameCallback is untouched / a fresh frame\'s mediaTime is CARRIED onto now through expectedDisplayTime and used / a stale sample falls back to currentTime (the hidden-tab path) / a sample from before a discontinuity is REJECTED so L2 still sees the raw currentTime and seeks / useRvfc:false and variableFps:true register no callback at all');
 console.log('mediaMaster OK: NEGATIVE CONTROL (sync across a 9 s gap BURSTS a catchUp:burst lane) / the helper SEEKS instead and folds / small errors still sync with no re-fire / the master is never nudged / timeupdate backstop attached+detached / seeking is not a clock / stall holds (1 element) and releases (N tiles)');
 console.log('setRange OK: durationMs follows / range keeps its identity / narrowing re-folds with a real seek / runtime items + auto / cursor exact and still O(1) across a range change and lane insertions');

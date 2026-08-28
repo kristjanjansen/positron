@@ -1,0 +1,148 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>timeline/lab — offline render determinism (real OfflineAudioContext)</title>
+<style>body{font:12px/1.5 ui-monospace,monospace;background:#111;color:#ddd;margin:12px}pre{white-space:pre-wrap}</style>
+<h3>offline render — byte-identical trace + identical audio buffer hash</h3>
+<canvas id="c" width="320" height="90" style="background:#000"></canvas>
+<pre id="out">rendering…</pre>
+<script type="module">
+// The browser half of the determinism proof: the SAME renderDeck(), but with a
+// REAL OfflineAudioContext behind the audio lane instead of a stub, so the
+// deliverable is an actual PCM hash of an actual rendered buffer.
+import { offlineDeck, renderDeck, renderDeckAudio, hashAudioBuffer, hashText } from '/timeline/render.mjs';
+
+const out = document.getElementById('out');
+const cvs = document.getElementById('c'), cx = cvs.getContext('2d');
+
+const SPAN = 4000, FPS = 30, SR = 48000;
+const CLICKS = [250, 500, 1000, 1750, 2500, 3000, 3999];
+const items = [];
+for (let i = 1; i <= 12; i++) items.push({ at: i * 300, kind: 'cue', id: `C${i}`, payload: { op: 'add', v: i } });
+for (let i = 0; i <= 20; i++) items.push({ at: i * 200, kind: 'pointer', id: `P${i}`, payload: { x: Math.sin(i) * 50 + 50, at: i * 200 } });
+
+const applyOp = (s, p) => (p.op === 'add' ? (s + p.v) % 1000003 : s);
+function build(sink) {
+  return offlineDeck({
+    items, range: [0, SPAN + 500], autoStart: false, evidence: { restored: { maxTier: 1 } },
+    adapters: {
+      cue: { caps: { catchUp: 'reduce', deterministic: true },
+             actuate: (p) => { sink.state = applyOp(sink.state, p); sink.fires++; },
+             reduce: (ps) => ps.reduce(applyOp, 0),
+             assertState: (s) => { sink.state = s; } },
+      pointer: { caps: { continuous: true, catchUp: 'drop', tier: 1, method: 'linear', deterministic: true },
+                 actuate: () => {}, interpolate: (a, b, u) => ({ x: a.x + (b.x - a.x) * u }) },
+    },
+  });
+}
+
+// A DRAWING render: onFrame is where a caller composites. Kept cheap (a canvas
+// polyline) but real — it reads sampleAt() per frame, which is the continuous
+// lane doing its job at a frame cadence it never sees in playback.
+async function one(drawInto) {
+  const sink = { state: 0, fires: 0 };
+  const deck = build(sink);
+  const frameDigest = [];
+  const r = await renderDeckAudio(deck, {
+    from: 0, to: SPAN, fps: FPS, sampleRate: SR, channels: 1,
+    audioItems: CLICKS.map((at, i) => ({ at, kind: 'click', id: `k${i}` })),
+    stateKinds: ['cue'],
+    onFrame: ({ frameIndex, pos, state }) => {
+      const s = deck.sampleAt('pointer', pos);
+      frameDigest.push(`${frameIndex}:${pos}:${state.cue}:${s ? s.x.toFixed(6) : 'null'}`);
+      if (drawInto) {
+        if (frameIndex === 0) { cx.fillStyle = '#000'; cx.fillRect(0, 0, 320, 90); cx.strokeStyle = '#6cf'; cx.beginPath(); }
+        cx.lineTo((frameIndex / (r0nFrames || 121)) * 320, 90 - (s ? s.x : 0) * 0.8);
+        if (frameIndex % 20 === 0) cx.stroke();
+      }
+    },
+  });
+  const digest = frameDigest.join('\n');
+  const res = {
+    traceHash: r.traceHash, traceBytes: r.traceText.length, traceText: r.traceText,
+    frames: r.frames, events: r.events, reduces: r.reduces, byKind: r.byKind,
+    audio: { ...r.audio }, frameDigest: digest, frameDigestHash: hashText(digest),
+    audit: r.audit, notes: r.notes, endPos: r.endPos, finalState: sink.state,
+    // where did the clicks actually land in the rendered PCM?
+    impulses: impulseIndices(r.buffer),
+  };
+  delete res.audio.scheduled;
+  deck.dispose();
+  return res;
+}
+let r0nFrames = 121;
+
+// A SECOND composition with a REAL DSP GRAPH, not one-sample impulses.
+// The coordinator's note is the reason it exists: the Web Audio spec gives
+// OfflineAudioContext NO determinism guarantee — "renders as quickly as
+// possible" says nothing about bit-exactness — so a one-sample impulse test
+// proves almost nothing (it is a memcpy). This one runs a sawtooth oscillator
+// through an exponentially swept biquad lowpass and an exponential envelope per
+// event: real float DSP, denormals, ramp interpolation. If Chrome's offline
+// renderer is not bit-reproducible, THIS is where it shows.
+function dspNode(ctx, audioT, ev) {
+  const osc = ctx.createOscillator();
+  const filt = ctx.createBiquadFilter();
+  const g = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(110 * (1 + ((ev.seq % 5) / 4)), audioT);
+  osc.frequency.exponentialRampToValueAtTime(55 * (1 + ((ev.seq % 3) / 2)), audioT + 0.3);
+  filt.type = 'lowpass'; filt.Q.value = 8;
+  filt.frequency.setValueAtTime(300, audioT);
+  filt.frequency.exponentialRampToValueAtTime(5200, audioT + 0.12);
+  filt.frequency.exponentialRampToValueAtTime(220, audioT + 0.32);
+  g.gain.setValueAtTime(0.0001, audioT);
+  g.gain.exponentialRampToValueAtTime(0.45, audioT + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioT + 0.32);
+  osc.connect(filt); filt.connect(g); g.connect(ctx.destination);
+  osc.start(audioT); osc.stop(audioT + 0.34);
+  return osc;
+}
+async function oneDsp() {
+  const sink = { state: 0, fires: 0 };
+  const deck = build(sink);
+  const r = await renderDeckAudio(deck, {
+    from: 0, to: SPAN, fps: FPS, sampleRate: SR, channels: 2,
+    audioItems: CLICKS.map((at, i) => ({ at, kind: 'voice', id: `v${i}` })),
+    makeNode: dspNode,
+  });
+  const out = { hash: r.audio.hash, nonzero: r.audio.nonzero, peak: r.audio.peak,
+                rmsish: r.audio.rmsish, length: r.audio.length, channels: r.audio.channels,
+                traceHash: r.traceHash };
+  deck.dispose();
+  return out;
+}
+
+function impulseIndices(buf) {
+  const d = buf.getChannelData(0), out = [];
+  for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > 1e-4) out.push({ i, v: +d[i].toFixed(6), ms: +(i / buf.sampleRate * 1000).toFixed(4) });
+  return out;
+}
+
+(async () => {
+  try {
+    const a = await one(true);
+    r0nFrames = a.frames;
+    const b = await one(false);
+    const d1 = await oneDsp();
+    const d2 = await oneDsp();
+    const want = CLICKS.map((c) => Math.round(c / 1000 * SR));
+    const got = a.impulses.map((x) => x.i);
+    window.__done = {
+      identicalTrace: a.traceText === b.traceText,
+      identicalTraceHash: a.traceHash === b.traceHash,
+      identicalAudioHash: a.audio.hash === b.audio.hash,
+      identicalFrames: a.frameDigest === b.frameDigest,
+      run1: { ...a, traceText: undefined, frameDigest: undefined },
+      run2: { ...b, traceText: undefined, frameDigest: undefined },
+      clicksWantSamples: want, clicksGotSamples: got,
+      dsp1: d1, dsp2: d2, dspIdentical: d1.hash === d2.hash && d1.rmsish === d2.rmsish,
+      clicksExact: JSON.stringify(want) === JSON.stringify(got),
+      sampleRate: SR, fps: FPS, span: SPAN,
+    };
+    out.textContent = JSON.stringify(window.__done, null, 1);
+  } catch (e) {
+    window.__done = { error: e.message, stack: String(e.stack).slice(0, 800) };
+    out.textContent = window.__done.stack;
+  }
+})();
+</script>

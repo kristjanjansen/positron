@@ -98,9 +98,17 @@ timeline transport UI. One build, not two.
 - `strip.mjs`: the canonical visualizer (canvas, px/s, playhead, lanes = queries).
 - Tests: trace-replay harness; property test `reduce(t) ≡ play(0→t)`; runs in CI
   (plain node, no humans).
-- **DoD-A**: proto/replay/replay.html REFACTORED onto the lib and the existing
-  measurement suite (run-record → run-measure) passes ≤100 ms p50 — the lib is
-  proven against already-green numbers before anything new is built on it.
+- **DoD-A**: ✅ **DISCHARGED 2026-08-28.** replay.html runs on `timeline/`; both
+  suites pass unchanged and the numbers IMPROVED: content anchor p50 59 → **16 ms**
+  (p95 71 → 34), native T₀ anchor p50 77 → **−4 ms** (p95 95 → 11), engine
+  lateness 52 → **5.5 ms**. ⚠️ AND the old figure was wrong in kind, not degree:
+  the historic 59 ms was **one deterministic phase sample, not a distribution**
+  (cues at 15.000 s = exactly 150 poll periods, so the errors reproduced
+  bit-identically two days later). Honest old spec: 0–100 ms + quantization,
+  worst case ~133 ms against a 150 ms target — **~11 % real margin, presented as
+  60 %.** Measurement cadences must use fractional offsets forever.
+  ⇒ Sessions B/C are unblocked; the SHOW panel's strip should read the deck's
+  drift channel (`audit()`/`driftStats()`), not page state.
 
 **Session B — `studio/engine.mjs`** (node CLI, TL-proof):
 - Supervises children: ffmpeg RTMPS leg, local segmented recorder (native T₀),

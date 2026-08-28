@@ -253,3 +253,188 @@ engineering.
 See plan-studio.md §5 "MERGED V0" — the timeline library ships as the studio
 engine's event backbone; the replay-page refactor onto the lib is the
 regression gate (the existing measurement suite must stay green).
+
+## 7. BUILT — state of the library (2026-08-28, sessions 6h–6ab)
+
+The substrate described above is no longer a plan. `timeline/` exists, is
+measured, and has **eight clients**. What follows amends §§1–6 with what the
+building taught; where a section above is now wrong, this section wins.
+
+### 7.1 What exists
+- **`transport.mjs` (v0.5)** — the position vector `{p0,t0,rate}` over a
+  pluggable ClockSource (zero timers inside the vector); lookahead wall lane
+  (25 ms tick / 100 ms horizon / 150 ms lateGrace, committed-vs-pending with
+  cancel); **worker tick host by default** (8.5 ms p95 hidden vs main's 981 ms
+  and rAF's 9175 ms); Chris-Wilson audio lane, **sample-accurate at 10 µs**,
+  which holds through a 500 ms main-thread stall; `registerAdapter(kind, {caps,
+  actuate, reduce, assertState, interpolate})` with per-kind dispatch and
+  policy derived from caps; `createDeck` / `makeLogDeck` (multi-lane logs);
+  `sampleAt` / `bracket` (O(1) amortised cursor — 3.67 comparisons/call at both
+  n=2k and n=8k); `deck.request()` → `{wanted, chose, degraded, reason}` and
+  `degradations()`; `sync()` for external clock masters, distinct from `seek()`;
+  `setRange()`; non-destructive drift reads (`onDrift`/`peekDrift`/`driftStats`).
+- **`nested.mjs`** — composition across timelines: `createNest(deck).add({id,
+  at, rate, deck, in, out, master})`. A nested deck is an ordinary adapter kind,
+  so `transport.mjs` needed **zero changes** to accept it. Fragment quotation
+  (`in`/`out`) plays a PIECE of a child; the same deck may be quoted twice at
+  different fragments; a degraded child cannot master the parent's clock.
+- **`media-master.mjs`** — the five laws (never nudge the master; drift is
+  `sync()` but a discontinuity > jumpMs is `seek()`; a stall gives up the role;
+  `timeupdate` is the hidden-tab backstop; paused/ended/seeking is not a clock).
+- **`store.mjs`** — memory / JSONL+Range / DO-paged backends behind the cursor's
+  two-line interface; **1 M rows open in 2.5 ms holding 3.8 MB** (vs an array's
+  143 ms / 114 MB), append-live under a moving playhead with zero cursor resets,
+  and a **fire-late-with-a-drift-record** miss policy (stall was rejected —
+  a store must not move the transport behind the client's back; skip was
+  rejected — it holes the prefix and breaks non-commutative reducers silently).
+- **The evidence firewall** (§5b as code) — see 7.3.
+- **`lab/prop-test.mjs`** — the C2 gate, runnable, six suites, green at 100
+  seeds; plus `prop-nested.mjs`, `prop-store.mjs`.
+
+### 7.2 Clients (each adoption found a latent bug in the code it replaced — 4/4)
+jam · jam-interval · replay-grid · instrument session replay · remixer ·
+paths (pointer/continuous) · text performer · Kurenniemi corpus. The bugs:
+a **−101 ms constant offset** nobody had measured; a forward seek that **fired
+every skipped cue**; stored audio starting **+1075 ms early** past a test
+structurally blind to it (`advanced > 0` passes for a one-second-early track);
+a child media element silently never playing. **Adoption is a bug-detector;
+budget for that, not just for the port.**
+
+### 7.3 §5b is now code — and the doctrine survived contact
+`createDeck({evidence})` / `setEvidence`, with `'attested' | {restored:{maxTier}}
+| 'all'` **forced**: a query either names its policy, inherits one the session
+explicitly set, or throws — and the only omission answered is one whose answer
+is *provably identical* under all three policies. `registerReconstructor()`
+appends **derived lanes**; **attested rows carry no `provenance` key at all —
+absence is the definition**; lane purity (a lane is attested or derived, never
+both) makes the firewall O(1) and makes "delete a restoration = drop its lane"
+the only thing dropping can mean. Proven: under `attested` the error is
+**bit-identical to a plain hold** (i.e. attested never secretly interpolates),
+and dropping 1,674 derived rows leaves master trace and audit **bit-identical**.
+- **The trigger is `caps.tier ≥ 1`, not `caps.continuous`** — tier is the
+  adapter's own admission that its between-sample values are restoration.
+  Gating on continuity would retro-classify honest clients (a MIDI CC holds a
+  level between messages *because MIDI says so*).
+- Still owed: tiers 2–3 (seam proved, no model plugged in), confidence not
+  mapped to stroke alpha, no provenance popover, reconstructors run once.
+
+### 7.4 §−1's uncertainty requirement — DESIGN SETTLED, cheaper than feared
+**Do not turn `at` into a distribution.** Keep the scalar; add an optional
+frozen sibling `when = {verbatim, edtf, earliest, latest, innerFrom, innerTo,
+rule, kind, note}`, resolved ONCE at ingest by a **versioned named rule**
+recorded on the row (`err-july15-padding@1`). **Absence of `when` is the crisp
+fast path — mirroring the firewall, where absence of `provenance` means
+attested. Two absences, two axes.**
+- **Firing rule: `at = when.earliest`, always.** It is one-sided sound
+  (`earliest ≤ true position` is a theorem), it gives the existing `ev.at <= pos`
+  comparison a true semantics ("possibly already occurred by pos" — the
+  *possible* half of Allen, free), and **nothing in the transport moves**.
+  Render-only was rejected: `prefixEvents` folds every row with `at <= pos`, so
+  a non-firing row hands a reducer a positionless payload AND vanishes from
+  `evidenceAccounting()` — silently shrinking the archive under exactly the
+  query the firewall protects.
+- `innerFrom`/`innerTo` are **not decoration**: without the inner bracket
+  "certainly in 1965" is unanswerable (`Y @> possible` under-reports). Four
+  traditions converged on four points (CIDOC P81/P82, OpenAtlas, PlanningLines,
+  TimeViz) and **every renderer surveyed keeps only two** — including PeriodO,
+  whose own model has four.
+- Query knob `window(..., {certainty:'possible'|'necessary'})` — Dyreson &
+  Snodgrass's *ordering plausibility* at its two endpoints; unlike the evidence
+  policy it DEFAULTS rather than throws (silence over-includes, it does not
+  fabricate). `positionAccounting()` reports **by rule**, so "43 % of this lane
+  is positioned by a padding artefact" is a visible number.
+- **Rendering is settled by a controlled study** (Gschwandtner et al. 2016):
+  *ambiguation* (two-tone: saturated certain core, lighter possible flanks) for
+  "when / how long"; *gradient/density* only for "how likely at t". Our flat
+  band is the right default; an aoristic curve answers a different question.
+  Fix the per-lane aggregate (currently a miscomputed aoristic sum): one bin per
+  **pixel column** (M4's discipline), mass `1/(b−a)` per item, divided by
+  overlapping-period count.
+- Deferred explicitly: **space** (the geo analogy taught the temporal problem;
+  adding a spatial axis is not in scope), the trapezoid interior, non-contiguous
+  brackets, Monte Carlo, competing authorities, transaction time, `when` on spans.
+
+### 7.5 Honest positioning — what we thought was novel, and what actually is
+An adversarial survey refuted two of three uniqueness claims and complicated
+the third:
+- **`reduce(prefix ≤ t)` + assert is thirty-year-old shipped practice**: DAWs
+  call it **MIDI chase** (Ardour's `midi_chase()` scans to the seek point
+  accumulating held-note/CC state, on by default); lighting consoles call it
+  **tracking**, and ETC Eos's flag is literally named **Assert**. What survives:
+  heterogeneity, the property proof, nesting, the cost model.
+- **Caps-driven adapters shipped in 2005** — `IMFRateSupport::IsRateSupported
+  (requested, &actual)` is `request()` with a Windows Media Foundation ship
+  date; AVFoundation publishes the rate lattice; GStreamer calls them caps.
+  Only **composition through nesting** survives.
+- **Provenance-as-a-timeline-axis ships — in Premiere** (Generative Extend
+  marks the invented frames in the timeline UI). But the exported credential
+  collapses to per-clip and the ecosystem cannot receive temporal regions (no
+  temporal manifests in the wild, no scrubber in the verifier, zero conformance
+  tests). The honest claim: **the firewall exists inside one editor and dies at
+  the door.** Ours is the one that has to survive the door.
+- **Our clock vector has a second ancestor**: Ableton Link's `(beat, time,
+  tempo)` triple — with a **drift slope** our re-anchoring lacks and a
+  `requestBeatAtTime`/`forceBeatAtTime` split that is exactly `sync()`/`seek()`.
+- The transport defaults (25/100 ms, worker) are **rediscovery** of Chris
+  Wilson 2013 / Tone.js. Arriving by measurement was still worth it — nobody
+  publishes p95s — but say so. **The deck was not a rediscovery**: heterogeneous
+  kinds + a real trace + media as clock master + state-reconstructing seek +
+  hidden-tab survival is an empty intersection.
+- The gap nobody has filled: **an interactive, zoomable, uncertainty-native
+  timeline.** Tools that model uncertainty don't draw it; tools that draw time
+  don't model it; the statistics packages render static PNGs.
+
+### 7.6 The steal list (adopt in this order)
+1. **`rVFC.mediaTime`** in the media servo — the dead band currently measures
+   `currentTime`, a coarse async view, when the browser can give the PTS of the
+   frame it actually showed. *(in flight)*
+2. **Deterministic offline render** — Remotion's doctrine ("no shared wall
+   clock ⇒ no wall clock at all"); we are uniquely placed (virtual runtime,
+   audio context by argument, pluggable host). ⚠️ `OfflineAudioContext` carries
+   **no determinism guarantee** and is not exposed in Workers — measure, don't
+   assume. *(in flight)*
+3. **Web Lock as a freeze exemption** — `kHoldingWebLock` is a standalone
+   Chrome exemption, which is the mitigation for Energy-Saver freezing hidden
+   tabs after ~5 min (a worker tick is NOT exempt). Also candidate:
+   **`Atomics.wait` tick host** (V8 waits on an OS condvar, structurally out of
+   the throttler's reach). Both want COOP/COEP, which also fixes Safari's 1 ms
+   `performance.now()`. Datum: **Windows on battery has an 8 ms timer floor**.
+4. **Two-phase seek** — JACK's slow-sync barrier (opt-in, non-blocking,
+   fail-open on timeout, re-armed by a locate mid-roll) + Ardour's
+   `LocateTransportDisposition {MustRoll, MustStop, RollIfAppropriate}`.
+5. **Time-ranged provenance on three carriers** — C2PA `Action.changes` +
+   `regionOfInterest` (and `reviewRatings` 1–5, the only confidence number in a
+   shipping media standard), `EXT-X-DATERANGE` `X-` attributes for the live
+   lane, OTIO namespaced metadata for the edit. TEI's `@locus` is the model for
+   separating uncertainty about the *boundary* from uncertainty about the
+   *identity*.
+6. **Proxy / decoded-frame scrub tier** — deferred; our `sampleAt` cursor is
+   already the right shape (a playhead-centred window sized by scrub direction),
+   but no current client scrubs heavy video hard enough to need it.
+
+### 7.7 Open seams, in cost order
+`caps.absentState`/`silence()` (a quotation parked at its edge currently holds
+whatever note `in`/`out` cut) · **a quotation is not yet a VALUE** — `nest.add()`
+mutates a nest and there is no serialisable `{deck, in, out, rate}` a stored
+score can carry, **which is the actual C10 ask** · content addressing (in/out
+are numbers; "from the third chorus" needs the child's own marks as an
+addressable lane) · overlapping quotations of one deck (rejected, not solved —
+a canon needs an instancing seam) · bracketing groups by kind, not series
+(`caps.series` is declared and unread, so a multi-controller lane degrades
+QUIETLY) · cross-year **queries** over the store (partition by (kind, year) at
+ingest) · the strip visualizer is STILL promised as a component and was
+hand-drawn again today.
+
+### 7.8 What the archives taught (two institutions)
+ERR gave the API and the padding convention; **Kurenniemi gave the lessons ERR
+alone could not**: the date field can describe the **file, not the work** (an
+Internet Archive rip date yields a corpus off by fifty years that is internally
+consistent about it); **rights need an asserter** (a 1968 commercial release
+marked public-domain — well-formed, machine-readable, wrong); ingest is
+**multi-source by construction**, so the adapter's real job is reconciliation;
+the honest form of "undated" is a **band**, and nine tapes sharing one guess
+render as nine identical bands — visible at a glance; **CORS posture varies by
+content type, not by item**; a throttled aggregator answers **200 with zero
+results** (the first ingest shipped an empty spine and reported success); and
+**the custodian is the one you cannot reach** — what plays is on an aggregator,
+uploaded by strangers, which is why provenance confidence must be first-class.

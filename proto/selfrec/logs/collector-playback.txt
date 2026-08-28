@@ -3,3 +3,4 @@ selfrec-collector on :8894 -> ~/personal/elektron/results/selfrec-playback.jsonl
 selfrec-collector on :8894 -> ~/personal/elektron/results/selfrec-playback.jsonl
 selfrec-collector on :8894 -> ~/personal/elektron/results/selfrec-playback.jsonl
 selfrec-collector on :8894 -> ~/personal/elektron/results/selfrec-playback.jsonl
+selfrec-collector on :8894 -> ~/personal/elektron/results/selfrec-playback.jsonl

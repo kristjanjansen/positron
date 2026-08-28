@@ -1,0 +1,106 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>timeline/lab — rVFC mediaTime vs currentTime (L4b)</title>
+<style>body{font:12px/1.5 ui-monospace,monospace;background:#111;color:#ddd;margin:12px}
+video{width:320px;background:#000}pre{white-space:pre-wrap}</style>
+<h3>L4b sensor A/B — one playback, four servos</h3>
+<video id="v" muted playsinline></video>
+<pre id="out">booting…</pre>
+<script type="module">
+// ONE real playback, FOUR mediaMaster instances over the SAME <video>:
+//   {useRvfc true, false} x {toleranceMs 20, 40}
+// Same element, same rAF loop, same tick cadence, independent decks — so the
+// only difference between the arms is WHICH CLOCK THE DEAD BAND IS ENFORCED
+// AGAINST. That is the whole experiment.
+import { createDeck } from '/timeline/transport.mjs';
+import { mediaMaster } from '/timeline/media-master.mjs';
+
+const P = new URLSearchParams(location.search);
+const FPS = +(P.get('fps') || 30);
+const SECS = +(P.get('secs') || 18);
+const v = document.getElementById('v');
+const out = document.getElementById('out');
+const log = (s) => { out.textContent = s; };
+
+const items = [];
+for (let i = 1; i * 500 < SECS * 1000; i++) items.push({ at: i * 500, kind: 'cue', id: `C${i}`, payload: { id: `C${i}` } });
+
+function makeArm(name, useRvfc, toleranceMs) {
+  const fired = [];
+  const deck = createDeck({
+    items, range: [0, SECS * 1000 + 2000], autoStart: true,
+    adapters: { cue: { caps: { catchUp: 'burst' }, actuate: (p) => fired.push(p.id) } },
+  });
+  const events = [];
+  const mm = mediaMaster(deck, v, {
+    anchorMs: 0, toleranceMs, jumpMs: 250, stallMs: 1000, stallPolicy: 'hold',
+    autoPlayPause: true, useRvfc,
+    onEvent: (e) => events.push(e),
+  });
+  return { name, useRvfc, toleranceMs, deck, mm, fired, events, errs: [], corrections: [] };
+}
+
+const TOLS = [5, 10, 20, 40];
+const arms = [];
+for (const t of TOLS) { arms.push(makeArm(`rvfc/${t}`, true, t)); arms.push(makeArm(`ct/${t}`, false, t)); }
+
+let ticks = 0, running = true;
+function loop() {
+  if (!running) return;
+  requestAnimationFrame(loop);
+  ticks++;
+  for (const a of arms) {
+    const r = a.mm.tick();
+    if (r && Number.isFinite(r.errMs)) a.errs.push(r.errMs);
+    if (r && r.correction) a.corrections.push(r.correction);
+  }
+}
+
+const q = (arr, p) => (arr.length ? arr.slice().sort((x, y) => x - y)[Math.min(arr.length - 1, Math.floor(p * arr.length))] : null);
+const absStats = (arr) => {
+  const a = arr.map(Math.abs);
+  return arr.length
+    ? { n: arr.length, p50: +q(a, 0.5).toFixed(3), p95: +q(a, 0.95).toFixed(3), max: +Math.max(...a).toFixed(3),
+        mean: +(arr.reduce((s, x) => s + x, 0) / arr.length).toFixed(3) }
+    : { n: 0 };
+};
+
+v.src = `/media/tl-${FPS}.mp4`;
+v.addEventListener('error', () => { window.__done = { error: `video error ${v.error && v.error.code}` }; });
+v.addEventListener('loadedmetadata', async () => {
+  log(`loaded ${v.videoWidth}x${v.videoHeight} dur=${v.duration.toFixed(3)}`);
+  requestAnimationFrame(loop);
+  for (const a of arms) a.deck.play();
+  try { await v.play(); } catch (e) { window.__done = { error: 'play rejected: ' + e.message }; return; }
+  setTimeout(finish, SECS * 1000);
+});
+
+function finish() {
+  running = false;
+  v.pause();
+  const rv = arms[0].mm.stats().rvfc;
+  const res = {
+    fps: FPS, secs: SECS, ticks, videoDuration: v.duration, endedAt: v.currentTime,
+    rvfc: rv,
+    disagreementMs: arms[0].mm.sensorStats(),
+    samples: arms[0].mm.sensorSamples(),
+    samplesRaw: arms[0].mm.sensorSamplesRaw(),
+    arms: arms.map((a) => ({
+      name: a.name, useRvfc: a.useRvfc, toleranceMs: a.toleranceMs,
+      syncs: a.mm.stats().syncs, corrections: a.mm.stats().corrections,
+      jumps: a.mm.stats().jumps, stalls: a.mm.stats().stalls,
+      backstopTicks: a.mm.stats().backstopTicks,
+      rvfcUsed: a.mm.stats().rvfc.used, rvfcFrames: a.mm.stats().rvfc.frames,
+      rvfcStale: a.mm.stats().rvfc.stale, rvfcRejected: a.mm.stats().rvfc.rejected,
+      supported: a.mm.stats().rvfc.supported,
+      err: absStats(a.errs),
+      correctionAbs: absStats(a.corrections),
+      fires: a.fired.length, uniqueFires: new Set(a.fired).size,
+      finalPos: +a.deck.position().toFixed(3),
+    })),
+  };
+  for (const a of arms) { a.mm.dispose(); a.deck.dispose(); }
+  window.__done = res;
+  log(JSON.stringify({ ...res, samples: `${res.samples.length} rows` }, null, 1));
+}
+</script>

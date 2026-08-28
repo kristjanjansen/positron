@@ -45,6 +45,37 @@
 //     survives, so without this backstop a hidden tab would run the vector free
 //     against a picture nobody is re-anchoring it to.
 //
+// L4b. THE SENSOR IS `requestVideoFrameCallback.mediaTime` WHEN IT IS THE
+//     FRESHER SAMPLE (v0.6, steal #1 from the browser-NLE survey §11).
+//     `el.currentTime` is a COARSE, ASYNCHRONOUSLY-UPDATED view of the decoder:
+//     the HTML spec lets a UA refresh it on its own schedule (Chrome does it
+//     roughly per frame *and* rounds it to 6 digits), so a servo enforcing a
+//     ±20-40 ms dead band against it is enforcing it against a noisy sensor.
+//     `rVFC`'s `mediaTime` is the presentation timestamp of the frame the
+//     compositor ACTUALLY SHOWED, delivered with the `expectedDisplayTime` it
+//     was shown at. Remotion reads it in preference to `currentTime` when its
+//     sample is the more recent one; so do we now.
+//
+//     THE RULE, and it is deliberately conservative:
+//       · a frame callback stores {mediaTime, expectedDisplayTime, at};
+//       · `mediaTime` is preferred only when the callback arrived AFTER the
+//         last observed change of `currentTime` AND is younger than
+//         `rvfcStaleMs` — so a hidden tab (rVFC stops, `timeupdate` does not)
+//         falls back to `currentTime` automatically, with no visibility API;
+//       · the correction is applied as a DELTA, `(mediaTime − currentTime)`,
+//         so the `{el, pos, key}` source form — whose `pos` is by construction
+//         `anchor + el.currentTime * 1000` in every client — gets it for free
+//         without the client changing a line;
+//       · Firefox before 132, Safari before ~15.4, and every `<audio>` element
+//         have no `requestVideoFrameCallback` at all: `useRvfc` degrades to the
+//         `currentTime` path silently and `stats().rvfc.supported` says so;
+//       · `variableFps: true` disables it (Remotion excludes variable-fps
+//         sources, and a VFR `mediaTime` is not on a frame grid).
+//     rVFC is an OBSERVATION primitive, never a seek primitive: the seek
+//     command still goes through `currentTime` in the client. Nothing about the
+//     policy above (the dead band, the jump threshold, L1–L5) changes — only
+//     which number the policy is applied to.
+//
 // L5. A PAUSED / ENDED / NOT-YET-READY / SEEKING MASTER IS NOT A CLOCK. While
 //     the element is seeking, its currentTime is a target, not a position:
 //     driving from it would fight the very seek in progress. Paused or ended,
@@ -74,6 +105,10 @@
  *   autoPlayPause a paused/ended master pauses the deck, and a running one
  *                 resumes it (L5)                                     [true]
  *   attachTimeupdate  install the L4 backstop                         [true]
+ *   useRvfc       prefer requestVideoFrameCallback.mediaTime (L4b)     [true]
+ *   variableFps   the source is VFR — never trust mediaTime (L4b)     [false]
+ *   rvfcStaleMs   a frame sample older than this is not a sample       [250]
+ *   sampleLimit   retained rvfc-vs-currentTime disagreement rows     [20000]
  *   onEvent       ({reason, ...}) — 'jump' | 'stall' | 'resume' | 'acquire' |
  *                 'release'. The client's engine log, not ours.
  *   onCorrection  (ms) — every applied sync correction, for the HUD.
@@ -86,6 +121,10 @@ export function mediaMaster(deck, source, {
   stallPolicy = 'hold',
   autoPlayPause = true,
   attachTimeupdate = true,
+  useRvfc = true,
+  variableFps = false,
+  rvfcStaleMs = 250,
+  sampleLimit = 20000,
   onEvent,
   onCorrection,
 } = {}) {
@@ -105,6 +144,10 @@ export function mediaMaster(deck, source, {
     syncs: 0, corrections: 0, jumps: 0, stalls: 0, releases: 0, acquires: 0,
     ticks: 0, backstopTicks: 0, idle: 0,
     lastCorrectionMs: null, lastJumpMs: null, key: null, stalled: false, driving: false,
+    // L4b accounting: the sensor is measured, not assumed.
+    rvfc: { supported: null, registered: 0, frames: 0, used: 0, stale: 0, rejected: 0,
+            lastMediaTime: null, lastExpectedDisplayMs: null, lastDeltaMs: null,
+            lastRawDeltaMs: null, samples: 0, dropped: 0 },
   };
   let lastPos = null, lastWall = 0, disposed = false, attachedTo = null;
   const now = () => (typeof performance === 'object' && performance.now ? performance.now() : Date.now());
@@ -112,8 +155,90 @@ export function mediaMaster(deck, source, {
 
   function clearAdvance() { lastPos = null; lastWall = 0; }
 
+  // ---- L4b: the rVFC sensor -------------------------------------------------
+  // One registration per mastering element, re-armed from inside the callback
+  // (rVFC is one-shot, like rAF). `rv` is the last frame the compositor told us
+  // it presented; `ctChangedAt` is when we last saw `currentTime` MOVE. The
+  // fresher of the two wins, and the disagreement between them is recorded so
+  // "which sensor is better" is a number rather than an opinion.
+  let rvEl = null, rv = null, rvArmed = false;
+  let lastCt = null, ctChangedAt = -Infinity;
+  const disagree = [];                 // (mediaTime carried to now − currentTime), ms
+  const disagreeRaw = [];              // (mediaTime − currentTime) UNCARRIED, ms
+
+  function rvfcSupported(el) {
+    return !!(el && typeof el.requestVideoFrameCallback === 'function');
+  }
+  function armRvfc(el) {
+    if (!useRvfc || variableFps || disposed || el !== rvEl || rvArmed) return;
+    if (!rvfcSupported(el)) return;
+    rvArmed = true;
+    S.rvfc.registered++;
+    el.requestVideoFrameCallback((nowMs, meta) => {
+      rvArmed = false;
+      if (disposed || el !== rvEl) return;
+      S.rvfc.frames++;
+      rv = {
+        mediaTime: meta.mediaTime,
+        expectedDisplayTime: meta.expectedDisplayTime,
+        presentationTime: meta.presentationTime,
+        presentedFrames: meta.presentedFrames,
+        at: now(),
+      };
+      S.rvfc.lastMediaTime = meta.mediaTime;
+      S.rvfc.lastExpectedDisplayMs = meta.expectedDisplayTime;
+      armRvfc(el);                     // one-shot: re-arm for the next frame
+    });
+  }
+  function detachRvfc() { rvEl = null; rv = null; rvArmed = false; lastCt = null; ctChangedAt = -Infinity; }
+  function attachRvfc(el) {
+    if (el === rvEl) return;
+    detachRvfc();
+    rvEl = el || null;
+    if (!rvEl) return;
+    S.rvfc.supported = useRvfc && !variableFps && rvfcSupported(rvEl);
+    armRvfc(rvEl);
+  }
+
+  /** The L4b decision, for ONE tick. Returns the ms to ADD to a position that
+   *  was derived from `el.currentTime` — 0 when the currentTime path wins,
+   *  which is every tick on Firefox < 132, on `<audio>`, on a VFR source, in a
+   *  hidden tab, and whenever a `timeupdate` moved currentTime more recently
+   *  than the compositor presented a frame. */
+  function sensorDeltaMs(el, wall) {
+    const ct = el.currentTime;
+    if (ct !== lastCt) { lastCt = ct; ctChangedAt = wall; }
+    if (!useRvfc || variableFps || !rv) return 0;
+    armRvfc(el);                       // a dropped re-arm must not blind us forever
+    const rate = Number.isFinite(el.playbackRate) && el.playbackRate > 0 ? el.playbackRate : 1;
+    // rVFC's sample is a PAIR, not a scalar: `mediaTime` is the PTS of the frame
+    // the compositor will show AT `expectedDisplayTime`. Read as a bare number
+    // it is ~half a frame to a frame AHEAD of `currentTime`, and that offset is
+    // display latency, not error — carrying it onto `wall` is the whole point of
+    // the spec shipping the two together. (Measured: uncarried, the two clocks
+    // disagree by 0.30 frame p50 / 1.01 frame max at 30 fps; carried, see
+    // sensorStats().)
+    const edt = Number.isFinite(rv.expectedDisplayTime) ? rv.expectedDisplayTime : rv.at;
+    const carried = rv.mediaTime + ((wall - edt) / 1000) * rate;
+    const raw = (rv.mediaTime - ct) * 1000;
+    const d = (carried - ct) * 1000;
+    if (disagree.length < sampleLimit) { disagree.push(d); disagreeRaw.push(raw); } else S.rvfc.dropped++;
+    S.rvfc.samples++;
+    S.rvfc.lastDeltaMs = +d.toFixed(4);
+    S.rvfc.lastRawDeltaMs = +raw.toFixed(4);
+    if (wall - rv.at > rvfcStaleMs) { S.rvfc.stale++; return 0; }
+    // A frame sample from BEFORE a discontinuity must never be carried across
+    // it: past the jump threshold the element has MOVED (L2) and only
+    // `currentTime` knows where to. This is what keeps the sensor swap from
+    // ever changing which branch L2 takes.
+    if (Math.abs(d) > jumpMs) { S.rvfc.rejected++; return 0; }
+    S.rvfc.used++;
+    return d;
+  }
+
   /** attach the L4 backstop to whichever element is currently mastering */
   function attach(el) {
+    attachRvfc(el || null);
     if (!attachTimeupdate || el === attachedTo) return;
     if (attachedTo && attachedTo.removeEventListener) attachedTo.removeEventListener('timeupdate', backstop);
     attachedTo = el || null;
@@ -144,10 +269,13 @@ export function mediaMaster(deck, source, {
     // L5: not a clock while it is loading or seeking.
     if (el.readyState < 1 || el.seeking) { S.idle++; return null; }
 
-    const pos = Number.isFinite(src.pos)
+    const wall = now();
+    // L4b: `src.pos` is `anchor + el.currentTime * 1000` in every client and in
+    // the element form below; the rVFC correction is therefore a DELTA on it.
+    const basePos = Number.isFinite(src.pos)
       ? src.pos
       : (typeof anchorMs === 'function' ? anchorMs() : anchorMs) + el.currentTime * 1000;
-    const wall = now();
+    const pos = basePos + sensorDeltaMs(el, wall);
 
     // L5: paused / ended — re-anchor once and hold.
     if (el.paused || el.ended) {
@@ -209,19 +337,53 @@ export function mediaMaster(deck, source, {
     pos() {
       const src = pick(); const el = src && src.el;
       if (!el || el.readyState < 1) return null;
-      return Number.isFinite(src.pos)
+      const base = Number.isFinite(src.pos)
         ? src.pos
         : (typeof anchorMs === 'function' ? anchorMs() : anchorMs) + el.currentTime * 1000;
+      // read-only: never touches the sensor's accounting or re-arms anything
+      if (!useRvfc || variableFps || !rv || el !== rvEl) return base;
+      const w = now();
+      if (w - rv.at > rvfcStaleMs) return base;
+      const rate = Number.isFinite(el.playbackRate) && el.playbackRate > 0 ? el.playbackRate : 1;
+      const edt = Number.isFinite(rv.expectedDisplayTime) ? rv.expectedDisplayTime : rv.at;
+      const d = (rv.mediaTime + ((w - edt) / 1000) * rate - el.currentTime) * 1000;
+      return Math.abs(d) > jumpMs ? base : base + d;
     },
     driving: () => S.driving,
     stalled: () => S.stalled,
     key: () => S.key,
-    stats: () => ({ ...S, laws: { toleranceMs, jumpMs, stallMs, stallPolicy, autoPlayPause } }),
+    /** L4b: the sensor disagreement distribution — |mediaTime − currentTime| in
+     *  ms over every tick where both were readable. This is the number that
+     *  says whether preferring rVFC was worth doing on THIS machine. */
+    sensorStats() {
+      const q = (arr, p) => arr[Math.min(arr.length - 1, Math.floor(p * arr.length))];
+      const dist = (rows) => {
+        const n = rows.length;
+        if (!n) return { n: 0, p50: null, p95: null, max: null, mean: null, signedP50: null };
+        const abs = rows.map(Math.abs).sort((a, b) => a - b);
+        const signed = rows.slice().sort((a, b) => a - b);
+        return {
+          n, p50: +q(abs, 0.5).toFixed(4), p95: +q(abs, 0.95).toFixed(4), max: +abs[n - 1].toFixed(4),
+          mean: +(rows.reduce((a, b) => a + b, 0) / n).toFixed(4),
+          signedP50: +q(signed, 0.5).toFixed(4),
+          signedMin: +signed[0].toFixed(4), signedMax: +signed[n - 1].toFixed(4),
+        };
+      };
+      // `carried` is the sensor the servo actually uses; `raw` is the naive
+      // "mediaTime instead of currentTime" read, kept because the gap between
+      // the two IS the finding (raw = display latency, carried = sensor noise).
+      return { ...dist(disagree), dropped: S.rvfc.dropped, carried: dist(disagree), raw: dist(disagreeRaw) };
+    },
+    /** every (carried, raw) disagreement sample in ms — for a histogram */
+    sensorSamples: () => disagree.slice(),
+    sensorSamplesRaw: () => disagreeRaw.slice(),
+    stats: () => ({ ...S, sensor: { useRvfc, variableFps, rvfcStaleMs },
+                    laws: { toleranceMs, jumpMs, stallMs, stallPolicy, autoPlayPause } }),
     /** give up the role by hand (the client took over, or the element is gone) */
     release(why = 'manual') {
       if (S.driving) { S.releases++; say('release', { why }); }
       S.driving = false; S.key = null; clearAdvance();
     },
-    dispose() { disposed = true; attach(null); },
+    dispose() { disposed = true; attach(null); detachRvfc(); },
   };
 }

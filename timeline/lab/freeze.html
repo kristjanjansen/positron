@@ -1,0 +1,137 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>timeline/lab — Chrome Page-Lifecycle FROZEN, at 5-minute scale</title>
+<style>body{font:12px/1.5 ui-monospace,monospace;background:#111;color:#ddd;margin:12px}pre{white-space:pre-wrap}</style>
+<h3>frozen tab — does <code>catchUp:'reduce'</code> still land on the right state?</h3>
+<pre id="out">idle</pre>
+<script type="module">
+// THE RISK (research/browser-av-editors-2026-08.md §3): Chrome 133 freezes a
+// hidden, silent, CPU-intensive tab after >5 min on Energy Saver. The exemption
+// list is mic/camera/screen-capture, a live RTCPeerConnection, WebUSB/Bluetooth/
+// HID, or a HELD WEB LOCK. **A worker tick is not on it.** Our whole hidden-tab
+// win (worker 8.5 ms p95 vs main 981 ms) is therefore not a defence against
+// FREEZING, only against THROTTLING — two different mechanisms, and we had only
+// measured the second.
+//
+// This page simulates the worst case directly, with Page.setWebLifecycleState
+// (the same FROZEN state Chrome puts the page into) held for minutes, and asks
+// the only question that matters operationally: when the tab comes back, does
+// the deck reach the RIGHT STATE, and how fast?
+//
+// Three lanes, three catch-up policies, so the answer is comparative:
+//   reduce — the archival answer: fold the whole missed prefix, assert once
+//   burst  — every missed cue fires, late, all at once
+//   drop   — every missed cue is lost
+import { createDeck } from '/timeline/transport.mjs';
+import { keepAwake } from '/timeline/keepalive.mjs';
+
+const P = new URLSearchParams(location.search);
+const KEEPALIVE = P.get('keepalive') === '1';
+const BURN = P.get('burn') === '1';   // Chrome only freezes a CPU-INTENSIVE tab
+const SPAN = +(P.get('span') || 15 * 60 * 1000);
+const STEP = 1000;
+const out = document.getElementById('out');
+
+// A NON-COMMUTATIVE fold, so "correct state" is an ordering claim, not a count.
+const applyOp = (s, p) => (p.op === 'mul' ? (s * p.v) % 1000003 : (s + p.v) % 1000003);
+const items = [];
+for (let i = 1; i * STEP <= SPAN; i++) {
+  const op = i % 7 === 0 ? { op: 'mul', v: 3 } : { op: 'add', v: (i % 9) + 1 };
+  for (const k of ['reduce', 'burst', 'drop']) items.push({ at: i * STEP, kind: k, id: `${k}${i}`, payload: op });
+}
+const expectedAt = (pos) => items.filter((x) => x.kind === 'reduce' && x.at <= pos)
+  .reduce((s, x) => applyOp(s, x.payload), 0);
+
+const S = { reduce: 0, burst: 0, drop: 0 };
+const fires = { reduce: 0, burst: 0, drop: 0 };
+const asserts = [];         // {t, pos, state, ok}
+
+const deck = createDeck({
+  items, range: [0, SPAN + 5000], tickMs: 25, horizonMs: 100,
+  adapters: {
+    reduce: {
+      caps: { catchUp: 'reduce', deterministic: true },
+      actuate: (p) => { S.reduce = applyOp(S.reduce, p); fires.reduce++; },
+      reduce: (ps) => ps.reduce(applyOp, 0),
+      assertState: (s, info) => {
+        S.reduce = s;
+        asserts.push({ t: +performance.now().toFixed(2), pos: +info.pos.toFixed(2), state: s,
+                       ok: s === expectedAt(info.pos), reason: info.reason, count: info.count });
+        if (asserts.length > 4000) asserts.splice(0, 2000);
+      },
+    },
+    burst: { caps: { catchUp: 'burst' }, actuate: (p) => { S.burst = applyOp(S.burst, p); fires.burst++; } },
+    drop: { caps: { catchUp: 'drop' }, actuate: (p) => { S.drop = applyOp(S.drop, p); fires.drop++; } },
+  },
+});
+
+// --- a MAIN-THREAD heartbeat: its gap is where the freeze was, from the
+//     page's own point of view (the page cannot observe its own resume any
+//     other way — it was not running).
+const beats = [];
+setInterval(() => { beats.push(Math.round(performance.now())); if (beats.length > 20000) beats.splice(0, 10000); }, 50);
+
+// --- a PROBE WORKER that keeps its own tick log in worker memory. This is the
+//     measurement nobody publishes: is a dedicated worker's timer frozen WITH
+//     its page? postMessage back would be queued by the freeze, so the worker
+//     records into its own array and dumps it on request afterwards.
+const probeSrc = `
+  let ticks = [];
+  setInterval(() => { ticks.push(Date.now()); }, 250);
+  onmessage = (e) => { if (e.data === 'dump') postMessage(ticks); };`;
+const probe = new Worker(URL.createObjectURL(new Blob([probeSrc], { type: 'text/javascript' })));
+let probeTicks = null;
+probe.onmessage = (e) => { probeTicks = e.data; };
+
+// --- the two cheap, PUBLISHED exemptions, implemented so the mitigation is a
+//     thing that runs rather than a paragraph. (Chrome's freeze doc lists a
+//     held Web Lock explicitly; an audible page is exempt from BOTH freezing
+//     and the 1 Hz timer clamp.)
+let keep = { held: false };
+async function armKeepAlive() {
+  const ka = await keepAwake({ lock: true, audio: true });
+  keep = { held: true, ...ka.status() };
+}
+
+// "CPU-intensive" is one of the four freeze preconditions, so a test that wants
+// Chrome's own freezing path has to actually burn CPU. ~12 ms of work every
+// 25 ms = roughly half a core.
+if (BURN) setInterval(() => { const end = performance.now() + 12; let x = 0; while (performance.now() < end) x += Math.sqrt(x + 1); window.__burn = x; }, 25);
+
+window.__ready = false;
+window.__start = async () => {
+  if (KEEPALIVE) await armKeepAlive();
+  deck.seek(0); deck.play();
+  window.__t0 = performance.now();
+  return true;
+};
+window.__report = () => {
+  const pos = deck.position();
+  const gaps = [];
+  for (let i = 1; i < beats.length; i++) if (beats[i] - beats[i - 1] > 500) gaps.push({ at: beats[i - 1], gapMs: beats[i] - beats[i - 1] });
+  const resumeAt = gaps.length ? gaps[gaps.length - 1].at + gaps[gaps.length - 1].gapMs : null;
+  const after = resumeAt === null ? [] : asserts.filter((a) => a.t >= resumeAt - 5);
+  const firstOk = after.find((a) => a.ok);
+  const pTicks = probeTicks || [];
+  const pGaps = [];
+  for (let i = 1; i < pTicks.length; i++) if (pTicks[i] - pTicks[i - 1] > 1000) pGaps.push(pTicks[i] - pTicks[i - 1]);
+  return {
+    keepalive: KEEPALIVE, keep,
+    pos: +pos.toFixed(2), rate: deck.rate(), playing: deck.playing(),
+    state: { ...S }, expected: expectedAt(pos), correct: S.reduce === expectedAt(pos),
+    fires: { ...fires },
+    mainThreadGaps: gaps, resumeAt,
+    recoveryMs: firstOk && resumeAt !== null ? +(firstOk.t - resumeAt).toFixed(3) : null,
+    recoveryAssert: firstOk || null,
+    assertsAfterResume: after.length,
+    firstFiveAfterResume: after.slice(0, 5),
+    probeTicks: pTicks.length, probeGapsMs: pGaps, probeFirst: pTicks[0] || null, probeLast: pTicks[pTicks.length - 1] || null,
+    sched: deck.stats(), driftStats: deck.sched.driftStats(),
+    hostName: deck.hostName, visibility: document.visibilityState,
+  };
+};
+window.__dumpProbe = () => { probe.postMessage('dump'); return true; };
+window.__ready = true;
+out.textContent = `ready — ${items.length} items over ${SPAN} ms, host=${deck.hostName}, keepalive=${KEEPALIVE}`;
+setInterval(() => { out.textContent = `pos ${deck.position().toFixed(0)}  reduce ${S.reduce} (want ${expectedAt(deck.position())})  burst ${fires.burst} drop ${fires.drop}`; }, 1000);
+</script>

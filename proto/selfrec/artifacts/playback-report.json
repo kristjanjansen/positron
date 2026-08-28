@@ -5,28 +5,28 @@
     "V2": {
       "samples": [
         {
-          "atS": 15.04,
+          "atS": 15.02,
           "clockA": 1787823391280,
           "clockB": 1787823391280,
           "interTileSkewMs": 0,
-          "tileErrA": -51,
-          "tileErrB": -51
+          "tileErrA": -37,
+          "tileErrB": -37
         },
         {
           "atS": 35.06,
           "clockA": 1787823411312,
           "clockB": 1787823411312,
           "interTileSkewMs": 0,
-          "tileErrA": -40,
-          "tileErrB": -40
+          "tileErrA": -39,
+          "tileErrB": -39
         },
         {
-          "atS": 65.04,
+          "atS": 65.02,
           "clockA": 1787823441279,
           "clockB": 1787823441279,
           "interTileSkewMs": 0,
-          "tileErrA": -53,
-          "tileErrB": -53
+          "tileErrA": -40,
+          "tileErrB": -40
         }
       ],
       "p50": 0,
@@ -117,13 +117,13 @@
       "jump": {
         "ok": true,
         "pid": "p1",
-        "fromS": 3.761,
+        "fromS": 3.755,
         "toS": 64.96,
         "targetT": 1787823441296,
-        "deckPosBefore": 1787823380099.4001
+        "deckPosBefore": 1787823380097.6
       },
-      "posPre": 1787823380096,
-      "posPost": 1787823443859,
+      "posPre": 1787823380092,
+      "posPost": 1787823443883,
       "skippedCueIds": [
         "RCUE-20",
         "RCUE-40",
@@ -134,7 +134,7 @@
       "newFireIds": [],
       "jumpEvents": [
         {
-          "jumpMs": 61189,
+          "jumpMs": 61191,
           "mediaTime": 64.96
         }
       ],
@@ -144,7 +144,7 @@
         "RCUE-60"
       ],
       "mediaMasterStats": {
-        "syncs": 2616,
+        "syncs": 2618,
         "jumps": 1,
         "stalls": 0,
         "corrections": 0,
@@ -186,11 +186,11 @@
       {
         "name": "V5-master-jump-folds-not-bursts",
         "ok": true,
-        "detail": "master p1 jumped 61189ms over cues [RCUE-20,RCUE-40,RCUE-60] — BURST fires 0 (must be 0), folded fired set [RCUE-20,RCUE-40,RCUE-60], playhead 1787823380096->1787823443859 (target 1787823441296)"
+        "detail": "master p1 jumped 61191ms over cues [RCUE-20,RCUE-40,RCUE-60] — BURST fires 0 (must be 0), folded fired set [RCUE-20,RCUE-40,RCUE-60], playhead 1787823380092->1787823443883 (target 1787823441296)"
       }
     ]
   },
-  "updatedAt": "2026-08-28T06:27:40.172Z",
+  "updatedAt": "2026-08-28T07:31:54.851Z",
   "masters_mse": {
     "show": "sync-20260827T093613",
     "participants": {
@@ -345,13 +345,13 @@
     "jump": {
       "ok": true,
       "pid": "p1",
-      "fromS": 3.761,
+      "fromS": 3.755,
       "toS": 64.96,
       "targetT": 1787823441296,
-      "deckPosBefore": 1787823380099.4001
+      "deckPosBefore": 1787823380097.6
     },
-    "posPre": 1787823380096,
-    "posPost": 1787823443859,
+    "posPre": 1787823380092,
+    "posPost": 1787823443883,
     "skippedCueIds": [
       "RCUE-20",
       "RCUE-40",
@@ -362,7 +362,7 @@
     "newFireIds": [],
     "jumpEvents": [
       {
-        "jumpMs": 61189,
+        "jumpMs": 61191,
         "mediaTime": 64.96
       }
     ],
@@ -372,7 +372,7 @@
       "RCUE-60"
     ],
     "mediaMasterStats": {
-      "syncs": 2616,
+      "syncs": 2618,
       "jumps": 1,
       "stalls": 0,
       "corrections": 0,
