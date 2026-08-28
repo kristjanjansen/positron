@@ -1,0 +1,999 @@
+{
+ "subject": "Erkki Kurenniemi (1941–2017)",
+ "generated": "2026-08-28T08:24:04.712Z",
+ "generator": "proto/kurenniemi/ingest.mjs --rewhen",
+ "note": "Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.",
+ "corpusRange": {
+  "from": 1963,
+  "to": 1973,
+  "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes"
+ },
+ "precisionConventions": {
+  "archive.org": "no precision field; `date` is uploader-typed and describes the FILE not the work — UNUSED as `at`. Year evidence comes from the FILENAME.",
+  "Wikidata": "EXPLICIT integer precision (8 decade / 9 year / 10 month / 11 day). Raw JSON zero-fills (+1970-00-00); SPARQL start-pads (1970-01-01). Same fact, two paddings, one declared precision.",
+  "Europeana/EDM": "the date LITERAL survives (\"1970\") — precision is the string length. Honest by omission.",
+  "ERR (arhiiv.err.ee, for contrast)": "no precision field; year-only MIDPOINT-padded to YYYY-07-15 — indistinguishable from an attested 15 July. Must be reverse-engineered."
+ },
+ "items": [
+  {
+   "id": "wd:Q3056683/P569",
+   "title": "Born — Hämeenlinna",
+   "kind": "life",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1941-07-10T00:00:00Z",
+    "wdPrecision": 11,
+    "at": -898732800000,
+    "hi": -898646400000,
+    "precision": "day"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q3056683#P569",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q3056683",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 by project policy — applies to the DATA, not to any media)",
+    "rightsConfidence": "HIGH (for the statement); media n/a",
+    "retrieved": "2026-08-28"
+   },
+   "at": -898732800000,
+   "bandMs": 86400000,
+   "precision": "day",
+   "when": {
+    "verbatim": "+1941-07-10T00:00:00Z",
+    "edtf": "1941-07-10",
+    "earliest": -898732800000,
+    "latest": -898646400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
+   "title": "Inventio _ Outventio",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 235.08,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Inventio%20_%20Outventio%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 1880745
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+   "title": "Katkelmia äänikirjeestä Jan Barkille",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "filename-year",
+    "raw": "Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+    "at": -220924800000,
+    "hi": -189388800000,
+    "precision": "year"
+   },
+   "durSec": 73.17,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Katkelmia%20%C3%A4%C3%A4nikirjeest%C3%A4%20Jan%20Barkille%20(1963)%20(320%20kbps)%20(1).mp3",
+    "type": "audio/mpeg",
+    "bytes": 2926897
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+    "edtf": "1963",
+    "earliest": -220924800000,
+    "latest": -189388800000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
+   "title": "Mix Master Universe 2",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 829.83,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Mix%20Master%20Universe%202%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 6638792
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - On-Off.mp3",
+   "title": "On-Off",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "wikidata-title-match",
+    "raw": "+1963-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -220924800000,
+    "hi": -189388800000,
+    "precision": "year",
+    "matched": "wd:Q115919332",
+    "tier": 1
+   },
+   "durSec": 770.21,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20On-Off.mp3",
+    "type": "audio/mpeg",
+    "bytes": 12323373
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - On-Off.mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1963-00-00T00:00:00Z",
+    "edtf": "1963",
+    "earliest": -220924800000,
+    "latest": -189388800000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-title-match@1",
+    "kind": "ignorance",
+    "note": "No date on the file; a Wikidata work with the same normalised title carries one, and its declared precision is inherited whole."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+   "title": "Saharan uni I",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 445.26,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20I%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 3562195
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
+   "title": "Saharan uni II",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 396.67,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Saharan%20uni%20II%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 3173493
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
+   "title": "Sähkösoittimen Ääniä",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 162.14,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%84%C3%A4ni%C3%A4%20.mp3",
+    "type": "audio/mpeg",
+    "bytes": 2594349
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
+   "title": "Sähkösoittimen ääniä",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 170.48,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20S%C3%A4hk%C3%B6soittimen%20%C3%A4%C3%A4ni%C3%A4%20.mp3",
+    "type": "audio/mpeg",
+    "bytes": 2727739
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Virsi (64 kbps).mp3",
+   "title": "Virsi",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 651.6,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Virsi%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 5212924
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Virsi (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3",
+   "title": "M.A. Numminen & Erkki Kurenniemi - Oigu-S",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 500.98,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/M.A.%20Numminen%20%26%20Erkki%20Kurenniemi%20-%20Oigu-S%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 4007948
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
+   "title": "M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "derived-from-corpus-range",
+    "raw": null,
+    "tier": 1,
+    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "at": -220924800000,
+    "hi": 126230400000,
+    "precision": "range"
+   },
+   "durSec": 96.16,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/M.A.%20Nummisen%20s%C3%A4hk%C3%B6kvartetti%20-%20Kaukana%20v%C3%A4ijyy%20yst%C3%A4vi%C3%A4%20(64%20kbps).mp3",
+    "type": "audio/mpeg",
+    "bytes": 769391
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -220924800000,
+   "bandMs": 347155200000,
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
+  },
+  {
+   "id": "wd:Q115918920",
+   "title": "Electronics In the World of Tomorrow",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1964-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -189388800000,
+    "hi": -157766400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918920",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918920",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -189388800000,
+   "bandMs": 31622400000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1964-00-00T00:00:00Z",
+    "edtf": "1964",
+    "earliest": -189388800000,
+    "latest": -157766400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "wd:Q115918918",
+   "title": "The Punched Tape of Life",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1964-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -189388800000,
+    "hi": -157766400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918918",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918918",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -189388800000,
+   "bandMs": 31622400000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1964-00-00T00:00:00Z",
+    "edtf": "1964",
+    "earliest": -189388800000,
+    "latest": -157766400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "wd:Q115918974",
+   "title": "Flora & Fauna",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1965-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -157766400000,
+    "hi": -126230400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918974",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918974",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -157766400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1965-00-00T00:00:00Z",
+    "edtf": "1965",
+    "earliest": -157766400000,
+    "latest": -126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "wd:Q115919052",
+   "title": "The Jump",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1965-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -157766400000,
+    "hi": -126230400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115919052",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115919052",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -157766400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1965-00-00T00:00:00Z",
+    "edtf": "1965",
+    "earliest": -157766400000,
+    "latest": -126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "ia:computer-music-1966-dir.-erkki-kurenniemi/Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+   "title": "Computer Music",
+   "kind": "film",
+   "dateEvidence": {
+    "how": "filename-year",
+    "raw": "Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+    "at": -126230400000,
+    "hi": -94694400000,
+    "precision": "year"
+   },
+   "durSec": 389,
+   "media": {
+    "url": "https://archive.org/download/computer-music-1966-dir.-erkki-kurenniemi/Computer%20Music(%201966)%20dir.%20Erkki%20Kurenniemi.mp4",
+    "type": "video/mp4",
+    "bytes": 18475192
+   },
+   "thumb": "https://archive.org/services/img/computer-music-1966-dir.-erkki-kurenniemi",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "computer-music-1966-dir.-erkki-kurenniemi/Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+    "sourceUrl": "https://archive.org/details/computer-music-1966-dir.-erkki-kurenniemi",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:34:19",
+    "itemDateField": "1966-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -126230400000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+    "edtf": "1966",
+    "earliest": -126230400000,
+    "latest": -94694400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
+  },
+  {
+   "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+   "title": "Antropoidien tanssi",
+   "kind": "audio",
+   "dateEvidence": {
+    "how": "filename-year",
+    "raw": "Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "at": -63158400000,
+    "hi": -31536000000,
+    "precision": "year"
+   },
+   "durSec": 282.1,
+   "media": {
+    "url": "https://archive.org/download/videoplayback-13_202304/Erkki%20Kurenniemi%20-%20Antropoidien%20tanssi%20(Love%20Records%2C%201968).mp3",
+    "type": "audio/mpeg",
+    "bytes": 4513581
+   },
+   "thumb": "https://archive.org/services/img/videoplayback-13_202304",
+   "prov": {
+    "source": "archive.org",
+    "sourceId": "videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "sourceUrl": "https://archive.org/details/videoplayback-13_202304",
+    "custody": "community upload (aggregator), not an institutional deposit",
+    "uploader": "4033675@opsb.info",
+    "uploaded": "2023-04-11 14:08:58",
+    "itemDateField": "2002-01-01",
+    "itemDateMeans": "when the FILE was made/ripped, not when the work was made",
+    "rights": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "rightsAsserter": "uploader (self-asserted, unverified)",
+    "rightsConfidence": "LOW",
+    "retrieved": "2026-08-28"
+   },
+   "at": -63158400000,
+   "bandMs": 31622400000,
+   "precision": "year",
+   "when": {
+    "verbatim": "Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "edtf": "1968",
+    "earliest": -63158400000,
+    "latest": -31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
+  },
+  {
+   "id": "wd:Q115918963",
+   "title": "Florence",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1970-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": 0,
+    "hi": 31536000000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918963",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918963",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": 0,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+1970-00-00T00:00:00Z",
+    "edtf": "1970",
+    "earliest": 0,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "eu:09102/_SMS_MM_X5176",
+   "title": "DIMI-A — the surviving instrument (Stockholm)",
+   "kind": "instrument",
+   "dateEvidence": {
+    "how": "edm-literal-length",
+    "raw": "1970",
+    "at": 0,
+    "hi": 31536000000,
+    "precision": "year"
+   },
+   "thumb": "http://www.mimo-international.com/media/SMS-MM/IMAGE/X5176_01.jpg",
+   "prov": {
+    "source": "Europeana / MIMO — Swedish Museum of Performing Arts",
+    "sourceId": "SMS-MM:X5176",
+    "sourceUrl": "https://www.europeana.eu/item/09102/_SMS_MM_X5176",
+    "custody": "institutional (Scenkonstmuseet), aggregated via MIMO -> Europeana",
+    "rights": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "rightsAsserter": "holding institution, via the aggregator (machine-readable EDM field)",
+    "rightsConfidence": "HIGH",
+    "photo": "Foto : Henrik Medquist",
+    "corsOnMedia": false,
+    "retrieved": "2026-08-28"
+   },
+   "at": 0,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "1970",
+    "edtf": "1970",
+    "earliest": 0,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "edm-literal-length@1",
+    "kind": "ignorance",
+    "note": "Europeana/EDM keeps the date LITERAL, so precision is the string's own length. Honest by omission; the bracket is the unit the literal names."
+   }
+  },
+  {
+   "id": "wd:Q115919656",
+   "title": "Future Is Not What It Used To Be",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+2002-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": 1009843200000,
+    "hi": 1041379200000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115919656",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115919656",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": 1009843200000,
+   "bandMs": 31536000000,
+   "precision": "year",
+   "when": {
+    "verbatim": "+2002-00-00T00:00:00Z",
+    "edtf": "2002",
+    "earliest": 1009843200000,
+    "latest": 1041379200000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  },
+  {
+   "id": "wd:Q3056683/P570",
+   "title": "Died",
+   "kind": "life",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+2017-05-01T00:00:00Z",
+    "wdPrecision": 11,
+    "at": 1493596800000,
+    "hi": 1493683200000,
+    "precision": "day"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q3056683#P570",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q3056683",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 by project policy — applies to the DATA, not to any media)",
+    "rightsConfidence": "HIGH (for the statement); media n/a",
+    "retrieved": "2026-08-28"
+   },
+   "at": 1493596800000,
+   "bandMs": 86400000,
+   "precision": "day",
+   "when": {
+    "verbatim": "+2017-05-01T00:00:00Z",
+    "edtf": "2017-05-01",
+    "earliest": 1493596800000,
+    "latest": 1493683200000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
+  }
+ ],
+ "positionRule": {
+  "anchor": "at = when.earliest (timeline/transport.mjs v0.6 U2) — the bracket's lower bound, never a midpoint",
+  "bracket": "CLOSED-OPEN [earliest, latest)",
+  "rules": [
+   "wikidata-precision@1",
+   "corpus-range@1",
+   "ia-filename-year@1",
+   "wikidata-title-match@1",
+   "edm-literal-length@1"
+  ],
+  "inner": "innerFrom/innerTo are null on every row: no source in this set carries CRM P81 evidence, so \"certainly in year Y\" is answerable only through outer containment (sound, incomplete)",
+  "kind": "every smear here is IGNORANCE — a real day the catalogue lost, never a vague concept"
+ }
+}

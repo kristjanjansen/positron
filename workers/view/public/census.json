@@ -1,0 +1,602 @@
+{
+ "source": "arhiiv.err.ee /api/v1/search, one query per UTC year, type:all",
+ "note": "counts = activeList.{audioCount,videoCount,photoCount}; UTC year ranges leak ±2-3h at edges (EET local-midnight epochs)",
+ "generatedAt": "2026-08-27T10:10:00.775Z",
+ "years": {
+  "1908": {
+   "audio": 1,
+   "video": 0,
+   "photo": 0
+  },
+  "1909": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1910": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1911": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1912": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1913": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1914": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1915": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1916": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1917": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1918": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1919": {
+   "audio": 2,
+   "video": 0,
+   "photo": 0
+  },
+  "1920": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1921": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1922": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1923": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1924": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1925": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1926": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1927": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1928": {
+   "audio": 5,
+   "video": 0,
+   "photo": 0
+  },
+  "1929": {
+   "audio": 0,
+   "video": 0,
+   "photo": 0
+  },
+  "1930": {
+   "audio": 7,
+   "video": 0,
+   "photo": 0
+  },
+  "1931": {
+   "audio": 2,
+   "video": 0,
+   "photo": 0
+  },
+  "1932": {
+   "audio": 1,
+   "video": 0,
+   "photo": 0
+  },
+  "1933": {
+   "audio": 1,
+   "video": 0,
+   "photo": 0
+  },
+  "1934": {
+   "audio": 3,
+   "video": 0,
+   "photo": 0
+  },
+  "1935": {
+   "audio": 2,
+   "video": 0,
+   "photo": 0
+  },
+  "1936": {
+   "audio": 12,
+   "video": 0,
+   "photo": 0
+  },
+  "1937": {
+   "audio": 18,
+   "video": 0,
+   "photo": 0
+  },
+  "1938": {
+   "audio": 40,
+   "video": 0,
+   "photo": 0
+  },
+  "1939": {
+   "audio": 24,
+   "video": 0,
+   "photo": 0
+  },
+  "1940": {
+   "audio": 21,
+   "video": 0,
+   "photo": 0
+  },
+  "1941": {
+   "audio": 15,
+   "video": 0,
+   "photo": 0
+  },
+  "1942": {
+   "audio": 9,
+   "video": 0,
+   "photo": 0
+  },
+  "1943": {
+   "audio": 8,
+   "video": 0,
+   "photo": 0
+  },
+  "1944": {
+   "audio": 7,
+   "video": 0,
+   "photo": 0
+  },
+  "1945": {
+   "audio": 9,
+   "video": 0,
+   "photo": 0
+  },
+  "1946": {
+   "audio": 23,
+   "video": 0,
+   "photo": 0
+  },
+  "1947": {
+   "audio": 25,
+   "video": 0,
+   "photo": 0
+  },
+  "1948": {
+   "audio": 16,
+   "video": 0,
+   "photo": 0
+  },
+  "1949": {
+   "audio": 13,
+   "video": 0,
+   "photo": 0
+  },
+  "1950": {
+   "audio": 12,
+   "video": 0,
+   "photo": 0
+  },
+  "1951": {
+   "audio": 19,
+   "video": 0,
+   "photo": 0
+  },
+  "1952": {
+   "audio": 25,
+   "video": 0,
+   "photo": 42
+  },
+  "1953": {
+   "audio": 91,
+   "video": 0,
+   "photo": 0
+  },
+  "1954": {
+   "audio": 113,
+   "video": 0,
+   "photo": 0
+  },
+  "1955": {
+   "audio": 121,
+   "video": 0,
+   "photo": 0
+  },
+  "1956": {
+   "audio": 128,
+   "video": 0,
+   "photo": 138
+  },
+  "1957": {
+   "audio": 171,
+   "video": 0,
+   "photo": 40
+  },
+  "1958": {
+   "audio": 166,
+   "video": 6,
+   "photo": 90
+  },
+  "1959": {
+   "audio": 223,
+   "video": 41,
+   "photo": 87
+  },
+  "1960": {
+   "audio": 294,
+   "video": 87,
+   "photo": 43
+  },
+  "1961": {
+   "audio": 285,
+   "video": 131,
+   "photo": 39
+  },
+  "1962": {
+   "audio": 386,
+   "video": 37,
+   "photo": 49
+  },
+  "1963": {
+   "audio": 469,
+   "video": 103,
+   "photo": 78
+  },
+  "1964": {
+   "audio": 516,
+   "video": 192,
+   "photo": 54
+  },
+  "1965": {
+   "audio": 543,
+   "video": 298,
+   "photo": 11
+  },
+  "1966": {
+   "audio": 587,
+   "video": 211,
+   "photo": 167
+  },
+  "1967": {
+   "audio": 593,
+   "video": 130,
+   "photo": 759
+  },
+  "1968": {
+   "audio": 599,
+   "video": 122,
+   "photo": 435
+  },
+  "1969": {
+   "audio": 1671,
+   "video": 1271,
+   "photo": 10000
+  },
+  "1970": {
+   "audio": 462,
+   "video": 102,
+   "photo": 116
+  },
+  "1971": {
+   "audio": 415,
+   "video": 148,
+   "photo": 107
+  },
+  "1972": {
+   "audio": 450,
+   "video": 127,
+   "photo": 238
+  },
+  "1973": {
+   "audio": 479,
+   "video": 171,
+   "photo": 173
+  },
+  "1974": {
+   "audio": 540,
+   "video": 99,
+   "photo": 277
+  },
+  "1975": {
+   "audio": 538,
+   "video": 130,
+   "photo": 395
+  },
+  "1976": {
+   "audio": 463,
+   "video": 365,
+   "photo": 673
+  },
+  "1977": {
+   "audio": 473,
+   "video": 543,
+   "photo": 701
+  },
+  "1978": {
+   "audio": 510,
+   "video": 613,
+   "photo": 679
+  },
+  "1979": {
+   "audio": 619,
+   "video": 757,
+   "photo": 1285
+  },
+  "1980": {
+   "audio": 966,
+   "video": 587,
+   "photo": 1849
+  },
+  "1981": {
+   "audio": 617,
+   "video": 1189,
+   "photo": 1070
+  },
+  "1982": {
+   "audio": 596,
+   "video": 1493,
+   "photo": 1178
+  },
+  "1983": {
+   "audio": 513,
+   "video": 1272,
+   "photo": 1397
+  },
+  "1984": {
+   "audio": 422,
+   "video": 1211,
+   "photo": 1240
+  },
+  "1985": {
+   "audio": 618,
+   "video": 794,
+   "photo": 875
+  },
+  "1986": {
+   "audio": 551,
+   "video": 845,
+   "photo": 1398
+  },
+  "1987": {
+   "audio": 643,
+   "video": 523,
+   "photo": 1671
+  },
+  "1988": {
+   "audio": 837,
+   "video": 552,
+   "photo": 2648
+  },
+  "1989": {
+   "audio": 727,
+   "video": 559,
+   "photo": 1806
+  },
+  "1990": {
+   "audio": 1018,
+   "video": 706,
+   "photo": 1612
+  },
+  "1991": {
+   "audio": 1040,
+   "video": 712,
+   "photo": 2695
+  },
+  "1992": {
+   "audio": 1294,
+   "video": 594,
+   "photo": 3158
+  },
+  "1993": {
+   "audio": 1407,
+   "video": 725,
+   "photo": 2193
+  },
+  "1994": {
+   "audio": 1213,
+   "video": 960,
+   "photo": 2226
+  },
+  "1995": {
+   "audio": 1068,
+   "video": 1032,
+   "photo": 3077
+  },
+  "1996": {
+   "audio": 1062,
+   "video": 1135,
+   "photo": 5540
+  },
+  "1997": {
+   "audio": 1020,
+   "video": 1178,
+   "photo": 5176
+  },
+  "1998": {
+   "audio": 1184,
+   "video": 1344,
+   "photo": 7849
+  },
+  "1999": {
+   "audio": 1433,
+   "video": 1278,
+   "photo": 8551
+  },
+  "2000": {
+   "audio": 1701,
+   "video": 1058,
+   "photo": 8336
+  },
+  "2001": {
+   "audio": 1573,
+   "video": 1047,
+   "photo": 5613
+  },
+  "2002": {
+   "audio": 1600,
+   "video": 1018,
+   "photo": 7111
+  },
+  "2003": {
+   "audio": 1960,
+   "video": 1048,
+   "photo": 4995
+  },
+  "2004": {
+   "audio": 2982,
+   "video": 1216,
+   "photo": 4116
+  },
+  "2005": {
+   "audio": 3537,
+   "video": 1269,
+   "photo": 4372
+  },
+  "2006": {
+   "audio": 4109,
+   "video": 1235,
+   "photo": 5104
+  },
+  "2007": {
+   "audio": 3569,
+   "video": 1326,
+   "photo": 5864
+  },
+  "2008": {
+   "audio": 3873,
+   "video": 1546,
+   "photo": 3601
+  },
+  "2009": {
+   "audio": 3301,
+   "video": 1810,
+   "photo": 4960
+  },
+  "2010": {
+   "audio": 3278,
+   "video": 1939,
+   "photo": 4174
+  },
+  "2011": {
+   "audio": 2803,
+   "video": 2514,
+   "photo": 4743
+  },
+  "2012": {
+   "audio": 3085,
+   "video": 2461,
+   "photo": 4521
+  },
+  "2013": {
+   "audio": 2972,
+   "video": 2354,
+   "photo": 4133
+  },
+  "2014": {
+   "audio": 3056,
+   "video": 2299,
+   "photo": 4418
+  },
+  "2015": {
+   "audio": 2915,
+   "video": 2349,
+   "photo": 5218
+  },
+  "2016": {
+   "audio": 3232,
+   "video": 2487,
+   "photo": 5597
+  },
+  "2017": {
+   "audio": 3227,
+   "video": 2558,
+   "photo": 6105
+  },
+  "2018": {
+   "audio": 4047,
+   "video": 2611,
+   "photo": 7314
+  },
+  "2019": {
+   "audio": 4457,
+   "video": 2616,
+   "photo": 7914
+  },
+  "2020": {
+   "audio": 6808,
+   "video": 2580,
+   "photo": 6739
+  },
+  "2021": {
+   "audio": 6675,
+   "video": 2622,
+   "photo": 9356
+  },
+  "2022": {
+   "audio": 6494,
+   "video": 2715,
+   "photo": 5892
+  },
+  "2023": {
+   "audio": 6444,
+   "video": 2980,
+   "photo": 10000
+  },
+  "2024": {
+   "audio": 6629,
+   "video": 2831,
+   "photo": 10000
+  },
+  "2025": {
+   "audio": 5881,
+   "video": 2897,
+   "photo": 7316
+  },
+  "2026": {
+   "audio": 3056,
+   "video": 1663,
+   "photo": 3081
+  }
+ }
+}

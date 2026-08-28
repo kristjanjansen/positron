@@ -1,0 +1,267 @@
+{
+ "base": "https://elektron-view.kristjan-jansen.workers.dev",
+ "at": "2026-08-28T15:03:53.551Z",
+ "asserts": {
+  "pass": 38,
+  "fail": 0
+ },
+ "upstreamCost": 0,
+ "gateBefore": {
+  "spacingMs": 1000,
+  "dayCapUtc": 400,
+  "day": "2026-08-28",
+  "upstreamToday": 8,
+  "upstreamTotal": 8,
+  "refusedBusy": 0,
+  "refusedCap": 0,
+  "durableCacheRows": 8,
+  "nextSlotInMs": 0
+ },
+ "gateAfter": {
+  "spacingMs": 1000,
+  "dayCapUtc": 400,
+  "day": "2026-08-28",
+  "upstreamToday": 8,
+  "upstreamTotal": 8,
+  "refusedBusy": 0,
+  "refusedCap": 0,
+  "durableCacheRows": 8,
+  "nextSlotInMs": 0
+ },
+ "results": [
+  {
+   "page": "index",
+   "name": "served 200 html",
+   "ok": true,
+   "detail": "ELEKTRON — viewing surfaces"
+  },
+  {
+   "page": "index",
+   "name": "lists all four pages",
+   "ok": true,
+   "detail": "/proto/megatimeline/ /proto/remixer/ /proto/kurenniemi/ /proto/flipper/"
+  },
+  {
+   "page": "index",
+   "name": "tap targets >= 44px",
+   "ok": true,
+   "detail": "127px"
+  },
+  {
+   "page": "index",
+   "name": "no horizontal overflow",
+   "ok": true,
+   "detail": "scrollWidth 390 vs clientWidth 390"
+  },
+  {
+   "page": "index",
+   "name": "viewport is 390x844",
+   "ok": true,
+   "detail": "innerWidth 390"
+  },
+  {
+   "page": "index",
+   "name": "zero page console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "megatimeline",
+   "name": "boot completed (__mt.ready)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "megatimeline",
+   "name": "census.json loaded from /census.json",
+   "ok": true,
+   "detail": "119 years"
+  },
+  {
+   "page": "megatimeline",
+   "name": "census totals non-zero",
+   "ok": true,
+   "detail": "audio 133718 video 79422 photo 234478"
+  },
+  {
+   "page": "megatimeline",
+   "name": "census bars drawn on canvas",
+   "ok": true,
+   "detail": "780x1688, 63 colours, 1927 lit samples"
+  },
+  {
+   "page": "megatimeline",
+   "name": "touch help shown (pointer:coarse branch)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "megatimeline",
+   "name": "remixer hand-off is same-origin (no localhost)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "megatimeline",
+   "name": "zero upstream ERR calls on load",
+   "ok": true,
+   "detail": "apiSearch+apiItem = 0"
+  },
+  {
+   "page": "megatimeline",
+   "name": "no horizontal overflow",
+   "ok": true,
+   "detail": "scrollWidth 390 vs clientWidth 390"
+  },
+  {
+   "page": "megatimeline",
+   "name": "viewport is 390x844",
+   "ok": true,
+   "detail": "innerWidth 390"
+  },
+  {
+   "page": "megatimeline",
+   "name": "zero page console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "megatimeline",
+   "name": "dive loads items from committed cache",
+   "ok": true,
+   "detail": "tier years, 765 items over 9 search calls"
+  },
+  {
+   "page": "megatimeline",
+   "name": "every dive search answered 200 (none gate-refused)",
+   "ok": true,
+   "detail": "9/9 from cache, 0 gated upstream"
+  },
+  {
+   "page": "remixer",
+   "name": "shared timeline lib loaded from /timeline/",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "remixer",
+   "name": "hls.js loaded",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "remixer",
+   "name": "search round-trips through the proxy",
+   "ok": true,
+   "detail": "200 cache=durable upstream=0 | 200 cache=durable upstream=0"
+  },
+  {
+   "page": "remixer",
+   "name": "search produced state",
+   "ok": true,
+   "detail": "{\"year\":1965,\"layers\":6,\"apiCalls\":2,\"errors\":0}"
+  },
+  {
+   "page": "remixer",
+   "name": "no horizontal overflow",
+   "ok": true,
+   "detail": "scrollWidth 390 vs clientWidth 390"
+  },
+  {
+   "page": "remixer",
+   "name": "viewport is 390x844",
+   "ok": true,
+   "detail": "innerWidth 390"
+  },
+  {
+   "page": "remixer",
+   "name": "zero page console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "kurenniemi",
+   "name": "corpus.json loaded",
+   "ok": true,
+   "detail": "22 items"
+  },
+  {
+   "page": "kurenniemi",
+   "name": "corpus rows rendered",
+   "ok": true,
+   "detail": "5 lanes, 22 item blocks"
+  },
+  {
+   "page": "kurenniemi",
+   "name": "timeline deck constructed (../../timeline resolved)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "kurenniemi",
+   "name": "no horizontal overflow",
+   "ok": true,
+   "detail": "scrollWidth 390 vs clientWidth 390"
+  },
+  {
+   "page": "kurenniemi",
+   "name": "viewport is 390x844",
+   "ok": true,
+   "detail": "innerWidth 390"
+  },
+  {
+   "page": "kurenniemi",
+   "name": "zero page console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "flipper",
+   "name": "hls.js loaded",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "flipper",
+   "name": "channel tiles rendered",
+   "ok": true,
+   "detail": "2 tiles, 3 video elements"
+  },
+  {
+   "page": "flipper",
+   "name": "a live stream reached readyState>0",
+   "ok": true,
+   "detail": "2/3 ready"
+  },
+  {
+   "page": "flipper",
+   "name": "icy stub answers 200 (no console noise)",
+   "ok": true,
+   "detail": "not requested"
+  },
+  {
+   "page": "flipper",
+   "name": "no horizontal overflow",
+   "ok": true,
+   "detail": "scrollWidth 390 vs clientWidth 390"
+  },
+  {
+   "page": "flipper",
+   "name": "viewport is 390x844",
+   "ok": true,
+   "detail": "innerWidth 390"
+  },
+  {
+   "page": "flipper",
+   "name": "zero page console errors",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "page": "flipper",
+   "name": "note: live.err.ee segment CORS/HTTP failures (upstream)",
+   "ok": true,
+   "detail": "4× — log(javascript): Access to XMLHttpRequest at 'https://live.err.ee/live/hls/etv-video=454400-931213240.m4s' from origin 'https://elektron-view.kristjan-jansen.workers.dev' has been blocked by CORS poli"
+  }
+ ]
+}
