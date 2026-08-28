@@ -34,6 +34,26 @@
 //       That is a real finding: "the audio lane takes a context by argument so
 //       OfflineAudioContext drops in" is TRUE ONLY THROUGH THIS SHIM.
 //
+// TWO LIMITS OF THE AUDIO HALF, both verified rather than assumed:
+//
+//   (a) `OfflineAudioContext` CARRIES NO DETERMINISM GUARANTEE. The spec says it
+//       "renders as quickly as possible… fulfilling the returned promise with
+//       the rendered result as an AudioBuffer" and says NOTHING about
+//       bit-exactness. So the event trace is the contract this file guarantees
+//       (it is our arithmetic on our virtual clock); audio PCM equality is
+//       something to MEASURE. Measured here: identical hashes twice in-process
+//       AND across two separate browser processes, for a one-sample-impulse
+//       graph and for a real DSP graph (sawtooth -> swept biquad -> exponential
+//       envelope, 2ch/48k, rms identical to 9 dp) — headless Chromium, macOS
+//       arm64, 2026-08-28. `hashAudioBuffer()` exists so a fleet can re-verify
+//       that per browser/build instead of trusting this paragraph.
+//   (b) WEB AUDIO IS `[Exposed=Window]`. Verified: inside a dedicated Worker
+//       `OfflineAudioContext`, `AudioContext` and `BaseAudioContext` are all
+//       `undefined`. So an offline AUDIO render cannot leave a document's main
+//       thread. `renderDeck()`'s wall lane has no such limit — it is pure JS
+//       over a virtual clock — so a render farm parallelises across DOCUMENTS
+//       (Remotion Lambda's shape: N tabs), never across workers in one page.
+//
 // ===========================================================================
 // THE DELIVERABLE IS A PROPERTY, NOT A FEATURE:
 //
