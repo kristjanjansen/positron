@@ -1,5 +1,5 @@
 {
- "at": "2026-08-27T15:34:45.055Z",
+ "at": "2026-08-28T10:45:49.599Z",
  "steps": {
   "boot": {
    "tier": "decades",
@@ -21,9 +21,9 @@
    }
   },
   "flight": {
-   "frames": 603,
+   "frames": 602,
    "p50": 8.3,
-   "p95": 9.8,
+   "p95": 9.6,
    "max": 10.3
   },
   "dive": {
@@ -49,8 +49,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.1,
-      "firstImgMs": 160
+      "mountMs": 1.6,
+      "firstImgMs": 171
      }
     ]
    }
@@ -78,8 +78,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.1,
-      "firstImgMs": 160
+      "mountMs": 1.6,
+      "firstImgMs": 171
      }
     ]
    }
@@ -107,13 +107,13 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.1,
-      "firstImgMs": 160
+      "mountMs": 1.6,
+      "firstImgMs": 171
      },
      {
       "newCards": 33,
-      "mountMs": 0.7,
-      "firstImgMs": 44
+      "mountMs": 1.6,
+      "firstImgMs": 53
      }
     ]
    }
@@ -141,13 +141,13 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 2.1,
-      "firstImgMs": 160
+      "mountMs": 1.6,
+      "firstImgMs": 171
      },
      {
       "newCards": 33,
-      "mountMs": 0.7,
-      "firstImgMs": 44
+      "mountMs": 1.6,
+      "firstImgMs": 53
      }
     ]
    }
@@ -162,7 +162,7 @@
   "consoleClean": true
  },
  "serverStats": {
-  "startedAt": "2026-08-27T15:34:45.142Z",
+  "startedAt": "2026-08-28T10:45:49.685Z",
   "upstreamSearch": 0,
   "upstreamContent": 0,
   "cacheHitSearch": 9,

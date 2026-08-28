@@ -1,21 +1,39 @@
 <!doctype html>
 <meta charset="utf-8">
+<!-- Without this the phone lays the whole instrument out at 980 CSS px and
+     scales it down: the ERR material becomes unreadable and every tap lands
+     2.5x away from where the finger was. `user-scalable` is left alone — the
+     stage does its own pinch, but the CHROME must stay zoomable for anyone who
+     needs it. viewport-fit=cover feeds the safe-area insets below. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>megatimeline — the ERR archive as one scrollable surface</title>
 <style>
-  :root { color-scheme: dark; --vi: #e8a54b; --au: #3ec9ba; --ph: #b48fff; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0a0c;
-    color: #ccd; font: 12px/1.4 ui-monospace, monospace; }
-  #stage { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+  :root { color-scheme: dark; --vi: #e8a54b; --au: #3ec9ba; --ph: #b48fff;
+          --rh: 30px; }
+  /* 100dvh, not 100vh: with the URL bar showing, 100vh is TALLER than the
+     visible viewport on iOS, so the bottom row of an inset:0 app sits under
+     Safari's own chrome and can never be tapped. */
+  html, body { margin: 0; height: 100dvh; overflow: hidden; background: #0a0a0c;
+    color: #ccd; font: 12px/1.4 ui-monospace, monospace;
+    -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+  /* touch-action:none is CORRECT here and only here: this surface fills the
+     viewport and has no page scroll to protect, so the stage owns both axes
+     and the pinch. (The shared strip, which lives inside scrolling pages,
+     declares pan-y instead.) */
+  #stage { position: fixed; inset: 0; touch-action: none; cursor: grab;
+    -webkit-tap-highlight-color: transparent; }
   #stage.dragging { cursor: grabbing; }
   canvas { position: absolute; inset: 0; }
   /* ruler */
-  #ruler { position: absolute; left: 0; right: 0; top: 0; height: 30px;
-    border-bottom: 1px solid #26262e; background: #0d0d11; overflow: hidden; z-index: 4; }
+  #ruler { position: absolute; left: 0; right: 0; top: 0; height: var(--rh);
+    border-bottom: 1px solid #26262e; background: #0d0d11; overflow: hidden; z-index: 4;
+    padding-top: env(safe-area-inset-top); }
   #rulerInner { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
-  .tick { position: absolute; top: 22px; bottom: 0; width: 1px; background: #3a3a46; }
-  .tick.major { top: 14px; background: #55556a; }
+  .tick { position: absolute; top: calc(var(--rh) - 8px); bottom: 0; width: 1px; background: #3a3a46; }
+  .tick.major { top: calc(var(--rh) - 16px); background: #55556a; }
   .tlab { position: absolute; top: 2px; color: #778; white-space: nowrap;
-    transform: translateX(3px); user-select: none; cursor: pointer; }
+    transform: translateX(3px); user-select: none; cursor: pointer;
+    touch-action: manipulation; }
   .tlab.major { color: #bbc; }
   .tlab:hover { color: #fff; }
   /* track furniture */
@@ -70,6 +88,50 @@
     pointer-events: none; text-shadow: 0 0 3px #000; }
   #hud b { color: #aab; }
   #help { position: fixed; right: 8px; bottom: 6px; color: #556; z-index: 5; pointer-events: none; }
+  #helpTouch { display: none; }
+
+  /* ======================================================================
+     COARSE POINTER. Everything below is inside one media query, so a desktop
+     mouse never sees a byte of it and the existing autotests (headless,
+     pointer:fine) are provably unaffected. A finger gets:
+       · a 46 px ruler so a YEAR is a 44 px tap target rather than a 29x17 one
+       · a panel that is a bottom sheet, not a 280 px column over a 360 px screen
+       · 44 px rows in that panel
+       · safe-area padding, so the HUD is not under the home indicator
+     ====================================================================== */
+  @media (pointer: coarse) {
+    :root { --rh: 46px; }
+    .tlab { top: 0; height: 44px; min-width: 44px; padding: 4px 12px 0 2px;
+            box-sizing: border-box; font-size: 12px; }
+    .tlab.major { font-weight: 600; }
+    #panel { right: 6px; left: 6px; top: auto;
+             bottom: calc(6px + env(safe-area-inset-bottom)); max-width: none; min-width: 0;
+             max-height: 52dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #panelHead { min-height: 44px; display: flex; align-items: center;
+                 justify-content: space-between; font-size: 12px; }
+    #panelHead .chev { float: none; }
+    .pv { gap: 6px; margin: 4px 0 10px; }
+    .pv button { min-height: 44px; font-size: 12px; border-radius: 6px;
+                 touch-action: manipulation; }
+    .laneRow { min-height: 44px; padding: 0 2px; gap: 10px; }
+    .laneRow input { width: 22px; height: 22px; }
+    #hud { bottom: calc(4px + env(safe-area-inset-bottom)); left: 8px; right: 8px;
+           font-size: 11px; }
+    #help { display: none; }
+    #helpTouch { display: block; position: fixed; z-index: 5; pointer-events: none;
+      left: 8px; right: 8px; bottom: calc(20px + env(safe-area-inset-bottom));
+      color: #667; font-size: 10.5px; text-shadow: 0 0 3px #000; }
+    /* the hover card becomes a TAP card: anchored to the bottom, full width,
+       and it carries its own OPEN button because a finger has no second
+       button and "tap = open in a new tab" is a trap on a phone. */
+    #hover { left: 6px; right: 6px; bottom: calc(70px + env(safe-area-inset-bottom));
+      max-width: none; padding: 10px 12px; border-radius: 6px; font-size: 12px;
+      pointer-events: auto; }
+    #hover .hopen { display: block; margin-top: 8px; min-height: 44px; width: 100%;
+      background: #26263a; color: #fff; border: 1px solid #4a4a5e; border-radius: 6px;
+      font: inherit; font-size: 12px; touch-action: manipulation; }
+    .card.video img { width: 108px; height: 61px; }
+  }
 </style>
 
 <div id="stage">
@@ -82,6 +144,7 @@
 <div id="panel"><div id="panelHead">TRACKS <span class="chev">▾</span></div><div id="panelBody"></div></div>
 <div id="hud">loading census…</div>
 <div id="help">wheel = zoom · drag = pan · dbl-click a year = dive · click item = play (remixer :8891)</div>
+<div id="helpTouch">pinch = zoom · drag = pan · double-tap a year = dive · tap an item = details, then OPEN</div>
 
 <script type="module">
 import {
@@ -92,6 +155,24 @@ import { attachGestures, panWasDrag } from './gesture.mjs';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ONE capability question, asked once. `pointer: coarse` — not a width — is the
+// right test: a 1024 px tablet has fingers and a 700 px desktop window does not,
+// and every touch affordance below is about the INSTRUMENT, not the size.
+const coarseMQ = matchMedia('(pointer: coarse)');
+let COARSE = coarseMQ.matches;
+// LIVE, not read-once: a 2-in-1 that folds into a tablet, a desktop that gains
+// a touchscreen, and (the case that bit this harness) a page that is loaded
+// before device emulation is applied all flip this after boot. Reading it once
+// leaves the touch affordances permanently off on exactly the devices they are
+// for.
+coarseMQ.addEventListener('change', (e) => { COARSE = e.matches; applyCoarse(); });
+function applyCoarse() {
+  const p = document.getElementById('panel');
+  if (p) p.classList.toggle('closed', COARSE);
+  if (!COARSE) hideHover();
+}
+window.__mtCoarse = () => COARSE;
 
 // ─── time & tracks ──────────────────────────────────────────────────────────
 const MS_DAY = 86400000;
@@ -433,6 +514,15 @@ function resize() {
   markDirty();
 }
 addEventListener('resize', resize);
+// iOS changes the visible viewport WITHOUT firing `resize` when the URL bar
+// slides away, so an inset:0 canvas keeps its old height and the bottom strip
+// of the archive is drawn under Safari's chrome. visualViewport does fire.
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', resize);
+  visualViewport.addEventListener('scroll', resize);
+}
+addEventListener('orientationchange', () => setTimeout(resize, 250));
+
 
 function draw() {
   const w = innerWidth, h = innerHeight;
@@ -703,11 +793,25 @@ function buildRuler() {
   $('rulerInner').style.transform = 'translate(0px, 0px) scale(1, 1)';
   // capture the ruler's own layout ref matches cards' (both rebuilt together on settle)
 }
-$('ruler').addEventListener('dblclick', (e) => {
-  const fit = e.target.dataset && e.target.dataset.fit;
-  if (!fit) return;
+function diveTo(target) {
+  const fit = target && target.dataset && target.dataset.fit;
+  if (!fit) return false;
   const [a, b] = fit.split(',').map(Number);
-  if (isFinite(a) && isFinite(b)) animateFitX(a, b, 900, markDirty);
+  if (!isFinite(a) || !isFinite(b)) return false;
+  animateFitX(a, b, 900, markDirty);
+  return true;
+}
+$('ruler').addEventListener('dblclick', (e) => diveTo(e.target));
+// DOUBLE-TAP, explicitly. Chrome synthesizes a dblclick from a double-tap, but
+// only when it decides the target is not part of a pan — and #stage declares
+// touch-action:none, which is exactly the case where it often decides wrong.
+// Owning the gesture is 8 lines and removes the guess.
+let lastTapT = 0, lastTapEl = null;
+$('ruler').addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  const now = performance.now();
+  if (lastTapEl === e.target && now - lastTapT < 380) { diveTo(e.target); lastTapT = 0; lastTapEl = null; return; }
+  lastTapT = now; lastTapEl = e.target;
 });
 
 // ─── furniture (lane labels — DOM, rebuilt on settle when layout changed) ───
@@ -812,6 +916,31 @@ function showHover(item, cx, cy) {
 function hideHover() { hoverItem = null; clearTimeout(dwellTimer); $('hover').style.display = 'none'; }
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
+// ─── coarse pointer: hover has a TAP equivalent ─────────────────────────────
+// A finger cannot dwell, so the dwell-gated content fetch and the whole hover
+// card were unreachable on a phone — and the only thing a tap DID do was open a
+// new tab, which is the most destructive of the two outcomes and the one a
+// mis-aimed finger produces most often. On coarse pointers the first tap shows
+// the card (and runs the same gated fetch immediately, since a tap IS the
+// intent a dwell was standing in for), and OPEN is a real 44 px button.
+function showTapCard(item, cx, cy) {
+  showHover(item, cx, cy);
+  const el = $('hover');
+  if (!el.querySelector('.hopen')) {
+    const b = document.createElement('button');
+    b.className = 'hopen';
+    b.textContent = item.type === 'photo' ? 'OPEN PHOTO ↗' : 'PLAY IN REMIXER ↗';
+    b.onclick = (ev) => { ev.stopPropagation(); openItem(item); hideHover(); };
+    el.appendChild(b);
+  } else {
+    const b = el.querySelector('.hopen');
+    b.textContent = item.type === 'photo' ? 'OPEN PHOTO ↗' : 'PLAY IN REMIXER ↗';
+    b.onclick = (ev) => { ev.stopPropagation(); openItem(item); hideHover(); };
+  }
+  clearTimeout(dwellTimer);
+  ensureContent(item).then(() => { if (hoverItem === item) showTapCard(item, cx, cy); });
+}
+
 addEventListener('mousemove', (e) => {
   const cardEl = e.target.closest && e.target.closest('.card');
   if (cardEl) {
@@ -837,13 +966,27 @@ function openItem(item) {
 }
 $('stage').addEventListener('click', (e) => {
   if (panWasDrag() || e.target.closest('.card') || e.target.closest('#ruler')) return;
+  // FINGER SLOP: a canvas hit rect is 2-6 px wide at year zoom. A mouse lands
+  // inside it; a finger's contact patch is ~9 mm. Grow the rect by the slop for
+  // a coarse pointer only — the geometry is identical, the radius is not.
+  const s = COARSE ? 12 : 0;
   for (let i = hitRects.length - 1; i >= 0; i--) {
     const r = hitRects[i];
-    if (e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
-      return openItem(r.item);
+    if (e.clientX >= r.x - s && e.clientX <= r.x + r.w + s && e.clientY >= r.y - s && e.clientY <= r.y + r.h + s) {
+      return COARSE ? showTapCard(r.item, e.clientX, e.clientY) : openItem(r.item);
     }
   }
+  if (COARSE) hideHover();      // a tap on empty sky dismisses the card
 });
+// a card THUMBNAIL is already 44 px+; on a phone its tap shows the same card
+// rather than opening a tab, so the two paths agree.
+$('cards').addEventListener('click', (e) => {
+  if (!COARSE || panWasDrag()) return;
+  const el = e.target.closest('.card');
+  if (!el) return;
+  const card = live.get(el.dataset.slug);
+  if (card) { e.stopPropagation(); showTapCard(card.item, e.clientX, e.clientY); }
+}, true);
 
 // ─── frame loop, settle discipline ──────────────────────────────────────────
 let dirty = true, lastChangeAt = 0, settleTimer = null, rafHandle = null;
@@ -983,4 +1126,11 @@ function snapshot() {
 }
 
 boot();
+
+// the track panel is a 52dvh bottom sheet on a phone: it starts CLOSED, or it
+// covers the material it is a control for. Called LAST: applyCoarse() reaches
+// into hideHover(), and a `let` further down the module is in its temporal dead
+// zone until the module body has run to the end — calling it early aborts the
+// whole module and every symbol after the throw silently never exists.
+applyCoarse();
 </script>

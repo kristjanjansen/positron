@@ -1,0 +1,17 @@
+{
+  "name": "osc",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "osc": "^2.4.5",
+    "osc-min": "^2.1.2"
+  }
+}

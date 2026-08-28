@@ -526,6 +526,14 @@ export function createStrip(canvas, deck, opts = {}) {
       ...(opts.theme || {}),
     },
     gutterPx: opts.gutter ?? 92,
+    gutterBase: opts.gutter ?? 92,
+    // NARROW-VIEWPORT gutter: at 360 px a 92 px label column eats a quarter of
+    // the plot. The gutter is the one piece of chrome that can shrink without
+    // changing a single measured number, because `plotW()` is derived from it
+    // and every renderer already draws in plot space. Desktop is untouched:
+    // the clamp only engages below `narrowAt`.
+    narrowAt: opts.narrowAt ?? 520,
+    gutterNarrow: opts.gutterNarrow ?? 46,
     axisH: opts.axisHeight ?? 20,
     // is the position domain absolute wall ms (replay-grid) or 0-based (jam)?
     absolute: opts.absolute !== undefined ? opts.absolute : !!(deck.range && deck.range[0] > 1e12),
@@ -701,6 +709,7 @@ export function createStrip(canvas, deck, opts = {}) {
       canvas.width = Math.round(cssW * S.dpr); canvas.height = Math.round(cssH * S.dpr);
     }
     S.width = cssW; S.height = cssH;
+    S.gutterPx = cssW < S.narrowAt ? Math.min(S.gutterBase, S.gutterNarrow) : S.gutterBase;
   }
 
   function drawAxis() {
@@ -949,10 +958,13 @@ export function createStrip(canvas, deck, opts = {}) {
   };
   function laneAt(y) { for (const L of S.lanes) if (L.show && y >= L.y && y < L.y + L.height) return L; return null; }
 
-  function hitTest(px, py) {
+  /** `tolPx` is the FINGER SLOP and nothing else: the hit geometry is identical
+   *  on both inputs, only the radius differs (6 px for a mouse, `touchSlop` for
+   *  a finger). Desktop precision is therefore unchanged by definition. */
+  function hitTest(px, py, tolPx = 6) {
     const L = laneAt(py);
     if (!L) return null;
-    const t = tAt(px), tol = (6 / S.view.pxPerSecond) * 1000;
+    const t = tAt(px), tol = (tolPx / S.view.pxPerSecond) * 1000;
     const C = laneContext(L, tAt(px - 400), tAt(px + 400));
     if (C.as === 'spans') {
       for (const s of C.spans) {
@@ -991,8 +1003,132 @@ export function createStrip(canvas, deck, opts = {}) {
   }
   const fmtVal = (v) => (typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(2)) : Array.isArray(v) ? `[${v.slice(0, 4)}]` : String(v).slice(0, 18));
 
+  // -- TOUCH -----------------------------------------------------------------
+  // The five ancestors were all built with a mouse. A finger is a different
+  // instrument and the difference is not "the same events, fatter":
+  //
+  //   · A mouse has a RESTING position, so hover is free and a press is
+  //     unambiguous. A finger has neither: press IS the first contact, so
+  //     press-to-seek (the desktop default) makes every touch a destructive
+  //     seek before the user has said what they wanted. Touch therefore defers:
+  //     the gesture is UNDECIDED until it moves past the slop or the finger
+  //     lifts. Drag => pan. Lift-without-drag => tap => seek.
+  //   · There is no wheel, so zoom must be PINCH, and pinch must be about the
+  //     MIDPOINT, not the centre — the same invariant zoomAt() already keeps
+  //     for the cursor (the time under the fingers does not move).
+  //   · There is no hover, so the tooltip must have a tap equivalent, and it
+  //     must be STICKY (a finger that is still down covers the thing it is
+  //     describing).
+  //
+  // touch-action DISCIPLINE — the whole contract in one declaration:
+  //   `pan-y`  the page keeps the VERTICAL axis; the strip owns the horizontal
+  //            one and pinch. A vertical swipe scrolls the page and the browser
+  //            hands us a pointercancel, which is exactly the right outcome and
+  //            costs no code. A client that fills the viewport and has no page
+  //            scroll to protect passes touchAction:'none'.
+  // Nothing here calls preventDefault on a touch stream: the declaration does
+  // the work, so the listeners stay passive-friendly and never fight the
+  // compositor.
+  const TOUCH = {
+    slop: opts.touchSlop ?? 22,      // finger radius for hit targets / playhead
+    tapPx: opts.tapSlop ?? 10,       // movement under which a press is a TAP
+    tapMs: opts.tapMs ?? 400,
+  };
+  const touches = new Map();         // pointerId -> {x, y, x0, y0, t0}
+  let pinch = null;                  // {d0, pps0, midT}
+  let touchGesture = null;           // 'undecided' | 'pan' | 'scrub' | 'pinch'
+  const isTouch = (e) => e.pointerType === 'touch' || e.pointerType === 'pen';
+
+  function pinchStart() {
+    const [a, b] = [...touches.values()];
+    const d0 = Math.max(1, Math.abs(a.x - b.x));
+    const midX = (a.x + b.x) / 2;
+    pinch = { d0, pps0: S.view.pxPerSecond, midT: tAt(midX) };
+    touchGesture = 'pinch';
+    disengage();
+  }
+  /** ZOOM ABOUT THE MIDPOINT: the time that was under the midpoint at pinch
+   *  start is still under the midpoint now. That is the same law zoomAt() keeps
+   *  for a wheel, written for two moving anchors instead of one fixed one — so
+   *  a pinch that also slides pans for free, which is what a hand expects. */
+  function pinchMove() {
+    if (!pinch || touches.size < 2) return;
+    const [a, b] = [...touches.values()];
+    const d = Math.max(1, Math.abs(a.x - b.x));
+    const midX = (a.x + b.x) / 2;
+    const pps = Math.max(1e-9, Math.min(1e7, pinch.pps0 * (d / pinch.d0)));
+    S.view.pxPerSecond = pps;
+    S.view.scrollX = ((pinch.midT - S.view.originTime) / 1000) * pps - midX;
+    invalidate();
+  }
+
+  /** the tap equivalent of hover: sticky, cleared by the next gesture. */
+  function tapInspect(px, py) {
+    const hit = describe(hitTest(px, py, TOUCH.slop));
+    if (hit) { hit.px = px; hit.py = py; hit.touch = true; }
+    S.hover = hit; S.dirty = true;
+    opts.onHover && opts.onHover(hit);
+  }
+
+  function onTouchDown(e) {
+    const px = localX(e), py = localY(e);
+    touches.set(e.pointerId, { x: px, y: py, x0: px, y0: py, t0: (typeof performance !== 'undefined' ? performance.now() : Date.now()) });
+    canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    if (touches.size === 2) { pinchStart(); return; }
+    if (touches.size > 2) return;
+    if (px < 0) { touchGesture = null; return; }
+    // the PLAYHEAD is a 1.5 px line — unhittable with a finger. Give it the
+    // full finger radius and a press inside it SCRUBS (the one place where a
+    // touch drag is a seek and not a pan). Desktop keeps its 1 px precision:
+    // this branch is only reachable from a touch pointer.
+    touchGesture = Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
+    S.dragX = px;
+    if (touchGesture === 'scrub') { S.dragging = true; disengage(); }
+  }
+
+  function onTouchMove(e) {
+    const p = touches.get(e.pointerId);
+    if (!p) return;
+    p.x = localX(e); p.y = localY(e);
+    if (touchGesture === 'pinch') { pinchMove(); return; }
+    if (touches.size !== 1) return;
+    const dx = p.x - p.x0, dy = p.y - p.y0;
+    if (touchGesture === 'undecided') {
+      if (Math.abs(dx) < TOUCH.tapPx && Math.abs(dy) < TOUCH.tapPx) return;
+      // past the slop and still ours (the page would have cancelled us if it
+      // had claimed the gesture) => this is a PAN.
+      touchGesture = 'pan'; S.dragging = true; S.dragX = p.x; disengage();
+      if (S.hover) { S.hover = null; opts.onHover && opts.onHover(null); }
+    }
+    if (touchGesture === 'scrub') { seek(tAt(p.x)); S.dirty = true; return; }
+    if (touchGesture === 'pan') { S.view.scrollX -= p.x - S.dragX; S.dragX = p.x; S.dirty = true; }
+  }
+
+  function onTouchUp(e) {
+    const p = touches.get(e.pointerId);
+    touches.delete(e.pointerId);
+    canvas.releasePointerCapture && e.pointerId !== undefined &&
+      canvas.hasPointerCapture && canvas.hasPointerCapture(e.pointerId) && canvas.releasePointerCapture(e.pointerId);
+    if (touchGesture === 'pinch') {
+      pinch = null;
+      // a lifted finger during a pinch hands the survivor a fresh pan origin
+      // rather than teleporting the view by the whole midpoint delta
+      if (touches.size === 1) { const r = touches.values().next().value; touchGesture = 'pan'; S.dragX = r.x; S.dragging = true; }
+      else { touchGesture = null; S.dragging = false; }
+      invalidate(); return;
+    }
+    if (touchGesture === 'undecided' && p && e.type !== 'pointercancel') {
+      const dt = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - p.t0;
+      const moved = Math.max(Math.abs(p.x - p.x0), Math.abs(p.y - p.y0));
+      if (dt <= TOUCH.tapMs && moved < TOUCH.tapPx && p.x >= 0) { seek(tAt(p.x)); tapInspect(p.x, p.y); }
+    }
+    if (touches.size === 0) { touchGesture = null; S.dragging = false; }
+    invalidate();
+  }
+
   let dragMode = null;
   function onDown(e) {
+    if (isTouch(e)) return onTouchDown(e);
     const px = localX(e);
     if (px < 0) return;
     canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
@@ -1006,6 +1142,7 @@ export function createStrip(canvas, deck, opts = {}) {
     invalidate();
   }
   function onMove(e) {
+    if (isTouch(e)) return onTouchMove(e);
     const px = localX(e), py = localY(e);
     if (S.dragging) {
       if (dragMode === 'seek') seek(tAt(px));
@@ -1019,7 +1156,11 @@ export function createStrip(canvas, deck, opts = {}) {
     S.hover = hit; S.dirty = true;
     opts.onHover && opts.onHover(hit);
   }
-  function onUp(e) { S.dragging = false; dragMode = null; canvas.releasePointerCapture && e.pointerId !== undefined && canvas.releasePointerCapture(e.pointerId); }
+  function onUp(e) {
+    if (isTouch(e)) return onTouchUp(e);
+    S.dragging = false; dragMode = null;
+    canvas.releasePointerCapture && e.pointerId !== undefined && canvas.releasePointerCapture(e.pointerId);
+  }
   function onWheel(e) {
     const px = localX(e);
     if (px < 0) return;
@@ -1027,13 +1168,26 @@ export function createStrip(canvas, deck, opts = {}) {
     if (e.ctrlKey || e.metaKey || e.shiftKey) zoomAt(Math.pow(1.0018, -e.deltaY), px);
     else { S.view.scrollX += e.deltaX || e.deltaY; disengage(); invalidate(); }
   }
+  const onLeave = (e) => {
+    // a TOUCH pointer "leaves" the moment it lifts, which would erase the
+    // sticky tap tooltip one frame after it appeared. Only a mouse leaving is
+    // a real loss of attention.
+    if (e && isTouch(e)) return;
+    if (S.hover) { S.hover = null; S.dirty = true; opts.onHover && opts.onHover(null); }
+  };
+  // iOS Safari still ships its own pinch (`gesturestart`) alongside the
+  // standard pointer stream; without this the page zooms and our pinch never
+  // gets its second pointer. Harmless everywhere else — nothing else fires it.
+  const onGesture = (e) => e.preventDefault();
   if (opts.interact !== false) {
-    canvas.style.touchAction = 'none';
+    canvas.style.touchAction = opts.touchAction || 'pan-y';
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('pointercancel', onUp);
-    canvas.addEventListener('pointerleave', () => { if (S.hover) { S.hover = null; S.dirty = true; opts.onHover && opts.onHover(null); } });
+    canvas.addEventListener('pointerleave', onLeave);
+    canvas.addEventListener('gesturestart', onGesture);
+    canvas.addEventListener('gesturechange', onGesture);
     if (opts.zoom !== false) canvas.addEventListener('wheel', onWheel, { passive: false });
   }
 
@@ -1064,7 +1218,7 @@ export function createStrip(canvas, deck, opts = {}) {
   if (typeof requestAnimationFrame === 'function' && opts.loop !== false) S.raf = requestAnimationFrame(loop);
   else draw();
 
-  return {
+  const api = {
     canvas, deck, state: S,
     /** the lane declarations — QUERIES; replace them and the picture changes
      *  without a row moving anywhere */
@@ -1084,6 +1238,10 @@ export function createStrip(canvas, deck, opts = {}) {
       return deck.evidence ? deck.evidence() : p;
     },
     evidence: () => (deck.evidence ? deck.evidence() : S.evidence),
+    /** what the fingers are currently doing — the only way a headless harness
+     *  can tell a pan from a pinch from a tap without reading pixels. */
+    gesture: () => ({ mode: touchGesture, pointers: touches.size, pinching: !!pinch, slop: TOUCH.slop }),
+    hover: () => S.hover,
     readout, invalidate, draw,
     timeToX: x, xToTime: tAt, tickLOD: () => tickLOD(S.view.pxPerSecond),
     /** per-lane painted-pixel probe: render ONE lane alone offscreen and count.
@@ -1105,15 +1263,29 @@ export function createStrip(canvas, deck, opts = {}) {
     ink() { const o = {}; for (const L of S.lanes) o[L.id] = this.inkOf(L.id); return o; },
     dispose() {
       S.disposed = true;
+      if (typeof globalThis !== 'undefined' && globalThis.__strips) {
+        const i = globalThis.__strips.indexOf(api); if (i >= 0) globalThis.__strips.splice(i, 1);
+      }
       if (S.raf) cancelAnimationFrame(S.raf);
       if (S._ro) S._ro.disconnect();
       if (S._offState) try { S._offState(); } catch { /* already gone */ }
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
+      canvas.removeEventListener('pointerleave', onLeave);
+      canvas.removeEventListener('gesturestart', onGesture);
+      canvas.removeEventListener('gesturechange', onGesture);
       canvas.removeEventListener('wheel', onWheel);
     },
   };
+  // A live registry of every strip on the page. A touch harness cannot reach a
+  // strip a client keeps in a module-scoped closure (proto/paths does), and
+  // "add a global to every client" is five edits to files this component does
+  // not own. One array, spliced on dispose, costs nothing and makes the shared
+  // component testable wherever it is mounted.
+  if (typeof globalThis !== 'undefined') (globalThis.__strips || (globalThis.__strips = [])).push(api);
+  return api;
 }
 
 export default createStrip;

@@ -36,6 +36,13 @@
   button:hover { background: #253046; }
   button.rate { padding: 5px 8px; min-width: 40px; }
   #strip { display: block; width: 100%; height: 190px; border: 1px solid var(--line); border-radius: 6px; background: #0b0d12; }
+  /* Both grids pin a 340px column, so at phone widths minmax(0,1fr) collapses
+     the strip canvas to ~2px and the shared component cannot be exercised at
+     all. Stack below the tablet breakpoint. */
+  @media (max-width: 860px) {
+    .wrap { grid-template-columns: minmax(0,1fr); padding: 10px 12px; }
+    .panel[style*="340px"] { grid-template-columns: minmax(0,1fr) !important; }
+  }
   #striphud, #striphover { font-size: 11px; color: var(--dim); margin-top: 4px; min-height: 15px; }
   .kv { color: var(--dim); }
   .kv b { color: var(--ink); font-weight: 600; }

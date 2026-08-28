@@ -1,9 +1,14 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>remixer — ERR archive year chords</title>
 <style>
   :root { color-scheme: dark; --au: #3ec9ba; --vi: #e8a54b; }
-  body { margin: 0; background: #0a0a0c; color: #ccd; font: 12px/1.45 ui-monospace, monospace; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: #0a0a0c; color: #ccd; font: 12px/1.45 ui-monospace, monospace;
+    overflow-x: hidden;
+    padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
   #top { display: flex; gap: 14px; align-items: baseline; padding: 8px 10px 4px; flex-wrap: wrap; }
   #top h1 { font-size: 13px; margin: 0; color: #fff; letter-spacing: 1px; }
   input[type=number] { width: 62px; background: #16161c; color: #ffd479; border: 1px solid #333; font: inherit; padding: 2px 4px; }
@@ -65,6 +70,60 @@
   #hud b { color: #fff; }
   #help { padding: 0 10px 8px; color: #667; }
   kbd { background: #223; padding: 0 4px; border-radius: 3px; color: #cde; }
+  /* the honest-degradation notice (Managed-MediaSource-only devices) */
+  #compat { display: none; margin: 0 10px 8px; padding: 8px 10px; border-radius: 4px;
+    border: 1px solid #4a3a20; background: #1a140a; color: #ffd479; font-size: 11px; line-height: 1.5; }
+  #compat[data-on="1"] { display: block; }
+  #compat b { color: #fff; }
+  /* THE audio-unlock affordance: one obvious thing to tap. */
+  #unlock { position: fixed; inset: 0; z-index: 60; display: none;
+    align-items: center; justify-content: center; background: rgba(6,6,10,.9);
+    -webkit-tap-highlight-color: transparent; padding: 24px; }
+  #unlock[data-on="1"] { display: flex; }
+  #unlock .u { max-width: 340px; text-align: center; }
+  #unlock button { min-height: 60px; width: 100%; font-size: 15px; color: #ffd479;
+    border-color: #e8a54b; border-radius: 10px; background: #1a140a; touch-action: manipulation; }
+  #unlock p { color: #99a; font-size: 11px; line-height: 1.55; }
+
+  /* --- narrow: one column. The two-column grid declares a 950 px minimum, so
+     on a phone it is not "cramped", it is a horizontal scrollbar. --- */
+  @media (max-width: 900px) {
+    #main { grid-template-columns: minmax(0, 1fr); }
+    .listBox { max-height: 220px; }
+    #tRead { min-width: 0; white-space: normal; }
+    #top { gap: 8px; }
+  }
+  /* ======================================================================
+     COARSE POINTER — desktop mice never match this block.
+     ====================================================================== */
+  @media (pointer: coarse) {
+    button, select, input[type=number] { min-height: 44px; padding: 0 14px;
+      border-radius: 6px; font-size: 13px; touch-action: manipulation; }
+    input[type=number] { width: 92px; }
+    #top { padding: 10px; row-gap: 10px; align-items: center; }
+    #top label { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+    #tbar { gap: 10px; padding: 0 10px 10px; flex-wrap: wrap; }
+    #tbar button { padding: 0 16px; min-width: 48px; }
+    /* the SCRUBBER is the one control a finger uses most and it was 26 px of
+       1 px-precision hit area. 44 px tall, and it takes a real drag. */
+    #tScrub { height: 44px; flex: 1 1 100%; order: 5; border-radius: 6px;
+      touch-action: none; }
+    #tScrub .sp { height: 7px; }
+    #tPh { width: 3px; }
+    #tRead { flex: 1 1 100%; order: 6; min-width: 0; white-space: normal; font-size: 11px; }
+    /* the year strip is a timeline: it owns the horizontal axis, the page keeps
+       the vertical one — the same discipline timeline/strip.mjs declares. */
+    #strip { height: 96px; touch-action: pan-y; }
+    .it { pointer-events: none; }      /* a MARK, not a control — see renderStrip */
+    .it.day { width: 6px; height: 22px; }
+    .it.month { height: 10px; }
+    .row { padding: 0 8px; min-height: 44px; align-items: center; }
+    .row .idx { width: 26px; }
+    .lrow { min-height: 48px; gap: 8px; }
+    .lrow input[type=range] { width: 100%; min-width: 80px; height: 32px; }
+    #help kbd { display: none; }
+    #help { font-size: 10.5px; }
+  }
 </style>
 
 <div id="top">
@@ -77,6 +136,7 @@
   <span id="counts">–</span>
 </div>
 
+<div id="compat"></div>
 <div id="stripWrap"><div id="strip"></div></div>
 
 <!-- ONE playhead over every layer (timeline/transport.mjs). Each archive item
@@ -111,6 +171,14 @@
   <span>errors <b id="errN">0</b></span>
   <span id="chordLed"></span>
   <span id="status"></span>
+</div>
+<div id="unlock">
+  <div class="u">
+    <button id="unlockBtn" type="button">▶ tap to enable sound</button>
+    <p>iOS starts every AudioContext suspended and refuses to play media outside a
+       user gesture. One tap unlocks the whole rack — layers, gains and the
+       transport — for the rest of the session.</p>
+  </div>
 </div>
 <div id="help">
   <kbd>1–9</kbd> audio item → free layer · <kbd>⇧1–9</kbd> video item → free layer ·
@@ -751,7 +819,16 @@ function renderStrip() {
         d.style.left = (dayFrac(b) * 100).toFixed(2) + '%';
         d.style.top = zoneTop + 6 + (i % 3) * 7 + 'px';
       }
-      d.onclick = () => loadNext(it);
+      // On a COARSE pointer the marks stop being individual controls: a 2 px
+      // day tick can never be a 44 px target without every tick in a month
+      // overlapping every other one. The mark stays a MARK and the strip gets
+      // one delegated hit-test with a finger radius — the same answer
+      // timeline/strip.mjs gives for a canvas tick.
+      d._it = it;
+      d.onclick = () => loadNext(it);   // inert on a coarse pointer: the CSS
+      // below sets `.it { pointer-events: none }` there and the strip's own
+      // delegated hit-test takes over. CSS, not a JS branch, because a media
+      // query is LIVE and a boolean read at render time is not.
       el.appendChild(d);
     });
   };
@@ -867,6 +944,139 @@ $('audioYearIn').onchange = (e) => setAudioYear(+e.target.value || null);
 $('chordBtn').onclick = () => { ensureCtx(); chord(); };
 $('stopBtn').onclick = allStop;
 $('shufBtn').onclick = shuffleAll;
+
+// ===========================================================================
+// TOUCH + iOS
+// ===========================================================================
+// asked LIVE at every call site: a tablet that gains a keyboard, an orientation
+// change, and (the case that caught this) emulation applied after load all flip
+// it. A boolean captured at boot is wrong on exactly the devices it is for.
+const coarseMQ = matchMedia('(pointer: coarse)');
+const COARSE = () => coarseMQ.matches;
+
+// --- 1. THE AUDIO UNLOCK ---------------------------------------------------
+// Three separate iOS refusals, and the rack trips all three:
+//   a) an AudioContext is created SUSPENDED and only resume() inside a user
+//      gesture starts it — every gain node in wireGain() is silent until then;
+//   b) HTMLMediaElement.play() outside a gesture is refused — and the rack's
+//      plays happen AFTER `await resolvePlayable()`, i.e. in a later task, so
+//      they are not "inside" the gesture even when a finger started them;
+//   c) an element that has never been played in a gesture stays locked forever.
+// (c) is why priming matters: playing and immediately pausing each element
+// during the first real gesture marks it user-activated for the session, after
+// which the async plays in attach() are allowed. This is the whole trick and it
+// has to happen ONCE, on the first touch, before anything is loaded.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+let unlocked = false;
+window.__audioUnlocked = () => unlocked;
+
+function primeElement(el) {
+  // never touch an element that is already carrying real material
+  if (el.src || el.currentSrc) return Promise.resolve();
+  el.src = SILENT_WAV;
+  const p = el.play();
+  return (p && p.catch ? p : Promise.resolve())
+    .then(() => { el.pause(); el.removeAttribute('src'); el.load(); })
+    .catch(() => { try { el.removeAttribute('src'); el.load(); } catch {} });
+}
+
+async function unlockAudio() {
+  if (unlocked) return true;
+  ensureCtx();
+  try { await actx.resume(); } catch {}
+  await Promise.all(allLayers().map((L) => primeElement(L.el)));
+  unlocked = actx.state === 'running';
+  $('unlock').dataset.on = unlocked ? '0' : '1';
+  if (unlocked) S.status = 'audio unlocked';
+  return unlocked;
+}
+// the first gesture of any kind, captured before anything else can swallow it
+for (const ev of ['pointerdown', 'touchend', 'keydown']) {
+  addEventListener(ev, () => { unlockAudio(); }, { capture: true, once: false, passive: true });
+}
+$('unlockBtn').onclick = async () => {
+  if (await unlockAudio()) $('unlock').dataset.on = '0';
+  else $('unlockBtn').textContent = 'still blocked — check Silent Mode / Low Power';
+};
+
+// --- 2. MediaSource honesty ------------------------------------------------
+// hls.js needs Media Source Extensions. An iPhone has NO classic MediaSource at
+// all; iOS 17.1+ ships MANAGED MediaSource, which hls.js only drives in recent
+// builds, and Safari plays HLS natively anyway. The existing `else L.el.src =
+// url` branch is already the correct degradation — what was missing is SAYING
+// so, because a silent fallback and a silent failure look identical.
+function mediaReport() {
+  const v = document.createElement('video');
+  const nativeHls = !!(v.canPlayType('application/vnd.apple.mpegurl') ||
+                       v.canPlayType('application/x-mpegURL'));
+  return {
+    mse: typeof window.MediaSource !== 'undefined',
+    managed: typeof window.ManagedMediaSource !== 'undefined',
+    hlsjs: !!(window.Hls && Hls.isSupported()),
+    nativeHls,
+  };
+}
+window.__mediaReport = mediaReport;
+(function announceCompat() {
+  const m = mediaReport();
+  if (m.hlsjs) return;                       // the normal desktop path; say nothing
+  const el = $('compat');
+  el.dataset.on = '1';
+  el.innerHTML = m.nativeHls
+    ? `<b>HLS runs natively here.</b> This device has no classic MediaSource` +
+      `${m.managed ? ' (only Managed MediaSource)' : ''}, so hls.js is off and the HLS layers ` +
+      `are handed straight to the video element. Playback works; per-layer buffer ` +
+      `statistics and the rendition lock do not.`
+    : `<b>HLS cannot play on this device.</b> No MediaSource` +
+      `${m.managed ? ' beyond Managed MediaSource' : ''} and no native HLS: ` +
+      `progressive audio layers will still play, HLS video layers will not.`;
+})();
+
+// --- 3. the year strip: one delegated hit-test with FINGER SLOP ------------
+// Nearest mark within `slop` px of the touch, measured on both axes so the
+// audio zone and the video zone stay distinguishable. A tap that finds nothing
+// does nothing, which is the correct answer for a tap on empty strip.
+$('strip').addEventListener('click', (e) => {
+  if (!COARSE()) return;
+  const strip = $('strip');
+  const slop = 22;
+  let best = null, bd = Infinity;
+  for (const d of strip.children) {
+    if (!d._it) continue;
+    const r = d.getBoundingClientRect();
+    const dx = e.clientX < r.left ? r.left - e.clientX : e.clientX > r.right ? e.clientX - r.right : 0;
+    const dy = e.clientY < r.top ? r.top - e.clientY : e.clientY > r.bottom ? e.clientY - r.bottom : 0;
+    const dist = Math.hypot(dx, dy);
+    if (dist < bd) { bd = dist; best = d._it; }
+  }
+  if (best && bd <= slop) loadNext(best);
+});
+
+// --- 4. the scrubber takes a DRAG, not just a click ------------------------
+// `onclick` alone means a finger gets one seek per lift and no scrub at all.
+(function dragScrub() {
+  const el = $('tScrub');
+  let dragging = false;
+  const seekTo = (clientX) => {
+    if (!TL.deck) return;
+    const r = el.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    tSeek(TL.deck.range[0] + f * (TL.deck.range[1] - TL.deck.range[0]));
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (!TL.deck) return;
+    dragging = true;
+    el.setPointerCapture(e.pointerId);
+    seekTo(e.clientX);
+  });
+  el.addEventListener('pointermove', (e) => { if (dragging) seekTo(e.clientX); });
+  const end = (e) => {
+    dragging = false;
+    if (el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+})();
 
 // --- autotest --------------------------------------------------------------
 // ?autotest=1: phase 1 = 1965 chord(3 audio) + 1 video, 30 s observation.

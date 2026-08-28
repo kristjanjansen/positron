@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>strip — touch bench</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b0d12; --panel:#12151d; --edge:#232838;
+          --ink:#c9d2e4; --dim:#7a8291; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 13px/1.5 ui-monospace, Menlo, monospace;
+         /* the page keeps the VERTICAL axis; the strip owns the horizontal one */
+         overflow-x: hidden; }
+  header { padding: 10px 12px calc(6px + env(safe-area-inset-top)); }
+  h1 { font-size: 13px; margin: 0 0 3px; letter-spacing: .04em; }
+  .sub { color: var(--dim); font-size: 11px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 12px 8px; }
+  /* 44 px is the tap target, not the ink: a 32 px button with 6 px of padding
+     is a 44 px target and looks the same on a desktop. */
+  button { min-height: 44px; min-width: 44px; padding: 0 14px;
+           background: #171b25; color: var(--ink); border: 1px solid var(--edge);
+           border-radius: 6px; font: inherit; font-size: 12px;
+           touch-action: manipulation; }   /* kills the 300 ms double-tap delay */
+  button[aria-pressed=true] { background: #26304a; border-color: #4a5c80; color: #fff; }
+  #wrap { padding: 0 12px; }
+  canvas { display: block; width: 100%; height: 260px; background: #0b0d12;
+           border: 1px solid var(--edge); border-radius: 6px; }
+  #hud, #hover { padding: 6px 12px; color: var(--dim); font-size: 11px;
+                 overflow-wrap: anywhere; }
+  .filler { padding: 12px; color: var(--dim); font-size: 11px; }
+  .filler p { margin: 0 0 14px; max-width: 60ch; }
+</style>
+
+<header>
+  <h1>timeline/strip.mjs — touch bench</h1>
+  <div class="sub">one-finger drag = pan · pinch = zoom about the midpoint · tap = seek + inspect</div>
+</header>
+<div class="bar">
+  <button id="play">play</button>
+  <button id="zin">zoom +</button>
+  <button id="zout">zoom −</button>
+  <button id="fit">fit</button>
+  <button id="follow" aria-pressed="true">follow</button>
+</div>
+<div id="wrap"><canvas id="strip"></canvas></div>
+<div id="hud">—</div>
+<div id="hover"></div>
+<div class="filler" id="filler"></div>
+
+<script type="module">
+// The bench exists because the shared component's two real clients (proto/paths,
+// proto/remixer/compose) are owned by other machines: the touch behaviour has to
+// be verifiable against the COMPONENT, on a page that also has real vertical
+// page scroll to fight over. Deterministic synthetic deck, zero network.
+import { createDeck } from '/timeline/transport.mjs';
+import { createStrip } from '/timeline/strip.mjs';
+
+const errors = window.__mobileErrors = [];
+addEventListener('error', (e) => errors.push(String(e.message).slice(0, 160)));
+addEventListener('unhandledrejection', (e) => errors.push('rejection: ' + String(e.reason).slice(0, 160)));
+
+// deterministic trace: a tick lane, a span lane and a continuous lane
+const items = [];
+let seed = 12345;
+const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+for (let i = 0; i < 90; i++) items.push({ at: i * 100, kind: 'cue', id: 'c' + i, payload: { n: i } });
+for (let i = 0; i < 14; i++) {
+  const a = 200 + i * 620;
+  items.push({ at: a, kind: 'span', id: 's' + i, payload: { lane: 'L' + (i % 4), phase: 'enter' } });
+  items.push({ at: a + 380, kind: 'span', id: 's' + i + 'e', payload: { lane: 'L' + (i % 4), phase: 'exit' } });
+}
+for (let i = 0; i < 600; i++) items.push({ at: i * 15, kind: 'ptr', id: 'p' + i, payload: { value: Math.sin(i / 40) * 50 + 50 + rnd() * 4 } });
+items.sort((a, b) => a.at - b.at);
+
+const seen = { ptr: null };
+const deck = createDeck({ items, adapters: {
+  ptr: { caps: { continuous: true, interpolate: 'linear' }, actuate: (p) => { seen.ptr = p; } },
+} });
+window.__deck = deck;
+
+const strip = createStrip(document.getElementById('strip'), deck, {
+  gutter: 92, hud: document.getElementById('hud'),
+  lanes: [
+    { id: 'ptr', kind: 'ptr', label: 'pointer', height: 90, as: 'continuous', value: (p) => p.value, dots: false },
+    { id: 'span', kind: 'span', label: 'spans', height: 84, as: 'spans', byKey: true },
+    { id: 'cue', kind: 'cue', label: 'cues', height: 40, as: 'ticks', latch: true },
+  ],
+  onHover: (h) => { document.getElementById('hover').textContent = h && h.text ? h.text.replace(/\n/g, ' · ') : ''; },
+  onFollowChange: (on, dis) => { document.getElementById('follow').setAttribute('aria-pressed', String(on && !dis)); },
+});
+window.__strip = strip;
+
+const $ = (id) => document.getElementById(id);
+$('play').onclick = () => { deck.playing && deck.playing() ? deck.pause() : deck.play(); $('play').textContent = deck.playing && deck.playing() ? 'pause' : 'play'; };
+$('zin').onclick = () => strip.zoomIn();
+$('zout').onclick = () => strip.zoomOut();
+$('fit').onclick = () => strip.fit();
+$('follow').onclick = () => strip.setFollow(!strip.follow().on);
+
+// real page content, so "the page keeps vertical scroll" is a claim with
+// something to scroll
+const f = $('filler');
+for (let i = 0; i < 8; i++) {
+  const p = document.createElement('p');
+  p.textContent = `${i}. touch-action: pan-y on the canvas is the entire contract — the browser keeps the vertical gesture and the strip keeps the horizontal one and the pinch. Nothing in the component calls preventDefault on a touch stream.`;
+  f.appendChild(p);
+}
+</script>
