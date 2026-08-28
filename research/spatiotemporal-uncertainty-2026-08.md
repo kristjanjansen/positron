@@ -983,3 +983,102 @@ Five rules the adapter follows:
 - **`when` on spans.** `Span {at, dur}` does not exist in code (planned at
   `plan-timeline.md:142-144`); a smeared *duration* is a genuinely harder object
   than a smeared instant and should not be designed before the span type is real.
+
+## §9 — Supplement: late findings (a stalled sub-agent's work, recovered)
+
+Arrived after §8 was written. Nothing here overturns §8; three items sharpen it,
+and one is the single most actionable finding in the whole survey.
+
+### 9.1 THE render decision is settled by a controlled study — task decides the mark
+📄 Gschwandtner, Bögl, Federico & Miksch, *"Visual Encodings of Temporal
+Uncertainty: A Comparative User Study"*, IEEE TVCG 22(1):539–548, 2016
+(DOI 10.1109/TVCG.2015.2467752). Compared gradient plots, violin plots,
+accumulated-probability plots, error bars, centred error bars and ambiguation:
+> *"We recommend using **ambiguation — using a lighter color value to represent
+> uncertain regions — or error bars for judging durations and temporal bounds**,
+> and **gradient plots — using fading color or transparency — for judging
+> probability values."*
+⇒ **"When did it happen / how long?" → two-tone ambiguation. "How likely at
+time t?" → gradient/density.** §8.4's flat band is the correct default for our
+primary task; a curve is for a different question, not a better answer to the
+same one. rcarbon ships exactly ambiguation (`col` inside the credible mass,
+`col2` outside).
+
+### 9.2 Four points, and four independent traditions converged on them
+CIDOC-CRM **P81 ongoing throughout (inner/CERTAIN) + P82 at some time within
+(outer/POSSIBLE)** 📄; OpenAtlas stores `begin_from/begin_to/end_from/end_to` 📄;
+PlanningLines encodes `[[ESS,LSS],[EFS,LFS],[MinDu,MaxDu]]` as nested bars with
+caps 📄 (Aigner et al., IV'05 — *users make fewer mistakes and are faster* than
+with a traditional encoding); TimeViz Fig 3.27 names the same four quantities.
+**Every renderer surveyed keeps only two and loses the "certainly" query
+permanently** — including PeriodO, whose own model has four (its `getEndpoints`
+returns `[earliestYear(start), latestYear(stop)]`, the outer hull). ⇒ our
+`when` sibling's `innerFrom`/`innerTo` are not optional decoration: without them
+"certainly in 1965" is unanswerable, because `Y @> possible` under-reports.
+
+### 9.3 The theory has names for our two knobs
+📄 Dyreson & Snodgrass, *"Supporting Valid-Time Indeterminacy"*, ACM TODS
+23(1):1–57, 1998. Representation = lower support + upper support + a p.m.f.
+between them; queries carry **correlation credibility** (what to do with
+indeterminacy in the DATA: keep / expected / max / min) and **ordering
+plausibility** (how strict the relation test is: 100 = definite answer,
+1 = possible answer), yielding nested Definite ⊂ Probable ⊂ Possible result
+sets — with **linear** evaluation cost, unlike general probabilistic DBs.
+⇒ §8's `{certainty: 'possible'|'necessary'}` is ordering plausibility at its two
+endpoints; `rule` at ingest is correlation credibility fixed once. Both knobs
+are 28 years old and named.
+
+### 9.4 Verified database facts (✅ run against postgres:16-alpine)
+- **Omitted bound ≠ `infinity` bound**: `upper_inf('[2020-01-01,)')` = t but
+  `upper_inf('[2020-01-01,infinity)')` = f, and the omitted form *contains*
+  `'infinity'::timestamptz` while the explicit form does not. ⇒ use the omitted
+  bound for EDTF's *unknown* end, reserve `infinity` for *explicitly ongoing* —
+  the `..`-vs-empty distinction §6 flags as universally lost, with a storage
+  representation that actually preserves it.
+- **Multiranges merge ADJACENT members silently**: `'{[1,3),[3,5)}'` becomes
+  `'{[1,5)}'`. ⇒ a multirange **cannot** represent EDTF's `[1667,1668,1670..1672]`
+  ("one of these years, definitely not the others"). Use one row per candidate
+  with a group id. (Deferred in §8.6, but this is *why*.)
+- Allen ↔ PG operators, verified: `&&` covers everything except `< > m mi`;
+  `<<` covers `<` AND `m` (`[1,5) << [5,9)` = t); `-|-` is `m`/`mi`; **no single
+  operator is `meets` alone**. SQL:2011 publishes the same mapping (`PRECEDES` ≡
+  before OR meets) — Kulkarni & Michels, SIGMOD Record 41(3), 2012, which also
+  confirms SQL:2011 has **no slot for uncertainty at all**: period endpoints are
+  ordinary DATE columns, and the standard's own future-work list never mentions
+  it. Bitemporality is not a substitute — it records *when we believed*, never
+  *how sure we are when it happened*.
+
+### 9.5 Aggregation at pixel-column resolution (fixes §8.4's broken lane sum)
+📄 M4 (Jugel et al., PVLDB 7(10), 2014, VLDB best paper): group into exactly `w`
+spans, one per **pixel column**, and it is *proven* that per-column min/max of
+value and time is required for an error-free line rendering; `w` is bounded by
+the display, not by `n`. The uncertain-interval analogue is the **aoristic bin**:
+one bin per pixel column, mass `1/(b−a)` per item (Ratcliffe 1998/2000; Ashby &
+Bowers 2013 for the cleanest OA definition), **divided by the number of
+overlapping periods** so coarsely-dated items don't dominate (aoristAAR's
+`period_correction`; PeriodO's 4-px histogram counts coverage, not mass, and has
+exactly this bias). Pair the curve with a rug of individuals — rcarbon's
+`barCodes()`, TimeDensityPlots' bar-panel-plus-silhouette.
+
+### 9.6 Deep time: regime-swapping, not a log axis (✅ read from ChronoZoom source)
+`Settings.maxPermitedTimeRange = {left: -13700000000, right: 0}` — a **signed
+float in YEARS**, not ms — with `deeperZoomConstraints` capping zoom depth
+*per era* (you cannot zoom to a day inside the Hadean), and `timescale.js`
+picking one of three tick sources (`cosmos` / `calendar` / `date`) by
+`log10(viewport span)`: **the log selects the tick source, it does not warp the
+axis.** Alvarez rejected a log axis outright. Corroboration: d3 ships no
+logarithmic time scale at all; TimelineJS bolts on a parallel `cosmological`
+big-number path and drops sub-year precision on it, because JS `Date` walls at
+±271821 BCE. ⇒ **never use a JS Date as the internal coordinate** (we already
+don't — epoch µs numbers — but a heritage deck spanning 13.8 Gyr needs the same
+signed-offset + per-era-cap treatment, and PeriodO's 1-px clamp for sub-pixel
+marks).
+
+### 9.7 The gap, stated plainly
+No JS timeline library surveyed has a field for uncertainty (vis-timeline,
+TimelineJS3, d3-timeline, patternfly, visavail, Histropedia). The one tool that
+*models* period disagreement discards half its model at render. The one
+authoring tool that *knew* it should encode uncertainty put it in Future Work
+("we opted for simplicity over expressiveness") and shipped without it. The
+archaeology R packages get the statistics right and render static PNGs in base R.
+**Nobody has shipped an interactive, zoomable, uncertainty-native timeline.**
