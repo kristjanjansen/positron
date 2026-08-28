@@ -148,6 +148,49 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### STORE LAYER (session 6x) — ✅ 39/39 (`node timeline/lab/prop-store.mjs`)
+New files only (`timeline/store.mjs` + lab); the transport wiring is a SKETCH in
+NOTES-store.md §6, not applied (siblings own transport.mjs).
+- **The interface is two lines** because v0.4 made the cursor the only
+  positional reader: `rows.length` + `rows[k]` with a non-decreasing key.
+  `open()` is async; **every read after it is synchronous** (a lookahead tick
+  cannot await), so the async half lives entirely in `ensure(fromPos, toPos)`
+  driven by the horizon the scheduler already computes — **prefetch is the
+  existing lookahead extended one level down**.
+- **Miss policy: FIRE LATE with a drift record** (`origin:'store-miss'`).
+  Rejected *stall* (there is no stall that isn't a pause(), and a store must
+  not move the transport behind the client's back) and *skip* (it holes the
+  prefix, making a non-commutative reducer silently wrong — SEAM 5 broken
+  invisibly). Fire-late wins because **it is not a new failure mode**:
+  lateGrace + per-kind catchUp already decide what happens. Mechanism: a
+  **ghost row** whose key is interpolated inside its page's known bounds, so
+  it stays monotone and the bisect still converges. Measurement forced two
+  fixes: `ensure()` must PIN its window (background repairs from a cold bisect
+  were evicting it — 200/200 seeks failed before pinning) and repairs cap at 2.
+- Backends: **memory** identical to `createCursor(array)` over 6400 probes incl.
+  the same cursor trajectory · **jsonl** 1M rows: **cmp/call 2.38 at 10k AND at
+  1M**, resident **32,768 rows (3.28 %) ≈ 3.8 MB at any size**, 200/200 exact
+  seek-anywhere, plus a **stale-index guard** (the sidecar is byte-bound to its
+  log and throws rather than Range-ing into a redacted line) · **do** reads the
+  real kept session **392/392 rows field-for-field, order preserved** — and
+  `from` is a ROW OFFSET because C4 said SQLite rows not a JSON blob: **the
+  amendment paid off two layers away**.
+- Bench at 1M rows: array 143.8 ms open / 114.5 MB heap vs **jsonl 2.5 ms open
+  / 3.8 MB heap, flat in n**; warm advance 1–2 µs; the entire price is one cold
+  seek at 6–10 ms (one Range round-trip) — which is exactly why the policy is
+  late, not stall. Page = 4096 ROWS ⇒ sidecar **22.7 KB for a 69.7 MB log**.
+- **Append-live: 3 appends under a moving playhead land in order,
+  `cursorResets === 0`** — true by construction (the tail is append-only past
+  `indexed`, so no index the cursor holds can move). Out-of-order appends are
+  inserted sorted AND reported, mirroring the DO's per-source rule.
+- **Biggest remaining gap for ERR: cross-year QUERIES, not seeks.** "What is at
+  t" over one ordered log is solved; "every event of kind X across forty years"
+  touches every page. Cheap first fix: physically partition by (kind, year) at
+  ingest (also removes storeLane's O(n) map); the index needs a second level
+  (root manifest → per-year sidecar — `proto/selfrec`'s manifest tree already
+  IS this shape); and doStore's 359 ms open is five sequential boundary probes
+  that a ~15-line `GET /session/<id>/index` would collapse to one.
+
 ### CONTINUOUS KINDS FIRST-CLASS (session 6w) — transport v0.4, all six seams closed
 | seam | API |
 |---|---|
