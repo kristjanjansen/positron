@@ -388,3 +388,151 @@ Catmull-Rom mean 0.036 px, per-lane ink identical). In that run the library
 served **4 847 `sampleAt` calls at 2.05 comparisons each** (4 577 cursor hits,
 199 linear advances, 5 binary searches) — the number the O(n) `reduceAt` would
 have turned into a per-frame rescan.
+
+---
+
+## Checkpoint 8 — v0.5: THE EVIDENCE FIREWALL (2026-08-28)
+
+v0.4 made a continuous kind interpolate. plan-timeline §5b names what that IS:
+interpolation is **tier 1 of a restoration spectrum** — interpolation (bounded by
+evidence on both sides) → inpainting (context + priors) → generative infill
+(detail never captured) — *one mechanism at three declared tiers*. A library that
+serves tier-1 material without saying so is lying by omission, and it was: every
+`sampleAt` in v0.4 invented a value and returned it looking exactly like a row
+from the log.
+
+### The API
+
+| line | what it is |
+|---|---|
+| `createDeck({evidence})` / `deck.setEvidence(p)` | **the** explicit choice: `'attested'` \| `{restored:{maxTier:n}}` \| `'all'` |
+| `deck.sampleAt(kind, pos, {evidence})` | under `attested`: the last **attested** sample + a report, never an interpolated one |
+| `deck.reduceAt(kind, pos, {evidence})` | §5b's `reduce()`; under a restricting policy `info.next` is **withheld**, so an interpolating reducer degrades to its own hold |
+| `deck.window(kind \| [kinds] \| undefined, from, to, {evidence})` | §5b's `window()`; merges lanes in `(at, seq)` order, **excludes** over-tier lanes |
+| `deck.bracket(kind, pos, {evidence})` | the raw pair; a derived lane over the cap answers `null` |
+| `deck.registerReconstructor(name, {from, into, tier, method, plan, derive, confidence, hz})` | → `{run(), drop(), rows(), stats()}` |
+| `deck.provenanceOf(kind?)` | per-lane rollup `{attested, restored, tier, source, method, confidence:{mean,min,max}}` |
+| `deck.evidenceAccounting(kind \| [kinds])` | `{attested, restored, total, inventedFraction, byTier, lanes}` — the invented-% a tratteggio UI displays, computed by the library |
+| `deck.request(kind, {evidence})` | ask the firewall itself; answers in the C6 shape |
+| `deck.degradations(kind)` | now also the **honesty ledger**: `attested-hold`, `attested-fold`, `excluded` |
+| `deck.stats()` | gains `attested` / `derived` beside `total` |
+| `normalizeEvidence(p)` | exported; the one parser, so a policy is never a bare boolean |
+
+### THE FORCED-CHOICE RULE (and why this one)
+
+    1. the per-call {evidence} wins;
+    2. else the deck policy the client set EXPLICITLY at createDeck({evidence});
+    3. else THROW  (Error.code === 'EVIDENCE_POLICY_REQUIRED')
+       — unless the answer is provably identical under all three policies.
+
+The brief allowed either "throw" or "resolve to an explicit deck policy". **Both,
+composed**: the deck policy is the forced choice and the throw is its
+enforcement. A client makes the declaration once, where it belongs (this is a
+property of the *session*, not of the 4 615 reads a render loop makes), and a
+client that never made it is told so at the call site that would have invented
+something, in a message naming the three legal forms.
+
+The exemption in step 3 is `policyMatters(kinds, op)` and it is **a proof, not a
+default**: a discrete kind's `sampleAt`, a `bracket` or a `window` over an
+attested lane return the same rows under `attested`, `restored(n)` and `all`, so
+an omission there cannot mix anything. What is *not* exempt: any derived lane,
+and any `sampleAt`/`reduce` on a kind whose adapter **declares `caps.tier ≥ 1`**.
+
+Why `caps.tier` and not `caps.continuous` is the trigger: `tier` is the adapter's
+own statement that what it returns *between* samples is restoration on §5b's
+spectrum. `continuous` says only that state exists between samples. Gating on
+`continuous` would have retro-classified four shipped clients' semantics from
+here — proto/automation's `cc` lane holds a level between two CC messages because
+**MIDI says so**, not because the library dreamed it. An adapter that
+interpolates but declares no tier now gets a line in the ledger at
+`registerAdapter` (*"its between-sample values are unqualified restoration and
+the evidence firewall cannot gate them"*) — recorded, not fatal, and not guessed
+at on its behalf.
+
+One deliberate asymmetry: the **query** API throws; the library's own internal
+folds (the seek and catch-up paths, which run inside a transport listener) use
+`softEvidence()` and *record* an unqualified fold instead. Throwing there would
+blow up a click handler instead of the query that deserves it.
+
+### The provenance schema, and lane purity
+
+A derived row carries, frozen, injected by the library **after** the payload
+(§2's law):
+
+```js
+provenance: { source: 'reconstructor-<name>', method, confidence /* [0,1] */,
+              tier: 1|2|3, refs: [attested ids…], from: '<evidence kind>' }
+```
+
+An attested row carries **no `provenance` key at all**. Absence is the
+definition — not a flag, not `provenance: null`, nothing to forget to set and
+nothing a payload can spoof.
+
+**LANE PURITY** is the invariant that makes the rest cheap and provable: a lane
+is attested or derived, **never both**. `scheduleEvent` throws in both
+directions (a reconstructor writing into its evidence lane; an attested row
+appended to a restoration). Consequences:
+* a lane's tier is the *lane's*, so the firewall is O(1) per query, not a
+  per-row scan;
+* **the master trace is append-only and is never rewritten** — a restoration
+  cannot be interleaved into it, so "deleting a restoration = dropping its lane"
+  is not a policy, it is the only thing dropping *can* mean;
+* reversibility is therefore checkable rather than asserted, and suite 6 checks
+  it: after `drop()` the master's rows are the same objects in the same order,
+  and `JSON.stringify(deck.eventsOf('p'))` is byte-identical to the snapshot
+  taken before the reconstructor existed.
+
+### Reconstructors: tier 1 real, tiers 2/3 unimplemented BY DESIGN
+
+`registerReconstructor` is §5b's "a reconstructor is an adapter that reads
+evidence lanes and appends derived events". The client supplies only what is
+genuinely its own: **`plan`** (*where* to invent, between an attested pair) and
+optionally **`derive`** (*what*). The default `derive` is **the interpolator
+`sampleAt` already is**, asked with `{evidence:'all'}` — the one caller whose
+whole job is to invent. What makes that honest is not refusing to do it; it is
+that every row it emits says so.
+
+Tier ≥ 2 **must bring its own `derive()`** or registration throws: *"the library
+implements tier 1 only, BY DESIGN. Tiers 2 and 3 are the same SEAM, not the same
+code."* That refusal is itself asserted in suite 6 — a RIFE/FILM frame
+interpolator or an audio-inpainting model plugs in here, and the library hosts
+and disciplines it without ever baking one in.
+
+Default confidence for tier 1 is an honesty curve, not a constant: `1 −
+2·min(u, 1−u)·min(1, dtMs/250)` — 1.0 at an attested endpoint, falling toward
+the middle of the gap and falling faster the wider the gap.
+
+### prop-test: suite 6, green at 30 AND 100 seeds
+
+`node timeline/lab/prop-test.mjs --seeds 100` → **0 violations**, all six suites.
+
+| arm | what it asserts | measured |
+|---|---|---|
+| `ev-attested` | every value `attested` returns is a row **in the log** (matched against the attested timestamps), and its px error against an analytic Lissajous is the zero-order one | **21.871 px attested vs 0.0232 px restored** — bit-identical to suite 5a's `hold`, which is the proof that `attested` *is* the hold |
+| `ev-attested` | the hold is a **reported** degradation in the C6 shape (`wanted:'attested'`, `chose:'attested-hold'`) | reason names the tier and the row it fell back to |
+| `ev-attested` | `reduce()` obeys the same firewall — `hold` under `attested`, `catmull-rom` under `restored(≤1)` | |
+| `ev-forced` | omitting the policy **throws** `EVIDENCE_POLICY_REQUIRED` on `sampleAt`/`reduce` of a tier-declaring kind; a per-call policy or an explicit deck policy satisfies it; a bogus policy is refused in words | |
+| `ev-forced` | and does **not** throw where the answer cannot differ: a discrete `sampleAt`, `bracket`/`window` over an attested lane | |
+| `ev-recon` | a reconstructor appends its own lane; **the master trace does not change by one byte**; every derived row carries the full schema and its `refs` name real attested ids | |
+| `ev-recon` | `evidenceAccounting` splits attested/restored and its `inventedFraction` matches | |
+| `ev-tier` | a **tier-2** lane is EXCLUDED at `maxTier:1` (with a reason naming tier and cap) and served in full at `maxTier:2`; a 3-lane window keeps tier 1 and drops tier 2 in one query | |
+| `ev-tier` | a tier-3 registration with no `derive()` is refused; `into === from` is refused; **both** lane-purity violations are refused | |
+| `ev-drop` | **REVERSIBILITY**: after dropping both derived lanes the master trace and its scheduler audit are **bit-identical** to the pre-reconstructor snapshot, `stats().derived === 0`, and a re-run reproduces the identical lane | 1 674 rows dropped |
+
+Suites 1–5 unchanged and green. The only edits they needed: `caps.tier: 1` on the
+test pointer adapter (the §5b declaration that arms the firewall) and
+`evidence: {restored:{maxTier:1}}` on the two continuous decks — which is exactly
+the forced choice being forced.
+
+### The client proof, and the cost
+
+proto/paths (`proto/paths/NOTES.md` §7) re-verified **14/14** with the numbers
+that matter unmoved: seek ×3 **0.042 / 0.032 / 0.042 px**, deviation **24.19 /
+0.679 / 0.0357 px**, and its "93.4 % of this path is invented" figure now
+computed by `deck.evidenceAccounting()` (**837 restored / 896 total**) instead of
+by client arithmetic over a private flattener array. Its evidence-only toggle is
+`deck.setEvidence('attested')`: both reconstruction lanes go to **0 px of ink**
+because the library refuses to serve them, not because the page stopped drawing
+them.
+
+No-regression: `proto/remixer/compose-run.mjs` **20/20**, 0 console errors.

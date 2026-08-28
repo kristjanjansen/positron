@@ -67,6 +67,39 @@
 // cadence belongs to the client; observePosition() already serves anyone who
 // wants a 60 Hz pull, and a library-owned rAF would be a second timer inside a
 // library whose first law is that the vector has no timers.
+//
+// v0.5 — THE EVIDENCE FIREWALL (plan-timeline §5b). v0.4 made a continuous kind
+// interpolate; §5b names what that IS: interpolation is the first tier of a
+// restoration spectrum (1 interpolation → 2 inpainting → 3 generative infill),
+// ONE mechanism at three declared tiers, and a system that serves restored
+// material without saying so is lying by omission. Four things close it:
+//   E1. PROVENANCE IS A FIELD, not a convention. A derived row carries
+//       {source: 'reconstructor-<name>', method, confidence, tier, refs, from};
+//       an ATTESTED row carries none of it, and `row.provenance === undefined`
+//       is therefore the definition of attested — distinguishable by
+//       construction, not by a flag someone can forget to set.
+//   E2. LANE PURITY + APPEND-ONLY. A reconstructor APPENDS a derived lane; it
+//       may never write into its evidence lane, and an attested row may never
+//       be appended to a derived lane (scheduleEvent throws both ways). The
+//       master trace is never rewritten, so DELETING A RESTORATION IS DROPPING
+//       ITS LANE — reversibility for free, and provable: the master's rows are
+//       the same objects in the same order before, during and after.
+//   E3. THE POLICY IS FORCED, NOT DEFAULTED. sampleAt / reduceAt / window /
+//       bracket take {evidence}: 'attested' | {restored:{maxTier:n}} | 'all'.
+//       Resolution is per-call → explicit deck policy (createDeck({evidence}))
+//       → THROW. There is no silent default; the only omission that is answered
+//       is one whose answer is provably identical under all three policies
+//       (policyMatters() below), which is not a default but a proof.
+//   E4. degradations() IS THE HONESTY LEDGER. Asking `attested` of a kind that
+//       can only answer by inventing returns the last ATTESTED sample plus a
+//       {wanted, chose, degraded, reason} report — the same shape C6 already
+//       used — and asking for a tier the deck does not hold, or querying a lane
+//       whose tier exceeds the policy, is reported the same way. A lane over
+//       the cap is EXCLUDED, never quietly down-mixed.
+// Tier 1 ships as a real reconstructor (registerReconstructor: the interpolator
+// sampleAt already is, appended as rows). Tiers 2 and 3 are UNIMPLEMENTED BY
+// DESIGN — they are the same seam, not the same code: a tier ≥ 2 registration
+// must bring its own derive(), and the library refuses to guess one.
 
 // ---------------------------------------------------------------------------
 // Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
@@ -362,6 +395,36 @@ function nearestRate(wanted, allowed) {
 }
 
 // ---------------------------------------------------------------------------
+// THE EVIDENCE POLICY (v0.5, plan-timeline §5b). Three declared forms, one
+// canonical shape {mode, maxTier, label}:
+//
+//   'attested'                 nothing invented. maxTier 0 — and note that this
+//                              EXCLUDES interpolation, which is tier-1
+//                              restoration however cheap it looks.
+//   {restored:{maxTier: n}}    restoration up to tier n:
+//                              1 interpolation (bounded by evidence both sides)
+//                              2 inpainting     (context + priors)
+//                              3 generative     (detail never captured)
+//   'all'                      every tier, and unqualified interpolation too.
+//
+// There is deliberately NO fourth form and no boolean shorthand: a policy that
+// can be written `true` is a policy nobody reads.
+// ---------------------------------------------------------------------------
+
+export function normalizeEvidence(p, where = 'evidence') {
+  if (p === undefined || p === null) return null;
+  if (p === 'attested') return { mode: 'attested', maxTier: 0, label: 'attested' };
+  if (p === 'all') return { mode: 'all', maxTier: Infinity, label: 'all' };
+  if (typeof p === 'object' && p.restored) {
+    const n = Number(p.restored.maxTier);
+    if (!Number.isFinite(n) || n < 0)
+      throw new Error(`${where}: {restored:{maxTier}} needs a finite tier >= 0, got ${JSON.stringify(p.restored.maxTier)}`);
+    return { mode: 'restored', maxTier: n, label: `restored(tier<=${n})` };
+  }
+  throw new Error(`${where}: unknown policy ${JSON.stringify(p)} — use 'attested' | {restored:{maxTier:n}} | 'all'`);
+}
+
+// ---------------------------------------------------------------------------
 // Wall-lane scheduler: lookahead loop, committed-vs-pending, per-kind catch-up
 // policies, first-class drift log, ADAPTER REGISTRY. Port of the timed-messages
 // crossing engine generalized per plan-timeline §1.
@@ -393,12 +456,17 @@ export function createScheduler(transport, {
   hostKind,            // 'worker' | 'main' | 'raf' — explicit opt-in shorthand
   host = tickHostByKind(hostKind),   // SEAM 3: worker by default (lab VERDICT)
   driftLimit = 20000,  // retained drift rows when nobody drains (SEAM 6)
+  evidence,            // E3: the deck-level evidence policy, explicitly chosen
 } = {}) {
   const clock = transport.clock;
   const events = [];            // sorted by (at, seq); wrappers own status, log stays immutable
   const byKind = new Map();     // kind -> the SAME wrappers, sorted, one lane per kind (C1)
   const cursors = new Map();    // kind -> createCursor over that lane
   const degraded = new Map();   // kind -> {kind, count, reports[]}  (C6)
+  const laneProv = new Map();   // kind -> {kind, attested, derived, tier, …}  (E1/E2)
+  const reconstructors = new Map();  // name -> handle  (E's tier-1 seam)
+  let derivedTotal = 0;
+  let evPolicy = normalizeEvidence(evidence, 'createDeck({evidence})');  // null = never chosen
   let seq = 0, gen = 0, firstLive = 0, running = false;
   let sampleCalls = 0, bracketCalls = 0;
   const policies = new Map();   // kind -> 'burst' | 'drop' | 'reduce' | {reduce(batch, info)}
@@ -430,6 +498,17 @@ export function createScheduler(transport, {
     let lo = 0, hi = lane.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (lane[m].at <= pos) lo = m + 1; else hi = m; }
     return lo;
+  }
+  /** first index of `lane` with at >= pos (window's left boundary) */
+  function fromIdx(lane, pos) {
+    let lo = 0, hi = lane.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (lane[m].at < pos) lo = m + 1; else hi = m; }
+    return lo;
+  }
+  function provFor(kind) {
+    let lp = laneProv.get(kind);
+    if (!lp) laneProv.set(kind, lp = { kind, attested: 0, derived: 0, tier: 0, source: null, method: null, confN: 0, confSum: 0, confMin: null, confMax: null });
+    return lp;
   }
 
   /** C6: every honest degradation, recorded rather than swallowed. Consecutive
@@ -501,7 +580,57 @@ export function createScheduler(transport, {
     for (const cb of fireCbs) cb(pub, rec);
     busyMs += clock.now() - t0;
   }
-  const publicEv = (ev) => ({ id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload });
+  /** E1: an ATTESTED row has no `provenance` key AT ALL. That absence is the
+   *  definition of attested — not a flag, not `provenance: null`, nothing to
+   *  forget to set and nothing a payload can spoof (the key is injected by the
+   *  library, after the payload, and only when the row really is derived). */
+  const publicEv = (ev) => (ev.prov
+    ? { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload, provenance: ev.prov }
+    : { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload });
+
+  /** E1/E2. The ONE place a row enters the log — and therefore the one place
+   *  LANE PURITY is enforced: a lane is attested or derived, never both. That
+   *  single invariant is what makes the firewall O(1) (a lane's tier is the
+   *  lane's, not a per-row scan) and what makes §5b's reversibility claim
+   *  *provable* rather than asserted: a restoration lives in its own lane, so
+   *  deleting it is dropping that lane, and the master trace's rows are the same
+   *  objects in the same order before, during and after. */
+  function scheduleEvent({ at, kind = 'default', id, payload, provenance }) {
+    const lp = provFor(kind);
+    let prov = null;
+    if (provenance) {
+      if (lp.attested)
+        throw new Error(`lane purity: kind '${kind}' holds ${lp.attested} ATTESTED rows — a reconstructor APPENDS its own lane (§5b) and never writes into the master trace`);
+      if (!provenance.source || !(Number(provenance.tier) >= 1))
+        throw new Error(`provenance needs {source:'reconstructor-<name>', tier:1|2|3} — got ${JSON.stringify(provenance)}`);
+      prov = Object.freeze({
+        source: provenance.source,
+        method: provenance.method ?? null,
+        confidence: provenance.confidence === undefined ? null : provenance.confidence,
+        tier: Number(provenance.tier),
+        refs: Object.freeze([...(provenance.refs || [])]),
+        from: provenance.from ?? null,
+      });
+    } else if (lp.derived) {
+      throw new Error(`lane purity: kind '${kind}' is a DERIVED lane (${lp.source}); an attested row may not be appended to a restoration`);
+    }
+    const ev = { at, kind, id: id ?? `e${seq}`, seq: seq++, payload, prov, status: 'pending', fires: 0, cancel: null };
+    events.splice(insertIdx(at, ev.seq), 0, ev);
+    const lane = laneOf(kind);
+    lane.splice(insertInto(lane, at, ev.seq), 0, ev);   // C1: the per-kind lane the cursor rides
+    if (prov) {
+      lp.derived++; derivedTotal++;
+      lp.tier = Math.max(lp.tier, prov.tier);
+      lp.source = prov.source; lp.method = prov.method;
+      if (typeof prov.confidence === 'number') {
+        lp.confN++; lp.confSum += prov.confidence;
+        lp.confMin = lp.confMin === null ? prov.confidence : Math.min(lp.confMin, prov.confidence);
+        lp.confMax = lp.confMax === null ? prov.confidence : Math.max(lp.confMax, prov.confidence);
+      }
+    } else lp.attested++;
+    if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
+    return ev.id;
+  }
 
   function cancelCommitted() {
     gen++;
@@ -622,12 +751,19 @@ export function createScheduler(transport, {
     const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
     const prefix = prefixEvents(kind, pos).map(publicEv);
     const since = prefix.filter((e) => e.at > snap.pos);
-    const nexts = successorEvents(kind, pos, 1 + (((ad && ad.caps) || {}).neighbourhood || 0));
+    // E3: the internal fold obeys the deck policy too, and WITHHOLDS the
+    // successor when the policy forbids restoration — which is what makes an
+    // interpolating reducer degrade to a hold without knowing the firewall
+    // exists (C4 read backwards: no successor, no interpolation).
+    const ev = softEvidence(kind, 'reduce');
+    const restrict = evRestrictsFold(kind, ev);
+    const nexts = restrict ? [] : successorEvents(kind, pos, 1 + (((ad && ad.caps) || {}).neighbourhood || 0));
     const info = {
       kind, pos, reason, nowUs: Math.round(now * 1000),
       count: missed ? missed.length : prefix.length,
       missed: missed || [], prefix, since, from: { pos: snap.pos, state: snap.state },
       next: nexts[0] || null, nexts,          // C4
+      evidence: ev, attestedOnly: restrict,   // E3
     };
     const t = clock.now();
     if (ad && typeof ad.reduce === 'function') {
@@ -651,6 +787,92 @@ export function createScheduler(transport, {
       if (ad.caps && ad.caps.assertOnSeek === false && !kind) continue;
       applyReduce(k, [], pos, clock.now(), kind ? 'assert' : 'seek');
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // E3/E4 — THE EVIDENCE FIREWALL. Everything below this line is the resolution
+  // of one question asked before every positional read: *is the caller willing
+  // to be told something that was invented?*
+  //
+  // THE FORCED-CHOICE RULE, in three steps:
+  //   1. the per-call {evidence} wins;
+  //   2. else the deck policy the client set EXPLICITLY at createDeck({evidence})
+  //      (or deck.setEvidence()) applies;
+  //   3. else the call THROWS (code: EVIDENCE_POLICY_REQUIRED) — unless the
+  //      answer is provably identical under all three policies, which is what
+  //      policyMatters() decides. That exemption is not a default: it is a proof
+  //      that the omission cannot mix anything. A discrete kind's sampleAt, a
+  //      bracket over an attested lane and a window over one are all in it; a
+  //      continuous kind that DECLARES caps.tier >= 1, and any derived lane, are
+  //      not, and must choose.
+  //
+  // Why an adapter's `caps.tier` is the trigger and not `caps.continuous`: tier
+  // is the adapter's own statement that what it returns BETWEEN samples is
+  // restoration on §5b's spectrum. An adapter that has not made that statement
+  // has not entered the spectrum, and the library will say so (registerAdapter
+  // records it) rather than retro-classify four shipped clients' semantics.
+  // -------------------------------------------------------------------------
+  const EV_UNSET = { mode: 'all', maxTier: Infinity, label: 'all', implicit: true };
+  const laneIsDerived = (k) => { const lp = laneProv.get(k); return !!(lp && lp.derived > 0); };
+  const laneTier = (k) => { const lp = laneProv.get(k); return lp ? lp.tier : 0; };
+  function adapterTier(kind) {
+    const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
+    const t = Number(caps.tier);
+    return Number.isFinite(t) && t >= 1 && (caps.continuous === true || typeof (ad || {}).interpolate === 'function') ? t : 0;
+  }
+
+  /** Can the answer to this read DIFFER between 'attested', restored(n) and
+   *  'all'? Only then is the choice forced. */
+  function policyMatters(kinds, op) {
+    if (kinds === undefined) return derivedTotal > 0;
+    const ks = Array.isArray(kinds) ? kinds : [kinds];
+    for (const k of ks) {
+      if (laneIsDerived(k)) return true;
+      if ((op === 'sampleAt' || op === 'reduce') && adapterTier(k) >= 1) return true;
+    }
+    return false;
+  }
+
+  function resolveEvidence(kinds, op, opts) {
+    if (opts && opts.evidence !== undefined) return normalizeEvidence(opts.evidence, `${op}({evidence})`);
+    if (evPolicy) return evPolicy;
+    if (!policyMatters(kinds, op)) return EV_UNSET;
+    const e = new Error(
+      `evidence policy required: ${op}(${JSON.stringify(kinds)}) can return RESTORED material and this deck has no explicit policy. ` +
+      `Pass {evidence: 'attested' | {restored:{maxTier:n}} | 'all'} to this call, or choose once at createDeck({evidence}). ` +
+      `(plan-timeline §5b: the API forces the choice — there is no default that silently mixes dreamed data into an archival query.)`);
+    e.code = 'EVIDENCE_POLICY_REQUIRED'; e.op = op; e.kind = kinds;
+    throw e;
+  }
+
+  /** The same resolution for the library's OWN internal folds (the seek and
+   *  catch-up paths), which run inside a transport listener where throwing would
+   *  blow up a click handler rather than the query that deserves it. An
+   *  unqualified internal fold is RECORDED in the ledger instead. */
+  function softEvidence(kind, op) {
+    if (evPolicy) return evPolicy;
+    if (policyMatters(kind, op))
+      noteDegraded(kind, { wanted: 'an explicit evidence policy', chose: 'all', degraded: true,
+        reason: `${op}('${kind}') folded tier-${adapterTier(kind) || laneTier(kind)} restoration with no policy set — pass evidence to createDeck(); an internal fold reports rather than throws` });
+    return EV_UNSET;
+  }
+
+  /** A lane whose tier exceeds the cap is EXCLUDED, never quietly down-mixed. */
+  function evExcludes(kind, ev, pos, op) {
+    if (!laneIsDerived(kind)) return false;
+    const t = laneTier(kind);
+    if (t <= ev.maxTier) return false;
+    const lp = laneProv.get(kind);
+    noteDegraded(kind, { wanted: ev.label, chose: 'excluded', degraded: true, pos,
+      reason: `lane '${kind}' is tier-${t} restoration from ${lp.source} (${lp.method}); '${ev.label}' allows tier <= ${ev.maxTier}, so the lane is EXCLUDED — a restoration is never down-mixed into a lower tier` });
+    return true;
+  }
+
+  /** Does this policy forbid the fold from using its successor? (An interpolated
+   *  reduce is tier-N restoration exactly as sampleAt is.) */
+  function evRestrictsFold(kind, ev) {
+    const t = adapterTier(kind);
+    return t >= 1 && t > ev.maxTier;
   }
 
   // -------------------------------------------------------------------------
@@ -686,10 +908,23 @@ export function createScheduler(transport, {
   }
 
   function sampleAt(kind, pos, opts) {
+    const ev = resolveEvidence(kind, 'sampleAt', opts);
+    if (evExcludes(kind, ev, pos, 'sampleAt')) return null;
     const br = bracketAt(kind, pos, opts);
     if (!br) return null;
     const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
     const can = !!(ad && typeof ad.interpolate === 'function' && caps.continuous !== false && caps.interpolate !== false);
+    const tier = adapterTier(kind);
+    if (can && tier >= 1 && tier > ev.maxTier) {
+      // E4 — THE FIREWALL, at its sharpest. Interpolating between two attested
+      // samples IS restoration (§5b tier 1); under a policy that does not admit
+      // it the honest answer is the last ATTESTED sample, returned WITH the
+      // report rather than instead of one.
+      const report = { wanted: ev.label, chose: 'attested-hold', degraded: true, pos,
+        reason: `interpolation is tier-${tier} restoration (§5b); '${ev.label}' allows tier <= ${ev.maxTier}, so sampleAt returns the last ATTESTED sample (id ${br.ids[0]} at ${br.aAt}) rather than inventing one at ${pos}` };
+      noteDegraded(kind, report);
+      return { ...br.a, evidence: { policy: ev.label, attested: true, interpolated: false, tier: 0, at: br.aAt, id: br.ids[0], report } };
+    }
     if (!can) {
       // C6: a discrete kind sampled between two events is a zero-order HOLD —
       // the honest answer, and the degradation is reported, not implied.
@@ -746,6 +981,22 @@ export function createScheduler(transport, {
       } else if (k === 'rate') {
         const r = nearestRate(v, Array.isArray(caps.rates) && caps.rates.length ? caps.rates : null);
         chose = r.chose; deg = r.degraded; reason = r.reason;
+      } else if (k === 'evidence') {
+        // E4: ask the firewall itself. What will this kind actually serve under
+        // the policy I intend to use?
+        const want = normalizeEvidence(v, "request({evidence})") || EV_UNSET;
+        const lt = laneIsDerived(kind) ? laneTier(kind) : 0;
+        const at2 = adapterTier(kind);
+        if (lt > want.maxTier) {
+          chose = 'excluded'; deg = true;
+          reason = `lane '${kind}' is tier-${lt} restoration; '${want.label}' allows tier <= ${want.maxTier}`;
+        } else if (at2 >= 1 && at2 > want.maxTier) {
+          chose = 'attested-hold'; deg = true;
+          reason = `kind '${kind}' answers between samples by tier-${at2} restoration; under '${want.label}' it can only hold the last attested sample`;
+        } else if (want.maxTier >= 1 && lt === 0 && at2 === 0) {
+          chose = 'attested'; deg = true;
+          reason = `'${want.label}' asks for restoration, but kind '${kind}' has none to give (no derived lane, and its adapter declares no caps.tier)`;
+        } else chose = want.label;
       } else if (v === true && caps[k] !== true) {
         chose = caps[k] === undefined ? false : caps[k];
         deg = true; reason = `adapter ${kind} does not declare caps.${k}`;
@@ -794,16 +1045,11 @@ export function createScheduler(transport, {
 
   return {
     hostName: host.name,
-    /** Add an event {at, kind, id?, payload?}. During playback, an event at or
-     *  behind the playhead fires immediately (overdub law, steal #11). */
-    schedule({ at, kind = 'default', id, payload }) {
-      const ev = { at, kind, id: id ?? `e${seq}`, seq: seq++, payload, status: 'pending', fires: 0, cancel: null };
-      events.splice(insertIdx(at, ev.seq), 0, ev);
-      const lane = laneOf(kind);
-      lane.splice(insertInto(lane, at, ev.seq), 0, ev);   // C1: the per-kind lane the cursor rides
-      if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
-      return ev.id;
-    },
+    /** Add an event {at, kind, id?, payload?, provenance?}. During playback, an
+     *  event at or behind the playhead fires immediately (overdub law, steal
+     *  #11). `provenance` marks the row DERIVED (E1) and is normally supplied by
+     *  a reconstructor rather than by hand. */
+    schedule: scheduleEvent,
     /** SEAM 1: register a per-kind adapter. Returns unregister. The library
      *  filters onFire for you and derives the catch-up policy from caps. */
     registerAdapter(kind, adapter) {
@@ -820,6 +1066,12 @@ export function createScheduler(transport, {
       if (caps.followsTransport === true && typeof adapter.transport !== 'function')
         noteDegraded(kind, { wanted: 'caps.followsTransport', chose: 'ignored', degraded: true,
           reason: `adapter ${kind} declares caps.followsTransport but implements no transport(state)` });
+      // E3: an adapter that INVENTS between samples but declares no tier has not
+      // entered §5b's spectrum, so the firewall cannot police it. That is a fact
+      // about the adapter, recorded — not a reason to guess a tier for it.
+      if (caps.continuous === true && typeof adapter.interpolate === 'function' && caps.tier === undefined)
+        noteDegraded(kind, { wanted: 'an evidence classification', chose: 'unqualified', degraded: true,
+          reason: `adapter ${kind} interpolates between samples but declares no caps.tier — its between-sample values are unqualified restoration and the evidence firewall cannot gate them (§5b: declare caps.tier 1|2|3)` });
       adapters.set(kind, adapter);
       policies.set(kind, catchUp);
       return () => {
@@ -836,24 +1088,209 @@ export function createScheduler(transport, {
     /** Re-fold + re-assert reducible kinds at pos (seek does this for you). */
     assertAt,
     /** reduce(prefix <= pos) for one kind, without asserting — the expected
-     *  state a harness compares against (the C2 left-hand side). */
-    reduceAt(kind, pos) {
+     *  state a harness compares against (the C2 left-hand side). §5b's
+     *  `reduce()` with an evidence policy: under a policy that forbids
+     *  restoration the successor is WITHHELD, so an interpolating reducer
+     *  returns its own honest hold. */
+    reduceAt(kind, pos, opts) {
       const ad = adapters.get(kind);
       if (!ad || typeof ad.reduce !== 'function') return null;
+      const ev = resolveEvidence(kind, 'reduce', opts);
+      if (evExcludes(kind, ev, pos, 'reduce')) return null;
+      const restrict = evRestrictsFold(kind, ev);
+      if (restrict) noteDegraded(kind, { wanted: ev.label, chose: 'attested-fold', degraded: true, pos,
+        reason: `reduce('${kind}') under '${ev.label}' withholds info.next — the fold may use only the ATTESTED prefix, so an interpolating reducer degrades to its own hold` });
       const prefix = prefixEvents(kind, pos).map(publicEv);
       const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
-      const nexts = successorEvents(kind, pos, 1 + ((ad.caps || {}).neighbourhood || 0));
+      const nexts = restrict ? [] : successorEvents(kind, pos, 1 + ((ad.caps || {}).neighbourhood || 0));
       return ad.reduce(prefix.map((e) => e.payload), pos, {
         kind, pos, reason: 'query', count: prefix.length, nowUs: Math.round(clock.now() * 1000),
         missed: [], prefix, since: prefix.filter((e) => e.at > snap.pos), from: { pos: snap.pos, state: snap.state },
         next: nexts[0] || null, nexts,          // C4
+        evidence: ev, attestedOnly: restrict,   // E3
       });
+    },
+    /** §5b's `window()`: the ordered rows in [from, to] for one kind, a list of
+     *  kinds (merged in (at, seq) order) or every kind — filtered by the
+     *  evidence policy. A lane over the tier cap is EXCLUDED and reported.
+     *  Rows carry `provenance` iff they are derived (E1). */
+    window(kind, from = -Infinity, to = Infinity, opts) {
+      const ev = resolveEvidence(kind, 'window', opts);
+      const kinds = kind === undefined ? [...byKind.keys()] : (Array.isArray(kind) ? kind : [kind]);
+      const picked = [];
+      for (const k of kinds) {
+        if (evExcludes(k, ev, undefined, 'window')) continue;
+        const lane = byKind.get(k);
+        if (!lane) continue;
+        for (let i = fromIdx(lane, from); i < lane.length && lane[i].at <= to; i++) picked.push(lane[i]);
+      }
+      if (kinds.length > 1) picked.sort((a, b) => a.at - b.at || a.seq - b.seq);
+      return picked.map(publicEv);
     },
     /** C2: the raw straddling pair at pos, plus its neighbourhood.
      *  -> {prev, a, b, next, u, prevs, nexts, i, aAt, bAt, dtMs, ids} (payloads). */
-    bracket: bracketAt,
-    /** C1: the INTERPOLATED value at any position — O(1) amortised. */
+    bracket(kind, pos, opts) {
+      const ev = resolveEvidence(kind, 'bracket', opts);
+      if (evExcludes(kind, ev, pos, 'bracket')) return null;
+      return bracketAt(kind, pos, opts);
+    },
+    /** C1: the INTERPOLATED value at any position — O(1) amortised. E3: takes
+     *  {evidence}; under 'attested' it returns the last attested sample plus a
+     *  report instead of interpolating. */
     sampleAt,
+    /** E3: the deck-level evidence policy — the explicit choice every omitting
+     *  query resolves to. null means the client never made one. */
+    evidence() { return evPolicy ? { ...evPolicy } : null; },
+    setEvidence(p) { evPolicy = normalizeEvidence(p, 'setEvidence'); return evPolicy && { ...evPolicy }; },
+    /** E1: the provenance rollup for a lane (or every lane). */
+    provenanceOf(kind) {
+      const one = (lp) => ({
+        kind: lp.kind, attested: lp.attested, restored: lp.derived, total: lp.attested + lp.derived,
+        tier: lp.derived ? lp.tier : 0, source: lp.source, method: lp.method,
+        confidence: lp.confN ? { mean: +(lp.confSum / lp.confN).toFixed(4), min: lp.confMin, max: lp.confMax } : null,
+      });
+      if (kind !== undefined) { const lp = laneProv.get(kind); return lp ? one(lp) : null; }
+      return [...laneProv.values()].map(one);
+    },
+    /** E4: the firewall's own accounting — "how much of what you are about to
+     *  look at was invented", over one kind, a list of kinds, or the whole deck.
+     *  This is the number a tratteggio UI displays; it is not the client's to
+     *  compute. */
+    evidenceAccounting(kind) {
+      const kinds = kind === undefined ? [...laneProv.keys()] : (Array.isArray(kind) ? kind : [kind]);
+      const out = { attested: 0, restored: 0, total: 0, inventedFraction: 0, byTier: {}, lanes: [] };
+      for (const k of kinds) {
+        const lp = laneProv.get(k);
+        if (!lp) continue;
+        out.attested += lp.attested; out.restored += lp.derived;
+        if (lp.derived) out.byTier[lp.tier] = (out.byTier[lp.tier] || 0) + lp.derived;
+        out.lanes.push(this.provenanceOf(k));
+      }
+      out.total = out.attested + out.restored;
+      out.inventedFraction = out.total ? out.restored / out.total : 0;
+      return out;
+    },
+    /** §5b's reconstructor-as-adapter, and the whole of it: a reconstructor
+     *  READS an evidence lane and APPENDS a derived lane carrying
+     *  {source, method, confidence, tier, refs}. It never touches the master.
+     *
+     *    const rc = deck.registerReconstructor('catmull', {
+     *      from: 'pointer',            // the evidence lane it reads
+     *      into: 'pointer~catmull',    // the derived lane it appends (default)
+     *      tier: 1, method: 'catmull-rom',
+     *      plan: ({a, b, aAt, bAt, dtMs, i}) => [positions…],   // WHERE to invent
+     *      derive: (pos, ctx) => payload,                       // WHAT to invent
+     *    });
+     *    rc.run();     // append (idempotent: a re-run drops and rebuilds)
+     *    rc.drop();    // delete the restoration — the master is bit-identical
+     *
+     *  TIER 1 IS THE ONLY ONE THE LIBRARY IMPLEMENTS, and it implements it by
+     *  reusing the interpolator sampleAt already is. Tiers 2 (inpainting) and 3
+     *  (generative) are UNIMPLEMENTED BY DESIGN: they register through this same
+     *  seam and must bring their own derive() — the library hosts a model, it
+     *  never guesses one. */
+    registerReconstructor(name, spec = {}) {
+      if (!name || reconstructors.has(name)) throw new Error(`reconstructor '${name}': name required and must be unique`);
+      const from = spec.from;
+      if (!from) throw new Error(`reconstructor '${name}': from (the evidence lane it reads) is required`);
+      const into = spec.into || `${from}~${name}`;
+      if (into === from)
+        throw new Error(`reconstructor '${name}': a reconstructor APPENDS a derived lane — it may never write into its own evidence lane '${from}' (§5b: the master trace is append-only and never rewritten)`);
+      const tier = spec.tier === undefined ? 1 : Number(spec.tier);
+      if (!(tier >= 1 && tier <= 3)) throw new Error(`reconstructor '${name}': tier must be 1 (interpolation) | 2 (inpainting) | 3 (generative infill)`);
+      if (tier > 1 && typeof spec.derive !== 'function')
+        throw new Error(`reconstructor '${name}': tier ${tier} must bring its own derive() — the library implements tier 1 only, BY DESIGN. Tiers 2 and 3 are the same SEAM, not the same code (§5b).`);
+      if (!evPolicy)
+        throw new Error(`reconstructor '${name}': this deck has no explicit evidence policy, and registering a reconstructor is exactly what makes a policy necessary. Set createDeck({evidence}) / deck.setEvidence() first (§5b: the API forces the choice).`);
+      const srcAd = adapters.get(from);
+      const srcCaps = (srcAd && srcAd.caps) || {};
+      const method = spec.method || srcCaps.method || 'linear';
+      const maxGap = spec.maxTrustedGapMs || 250;
+      const hz = spec.hz || 60;
+      const plan = spec.plan || (({ aAt, bAt }) => {
+        const step = 1000 / hz, out = [];
+        for (let t = aAt + step; t < bAt - 1e-9; t += step) out.push(t);
+        return out;
+      });
+      // The DEFAULT tier-1 derive is the interpolator sampleAt already is —
+      // asked with {evidence:'all'} because a reconstructor is the one caller
+      // whose whole job is to invent. What makes that honest is not refusing to
+      // do it; it is that every row it emits says so.
+      const derive = spec.derive || ((pos) => sampleAt(from, pos, { ...(spec.opts || {}), evidence: 'all' }));
+      const confidence = typeof spec.confidence === 'function' ? spec.confidence
+        : spec.confidence !== undefined ? () => spec.confidence
+        // tier-1 honesty curve: 1.0 at an attested endpoint, falling toward the
+        // middle of the gap and falling faster the wider the gap is.
+        : ({ u, dtMs }) => +Math.max(0, 1 - 2 * Math.min(u, 1 - u) * Math.min(1, dtMs / maxGap)).toFixed(4);
+      if (!spec.adapter && !adapters.has(into)) {
+        const canInterp = typeof (srcAd || {}).interpolate === 'function';
+        this.registerAdapter(into, {
+          caps: {
+            ...srcCaps, tier, method, derived: true, source: `reconstructor-${name}`, from,
+            continuous: canInterp ? srcCaps.continuous : false,
+            catchUp: 'drop',          // a derived lane is a READ lane; never burst stale invention
+            assertOnSeek: false, followsTransport: false,
+          },
+          actuate: spec.actuate || (() => {}),
+          ...(canInterp ? { interpolate: (a, b, u, ctx) => srcAd.interpolate(a, b, u, ctx) } : {}),
+        });
+      } else if (spec.adapter) this.registerAdapter(into, spec.adapter);
+
+      const handle = {
+        name, from, into, tier, method,
+        run(opts = {}) {
+          if ((byKind.get(into) || []).length) handle.drop();
+          const lane = byKind.get(from) || [];
+          let emitted = 0, skipped = 0;
+          for (let i = 0; i < lane.length - 1; i++) {
+            const a = lane[i], b = lane[i + 1];
+            const dtMs = b.at - a.at;
+            if (!(dtMs > 0)) { skipped++; continue; }
+            const ctx0 = { a: a.payload, b: b.payload, aAt: a.at, bAt: b.at, dtMs, i, ...opts };
+            for (const pos of plan(ctx0) || []) {
+              // INTERIOR ONLY. An endpoint is attested; emitting a derived row
+              // on top of one would double-count the evidence and corrupt the
+              // invented-fraction the UI displays.
+              if (!(pos > a.at && pos < b.at)) { skipped++; continue; }
+              const u = (pos - a.at) / dtMs;
+              const payload = derive(pos, { ...ctx0, pos, u });
+              if (!payload) { skipped++; continue; }
+              scheduleEvent({
+                at: pos, kind: into, id: `${into}-${emitted}`, payload,
+                provenance: { source: `reconstructor-${name}`, method, tier, from,
+                  confidence: confidence({ u, dtMs, i, pos }), refs: [a.id, b.id] },
+              });
+              emitted++;
+            }
+          }
+          return { name, into, tier, method, emitted, skipped, from, evidence: (byKind.get(from) || []).length };
+        },
+        /** §5b's reversibility, and it is not a metaphor: dropping the lane is
+         *  the whole of deleting the restoration. */
+        drop() {
+          const lane = byKind.get(into) || [];
+          const n = lane.length;
+          if (!n) return { dropped: 0 };
+          for (let i = events.length - 1; i >= 0; i--) {
+            if (events[i].kind !== into) continue;
+            events[i].cancel && events[i].cancel();
+            events.splice(i, 1);
+          }
+          byKind.delete(into); cursors.delete(into); snapshots.delete(into); laneProv.delete(into);
+          derivedTotal -= n;
+          firstLive = 0;                       // indices moved; the next scan re-advances
+          return { dropped: n };
+        },
+        rows: (opts) => (byKind.get(into) || []).map(publicEv),
+        stats: () => ({ name, from, into, tier, method, ...(laneProv.get(into) || { derived: 0 }) }),
+      };
+      reconstructors.set(name, handle);
+      return handle;
+    },
+    reconstructors(name) {
+      if (name !== undefined) return reconstructors.get(name) || null;
+      return [...reconstructors.values()].map((r) => r.stats());
+    },
     /** C6: ask for a capability; get {wanted, chose, degraded, reason}. */
     request,
     /** C6: what this deck has silently had to refuse, per kind. */
@@ -877,6 +1314,7 @@ export function createScheduler(transport, {
       cancelCommitted(); events.length = 0; firstLive = 0; snapshots.clear();
       for (const lane of byKind.values()) lane.length = 0;
       for (const c of cursors.values()) c.reset();
+      laneProv.clear(); derivedTotal = 0;      // E1: the provenance ledger is the log's
     },
     /** SEAM 6: non-destructive drift reads. */
     onDrift(cb) { driftCbs.add(cb); return () => driftCbs.delete(cb); },
@@ -892,7 +1330,11 @@ export function createScheduler(transport, {
     stats() {
       const counts = { pending: 0, committed: 0, fired: 0, passed: 0, dropped: 0, reduced: 0 };
       for (const ev of events) counts[ev.status]++;
-      return { counts, total: events.length, busyMs: +busyMs.toFixed(2), maxTickGapMs: +maxTickGapMs.toFixed(2) };
+      // E1: `total` counts every row in the deck; `attested` and `derived` split
+      // it, so a client asserting "my capture is intact" compares against
+      // `attested` and a restoration can never inflate it.
+      return { counts, total: events.length, attested: events.length - derivedTotal, derived: derivedTotal,
+               busyMs: +busyMs.toFixed(2), maxTickGapMs: +maxTickGapMs.toFixed(2) };
     },
     /** For asserts: fires-per-event table and armed-timer count. */
     audit() {
@@ -997,7 +1439,9 @@ export function observePosition(transport, cb, { hz = 60, useRaf = typeof reques
 //   deck.play(); deck.setRate(0.5); deck.seek(t); deck.pause();
 //
 // `range` is the seekable window in the position domain (absolute wall ms is
-// as legal as 0-based ms — replay-grid uses the former, jam the latter).
+// as legal as 0-based ms — replay-grid uses the former, jam the latter). Since
+// v0.5 it is NOT fixed at construction: `deck.setRange([min,max] | 'auto')`
+// moves it in place for a client whose item set grows at runtime.
 // ---------------------------------------------------------------------------
 
 export function createDeck({
@@ -1010,16 +1454,21 @@ export function createDeck({
   tickMs = 25, horizonMs = 100, lateGraceMs = 150,
   onPosition, onDrift, driftFlushMs = 100, positionHz = 60,
   autoStart = true,
+  evidence,                    // E3: 'attested' | {restored:{maxTier:n}} | 'all'
 } = {}) {
   const host = tickHost && typeof tickHost === 'object' ? tickHost : tickHostByKind(tickHost);
   const transport = createTransport({ clock });
-  const sched = createScheduler(transport, { tickMs, horizonMs, lateGraceMs, host });
+  const sched = createScheduler(transport, { tickMs, horizonMs, lateGraceMs, host, evidence });
   for (const [kind, ad] of Object.entries(adapters)) sched.registerAdapter(kind, ad);
   for (const it of items) sched.schedule(it);
 
-  const lastAt = items.length ? Math.max(...items.map((i) => i.at)) : 0;
+  // `span` is MUTATED IN PLACE by setRange() so `deck.range` stays one stable
+  // reference every holder already has (nested.mjs reads it at add(), HUDs cache
+  // it). `lastAt` tracks the furthest item ever scheduled, which is what an
+  // 'auto' range is derived from.
+  let lastAt = items.length ? Math.max(...items.map((i) => i.at)) : 0;
   const span = range && range.length === 2 ? [range[0], range[1]] : [0, lastAt + tailMs];
-  const durationMs = span[1] - span[0];
+  let durationMs = span[1] - span[0];
 
   // SEAM 6 in action: the deck SUBSCRIBES to drift instead of draining it, so
   // a harness can still peek/drain the library's own buffer independently.
@@ -1039,8 +1488,47 @@ export function createDeck({
   if (autoStart) sched.start();   // rate is 0 -> nothing fires until play()
 
   const clamp = (p) => Math.max(span[0], Math.min(span[1], p));
+  let rangeGen = 0;
   return {
-    transport, sched, items, adapters, durationMs, range: span, hostName: host.name,
+    transport, sched, items, adapters, range: span, hostName: host.name,
+    /** getter, not a frozen number: setRange() can move it (v0.5). */
+    get durationMs() { return durationMs; },
+    /** how many times the range has moved — a positional reader (a cursor
+     *  client, a scrubber) can cheaply notice it must re-derive. */
+    rangeGen: () => rangeGen,
+    /**
+     * RANGE IS NO LONGER FIXED AT CONSTRUCTION (v0.5). Every client whose item
+     * set grows at runtime — the remixer, every time a layer loads — had to
+     * `dispose()` and rebuild the whole deck just to widen the seekable window,
+     * throwing away the drift log, the adapters and the playhead with it.
+     *
+     *   deck.setRange([min, max])   explicit window in the position domain
+     *   deck.setRange('auto')       [span[0], furthest scheduled at + tailMs]
+     *
+     * Purely additive and invariant-preserving:
+     *  · `deck.range` keeps its identity (the array is mutated in place), so
+     *    nested.mjs spans and HUDs holding it stay correct;
+     *  · `durationMs` is a getter and follows;
+     *  · if the playhead is now OUTSIDE the window it is moved with a real
+     *    `seek()` — reduce + assertState — never a silent clamp, so the state
+     *    at the new position is re-folded exactly as any other seek;
+     *  · the scheduler's per-kind lanes and their CURSORS are untouched: range
+     *    is a *window on positions*, not a filter on events. The cursor stays
+     *    the only positional reader and it keeps riding the same lane array.
+     * @returns {[number, number]} the new range
+     */
+    setRange(r) {
+      const want = (r === undefined || r === 'auto') ? [span[0], lastAt + tailMs] : r;
+      if (!Array.isArray(want) || want.length !== 2 || !Number.isFinite(want[0]) || !Number.isFinite(want[1]))
+        throw new Error('setRange needs [min, max] numbers (or "auto")');
+      if (!(want[1] > want[0])) throw new Error(`setRange needs max > min (got [${want[0]}, ${want[1]}])`);
+      span[0] = want[0]; span[1] = want[1];
+      durationMs = span[1] - span[0];
+      rangeGen++;
+      const p = transport.position(), q = clamp(p);
+      if (q !== p) { transport.seek(q); flush(); }     // a real seek: state re-folds
+      return span;
+    },
     play(r) { transport.play(r); },
     pause() { transport.pause(); flush(); },
     setRate(r) { transport.setRate(r); },         // SEAM 2: does not start playback
@@ -1051,17 +1539,29 @@ export function createDeck({
     rate: () => transport.rate,
     targetRate: () => transport.targetRate,       // SEAM 2: what a paused UI shows
     playing: () => transport.playing,
-    schedule(item) { return sched.schedule(item); },
+    schedule(item) {
+      if (item && Number.isFinite(item.at) && item.at > lastAt) lastAt = item.at;   // feeds setRange('auto')
+      return sched.schedule(item);
+    },
+    lastAt: () => lastAt,
     /** every fire's {intendedUs, firedUs, deltaMs, origin} — the drift channel */
     drift: () => (flush(), drift.slice()),
     fireCount: () => flush(),
     resetDrift() { sched.drainDrift(); drift = []; pendingRows = []; },
-    reduceAt: (kind, pos) => sched.reduceAt(kind, pos),
+    reduceAt: (kind, pos, opts) => sched.reduceAt(kind, pos, opts),
     assertAt: (pos, kind) => sched.assertAt(pos, kind),
     /** v0.4 CONTINUOUS KINDS — the interpolated value at any position (C1), the
-     *  raw straddling pair (C2), honest capability negotiation (C6). */
+     *  raw straddling pair (C2), honest capability negotiation (C6).
+     *  v0.5 THE EVIDENCE FIREWALL — all four take {evidence} (E3). */
     sampleAt: (kind, pos, opts) => sched.sampleAt(kind, pos, opts),
     bracket: (kind, pos, opts) => sched.bracket(kind, pos, opts),
+    window: (kind, from, to, opts) => sched.window(kind, from, to, opts),
+    evidence: () => sched.evidence(),
+    setEvidence: (p) => sched.setEvidence(p),
+    provenanceOf: (kind) => sched.provenanceOf(kind),
+    evidenceAccounting: (kind) => sched.evidenceAccounting(kind),
+    registerReconstructor: (name, spec) => sched.registerReconstructor(name, spec),
+    reconstructors: (name) => sched.reconstructors(name),
     request: (kind, want) => sched.request(kind, want),
     degradations: (kind) => sched.degradations(kind),
     eventsOf: (kind) => sched.eventsOf(kind),

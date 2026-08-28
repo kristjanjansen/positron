@@ -310,3 +310,122 @@ Library-side proof: `timeline/lab/prop-test.mjs` suite 5 (`--seeds 30` and
 cost proved flat in *n*, `info.next`, caps degradation, `followsTransport`, and
 the logdeck `at` regression. No-regression run: `proto/remixer/compose-run.mjs`
 **16/16** (it exercises `makeLogDeck`, nested spans and media spans at once).
+
+---
+
+## 7. THE EVIDENCE FIREWALL — what §5 said was missing, closed (2026-08-28, library v0.5)
+
+§5 ended with the one thing this client could not do from here:
+
+> the reconstructions are computed on the fly rather than **appended as derived
+> lanes** … and `reduce()`/`window()` do not yet take the
+> `attested | restored(tier ≤ n) | all` evidence policy. This client is the
+> tier-1 proof and the UI; the provenance plumbing is a library change.
+
+The library change landed (`timeline/lab/NOTES.md` Checkpoint 8). Here is what it
+did to this client.
+
+### The three claims of §5.2/§5.3, now backed by the library
+
+| §5b requirement | was, here | is |
+|---|---|---|
+| a global **evidence-only toggle** | `SHOW.linear = SHOW.smooth = false` — this page drawing less of what it had already computed | `deck.setEvidence('attested')`. The library stops **serving** the derived rows: `window([pointer, pointer~catmull])` returns the 59 attested rows and nothing else, and the lanes paint **0 px**. There is no client-side filtering left to get wrong |
+| **hatched** reconstruction | `dash: [7,4]` hand-written in a table keyed by a lane name this page invented | `HATCH[row.provenance.tier]`, colour/width from `provenance.method`, both read out of `deck.provenanceOf(kind)`. A tier-2 lane would arrive hatched differently without one line of styling being written for it |
+| **"93.4 % of this path is invented"** | `(drawn − attested) / drawn` over a private flattener array | `deck.evidenceAccounting(['pointer','pointer~catmull'])` → `{attested: 59, restored: 837, total: 896, inventedFraction: 0.9342, byTier:{1:837}}`. **Same number, and now it is the firewall's own count** — it cannot drift from what the policy would let you see |
+
+### The reconstructions are lanes now
+
+```js
+S.recon[r.lane] = deck.registerReconstructor(r.name, {
+  from: 'pointer', tier: 1, method: r.method,
+  plan: pxBudgetPlan,                                    // WHERE to invent (px budget, FIX-4)
+  derive: (pos) => deck.sampleAt('pointer', pos, { mode: r.mode, evidence: RESTORED_1 }),
+});
+S.recon[r.lane].run();                                   // appends 837 derived rows
+```
+
+Two of them (`pointer~linear`, `pointer~catmull`) — same seam, same `plan`,
+different interpolator, which is §5b's "one mechanism" made literal. Each derived
+row carries
+`{source:'reconstructor-catmull', method:'catmull-rom', confidence:0.9616, tier:1, refs:['pointer-0','pointer-1'], from:'pointer'}`
+and the attested rows carry **no `provenance` key at all**.
+
+The geometry is bit-for-bit what the flattener produced: `plan` emits the same
+px-budget subdivision positions, `derive` is the same `deck.sampleAt` call, and
+the drawn polyline is `window([pointer, derived])` merged in position order —
+which is exactly `flat()`'s order, because u = 1 of segment *k* lands on attested
+sample *k+1* and the derived rows are strictly interior.
+
+### Verification — 14 pass / 0 fail, the numbers that matter unmoved
+
+Same trace (Lissajous, 6 000 ms, 120 Hz ±2 ms jitter, 721 evidence → 59 stored).
+
+| assert | v0.4 | v0.5 |
+|---|---|---|
+| A sample count | 59 = 59 = 59 = 59 | **identical** (`schedTotal` now reads `stats().attested`, because the deck also holds 1 674 derived rows and "my capture is intact" is a claim about the attested ones) |
+| B seek ×3 vs analytic | 0.042 / 0.032 / 0.042 px | **0.042 / 0.032 / 0.042 px** |
+| B2 same seeks, zero-order hold | 38.31 / 45.55 / 27.03 px | **38.31 / 45.55 / 27.03 px** |
+| C pause holds | drift 0.000 ms | **0.000 ms** |
+| D rate 2× | 1.992× | **1.998×** (wall-clock arm) |
+| E four lanes ink | 4 690 / 5 529 / 18 652 / 7 203 px | **4 690 / 5 529 / 17 973 / 7 203** |
+| F deviation mean | hold 24.19 / linear 0.679 / catmull 0.0357 px | **24.19 / 0.679 / 0.0357 px** |
+| F2 adapter actuated | 29 fires, 4 856 interpolate, 11 reduce | **29 / 4 624 / 14** |
+| **H evidence-firewall** | — | `window(smooth)` restored **896 rows (837 derived)** · attested **59 rows (0 derived)** |
+| **H2 evidence-only collapses** | — | under `attested` the two reconstruction lanes paint **0 px** (from 17 973 / 7 203); evidence and stored ink **unchanged**; switching back restores both **exactly** |
+| **I provenance fields** | — | `{source:'reconstructor-catmull', method:'catmull-rom', confidence:0.9616, tier:1, refs:['pointer-0','pointer-1'], from:'pointer'}` |
+| **I2 invented fraction** | — | **837 / 896 = 93.4 %**, from `evidenceAccounting`, tiers `{1: 837}` |
+| **J reversibility** | — | dropping both lanes (**1 674 rows**) leaves the master trace **bit-identical**: 59 attested, 0 derived |
+| G console | 0 errors | **0 errors** |
+
+The **one number that moved on purpose** is the linear lane's ink, 18 652 →
+17 973 px: it is hatched now. It was solid before because the dash was assigned
+by hand per lane; it is dashed now because its rows say `tier: 1`, and tratteggio
+says all infill is hatched. Every other pixel count is identical, which is the
+evidence that the derived lane reproduces the flattener's geometry exactly.
+
+### The client line delta
+
+Code lines only (comments and blanks excluded):
+
+| file | before | after | Δ |
+|---|---|---|---|
+| `pointer-adapter.js` | 161 | **128** | **−33** (`makeFlattener`, 30 lines of incremental subdivision cache, → `pxBudgetPlan`, 7) |
+| `paths.js` | 405 | **476** | **+71** |
+| **client total** | 566 | **604** | **+38** |
+| `harness/run-paths.mjs` | 134 | 166 | +32 (four new asserts) |
+
+The honest split of that +71, because "the firewall cost the client 71 lines" is
+not what happened:
+
+* the **rendering mechanism** — flattener state, `posOf`, two `makeFlattener`
+  calls, `rebuildAll`, two `paintLane` branches, the `flat()` arithmetic in the
+  readout, and `makeFlattener` itself — was **≈ 40 code lines** and is now
+  **≈ 30** (the `RECON` loop, `rebuildRows`, one `paintLane` branch,
+  `pxBudgetPlan`): **−10**, and every read in it is a library call.
+* the remaining **+48** is capability this page did not have: tratteggio styling
+  driven by `tier`/`method` (`HATCH`, `BY_METHOD`, `specFor`, ≈ 20), the policy
+  switch (`setPolicy`, ≈ 6), the provenance/accounting panel (≈ 10), and three
+  harness probes for the firewall (`setPolicy`, `probeWindow`,
+  `dropRestorations`, ≈ 22) that exist only to make §5b assertable from outside.
+
+So: the evidence firewall **removed** client code from the path it replaced, and
+the growth is the UI and the proof, not the plumbing.
+
+### What §5b still promises that this does not deliver
+
+* **Tiers 2 and 3 are unimplemented** — by design, and the library refuses to
+  guess a `derive()` for them. The seam is proved (prop-test suite 6 registers a
+  tier-2 lane and watches `maxTier:1` exclude it) but no inpainting or
+  generative model is plugged in.
+* **Reconstruction does not yet render into §−1's uncertainty smear** — the
+  hatch is per-lane and per-tier; per-row `confidence` is carried, displayed as a
+  lane mean, and *not* yet mapped to stroke alpha, so a low-confidence mid-gap
+  invention looks exactly like a high-confidence one next to an attested sample.
+* **No provenance popover.** Inspection is the 14× inset and the caps panel;
+  clicking a stroke does not yet name the two `refs` it was derived from, though
+  the data for it is on the row.
+* **C10's "restoration IS remix"** is stated, not exercised: nothing here quotes
+  *another* session's trace with restorative intent.
+* Reconstructors run once at `build()`. There is no incremental `run()` over a
+  growing lane, so live capture still draws its raw evidence stroke and the
+  derived lanes appear when the gesture ends.

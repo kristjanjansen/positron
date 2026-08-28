@@ -152,8 +152,50 @@ async function main() {
   check('F2 adapter-actuated', st.fires > 0 && st.interpCalls > st.fires,
     `attested fires=${st.fires}, interpolate() calls=${st.interpCalls}, reduce() calls=${st.reduceCalls}`);
 
+  // H — THE EVIDENCE FIREWALL (v0.5, plan-timeline §5b). The evidence-only
+  // toggle is a LIBRARY query now, not client filtering: under 'attested' the
+  // deck refuses to serve the derived lanes at all, so the strokes have nothing
+  // to draw and the per-lane ink for both reconstructions goes to zero while the
+  // attested lanes are untouched.
+  const wRestored = await page.eval('JSON.stringify(paths.probeWindow("smooth","restored"))').then(JSON.parse);
+  const wAttested = await page.eval('JSON.stringify(paths.probeWindow("smooth","attested"))').then(JSON.parse);
+  R.numbers.firewall = { restored: wRestored, attested: wAttested, accounting: st.accounting, policy: st.policy, provenance: st.provenance };
+  console.log(`[firewall] window(smooth) restored=${wRestored.n} rows (${wRestored.derived} derived) · attested=${wAttested.n} rows (${wAttested.derived} derived)`);
+  check('H evidence-firewall', wRestored.derived > 0 && wAttested.derived === 0 && wAttested.n === st.laneItems,
+    `attested serves ONLY the ${wAttested.n} attested rows; restored adds ${wRestored.derived} derived ones`);
+  await page.eval('paths.setPolicy("attested")');
+  await sleep(150);
+  const inkAtt = await page.eval('paths.laneInk()');
+  await page.eval('paths.setPolicy("restored")');
+  await sleep(150);
+  const inkBack = await page.eval('paths.laneInk()');
+  R.numbers.inkAttested = inkAtt;
+  console.log(`[firewall] evidence-only ink — evidence=${inkAtt.evidence} stored=${inkAtt.stored} linear=${inkAtt.linear} smooth=${inkAtt.smooth}`);
+  check('H2 evidence-only-collapses', inkAtt.linear === 0 && inkAtt.smooth === 0 &&
+    inkAtt.evidence === ink.evidence && inkAtt.stored === ink.stored &&
+    inkBack.linear === ink.linear && inkBack.smooth === ink.smooth,
+    `under 'attested' both reconstruction lanes paint 0 px (was ${ink.linear}/${ink.smooth}) and the attested lanes are unchanged; switching back restores them exactly`);
+
+  // I — provenance is a real field on real rows
+  const pv = wRestored.prov;
+  R.numbers.provenance = pv;
+  console.log(`[provenance] ${JSON.stringify(pv)}`);
+  check('I provenance-fields', pv && pv.source === 'reconstructor-catmull' && pv.method === 'catmull-rom' &&
+    pv.tier === 1 && typeof pv.confidence === 'number' && Array.isArray(pv.refs) && pv.refs.length === 2,
+    `derived rows carry {source, method, confidence, tier, refs}: ${JSON.stringify(pv)}`);
+  const acct = st.accounting;
+  check('I2 invented-fraction', acct && acct.attested === st.laneItems && acct.restored > 0 &&
+    Math.abs(acct.inventedFraction - acct.restored / acct.total) < 1e-12,
+    `the invented fraction is the FIREWALL's accounting: ${acct.restored}/${acct.total} = ${(100 * acct.inventedFraction).toFixed(1)}% invented (attested ${acct.attested}, tiers ${JSON.stringify(acct.byTier)})`);
+
+  // J — reversibility: deleting a restoration is dropping its lane
+  const rev = await page.eval('JSON.stringify(paths.dropRestorations())').then(JSON.parse);
+  R.numbers.reversibility = rev;
+  check('J reversibility', rev.masterIdentical && rev.derivedAfterDrop === 0 && rev.attestedAfterDrop === st.laneItems,
+    `dropping both derived lanes (${rev.dropped} rows) leaves the master trace BIT-IDENTICAL (${rev.attestedAfterDrop} attested, ${rev.derivedAfterDrop} derived)`);
+
   // G — console errors
-  const pageErrors = st.errors;
+  const pageErrors = await page.eval('paths.state()').then((s) => s.errors);
   R.numbers.errors = { cdp: consoleErrors, page: pageErrors };
   check('G zero-console-errors', consoleErrors.length === 0 && pageErrors.length === 0,
     `cdp=${consoleErrors.length} page=${pageErrors.length}${consoleErrors.length ? ' :: ' + consoleErrors[0] : ''}`);

@@ -84,54 +84,28 @@ export function catmullSample(p0, p1, p2, p3, u) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Incrementally cached flattening (FIX-5). Segment k spans lane[k]..lane[k+1]
-// and depends on lane[k-1 .. k+2]; appending lane[n-1] therefore invalidates
-// only segments n-3 .. n-1. Nothing is ever recomputed per frame.
+// [DELETED 2026-08-28, library v0.5] `makeFlattener(lane, interp)` — 44 lines of
+// client-side incremental flattening cache. It existed because the
+// reconstructions were computed ON THE FLY, per frame, into a private array the
+// library knew nothing about; §5b's answer is that a reconstruction is not a
+// rendering pass, it is a DERIVED LANE appended to the timeline with provenance.
+// So the cache is now `deck.registerReconstructor(...).run()` (append once) plus
+// `deck.window([evidence, derived], …, {evidence: policy})` (read back, in
+// position order, honestly filtered). What survives of the flattener is the only
+// part that was ever this client's business: WHERE to invent, in pixels.
 // ---------------------------------------------------------------------------
 
-export function makeFlattener(lane, interp) {
-  const segs = [];            // segs[k] = [{x,y}, …] for lane[k] -> lane[k+1]
-  let flatCache = null, builtTo = -1;
-
-  function build(k) {
-    const a = lane[k], b = lane[k + 1];
-    if (!a || !b) return [];
-    const chord = Math.hypot(b.x - a.x, b.y - a.y);
-    const steps = Math.max(MIN_STEPS, Math.min(MAX_STEPS, Math.ceil(chord / PX_PER_STEP))); // FIX-4
-    const out = [];
-    for (let s = 0; s <= steps; s++) out.push(interp(k, s / steps));   // integer stepping: u hits 1 exactly
-    return out;
-  }
-
-  return {
-    /** call after lane.push(sample) */
-    appended() {
-      const n = lane.length;
-      for (let k = Math.max(0, n - 4); k <= n - 2; k++) segs[k] = build(k);
-      segs.length = Math.max(0, n - 1);
-      flatCache = null;
-      builtTo = n - 2;
-    },
-    rebuildAll() {
-      segs.length = 0;
-      for (let k = 0; k <= lane.length - 2; k++) segs[k] = build(k);
-      flatCache = null; builtTo = lane.length - 2;
-    },
-    /** flattened polyline over the whole lane; cached until the lane changes */
-    flat() {
-      if (flatCache) return flatCache;
-      if (builtTo !== lane.length - 2) this.rebuildAll();
-      const out = [];
-      for (let k = 0; k < segs.length; k++) {
-        const s = segs[k] || [];
-        for (let j = k === 0 ? 0 : 1; j < s.length; j++) out.push(s[j]);
-      }
-      flatCache = out;
-      return out;
-    },
-    segCount: () => segs.length,
-    rebuilds: () => builtTo,
-  };
+/** §5b `plan`: the positions a reconstructor should invent between two attested
+ *  samples. Arc-length budget with INTEGER steps (FIX-4) — fixed subdivision
+ *  starves long segments and wastes work on short ones. INTERIOR ONLY: the
+ *  endpoints are attested, and emitting a derived row on top of one would
+ *  double-count the evidence in the firewall's invented-fraction. */
+export function pxBudgetPlan({ a, b, aAt, bAt }) {
+  const chord = Math.hypot(b.x - a.x, b.y - a.y);
+  const steps = Math.max(MIN_STEPS, Math.min(MAX_STEPS, Math.ceil(chord / PX_PER_STEP)));
+  const out = [];
+  for (let s = 1; s < steps; s++) out.push(aAt + (bAt - aAt) * (s / steps));
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,8 +231,11 @@ export function deviations(evidence, lane, deck, kind = 'pointer') {
   for (const e of evidence) {
     if (e.at < t0 || e.at > t1) continue;
     for (const m of modes) {
-      // the LIBRARY's read: bracket + neighbourhood + interpolate, one call
-      const s = deck.sampleAt(kind, e.at, { mode: m });
+      // the LIBRARY's read: bracket + neighbourhood + interpolate, one call.
+      // The policy is DECLARED here rather than inherited from the deck: this
+      // measurement is "how far does the restoration deviate", so it must be
+      // taken with restoration switched on whatever the UI is showing.
+      const s = deck.sampleAt(kind, e.at, { mode: m, evidence: { restored: { maxTier: 1 } } });
       if (!s) continue;
       const d = Math.hypot(s.x - e.x, s.y - e.y);
       const o = out[m];

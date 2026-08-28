@@ -148,6 +148,58 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### EVIDENCE FIREWALL + PROVENANCE (session 6y) — ✅ transport v0.5, §5b's doctrine is now code
+- API: `createDeck({evidence})` / `setEvidence` (`'attested' | {restored:{maxTier:n}} | 'all'`);
+  `sampleAt/reduceAt/window/bracket` all take `{evidence}`;
+  **`registerReconstructor(name,{from,into,tier,method,derive,confidence})`**
+  → `{run, drop, rows, stats}`; `provenanceOf()`, `evidenceAccounting()`
+  (`{attested, restored, total, inventedFraction, byTier}`).
+- **Forced choice, both arms composed**: per-call `{evidence}` → explicit deck
+  policy → **throw `EVIDENCE_POLICY_REQUIRED`**. The deck policy IS the forced
+  choice (a property of the session, not of 4,615 render-loop reads); the throw
+  enforces it. **The only omission answered is one whose answer is PROVABLY
+  identical under all three policies** (`policyMatters()`) — a proof, not a
+  default.
+- **The trigger is `caps.tier ≥ 1`, NOT `caps.continuous`** — subtle and right:
+  tier is the adapter's own statement that its between-sample values are
+  restoration; gating on `continuous` would retro-classify shipped clients
+  (proto/automation's `cc` holds a level between messages *because MIDI says
+  so*, not because it invents). An interpolating adapter with no declared tier
+  gets a ledger line at registerAdapter — recorded, not guessed.
+- **Attested rows carry NO `provenance` key at all — absence is the
+  definition.** Derived rows: `{source:'reconstructor-<name>', method,
+  confidence, tier, refs:[attested ids], from}`, frozen, injected after the
+  payload. **Lane purity** (a lane is attested or derived, never both;
+  scheduleEvent throws both ways) makes the firewall O(1) and makes "delete a
+  restoration = drop its lane" the only thing dropping CAN mean.
+- Nice mechanism: **a restricting policy WITHHOLDS `info.next`**, so an
+  interpolating reducer degrades to its own hold with **no adapter change**.
+- prop-test suite 6, 0 violations at 30 and 100 seeds: attested mean error
+  **21.871 px** vs restored **0.0232** — **bit-identical to suite 5a's `hold`,
+  which IS the proof that attested never interpolates**; forced-choice throws
+  exactly where the answer could differ and NOT on discrete reads; tier-2 lane
+  excluded at maxTier 1 and served at 2; tier-3-without-derive refused in
+  words; **reversibility: 1,674 derived rows dropped → master trace AND
+  scheduler audit bit-identical**, re-run reproduces it.
+- **proto/paths 14/14, numbers held** (seek 0.042/0.032/0.042; deviation
+  24.19/0.679/0.0357). Now: `window(smooth)` restored 896 rows (837 derived) vs
+  attested 59 (0 derived); **evidence-only makes both reconstruction lanes
+  paint 0 px — the LIBRARY refuses to serve them** — with evidence ink
+  unchanged and exact restore; **the 93.4 % invented figure now comes from
+  `evidenceAccounting` (837/896)**. One number moved on purpose: linear ink
+  18,652 → 17,973 because it is hatched from `tier:1` on the rows rather than a
+  client table. Client +38 lines net (−10 on the mechanism it replaced, +48
+  new capability: tier styling, policy switch, provenance panel).
+- No-regression: compose-run **20/20** (grown from 16 by the sibling's fragment
+  work) and the sibling's prop-nested 128/0 — their `curve` adapter declares no
+  tier, so the firewall leaves it untouched: the compatibility property by
+  design.
+- §5b still owes: tiers 2/3 (seam proved, no model plugged in); reconstruction
+  does not render into §−1's uncertainty smear (per-row `confidence` carried
+  but not mapped to alpha); no provenance popover (refs on the row, not
+  clickable); "restoration IS remix" stated not exercised; reconstructors run
+  once — no incremental run() over a growing lane.
+
 ### STORE LAYER (session 6x) — ✅ 39/39 (`node timeline/lab/prop-store.mjs`)
 New files only (`timeline/store.mjs` + lab); the transport wiring is a SKETCH in
 NOTES-store.md §6, not applied (siblings own transport.mjs).
