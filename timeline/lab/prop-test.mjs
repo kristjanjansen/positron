@@ -1185,6 +1185,390 @@ function makeContinuousDeck(vr, opts = {}) {
   deck.dispose();
 }
 
+// ---------------------------------------------------------------------------
+// suite 7: UNCERTAINTY AS POSITION (v0.6, plan-timeline §7.4 / §−1's "a smear,
+// not a fake instant"). `at` stays a scalar; a frozen sibling `when` carries the
+// bracket, and the scalar is resolved ONCE at ingest by a named versioned rule.
+//   7a  a `when` row fires at `earliest`, exactly once, and NEVER moves the sort
+//   7b  possible/necessary give different, correct answers — and `necessary` is
+//       UNANSWERABLE-AND-SAYS-SO when the inner bracket is absent
+//   7c  the two axes stay independent: all four cells of evidence × certainty
+//   7d  positionAccounting() sums correctly, BY RULE
+//   7e  caps.series fixes a multi-controller lane that degraded SILENTLY
+//   7f  two-phase seek FAILS OPEN under a deliberately slow adapter
+// ---------------------------------------------------------------------------
+import { normalizeWhen, normalizeCertainty, WHEN_KINDS } from '../transport.mjs';
+
+const Y = (y, m = 0, d = 1) => Date.UTC(y, m, d);
+/** the nine fields, with the optional five defaulted — tests name only what matters */
+const W = (o) => ({ verbatim: null, edtf: null, innerFrom: null, innerTo: null, note: null, ...o });
+const ids = (rows) => rows.map((r) => r.id);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// --- 7a: THE FIRING RULE — at = when.earliest, and nothing else moves --------
+{
+  // The supplied `at` on `smear-200` is deliberately WRONG (9999) and
+  // `smear-050` supplies none at all: both must land on `when.earliest`.
+  const mk = () => [
+    { at: 100, kind: 'arc', id: 'crisp-100', payload: { tag: 'crisp-100' } },
+    { at: 9999, kind: 'arc', id: 'smear-200', payload: { tag: 'smear-200' },
+      when: W({ earliest: 200, latest: 1200, rule: 'test-band@1', kind: 'ignorance', verbatim: '1965-07-15' }) },
+    { kind: 'arc', id: 'smear-050', payload: { tag: 'smear-050' },
+      when: W({ earliest: 50, latest: 5000, rule: 'test-wide@1', kind: 'vagueness' }) },
+    { at: 400, kind: 'arc', id: 'crisp-400', payload: { tag: 'crisp-400' } },
+  ];
+  const vr = sharedVR();
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 6000], items: mk() });
+  const rows = deck.eventsOf('arc');
+  check('when-fire', 0, same(rows.map((r) => r.at), [50, 100, 200, 400]),
+    `at must be when.earliest for every smeared row and untouched for crisp ones: ${JSON.stringify(rows.map((r) => [r.id, r.at]))}`);
+  check('when-fire', 0, same(ids(rows), ['smear-050', 'crisp-100', 'smear-200', 'crisp-400']),
+    `the lane must be sorted by the ANCHOR: ${ids(rows)}`);
+  check('when-fire', 0, rows.find((r) => r.id === 'smear-200').at === 200,
+    'a supplied at that disagrees with when.earliest must be OVERRIDDEN, not honoured');
+  // the anchoring is REPORTED — degradations() gains its fourth literal
+  const anc = deck.degradations('arc').reports.filter((r) => r.chose === 'anchored');
+  check('when-fire', 1, anc.length === 2 && anc.some((r) => /test-band@1/.test(r.reason)) &&
+    anc.some((r) => /OVERRIDDEN/.test(r.reason)),
+    `every anchoring must be on the record, naming its rule: ${JSON.stringify(anc.map((r) => r.reason.slice(0, 60)))}`);
+
+  // THE SORT DOES NOT MOVE: a twin deck given the same anchors as plain scalars
+  // fires the same ids in the same order at the same positions.
+  const vr2 = sharedVR();
+  const twin = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 6000], items: [
+    { at: 100, kind: 'arc', id: 'crisp-100', payload: {} }, { at: 200, kind: 'arc', id: 'smear-200', payload: {} },
+    { at: 50, kind: 'arc', id: 'smear-050', payload: {} }, { at: 400, kind: 'arc', id: 'crisp-400', payload: {} },
+  ] });
+  check('when-fire', 1, same(ids(deck.eventsOf('arc')), ids(twin.eventsOf('arc'))) &&
+    same(deck.eventsOf('arc').map((r) => r.at), twin.eventsOf('arc').map((r) => r.at)),
+    'a `when` row must sort EXACTLY where its anchor sorts — the bracket is not an ordering key');
+
+  const fired = [], drifted = [];
+  deck.sched.onFire((pub, rec) => { fired.push(pub.id); drifted.push(rec); });
+  const runTo = (d, v, pos) => { d.play(); v.advanceTo(v.now() + (pos - d.position())); d.pause(); };
+  deck.seek(0); runTo(deck, vr, 300);
+  check('when-fire', 2, same(fired, ['smear-050', 'crisp-100', 'smear-200']),
+    `play(0 -> 300) must fire exactly the rows whose ANCHOR is <= 300, in anchor order: ${fired}`);
+  check('when-fire', 2, deck.audit().fires.every((f) => f.fires <= 1), 'exactly once each');
+  // the fire is MARKED, not suppressed: `when` rides the public event AND the
+  // drift record, so a consumer that must not act on a bound can see the bound.
+  const dr = drifted.find((r) => r.id === 'smear-200');
+  check('when-fire', 3, dr && dr.anchored === true && dr.when && dr.when.rule === 'test-band@1' && dr.when.verbatim === '1965-07-15',
+    `the drift record must carry the bracket and say it is anchored: ${JSON.stringify(dr && { anchored: dr.anchored, rule: dr.when && dr.when.rule })}`);
+  check('when-fire', 3, deck.eventsOf('arc').filter((r) => r.when).length === 2 &&
+    deck.eventsOf('arc').filter((r) => r.when === undefined).length === 2,
+    'ABSENCE of `when` is the crisp fast path — a crisp row must carry no `when` KEY at all');
+  check('when-fire', 3, deck.stats().crisp === 2 && deck.stats().smeared === 2 && deck.stats().attested === 4,
+    `crisp/smeared and attested/derived are TWO partitions of the same rows: ${JSON.stringify(deck.stats())}`);
+  deck.dispose(); twin.dispose();
+}
+
+// --- 7a': the bracket is frozen, per-row, and validated ---------------------
+{
+  const vr = sharedVR();
+  const shared = { earliest: 10, latest: 20, rule: 'hand', kind: 'ignorance' };
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 100], autoStart: false, items: [
+    { kind: 'k', id: 'a', payload: {}, when: shared }, { kind: 'k', id: 'b', payload: {}, when: shared },
+  ] });
+  const [a, b] = deck.eventsOf('k');
+  check('when-shape', 0, a.when !== b.when && a.when !== shared,
+    'NEVER INTERNED: sharing one uncertainty object between two rows asserts they are SIMULTANEOUS (CIDOC E52), so every row gets its own copy');
+  check('when-shape', 0, Object.isFrozen(a.when) && Object.keys(a.when).length === 9 &&
+    Object.keys(a.when).join(',') === 'verbatim,edtf,earliest,latest,innerFrom,innerTo,rule,kind,note',
+    `frozen, exactly nine fields: ${Object.keys(a.when)}`);
+  check('when-shape', 0, a.when.innerFrom === null && a.when.innerTo === null,
+    'no inner bound is null, not a sentinel — CRM Issue 288: NOT instantiating P81 is correct');
+  const boom = (w) => { try { normalizeWhen(w); return null; } catch (e) { return e.message; } };
+  check('when-shape', 1, /crisp fast path/.test(boom({ earliest: 5, latest: 5, rule: 'hand', kind: 'ignorance' }) || ''),
+    'a ZERO-WIDTH bracket must be refused in words: it is a crisp position, and absence of `when` is how you say that');
+  check('when-shape', 1, /VERSIONED/.test(boom({ earliest: 1, latest: 2, rule: 'err-july15-padding', kind: 'ignorance' }) || ''),
+    'an UNVERSIONED rule must be refused — when the heuristic changes the affected rows must be one WHERE away');
+  check('when-shape', 1, boom({ earliest: 1, latest: 2, rule: 'hand', kind: 'ignorance' }) === null &&
+    boom({ earliest: 1, latest: 2, rule: 'unknown', kind: 'vagueness' }) === null,
+    "'hand' and 'unknown' are the two reserved unversioned literals");
+  check('when-shape', 1, /kind must be/.test(boom({ earliest: 1, latest: 2, rule: 'hand', kind: 'fuzzy' }) || '') &&
+    same(WHEN_KINDS, ['ignorance', 'vagueness']),
+    'ignorance vs vagueness is REQUIRED: same bracket, opposite affordances');
+  check('when-shape', 1, /rule is REQUIRED/.test(boom({ earliest: 1, latest: 2, kind: 'hand' }) || ''),
+    'a bracket with no recorded rule is a number nobody can re-audit');
+  check('when-shape', 2, /P82a <= P81a/.test(boom({ earliest: 10, latest: 20, innerFrom: 5, rule: 'hand', kind: 'ignorance' }) || ''),
+    'CRM: the inner bracket may not escape the outer one');
+  check('when-shape', 2, boom({ earliest: 10, latest: 20, innerFrom: 18, innerTo: 12, rule: 'hand', kind: 'ignorance' }) === null,
+    'innerFrom > innerTo is LEGAL, not a bug (CRM §3: it degenerates the trapezoid to a triangle = no known inner bound)');
+  check('when-shape', 2, normalizeWhen({ earliest: 10, latest: null, rule: 'unknown', kind: 'ignorance' }).latest === null,
+    'latest:null is an OPEN end — open and unknown are different facts and both must be representable');
+  deck.dispose();
+}
+
+// --- 7b: possible vs necessary on a hand-built fuzzy set --------------------
+const FUZZY = [
+  { at: Y(1965, 5, 15), kind: 'arch', id: 'exact-1965', payload: {} },
+  { at: Y(1971, 3, 10), kind: 'arch', id: 'exact-1971', payload: {} },
+  { kind: 'arch', id: 'err-1965', payload: {}, when: W({ verbatim: '1965-07-15', edtf: '1965',
+    earliest: Y(1965), latest: Y(1966), rule: 'err-audio-month-null@1', kind: 'ignorance',
+    note: 'ERR month field null on an audio record; 07-15 is a database padding artefact.' }) },
+  { kind: 'arch', id: 'sixties', payload: {}, when: W({ verbatim: 'the sixties', edtf: '196X',
+    earliest: Y(1960), latest: Y(1970), rule: 'decade-guess@1', kind: 'vagueness' }) },
+  // THE §9.2 CASE: an outer decade with a KNOWN inner month. Outer containment
+  // says "not certainly 1965"; the inner bracket says it certainly is.
+  { kind: 'arch', id: 'sixties-inner-65', payload: {}, when: W({ verbatim: 'spring 1965, in the sixties tapes',
+    earliest: Y(1960), latest: Y(1970), innerFrom: Y(1965, 2, 1), innerTo: Y(1965, 3, 1),
+    rule: 'hand', kind: 'ignorance' }) },
+  { kind: 'arch', id: 'spring-71', payload: {}, when: W({ verbatim: 'probably spring 1971', edtf: '1971-21?',
+    earliest: Y(1971), latest: Y(1972), innerFrom: Y(1971, 2, 1), innerTo: Y(1971, 4, 1),
+    rule: 'edtf-l1@1', kind: 'vagueness' }) },
+  { kind: 'arch', id: 'open-end', payload: {}, when: W({ verbatim: 'from 1964, end lost',
+    earliest: Y(1964), latest: null, rule: 'unknown', kind: 'ignorance' }) },
+  { kind: 'arch', id: 'tri', payload: {}, when: W({ earliest: Y(1968), latest: Y(1969),
+    innerFrom: Y(1968, 5, 1), innerTo: Y(1968, 2, 1), rule: 'hand', kind: 'ignorance' }) },
+];
+{
+  const vr = sharedVR();
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false,
+    range: [Y(1955), Y(1980)], items: FUZZY.map((x) => ({ ...x })) });
+  const A = Y(1965), B = Y(1966);
+  const poss = deck.window('arch', A, B, { certainty: 'possible' });
+  const nec = deck.window('arch', A, B, { certainty: 'necessary' });
+  check('cert', 0, same(ids(poss).sort(), ['err-1965', 'exact-1965', 'open-end', 'sixties', 'sixties-inner-65']),
+    `POSSIBLY in 1965 = every bracket that OVERLAPS the year: ${ids(poss)}`);
+  check('cert', 0, same(ids(nec).sort(), ['err-1965', 'exact-1965', 'sixties-inner-65']),
+    `CERTAINLY in 1965 = the query contains the row's CERTAIN extent: ${ids(nec)}`);
+  check('cert', 1, ids(poss).includes('sixties') && !ids(nec).includes('sixties'),
+    'a decade-wide row is POSSIBLY 1965 and not NECESSARILY — two different, both-correct answers to what looks like one question');
+  check('cert', 1, ids(nec).includes('sixties-inner-65'),
+    'THE INNER BRACKET IS NOT DECORATION: a decade-wide outer with a known 1965 inner IS certainly 1965, and outer containment (Y @> possible) would under-report it');
+  check('cert', 1, ids(nec).includes('err-1965'),
+    'a year-only ERR row IS certainly in its own year — outer containment is a SOUND sufficient condition where no inner bracket exists');
+  // …and where that sufficient condition fails, the question is UNDECIDABLE
+  const un = deck.degradations('arch').reports.filter((r) => r.chose === 'unanswerable');
+  check('cert', 2, un.length > 0 && un.some((r) => /decade-guess@1/.test(r.reason)) && un.some((r) => /unknown/.test(r.reason)) &&
+    un.every((r) => /EXCLUDED rather than answered 'no'/.test(r.reason)),
+    `necessary must be UNANSWERABLE-AND-SAY-SO when the inner bracket is absent: ${JSON.stringify(un.map((r) => r.reason.slice(0, 48)))}`);
+  // innerFrom > innerTo is "no known inner bound", so it takes the same path
+  const nec68 = deck.window('arch', Y(1968), Y(1968, 6, 1), { certainty: 'necessary' });
+  check('cert', 2, !ids(nec68).includes('tri'),
+    'a REVERSED inner pair is CRM\'s "no known inner bound" — it must not be read as an interval');
+  check('cert', 3, same(deck.window('arch', A, B), poss),
+    "the DEFAULT is 'possible' — silence over-includes, it does not fabricate");
+  let bad = null;
+  try { deck.window('arch', A, B, { certainty: 'probably' }); } catch (e) { bad = e.message; }
+  check('cert', 3, bad && /use 'possible'/.test(bad), `an unknown certainty must be refused: ${bad}`);
+  check('cert', 3, normalizeCertainty(undefined).implicit === true && normalizeCertainty('possible').implicit === false,
+    'the default is marked as implicit, so a caller can tell it apart from an explicit choice');
+  // the CRISP FAST PATH: a lane with no bracket answers identically under both
+  const crispOnly = deck.window('arch', A, B, { certainty: 'possible' }).filter((r) => !r.when);
+  check('cert', 4, same(ids(crispOnly), ['exact-1965']) &&
+    same(ids(deck.window('arch', A, B, { certainty: 'necessary' }).filter((r) => !r.when)), ['exact-1965']),
+    'a crisp row is a POINT under both readings, and a lane with no bracket is unaffected by the knob');
+  // sanity: an event with a wide bracket that STARTS before the window is found
+  check('cert', 4, ids(poss).includes('open-end') && FUZZY.find((f) => f.id === 'open-end').when.earliest < A,
+    'a row whose anchor precedes the window must still be found when its bracket reaches into it');
+  deck.dispose();
+}
+
+// --- 7c: THE TWO AXES ARE INDEPENDENT — all four combinations ---------------
+{
+  const vr = sharedVR();
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 10000], items: [
+    { at: 1000, kind: 'a', id: 'att-crisp', payload: {} },
+    // an uncertain ATTESTED row: tier 0, wide bracket. It MUST survive 'attested'.
+    { kind: 'a', id: 'att-smear', payload: {}, when: W({ earliest: 2000, latest: 6000, rule: 'test-band@1', kind: 'ignorance' }) },
+  ] });
+  // a precise RESTORED row: tier 1, NO bracket. It MUST survive 'necessary'.
+  deck.schedule({ at: 3000, kind: 'a~r', id: 'res-crisp', payload: {},
+    provenance: { source: 'reconstructor-t', tier: 1, method: 'linear' } });
+  deck.schedule({ kind: 'a~r', id: 'res-smear', payload: {}, provenance: { source: 'reconstructor-t', tier: 1, method: 'linear' },
+    when: W({ earliest: 4000, latest: 8000, rule: 'test-band@1', kind: 'vagueness' }) });
+  const K = ['a', 'a~r'];
+  const q = (evidence, certainty) => ids(deck.window(K, 0, 5000, { evidence, certainty })).sort();
+  const cell = {
+    'attested|possible': q('attested', 'possible'),
+    'attested|necessary': q('attested', 'necessary'),
+    'all|possible': q('all', 'possible'),
+    'all|necessary': q('all', 'necessary'),
+  };
+  check('axes', 0, same(cell['attested|possible'], ['att-crisp', 'att-smear']),
+    `AN UNCERTAIN ATTESTED ROW IS TIER 0 and must survive an attested-only query — folding the axes here deletes the whole pre-1960 archive: ${cell['attested|possible']}`);
+  check('axes', 0, same(cell['all|necessary'], ['att-crisp', 'res-crisp']),
+    `A PRECISE RESTORED ROW must survive a necessary query — being invented is not being badly positioned: ${cell['all|necessary']}`);
+  check('axes', 1, same(cell['attested|necessary'], ['att-crisp']) && same(cell['all|possible'], ['att-crisp', 'att-smear', 'res-crisp', 'res-smear']),
+    `all four cells must be populated and distinct: ${JSON.stringify(cell)}`);
+  check('axes', 1, new Set(Object.values(cell).map((v) => v.join(','))).size === 4,
+    'no cell may be a synonym for another — the 2x2 is fully populated');
+  // NEITHER RESTRICTION IMPLIES THE OTHER, stated as an equality on the sets
+  check('axes', 2, cell['attested|possible'].filter((x) => x.startsWith('res')).length === 0 &&
+    cell['all|necessary'].filter((x) => x === 'att-smear' || x === 'res-smear').length === 0 &&
+    cell['all|possible'].length === 4,
+    'evidence filters ONLY on fabrication, certainty ONLY on width, and each leaves the other axis whole');
+  // the certainty knob does NOT satisfy the evidence forced choice
+  let forced = null;
+  try { deck.window(K, 0, 5000, { certainty: 'necessary' }); } catch (e) { forced = e.code; }
+  check('axes', 2, forced === 'EVIDENCE_POLICY_REQUIRED',
+    'naming a certainty must NOT be mistaken for naming an evidence policy — the forced choice is on the other axis');
+  // and the two accountings are two numbers, never one score
+  const ea = deck.evidenceAccounting(K), pa = deck.positionAccounting(K);
+  check('axes', 3, ea.total === 4 && ea.restored === 2 && pa.total === 4 && pa.smeared === 2 &&
+    ea.inventedFraction === 0.5 && pa.smearedFraction === 0.5 && ea.restored !== undefined && pa.byRule !== undefined,
+    `two partitions of the same four rows, crossing: ${JSON.stringify({ ea: [ea.attested, ea.restored], pa: [pa.crisp, pa.smeared] })}`);
+  deck.dispose();
+}
+
+// --- 7d: positionAccounting sums correctly, BY RULE -------------------------
+{
+  const vr = sharedVR();
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false,
+    range: [Y(1955), Y(1980)], items: FUZZY.map((x) => ({ ...x })) });
+  const pa = deck.positionAccounting('arch');
+  check('pos-acct', 0, pa.total === 8 && pa.crisp === 2 && pa.smeared === 6 && pa.smearedFraction === 0.75,
+    `crisp + smeared must partition the lane: ${JSON.stringify({ t: pa.total, c: pa.crisp, s: pa.smeared })}`);
+  const byRuleN = Object.values(pa.byRule).reduce((a, r) => a + r.n, 0);
+  check('pos-acct', 0, byRuleN === pa.smeared,
+    `every smeared row must be attributed to exactly one rule: ${byRuleN} vs ${pa.smeared}`);
+  check('pos-acct', 0, same(Object.keys(pa.byRule).sort(),
+    ['decade-guess@1', 'edtf-l1@1', 'err-audio-month-null@1', 'hand', 'unknown']),
+    `the rules must be the ones the rows carry: ${Object.keys(pa.byRule)}`);
+  // THE HEADLINE NUMBER: "N % of this lane is positioned by a padding artefact"
+  check('pos-acct', 1, pa.byRule['err-audio-month-null@1'].n === 1 && pa.byRule['err-audio-month-null@1'].fraction === 1 / 8 &&
+    pa.byRule.hand.n === 2 && pa.byRule.hand.fraction === 2 / 8,
+    `fraction must be n / TOTAL rows (not n / smeared) — the visible number is "x % of this lane": ${JSON.stringify(Object.entries(pa.byRule).map(([k, r]) => [k, r.n, +r.fraction.toFixed(3)]))}`);
+  check('pos-acct', 1, pa.byWhenKind.ignorance === 4 && pa.byWhenKind.vagueness === 2 &&
+    pa.byWhenKind.ignorance + pa.byWhenKind.vagueness === pa.smeared,
+    `ignorance and vagueness must partition the smeared rows: ${JSON.stringify(pa.byWhenKind)}`);
+  check('pos-acct', 2, pa.openEnded === 1 && pa.byRule.unknown.open === 1 && pa.byRule.unknown.medianSpanMs === null,
+    'an OPEN end has no width and must not be averaged into one');
+  check('pos-acct', 2, pa.withInner === 2 && pa.byRule['edtf-l1@1'].withInner === 1 && pa.byRule.hand.withInner === 1,
+    `only an ORDERED inner pair counts as "has an inner bracket": ${pa.withInner}`);
+  const spans = FUZZY.filter((f) => f.when && f.when.latest !== null).map((f) => f.when.latest - f.when.earliest).sort((a, b) => a - b);
+  check('pos-acct', 3, pa.maxSpanMs === spans[spans.length - 1] && pa.medianSpanMs === spans[spans.length >> 1],
+    `median/max must be over FINITE spans only: ${pa.medianSpanMs} / ${pa.maxSpanMs} vs ${spans}`);
+  check('pos-acct', 3, pa.byRule['decade-guess@1'].meanSpanMs === Y(1970) - Y(1960) &&
+    pa.byRule['err-audio-month-null@1'].maxSpanMs === Y(1966) - Y(1965),
+    'per-rule widths must be the rows\' own widths');
+  check('pos-acct', 3, pa.lanes.length === 1 && pa.lanes[0].kind === 'arch' && pa.lanes[0].smeared === 6,
+    'the per-lane rollup must be there too');
+  const whole = deck.positionAccounting();
+  check('pos-acct', 4, whole.total === pa.total && deck.positionAccounting('nope').total === 0,
+    'the whole-deck call and an unknown kind must both answer, not throw');
+  deck.dispose();
+}
+
+// --- 7e: caps.series — a multi-controller lane that used to lie silently -----
+{
+  const vr = sharedVR();
+  // ONE kind, TWO controllers, interleaved. The straddling pair over the merged
+  // lane at t=750 is (cc74@500, cc1@1000) — two DIFFERENT controllers.
+  const cc = [
+    { at: 0, cc: 1, v: 0 }, { at: 500, cc: 74, v: 200 }, { at: 1000, cc: 1, v: 100 },
+    { at: 1500, cc: 74, v: 200 }, { at: 2000, cc: 1, v: 0 }, { at: 2500, cc: 74, v: 200 },
+  ];
+  const ad = {
+    caps: { continuous: true, interpolate: true, tier: 1, series: (p) => p.cc, catchUp: 'drop' },
+    actuate() {},
+    interpolate: (a, b, u) => a.v + (b.v - a.v) * u,
+  };
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 3000],
+    evidence: { restored: { maxTier: 1 } }, adapters: { cc: ad },
+    items: cc.map((r, i) => ({ at: r.at, kind: 'cc', id: `cc-${i}`, payload: r })) });
+  // (1) THE OLD BEHAVIOUR, now on the record instead of silent
+  const merged = deck.sampleAt('cc', 750);
+  check('series', 0, merged === 150,
+    `without a series the merged lane still interpolates ACROSS controllers (cc74=200 -> cc1=100): got ${merged}`);
+  const amb = deck.degradations('cc').reports.filter((r) => r.chose === 'series-ambiguous');
+  check('series', 0, amb.length === 1 && /may belong to DIFFERENT series/.test(amb[0].reason) && /deck.seriesOf/.test(amb[0].reason),
+    `…and THAT is the fix: the degradation is now reported, with the remedy: ${amb.length && amb[0].reason.slice(0, 70)}`);
+  // (2) THE FIX: per-series sub-lanes, each with its own cursor
+  check('series', 1, deck.sampleAt('cc', 750, { series: 1 }) === 75,
+    `series 1 brackets (0@0, 100@1000) -> 75, got ${deck.sampleAt('cc', 750, { series: 1 })}`);
+  check('series', 1, deck.sampleAt('cc', 750, { series: 74 }) === 200,
+    `series 74 brackets (200@500, 200@1500) -> 200, got ${deck.sampleAt('cc', 750, { series: 74 })}`);
+  const br = deck.bracket('cc', 750, { series: 1 });
+  check('series', 1, same(br.ids, ['cc-0', 'cc-2']) && br.series === '1' && br.aAt === 0 && br.bAt === 1000,
+    `the bracket must come from ONE series: ${JSON.stringify(br.ids)}`);
+  check('series', 2, same(deck.seriesOf('cc'), ['1', '74']) && deck.seriesOf('nope') === null,
+    `seriesOf must enumerate what the lane holds, and answer null where no caps.series is declared: ${deck.seriesOf('cc')}`);
+  // (3) the sub-lanes are maintained INCREMENTALLY, not rebuilt
+  deck.schedule({ at: 750, kind: 'cc', id: 'cc-late', payload: { at: 750, cc: 1, v: 60 } });
+  check('series', 2, deck.sampleAt('cc', 750, { series: 1 }) === 60 &&
+    same(deck.bracket('cc', 900, { series: 1 }).ids, ['cc-late', 'cc-2']),
+    'a row scheduled after the split must land in its own sub-lane, in order');
+  const miss = deck.sampleAt('cc', 750, { series: 99 });
+  check('series', 3, miss === null && deck.degradations('cc').reports.some((r) => r.chose === 'empty' && /known series/.test(r.reason)),
+    'an unknown series must be reported, not silently answered from the merged lane');
+  deck.dispose();
+}
+
+// --- 7f: two-phase seek — non-blocking, fail-open, re-armed -----------------
+{
+  const vr = sharedVR();
+  const log = [];
+  let releaseSlow = null;
+  const fast = { caps: { slowSync: true, catchUp: 'drop' }, actuate() {},
+    prepareSeek(req) { log.push(['fast', req.pos, req.disposition]); return true; } };
+  const slow = { caps: { slowSync: true, catchUp: 'drop' }, actuate() {},
+    prepareSeek(req, ready) { log.push(['slow', req.pos, req.disposition]); releaseSlow = ready; } };
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 10000],
+    adapters: { fast, slow }, items: [{ at: 100, kind: 'fast', payload: {} }, { at: 5000, kind: 'slow', payload: {} }] });
+  deck.seek(0); deck.play();
+  vr.advanceTo(vr.now() + 200);
+  const t0 = vr.now();
+  const q = deck.seek(1500, { timeoutMs: 300, disposition: 'RollIfAppropriate' });
+  const b0 = deck.seekBarrier();
+  // PHASE 1 happened; PHASE 2 has not.
+  check('2phase', 0, q === 1500 && deck.position() === 1500 && !deck.playing(),
+    `the LOCATE is immediate and synchronous (seek still returns the clamped position); only the ROLL waits: pos ${deck.position()}, playing ${deck.playing()}`);
+  check('2phase', 0, b0.phase === 'locate' && same(b0.ready, ['fast']) && same(b0.clients.sort(), ['fast', 'slow']),
+    `the ready client is in, the slow one is not: ${JSON.stringify({ phase: b0.phase, ready: b0.ready })}`);
+  check('2phase', 0, same(log.map((l) => l[0]).sort(), ['fast', 'slow']) && log.every((l) => l[1] === 1500 && l[2] === 'RollIfAppropriate'),
+    `Ardour's LocateTransportDisposition must be CARRIED in the request: ${JSON.stringify(log)}`);
+  // FAIL OPEN
+  vr.advanceTo(vr.now() + 301);
+  const b1 = deck.seekBarrier();
+  check('2phase', 1, b1.phase === 'done' && b1.why === 'timeout' && b1.failedOpen === true &&
+    same(b1.timedOut, ['slow']) && b1.rolled === true && deck.playing(),
+    `the barrier must FAIL OPEN and roll: ${JSON.stringify({ why: b1.why, timedOut: b1.timedOut, rolled: b1.rolled, playing: deck.playing() })}`);
+  check('2phase', 1, +(b1.waitedMs).toFixed(0) === 300 && vr.now() - t0 >= 300,
+    `and it must have actually waited the timeout, not skipped it: ${b1.waitedMs}`);
+  const fo = deck.degradations('slow').reports.filter((r) => r.chose === 'fail-open');
+  check('2phase', 1, fo.length === 1 && /did not report ready within 300 ms/.test(fo[0].reason) && /held hostage/.test(fo[0].reason),
+    `the laggard must be named on the record: ${fo.length && fo[0].reason.slice(0, 60)}`);
+  // the laggard catches up LATE and nothing breaks
+  const posBefore = deck.position();
+  releaseSlow();
+  check('2phase', 2, deck.playing() && deck.position() === posBefore,
+    'a late ready() after a fail-open must be inert — the laggard catches up, it does not rewind the transport');
+  // RE-ARMED by a locate mid-barrier: the second inherits the TRUE rolling state
+  log.length = 0; releaseSlow = null;
+  deck.seek(2000, { timeoutMs: 400 });
+  const g1 = deck.seekBarrier().gen;
+  deck.seek(2500, { timeoutMs: 400 });
+  const b2 = deck.seekBarrier();
+  check('2phase', 3, b2.gen === g1 + 1 && b2.rolling === true && deck.position() === 2500 && !deck.playing(),
+    `a locate mid-barrier must supersede and INHERIT the rolling state: ${JSON.stringify({ gen: b2.gen, rolling: b2.rolling })}`);
+  releaseSlow();
+  const b3 = deck.seekBarrier();
+  check('2phase', 3, b3.phase === 'done' && b3.why === 'all-ready' && b3.rolled === true && deck.playing() && b3.timedOut.length === 0,
+    `and when everyone reports, it opens EARLY with nothing on the record: ${JSON.stringify({ why: b3.why, rolled: b3.rolled })}`);
+  // DISPOSITION
+  deck.seek(3000, { disposition: 'MustStop', timeoutMs: 50 }); releaseSlow();
+  check('2phase', 4, !deck.playing() && deck.seekBarrier().rolled === false,
+    'MustStop must not roll, whatever the transport was doing');
+  deck.seek(3500, { disposition: 'MustRoll', timeoutMs: 50 }); releaseSlow();
+  check('2phase', 4, deck.playing() && deck.seekBarrier().rolled === true,
+    'MustRoll must roll from a stopped transport');
+  let badDisp = null;
+  try { deck.seek(10, { disposition: 'Whenever' }); } catch (e) { badDisp = e.message; }
+  check('2phase', 4, badDisp && /LocateTransportDisposition/.test(badDisp), `an unknown disposition must be refused: ${badDisp}`);
+  deck.dispose();
+  // THE FAST PATH: a deck with NO slow-sync adapter takes the v0.5 path exactly
+  const vr2 = sharedVR();
+  const plain = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 10000],
+    items: [{ at: 100, kind: 'x', payload: {} }] });
+  plain.play(); const r = plain.seek(1500);
+  check('2phase', 5, r === 1500 && plain.playing() && plain.seekBarrier() === null,
+    'a deck holding no caps.slowSync adapter must never build a barrier and must never lose the roll');
+  plain.dispose();
+}
+
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);
 if (failures) {
   console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams + nesting`);
@@ -1194,4 +1578,6 @@ console.log(`prop-test OK: ${basicRuns} basic + ${gymRuns} gymnastics seeds, 0 v
 console.log(`seams OK: adapter registry / setRate!=play / worker default / wall->audio bridge / whole-prefix reduce (${seamRuns} freeze seeds) / non-destructive drift`);
 console.log('nesting OK: nested seek (reduce-on-seek runs in the child) / rate composition incl. honest degradation / nested pause / absence outside the span / follow+master servo / cycle + depth rejection');
 console.log('evidence OK: attested never interpolates (and is reported when it holds) / restored(tier<=1) does / the forced-choice rule throws EVIDENCE_POLICY_REQUIRED exactly where the answer could differ / a reconstructor APPENDS a derived lane and provenance {source, method, confidence, tier, refs, from} round-trips / a tier-2 lane is EXCLUDED at maxTier 1 / dropping a derived lane leaves the master trace BIT-IDENTICAL and a re-run reproduces it');
+console.log("uncertainty OK: a `when` row fires ONCE at when.earliest and never moves the sort (a twin deck of plain anchors is identical) / the anchoring is on the record as 'anchored' and rides the fire + the drift row / the bracket is frozen, nine fields, PER ROW (never interned) and refuses a zero-width bracket, an unversioned rule and an inner bound outside the outer one / possible vs necessary differ correctly on a hand-built fuzzy set, the INNER bracket recovers 'certainly 1965' from a decade-wide row, and necessary is UNANSWERABLE-AND-SAYS-SO without one / the default is 'possible' / all four cells of evidence x certainty are populated and neither restriction implies the other / positionAccounting sums BY RULE");
+console.log('seams v0.6 OK: caps.series splits a multi-controller lane into per-series cursors (the merged lane interpolated 200->100 across two controllers and said nothing; now it says so, and {series} answers correctly) / two-phase seek locates immediately, holds only the ROLL, FAILS OPEN on timeout with the laggard named, is re-armed by a locate mid-roll inheriting the true rolling state, and carries MustRoll/MustStop/RollIfAppropriate — a deck with no slowSync adapter never builds a barrier');
 console.log('continuous OK: sampleAt vs analytic curve (hold > linear > catmull, C1 degrades to linear without a neighbourhood) / cursor O(1) forward + O(log n) on seek and random access / info.next makes an interpolated reduce expressible and it equals sampleAt / caps read + refusals reported / followsTransport (play,rate,pause; never seek, never sync) / logdeck at-clobber regression');

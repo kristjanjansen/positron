@@ -20,6 +20,10 @@
 import { createDeck, createVirtualRuntime, createCursor } from '../transport.mjs';
 import { createNest } from '../nested.mjs';
 import { mediaMaster } from '../media-master.mjs';
+import {
+  quotation, isQuotation, quotationEquals, score, parseScore, scoreToJSON, scoreRefs,
+  loadScore, refDeck, deckRef, marksOf, exportProvenance, validateProvenance, npt, toReviewRating,
+} from '../score.mjs';
 
 const VERBOSE = process.argv.includes('--verbose');
 let failures = 0, checks = 0;
@@ -62,17 +66,23 @@ const CHILD_END = 4000;
 const heldAt = (t) => NOTES.filter((x) => x.on <= t && x.off > t).map((x) => x.n).sort((a, b) => a - b);
 const CHILD_RATES = [0.25, 0.5, 1, 2, 4];
 
-function makeChild(vr, sink, range = [0, CHILD_END]) {
+// suite 11/13 add two knobs and change nothing for suites 6-9: `shift` moves
+// the whole child (a RE-CUT source: a restored leader spliced in front), and
+// `absentState`/`silence` is rule 9's declaration.
+function makeChild(vr, sink, range = [0, CHILD_END], { shift = 0, marks = null, absentState, silence } = {}) {
   const items = [];
   for (const x of NOTES) {
-    items.push({ at: x.on, kind: 'note', payload: { raw: [144, x.n, 90] } });
-    items.push({ at: x.off, kind: 'note', payload: { raw: [128, x.n, 0] } });
+    items.push({ at: x.on + shift, kind: 'note', payload: { raw: [144, x.n, 90] } });
+    items.push({ at: x.off + shift, kind: 'note', payload: { raw: [128, x.n, 0] } });
   }
+  for (const m of marks || []) items.push({ at: m.at + shift, kind: 'mark', id: m.id, payload: { label: m.label } });
   return createDeck({
     clock: vr.clock, tickHost: vr.newHost(), items, range,
     adapters: {
       note: {
-        caps: { catchUp: 'reduce', rates: CHILD_RATES, reducible: true, seekable: true },
+        caps: { catchUp: 'reduce', rates: CHILD_RATES, reducible: true, seekable: true,
+                ...(absentState ? { absentState } : {}) },
+        ...(silence ? { silence } : {}),
         actuate(p) {
           const [s, n] = p.raw;
           if ((s & 0xf0) === 0x90) sink.live.add(n); else sink.live.delete(n);
@@ -661,6 +671,442 @@ function fakeVideo(t0 = 0) {
   }
 }
 
+// ===========================================================================
+// suite 10 — A QUOTATION IS A VALUE, and a SCORE ROUND-TRIPS. The C10 property:
+//            an arrangement, serialised to JSON, reloaded in a FRESH RUNTIME
+//            that has only the bytes and a resolver, plays IDENTICALLY.
+//
+// "Identically" is not a vibe: the trace below records, at every step of a
+// fixed script, the parent position, both children's positions, both children's
+// held-note sets, and the full ordered list of every event either child fired.
+// Two traces are compared as strings.
+// ===========================================================================
+const MARKS_DEF = [
+  { id: 'chorus-3', at: 900, label: 'Chorus 3' },
+  { id: 'chorus-4', at: 2500, label: 'Chorus 4' },
+  { id: 'coda', at: 3600, label: 'Coda' },
+];
+
+/** the fixed script both runtimes run — seeks in and out of every span, plays
+ *  across boundaries, and ends by scrubbing backwards (the case that found the
+ *  park bug in rule 7c). */
+const SCRIPT = [
+  { seek: 0 }, { seek: 1500 }, { seek: 2000 }, { seek: 2600 }, { play: 900 },
+  { seek: 12000 }, { seek: 12400 }, { play: 1200 }, { seek: 30000 },
+  { seek: 6000 }, { seek: 2100 }, { play: 400 }, { seek: 0 }, { seek: 25400 },
+];
+
+function runScript(vr, parent, nest, kids) {
+  const trace = [];
+  const snap = (tag) => trace.push([tag,
+    +parent.position().toFixed(4),
+    ...kids.map((k) => +k.deck.position().toFixed(4)),
+    ...kids.map((k) => heldNow(k.sink).join('.')),
+    ...kids.map((k) => k.sink.fires),
+    ...kids.map((k) => k.sink.firedAt.map((t) => +t.toFixed(3)).join('.')),
+    ...nest.spans().map((sp) => `${sp.id}:${sp.present}:${sp.enters}/${sp.exits}`),
+  ].join('|'));
+  snap('init');
+  for (const step of SCRIPT) {
+    if (step.seek !== undefined) { parent.seek(step.seek); snap(`seek${step.seek}`); }
+    else {
+      parent.play();
+      for (let i = 0; i < step.play / 100; i++) { vr.advanceTo(vr.now() + 100); nest.servo(); }
+      parent.pause();
+      snap(`play${step.play}`);
+    }
+  }
+  return trace;
+}
+
+/** one arrangement, built two ways: by hand (A) or from a score (B). */
+function arrangement(make) {
+  const vr = sharedVR();
+  const sinks = [newSink(), newSink()];
+  const alpha = makeChild(vr, sinks[0], [0, CHILD_END], { marks: MARKS_DEF });
+  const beta = makeChild(vr, sinks[1], [0, CHILD_END], { marks: MARKS_DEF });
+  refDeck(alpha, 'alpha'); refDeck(beta, 'beta');
+  const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 40000], items: [] });
+  const nest = createNest(parent, { toleranceMs: 5, hardSeekMs: 200, resolve: (r) => ({ alpha, beta }[r]) });
+  const kids = [{ deck: alpha, sink: sinks[0] }, { deck: beta, sink: sinks[1] }];
+  make({ nest, alpha, beta, parent });
+  return { vr, parent, nest, kids, alpha, beta,
+    dispose() { nest.dispose(); parent.dispose(); alpha.dispose(); beta.dispose(); } };
+}
+
+{
+  // --- A: build by hand, mixing every address form and a master span --------
+  const A = arrangement(({ nest, alpha, beta }) => {
+    nest.add({ id: 'q1', at: 2000, rate: 1, deck: alpha, in: 200, out: 1400,
+      provenance: { source: 'ERR 1965-03-12 broadcast', asserter: 'kj', tier: 0,
+        certainty: [{ locus: 'name', cert: 0.95, resp: 'kj', note: 'this is the Kurenniemi segment' },
+                    { locus: 'start', cert: 0.6, resp: 'kj', note: 'tape splice, +/- 2 s' }] } });
+    nest.add({ id: 'q2', at: 12000, rate: 1, deck: alpha, in: { mark: 'chorus-4' }, out: 3600 });
+    nest.add({ id: 'q3', at: 25000, rate: 2, deck: beta, in: 1000, out: 3000,
+      provenance: { source: 'IA rip, uploader unknown', asserter: null, tier: 1, method: 'catmull-rom',
+        certainty: [{ locus: 'name', cert: 0.4, note: 'attribution is an aggregator claim' }] } });
+  });
+
+  const s = A.nest.toScore({ id: 'ekstra-1', meta: { title: 'a score that quotes traces' } });
+  check('score-value', 0, s.quotations.length === 3 && s.id === 'ekstra-1',
+    `toScore must yield one quotation per span: ${JSON.stringify(s).slice(0, 120)}`);
+  check('score-value', 0, s.quotations.every(isQuotation), 'every entry must be a quotation value');
+  check('score-value', 0, String(scoreRefs(s).sort()) === 'alpha,beta',
+    `a score must name its sources: ${scoreRefs(s)}`);
+  // a VALUE: frozen, no live object anywhere, JSON-total
+  check('score-value', 0, Object.isFrozen(s) && Object.isFrozen(s.quotations[0]), 'a quotation/score must be frozen');
+  check('score-value', 0, (() => { try { s.quotations[0].at = 9; } catch { return true; } return s.quotations[0].at === 2000; })(),
+    'a quotation must not be mutable');
+  const json = scoreToJSON(s);
+  check('score-value', 0, !/\[object|function|undefined/.test(json) && json.length > 200,
+    'a score must serialise with no live reference in it');
+  check('score-value', 0, /"mark":"chorus-4"/.test(json) && /"wasAt":2500/.test(json),
+    `a mark address must survive serialisation as a MARK, stamped with what it resolved to: ${json}`);
+  check('score-value', 0, /"locus":"start"/.test(json) && /"cert":0.6/.test(json),
+    "TEI @locus must survive serialisation — boundary uncertainty is not identity uncertainty");
+  // equality is structural, not referential
+  const s2 = parseScore(json);
+  check('score-value', 0, quotationEquals(s.quotations[0], s2.quotations[0]) &&
+    s.quotations[0] !== s2.quotations[0], 'a re-parsed quotation must be EQUAL and not identical');
+  check('score-value', 0, scoreToJSON(s2) === json, 'parse(serialise(x)) must be a fixed point');
+  check('score-value', 0, !quotationEquals(s.quotations[0], s.quotations[1]), 'different quotations must not compare equal');
+  check('score-value', 0, quotationEquals(quotation({ ref: 'a', at: 1, rate: 1, in: 2, out: 3 }),
+    quotation({ in: 2, rate: 1, out: 3, at: 1, ref: 'a' })), 'quotation equality must be key-order-insensitive');
+  check('score-value', 0, /identity/i.test(throws(() => quotation({ at: 0 })) || ''),
+    'a quotation without a ref must be rejected — identity is not optional');
+
+  // --- B: a FRESH RUNTIME with only the JSON and a resolver -----------------
+  const traceA = runScript(A.vr, A.parent, A.nest, A.kids);
+  let loaded = null;
+  const B = arrangement(({ nest, alpha, beta }) => {
+    // the ONLY thing crossing the boundary is `json` and this resolver.
+    loaded = loadScore(JSON.parse(json), (ref) => ({ alpha, beta }[ref]), { nest });
+  });
+  check('score-load', 0, loaded.spans.length === 3 && loaded.report.refs.length === 2,
+    `loadScore must instantiate every quotation: ${JSON.stringify(loaded.report)}`);
+  const traceB = runScript(B.vr, B.parent, B.nest, B.kids);
+
+  check('score-roundtrip', 0, traceA.length === traceB.length, `trace lengths differ: ${traceA.length} vs ${traceB.length}`);
+  let firstDiff = -1;
+  for (let i = 0; i < Math.min(traceA.length, traceB.length); i++) if (traceA[i] !== traceB[i]) { firstDiff = i; break; }
+  check('score-roundtrip', 0, firstDiff === -1,
+    firstDiff < 0 ? '' : `THE C10 PROPERTY FAILED at step ${firstDiff}:\n  A: ${traceA[firstDiff]}\n  B: ${traceB[firstDiff]}`);
+  if (VERBOSE) console.log(`      round-trip trace: ${traceA.length} steps, ${traceA.join('\n').length} chars, identical`);
+
+  // and the reloaded arrangement re-serialises to the SAME score
+  check('score-roundtrip', 0, scoreToJSON(B.nest.toScore({ id: 'ekstra-1', meta: s.meta })) === json,
+    'toScore(loadScore(x)) must be x — the round trip is a fixed point, not an approximation');
+
+  // a resolver that cannot supply a ref fails LOUDLY, naming what it needed
+  const miss = throws(() => loadScore(JSON.parse(json), () => null, { parent: B.parent }));
+  check('score-load', 1, /alpha/.test(miss || '') && /resolve/.test(miss || ''),
+    `an unresolvable ref must name the refs the score needs: ${miss}`);
+  check('score-load', 1, /resolve/.test(throws(() => loadScore(s, undefined, { parent: B.parent })) || ''),
+    'loadScore without a resolver must be rejected — without one a score is just bytes');
+  check('score-load', 1, /version/.test(throws(() => parseScore({ v: 99, quotations: [] })) || ''),
+    'an unknown score version must be rejected, not guessed at');
+  check('score-load', 1, /identity/i.test(throws(() => {
+    const orphan = makeChild(A.vr, newSink());
+    const n = createNest(A.parent, { kind: 'orphan-span' });
+    n.add({ id: 'z', at: 35000, deck: orphan }); n.toScore();
+  }) || ''), 'toScore must refuse to serialise a deck with no identity rather than invent one');
+
+  A.dispose(); B.dispose();
+}
+
+// ===========================================================================
+// suite 11 — MARKS: content addressing, and the case that is the whole reason
+//            for it — A MARK THAT MOVED. The source is re-cut (600 ms of
+//            restored leader spliced in front); the score still lands on the
+//            music. The numbers it would otherwise have stored do not.
+// ===========================================================================
+{
+  const SHIFT = 600;
+  const vr = sharedVR();
+  const sinkV1 = newSink();
+  const v1 = makeChild(vr, sinkV1, [0, CHILD_END], { marks: MARKS_DEF });
+  refDeck(v1, 'tape-A');
+  check('marks', 0, marksOf(v1).length === 3 && marksOf(v1)[0].id === 'chorus-3',
+    `a deck's mark lane must be readable as {id, at, label}: ${JSON.stringify(marksOf(v1))}`);
+
+  const p1 = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 40000], items: [] });
+  const n1 = createNest(p1, { toleranceMs: 5 });
+  const spM = n1.add({ id: 'byMark', at: 5000, rate: 1, deck: v1, in: { mark: 'chorus-3' }, out: { mark: 'coda' } });
+  const spN = n1.add({ id: 'byNumber', at: 15000, rate: 1, deck: v1, in: 900, out: 3600 });
+  check('marks', 0, String(n1.fragment('byMark')) === String([900, 3600]),
+    `a mark address must resolve to the mark's position: ${n1.fragment('byMark')}`);
+  check('marks', 0, String(n1.fragment('byMark')) === String(n1.fragment('byNumber')),
+    'a mark and the number it resolves to must be the same quotation TODAY');
+  check('marks', 0, n1.marks('byMark').in.matchedBy === 'id' && n1.marks('byNumber') === null,
+    'only a mark address gets a mark report');
+  check('marks', 0, /does not resolve/.test(throws(() => n1.add({ id: 'x', at: 30000, deck: v1, in: { mark: 'nope' }, out: 3000 })) || ''),
+    'an unresolvable mark must fail at add(), naming the marks that do exist');
+  check('marks', 0, marksOf(v1).length === 3 && String(v1.range) === String([0, CHILD_END]),
+    'reading marks must not disturb the deck');
+  // the mark's musical truth, captured before the re-cut
+  const musicAtMark = heldAt(900);
+  const json = scoreToJSON(n1.toScore({ id: 'recut-proof' }));
+  check('marks', 0, /"wasAt":900/.test(json), `the score must record what the mark resolved to when written: ${json}`);
+
+  // --- THE RE-CUT: 600 ms of restored leader spliced in front. Marks moved
+  //     WITH the music, because a mark is an event on the same lane.
+  const vr2 = sharedVR();
+  const sinkV2 = newSink();
+  const v2 = makeChild(vr2, sinkV2, [0, CHILD_END + SHIFT], { shift: SHIFT, marks: MARKS_DEF });
+  refDeck(v2, 'tape-A');
+  const p2 = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 40000], items: [] });
+  const { nest: n2, report } = loadScore(JSON.parse(json), () => v2, { parent: p2, toleranceMs: 5 });
+
+  check('marks-moved', 0, String(n2.fragment('byMark')) === String([900 + SHIFT, 3600 + SHIFT]),
+    `the mark-addressed quotation must FOLLOW the re-cut: ${n2.fragment('byMark')}`);
+  check('marks-moved', 0, String(n2.fragment('byNumber')) === String([900, 3600]),
+    `the number-addressed quotation must NOT follow it (that is the point): ${n2.fragment('byNumber')}`);
+  check('marks-moved', 0, report.movedMarks.length === 2 && /moved/.test(report.note || ''),
+    `a moved mark must be REPORTED, never silently followed: ${JSON.stringify(report.movedMarks)}`);
+  check('marks-moved', 0, report.movedMarks.every((m) => m.moved.deltaMs === SHIFT),
+    `the report must say how far it moved: ${JSON.stringify(report.movedMarks.map((m) => m.moved))}`);
+
+  // and now the sentence the whole mechanism exists for:
+  p2.seek(5000);                                     // entry of the mark quotation
+  const heldByMark = heldNow(sinkV2);
+  p2.seek(15000);                                    // entry of the number quotation
+  const heldByNumber = heldNow(sinkV2);
+  check('marks-moved', 0, String(heldByMark) === String(musicAtMark) && musicAtMark.length > 0,
+    `the MARK-addressed quotation opens on the same music as before the re-cut: [${heldByMark}] vs [${musicAtMark}]`);
+  check('marks-moved', 0, String(heldByNumber) !== String(musicAtMark),
+    `the NUMBER-addressed quotation opens on DIFFERENT music after the re-cut ([${heldByNumber}]) — ` +
+    'if this ever passes trivially the test has stopped proving anything');
+  check('marks-moved', 0, String(heldByNumber) === String(heldAt(900 - SHIFT)),
+    `…and specifically on whatever now sits at the old number: [${heldByNumber}]`);
+
+  n1.dispose(); p1.dispose(); v1.dispose(); n2.dispose(); p2.dispose(); v2.dispose();
+}
+
+// ===========================================================================
+// suite 12 — RULE 9: caps.absentState / silence(). A quotation parked at its
+//            edge asserts whatever `in`/`out` cut, so a MIDI actuator holds an
+//            edge note for the whole time the span is absent. An adapter may
+//            declare how to be silent; the nest never learns what a note is.
+// ===========================================================================
+{
+  const IN = 700, OUT = 2800, AT = 5000;            // both edges cut held notes
+  const mk = (opts) => {
+    const vr = sharedVR();
+    const sink = newSink();
+    const silenced = [];
+    const child = makeChild(vr, sink, [0, CHILD_END], {
+      ...opts,
+      silence: opts.withSilence ? (info) => { silenced.push(info); sink.live = new Set(); } : undefined,
+    });
+    const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 40000], items: [] });
+    const nest = createNest(parent, { toleranceMs: 5 });
+    nest.add({ id: 'q', at: AT, rate: 1, deck: child, in: IN, out: OUT });
+    return { vr, sink, child, parent, nest, silenced,
+      dispose() { nest.dispose(); parent.dispose(); child.dispose(); } };
+  };
+
+  // --- NEGATIVE CONTROL: no declaration -> today's behaviour, unchanged.
+  const hold = mk({});
+  hold.parent.seek(AT + (OUT - IN) + 500);
+  check('absent', 'hold', heldAt(OUT).length > 0 && String(heldNow(hold.sink)) === String(heldAt(OUT)),
+    `default absentState must HOLD the edge state (a video frame wants exactly this): [${heldNow(hold.sink)}]`);
+  check('absent', 'hold', hold.nest.absent('q') === null || hold.nest.absent('q').mode === 'hold',
+    'an adapter that declared nothing must be reported as holding');
+  hold.dispose();
+
+  // --- the declaration
+  const sil = mk({ absentState: 'silence', withSilence: true });
+  sil.parent.seek(AT + 400);                        // inside: normal assertion
+  check('absent', 'silence', String(heldNow(sil.sink)) === String(heldAt(IN + 400)) && sil.silenced.length === 0,
+    `inside the quotation nothing is silenced: [${heldNow(sil.sink)}]`);
+  sil.parent.seek(AT + (OUT - IN) + 500);           // past `out`
+  check('absent', 'silence', sil.silenced.length === 1 && sil.silenced[0].kind === 'note',
+    `going absent must call the adapter's silence() exactly once: ${JSON.stringify(sil.silenced)}`);
+  check('absent', 'silence', sil.silenced[0].pos === OUT && sil.silenced[0].reason === 'absent' &&
+    sil.silenced[0].span === 'q' && sil.silenced[0].in === IN && sil.silenced[0].out === OUT,
+    `silence() must be told where and why, and for which quotation: ${JSON.stringify(sil.silenced[0])}`);
+  check('absent', 'silence', heldNow(sil.sink).length === 0 && heldAt(OUT).length > 0,
+    `a quotation whose \`out\` cuts a held note must not hold it while absent: [${heldNow(sil.sink)}]`);
+  check('absent', 'silence', sil.child.position() === OUT,
+    'silencing must not move the child off its park (absence is still a POSITION)');
+  const rep = sil.nest.absent('q');
+  check('absent', 'silence', rep.mode === 'silence' && String(rep.kinds) === 'note' && rep.degraded.length === 0,
+    `the absent report must name the lanes silenced: ${JSON.stringify(rep)}`);
+  check('absent', 'silence', sil.nest.driftStats().spans[0].silences === 1,
+    'driftStats must carry the silence count');
+
+  // idempotent: staying absent must not re-silence every tick
+  sil.parent.seek(AT + (OUT - IN) + 900);
+  sil.parent.seek(AT + (OUT - IN) + 1300);
+  check('absent', 'silence', sil.silenced.length === 1,
+    `staying absent must not re-fire silence(): ${sil.silenced.length} calls`);
+  // …but leaving through the OTHER edge is a different park, and re-silences
+  sil.parent.seek(AT - 500);
+  check('absent', 'silence', sil.silenced.length === 2 && sil.silenced[1].pos === IN,
+    `parking at the other edge must re-ask: ${JSON.stringify(sil.silenced.map((s) => s.pos))}`);
+  // SELF-HEALING: re-entering re-folds and re-asserts, with no help from rule 9
+  sil.parent.seek(AT + 400);
+  check('absent', 'silence', String(heldNow(sil.sink)) === String(heldAt(IN + 400)),
+    `re-entering must restore the state by the ordinary fold: [${heldNow(sil.sink)}]`);
+  sil.dispose();
+
+  // --- a declaration the adapter cannot back is a DEGRADATION, out loud
+  const lie = mk({ absentState: 'silence' });        // declares it, implements nothing
+  lie.parent.seek(AT + (OUT - IN) + 500);
+  const lr = lie.nest.absent('q');
+  check('absent', 'degraded', lr.degraded.length === 1 && /implements no silence\(\)/.test(lr.degraded[0].reason),
+    `declaring absentState with no silence() must be reported: ${JSON.stringify(lr)}`);
+  check('absent', 'degraded', lr.mode === 'hold' && String(heldNow(lie.sink)) === String(heldAt(OUT)),
+    'a degraded silence must fall back to holding, not to guessing');
+  check('absent', 'degraded', lie.nest.driftStats().spans[0].absentDegradations === 1,
+    'the degradation must reach driftStats');
+  lie.dispose();
+
+  // --- an unknown mode is also a degradation, never a silent no-op
+  const weird = mk({ absentState: 'mute-ish' });
+  weird.parent.seek(AT + (OUT - IN) + 500);
+  check('absent', 'unknown', /not a mode this nest knows/.test((weird.nest.absent('q').degraded[0] || {}).reason || ''),
+    `an unknown absentState must be reported: ${JSON.stringify(weird.nest.absent('q'))}`);
+  weird.dispose();
+}
+
+// ===========================================================================
+// suite 13 — PROVENANCE THAT SURVIVES THE DOOR: three carriers, validated
+//            against published field names.
+// ===========================================================================
+{
+  const vr = sharedVR();
+  const sink = newSink();
+  const child = makeChild(vr, sink, [0, CHILD_END], { marks: MARKS_DEF });
+  refDeck(child, 'kurenniemi-1972');
+  const parent = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 40000], items: [] });
+  const nest = createNest(parent, { toleranceMs: 5 });
+  nest.add({ id: 'A', at: 5000, rate: 1, deck: child, in: { mark: 'chorus-3' }, out: { mark: 'coda' },
+    provenance: { source: 'Internet Archive rip; uploader unknown', asserter: 'kj', tier: 0,
+      certainty: [{ locus: 'name', cert: 0.85, resp: 'kj', note: 'attribution is an aggregator claim' },
+                  { locus: 'start', cert: 0.5, resp: 'kj', note: 'tape splice', widthMs: 2000 }] } });
+  nest.add({ id: 'B', at: 20000, rate: 2, deck: child, in: 200, out: 800,
+    provenance: { source: 'restored', tier: 1, method: 'catmull-rom' } });
+
+  // --- (a) C2PA-shaped ----------------------------------------------------
+  const c = exportProvenance(nest, { carrier: 'c2pa' });
+  check('export-c2pa', 0, c.validation.ok, `C2PA shape must validate: ${JSON.stringify(c.validation.errors)}`);
+  check('export-c2pa', 0, c.validation.seen.temporal >= 3 && c.validation.seen.ratings >= 2,
+    `there must be real TEMPORAL regions and real reviewRatings: ${JSON.stringify(c.validation.seen)}`);
+  const act = c.doc.assertions[0].data.actions[0];
+  check('export-c2pa', 0, c.doc.assertions[0].label === 'c2pa.actions.v2' && Array.isArray(act.changes),
+    'the actions assertion must carry Action.changes (§18.15.4.6)');
+  const roi = act.changes[0].region[0];
+  check('export-c2pa', 0, roi.type === 'temporal' && roi.time.type === 'npt' &&
+    roi.time.start === npt(5000) && roi.time.end === npt(5000 + 2700),
+    `the region must be a temporal npt range over PARENT time: ${JSON.stringify(roi)}`);
+  check('export-c2pa', 0, typeof roi.time.start === 'string' && typeof roi.time.end === 'string',
+    'npt start/end are tstr in the CDDL — numbers will not round-trip through c2pa-rs');
+  check('export-c2pa', 0, act.digitalSourceType.endsWith('/digitalCapture') &&
+    c.doc.assertions[0].data.actions[1].digitalSourceType.endsWith('/algorithmicallyEnhanced'),
+    `the IPTC digitalSourceType must follow §5b's tier: ${act.digitalSourceType}`);
+  const bnd = act.changes.find((x) => x.name === 'A:start');
+  check('export-c2pa', 0, bnd && bnd.region[0].time.start === npt(5000 - 2000) && bnd.role === 'c2pa.areaOfInterest',
+    `TEI @locus='start' must become its own region — C2PA cannot say WHICH part of a claim a rating qualifies: ${JSON.stringify(bnd)}`);
+  check('export-c2pa', 0, toReviewRating(0.85) === 4 && toReviewRating(0) === 1 && toReviewRating(1) === 5,
+    'confidence must map onto the int-range 1..5 rating-map');
+  const ing = c.doc.assertions.find((a) => a.label === 'c2pa.ingredient.v3');
+  check('export-c2pa', 0, ing && ing.data.metadata.regionOfInterest.region[0].time.start === npt(900),
+    `§18.16.13 (normative): the portion of the INGREDIENT used must be a regionOfInterest in the SOURCE's domain: ${JSON.stringify(ing && ing.data.metadata.regionOfInterest)}`);
+  check('export-c2pa', 0, JSON.stringify(act.parameters).includes('"locus":"start"'),
+    'the unquantised TEI model must survive verbatim in our namespace, since no C2PA field holds it');
+  check('export-c2pa', 0, c.caveats.length >= 4 && c.caveats.some((x) => /NOT SIGNED/.test(x)) &&
+    c.caveats.some((x) => /verify-site|conformance/.test(x)),
+    'every export must carry what it is NOT: unsigned, and unreadable by any shipping tool');
+
+  // negative control: the validator must actually reject a wrong spelling
+  const wrong = JSON.parse(JSON.stringify(c.doc));
+  wrong.assertions[0].data.actions[0].changes[0].region[0].type = 'time';
+  wrong.assertions[0].data.actions[0].regionOfInterest = {};
+  const v2 = validateProvenance(wrong, 'c2pa');
+  check('export-c2pa', 1, !v2.ok && v2.errors.length >= 2,
+    `NEGATIVE CONTROL: a misspelled range type and a misplaced field must FAIL: ${JSON.stringify(v2)}`);
+  const wrong2 = JSON.parse(JSON.stringify(c.doc));
+  wrong2.assertions[0].metadata.reviewRatings[0].value = 7;
+  check('export-c2pa', 1, !validateProvenance(wrong2, 'c2pa').ok, 'a rating outside 1..5 must fail');
+
+  // --- (b) EXT-X-DATERANGE ------------------------------------------------
+  const h = exportProvenance(nest, { carrier: 'hls', anchor: '2026-08-28T09:00:00.000Z' });
+  check('export-hls', 0, h.validation.ok, `HLS tags must validate: ${JSON.stringify(h.validation.errors)}`);
+  check('export-hls', 0, h.tags.length === 2 && h.tags.every((t) => t.startsWith('#EXT-X-DATERANGE:')),
+    `one tag per claim: ${h.tags.length}`);
+  check('export-hls', 0, /ID="A",CLASS="org\.elektron\.timeline\.quotation",START-DATE="2026-08-28T09:00:05\.000Z"/.test(h.tags[0]),
+    `START-DATE is WALL CLOCK (anchor + parent position): ${h.tags[0]}`);
+  check('export-hls', 0, /X-ORG-ELEKTRON-REF="kurenniemi-1972"/.test(h.tags[0]) &&
+    /X-ORG-ELEKTRON-IN=0\.9/.test(h.tags[0]) && /X-ORG-ELEKTRON-CERT-START=0\.5/.test(h.tags[0]),
+    `client attributes must be reverse-DNS X- and carry the TEI loci: ${h.tags[0]}`);
+  check('export-hls', 0, /DURATION=2\.7/.test(h.tags[0]), `DURATION is decimal SECONDS of parent time: ${h.tags[0]}`);
+  check('export-hls', 0, !validateProvenance(['#EXT-X-DATERANGE:CLASS="x",X_BAD=1'], 'hls').ok,
+    'NEGATIVE CONTROL: a missing ID and a non-conforming client attribute must fail');
+  check('export-hls', 0, /anchor/.test(throws(() => exportProvenance(nest, { carrier: 'hls', anchor: 'not-a-date' })) || ''),
+    'HLS export without a real wall-clock anchor must be rejected, not defaulted');
+
+  // --- (c) OTIO-shaped ----------------------------------------------------
+  const o = exportProvenance(nest, { carrier: 'otio', title: 'ekstra-1' });
+  check('export-otio', 0, o.validation.ok, `OTIO shape must validate: ${JSON.stringify(o.validation.errors)}`);
+  const track = o.doc.tracks.children[0];
+  const clips = track.children.filter((x) => x.OTIO_SCHEMA === 'Clip.2');
+  check('export-otio', 0, o.validation.seen.clips === 2 && track.children.some((x) => x.OTIO_SCHEMA === 'Gap.1'),
+    `two clips and a real Gap between them: ${track.children.map((x) => x.OTIO_SCHEMA)}`);
+  check('export-otio', 0, clips[0].source_range.start_time.value === 900 && clips[0].source_range.start_time.rate === 1000,
+    `source_range is in the SOURCE's domain at rate 1000 (ms — no 23.976 rounding class exists here): ${JSON.stringify(clips[0].source_range)}`);
+  check('export-otio', 0, clips[0].media_reference.target_url === 'elektron:deck/kurenniemi-1972',
+    'the media reference must name the deck by the same ref a score uses');
+  check('export-otio', 0, clips[1].effects[0].OTIO_SCHEMA === 'LinearTimeWarp.1' && clips[1].effects[0].time_scalar === 2,
+    `a rate != 1 must become a LinearTimeWarp: ${JSON.stringify(clips[1].effects)}`);
+  check('export-otio', 0, clips[0].metadata['org.elektron.timeline'].certainty.some((x) => x.locus === 'start'),
+    'the namespaced metadata dict is the only carrier that loses NOTHING');
+  check('export-otio', 0, clips[0].markers.length === 2 && clips[0].markers[0].OTIO_SCHEMA === 'Marker.2',
+    `mark addresses must surface as OTIO markers: ${JSON.stringify(clips[0].markers.map((m) => m.name))}`);
+  const badOtio = JSON.parse(JSON.stringify(o.doc));
+  badOtio.tracks.children[0].children.find((x) => x.OTIO_SCHEMA === 'Clip.2').metadata = { elektron: {} };
+  check('export-otio', 0, !validateProvenance(badOtio, 'otio').ok,
+    'NEGATIVE CONTROL: a non-namespaced metadata key must fail (reverse-DNS is the convention that makes the hook safe)');
+
+  // --- a SCORE exports too (no live decks needed for the numeric case) -----
+  const sc = nest.toScore({ id: 'ekstra-1' });
+  const cs = exportProvenance(sc, { carrier: 'c2pa', resolve: () => child });
+  check('export-score', 0, cs.validation.ok && cs.rows.length === 2 && cs.rows[0].ref === 'kurenniemi-1972',
+    `a stored score must export the same claims as the live arrangement: ${JSON.stringify(cs.validation.errors)}`);
+  check('export-score', 0, /unknown carrier/.test(throws(() => exportProvenance(sc, { carrier: 'xmp' })) || ''),
+    'an unknown carrier must be rejected');
+
+  nest.dispose(); parent.dispose(); child.dispose();
+}
+
+// --- suite 13b: a DECK subject — "these seconds were reconstructed" ---------
+{
+  const vr = sharedVR();
+  const items = [];
+  for (const t of [0, 1000, 5000, 6000]) items.push({ at: t, kind: 'curve', payload: { v: t } });
+  const deck = createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), items, range: [0, 6000], evidence: 'all',
+    adapters: { curve: { caps: { continuous: true, interpolate: true, tier: 1 }, actuate() {},
+      interpolate: (a, b, u) => ({ v: a.v + (b.v - a.v) * u }) } },
+  });
+  refDeck(deck, 'pointer-trace');
+  const rc = deck.registerReconstructor('catmull', { from: 'curve', tier: 1, method: 'catmull-rom', hz: 20 });
+  rc.run();
+  const d = exportProvenance(deck, { carrier: 'c2pa' });
+  check('export-deck', 0, d.validation.ok && d.rows.length === 1 && d.rows[0].kind === 'reconstruction',
+    `a deck with a reconstructor must export a time-ranged restoration claim: ${JSON.stringify(d.validation.errors)}`);
+  const a0 = d.doc.assertions[0].data.actions[0];
+  check('export-deck', 0, a0.action === 'c2pa.edited' && a0.digitalSourceType.endsWith('/algorithmicallyEnhanced') &&
+    a0.changes[0].region[0].type === 'temporal',
+    `§5b tier 1 must land on IPTC algorithmicallyEnhanced over a temporal region: ${JSON.stringify(a0.digitalSourceType)}`);
+  check('export-deck', 0, d.rows[0].confidence !== null && d.rows[0].confidence <= 1,
+    `the reconstructor's own confidence curve must reach the export: ${d.rows[0].confidence}`);
+  const h = exportProvenance(deck, { carrier: 'hls', anchor: 0 });
+  check('export-deck', 0, h.validation.ok && /X-ORG-ELEKTRON-TIER=1/.test(h.tags[0]),
+    `…and onto the live lane as an X- attribute: ${h.tags[0]}`);
+  deck.dispose();
+}
+
 if (failures) {
   console.error(`prop-nested: ${failures} VIOLATION(S) in ${checks} checks`);
   process.exit(1);
@@ -669,4 +1115,8 @@ console.log(`prop-nested OK: ${checks} checks, 0 violations`);
 console.log('fragment OK: (out-in)/rate span length / entry seeks+asserts at `in` / `out` is the child\'s end / parent seek maps exact / clamp reported / in>=out + wholly-outside + overlapping-quotation rejected / THE SAME DECK QUOTED TWICE, both playing correctly, child range untouched');
 console.log('rVFC (L4b) OK: an element without requestVideoFrameCallback is untouched / a fresh frame\'s mediaTime is CARRIED onto now through expectedDisplayTime and used / a stale sample falls back to currentTime (the hidden-tab path) / a sample from before a discontinuity is REJECTED so L2 still sees the raw currentTime and seeks / useRvfc:false and variableFps:true register no callback at all');
 console.log('mediaMaster OK: NEGATIVE CONTROL (sync across a 9 s gap BURSTS a catchUp:burst lane) / the helper SEEKS instead and folds / small errors still sync with no re-fire / the master is never nudged / timeupdate backstop attached+detached / seeking is not a clock / stall holds (1 element) and releases (N tiles)');
+console.log('score OK (C10): a quotation is a FROZEN VALUE naming its source by identity / toScore -> JSON -> loadScore in a FRESH RUNTIME with only bytes + a resolver plays IDENTICALLY (trace-for-trace) / toScore(loadScore(x)) === x / an unresolvable ref and an unnamed deck fail loudly');
+console.log('marks OK: {mark:\'chorus-3\'} resolves against the child\'s own mark lane at add() / numeric in/out unchanged / after a RE-CUT the mark-addressed quotation opens on the SAME MUSIC and the number-addressed one does not, and the move is reported');
+console.log('absentState OK (rule 9): default holds the edge / a declared silence() is called once per park, told where/why/which quotation, and re-entry self-heals by the ordinary fold / declaring it without implementing it is a reported DEGRADATION, as is an unknown mode');
+console.log('provenance export OK: C2PA Action.changes[].regionOfInterest temporal npt + reviewRatings 1-5 + ingredient regionOfInterest (§18.16.13) / EXT-X-DATERANGE with reverse-DNS X- attributes off a wall-clock anchor / OTIO Clip.2 + LinearTimeWarp + Marker.2 + namespaced metadata / all three validated against published field names, with negative controls');
 console.log('setRange OK: durationMs follows / range keeps its identity / narrowing re-folds with a real seek / runtime items + auto / cursor exact and still O(1) across a range change and lane insertions');

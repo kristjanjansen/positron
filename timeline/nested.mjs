@@ -87,6 +87,26 @@
 //       parent time — a deck has one position, so an overlap is not a trim
 //       problem but an arithmetic impossibility, and it is rejected at add().
 //
+// 8. A QUOTATION IS A VALUE (timeline/score.mjs, plan-timeline §7.7 / C10).
+//    `add()` also takes a serialisable `quotation({ref, at, rate, in, out,
+//    provenance})` — which names its source by IDENTITY, not by object — and
+//    `nest.toScore()` turns a live arrangement back into one. `in`/`out` may be
+//    `{mark: 'chorus-3'}`, resolved against the child's own `mark` lane at ADD
+//    time, so a score survives a re-cut of its source that numbers would not.
+//    Numeric in/out is untouched: rule 7 is unchanged, it just gained an
+//    address type.
+//
+// 9. ABSENCE MAY BE SILENT, AND THE NEST NEVER LEARNS WHAT A NOTE IS. Rule 7b/c
+//    parks the child at the fragment edge and asserts there — so a quotation
+//    whose `in` cuts a held note is parked HOLDING it, and a MIDI actuator sits
+//    on that note for the whole time the span is absent. An adapter may declare
+//    `caps.absentState: 'silence'` and implement `silence(info)`; the nest calls
+//    it after the park and knows nothing about what was silenced. The default
+//    is `'hold'` — today's behaviour, and the right one for a video frame.
+//    Declaring 'silence' without implementing `silence()` is a DEGRADATION, and
+//    it is reported (`span.absent.degraded`, `driftStats().spans[].absent`),
+//    never guessed at.
+//
 // No timers live in here (the vector law): `servo()` is called by the client's
 // existing rAF/interval loop, exactly like the media servo every media client
 // already runs.
@@ -94,6 +114,7 @@
 // Plain ESM, browser+node, no deps beyond the library itself.
 
 import { pstats } from './logdeck.mjs';
+import { isQuotation, quotation, score, deckRef, refDeck, resolveAddress, isMarkAddress, normalizeProvenance } from './score.mjs';
 
 // --- the nesting graph (rule 6) --------------------------------------------
 const CHILDREN = new WeakMap();   // deck -> Set<deck>
@@ -171,6 +192,8 @@ export function createNest(parent, {
   toleranceMs = 40,
   hardSeekMs = 250,
   epsMs = 0.5,
+  resolve = null,          // rule 8: (ref, quotation) -> deck, for score loading
+  markKind = 'mark',       // rule 8: the child lane a {mark:'id'} address reads
 } = {}) {
   const spans = new Map();     // id -> span record
   let masterId = null, servoTicks = 0, disposed = false;
@@ -205,6 +228,51 @@ export function createNest(parent, {
     return true;
   };
 
+  /** RULE 9. The adapters of a child deck, for the one purpose of asking them
+   *  to be silent. `deck.adapters` is the constructor-registered map that
+   *  transport.mjs already exposes.
+   *
+   *  ⚠ SEAM: an adapter registered AFTER construction (`deck.sched
+   *  .registerAdapter(...)`) lives in the scheduler's private map and is not
+   *  reachable from here. transport.mjs is owned by a sibling this cycle, so the
+   *  hook it wants — `sched.adapter(kind)` or a `deck.silence()` that fans out
+   *  internally — is NOT added here. Until it exists, such an adapter is
+   *  reported as `unreachable` rather than silently skipped. */
+  const adaptersOf = (deck) => (deck && deck.adapters && typeof deck.adapters === 'object' ? deck.adapters : {});
+
+  /** Ask every lane of the child that declared `caps.absentState:'silence'` to
+   *  be silent. The nest passes a reason and a position and learns nothing about
+   *  what a note is — that is the whole point of putting this on the adapter. */
+  function silenceChild(sp, park, reason) {
+    const caps = typeof sp.deck.caps === 'function' ? (sp.deck.caps() || {}) : {};
+    const ads = adaptersOf(sp.deck);
+    const rep = { mode: 'hold', kinds: [], degraded: [], park, reason };
+    for (const [k, c] of Object.entries(caps)) {
+      const mode = (c && c.absentState) || 'hold';
+      if (mode === 'hold') continue;
+      if (mode !== 'silence') {
+        rep.degraded.push({ kind: k, wanted: mode, chose: 'hold', degraded: true,
+          reason: `caps.absentState '${mode}' is not a mode this nest knows — use 'hold' | 'silence'` });
+        continue;
+      }
+      const ad = ads[k];
+      if (!ad || typeof ad.silence !== 'function') {
+        rep.degraded.push({ kind: k, wanted: 'silence', chose: 'hold', degraded: true,
+          reason: ad ? `adapter '${k}' declares caps.absentState 'silence' but implements no silence()`
+                     : `adapter '${k}' is not reachable through deck.adapters (registered after construction) — see the transport.mjs seam note in nested.mjs`,
+          unreachable: !ad });
+        continue;
+      }
+      ad.silence({ kind: k, deck: sp.deck, pos: park, reason, span: sp.id, in: sp.c0, out: sp.c1 });
+      rep.kinds.push(k);
+      rep.mode = 'silence';
+    }
+    sp.absent = rep;
+    if (rep.kinds.length) sp.silences++;
+    if (rep.degraded.length) sp.absentDegradations++;
+    return rep;
+  }
+
   function applyRate(sp) {
     const r = composeRate(parent.targetRate(), sp.rate, sp.allowed);
     if (r.degraded && (!sp.rateReport || sp.rateReport.chose !== r.chose)) sp.degradations++;
@@ -237,12 +305,19 @@ export function createNest(parent, {
       // already been spent. Absence is a POSITION, not an edge event, so the
       // park is now driven by where the child actually is.
       const park = parentPos < sp.at ? sp.c0 : sp.c1;
-      if (parksIt(sp, parentPos) && sp.deck.position() !== park) sp.deck.seek(park);
+      if (parksIt(sp, parentPos)) {
+        if (sp.deck.position() !== park) { sp.deck.seek(park); sp.silencedAt = null; }
+        // RULE 9: the park ASSERTED the edge — whatever `in`/`out` cut is now
+        // held. An adapter that declared how to be silent gets asked, exactly
+        // once per park position (a re-park at a different edge re-asks).
+        if (sp.silencedAt !== park) { silenceChild(sp, park, 'absent'); sp.silencedAt = park; }
+      }
       if (sp.present !== false) { sp.present = false; sp.exits++; }
       return;
     }
     applyRate(sp);
     sp.deck.seek(toChild(sp, parentPos));
+    sp.silencedAt = null;                    // present again: the fold re-asserts
     if (sp.present !== true) { sp.present = true; sp.enters++; }
     if (parent.playing() && sp.rateReport.chose > 0) sp.deck.play(); else sp.deck.pause();
   }
@@ -305,15 +380,34 @@ export function createNest(parent, {
      *  on a fragment wholly outside the child's range, and on two quotations of
      *  one deck overlapping in parent time.
      *
-     *  @param opts {id, at, rate, deck, in, out, master}
+     *  @param spec {id, at, rate, deck, in, out, master, ref?, provenance?, meta?}
      *              `in`/`out` are positions in the CHILD's domain and default
      *              to `deck.range` — the whole-range case is the default case.
+     *              They may also be `{mark:'chorus-3', offset?}` (rule 8).
+     *              — OR — a QUOTATION VALUE from score.mjs, in which case the
+     *              deck comes from `extra.resolve ?? nest's resolve` applied to
+     *              `quotation.ref`. That is the whole of "a score can be loaded
+     *              in a process that has never seen the decks".
+     *  @param extra {resolve, markKind, deck}
      */
-    add(opts = {}) {
+    add(spec = {}, extra = {}) {
+      if (disposed) throw new Error('nest disposed');
+      // --- rule 8: a quotation VALUE is an acceptable argument ---------------
+      let opts = spec, qval = null;
+      if (isQuotation(spec)) {
+        qval = spec;
+        const res = extra.resolve || resolve;
+        const d = extra.deck || (res ? res(qval.ref, qval) : null);
+        if (!d) throw new Error(`nest.add: quotation names ref '${qval.ref}' and no resolver supplied a deck for it — ` +
+          'pass createNest(parent, {resolve}) or nest.add(q, {resolve}) (a quotation names its source by IDENTITY, never by object)');
+        opts = { id: qval.id === null ? undefined : qval.id, at: qval.at, rate: qval.rate, deck: d,
+                 master: !!qval.master, in: qval.in, out: qval.out,
+                 provenance: qval.provenance, meta: qval.meta, ref: qval.ref };
+      }
       const { at = 0, rate = 1, deck, master = false } = opts;
       let { id } = opts;
-      if (disposed) throw new Error('nest disposed');
       if (!deck || typeof deck.position !== 'function') throw new Error('nest.add needs a deck');
+      if (opts.ref) refDeck(deck, String(opts.ref));
       if (!(rate > 0)) throw new Error('nest.add needs a positive span rate');
       if (id === undefined) id = `n${spans.size}`;
       if (spans.has(id)) throw new Error(`nested span ${id} already exists`);
@@ -322,10 +416,19 @@ export function createNest(parent, {
 
       // --- rule 7: the fragment. The child is NEVER touched: everything below
       // lands on the SPAN record, so one deck can carry many quotations. ------
+      //
+      // rule 8: `in`/`out` are ADDRESSES now — a number, or `{mark:'chorus-3'}`
+      // resolved against the child's own mark lane. Resolution happens HERE, at
+      // add() time, so everything downstream still sees two numbers.
+      const mk = extra.markKind || markKind;
       const [d0, d1] = deck.range;
       const isFrag = opts.in !== undefined || opts.out !== undefined;
-      const wantIn = opts.in === undefined ? d0 : +opts.in;
-      const wantOut = opts.out === undefined ? d1 : +opts.out;
+      const inA = opts.in === undefined ? null : resolveAddress(deck, opts.in, { kind: mk, where: 'in' });
+      const outA = opts.out === undefined ? null : resolveAddress(deck, opts.out, { kind: mk, where: 'out' });
+      const wantIn = inA ? inA.at : d0;
+      const wantOut = outA ? outA.at : d1;
+      const marks = (inA && inA.mark) || (outA && outA.mark)
+        ? { in: inA && inA.mark ? inA : null, out: outA && outA.mark ? outA : null } : null;
       if (!Number.isFinite(wantIn) || !Number.isFinite(wantOut))
         throw new Error('nest.add: in/out must be finite positions in the child domain');
       if (wantIn >= wantOut)                                              // 7f
@@ -359,6 +462,16 @@ export function createNest(parent, {
         parentDur: 0, present: null, enters: 0, exits: 0, degradations: 0,
         hardSeeks: 0, masterSuspended: 0, parentCorrections: [], childCorrections: [],
         allowed: rateLattice(deck), rateReport: null,
+        // rule 8: the ADDRESSES as authored (a mark stays a mark), so toScore()
+        // gives back what was written and not what it happened to resolve to.
+        marks, quotation: qval,
+        quoted: { at, rate, master: !!master, in: opts.in, out: opts.out,
+                  // normalised HERE so a bad @locus / tier is a rejection at add()
+                  // time, not a surprise at export time.
+                  provenance: normalizeProvenance(opts.provenance, `nest.add('${id}')`),
+                  meta: opts.meta ?? null },
+        // rule 9
+        absent: null, silencedAt: null, silences: 0, absentDegradations: 0,
       };
       sp.parentDur = parentDurOf(sp);
       spans.set(id, sp);
@@ -433,6 +546,37 @@ export function createNest(parent, {
     /** every span quoting this deck — the "one timeline, many quotations" read */
     quotationsOf: (deck) => [...spans.values()].filter((sp) => sp.deck === deck),
 
+    // --- rule 8: a quotation is a VALUE ------------------------------------
+
+    /** The serialisable quotation VALUE for one span — `{ref, at, rate, in,
+     *  out, provenance}`, frozen, JSON-safe, with no live reference in it.
+     *  A mark address stays a mark address, and carries `wasAt`: what it
+     *  resolved to when this score was written, so a later load can say out loud
+     *  that the mark MOVED. */
+    quotation(id) {
+      const sp = spans.get(id);
+      if (!sp) return null;
+      const ref = deckRef(sp.deck);
+      if (!ref) throw new Error(`nest.quotation('${id}'): the quoted deck has no identity. ` +
+        `Name it — refDeck(deck, '<ref>') or nest.add({…, ref:'<ref>'}) — because a quotation names its source by identity, never by object.`);
+      const stamp = (addr, m) => (isMarkAddress(addr) && m ? { ...addr, wasAt: m.at } : addr);
+      return quotation({
+        id: sp.id, ref, at: sp.quoted.at, rate: sp.quoted.rate, master: sp.quoted.master,
+        in: stamp(sp.quoted.in, sp.marks && sp.marks.in), out: stamp(sp.quoted.out, sp.marks && sp.marks.out),
+        provenance: sp.quoted.provenance, meta: sp.quoted.meta,
+      });
+    },
+    /** THE ROUND TRIP, outbound half: a live arrangement -> a value that
+     *  `JSON.stringify` accepts and `loadScore()` reads back. */
+    toScore(opts = {}) {
+      return score({ id: opts.id, meta: opts.meta,
+        quotations: [...spans.keys()].map((id) => nest.quotation(id)) });
+    },
+    /** rule 8: how a span's mark addresses resolved (and whether they moved) */
+    marks: (id) => { const sp = spans.get(id); return sp ? sp.marks : null; },
+    /** rule 9: what the child did when this span went absent */
+    absent: (id) => { const sp = spans.get(id); return sp ? sp.absent : null; },
+
     /** rule 5: NESTED stats. The child's drift channel stays in the child's
      *  domain; the parent gets a table of spans, not an average. */
     driftStats() {
@@ -442,6 +586,8 @@ export function createNest(parent, {
           id: sp.id, at: sp.at, rate: sp.rate, master: sp.master,
           parentDurMs: +sp.parentDur.toFixed(3), childRange: [sp.c0, sp.c1],
           fragment: sp.trim.fragment ? [sp.c0, sp.c1] : null, deckRange: sp.deckRange, trim: sp.trim,
+          marks: sp.marks, absent: sp.absent, silences: sp.silences,
+          absentDegradations: sp.absentDegradations,
           present: sp.present, enters: sp.enters, exits: sp.exits,
           rate_composition: sp.rateReport, degradations: sp.degradations,
           hardSeeks: sp.hardSeeks, masterSuspended: sp.masterSuspended,
