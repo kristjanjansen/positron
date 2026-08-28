@@ -1,7 +1,7 @@
 {
  "subject": "Erkki Kurenniemi (1941–2017)",
- "generated": "2026-08-28T06:43:14.147Z",
- "generator": "proto/kurenniemi/ingest.mjs",
+ "generated": "2026-08-28T08:24:04.712Z",
+ "generator": "proto/kurenniemi/ingest.mjs --rewhen",
  "note": "Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.",
  "corpusRange": {
   "from": 1963,
@@ -39,7 +39,18 @@
    },
    "at": -898732800000,
    "bandMs": 86400000,
-   "precision": "day"
+   "precision": "day",
+   "when": {
+    "verbatim": "+1941-07-10T00:00:00Z",
+    "edtf": "1941-07-10",
+    "earliest": -898732800000,
+    "latest": -898646400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
@@ -77,7 +88,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
@@ -113,7 +135,18 @@
    },
    "at": -220924800000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
+    "edtf": "1963",
+    "earliest": -220924800000,
+    "latest": -189388800000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
@@ -151,7 +184,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - On-Off.mp3",
@@ -190,7 +234,18 @@
    },
    "at": -220924800000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1963-00-00T00:00:00Z",
+    "edtf": "1963",
+    "earliest": -220924800000,
+    "latest": -189388800000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-title-match@1",
+    "kind": "ignorance",
+    "note": "No date on the file; a Wikidata work with the same normalised title carries one, and its declared precision is inherited whole."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
@@ -228,7 +283,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni II (64 kbps).mp3",
@@ -266,7 +332,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen Ääniä .mp3",
@@ -304,7 +381,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Sähkösoittimen ääniä .mp3",
@@ -342,7 +430,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Virsi (64 kbps).mp3",
@@ -380,7 +479,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/M.A. Numminen & Erkki Kurenniemi - Oigu-S (64 kbps).mp3",
@@ -418,7 +528,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/M.A. Nummisen sähkökvartetti - Kaukana väijyy ystäviä (64 kbps).mp3",
@@ -456,7 +577,18 @@
    },
    "at": -220924800000,
    "bandMs": 347155200000,
-   "precision": "range"
+   "precision": "range",
+   "when": {
+    "verbatim": null,
+    "edtf": "1963/1973",
+    "earliest": -220924800000,
+    "latest": 126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "corpus-range@1",
+    "kind": "ignorance",
+    "note": "No date evidence at all on the file. The bracket is the corpus range: Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes. A lower AND upper bound that are true, in place of a point that is false."
+   }
   },
   {
    "id": "wd:Q115918920",
@@ -482,7 +614,18 @@
    },
    "at": -189388800000,
    "bandMs": 31622400000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1964-00-00T00:00:00Z",
+    "edtf": "1964",
+    "earliest": -189388800000,
+    "latest": -157766400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "wd:Q115918918",
@@ -508,7 +651,18 @@
    },
    "at": -189388800000,
    "bandMs": 31622400000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1964-00-00T00:00:00Z",
+    "edtf": "1964",
+    "earliest": -189388800000,
+    "latest": -157766400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "wd:Q115918974",
@@ -534,7 +688,18 @@
    },
    "at": -157766400000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1965-00-00T00:00:00Z",
+    "edtf": "1965",
+    "earliest": -157766400000,
+    "latest": -126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "wd:Q115919052",
@@ -560,7 +725,18 @@
    },
    "at": -157766400000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1965-00-00T00:00:00Z",
+    "edtf": "1965",
+    "earliest": -157766400000,
+    "latest": -126230400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "ia:computer-music-1966-dir.-erkki-kurenniemi/Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
@@ -596,7 +772,18 @@
    },
    "at": -126230400000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+    "edtf": "1966",
+    "earliest": -126230400000,
+    "latest": -94694400000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
@@ -632,7 +819,18 @@
    },
    "at": -63158400000,
    "bandMs": 31622400000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
+    "edtf": "1968",
+    "earliest": -63158400000,
+    "latest": -31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "ia-filename-year@1",
+    "kind": "ignorance",
+    "note": "The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year."
+   }
   },
   {
    "id": "wd:Q115918963",
@@ -658,7 +856,18 @@
    },
    "at": 0,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+1970-00-00T00:00:00Z",
+    "edtf": "1970",
+    "earliest": 0,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "eu:09102/_SMS_MM_X5176",
@@ -686,7 +895,18 @@
    },
    "at": 0,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "1970",
+    "edtf": "1970",
+    "earliest": 0,
+    "latest": 31536000000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "edm-literal-length@1",
+    "kind": "ignorance",
+    "note": "Europeana/EDM keeps the date LITERAL, so precision is the string's own length. Honest by omission; the bracket is the unit the literal names."
+   }
   },
   {
    "id": "wd:Q115919656",
@@ -712,7 +932,18 @@
    },
    "at": 1009843200000,
    "bandMs": 31536000000,
-   "precision": "year"
+   "precision": "year",
+   "when": {
+    "verbatim": "+2002-00-00T00:00:00Z",
+    "edtf": "2002",
+    "earliest": 1009843200000,
+    "latest": 1041379200000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   },
   {
    "id": "wd:Q3056683/P570",
@@ -738,7 +969,31 @@
    },
    "at": 1493596800000,
    "bandMs": 86400000,
-   "precision": "day"
+   "precision": "day",
+   "when": {
+    "verbatim": "+2017-05-01T00:00:00Z",
+    "edtf": "2017-05-01",
+    "earliest": 1493596800000,
+    "latest": 1493683200000,
+    "innerFrom": null,
+    "innerTo": null,
+    "rule": "wikidata-precision@1",
+    "kind": "ignorance",
+    "note": "Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision."
+   }
   }
- ]
+ ],
+ "positionRule": {
+  "anchor": "at = when.earliest (timeline/transport.mjs v0.6 U2) — the bracket's lower bound, never a midpoint",
+  "bracket": "CLOSED-OPEN [earliest, latest)",
+  "rules": [
+   "wikidata-precision@1",
+   "corpus-range@1",
+   "ia-filename-year@1",
+   "wikidata-title-match@1",
+   "edm-literal-length@1"
+  ],
+  "inner": "innerFrom/innerTo are null on every row: no source in this set carries CRM P81 evidence, so \"certainly in year Y\" is answerable only through outer containment (sound, incomplete)",
+  "kind": "every smear here is IGNORANCE — a real day the catalogue lost, never a vague concept"
+ }
 }

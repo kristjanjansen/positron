@@ -1408,3 +1408,223 @@ skipped. **The hook transport.mjs should grow: `sched.adapter(kind)`, or better 
     node timeline/lab/prop-test.mjs --seeds 30    # green
     node timeline/lab/prop-test.mjs --seeds 100   # green
     node proto/remixer/compose-run.mjs            # 20/20, 0 console errors
+
+## Checkpoint 10 — v0.6: UNCERTAINTY AS POSITION (2026-08-28)
+
+The last of plan-timeline's five gaps and §−1's founding requirement ("a smear,
+not a fake instant"). Design was settled by `research/spatiotemporal-uncertainty-2026-08.md`
+before a line was written; this checkpoint is implementation, and the one thing
+worth recording is **how cheap it turned out to be** — because `at` never became
+a distribution.
+
+### 10.1 The API, in full
+
+```js
+// U1 — the row shape. OPTIONAL, FROZEN PER ROW, never interned.
+schedule({ kind, id, payload, when: {
+  verbatim,          // what the source SAID, byte for byte. Never dropped.
+  edtf,              // the honest re-expression: '1965', '196X', '1963/1973'
+  earliest, latest,  // CLOSED-OPEN transport ms. latest:null = OPEN end.
+  innerFrom, innerTo,// CRM P81. null = no known inner bound. from > to is LEGAL.
+  rule,              // VERSIONED: 'err-july15-padding@1'. 'hand'/'unknown' only.
+  kind,              // 'ignorance' | 'vagueness'
+  note,              // the assumption made (DarwinCore georeferenceRemarks)
+}})
+normalizeWhen(w, where?)  normalizeCertainty(c, where?)  WHEN_KINDS   // exported
+
+// U2 — at = when.earliest, ALWAYS, resolved once at ingest. Reported as a
+//      fourth degradation literal: 'anchored'. `when` rides publicEv AND the
+//      drift row (rec.when, rec.anchored).
+// U3 — the query knob. DEFAULTS; does not throw.
+deck.window(kind, from, to, { evidence, certainty: 'possible' | 'necessary' })
+// U4 — the position-axis twin of evidenceAccounting(), reported BY RULE.
+deck.positionAccounting(kind?)
+//   -> {crisp, smeared, total, smearedFraction, openEnded, withInner,
+//       byRule: {rule: {n, fraction, meanSpanMs, medianSpanMs, maxSpanMs,
+//                       minSpanMs, open, withInner, kinds:{…}, lanes:[…]}},
+//       byWhenKind: {ignorance, vagueness}, medianSpanMs, maxSpanMs, lanes:[…]}
+deck.stats()  // gains {crisp, smeared} beside {attested, derived}
+
+// U5 — caps.series(payload, ev) -> key. Per-series sub-lanes + per-series cursors.
+deck.sampleAt(kind, pos, { series })   deck.bracket(kind, pos, { series })
+deck.seriesOf(kind)                    // null where no caps.series is declared
+
+// U6 — two-phase seek. caps.slowSync + adapter.prepareSeek(req, ready).
+deck.seek(pos, { disposition, timeoutMs })   // still returns the clamped pos
+deck.requestSeek(pos, opts)  deck.seekBarrier()   // {gen, phase, ready, timedOut,
+//   rolled, failedOpen, superseded, waitedMs, why, promise}
+// disposition: 'MustRoll' | 'MustStop' | 'RollIfAppropriate' (default)
+
+// requested by the quotation sibling, additive:
+deck.adapter(kind)     // the registry, readable — incl. LATE registrations
+deck.silence(info)     // caps.absentState fan-out -> {silenced, held, missing}
+```
+
+### 10.2 The default for `certainty` is `'possible'`, and the asymmetry is the point
+
+`EVIDENCE_POLICY_REQUIRED` throws because a silent default there mixes *dreamed
+data* into an archival answer — the omission can FABRICATE. The certainty knob
+cannot: `'possible'` is sound in the inclusive direction, so a caller who says
+nothing gets every row that might be in the window and never loses one that is.
+Silence over-includes; it does not invent. **Forced choice where silence
+fabricates, safe default where silence merely widens the net.** A throw here
+would be ceremony, and `normalizeCertainty(undefined).implicit === true` lets a
+caller still tell a default apart from an explicit choice.
+
+### 10.3 `necessary` has THREE answers, not two — and that is the finding
+
+The brief said "the query range contains the inner bracket". Implementing it
+literally deletes a true answer: an ERR year-only row (outer `[1965, 1966)`, no
+inner) IS certainly in 1965, and `Y @> inner` cannot say so because there is no
+inner. So the predicate is:
+
+1. ordered inner pair present → `from <= innerFrom && innerTo <= to`;
+2. else outer containment → **sound but incomplete**, and it recovers the ERR case;
+3. else **UNDECIDABLE** → the row is EXCLUDED *and the undecidability is
+   reported* (`chose: 'unanswerable'`, naming the rule).
+
+That third state is the whole reason the inner bracket is not decoration. The
+proof carries both directions in one lane: a decade-wide row with a known 1965
+inner is `necessary`-in-1965 (outer containment would have missed it), and a
+decade-wide row *without* one is neither in nor out — it is unanswerable, and
+says so. Answering `false` to a question you cannot answer is the failure every
+renderer in the survey shipped.
+
+### 10.4 What did NOT move, and why that was the whole design
+
+`insertInto`, `afterIdx`, `createCursor`'s `bsearch`, `scan`'s
+`ev.at > horizonPos` early exit and `reconcile` are **unchanged**. All six
+pre-existing suites are green at 30 and 100 seeds without a single edit, and so
+are `prop-nested` (143 checks), `prop-store` (39) and `prop-render` (301). The
+crisp fast path is preserved *structurally*, not by discipline: a lane's
+`maxSpan` is 0 until a `when` row lands in it, and `window()` branches on that,
+so a v0.5 lane takes the identical `fromIdx(lane, from)` scan with the predicate
+compiled out. **Absence of `when` costs nothing, exactly as absence of
+`provenance` costs nothing.**
+
+One cost that is real: `window()` with brackets must scan back by the lane's
+widest bracket (the interval-index trick), and an OPEN-ended row makes that the
+whole lane. Documented, not fixed — a lane of open-ended rows is a lane with no
+upper bounds and there is nothing to index.
+
+### 10.5 The two axes: proved independent, all four cells
+
+| | `evidence:'attested'` | `evidence:'all'` |
+|---|---|---|
+| **possible** | att-crisp, att-**smear** | + res-crisp, res-smear |
+| **necessary** | att-crisp | + res-**crisp** |
+
+The two load-bearing cells: **an uncertain ATTESTED row survives an
+attested-only query** (fold the axes and the entire pre-1960 archive disappears
+under exactly the query the firewall exists to protect), and **a precise
+RESTORED row survives a `necessary` query** (being invented is not being badly
+positioned). Four cells, four distinct row sets, none a synonym for another.
+And naming a `certainty` does NOT satisfy the evidence forced choice — that
+still throws, which is asserted.
+
+### 10.6 `caps.series` — the silent lie, measured
+
+The synthetic lane in the proof is one kind holding controller 1 and controller
+74 interleaved. `sampleAt('cc', 750)` over the merged lane brackets
+`(cc74=200 @500, cc1=100 @1000)` and returns **150 — a value belonging to
+neither controller**, produced by interpolating across two different signals.
+That was v0.5's answer and it arrived in silence. Now: the same call still
+answers 150 (the merged lane is what you asked for) but records
+`chose: 'series-ambiguous'` naming `deck.seriesOf()` as the remedy, and
+`{series: 1}` → 75, `{series: 74}` → 200, each from its own sub-lane and its own
+cursor. Sub-lanes are built lazily from the already-sorted lane and maintained
+incrementally on `schedule()`, so nothing is rebuilt and a lane with no
+`caps.series` never allocates one.
+
+### 10.7 Two-phase seek — the safety property is FAIL-OPEN, not "wait"
+
+Ported with JACK's guarantees intact: the **locate is immediate and
+unconditional** (position moves, reduce + assertState run, `seek()` still
+returns the clamped position synchronously), only the **roll** waits, and on
+timeout the barrier opens anyway with every laggard named in `degradations()`.
+A late `ready()` after a fail-open is inert — the laggard catches up, it never
+rewinds the transport. A locate mid-barrier supersedes the one in flight and
+**inherits its true rolling state**, so a scrub firing ten locates does not lose
+the roll on the tenth (the bug you get for free if you read `transport.rate`
+after your own barrier paused it). Ardour's disposition rides in the request and
+is honoured at the barrier. A deck with no `caps.slowSync` adapter never builds
+one: `seekBarrier() === null`, and the roll is untouched.
+
+### 10.8 The Kurenniemi client — the delta, and no number moved
+
+`proto/kurenniemi` was chosen as the day-one client because it had independently
+arrived at the same rule from data ("a midpoint is indistinguishable from an
+attested 15 July; a start is at least a LOWER BOUND that is true"). What changed:
+
+- `ingest.mjs` gains `whenFor(dateEvidence)` — pure — and `at`/`bandMs`/
+  `precision` are now **derived from `when`**, one source of truth. A
+  `--rewhen` flag re-expresses the existing corpus offline; because `when` is a
+  pure function of a field every row already carried, this is a migration, not
+  a re-ingest, and no API was hit.
+- `index.html` **passes no `at` at all**. Items go to the deck as `{kind, id,
+  payload, when}` and the library anchors them. The client can no longer pad a
+  position because it never writes one.
+- Result: `22 items re-expressed; 0 numbers moved — at / bandMs / precision are
+  BIT-IDENTICAL.` The corpus diff is purely additive (`when` per item, one
+  `positionRule` block). `verify.mjs` **8/8**, and every prior number is
+  unchanged: 22 items / 3 sources / 12 playable / 12 rate refusals / 297-300
+  probes differ / 4 distinct attested values. (V5 now counts only the *rate*
+  refusals, because the same ledger holds the `'anchored'` rows, which are a
+  statement about position and not a refusal.)
+- **The new numbers, which are the point.** `positionAccounting` says:
+  **22/22 rows are a smear — this archive contains no crisply positioned row at
+  all** — and by rule: **41 % `corpus-range@1`** · 36 % `wikidata-precision@1` ·
+  14 % `ia-filename-year@1` · 5 % `edm-literal-length@1` · 5 %
+  `wikidata-title-match@1`. Forty-one percent of the Kurenniemi spine is
+  positioned by one guess about a compilation title. That sentence was
+  unsayable yesterday.
+- **Every smear in this corpus is `ignorance`; none is `vagueness`.** A tape was
+  recorded on a real day and the catalogue lost it. The vagueness cases are the
+  ones a *performance* will author, not the ones an archive hands us.
+- **`innerFrom`/`innerTo` are null on all 22 rows**, and correctly so (CRM Issue
+  288). The consequence is exact: "certainly in 1966" is answerable for this
+  corpus only through §10.3's sound-but-incomplete outer containment. If MIMO
+  ever says "spring 1970", that is an inner bracket and the query sharpens for
+  free.
+
+### 10.9 What §−1 still promises that this does NOT deliver
+
+1. **The renderer.** §8.4/§9.1 are settled by a controlled study
+   (Gschwandtner 2016: *ambiguation* for "when/how long", gradient only for
+   "how likely at t") and NONE of it is built. The per-lane aggregate in
+   `proto/megatimeline` is still the miscomputed aoristic sum — `+1` per item
+   regardless of span, clipped at alpha 0.4 — and the fix (one bin per PIXEL
+   COLUMN per M4, mass `1/(b−a)`, divided by overlapping-period count, drawn as
+   HEIGHT because height does not clip) is unwritten. `when.kind` is stored and
+   nothing draws a different edge for it; the inner/outer core-and-skirt split
+   has data and no ink. **The transport can now say what it does not know; the
+   strip still cannot show it.**
+2. **Deep time.** §−1 asks for decades-to-Gyr and we have `Number` epoch ms.
+   §9.6's answer — regime-swapping tick sources selected by
+   `log10(viewport span)`, per-era zoom caps, a signed offset, never a JS
+   `Date` as the internal coordinate — is read and not built. Nothing in v0.6
+   is deep-time aware; `positionAccounting`'s spans are ms and will be useless
+   at 13.8 Gyr.
+3. **`when` on SPANS.** `Span {at, dur}` still does not exist in code, so a
+   smeared *duration* — a tape of unknown length, a period whose end is a
+   second bracket — is not expressible. Deferred on purpose: it is a harder
+   object than a smeared instant and should not be designed before the span
+   type is real.
+4. **Non-contiguous brackets.** EDTF's `[1821,1822,1830..1832]` and `1984-X1`
+   ("January OR November") smear across the ten months between. The `when`
+   docstring says contiguity is not a guarantee about the world; the *code*
+   assumes it everywhere.
+5. **Competing authorities.** One `when` per row. When a second cataloguer
+   disagrees with ERR the shape is `when: [ …, … ]` with an authority id
+   (PeriodO's model: disagreement by co-existence, no merge). This is the
+   deferral most likely to be regretted, and the migration is additive.
+6. **Transaction time.** "The catalogue said 1965 until the 2019 re-dating" is a
+   THIRD axis (SQL:2011's system time), real, and not touched. The monotonic
+   `seq` tiebreak is a degenerate version of it and must not be mistaken for one.
+7. **The aoristic sum as a statistic.** We can now compute one honestly; nothing
+   does, and Crema's warning stands — it is descriptive, not inferential, and
+   summation hides the uncertainty it encodes.
+8. **Space.** Deliberately, entirely absent. §5 of the survey was read *for the
+   temporal problem*; not one spatial field is emitted, and if a place is ever
+   needed the settled answer (Linked Places' `"geometry": null` + IIIF
+   `navPlace`'s disclaimer) is a different document.

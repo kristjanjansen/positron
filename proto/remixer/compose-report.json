@@ -33,7 +33,7 @@
     {
       "name": "the session PLAYS in its arrangement slot (notes fire, its own audio runs)",
       "ok": true,
-      "detail": "{\"parentS\":34.915,\"childS\":4.915,\"mapErrMs\":0,\"fires\":23,\"mediaCurrentTimeS\":4.664,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":0,\"childSpanFires\":1,\"innerSyncCalls\":570,\"innerCorrections\":2,\"outerCorrections\":2}"
+      "detail": "{\"parentS\":34.964,\"childS\":4.964,\"mapErrMs\":0,\"fires\":24,\"mediaCurrentTimeS\":4.678,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":1,\"childSpanFires\":1,\"innerSyncCalls\":571,\"innerCorrections\":1,\"outerCorrections\":1}"
     },
     {
       "name": "child position tracks the parent mapping while the CHILD masters",
@@ -58,17 +58,17 @@
     {
       "name": "rate 2x composes: parent AND nested child both advance ~2x wall, child media at 2.00x",
       "ok": true,
-      "detail": "{\"wallMs\":3006,\"parentAdvancedMs\":6021,\"childAdvancedMs\":6021,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":2.003,\"childRatio\":2.003}"
+      "detail": "{\"wallMs\":3000,\"parentAdvancedMs\":5966,\"childAdvancedMs\":5966,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":1.988,\"childRatio\":1.988}"
     },
     {
       "name": "a composed rate off the child lattice DEGRADES HONESTLY (chose it, said so, suspended mastering)",
       "ok": true,
-      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":300,\"childCorrections\":225,\"parentRatio\":1.5,\"childMapErrMs\":-21.2,\"childAdvancedMs\":3731,\"wallMs\":2501,\"childMediaOffsetMs\":-8}"
+      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":300,\"childCorrections\":198,\"parentRatio\":1.5,\"childMapErrMs\":7.3,\"childAdvancedMs\":3759,\"wallMs\":2501,\"childMediaOffsetMs\":3}"
     },
     {
       "name": "outside the span the session is ABSENT (silent, paused, frozen) while an archive layer keeps playing",
       "ok": true,
-      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.49,\"advancedMs\":2493},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.99,\"advancedMs\":0}],\"parentAdvancedMs\":2503}"
+      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.49,\"advancedMs\":2490},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.93,\"advancedMs\":0}],\"parentAdvancedMs\":2503}"
     },
     {
       "name": "drift NESTS: the child channel stays in the child domain",
@@ -262,18 +262,18 @@
     "back": "nested cycle: the child already contains this parent"
   },
   "playsInSlot": {
-    "parentS": 34.915,
-    "childS": 4.915,
+    "parentS": 34.964,
+    "childS": 4.964,
     "mapErrMs": 0,
-    "fires": 23,
-    "mediaCurrentTimeS": 4.664,
+    "fires": 24,
+    "mediaCurrentTimeS": 4.678,
     "mediaReadyState": 4,
     "mediaPaused": false,
-    "mediaRestarts": 0,
+    "mediaRestarts": 1,
     "childSpanFires": 1,
-    "innerSyncCalls": 570,
-    "innerCorrections": 2,
-    "outerCorrections": 2
+    "innerSyncCalls": 571,
+    "innerCorrections": 1,
+    "outerCorrections": 1
   },
   "probeSummary": {
     "n": 14,
@@ -315,16 +315,16 @@
       }
     },
     "run": {
-      "wallMs": 3006,
-      "parentAdvancedMs": 6021,
-      "childAdvancedMs": 6021,
+      "wallMs": 3000,
+      "parentAdvancedMs": 5966,
+      "childAdvancedMs": 5966,
       "childMediaRate": 2,
       "archiveRates": [
         2,
         2
       ],
-      "parentRatio": 2.003,
-      "childRatio": 2.003
+      "parentRatio": 1.988,
+      "childRatio": 1.988
     },
     "degrade": {
       "wanted": 1.5,
@@ -354,12 +354,12 @@
       ],
       "childTarget": 2,
       "masterSuspended": 300,
-      "childCorrections": 225,
+      "childCorrections": 198,
       "parentRatio": 1.5,
-      "childMapErrMs": -21.2,
-      "childAdvancedMs": 3731,
+      "childMapErrMs": 7.3,
+      "childAdvancedMs": 3759,
       "wallMs": 2501,
-      "childMediaOffsetMs": -8
+      "childMediaOffsetMs": 3
     }
   },
   "absence": {
@@ -375,13 +375,13 @@
         "inSpan": true,
         "paused": false,
         "ct": 62.49,
-        "advancedMs": 2493
+        "advancedMs": 2490
       },
       {
         "tag": "A2",
         "inSpan": false,
         "paused": true,
-        "ct": 36.99,
+        "ct": 36.93,
         "advancedMs": 0
       }
     ],
@@ -389,7 +389,7 @@
   },
   "drift": {
     "kind": "deck-span",
-    "servoTicks": 2354,
+    "servoTicks": 2332,
     "depth": 2,
     "spans": [
       {
@@ -459,17 +459,17 @@
         "masterSuspended": 300,
         "parentCorrections": {
           "n": 4,
-          "p50": 52.14,
-          "p95": 62.23,
-          "min": 42.07,
-          "max": 62.23
+          "p50": 53.99,
+          "p95": 67.3,
+          "min": 42.85,
+          "max": 67.3
         },
         "childCorrections": {
-          "n": 225,
-          "p50": 117.49,
-          "p95": 231.58,
-          "min": 40.65,
-          "max": 249.6
+          "n": 198,
+          "p50": 118.23,
+          "p95": 236.64,
+          "min": 40.8,
+          "max": 249.88
         },
         "child": {
           "fires": 126,
@@ -484,17 +484,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 0.2,
-              "p95": 0.2,
-              "min": 0.2,
-              "max": 0.2
+              "p50": 7.2,
+              "p95": 7.2,
+              "min": 7.2,
+              "max": 7.2
             },
             "midi-actuated": {
               "n": 125,
-              "p50": 3.15,
-              "p95": 8.49,
-              "min": -0.81,
-              "max": 26.05
+              "p50": 2.68,
+              "p95": 7.97,
+              "min": -0.63,
+              "max": 28.36
             }
           }
         }
@@ -594,17 +594,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 0.2,
-              "p95": 0.2,
-              "min": 0.2,
-              "max": 0.2
+              "p50": 7.2,
+              "p95": 7.2,
+              "min": 7.2,
+              "max": 7.2
             },
             "midi-actuated": {
               "n": 125,
-              "p50": 3.15,
-              "p95": 8.49,
-              "min": -0.81,
-              "max": 26.05
+              "p50": 2.68,
+              "p95": 7.97,
+              "min": -0.63,
+              "max": 28.36
             }
           }
         }
@@ -624,17 +624,17 @@
     "kinds": {
       "media-span": {
         "n": 1,
-        "p50": 0.2,
-        "p95": 0.2,
-        "min": 0.2,
-        "max": 0.2
+        "p50": 7.2,
+        "p95": 7.2,
+        "min": 7.2,
+        "max": 7.2
       },
       "midi-actuated": {
         "n": 125,
-        "p50": 3.15,
-        "p95": 8.49,
-        "min": -0.81,
-        "max": 26.05
+        "p50": 2.68,
+        "p95": 7.97,
+        "min": -0.63,
+        "max": 28.36
       }
     }
   },

@@ -258,8 +258,11 @@ const phaseOf = (lane, r) => (lane.phase ? lane.phase(r) : (r.payload || {}).pha
 
 function whenOf(w) {
   if (!w || typeof w !== 'object') return null;
-  const oF = w.outerFrom ?? w.from ?? w.earliestStart;
-  const oT = w.outerTo ?? w.to ?? w.latestEnd;
+  // The settled shape (transport v0.6 §U1) is earliest/latest; the rest are
+  // tolerated legacy spellings. Reading only the aliases silently lost every
+  // real `when` row to the point renderer.
+  const oF = w.earliest ?? w.outerFrom ?? w.from ?? w.earliestStart;
+  const oT = w.latest ?? w.outerTo ?? w.to ?? w.latestEnd;
   if (!Number.isFinite(oF) || !Number.isFinite(oT)) return null;
   const iF = Number.isFinite(w.innerFrom ?? w.latestStart) ? (w.innerFrom ?? w.latestStart) : null;
   const iT = Number.isFinite(w.innerTo ?? w.earliestEnd) ? (w.innerTo ?? w.earliestEnd) : null;

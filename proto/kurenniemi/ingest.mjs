@@ -28,7 +28,7 @@
 //
 // Run:  node proto/kurenniemi/ingest.mjs   -> proto/kurenniemi/corpus.json
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -106,6 +106,85 @@ function fromEdmLiteral(s) {
   if (/^\d{4}-\d{2}$/.test(t)) return band('month', +t.slice(0, 4), +t.slice(5, 7));
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return band('day', +t.slice(0, 4), +t.slice(5, 7), +t.slice(8, 10));
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// THE BAND, RE-EXPRESSED AS `when` (timeline/transport.mjs v0.6, U1).
+//
+// This adapter reached the library's rule from the data BEFORE the library had
+// it: `at` = the band's START, never a midpoint, "because a start is at least a
+// LOWER BOUND that is true". That is exactly `at = when.earliest`. What the ad
+// hoc `{at, hi, precision, how}` could NOT say, and `when` can:
+//
+//   · WHICH RULE produced the bracket, versioned, per row — so when the
+//     heuristic changes the affected rows are one `WHERE rule = …` away
+//     (DarwinCore's georeferenceProtocol; §5.2's "untested is a declarable
+//     state with its own wording");
+//   · the VERBATIM source string beside the derived numbers, kept even when it
+//     parses cleanly, because it is the evidence that the rule fired;
+//   · an honest EDTF re-expression (`196X`, `1963/1973`) instead of a private
+//     `precision` enum;
+//   · ignorance vs vagueness — and the answer for this corpus is uniform, which
+//     is itself a finding: EVERY smear here is IGNORANCE. A tape was recorded on
+//     a real day and the catalogue lost it; a person was born at a real moment.
+//     Nothing in Kurenniemi's archive is vague in Fisher's sense. The vagueness
+//     cases are the ones a PERFORMANCE will author, not the ones an archive
+//     hands us.
+//   · innerFrom/innerTo — CRM P81, "ongoing throughout". NULL on every row here,
+//     and correctly so (CRM Issue 288): no source in this set carries inner
+//     evidence. The consequence is precise and worth stating: "certainly in
+//     1966" is answerable for these rows ONLY through outer containment, which
+//     is sound but incomplete. If MIMO ever says "spring 1970", that is an inner
+//     bracket and the query gets sharper for free.
+//
+// `bandMs` and `precision` survive as DERIVED fields (bandMs = latest -
+// earliest) so the renderer and the older asserts keep working — but `when` is
+// now the single source of truth and they are computed from it, never beside it.
+// ---------------------------------------------------------------------------
+const CORPUS_RANGE_WHY = 'Wikidata Q122801742 "Äänityksiä / Recordings 1963–1973" — the authoritative compilation of his tapes';
+const RULE_OF = {
+  'wikidata-declared-precision': 'wikidata-precision@1',
+  'edm-literal-length': 'edm-literal-length@1',
+  'filename-year': 'ia-filename-year@1',
+  'wikidata-title-match': 'wikidata-title-match@1',
+  'derived-from-corpus-range': 'corpus-range@1',
+};
+const NOTE_OF = {
+  'wikidata-declared-precision': 'Wikidata declares precision as an integer (11 day / 10 month / 9 year / 8 decade). The bracket is that unit; the raw value is zero-filled in JSON (+1966-00-00) and start-padded in SPARQL (1966-01-01) — same fact, two paddings, one declared precision.',
+  'edm-literal-length': 'Europeana/EDM keeps the date LITERAL, so precision is the string\'s own length. Honest by omission; the bracket is the unit the literal names.',
+  'filename-year': 'The only date evidence for this track is a year in parentheses in the uploaded filename. Weak, and real — the bracket is the whole year.',
+  'wikidata-title-match': 'No date on the file; a Wikidata work with the same normalised title carries one, and its declared precision is inherited whole.',
+  'derived-from-corpus-range': `No date evidence at all on the file. The bracket is the corpus range: ${CORPUS_RANGE_WHY}. A lower AND upper bound that are true, in place of a point that is false.`,
+};
+
+const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+/** the honest EDTF re-expression of a band. Level 1 suffices except for the
+ *  decade case, which is L2's unspecified digit (`196X`). */
+function edtfOf(precision, lo, hi) {
+  const y = new Date(lo).getUTCFullYear();
+  if (precision === 'day') return isoDay(lo);
+  if (precision === 'month') return isoDay(lo).slice(0, 7);
+  if (precision === 'year') return String(y);
+  if (precision === 'decade') return `${Math.floor(y / 10)}X`;
+  return `${y}/${new Date(hi - 1).getUTCFullYear()}`;      // EDTF interval
+}
+
+/** dateEvidence -> the library's frozen-sibling shape. Pure, so the corpus can
+ *  be re-expressed offline (`--rewhen`) without re-hitting four APIs. */
+export function whenFor(e) {
+  if (!e || !Number.isFinite(e.at) || !Number.isFinite(e.hi)) return null;
+  const rule = RULE_OF[e.how];
+  if (!rule) throw new Error(`no versioned rule for dateEvidence.how='${e.how}' — every bracket must name the rule that made it`);
+  return {
+    verbatim: e.raw === undefined ? null : e.raw,
+    edtf: edtfOf(e.precision, e.at, e.hi),
+    earliest: e.at,
+    latest: e.hi,                 // CLOSED-OPEN
+    innerFrom: null, innerTo: null,   // CRM P81 not instantiated — correct here
+    rule,
+    kind: 'ignorance',            // see the block comment: uniform, and a finding
+    note: NOTE_OF[e.how] || null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +380,7 @@ async function europeana() {
  *  `how: 'derived-from-corpus-range'`. It is a lower- and upper-bound that is
  *  TRUE, rather than a point that is false. Tier 1 on §5b's spectrum:
  *  bounded by evidence on both sides. */
-const CORPUS_RANGE = { from: 1963, to: 1973, why: 'Wikidata Q122801742 "Äänityksiä / Recordings 1963–1973" — the authoritative compilation of his tapes' };
+const CORPUS_RANGE = { from: 1963, to: 1973, why: CORPUS_RANGE_WHY };
 
 function reconcile(items, works) {
   const byTitle = new Map(works.filter((w) => w.dateEvidence.at != null)
@@ -320,6 +399,58 @@ function reconcile(items, works) {
   return items;
 }
 
+/** The one place `at`, `bandMs` and `precision` are written, and all three are
+ *  now DERIVED from `when` — one source of truth, so they cannot drift apart.
+ *  `at = when.earliest` is the library's firing rule stated in the client. */
+const withWhen = (i) => {
+  const when = whenFor(i.dateEvidence);
+  return { ...i, when, at: when.earliest, bandMs: when.latest - when.earliest, precision: i.dateEvidence.precision };
+};
+
+function summarise(all, label) {
+  const n = (k) => all.filter((i) => i.kind === k).length;
+  console.log(`${label}: ${all.length} items — life ${n('life')} · work ${n('work')} · instrument ${n('instrument')} · audio ${n('audio')} · film ${n('film')}`);
+  const byP = {}; for (const i of all) byP[i.precision] = (byP[i.precision] || 0) + 1;
+  console.log('precision:', byP);
+  // the U4 number, computed here so it is visible without a browser: what
+  // fraction of this corpus is positioned by WHICH rule.
+  const byR = {}; for (const i of all) byR[i.when.rule] = (byR[i.when.rule] || 0) + 1;
+  console.log('by rule  :', Object.entries(byR).map(([r, c]) => `${r} ${c} (${((c / all.length) * 100).toFixed(0)}%)`).join(' · '));
+  console.log('smeared  :', all.filter((i) => i.bandMs > 0).length, '/', all.length,
+    '· with an inner bracket:', all.filter((i) => i.when.innerFrom !== null).length,
+    '· kinds:', [...new Set(all.map((i) => i.when.kind))].join(','));
+  console.log('playable :', all.filter((i) => i.media).length, 'media refs,',
+    all.filter((i) => i.media?.type === 'audio/mpeg').length, 'audio');
+  const span = [all[0].at, Math.max(...all.map((i) => i.when.latest))];
+  console.log('span     :', isoDay(span[0]), '->', isoDay(span[1]), `(${((span[1] - span[0]) / YEAR).toFixed(1)} y)`);
+}
+
+/** `--rewhen` — RE-EXPRESS the existing corpus through `when`, offline.
+ *  `when` is a PURE function of `dateEvidence`, which every row already carries,
+ *  so this is a migration and not a re-ingest: no API is hit, no number can move
+ *  for a reason unrelated to the change, and the diff is exactly the new field
+ *  plus whatever `bandMs`/`precision` were if they had ever drifted from it. */
+function rewhen() {
+  const path = join(HERE, 'corpus.json');
+  const corpus = JSON.parse(readFileSync(path, 'utf8'));
+  const before = corpus.items.map((i) => [i.id, i.at, i.bandMs, i.precision]);
+  corpus.items = corpus.items.map(withWhen);
+  corpus.generated = new Date().toISOString();
+  corpus.generator = 'proto/kurenniemi/ingest.mjs --rewhen';
+  corpus.positionRule = {
+    anchor: 'at = when.earliest (timeline/transport.mjs v0.6 U2) — the bracket\'s lower bound, never a midpoint',
+    bracket: 'CLOSED-OPEN [earliest, latest)',
+    rules: [...new Set(corpus.items.map((i) => i.when.rule))],
+    inner: 'innerFrom/innerTo are null on every row: no source in this set carries CRM P81 evidence, so "certainly in year Y" is answerable only through outer containment (sound, incomplete)',
+    kind: 'every smear here is IGNORANCE — a real day the catalogue lost, never a vague concept',
+  };
+  writeFileSync(path, JSON.stringify(corpus, null, 1));
+  const moved = corpus.items.filter((i, k) => before[k][1] !== i.at || before[k][2] !== i.bandMs || before[k][3] !== i.precision);
+  console.log(`--rewhen: ${corpus.items.length} items re-expressed through \`when\`; ${moved.length} number(s) moved` +
+    (moved.length ? `: ${moved.map((m) => m.id).join(', ')}` : ' — at / bandMs / precision are BIT-IDENTICAL'));
+  summarise(corpus.items, 'corpus.json');
+}
+
 // ---------------------------------------------------------------------------
 const main = async () => {
   const [ia, life, works, eu] = [await archiveOrg(), await wikidataLife(), await wikidataWorks(), await europeana()];
@@ -332,12 +463,7 @@ const main = async () => {
   const all = [...life, ...spine, ...eu, ...ia]
     .filter((i) => Number.isFinite(i.dateEvidence.at))
     .sort((a, b2) => a.dateEvidence.at - b2.dateEvidence.at)
-    .map((i) => ({
-      ...i,
-      at: i.dateEvidence.at,
-      bandMs: i.dateEvidence.hi - i.dateEvidence.at,
-      precision: i.dateEvidence.precision,
-    }));
+    .map(withWhen);
 
   const corpus = {
     subject: 'Erkki Kurenniemi (1941–2017)',
@@ -345,6 +471,13 @@ const main = async () => {
     generator: 'proto/kurenniemi/ingest.mjs',
     note: 'Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.',
     corpusRange: CORPUS_RANGE,
+    positionRule: {
+      anchor: "at = when.earliest (timeline/transport.mjs v0.6 U2) — the bracket's lower bound, never a midpoint",
+      bracket: 'CLOSED-OPEN [earliest, latest)',
+      rules: [...new Set(all.map((i) => i.when.rule))],
+      inner: 'innerFrom/innerTo are null on every row: no source in this set carries CRM P81 evidence, so "certainly in year Y" is answerable only through outer containment (sound, incomplete)',
+      kind: 'every smear here is IGNORANCE — a real day the catalogue lost, never a vague concept',
+    },
     precisionConventions: {
       'archive.org': "no precision field; `date` is uploader-typed and describes the FILE not the work — UNUSED as `at`. Year evidence comes from the FILENAME.",
       Wikidata: 'EXPLICIT integer precision (8 decade / 9 year / 10 month / 11 day). Raw JSON zero-fills (+1970-00-00); SPARQL start-pads (1970-01-01). Same fact, two paddings, one declared precision.',
@@ -354,14 +487,7 @@ const main = async () => {
     items: all,
   };
   writeFileSync(join(HERE, 'corpus.json'), JSON.stringify(corpus, null, 1));
-  const n = (k) => all.filter((i) => i.kind === k).length;
-  console.log(`corpus.json: ${all.length} items — life ${n('life')} · work ${n('work')} · instrument ${n('instrument')} · audio ${n('audio')} · film ${n('film')}`);
-  const byP = {}; for (const i of all) byP[i.precision] = (byP[i.precision] || 0) + 1;
-  console.log('precision:', byP);
-  console.log('playable :', all.filter((i) => i.media).length, 'media refs,',
-    all.filter((i) => i.media?.type === 'audio/mpeg').length, 'audio');
-  const span = [all[0].at, Math.max(...all.map((i) => i.dateEvidence.hi))];
-  console.log('span     :', new Date(span[0]).toISOString().slice(0, 10), '->', new Date(span[1]).toISOString().slice(0, 10),
-    `(${((span[1] - span[0]) / YEAR).toFixed(1)} y)`);
+  summarise(all, 'corpus.json');
 };
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv.includes('--rewhen')) rewhen();
+else main().catch((e) => { console.error(e); process.exit(1); });
