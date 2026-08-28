@@ -734,13 +734,22 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.strokeStyle = T.axis; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(S.gutterPx + 0.5, 0); ctx.lineTo(S.gutterPx + 0.5, S.height); ctx.stroke();
     ctx.font = '10px ui-monospace, Menlo, monospace';
+    // truncate by MEASUREMENT, not by a hardcoded character count: a lane label
+    // must fit whatever gutter the client asked for.
+    const avail = S.gutterPx - 15;
+    const clip = (s) => {
+      if (ctx.measureText(s).width <= avail) return s;
+      let n = s.length;
+      while (n > 1 && ctx.measureText(s.slice(0, n) + '…').width > avail) n--;
+      return s.slice(0, n) + '…';
+    };
     for (const L of S.lanes) {
       if (!L.show) continue;
       const st = L._style || {};
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
       ctx.fillRect(4, L.y + 4, 3, Math.min(14, L.height - 8));
       ctx.fillStyle = T.ink;
-      ctx.fillText(String(L.label ?? L.id).slice(0, 13), 11, L.y + 13);
+      ctx.fillText(clip(String(L.label ?? L.id)), 11, L.y + 13);
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
       const caps = (deck.caps && L.kind !== undefined) ? (() => { try { return deck.caps(L.kind); } catch { return null; } })() : null;
@@ -751,7 +760,7 @@ export function createStrip(canvas, deck, opts = {}) {
       if (st.tier) sub.push(`tier ${st.tier}`);
       if (sub.length && L.height >= 22) {
         ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
-        ctx.fillText(sub.join(' · ').slice(0, 15), 11, L.y + 24);
+        ctx.fillText(clip(sub.join(' · ')), 11, L.y + 24);
       }
       ctx.globalAlpha = 1;
     }
