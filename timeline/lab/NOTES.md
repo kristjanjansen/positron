@@ -703,3 +703,544 @@ that tile's anchor.
    each quotation its own position, not one shared deck.
 5. **`driftStats()` reports a twice-quoted child's channel twice.** Correct but
    redundant; per-deck de-duplication is a reporting fix, not a semantic one.
+
+---
+
+# Checkpoint — v0.6: two steals from the browser-NLE survey (2026-08-28)
+
+Source: `research/browser-av-editors-2026-08.md` §11 "Three things others do
+better that we should steal". Taken: **#1 rVFC as the media servo's sensor** and
+**#2 a deterministic offline render mode**. **#3 (the proxy / decoded-frame
+scrub tier) is DEFERRED — §5 says why in full.** Two corrections from the
+sibling's widened survey (`browser-av-editors-wide-2026-08.md`) are folded in
+and measured, not assumed: §2f (OfflineAudioContext has no determinism
+*guarantee*) and §3d (the Web Lock freeze exemption).
+
+New/changed files, all under `timeline/`. **`timeline/transport.mjs` and
+`timeline/nested.mjs` were not modified at all this cycle.**
+
+| file | what |
+|---|---|
+| `timeline/media-master.mjs` | **L4b** — `requestVideoFrameCallback.mediaTime` as the sensor (additive; L1–L5 unchanged) |
+| `timeline/render.mjs` | **NEW** — `createRenderRuntime` / `offlineDeck` / `renderDeck` / `renderDeckAudio` / `offlineAudioTarget` / `auditAdapters` |
+| `timeline/keepalive.mjs` | **NEW** — the two published Chrome freeze exemptions, ~90 lines |
+| `timeline/lab/prop-render.mjs` | **NEW** — the determinism property arms |
+| `timeline/lab/prop-nested.mjs` | **+suite 9** — the L4b sensor law (128 → 143 checks) |
+| `timeline/lab/run-sensor.mjs` + `sensor.html` | rVFC-vs-currentTime, real playback |
+| `timeline/lab/run-render.mjs` + `render.html` | real-`OfflineAudioContext` determinism, 8/8 |
+| `timeline/lab/run-freeze.mjs` + `freeze.html` | Chrome-133 freeze, SIGSTOP and natural arms |
+
+```
+node timeline/lab/prop-render.mjs                    # 301 checks, 0 violations
+node timeline/lab/prop-render.mjs --seeds 100        # 931 checks, 0 violations (2.5 s)
+node timeline/lab/prop-nested.mjs                    # 143 checks, 0 violations
+node timeline/lab/run-sensor.mjs --secs 20           # headless Chrome, :8894
+node timeline/lab/run-render.mjs                     # headless Chrome, :8885, 8/8
+node timeline/lab/run-freeze.mjs --freeze 300        # SIGSTOP arm, ~5.5 min
+node timeline/lab/run-freeze.mjs --natural --freeze 380 [--keepalive]
+```
+
+---
+
+## 1. STEAL #1 — `rVFC.mediaTime` in the media servo, and the trap in it
+
+### 1a. The naive form of this steal makes the servo WORSE. Measured first.
+
+The steal list says: *"read `requestVideoFrameCallback.mediaTime` instead of
+`video.currentTime`… it should tighten the numbers without changing any
+policy."* Implemented exactly that way — prefer `mediaTime` when its sample is
+the more recent one, per Remotion — and measured on a real 30 fps headless
+playback with **four servos over one `<video>`** ({rvfc, currentTime} × {20, 40}
+ms dead band, same element, same rAF loop, so the ONLY difference is which clock
+the band is enforced against):
+
+| 30 fps, tol 20 ms | corrections | \|err\| p95 |
+|---|---|---|
+| `currentTime` | **9** | 8.9 ms |
+| `mediaTime`, naive swap | **380** | 25.6 ms |
+
+**42× worse.** Two reasons, both visible in the data:
+
+1. `mediaTime − currentTime` is **not noise, it is a BIAS of about one frame**
+   (signed mean **+8.8 ms** at 30 fps, **+12.5 ms** at 60 fps). `mediaTime` is
+   the PTS of the frame the compositor will show **at `expectedDisplayTime`**,
+   which is in the FUTURE when the callback runs; `currentTime` is Chrome's
+   continuously-interpolated estimate of the media clock **now**. They are not
+   two measurements of the same quantity.
+2. "prefer the more recent sample" does not even select stably. Chrome's
+   `currentTime` is re-interpolated on *every read*, so "when did currentTime
+   last change" updates nearly every tick and the rule picked `currentTime`
+   78 % of the time. The servo was therefore **alternating between two clocks a
+   frame apart**, and every alternation is a step the dead band must correct.
+
+### 1b. The fix: the sample is a PAIR, so carry it
+
+```
+mediaAtNow = mediaTime + (now − expectedDisplayTime) / 1000 × playbackRate
+delta      = (mediaAtNow − currentTime) × 1000        // ms added to pos
+```
+
+The delta is applied to a position that both call forms already compute as
+`anchor + el.currentTime * 1000`, so `proto/selfrec/replay-grid.html`'s
+`{el, pos, key}` source function gets the correction **without changing a line**.
+
+Guards, all measured into existence rather than guessed:
+
+- **stale ⇒ fall back.** A frame sample older than `rvfcStaleMs` (250 ms) is not
+  a sample. This is the hidden-tab path for free: rVFC dies with rAF,
+  `timeupdate` (L4) does not — so the servo returns to `currentTime` with no
+  `visibilitychange` listener anywhere.
+- **past `jumpMs` ⇒ reject.** A frame sample from before a discontinuity must
+  never be carried across it, or the sensor could change which branch **L2**
+  takes. `prop-nested` 9/N4: after a 9 s external scrub the servo still
+  `seek()`s and still folds `C1…C9`.
+- **`useRvfc:false` / `variableFps:true`** register no callback at all (Remotion
+  excludes VFR sources; a VFR `mediaTime` is not on a frame grid).
+- **no rVFC ⇒ nothing changes.** Firefox < 132, Safari < ~15.4 and every
+  `<audio>` element take the identical `currentTime` path. `proto/kurenniemi`
+  masters an `<audio>` element and is bit-for-bit unaffected by construction.
+
+### 1c. The numbers
+
+`timeline/lab/run-sensor.mjs`, 20 s of real headless playback per fps, one
+`<video>`, **eight** servos ({rvfc, currentTime} × tol {5, 10, 20, 40}).
+Rows in `timeline/lab/results/sensor-rvfc.json`.
+
+**Sensor disagreement** (n ≈ 2 460 ticks per fps):
+
+| | p50 | p95 | max | frames (p50/p95/max) | signed mean |
+|---|---|---|---|---|---|
+| 30 fps, RAW | 7.22 ms | 20.79 ms | 29.84 ms | 0.22 / 0.62 / 0.90 f | **+4.8 ms** |
+| 30 fps, CARRIED | 8.34 ms | **11.85 ms** | 33.80 ms | 0.25 / 0.36 / 1.01 f | −8.5 ms |
+| 60 fps, RAW | 15.00 ms | 25.51 ms | 26.90 ms | 0.90 / 1.53 / 1.61 f | **+15.1 ms** |
+| 60 fps, CARRIED | 7.54 ms | **10.28 ms** | 18.33 ms | 0.45 / 0.62 / 1.10 f | +7.8 ms |
+
+An earlier 18 s run gave CARRIED p50 5.70 / p95 7.62 (30 fps) and p50 4.67 /
+p95 6.98 (60 fps), so across runs **carried p50 is 4.7–8.3 ms, p95 7.0–11.9 ms**.
+The run-to-run wander is in the *bias*, not the spread — carried p95−p50 is
+3.5 ms where raw p95−p50 is 13.6 ms, and the spread is what a servo pays for.
+
+**Correction count, same playback, four dead bands:**
+
+| dead band | 30 fps: `currentTime` → `rvfc` | 60 fps: `currentTime` → `rvfc` |
+|---|---|---|
+| **5 ms** | **365 → 18  (−95.1 %)** | **27 → 3  (−88.9 %)** |
+| 10 ms | 12 → 11 (−8.3 %) | 4 → 2 (−50 %) |
+| 20 ms | 8 → 8 (0 %) | 2 → 1 (−50 %) |
+| 40 ms | 4 → 4 (0 %) | 1 → 1 (0 %) |
+
+Residual tracking error left in the vector:
+
+| | \|err\| p95, `currentTime` | \|err\| p95, `rvfc` |
+|---|---|---|
+| 30 fps, tol 5 / 10 / 20 | 7.52 / 5.58 / 5.48 ms | **0.87 / 0.87 / 0.87 ms** |
+| 60 fps, tol 5 | 4.38 ms | **0.50 ms** |
+
+**Read this honestly.** At the dead bands our clients actually ship (40 ms in
+`replay.html`, `replay-grid.html` and `kurenniemi`) the correction count is
+already ~0 and **the sensor is invisible there** — 8→8, 4→4. The steal does not
+improve the shipped configuration. What it does is **make a tighter one
+possible**: at a 5 ms band — lip-sync class, 5× tighter than timingsrc's 25 ms
+"~lipsync" default — `currentTime` thrashes at 365 corrections in 20 s (≈18/s,
+the servo fighting its own sensor) and `mediaTime` does not (18), and the
+residual error drops **6–9×**. **The dead band is no longer set by the sensor.**
+Whether to spend that is a separate decision and is NOT taken here: the shipped
+defaults are unchanged.
+
+Also: `stale = 0`, `rejected = 0` across both runs — in a foreground playback the
+frame sample was usable on **every one of ~4 900 ticks** (595 presented frames at
+30 fps, 1 198 at 60 fps; the carry covers the ticks between them).
+
+### 1d. What did NOT change
+
+`toleranceMs`, `jumpMs`, `stallMs`, `stallPolicy`, `autoPlayPause`,
+`attachTimeupdate`, L1–L5: byte-identical in behaviour. rVFC is an
+**observation** primitive; the seek command still goes through `currentTime` in
+the client (hls.js's maintainer says the same). The gate suites in §4 are the
+proof that the servo edit moved nothing measured — in particular
+`run-measure-archive` reproduced its per-cue table **to the last digit**.
+
+---
+
+## 2. STEAL #2 — `timeline/render.mjs`: the offline render mode
+
+### 2a. Doctrine and seams
+
+Remotion's `/docs/flickering` in one line: *no shared wall clock ⇒ results differ
+across machines ⇒ therefore no wall clock at all.* We had the seams and had never
+used them. This is not a second engine; it is a **frame-stepping driver over the
+one engine**, plus the two things the seams did not already provide (§2c, §2e).
+
+```js
+import { offlineDeck, renderDeck, renderDeckAudio } from './timeline/render.mjs';
+
+const deck = offlineDeck({ items, adapters, range: [0, 600000] });
+const r = renderDeck(deck, {
+  from: 0, to: 600000, fps: 30,
+  onFrame: ({ frameIndex, pos, state }) => draw(pos, state.cue),
+  stateKinds: ['cue'],
+});
+r.traceText   // canonical event trace — byte-identical across runs
+r.traceHash   // FNV-1a 64 short form
+r.audit       // what could not be made deterministic, and why
+```
+
+| export | |
+|---|---|
+| `createRenderRuntime(startMs)` | deterministic clock + **many** tick hosts + `advanceTo` |
+| `offlineDeck(spec)` | `createDeck` wired to one, carrying `.renderRuntime` |
+| `renderDeck(deck, {from,to,fps,rate,onFrame,stateKinds,seedRandom,onNondeterministic,pauseAtEnd})` | the driver |
+| `renderDeckAudio(deck, {…, audioItems, makeNode, sampleRate, channels})` | + a real `OfflineAudioContext`; returns the `AudioBuffer` and its hash |
+| `offlineAudioTarget(ctx, runtime)` | the shim that makes an `OfflineAudioContext` usable by the shipped audio lane |
+| `auditAdapters(deck)` | the nondeterminism report, standalone |
+| `hashText` / `hashAudioBuffer` | short forms |
+
+### 2b. The determinism proof
+
+`node timeline/lab/prop-render.mjs --seeds 100` → **931 checks, 0 violations**
+(2.5 s). At 30 seeds: **301 checks, 0 violations**.
+
+- **D1 byte-identical.** Two renders ⇒ `traceText` equal as a string,
+  `traceHash` equal, the per-frame `(frameIndex, pos, state)` sequence equal,
+  final state equal. 100 seeds × {24, 30, 60} fps × 120–320-item traces with
+  same-ms ties.
+- **D2 equals playback.** The render trace equals (a) the same deck advanced in
+  **irregular** chunks on a virtual clock (jitter, dropped ticks) and (b) the
+  same deck played on a **genuine wall clock with `mainTickHost()`** — same
+  events, same order, same count, same final non-commutative state.
+- **D3 exactly once, in order.** No id twice; every cue in the window fires;
+  `at` nondecreasing across the trace.
+- **D4 exact frame grid.** `frames === round((to−from)·fps/1000)+1`, and every
+  frame position `=== i*1000/fps` **exactly** — computed from the integer index
+  each time, never accumulated.
+- **D5 it does not wait.** 10 minutes of position time, 18 001 frames, 6 000
+  events, in **7–10 ms wall = 60 000–86 000× real time.** That is the number
+  that replaces "export the archival remix = 90 minutes and a promise that
+  nothing stuttered".
+- **The window's left edge is a check, not a surprise**: a render opens with a
+  real `seek(from)`, so it is **half-open on the left, `(from, to]`** — an event
+  at exactly `from` is folded into `reduce(<= from)`, one at exactly `to` fires.
+
+### 2c. `createVirtualRuntime` could not host a render
+
+It exports **one** host whose `start()` overwrites the previous callback, so a
+deck and an audio lane cannot both run on it. Asserted as a CONTROL in
+`prop-render` (`render-runtime`). `createRenderRuntime()` hosts N tick hosts at
+independent cadences on one clock and one timer queue, ordered by `(due, id)`.
+
+### 2d. What the mode CANNOT make deterministic — and how it says so
+
+`renderDeck()` audits every adapter before frame 0 and returns the audit;
+`onNondeterministic: 'throw'` makes it a CI gate. Two halves of deliberately
+different strength:
+
+- **DECLARED** — `caps.deterministic === true | false`, the adapter's own word.
+- **SUSPECTED** — a source-text scan of `actuate`/`reduce`/`assertState`/
+  `interpolate`/`transport` for `Math.random`, `crypto.getRandomValues`,
+  `Date.now`, `new Date()`, `performance.now`, `requestAnimationFrame`,
+  `requestVideoFrameCallback`, `setTimeout`/`setInterval`, `.currentTime`,
+  `getOutputTimestamp`, `fetch`, `XMLHttpRequest`, `WebSocket`, storage,
+  `navigator.*`, Web MIDI, `getUserMedia`, `[native code]`.
+
+**The scan is a heuristic and the suite asserts its blind spot** rather than
+letting a clean report read as a proof: `render-audit-blindspot` builds an
+adapter reaching `Math.random` **through a closure** and asserts the audit comes
+back CLEAN. A dirty scan is a reason to look; a clean scan is not a certificate.
+
+The one nondeterminism the mode can **fix** is unseeded randomness, on request:
+`seedRandom: <int>` swaps `Math.random` for a seeded mulberry32, **counts the
+draws**, and restores it in a `finally`. Asserted both ways — with the seed two
+renders match, without it they genuinely differ, so the report is not theatre.
+
+Categorically out of reach: real devices (a media element's `currentTime`, a
+MIDI port, a camera, audio hardware), I/O, and any direct wall-clock read. For
+those the honest architecture is Remotion's `<OffthreadVideo>` move — replace the
+device with a deterministic source for the render only — which is the same shape
+as the deferred proxy tier (§5).
+
+### 2e. A REAL finding: the `OfflineAudioContext` seam does not just "drop in"
+
+The survey said *"the audio lane takes a context by argument so
+`OfflineAudioContext` drops in"*. **It does not.** Two things had to be true and
+neither was:
+
+1. **`OfflineAudioContext.currentTime` is pinned at 0 until `startRendering()`.**
+   `createAudioLane` anchors wall↔audio by sampling `clock.now()` and
+   `ctx.currentTime` together; against a bare offline context every re-anchor
+   maps "now" onto 0 and every node starts ~one lookahead horizon into the
+   buffer regardless of its real position. `offlineAudioTarget()` is a Proxy
+   whose `currentTime` **rides the virtual clock** (methods bound to the real
+   context — a native `AudioContext` method throws on a foreign receiver, which
+   is why this is a Proxy and not `Object.create`). With it,
+   `audioTimeFor(wall) === (wall − t0)/1000` exactly.
+   **NEGATIVE CONTROL, `prop-render/render-audio-control`: with the bare context
+   every node collapses into the first 200 ms.**
+2. **A closing `pause()` destroys the render.** An offline context has rendered
+   nothing when the last frame is stepped, so the lane's nodes are still
+   `committed`; `createAudioLane` cancels committed nodes on any transport state
+   change (correct — a pause must not leave notes ringing), so `pause()`
+   `stop()`s and `disconnect()`s the whole scheduled graph microseconds before
+   `startRendering()` reads it. **The first run of `run-render.mjs` produced a
+   completely silent 192 000-sample buffer with 7 nodes still `pending`.** Hence
+   `renderDeck({pauseAtEnd:false})`, which `renderDeckAudio` sets, pausing only
+   after the buffer exists.
+
+Neither is a defect in the audio lane; both are the shape of the seam, and
+neither is discoverable without building the thing.
+
+### 2f. `OfflineAudioContext` determinism is OBSERVED, not GUARANTEED
+
+Correction from `research/browser-av-editors-wide-2026-08.md`, and it is right:
+the Web Audio spec says an `OfflineAudioContext` *"renders as quickly as
+possible… fulfilling the returned promise with the rendered result as an
+AudioBuffer"* and says **nothing about bit-exactness**. There is no determinism
+guarantee to lean on. So it was measured.
+
+`node timeline/lab/run-render.mjs` → **8/8**, and the impulse arm alone would
+not have been enough (a one-sample impulse render is a memcpy), so a second
+composition runs a **real DSP graph**: per event a sawtooth oscillator through
+an exponentially swept biquad lowpass (Q 8, 300 → 5200 → 220 Hz) and an
+exponential gain envelope, 2 channels, 48 kHz — float DSP, ramp interpolation,
+denormals.
+
+```
+frames 121  events 32  reduces 1  byKind {"cue":12,"pointer":20}  endPos 4000
+trace    2385 bytes  hash aec58cd41cec0e99  ==  2385 bytes  hash aec58cd41cec0e99
+impulse  192000 x 1ch @48k  hash b7490f1865048393  ==  b7490f1865048393
+DSP      192000 x 2ch @48k  hash 4a36fb31e25e8f3c  ==  4a36fb31e25e8f3c
+         200416 nonzero, peak 0.697998, rms 0.012062198 (identical to 9 dp)
+impulses want [12000,24000,48000,84000,120000,144000,191952]
+         got  [12000,24000,48000,84000,120000,144000,191952]
+```
+
+**All seven impulses land on the exact expected sample index** — not "the buffers
+hash the same" but "the clicks are where the positions say they are, to the
+sample". And **cross-process**: two separate `run-render.mjs` invocations, two
+separate Chrome launches, all five hashes matched (trace, impulse PCM, DSP PCM,
+DSP rms to 9 dp, per-frame digest).
+
+**State it this way and no stronger: bit-reproducible AS OBSERVED on this
+browser/build/CPU (headless Chromium, macOS arm64, 2026-08-28), twice in-process
+and twice cross-process, for both a trivial and a nontrivial graph. That is an
+observation, not a platform guarantee.** A distributed render across
+heterogeneous machines must therefore treat the *event trace* as the contract
+(that one IS guaranteed — it is our arithmetic, on our virtual clock) and treat
+audio PCM equality as something to verify per fleet, not assume. `hashAudioBuffer`
+exists so that verification is one call.
+
+**And the placement constraint, verified here** (probe: a dedicated Worker on
+this build reports `typeof OfflineAudioContext === 'undefined'`, likewise
+`AudioContext` and `BaseAudioContext`; the main thread reports `'function'`):
+**Web Audio is `[Exposed=Window]` — there is no `OfflineAudioContext` in a
+Worker.** So an offline audio render cannot be moved off the main thread of a
+document. The wall-lane half of `renderDeck()` has no such limit (it is pure JS
+over a virtual clock and would run in a Worker unchanged); only the audio half
+is pinned to a Window. A render farm therefore parallelises across *documents*
+(Remotion Lambda's shape: N tabs), not across workers in one document.
+
+---
+
+## 3. The Chrome-133 Energy-Saver freeze — what actually happens
+
+### 3a. The risk, restated
+
+`research/browser-av-editors-2026-08.md` §3: Chrome ≥133 freezes a **hidden +
+silent + CPU-intensive** tab after >5 min on Energy Saver; exempt are
+mic/camera/screen-capture, a live `RTCPeerConnection`, WebUSB/Bluetooth/HID, or a
+**held Web Lock**. **A worker tick is not on that list.** Our hidden-tab win
+(worker 8.5 ms p95 vs main 981 ms, rAF 9175 ms) defends against **throttling**;
+freezing is a *different mechanism* and we had never measured it.
+
+### 3b. The worst case, measured: SIGSTOP on the renderer for 5 minutes
+
+`node timeline/lab/run-freeze.mjs --freeze 300`. A dedicated worker lives in its
+page's renderer process, so `kill -STOP` on that process stops the main thread
+**and** the worker tick together — which is exactly what a freeze does.
+(`Page.setWebLifecycleState 'frozen'` was also sent; in headless it is accepted
+and is a **no-op** — 0 gaps. Recorded so nobody trusts it as a test tool.)
+
+A probe worker logs its own `setInterval(250)` ticks into worker memory and dumps
+them after resume, so "was the worker frozen too?" is a measurement, not an
+inference:
+
+| | 20 s freeze | **300 s freeze** |
+|---|---|---|
+| main-thread gap | 20 060 ms | **300 060 ms** |
+| **probe WORKER gap** | 20 092 ms | **300 091 ms** |
+| scheduler `maxTickGapMs` | 20 018 ms | **300 023 ms** |
+| `catchUp:'reduce'` state correct? | **yes** | **yes** (892 525 == 892 525) |
+| time to correct state after resume | **0.1 ms** | **1.1 ms** |
+| `catchUp:'burst'` | 29 fired (20 at once) | **309 fired — 300 cues burst at once, up to 300 s late** |
+| `catchUp:'drop'` | 20 lost | **300 lost** |
+
+**Finding 1: the worker tick host is NOT a defence against freezing.** The probe
+worker's own clock shows the same 300 s gap the main thread does. The
+hidden-tab win is real and is about throttling only.
+
+**Finding 2: `catchUp:'reduce'` survives it, at 5-minute scale.** The vector is
+`p0 + (now−t0)·rate` with no timers in it, so position never stopped — it read
+309 603 ms on resume, correctly. The whole missed prefix folded and asserted on
+the **first task** after resume: **1.1 ms** to correct non-commutative state
+after a 5-minute freeze (0.5 ms after 3 s in the earlier lab run, 0.1 ms after
+20 s here — the recovery cost is essentially independent of freeze length,
+because `reduce` is a fold over a prefix and not a replay of it).
+
+**This is the operational answer**: a broadcast timeline in a frozen tab wakes up
+*correct*. A cue lane on `'burst'` does not — it fires 300 cues in one tick, up
+to 5 minutes late — and a lane on `'drop'` loses all 300. **Choose `'reduce'`
+for anything a hidden tab might carry.** That is now a measured recommendation
+rather than a design preference.
+
+### 3c. The natural freeze could NOT be reproduced here — say so plainly
+
+`--natural` asks Chrome to do it: launched with
+`--enable-features=FreezingOnEnergySaver,FreezingOnEnergySaverTesting`, page
+hidden the way arm BG hid it (**browser-level `Target.createTarget` +
+`Target.activateTarget`** — Playwright's `newPage()` cannot: each new page is its
+own window and stays `visibilityState: 'visible'`, verified), CPU burned at
+~12 ms every 25 ms, muted, held hidden for **380 s**.
+
+**Result, both arms: no freeze.** 0 main-thread gaps, 0 worker gaps, 1 560 probe
+ticks, all 390 cues fired normally on every lane. Headless Chrome did not apply
+the Energy-Saver intervention (no battery/power-state signal is the likely
+reason; `chrome://discards`, which would have shown the freeze accounting, is
+blocked by Playwright's URL filter — `ERR_INVALID_URL`).
+
+So: **we could not get the CONTROL to freeze, which makes the exemption arm
+untestable here.** The Web Lock exemption is **documented, not verified by us.**
+Anyone with a real battery-powered Chrome should re-run
+`run-freeze.mjs --natural` on it; the rig is ready and the two arms differ only
+in `--keepalive`.
+
+**A bonus datum from the same runs, and it is a good one:** 380 s hidden with the
+worker tick host gave scheduler `maxTickGapMs` of **33.3 ms** (plain) and
+**34.1 ms** (keepalive). Arm BG's hidden-tab win was measured over a 10-second
+window; this extends it to **six and a half minutes** — the worker tick does not
+degrade with time hidden.
+
+### 3d. The mitigation, implemented — `timeline/keepalive.mjs`
+
+The sibling survey source-confirms `CannotFreezeReason::kHoldingWebLock` as a
+standalone Chrome freeze exemption, so the mitigation is one line of platform:
+
+```js
+import { keepAwake } from './timeline/keepalive.mjs';
+const ka = await keepAwake({ lock: true, audio: false });   // …ka.release()
+```
+
+- **A held Web Lock** — `navigator.locks.request(name, {mode:'exclusive'}, () =>
+  new Promise(() => {}))`, held for the life of the deck. On the published
+  exemption list, no device, no permission prompt, works muted.
+- **An audible page** (opt-in, default off) — exempt from freezing **and** from
+  the 1 Hz timer clamp; Firefox additionally does not throttle a tab containing
+  an AudioContext. ⚠️ "audible" is Chrome's determination and gain 0 is not
+  audible, so this emits a real tiny tone (default 8e-4 at 40 Hz) and reports the
+  gain it used. If any output is unacceptable, use the lock alone.
+
+Verified to initialise cleanly in the rig (`--keepalive`):
+`{lock: true, lockName: 'timeline-keepalive', audio: true, audioState: 'running',
+gain: 0.0008, errors: []}`. What is **not** verified is that it prevents a
+freeze — see §3c.
+
+**The third option remains the strongest, and it is the one we actually have:
+accept the freeze.** 1.1 ms to correct state after 5 minutes is a cheaper
+guarantee than a tab that never freezes, and it needs no permission, no lock, no
+audio device and no vendor's continued goodwill. `keepalive.mjs` is a belt
+alongside that brace, not a replacement for it.
+
+### 3e. Two more from the widened survey, recorded not built
+
+- **`Atomics.wait` as a third tick host.** V8's `Atomics.wait` blocks on an OS
+  condvar, not on a task queue, so it is structurally out of the throttler's
+  reach — a candidate host beside `worker` and `main`. **Prerequisite: COOP/COEP**
+  (cross-origin isolation) for `SharedArrayBuffer`. Verified in the rig: inside a
+  dedicated worker `typeof Atomics === 'object'` but `typeof SharedArrayBuffer
+  === 'undefined'` and `self.crossOriginIsolated === false`, so there is nothing
+  to wait *on* until the serving origin sends the headers. The same headers fix
+  Safari's 1 ms `performance.now()` clamp, which makes them worth having twice
+  over. **Not implemented**: an untested tick host in the library is worse than
+  none, and the measurement belongs in arm BG's rig with COOP/COEP served.
+  (Also noted from the same probe: `navigator.locks` was `undefined` inside the
+  worker — but that probe ran on a `data:` URL, which is not a secure context, so
+  it proves nothing about Worker exposure. On `http://127.0.0.1` the lock was
+  granted on the main thread without complaint.)
+- **Windows on battery has an 8 ms timer floor.** Our tick is 25 ms with a 100 ms
+  horizon, so the margin is 3× — comfortable, and no code change is warranted.
+  Worth knowing before anyone proposes dropping `tickMs` below ~10 ms: on that
+  platform the floor, not the design, would decide.
+
+---
+
+## 4. Gate suites — all green, and the servo edit is proved inert
+
+| suite | result |
+|---|---|
+| `node timeline/lab/prop-test.mjs` | **OK, 30 basic + 15 gymnastics, 0 violations** |
+| `node timeline/lab/prop-test.mjs --seeds 100` | **OK, 100 + 50, 0 violations** |
+| `node timeline/lab/prop-nested.mjs` (also `--seeds 100`) | **OK, 143 checks, 0 violations** (was 128; +15 rVFC) |
+| `node timeline/lab/prop-render.mjs` / `--seeds 100` | **OK, 301 / 931 checks, 0 violations** |
+| `node timeline/lab/run-render.mjs` | **8/8** |
+| `proto/selfrec/verify-replay.mjs` | **6/6** — V1 boot, V1 block anchors, V2 inter-tile skew p50 0 / max 0, V3 scrubber seeks, V4 block-anchor, V5 master jump 61 191 ms over 3 cues → **0 burst fires**, all folded |
+| `proto/archive/run-measure-archive.mjs` | **7/7** |
+
+`run-measure-archive` is the important one for the servo edit, because it is a
+*measurement* gate rather than an assertion gate. Its per-cue table came back
+**identical to the recorded pre-change run 2, digit for digit**:
+
+```
+CUE-01:-7 CUE-02:-21 CUE-03:-7 CUE-04:-10 CUE-05:0 CUE-06:-4 CUE-07:11 CUE-08:1
+p50 -4 / p95 11, abs p95 21 ms against a 150 ms gate
+content−native anchor delta -15 ms, burn-decode 5117/5118
+```
+
+That page masters one `<video>` at a 40 ms dead band, i.e. exactly the regime
+where §1c says the sensor is invisible — and it is. The steal changed nothing
+that was already being measured, which is the result we wanted from it.
+
+---
+
+## 5. DEFERRED — steal #3, the proxy / decoded-frame scrub tier
+
+Not built, deliberately. The reasoning, so the next session does not re-derive it:
+
+- **It is the most universal pattern in the commercial survey and we have
+  nothing** — Descript's optimized assets, Kapwing's low-res transcodes + >90 %
+  IndexedDB hit rate, Frame.io's C2C proxies, Shotstack's `captureFps` frame
+  pre-capture, Mux's 50–100 WebVTT storyboard tiles, and the JPEG-per-frame
+  extreme. All 13 commercial NLEs surveyed have one.
+- **The right shape is known, and it is already ours.** Grass Valley's James
+  Pearce (W3C Media Production Workshop 2021) gives the best published
+  description: a **playhead-centred decoded-frame window**, "a few frames either
+  side of that cursor, and in some cases a second or two", **predictively resized
+  by the observed scrub direction**, one buffer serving both directions. That is
+  `createCursor` — `locate()` already holds an index at the playhead, advances
+  ~1 per frame forward, binary-searches on a seek, and exposes `prevs`/`nexts`
+  sized by `caps.neighbourhood`. A decoded-frame lane is `sampleAt` plus an
+  eviction policy, not a new index.
+- **Nothing in the current clients scrubs heavy video hard enough to need it.**
+  `proto/replay` masters one `<video>`; `proto/selfrec/replay-grid` slaves N tiles
+  and its measured inter-tile skew is 34 ms = one 30 fps frame, the physical
+  floor; `proto/kurenniemi` masters an `<audio>` tape. The scrub cost we actually
+  have is `currentTime` seek imprecision, which a proxy does not fix.
+- **So the ordering is: keyframe index first, proxy tier second.** Kapwing's
+  `stss` read would let `seek()` report the *achievable* target position instead
+  of discovering it after the fact — the same "degrade honestly" contract
+  `deck.request()` already implements for rates. The decoded-frame window only
+  earns its complexity when a client scrubs a large remote asset, i.e. the
+  archival client, which does not exist yet.
+- One thing §2 makes newly relevant: a proxy tier and `<OffthreadVideo>`-style
+  deterministic frame extraction are **the same mechanism from two sides**
+  (decouple what you scrub from what you export). Whoever builds either should
+  look at both.
+
+## 6. Still needed
+
+1. **Re-run `run-freeze.mjs --natural` on a real battery-powered Chrome.** It is
+   the only way to close §3c, and the rig is ready (two arms, `--keepalive`).
+2. **Serve COOP/COEP somewhere** and measure the `Atomics.wait` tick host against
+   arm BG's hidden matrix (§3e). Two wins in one header pair.
+3. **Decide whether to spend the tightened dead band** (§1c). The library does
+   not decide it; the number that would justify it is a client's, not ours.
+4. **A canvas/frame sink for `renderDeck`.** `onFrame` gives the caller the hook;
+   nothing yet turns 18 001 canvases into a file. That is the encode half, and
+   it is WebCodecs `VideoEncoder` + a muxer, not more transport work.

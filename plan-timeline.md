@@ -385,20 +385,51 @@ the third:
   don't model it; the statistics packages render static PNGs.
 
 ### 7.6 The steal list (adopt in this order)
-1. **`rVFC.mediaTime`** in the media servo — the dead band currently measures
-   `currentTime`, a coarse async view, when the browser can give the PTS of the
-   frame it actually showed. *(in flight)*
-2. **Deterministic offline render** — Remotion's doctrine ("no shared wall
-   clock ⇒ no wall clock at all"); we are uniquely placed (virtual runtime,
-   audio context by argument, pluggable host). ⚠️ `OfflineAudioContext` carries
-   **no determinism guarantee** and is not exposed in Workers — measure, don't
-   assume. *(in flight)*
-3. **Web Lock as a freeze exemption** — `kHoldingWebLock` is a standalone
-   Chrome exemption, which is the mitigation for Energy-Saver freezing hidden
-   tabs after ~5 min (a worker tick is NOT exempt). Also candidate:
-   **`Atomics.wait` tick host** (V8 waits on an OS condvar, structurally out of
-   the throttler's reach). Both want COOP/COEP, which also fixes Safari's 1 ms
-   `performance.now()`. Datum: **Windows on battery has an 8 ms timer floor**.
+1. ✅ **`rVFC.mediaTime`** — DONE (law L4b), but **the naive steal is a
+   regression and we measured it first: preferring `mediaTime` "when it is the
+   newer sample" (Remotion's rule) took corrections 9 → 380.** `mediaTime −
+   currentTime` is a **one-frame BIAS, not noise** (signed mean +8.8 ms @30 fps,
+   +12.5 @60) because `mediaTime` is the PTS of the frame shown at
+   `expectedDisplayTime`, which is in the FUTURE — and Chrome re-interpolates
+   `currentTime` on every read, so "newest" alternated between two clocks a
+   frame apart. The fix is to use the sample as the PAIR it is:
+   `mediaAtNow = mediaTime + (now − expectedDisplayTime)·rate`.
+   Result: at a 5 ms band corrections **365 → 18 (−95 %)** and residual |err|
+   p95 **7.52 → 0.87 ms**. ⚠️ **Honest finding: at the 20/40 ms bands our
+   clients ship, corrections were already ~0 and the change is invisible
+   (8→8, 4→4). The steal does not improve the shipped config — it removes the
+   SENSOR as the thing that sets the dead band.** Defaults unchanged.
+2. ✅ **Deterministic offline render** — DONE (`timeline/render.mjs`):
+   **60,000–86,000× real time** (10 min of position time = 18,001 frames +
+   6,000 events in 7–10 ms), byte-identical trace + hash across renders,
+   **identical audio buffer hash across two separate Chrome processes**, and
+   equal to real wall-clock playback (same events, order, count, state).
+   Two seams only findable by building it: a bare `OfflineAudioContext` pins
+   `currentTime` at 0 so the lane's anchor collapses every node into the first
+   200 ms (hence a virtual-clock Proxy), and a closing `transport.pause()`
+   tears down committed nodes microseconds before `startRendering()` — which
+   produced a **silent 192,000-sample buffer** on the first run. Determinism is
+   reported as **observed, not guaranteed** (the spec gives none), and Web Audio
+   is `[Exposed=Window]` so **offline audio cannot leave a document's main
+   thread — a render farm parallelises across documents, not workers.**
+   Non-determinism is *reported*: `caps.deterministic` + a source scan +
+   `onNondeterministic:'throw'` as a CI gate — and the suite **asserts the
+   scan's blind spot** (closure-hidden `Math.random` scans clean) so nobody
+   reads clean as proof.
+3. ⚠️ **Web Lock freeze exemption — implemented, NOT verified.**
+   `timeline/keepalive.mjs` (held Web Lock + optional audible tone) exists, but
+   **Chrome's natural Energy-Saver freeze could not be reproduced** (380 s
+   hidden, CPU-burning, muted, features forced → no freeze in either arm), so
+   the exemption is documented, not proven. **What WAS measured, by SIGSTOP for
+   300 s: the worker tick host is frozen WITH the page (300,091 ms gap) — a
+   worker defends against throttling, never against freezing.** The real
+   defence is the catch-up policy: `'reduce'` landed correct non-commutative
+   state **1.1 ms after resume, a cost independent of freeze length** (vs
+   `'burst'` firing 300 cues up to 5 min late, `'drop'` losing 300).
+   Bonus: worker `maxTickGapMs` was **33 ms over 380 s hidden** — the
+   hidden-tab win extends from 10 s to 6.5 minutes. `Atomics.wait` host needs
+   COOP/COEP (`crossOriginIsolated: false` today) — documented, not built.
+   Windows' 8 ms battery timer floor vs our 25 ms tick = 3× margin, no change.
 4. **Two-phase seek** — JACK's slow-sync barrier (opt-in, non-blocking,
    fail-open on timeout, re-armed by a locate mid-roll) + Ardour's
    `LocateTransportDisposition {MustRoll, MustStop, RollIfAppropriate}`.
