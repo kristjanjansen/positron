@@ -1,6 +1,6 @@
 {
  "subject": "Erkki Kurenniemi (1941–2017)",
- "generated": "2026-08-28T06:36:56.017Z",
+ "generated": "2026-08-28T06:43:14.147Z",
  "generator": "proto/kurenniemi/ingest.mjs",
  "note": "Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.",
  "corpusRange": {
@@ -81,7 +81,7 @@
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Katkelmia äänikirjeestä Jan Barkille (1963) (320 kbps) (1).mp3",
-   "title": "Katkelmia äänikirjeestä Jan Barkille (1963)",
+   "title": "Katkelmia äänikirjeestä Jan Barkille",
    "kind": "audio",
    "dateEvidence": {
     "how": "filename-year",
@@ -158,13 +158,14 @@
    "title": "On-Off",
    "kind": "audio",
    "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
+    "how": "wikidata-title-match",
+    "raw": "+1963-00-00T00:00:00Z",
+    "wdPrecision": 9,
     "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
+    "hi": -189388800000,
+    "precision": "year",
+    "matched": "wd:Q115919332",
+    "tier": 1
    },
    "durSec": 770.21,
    "media": {
@@ -188,8 +189,8 @@
     "retrieved": "2026-08-28"
    },
    "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range"
+   "bandMs": 31536000000,
+   "precision": "year"
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
@@ -458,17 +459,119 @@
    "precision": "range"
   },
   {
+   "id": "wd:Q115918920",
+   "title": "Electronics In the World of Tomorrow",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1964-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -189388800000,
+    "hi": -157766400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918920",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918920",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -189388800000,
+   "bandMs": 31622400000,
+   "precision": "year"
+  },
+  {
+   "id": "wd:Q115918918",
+   "title": "The Punched Tape of Life",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1964-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -189388800000,
+    "hi": -157766400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918918",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918918",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -189388800000,
+   "bandMs": 31622400000,
+   "precision": "year"
+  },
+  {
+   "id": "wd:Q115918974",
+   "title": "Flora & Fauna",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1965-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -157766400000,
+    "hi": -126230400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918974",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918974",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -157766400000,
+   "bandMs": 31536000000,
+   "precision": "year"
+  },
+  {
+   "id": "wd:Q115919052",
+   "title": "The Jump",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1965-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": -157766400000,
+    "hi": -126230400000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115919052",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115919052",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": -157766400000,
+   "bandMs": 31536000000,
+   "precision": "year"
+  },
+  {
    "id": "ia:computer-music-1966-dir.-erkki-kurenniemi/Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
-   "title": "Computer Music( 1966) dir. Erkki Kurenniemi",
+   "title": "Computer Music",
    "kind": "film",
    "dateEvidence": {
-    "how": "derived-from-corpus-range",
-    "raw": null,
-    "tier": 1,
-    "why": "Wikidata Q122801742 \"Äänityksiä / Recordings 1963–1973\" — the authoritative compilation of his tapes",
-    "at": -220924800000,
-    "hi": 126230400000,
-    "precision": "range"
+    "how": "filename-year",
+    "raw": "Computer Music( 1966) dir. Erkki Kurenniemi.mp4",
+    "at": -126230400000,
+    "hi": -94694400000,
+    "precision": "year"
    },
    "durSec": 389,
    "media": {
@@ -491,13 +594,13 @@
     "rightsConfidence": "LOW",
     "retrieved": "2026-08-28"
    },
-   "at": -220924800000,
-   "bandMs": 347155200000,
-   "precision": "range"
+   "at": -126230400000,
+   "bandMs": 31536000000,
+   "precision": "year"
   },
   {
    "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Antropoidien tanssi (Love Records, 1968).mp3",
-   "title": "Antropoidien tanssi (Love Records, 1968)",
+   "title": "Antropoidien tanssi",
    "kind": "audio",
    "dateEvidence": {
     "how": "filename-year",
@@ -532,6 +635,32 @@
    "precision": "year"
   },
   {
+   "id": "wd:Q115918963",
+   "title": "Florence",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+1970-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": 0,
+    "hi": 31536000000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115918963",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115918963",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": 0,
+   "bandMs": 31536000000,
+   "precision": "year"
+  },
+  {
    "id": "eu:09102/_SMS_MM_X5176",
    "title": "DIMI-A — the surviving instrument (Stockholm)",
    "kind": "instrument",
@@ -556,6 +685,32 @@
     "retrieved": "2026-08-28"
    },
    "at": 0,
+   "bandMs": 31536000000,
+   "precision": "year"
+  },
+  {
+   "id": "wd:Q115919656",
+   "title": "Future Is Not What It Used To Be",
+   "kind": "work",
+   "dateEvidence": {
+    "how": "wikidata-declared-precision",
+    "raw": "+2002-00-00T00:00:00Z",
+    "wdPrecision": 9,
+    "at": 1009843200000,
+    "hi": 1041379200000,
+    "precision": "year"
+   },
+   "prov": {
+    "source": "Wikidata",
+    "sourceId": "Q115919656",
+    "sourceUrl": "https://www.wikidata.org/wiki/Q115919656",
+    "custody": "community knowledge base (CC0 data)",
+    "rights": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "rightsAsserter": "Wikidata (CC0 — the STATEMENT; the work itself is not free)",
+    "rightsConfidence": "HIGH (statement)",
+    "retrieved": "2026-08-28"
+   },
+   "at": 1009843200000,
    "bandMs": 31536000000,
    "precision": "year"
   },

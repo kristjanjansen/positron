@@ -148,6 +148,68 @@ Two agents, one per architecture, both against the deployed elektron-rtc worker
   conventions into the lib. NEW worker kept: elektron-jam (hibernation DO,
   echoes verbatim binary+text, stores nothing; workers/jam/DEPLOYED.md).
 
+### KURENNIEMI CORPUS (session 6aa) — ✅ Tier A, 8/8 (proto/kurenniemi) — the SECOND institution
+The PhD case study at the project's origin, now a real client: position domain
+IS calendar time (1941→2018), 22 items / 3 sources / **12 playable** MP3s.
+Three adapters: `record` (discrete), `tape` (`caps.rates:[1]` — a tape only
+plays at tape speed, so archive rates are **refused on the record** via
+`deck.request`; 12 refusals logged, `lattice [1] cannot express 31557600`),
+`certainty` (continuous, `caps.tier:1` — which ARMS the evidence firewall on
+real archive data: `sampleAt` with no policy throws EVIDENCE_POLICY_REQUIRED,
+and attested-vs-restored differ on 297/300 probes with attested taking **4
+distinct values, all of them real samples**).
+- Availability: **archive.org** is the only playable source (audio 206 + ACAO:*;
+  **video 206 with NO ACAO** — the 302 has it, the final node doesn't; no
+  expose-headers anywhere). Wikidata supplies dates WITH explicit `precision`
+  (incl. a genuine precision-8 decade). Europeana has the DIMI-A image (CC
+  BY-NC-SA, institutionally asserted). **Finna 403s a Cloudflare managed
+  challenge to curl, node, WebFetch AND headless Chrome** — an edge rule, not
+  policy. FNG's API ignores `?q=`; the Kurenniemi archive isn't in it.
+  AV-arkki/Yle/Constant: no API / 404 / **`kurenniemi.activearchives.org` no
+  longer resolves**. The Taanila doc is on IA as a Yle rip with null licence —
+  deliberately EXCLUDED.
+- **Four sources, four precision conventions for "1970"**: ERR `1970-07-15`
+  (midpoint pad, no precision field — the trap); Wikidata raw `+1970-00-00` +
+  `precision: 9`; Wikidata SPARQL `1970-01-01` + timePrecision (**same
+  statement, different padding**); EDM `"1970"` (precision = string length).
+  The client sets `at` = band **LOWER BOUND, never a midpoint**, carrying
+  `bandMs` — which is exactly the spatiotemporal survey's truncation-not-padding
+  rule, arrived at independently from data.
+- **What ERR alone did not teach (the real value of a second institution):**
+  1. **The date field can describe the FILE, not the WORK** — IA's `date` on
+     the collection is 2022-04-11, the day someone ripped it; naive
+     `source.date → at` yields a corpus off by 50 years that is *internally
+     consistent about it*. The rejected field is kept as `prov.itemDateField`
+     so the rejection is auditable.
+  2. **Rights need an ASSERTER** — IA marks a 1968 Love Records release
+     `publicdomain/mark/1.0`: well-formed, machine-readable and wrong. 13/22
+     items are `confidence: LOW`. **A rights value without a chain of assertion
+     is decoration.**
+  3. **Ingest is multi-source by construction** (media on IA, dates on
+     Wikidata, object in Europeana) — the adapter's real job is RECONCILIATION;
+     every item names one of five `dateEvidence.how` methods.
+  4. **The honest form of "undated" is a BAND** — 9 tapes take 1963–1973 from
+     the title of the authoritative compilation, tier-1, rendered as nine
+     identical hatched bars: *nine items pinned to one guess, visible at a
+     glance*.
+  5. **CORS posture varies per content TYPE, not per item** — so mediaRef
+     indirection isn't enough; the corpus must record what the client may DO
+     with the bytes.
+  6. **An aggregator can rate-limit you into a silent lie** — throttled WDQS
+     answers **200 with zero bindings**; the first run shipped `work: 0` and
+     reported success. Ingest now refuses to ship an empty spine.
+  7. **The custodian is the one you can't reach** — both real holders (FNG
+     Central Art Archives, Finna) are closed; what plays is on an aggregator,
+     uploaded by strangers. That asymmetry is why provenance confidence must be
+     first-class.
+- Library note: **`deck.range` is a seek window, not a play stop** — at 3.16e7
+  the vector ran to year 10943 with nothing complaining. For an archival deck,
+  "the archive ends" is normal, not an error.
+- Unlock list: Finna (a CDN edge rule — an allowlisted UA turns 3 sources into
+  a national aggregator) · FNG for the Kurenniemi **finding aid as data** even
+  without digitised objects · Yle for the Taanila doc (not the IA rip) ·
+  rightsholders for the tapes before any public performance.
+
 ### FRAGMENT QUOTATION + mediaMaster (session 6z) — ✅ 128 + 20/20 + 6/6 + 7/7
 - **`nest.add({id, at, rate, deck, in, out, master})`** — `in`/`out` default to
   `deck.range`, so **the whole-range case IS the default case** and rules 1–6
