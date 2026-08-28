@@ -38,13 +38,23 @@ const RETRIEVED = new Date().toISOString().slice(0, 10);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let lastReq = 0;
-async function polite(url, opts = {}) {          // <= 1 req/s, always
-  const wait = 1050 - (Date.now() - lastReq);
-  if (wait > 0) await sleep(wait);
-  lastReq = Date.now();
-  const r = await fetch(url, { ...opts, headers: { 'User-Agent': UA, Accept: 'application/json', ...(opts.headers || {}) } });
-  if (!r.ok) throw new Error(`${r.status} ${url}`);
-  return r.json();
+async function polite(url, opts = {}, tries = 3) {   // <= 1 req/s, always
+  for (let n = 1; ; n++) {
+    const wait = 1050 - (Date.now() - lastReq);
+    if (wait > 0) await sleep(wait);
+    lastReq = Date.now();
+    try {
+      const r = await fetch(url, { ...opts, headers: { 'User-Agent': UA, Accept: 'application/json', ...(opts.headers || {}) } });
+      // 429 is the one that MUST NOT be swallowed: WDQS answers a throttled
+      // query 200-with-zero-rows, so an ingest that shrugs at rate limits ships
+      // an empty corpus that looks successful.
+      if (!r.ok) throw new Error(`${r.status} ${url}`);
+      return await r.json();
+    } catch (e) {
+      if (n >= tries) throw e;
+      await sleep(2000 * n);                       // archive.org closes idle keep-alives
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -106,15 +116,16 @@ const IA_ITEMS = ['videoplayback-13_202304', 'computer-music-1966-dir.-erkki-kur
 /** Some IA filenames carry the ONLY date evidence there is for that track:
  *  "… (Love Records, 1968).mp3", "… Jan Barkille (1963) ….mp3". That is
  *  evidence, and it is weak, and both facts must survive into the corpus. */
-const yearInName = (n) => { const m = /\((?:[^()]*,\s*)?(19\d\d)\)/.exec(n); return m ? +m[1] : null; };
+const yearInName = (n) => { const m = /\(\s*(?:[^()]*,\s*)?(19\d\d)\s*\)/.exec(n); return m ? +m[1] : null; };
 
-/** Titles whose date comes from Wikidata rather than the filename. Filled in
- *  from the live SPARQL result below — this map is only the title matcher. */
-const WD_TITLE = { 'on-off': 'On-Off' };
-
+/** The filename is BOTH the title and (sometimes) the only date evidence. It is
+ *  cleaned for display AFTER yearInName() has read it, and the raw name is kept
+ *  in dateEvidence.raw so the evidence is never destroyed by the cosmetics. */
 const clean = (n) => n.replace(/\.(mp3|mp4)$/i, '')
+  .replace(/\s*(dir\.|Dir\.)?\s*(by\s+)?Erkki Kurenniemi\s*$/, '')
   .replace(/^Erkki Kurenniemi\s*-\s*/, '')
   .replace(/\s*\((?:64|128|320) kbps\)\s*/g, ' ')
+  .replace(/\s*\(\s*(?:[^()]*,\s*)?19\d\d\s*\)\s*/g, ' ')     // the year parenthetical
   .replace(/\s*\(\d+\)\s*$/, '')
   .replace(/\s+/g, ' ').trim();
 
@@ -197,35 +208,57 @@ async function wikidataLife() {
   return out;
 }
 
-const SPARQL = `SELECT ?item ?itemLabel ?date ?prec WHERE {
-  VALUES ?p { wdt:P170 wdt:P287 wdt:P57 wdt:P86 wdt:P175 }
-  ?item ?p wd:${Q} .
-  OPTIONAL { ?item p:P571 ?st . ?st psv:P571 ?tv . ?tv wikibase:timeValue ?date ; wikibase:timePrecision ?prec }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,fi,sv" } }`;
+// The obvious route here is WDQS SPARQL:
+//   VALUES ?p { wdt:P170 wdt:P287 wdt:P57 wdt:P86 wdt:P175 } ?item ?p wd:Q3056683
+//   OPTIONAL { ?item p:P571/psv:P571 [ wikibase:timeValue ?date ;
+//                                      wikibase:timePrecision ?prec ] }
+// It works (measured: 14 rows, every ?prec = 9) but WDQS answers 429 to an
+// unregistered agent within a couple of calls AND — the trap — a throttled
+// answer can come back 200 with ZERO bindings, i.e. an empty corpus that looks
+// like a successful ingest. CirrusSearch + EntityData is rate-stable and, as a
+// bonus, returns the RAW time value, which is where Wikidata's zero-fill
+// convention (`+1966-00-00T00:00:00Z`) is visible; SPARQL start-pads it to
+// `1966-01-01` and hides that.
+const WD_PROPS = ['P170', 'P287', 'P57', 'P86', 'P175', 'P61'];   // creator, designer, director, composer, performer, inventor
 
 async function wikidataWorks() {
-  const url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(SPARQL);
-  const d = await polite(url, { headers: { Accept: 'application/sparql-results+json' } });
-  const seen = new Map();
-  for (const b of d.results.bindings) {
-    const qid = b.item.value.split('/').pop();
-    if (seen.has(qid)) continue;
-    const b2 = b.date ? fromWikidataTime(b.date.value, Number(b.prec.value)) : null;
-    seen.set(qid, {
-      id: `wd:${qid}`, title: b.itemLabel?.value || qid, kind: 'work',
-      dateEvidence: b2
-        ? { how: 'wikidata-declared-precision', raw: b.date.value, wdPrecision: Number(b.prec.value), ...b2 }
-        : { how: 'undated', raw: null },
-      prov: {
-        source: 'Wikidata (SPARQL)', sourceId: qid, sourceUrl: `https://www.wikidata.org/wiki/${qid}`,
-        custody: 'community knowledge base (CC0 data)',
-        rights: 'https://creativecommons.org/publicdomain/zero/1.0/',
-        rightsAsserter: 'Wikidata (CC0 — the STATEMENT; the work itself is not free)',
-        rightsConfidence: 'HIGH (statement)', retrieved: RETRIEVED,
-      },
-    });
+  // One query per property: CirrusSearch takes `haswbstatement:P57=Q…` fine but
+  // silently returns nothing for the OR of several of them.
+  const qidSet = new Set();
+  for (const p of WD_PROPS) {
+    const s = await polite('https://www.wikidata.org/w/api.php?action=query&list=search&format=json&srlimit=50&srsearch='
+      + encodeURIComponent(`haswbstatement:${p}=${Q}`));
+    for (const r of s.query?.search || []) if (/^Q\d+$/.test(r.title)) qidSet.add(r.title);
   }
-  return [...seen.values()];
+  const qids = [...qidSet];
+  if (!qids.length) throw new Error('wikidata: search returned no QIDs — refusing to ship an empty spine');
+  const out = [];
+  for (let i = 0; i < qids.length; i += 25) {
+    const batch = qids.slice(i, i + 25);
+    const d = await polite('https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels|claims'
+      + '&languages=en|fi|sv&ids=' + batch.join('|'));
+    for (const qid of batch) {
+      const e = d.entities?.[qid]; if (!e || e.missing !== undefined) continue;
+      const label = e.labels?.en?.value || e.labels?.fi?.value || e.labels?.sv?.value || qid;
+      const inc = e.claims?.P571?.[0]?.mainsnak?.datavalue?.value           // inception
+        || e.claims?.P577?.[0]?.mainsnak?.datavalue?.value;                // publication date
+      const b = inc?.time ? fromWikidataTime(inc.time, inc.precision) : null;
+      out.push({
+        id: `wd:${qid}`, title: label, kind: 'work',
+        dateEvidence: b
+          ? { how: 'wikidata-declared-precision', raw: inc.time, wdPrecision: inc.precision, ...b }
+          : { how: 'undated', raw: null },
+        prov: {
+          source: 'Wikidata', sourceId: qid, sourceUrl: `https://www.wikidata.org/wiki/${qid}`,
+          custody: 'community knowledge base (CC0 data)',
+          rights: 'https://creativecommons.org/publicdomain/zero/1.0/',
+          rightsAsserter: 'Wikidata (CC0 — the STATEMENT; the work itself is not free)',
+          rightsConfidence: 'HIGH (statement)', retrieved: RETRIEVED,
+        },
+      });
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

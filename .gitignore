@@ -19,3 +19,4 @@ __pycache__/
 *.log
 .wrangler/
 proto/megatimeline/*-cache.jsonl
+proto/kurenniemi/.chrome-verify/
