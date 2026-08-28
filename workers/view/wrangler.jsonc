@@ -1,0 +1,30 @@
+{
+  // elektron-view — the repo's public viewing surfaces on one phone-openable
+  // URL: a menu at / plus four pages under /proto/*.
+  //
+  // public/ is ASSEMBLED BY build.mjs from an explicit allowlist, never from a
+  // directory glob — the repo root holds .env and an assets directory is
+  // uploaded publicly and verbatim. Run `node build.mjs` before every deploy.
+  //
+  // Static assets serve every page, every module and every committed cache
+  // entry straight from the edge. src/index.js runs only for /api/*, /icy/*
+  // and /report — see DEPLOYED.md.
+  "name": "elektron-view",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./public",
+    // the Worker reads committed cache entries back out of the asset store
+    "binding": "ASSETS",
+    // unmatched paths fall through to the Worker (which 404s) rather than
+    // being answered with an SPA index.html
+    "not_found_handling": "none"
+  },
+  // ONE instance (idFromName('err')) gates every upstream arhiiv.err.ee call
+  // this deployment makes, and holds the durable 2-day response cache.
+  "durable_objects": {
+    "bindings": [{ "name": "GATE", "class_name": "Gate" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Gate"] }],
+  "observability": { "enabled": true }
+}

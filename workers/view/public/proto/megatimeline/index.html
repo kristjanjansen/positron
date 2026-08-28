@@ -1,0 +1,1136 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- Without this the phone lays the whole instrument out at 980 CSS px and
+     scales it down: the ERR material becomes unreadable and every tap lands
+     2.5x away from where the finger was. `user-scalable` is left alone — the
+     stage does its own pinch, but the CHROME must stay zoomable for anyone who
+     needs it. viewport-fit=cover feeds the safe-area insets below. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>megatimeline — the ERR archive as one scrollable surface</title>
+<style>
+  :root { color-scheme: dark; --vi: #e8a54b; --au: #3ec9ba; --ph: #b48fff;
+          --rh: 30px; }
+  /* 100dvh, not 100vh: with the URL bar showing, 100vh is TALLER than the
+     visible viewport on iOS, so the bottom row of an inset:0 app sits under
+     Safari's own chrome and can never be tapped. */
+  html, body { margin: 0; height: 100dvh; overflow: hidden; background: #0a0a0c;
+    color: #ccd; font: 12px/1.4 ui-monospace, monospace;
+    -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+  /* touch-action:none is CORRECT here and only here: this surface fills the
+     viewport and has no page scroll to protect, so the stage owns both axes
+     and the pinch. (The shared strip, which lives inside scrolling pages,
+     declares pan-y instead.) */
+  #stage { position: fixed; inset: 0; touch-action: none; cursor: grab;
+    -webkit-tap-highlight-color: transparent; }
+  #stage.dragging { cursor: grabbing; }
+  canvas { position: absolute; inset: 0; }
+  /* ruler */
+  #ruler { position: absolute; left: 0; right: 0; top: 0; height: var(--rh);
+    border-bottom: 1px solid #26262e; background: #0d0d11; overflow: hidden; z-index: 4;
+    padding-top: env(safe-area-inset-top); }
+  #rulerInner { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
+  .tick { position: absolute; top: calc(var(--rh) - 8px); bottom: 0; width: 1px; background: #3a3a46; }
+  .tick.major { top: calc(var(--rh) - 16px); background: #55556a; }
+  .tlab { position: absolute; top: 2px; color: #778; white-space: nowrap;
+    transform: translateX(3px); user-select: none; cursor: pointer;
+    touch-action: manipulation; }
+  .tlab.major { color: #bbc; }
+  .tlab:hover { color: #fff; }
+  /* track furniture */
+  #furniture { position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    transform-origin: 0 0; will-change: transform; }
+  .trackLab { position: absolute; left: 8px; letter-spacing: 2px; font-size: 11px;
+    opacity: .75; text-shadow: 0 0 4px #000; }
+  .trackSub { position: absolute; left: 8px; color: #556; font-size: 10px; }
+  .laneLab { letter-spacing: 0; font-size: 10px; opacity: 1; background: #0a0a0cd0;
+    padding: 1px 5px; border-radius: 2px; max-width: 320px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .laneLab .laneCount { color: #778; }
+  /* track panel (tracks-are-queries UI) */
+  #panel { position: fixed; right: 8px; top: 36px; z-index: 6; min-width: 210px;
+    max-width: 280px; background: #101016ec; border: 1px solid #2a2a34;
+    border-radius: 3px; font-size: 11px; backdrop-filter: blur(2px); }
+  #panelHead { padding: 5px 9px; cursor: pointer; color: #aab; letter-spacing: 1px;
+    user-select: none; }
+  #panelHead .chev { float: right; color: #667; }
+  #panel.closed #panelBody { display: none; }
+  #panelBody { padding: 5px 9px 9px; border-top: 1px solid #22222a; }
+  .pv { display: flex; gap: 4px; margin: 2px 0 8px; }
+  .pv button { flex: 1; background: #16161e; color: #99a; border: 1px solid #2a2a34;
+    font: inherit; font-size: 11px; padding: 3px 0; cursor: pointer; border-radius: 2px; }
+  .pv button.on { background: #26263a; color: #fff; border-color: #4a4a5e; }
+  .laneRow { display: flex; align-items: center; gap: 6px; padding: 2px 0;
+    cursor: pointer; color: #bbc; }
+  .laneRow input { accent-color: #556; margin: 0; flex: none; }
+  .laneRow .ln { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .laneRow .lc { margin-left: auto; color: #667; flex: none; }
+  .pnote { margin-top: 7px; color: #556; font-size: 10px; line-height: 1.35; }
+  /* thumbnail cards */
+  #cards { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; z-index: 2; }
+  .card { position: absolute; left: 0; top: 0; will-change: transform; cursor: pointer; }
+  .card img { display: block; object-fit: cover; background: #14141a;
+    border: 1px solid #333; border-radius: 2px; }
+  .card.video img { width: 126px; height: 71px; border-color: #4a3a20; }
+  .card.photo img { width: 64px; height: 64px; border-color: #3a3050; }
+  .card:hover img { border-color: #fff; z-index: 10; }
+  /* hover card */
+  #hover { position: fixed; display: none; max-width: 380px; background: #14141be8;
+    border: 1px solid #3a3a46; padding: 6px 9px; pointer-events: none; z-index: 20;
+    backdrop-filter: blur(2px); }
+  #hover .ht { color: #fff; margin-bottom: 2px; }
+  #hover .hm { color: #99a; }
+  .badge { font-size: 10px; padding: 0 4px; border-radius: 2px; background: #223; color: #9ec5ff; }
+  .badge.p-year { background: #3a2a10; color: #ffd479; }
+  .badge.p-month { background: #2a2a10; color: #e5e08a; }
+  .badge.heur { opacity: .66; font-style: italic; }
+  /* hud */
+  #hud { position: fixed; left: 8px; bottom: 6px; color: #667; z-index: 5;
+    pointer-events: none; text-shadow: 0 0 3px #000; }
+  #hud b { color: #aab; }
+  #help { position: fixed; right: 8px; bottom: 6px; color: #556; z-index: 5; pointer-events: none; }
+  #helpTouch { display: none; }
+
+  /* ======================================================================
+     COARSE POINTER. Everything below is inside one media query, so a desktop
+     mouse never sees a byte of it and the existing autotests (headless,
+     pointer:fine) are provably unaffected. A finger gets:
+       · a 46 px ruler so a YEAR is a 44 px tap target rather than a 29x17 one
+       · a panel that is a bottom sheet, not a 280 px column over a 360 px screen
+       · 44 px rows in that panel
+       · safe-area padding, so the HUD is not under the home indicator
+     ====================================================================== */
+  @media (pointer: coarse) {
+    :root { --rh: 46px; }
+    .tlab { top: 0; height: 44px; min-width: 44px; padding: 4px 12px 0 2px;
+            box-sizing: border-box; font-size: 12px; }
+    .tlab.major { font-weight: 600; }
+    #panel { right: 6px; left: 6px; top: auto;
+             bottom: calc(6px + env(safe-area-inset-bottom)); max-width: none; min-width: 0;
+             max-height: 52dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #panelHead { min-height: 44px; display: flex; align-items: center;
+                 justify-content: space-between; font-size: 12px; }
+    #panelHead .chev { float: none; }
+    .pv { gap: 6px; margin: 4px 0 10px; }
+    .pv button { min-height: 44px; font-size: 12px; border-radius: 6px;
+                 touch-action: manipulation; }
+    .laneRow { min-height: 44px; padding: 0 2px; gap: 10px; }
+    .laneRow input { width: 22px; height: 22px; }
+    #hud { bottom: calc(4px + env(safe-area-inset-bottom)); left: 8px; right: 8px;
+           font-size: 11px; }
+    #help { display: none; }
+    #helpTouch { display: block; position: fixed; z-index: 5; pointer-events: none;
+      left: 8px; right: 8px; bottom: calc(20px + env(safe-area-inset-bottom));
+      color: #667; font-size: 10.5px; text-shadow: 0 0 3px #000; }
+    /* the hover card becomes a TAP card: anchored to the bottom, full width,
+       and it carries its own OPEN button because a finger has no second
+       button and "tap = open in a new tab" is a trap on a phone. */
+    #hover { left: 6px; right: 6px; bottom: calc(70px + env(safe-area-inset-bottom));
+      max-width: none; padding: 10px 12px; border-radius: 6px; font-size: 12px;
+      pointer-events: auto; }
+    #hover .hopen { display: block; margin-top: 8px; min-height: 44px; width: 100%;
+      background: #26263a; color: #fff; border: 1px solid #4a4a5e; border-radius: 6px;
+      font: inherit; font-size: 12px; touch-action: manipulation; }
+    .card.video img { width: 108px; height: 61px; }
+  }
+</style>
+
+<div id="stage">
+  <canvas id="field"></canvas>
+  <div id="cards"></div>
+  <div id="furniture"></div>
+  <div id="ruler"><div id="rulerInner"></div></div>
+</div>
+<div id="hover"></div>
+<div id="panel"><div id="panelHead">TRACKS <span class="chev">▾</span></div><div id="panelBody"></div></div>
+<div id="hud">loading census…</div>
+<div id="help">wheel = zoom · drag = pan · dbl-click a year = dive · click item = play (opens remixer)</div>
+<div id="helpTouch">pinch = zoom · drag = pan · double-tap a year = dive · tap an item = details, then OPEN</div>
+
+<script type="module">
+import {
+  viewport, ZX_MIN, ZX_MAX, setWorldHeight, clampY, screenToWorld,
+  worldToScreenX, worldToScreenY, visibleX, fitX, animateFitX, cancelAnim,
+} from './viewport.mjs';
+import { attachGestures, panWasDrag } from './gesture.mjs';
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ONE capability question, asked once. `pointer: coarse` — not a width — is the
+// right test: a 1024 px tablet has fingers and a 700 px desktop window does not,
+// and every touch affordance below is about the INSTRUMENT, not the size.
+const coarseMQ = matchMedia('(pointer: coarse)');
+let COARSE = coarseMQ.matches;
+// LIVE, not read-once: a 2-in-1 that folds into a tablet, a desktop that gains
+// a touchscreen, and (the case that bit this harness) a page that is loaded
+// before device emulation is applied all flip this after boot. Reading it once
+// leaves the touch affordances permanently off on exactly the devices they are
+// for.
+coarseMQ.addEventListener('change', (e) => { COARSE = e.matches; applyCoarse(); });
+function applyCoarse() {
+  const p = document.getElementById('panel');
+  if (p) p.classList.toggle('closed', COARSE);
+  if (!COARSE) hideHover();
+}
+window.__mtCoarse = () => COARSE;
+
+// ─── time & tracks ──────────────────────────────────────────────────────────
+const MS_DAY = 86400000;
+const dayUTC = (y, m = 0, d = 1) => Date.UTC(y, m, d) / MS_DAY;
+const T0 = dayUTC(1908), T1 = dayUTC(2027);
+const yearOfDay = (d) => new Date(d * MS_DAY).getUTCFullYear();
+
+const TRACKS = [
+  { id: 'video', label: 'VIDEO', y: 40, h: 224, color: '#e8a54b', sub: 'archive video begins 1958-07-11' },
+  { id: 'audio', label: 'AUDIO', y: 284, h: 156, color: '#3ec9ba', sub: 'reaches back to 1908' },
+  { id: 'photo', label: 'PHOTO', y: 460, h: 148, color: '#b48fff', sub: 'sparse throughout' },
+];
+const trackOf = {}; TRACKS.forEach((t) => (trackOf[t.id] = t));
+setWorldHeight(620);
+
+// tiers (zx = px per day)
+const TIER_TICKS = 40 / 365;   // a year spans >= ~40 px
+const TIER_THUMB = 2;          // a month spans >= ~60 px
+const tierOf = (zx) => (zx >= TIER_THUMB ? 'days' : zx >= TIER_TICKS ? 'years' : 'decades');
+
+const IMG_HOST = 'https://arhiiv-images.err.ee/';
+const REMIXER = '/proto/remixer';
+const MAX_CARDS = 300;
+const PAGE_CAP = 5;            // max pages of 100 per (year, type)
+
+// series lanes (tracks-are-queries, plan §4): top-N series by loaded item
+// count within the visible years, the rest pooled in one "muu / other" lane.
+const SERIES_N = 7;
+const SL_TOP = 40;             // first lane y (matches type view)
+const SL_GAP = 6;
+const SL_THUMB_H = 104;        // lane with video/photo cards (71px card fits)
+const SL_AUDIO_H = 72;         // audio-only lane (40px waveform strip fits)
+
+// ─── state ──────────────────────────────────────────────────────────────────
+const S = {
+  census: null, censusMax: { audio: 1, video: 1, photo: 1 },
+  censusTotal: { audio: 0, video: 0, photo: 0 },
+  yearData: new Map(),         // 'type:year' -> {items, bySlug, total, pagesLoaded, status}
+  contentCache: new Map(),     // slug -> content record
+  apiSearch: 0, apiItem: 0,    // client-issued API-layer fetches
+  consoleClean: true,
+  view: 'type',                // 'type' | 'series' (master switch; decades tier
+                               // always renders the type census — series data
+                               // does not exist at census granularity)
+  hidden: new Set(),           // lane keys toggled off ('type:video', 'series:…')
+  seriesDerived: [],           // settle-derived [{name,label,count,types,hasThumbs,color,muu}]
+  dataVersion: 0,              // bumped per landed page → re-derive trigger
+};
+const metrics = {
+  settleAt: 0, imgLoaded: 0,
+  mounts: [],                  // per-settle {newCards, mountMs, firstImgMs} where newCards>0
+  frameRec: null,              // array of timestamps while recording
+};
+
+// ─── data layer (server gates upstream at <=1 req/s; JSONL caches absorb) ───
+function pageBody(type, year, page) {
+  return { queryParams: { phrase: '*', type, sortOption: 'abc', page, limit: 100,
+    timeRange: 'custom', timeRangeFrom: Date.UTC(year, 0, 1) / 1000,
+    timeRangeTo: Date.UTC(year + 1, 0, 1) / 1000 - 1,
+    includeTranscription: false, advancedParams: [] } };
+}
+function ydOf(type, year) {
+  const key = type + ':' + year;
+  let yd = S.yearData.get(key);
+  if (!yd) { yd = { items: [], bySlug: new Set(), total: null, pagesLoaded: 0, status: 'new' }; S.yearData.set(key, yd); }
+  return yd;
+}
+async function fetchPage(type, year, page) {
+  const yd = ydOf(type, year);
+  yd.status = 'loading';
+  S.apiSearch++;
+  const r = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pageBody(type, year, page)) });
+  const j = await r.json();
+  if (!r.ok) { yd.status = 'error'; throw new Error('search ' + r.status); }
+  const al = j.activeList || {};
+  yd.total = al[type + 'Count'] ?? yd.total;
+  for (const g of al.data || []) {
+    for (const h of g.data || []) {
+      const t = h.archiveType === 'foto' ? 'photo' : h.archiveType;  // measured: photo hits say "foto"
+      if (t !== type || yd.bySlug.has(h.url)) continue;
+      yd.bySlug.add(h.url);
+      let wf = null;
+      if (t === 'audio' && h.waveform) { try { wf = JSON.parse(h.waveform); } catch {} }
+      // series nav link (measured shape: navigationLinks[{type:'series',data:[{name,url}]}])
+      const serNav = (h.navigationLinks || []).find((n) => n.type === 'series');
+      const ser = (serNav && serNav.data && serNav.data[0]) || null;
+      yd.items.push({ type: t, slug: h.url, title: h.heading, iso: h.date,
+        d: Date.parse(h.date) / MS_DAY, photoUrl: h.photoUrl || '', wf, lead: h.lead || '',
+        series: ser ? ser.name : '', seriesUrl: ser ? ser.url : '' });
+    }
+  }
+  yd.items.sort((a, b) => a.d - b.d);
+  yd.pagesLoaded = Math.max(yd.pagesLoaded, page);
+  yd.status = 'ready';
+  S.dataVersion++;
+}
+
+async function ensureContent(item) {
+  if (S.contentCache.has(item.slug)) return S.contentCache.get(item.slug);
+  S.apiItem++;
+  const r = await fetch(`/api/item/${item.type}/${item.slug}`);
+  if (!r.ok) return null;
+  const c = await r.json();
+  S.contentCache.set(item.slug, c);
+  markDirty();
+  return c;
+}
+
+// wanted-jobs queue, recomputed on every settle; single serial pump
+let wanted = [];
+let pumping = false;
+function censusCount(type, year) {
+  const y = S.census && S.census.years[year];
+  return y ? y[type] : 0;
+}
+function computeWanted() {
+  const [d0, d1] = visibleX();
+  const jobs = [];
+  if (viewport.zx >= TIER_TICKS && S.census) {
+    const y0 = Math.max(1908, yearOfDay(d0)), y1 = Math.min(2026, yearOfDay(d1));
+    const centerY = yearOfDay((d0 + d1) / 2);
+    const yrs = [];
+    for (let y = y0; y <= y1; y++) yrs.push(y);
+    yrs.sort((a, b) => Math.abs(a - centerY) - Math.abs(b - centerY));
+    for (const y of yrs.slice(0, 30)) {
+      const ys = dayUTC(y), ye = dayUTC(y + 1);
+      const visFrac = (Math.min(ye, d1) - Math.max(ys, d0)) / (ye - ys);
+      for (const t of ['video', 'audio', 'photo']) {
+        if (!censusCount(t, y)) continue;                 // honest emptiness costs zero requests
+        if (viewport.zx >= TIER_THUMB && visFrac < 0.15) continue;  // edge slivers: skip
+        jobs.push({ type: t, year: y, page: 1 });
+      }
+      if (viewport.zx >= TIER_THUMB && visFrac >= 0.3) {
+        for (const t of ['video', 'audio', 'photo']) {
+          const pages = Math.min(PAGE_CAP, Math.ceil(censusCount(t, y) / 100));
+          for (let p = 2; p <= pages; p++) jobs.push({ type: t, year: y, page: p });
+        }
+      }
+    }
+  }
+  wanted = jobs;
+  pump();
+}
+async function pump() {
+  if (pumping) return;
+  pumping = true;
+  for (;;) {
+    const job = wanted.find((j) => {
+      const yd = ydOf(j.type, j.year);
+      return yd.pagesLoaded < j.page && yd.status !== 'error' && yd.status !== 'loading';
+    });
+    if (!job) break;
+    try { await fetchPage(job.type, job.year, job.page); } catch (e) { console.warn('page load failed', job, e); }
+    markDirty();
+    scheduleSettleWork();   // new data → cards may want mounting
+  }
+  pumping = false;
+}
+
+// ─── precision decode (remixer-corrected rules) ─────────────────────────────
+// heuristic (search-hit date only): 07-15 => year-only, day-15 => month-only.
+// confirmed (content record): audio month:null => year-only (AUDIO-only rule);
+// video day-evidence = technical Eetrikuupäev/Võttekuupäev or "Esmaeeter"
+// dateCombined prefix — overrides the synthesized-date patterns.
+function decodeItem(it) {
+  const [Y, M, D] = it.iso.slice(0, 10).split('-').map(Number);
+  const c = S.contentCache.get(it.slug);
+  if (c && c.info) {
+    const month = c.info.month;
+    const tech = (c.metadata && c.metadata.technical) || [];
+    const hasAirDay = tech.some((t) => /eetrikuupäev|esmaeeter|võttekuupäev/i.test(t.label || '') && /\d{1,2}\.\d{1,2}\.\d{4}/.test(t.value || ''));
+    const esmaeeter = /^\s*esmaeeter/i.test(c.info.dateCombined || '');
+    const dayEv = hasAirDay || esmaeeter;
+    if (it.type === 'audio' && (month === null || month === 0)) return { prec: 'year', conf: true, Y, M, D };
+    if (M === 7 && D === 15 && !dayEv) return { prec: 'year', conf: true, Y, M, D };
+    if (D === 15 && !dayEv) return { prec: 'month', conf: true, Y, M, D };
+    return { prec: 'day', conf: true, Y, M, D };
+  }
+  if (M === 7 && D === 15) return { prec: 'year', conf: false, Y, M, D };
+  if (D === 15) return { prec: 'month', conf: false, Y, M, D };
+  return { prec: 'day', conf: false, Y, M, D };
+}
+function badgeHTML(it) {
+  const b = decodeItem(it);
+  const text = b.prec === 'year' ? String(b.Y) : b.prec === 'month' ? `${b.Y}-${String(b.M).padStart(2, '0')}` : it.iso.slice(0, 10);
+  return `<span class="badge p-${b.prec}${b.conf ? '' : ' heur'}">${text}</span>`;
+}
+function durOf(it) {
+  const c = S.contentCache.get(it.slug);
+  const tech = (c && c.metadata && c.metadata.technical) || [];
+  const k = tech.find((t) => (t.label || '').toLowerCase() === 'kestus');
+  return k ? k.value : null;
+}
+
+// ─── tracks are queries (plan §4): series lanes ─────────────────────────────
+// deriveSeries runs on SETTLE only (never per pan/zoom frame): group the
+// loaded items of the visible years by their series nav link, top SERIES_N by
+// count become lanes, everything else (incl. series-less items) pools into
+// "muu / other". Zero upstream cost — it reads what the tile loader already
+// fetched. Decades tier is untouched: census has no series dimension.
+let seriesDeriveKey = '';
+function domColor(types) {
+  const best = ['video', 'audio', 'photo'].reduce((a, b) => (types[b] > types[a] ? b : a));
+  return trackOf[best].color;
+}
+function deriveSeries() {
+  if (S.view !== 'series' || tierOf(viewport.zx) === 'decades') return;
+  const [d0, d1] = visibleX();
+  const y0 = Math.max(1908, yearOfDay(d0)), y1 = Math.min(2026, yearOfDay(d1));
+  const key = `${y0}-${y1}|v${S.dataVersion}`;
+  if (key === seriesDeriveKey) return;
+  seriesDeriveKey = key;
+  const counts = new Map();    // series name ('' = none) -> {count, types}
+  for (const t of ['video', 'audio', 'photo']) {
+    for (let y = y0; y <= y1; y++) {
+      const yd = S.yearData.get(t + ':' + y);
+      if (!yd) continue;
+      for (const it of yd.items) {
+        let c = counts.get(it.series);
+        if (!c) counts.set(it.series, (c = { count: 0, types: { video: 0, audio: 0, photo: 0 } }));
+        c.count++; c.types[t]++;
+      }
+    }
+  }
+  const named = [...counts].filter(([n]) => n).sort((a, b) => b[1].count - a[1].count);
+  const top = named.slice(0, SERIES_N);
+  const muu = { count: 0, types: { video: 0, audio: 0, photo: 0 } };
+  const rest = named.slice(SERIES_N).map(([, c]) => c);
+  if (counts.has('')) rest.push(counts.get(''));
+  for (const c of rest) {
+    muu.count += c.count;
+    for (const t in muu.types) muu.types[t] += c.types[t];
+  }
+  S.seriesDerived = top.map(([name, c]) => ({
+    name, label: name, count: c.count, types: c.types,
+    hasThumbs: c.types.video + c.types.photo > 0, color: domColor(c.types), muu: false,
+  }));
+  if (muu.count) S.seriesDerived.push({
+    name: '__muu', label: 'muu / other', count: muu.count, types: muu.types,
+    hasThumbs: muu.types.video + muu.types.photo > 0, color: '#8890a0', muu: true,
+  });
+  layoutCache.sig = '';        // lane geometry changed → relayout
+}
+
+// per-lane render geometry. Type lanes keep the v0 constants exactly; series
+// lanes shrink to fit (the "track heights may shrink" call).
+function typeGeom(t) {
+  return {
+    tickY: 14, tickRows: 3, tickStep: 9, tickH: 12,
+    monthY: 30, monthStep: 7, monthH: 5, yearY: t.h - 20, yearH: 7,
+    wf: t.id === 'audio' ? { y: 34, h: 46, lanes: 2, alpha: 0.75 } : null,
+    cards: t.id === 'video' || t.id === 'photo' ? { y: 26 } : null,
+  };
+}
+function seriesGeom(h, hasThumbs) {
+  return {
+    tickY: 8, tickRows: 2, tickStep: 7, tickH: 9,
+    monthY: h - 26, monthStep: 5, monthH: 4, yearY: h - 9, yearH: 4,
+    // mixed lanes draw strips faint UNDER the DOM cards; audio-only lanes get
+    // the strip as the main visual
+    wf: hasThumbs ? { y: 30, h: h - 44, lanes: 1, alpha: 0.4 }
+                  : { y: 26, h: h - 32, lanes: 1, alpha: 0.75 },
+    cards: hasThumbs ? { y: 28 } : null,
+  };
+}
+
+// layoutLanes: cheap, cached by signature; safe to call per frame. Modes:
+// 'census' (decades tier — ALWAYS the three type tracks, unchanged),
+// 'type' (toggleable type lanes, reflowed), 'series' (derived lanes).
+let layoutCache = { sig: null, lanes: [], byName: new Map(), byType: {}, muu: null, mode: 'census' };
+function layoutLanes() {
+  const tier = tierOf(viewport.zx);
+  const mode = tier === 'decades' ? 'census' : S.view;
+  const sig = mode + '|' + seriesDeriveKey + '|' + [...S.hidden].join(',');
+  if (layoutCache.sig === sig) return layoutCache;
+  const lanes = [];
+  const byName = new Map();
+  const byType = {};
+  let muu = null;
+  if (mode === 'census') {
+    for (const t of TRACKS) {
+      lanes.push({ key: 'type:' + t.id, kind: 'type', label: t.label, sub: t.sub,
+        color: t.color, y: t.y, h: t.h, censusType: t.id, count: S.censusTotal[t.id], geom: typeGeom(t) });
+    }
+    setWorldHeight(620);
+  } else if (mode === 'type') {
+    let y = SL_TOP;
+    for (const t of TRACKS) {
+      if (S.hidden.has('type:' + t.id)) continue;
+      const lane = { key: 'type:' + t.id, kind: 'type', label: t.label, sub: t.sub,
+        color: t.color, y, h: t.h, censusType: t.id, count: S.censusTotal[t.id], geom: typeGeom(t) };
+      byType[t.id] = lane;
+      lanes.push(lane);
+      y += t.h + 20;           // reproduces the v0 y positions when none hidden
+    }
+    setWorldHeight(Math.max(300, y - 20 + 12));
+  } else {                     // series
+    let y = SL_TOP;
+    for (const sd of S.seriesDerived) {
+      const key = 'series:' + sd.name;
+      if (S.hidden.has(key)) {
+        if (!sd.muu) byName.set(sd.name, null);   // hidden: items vanish, not into muu
+        continue;
+      }
+      const h = sd.hasThumbs ? SL_THUMB_H : SL_AUDIO_H;
+      const lane = { key, kind: 'series', label: sd.label, count: sd.count,
+        color: sd.color, y, h, geom: seriesGeom(h, sd.hasThumbs) };
+      if (sd.muu) muu = lane; else byName.set(sd.name, lane);
+      lanes.push(lane);
+      y += h + SL_GAP;
+    }
+    setWorldHeight(Math.max(300, y - SL_GAP + 12));
+  }
+  layoutCache = { sig, lanes, byName, byType, muu, mode };
+  return layoutCache;
+}
+// item → lane (null = not rendered under current view/toggles)
+function laneFor(L, it) {
+  if (L.mode === 'series') {
+    const v = L.byName.get(it.series);
+    return v === undefined ? L.muu : v;
+  }
+  return L.byType[it.type] || null;
+}
+
+// ─── canvas field layer ─────────────────────────────────────────────────────
+const canvas = $('field');
+const ctx = canvas.getContext('2d');
+let hitRects = [];   // [{x,y,w,h,item}] rebuilt per draw at years/days tiers
+
+function resize() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(innerWidth * dpr);
+  canvas.height = Math.round(innerHeight * dpr);
+  canvas.style.width = innerWidth + 'px';
+  canvas.style.height = innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  clampY();
+  markDirty();
+}
+addEventListener('resize', resize);
+// iOS changes the visible viewport WITHOUT firing `resize` when the URL bar
+// slides away, so an inset:0 canvas keeps its old height and the bottom strip
+// of the archive is drawn under Safari's chrome. visualViewport does fire.
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', resize);
+  visualViewport.addEventListener('scroll', resize);
+}
+addEventListener('orientationchange', () => setTimeout(resize, 250));
+
+
+function draw() {
+  const w = innerWidth, h = innerHeight;
+  ctx.clearRect(0, 0, w, h);
+  hitRects = [];
+  const [d0, d1] = visibleX();
+  const tier = tierOf(viewport.zx);
+  const L = layoutLanes();
+  const yOff = worldToScreenY(0);            // world y0 in screen coords
+
+  // lane backgrounds
+  for (const l of L.lanes) {
+    ctx.fillStyle = '#101016';
+    ctx.fillRect(0, yOff + l.y, w, l.h);
+    ctx.fillStyle = '#26262e';
+    ctx.fillRect(0, yOff + l.y + l.h, w, 1);
+  }
+
+  // census histogram — decades tier fully; faint above it on type lanes only
+  // (series lanes have no census dimension — honest absence, plan §4 + rule 3)
+  if (S.census) {
+    const alpha = tier === 'decades' ? 0.85 : 0.16;
+    for (const l of L.lanes) {
+      if (!l.censusType) continue;
+      ctx.fillStyle = l.color;
+      ctx.globalAlpha = alpha;
+      const max = S.censusMax[l.censusType];
+      const y0v = Math.max(1908, yearOfDay(d0) - 1), y1v = Math.min(2026, yearOfDay(d1) + 1);
+      for (let y = y0v; y <= y1v; y++) {
+        const n = censusCount(l.censusType, y);
+        if (!n) continue;
+        const x0 = worldToScreenX(dayUTC(y)), x1 = worldToScreenX(dayUTC(y + 1));
+        const bh = Math.max(1, (l.h - 24) * Math.sqrt(n / max));
+        ctx.fillRect(x0, yOff + l.y + l.h - bh, Math.max(1, x1 - x0 - 0.6), bh);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // years tier + days tier: ticks and precision bands, item routed to its lane
+  if (tier !== 'decades') {
+    const y0v = Math.max(1908, yearOfDay(d0)), y1v = Math.min(2026, yearOfDay(d1));
+    const yearAgg = new Map();   // lane -> Map(year -> count) for the faint bands
+    for (const trk of ['video', 'audio', 'photo']) {
+      const color = trackOf[trk].color;      // item keeps its TYPE color in any lane
+      for (let y = y0v; y <= y1v; y++) {
+        const yd = S.yearData.get(trk + ':' + y);
+        if (!yd || !yd.items.length) continue;
+        for (let i = 0; i < yd.items.length; i++) {
+          const it = yd.items[i];
+          if (it.d < d0 - 40 || it.d > d1 + 40) continue;
+          const lane = laneFor(L, it);
+          if (!lane) continue;
+          const g = lane.geom, ty = yOff + lane.y;
+          const b = decodeItem(it);
+          if (b.prec === 'year') {
+            let m = yearAgg.get(lane);
+            if (!m) yearAgg.set(lane, (m = new Map()));
+            m.set(b.Y, (m.get(b.Y) || 0) + 1);
+            continue;
+          }
+          if (b.prec === 'month') {
+            const mx0 = worldToScreenX(dayUTC(b.Y, b.M - 1, 1));
+            const mx1 = worldToScreenX(dayUTC(b.Y, b.M, 1));
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.16;
+            const my = ty + g.monthY + (b.M % 2) * g.monthStep;
+            ctx.fillRect(mx0, my, mx1 - mx0, g.monthH);
+            ctx.globalAlpha = 1;
+            hitRects.push({ x: mx0, y: my - 3, w: mx1 - mx0, h: g.monthH + 6, item: it });
+          } else {
+            const x = worldToScreenX(it.d);
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.9;
+            const tyk = ty + g.tickY + (i % g.tickRows) * g.tickStep;
+            ctx.fillRect(x - 1, tyk, 2, g.tickH);
+            ctx.globalAlpha = 1;
+            hitRects.push({ x: x - 4, y: tyk - 2, w: 8, h: g.tickH + 4, item: it });
+          }
+        }
+      }
+    }
+    // aggregated year-only bands per lane: one faint full-year band, alpha by count
+    for (const [lane, m] of yearAgg) {
+      const g = lane.geom;
+      ctx.fillStyle = lane.color;
+      for (const [Y, n] of m) {
+        const x0 = worldToScreenX(dayUTC(Y)), x1 = worldToScreenX(dayUTC(Y + 1));
+        ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n);
+        ctx.fillRect(x0, yOff + lane.y + g.yearY, x1 - x0, g.yearH);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // days tier: audio waveform strips (free arrays from search hits — no media)
+  if (tier === 'days') {
+    const stripW = 140;
+    const occ = new Map();       // lane -> x-occupancy slots
+    const y0v = Math.max(1908, yearOfDay(d0)), y1v = Math.min(2026, yearOfDay(d1));
+    let drawn = 0;
+    for (let y = y0v; y <= y1v && drawn < 200; y++) {
+      const yd = S.yearData.get('audio:' + y);
+      if (!yd) continue;
+      for (const it of yd.items) {
+        if (it.d < d0 - 10 || it.d > d1 + 10 || !it.wf || !it.wf.length) continue;
+        const lane = laneFor(L, it);
+        if (!lane || !lane.geom.wf) continue;
+        const g = lane.geom.wf;
+        let slots = occ.get(lane);
+        if (!slots) occ.set(lane, (slots = new Array(g.lanes).fill(-Infinity)));
+        const x = worldToScreenX(it.d);
+        const slot = slots.findIndex((end) => x > end - 40);
+        if (slot === -1) continue;                     // overlap — the tick already shows it
+        slots[slot] = x + stripW;
+        const sy = yOff + lane.y + g.y + slot * (g.h + 10);
+        const max = Math.max(...it.wf, 1);
+        const bw = stripW / it.wf.length;
+        ctx.fillStyle = trackOf.audio.color;
+        ctx.globalAlpha = g.alpha;
+        for (let k = 0; k < it.wf.length; k++) {
+          const bh = Math.max(1, (it.wf[k] / max) * g.h);
+          ctx.fillRect(x + k * bw, sy + (g.h - bh) / 2, Math.max(1, bw - 0.4), bh);
+        }
+        ctx.globalAlpha = 1;
+        hitRects.push({ x, y: sy, w: stripW, h: g.h, item: it });
+        drawn++;
+      }
+    }
+  }
+}
+
+// ─── DOM thumbnail cards (virtualized, EKA hybrid: cards under one transform)
+const cardsEl = $('cards');
+const live = new Map();  // slug -> {el, item, lastSeen}
+let layoutRef = { panX: 0, zx: 1, panY: 0 };
+
+// x-affine mapping screen coords at a reference camera → screen coords now:
+// a = zx/zxRef, b = zx·(panX−panXRef) + (w/2)·(1−a)
+function xAffine(ref) {
+  const a = viewport.zx / ref.zx;
+  const b = viewport.zx * (viewport.panX - ref.panX) + (innerWidth / 2) * (1 - a);
+  return [a, b];
+}
+function cardTransformFrame() {
+  const [a, b] = xAffine(layoutRef);
+  const dy = (viewport.panY - layoutRef.panY) * viewport.zy;
+  cardsEl.style.transform = `translate(${b.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${a.toFixed(5)}, 1)`;
+  const [ra, rb] = xAffine(rulerRef);
+  $('rulerInner').style.transform = `translate(${rb.toFixed(2)}px, 0px) scale(${ra.toFixed(5)}, 1)`;
+  $('furniture').style.transform = `translate(0px, ${(viewport.panY * viewport.zy + innerHeight / 2).toFixed(2)}px)`;
+}
+
+function mountCards() {
+  const t0 = performance.now();
+  const tier = tierOf(viewport.zx);
+  const [d0, d1] = visibleX();
+  const span = d1 - d0;
+  const keep = new Set();
+  if (tier === 'days') {
+    const L = layoutLanes();
+    const candidates = [];
+    const occ = new Map();       // lane -> x-occupancy slots (shared video+photo in muu)
+    for (const trk of ['video', 'photo']) {
+      const cardW = trk === 'video' ? 126 : 64, cardH = trk === 'video' ? 71 : 64;
+      const y0v = Math.max(1908, yearOfDay(d0 - span / 2)), y1v = Math.min(2026, yearOfDay(d1 + span / 2));
+      for (let y = y0v; y <= y1v; y++) {
+        const yd = S.yearData.get(trk + ':' + y);
+        if (!yd) continue;
+        for (const it of yd.items) {
+          if (!it.photoUrl || it.d < d0 - span / 2 || it.d > d1 + span / 2) continue;
+          const lane = laneFor(L, it);
+          if (!lane || !lane.geom.cards) continue;
+          const laneN = lane.kind === 'type'
+            ? Math.max(1, Math.floor((lane.h - 30) / (cardH + 8)))   // v0 numbers kept
+            : 1;                                                     // series lanes: one film strip
+          let slots = occ.get(lane);
+          if (!slots) occ.set(lane, (slots = new Array(laneN).fill(-Infinity)));
+          const x = worldToScreenX(it.d);
+          let slot = -1;
+          for (let l = 0; l < slots.length; l++) if (x > slots[l] - cardW * 0.35) { slot = l; break; }
+          if (slot === -1) continue;               // too dense at this zoom — the tick shows it
+          slots[slot] = x + cardW;
+          candidates.push({ it, x, y: lane.y + lane.geom.cards.y + slot * (cardH + 8), trk,
+            dist: Math.abs(it.d - (d0 + d1) / 2) });
+        }
+      }
+    }
+    candidates.sort((a, b) => a.dist - b.dist);
+    let rec = null;   // per-settle mount record, created on first new card
+    for (const c of candidates.slice(0, MAX_CARDS)) {
+      keep.add(c.it.slug);
+      let card = live.get(c.it.slug);
+      if (!card) {
+        if (!rec) { rec = { newCards: 0, mountMs: null, firstImgMs: null }; metrics.mounts.push(rec); if (metrics.mounts.length > 20) metrics.mounts.shift(); }
+        rec.newCards++;
+        const myRec = rec;
+        const el = document.createElement('div');
+        el.className = 'card ' + c.trk;
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = IMG_HOST + c.it.photoUrl;
+        img.onload = () => {
+          metrics.imgLoaded++;
+          if (myRec.firstImgMs == null) myRec.firstImgMs = Math.round(performance.now() - t0);
+        };
+        el.appendChild(img);
+        el.onclick = (e) => { e.stopPropagation(); openItem(c.it); };
+        el.dataset.slug = c.it.slug;
+        cardsEl.appendChild(el);
+        card = { el, item: c.it, lastSeen: 0 };
+        live.set(c.it.slug, card);
+      }
+      card.lastSeen = performance.now();
+      card.el.style.transform = `translate(${c.x.toFixed(1)}px, ${(worldToScreenY(0) + c.y).toFixed(1)}px)`;
+    }
+  }
+  // unmount: everything not in this settle's candidate set
+  for (const [slug, card] of live) {
+    if (!keep.has(slug)) { card.el.remove(); live.delete(slug); }
+  }
+  layoutRef = { panX: viewport.panX, zx: viewport.zx, panY: viewport.panY };
+  cardsEl.style.transform = 'translate(0px, 0px) scale(1, 1)';
+  const last = metrics.mounts[metrics.mounts.length - 1];
+  if (last && last.mountMs == null) last.mountMs = +(performance.now() - t0).toFixed(1);
+}
+
+// ─── ruler (DOM, adaptive decades→years→months→days) ────────────────────────
+const EST_MONTHS = ['jaan', 'veebr', 'märts', 'apr', 'mai', 'juuni', 'juuli', 'aug', 'sept', 'okt', 'nov', 'dets'];
+let rulerBuiltAt = 0;
+let rulerRef = { panX: 0, zx: 1 };
+function buildRuler() {
+  rulerBuiltAt = performance.now();
+  rulerRef = { panX: viewport.panX, zx: viewport.zx };
+  const [d0, d1] = visibleX();
+  const zx = viewport.zx;
+  const parts = [];
+  const X = (d) => worldToScreenX(d).toFixed(1);
+  const put = (d, label, major, fit) => {
+    parts.push(`<div class="tick${major ? ' major' : ''}" style="left:${X(d)}px"></div>`);
+    if (label) parts.push(`<div class="tlab${major ? ' major' : ''}" data-fit="${fit || ''}" style="left:${X(d)}px">${label}</div>`);
+  };
+  const yA = Math.max(1900, yearOfDay(d0) - 1), yB = Math.min(2027, yearOfDay(d1) + 1);
+  if (zx >= 25) {                                          // days
+    const a = Math.floor(d0) - 1, b = Math.ceil(d1) + 1;
+    for (let d = a; d <= b; d++) {
+      const dt = new Date(d * MS_DAY);
+      const first = dt.getUTCDate() === 1;
+      put(d, dt.getUTCDate() === 1 ? `${dt.getUTCFullYear()} ${EST_MONTHS[dt.getUTCMonth()]}` : String(dt.getUTCDate()), first);
+    }
+  } else if (zx >= 1.7) {                                  // months
+    for (let y = yA; y <= yB; y++) for (let m = 0; m < 12; m++) {
+      const d = dayUTC(y, m, 1);
+      if (d < d0 - 40 || d > d1 + 40) continue;
+      put(d, m === 0 ? String(y) : EST_MONTHS[m], m === 0, `${d},${dayUTC(y, m + 1, 1)}`);
+    }
+  } else if (zx * 365 >= 35) {                             // years
+    for (let y = yA; y <= yB; y++) put(dayUTC(y), String(y), y % 10 === 0, `${dayUTC(y)},${dayUTC(y + 1)}`);
+  } else {                                                 // decades
+    const dA = Math.floor(yA / 10) * 10;
+    for (let y = dA; y <= yB; y += (zx * 3650 >= 40 ? 10 : 20)) {
+      put(dayUTC(y), String(y), y % 100 === 0, `${dayUTC(y)},${dayUTC(y + 10)}`);
+      if (zx * 365 >= 9) for (let yy = y + 1; yy < y + 10; yy++) put(dayUTC(yy), null, false);
+    }
+  }
+  $('rulerInner').innerHTML = parts.join('');
+  $('rulerInner').style.transform = 'translate(0px, 0px) scale(1, 1)';
+  // capture the ruler's own layout ref matches cards' (both rebuilt together on settle)
+}
+function diveTo(target) {
+  const fit = target && target.dataset && target.dataset.fit;
+  if (!fit) return false;
+  const [a, b] = fit.split(',').map(Number);
+  if (!isFinite(a) || !isFinite(b)) return false;
+  animateFitX(a, b, 900, markDirty);
+  return true;
+}
+$('ruler').addEventListener('dblclick', (e) => diveTo(e.target));
+// DOUBLE-TAP, explicitly. Chrome synthesizes a dblclick from a double-tap, but
+// only when it decides the target is not part of a pan — and #stage declares
+// touch-action:none, which is exactly the case where it often decides wrong.
+// Owning the gesture is 8 lines and removes the guess.
+let lastTapT = 0, lastTapEl = null;
+$('ruler').addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  const now = performance.now();
+  if (lastTapEl === e.target && now - lastTapT < 380) { diveTo(e.target); lastTapT = 0; lastTapEl = null; return; }
+  lastTapT = now; lastTapEl = e.target;
+});
+
+// ─── furniture (lane labels — DOM, rebuilt on settle when layout changed) ───
+let furnSig = null;
+function buildFurniture() {
+  const L = layoutLanes();
+  if (L.sig === furnSig) return;
+  furnSig = L.sig;
+  const rows = L.lanes.map((l) => {
+    if (l.kind === 'series') {
+      return `<div class="trackLab laneLab" style="top:${l.y + 4}px;color:${l.color}">` +
+        `${escapeHtml(l.label)} <span class="laneCount">· ${l.count}</span></div>`;
+    }
+    return `<div class="trackLab" style="top:${l.y + 6}px;color:${l.color}">${l.label}</div>` +
+      `<div class="trackSub" style="top:${l.y + 22}px">${l.sub}</div>`;
+  });
+  if (S.view === 'series' && L.mode === 'census') {
+    rows.push(`<div class="trackSub" style="top:${620 + 8}px">seeriad ilmuvad aastavaates — zoom into a year for series lanes (census has no series dimension)</div>`);
+  }
+  if (L.mode === 'series' && !L.lanes.length) {
+    rows.push(`<div class="trackSub" style="top:${SL_TOP + 8}px">deriving series lanes from loaded items…</div>`);
+  }
+  $('furniture').innerHTML = rows.join('');
+}
+
+// ─── track panel (collapsible; lanes-are-queries toggles) ───────────────────
+let panelLanes = [];
+let panelSig = null;
+function buildPanel(force) {
+  const lanes = [];
+  if (S.view === 'type') {
+    for (const t of TRACKS) lanes.push({ key: 'type:' + t.id, label: t.label.toLowerCase(), count: S.censusTotal[t.id], color: t.color });
+  } else {
+    for (const sd of S.seriesDerived) lanes.push({ key: 'series:' + sd.name, label: sd.label, count: sd.count, color: sd.color });
+  }
+  const sig = S.view + '|' + lanes.map((l) => l.key + '=' + l.count).join(',') + '|' + [...S.hidden].join(',');
+  if (!force && sig === panelSig) return;
+  panelSig = sig;
+  panelLanes = lanes;
+  const rows = lanes.map((l, i) =>
+    `<label class="laneRow"><input type="checkbox" data-i="${i}"${S.hidden.has(l.key) ? '' : ' checked'}>` +
+    `<span class="ln" style="color:${l.color}">${escapeHtml(l.label)}</span><span class="lc">${l.count ?? ''}</span></label>`);
+  if (S.view === 'series' && !lanes.length) {
+    rows.push('<div class="pnote">zoom into a year — series lanes derive from the loaded items in view</div>');
+  }
+  $('panelBody').innerHTML =
+    `<div class="pv"><button data-v="type"${S.view === 'type' ? ' class="on"' : ''}>liigid / types</button>` +
+    `<button data-v="series"${S.view === 'series' ? ' class="on"' : ''}>seeriad / series</button></div>` +
+    rows.join('') +
+    (S.view === 'series' && lanes.length
+      ? '<div class="pnote">top series of the visible years (re-derived on zoom settle); decades tier keeps the type census</div>' : '');
+}
+function setView(v) {
+  if (S.view === v) return;
+  S.view = v;
+  seriesDeriveKey = '';        // force re-derive for the visible window
+  layoutCache.sig = null;
+  furnSig = null;
+  deriveSeries();
+  buildPanel(true);
+  buildFurniture();
+  mountCards();
+  markDirty();
+  scheduleSettleWork();
+}
+$('panel').addEventListener('click', (e) => {
+  if (e.target.closest('#panelHead')) return $('panel').classList.toggle('closed');
+  const b = e.target.closest('button[data-v]');
+  if (b) setView(b.dataset.v);
+});
+$('panel').addEventListener('change', (e) => {
+  const l = panelLanes[+e.target.dataset.i];
+  if (!l) return;
+  if (e.target.checked) S.hidden.delete(l.key); else S.hidden.add(l.key);
+  layoutCache.sig = null;
+  furnSig = null;
+  buildPanel(true);
+  buildFurniture();
+  mountCards();
+  markDirty();
+  scheduleSettleWork();
+});
+
+// ─── hover card ─────────────────────────────────────────────────────────────
+let hoverItem = null, dwellTimer = null;
+function showHover(item, cx, cy) {
+  hoverItem = item;
+  const el = $('hover');
+  const dur = durOf(item);
+  el.innerHTML = `<div class="ht">${badgeHTML(item)} ${escapeHtml(item.title)}</div>` +
+    `<div class="hm">${item.type}${item.series ? ' · ' + escapeHtml(item.series) : ''} · ${dur || 'duration —'}${item.lead ? '<br>' + escapeHtml(item.lead.slice(0, 180)) : ''}</div>`;
+  el.style.display = 'block';
+  el.style.left = Math.min(cx + 14, innerWidth - 400) + 'px';
+  el.style.top = Math.min(cy + 14, innerHeight - 90) + 'px';
+  clearTimeout(dwellTimer);
+  dwellTimer = setTimeout(async () => {           // dwell 600 ms → one gated content fetch
+    if (hoverItem !== item) return;
+    await ensureContent(item);
+    if (hoverItem === item) showHover(item, cx, cy);
+  }, 600);
+}
+function hideHover() { hoverItem = null; clearTimeout(dwellTimer); $('hover').style.display = 'none'; }
+const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+// ─── coarse pointer: hover has a TAP equivalent ─────────────────────────────
+// A finger cannot dwell, so the dwell-gated content fetch and the whole hover
+// card were unreachable on a phone — and the only thing a tap DID do was open a
+// new tab, which is the most destructive of the two outcomes and the one a
+// mis-aimed finger produces most often. On coarse pointers the first tap shows
+// the card (and runs the same gated fetch immediately, since a tap IS the
+// intent a dwell was standing in for), and OPEN is a real 44 px button.
+function showTapCard(item, cx, cy) {
+  showHover(item, cx, cy);
+  const el = $('hover');
+  if (!el.querySelector('.hopen')) {
+    const b = document.createElement('button');
+    b.className = 'hopen';
+    b.textContent = item.type === 'photo' ? 'OPEN PHOTO ↗' : 'PLAY IN REMIXER ↗';
+    b.onclick = (ev) => { ev.stopPropagation(); openItem(item); hideHover(); };
+    el.appendChild(b);
+  } else {
+    const b = el.querySelector('.hopen');
+    b.textContent = item.type === 'photo' ? 'OPEN PHOTO ↗' : 'PLAY IN REMIXER ↗';
+    b.onclick = (ev) => { ev.stopPropagation(); openItem(item); hideHover(); };
+  }
+  clearTimeout(dwellTimer);
+  ensureContent(item).then(() => { if (hoverItem === item) showTapCard(item, cx, cy); });
+}
+
+addEventListener('mousemove', (e) => {
+  const cardEl = e.target.closest && e.target.closest('.card');
+  if (cardEl) {
+    const card = live.get(cardEl.dataset.slug);
+    if (card) return showHover(card.item, e.clientX, e.clientY);
+  }
+  for (let i = hitRects.length - 1; i >= 0; i--) {
+    const r = hitRects[i];
+    if (e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
+      return showHover(r.item, e.clientX, e.clientY);
+    }
+  }
+  hideHover();
+});
+
+// ─── click = play (megatimeline navigates, remixer performs) ────────────────
+function openItem(item) {
+  if (item.type === 'photo') {
+    window.open(`https://arhiiv.err.ee/foto/${item.slug}`, '_blank');
+  } else {
+    window.open(`${REMIXER}/?play=${item.type}:${item.slug}`, '_blank');
+  }
+}
+$('stage').addEventListener('click', (e) => {
+  if (panWasDrag() || e.target.closest('.card') || e.target.closest('#ruler')) return;
+  // FINGER SLOP: a canvas hit rect is 2-6 px wide at year zoom. A mouse lands
+  // inside it; a finger's contact patch is ~9 mm. Grow the rect by the slop for
+  // a coarse pointer only — the geometry is identical, the radius is not.
+  const s = COARSE ? 12 : 0;
+  for (let i = hitRects.length - 1; i >= 0; i--) {
+    const r = hitRects[i];
+    if (e.clientX >= r.x - s && e.clientX <= r.x + r.w + s && e.clientY >= r.y - s && e.clientY <= r.y + r.h + s) {
+      return COARSE ? showTapCard(r.item, e.clientX, e.clientY) : openItem(r.item);
+    }
+  }
+  if (COARSE) hideHover();      // a tap on empty sky dismisses the card
+});
+// a card THUMBNAIL is already 44 px+; on a phone its tap shows the same card
+// rather than opening a tab, so the two paths agree.
+$('cards').addEventListener('click', (e) => {
+  if (!COARSE || panWasDrag()) return;
+  const el = e.target.closest('.card');
+  if (!el) return;
+  const card = live.get(el.dataset.slug);
+  if (card) { e.stopPropagation(); showTapCard(card.item, e.clientX, e.clientY); }
+}, true);
+
+// ─── frame loop, settle discipline ──────────────────────────────────────────
+let dirty = true, lastChangeAt = 0, settleTimer = null, rafHandle = null;
+function markDirty() {
+  dirty = true;
+  lastChangeAt = performance.now();
+  scheduleSettleWork();
+  if (!rafHandle) rafHandle = requestAnimationFrame(frame);
+}
+function scheduleSettleWork() {
+  clearTimeout(settleTimer);
+  settleTimer = setTimeout(onSettle, 150);        // the engine's own hysteresis
+}
+function onSettle() {
+  metrics.settleAt = performance.now();
+  deriveSeries();              // series lanes re-derive on SETTLE only (no pan-frame churn)
+  computeWanted();
+  mountCards();
+  buildRuler();
+  buildFurniture();
+  buildPanel();
+  updateHud();
+}
+function frame(t) {
+  rafHandle = null;
+  if (metrics.frameRec) metrics.frameRec.push(t);
+  if (dirty) {
+    dirty = false;
+    draw();
+    cardTransformFrame();
+    if (performance.now() - rulerBuiltAt > 120) buildRuler();
+    rafHandle = requestAnimationFrame(frame);
+  }
+}
+
+function updateHud() {
+  const [d0, d1] = visibleX();
+  const fmt = (d) => new Date(d * MS_DAY).toISOString().slice(0, 10);
+  $('hud').innerHTML = `<b>${fmt(d0)}</b> → <b>${fmt(d1)}</b> · tier <b>${tierOf(viewport.zx)}</b>` +
+    ` · view <b>${S.view}</b> · lanes <b>${layoutLanes().lanes.length}</b>` +
+    ` · zx ${viewport.zx.toFixed(3)} px/day · cards <b>${live.size}</b>` +
+    ` · api search ${S.apiSearch} item ${S.apiItem}` +
+    (S.census ? '' : ' · <span style="color:#e66">NO CENSUS — run census.mjs</span>');
+}
+
+// ─── boot ───────────────────────────────────────────────────────────────────
+resize();
+buildFurniture();
+buildPanel(true);
+attachGestures($('stage'), markDirty);
+
+async function boot() {
+  try {
+    const r = await fetch('/census.json');
+    if (r.ok) {
+      S.census = await r.json();
+      for (const t of ['audio', 'video', 'photo']) {
+        const cols = Object.values(S.census.years).map((y) => y[t]);
+        S.censusMax[t] = Math.max(1, ...cols);
+        S.censusTotal[t] = cols.reduce((s, n) => s + n, 0);
+      }
+      buildPanel(true);
+    }
+  } catch {}
+  fitX(T0, T1);
+  markDirty();
+  window.__mt.ready = true;
+}
+
+// ─── autotest / instrumentation hooks ───────────────────────────────────────
+window.__mt = {
+  ready: false, S, viewport, metrics, live,
+  tier: () => tierOf(viewport.zx),
+  setView,
+  laneReport: () => {          // lanes + how many loaded in-view items land in each
+    const L = layoutLanes();
+    const [d0, d1] = visibleX();
+    const per = new Map(L.lanes.map((l) => [l, 0]));
+    const y0 = Math.max(1908, yearOfDay(d0)), y1 = Math.min(2026, yearOfDay(d1));
+    for (const t of ['video', 'audio', 'photo']) {
+      for (let y = y0; y <= y1; y++) {
+        const yd = S.yearData.get(t + ':' + y);
+        if (!yd) continue;
+        for (const it of yd.items) {
+          if (it.d < d0 || it.d > d1) continue;
+          const lane = laneFor(L, it);
+          if (lane) per.set(lane, per.get(lane) + 1);
+        }
+      }
+    }
+    return { mode: L.mode, view: S.view, lanes: L.lanes.map((l) => ({
+      key: l.key, kind: l.kind, label: l.label, count: l.count ?? null,
+      inView: per.get(l) || 0, y: l.y, h: l.h })) };
+  },
+  fitAll: () => { fitX(T0, T1); markDirty(); },
+  panBy: (viewFractions) => {                 // world-pan by a fraction of the view width
+    viewport.panX -= (viewFractions * innerWidth) / viewport.zx;
+    markDirty();
+  },
+  dive: (year, months = 12) => new Promise((res) => {
+    animateFitX(dayUTC(year), dayUTC(year, months, 1), 1600, markDirty);
+    const iv = setInterval(() => {
+      if (performance.now() - metrics.settleAt < 4000 && metrics.settleAt > 0 &&
+          performance.now() - lastChangeAt > 400 && !pumping) { clearInterval(iv); res(snapshot()); }
+    }, 250);
+    setTimeout(() => { clearInterval(iv); res(snapshot()); }, 60000);
+  }),
+  flight: async (ms = 5000) => {
+    fitX(T0, T1); markDirty();
+    await sleep(350);
+    metrics.frameRec = [];
+    animateFitX(dayUTC(1965, 5, 1), dayUTC(1965, 6, 1), ms, markDirty);
+    await sleep(ms + 120);
+    const rec = metrics.frameRec; metrics.frameRec = null;
+    const deltas = [];
+    for (let i = 1; i < rec.length; i++) deltas.push(rec[i] - rec[i - 1]);
+    deltas.sort((a, b) => a - b);
+    const q = (p) => deltas.length ? +deltas[Math.min(deltas.length - 1, Math.floor(p * deltas.length))].toFixed(2) : null;
+    return { frames: rec.length, p50: q(0.5), p95: q(0.95), max: deltas.length ? +deltas[deltas.length - 1].toFixed(2) : null };
+  },
+  snapshot: () => snapshot(),
+};
+function snapshot() {
+  const imgs = [...cardsEl.querySelectorAll('img')];
+  return {
+    tier: tierOf(viewport.zx), zx: viewport.zx,
+    view: S.view, laneCount: layoutLanes().lanes.length,
+    censusLoaded: !!S.census, censusYears: S.census ? Object.keys(S.census.years).length : 0,
+    liveCards: live.size,
+    imgsLoaded: imgs.filter((i) => i.naturalWidth > 0).length,
+    imgsTotal: imgs.length,
+    apiSearch: S.apiSearch, apiItem: S.apiItem,
+    yearDataKeys: [...S.yearData.keys()].filter((k) => S.yearData.get(k).items.length),
+    itemsLoaded: [...S.yearData.values()].reduce((s, y) => s + y.items.length, 0),
+    metrics: { imgLoadedEvents: metrics.imgLoaded, mounts: metrics.mounts.slice(-8) },
+  };
+}
+
+boot();
+
+// the track panel is a 52dvh bottom sheet on a phone: it starts CLOSED, or it
+// covers the material it is a control for. Called LAST: applyCoarse() reaches
+// into hideHover(), and a `let` further down the module is in its temporal dead
+// zone until the module body has run to the end — calling it early aborts the
+// whole module and every symbol after the throw silently never exists.
+applyCoarse();
+</script>
