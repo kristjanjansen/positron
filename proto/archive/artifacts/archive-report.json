@@ -20,7 +20,7 @@
       "vodT": 15.001,
       "fired": true,
       "errMs": -7,
-      "engineLateMs": 4,
+      "engineLateMs": 1,
       "liveLateMs": 59,
       "replayVsLiveMs": -66
     },
@@ -42,7 +42,7 @@
       "vodT": 57.702,
       "fired": true,
       "errMs": -7,
-      "engineLateMs": 3,
+      "engineLateMs": 1,
       "liveLateMs": 59,
       "replayVsLiveMs": -66
     },
@@ -64,7 +64,7 @@
       "vodT": 99.902,
       "fired": true,
       "errMs": 0,
-      "engineLateMs": 2,
+      "engineLateMs": 3,
       "liveLateMs": 67,
       "replayVsLiveMs": -67
     },
@@ -86,7 +86,7 @@
       "vodT": 141.603,
       "fired": true,
       "errMs": 11,
-      "engineLateMs": 1,
+      "engineLateMs": 5,
       "liveLateMs": 78,
       "replayVsLiveMs": -66
     },
@@ -97,7 +97,7 @@
       "vodT": 162.8,
       "fired": true,
       "errMs": 1,
-      "engineLateMs": 2,
+      "engineLateMs": 1,
       "liveLateMs": 1,
       "replayVsLiveMs": 0
     }
@@ -145,12 +145,12 @@
     {
       "name": "burn-decode-rate",
       "ok": true,
-      "detail": "5118/5118"
+      "detail": "5117/5118"
     }
   ],
   "rvfc": {
     "samples": 5118,
-    "validClock": 5118,
+    "validClock": 5117,
     "validCue": 4669
   },
   "previousContentAnchoredRun": {
