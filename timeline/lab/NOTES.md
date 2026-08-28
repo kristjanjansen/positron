@@ -536,3 +536,170 @@ because the library refuses to serve them, not because the page stopped drawing
 them.
 
 No-regression: `proto/remixer/compose-run.mjs` **20/20**, 0 console errors.
+
+## Checkpoint 9 — v0.5: QUOTATION (fragment spans), setRange, mediaMaster (2026-08-28)
+
+Checkpoint 6 gave a span that is a deck. It could only play the child's **whole
+range** — which is the one thing a quotation never is. plan-timeline §−1 / C10
+says *a new work is a score that QUOTES archive timelines*, and nobody quotes a
+whole broadcast. This checkpoint closes that gap, plus the two library chores
+three clients had been paying for.
+
+### 1. `nest.add({id, at, rate, deck, in, out, master})` — rule 7
+
+`in`/`out` select a sub-range of the CHILD's domain and default to `deck.range`,
+so **the whole-range case is the default case** and rules 1–6 are unchanged.
+
+| rule | decided | why |
+|---|---|---|
+| 7a | the span occupies `(out − in)/rate` of PARENT time | the same law as rule 1, with the fragment length substituted |
+| 7b | entry seeks the child to `in` and asserts there | the quotation opens with whatever `in` cuts — a ringing chord opens ringing. `reduce(<= in)` runs IN the child, exactly as `c0` does |
+| 7c | `out` IS the child's end: absent past it, parked and asserted at `out` | not the deck's end. A quotation that ends mid-phrase ends mid-phrase |
+| 7d | a parent seek maps to `in + (parentPos − at)·rate`, exactly | one multiply, one origin — the same affine map, so exactness is inherited, not re-derived |
+| 7e | `in`/`out` outside the child's range CLAMP, and `span.trim` reports `{fragment, wanted, chose, deckRange, clamped, degraded, quotedFraction, reason}` | the library's standing rule: degrade, never lie. A fragment **wholly** outside is a rejection, not a clamp to nothing |
+| 7f | `in >= out` rejected at `add()` | not discovered at play time |
+| 7g | **trim does not mutate the child** | the fragment lives on the SPAN record. `deck.range` is never touched — that is what makes one stored timeline carry many quotations |
+
+New reads: `nest.fragment(id)`, `nest.trim(id)`, `nest.quotationsOf(deck)`;
+`driftStats()` rows gain `fragment`, `deckRange`, `trim`.
+
+### 2. Two rules 7g FORCED, and they are the interesting half
+
+**(a) An absent span must not park a sibling quoting the same deck.** Two
+quotations of one deck are disjoint in parent time, so at any instant at most
+one is present — but `assertState` iterates *every* span, and the absent one
+would `seek()+pause()` the shared child out from under the present one.
+`otherPresentOn(sp, pos)` guards it. Without this guard the second quotation
+plays for exactly zero milliseconds.
+
+**(b) Absence is a POSITION, not an edge event.** The park used to sit inside
+`if (sp.present !== false)`, i.e. it fired only on the present→absent
+*transition*. Fragments made the latent bug visible: play past a span (parked at
+`out`, `present=false`), then seek to before it — the child stayed at `out`,
+because the transition had already been spent. Now the park is driven by where
+the child actually **is**. And when *every* quotation of a deck is absent they
+would all want it at a different edge, so the nearest one in parent time wins
+(`parksIt`) — deterministic, and it is the edge you actually left.
+
+Also rejected at `add()`: two quotations of ONE deck **overlapping** in parent
+time. That is not a trim problem, it is arithmetic — a deck has one position.
+The error says so and says what to do instead (two decks, to overlay).
+
+**The consequence to know:** parking at the fragment edge means a quotation
+whose `in`/`out` cuts a held event is parked HOLDING it. That is right for
+"paused on the last frame" and for "opens on a ringing chord"; for a MIDI-ish
+actuator it means the absent quotation's edge notes are asserted. A quotation
+trimmed to a silent boundary has no such state. See "still needed" below.
+
+### 3. `deck.setRange([min,max] | 'auto')` — the range stops being frozen
+
+> **LOUD, for whoever else is in `transport.mjs` this cycle:** this chore is the
+> only edit made to `timeline/transport.mjs` from the nesting side, and it is
+> strictly ADDITIVE — three new members (`setRange`, `rangeGen`, `lastAt`), a
+> `schedule()` wrapper that only records `lastAt`, and `durationMs` changing
+> from a frozen number to a getter of the same value (every consumer in the repo
+> only reads it; `logdeck.mjs`'s `Object.assign(deck, …)` does not touch it).
+> `prop-test.mjs` was re-run after it, at 30 and 100 seeds, green.
+
+A client whose item set changes at runtime (the remixer, every time a layer
+loads) had to `dispose()` and rebuild the whole deck — throwing away the drift
+log, the adapters and the playhead — just to widen the seekable window. Additive
+and invariant-preserving:
+
+- `deck.range` is **mutated in place**, so its identity survives (nested spans
+  and HUDs hold that array); `durationMs` became a getter and follows;
+  `rangeGen()` lets a positional reader notice cheaply.
+- a playhead left outside the new window is moved with a **real `seek()`** —
+  reduce + assertState — never a silent clamp.
+- `deck.schedule()` now tracks `lastAt()`, which is what `setRange('auto')`
+  derives from. `nest.add()` schedules the span's two items, so a parent can be
+  built with a placeholder range and `setRange('auto')`'d after the last add.
+- the CURSOR is untouched by design: range is a *window on positions*, not a
+  filter on events, and the cursor keeps riding the same lane array.
+
+### 4. `timeline/media-master.mjs` — and a LIVE BUG it fixes
+
+Three clients hand-rolled the same media-element master block with the same laws
+in different code, and one of the copies had **lost a law**:
+`proto/selfrec/replay-grid.html` called `deck.sync()` **unconditionally**, with
+no jump-vs-drift discrimination. Its cue kind is `catchUp: 'burst'` (a cue is a
+note, never silently dropped), so any discontinuity in the master's
+`currentTime` — an external scrub, an hls.js recovery jump, a gap skip — left
+every skipped cue `pending` and the lookahead fired ALL of them at once. That is
+the same burst-every-skipped-cue bug the page's own adoption of the library had
+fixed on the SEEK path. It was still open on the MASTER path.
+
+    const mm = mediaMaster(deck, elementOrSourceFn, opts);
+    function loop() { requestAnimationFrame(loop); mm.tick(); }
+
+| law | |
+|---|---|
+| L1 | **the master is never nudged** — rate and currentTime are read, never written |
+| L2 | **drift is a `sync()`, a discontinuity is a `seek()`** — past `jumpMs` the element MOVED; a sync would leave the skipped cues pending. *This is why the helper exists.* |
+| L3 | a stalled master (currentTime frozen > `stallMs`) gives up the role: `stallPolicy:'hold'` pauses the deck (one element — proto/replay), `'release'` frees it so the client re-picks or free-runs (N tiles — replay-grid) |
+| L4 | `timeupdate` is the **hidden-tab backstop** (rAF dies, the worker tick host does not) |
+| L5 | a paused / ended / not-ready / **seeking** element is not a clock |
+
+`source` may be the element (with `anchorMs`, number or function) or a function
+returning `{el, pos, key}` — the grid form, which picks the master AND supplies
+that tile's anchor.
+
+### 5. prop arms — a NEW file, `timeline/lab/prop-nested.mjs`
+
+`prop-test.mjs` is a sibling's this cycle, so v0.5's arms live beside it:
+
+    node timeline/lab/prop-nested.mjs            # 128 checks, 0 violations
+    node timeline/lab/prop-test.mjs              # unchanged, green
+    node timeline/lab/prop-test.mjs --seeds 100  # unchanged, green
+
+| arm | what it asserts |
+|---|---|
+| `frag-span` | `(out−in)/rate` span length; `fragment`/`trim`/`quotedFraction`; **the child's range is not mutated** |
+| `frag-entry` | absent-before parks at `in`; entry seeks to `in` and the child's `reduce(<= in)` really ran there (`reason:'seek'` inside the child) |
+| `frag-exit` | past `out`: absent, paused, parked AT `out` (not at the deck's end), does not run on while the parent plays |
+| `frag-seek` | 7 probes incl. fractional ms: child pos exact to **1e-9**, held set === `reduce(<= in+u)`, `childPos`/`parentPos` mutually inverse |
+| `frag-play` | playing the quotation fires **nothing** from outside `[in, out]` |
+| `frag-clamp` | two-sided and one-sided clamps reported with `wanted`, `chose` and a reason; the clamped length is the span length; the report reaches `driftStats()` |
+| `frag-reject` | `in === out`, `in > out`, non-finite, wholly-outside — all rejected at `add()`, leaving no span behind |
+| `frag-twice` | **THE SAME DECK QUOTED TWICE** at two fragments: exclusive presence, each maps into its OWN fragment, **both play correctly**, nothing fires from outside either fragment, the gap parks at the nearer edge, an overlapping third quotation is rejected, a non-overlapping 2× one composes |
+| `setrange` | `durationMs` follows; `range` keeps its identity; narrowing re-folds with a real seek; runtime items + `'auto'`; malformed ranges rejected without moving the window |
+| `setrange-cursor` | `sampleAt` stays exact across a range change **and** insertions ahead of and behind the cached index, still ~O(1); `createCursor` re-locates after its rows array is mutated under it |
+| `media-master` | **NEGATIVE CONTROL: `sync()` across a 9 s gap bursts 9 of 10 cues on a `catchUp:'burst'` lane** — the replay-grid bug, reproduced. The helper on the identical gap: **0 burst**, all 9 FOLDED, vector lands exactly on the master. A 120 ms error still syncs with 0 re-fires; `playbackRate` written 0 times; backstop attached once and detached on dispose; a seeking element drives nothing; stall holds (1 element) and releases (N tiles) |
+
+### 6. Client results
+
+- **`proto/remixer/compose-run.mjs`: 20/20** (was 16/16 — all 16 unchanged, +4
+  fragment). The arrangement now carries the SAME session deck twice: `sess`
+  (whole, 18 644 ms, `master:true`) at 30 s and `quote` (a 10 s middle slice,
+  `in 4322 → out 14322`) at 5 s. Parent seek inside the quotation: **6/6 exact,
+  max child position error 0.000 ms**, held-note reduce exact. Past `out`:
+  parked at 14 322, not at 18 644. A 20 s ask on an 18.6 s session clamps to
+  `[4322, 18644]` and says so; `in>=out` and an overlapping quotation are
+  rejected in words. 0 console errors, 0 media errors.
+- **`proto/selfrec/verify-replay.mjs`: 6/6** (was 5/5 — +V5). V5 scrubs the
+  master tile's `currentTime` **61 189 ms** forward over all three cues:
+  **0 burst fires**, all three folded into the fired set, one reported `jump`,
+  playhead within 2.6 s of the target. That check fails on the pre-adoption code.
+- **`proto/archive/run-measure-archive.mjs` (the proto/replay gate): 7/7, run
+  twice.** Run 2 reproduces the pre-adoption per-cue table to the last digit
+  (`−7 −21 −7 −10 0 −4 11 1`, **p50 −4 / p95 11**, abs p95 21 ms against a
+  150 ms gate). Run 1 had three cues one video frame (33 ms) out and came back
+  on the next fetch — decoded-frame quantisation, not the fire path.
+
+### 7. Still needed for "timelines referencing timelines"
+
+1. **A quotation cannot yet be silenced at its edges.** Parking at `in`/`out`
+   asserts whatever those boundaries cut. There is no parent-level "the child is
+   absent, quiet it" hook; a `caps.absentState` (or an adapter `silence()`) would
+   close it without the nest having to know what a note is.
+2. **Nothing addresses a fragment by CONTENT.** `in`/`out` are numbers in the
+   child's domain. Quoting "from the third chorus" needs the child's own marks
+   as an addressable lane.
+3. **A quotation is not yet a value.** `nest.add()` mutates a nest; there is no
+   serialisable `{deck: <id>, in, out, rate}` that a stored score could carry, so
+   a quotation cannot round-trip through a file — which is the actual C10 ask.
+4. **Two overlapping quotations of one deck are rejected, not solved.** Overlaying
+   a timeline on itself (a canon, a delay) needs an instancing seam that gives
+   each quotation its own position, not one shared deck.
+5. **`driftStats()` reports a twice-quoted child's channel twice.** Correct but
+   redundant; per-deck de-duplication is a reporting fix, not a semantic one.

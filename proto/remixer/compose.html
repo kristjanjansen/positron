@@ -279,6 +279,11 @@ function servoArchive() {
 }
 
 const ARR_END = 75000, NEST_AT = 30000;
+// the QUOTATION: a 10 s slice of the same session, placed BEFORE the whole one.
+// [5000, 15000] in parent time — disjoint from `sess` at [30000, 30000+childDur],
+// which rule 7g requires: one deck has one position.
+const FRAG_AT = 5000, FRAG_HALF = 5000;
+const FRAG = { in: null, out: null };
 const LAYOUT = [
   { tag: 'A1', at: 0, durMs: 75000, freq: 110 },
   { tag: 'A2', at: 10000, durMs: 40000, freq: 147 },
@@ -308,6 +313,21 @@ async function build() {
   // ---- THE NESTED SPAN. One line of client code, and it is a deck. ----------
   PA.nest = createNest(deck, { kind: 'deck-span', toleranceMs: 40, hardSeekMs: 250 });
   PA.nest.add({ id: 'sess', at: NEST_AT, rate: 1, deck: child.deck, master: true });
+
+  // ---- AND THE QUOTATION (v0.5, rule 7). The SAME session deck, a second
+  // time, as a SLICE: `in`/`out` pick a sub-range of the child's domain. This
+  // is the mission sentence (plan-timeline §−1 / C10 — "a new work is a score
+  // that QUOTES archive timelines") made executable: nobody quotes a whole
+  // broadcast, and until now a span could only play the child's whole range.
+  // Note there is exactly ONE child deck and ONE audio element under it: the
+  // trim lives on the SPAN, so one stored timeline carries many quotations.
+  const [cq0, cq1] = child.deck.range;
+  const cmid = (cq0 + cq1) / 2;
+  // the session is ~18.6 s, so the largest true MIDDLE slice is 10 s (a 20 s
+  // ask would clamp to the whole session — asserted, with its report, in run())
+  FRAG.in = Math.max(cq0, cmid - FRAG_HALF);
+  FRAG.out = Math.min(cq1, cmid + FRAG_HALF);
+  PA.nest.add({ id: 'quote', at: FRAG_AT, rate: 1, deck: child.deck, in: FRAG.in, out: FRAG.out });
   deck.seek(0);
   drawArrangement();
   return child;
@@ -403,6 +423,10 @@ function paint() {
   $('hud').innerHTML = [
     ['parent pos / rate', `${(pos / 1000).toFixed(3)} s · ${d.rate().toFixed(2)}× (target ${d.targetRate().toFixed(2)}×)`],
     ['nested span', `at ${(NEST_AT / 1000)} s · rate 1 · ${(PA.nest.span('sess').parentDur / 1000).toFixed(2)} s of parent time · master=${PA.nest.masterId()}`],
+    ['QUOTATION', (() => { const q = PA.nest.span('quote'); return q
+      ? `at ${(q.at / 1000)} s · in ${(q.in / 1000).toFixed(2)} s → out ${(q.out / 1000).toFixed(2)} s of the SAME deck ` +
+        `(${((q.out - q.in) / 1000).toFixed(2)} s slice, ${(q.trim.quotedFraction * 100).toFixed(0)}% of the session) · ` +
+        `${PA.nest.present('quote') ? 'PRESENT' : 'absent'}` : '—'; })()],
     ['child pos / rate', present ? `${(CH.deck.position() / 1000).toFixed(3)} s · ${CH.deck.rate().toFixed(2)}× (target ${CH.deck.targetRate().toFixed(2)}×)` : 'ABSENT — outside the span'],
     ['rate composition', rr ? `wanted ${rr.wanted}× → chose ${rr.chose}×${rr.degraded ? ' <span class="bad">DEGRADED</span>' : ' <span class="ok">exact</span>'} · child lattice [${rr.allowed}]` : '–'],
     ['child fires', `midi-actuated ${CH.fires['midi-actuated']} · media-span ${CH.fires['media-span']} · held [${[...CH.voices].sort((a, b) => a - b)}]`],
@@ -609,6 +633,67 @@ async function run() {
     !!(R.drift.spans[0].child && R.drift.spans[0].child.kinds && R.drift.spans[0].child.kinds['midi-actuated']),
     Object.keys(R.drift.spans[0].child.kinds || {}).join(','));
 
+  // 9 — FRAGMENT QUOTATION (v0.5 rule 7): the same session deck, quoted twice.
+  const FQ = PA.nest.span('quote');
+  R.fragment = {
+    at: FRAG_AT, in: +FQ.in.toFixed(1), out: +FQ.out.toFixed(1),
+    parentDurMs: +FQ.parentDur.toFixed(1), sliceMs: +(FQ.out - FQ.in).toFixed(1),
+    deckRange: FQ.deckRange, childRangeNow: CH.deck.range, trim: FQ.trim,
+    quotations: PA.nest.quotationsOf(CH.deck).map((s) => ({ id: s.id, at: s.at, frag: [s.in, s.out] })),
+  };
+  chk('ONE session deck is QUOTED TWICE — a 10 s slice and the whole thing — and trim did not mutate the child',
+    R.fragment.quotations.length === 2 &&
+    String(CH.deck.range) === String(FQ.deckRange) &&
+    Math.abs(FQ.parentDur - (FQ.out - FQ.in)) < 1e-6 &&
+    FQ.out - FQ.in < (FQ.deckRange[1] - FQ.deckRange[0]),
+    JSON.stringify(R.fragment.quotations) + ` slice ${R.fragment.sliceMs} ms of ${FQ.deckRange[1] - FQ.deckRange[0]} ms, child range untouched ${JSON.stringify(CH.deck.range)}`);
+
+  // the seek that matters: a parent seek inside the QUOTATION must land inside
+  // the FRAGMENT (in + u), not at u — which is where the whole-range mapping
+  // would have put it, and the exact regression this feature exists to close.
+  R.fragProbes = [];
+  for (const u of [0, 900, 2500, 5000, 7500, FQ.parentDur - 1]) {
+    PA.deck.seek(FRAG_AT + u);
+    await sleep(60);
+    const want = FQ.in + u, got = CH.deck.position();
+    const gotHeld = held(), wantH = wantHeld(want);
+    R.fragProbes.push({ parentMs: FRAG_AT + u, wantChildMs: +want.toFixed(1), gotChildMs: +got.toFixed(1),
+      childPosErrMs: +(got - want).toFixed(3), wholeRangeWouldBe: u,
+      held: gotHeld, wantHeld: wantH, ok: Math.abs(got - want) < 1 && String(gotHeld) === String(wantH) });
+  }
+  R.fragSummary = {
+    n: R.fragProbes.length, exact: R.fragProbes.filter((p) => p.ok).length,
+    maxChildPosErrMs: Math.max(...R.fragProbes.map((p) => Math.abs(p.childPosErrMs))),
+    withNoteHeld: R.fragProbes.filter((p) => p.wantHeld.length).length,
+  };
+  chk('a parent seek inside the QUOTATION lands inside the FRAGMENT (child pos = in + u, held-note reduce exact)',
+    R.fragSummary.exact === R.fragProbes.length && R.fragSummary.maxChildPosErrMs < 1,
+    JSON.stringify(R.fragSummary));
+
+  // `out` is the child's END for this quotation: past it, absent and parked there
+  PA.deck.seek(FRAG_AT + FQ.parentDur + 1200);
+  await sleep(120);
+  R.fragExit = { present: PA.nest.present('quote'), childPos: +CH.deck.position().toFixed(1),
+                 wantParkedAt: +FQ.out.toFixed(1), childPlaying: CH.deck.playing() };
+  chk('past the quotation\'s `out` the session is absent and parked AT `out` (not at the deck\'s end)',
+    !R.fragExit.present && !R.fragExit.childPlaying && Math.abs(R.fragExit.childPos - FQ.out) < 1,
+    JSON.stringify(R.fragExit));
+
+  // a fragment WIDER than the child clamps, and says so (never silently)
+  const scratch = createDeck({ items: [], range: [0, 100000], tickHost: 'main' });
+  const sNest = createNest(scratch, { kind: 'scratch-span' });
+  const wide = sNest.add({ id: 'w', at: 0, rate: 1, deck: CH.deck, in: FQ.in, out: FQ.in + 20000 });
+  R.fragClamp = wide.trim;
+  let badFrag = null;
+  try { sNest.add({ id: 'bad', at: 60000, deck: CH.deck, in: 5000, out: 5000 }); } catch (e) { badFrag = e.message; }
+  let overlap = null;
+  try { PA.nest.add({ id: 'ov', at: FRAG_AT + 500, deck: CH.deck, in: 0, out: 1000 }); } catch (e) { overlap = e.message; }
+  sNest.dispose(); scratch.dispose();
+  chk('a 20 s ask on an 18.6 s session CLAMPS and REPORTS it; in>=out and an overlapping quotation are rejected at add()',
+    R.fragClamp.clamped === true && R.fragClamp.chose[1] === CH.deck.range[1] &&
+    /strictly before/.test(badFrag || '') && /OVERLAPPING parent window/.test(overlap || ''),
+    `${JSON.stringify(R.fragClamp)} | ${badFrag} | ${overlap}`);
+
   R.errors = ERRORS;
   R.mediaErrors = [...PA.layers.values()].concat([CH.spans.audio]).filter((L) => L.el.error).length;
   chk('no page errors, no media errors', ERRORS.length === 0 && R.mediaErrors === 0, `${ERRORS.length} / ${R.mediaErrors}`);
@@ -625,6 +710,9 @@ requestAnimationFrame(loop);
 const summary = { notes: sess.notes, sessionRows: sess.sessionRows, audioAtUs: sess.atUs,
   audioDurMs: sess.durMs, childRange: CH.deck.range, childHost: CH.deck.hostName,
   parentRange: PA.deck.range, nestAt: NEST_AT, nestParentDurMs: +PA.nest.span('sess').parentDur.toFixed(1),
+  quote: { at: FRAG_AT, in: +FRAG.in.toFixed(1), out: +FRAG.out.toFixed(1),
+           parentDurMs: +PA.nest.span('quote').parentDur.toFixed(1),
+           quotationsOfOneDeck: PA.nest.quotationsOf(CH.deck).length },
   noteIntervals: CH.notes.length };
 window.__compose = { run, PA, CH, nest: () => PA.nest, session: sess, summary, checks: CHECKS };
 $('verdict').textContent = `built. child = ${sess.notes} real MIDI rows from proto/instrument/results/instr-session.jsonl (${sess.sessionRows} log rows), child range ${JSON.stringify(CH.deck.range)} ms, nested at ${NEST_AT} ms. call __compose.run().`;

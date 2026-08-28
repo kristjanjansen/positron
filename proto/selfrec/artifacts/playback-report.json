@@ -5,32 +5,32 @@
     "V2": {
       "samples": [
         {
-          "atS": 15.05,
+          "atS": 15.04,
           "clockA": 1787823391280,
-          "clockB": 1787823391314,
-          "interTileSkewMs": 34,
-          "tileErrA": -64,
-          "tileErrB": -30
+          "clockB": 1787823391280,
+          "interTileSkewMs": 0,
+          "tileErrA": -51,
+          "tileErrB": -51
         },
         {
-          "atS": 35.05,
-          "clockA": 1787823411283,
+          "atS": 35.06,
+          "clockA": 1787823411312,
           "clockB": 1787823411312,
-          "interTileSkewMs": 29,
-          "tileErrA": -58,
-          "tileErrB": -29
+          "interTileSkewMs": 0,
+          "tileErrA": -40,
+          "tileErrB": -40
         },
         {
-          "atS": 65.05,
+          "atS": 65.04,
           "clockA": 1787823441279,
           "clockB": 1787823441279,
           "interTileSkewMs": 0,
-          "tileErrA": -68,
-          "tileErrB": -68
+          "tileErrA": -53,
+          "tileErrB": -53
         }
       ],
-      "p50": 29,
-      "max": 34,
+      "p50": 0,
+      "max": 0,
       "targetMs": 100
     },
     "V3": {
@@ -112,6 +112,51 @@
       },
       "note": "decodedErr = burned clock - playhead T at the 73 s tail; block anchoring wins iff |blocks| < |linear|"
     },
+    "V5": {
+      "masterPid": "p1",
+      "jump": {
+        "ok": true,
+        "pid": "p1",
+        "fromS": 3.761,
+        "toS": 64.96,
+        "targetT": 1787823441296,
+        "deckPosBefore": 1787823380099.4001
+      },
+      "posPre": 1787823380096,
+      "posPost": 1787823443859,
+      "skippedCueIds": [
+        "RCUE-20",
+        "RCUE-40",
+        "RCUE-60"
+      ],
+      "firesPre": 3,
+      "firesPost": 3,
+      "newFireIds": [],
+      "jumpEvents": [
+        {
+          "jumpMs": 61189,
+          "mediaTime": 64.96
+        }
+      ],
+      "firedIdsAfter": [
+        "RCUE-20",
+        "RCUE-40",
+        "RCUE-60"
+      ],
+      "mediaMasterStats": {
+        "syncs": 2616,
+        "jumps": 1,
+        "stalls": 0,
+        "corrections": 0,
+        "laws": {
+          "toleranceMs": 40,
+          "jumpMs": 250,
+          "stallMs": 1000,
+          "stallPolicy": "release",
+          "autoPlayPause": false
+        }
+      }
+    },
     "checks": [
       {
         "name": "V1-boot-from-show-json",
@@ -126,7 +171,7 @@
       {
         "name": "V2-inter-tile-skew-new-path",
         "ok": true,
-        "detail": "p50=29 max=34 (0,29,34)"
+        "detail": "p50=0 max=0 (0,0,0)"
       },
       {
         "name": "V3-scrubber-seeks",
@@ -137,10 +182,15 @@
         "name": "V4-block-anchor-measured",
         "ok": true,
         "detail": "tail err linear p1=-64/p2=-69, cluster-anchored p1=-100/p2=-99, BLOCKS p1=-64/p2=-99 — winner p1:linear p2:linear"
+      },
+      {
+        "name": "V5-master-jump-folds-not-bursts",
+        "ok": true,
+        "detail": "master p1 jumped 61189ms over cues [RCUE-20,RCUE-40,RCUE-60] — BURST fires 0 (must be 0), folded fired set [RCUE-20,RCUE-40,RCUE-60], playhead 1787823380096->1787823443859 (target 1787823441296)"
       }
     ]
   },
-  "updatedAt": "2026-08-27T21:03:34.268Z",
+  "updatedAt": "2026-08-28T06:27:40.172Z",
   "masters_mse": {
     "show": "sync-20260827T093613",
     "participants": {
@@ -289,5 +339,50 @@
         "detail": "errs 11/5/5 ms (informational band ±150)"
       }
     ]
+  },
+  "grid_master_jump": {
+    "masterPid": "p1",
+    "jump": {
+      "ok": true,
+      "pid": "p1",
+      "fromS": 3.761,
+      "toS": 64.96,
+      "targetT": 1787823441296,
+      "deckPosBefore": 1787823380099.4001
+    },
+    "posPre": 1787823380096,
+    "posPost": 1787823443859,
+    "skippedCueIds": [
+      "RCUE-20",
+      "RCUE-40",
+      "RCUE-60"
+    ],
+    "firesPre": 3,
+    "firesPost": 3,
+    "newFireIds": [],
+    "jumpEvents": [
+      {
+        "jumpMs": 61189,
+        "mediaTime": 64.96
+      }
+    ],
+    "firedIdsAfter": [
+      "RCUE-20",
+      "RCUE-40",
+      "RCUE-60"
+    ],
+    "mediaMasterStats": {
+      "syncs": 2616,
+      "jumps": 1,
+      "stalls": 0,
+      "corrections": 0,
+      "laws": {
+        "toleranceMs": 40,
+        "jumpMs": 250,
+        "stallMs": 1000,
+        "stallPolicy": "release",
+        "autoPlayPause": false
+      }
+    }
   }
 }

@@ -100,7 +100,7 @@ const S = window.__grid = {
   spans: {}, cues: [], fires: [],
   playheadT: 0, playing: false, mapping: "linear",
   tiles: {}, rangeT: [0, 0],
-  masterPid: null, syncCorrections: [], hostName: null,
+  masterPid: null, syncCorrections: [], hostName: null, masterEvents: [],
 };
 
 // ---- burned-row decoder (contract: NB=64 BW=12 RX=32 y=600 h=48) -----------
@@ -206,6 +206,25 @@ window.__pause = () => {
   for (const t of Object.values(S.tiles)) t.video.pause();
 };
 window.__setRate = (r) => { deck && deck.setRate(r); };   // library seam 2: does not play
+// TEST HOOK — an EXTERNAL scrub of the master element (what an hls.js recovery
+// jump or a user dragging the <video> looks like to us): move currentTime
+// discontinuously WITHOUT telling the deck. The library's mediaMaster must
+// notice (|err| > jumpMs) and route it to deck.seek(), so the cues in between
+// are FOLDED, not burst. Before v0.5 this page synced unconditionally and burst.
+window.__jumpMaster = (T) => {
+  const m = S.masterPid && S.tiles[S.masterPid];
+  if (!m) return { ok: false, why: "no master" };
+  const u = mapT(m, T);
+  if (u < 0 || u > m.mediaDurMs) return { ok: false, why: "target outside the master's media" };
+  const before = m.video.currentTime;
+  m.video.currentTime = u / 1000;
+  return { ok: true, pid: m.pid, fromS: +before.toFixed(3), toS: +(u / 1000).toFixed(3),
+           targetT: T, deckPosBefore: currentT() };
+};
+window.__masterInfo = () => ({ pid: S.masterPid, events: S.masterEvents.slice(),
+                               stats: mmaster ? mmaster.stats() : null,
+                               firedIds: [...firedIds].sort(), fires: S.fires.length,
+                               pos: currentT() });
 window.__setMapping = (m) => { S.mapping = m; window.__seekWall(currentT()); };
 window.__decodeNow = () => {
   const T = currentT();
@@ -296,30 +315,49 @@ const cueAdapter = {
 };
 
 // ---- clock master: the media element drives the library, not the wall --------
+// ADOPTED (v0.5): this block used to be hand-written here, and it had a live
+// bug that the LIBRARY version does not have — it called `deck.sync()`
+// UNCONDITIONALLY, with no jump-vs-drift discrimination. Any discontinuity in
+// the master's currentTime (an external scrub of the video element, an hls.js
+// recovery jump, a gap skip) therefore slid the vector forward with a sync,
+// which leaves every cue in between `pending` — and the cue lane here is
+// `catchUp: "burst"`, so the lookahead fires ALL of them at once the next tick.
+// That is exactly the burst-every-skipped-cue bug this page's adoption of the
+// library had already fixed for the SEEK path (window.__seekWall -> deck.seek
+// -> reduce + assertState). It was still open on the MASTER path.
+//
+// `mediaMaster()` carries the law instead (timeline/media-master.mjs L1-L5):
+// sync inside tolerance, SEEK past jumpMs, timeupdate as the hidden-tab
+// backstop, and a stall releases the master role (this page has N tiles, so
+// `release` — proto/replay has one video, so it uses `hold`).
+import { mediaMaster } from "/timeline/media-master.mjs";
 const SYNC_TOL_MS = 40;            // don't churn the lookahead on frame quantization
-let masterAdvance = { t: null, wall: 0 };
-function driveFromMaster(T) {
-  if (S.mapping !== "linear") return null;   // T->u is only invertible for linear
-  let m = S.masterPid && S.tiles[S.masterPid];
-  const usable = (t) => t && t.ready && !t.absent && !t.video.paused &&
-                        mapT(t, T) >= 0 && mapT(t, T) <= t.mediaDurMs;
-  if (!usable(m)) {
-    m = Object.values(S.tiles).find(usable) || null;
-    S.masterPid = m ? m.pid : null;
-    masterAdvance = { t: null, wall: 0 };
-  }
-  if (!m) return null;
-  const mediaT = m.linearAnchor + m.video.currentTime * 1000;   // the master's wall instant
-  const now = performance.now();
-  if (masterAdvance.t !== null && mediaT === masterAdvance.t && now - masterAdvance.wall > 1000) {
-    S.masterPid = null; return null;          // master stalled: free-run on the wall clock
-  }
-  if (masterAdvance.t === null || mediaT !== masterAdvance.t) masterAdvance = { t: mediaT, wall: now };
-  m.video.playbackRate = 1;                   // THE MASTER IS NEVER NUDGED
-  const corr = deck.sync(mediaT, { toleranceMs: SYNC_TOL_MS });
-  if (corr) S.syncCorrections.push(+corr.toFixed(1));
-  return corr;
+const JUMP_MS = 250;               // past this it is not drift, it is a MOVE
+let mmaster = null;
+function buildMaster() {
+  mmaster = window.__mmaster = mediaMaster(deck, () => {
+    if (S.mapping !== "linear") return null;   // T->u is only invertible for linear
+    const T = currentT();
+    const usable = (t) => t && t.ready && !t.absent && !t.video.paused &&
+                          mapT(t, T) >= 0 && mapT(t, T) <= t.mediaDurMs;
+    let m = S.masterPid && S.tiles[S.masterPid];
+    if (!usable(m)) { m = Object.values(S.tiles).find(usable) || null; S.masterPid = m ? m.pid : null; }
+    if (!m) return null;
+    m.video.playbackRate = 1;                  // THE MASTER IS NEVER NUDGED (L1)
+    return { el: m.video, pos: m.linearAnchor + m.video.currentTime * 1000, key: m.pid };
+  }, {
+    toleranceMs: SYNC_TOL_MS, jumpMs: JUMP_MS, stallMs: 1000,
+    stallPolicy: "release",        // N tiles: give up the role, free-run / re-pick
+    autoPlayPause: false,          // this page owns play/pause (the scrubber does)
+    onCorrection: (c) => { S.syncCorrections.push(c); if (S.syncCorrections.length > 500) S.syncCorrections.shift(); },
+    onEvent: (e) => {
+      S.masterEvents.push(e);
+      if (S.masterEvents.length > 200) S.masterEvents.shift();
+      if (e.reason === "release") S.masterPid = null;   // free-run on the wall clock
+    },
+  });
 }
+function driveFromMaster() { return mmaster ? mmaster.tick() : null; }
 
 // ---- scrubber / transport UI ------------------------------------------------
 const scrubEl = document.getElementById("scrub");
@@ -376,7 +414,7 @@ function loop() {
   S.playing = deck ? deck.playing() : false;
   let T = currentT();
   if (S.playing) {
-    driveFromMaster(T);                     // media element -> library vector
+    driveFromMaster();                      // media element -> library vector (L1-L5)
     T = currentT();
     for (const t of Object.values(S.tiles)) if (t.pid !== S.masterPid) servoTile(t, T);
     if (S.masterPid && S.tiles[S.masterPid]) servoPresence(S.tiles[S.masterPid], T);
@@ -507,11 +545,14 @@ function reduceCuelog(log, wantSpans) {
       onPosition: (pos) => { S.playheadT = pos; },
     });
     S.hostName = deck.hostName;
+    buildMaster();                    // the library's media-element master law
     window.__drift = () => deck.drift();
     window.__deckStats = () => ({ stats: deck.stats(), audit: deck.audit(),
                                   drift: deck.drift(), driftStats: deck.sched.driftStats(),
                                   caps: deck.caps(), syncCorrections: S.syncCorrections.slice(),
                                   master: S.masterPid, host: deck.hostName,
+                                  mediaMaster: mmaster ? mmaster.stats() : null,
+                                  masterEvents: S.masterEvents.slice(),
                                   rate: deck.rate(), targetRate: deck.targetRate() });
     window.__seekWall(S.rangeT[0]);
     S.phase = "running";

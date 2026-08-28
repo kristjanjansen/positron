@@ -238,3 +238,54 @@ Evidence: `compose-nested.png` — the parent playhead at 40.29 s crossing the
 nested deck's own note lane, the child's playhead glowing at 10.29 s inside it,
 and key **C5 lit because a parent seek landed in the middle of that note and the
 child's reducer re-asserted it**. Report: `compose-report.json`.
+
+## Step 7 — QUOTATION: the same session deck, twice, at two fragments (v0.5)
+
+Step 6 nested a whole stored session. `compose.html` now also **quotes a slice**
+of it — `timeline/nested.mjs` rule 7, `nest.add({… in, out})`:
+
+```js
+PA.nest.add({ id: 'sess',  at: 30000, rate: 1, deck: child.deck, master: true });
+PA.nest.add({ id: 'quote', at:  5000, rate: 1, deck: child.deck,
+              in: 4322, out: 14322 });          // a 10 s slice of the SAME deck
+```
+
+One child deck, one audio element under it, **two spans**. The trim lives on the
+span record, not on the deck (`CH.deck.range` is still `[0, 18644]` after both
+adds — asserted). This is plan-timeline §−1 / C10 made executable: *a new work
+is a score that QUOTES archive timelines*, and until now a span could only play
+the child's whole range.
+
+### `node proto/remixer/compose-run.mjs` — **20/20**, 0 console errors
+
+All 16 of Step 6's checks pass unchanged. The four new ones:
+
+| check | measured |
+|---|---|
+| ONE session deck QUOTED TWICE and trim did not mutate the child | `[{sess, at 30000, [0,18644]}, {quote, at 5000, [4322,14322]}]` — a 10 000 ms slice of 18 644 ms, `CH.deck.range` still `[0, 18644]` |
+| a parent seek inside the QUOTATION lands inside the FRAGMENT | **6/6 exact, max child position error 0.000 ms**, held-note reduce exact at every probe (2 of 6 land mid-note). The whole-range mapping would have put the child at `u`; the fragment map puts it at `in + u` |
+| past the quotation's `out` the session is absent and parked AT `out` | parked at **14 322**, not at the deck's end 18 644 — `out` IS the child's end for this quotation |
+| a 20 s ask on an 18.6 s session CLAMPS and REPORTS it | `{wanted:[4322,24322], chose:[4322,18644], clamped:true, reason:"in/out clamped to the child's range [0, 18644]"}`; `in===out` and an overlapping quotation of the same deck both rejected at `add()` in words |
+
+The 20 s slice the brief asked for does not exist: the real instrument session
+is **18 644 ms**. So the demo quotes the largest true MIDDLE slice (10 s,
+53.6 % of the session) and asserts the 20 s ask **clamps and says so** — which
+is the more useful of the two facts.
+
+**Placement is a rule, not a preference.** `quote` sits at `[5000, 15000]` and
+`sess` at `[30000, 48644]`: rule 7g rejects two quotations of one deck that
+OVERLAP in parent time, because a deck has one position. Asked for an overlap,
+the library answers with the arithmetic and the workaround (two decks, to
+overlay). That rejection is a check here.
+
+**The bug the twice-quoted case forced out of the library** (both fixed in
+`timeline/nested.mjs`, see lab NOTES Checkpoint 9 §2): an absent span used to
+park + pause the shared child even when a sibling quotation was PRESENT (the
+second quotation would have played for zero milliseconds), and the park used to
+fire only on the present→absent *transition*, so playing past a span and then
+seeking before it left the child stuck at the wrong edge.
+
+`deck.setRange()` also landed this cycle (transport v0.5) — this client is the
+one that filed it: a layer loading at runtime no longer needs the arrangement
+deck disposed and rebuilt. `compose.html` still declares `range: [0, ARR_END]`
+because its layout is static; `index.html` is the one that should adopt it.
