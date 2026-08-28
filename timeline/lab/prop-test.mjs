@@ -1508,8 +1508,10 @@ const FUZZY = [
     prepareSeek(req, ready) { log.push(['slow', req.pos, req.disposition]); releaseSlow = ready; } };
   const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 10000],
     adapters: { fast, slow }, items: [{ at: 100, kind: 'fast', payload: {} }, { at: 5000, kind: 'slow', payload: {} }] });
-  deck.seek(0); deck.play();
+  // setting up is itself a locate: close its barrier cleanly, then start clean.
+  deck.seek(0); releaseSlow(); deck.play();
   vr.advanceTo(vr.now() + 200);
+  log.length = 0; releaseSlow = null;
   const t0 = vr.now();
   const q = deck.seek(1500, { timeoutMs: 300, disposition: 'RollIfAppropriate' });
   const b0 = deck.seekBarrier();
@@ -1567,6 +1569,32 @@ const FUZZY = [
   check('2phase', 5, r === 1500 && plain.playing() && plain.seekBarrier() === null,
     'a deck holding no caps.slowSync adapter must never build a barrier and must never lose the roll');
   plain.dispose();
+}
+
+// --- 7g: the registry is readable, and caps.absentState fans out from the deck
+// (requested by the quotation sibling: a nest could see the CAP through
+// deck.adapters and not the METHOD of an adapter registered later).
+{
+  const vr = sharedVR();
+  const quiet = [];
+  const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 1000],
+    adapters: { note: { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {}, silence: (i) => quiet.push(['note', i.reason, i.kind]) } } });
+  // registered LATE — invisible in deck.adapters, which is the reported bug
+  deck.sched.registerAdapter('late', { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {}, silence: (i) => quiet.push(['late', i.reason, i.kind]) });
+  deck.sched.registerAdapter('video', { caps: { catchUp: 'drop' }, actuate() {} });          // default: HOLD a frame
+  deck.sched.registerAdapter('liar2', { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {} });
+  check('absent', 0, deck.adapters.late === undefined && deck.adapter('late') !== null && typeof deck.adapter('late').silence === 'function',
+    'a late-registered adapter must be reachable through deck.adapter(kind) even though deck.adapters never held it');
+  const r = deck.silence({ reason: 'parked-outside-span' });
+  check('absent', 0, same(quiet.sort(), [['late', 'parked-outside-span', 'late'], ['note', 'parked-outside-span', 'note']]) &&
+    same(r.silenced.sort(), ['late', 'note']) && same(r.held, ['video']) && same(r.missing, ['liar2']),
+    `silence() must go quiet where an adapter says how, HOLD by default, and report the declared-but-unimplemented one: ${JSON.stringify(r)}`);
+  check('absent', 1, deck.degradations('liar2').reports.some((x) => /declares caps.absentState 'silence' but implements no silence/.test(x.reason)),
+    'and the unbacked claim must be on the record at registration, not discovered at a park');
+  quiet.length = 0;
+  check('absent', 1, same(deck.silence({ kind: 'note', reason: 'x' }).silenced, ['note']) && quiet.length === 1,
+    'info.kind must narrow the fan-out to one lane');
+  deck.dispose();
 }
 
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);

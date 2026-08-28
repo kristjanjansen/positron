@@ -429,3 +429,53 @@ the growth is the UI and the proof, not the plumbing.
 * Reconstructors run once at `build()`. There is no incremental `run()` over a
   growing lane, so live capture still draws its raw evidence stroke and the
   derived lanes appear when the gesture ends.
+
+## 8. THE STRIP IS A COMPONENT (2026-08-28, `timeline/strip.mjs`)
+
+plan-timeline §0/§6 promised one strip component and got five hand-rolled ones
+(jam, selfrec/replay-grid, instrument, remixer/compose, and this file). This
+client adopted `timeline/strip.mjs`; the numbers held exactly.
+
+**Deleted from `paths.js` — 32 lines, all of it drawing machinery this file had
+no business owning:**
+
+| what | lines | now |
+| --- | --- | --- |
+| `strokePoly()` — dashed/alpha polyline | 12 | `strip.mjs` export |
+| `HATCH` tier→dash table | 2 | `hatchFor(tier)` |
+| `specFor()` provenance→style derivation | 5 | `styleFor(deck, kind, base)`; this file keeps only `BY_METHOD`, the per-*method* palette, which genuinely is its business |
+| `laneInk()` offscreen ink probe | 10 | `laneInk(draw, w, h)` |
+| `#scrub` range wiring (`oninput` + the write-back in `frame()`) | 3 | drag-to-seek on the strip; control-is-the-display |
+
+**Gained — a time axis this client never had.** It had a 1001-step
+`<input type=range>`, which was the fourth incompatible answer in this repo to
+the same question. What arrived instead:
+
+* four lanes, **three of them deck QUERIES** (`pointer`, `pointer~linear`,
+  `pointer~catmull`) and one — the evidence buffer — using the declared
+  `render` escape hatch, *because the evidence buffer is deliberately not in
+  the log* and the component makes that say itself out loud;
+* **tick LOD**: zoom in far enough and the 100 ms attestation grid separates
+  into individual ticks with millisecond labels. The amber ticks are the only
+  positions the log attests; everything between them on the pink and cyan lanes
+  is invented, and now you can *see* the ratio the 93.4% number reports;
+* **the dual cursor** — a wall-clock line beside the playhead, the gap labelled
+  in seconds, so the accumulated pause/rate offset is a measurement not a mood;
+* **follow-mode that disengages on user scroll** and re-engages on the button;
+* the evidence-only toggle needed **zero wiring**: three lanes name deck kinds,
+  so under `attested` the *deck* refuses to serve the two derived ones.
+
+**The firewall is now proved twice, in two projections, by one definition of
+"did this lane put ink on a canvas".** `paths.laneInk()` (the x/y overlay) and
+`paths.stripInk()` (the time strip) both call the component's `laneInk`.
+
+**Verification unchanged (14 pass / 0 fail):** seek error `0.042 / 0.032 /
+0.042` px vs analytic truth; deviation `hold 24.19 > linear 0.679 > catmull
+0.0357` px mean; evidence-only ink `linear=0 smooth=0` while `evidence=4690
+stored=5529` are untouched; 0 console errors.
+
+**Not deleted, deliberately.** The four-paths x/y overlay and the 14× inset stay
+hand-drawn here, because they are a *projection* (value→x, value→y), not a time
+axis, and a strip component that tried to own them would be a canvas library.
+They now share the component's stroker and style derivation, which is the part
+that was actually duplicated.

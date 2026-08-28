@@ -1523,6 +1523,9 @@ export function createScheduler(transport, {
       if (caps.followsTransport === true && typeof adapter.transport !== 'function')
         noteDegraded(kind, { wanted: 'caps.followsTransport', chose: 'ignored', degraded: true,
           reason: `adapter ${kind} declares caps.followsTransport but implements no transport(state)` });
+      if (caps.absentState === 'silence' && typeof adapter.silence !== 'function')
+        noteDegraded(kind, { wanted: "caps.absentState 'silence'", chose: 'hold', degraded: true,
+          reason: `adapter ${kind} declares caps.absentState 'silence' but implements no silence(info) — a quotation parked outside its span will HOLD whatever the cut left ringing` });
       if (caps.slowSync === true && typeof adapter.prepareSeek !== 'function')
         noteDegraded(kind, { wanted: 'caps.slowSync', chose: 'ignored', degraded: true,
           reason: `adapter ${kind} declares caps.slowSync but implements no prepareSeek(request, ready) — the two-phase seek barrier will treat it as instantly ready (U6)` });
@@ -1555,6 +1558,42 @@ export function createScheduler(transport, {
       if (kind !== undefined) { const a = adapters.get(kind); return a ? a.caps || {} : null; }
       const out = {};
       for (const [k, a] of adapters) out[k] = a.caps || {};
+      return out;
+    },
+    /** Read accessor on the adapter registry. `deck.adapters` only ever held the
+     *  CONSTRUCTOR-registered ones, so anything registered later through
+     *  registerAdapter() was unreachable from outside — a nest could see the cap
+     *  and not the method. Read-only, additive. */
+    adapter(kind) { return adapters.get(kind) || null; },
+    /** caps.absentState — the deck-level fan-out, so a caller never has to know
+     *  WHERE the registry lives. A quotation parked outside its span currently
+     *  holds whatever the cut left ringing; an adapter that declares
+     *  caps.absentState === 'silence' says how to go quiet, and this calls it.
+     *  The DEFAULT stays 'hold' (right for a video frame; wrong for a note), and
+     *  declaring the cap without implementing silence() is REPORTED, never
+     *  guessed at. `info.kind` narrows to one lane; omitted, it fans out.
+     *  -> {kinds, silenced, held, missing} */
+    silence(info = {}) {
+      const kinds = info.kind !== undefined
+        ? (Array.isArray(info.kind) ? info.kind : [info.kind])
+        : [...adapters.keys()];
+      const out = { kinds, silenced: [], held: [], missing: [] };
+      for (const k of kinds) {
+        const ad = adapters.get(k);
+        const caps = (ad && ad.caps) || {};
+        if (!ad) { out.missing.push(k); continue; }
+        if (caps.absentState !== 'silence') { out.held.push(k); continue; }
+        if (typeof ad.silence !== 'function') {
+          out.missing.push(k);
+          noteDegraded(k, { wanted: "caps.absentState 'silence'", chose: 'hold', degraded: true,
+            reason: `adapter ${k} declares caps.absentState 'silence' but implements no silence(info) — the lane HOLDS whatever the cut left ringing, which is the very thing the cap was declared to prevent` });
+          continue;
+        }
+        const t = clock.now();
+        ad.silence({ ...info, kind: k });
+        busyMs += clock.now() - t;
+        out.silenced.push(k);
+      }
       return out;
     },
     /** Re-fold + re-assert reducible kinds at pos (seek does this for you). */
@@ -2153,6 +2192,12 @@ export function createDeck({
     eventsOf: (kind) => sched.eventsOf(kind),
     cursorStats: (kind) => sched.cursorStats(kind),
     caps: (kind) => sched.adapterCaps(kind),
+    /** the adapter registry, readable — including adapters registered AFTER
+     *  construction, which `deck.adapters` (the constructor object) never held. */
+    adapter: (kind) => sched.adapter(kind),
+    /** caps.absentState fan-out: go quiet where an adapter says how, hold where
+     *  it does not, and report where the cap was declared but not implemented. */
+    silence: (info) => sched.silence(info),
     audit: () => sched.audit(),
     stats: () => sched.stats(),
     dispose() { if (flushIv) clearInterval(flushIv); offDrift(); offPos(); sched.dispose(); },

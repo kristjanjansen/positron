@@ -8,6 +8,12 @@
 
 import { makeLogDeck } from '/timeline/logdeck.mjs';
 import { createCursor } from '/timeline/transport.mjs';
+// THE STRIP IS A COMPONENT NOW. Four things this file used to own outright —
+// the tier->hatch table, the provenance->style derivation, the dashed-polyline
+// stroker and the per-lane offscreen ink probe — are imported, not written; and
+// the time axis below the stage (which this client never had: it had a
+// featureless <input type=range>) is one createStrip() call.
+import { createStrip, strokePoly, hatchFor, styleFor, laneInk } from '/timeline/strip.mjs';
 import { makePointerAdapter, pxBudgetPlan, deviations } from './pointer-adapter.js';
 
 const STORE_MS = 100;                 // the lineage's stored-lane throttle
@@ -28,8 +34,8 @@ const RECON = [
 ];
 // TRATTEGGIO BY TIER: hatching is not hand-assigned per lane any more — it is a
 // function of the row's own declared tier, so a tier-2 lane would arrive hatched
-// differently without one line of styling being written for it.
-const HATCH = { 0: null, 1: [7, 4], 2: [3, 3], 3: [2, 6] };
+// differently without one line of styling being written for it. The table used
+// to live here; it is `hatchFor()` in the component, shared with every strip.
 const BY_METHOD = {
   linear: { color: '#ff3d8b', width: 6.5, alpha: 0.20, label: 'linear interp' },
   'catmull-rom': { color: '#3fe0ff', width: 2.6, alpha: 0.60, label: 'Catmull-Rom' },
@@ -62,6 +68,7 @@ const S = {
   pos: 0,
   dur: 0,
   live: { linear: null, smooth: null, evidence: null, fire: null },
+  strip: null,         // the component. Built with the deck, disposed with it.
   capturing: false,
   synthetic: null,     // {t0Us, durationMs} when the path came from the parametric curve
   watchers: [],
@@ -76,20 +83,19 @@ const SHOW = { evidence: true, stored: true, linear: true, smooth: true };
 // provenance rollup — see specFor().
 const LANES = {
   linear:   { ...BY_METHOD.linear, dash: null },
-  smooth:   { ...BY_METHOD['catmull-rom'], dash: HATCH[1] },
+  smooth:   { ...BY_METHOD['catmull-rom'], dash: hatchFor(1) },
   stored:   { color: '#ffb020', width: 1.0, alpha: 0.35, dash: null,   label: 'stored (100 ms)' },
   evidence: { color: '#ffffff', width: 1.1, alpha: 0.95, dash: null,   label: 'evidence (full rate)' },
 };
 
 /** The lane's look, derived from the LIBRARY's provenance rather than a table
  *  keyed by a name this client chose: colour/width from `method`, hatch from
- *  `tier`. §5b's tratteggio principle with the styling wired to the data. */
+ *  `tier`. That derivation is `styleFor()` in the component now — this client
+ *  supplies only the one thing that is its business, the per-METHOD palette. */
 function specFor(kind) {
   const p = S.deck.provenanceOf(kind) || { tier: 0, method: null };
   const base = BY_METHOD[p.method] || BY_METHOD.linear;
-  return { ...base, dash: HATCH[p.tier] || null, tier: p.tier, method: p.method,
-           confidence: p.confidence, source: p.source,
-           label: `${base.label} · tier ${p.tier}` };
+  return styleFor(S.deck, kind, { ...base, label: `${base.label} · tier ${p.tier}` });
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +157,7 @@ function resetCapture() {
   S.evidence = []; S.stored = []; S.lastStoredUs = -Infinity;
   S.recon = {}; S.rows = {}; S.dev = {};
   S.live = { linear: null, smooth: null, evidence: null, fire: null };
+  if (S.strip) { S.strip.dispose(); S.strip = null; }
   if (S.deck) { S.deck.dispose(); S.deck = null; }
 }
 
@@ -208,6 +215,7 @@ function analyticAt(posMs) {
 // ---------------------------------------------------------------------------
 
 function build() {
+  if (S.strip) { S.strip.dispose(); S.strip = null; }   // never let a strip outlive its deck
   if (S.deck) { S.deck.dispose(); S.deck = null; }
 
   const adapter = makePointerAdapter({
@@ -262,6 +270,7 @@ function build() {
     LANES[r.lane] = specFor(S.recon[r.lane].into);
   }
   rebuildRows();
+  buildStrip();
 
   S.dev = deviations(S.evidencePos, S.lane, deck);
   S.dur = deck.durationMs;
@@ -270,6 +279,57 @@ function build() {
   drawStatic();
   readout();
   return deck;
+}
+
+// ---------------------------------------------------------------------------
+// THE TIME STRIP — timeline/strip.mjs, four lanes, all four of them QUERIES.
+//
+// This client never had a time axis. It had an <input type=range> with 1001
+// steps, which is the fourth incompatible answer to the same question in this
+// repo. What arrives with the component is what none of the five hand-rolled
+// strips had: a real {originTime, pxPerSecond, scrollX} window, tick LOD (zoom
+// far enough in and the 100 ms attestation grid separates into individual
+// ticks with millisecond labels), a wall-clock line beside the playhead, and
+// drag-to-seek that is the display.
+//
+// The evidence-only toggle needs no wiring here at all: three of the four lanes
+// name deck kinds, so under `attested` the DECK refuses to serve the two
+// derived ones and they paint nothing. That is the same firewall the x/y
+// overlay obeys, in a second projection, with no second implementation.
+// ---------------------------------------------------------------------------
+function buildStrip() {
+  const c = $('strip');
+  if (!c) return;
+  if (S.strip) S.strip.dispose();
+  const cont = (name, kind) => ({
+    id: name, kind, label: LANES[name].label, height: 46, as: 'continuous',
+    value: (p) => p.x, min: 0, max: W, dots: false,
+    color: LANES[name].color, width: LANES[name].width * 0.5, alpha: LANES[name].alpha + 0.25,
+  });
+  S.strip = createStrip(c, S.deck, {
+    gutter: 116, hud: $('striphud'), evidence: S.policy,
+    // the strip must not re-declare the deck's policy — this client owns that
+    // choice and setPolicy() below is where it is made
+    deckPolicy: false,
+    lanes: [
+      cont('linear', S.recon.linear && S.recon.linear.into),
+      cont('smooth', S.recon.smooth && S.recon.smooth.into),
+      { id: 'stored', kind: KIND, label: LANES.stored.label, height: 26, as: 'ticks',
+        color: LANES.stored.color, alpha: 0.8, width: 1.2 },
+      // THE ONE LANE THAT IS NOT A QUERY, and the component makes it say so: the
+      // evidence buffer is deliberately NOT in the log (that is this client's
+      // whole point), so it cannot be asked for. It takes the declared `render`
+      // escape hatch and reuses the component's own stroker.
+      { id: 'evidence', label: LANES.evidence.label, height: 46, render: (ctx, L, C) => {
+          const y = (v) => L.y + L.height - 3 - (v / W) * (L.height - 6);
+          const pts = [];
+          for (const p of S.evidencePos) { if (p.at < C.t0 || p.at > C.t1) continue; pts.push({ x: C.x(p.at), y: y(p.x) }); }
+          strokePoly(ctx, pts, { ...LANES.evidence, width: 1 });
+        } },
+    ],
+    onHover: (h) => { const el = $('striphover'); if (el) el.textContent = h && h.text ? h.text.replace(/\n/g, ' · ') : ''; },
+    onFollowChange: (on, disengaged) => { const b = $('follow'); if (b) b.textContent = `follow: ${on ? (disengaged ? 'disengaged' : 'on') : 'off'}`; },
+  });
 }
 
 /** THE EVIDENCE-ONLY TOGGLE IS A LIBRARY QUERY. Every reconstruction polyline is
@@ -291,6 +351,7 @@ function rebuildRows() {
 function setPolicy(p) {
   S.policy = p;
   S.deck && S.deck.setEvidence(p);     // the LIVE reads obey it too, not just the strokes
+  S.strip && S.strip.setEvidence(p);   // and the strip asks the deck the same question
   rebuildRows();
   drawStatic(); drawCursors(); readout();
 }
@@ -298,19 +359,6 @@ function setPolicy(p) {
 // ---------------------------------------------------------------------------
 // drawing — the four-paths overlay
 // ---------------------------------------------------------------------------
-
-function strokePoly(ctx, pts, spec) {
-  if (!pts || pts.length < 2) return;
-  ctx.save();
-  ctx.strokeStyle = spec.color; ctx.globalAlpha = spec.alpha; ctx.lineWidth = spec.width;
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (spec.dash) ctx.setLineDash(spec.dash);
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.stroke();
-  ctx.restore();
-}
 
 /** Draw one lane into an arbitrary context — the single definition shared by
  *  the overlay and the harness's per-lane ink probe. */
@@ -418,8 +466,8 @@ function frame(pos, dur) {
   S.perFrame.renderAt = performance.now() - t0;
   drawCursors();
   drawInset();
-  const sc = $('scrub');
-  if (sc && document.activeElement !== sc) sc.value = String(dur ? (pos / dur) * 1000 : 0);
+  // no scrubber to write back into: the strip reads deck.position() itself, in
+  // its own rAF, and drawing IS the control
   tick();
   for (let i = S.watchers.length - 1; i >= 0; i--) {
     if (S.watchers[i].test(pos)) { S.watchers[i].resolve(pos); S.watchers.splice(i, 1); }
@@ -491,7 +539,10 @@ function wire() {
     b.onclick = () => { if (!S.deck) return; S.deck.setRate(r); tick(); };
     $('rates').appendChild(b);
   }
-  $('scrub').oninput = (e) => { if (S.deck) S.deck.seek((+e.target.value / 1000) * S.dur); };
+  $('follow').onclick = () => S.strip && S.strip.setFollow(!S.strip.follow().on);
+  $('zin').onclick = () => S.strip && S.strip.zoomIn(2);
+  $('zout').onclick = () => S.strip && S.strip.zoomOut(2);
+  $('zfit').onclick = () => S.strip && S.strip.fit();
   $('synth').onclick = () => synthesize();
   $('clear').onclick = () => { resetCapture(); drawStatic(); };
   for (const name of ORDER) {
@@ -611,18 +662,14 @@ window.paths = {
    *  proof that all four lanes actually put marks on the canvas. */
   laneInk() {
     const out = {};
-    for (const name of ORDER) {
-      const off = document.createElement('canvas');
-      off.width = W; off.height = H;
-      const ctx = off.getContext('2d');
-      paintLane(ctx, name);
-      const d = ctx.getImageData(0, 0, W, H).data;
-      let n = 0;
-      for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
-      out[name] = n;
-    }
+    for (const name of ORDER) out[name] = laneInk((ctx) => paintLane(ctx, name), W, H);
     return out;
   },
+  /** the same probe on the TIME STRIP, from the component's own API — so the
+   *  evidence firewall is now proved twice, in two projections, by one
+   *  definition of "did this lane put ink on a canvas". */
+  stripInk() { return S.strip ? S.strip.ink() : null; },
+  strip() { return S.strip ? { view: S.strip.view(), lod: S.strip.tickLOD(), readout: S.strip.readout() } : null; },
   setMode(m) { S.adapter.mode = m; },
   show(name, on) { SHOW[name] = on; $('t-' + name).checked = on; drawStatic(); drawCursors(); },
   /** the evidence firewall, as the harness drives it: 'attested' collapses every

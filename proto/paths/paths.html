@@ -35,7 +35,8 @@
            padding: 5px 11px; font: inherit; cursor: pointer; }
   button:hover { background: #253046; }
   button.rate { padding: 5px 8px; min-width: 40px; }
-  #scrub { flex: 1 1 260px; min-width: 200px; accent-color: var(--smooth); }
+  #strip { display: block; width: 100%; height: 190px; border: 1px solid var(--line); border-radius: 6px; background: #0b0d12; }
+  #striphud, #striphover { font-size: 11px; color: var(--dim); margin-top: 4px; min-height: 15px; }
   .kv { color: var(--dim); }
   .kv b { color: var(--ink); font-weight: 600; }
   .dim { color: var(--dim); }
@@ -62,8 +63,10 @@
   <button id="rewind">⏮</button>
   <button id="play">▶ play</button>
   <button id="pause">⏸ pause</button>
-  <input id="scrub" type="range" min="0" max="1000" value="0" step="1" />
   <span id="rates" style="display:flex;gap:4px"></span>
+  <span style="width:10px"></span>
+  <button id="follow">follow: on</button>
+  <button id="zout">−zoom</button><button id="zin">+zoom</button><button id="zfit">fit</button>
 </div>
 
 <div class="wrap">
@@ -71,6 +74,17 @@
     <div class="stage" style="margin-bottom:12px">
       <canvas id="paths" width="1000" height="620"></canvas>
       <canvas id="cursors" width="1000" height="620"></canvas>
+    </div>
+    <div class="panel" style="margin-bottom:12px">
+      <h2>the strip — timeline/strip.mjs, four lanes, three of them deck queries</h2>
+      <canvas id="strip"></canvas>
+      <div id="striphud"></div>
+      <div id="striphover"></div>
+      <p class="note" style="margin:6px 0 0">Drag to seek · shift-drag to pan · shift-wheel to zoom · hover for row
+        detail. The <b>amber ticks</b> are the only positions the log <b>attests</b>; everything between them on the
+        pink and cyan lanes is <b>invented</b>, and under <i>evidence only</i> the deck stops serving those two lanes
+        so they paint nothing at all. The dashed amber line beside the white playhead is <b>wall-clock now</b> — the
+        gap between them is the accumulated pause and rate offset.</p>
     </div>
     <div class="panel" style="display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:center">
       <canvas id="inset" width="632" height="380" style="width:100%;height:auto;border-radius:4px;background:#0b0d12"></canvas>
