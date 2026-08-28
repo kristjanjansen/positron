@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>elektron studio — console</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --line:#1e252e; --ink:#dfe6ee; --dim:#7b8794;
+    --go:#3ecf8e; --stop:#e2726e; --amber:#e8b44a; --blue:#6aa9f0;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.45 var(--mono);-webkit-font-smoothing:antialiased}
+  header{display:flex;align-items:baseline;gap:16px;padding:12px 18px;
+         border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;letter-spacing:.16em;text-transform:uppercase}
+  .phase{padding:2px 9px;border-radius:99px;border:1px solid var(--line);font-size:12px}
+  .phase.live{background:#1a3a2c;border-color:var(--go);color:var(--go)}
+  .phase.failed{background:#3a1e1d;border-color:var(--stop);color:var(--stop)}
+  .phase.done{background:#1c2733;border-color:var(--blue);color:var(--blue)}
+  .grow{flex:1}
+  .meta{color:var(--dim);font-size:12px}
+  main{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
+       gap:14px;padding:14px 18px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+  section h2{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+             margin:0 0 12px}
+  label{display:block;font-size:11px;color:var(--dim);margin:9px 0 3px;
+        letter-spacing:.09em;text-transform:uppercase}
+  select,input[type=text]{width:100%;background:#0a0d11;color:var(--ink);
+        border:1px solid var(--line);border-radius:5px;padding:7px 9px;font:13px var(--mono)}
+  button{width:100%;padding:12px;border-radius:6px;border:1px solid var(--line);
+         background:#1a212a;color:var(--ink);font:600 13px var(--mono);cursor:pointer;
+         letter-spacing:.12em;text-transform:uppercase;margin-top:12px}
+  button:hover:not(:disabled){border-color:var(--dim)}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  button.go{background:#12321f;border-color:var(--go);color:var(--go)}
+  button.stop{background:#331b1a;border-color:var(--stop);color:var(--stop)}
+  button.small{width:auto;padding:8px 14px;margin:0}
+  .row{display:flex;gap:8px;align-items:flex-end}
+  .row>*{flex:1}
+  .lights{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;
+          padding-top:12px;border-top:1px solid var(--line)}
+  .light{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);
+         text-transform:uppercase;letter-spacing:.08em}
+  .dot{width:9px;height:9px;border-radius:50%;background:#2b333d;
+       box-shadow:inset 0 0 0 1px #000}
+  .dot.on{background:var(--go);box-shadow:0 0 7px #3ecf8e88}
+  .dot.off{background:var(--stop)}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:3px 14px;margin:0;font-size:12px}
+  dt{color:var(--dim)}
+  dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+  .check{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--dim)}
+  .replay{display:block;margin-top:12px;padding:11px;border-radius:6px;
+     background:#12222f;border:1px solid var(--blue);color:var(--blue);
+     text-decoration:none;text-align:center;letter-spacing:.1em;text-transform:uppercase;
+     font-size:12px;font-weight:600;word-break:break-all}
+  .replay.hidden{display:none}
+  .stripwrap{grid-column:1/-1;background:var(--panel);border:1px solid var(--line);
+             border-radius:8px;padding:14px}
+  canvas{width:100%;height:186px;display:block;border-radius:5px;background:#080a0c}
+  .legend{display:flex;gap:18px;margin-top:9px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+  .swatch{display:inline-block;width:9px;height:9px;margin-right:5px;vertical-align:-1px}
+  .log{margin-top:12px;max-height:118px;overflow:auto;font-size:11px;color:var(--dim);
+       border-top:1px solid var(--line);padding-top:9px;white-space:pre-wrap}
+  .err{color:var(--stop)}
+</style>
+</head>
+<body>
+<header>
+  <h1>elektron studio</h1>
+  <span class="phase" id="phase">…</span>
+  <span class="meta" id="runmeta"></span>
+  <span class="grow"></span>
+  <span class="meta" id="clock"></span>
+</header>
+
+<main>
+  <!-- ================= GO LIVE ================= -->
+  <section>
+    <h2>Go live</h2>
+    <label for="source">Video source</label>
+    <select id="source">
+      <option value="page">Canvas stage (headless page, native T₀)</option>
+      <option value="lavfi">Test pattern (ffmpeg lavfi, T₀ approximate)</option>
+    </select>
+    <label for="audio">Audio source</label>
+    <select id="audio">
+      <option value="silent">SILENT — a silent show is a valid show</option>
+      <option value="tone">Test tone (440 Hz)</option>
+      <option value="device:0">Input device 0 (avfoundation, unverified)</option>
+    </select>
+    <div class="check"><input type="checkbox" id="stage"><label for="stage"
+      style="margin:0;text-transform:none;letter-spacing:0">Stage leg (RTMPS → LL-HLS)</label></div>
+    <button id="btnGo" class="go">Go live</button>
+    <button id="btnStop" class="stop" disabled>Stop show</button>
+    <div class="lights" id="lights"></div>
+  </section>
+
+  <!-- ================= ARCHIVE ================= -->
+  <section>
+    <h2>Archive</h2>
+    <div class="check"><input type="checkbox" id="archive" checked><label for="archive"
+      style="margin:0;text-transform:none;letter-spacing:0">Record + upload to R2 (default on)</label></div>
+    <dl>
+      <dt>segments closed</dt><dd id="aSegs">—</dd>
+      <dt>uploaded + verified</dt><dd id="aUp">—</dd>
+      <dt>upload lag</dt><dd id="aLag">—</dd>
+      <dt>resident on disk</dt><dd id="aDisk">—</dd>
+      <dt>native T₀</dt><dd id="aT0">—</dd>
+      <dt>time to live</dt><dd id="aTTL">—</dd>
+    </dl>
+    <a class="replay hidden" id="replay" target="_blank" rel="noopener">Open replay ▸</a>
+    <div class="log" id="reconcile"></div>
+  </section>
+
+  <!-- ================= SHOW ================= -->
+  <section>
+    <h2>Show</h2>
+    <label for="cue">Cue text</label>
+    <div class="row">
+      <input type="text" id="cue" placeholder="subtitle / overlay text" disabled>
+      <button class="small" id="btnCue" disabled style="flex:0 0 84px">Fire</button>
+    </div>
+    <label for="score">Score</label>
+    <div class="row">
+      <select id="score"></select>
+      <button class="small" id="btnScore" disabled style="flex:0 0 84px">Load</button>
+    </div>
+    <dl style="margin-top:14px">
+      <dt>cues fired</dt><dd id="sCues">—</dd>
+      <dt>drift p50 / p95</dt><dd id="sDrift">—</dd>
+      <dt>armed / retained</dt><dd id="sArmed">—</dd>
+      <dt>lane host</dt><dd id="sHost">—</dd>
+    </dl>
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- ================= STRIP ================= -->
+  <div class="stripwrap">
+    <h2 style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:0 0 10px">
+      Strip — the deck's drift channel</h2>
+    <canvas id="strip"></canvas>
+    <div class="legend">
+      <span><i class="swatch" style="background:#e8b44a"></i>cue armed</span>
+      <span><i class="swatch" style="background:#3ecf8e"></i>cue fired (height = |drift|)</span>
+      <span><i class="swatch" style="background:#2f6fae"></i>media-span (closed segment)</span>
+      <span><i class="swatch" style="background:#6b7f92"></i>upload lag</span>
+      <span><i class="swatch" style="background:#e2726e"></i>playhead = deck.position()</span>
+      <span id="stripsrc" style="margin-left:auto"></span>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// The console is a THIN surface over the engine. Every number it shows comes
+// from the engine's status frame; the strip specifically renders
+// deck.drift() / deck.audit() / transport.driftStats() — the library's own
+// channel — never anything this page inferred from its own clicks.
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+let ST = null, ws = null, rows = [];
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/control`);
+  ws.onopen = () => { log("control channel open"); send({ op: "status" }); };
+  ws.onclose = () => { log("control channel closed — retrying"); setTimeout(connect, 1200); };
+  ws.onmessage = (m) => {
+    const f = JSON.parse(m.data);
+    if (f.type === "status") { ST = f; render(); }
+    else if (f.type === "row") { rows.push(f.row); if (rows.length > 4000) rows.splice(0, 1000);
+      if (f.row.kind === "marker") log(`▸ ${f.row.payload.marker} ${f.row.payload.leg || f.row.payload.why || ""}`); }
+    else if (f.type === "error") log(`✗ ${f.op}: ${f.error}`, true);
+    else if (f.type === "ack" && f.op === "score") log(`score loaded: ${f.result.title} (${f.result.loaded} events)`);
+  };
+}
+const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
+function log(s, err) {
+  const el = $("log"); const d = document.createElement("div");
+  d.textContent = `${new Date().toISOString().slice(11, 19)} ${s}`;
+  if (err) d.className = "err";
+  el.prepend(d); while (el.children.length > 60) el.lastChild.remove();
+}
+
+// ---- controls --------------------------------------------------------------
+$("btnGo").onclick = () => send({ op: "go", source: $("source").value, audio: $("audio").value,
+                                  stage: $("stage").checked, archive: $("archive").checked });
+$("btnStop").onclick = () => { $("btnStop").disabled = true; log("stopping — draining uploader…"); send({ op: "stop" }); };
+$("btnCue").onclick = () => {
+  const t = $("cue").value.trim(); if (!t) return;
+  send({ op: "cue", id: `CUE-${Date.now() % 100000}`, text: t, data: { text: t, mode: "manual" } });
+  $("cue").value = "";
+};
+$("cue").onkeydown = (e) => { if (e.key === "Enter") $("btnCue").click(); };
+$("btnScore").onclick = () => {
+  const o = $("score").selectedOptions[0]; if (!o) return;
+  send({ op: "score", dir: o.dataset.dir, file: o.value });
+};
+fetch("/api/scores").then((r) => r.json()).then((list) => {
+  $("score").innerHTML = list.map((s) =>
+    `<option value="${s.file}" data-dir="${s.dir}">${s.title} (${s.events})</option>`).join("")
+    || `<option disabled>no scores/*.json found</option>`;
+});
+
+// ---- render ----------------------------------------------------------------
+const LEGS = ["source", "record", "stage", "archive", "room"];
+function render() {
+  if (!ST) return;
+  const live = ST.phase === "live";
+  $("phase").textContent = ST.phase;
+  $("phase").className = "phase " + ST.phase;
+  $("runmeta").textContent = ST.runId
+    ? `${ST.runId} · ${ST.source}/${ST.audio}${ST.scoreTitle ? " · " + ST.scoreTitle : ""}` : "";
+  $("btnGo").disabled = live || ST.phase === "arming" || ST.phase === "stopping";
+  $("btnStop").disabled = !live;
+  $("btnCue").disabled = !live; $("cue").disabled = !live; $("btnScore").disabled = !live;
+  $("stage").disabled = !ST.stageConfigured && !live;
+  if (!ST.stageConfigured) $("stage").parentElement.lastElementChild.textContent =
+    "Stage leg (RTMPS) — no STAGE_RTMPS in .env";
+
+  $("lights").innerHTML = LEGS.map((n) => {
+    const l = ST.legs[n];
+    const cls = !l ? "" : (l.up ? "on" : "off");
+    return `<span class="light" title="${l && l.detail || l && l.why || "not started"}">
+              <i class="dot ${cls}"></i>${n}</span>`;
+  }).join("");
+
+  const h = ST.health || {};
+  $("aSegs").textContent = ST.spans || 0;
+  $("aUp").textContent = ST.uploader ? ST.uploader.segments : 0;
+  $("aLag").textContent = ST.uploader && ST.uploader.lastLagMs != null
+    ? (ST.uploader.lastLagMs / 1000).toFixed(1) + " s" : "—";
+  $("aDisk").textContent = h.residentBytes != null
+    ? `${(h.residentBytes / 1048576).toFixed(1)} MB / ${h.residentSegs} seg` : "—";
+  $("aT0").textContent = ST.T0 ? `${ST.T0}${ST.t0Exact ? "" : " (approx)"}` : "—";
+  $("aTTL").textContent = ST.T0 && ST.deck !== undefined && ST.elapsedMs
+    ? fmt(ST.elapsedMs) + " elapsed" : "—";
+
+  const d = ST.deck;
+  $("sCues").textContent = (ST.cues || []).length;
+  if (d) {
+    const deltas = d.drift.map((x) => Math.abs(x.deltaMs)).filter(Number.isFinite).sort((a, b) => a - b);
+    const q = (p) => deltas.length ? deltas[Math.min(deltas.length - 1, Math.floor(p * deltas.length))].toFixed(1) : "—";
+    $("sDrift").textContent = deltas.length ? `${q(.5)} / ${q(.95)} ms` : "—";
+    $("sArmed").textContent = `${d.audit.armed} / ${d.driftStats.retained} (${d.driftStats.total} total)`;
+    $("sHost").textContent = d.host + (ST.deckOffsetMs != null ? ` · offset ${ST.deckOffsetMs} ms` : "");
+    $("stripsrc").textContent = `deck.drift() n=${d.drift.length} · driftStats ${JSON.stringify(d.driftStats)}`;
+  } else { $("sDrift").textContent = $("sArmed").textContent = $("sHost").textContent = "—"; }
+
+  if (ST.replayUrl) { $("replay").href = ST.replayUrl; $("replay").classList.remove("hidden"); }
+  else $("replay").classList.add("hidden");
+  if (ST.error) log("engine error: " + ST.error, true);
+}
+const fmt = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+setInterval(() => {
+  $("clock").textContent = new Date().toISOString().slice(11, 19) +
+    (ST && ST.T0 && ST.phase === "live" ? `  ·  show ${fmt(Date.now() - ST.T0)}` : "");
+}, 250);
+
+// ---- the strip -------------------------------------------------------------
+// Minimal, drawn here: timeline/strip.mjs does not exist yet (a sibling owns
+// it). When it lands, delete this block and import the component — the data it
+// needs is exactly what is read below.
+const cv = $("strip"), cx = cv.getContext("2d");
+function drawStrip() {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx.clearRect(0, 0, W, H);
+  cx.fillStyle = "#080a0c"; cx.fillRect(0, 0, W, H);
+  if (!ST || !ST.T0) { cx.fillStyle = "#3a444f"; cx.font = "12px ui-monospace,monospace";
+    cx.fillText("idle — the strip lights when the deck does", 14, H / 2); return; }
+
+  const d = ST.deck;
+  const now = ST.phase === "live" ? Date.now() : (ST.T0 + (ST.elapsedMs || 0));
+  const armedAt = d ? d.audit.fires.map((f) => f.at) : [];
+  const t1 = Math.max(now + 12000, ...(armedAt.length ? [Math.max(...armedAt) + 6000] : []));
+  const t0 = ST.T0 - 2000;
+  const X = (t) => ((t - t0) / (t1 - t0)) * (W - 20) + 10;
+
+  // grid: 10 s ticks
+  cx.strokeStyle = "#141a20"; cx.fillStyle = "#39434e";
+  cx.font = "10px ui-monospace,monospace"; cx.lineWidth = 1;
+  for (let s = 0; ST.T0 + s * 1000 <= t1; s += 10) {
+    const x = Math.round(X(ST.T0 + s * 1000)) + .5;
+    cx.beginPath(); cx.moveTo(x, 16); cx.lineTo(x, H - 4); cx.stroke();
+    cx.fillText(`+${s}s`, x + 3, 12);
+  }
+
+  const LANE = { cue: 34, media: 104, health: 140 };
+  lane("cue", LANE.cue, 52); lane("media-span", LANE.media, 22); lane("health", LANE.health, 34);
+  function lane(name, y, h) {
+    cx.strokeStyle = "#161d24"; cx.beginPath();
+    cx.moveTo(10, y + h + .5); cx.lineTo(W - 10, y + h + .5); cx.stroke();
+    cx.fillStyle = "#4b5764"; cx.fillText(name, 12, y - 3);
+  }
+
+  // ---- media-span lane: one bar per CLOSED segment ------------------------
+  for (const r of rows) {
+    if (r.kind !== "media-span") continue;
+    const a = X(r.payload.at), b = X(r.payload.at + r.payload.durMs);
+    cx.fillStyle = "#2f6fae"; cx.fillRect(a, LANE.media, Math.max(1, b - a - 1), 22);
+  }
+
+  // ---- health lane: upload lag (bars) + fps (line) ------------------------
+  let prev = null;
+  for (const r of rows) {
+    if (r.kind !== "health") continue;
+    const x = X(r.payload.t);
+    if (r.payload.uploadLagMs != null) {
+      const hh = Math.min(34, (r.payload.uploadLagMs / 10000) * 34);
+      cx.fillStyle = "#6b7f92"; cx.fillRect(x, LANE.health + 34 - hh, 2, hh);
+    }
+    if (r.payload.fps != null) {
+      const y = LANE.health + 34 - Math.min(34, (r.payload.fps / 40) * 34);
+      cx.strokeStyle = "#3ecf8e88"; cx.beginPath();
+      if (prev) { cx.moveTo(prev[0], prev[1]); cx.lineTo(x, y); cx.stroke(); }
+      prev = [x, y];
+    }
+  }
+
+  // ---- cue lane: THE DRIFT CHANNEL ----------------------------------------
+  // audit() gives every scheduled item and its status; drift() gives the
+  // library's own record of when each one actually fired. Nothing here is
+  // derived from what this page clicked.
+  if (d) {
+    for (const f of d.audit.fires) {
+      const x = Math.round(X(f.at)) + .5;
+      const fired = f.fires > 0;
+      cx.strokeStyle = fired ? "#3ecf8e" : "#e8b44a";
+      cx.beginPath(); cx.moveTo(x, LANE.cue + (fired ? 12 : 0)); cx.lineTo(x, LANE.cue + 52); cx.stroke();
+      if (!fired) { cx.fillStyle = "#e8b44a"; cx.fillRect(x - 2, LANE.cue, 4, 4); }
+    }
+    for (const rec of d.drift) {
+      const at = rec.intendedUs != null ? rec.intendedUs / 1000 : null;
+      if (at == null) continue;
+      const x = X(at), mag = Math.min(24, Math.abs(rec.deltaMs) * 1.2);
+      cx.fillStyle = "#3ecf8e"; cx.fillRect(x - 1.5, LANE.cue + 52 - mag - 3, 3, mag + 3);
+    }
+    // playhead — the transport's own position, in wall ms
+    const px = Math.round(X(d.position)) + .5;
+    cx.strokeStyle = "#e2726e"; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.moveTo(px, 16); cx.lineTo(px, H - 4); cx.stroke(); cx.lineWidth = 1;
+  }
+}
+setInterval(drawStrip, 200);
+addEventListener("resize", drawStrip);
+connect();
+</script>
+</body>
+</html>

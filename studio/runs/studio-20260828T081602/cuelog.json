@@ -1,0 +1,33 @@
+{
+  "count": 2,
+  "cues": [
+    {
+      "from": "engine",
+      "cue": {
+        "id": "CUE-01",
+        "at": 1787904970956,
+        "sentAt": 1787904970959,
+        "data": {
+          "text": "CUE-01",
+          "mode": "scored"
+        },
+        "serverAt": 1787904971053
+      },
+      "doRecvTs": 1787904971053
+    },
+    {
+      "from": "engine",
+      "cue": {
+        "id": "CUE-02",
+        "at": 1787904979356,
+        "sentAt": 1787904979358,
+        "data": {
+          "text": "CUE-02",
+          "mode": "scored"
+        },
+        "serverAt": 1787904979448
+      },
+      "doRecvTs": 1787904979448
+    }
+  ]
+}

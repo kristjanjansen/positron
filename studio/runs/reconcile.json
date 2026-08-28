@@ -1,0 +1,94 @@
+{
+  "t": 1787905436786,
+  "results": [
+    {
+      "runId": "studio-20260828T081602",
+      "prefix": "shows/studio-20260828T081602",
+      "checks": [
+        {
+          "name": "playlist-in-r2",
+          "ok": true,
+          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081602/index.m3u8"
+        },
+        {
+          "name": "playlist-ended",
+          "ok": true,
+          "detail": "7 segments"
+        },
+        {
+          "name": "every-segment-present",
+          "ok": true,
+          "detail": "7/7, 5.5 MB"
+        },
+        {
+          "name": "sidecar-timeline.jsonl",
+          "ok": true
+        },
+        {
+          "name": "sidecar-timeline.idx.json",
+          "ok": true
+        },
+        {
+          "name": "sidecar-show.json",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "t": 1787905429904,
+      "segments": 7,
+      "bytes": 5804124,
+      "missing": []
+    },
+    {
+      "runId": "studio-20260828T081827",
+      "prefix": "shows/studio-20260828T081827",
+      "checks": [
+        {
+          "name": "playlist-in-r2",
+          "ok": true,
+          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/index.m3u8"
+        },
+        {
+          "name": "playlist-ended",
+          "ok": true,
+          "detail": "21 segments"
+        },
+        {
+          "name": "every-segment-present",
+          "ok": true,
+          "detail": "21/21, 17.8 MB"
+        },
+        {
+          "name": "sidecar-timeline.jsonl",
+          "ok": true
+        },
+        {
+          "name": "sidecar-timeline.idx.json",
+          "ok": true
+        },
+        {
+          "name": "sidecar-show.json",
+          "ok": true
+        }
+      ],
+      "ok": true,
+      "t": 1787905431404,
+      "segments": 21,
+      "bytes": 18667084,
+      "missing": []
+    },
+    {
+      "runId": "studio-20260828T081543",
+      "prefix": "shows/studio-20260828T081543",
+      "checks": [
+        {
+          "name": "playlist-in-r2",
+          "ok": false,
+          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081543/index.m3u8"
+        }
+      ],
+      "ok": false,
+      "t": 1787905436657
+    }
+  ]
+}

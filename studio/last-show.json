@@ -1,0 +1,109 @@
+{
+  "v": 1,
+  "runId": "studio-20260828T081602",
+  "room": "studio-20260828T081602",
+  "bucket": "elektron-archive-test",
+  "prefix": "shows/studio-20260828T081602",
+  "pubBase": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev",
+  "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081602/index.m3u8",
+  "timelineUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081602/timeline.jsonl",
+  "T0native": 1787904964656,
+  "t0Exact": true,
+  "tGoPressed": 1787904962202,
+  "tStop": 1787904990670,
+  "timeToLiveMs": 2454,
+  "durationMs": 26014,
+  "source": "page",
+  "audio": "silent",
+  "score": null,
+  "segments": 6,
+  "cues": 2,
+  "cueDriftMs": {
+    "n": 2,
+    "p50": 2.106,
+    "p95": 2.106,
+    "max": 2.106
+  },
+  "cueList": [
+    {
+      "id": "CUE-01",
+      "at": 1787904970956,
+      "sentAt": 1787904970959,
+      "lateMs": 3,
+      "label": null
+    },
+    {
+      "id": "CUE-02",
+      "at": 1787904979356,
+      "sentAt": 1787904979358,
+      "lateMs": 2,
+      "label": null
+    }
+  ],
+  "timeline": {
+    "rows": 45,
+    "pages": 1,
+    "indexBytes": 171
+  },
+  "uploader": {
+    "segments": 7,
+    "allVerified": true,
+    "degraded": false,
+    "lagMs": {
+      "p50": 3979,
+      "p95": 5189,
+      "min": 2567,
+      "max": 5189
+    },
+    "diskHighWater": {
+      "bytes": 1853933,
+      "segments": 2,
+      "samples": 38
+    },
+    "totalBytes": 5804422
+  },
+  "cuelogCount": 2,
+  "replay": {
+    "anchor": "stamp",
+    "t0": 1787904964656,
+    "url": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260828T081602%2Findex.m3u8&room=studio-20260828T081602&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1787904964656"
+  },
+  "reconcile": {
+    "prefix": "shows/studio-20260828T081602",
+    "checks": [
+      {
+        "name": "playlist-in-r2",
+        "ok": true,
+        "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081602/index.m3u8"
+      },
+      {
+        "name": "playlist-ended",
+        "ok": true,
+        "detail": "7 segments"
+      },
+      {
+        "name": "every-segment-present",
+        "ok": true,
+        "detail": "7/7, 5.5 MB"
+      },
+      {
+        "name": "sidecar-timeline.jsonl",
+        "ok": true
+      },
+      {
+        "name": "sidecar-timeline.idx.json",
+        "ok": true
+      },
+      {
+        "name": "sidecar-show.json",
+        "ok": true
+      }
+    ],
+    "ok": true,
+    "t": 1787905005051,
+    "segments": 7,
+    "bytes": 5804124,
+    "missing": []
+  },
+  "stopToReplayMs": 18290
+}
