@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>flipper — ERR remix station</title>
 <style>
   :root { color-scheme: dark; }
@@ -11,6 +12,26 @@
   .tile { position: relative; background: #000; cursor: pointer; }
   video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
   .tile.featured { outline: 2px solid #e33; }
+  /* PHONE: the desktop 3fr/1fr split makes the featured tile a tall portrait
+     black box and pushes the strip under Safari's toolbar. Stack instead, and
+     give every tile a real 16:9 box so video fills it. */
+  @media (max-width: 760px), (pointer: coarse) {
+    #stage { grid-template-columns: 1fr; grid-template-rows: auto auto;
+             height: auto; padding: 6px; gap: 6px; }
+    #featuredWrap { aspect-ratio: 16 / 9; width: 100%; }
+    #tiles { grid-template-rows: none;
+             grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+    .tile { aspect-ratio: 16 / 9; }
+    body { padding-bottom: calc(env(safe-area-inset-bottom) + 64px); }
+  }
+  /* iOS will not autoplay an UNMUTED video, so the featured tile (which is the
+     audio source) stays black forever. Everything starts muted; one tap arms
+     sound. */
+  #soundgate { position: fixed; inset: 0; display: none; place-items: center;
+    background: rgba(0,0,0,.72); z-index: 50; font: 600 16px/1.4 ui-monospace, monospace;
+    color: #e8edf2; text-align: center; padding: 24px; }
+  #soundgate.on { display: grid; }
+  #soundgate b { display: block; font-size: 22px; margin-bottom: 8px; }
   .tile.audiosrc::after { content: "AUDIO"; position: absolute; top: 4px; right: 4px; color: #3e3; font-size: 10px; }
   .label { position: absolute; top: 4px; left: 6px; color: #fff; text-shadow: 0 0 4px #000; z-index: 2; }
   .fc { position: absolute; bottom: 4px; right: 6px; color: #9ab; text-shadow: 0 0 4px #000; z-index: 2; font-size: 11px; }
@@ -20,7 +41,8 @@
   kbd { background: #223; padding: 0 4px; border-radius: 3px; color: #cde; }
 </style>
 
-<div id="stage">
+<div id="soundgate"><div><b>Tap for sound</b>Channels are playing muted —<br>iOS needs one tap before audio.</div></div>
+  <div id="stage">
   <div id="featuredWrap" class="tile featured"><span class="label" id="featLabel"></span><span class="fc" id="featFc"></span></div>
   <div id="tiles"></div>
 </div>
@@ -116,12 +138,27 @@ function flip(i, keydownTs) {
 }
 
 // --- SPLIT A/V ------------------------------------------------------------
+let soundArmed = false;
+function armSound() {
+  if (soundArmed) return;
+  soundArmed = true;
+  document.getElementById('soundgate').classList.remove('on');
+  for (const t of tiles) { try { t.el.play(); } catch {} }
+  try { applyAudio(); } catch {}
+}
+addEventListener('pointerdown', armSound, { once: true });
+addEventListener('keydown', armSound, { once: true });
+if (matchMedia('(pointer: coarse)').matches) {
+  addEventListener('load', () => document.getElementById('soundgate').classList.add('on'));
+}
 let audioMode = { type: 'featured' }; // {type:'featured'} | {type:'tv',i} | {type:'radio',key}
 const radioEl = new Audio(); radioEl.crossOrigin = null; radioEl.preload = 'none';
 let icyTimer = null;
 function applyAudio() {
   const audioTileIdx = audioMode.type === 'tv' ? audioMode.i : audioMode.type === 'featured' ? featured : -1;
-  tiles.forEach((t, i) => { t.el.muted = i !== audioTileIdx; });
+  // Until the user has tapped once, EVERY element stays muted or iOS refuses
+  // to start the unmuted one at all (the featured tile renders black).
+  tiles.forEach((t, i) => { t.el.muted = !soundArmed || i !== audioTileIdx; });
   document.querySelectorAll('.audiosrc').forEach((n) => n.classList.remove('audiosrc'));
   if (audioMode.type === 'radio') {
     const r = RADIO[audioMode.key];
