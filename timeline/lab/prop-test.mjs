@@ -713,6 +713,9 @@ function makePointerish() {
     caps: {
       continuous: true, interpolate: true, interpolators: ['hold', 'linear', 'catmull-rom'],
       neighbourhood: 1,                    // 0 = two-sample, 1 = one each side
+      tier: 1,                             // §5b: what I return BETWEEN samples is
+                                           // tier-1 restoration, and I say so —
+                                           // which is what arms the firewall (E3)
       method: 'catmull-rom', catchUp: 'reduce', assertOnSeek: true,
       seek: true, rate: true, rates: [0.25, 0.5, 1, 2, 4], followsTransport: true,
     },
@@ -747,7 +750,8 @@ function makePointerish() {
   return ad;
 }
 
-function makeContinuousDeck(vr, { stepMs = 100, jitterMs = 2, seed = 7 } = {}) {
+function makeContinuousDeck(vr, opts = {}) {
+  const { stepMs = 100, jitterMs = 2, seed = 7 } = opts;
   const rand = mulberry32(seed);
   const items = [];
   for (let t = 0; t <= DUR; t += stepMs) {
@@ -762,6 +766,10 @@ function makeContinuousDeck(vr, { stepMs = 100, jitterMs = 2, seed = 7 } = {}) {
       ...items, { at: 500, kind: 'd', payload: { v: 1 } }, { at: 2500, kind: 'd', payload: { v: 2 } },
     ],
     adapters: { p: ad, d: disc },
+    // E3: the deck-level policy every omitting query below resolves to. It is
+    // here BECAUSE `p` declares caps.tier 1 — without it every sampleAt in
+    // suite 5 would throw EVIDENCE_POLICY_REQUIRED, which is the point.
+    evidence: opts.evidence === undefined ? { restored: { maxTier: 1 } } : opts.evidence,
   });
   return { deck, ad, items };
 }
@@ -822,7 +830,7 @@ function makeContinuousDeck(vr, { stepMs = 100, jitterMs = 2, seed = 7 } = {}) {
     const items = [];
     for (let i = 0; i < n; i++) items.push({ at: i * 10, kind: 'p', payload: { x: i, y: -i, at: i * 10, i } });
     return createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, n * 10], items,
-      adapters: { p: makePointerish() } });
+      adapters: { p: makePointerish() }, evidence: { restored: { maxTier: 1 } } });
   };
   const deck = mkDeck(N);
   const cmps = () => deck.cursorStats('p').cursor.comparisons;
@@ -989,6 +997,194 @@ function makeContinuousDeck(vr, { stepMs = 100, jitterMs = 2, seed = 7 } = {}) {
   deck.dispose();
 }
 
+// ---------------------------------------------------------------------------
+// suite 6: THE EVIDENCE FIREWALL (v0.5, plan-timeline §5b). Interpolation is
+// not a rendering detail — it is tier 1 of a restoration spectrum, and a system
+// that serves restored material without saying so is lying by omission.
+//   6a  attested NEVER returns an interpolated value; restored(tier<=1) does
+//   6b  the FORCED-CHOICE rule fires when the policy is omitted, and only where
+//       the answer could actually differ
+//   6c  a reconstructor APPENDS a derived lane; provenance round-trips
+//   6d  a tier-2 lane is EXCLUDED at maxTier 1, not down-mixed
+//   6e  REVERSIBILITY: dropping a derived lane leaves the master bit-identical
+//   6f  tiers 2/3 are unimplemented BY DESIGN — the same seam, not the same code
+// ---------------------------------------------------------------------------
+
+// --- 6a: attested never interpolates; restored(<=1) does -------------------
+{
+  const vr = sharedVR();
+  const { deck, items } = makeContinuousDeck(vr);
+  const err = { attested: [], restored: [] };
+  let everInterpolated = false;
+  const attestedAt = new Set(items.map((it) => +it.at.toFixed(6)));
+  for (let t = 0; t <= DUR; t += 7.3) {
+    const truth = curveAt(t);
+    const a = deck.sampleAt('p', t, { evidence: 'attested' });
+    const r = deck.sampleAt('p', t, { evidence: { restored: { maxTier: 1 } } });
+    // THE CLAIM: every value 'attested' returns is a row that is IN THE LOG.
+    if (!attestedAt.has(+a.at.toFixed(6))) everInterpolated = true;
+    if (a.evidence === undefined || a.evidence.interpolated !== false) everInterpolated = true;
+    err.attested.push(Math.hypot(a.x - truth.x, a.y - truth.y));
+    err.restored.push(Math.hypot(r.x - truth.x, r.y - truth.y));
+  }
+  const mean = (xs) => xs.reduce((x, y) => x + y, 0) / xs.length;
+  const [ma, mr] = [mean(err.attested), mean(err.restored)];
+  check('ev-attested', 0, !everInterpolated,
+    'evidence:attested returned a value that is NOT an attested row — the firewall leaked');
+  check('ev-attested', 0, ma > mr * 100,
+    `attested must be the ZERO-ORDER answer and restored the interpolated one: ${ma.toFixed(3)} vs ${mr.toFixed(4)} px`);
+  if (VERBOSE) console.log(`ev-attested mean px error: attested(hold) ${ma.toFixed(3)} · restored(tier<=1) ${mr.toFixed(4)}`);
+  // and it is REPORTED, in the C6 shape, not silently held
+  const dg = deck.degradations('p');
+  const rep = dg.reports.find((x) => x.chose === 'attested-hold');
+  check('ev-attested', 1, rep && rep.degraded && rep.wanted === 'attested' && /tier-1 restoration/.test(rep.reason),
+    `an attested ask served by a hold must be a reported degradation: ${JSON.stringify(rep)}`);
+  // reduce() obeys the same firewall: no successor, so the reducer holds
+  const rr = deck.reduceAt('p', 1234.5, { evidence: 'attested' });
+  const ri = deck.reduceAt('p', 1234.5, { evidence: { restored: { maxTier: 1 } } });
+  check('ev-attested', 2, rr.method === 'hold' && ri.method === 'catmull-rom' && attestedAt.has(+rr.at.toFixed(6)),
+    `reduce under attested must hold (${rr.method}) and under restored must interpolate (${ri.method})`);
+  deck.dispose();
+}
+
+// --- 6b: the forced choice ------------------------------------------------
+{
+  const vr = sharedVR();
+  const { deck } = makeContinuousDeck(vr, { evidence: null });   // NO policy, on purpose
+  check('ev-forced', 0, deck.evidence() === null, 'a deck with no explicit policy must report none');
+  let code = null;
+  try { deck.sampleAt('p', 1234.5); } catch (e) { code = e.code; }
+  check('ev-forced', 0, code === 'EVIDENCE_POLICY_REQUIRED',
+    `sampleAt on a tier-declaring kind with no policy must THROW, got ${code}`);
+  code = null;
+  try { deck.reduceAt('p', 1234.5); } catch (e) { code = e.code; }
+  check('ev-forced', 1, code === 'EVIDENCE_POLICY_REQUIRED',
+    `reduce on a tier-declaring kind with no policy must THROW, got ${code}`);
+  // ...and ONLY where the answer could differ. These cannot invent, so they answer.
+  check('ev-forced', 2, deck.sampleAt('d', 1500).v === 1,
+    'a DISCRETE kind cannot interpolate, so its answer is identical under all three policies and must not throw');
+  check('ev-forced', 2, !!deck.bracket('p', 1234.5) && deck.window('p', 0, 300).length > 0,
+    'bracket()/window() over an ATTESTED lane return the same rows under every policy and must not throw');
+  // the per-call policy satisfies it, and so does an explicitly set deck policy
+  check('ev-forced', 3, !!deck.sampleAt('p', 1234.5, { evidence: 'all' }), 'a per-call policy must satisfy the rule');
+  deck.setEvidence({ restored: { maxTier: 1 } });
+  check('ev-forced', 3, deck.evidence().maxTier === 1 && !!deck.sampleAt('p', 1234.5),
+    'an EXPLICIT deck policy is what an omitting call resolves to');
+  let bad = null;
+  try { deck.sampleAt('p', 0, { evidence: true }); } catch (e) { bad = e.message; }
+  check('ev-forced', 4, bad && /unknown policy/.test(bad), `a bogus policy must be refused in words: ${bad}`);
+  deck.dispose();
+}
+
+// --- 6c/6d/6e: reconstructors, provenance, exclusion, reversibility --------
+{
+  const vr = sharedVR();
+  const { deck, items } = makeContinuousDeck(vr);
+  // the master trace, byte for byte, BEFORE any restoration exists
+  const masterBefore = JSON.stringify(deck.eventsOf('p'));
+  const auditBefore = JSON.stringify(deck.audit().fires.filter((f) => f.kind === 'p'));
+  check('ev-recon', 0, !JSON.parse(masterBefore).some((r) => 'provenance' in r),
+    'an attested row must carry NO provenance key at all — absence is the definition (E1)');
+
+  const rc = deck.registerReconstructor('catmull', {
+    from: 'p', tier: 1, method: 'catmull-rom', hz: 40,
+  });
+  const ran = rc.run();
+  check('ev-recon', 1, ran.emitted > 0 && ran.into === 'p~catmull',
+    `the tier-1 reconstructor must APPEND rows into its own lane: ${JSON.stringify(ran)}`);
+  check('ev-recon', 1, JSON.stringify(deck.eventsOf('p')) === masterBefore,
+    'APPEND-ONLY: running a reconstructor must not touch one byte of the master trace');
+
+  // provenance round-trips, and its refs point at REAL attested rows
+  const rows = deck.window('p~catmull', -Infinity, Infinity, { evidence: { restored: { maxTier: 1 } } });
+  const ids = new Set(deck.eventsOf('p').map((e) => e.id));
+  const p0 = rows[0].provenance;
+  check('ev-recon', 2, rows.length === ran.emitted && rows.every((r) => r.provenance),
+    `every row of a derived lane must carry provenance (${rows.length}/${ran.emitted})`);
+  check('ev-recon', 2, p0.source === 'reconstructor-catmull' && p0.method === 'catmull-rom' && p0.tier === 1 &&
+    typeof p0.confidence === 'number' && p0.from === 'p' && p0.refs.length === 2,
+    `provenance schema must round-trip {source, method, confidence, tier, refs, from}: ${JSON.stringify(p0)}`);
+  check('ev-recon', 2, rows.every((r) => r.provenance.refs.every((id) => ids.has(id))),
+    'refs must name the ATTESTED rows the restoration was derived from, and they must exist');
+  check('ev-recon', 2, rows.every((r) => r.provenance.confidence <= 1 && r.provenance.confidence >= 0),
+    'confidence must be a [0,1] number on every derived row');
+  // the accounting the tratteggio UI displays is the LIBRARY's, not the client's
+  const acct = deck.evidenceAccounting(['p', 'p~catmull']);
+  check('ev-recon', 3, acct.attested === items.length && acct.restored === ran.emitted &&
+    Math.abs(acct.inventedFraction - ran.emitted / (items.length + ran.emitted)) < 1e-12 &&
+    acct.byTier[1] === ran.emitted,
+    `evidenceAccounting must split attested/restored and give the invented fraction: ${JSON.stringify(acct)}`);
+
+  // the firewall over a DERIVED lane: attested excludes it entirely
+  const none = deck.window('p~catmull', -Infinity, Infinity, { evidence: 'attested' });
+  const dgd = deck.degradations('p~catmull');
+  check('ev-recon', 4, none.length === 0 && dgd.reports.some((r) => r.chose === 'excluded'),
+    `a tier-1 lane under 'attested' must be EXCLUDED and reported, not down-mixed: ${none.length} rows`);
+  check('ev-recon', 4, deck.sampleAt('p~catmull', 1234.5, { evidence: 'attested' }) === null,
+    'sampleAt on an excluded lane must answer null, never a quietly held value');
+
+  // 6d — a TIER-2 lane, and the cap that excludes it
+  const rc2 = deck.registerReconstructor('dream', {
+    from: 'p', tier: 2, method: 'inpaint-stub', confidence: 0.4,
+    hz: 10,
+    // tier >= 2 MUST bring its own derive() — the library implements tier 1 only
+    derive: (pos, ctx) => ({ x: ctx.a.x, y: ctx.a.y, at: pos, method: 'inpaint-stub' }),
+  });
+  const ran2 = rc2.run();
+  check('ev-tier', 0, ran2.emitted > 0 && deck.provenanceOf('p~dream').tier === 2,
+    `a tier-2 lane must register and record its tier: ${JSON.stringify(deck.provenanceOf('p~dream'))}`);
+  check('ev-tier', 1, deck.window('p~dream', -Infinity, Infinity, { evidence: { restored: { maxTier: 1 } } }).length === 0,
+    'a TIER-2 lane must be excluded when the query allows tier <= 1');
+  check('ev-tier', 1, deck.window('p~dream', -Infinity, Infinity, { evidence: { restored: { maxTier: 2 } } }).length === ran2.emitted,
+    'the same lane must be served in full when the query allows tier <= 2');
+  const dgD = deck.degradations('p~dream').reports.find((r) => r.chose === 'excluded');
+  check('ev-tier', 1, dgD && /tier-2/.test(dgD.reason) && /allows tier <= 1/.test(dgD.reason),
+    `the exclusion must say which tier and which cap: ${JSON.stringify(dgD)}`);
+  // a mixed window under maxTier 1 keeps tier-1 and drops tier-2 — one query
+  const mixed = deck.window(['p', 'p~catmull', 'p~dream'], -Infinity, Infinity, { evidence: { restored: { maxTier: 1 } } });
+  check('ev-tier', 2, mixed.length === items.length + ran.emitted &&
+    mixed.every((r, i, a) => i === 0 || a[i - 1].at <= r.at),
+    `a multi-lane window must merge in position order and drop only the over-tier lane (${mixed.length})`);
+
+  // 6f — tiers 2/3 are the same SEAM, not the same code, and the library says so
+  let refused = null;
+  try { deck.registerReconstructor('halluc', { from: 'p', tier: 3 }); } catch (e) { refused = e.message; }
+  check('ev-tier', 3, refused && /tier 3 must bring its own derive/.test(refused),
+    `a tier-3 registration with no derive() must be refused in words: ${refused}`);
+  let lane = null;
+  try { deck.registerReconstructor('selfish', { from: 'p', into: 'p', tier: 1 }); } catch (e) { lane = e.message; }
+  check('ev-tier', 3, lane && /never write into its own evidence lane/.test(lane),
+    `a reconstructor writing into its evidence lane must be refused: ${lane}`);
+  let purity = null;
+  try { deck.schedule({ at: 10, kind: 'p~catmull', payload: { x: 0, y: 0, at: 10 } }); } catch (e) { purity = e.message; }
+  check('ev-tier', 3, purity && /lane purity/.test(purity),
+    `an attested row appended to a derived lane must be refused: ${purity}`);
+  purity = null;
+  try { deck.schedule({ at: 10, kind: 'p', payload: { x: 0, y: 0, at: 10 }, provenance: { source: 'x', tier: 1 } }); } catch (e) { purity = e.message; }
+  check('ev-tier', 3, purity && /lane purity/.test(purity),
+    `a derived row appended to the MASTER trace must be refused: ${purity}`);
+
+  // 6e — REVERSIBILITY. Deleting a restoration is dropping its lane.
+  const dropped = rc.drop().dropped + rc2.drop().dropped;
+  check('ev-drop', 0, dropped === ran.emitted + ran2.emitted, `both lanes must drop in full (${dropped})`);
+  check('ev-drop', 0, JSON.stringify(deck.eventsOf('p')) === masterBefore,
+    'THE REVERSIBILITY CLAIM: after dropping every derived lane the master trace must be BIT-IDENTICAL');
+  check('ev-drop', 0, JSON.stringify(deck.audit().fires.filter((f) => f.kind === 'p')) === auditBefore,
+    'and so must its scheduler state — statuses, fire counts, order');
+  check('ev-drop', 1, deck.stats().derived === 0 && deck.stats().attested === deck.stats().total,
+    `the deck must be back to attested-only: ${JSON.stringify(deck.stats())}`);
+  check('ev-drop', 1, deck.window('p~catmull', -Infinity, Infinity, { evidence: 'all' }).length === 0,
+    'a dropped restoration must leave nothing behind');
+  // and re-running it reproduces the same rows: a restoration is a FUNCTION of
+  // the evidence, which is why dropping it loses nothing.
+  const again = rc.run();
+  check('ev-drop', 2, again.emitted === ran.emitted &&
+    JSON.stringify(deck.window('p~catmull', -Infinity, Infinity, { evidence: 'all' })) === JSON.stringify(rows),
+    'a re-run must reproduce the identical derived lane — the restoration is a function of the evidence');
+  check('ev-drop', 2, JSON.stringify(deck.eventsOf('p')) === masterBefore, 'and STILL not touch the master');
+  deck.dispose();
+}
+
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);
 if (failures) {
   console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams + nesting`);
@@ -997,4 +1193,5 @@ if (failures) {
 console.log(`prop-test OK: ${basicRuns} basic + ${gymRuns} gymnastics seeds, 0 violations (reduce(<=t) === play(0->t))`);
 console.log(`seams OK: adapter registry / setRate!=play / worker default / wall->audio bridge / whole-prefix reduce (${seamRuns} freeze seeds) / non-destructive drift`);
 console.log('nesting OK: nested seek (reduce-on-seek runs in the child) / rate composition incl. honest degradation / nested pause / absence outside the span / follow+master servo / cycle + depth rejection');
+console.log('evidence OK: attested never interpolates (and is reported when it holds) / restored(tier<=1) does / the forced-choice rule throws EVIDENCE_POLICY_REQUIRED exactly where the answer could differ / a reconstructor APPENDS a derived lane and provenance {source, method, confidence, tier, refs, from} round-trips / a tier-2 lane is EXCLUDED at maxTier 1 / dropping a derived lane leaves the master trace BIT-IDENTICAL and a re-run reproduces it');
 console.log('continuous OK: sampleAt vs analytic curve (hold > linear > catmull, C1 degrades to linear without a neighbourhood) / cursor O(1) forward + O(log n) on seek and random access / info.next makes an interpolated reduce expressible and it equals sampleAt / caps read + refusals reported / followsTransport (play,rate,pause; never seek, never sync) / logdeck at-clobber regression');

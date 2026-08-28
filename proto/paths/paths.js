@@ -8,10 +8,32 @@
 
 import { makeLogDeck } from '/timeline/logdeck.mjs';
 import { createCursor } from '/timeline/transport.mjs';
-import { makePointerAdapter, makeFlattener, deviations } from './pointer-adapter.js';
+import { makePointerAdapter, pxBudgetPlan, deviations } from './pointer-adapter.js';
 
 const STORE_MS = 100;                 // the lineage's stored-lane throttle
 const W = 1000, H = 620;
+const KIND = 'pointer';
+
+// plan-timeline §5b, the evidence firewall. The two policies this client moves
+// between; there is no third state and no implicit one — the library refuses to
+// answer a restoring query without one (EVIDENCE_POLICY_REQUIRED).
+const RESTORED_1 = { restored: { maxTier: 1 } };
+const ATTESTED = 'attested';
+
+// The two tier-1 reconstructors this client registers. Same seam, same plan,
+// different interpolator — which is the whole of §5b's "one mechanism".
+const RECON = [
+  { name: 'linear', lane: 'linear', method: 'linear', mode: 'linear', tier: 1 },
+  { name: 'catmull', lane: 'smooth', method: 'catmull-rom', mode: 'catmull', tier: 1 },
+];
+// TRATTEGGIO BY TIER: hatching is not hand-assigned per lane any more — it is a
+// function of the row's own declared tier, so a tier-2 lane would arrive hatched
+// differently without one line of styling being written for it.
+const HATCH = { 0: null, 1: [7, 4], 2: [3, 3], 3: [2, 6] };
+const BY_METHOD = {
+  linear: { color: '#ff3d8b', width: 6.5, alpha: 0.20, label: 'linear interp' },
+  'catmull-rom': { color: '#3fe0ff', width: 2.6, alpha: 0.60, label: 'Catmull-Rom' },
+};
 
 const $ = (id) => document.getElementById(id);
 const nowUs = () => Math.round((performance.timeOrigin + performance.now()) * 1000);
@@ -31,8 +53,9 @@ const S = {
   adapter: null,
   lane: [],            // position-domain payloads, index-aligned with stored[]
   evidencePos: [],     // evidence mapped into the position domain
-  flatLinear: null,
-  flatSmooth: null,
+  recon: {},           // name -> the library's reconstructor handle (v0.5 §5b)
+  rows: {},            // name -> the polyline the FIREWALL currently serves
+  policy: RESTORED_1,  // the evidence policy every query resolves to
   curEvidence: null,   // library cursor over the un-logged ground-truth lane
   ask: null,           // the deck's answer to what this client asked for (C6)
   dev: {},
@@ -48,12 +71,26 @@ const S = {
 
 const SHOW = { evidence: true, stored: true, linear: true, smooth: true };
 
+// stored/evidence are ATTESTED (tier 0, solid, never hatched); the two
+// reconstruction entries are FILLED IN AT BUILD from the library's own
+// provenance rollup — see specFor().
 const LANES = {
-  linear:   { color: '#ff3d8b', width: 6.5, alpha: 0.20, dash: null,   label: 'linear interp' },
-  smooth:   { color: '#3fe0ff', width: 2.6, alpha: 0.60, dash: [7, 4], label: 'Catmull-Rom' },
+  linear:   { ...BY_METHOD.linear, dash: null },
+  smooth:   { ...BY_METHOD['catmull-rom'], dash: HATCH[1] },
   stored:   { color: '#ffb020', width: 1.0, alpha: 0.35, dash: null,   label: 'stored (100 ms)' },
   evidence: { color: '#ffffff', width: 1.1, alpha: 0.95, dash: null,   label: 'evidence (full rate)' },
 };
+
+/** The lane's look, derived from the LIBRARY's provenance rather than a table
+ *  keyed by a name this client chose: colour/width from `method`, hatch from
+ *  `tier`. §5b's tratteggio principle with the styling wired to the data. */
+function specFor(kind) {
+  const p = S.deck.provenanceOf(kind) || { tier: 0, method: null };
+  const base = BY_METHOD[p.method] || BY_METHOD.linear;
+  return { ...base, dash: HATCH[p.tier] || null, tier: p.tier, method: p.method,
+           confidence: p.confidence, source: p.source,
+           label: `${base.label} · tier ${p.tier}` };
+}
 
 // ---------------------------------------------------------------------------
 // capture — the two lanes
@@ -112,7 +149,7 @@ function endCapture(ev) {
 
 function resetCapture() {
   S.evidence = []; S.stored = []; S.lastStoredUs = -Infinity;
-  S.flatLinear = S.flatSmooth = null; S.dev = {};
+  S.recon = {}; S.rows = {}; S.dev = {};
   S.live = { linear: null, smooth: null, evidence: null, fire: null };
   if (S.deck) { S.deck.dispose(); S.deck = null; }
 }
@@ -184,33 +221,47 @@ function build() {
   // position-domain `at` the library computed. The row goes in as it stands and
   // comes back as {x, y, pressure, at: posMs, atUs: the row's own stamp, i}.
   const deck = makeLogDeck({
-    lanes: [{ kind: 'pointer', rows: S.stored, adapter }],
+    lanes: [{ kind: KIND, rows: S.stored, adapter }],
     leadInMs: 250, tailMs: 250,
     onPosition: (pos, dur) => frame(pos, dur),
+    // §5b, THE FORCED CHOICE. The library will not answer a restoring query
+    // without a policy; this is where this client makes its one explicit
+    // declaration, and every omitting call below resolves to it.
+    evidence: S.policy,
   });
   S.deck = deck;
 
   // ASK, and be told (C6). Nothing here is a workaround: if the adapter could
   // not honour the ask, `S.ask.degraded` would say so, in words, on screen.
-  S.ask = deck.request('pointer', { continuous: true, interpolate: 'catmull-rom', neighbourhood: 1, seek: true });
+  S.ask = deck.request(KIND, { continuous: true, interpolate: 'catmull-rom', neighbourhood: 1, seek: true,
+                               evidence: RESTORED_1 });
 
   // The lane, read from the library's own per-kind ordered lane — for DRAWING
   // (the stored polyline and its dots) and for segment indexing. Interpolation
   // no longer needs it: that is deck.sampleAt's job.
-  S.lane = deck.eventsOf('pointer').map((e) => e.payload);
+  S.lane = deck.eventsOf(KIND).map((e) => e.payload);
 
   S.evidencePos = S.evidence.map((e) => ({ at: deck.toPos(e.at), x: e.x, y: e.y, pressure: e.pressure }));
   // the evidence lane is ground truth and deliberately NOT in the log, so it
   // gets the library's exported cursor rather than a second implementation.
   S.curEvidence = createCursor(S.evidencePos);
 
-  // Flattening asks the DECK for each subdivision point: one call, which
-  // brackets, gathers the neighbourhood and interpolates. u = 1 of segment k
-  // lands exactly on sample k+1, so segments still join exactly (FIX-4).
-  const posOf = (k, u) => S.lane[k].at + (S.lane[k + 1].at - S.lane[k].at) * u;
-  S.flatLinear = makeFlattener(S.lane, (k, u) => deck.sampleAt('pointer', posOf(k, u), { mode: 'linear' }));
-  S.flatSmooth = makeFlattener(S.lane, (k, u) => deck.sampleAt('pointer', posOf(k, u), { mode: 'catmull' }));
-  S.flatLinear.rebuildAll(); S.flatSmooth.rebuildAll();
+  // §5b's reconstructor-as-adapter, twice. Each READS the attested lane and
+  // APPENDS its own derived lane carrying {source, method, confidence, tier,
+  // refs}; the master trace is never touched, and dropping a lane deletes that
+  // restoration entirely. This client supplies only the two things that are its
+  // business — WHERE to invent (a pixel budget) and WHICH interpolator — and the
+  // library does the appending, the stamping and the accounting.
+  for (const r of RECON) {
+    S.recon[r.lane] = deck.registerReconstructor(r.name, {
+      from: KIND, tier: r.tier, method: r.method,
+      plan: pxBudgetPlan,
+      derive: (pos) => deck.sampleAt(KIND, pos, { mode: r.mode, evidence: RESTORED_1 }),
+    });
+    S.recon[r.lane].run();
+    LANES[r.lane] = specFor(S.recon[r.lane].into);
+  }
+  rebuildRows();
 
   S.dev = deviations(S.evidencePos, S.lane, deck);
   S.dur = deck.durationMs;
@@ -219,6 +270,29 @@ function build() {
   drawStatic();
   readout();
   return deck;
+}
+
+/** THE EVIDENCE-ONLY TOGGLE IS A LIBRARY QUERY. Every reconstruction polyline is
+ *  `window([evidence lane, derived lane])` under the current policy — so under
+ *  `attested` the library returns the attested rows alone and the lane is not
+ *  drawn at all. There is no client-side filtering left to get wrong: the
+ *  firewall decides what this client is even able to see. */
+function rebuildRows() {
+  for (const r of RECON) {
+    const h = S.recon[r.lane];
+    if (!h) { S.rows[r.lane] = []; continue; }
+    const rows = S.deck.window([KIND, h.into], -Infinity, Infinity, { evidence: S.policy });
+    // a "reconstruction" the firewall served with no restored row in it is not a
+    // reconstruction — it is the attested polyline, which the stored lane draws.
+    S.rows[r.lane] = rows.some((x) => x.provenance) ? rows.map((x) => x.payload) : [];
+  }
+}
+
+function setPolicy(p) {
+  S.policy = p;
+  S.deck && S.deck.setEvidence(p);     // the LIVE reads obey it too, not just the strokes
+  rebuildRows();
+  drawStatic(); drawCursors(); readout();
 }
 
 // ---------------------------------------------------------------------------
@@ -243,8 +317,7 @@ function strokePoly(ctx, pts, spec) {
 function paintLane(ctx, name, override) {
   const spec = override || LANES[name];
   if (name === 'evidence') return strokePoly(ctx, S.evidencePos, spec);
-  if (name === 'linear') return strokePoly(ctx, S.flatLinear ? S.flatLinear.flat() : [], spec);
-  if (name === 'smooth') return strokePoly(ctx, S.flatSmooth ? S.flatSmooth.flat() : [], spec);
+  if (name === 'linear' || name === 'smooth') return strokePoly(ctx, S.rows[name] || [], spec);
   if (name === 'stored') {
     strokePoly(ctx, S.lane, spec);
     ctx.save();
@@ -379,18 +452,29 @@ function readout() {
   $('dev').innerHTML = rows.map(([label, lane, d]) => d
     ? `<tr><td><i style="background:${LANES[lane].color}"></i>${label}</td><td>${f2(d.mean)}</td><td>${f2(d.p95)}</td><td>${f2(d.max)}</td></tr>`
     : '').join('');
-  const attested = S.lane.length;
-  const drawn = (S.flatSmooth ? S.flatSmooth.flat().length : 0);
+  // THE INVENTED FRACTION IS THE LIBRARY'S, NOT THIS CLIENT'S. It used to be
+  // (drawn - attested)/drawn over a private flattener array; it is now the
+  // evidence firewall's own accounting over the two lanes actually drawn, which
+  // means it counts what the policy would let you SEE and cannot drift from it.
+  const acct = S.deck ? S.deck.evidenceAccounting([KIND, S.recon.smooth ? S.recon.smooth.into : '']) : null;
+  const conf = S.deck && S.recon.smooth ? S.deck.provenanceOf(S.recon.smooth.into) : null;
   $('counts').innerHTML =
     `<div><b>${S.evidence.length}</b> evidence samples (full rate)</div>` +
-    `<div><b>${attested}</b> attested samples in the log (${STORE_MS} ms wall-clock throttle)</div>` +
-    `<div><b>${drawn}</b> points drawn on the Catmull-Rom lane → ` +
-    `<b>${drawn ? (100 * (drawn - attested) / drawn).toFixed(1) : '0'}%</b> of the rendered path is <i>invented</i></div>` +
+    `<div><b>${acct ? acct.attested : 0}</b> attested samples in the log (${STORE_MS} ms wall-clock throttle)</div>` +
+    `<div><b>${acct ? acct.total : 0}</b> points drawn on the Catmull-Rom lane → ` +
+    `<b>${acct ? (100 * acct.inventedFraction).toFixed(1) : '0'}%</b> of the rendered path is <i>invented</i>` +
+    `${acct && acct.restored ? ` (${acct.restored} derived rows, tier ${Object.keys(acct.byTier).join('/')}` +
+      `${conf && conf.confidence ? `, mean confidence ${conf.confidence.mean.toFixed(3)}` : ''})` : ''}</div>` +
+    `<div class="dim">evidence policy: <b>${S.deck && S.deck.evidence() ? S.deck.evidence().label : '–'}</b>` +
+    `${S.policy === ATTESTED ? ' — every derived lane is EXCLUDED by the library, not hidden by this page' : ''}</div>` +
     `<div class="dim">header: t0=${S.header ? S.header.t0Us : '–'} µs · duration=${S.header ? S.header.durationMs.toFixed(0) : '–'} ms · ${S.header ? S.header.source : '–'}</div>`;
-  $('caps').textContent = JSON.stringify(S.deck ? S.deck.caps('pointer') : {}, null, 1) +
+  $('caps').textContent = JSON.stringify(S.deck ? S.deck.caps(KIND) : {}, null, 1) +
     (S.ask ? `\n\nrequest -> ${S.ask.degraded ? 'DEGRADED' : 'granted in full'}\n` +
       Object.entries(S.ask.per).map(([k, v]) =>
-        ` ${k}: ${JSON.stringify(v.chose)}${v.degraded ? `  (wanted ${JSON.stringify(v.wanted)} — ${v.reason})` : ''}`).join('\n') : '');
+        ` ${k}: ${JSON.stringify(v.chose)}${v.degraded ? `  (wanted ${JSON.stringify(v.wanted)} — ${v.reason})` : ''}`).join('\n') : '') +
+    (S.deck ? `\n\nprovenance\n` + S.deck.provenanceOf().map((p) =>
+      ` ${p.kind}: ${p.attested} attested / ${p.restored} restored` +
+      `${p.restored ? ` · tier ${p.tier} · ${p.method} · ${p.source}` : ''}`).join('\n') : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -414,12 +498,14 @@ function wire() {
     const cb = $('t-' + name);
     cb.onchange = () => { SHOW[name] = cb.checked; drawStatic(); drawCursors(); };
   }
+  // §5b's evidence firewall, one button. It no longer hides two lanes this page
+  // drew anyway — it changes the DECK's evidence policy, and the library stops
+  // serving restored rows to anything: the strokes, the live cursor and the
+  // inset all fall back to what the log actually attests.
   $('evonly').onclick = () => {
-    const on = SHOW.linear || SHOW.smooth;
-    SHOW.linear = SHOW.smooth = !on;
-    for (const n of ['linear', 'smooth']) $('t-' + n).checked = SHOW[n];
+    const on = S.policy !== ATTESTED;
+    setPolicy(on ? ATTESTED : RESTORED_1);
     $('evonly').textContent = on ? 'show reconstructions' : 'evidence only';
-    drawStatic(); drawCursors();
   };
   const c = $('cursors');
   c.addEventListener('pointerdown', (e) => { c.setPointerCapture(e.pointerId); beginCapture(e); });
@@ -451,20 +537,27 @@ window.paths = {
   state() {
     return {
       evidence: S.evidence.length, stored: S.stored.length, laneItems: S.lane.length,
-      deckItems: S.deck ? S.deck.laneCount('pointer') : 0,
-      schedTotal: S.deck ? S.deck.stats().total : 0,
+      deckItems: S.deck ? S.deck.laneCount(KIND) : 0,
+      // stats().attested, not stats().total: the deck now also holds the derived
+      // lanes, and "my capture is intact" is a claim about the ATTESTED rows.
+      schedTotal: S.deck ? S.deck.stats().attested : 0,
+      schedDerived: S.deck ? S.deck.stats().derived : 0,
       durationMs: S.dur, pos: S.pos, rate: S.deck ? S.deck.rate() : null,
       playing: S.deck ? S.deck.playing() : false,
       fires: S.adapter ? S.adapter.fires : 0,
       reduceCalls: S.adapter ? S.adapter.reduceCalls : 0,
       interpCalls: S.adapter ? S.adapter.interpCalls : 0,
-      caps: S.deck ? S.deck.caps('pointer') : null,
+      caps: S.deck ? S.deck.caps(KIND) : null,
       ask: S.ask,
-      degradations: S.deck ? S.deck.degradations('pointer') : null,
-      cursor: S.deck ? S.deck.cursorStats('pointer') : null,
+      degradations: S.deck ? S.deck.degradations(KIND) : null,
+      cursor: S.deck ? S.deck.cursorStats(KIND) : null,
       dev: S.dev,
-      flatSmooth: S.flatSmooth ? S.flatSmooth.flat().length : 0,
-      flatLinear: S.flatLinear ? S.flatLinear.flat().length : 0,
+      flatSmooth: (S.rows.smooth || []).length,
+      flatLinear: (S.rows.linear || []).length,
+      // v0.5 the evidence firewall, as the harness sees it
+      policy: S.deck && S.deck.evidence() ? S.deck.evidence().label : null,
+      accounting: S.deck && S.recon.smooth ? S.deck.evidenceAccounting([KIND, S.recon.smooth.into]) : null,
+      provenance: S.deck ? S.deck.provenanceOf() : null,
       header: S.header,
       errors: S.errors.slice(),
       renderAtMs: S.perFrame.renderAt,
@@ -473,13 +566,21 @@ window.paths = {
   /** seek to pos, then compare the library's reduce() with analytic truth */
   seekProbe(pos) {
     S.deck.seek(pos);
-    const reduced = S.deck.reduceAt('pointer', pos);
+    // the policy is DECLARED here (not inherited): this probe measures the
+    // restored path's accuracy, so it asks for restoration explicitly and its
+    // numbers are independent of whatever the evidence toggle is showing.
+    const reduced = S.deck.reduceAt(KIND, pos, { evidence: RESTORED_1 });
     const truth = analyticAt(pos);
-    const hold = S.deck.sampleAt('pointer', pos, { mode: 'hold' });
-    const lin = S.deck.sampleAt('pointer', pos, { mode: 'linear' });
+    const hold = S.deck.sampleAt(KIND, pos, { mode: 'hold', evidence: RESTORED_1 });
+    const lin = S.deck.sampleAt(KIND, pos, { mode: 'linear', evidence: RESTORED_1 });
+    const attested = S.deck.sampleAt(KIND, pos, { evidence: ATTESTED });
     const err = (p) => (p && truth ? +Math.hypot(p.x - truth.x, p.y - truth.y).toFixed(3) : null);
     return {
       pos, truth, reduced, method: reduced && reduced.method,
+      // the firewall's answer at the same position: the last ATTESTED sample,
+      // plus the report saying so
+      errAttestedPx: err(attested), attestedReport: attested && attested.evidence,
+      attestedReduced: S.deck.reduceAt(KIND, pos, { evidence: ATTESTED }),
       errReducedPx: err(reduced), errHoldPx: err(hold), errLinearPx: err(lin),
       cursor: S.live.smooth, errCursorPx: err(S.live.smooth),
     };
@@ -524,6 +625,28 @@ window.paths = {
   },
   setMode(m) { S.adapter.mode = m; },
   show(name, on) { SHOW[name] = on; $('t-' + name).checked = on; drawStatic(); drawCursors(); },
+  /** the evidence firewall, as the harness drives it: 'attested' collapses every
+   *  derived lane at the LIBRARY, not here. */
+  setPolicy(p) { setPolicy(p === 'attested' ? ATTESTED : RESTORED_1); return S.deck.evidence(); },
+  /** what the firewall serves for one lane under one policy, without drawing */
+  probeWindow(laneName, p) {
+    const h = S.recon[laneName];
+    if (!h) return null;
+    const rows = S.deck.window([KIND, h.into], -Infinity, Infinity,
+      { evidence: p === 'attested' ? ATTESTED : RESTORED_1 });
+    return { n: rows.length, derived: rows.filter((r) => r.provenance).length,
+             prov: (rows.find((r) => r.provenance) || {}).provenance || null };
+  },
+  /** §5b reversibility, on demand: drop every restoration and compare */
+  dropRestorations() {
+    const before = JSON.stringify(S.deck.eventsOf(KIND));
+    const dropped = RECON.reduce((n, r) => n + S.recon[r.lane].drop().dropped, 0);
+    const identical = JSON.stringify(S.deck.eventsOf(KIND)) === before;
+    const stats = S.deck.stats();
+    for (const r of RECON) S.recon[r.lane].run();      // put them straight back
+    rebuildRows();
+    return { dropped, masterIdentical: identical, attestedAfterDrop: stats.attested, derivedAfterDrop: stats.derived };
+  },
 };
 
 wire();

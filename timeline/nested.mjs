@@ -7,7 +7,8 @@
 // scalar — so "a stored instrument session dropped into an arrangement beside a
 // 1965 broadcast" had no representation. It does now:
 //
-//     nest.add({ id, at, rate, deck })      // a nested/offset span
+//     nest.add({ id, at, rate, deck })                // a nested/offset span
+//     nest.add({ id, at, rate, deck, in, out })       // …QUOTING A FRAGMENT
 //
 // One transport drives another DECK's position instead of an element's
 // currentTime, through the SAME sync() contract. Everything below is the
@@ -57,6 +58,34 @@
 //    may not contain itself, nor any of its ancestors. Depth is capped at
 //    MAX_NEST_DEPTH (8 decks in a chain) — the limit exists because seek and
 //    assert recurse through the whole chain synchronously.
+//
+// 7. A SPAN QUOTES A FRAGMENT, NOT A WHOLE. `add({… in, out})` selects a
+//    sub-range of the CHILD's domain, and that is the whole point of the
+//    format: plan-timeline §−1 says a new work is a score that QUOTES archive
+//    timelines, and nobody quotes a whole broadcast. `in`/`out` default to the
+//    child's own `range`, so rule 1 is the special case `in = c0, out = c1`.
+//
+//    a. The span occupies `(out - in) / rate` of PARENT time.
+//    b. `in` IS the child's start for this span: entry seeks the child to `in`
+//       and asserts there, exactly as the whole-range case asserts at `c0`.
+//    c. `out` IS the child's end: past it the child is absent, parked and
+//       asserted at `out`.
+//    d. A parent seek anywhere inside maps to `in + (parentPos - at) * rate`,
+//       exactly (the same affine map, with a different origin).
+//    e. `in`/`out` outside the child's range CLAMP, and the clamp is REPORTED
+//       (`span.trim` / `nest.trim(id)` carries {wanted, chose, clamped,
+//       reason}) — never silently. A fragment entirely outside the range is a
+//       rejection, not a clamp to nothing.
+//    f. `in >= out` is rejected at `add()`.
+//    g. **TRIM DOES NOT MUTATE THE CHILD.** The fragment lives on the SPAN
+//       record; `deck.range` is untouched. That is what lets the SAME deck be
+//       quoted twice, at two different fragments, in one arrangement — the
+//       "timelines referencing timelines" case, and the thing trim is FOR. The
+//       consequence enforced below: a span that is ABSENT must not park or
+//       pause the child when a SIBLING quotation of that same deck is present
+//       (`otherPresentOn`), and two quotations of one deck may not OVERLAP in
+//       parent time — a deck has one position, so an overlap is not a trim
+//       problem but an arithmetic impossibility, and it is rejected at add().
 //
 // No timers live in here (the vector law): `servo()` is called by the client's
 // existing rAF/interval loop, exactly like the media servo every media client
@@ -128,9 +157,11 @@ export function composeRate(parentRate, spanRate, allowed) {
 // --- the nest ---------------------------------------------------------------
 
 /**
- * @param parent  a deck (createDeck / makeLogDeck). Give it an explicit
- *                `range` covering the nested spans — a deck's range is fixed at
- *                construction and nested items are scheduled afterwards.
+ * @param parent  a deck (createDeck / makeLogDeck). It must have a `range`
+ *                covering the nested spans. Either declare it at construction,
+ *                or — since transport v0.5 — call `parent.setRange('auto')`
+ *                after the last `nest.add()`: add() schedules the span's two
+ *                items, so the derived range already covers them.
  * @param kind    the parent-domain event kind for nested spans
  * @param toleranceMs  servo dead band, both directions (sync's toleranceMs)
  * @param hardSeekMs   follow mode: past this error, seek the child instead
@@ -146,8 +177,33 @@ export function createNest(parent, {
 
   const parentDurOf = (sp) => (sp.c1 - sp.c0) / sp.rate;
   const inSpan = (sp, pos) => pos >= sp.at - epsMs && pos <= sp.at + sp.parentDur + epsMs;
+  // rule 7d: the fragment map. c0 IS `in`, so this is the whole-range map with
+  // a different origin — and it stays exact because it is still one multiply.
   const toChild = (sp, pos) => Math.max(sp.c0, Math.min(sp.c1, sp.c0 + (pos - sp.at) * sp.rate));
   const toParent = (sp, cpos) => sp.at + (cpos - sp.c0) / sp.rate;
+
+  /** rule 7g: is some OTHER span quoting the SAME deck present right now? If so
+   *  this span's absence is not the child's absence, and must not touch it. */
+  const otherPresentOn = (sp, pos) => {
+    for (const [, o] of spans) if (o !== sp && o.deck === sp.deck && inSpan(o, pos)) return o;
+    return null;
+  };
+  /** distance from `pos` to a span's parent window (0 = inside) */
+  const distTo = (sp, pos) => (pos < sp.at ? sp.at - pos : Math.max(0, pos - (sp.at + sp.parentDur)));
+  /** rule 7g: when EVERY quotation of a deck is absent they would all want to
+   *  park it, at different edges, and the last writer would win at random. The
+   *  child parks at the edge of the quotation the playhead is NEAREST to (ties
+   *  go to insertion order) — deterministic, and the edge you actually left. */
+  const parksIt = (sp, pos) => {
+    const d = distTo(sp, pos);
+    for (const [, o] of spans) {
+      if (o === sp || o.deck !== sp.deck) continue;
+      const od = distTo(o, pos);
+      if (od < d) return false;
+      if (od === d && [...spans.values()].indexOf(o) < [...spans.values()].indexOf(sp)) return false;
+    }
+    return true;
+  };
 
   function applyRate(sp) {
     const r = composeRate(parent.targetRate(), sp.rate, sp.allowed);
@@ -163,13 +219,26 @@ export function createNest(parent, {
   function assertSpan(sp, parentPos, present) {
     const inside = present && inSpan(sp, parentPos);
     if (!inside) {
-      if (sp.deck.playing()) sp.deck.pause();
-      if (sp.present !== false) {
-        // leave through the boundary we actually left through, so the child's
-        // reducer asserts the edge state (a well-formed session: silence)
-        sp.deck.seek(parentPos < sp.at ? sp.c0 : sp.c1);
-        sp.present = false; sp.exits++;
+      // rule 7g: a sibling quotation of the same deck owns the child right now.
+      // Parking would drag it out from under the span that IS present.
+      if (otherPresentOn(sp, parentPos)) {
+        if (sp.present !== false) { sp.present = false; sp.exits++; }
+        return;
       }
+      if (sp.deck.playing()) sp.deck.pause();
+      // Leave through the boundary we actually left through, so the child's
+      // reducer asserts the edge state. With a fragment those boundaries are
+      // `in` and `out` (rule 7b/7c), not the deck's own ends.
+      //
+      // This used to be inside `if (sp.present !== false)` — i.e. it parked
+      // ONLY on the present -> absent transition. Fragments made the bug
+      // visible: play past a span (parked at `out`, present=false), then seek
+      // to BEFORE it, and the child stayed at `out` because the transition had
+      // already been spent. Absence is a POSITION, not an edge event, so the
+      // park is now driven by where the child actually is.
+      const park = parentPos < sp.at ? sp.c0 : sp.c1;
+      if (parksIt(sp, parentPos) && sp.deck.position() !== park) sp.deck.seek(park);
+      if (sp.present !== false) { sp.present = false; sp.exits++; }
       return;
     }
     applyRate(sp);
@@ -201,7 +270,10 @@ export function createNest(parent, {
     transport(st) {
       const pos = st.pos;
       for (const [, sp] of spans) {
-        if (!inSpan(sp, pos)) { if (sp.deck.playing()) sp.deck.pause(); continue; }
+        if (!inSpan(sp, pos)) {
+          if (!otherPresentOn(sp, pos) && sp.deck.playing()) sp.deck.pause();   // rule 7g
+          continue;
+        }
         const r = applyRate(sp);
         if (parent.playing() && r.chose > 0) sp.deck.play(); else sp.deck.pause();
       }
@@ -228,8 +300,18 @@ export function createNest(parent, {
   const nest = {
     kind, adapter, toleranceMs, hardSeekMs,
 
-    /** Add a nested/offset span. Throws on cycle / depth (rule 6). */
-    add({ id, at = 0, rate = 1, deck, master = false }) {
+    /** Add a nested/offset span, optionally QUOTING A FRAGMENT of the child
+     *  (`in`/`out`, rule 7). Throws on cycle / depth (rule 6), on `in >= out`,
+     *  on a fragment wholly outside the child's range, and on two quotations of
+     *  one deck overlapping in parent time.
+     *
+     *  @param opts {id, at, rate, deck, in, out, master}
+     *              `in`/`out` are positions in the CHILD's domain and default
+     *              to `deck.range` — the whole-range case is the default case.
+     */
+    add(opts = {}) {
+      const { at = 0, rate = 1, deck, master = false } = opts;
+      let { id } = opts;
       if (disposed) throw new Error('nest disposed');
       if (!deck || typeof deck.position !== 'function') throw new Error('nest.add needs a deck');
       if (!(rate > 0)) throw new Error('nest.add needs a positive span rate');
@@ -238,9 +320,42 @@ export function createNest(parent, {
       const chain = checkNestable(parent, deck);
       if (master && masterId !== null) throw new Error(`nested master already claimed by ${masterId}`);
 
-      const [c0, c1] = deck.range;
+      // --- rule 7: the fragment. The child is NEVER touched: everything below
+      // lands on the SPAN record, so one deck can carry many quotations. ------
+      const [d0, d1] = deck.range;
+      const isFrag = opts.in !== undefined || opts.out !== undefined;
+      const wantIn = opts.in === undefined ? d0 : +opts.in;
+      const wantOut = opts.out === undefined ? d1 : +opts.out;
+      if (!Number.isFinite(wantIn) || !Number.isFinite(wantOut))
+        throw new Error('nest.add: in/out must be finite positions in the child domain');
+      if (wantIn >= wantOut)                                              // 7f
+        throw new Error(`nest.add: in (${wantIn}) must be strictly before out (${wantOut})`);
+      const c0 = Math.max(d0, Math.min(d1, wantIn));                      // 7e
+      const c1 = Math.max(d0, Math.min(d1, wantOut));
+      const clamped = c0 !== wantIn || c1 !== wantOut;
+      if (!(c1 > c0))
+        throw new Error(`nest.add: fragment [${wantIn}, ${wantOut}] lies entirely outside the child's range [${d0}, ${d1}] — nothing to quote`);
+      const trim = {
+        fragment: isFrag, in: c0, out: c1, wanted: [wantIn, wantOut], chose: [c0, c1],
+        deckRange: [d0, d1], clamped, degraded: clamped,
+        childDurMs: c1 - c0, quotedFraction: +((c1 - c0) / (d1 - d0)).toFixed(6),
+        reason: clamped ? `in/out clamped to the child's range [${d0}, ${d1}]` : null,
+      };
+
+      // 7g: one deck has ONE position — two quotations of it may not be present
+      // at the same parent instant. That is arithmetic, not policy.
+      const parentDur = (c1 - c0) / rate;
+      for (const [oid, o] of spans) {
+        if (o.deck !== deck) continue;
+        if (at < o.at + o.parentDur - epsMs && o.at < at + parentDur - epsMs)
+          throw new Error(`nest.add: deck already quoted by span ${oid} over an OVERLAPPING parent window ` +
+            `([${o.at}, ${o.at + o.parentDur}] vs [${at}, ${at + parentDur}]) — a deck has one position; ` +
+            `quote non-overlapping fragments, or build a second deck to overlay`);
+      }
+
       const sp = {
         id, at, rate, deck, master: !!master, c0, c1, chain,
+        in: c0, out: c1, trim, deckRange: [d0, d1],
         parentDur: 0, present: null, enters: 0, exits: 0, degradations: 0,
         hardSeeks: 0, masterSuspended: 0, parentCorrections: [], childCorrections: [],
         allowed: rateLattice(deck), rateReport: null,
@@ -257,12 +372,14 @@ export function createNest(parent, {
 
       // one span, TWO items — a span is an interval, not an instant
       parent.schedule({ at, kind, id: `${kind}-${id}-in`,
-        payload: { ref: id, phase: 'enter', at, rate, parentDur: sp.parentDur, childRange: [c0, c1] } });
+        payload: { ref: id, phase: 'enter', at, rate, parentDur: sp.parentDur, childRange: [c0, c1],
+                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1] } });
       parent.schedule({ at: at + sp.parentDur, kind, id: `${kind}-${id}-out`,
-        payload: { ref: id, phase: 'exit', at, rate, parentDur: sp.parentDur, childRange: [c0, c1] } });
+        payload: { ref: id, phase: 'exit', at, rate, parentDur: sp.parentDur, childRange: [c0, c1],
+                   in: c0, out: c1, fragment: isFrag, deckRange: [d0, d1] } });
 
       applyRate(sp);
-      sp.deck.pause();
+      if (!otherPresentOn(sp, parent.position())) sp.deck.pause();   // rule 7g
       return sp;
     },
 
@@ -309,6 +426,12 @@ export function createNest(parent, {
     parentPos: (id, cpos) => { const sp = spans.get(id); return sp ? toParent(sp, cpos) : null; },
     present: (id) => { const sp = spans.get(id); return !!(sp && inSpan(sp, parent.position())); },
     rateReport: (id) => { const sp = spans.get(id); return sp ? sp.rateReport : null; },
+    /** rule 7: the quoted fragment [in, out] in the CHILD's domain, and the
+     *  honest report of any clamping that produced it. */
+    fragment: (id) => { const sp = spans.get(id); return sp ? [sp.c0, sp.c1] : null; },
+    trim: (id) => { const sp = spans.get(id); return sp ? sp.trim : null; },
+    /** every span quoting this deck — the "one timeline, many quotations" read */
+    quotationsOf: (deck) => [...spans.values()].filter((sp) => sp.deck === deck),
 
     /** rule 5: NESTED stats. The child's drift channel stays in the child's
      *  domain; the parent gets a table of spans, not an average. */
@@ -318,6 +441,7 @@ export function createNest(parent, {
         spans: [...spans.values()].map((sp) => ({
           id: sp.id, at: sp.at, rate: sp.rate, master: sp.master,
           parentDurMs: +sp.parentDur.toFixed(3), childRange: [sp.c0, sp.c1],
+          fragment: sp.trim.fragment ? [sp.c0, sp.c1] : null, deckRange: sp.deckRange, trim: sp.trim,
           present: sp.present, enters: sp.enters, exits: sp.exits,
           rate_composition: sp.rateReport, degradations: sp.degradations,
           hardSeeks: sp.hardSeeks, masterSuspended: sp.masterSuspended,
