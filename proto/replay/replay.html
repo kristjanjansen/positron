@@ -2,34 +2,79 @@
 <html>
 <head>
 <meta charset="utf-8">
+<!-- Without this a phone lays the page out at 980 CSS px and then scales it
+     down: every number in the HUD becomes unreadable and the 854 px video box
+     becomes a 340 px one. `viewport-fit=cover` lets the safe-area insets below
+     do their job on a notched device. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>elektron VOD replay + cues</title>
 <style>
-:root{--bg:#0d0f12;--panel:#14171c;--edge:#242a33;--ink:#cfd6df;--dim:#6b7683}
+:root{--bg:#0d0f12;--panel:#14171c;--edge:#242a33;--ink:#cfd6df;--dim:#6b7683;
+      --vidmax:854px}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:13px/1.45 monospace;margin:0;padding:12px}
+html{-webkit-text-size-adjust:100%}          /* iOS must not inflate our monospace */
+body{background:var(--bg);color:var(--ink);font:13px/1.45 monospace;margin:0;
+  padding:12px calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));
+  overflow-x:hidden}
 #wrap{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
-#vidbox{position:relative;width:854px}
-video{width:854px;height:480px;background:#000;display:block;border:1px solid var(--edge)}
-#overlay{position:absolute;left:0;right:0;bottom:64px;text-align:center;pointer-events:none}
-#overlay .cue{display:inline-block;padding:8px 26px;border-radius:6px;font-size:34px;font-weight:700;
+/* THE FIX THAT MATTERS: the box is fluid up to the desktop size it always had.
+   At >= 880 px this is byte-identical to `width:854px`, so the measured gate
+   (1300 x 620) sees exactly the layout it was calibrated on. */
+#vidbox{position:relative;width:100%;max-width:var(--vidmax);min-width:0}
+video{width:100%;max-width:var(--vidmax);aspect-ratio:16/9;height:auto;
+  background:#000;display:block;border:1px solid var(--edge)}
+/* the overlay is sized in cqw (a share of the VIDEO's own width), so a cue is
+   the same fraction of the picture on a 390 px phone as on a 854 px desktop.
+   It used to be 34 px absolute — a third of a phone screen. */
+#vidbox{container-type:inline-size}
+#overlay{position:absolute;left:0;right:0;bottom:8%;text-align:center;pointer-events:none;
+  padding:0 4%}
+#overlay .cue{display:inline-block;padding:clamp(4px,1cqw,8px) clamp(10px,3cqw,26px);
+  border-radius:6px;font-size:clamp(17px,4cqw,34px);font-weight:700;line-height:1.15;
+  max-width:100%;overflow-wrap:anywhere;
   background:rgba(0,0,0,.72);color:#e8b44a;border:2px solid #e8b44a}
 #overlay .cue.catchup{color:#8a93a0;border-color:#4d5661}
-#overlay .tag{display:block;font-size:11px;color:#8a93a0;margin-top:4px}
-#side{width:400px}
+#overlay .tag{display:block;font-size:clamp(9px,1.4cqw,11px);color:#8a93a0;margin-top:4px}
+#side{width:400px;max-width:100%;min-width:0;flex:1 1 320px}
 #hud,#cues{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:10px;margin-bottom:10px;
-  white-space:pre-wrap;font-size:11px;color:var(--dim)}
+  white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;color:var(--dim)}
+#cues{max-height:42vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #cues .fired{color:#57c973}
 #cues .catchup{color:#e8a44a}
 #cues .pending{color:#4d5661}
 h1{font-size:14px;margin:0 0 10px}
+/* TAP TO START — the iOS affordance. It is `hidden` by default and is only
+   ever revealed when vid.play() is REFUSED, so the headless gate (which runs
+   with autoplay allowed) never sees it. A refused play used to leave a black
+   rectangle and a HUD stuck on "loading": silent failure, the exact thing the
+   phone is worst at explaining. */
+#tapstart{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(6,8,11,.86);z-index:9;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#tapstart[data-on="1"]{display:flex}
+#tapstart .btn{min-height:64px;min-width:200px;padding:0 26px;display:flex;align-items:center;
+  justify-content:center;gap:10px;border:2px solid #e8b44a;border-radius:10px;color:#e8b44a;
+  background:rgba(0,0,0,.55);font:600 16px/1.2 monospace;text-align:center}
+#tapstart small{display:block;color:#8a93a0;font-weight:400;font-size:11px;margin-top:5px}
+#sound{position:absolute;right:8px;top:8px;z-index:8;min-height:44px;min-width:44px;
+  padding:0 12px;border-radius:8px;border:1px solid var(--edge);background:rgba(6,8,11,.72);
+  color:var(--ink);font:12px monospace;display:none;touch-action:manipulation}
+#sound[data-on="1"]{display:block}
 </style>
 </head>
 <body>
 <h1>elektron · synced VOD replay with cues</h1>
 <div id="wrap">
   <div id="vidbox">
-    <video id="vid" muted playsinline></video>
+    <!-- playsinline is MANDATORY on iOS: without it the video is torn out into
+         the system fullscreen player, which loses the overlay, the subtitle
+         track styling and (because the element is no longer composited into
+         the page) the burned-row decode this whole page is built on. -->
+    <video id="vid" muted playsinline webkit-playsinline disablepictureinpicture></video>
     <div id="overlay"></div>
+    <button id="sound" type="button" aria-label="turn sound on">🔇 sound</button>
+    <div id="tapstart" role="button" tabindex="0" aria-label="tap to start playback">
+      <div class="btn"><span>▶ tap to start<small id="tapwhy">this phone will not start video on its own</small></span></div>
+    </div>
   </div>
   <div id="side"><div id="hud">booting…</div><div id="cues"></div></div>
 </div>
@@ -116,6 +161,10 @@ const S = window.__state = {
   engineEvents: [],        // lane lifecycle: start / seek / resync-jump
   levels: null, level: null, cuesLoaded: 0, ended: false,
   hostName: null, playheadWall: null, syncCorrections: [], stalls: 0,
+  // which media path this device actually took, and what it costs — see
+  // startHls() below. Reported so a phone never fails silently.
+  media: null, mediaPath: null, degraded: [], gestureRequired: null,
+  gestureUnlocked: false, muted: true,
 };
 const vid = document.getElementById("vid");
 const hudEl = document.getElementById("hud");
@@ -178,12 +227,52 @@ async function loadCues() {
 }
 
 // ---- hls VOD ----------------------------------------------------------------
+// MEDIASOURCE, honestly. hls.js is Media Source Extensions and nothing else.
+// An iPhone has NO classic `MediaSource` at any iOS version; 17.1+ added
+// `ManagedMediaSource`, which is a different constructor with a different
+// contract. So on an iPhone the branch below is not an edge case, it is THE
+// case — and `reject("hls.js unsupported")` turned that into phase=failed and a
+// black rectangle. Safari plays HLS natively, so the correct degradation is to
+// hand the manifest straight to the element and SAY which path was taken.
+// What is genuinely lost on that path is on the record in S.degraded:
+//   · no rendition lock (hls.currentLevel) — the burned rows are calibrated at
+//     720p, so a lower rendition decodes as low-contrast and the CONTENT anchor
+//     cannot form. anchor=stamp still works; anchor=content will time out.
+//   · a cross-origin native-HLS video TAINTS a canvas on Safari, so
+//     getImageData() in decodeAt() throws — the burned-row cross-check is not
+//     available on iOS at all, with or without a rendition lock.
+function mediaCapabilities() {
+  return {
+    mse: typeof window.MediaSource !== "undefined",
+    managedMse: typeof window.ManagedMediaSource !== "undefined",
+    hlsjs: !!(window.Hls && window.Hls.isSupported()),
+    nativeHls: !!(vid.canPlayType("application/vnd.apple.mpegurl") ||
+                  vid.canPlayType("application/x-mpegURL")),
+  };
+}
+function startNativeHls() {
+  return new Promise((resolve, reject) => {
+    S.mediaPath = "native-hls";
+    S.degraded = ["no rendition lock (content anchor may not form — use anchor=stamp)",
+                  "cross-origin video taints the canvas: burned-row decode unavailable"];
+    vid.src = SRC;
+    vid.addEventListener("loadedmetadata", () => resolve(null), { once: true });
+    vid.addEventListener("error", () => reject(new Error("native hls load failed")), { once: true });
+    setTimeout(() => (vid.readyState >= 1 ? resolve(null) : reject(new Error("native hls timeout"))), 20000);
+  });
+}
 function startHls() {
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
     s.onload = () => {
-      if (!window.Hls || !Hls.isSupported()) return reject(new Error("hls.js unsupported"));
+      const caps = S.media = mediaCapabilities();
+      if (!caps.hlsjs) {
+        if (caps.nativeHls) return startNativeHls().then(resolve, reject);
+        return reject(new Error(
+          `no HLS path on this device: MediaSource=${caps.mse} ManagedMediaSource=${caps.managedMse} nativeHLS=false`));
+      }
+      S.mediaPath = "hls.js";
       const hls = new Hls();                    // plain VOD: no live logic needed
       hls.on(Hls.Events.MANIFEST_PARSED, (_e, d) => {
         let best = 0;                            // lock the top rendition: the
@@ -200,7 +289,13 @@ function startHls() {
       hls.loadSource(SRC);
       hls.attachMedia(vid);
     };
-    s.onerror = () => reject(new Error("hls.js cdn load failed"));
+    s.onerror = () => {
+      // the CDN being unreachable is not the same failure as MSE being absent,
+      // and on a phone the first is common (captive portal, content blocker)
+      S.media = mediaCapabilities();
+      if (S.media.nativeHls) return startNativeHls().then(resolve, reject);
+      reject(new Error("hls.js cdn load failed and no native HLS"));
+    };
     document.head.appendChild(s);
   });
 }
@@ -455,8 +550,55 @@ setInterval(() => {
     `lane ${S.hostName || "…"} tick · master=video · sync ${corr.length}` +
     (corr.length ? ` (last ${corr[corr.length - 1]} ms)` : "") + ` · stalls ${S.stalls}\n` +
     (S.rvfc.last ? `frame clock ${S.rvfc.last.clockMs} cueSeq ${S.rvfc.last.cueSeq}\n` : "") +
+    (S.mediaPath ? `media ${S.mediaPath}${S.media ? ` (MSE ${S.media.mse} · managed ${S.media.managedMse} · native ${S.media.nativeHls})` : ""}\n` : "") +
+    (S.degraded.length ? `DEGRADED · ${S.degraded.join(" · ")}\n` : "") +
     (S.error ? `ERROR ${S.error}` : "");
 }, 250);
+
+// ---- iOS: the user-gesture unlock ------------------------------------------
+// Two separate refusals, and conflating them is why a phone shows a black box:
+//   1. AUTOPLAY AT ALL — Safari refuses play() outside a user gesture unless the
+//      element is muted. We ship `muted`, so this usually succeeds; when it does
+//      not (Low Power Mode, "Auto-Play: Never" in Settings) play() REJECTS, and
+//      the only correct response is to ask, once, in a way a finger can answer.
+//   2. AUDIO — a muted element can be unmuted only from inside a gesture. That
+//      is a second, separate affordance and it is not the same button.
+// Everything below is inert when play() resolves, which is the headless case,
+// so `run-measure-archive.mjs` never sees any of it.
+const tapEl = document.getElementById("tapstart");
+const soundEl = document.getElementById("sound");
+
+function showTapToStart(why) {
+  S.phase = "needs-gesture";
+  S.gestureRequired = why || "play() refused";
+  document.getElementById("tapwhy").textContent =
+    "this phone will not start video on its own · " + S.gestureRequired;
+  tapEl.dataset.on = "1";
+  return new Promise((resolve) => {
+    const go = async () => {
+      try { await vid.play(); tapEl.dataset.on = "0"; S.gestureUnlocked = true; resolve(true); }
+      catch (e) { document.getElementById("tapwhy").textContent = "still refused: " + (e && e.name); }
+    };
+    tapEl.addEventListener("click", go);
+    tapEl.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") go(); });
+  });
+}
+
+async function startPlayback() {
+  try { await vid.play(); }
+  catch (e) { await showTapToStart(String((e && e.name) || e)); }
+  // sound is a SECOND gesture and is offered only once video is running: an
+  // unmute outside a gesture is refused silently on iOS, so it must be a button
+  // and never an automatic call.
+  soundEl.dataset.on = "1";
+  soundEl.onclick = () => {
+    vid.muted = !vid.muted;
+    if (!vid.muted) { vid.volume = 1; vid.play().catch(() => { vid.muted = true; }); }
+    soundEl.textContent = vid.muted ? "🔇 sound" : "🔊 sound";
+    soundEl.setAttribute("aria-label", vid.muted ? "turn sound on" : "turn sound off");
+    S.muted = vid.muted;
+  };
+}
 
 // ---- boot -------------------------------------------------------------------
 (async () => {
@@ -467,7 +609,7 @@ setInterval(() => {
     S.cuesLoaded = cues.length;
     await startHls();
     if (START_AT > 0) vid.currentTime = START_AT;
-    await vid.play();
+    await startPlayback();
     S.phase = "anchoring";
     // wait for the content anchor (or use the stamp directly)
     const tA = performance.now();

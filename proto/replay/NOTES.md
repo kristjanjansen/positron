@@ -224,3 +224,36 @@ margin.
 
 `__deckStats().mediaMaster` now exposes the helper's counters (syncs, jumps,
 stalls, corrections, and the laws it is running under).
+
+## Mobile (2026-08-28)
+
+The page had **no viewport meta**, so a phone laid it out at 980 CSS px and
+scaled down; `#vidbox`/`video` were hard-coded 854x480 and `#side` 400 px. All
+three are now fluid up to the same desktop sizes (`max-width: 854px`), so at
+>= 880 px the layout is byte-identical to what the measured gate was calibrated
+on — `run-measure-archive.mjs` (1300x620) still reports **7/7, p50 −4 / p95
+11 ms** with the anchor delta unchanged. The cue overlay was 34 px absolute (a
+third of a phone screen); it is now sized in `cqw` against `#vidbox`, so a cue
+is the same fraction of the picture at 390 px as at 854 px.
+
+Three iOS behaviours are now handled instead of failing silently — see
+`research/mobile-2026-08.md` §3:
+* **autoplay refusal** reveals a tap-to-start overlay (`#tapstart`), hidden
+  unless `vid.play()` actually rejects, so the headless gate never sees it;
+  sound is a **second, separate** button because unmuting outside a gesture is
+  refused too;
+* **`playsinline`** was already there (it has to be — the system player would
+  take the video away from the overlay *and* from the burned-row decode);
+  `webkit-playsinline` + `disablepictureinpicture` added;
+* **MediaSource**: hls.js is MSE and an iPhone has no classic `MediaSource` at
+  any version. `startHls()` used to `reject("hls.js unsupported")` there —
+  phase=failed, black rectangle. It now falls back to **native HLS** and
+  reports the path in `S.mediaPath`/`S.media` and the cost in `S.degraded`
+  (both in the HUD): no rendition lock, so the **content** anchor cannot form
+  (use `anchor=stamp`), and a cross-origin native-HLS video taints the canvas,
+  so `decodeAt()`'s `getImageData()` throws — the burned-row cross-check is
+  **not available on iOS at all**. That last one is a real capability loss, not
+  a bug to fix.
+
+Verified with `node timeline/lab/mobile-verify.mjs replay` — 9/9 at 390x844@3,
+844x390@3, 360x800@2, 800x360@2. Screenshot: `results/mobile/replay-390x844.png`.

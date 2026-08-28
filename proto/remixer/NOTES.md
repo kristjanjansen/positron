@@ -289,3 +289,39 @@ seeking before it left the child stuck at the wrong edge.
 one that filed it: a layer loading at runtime no longer needs the arrangement
 deck disposed and rebuilt. `compose.html` still declares `range: [0, ARR_END]`
 because its layout is static; `index.html` is the one that should adopt it.
+
+## Mobile (2026-08-28) — index.html
+
+No viewport meta, and `#main`'s `minmax(430px,1fr) minmax(520px,1.1fr)` grid
+declares a 950 px minimum, so on a phone it was not "cramped", it was a
+horizontal scrollbar. Now one column below 900 px, and a
+`@media (pointer: coarse)` block gives 44 px controls, a 44 px scrubber that
+takes a real **drag** (it was `onclick` only — one seek per lift and no scrub
+at all), and a 96 px year strip.
+
+**Marks are not controls.** A day tick is 2 px; there is no world in which each
+becomes a 44 px target without every tick in a month overlapping. Under coarse
+the marks get `pointer-events: none` (in CSS — a media query is live, a boolean
+read at render time is not, and that was a real bug here) and `#strip` gets one
+delegated hit-test picking the nearest item within 22 px. Same answer
+`timeline/strip.mjs` gives for a canvas tick.
+
+**Audio unlock.** iOS creates an AudioContext suspended, refuses `play()`
+outside a gesture, and — the one that actually bites this rack — the layer
+plays happen *after* `await resolvePlayable()`, i.e. in a later task, so they
+are not inside the gesture even when a finger started them. `unlockAudio()`
+runs on the first gesture of any kind (captured `pointerdown`/`touchend`/
+`keydown`): it resumes the context and **primes** every media element with a
+silent WAV (play → pause), which marks each element user-activated for the
+session. `#unlock` is the visible fallback if `resume()` still fails.
+
+**MediaSource, said out loud.** `attach()` already degraded correctly
+(`else L.el.src = src.url` — Safari plays HLS natively). What was missing was
+saying so: a silent fallback and a silent failure look identical. `#compat` now
+names it, and `window.__mediaReport()` reports `{mse, managed, hlsjs,
+nativeHls}`. Playback works on that path; per-layer buffer statistics and the
+rendition lock do not.
+
+`compose-run.mjs` still **20/20** (it drives `compose.html`, untouched).
+`node timeline/lab/mobile-verify.mjs remixer` — 9/9.
+Screenshot: `results/mobile/remixer-390x844.png`.

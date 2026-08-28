@@ -168,3 +168,36 @@ autotest-decades.png + autotest-1965.png (evidence), autotest-series.mjs +
 autotest-series-report.json + autotest-1965-series.png (query-tracks
 evidence), search-cache.jsonl + items-cache.jsonl (local politeness caches).
 proto/remixer/index.html gained the ?play= boot path (~25 lines).
+
+## Mobile (2026-08-28)
+
+No viewport meta ⇒ 980 px layout; `height: 100%` ⇒ the bottom of an `inset:0`
+app sat under Safari's URL bar; year labels were 29x17 tap targets; the panel
+was a 280 px column over a 360 px screen; and the hover card — with its 600 ms
+dwell-gated content fetch — was **unreachable with a finger**, while a tap went
+straight to opening a new tab.
+
+Fixed: `width=device-width` + `viewport-fit=cover`; `100dvh` plus
+`visualViewport` `resize`/`scroll` listeners (iOS changes the visible viewport
+*without* firing `resize` when the URL bar slides away); a 46 px ruler under
+`@media (pointer: coarse)` so a year is a 44 px target; the track panel becomes
+a bottom sheet that starts **closed**; and on a coarse pointer the first tap
+shows the card — with a real 44 px OPEN button in it — instead of navigating.
+Canvas `hitRects` are grown by 12 px of finger slop; double-tap-to-dive on the
+ruler is owned explicitly rather than left to Chrome's synthesized `dblclick`,
+which it declines to emit exactly when `touch-action: none` is in play.
+`#stage` **keeps** `touch-action: none` — correct here and only here, because
+this surface fills the viewport and has no page scroll to protect (the shared
+`timeline/strip.mjs`, which lives inside scrolling pages, declares `pan-y`).
+
+Every touch affordance is inside one `@media (pointer: coarse)` block, so a
+desktop mouse never sees a byte of it: `autotest.mjs` passes with all asserts
+green and **upstreamTotal = 0** (zero ERR calls). Two traps worth remembering:
+`const COARSE = matchMedia(...).matches` read once at boot is **wrong** (a
+listener re-applies it now — see `applyCoarse()`), and `applyCoarse()` must be
+called **last** in the module, because it reaches into `hideHover()` and a
+`let` further down is in its temporal dead zone — calling it early aborted the
+whole module and every symbol after the throw silently never existed.
+
+`node timeline/lab/mobile-verify.mjs megatimeline` — 11/11.
+Screenshot: `results/mobile/megatimeline-390x844.png`.

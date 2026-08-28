@@ -238,3 +238,48 @@ draw, and nobody told it about the quotation.
 * `sampleAt` on a *derived* lane has no adapter, so the continuous renderer's
   edge samples return null there and the polyline starts at the first visible
   row rather than the window edge. Cosmetic at any useful zoom.
+
+## 11. Touch (2026-08-28)
+
+`touch-action: pan-y` on the canvas is the whole contract: **the strip owns the
+horizontal axis and the pinch, the page keeps the vertical one.** A vertical
+swipe scrolls the page and the browser hands us a `pointercancel`, which is the
+right outcome and costs no code. Nothing here calls `preventDefault` on a touch
+stream. It was `none`, which is correct only for a surface that fills the
+viewport (`opts.touchAction: 'none'` for those — `proto/megatimeline` is one).
+
+Touch **defers**: press is first contact, so press-to-seek would make every
+touch a destructive seek before the user had said what they wanted. The gesture
+stays `undecided` until it passes the 10 px tap slop or the finger lifts —
+drag ⇒ pan, lift-without-drag ⇒ tap ⇒ seek. The playhead is the one exception
+(a press within `touchSlop` = 22 px of it scrubs), because it is a 1.5 px line.
+
+Pinch zooms about the **midpoint** — the same invariant `zoomAt()` keeps for a
+cursor, for two moving anchors instead of one fixed one, so a pinch that also
+slides pans for free. Measured drift of the time under the midpoint across a
+×3.33 zoom: **0.00 px**.
+
+Hover gets a **sticky** tap equivalent (a finger covers what it is describing),
+and `pointerleave` is ignored for touch pointers — for touch it fires the
+instant the finger lifts, which erased the tap tooltip one frame after it
+appeared.
+
+`hitTest(px, py, tolPx = 6)`: the hit geometry is identical on both inputs,
+only the radius differs. **Desktop precision is unchanged by definition, not by
+test** — `run-paths.mjs` is still 14/14 with seek 0.042/0.032/0.042 and
+deviation 24.19/0.679/0.0357.
+
+Also: the gutter clamps to 46 px below 520 px viewport width (the one piece of
+chrome that can shrink without moving a measured number); `globalThis.__strips`
+is a live registry spliced on `dispose()` (a harness cannot otherwise reach a
+strip a client keeps in a module closure — `proto/paths` does); `gesture()` and
+`hover()` are exposed so a headless harness can tell a pan from a pinch from a
+tap without reading pixels; and `gesturestart`/`gesturechange` are prevented
+because iOS Safari still ships its own pinch alongside the pointer stream.
+
+Bench + harness: `timeline/lab/strip-touch.html`,
+`node timeline/lab/mobile-verify.mjs strip` — **18/18**.
+**Open, for `proto/paths`' owner:** that page's CSS lays the strip canvas out
+at **2 px wide** at a 390 px viewport, so the component cannot be exercised
+there at all; the harness diagnoses it explicitly rather than blaming the
+component. Full account in `research/mobile-2026-08.md`.

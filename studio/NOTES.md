@@ -228,3 +228,22 @@ Nothing under `timeline/` or `proto/` was edited. The library is imported;
   lane).
 - **No seek/scrub on the live strip** — it is a monitor, not a transport.
 - **rate ≠ 1 on media, editing, nested quotation** — out of v0 by the plan.
+
+## Mobile (2026-08-28) — console.html
+
+Operator-facing and still desktop-first; this was the cheap pass only. It
+already had a viewport meta and did not overflow. Added, all inside
+`@media (pointer: coarse)` so a mouse never sees it: 48 px GO/STOP, 44 px
+inputs/selects at **16 px font** (iOS zooms the whole page in on focusing
+anything smaller and never zooms back), 44 px checkbox rows via the existing
+`<label for=…>`, and safe-area padding.
+
+One real bug found on the way: `fetch("/api/scores").then(r => r.json())` had
+no `.catch`, so opening the console **without the engine behind it** (a phone
+pointed at a static copy, a bookmark loaded before `node studio/engine.mjs` is
+up) threw an unhandled rejection that aborted the rest of that task — the score
+picker stayed empty and said nothing. It now degrades to
+`<option disabled>no engine — …</option>`.
+
+`node timeline/lab/mobile-verify.mjs console` — 9/9 at four device modes.
+Screenshot: `results/mobile/console-390x844.png`.
