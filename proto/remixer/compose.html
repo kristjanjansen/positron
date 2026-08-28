@@ -13,17 +13,9 @@
   button { background:#161a22; color:var(--fg); border:1px solid #2a3040; padding:3px 10px; font:inherit; cursor:pointer; }
   button.hot { background:#2a2010; border-color:#5a4a20; color:var(--nest); }
   #tbar { display:flex; gap:10px; align-items:center; padding:8px 12px; border-bottom:1px solid #1c2028; }
-  #arr { position:relative; height:150px; background:#0f1117; border:1px solid #1c2028; }
-  .lane { position:absolute; height:20px; border-radius:2px; }
-  .lane .lbl { position:absolute; left:5px; top:1px; font-size:10px; color:#04121a; letter-spacing:.1em; }
-  .arch { background:var(--au); }
-  #nestbox { position:absolute; border:1px solid var(--nest); background:rgba(255,212,121,.10); }
-  #nestbox .hdr { font-size:10px; letter-spacing:.14em; color:var(--nest); padding:1px 5px; }
-  #childlanes { position:absolute; left:0; right:0; top:16px; bottom:2px; }
-  .cnote { position:absolute; height:5px; background:var(--note); border-radius:1px; }
-  .cmedia { position:absolute; height:9px; background:#3a6f80; border-radius:2px; }
-  #ph { position:absolute; top:0; bottom:0; width:2px; background:#fff; z-index:5; }
-  #cph { position:absolute; top:0; bottom:0; width:3px; margin-left:-1px; background:var(--nest); box-shadow:0 0 8px 2px var(--nest); z-index:6; }
+  canvas.strip { display:block; width:100%; border:1px solid #1c2028; background:#0f1117; }
+  #arr { height:122px; } #child { height:78px; }
+  #stripread { font-size:10.5px; color:var(--dim); padding:4px 0 0; }
   #keys { display:flex; gap:2px; margin-top:8px; }
   #keys div { width:15px; height:34px; background:#161a22; border:1px solid #232936; border-radius:0 0 2px 2px; }
   #keys div.lit { background:var(--note); border-color:var(--note); }
@@ -49,8 +41,11 @@
 </div>
 
 <div class="box">
-  <h2>ARRANGEMENT (parent domain, ms) — click to seek</h2>
-  <div id="arr"><div id="ph"></div></div>
+  <h2>ARRANGEMENT (parent domain, ms) — drag to seek · shift-drag to pan · shift-wheel to zoom</h2>
+  <canvas id="arr" class="strip" height="122"></canvas>
+  <canvas id="child" class="strip" height="78" style="margin-top:6px"></canvas>
+  <div id="stripread"></div>
+  <div style="margin-top:6px"><button id="follow">follow: on</button> <button id="fitall">fit arrangement</button> <button id="fitnest">fit the session</button></div>
   <div id="keys"></div>
 </div>
 
@@ -88,6 +83,7 @@
 import { createDeck } from '/timeline/transport.mjs';
 import { makeLogDeck, pstats } from '/timeline/logdeck.mjs';
 import { createNest, nestedDrift } from '/timeline/nested.mjs';
+import { createStrip, spansOf } from '/timeline/strip.mjs';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -127,6 +123,17 @@ const ready = (el) => new Promise((res) => {
 // ============================================================================
 const CH = { deck: null, spans: {}, master: null, fires: { 'midi-actuated': 0, 'media-span': 0 },
              syncCalls: 0, syncCorrections: [], voices: new Set(), notes: [], mediaRestarts: 0 };
+
+// THE NOTE LANE, as a QUERY. Nothing in the MIDI log says `phase` — a note-on
+// and its note-off are two flat rows — so the LANE declares the pairing and the
+// strip's span machinery does the rest. This one declaration is both the
+// drawing and the source of CH.notes (see buildChild).
+const NOTE_LANE = {
+  id: 'notes', kind: 'midi-actuated', label: 'notes', height: 42, as: 'spans',
+  phase: (r) => { const [s, , v] = r.payload.raw; return ((s & 0xf0) === 0x90 && v > 0) ? 'enter' : 'exit'; },
+  group: (r) => r.payload.raw[1],
+  slots: 8, slotOf: (s) => (s.key - 60), labels: false, color: '#ff7ba9', allSkirt: false,
+};
 let ac = null, gain = null;
 try { ac = new (window.AudioContext || window.webkitAudioContext)(); gain = ac.createGain(); gain.gain.value = 0.12; gain.connect(ac.destination); ac.resume().catch(() => {}); } catch {}
 const OSC = new Map();
@@ -228,13 +235,13 @@ async function buildChild() {
       if (deck.playing() && u >= 0 && u <= sp.durMs) sp.el.play().catch(() => {}); else sp.el.pause();
     }
   });
-  // note intervals, for drawing and for choosing meaningful probe positions
-  const openN = new Map();
-  for (const r of masterRows) {
-    const [s, n, v] = r.raw, p = deck.toPos(r.at);
-    if ((s & 0xf0) === 0x90 && v > 0) openN.set(n, p);
-    else if (openN.has(n)) { CH.notes.push({ n, on: openN.get(n), off: p }); openN.delete(n); }
-  }
+  // Note intervals, for choosing meaningful probe positions. This used to be a
+  // six-line open-note map written here; it is the SAME pairing the strip does
+  // for its note lane, so it is one call to the component's own spansOf() over
+  // a deck query. One definition, two consumers.
+  CH.notes = spansOf(deck.window('midi-actuated'), NOTE_LANE)
+    .filter((s) => Number.isFinite(s.to))
+    .map((s) => ({ n: s.key, on: s.from, off: s.to }));
   deck.seek(deck.range[0]);
   return { deck, notes: masterRows.length, atUs, durMs, sessionRows: rows.length };
 }
@@ -364,39 +371,34 @@ function loop() {
 }
 
 // --- drawing ----------------------------------------------------------------
+// TWO STRIPS, ONE COMPONENT. The parent arrangement and the child session are
+// two decks, so they are two createStrip() calls over the same lanes-as-queries
+// shape — not two hand-drawn pictures. Everything the divs used to do (percent
+// of a hardcoded ARR_END, an absolutely positioned playhead, a nested box with
+// its own inner percent mapping) is gone; what arrives instead is a real time
+// axis with tick LOD, zoom, a dual cursor, hover detail, and — for the first
+// time — the QUOTATION span drawn, which the div version never showed at all.
+const STRIP = { arr: null, child: null };
 function drawArrangement() {
-  const arr = $('arr');
-  arr.querySelectorAll('.lane,#nestbox').forEach((n) => n.remove());
-  const pct = (ms) => (ms / ARR_END * 100).toFixed(3) + '%';
-  let row = 0;
-  for (const [tag, L] of PA.layers) {
-    const d = document.createElement('div');
-    d.className = 'lane arch';
-    d.style.left = pct(L.at); d.style.width = pct(L.durMs); d.style.top = (8 + row++ * 26) + 'px';
-    d.innerHTML = `<span class="lbl">${tag} · archive stand-in ${(L.durMs / 1000) | 0}s</span>`;
-    arr.insertBefore(d, $('ph'));
-  }
-  const sp = PA.nest.span('sess');
-  const box = document.createElement('div');
-  box.id = 'nestbox';
-  box.style.left = pct(sp.at); box.style.width = pct(sp.parentDur);
-  box.style.top = (8 + row * 26) + 'px'; box.style.height = '78px';
-  box.innerHTML = `<div class="hdr">NESTED DECK · instrument session · ${CH.notes.length} notes</div>
-                   <div id="childlanes"><div id="cph"></div></div>`;
-  arr.insertBefore(box, $('ph'));
-  const cl = $('childlanes'), [c0, c1] = CH.deck.range, cspan = c1 - c0;
-  const cp = (p) => ((p - c0) / cspan * 100).toFixed(3) + '%';
-  const m = CH.spans.audio;
-  const md = document.createElement('div');
-  md.className = 'cmedia'; md.style.left = cp(m.pos0); md.style.width = ((m.durMs / cspan) * 100).toFixed(3) + '%';
-  md.style.top = '2px'; cl.appendChild(md);
-  for (const nt of CH.notes) {
-    const d = document.createElement('div');
-    d.className = 'cnote';
-    d.style.left = cp(nt.on); d.style.width = Math.max(0.35, (nt.off - nt.on) / cspan * 100).toFixed(3) + '%';
-    d.style.top = (16 + ((nt.n - 60) % 8) * 5) + 'px';
-    cl.appendChild(d);
-  }
+  STRIP.arr = createStrip($('arr'), PA.deck, {
+    absolute: false, gutter: 96, hud: $('stripread'),
+    lanes: [
+      { id: 'archive', kind: 'media-span', label: 'archive', height: 40, color: '#4fb0c6',
+        labelOf: (s) => `${s.key} · archive stand-in ${((s.to - s.from) / 1000) | 0}s` },
+      // the nested SESSION and the QUOTATION are the same lane: both are
+      // `deck-span` items on the parent, so one query draws both.
+      { id: 'nested', kind: 'deck-span', label: 'nested decks', height: 34, color: '#ffd479',
+        labelOf: (s) => `${s.key}${s.row.payload.childRange ? ` · ${((s.row.payload.trim && s.row.payload.trim.chose ? s.row.payload.trim.chose[1] - s.row.payload.trim.chose[0] : s.to - s.from) / 1000).toFixed(1)}s of the session` : ''}` },
+    ],
+  });
+  STRIP.child = createStrip($('child'), CH.deck, {
+    absolute: false, gutter: 96,
+    lanes: [
+      { id: 'audio', kind: 'media-span', label: 'session audio', height: 24, color: '#3a6f80', labels: false },
+      NOTE_LANE,
+    ],
+  });
+  STRIP.child.fit();
   const kb = $('keys');
   kb.innerHTML = '';
   for (let n = 60; n <= 72; n++) { const d = document.createElement('div'); d.dataset.n = n; kb.appendChild(d); }
@@ -408,16 +410,11 @@ function paintKeys() {
 function paint() {
   const d = PA.deck; if (!d) return;
   const pos = d.position();
-  $('ph').style.left = (Math.max(0, Math.min(1, pos / ARR_END)) * 100).toFixed(3) + '%';
+  // both playheads are the strips' own, drawn from deck.position() every frame
   $('play').textContent = d.playing() ? '❚❚' : '▶';
   $('rate').textContent = d.targetRate().toFixed(2) + '×';
-  const present = PA.nest.present('sess');
-  const cph = $('cph');
-  if (cph) {
-    const [c0, c1] = CH.deck.range;
-    cph.style.display = present ? '' : 'none';
-    cph.style.left = (((CH.deck.position() - c0) / (c1 - c0)) * 100).toFixed(3) + '%';
-  }
+  const present = PA.nest.present('sess') || PA.nest.present('quote');
+  if (STRIP.child) $('child').style.opacity = present ? '1' : '0.35';
   $('read').textContent = `parent ${(pos / 1000).toFixed(2)}s · session ${present ? (CH.deck.position() / 1000).toFixed(2) + 's' : 'ABSENT'}`;
   const rr = PA.nest.rateReport('sess');
   $('hud').innerHTML = [
@@ -441,10 +438,11 @@ $('slow').onclick = () => PA.deck.setRate(Math.max(0.25, PA.deck.targetRate() / 
 $('fast').onclick = () => PA.deck.setRate(Math.min(4, PA.deck.targetRate() * 2));
 $('toNest').onclick = () => PA.deck.seek(NEST_AT + 9000);
 $('outside').onclick = () => PA.deck.seek(60000);
-$('arr').onclick = (e) => {
-  const r = $('arr').getBoundingClientRect();
-  PA.deck.seek((e.clientX - r.left) / r.width * ARR_END);
-};
+// seek, pan, zoom and hover are the strip's (control-is-the-display); all that
+// is left here is the follow control the strip refuses to fake.
+$('follow').onclick = () => { const on = !STRIP.arr.follow().on; STRIP.arr.setFollow(on); STRIP.child.setFollow(on); $('follow').textContent = `follow: ${on ? 'on' : 'off'}`; };
+$('fitall').onclick = () => STRIP.arr.fit(0, ARR_END);
+$('fitnest').onclick = () => STRIP.arr.fit(NEST_AT - 2000, NEST_AT + PA.nest.span('sess').parentDur + 2000);
 
 // ============================================================================
 // VERIFICATION — headless-drivable; the driver calls __compose.run()

@@ -33,7 +33,7 @@
     {
       "name": "the session PLAYS in its arrangement slot (notes fire, its own audio runs)",
       "ok": true,
-      "detail": "{\"parentS\":34.96,\"childS\":4.96,\"mapErrMs\":0,\"fires\":24,\"mediaCurrentTimeS\":4.674,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":0,\"childSpanFires\":1,\"innerSyncCalls\":570,\"innerCorrections\":1,\"outerCorrections\":1}"
+      "detail": "{\"parentS\":34.915,\"childS\":4.915,\"mapErrMs\":0,\"fires\":23,\"mediaCurrentTimeS\":4.663,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":0,\"childSpanFires\":1,\"innerSyncCalls\":570,\"innerCorrections\":2,\"outerCorrections\":2}"
     },
     {
       "name": "child position tracks the parent mapping while the CHILD masters",
@@ -58,17 +58,17 @@
     {
       "name": "rate 2x composes: parent AND nested child both advance ~2x wall, child media at 2.00x",
       "ok": true,
-      "detail": "{\"wallMs\":3002,\"parentAdvancedMs\":5956,\"childAdvancedMs\":5956,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":1.984,\"childRatio\":1.984}"
+      "detail": "{\"wallMs\":3007,\"parentAdvancedMs\":5972,\"childAdvancedMs\":5972,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":1.986,\"childRatio\":1.986}"
     },
     {
       "name": "a composed rate off the child lattice DEGRADES HONESTLY (chose it, said so, suspended mastering)",
       "ok": true,
-      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":301,\"childCorrections\":202,\"parentRatio\":1.5,\"childMapErrMs\":0.5,\"childAdvancedMs\":3751,\"wallMs\":2500,\"childMediaOffsetMs\":92}"
+      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":301,\"childCorrections\":206,\"parentRatio\":1.5,\"childMapErrMs\":4.3,\"childAdvancedMs\":3767,\"wallMs\":2508,\"childMediaOffsetMs\":231}"
     },
     {
       "name": "outside the span the session is ABSENT (silent, paused, frozen) while an archive layer keeps playing",
       "ok": true,
-      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.48,\"advancedMs\":2485},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.93,\"advancedMs\":0}],\"parentAdvancedMs\":2502}"
+      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.48,\"advancedMs\":2485},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.89,\"advancedMs\":0}],\"parentAdvancedMs\":2507}"
     },
     {
       "name": "drift NESTS: the child channel stays in the child domain",
@@ -262,18 +262,18 @@
     "back": "nested cycle: the child already contains this parent"
   },
   "playsInSlot": {
-    "parentS": 34.96,
-    "childS": 4.96,
+    "parentS": 34.915,
+    "childS": 4.915,
     "mapErrMs": 0,
-    "fires": 24,
-    "mediaCurrentTimeS": 4.674,
+    "fires": 23,
+    "mediaCurrentTimeS": 4.663,
     "mediaReadyState": 4,
     "mediaPaused": false,
     "mediaRestarts": 0,
     "childSpanFires": 1,
     "innerSyncCalls": 570,
-    "innerCorrections": 1,
-    "outerCorrections": 1
+    "innerCorrections": 2,
+    "outerCorrections": 2
   },
   "probeSummary": {
     "n": 14,
@@ -315,16 +315,16 @@
       }
     },
     "run": {
-      "wallMs": 3002,
-      "parentAdvancedMs": 5956,
-      "childAdvancedMs": 5956,
+      "wallMs": 3007,
+      "parentAdvancedMs": 5972,
+      "childAdvancedMs": 5972,
       "childMediaRate": 2,
       "archiveRates": [
         2,
         2
       ],
-      "parentRatio": 1.984,
-      "childRatio": 1.984
+      "parentRatio": 1.986,
+      "childRatio": 1.986
     },
     "degrade": {
       "wanted": 1.5,
@@ -354,12 +354,12 @@
       ],
       "childTarget": 2,
       "masterSuspended": 301,
-      "childCorrections": 202,
+      "childCorrections": 206,
       "parentRatio": 1.5,
-      "childMapErrMs": 0.5,
-      "childAdvancedMs": 3751,
-      "wallMs": 2500,
-      "childMediaOffsetMs": 92
+      "childMapErrMs": 4.3,
+      "childAdvancedMs": 3767,
+      "wallMs": 2508,
+      "childMediaOffsetMs": 231
     }
   },
   "absence": {
@@ -381,15 +381,15 @@
         "tag": "A2",
         "inSpan": false,
         "paused": true,
-        "ct": 36.93,
+        "ct": 36.89,
         "advancedMs": 0
       }
     ],
-    "parentAdvancedMs": 2502
+    "parentAdvancedMs": 2507
   },
   "drift": {
     "kind": "deck-span",
-    "servoTicks": 2353,
+    "servoTicks": 2355,
     "depth": 2,
     "spans": [
       {
@@ -429,6 +429,16 @@
           "quotedFraction": 1,
           "reason": null
         },
+        "marks": null,
+        "absent": {
+          "mode": "hold",
+          "kinds": [],
+          "degraded": [],
+          "park": 18644,
+          "reason": "absent"
+        },
+        "silences": 0,
+        "absentDegradations": 0,
         "present": true,
         "enters": 2,
         "exits": 2,
@@ -448,21 +458,21 @@
         "hardSeeks": 3,
         "masterSuspended": 301,
         "parentCorrections": {
-          "n": 2,
-          "p50": 47.14,
-          "p95": 47.14,
-          "min": 42.44,
-          "max": 47.14
+          "n": 6,
+          "p50": 43.05,
+          "p95": 48.79,
+          "min": 40.15,
+          "max": 48.79
         },
         "childCorrections": {
-          "n": 202,
-          "p50": 113.17,
-          "p95": 233.91,
-          "min": 40.59,
-          "max": 248.14
+          "n": 206,
+          "p50": 136.4,
+          "p95": 236,
+          "min": 40.54,
+          "max": 249.38
         },
         "child": {
-          "fires": 127,
+          "fires": 126,
           "range": [
             0,
             18644
@@ -474,17 +484,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 2.5,
-              "p95": 2.5,
-              "min": 2.5,
-              "max": 2.5
+              "p50": 1.5,
+              "p95": 1.5,
+              "min": 1.5,
+              "max": 1.5
             },
             "midi-actuated": {
-              "n": 126,
-              "p50": 3.6,
-              "p95": 8.18,
-              "min": -0.34,
-              "max": 9.13
+              "n": 125,
+              "p50": 4.21,
+              "p95": 8.15,
+              "min": -0.49,
+              "max": 35.52
             }
           }
         }
@@ -529,6 +539,16 @@
           "quotedFraction": 0.536366,
           "reason": null
         },
+        "marks": null,
+        "absent": {
+          "mode": "hold",
+          "kinds": [],
+          "degraded": [],
+          "park": 4322,
+          "reason": "absent"
+        },
+        "silences": 0,
+        "absentDegradations": 0,
         "present": false,
         "enters": 0,
         "exits": 1,
@@ -562,7 +582,7 @@
           "max": null
         },
         "child": {
-          "fires": 127,
+          "fires": 126,
           "range": [
             0,
             18644
@@ -574,17 +594,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 2.5,
-              "p95": 2.5,
-              "min": 2.5,
-              "max": 2.5
+              "p50": 1.5,
+              "p95": 1.5,
+              "min": 1.5,
+              "max": 1.5
             },
             "midi-actuated": {
-              "n": 126,
-              "p50": 3.6,
-              "p95": 8.18,
-              "min": -0.34,
-              "max": 9.13
+              "n": 125,
+              "p50": 4.21,
+              "p95": 8.15,
+              "min": -0.49,
+              "max": 35.52
             }
           }
         }
@@ -592,7 +612,7 @@
     ]
   },
   "childDrift": {
-    "fires": 127,
+    "fires": 126,
     "range": [
       0,
       18644
@@ -604,17 +624,17 @@
     "kinds": {
       "media-span": {
         "n": 1,
-        "p50": 2.5,
-        "p95": 2.5,
-        "min": 2.5,
-        "max": 2.5
+        "p50": 1.5,
+        "p95": 1.5,
+        "min": 1.5,
+        "max": 1.5
       },
       "midi-actuated": {
-        "n": 126,
-        "p50": 3.6,
-        "p95": 8.18,
-        "min": -0.34,
-        "max": 9.13
+        "n": 125,
+        "p50": 4.21,
+        "p95": 8.15,
+        "min": -0.49,
+        "max": 35.52
       }
     }
   },

@@ -1244,3 +1244,167 @@ Not built, deliberately. The reasoning, so the next session does not re-derive i
 4. **A canvas/frame sink for `renderDeck`.** `onFrame` gives the caller the hook;
    nothing yet turns 18 001 canvases into a file. That is the encode half, and
    it is WebCodecs `VideoEncoder` + a muxer, not more transport work.
+
+---
+
+## 7. A QUOTATION IS A VALUE — score.mjs, marks, provenance export, absentState
+### (2026-08-28; closes plan-timeline §7.7's "the actual C10 ask")
+
+**The seam that was open.** §5 C10 says the timeline is a TRACE format and a
+score is a PROGRAM that quotes traces. §7.7 named why that was unbuildable: a
+quotation was not a value. `nest.add()` mutated a nest, took a live object for
+its `deck`, and left nothing behind. You could BUILD an arrangement; you could
+not SAVE, mail, diff, or reload one.
+
+### 7a. `timeline/score.mjs` (new) — the value, and the round trip
+
+    refDeck(deck, 'kurenniemi-1972')            // identity: a string, not an object
+    quotation({ref, at, rate, in, out, master, provenance, meta})   // frozen value
+    score({id, quotations, meta})                                   // frozen value
+    nest.toScore({id, meta})  ->  score           // arrangement -> value
+    loadScore(score, resolve, {parent|nest})      // value -> arrangement
+
+`resolve(ref, q) -> deck` is the ONLY place a ref becomes an object, which is
+exactly what "a process that has never seen the decks" means. `nest.add()` takes
+either shape: the old `{deck, in, out}` opts (unchanged) or a quotation value.
+
+**The C10 proof is a trace comparison, not a vibe** (prop-nested suite 10).
+Build a 3-quotation arrangement over 2 decks by hand; `toScore` →
+`JSON.stringify`; in a FRESH virtual runtime with new decks, `loadScore` from the
+parsed JSON and a resolver; run both through a fixed 14-step script (seeks in and
+out of every span, plays across boundaries, scrubs backwards); record at each
+step the parent position, both children's positions, both held-note sets, both
+fire counts, the full ordered `firedAt` list, and every span's
+present/enters/exits. **The two traces compare equal as strings.** And
+`toScore(loadScore(x)) === x` byte-for-byte — the round trip is a fixed point.
+
+Deliberate refusals: a quotation with no `ref` is rejected (identity is not
+optional); `toScore()` on an unnamed deck throws rather than inventing an id;
+`loadScore` without a resolver throws ("without one a score is just bytes"); an
+unresolvable ref names every ref the score needed; an unknown score version is
+rejected, never guessed.
+
+### 7b. Marks — the seam that makes a score survive a RE-CUT of its source
+
+`in`/`out` gained an address type: a number (unchanged) or `{mark:'chorus-3',
+offset?}`, resolved at `add()` time against the child's own marks. A deck exposes
+marks three ways — a real lane of kind `mark` (native: a mark is an event, so it
+moves with a re-cut and shows up in `window()`), `deck.marks`, or
+`registerMarks()` for a deck you do not own.
+
+**The test that matters** (suite 11): write a score against a tape where
+`chorus-3` is at 900 ms, then re-cut the source (600 ms of restored leader
+spliced in front, so notes AND marks move). Reload the same JSON:
+
+- the mark-addressed quotation lands at 1500 and **opens on the same music**;
+- the number-addressed quotation lands at 900 and **opens on different music**
+  (asserted positively — if that ever passes trivially the test is dead);
+- `loadScore().report.movedMarks` says `chorus-3 900->1500, deltaMs 600`. A mark
+  that moved is REPORTED, never silently followed. The quotation carries `wasAt`
+  (what the mark resolved to when written) purely so this sentence can exist.
+
+### 7c. Provenance that survives the door — three carriers, validated
+
+`exportProvenance(deck|nest|score, {carrier})`. Every subject normalises to the
+same row — *a claim about a time range* — which is precisely what all three
+carriers can hold and what no shipping tool reads.
+
+- **C2PA-shaped**: `c2pa.actions.v2` with `Action.changes[]` region-maps,
+  `{type:'temporal', time:{type:'npt', start, end}}` (tstr, half-open, ends
+  exclusive by spec default — same as us and Media Fragments), `reviewRatings`
+  (int-range 1..5) on assertion metadata, IPTC `digitalSourceType` selected by
+  §5b tier (`digitalCapture` / `algorithmicallyEnhanced` /
+  `compositeWithTrainedAlgorithmicMedia`), and — §18.16.13, normative — a
+  `c2pa.ingredient.v3` per quotation whose `metadata.regionOfInterest` is the
+  portion of the SOURCE used. That sentence is the archival-quotation case
+  written down by a standards body.
+- **`EXT-X-DATERANGE`**: one tag per claim, `X-ORG-ELEKTRON-*` reverse-DNS client
+  attributes (RFC 8216 §4.3.2.7), off a required wall-clock `anchor` — an HLS
+  export with no anchor is REJECTED, because START-DATE is not a media offset.
+  hls.js surfaces these as metadata cues today (`enableDateRangeMetadataCues`),
+  which makes this the only carrier of the three with a shipping reader and the
+  weakest one (no signature, anyone can edit a playlist).
+- **OTIO-shaped**: `Clip.2` + `source_range` in the source's domain at
+  `RationalTime` rate **1000 (ms)** — OTIO issue #468's 23.976→29.97 rounding
+  class is one we never enter — `LinearTimeWarp.1` for rate≠1, `Marker.2` per
+  resolved mark, `Gap.1` between quotations, and the whole quotation under a
+  namespaced `metadata` dict. The only carrier that loses NOTHING and the only
+  one that acts on nothing.
+
+`validateProvenance(doc, carrier)` checks against PUBLISHED field names (action
+fields, region-map/range-map/npt-time-map fields, the Role and review-code
+vocabularies, rating value 1..5; HLS attribute grammar and the ID/START-DATE
+requirements; OTIO schema names, clip fields, namespaced metadata). Each carrier
+has a **negative control** in the suite: a misspelled `type:'time'`, a rating of
+7, a tag with no ID, a non-namespaced OTIO metadata key — all must FAIL.
+
+**TEI's `@locus` is in the model and only one carrier survives it.** A quotation
+carries `provenance.certainty: [{locus, cert, resp, note, widthMs}]` with `locus
+∈ name|start|end|location|value` — the only vocabulary anywhere that separates
+uncertainty about the BOUNDARY from uncertainty about the IDENTITY ("0.95 that
+this is the Kurenniemi segment, 0.5 on where it starts"). C2PA has exactly one
+confidence field and no way to say which part of a claim it qualifies, so a
+boundary certainty is exported as its OWN `c2pa.areaOfInterest` region widened by
+`widthMs` — the lossy mapping made visible instead of dropped — and the
+unquantised original rides along under `parameters["org.elektron.timeline"]`.
+
+**What a real implementation needs, stated in the export itself** (every doc
+carries a `caveats` array): signing (a c2pa Builder — `@contentauth/c2pa-web`
+WASM or `@trustnxt/c2pa-ts` for pure-TS MP4 — a `c2pa.hash.bmff.v3` hard binding
+over the fMP4 we already ship, a COSE signature, a cert on a recognised trust
+list); and the fact that **no ecosystem tool can currently READ a temporal ROI**
+— verify-site has zero `temporal` code paths, conformance-public never tests
+`regionOfInterest`, the only c2pa-rs fixture emits an EMPTY time map, and
+Premiere's exported credential collapses to per-clip. Emitting these puts us
+first and alone.
+
+### 7d. `caps.absentState` / `silence()` — the cheap seam, closed
+
+Rule 7b/c parks an absent child at its fragment edge and ASSERTS there, so a
+quotation whose `out` cuts a held note sat on that note for the whole absence. An
+adapter may now declare `caps.absentState: 'silence'` and implement
+`silence({kind, deck, pos, reason, span, in, out})`. The nest calls it after the
+park and **learns nothing about what a note is**. Default `'hold'` — unchanged,
+and the right answer for a video frame.
+
+Once per park position (staying absent does not re-fire; leaving through the
+other edge does). Re-entry needs no help: the ordinary seek→reduce→assertState
+restores the state. Declaring `'silence'` with no `silence()` is a reported
+DEGRADATION (`nest.absent(id).degraded`, `driftStats().spans[].absentDegradations`)
+falling back to hold, never to a guess; an unknown mode likewise.
+
+**⚠ SEAM LEFT OPEN (transport.mjs is a sibling's this cycle).** The nest reaches
+adapters through `deck.adapters`, the constructor-registered map. An adapter
+registered LATER via `deck.sched.registerAdapter()` lives in the scheduler's
+private map and cannot be reached — it is reported as `unreachable` rather than
+skipped. **The hook transport.mjs should grow: `sched.adapter(kind)`, or better a
+`deck.silence(info)` that fans out internally.** Then nested.mjs deletes its
+`adaptersOf()` and the caveat with it.
+
+### 7e. What "timelines referencing timelines" STILL lacks
+
+1. **A score cannot quote a SCORE.** `ref` resolves to a deck. Quoting another
+   score means materialising it into a deck first, by hand, outside the format.
+   The recursion the phrase promises is one level deep.
+2. **Overlapping quotations of one deck are still rejected**, not solved. A deck
+   has one position; a canon over one tape needs an INSTANCING seam (clone the
+   deck's lanes into a lightweight view) and there is none.
+3. **No content hash.** `ref` is a name. Nothing detects that `tape-A` on the
+   other side is a different transfer of the same work — the marks moved and we
+   reported it, but we cannot say the BYTES changed. C2PA's hard binding is the
+   obvious borrow and it needs the asset, which a score does not have.
+4. **Marks are addresses, not a lane the strip draws.** Resolution is at load;
+   nothing re-resolves if a mark moves while loaded.
+5. **A score has no ORDER semantics beyond `at`.** No conditionals, no repeats,
+   no tempo map — it is a flat list of placements. §5 C10 says a score is a
+   program; this one has no control flow.
+6. **The export is one-way.** We emit C2PA/HLS/OTIO and read none of them back.
+   An OTIO import would be the cheapest (the namespaced metadata round-trips
+   verbatim) and would make the format an interchange rather than a door.
+
+### 7f. Run
+
+    node timeline/lab/prop-nested.mjs        # 228 checks, 0 violations
+    node timeline/lab/prop-test.mjs --seeds 30    # green
+    node timeline/lab/prop-test.mjs --seeds 100   # green
+    node proto/remixer/compose-run.mjs            # 20/20, 0 console errors

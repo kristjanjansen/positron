@@ -100,6 +100,59 @@
 // sampleAt already is, appended as rows). Tiers 2 and 3 are UNIMPLEMENTED BY
 // DESIGN — they are the same seam, not the same code: a tier ≥ 2 registration
 // must bring its own derive(), and the library refuses to guess one.
+//
+// v0.6 — UNCERTAINTY AS POSITION (plan-timeline §7.4, §−1's founding ask: "a
+// smear, not a fake instant"; research/spatiotemporal-uncertainty-2026-08.md).
+// `at` does NOT become a distribution. It stays one scalar, and every hot loop
+// (insertInto, afterIdx, createCursor's bsearch, scan's `ev.at > horizonPos`
+// early exit, reconcile) is byte-for-byte unchanged. Four things close it:
+//   U1. THE ROW SHAPE. One optional frozen sibling `when = {verbatim, edtf,
+//       earliest, latest, innerFrom, innerTo, rule, kind, note}` (§8.1).
+//       ABSENCE OF `when` IS THE CRISP FAST PATH — exactly as absence of
+//       `provenance` is the definition of attested. TWO ABSENCES, TWO AXES:
+//       an uncertain ATTESTED row is tier 0 with a wide bracket, a precise
+//       RESTORED row is tier 1 with no bracket at all, and neither restriction
+//       may imply the other. `when` is normalized and FROZEN PER ROW, never
+//       interned (CRM: one shared Time-Span asserts simultaneity).
+//   U2. THE FIRING RULE: `at = when.earliest`, ALWAYS, resolved ONCE at ingest
+//       by a VERSIONED NAMED RULE recorded on the row (DarwinCore's
+//       `georeferenceProtocol`). It is one-sided sound — `earliest <= true
+//       position` is a theorem, not an estimate — and it gives the existing
+//       `ev.at <= pos` a true semantics: "POSSIBLY already occurred by pos",
+//       the *possible* half of Allen, for free. The anchoring is REPORTED, not
+//       silent: degradations() gains a fourth literal, 'anchored'.
+//   U3. THE QUERY KNOB. window(kind, a, b, {certainty:'possible'|'necessary'}).
+//       possible = the bracket OVERLAPS the range (Postgres &&); necessary =
+//       the range CONTAINS the row's certain extent — the INNER bracket
+//       (Y @> cert), because `Y @> outer` under-reports. Unlike the evidence
+//       policy this knob DEFAULTS rather than throws: silence here
+//       over-includes, it does not fabricate. Where 'necessary' genuinely
+//       cannot be decided (no inner bracket, outer not contained) the row is
+//       excluded AND the undecidability is reported ('unanswerable').
+//   U4. positionAccounting(kind?) — the position-axis twin of
+//       evidenceAccounting(), reported BY RULE, so "43 % of this lane is
+//       positioned by a padding artefact" is a number someone can see (NSSDA's
+//       discipline: publish the accuracy statement or declare it untested).
+// Also closed here, because they degraded QUIETLY and caps exist to prevent
+// exactly that:
+//   U5. caps.series(payload) — bracketing used to group by KIND, so a
+//       multi-controller lane's "straddling pair" could be two different
+//       controllers. sampleAt/bracket now ride a PER-SERIES sub-lane when the
+//       adapter declares one, and an omitted {series} on a lane that declares
+//       caps.series is reported instead of silently answering nonsense.
+//   U6. TWO-PHASE SEEK — JACK's slow-sync barrier. Opt-in per adapter
+//       (caps.slowSync), non-blocking (the locate happens immediately; only
+//       ROLLING waits), FAIL-OPEN on timeout (laggards catch up, and the
+//       timeout is on the record), re-armed by a locate mid-roll, and carrying
+//       Ardour's LocateTransportDisposition {MustRoll, MustStop,
+//       RollIfAppropriate} in the seek request.
+// DEFERRED, explicitly (research §8.6): space entirely; the trapezoid interior
+// (innerFrom/innerTo are STORED and read only by the necessary predicate and a
+// renderer's core/skirt split — no membership functions, no fuzzified Allen);
+// NON-CONTIGUOUS brackets (EDTF's `[1821,1822,1830..1832]` / `1984-X1` — a
+// `when` bracket is CONTIGUOUS and that is NOT a guarantee about the world);
+// Monte Carlo; competing authorities (one `when` per row); transaction time;
+// and `when` on spans (the span type does not exist yet).
 
 // ---------------------------------------------------------------------------
 // Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
@@ -425,6 +478,110 @@ export function normalizeEvidence(p, where = 'evidence') {
 }
 
 // ---------------------------------------------------------------------------
+// THE POSITION BRACKET (v0.6, U1 — research §8.1). Nine fields, no more:
+//
+//   verbatim   EXACTLY what the source said ('Esmaeeter 4. jaanuar 1965',
+//              '1965-07-15', 'sometime that spring'). Never normalised, never
+//              dropped — it is the evidence that the rule fired, and the only
+//              way to re-audit which rows we reinterpreted.
+//   edtf       the honest re-expression ('1965', '1971-21?'), or null.
+//   earliest   CLOSED-open transport ms. THE indexed bound, and the anchor.
+//   latest     the open upper bound, or null for an OPEN end (EDTF '..').
+//              open (still running) and unknown (we lost it) are different
+//              facts; null here means open, and `rule` carries which.
+//   innerFrom  CRM P81a — null when there is no known inner bound. CRM Issue
+//   innerTo    CRM P81b — 288: not instantiating P81 is CORRECT when nothing is
+//              known. innerFrom > innerTo is LEGAL, not a bug: it degenerates
+//              the trapezoid to a triangle, i.e. "no known inner bound".
+//   rule       the VERSIONED NAMED RULE that produced the bracket and the
+//              anchor — DarwinCore's `georeferenceProtocol`. Required.
+//              'err-july15-padding@1', 'wikidata-precision@1', 'edtf-l1@1'.
+//              Two reserved unversioned literals: 'hand' (a human typed it)
+//              and 'unknown' (genuinely unbounded). Everything else MUST carry
+//              @<int>, because when a heuristic changes the affected rows have
+//              to be one `WHERE rule = …` away.
+//   kind       'ignorance' (a fact of the matter exists and the catalogue lost
+//              it — narrowing is a REPAIR) | 'vagueness' (no fact of the matter
+//              — narrowing is a FALSIFICATION). Same bracket, opposite
+//              affordances; the transport treats them identically (a vague
+//              event still has to sort) and only the UI cares.
+//   note       DarwinCore's `georeferenceRemarks`: the assumption made.
+//
+// NOT here, deliberately: `confidence`. provenance.confidence is a number in
+// [0,1] about FABRICATION; position uncertainty is a bracket, not a scalar, and
+// no mature standard in the survey emits a confidence number for it.
+//
+// The returned object is a FRESH FROZEN COPY on every call. Never interned:
+// sharing one uncertainty object between two rows asserts they are simultaneous
+// (CIDOC E52 scope note), which is a claim no ingest ever means to make.
+// ---------------------------------------------------------------------------
+
+export const WHEN_KINDS = ['ignorance', 'vagueness'];
+const RULE_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]*@\d+$/;
+const RULE_UNVERSIONED = ['hand', 'unknown'];
+
+export function normalizeWhen(w, where = 'when') {
+  if (w === undefined || w === null) return null;
+  if (typeof w !== 'object' || Array.isArray(w))
+    throw new Error(`${where}: expected an object {verbatim, edtf, earliest, latest, innerFrom, innerTo, rule, kind, note}, got ${JSON.stringify(w)}`);
+  const num = (k, req) => {
+    const v = w[k];
+    if (v === undefined || v === null) {
+      if (req) throw new Error(`${where}.${k} is required and must be a finite transport-ms number`);
+      return null;
+    }
+    if (!Number.isFinite(Number(v))) throw new Error(`${where}.${k} must be a finite number (transport ms), got ${JSON.stringify(v)}`);
+    return Number(v);
+  };
+  const earliest = num('earliest', true);
+  const latest = num('latest', false);
+  if (latest !== null && !(latest > earliest))
+    throw new Error(`${where}: the bracket is CLOSED-OPEN, so latest (${latest}) must be > earliest (${earliest}). ` +
+      `A zero-width bracket is a crisp position — OMIT \`when\` entirely (absence of \`when\` IS the crisp fast path, §8.1 rule 1), ` +
+      `exactly as DarwinCore refuses zero for coordinateUncertaintyInMeters. Use latest:null for an OPEN end.`);
+  const innerFrom = num('innerFrom', false), innerTo = num('innerTo', false);
+  // CRM's four-date constraints — MINUS the one that is deliberately absent.
+  // P82a <= P81a, P82a <= P81b, P81a <= P82b, P81b <= P82b are real; asserting
+  // P81a <= P81b is a BUG, not a validation (§3).
+  for (const [k, v] of [['innerFrom', innerFrom], ['innerTo', innerTo]]) {
+    if (v === null) continue;
+    if (v < earliest) throw new Error(`${where}.${k} (${v}) precedes earliest (${earliest}) — CRM requires P82a <= P81a and P82a <= P81b`);
+    if (latest !== null && v > latest) throw new Error(`${where}.${k} (${v}) exceeds latest (${latest}) — CRM requires P81a <= P82b and P81b <= P82b`);
+  }
+  const rule = w.rule;
+  if (typeof rule !== 'string' || !rule.length)
+    throw new Error(`${where}.rule is REQUIRED: the named, versioned rule that produced this bracket (DarwinCore's georeferenceProtocol). ` +
+      `A bracket with no recorded rule is a number nobody can re-audit.`);
+  if (!RULE_RE.test(rule) && !RULE_UNVERSIONED.includes(rule))
+    throw new Error(`${where}.rule '${rule}' must be VERSIONED as '<name>@<int>' (e.g. 'err-july15-padding@1', 'wikidata-precision@1') ` +
+      `so that when the heuristic changes the affected rows are one \`WHERE rule = …\` away. ` +
+      `The only unversioned literals are ${RULE_UNVERSIONED.map((r) => `'${r}'`).join(' and ')}.`);
+  const kind = w.kind;
+  if (!WHEN_KINDS.includes(kind))
+    throw new Error(`${where}.kind must be 'ignorance' (a fact of the matter exists and the catalogue lost it — narrowing is a repair) ` +
+      `or 'vagueness' (no fact of the matter — narrowing is a falsification), got ${JSON.stringify(kind)}`);
+  const str = (k) => (w[k] === undefined || w[k] === null ? null : String(w[k]));
+  // A FRESH object every call — never interned (§3's CRM trap).
+  return Object.freeze({
+    verbatim: str('verbatim'), edtf: str('edtf'),
+    earliest, latest, innerFrom, innerTo,
+    rule, kind, note: str('note'),
+  });
+}
+
+/** U3 — the certainty knob. Unlike the evidence policy this DEFAULTS instead of
+ *  throwing: 'possible' never omits a row that really is in the window, so a
+ *  silent default here over-includes; it cannot fabricate. The asymmetry is the
+ *  point — forced choice where silence mixes in dreamed data, safe default
+ *  where silence merely widens the net. */
+export function normalizeCertainty(c, where = 'certainty') {
+  if (c === undefined || c === null) return { mode: 'possible', label: 'possible', implicit: true };
+  if (c === 'possible') return { mode: 'possible', label: 'possible', implicit: false };
+  if (c === 'necessary') return { mode: 'necessary', label: 'necessary', implicit: false };
+  throw new Error(`${where}: unknown certainty ${JSON.stringify(c)} — use 'possible' (bracket overlaps the range) | 'necessary' (the range contains the row's certain extent)`);
+}
+
+// ---------------------------------------------------------------------------
 // Wall-lane scheduler: lookahead loop, committed-vs-pending, per-kind catch-up
 // policies, first-class drift log, ADAPTER REGISTRY. Port of the timed-messages
 // crossing engine generalized per plan-timeline §1.
@@ -464,8 +621,10 @@ export function createScheduler(transport, {
   const cursors = new Map();    // kind -> createCursor over that lane
   const degraded = new Map();   // kind -> {kind, count, reports[]}  (C6)
   const laneProv = new Map();   // kind -> {kind, attested, derived, tier, …}  (E1/E2)
+  const lanePos = new Map();    // kind -> {kind, crisp, smeared, byRule, …}   (U1/U4)
+  const seriesLanes = new Map();// kind -> Map(seriesKey -> rows[])            (U5)
   const reconstructors = new Map();  // name -> handle  (E's tier-1 seam)
-  let derivedTotal = 0;
+  let derivedTotal = 0, smearedTotal = 0;
   let evPolicy = normalizeEvidence(evidence, 'createDeck({evidence})');  // null = never chosen
   let seq = 0, gen = 0, firstLive = 0, running = false;
   let sampleCalls = 0, bracketCalls = 0;
@@ -510,6 +669,40 @@ export function createScheduler(transport, {
     if (!lp) laneProv.set(kind, lp = { kind, attested: 0, derived: 0, tier: 0, source: null, method: null, confN: 0, confSum: 0, confMin: null, confMax: null });
     return lp;
   }
+  /** U4 — the POSITION ledger, the exact twin of laneProv on the other axis.
+   *  Counters only (O(1) per row); medians are computed by scanning the lane at
+   *  report time, because positionAccounting() is a reporting call and a
+   *  parallel span array would double the deck's memory for a number nobody
+   *  reads at 60 Hz. `maxSpan` is load-bearing beyond reporting: it is how far
+   *  BACK a certainty query has to scan (the interval-index trick), and a lane
+   *  with maxSpan 0 — i.e. every lane that existed before v0.6 — costs nothing. */
+  function posFor(kind) {
+    let pp = lanePos.get(kind);
+    if (!pp) lanePos.set(kind, pp = { kind, crisp: 0, smeared: 0, maxSpan: 0, maxFinite: 0, open: 0, withInner: 0, ignorance: 0, vagueness: 0, byRule: new Map() });
+    return pp;
+  }
+  function notePosition(kind, w) {
+    const pp = posFor(kind);
+    if (!w) { pp.crisp++; return pp; }
+    pp.smeared++; smearedTotal++;
+    const span = w.latest === null ? Infinity : w.latest - w.earliest;
+    if (span > pp.maxSpan) pp.maxSpan = span;              // scan bound (may be Infinity)
+    if (w.latest === null) pp.open++;
+    else if (span > pp.maxFinite) pp.maxFinite = span;     // reported width
+
+    if (w.innerFrom !== null && w.innerTo !== null && w.innerFrom <= w.innerTo) pp.withInner++;
+    pp[w.kind]++;
+    let r = pp.byRule.get(w.rule);
+    if (!r) pp.byRule.set(w.rule, r = { rule: w.rule, n: 0, sum: 0, max: 0, min: Infinity, open: 0, withInner: 0, ignorance: 0, vagueness: 0 });
+    r.n++; r[w.kind]++;
+    if (w.latest === null) r.open++;
+    else { r.sum += span; if (span > r.max) r.max = span; if (span < r.min) r.min = span; }
+    if (w.innerFrom !== null && w.innerTo !== null && w.innerFrom <= w.innerTo) r.withInner++;
+    return pp;
+  }
+  /** how far back a certainty query must scan in this lane (0 = the crisp fast
+   *  path: a lane with no `when` row is scanned exactly as it was in v0.5). */
+  const laneMaxSpan = (kind) => { const pp = lanePos.get(kind); return pp ? pp.maxSpan : 0; };
 
   /** C6: every honest degradation, recorded rather than swallowed. Consecutive
    *  identical reports are folded (a 60 Hz caller must not grow memory). */
@@ -571,6 +764,10 @@ export function createScheduler(transport, {
       origin, // 'commit' | 'tick-late' | 'burst' | 'overdub'
       tag: ev.payload && ev.payload.tag,
     };
+    // U2: the fire is MARKED, not suppressed. A consumer that must not act on a
+    // bound reads `when` here and on the callback's public event; the row still
+    // fires, exactly once, at the bracket's lower bound.
+    if (ev.when) { rec.when = ev.when; rec.anchored = true; }
     const ad = adapters.get(ev.kind);
     const when = audioWhen(ad, rec);
     logDrift(rec);
@@ -583,10 +780,17 @@ export function createScheduler(transport, {
   /** E1: an ATTESTED row has no `provenance` key AT ALL. That absence is the
    *  definition of attested — not a flag, not `provenance: null`, nothing to
    *  forget to set and nothing a payload can spoof (the key is injected by the
-   *  library, after the payload, and only when the row really is derived). */
-  const publicEv = (ev) => (ev.prov
-    ? { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload, provenance: ev.prov }
-    : { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload });
+   *  library, after the payload, and only when the row really is derived).
+   *  U1: `when` is the SECOND absence, on the OTHER axis. A crisp row has no
+   *  `when` key; a row may carry either, both or neither, and no query may
+   *  read one as evidence about the other. */
+  const publicEv = (ev) => {
+    const o = ev.prov
+      ? { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload, provenance: ev.prov }
+      : { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload };
+    if (ev.when) o.when = ev.when;
+    return o;
+  };
 
   /** E1/E2. The ONE place a row enters the log — and therefore the one place
    *  LANE PURITY is enforced: a lane is attested or derived, never both. That
@@ -595,8 +799,33 @@ export function createScheduler(transport, {
    *  *provable* rather than asserted: a restoration lives in its own lane, so
    *  deleting it is dropping that lane, and the master trace's rows are the same
    *  objects in the same order before, during and after. */
-  function scheduleEvent({ at, kind = 'default', id, payload, provenance }) {
+  function scheduleEvent({ at, kind = 'default', id, payload, provenance, when }) {
     const lp = provFor(kind);
+    // U2 — THE FIRING RULE, and it is the whole of it: `at = when.earliest`,
+    // resolved ONCE, here, by the named rule the row carries. One-sided sound
+    // (`earliest <= true position` is a theorem), so `ev.at <= pos` keeps a TRUE
+    // meaning — "possibly already occurred by pos" — instead of a fictional one.
+    // Rejected: a midpoint (that is the `07-15` disease with our name on it and
+    // it supports no inference), the inner bound (frequently absent, and a
+    // stronger claim than the outer bound), render-only-never-fire (prefixEvents
+    // folds every row with at <= pos, so a non-firing row hands a reducer a
+    // positionless payload AND vanishes from evidenceAccounting — silently
+    // shrinking the archive under exactly the query the firewall protects), and
+    // a per-kind caps policy (the transport has ONE ordering key; two lanes
+    // disagreeing about what `at <= pos` means makes window() ill-defined).
+    const w = normalizeWhen(when, `schedule({kind:'${kind}'}).when`);
+    let atPos = at;
+    if (w) {
+      atPos = w.earliest;
+      const moved = Number.isFinite(at) && at !== w.earliest;
+      noteDegraded(kind, {
+        wanted: 'a positioned fact', chose: 'anchored', degraded: true,
+        reason: moved
+          ? `positioned by rule '${w.rule}': at := when.earliest, the bracket's LOWER BOUND — and the supplied at was OVERRIDDEN. The row fires at a bound, not at an attested instant; the true position lies inside the bracket, and the transport's ordering is a "possibly by now", never a "definitely at".`
+          : `positioned by rule '${w.rule}': at = when.earliest, the bracket's LOWER BOUND. The row fires at a bound, not at an attested instant; the true position lies inside the bracket, and the transport's ordering is a "possibly by now", never a "definitely at".`,
+      });
+    }
+    at = atPos;
     let prov = null;
     if (provenance) {
       if (lp.attested)
@@ -614,10 +843,20 @@ export function createScheduler(transport, {
     } else if (lp.derived) {
       throw new Error(`lane purity: kind '${kind}' is a DERIVED lane (${lp.source}); an attested row may not be appended to a restoration`);
     }
-    const ev = { at, kind, id: id ?? `e${seq}`, seq: seq++, payload, prov, status: 'pending', fires: 0, cancel: null };
+    const ev = { at, kind, id: id ?? `e${seq}`, seq: seq++, payload, prov, when: w, status: 'pending', fires: 0, cancel: null };
     events.splice(insertIdx(at, ev.seq), 0, ev);
     const lane = laneOf(kind);
     lane.splice(insertInto(lane, at, ev.seq), 0, ev);   // C1: the per-kind lane the cursor rides
+    notePosition(kind, w);                              // U4: the position ledger
+    // U5: keep any BUILT series sub-lane in sync (built lazily on first read, so
+    // a lane whose adapter declares no caps.series never allocates one).
+    const sm = seriesLanes.get(kind);
+    if (sm) {
+      const k = seriesKeyOf(kind, ev);
+      let a = sm.get(k);
+      if (!a) sm.set(k, a = []);
+      a.splice(insertInto(a, at, ev.seq), 0, ev);
+    }
     if (prov) {
       lp.derived++; derivedTotal++;
       lp.tier = Math.max(lp.tier, prov.tier);
@@ -876,6 +1115,39 @@ export function createScheduler(transport, {
   }
 
   // -------------------------------------------------------------------------
+  // U3 — THE CERTAINTY PREDICATE. Two integer comparisons per row, which is the
+  // whole of "possibly in 1965" vs "certainly in 1965".
+  //
+  //   POSSIBLY in [a,b]   <=>  the closed-open bracket OVERLAPS it   (PG `&&`)
+  //   NECESSARILY in [a,b]<=>  [a,b] CONTAINS the row's CERTAIN extent (PG `@>`)
+  //
+  // The certain extent is the INNER bracket (CRM P81, "ongoing throughout") when
+  // one exists. Where it does not — the common case, and CORRECT per CRM Issue
+  // 288 ("it is also correct not to instantiate P81") — outer containment is
+  // still a SOUND sufficient condition (a bracket wholly inside the window is
+  // certainly inside it), so it is tried; and where THAT fails the question is
+  // genuinely undecidable from what the row carries. Undecidable is not `false`:
+  // the row is excluded and the undecidability is REPORTED, because a query that
+  // silently answers "no" to a question it cannot answer is the failure mode
+  // every renderer in the survey shipped.
+  // -------------------------------------------------------------------------
+  function certAccepts(ev, from, to, cert, kind) {
+    const w = ev.when;
+    if (!w) return ev.at >= from && ev.at <= to;            // crisp row = a point
+    if (cert.mode === 'possible')
+      return w.earliest <= to && (w.latest === null || w.latest > from);
+    // 'necessary'
+    const hasInner = w.innerFrom !== null && w.innerTo !== null && w.innerFrom <= w.innerTo;
+    if (hasInner) return from <= w.innerFrom && w.innerTo <= to;
+    if (w.latest !== null && from <= w.earliest && w.latest <= to) return true;
+    noteDegraded(kind, {
+      wanted: "certainty:'necessary'", chose: 'unanswerable', degraded: true,
+      reason: `rows positioned by rule '${w.rule}' carry no inner bracket (CRM P81 not instantiated, which is CORRECT when nothing is known) and their outer bracket is not contained in the query, so "certainly within this window" is UNDECIDABLE from what the row holds — the row is EXCLUDED rather than answered 'no'. Supply when.innerFrom/innerTo to make it answerable: four traditions converged on four points and every renderer surveyed keeps two, which loses this query permanently.`,
+    });
+    return false;
+  }
+
+  // -------------------------------------------------------------------------
   // C1/C2/C3 — the CONTINUOUS reads. bracket() is the raw pair (plus its
   // neighbourhood); sampleAt() is the interpolated value, which is what a
   // renderer actually wants. Both go through the per-kind cursor: O(1) amortised
@@ -884,23 +1156,90 @@ export function createScheduler(transport, {
   // -------------------------------------------------------------------------
   const payOf = (ev) => (ev ? ev.payload : undefined);
 
-  function cursorFor(kind) {
-    const lane = laneOf(kind);
-    let cur = cursors.get(kind);
-    if (!cur || cur.rows !== lane) cursors.set(kind, cur = createCursor(lane));
+  // -------------------------------------------------------------------------
+  // U5 — caps.series. A lane is one KIND; a kind is not always one SIGNAL. A
+  // MIDI CC lane carries controller 1 and controller 74 interleaved, and
+  // "the pair of samples straddling pos" over the merged lane can be two
+  // different controllers — an interpolation between a modwheel value and a
+  // filter-cutoff value, which is not wrong by a little. The declared-and-unread
+  // `caps.series` closes it: `caps.series(payload, ev) -> key` splits the lane
+  // into per-series sub-lanes, each with its OWN cursor, and bracket/sampleAt
+  // ride the sub-lane named by `{series}`. Sub-lanes are built LAZILY (one scan
+  // of an already-sorted lane) and maintained incrementally on schedule, so a
+  // lane whose adapter declares no series never allocates and never pays.
+  // -------------------------------------------------------------------------
+  function seriesFn(kind) {
+    const ad = adapters.get(kind), f = ad && ad.caps && ad.caps.series;
+    return typeof f === 'function' ? f : null;
+  }
+  function seriesKeyOf(kind, ev) {
+    const f = seriesFn(kind);
+    if (!f) return null;
+    const k = f(ev.payload, ev);
+    return k === undefined || k === null ? '' : String(k);
+  }
+  function seriesMap(kind) {
+    let m = seriesLanes.get(kind);
+    if (m) return m;
+    if (!seriesFn(kind)) return null;
+    m = new Map();
+    for (const ev of laneOf(kind)) {          // already sorted by (at, seq)
+      const k = seriesKeyOf(kind, ev);
+      let a = m.get(k);
+      if (!a) m.set(k, a = []);
+      a.push(ev);
+    }
+    seriesLanes.set(kind, m);
+    return m;
+  }
+  /** the rows bracket()/sampleAt() should ride for this call, plus the cursor
+   *  cache key. Falls back to the whole lane — and REPORTS — when a lane that
+   *  declares caps.series is read without naming one, which is the case that
+   *  used to answer nonsense in silence. */
+  function rowsFor(kind, opts) {
+    const lane = byKind.get(kind);
+    const want = opts && opts.series;
+    const m = seriesMap(kind);
+    if (!m) {
+      if (want !== undefined && want !== null)
+        noteDegraded(kind, { wanted: `series=${JSON.stringify(want)}`, chose: 'whole-lane', degraded: true,
+          reason: `kind '${kind}' declares no caps.series(payload), so it has exactly one series and {series} cannot select within it` });
+      return { rows: lane, key: kind, series: null };
+    }
+    if (want === undefined || want === null) {
+      noteDegraded(kind, { wanted: 'a bracket', chose: 'series-ambiguous', degraded: true,
+        reason: `kind '${kind}' declares caps.series and holds ${m.size} series [${[...m.keys()].slice(0, 8).join(', ')}${m.size > 8 ? ', …' : ''}] — this read did not name one, so the straddling pair is taken over the MERGED lane and its two samples may belong to DIFFERENT series. Pass {series:'…'} (deck.seriesOf('${kind}') enumerates them).` });
+      return { rows: lane, key: kind, series: null };
+    }
+    const k = String(want);
+    const rows = m.get(k);
+    if (!rows || !rows.length) {
+      noteDegraded(kind, { wanted: `series=${JSON.stringify(want)}`, chose: 'empty', degraded: true,
+        reason: `kind '${kind}' holds no rows for series '${k}' — known series are [${[...m.keys()].join(', ')}]` });
+      return { rows: [], key: `${kind} ${k}`, series: k };
+    }
+    return { rows, key: `${kind} ${k}`, series: k };
+  }
+
+  function cursorForRows(cacheKey, rows) {
+    let cur = cursors.get(cacheKey);
+    if (!cur || cur.rows !== rows) cursors.set(cacheKey, cur = createCursor(rows));
     return cur;
   }
+  function cursorFor(kind) { return cursorForRows(kind, laneOf(kind)); }
 
   function bracketAt(kind, pos, opts) {
     const lane = byKind.get(kind);
     if (!lane || !lane.length) return null;
     const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
     const nbr = opts && opts.neighbourhood !== undefined ? opts.neighbourhood : (caps.neighbourhood || 0);
-    const br = cursorFor(kind).bracket(pos, nbr);
+    const sel = rowsFor(kind, opts);
+    if (!sel.rows || !sel.rows.length) return null;
+    const br = cursorForRows(sel.key, sel.rows).bracket(pos, nbr);
     if (!br) return null;
     bracketCalls++;
     return {
-      kind, pos, i: br.i, u: br.u, aAt: br.aAt, bAt: br.bAt, dtMs: br.dtMs,
+      kind, series: sel.series, pos, i: br.i, u: br.u, aAt: br.aAt, bAt: br.bAt, dtMs: br.dtMs,
       a: payOf(br.a), b: payOf(br.b), prev: payOf(br.prev), next: payOf(br.next),
       prevs: br.prevs.map(payOf), nexts: br.nexts.map(payOf),
       ids: [br.a.id, br.b.id],
@@ -1036,6 +1375,124 @@ export function createScheduler(transport, {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // U6 — TWO-PHASE SEEK (JACK's slow-sync barrier + Ardour's locate
+  // disposition). The problem the transport already has: `seek()` moves the
+  // vector and re-asserts state in one synchronous step, but a real client —
+  // a media element that must finish a `currentTime` seek, a sampler that must
+  // reload a bank, a nested deck that must re-fold — is not ready at that
+  // instant, and today it just plays the wrong thing for a few hundred ms.
+  //
+  // JACK's answer, ported with its safety properties intact:
+  //   OPT-IN     per adapter (caps.slowSync + prepareSeek). A deck with no
+  //              slow-sync adapter takes the v0.5 path, byte for byte.
+  //   PHASE 1    the LOCATE happens immediately and unconditionally. The
+  //              position moves, reconcile + assertState run. Only ROLLING is
+  //              deferred — the transport parks at the new position.
+  //   NON-BLOCKING  seek() still returns the clamped position synchronously.
+  //              The barrier is observable (seekBarrier(), and a promise) and
+  //              nothing awaits it on the caller's behalf.
+  //   FAIL-OPEN  on timeout the barrier opens ANYWAY, every laggard is named
+  //              in degradations(), and the laggards catch up on their own
+  //              (they are not rewound, and the transport is not held hostage
+  //              by one slow client — the correctness bug JACK's own docs warn
+  //              about).
+  //   RE-ARMED   a locate mid-barrier supersedes the one in flight, and
+  //              inherits its TRUE rolling state, so a scrub that fires ten
+  //              locates does not lose the roll on the tenth.
+  //   DISPOSITION  Ardour's LocateTransportDisposition, carried in the request
+  //              and honoured at the barrier: MustRoll | MustStop |
+  //              RollIfAppropriate (default — roll iff it was rolling).
+  // -------------------------------------------------------------------------
+  const LOCATE_DISPOSITIONS = ['MustRoll', 'MustStop', 'RollIfAppropriate'];
+  let seekGen = 0, barrier = null;
+  const slowSyncClients = () => [...adapters].filter(([, ad]) => ad.caps && ad.caps.slowSync === true);
+  const hasSlowSync = () => slowSyncClients().length > 0;
+
+  function requestSeek(pos, opts = {}) {
+    const disposition = opts.disposition === undefined ? 'RollIfAppropriate' : opts.disposition;
+    if (!LOCATE_DISPOSITIONS.includes(disposition))
+      throw new Error(`requestSeek({disposition}): expected one of ${LOCATE_DISPOSITIONS.join(' | ')} (Ardour's LocateTransportDisposition), got ${JSON.stringify(disposition)}`);
+    const timeoutMs = opts.timeoutMs === undefined ? 200 : Number(opts.timeoutMs);
+    const clients = slowSyncClients();
+    const inflight = barrier && barrier.report.phase !== 'done' ? barrier : null;
+    const wasRolling = inflight ? inflight.report.rolling : transport.rate !== 0;
+    const resumeRate = inflight ? inflight.report.rate : transport.targetRate;
+    const gen = ++seekGen;
+    if (inflight) {                       // RE-ARMED by a locate mid-roll
+      inflight.cancel && inflight.cancel();
+      inflight.report.phase = 'done'; inflight.report.superseded = true;
+      inflight.resolve(inflight.report);
+    }
+    const report = {
+      gen, pos, disposition, reason: opts.reason || 'seek',
+      rolling: wasRolling, rate: resumeRate, timeoutMs,
+      clients: clients.map(([k]) => k), ready: [], timedOut: [],
+      rolled: false, failedOpen: false, superseded: false, waitedMs: 0, phase: 'locate', why: null,
+    };
+    const t0 = clock.now();
+    let resolve;
+    const promise = new Promise((r) => { resolve = r; });
+    const self = { report, promise, resolve, cancel: null };
+    barrier = self;
+
+    // PHASE 1 — the locate. Unconditional, immediate, identical to v0.5.
+    if (clients.length && transport.rate !== 0) transport.pause();
+    transport.seek(pos);
+    const shouldRoll = disposition === 'MustRoll' ? true : disposition === 'MustStop' ? false : wasRolling;
+
+    function finish(why) {
+      if (report.phase === 'done') return report;
+      report.phase = 'done'; report.why = why;
+      report.waitedMs = +(clock.now() - t0).toFixed(3);
+      if (disposition === 'MustStop') { if (transport.rate !== 0) transport.pause(); report.rolled = false; }
+      else if (shouldRoll) { if (transport.rate === 0) transport.play(resumeRate); report.rolled = true; }
+      else report.rolled = transport.rate !== 0;
+      resolve(report);
+      return report;
+    }
+    if (!clients.length) return finish('no-slow-sync-clients'), self;
+
+    // PHASE 2 — the barrier. Armed BEFORE dispatch, so a synchronously-ready
+    // client cannot race the timer.
+    let waiting = clients.length;
+    const seen = new Set();
+    const ready = (k) => {
+      if (gen !== seekGen || report.phase === 'done' || seen.has(k)) return;
+      seen.add(k); report.ready.push(k);
+      if (--waiting === 0) { self.cancel && self.cancel(); finish('all-ready'); }
+    };
+    self.cancel = host.setTimer(timeoutMs, () => {
+      if (gen !== seekGen || report.phase === 'done') return;
+      for (const [k] of clients) {
+        if (seen.has(k)) continue;
+        report.timedOut.push(k);
+        noteDegraded(k, { wanted: 'two-phase seek: ready before the roll', chose: 'fail-open', degraded: true, pos,
+          reason: `adapter '${k}' declared caps.slowSync but did not report ready within ${timeoutMs} ms of the locate to ${pos}; the barrier FAILS OPEN — the transport rolls and the laggard catches up. A transport held hostage by one slow client is a worse failure than a client that is briefly behind.` });
+      }
+      report.failedOpen = report.timedOut.length > 0;
+      finish('timeout');
+    });
+    for (const [k, ad] of clients) {
+      if (typeof ad.prepareSeek !== 'function') {
+        noteDegraded(k, { wanted: 'caps.slowSync', chose: 'ignored', degraded: true,
+          reason: `adapter ${k} declares caps.slowSync but implements no prepareSeek(request, ready) — it is treated as instantly ready` });
+        ready(k); continue;
+      }
+      let r;
+      try {
+        r = ad.prepareSeek({ ...report, kind: k, ready: () => ready(k) }, () => ready(k));
+      } catch (e) {
+        noteDegraded(k, { wanted: 'two-phase seek: prepareSeek()', chose: 'fail-open', degraded: true,
+          reason: `adapter ${k} threw from prepareSeek(): ${e && e.message}` });
+        ready(k); continue;
+      }
+      if (r === true) ready(k);
+      else if (r && typeof r.then === 'function') r.then(() => ready(k), () => ready(k));
+    }
+    return self;
+  }
+
   const unsubState = transport.onState((st) => {
     cancelCommitted();
     if (st.reason === 'seek') { reconcile(st.p0); assertAt(st.p0); }
@@ -1066,6 +1523,15 @@ export function createScheduler(transport, {
       if (caps.followsTransport === true && typeof adapter.transport !== 'function')
         noteDegraded(kind, { wanted: 'caps.followsTransport', chose: 'ignored', degraded: true,
           reason: `adapter ${kind} declares caps.followsTransport but implements no transport(state)` });
+      if (caps.slowSync === true && typeof adapter.prepareSeek !== 'function')
+        noteDegraded(kind, { wanted: 'caps.slowSync', chose: 'ignored', degraded: true,
+          reason: `adapter ${kind} declares caps.slowSync but implements no prepareSeek(request, ready) — the two-phase seek barrier will treat it as instantly ready (U6)` });
+      if (caps.series !== undefined && typeof caps.series !== 'function')
+        noteDegraded(kind, { wanted: 'caps.series', chose: 'ignored', degraded: true,
+          reason: `adapter ${kind} declares caps.series but it is not a function (payload, ev) => key — bracketing stays grouped by KIND, which is what silently interpolates between two different series (U5)` });
+      // U5: a lane whose rows were scheduled BEFORE the adapter arrives has to
+      // forget any sub-lane split it built under the old (or absent) caps.
+      seriesLanes.delete(kind);
       // E3: an adapter that INVENTS between samples but declares no tier has not
       // entered §5b's spectrum, so the firewall cannot police it. That is a fact
       // about the adapter, recorded — not a reason to guess a tier for it.
@@ -1076,9 +1542,15 @@ export function createScheduler(transport, {
       policies.set(kind, catchUp);
       return () => {
         if (adapters.get(kind) !== adapter) return;
-        adapters.delete(kind); policies.delete(kind); snapshots.delete(kind);
+        adapters.delete(kind); policies.delete(kind); snapshots.delete(kind); seriesLanes.delete(kind);
       };
     },
+    /** U6: the two-phase seek entry point. Returns {report, promise} — the
+     *  LOCATE has already happened when it returns; only the roll is deferred. */
+    requestSeek,
+    /** U6: the barrier in flight (or the last one). */
+    seekBarrier() { return barrier ? { ...barrier.report, promise: barrier.promise } : null; },
+    hasSlowSync,
     adapterCaps(kind) {
       if (kind !== undefined) { const a = adapters.get(kind); return a ? a.caps || {} : null; }
       const out = {};
@@ -1113,20 +1585,103 @@ export function createScheduler(transport, {
     /** §5b's `window()`: the ordered rows in [from, to] for one kind, a list of
      *  kinds (merged in (at, seq) order) or every kind — filtered by the
      *  evidence policy. A lane over the tier cap is EXCLUDED and reported.
-     *  Rows carry `provenance` iff they are derived (E1). */
+     *  Rows carry `provenance` iff they are derived (E1).
+     *
+     *  U3 — and, ORTHOGONALLY, by `{certainty}`. The two filters read disjoint
+     *  fields: the evidence filter reads only `laneTier(kind)`, the certainty
+     *  filter reads only `row.when`. Neither can imply the other, and that is
+     *  structural rather than disciplinary: a per-row `when` cannot reach
+     *  evExcludes even by a careless patch, and a lane tier is not a bracket.
+     *
+     *    certainty:'possible'   (DEFAULT) the row's bracket OVERLAPS [from, to]
+     *    certainty:'necessary'  [from, to] CONTAINS the row's certain extent
+     *
+     *  A crisp row is a POINT under both: [at, at]. A lane with no `when` row
+     *  at all takes exactly the v0.5 code path, scan bounds included. */
     window(kind, from = -Infinity, to = Infinity, opts) {
       const ev = resolveEvidence(kind, 'window', opts);
+      const cert = normalizeCertainty(opts && opts.certainty, 'window({certainty})');
       const kinds = kind === undefined ? [...byKind.keys()] : (Array.isArray(kind) ? kind : [kind]);
       const picked = [];
       for (const k of kinds) {
         if (evExcludes(k, ev, undefined, 'window')) continue;
         const lane = byKind.get(k);
         if (!lane) continue;
-        for (let i = fromIdx(lane, from); i < lane.length && lane[i].at <= to; i++) picked.push(lane[i]);
+        // The interval-index trick: a row whose bracket reaches into [from, to]
+        // may START before `from`, so the scan begins one maxSpan earlier. For
+        // every lane that has no bracket at all maxSpan is 0 and this is the
+        // identical `fromIdx(lane, from)` v0.5 used.
+        const span = laneMaxSpan(k);
+        const start = span > 0 ? (span === Infinity ? 0 : fromIdx(lane, from - span)) : fromIdx(lane, from);
+        const plain = span === 0 && cert.mode === 'possible';
+        for (let i = start; i < lane.length && lane[i].at <= to; i++) {
+          if (plain || certAccepts(lane[i], from, to, cert, k)) picked.push(lane[i]);
+        }
       }
       if (kinds.length > 1) picked.sort((a, b) => a.at - b.at || a.seq - b.seq);
       return picked.map(publicEv);
     },
+    /** U4 — the POSITION-axis twin of evidenceAccounting(), reported BY RULE.
+     *  "43 % of this lane is positioned by err-july15-padding@1" is the number
+     *  NSSDA's discipline demands: publish the accuracy statement, or declare
+     *  it untested. NEVER multiply this with the evidence numbers — a "trust"
+     *  score that folds tier and span is the exact collapse the whole design
+     *  exists to prevent, and it deletes the pre-1960 archive from any
+     *  attested-only view. */
+    positionAccounting(kind) {
+      const kinds = kind === undefined ? [...lanePos.keys()] : (Array.isArray(kind) ? kind : [kind]);
+      const out = { crisp: 0, smeared: 0, total: 0, smearedFraction: 0, openEnded: 0, withInner: 0,
+                    byRule: {}, byWhenKind: { ignorance: 0, vagueness: 0 },
+                    medianSpanMs: null, maxSpanMs: 0, lanes: [] };
+      const allSpans = [], spansByRule = new Map();
+      for (const k of kinds) {
+        const pp = lanePos.get(k);
+        if (!pp) continue;
+        out.crisp += pp.crisp; out.smeared += pp.smeared;
+        out.openEnded += pp.open; out.withInner += pp.withInner;
+        out.byWhenKind.ignorance += pp.ignorance; out.byWhenKind.vagueness += pp.vagueness;
+        if (pp.maxFinite > out.maxSpanMs) out.maxSpanMs = pp.maxFinite;
+        for (const [rule, r] of pp.byRule) {
+          let acc = out.byRule[rule];
+          if (!acc) acc = out.byRule[rule] = { rule, n: 0, fraction: 0, meanSpanMs: null, medianSpanMs: null,
+                                               maxSpanMs: 0, minSpanMs: null, open: 0, withInner: 0,
+                                               kinds: { ignorance: 0, vagueness: 0 }, lanes: [] };
+          acc.n += r.n; acc.open += r.open; acc.withInner += r.withInner;
+          acc.kinds.ignorance += r.ignorance; acc.kinds.vagueness += r.vagueness;
+          if (r.max > acc.maxSpanMs) acc.maxSpanMs = r.max;
+          if (r.min !== Infinity && (acc.minSpanMs === null || r.min < acc.minSpanMs)) acc.minSpanMs = r.min;
+          if (!acc.lanes.includes(k)) acc.lanes.push(k);
+          if (!spansByRule.has(rule)) spansByRule.set(rule, []);
+        }
+        // medians need the rows; this is a REPORTING call, so scan them here
+        // rather than carry a parallel span array through every schedule().
+        for (const evr of byKind.get(k) || []) {
+          const w = evr.when;
+          if (!w || w.latest === null) continue;
+          const s = w.latest - w.earliest;
+          allSpans.push(s);
+          spansByRule.get(w.rule).push(s);
+        }
+        out.lanes.push({ kind: k, crisp: pp.crisp, smeared: pp.smeared, total: pp.crisp + pp.smeared,
+                         smearedFraction: (pp.crisp + pp.smeared) ? pp.smeared / (pp.crisp + pp.smeared) : 0,
+                         maxSpanMs: pp.maxFinite, openEnded: pp.open, withInner: pp.withInner,
+                         rules: [...pp.byRule.keys()] });
+      }
+      const median = (xs) => { if (!xs.length) return null; const s = xs.slice().sort((a, b) => a - b); return s[s.length >> 1]; };
+      out.total = out.crisp + out.smeared;
+      out.smearedFraction = out.total ? out.smeared / out.total : 0;
+      out.medianSpanMs = median(allSpans);
+      for (const [rule, acc] of Object.entries(out.byRule)) {
+        acc.fraction = out.total ? acc.n / out.total : 0;
+        const xs = spansByRule.get(rule) || [];
+        acc.medianSpanMs = median(xs);
+        acc.meanSpanMs = xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+      }
+      return out;
+    },
+    /** U5: the series keys a lane actually holds (null when the adapter
+     *  declares no caps.series — one kind, one series). */
+    seriesOf(kind) { const m = seriesMap(kind); return m ? [...m.keys()] : null; },
     /** C2: the raw straddling pair at pos, plus its neighbourhood.
      *  -> {prev, a, b, next, u, prevs, nexts, i, aAt, bAt, dtMs, ids} (payloads). */
     bracket(kind, pos, opts) {
@@ -1277,6 +1832,9 @@ export function createScheduler(transport, {
             events.splice(i, 1);
           }
           byKind.delete(into); cursors.delete(into); snapshots.delete(into); laneProv.delete(into);
+          const pp = lanePos.get(into);
+          if (pp) { smearedTotal -= pp.smeared; lanePos.delete(into); }
+          seriesLanes.delete(into);
           derivedTotal -= n;
           firstLive = 0;                       // indices moved; the next scan re-advances
           return { dropped: n };
@@ -1315,6 +1873,8 @@ export function createScheduler(transport, {
       for (const lane of byKind.values()) lane.length = 0;
       for (const c of cursors.values()) c.reset();
       laneProv.clear(); derivedTotal = 0;      // E1: the provenance ledger is the log's
+      lanePos.clear(); smearedTotal = 0;       // U4: and so is the position ledger
+      seriesLanes.clear();                     // U5
     },
     /** SEAM 6: non-destructive drift reads. */
     onDrift(cb) { driftCbs.add(cb); return () => driftCbs.delete(cb); },
@@ -1333,7 +1893,11 @@ export function createScheduler(transport, {
       // E1: `total` counts every row in the deck; `attested` and `derived` split
       // it, so a client asserting "my capture is intact" compares against
       // `attested` and a restoration can never inflate it.
+      // U1: the SECOND split, on the other axis, and deliberately not multiplied
+      // into the first — `attested + derived` and `crisp + smeared` are two
+      // partitions of the same rows, never one score.
       return { counts, total: events.length, attested: events.length - derivedTotal, derived: derivedTotal,
+               crisp: events.length - smearedTotal, smeared: smearedTotal,
                busyMs: +busyMs.toFixed(2), maxTickGapMs: +maxTickGapMs.toFixed(2) };
     },
     /** For asserts: fires-per-event table and armed-timer count. */
@@ -1466,7 +2030,10 @@ export function createDeck({
   // reference every holder already has (nested.mjs reads it at add(), HUDs cache
   // it). `lastAt` tracks the furthest item ever scheduled, which is what an
   // 'auto' range is derived from.
-  let lastAt = items.length ? Math.max(...items.map((i) => i.at)) : 0;
+  // U2: an item may carry ONLY a `when` — the anchor is `when.earliest`, so
+  // that is the position the range has to see.
+  const anchorOf = (i) => (i && i.when && Number.isFinite(Number(i.when.earliest)) ? Number(i.when.earliest) : i.at);
+  let lastAt = items.length ? Math.max(...items.map(anchorOf)) : 0;
   const span = range && range.length === 2 ? [range[0], range[1]] : [0, lastAt + tailMs];
   let durationMs = span[1] - span[0];
 
@@ -1532,7 +2099,20 @@ export function createDeck({
     play(r) { transport.play(r); },
     pause() { transport.pause(); flush(); },
     setRate(r) { transport.setRate(r); },         // SEAM 2: does not start playback
-    seek(p) { const q = clamp(p); transport.seek(q); flush(); return q; },
+    /** seek(pos) is unchanged. seek(pos, {disposition, timeoutMs}) — or ANY
+     *  seek on a deck holding a caps.slowSync adapter — goes through U6's
+     *  two-phase barrier: the LOCATE still happens synchronously (and this
+     *  still returns the clamped position), only the ROLL waits, and it fails
+     *  open. deck.seekBarrier() is the report; .promise settles when it opens. */
+    seek(p, opts) {
+      const q = clamp(p);
+      if (opts !== undefined || sched.hasSlowSync()) sched.requestSeek(q, opts || {});
+      else transport.seek(q);
+      flush();
+      return q;
+    },
+    requestSeek: (p, opts) => sched.requestSeek(clamp(p), opts),
+    seekBarrier: () => sched.seekBarrier(),
     /** slave the deck to an external clock master (SEAM: media-element master) */
     sync(p, opts) { return transport.sync(clamp(p), opts); },
     position: () => transport.position(),
@@ -1540,7 +2120,8 @@ export function createDeck({
     targetRate: () => transport.targetRate,       // SEAM 2: what a paused UI shows
     playing: () => transport.playing,
     schedule(item) {
-      if (item && Number.isFinite(item.at) && item.at > lastAt) lastAt = item.at;   // feeds setRange('auto')
+      const a = anchorOf(item);
+      if (Number.isFinite(a) && a > lastAt) lastAt = a;   // feeds setRange('auto')
       return sched.schedule(item);
     },
     lastAt: () => lastAt,
@@ -1560,6 +2141,11 @@ export function createDeck({
     setEvidence: (p) => sched.setEvidence(p),
     provenanceOf: (kind) => sched.provenanceOf(kind),
     evidenceAccounting: (kind) => sched.evidenceAccounting(kind),
+    /** U4: the position-axis twin, reported BY RULE. Never multiply it with
+     *  evidenceAccounting() — two axes, two numbers, no score. */
+    positionAccounting: (kind) => sched.positionAccounting(kind),
+    /** U5: the series keys a lane holds (null if the adapter declares none). */
+    seriesOf: (kind) => sched.seriesOf(kind),
     registerReconstructor: (name, spec) => sched.registerReconstructor(name, spec),
     reconstructors: (name) => sched.reconstructors(name),
     request: (kind, want) => sched.request(kind, want),
