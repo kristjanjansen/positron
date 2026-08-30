@@ -113,3 +113,34 @@ deployed end-to-end (registry worker, host/player pages, session-as-timeline-log
 
 **Open**: 4 secret rotations (SECRETS-ROTATION.md), elektron.studio purchase, iPhone capture
 probe, Web MIDI precision (needs IAC toggle), hardware jam/instrument run.
+
+## Session 6 continued (2026-08-28/30) — the library became a platform
+
+**Studio v0 runs**: one command, one URL, GO LIVE → cues → stop → a working
+replay link, all measured. **DoD-A discharged** (replay.html on the library,
+both suites green, cue sync 59 → 16 ms) — which also revealed the old 59 ms was
+a single locked phase sample rather than a distribution.
+
+**The library closed every gap it had**: the evidence firewall + provenance
+(§5b as code; attested provably never interpolates; dropping 1,674 derived rows
+leaves the master bit-identical), quotation-as-a-value (a score round-trips into
+a process that has never seen the decks; marks survive a re-cut where numbers
+don't), uncertainty-as-position (`at = when.earliest`; the Kurenniemi corpus is
+22/22 smeared with 41 % of its spine from one guess), a store (1M rows in
+3.8 MB), the strip component (after five hand-rollings), continuous kinds,
+nested decks, and **loops** (wraps are the most precise instant in the loop;
+phasing needs two decks exactly as Reich needed two tape machines;
+disintegration climbs 0 → 90.6 % invented while the attested count never moves).
+
+**Reach**: the four archive viewers are live at
+https://elektron-view.kristjan-jansen.workers.dev behind a globally-gated,
+politeness-first ERR proxy, and work on a phone.
+
+**Honest positioning**: an adversarial survey refuted two of our three
+uniqueness claims (seek-by-reduce is thirty-year-old DAW *MIDI chase* and
+lighting-console *tracking*; caps-driven adapters shipped in 2005) and
+complicated the third — provenance-on-a-timeline exists in Premiere but
+collapses at export, so the real claim is that **the firewall dies at the door
+and ours has to survive it.** No ecosystem tool can currently read a temporal
+region at all.
+

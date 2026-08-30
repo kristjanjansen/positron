@@ -1,95 +1,91 @@
-# Handoff — 2026-08-28 (end of session 6)
+# Handoff — 2026-08-30 (end of session 6)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
-(sessions 6a–6r, newest first) → the plan you're touching.
+(newest first) → the plan you're touching. `plan-timeline.md` §7–§8 is the
+current state of the library and OVERRIDES §§1–6 where they disagree.
 
-## The one-line state
+## One line
 
-The timeline library exists, is measured, and has **five real clients**; the
-open work is (a) finishing three in-flight builds, (b) the continuous-kind
-seams the paths client exposed, (c) the nested-span primitive, (d) the DoD-A
-verdict.
+The timeline library is built, measured, and has **thirteen clients**; the
+studio runs a complete show; the archive viewers are live on the public web.
+**Nothing has ever been used by a human.**
 
-## In flight — NONE. All eight builds reported and are committed.
+## Nothing is in flight. Everything below is committed and green.
 
-Session 6 closed with: nested spans · continuous kinds first-class (v0.4) ·
-DoD-A discharged · CC automation + slider-video · text performer · paths ·
-instrument session storage + gaps · 5 library clients.
+## What exists
 
-**Next action, and it is small: the EVIDENCE FIREWALL (~20 lines + one prop
-arm).** `info.policy` in reduce + `sampleAt(kind, pos, {evidence:'attested'})`.
-The machinery already exists (sampleAt IS the tier-1 reconstructor; caps.tier/
-method/evidence/deviates are read; `request()` already returns the firewall's
-`{wanted,chose,degraded,reason}`; `degradations()` is the ledger), and
-`proto/paths` proves it on day one at zero client cost — it already ships the
-evidence-only toggle, the hatching and the invented-percentage.
-Then, in order: provenance fields · fragment quotation (`in`/`out` on a nested
-span) · uncertainty-as-position · a real store · `mediaMaster()` helper
-(⚠️ replay-grid syncs unconditionally today and can re-open its own burst bug).
+**`timeline/`** — `transport.mjs` v0.6 (vector + lookahead, worker tick default,
+sample-accurate audio lane, adapter registry with caps the library READS,
+evidence firewall + provenance, `when` uncertainty, `caps.series`, two-phase
+seek) · `nested.mjs` (nested decks, fragment quotation, loops) · `score.mjs`
+(a quotation is a VALUE; scores round-trip byte-identically; marks survive a
+re-cut) · `strip.mjs` (the component, lanes are deck queries, tick LOD over ten
+orders of magnitude, touch) · `store.mjs` (memory/JSONL/DO; 1M rows in 3.8 MB;
+fire-late miss policy) · `render.mjs` (deterministic offline render,
+60–86k× real time) · `media-master.mjs` · `osc.mjs` · `keepalive.mjs` · `lab/`
+(prop-test, prop-nested, prop-store, prop-render — all green at 100 seeds).
 
-## Library: what's true and what's missing
+**`studio/`** — `node studio/engine.mjs` + one URL runs a complete show.
+GO LIVE 3.0 s · stop→replay-link 20.9 s · cue drift p50 1.1 ms · per-cue replay
+abs p95 39 ms vs a 150 ms target.
 
-**True (measured):** vector + lookahead; worker tick default (8.5 ms hidden vs
-main's 981 ms); audio lane sample-accurate (10 µs) and survives main-thread
-stalls; `registerAdapter` + `createDeck`/`makeLogDeck`; reduce gets the
-complete ordered prefix; `transport.sync()` for external clock masters;
-non-destructive drift reads; C2 property gate runnable
-(`node timeline/lab/prop-test.mjs`). Fan-out graveyard fails 6/7 asserts as a
-permanent fixture.
+**Deployed**: `elektron-view` (the four archive viewers, public, DO-gated ERR
+proxy) · `elektron-rtc` · `elektron-selfrec` · `elektron-jam` ·
+`elektron-instrument` (EU-pinned) · `elektron-osc`.
+**Public link**: https://elektron-view.kristjan-jansen.workers.dev
 
-**Missing — the continuous-kind seams (from proto/paths, highest value):**
-1. `interpolate` is never called by the library; caps are read only for
-   `catchUp`/`audio`/`assertOnSeek` — so C3's honest degradation cannot happen.
-2. No adapter hook between fires (98.8 % of pointer motion was client code).
-   Fix: drive `caps.continuous` adapters off the deck's position observable.
-3. No `sched.bracket(kind, pos)`; `reduceAt` rescans from 0 (would reproduce
-   demo10's per-frame-recompute defect inside the library).
-4. `reduce()` gets `prefix ≤ pos` so the successor is absent — an interpolated
-   reduce is not expressible. Fix: `info.next` (two lines).
-5. `interpolate(a,b,u)` under-specified for C¹ — add neighbourhood.
-6. **BUG**: `logdeck` `payload:{i, at, ...p.payload}` lets a row's epoch-µs
-   `at` clobber the injected position-domain `at`. Fix: inject last.
+**Protos**: megatimeline · remixer (+compose) · kurenniemi · flipper · jam
+(+interval) · instrument (+host-check) · automation · paths · text · loops ·
+osc · selfrec · replay · archive · m2m.
 
-**Also missing (plan-timeline, not yet built anywhere):** derived lanes with
-`source: reconstructor-*` + method/confidence/tier + refs, and the
-`attested | restored(tier ≤ n) | all` evidence policy on reduce/window.
+## The four hard numbers worth remembering
 
-## Clients (each adoption found a latent bug — the pattern held 3/3)
+- Cue sync **16 ms p50** on the library (was 59 — and that 59 was ONE LOCKED
+  PHASE SAMPLE, not a distribution: real old margin ~11 %, presented as 60 %).
+- Remote instrument **35.8 ms** key→ear over MoQ vs 77.7 ms over WebRTC, where
+  the jitter buffer is 98.6 % of the loop and cannot be hinted away.
+- Loop wraps are the **most** precise instant in a loop (wrap-adjacent lateness
+  p50 0.10 ms vs 4.50 ms elsewhere; 0.000 ms/wrap accumulation over 600 wraps).
+- MoQ **group-per-bundle = 100 % OSC bundle integrity**; message-per-group = 0 %
+  — and the sparse arm showed 0 % message loss with 9.2 % integrity, which any
+  message-counting metric would have called lossless.
 
-- `proto/jam` — hand-rolled path was firing **−101 ms** (unmeasured).
-- `proto/selfrec/replay-grid` — forward seek **fired every skipped cue** (3 cues,
-  45/25/5 s late) — the exact assert the graveyard arm fails, shipped.
-- `proto/instrument` — stored replay started audio **+1075 ms early**; the test
-  was blind to it (`advanced > 0` passes for a one-second-early track).
-- `proto/remixer` — chord start spread 0–43 ms → **0.1 ms**; one seek moves all.
-- `proto/paths` — first continuous kind; seek 0.042 px vs 38 px hold.
+## Next, in order
 
-## Deployed (all workers.dev, $0-scale)
+1. **Run a real show.** Everything measured is synthetic — canvas sources, fake
+   devices, headless Chrome, burned clocks. Twenty minutes with a real camera,
+   real cues and one other person watching would teach more than any module.
+2. **Close the read-side-only evidence firewall** — nothing stops a derived lane
+   from FIRING under `attested`; an evidence-only *performance* is currently the
+   adapter's job. Wants `fire()` gating or `caps.evidenceGated`.
+3. **The renderer gap** — the transport can say what it does not know; the strip
+   still cannot show it. Ambiguation (settled by a controlled study) is unbuilt;
+   the megatimeline aggregate is still a miscomputed `+1`-per-item sum.
+4. Studio v1: ROOM/SOUND panels, grid-archive wiring, and the unexplained
+   **−45 ms** native anchor (vs the archive rig's −15 ms, reproduced with a
+   negative control, systematic, unexplained).
+5. Deep time in the strip; `deck.assertState`; `renderDeck` seeing a nest.
 
-`elektron-rtc` (rooms/cues) · `elektron-selfrec` · `elektron-jam` ·
-`elektron-instrument` (v6473040f — EU-pinned Sessions DO + R2 audio/AV,
-capability tokens, 54/54). Kept R2 proof data under `instrument/` and
-`selfrec/` in `elektron-archive-test`.
+## Yours alone
 
-## Open, needing the user
-
-1. Secret rotations — `SECRETS-ROTATION.md` (untracked, deliberately).
-2. `elektron.studio` — drop-caught, for sale via the Afternic lander; expiry
-   2027-02-08.
-3. iPhone capture probe before phones join a grid (MediaRecorder crash
-   durability is the unknown).
-4. macOS IAC MIDI bus toggle → the one unmeasured cell (Web MIDI send precision).
-5. Usage credits — an agent died of exhaustion mid-run once today.
+Rotate the leaked secrets (`SECRETS-ROTATION.md`) · `elektron.studio` is
+drop-caught and for sale via the Afternic lander (expiry 2027-02-08) · an
+iPhone capture probe before phones join a grid · the macOS **IAC MIDI toggle**
+(the one unmeasured cell: Web MIDI send precision) · ask ERR about the **Finna
+CDN edge rule** (not policy — it blocks three Kurenniemi sources) · and the ERR
+licence conversation, which gates anything public.
 
 ## Traps that cost hours (do not re-derive)
 
-DO keeps running OLD class code after deploy (~1 min) — a smoke test straight
-after `wrangler deploy` lies. · CORS allow-headers must carry `X-Chunk-Sha256`
-when copying the upload pipeline. · Backstop ordering is correctness (once
-anything parks, everything parks). · CDP `packetLoss` is a no-op in Chrome 151
-(use netem). · `--use-fake-ui-for-media-devices` insufficient under
-headless=new (needs CDP `Browser.grantPermissions`). · Chrome hands an
-AudioWorklet an EMPTY input array when it latches a bus silent (fix: started
-`ConstantSourceNode(offset 0)`). · One MoQ group = one QUIC uni-stream. ·
-`-bf 0` mandatory for repackaged MediaRecorder streams. · Docker-esbuild is
-GONE: `cd proto/jam/moq && npm run build` (esbuild-wasm, 1.1 s).
+A DO runs OLD class code after deploy (~1 min) — a smoke test straight after
+`wrangler deploy` lies · CORS allow-headers must carry `X-Chunk-Sha256` when
+copying the upload pipeline · backstop ordering is correctness (once anything
+parks, everything parks) · CDP `packetLoss` is a no-op in Chrome 151 (use
+netem) · `--use-fake-ui-for-media-devices` is insufficient under headless=new
+(needs `Browser.grantPermissions`) · Chrome hands an AudioWorklet an EMPTY input
+array when it latches a bus silent (fix: a started `ConstantSourceNode(0)`) ·
+**iOS refuses to autoplay an UNMUTED video** (this is why flipper's featured
+tile rendered black) · one MoQ group = one QUIC uni-stream · `-bf 0` for
+repackaged MediaRecorder streams · a codec is not testable against itself (our
+OSC padding bug round-tripped perfectly and died on the first real packet) ·
+Docker-esbuild is GONE (`cd proto/jam/moq && npm run build`, 1.1 s).
