@@ -72,9 +72,16 @@ TO BUILD:
 - v0 (≈2 sessions): engine.mjs (leg supervisor + control WS + T0 stamping + uploader
   integration); console page with GO LIVE + ARCHIVE wired end-to-end. Definition of
   done: one command + one page runs a complete show incl. replay link.
-- v1 (≈2 sessions): SHOW + ROOM + SOUND panels; score editor (textarea + validate is
-  enough); sound-check; health strip. Two-clock rehearsal happens HERE (first real
-  human test through the console).
+- v1 ✅ **DONE 2026-08-30** (session 7): SHOW + ROOM + SOUND panels, sound-check,
+  health strip. `studio/roster.mjs` is the roster adapter §5 promised and that
+  had never been written — plain ESM, loaded identically by node and the browser,
+  registered on the same deck as the cues so `deck.reduceAt('roster', t)` works
+  and every room delta is a row on the run's timeline. Measured: promote/demote
+  echo 32–47 ms; the 5 s sound check traverses the REAL publish path to R2 and
+  back (silent → "a silent show is a valid show"; tone → AAC 96k costs 2.7 dB).
+  Grid archive wired end to end, 8/8. Verify 14/15 → **24/24**.
+  **Two-clock rehearsal has still not happened — it needs a human, and that is
+  now the binding constraint on the whole project.**
 - v2 (when an unmanaged machine exists): Tauri wrap + signing; OBS plugin/profile
   auto-config; composite-recorder audio mix test; MoQ auto-upgrade tier in the
   audience player; R2 lifecycle rules (retention/pruning).
@@ -137,6 +144,15 @@ editing, Tauri. Grid-archive replay (per-participant, roster reducer) is the
 FIRST v1 feature and the reason the roster adapter ships in v0.
 
 ## 4. Risks / open items
+
+**Closed 2026-08-30**: the ⚠ −45.3 ms content anchor is explained — it was never
+a constant but a ~95 ms-wide, frame-quantised distribution (a stale first
+screencast frame stamped `now`, plus encoder frame swallow). Stamping on frame
+swap took per-cue replay abs p95 from 39 to 19–26 ms. ⚠ **And it reaches
+further: `replay.html`'s content anchor carries ~one frame of bias of its own,
+so every content-anchor number this project has printed carries it, including
+the archive rig's −15 ms.** See `studio/NOTES.md` for the one-line fix and the
+"re-measure them all in the same breath" caveat.
 
 - Composite grid-audio mix untested (flagged phase 3); engine treats grid-archive
   as v2.

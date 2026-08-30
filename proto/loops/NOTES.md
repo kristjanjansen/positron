@@ -196,6 +196,14 @@ that actually bites, and it is why the wrap is a **callback and never a row**.
 
 ## Seams found in code I do not own
 
+> **UPDATE 2026-08-30 (session 7): seams 1, 2 and 3 are all CLOSED.** See
+> plan-timeline.md §9. Seam 1 turned out to have a second door nobody had
+> noticed — the seek fold's `assertState()` — and `caps.evidenceGated`, wanted
+> below, was refuted in favour of an unconditional gate. Seam 2's
+> `deck.assertState` exists and `wrapSpan()` now uses it. Seam 3 is closed by a
+> renderer that runs the nest rather than being handed two numbers. The
+> original text is kept below as written.
+
 1. **The evidence firewall is a READ-side firewall.** `window`/`reduce`/
    `sampleAt`/`bracket` are gated by the policy; **actuation is not** — nothing
    in transport.mjs stops a derived lane from FIRING under `'attested'`. An

@@ -256,8 +256,12 @@ regression gate (the existing measurement suite must stay green).
 
 ## 7. BUILT — state of the library (2026-08-28, sessions 6h–6ab)
 
+> ⚠ **§9 (2026-08-30) is newer and supersedes this section wherever they
+> disagree** — in particular every seam §7.7/§7.9/§8.8 lists as open.
+
 The substrate described above is no longer a plan. `timeline/` exists, is
-measured, and has **eight clients**. What follows amends §§1–6 with what the
+measured, and has **fourteen clients** (eight at the time this section was
+written; see §9). What follows amends §§1–6 with what the
 building taught; where a section above is now wrong, this section wins.
 
 ### 7.1 What exists
@@ -636,7 +640,9 @@ as future work; a loop with an evidence toggle is a direct answer.
   into the string `"null"` (broke byte-identity on the SECOND round-trip);
   nested's "adapter registered after construction is unreachable" seam is closed
   by v0.6's `deck.adapter`/`deck.silence`.
-- **Seams still open**: the evidence firewall is **read-side only** — nothing
+- **Seams still open** *(as of 2026-08-29 — **all three are CLOSED in §9**;
+  kept as written because the first one turned out to have a second door this
+  list did not know about)*: the evidence firewall is **read-side only** — nothing
   stops a derived lane from FIRING under `'attested'`, so an evidence-only
   performance is the adapter's job (wants `fire()` gating or
   `caps.evidenceGated`); no `deck.assertState(kind, state, info)`; `renderDeck`
@@ -645,3 +651,112 @@ as future work; a loop with an evidence toggle is a direct answer.
   bar to be polymetric AGAINST; addressing an inner loop's repetitions from an
   outer score; and a wrap the SCORE can branch on — a score quotes traces, it
   does not branch.
+
+## 9. CLOSED (2026-08-30, session 7) — what §7 and §8 still listed as open
+
+This section is newer than §7–§8 and wins where they disagree. Every seam those
+sections name as open is closed below, or restated with the reason it stays.
+Full detail: `timeline/lab/NOTES-firewall.md`, `NOTES-strip.md` §12,
+`NOTES-render-nest.md`, `proto/looper/NOTES.md`, `studio/NOTES.md`.
+
+### 9.1 The evidence firewall is no longer read-side only — and it had two doors
+§8.8 named one hole (`fire()`). There were **two**. Beside firing,
+`applyReduce()` → `adapter.assertState()` folded a derived lane's whole prefix
+into its actuator under `'attested'`: `deck.reduceAt('tone~erode', t)` returned
+`null` while `deck.seek(t)` silently asserted tier 3. **One lane, two answers,
+decided by which door the query came through.** Both are gated, plus the new
+third (`deck.assertState`).
+
+**`caps.evidenceGated` is REFUTED and the gate is unconditional.** An adapter
+opt-in reproduces the `caps.series` failure with the sign flipped — *declared
+and unread* returned a value belonging to neither controller; *undeclared and
+unenforced* returns a dreamed note in an archival performance. The governing
+sentence: **asking the adapter's permission on one side of a firewall and not
+the other is not a firewall.** The adapter keeps a say in what a refusal
+*sounds* like (`caps.absentState`/`silence()`), never in whether it happens.
+
+Proof, matched to §7.3's read-side standard: an `attested` deck's **actuation
+trace and drift channel** are bit-identical to a deck that never held the
+restorations and to one after a physical `drop()` (110 rows, 4,165 bytes). A
+refusal writes no drift row, which is *why* that identity is available.
+
+### 9.2 `deck.assertState(kind, state, info)` exists
+Moves the reduce snapshot without replaying a prefix; writes no drift row;
+verification opt-in (1.48 µs vs 81.4 µs, 55×); refusals never move the snapshot.
+`nested.mjs`'s `wrapSpan()` step 3 now uses it — folding at `out` and asserting
+at the **playhead** — which closes proto/loops seam #2 ("works; slightly
+untrue").
+
+### 9.3 The renderer gap of §7.9 is closed
+Ambiguation, `when.kind` edges, the aoristic aggregate and deep time all ship.
+Three results amend what §7.4 assumed:
+- **The empty core is the normal case, not an edge case** — `core: 0` in every
+  window at every zoom on the only real archive we have. Ambiguation
+  *degenerates* when the core is empty, so the fallback is the same study's
+  other recommendation for the same task (error bars over the outer bracket),
+  which cannot be misread as a core because it is not a filled region.
+- **The third answer of `necessary` is a property of the row AND THE WINDOW.**
+  The undecidable tally moves with the scroll wheel (19/0 at one zoom, 0/11 at
+  another): the epistemics belong to the *question*, and on a zoomable axis the
+  wheel is what asks it. Undecidable rows ghost; they never vanish.
+- **§7.4's aggregate recipe had one factor too many.** Mass `1/(b−a)` and
+  "divided by overlapping-period count" are the same operation once there is one
+  bin per pixel column — the column *is* the period. Applying both halves every
+  mass twice.
+
+### 9.4 Deep time — a measured ceiling, and ms stays the position domain
+Integer ms is exact to 2^53 = 285,426.8 y; ulp at 13.8 Gyr is 65,536 ms; `t += 1`
+stalls at ~295 kyr. **But the failure that would arrive first is not precision**:
+the axis asked for 138,000,000 major ticks per frame, and `formatTime` handed
+deep positions to `Date`, where `new Date(-4.35e20).toISOString()` throws. Both
+fixed. The zoom ceiling is now derived from IEEE-754 (`1000/ulp(t)`) rather than
+hand-authored per era — at 13.8 Gyr the deepest honest view still spans 25.5
+hours. What would force an offset+scale domain is a deck needing millisecond
+resolution *and* a Gyr span; that is not a timeline, it is two.
+
+### 9.5 `renderDeck` sees a nest
+By **running the shipped nest**, not re-deriving it. Byte-identical twice across
+fragment, loop, two levels and a twice-round-tripped score; four hashes equal
+across two Chrome processes; lateness 0.000 ms; 1.9× a flat render.
+- **The polled artefact inverted**: in playback polling *lost* a downbeat;
+  offline it *leaks* (the child free-runs past `out`). And the polled render is
+  byte-identical **to itself** — **determinism is not correctness**, which is a
+  general warning about every hash-equality proof in this document.
+- **Offline, a loop is EXPANDED, not replayed.** `createAudioLane` cancels
+  committed nodes on every transport state change and a wrap *is* a
+  `child.seek()`, so a looping child cancelled its own audio once per pass
+  (1 nonzero sample of 7). Corollary now asserted: **a stub context is blind to
+  this whole bug class** (7/7 stub vs 1/7 real).
+
+### 9.6 What the fourteenth client taught (proto/looper)
+The first client to put capture, projection, quotation and actuation on one
+clock at once.
+- **C10 is the looper's user interface.** A looper appeared to need the missing
+  `nest.retrigger()` and does not: the quotation is authored *after* the trace
+  exists, so the length is known before the quotation is built. This is the
+  strongest evidence so far that §8.1 put `repeat` in the score and not the log.
+- **`caps.audio` is inert without `leadMs`** — 1/36 fires reach the sample grid
+  at 0, 27/27 at 30; sd 4.38 → 0.38 ms. The library should either default it
+  non-zero or report `bridged: n/total`, because today an adapter can declare
+  the cap, take the fallback on 34 of 36 fires, and look identical to one that
+  works.
+- **"No stuck notes" comes from the reducer, not from `loopWrap()`.** Disabling
+  the callback changes nothing; removing `reduce()`/`assertState()` strands
+  voices forever. §8.3's flag names the behaviour; the seek performs it.
+- **`nest.add()` on an already-playing parent silently never enters** — it
+  pauses the deck and relies on an `enter` event already behind the playhead. It
+  wants to do the re-seek itself, or report a degradation saying it did not.
+- A remote loop is **latency-indifferent** because a quotation is a value; what
+  is *not* free is clock agreement, and the servo's dead band — invisible with
+  one deck — becomes a cross-peer flam because two peers park independently
+  inside their own bands.
+
+### 9.7 Still open
+`when` on spans (a span cannot carry one bracket for its start and another for
+its end, so PlanningLines' six quantities collapse to four) · competing
+authorities (one `when` per row — still the deferral most likely to be
+regretted) · non-contiguous brackets (rendered as their hull, which over-claims)
+· the trapezoid interior · transaction time · space · `createAudioLane` does not
+consult the evidence gate, and wants `{onStateChange: 'cancel' | 'keep'}` ·
+`certainty` is inert on a span lane's own query (the strip re-derives it per
+window) · `nest.retrigger()` · a wrap the SCORE can branch on.
