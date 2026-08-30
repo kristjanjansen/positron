@@ -28,3 +28,5 @@ proto/loops/.chrome-verify/
 
 # studio run logs: transient, and the run artifacts under studio/runs are the record
 studio/logs/
+
+**/.chrome-mobile/

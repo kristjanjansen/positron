@@ -1,5 +1,9 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>looper — a quotation with repetition, played by hand</title>
 <style>
   :root{
@@ -31,13 +35,65 @@
   .pill.on{color:var(--live);border-color:#2a4a33}
 
   canvas{width:100%;display:block;border:1px solid var(--line);border-radius:9px;background:#0e1216}
-  .keys{margin-top:16px;display:flex;gap:3px;user-select:none;flex-wrap:wrap}
-  .k{position:relative;width:38px;height:96px;border-radius:0 0 6px 6px;border:1px solid var(--line);
+
+  /* THE KEYBED. One geometry for both pointer classes: white keys flex to fill,
+     black keys are absolutely placed at a percentage, so the same DOM is a
+     38 px desktop piano and a full-width thumb piano with no second layout.
+     `touch-action: none` is correct HERE and only here — this element is a
+     control surface, and the page around it keeps its scroll. */
+  .kb{position:relative;margin-top:16px;display:flex;gap:3px;user-select:none;
+      -webkit-user-select:none;touch-action:none;max-width:560px}
+  .k{flex:1 1 0;height:96px;border-radius:0 0 6px 6px;border:1px solid var(--line);
      background:#e8edf3;color:#0b0d10;font:600 10px/1 var(--mono);display:flex;align-items:flex-end;
-     justify-content:center;padding-bottom:7px;cursor:pointer}
-  .k.blk{background:#1a2029;color:#8a95a3;height:62px;width:26px;margin:0 -14px;z-index:2;border-color:#2a323d}
+     justify-content:center;padding-bottom:7px;cursor:pointer;min-width:0}
+  .k.blk{position:absolute;top:0;flex:none;background:#1a2029;color:#8a95a3;
+         height:60%;width:7.2%;z-index:2;border-color:#2a323d;transform:translateX(-50%)}
   .k.down{background:var(--hot);color:#231a00}
   .k.blk.down{background:#a9761f;color:#fff}
+
+  /* ------------------------------------------------------------------------
+     COARSE POINTERS. `pointer: coarse` and not a viewport width — a 1024 px
+     tablet is a touch device and a 500 px desktop window is not (mobile-2026-08
+     §1, and it is the rule the strip already follows).
+     ------------------------------------------------------------------------ */
+  @media (pointer: coarse){
+    body{font-size:15px}
+    header{padding:calc(10px + env(safe-area-inset-top)) 16px 8px}
+    h1{font-size:15px} h1 span{display:none} .sub{display:none}
+    main{grid-template-columns:1fr}
+    .stage{padding:12px 12px 0;display:flex;flex-direction:column}
+    /* the instrument owns the screen; the readouts go below the fold */
+    aside{border-left:none;border-top:1px solid var(--line);
+          padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+    canvas{border-radius:7px}
+    .kb{max-width:none;margin-top:12px}
+    .k{height:150px;border-radius:0 0 9px 9px;font-size:12px;padding-bottom:10px}
+    .k.blk{height:58%}
+    /* 44 px minimum target, and manipulation kills the 300 ms double-tap wait */
+    button{min-height:44px;padding:12px 16px;font-size:13px;touch-action:manipulation}
+    input[type=range]{height:44px;touch-action:manipulation}
+    /* iOS zooms in on a sub-16 px input and never zooms back */
+    input,select{font-size:16px}
+    .transport{gap:7px;margin-bottom:12px}
+    .pill{padding:8px 10px}
+    /* THE PEDAL. There is no space bar on a phone, so the gesture the whole
+       instrument is named for gets a thumb-sized target of its own. */
+    #rec{flex:1 1 100%;order:-1;min-height:56px;font-size:15px}
+    .hint kbd{display:none}
+    .hint .desktop-only{display:none}
+  }
+  @media (pointer: fine){ .touch-only{display:none} }
+  .octgrp{display:flex;gap:7px}
+  @media (pointer: coarse){
+    /* the readouts are a strip, not a stack of buttons */
+    .pill{font-size:10.5px;padding:6px 8px}
+    /* the octave pair is one control and must not be split across a wrap */
+    .octgrp{display:flex;gap:7px}
+    #octDown,#octUp{padding:12px 14px}
+    /* which lane the synth is on is developer information, not performer
+       information — it costs a row on a phone and tells a player nothing */
+    #p-mode{display:none}
+  }
 
   table{width:100%;border-collapse:collapse;font:12px/1.5 var(--mono)}
   td{padding:3px 0;vertical-align:top}
@@ -70,18 +126,20 @@
       <button id="save" disabled>SAVE</button>
       <button id="load" disabled>LOAD</button>
       <input type="file" id="file" accept="application/json" hidden>
+      <span class="octgrp touch-only"><button id="octDown" title="octave down">OCT −</button><button id="octUp" title="octave up">OCT +</button></span>
       <span class="pill" id="p-pass">pass —</span>
       <span class="pill" id="p-len">loop —</span>
       <span class="pill" id="p-voices">0 voices</span>
       <span class="pill" id="p-mode">audio lane</span>
     </div>
 
-    <canvas id="loop" height="300"></canvas>
+    <canvas id="loop"></canvas>
 
-    <div class="keys" id="keys"></div>
+    <div class="kb" id="keys"></div>
     <div class="hint">
-      Play with <kbd>a</kbd><kbd>w</kbd><kbd>s</kbd><kbd>e</kbd><kbd>d</kbd><kbd>f</kbd><kbd>t</kbd><kbd>g</kbd><kbd>y</kbd><kbd>h</kbd><kbd>u</kbd><kbd>j</kbd><kbd>k</kbd> ·
-      octave <kbd>z</kbd><kbd>x</kbd> · <kbd>space</kbd> = REC/pedal.
+      <span class="desktop-only">Play with <kbd>a</kbd><kbd>w</kbd><kbd>s</kbd><kbd>e</kbd><kbd>d</kbd><kbd>f</kbd><kbd>t</kbd><kbd>g</kbd><kbd>y</kbd><kbd>h</kbd><kbd>u</kbd><kbd>j</kbd><kbd>k</kbd> ·
+      octave <kbd>z</kbd><kbd>x</kbd> · <kbd>space</kbd> = REC/pedal. </span>
+      <span class="touch-only">Play the keys with as many fingers as you like. <b>REC</b> is the pedal. </span>
       First press starts recording; second press <em>sets the loop length to what you played</em> and starts it looping.
       Every press after that records an overdub onto its own layer.
     </div>
@@ -127,20 +185,52 @@ const $ = (s) => document.querySelector(s);
 const LAYER_COLORS = ['#7aa2f7', '#bb9af7', '#7dcfff', '#e0af68', '#f7768e', '#9ece6a'];
 
 // --- the keyboard as a piano ------------------------------------------------
-const KEYMAP = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12, l:14 };
+const FULL_KEYMAP = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12, l:14 };
 const BLACK = new Set([1, 3, 6, 8, 10]);
+const COARSE = matchMedia('(pointer: coarse)').matches;
+// ONE OCTAVE ON A THUMB, not nine white keys squeezed into a phone. Dropping
+// the ninth white (`l`, a ninth above the root) takes each key from 38 to
+// ~43 px on a 390 px device — still under the 44 px guideline, but the
+// alternative is a piano nobody can hit. The keys removed are the ones a
+// player reaches for last, and `z`/`x` still move the octave.
+const KEYMAP = COARSE
+  ? Object.fromEntries(Object.entries(FULL_KEYMAP).filter(([k]) => k !== 'l'))
+  : FULL_KEYMAP;
 let octave = 4;
 const noteOf = (k) => 12 * (octave + 1) + KEYMAP[k];
 
 const keysEl = $('#keys');
 const keyEls = new Map();
-for (const [k, semi] of Object.entries(KEYMAP)) {
-  const el = document.createElement('div');
-  el.className = 'k' + (BLACK.has(semi % 12) ? ' blk' : '');
-  el.textContent = k;
-  el.dataset.key = k;
-  keysEl.appendChild(el); keyEls.set(k, el);
+{
+  // Whites first, in order, so flex lays them out; then blacks placed at the
+  // boundary between the whites they sit between. One pass, no magic numbers.
+  const entries = Object.entries(KEYMAP);
+  const whites = entries.filter(([, semi]) => !BLACK.has(semi % 12));
+  const blacks = entries.filter(([, semi]) => BLACK.has(semi % 12));
+  for (const [k] of whites) {
+    const el = document.createElement('div');
+    el.className = 'k'; el.dataset.key = k;
+    keysEl.appendChild(el); keyEls.set(k, el);
+  }
+  for (const [k, semi] of blacks) {
+    const before = whites.filter(([, s2]) => s2 < semi).length;   // whites to its left
+    const el = document.createElement('div');
+    el.className = 'k blk'; el.dataset.key = k;
+    el.style.left = `${(before / whites.length) * 100}%`;
+    keysEl.appendChild(el); keyEls.set(k, el);
+  }
 }
+/** On a phone the letters name keys on a keyboard that is not there, so the
+ *  keys say what they SOUND — pitch class, which does not move with the octave. */
+const PITCH = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+function relabelKeys() {
+  for (const [k, el] of keyEls) el.textContent = COARSE ? PITCH[noteOf(k) % 12] : k;
+}
+// called HERE, not inside the build block above: `relabelKeys` hoists but the
+// `const PITCH` it reads does not, so calling it earlier is a TDZ error that
+// takes the whole module down — and a module that throws leaves `window.__L`
+// undefined, which reads as "audio failed to start".
+relabelKeys();
 
 // --- state ------------------------------------------------------------------
 let ctx = null, voices = null, looper = null, ear = null;
@@ -182,12 +272,41 @@ async function boot() {
   window.__L = { looper, voices, ctx, ear, onsets, earOnsets, drainEar, press, release, setCc,
                  peer, room: ROOM, id: PEER_ID, remote: [], audioAnchor };
 
-  $('#start').disabled = true; $('#start').textContent = 'AUDIO RUNNING';
+  // Once audio is running this button can do nothing but take up a row of a
+  // phone screen, so it leaves rather than sitting there greyed out.
+  $('#start').hidden = true;
   for (const b of ['#rec', '#clear', '#save', '#load']) $(b).disabled = false;
   requestAnimationFrame(frame);
   setInterval(drainEar, 500);
 }
 $('#start').onclick = boot;
+
+/**
+ * THE UNLOCK. An AudioContext starts suspended on iOS and `resume()` only works
+ * inside a user gesture — so the first gesture of ANY kind arms it, not just a
+ * press of the button that happens to say so. Capture phase, once, and it does
+ * not swallow the gesture.
+ *
+ * ⚠ HONESTLY UNTESTED: headless Chrome runs with
+ * `--autoplay-policy=no-user-gesture-required`, which makes this path DEAD CODE
+ * in every harness we have (mobile-2026-08 §9.2 calls it the single largest
+ * untested surface in the mobile work). It is written from the documented
+ * behaviour and has never executed under a real refusal.
+ */
+for (const ev of ['pointerdown', 'touchend', 'keydown']) {
+  addEventListener(ev, function armAudio() {
+    for (const e2 of ['pointerdown', 'touchend', 'keydown']) removeEventListener(e2, armAudio, true);
+    if (!ctx) boot().catch(showAudioRefusal);
+    else if (ctx.state === 'suspended') ctx.resume().catch(showAudioRefusal);
+  }, { capture: true, once: false });
+}
+function showAudioRefusal(err) {
+  // A silent fallback and a silent failure look identical — so name it.
+  $('#warn').textContent = `audio refused (${err && err.name ? err.name : 'unknown'}) — tap CLICK TO START AUDIO. `
+    + `On iOS check Silent Mode and Low Power Mode; each refuses differently.`;
+  $('#start').disabled = false;
+  $('#start').textContent = 'TAP TO START AUDIO';
+}
 
 /**
  * The pair that lets one page's EAR be compared with another's. An onset
@@ -236,6 +355,11 @@ const stampOf = (ev) => {
   return peer ? local + performance.timeOrigin + peer.offsetMs() : local;
 };
 const nowStamp = () => (peer ? peer.now() : performance.now());
+/** what actually produced this event — 'touch' and 'kbd' have different input
+ *  latencies and a trace that calls them both 'kbd' cannot tell them apart */
+const sourceOf = (ev) => (!ev ? 'synthetic'
+  : ev.pointerType ? (ev.pointerType === 'mouse' ? 'pointer' : ev.pointerType)
+  : 'kbd');
 
 function press(key, ev) {
   if (!looper || down.has(key)) return;
@@ -244,7 +368,7 @@ function press(key, ev) {
   const row = {
     at: stampOf(ev),
     handlerAt: nowStamp(),
-    type: 'note-on', note: noteOf(key), vel: 100, source: ev ? 'kbd' : 'synthetic',
+    type: 'note-on', note: noteOf(key), vel: 100, source: sourceOf(ev),
     layer: looper.layers.length,
   };
   looper.capture(row);
@@ -255,7 +379,7 @@ function release(key, ev) {
   down.delete(key);
   const el = keyEls.get(key); if (el) el.classList.remove('down');
   const row = { at: stampOf(ev), handlerAt: nowStamp(),
-    type: 'note-off', note: noteOf(key), source: ev ? 'kbd' : 'synthetic',
+    type: 'note-off', note: noteOf(key), source: sourceOf(ev),
     layer: looper.layers.length };
   looper.capture(row);
   if (peer) peer.publishLive(row);
@@ -271,16 +395,47 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const k = e.key.toLowerCase();
   if (k === ' ') { e.preventDefault(); pedal(e); return; }
-  if (k === 'z') { octave = Math.max(1, octave - 1); return; }
-  if (k === 'x') { octave = Math.min(7, octave + 1); return; }
+  if (k === 'z') { setOctave(-1); return; }
+  if (k === 'x') { setOctave(1); return; }
   if (k in KEYMAP) { e.preventDefault(); press(k, e); }
 });
 addEventListener('keyup', (e) => {
   const k = e.key.toLowerCase();
   if (k in KEYMAP) release(k, e);
 });
-keysEl.addEventListener('pointerdown', (e) => { const k = e.target.dataset && e.target.dataset.key; if (k) press(k, e); });
-addEventListener('pointerup', () => { for (const k of [...down]) release(k, null); });
+/**
+ * TOUCH IS POLYPHONIC AND THE OLD HANDLER WAS NOT. A single window-level
+ * `pointerup` that released every held key is correct for a mouse (there is one
+ * of them) and wrong for fingers: lifting one thumb silenced the chord the
+ * other one was holding. Each pointer now owns exactly the key it pressed, and
+ * `setPointerCapture` guarantees the release lands on this element even if the
+ * finger has drifted off the key by the time it lifts — a real finger rolls
+ * 5–10 px after the player believes they have let go (mobile-2026-08 §9.6).
+ *
+ * `pointercancel` matters as much as `pointerup`: the browser sends it when it
+ * decides a gesture was really a scroll, and a note whose cancel is ignored is
+ * a stuck note.
+ */
+const byPointer = new Map();          // pointerId -> key
+keysEl.addEventListener('pointerdown', (e) => {
+  const k = e.target.dataset && e.target.dataset.key;
+  if (!k) return;
+  e.preventDefault();
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+  byPointer.set(e.pointerId, k);
+  press(k, e);
+});
+const liftPointer = (e) => {
+  const k = byPointer.get(e.pointerId);
+  if (k === undefined) return;
+  byPointer.delete(e.pointerId);
+  release(k, e);
+};
+keysEl.addEventListener('pointerup', liftPointer);
+keysEl.addEventListener('pointercancel', liftPointer);
+// a mouse that leaves the window mid-press still has to let go
+addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') liftPointer(e); });
+addEventListener('blur', () => { for (const [id, k] of [...byPointer]) { byPointer.delete(id); release(k, null); } });
 $('#cc').addEventListener('input', (e) => setCc(+e.target.value, e));
 
 // --- Web MIDI, if a device happens to be there ------------------------------
@@ -314,6 +469,7 @@ function pedal(ev) {
     $('#rec').textContent = looper.layers.length === 0 ? '● RECORDING (sets length)' : '● OVERDUBBING';
   } else {
     const layer = looper.commitLayer(at);
+    resize();
     $('#rec').classList.remove('armed');
     $('#rec').textContent = '● OVERDUB';
     renderLayers();
@@ -345,6 +501,10 @@ $('#save').onclick = () => {
   $('#warn').textContent = `saved ${json.length} B — ${Math.round(json.length / looper.layers.length)} B per layer`;
 };
 $('#load').onclick = () => $('#file').click();
+const setOctave = (d) => { octave = Math.max(1, Math.min(7, octave + d)); relabelKeys();
+  $('#warn').textContent = `octave ${octave}`; };
+$('#octDown').onclick = () => setOctave(-1);
+$('#octUp').onclick = () => setOctave(1);
 $('#file').onchange = async (e) => {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
@@ -392,13 +552,45 @@ function receiveLayer(rec) {
 
 // --- the loop display -------------------------------------------------------
 const cv = $('#loop'), g = cv.getContext('2d');
-function resize() { cv.width = cv.clientWidth * devicePixelRatio; cv.height = 300 * devicePixelRatio;
-                    g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); }
-addEventListener('resize', resize); resize();
+let cvH = 300;
+/**
+ * iOS changes the VISIBLE viewport when the URL bar slides away and does NOT
+ * fire `resize` — an element sized from `innerHeight` keeps a height the user
+ * can no longer see. `visualViewport` is the event that actually fires
+ * (mobile-2026-08 §3), so the canvas listens to both.
+ *
+ * Height is derived rather than fixed at 300: on a phone the loop display gets
+ * whatever is left after the keybed and the transport, with a floor so it never
+ * collapses to nothing.
+ */
+function resize() {
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const vh = (window.visualViewport && window.visualViewport.height) || innerHeight;
+  // SIZE TO CONTENT, not to a constant. 300 px of empty lane is free on a
+  // desktop and expensive on a phone — it pushes the keys off the screen. The
+  // display is the header plus one lane per layer, floored so an empty
+  // instrument still shows its grid, and capped so a stack of layers scrolls
+  // rather than swallowing the keybed.
+  const lanes = Math.max(1, looper ? looper.layers.length
+    + remoteLoopers.reduce((a, r) => a + r.looper.layers.length, 0) : 1);
+  const needed = 26 + lanes * 34 + 18;
+  cvH = coarse ? Math.max(96, Math.min(needed, Math.max(96, vh - 430))) : Math.max(160, Math.min(300, needed));
+  cv.style.height = `${cvH}px`;
+  cv.width = cv.clientWidth * devicePixelRatio;
+  cv.height = cvH * devicePixelRatio;
+  g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 150));
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', resize);
+  visualViewport.addEventListener('scroll', resize);
+}
+resize();
 
 function frame() {
   requestAnimationFrame(frame);
-  const W = cv.clientWidth, H = 300;
+  const W = cv.clientWidth, H = cvH;
   g.clearRect(0, 0, W, H);
   const L = looper.loopMs();
   const phase = looper.phase();

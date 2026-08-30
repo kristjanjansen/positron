@@ -298,6 +298,72 @@ over-read.
 
 ---
 
+## MOBILE — `node proto/looper/mobile-verify.mjs`, 15 asserts
+
+Device metrics + touch emulation + **real `Input.dispatchTouchEvent` streams**,
+never a resized window — a resized window is a small desktop, which is a
+different thing from a phone. Two devices: iPhone-class 390×844@3× and
+small-Android 360×800@2×. Rules taken wholesale from
+`research/mobile-2026-08.md` rather than rediscovered.
+
+- **There was no viewport meta.** The repo's own findings call that "the single
+  biggest bug on three of the four public surfaces"; the looper was a fourth.
+- **`pointer: coarse`, not a viewport width** — a 1024 px tablet is a touch
+  device and a 500 px desktop window is not.
+- **Touch is polyphonic and the old handler was not.** A single window-level
+  `pointerup` releasing every held key is correct for a mouse (there is one of
+  them) and wrong for fingers: lifting one thumb silenced the chord the other
+  was holding. Each pointer now owns exactly the key it pressed, with
+  `setPointerCapture` so the release lands even though a real finger rolls
+  5–10 px after the player believes they let go. **Asserted**: three fingers →
+  3 voices; lift one → the other two still held. `pointercancel` is handled with
+  `pointerup`, because a cancel the page ignores is a stuck note.
+- **One octave, not nine white keys squeezed into a phone.** Dropping the ninth
+  white takes each key from 38 px to 43 px on a 390 px device — still under the
+  44 px guideline, and the alternative is a piano nobody can hit.
+- **The keys say what they SOUND on touch** (C, D, E…), because the letters name
+  keys on a keyboard that is not there. Octave buttons for the same reason: `z`
+  and `x` are equally absent.
+- **The pedal gets a thumb-sized target of its own** (366×56 px, full width,
+  first in the transport). There is no space bar on a phone, and the gesture the
+  instrument is named for cannot be the one that is hard to hit.
+- **The loop display is sized to CONTENT** — header + one lane per layer, floor
+  96 px — where the desktop constant was 300. On a phone 200 px of empty lane is
+  not free; it pushes the keybed off the screen.
+- `touch-action: none` on the keybed **and only there**, so a drag across the
+  keys plays instead of scrolling while the page around it keeps its scroll.
+  `touch-action: manipulation` on buttons kills the 300 ms double-tap wait.
+- **A loop recorded entirely by touch**: two REC taps and five finger presses,
+  5 notes over 2067 ms, length set by playing, and it loops and sounds (20
+  onsets detected in the output samples).
+
+### Two bugs the mobile pass found, one of them mine twice over
+- **`#oct+` is not a valid CSS selector.** `querySelector` threw, which aborted
+  module evaluation partway, which left `const cv` uninitialised, which made
+  every animation frame throw *"Cannot access 'cv' before initialization"* —
+  several hundred times, pointing at a line that was completely innocent. One
+  invalid character, three symptoms, none of them near the cause.
+- **A hoisting trap of the same family**: `relabelKeys()` was called from the
+  keyboard-build block above the `const PITCH` it reads. The function hoists;
+  the const does not. Same outcome — a module that throws leaves `window.__L`
+  undefined, which reads as "audio failed to start".
+- And a harness bug: **CDP's `touchEnd` takes the points being RELEASED**, not
+  the ones remaining. Sending the survivors ends them instead, which is how the
+  polyphony assert first "failed" against a page that was already correct.
+
+### ⚠ What this does not test
+1. **Safari is not emulated at all** — this is Blink with a small viewport.
+2. **The audio unlock is dead code here.** Headless Chrome runs with
+   `--autoplay-policy=no-user-gesture-required`, so the suspended-context branch
+   never executes. `research/mobile-2026-08.md` §9.2 already called this the
+   single largest untested surface in the mobile work, and the looper has not
+   changed that. The unlock is written from documented behaviour and has never
+   run under a real refusal.
+3. **Real finger physics** — contact drift, palm rejection, variable pressure.
+   The synthetic points are clean 12 px circles.
+
+---
+
 ## Seams found in code I do not own
 
 1. **`nest.add()` on an already-playing parent silently never enters.** It ends
