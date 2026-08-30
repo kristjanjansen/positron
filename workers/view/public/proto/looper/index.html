@@ -1,0 +1,719 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>looper — a quotation with repetition, played by hand</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#12161b; --line:#232a33; --ink:#e8edf3; --dim:#8a95a3;
+    --hot:#ffcc66; --live:#7ee787; --rec:#ff6b6b; --l0:#7aa2f7; --l1:#bb9af7; --l2:#7dcfff; --l3:#e0af68;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif}
+  header{padding:18px 22px 10px;border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:17px;font-weight:620;letter-spacing:-.01em}
+  h1 span{color:var(--dim);font-weight:400}
+  .sub{color:var(--dim);font-size:12.5px;margin-top:3px}
+  main{display:grid;grid-template-columns:1fr 340px;gap:0;min-height:calc(100vh - 74px)}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+  .stage{padding:18px 22px}
+  aside{border-left:1px solid var(--line);padding:18px;background:var(--panel)}
+  @media (max-width:900px){aside{border-left:none;border-top:1px solid var(--line)}}
+
+  .transport{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  button{font:600 12.5px/1 var(--mono);letter-spacing:.03em;color:var(--ink);background:#1a2029;
+    border:1px solid var(--line);border-radius:7px;padding:10px 14px;cursor:pointer}
+  button:hover{border-color:#3a4553}
+  button:disabled{opacity:.4;cursor:default}
+  button.arm{background:#2a1417;border-color:#5c2a2f;color:#ffb3b3}
+  button.armed{background:var(--rec);border-color:var(--rec);color:#1a0000;animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.62}}
+  .pill{font:600 11px/1 var(--mono);padding:6px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+  .pill.on{color:var(--live);border-color:#2a4a33}
+
+  canvas{width:100%;display:block;border:1px solid var(--line);border-radius:9px;background:#0e1216}
+
+  /* THE KEYBED. One geometry for both pointer classes: white keys flex to fill,
+     black keys are absolutely placed at a percentage, so the same DOM is a
+     38 px desktop piano and a full-width thumb piano with no second layout.
+     `touch-action: none` is correct HERE and only here — this element is a
+     control surface, and the page around it keeps its scroll. */
+  .kb{position:relative;margin-top:16px;display:flex;gap:3px;user-select:none;
+      -webkit-user-select:none;touch-action:none;max-width:560px}
+  .k{flex:1 1 0;height:96px;border-radius:0 0 6px 6px;border:1px solid var(--line);
+     background:#e8edf3;color:#0b0d10;font:600 10px/1 var(--mono);display:flex;align-items:flex-end;
+     justify-content:center;padding-bottom:7px;cursor:pointer;min-width:0}
+  .k.blk{position:absolute;top:0;flex:none;background:#1a2029;color:#8a95a3;
+         height:60%;width:7.2%;z-index:2;border-color:#2a323d;transform:translateX(-50%)}
+  .k.down{background:var(--hot);color:#231a00}
+  .k.blk.down{background:#a9761f;color:#fff}
+
+  /* ------------------------------------------------------------------------
+     COARSE POINTERS. `pointer: coarse` and not a viewport width — a 1024 px
+     tablet is a touch device and a 500 px desktop window is not (mobile-2026-08
+     §1, and it is the rule the strip already follows).
+     ------------------------------------------------------------------------ */
+  @media (pointer: coarse){
+    body{font-size:15px}
+    header{padding:calc(10px + env(safe-area-inset-top)) 16px 8px}
+    h1{font-size:15px} h1 span{display:none} .sub{display:none}
+    main{grid-template-columns:1fr}
+    .stage{padding:12px 12px 0;display:flex;flex-direction:column}
+    /* the instrument owns the screen; the readouts go below the fold */
+    aside{border-left:none;border-top:1px solid var(--line);
+          padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+    canvas{border-radius:7px}
+    .kb{max-width:none;margin-top:12px}
+    .k{height:150px;border-radius:0 0 9px 9px;font-size:12px;padding-bottom:10px}
+    .k.blk{height:58%}
+    /* 44 px minimum target, and manipulation kills the 300 ms double-tap wait */
+    button{min-height:44px;padding:12px 16px;font-size:13px;touch-action:manipulation}
+    input[type=range]{height:44px;touch-action:manipulation}
+    /* iOS zooms in on a sub-16 px input and never zooms back */
+    input,select{font-size:16px}
+    .transport{gap:7px;margin-bottom:12px}
+    .pill{padding:8px 10px}
+    /* THE PEDAL. There is no space bar on a phone, so the gesture the whole
+       instrument is named for gets a thumb-sized target of its own. */
+    #rec{flex:1 1 100%;order:-1;min-height:56px;font-size:15px}
+    .hint kbd{display:none}
+    .hint .desktop-only{display:none}
+  }
+  @media (pointer: fine){ .touch-only{display:none} }
+  .octgrp{display:flex;gap:7px}
+  @media (pointer: coarse){
+    /* the readouts are a strip, not a stack of buttons */
+    .pill{font-size:10.5px;padding:6px 8px}
+    /* the octave pair is one control and must not be split across a wrap */
+    .octgrp{display:flex;gap:7px}
+    #octDown,#octUp{padding:12px 14px}
+    /* which lane the synth is on is developer information, not performer
+       information — it costs a row on a phone and tells a player nothing */
+    #p-mode{display:none}
+  }
+
+  table{width:100%;border-collapse:collapse;font:12px/1.5 var(--mono)}
+  td{padding:3px 0;vertical-align:top}
+  td:first-child{color:var(--dim);padding-right:10px;white-space:nowrap}
+  td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  h2{font:600 11px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--dim);
+     margin:0 0 9px;padding-top:14px;border-top:1px solid var(--line)}
+  h2:first-child{padding-top:0;border-top:none}
+  .layer{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1a2029;font:12px/1 var(--mono)}
+  .swatch{width:10px;height:10px;border-radius:3px;flex:none}
+  .layer .n{flex:1;color:var(--dim)}
+  .layer button{padding:4px 8px;font-size:10.5px}
+  .hint{color:var(--dim);font-size:12px;margin-top:12px}
+  kbd{font:600 11px var(--mono);background:#1a2029;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  input[type=range]{width:100%;accent-color:var(--hot)}
+  .warn{color:var(--hot);font-size:12px;margin-top:8px}
+</style>
+
+<header>
+  <h1>looper <span>— a quotation with repetition, played by hand</span></h1>
+  <div class="sub">The trace is what you played. The loop is a quotation of it. Nothing is ever re-stamped.</div>
+</header>
+
+<main>
+  <div class="stage">
+    <div class="transport">
+      <button id="start">CLICK TO START AUDIO</button>
+      <button id="rec" class="arm" disabled>● REC</button>
+      <button id="clear" disabled>CLEAR</button>
+      <button id="save" disabled>SAVE</button>
+      <button id="load" disabled>LOAD</button>
+      <input type="file" id="file" accept="application/json" hidden>
+      <span class="octgrp touch-only"><button id="octDown" title="octave down">OCT −</button><button id="octUp" title="octave up">OCT +</button></span>
+      <span class="pill" id="p-pass">pass —</span>
+      <span class="pill" id="p-len">loop —</span>
+      <span class="pill" id="p-voices">0 voices</span>
+      <span class="pill" id="p-mode">audio lane</span>
+    </div>
+
+    <canvas id="loop"></canvas>
+
+    <div class="kb" id="keys"></div>
+    <div class="hint">
+      <span class="desktop-only">Play with <kbd>a</kbd><kbd>w</kbd><kbd>s</kbd><kbd>e</kbd><kbd>d</kbd><kbd>f</kbd><kbd>t</kbd><kbd>g</kbd><kbd>y</kbd><kbd>h</kbd><kbd>u</kbd><kbd>j</kbd><kbd>k</kbd> ·
+      octave <kbd>z</kbd><kbd>x</kbd> · <kbd>space</kbd> = REC/pedal. </span>
+      <span class="touch-only">Play the keys with as many fingers as you like. <b>REC</b> is the pedal. </span>
+      First press starts recording; second press <em>sets the loop length to what you played</em> and starts it looping.
+      Every press after that records an overdub onto its own layer.
+    </div>
+    <div class="warn" id="warn"></div>
+  </div>
+
+  <aside>
+    <h2>this loop</h2>
+    <table id="t-loop"></table>
+    <h2>layers</h2>
+    <div id="layers"><div class="hint" style="margin:0">none yet — press <kbd>space</kbd> and play.</div></div>
+    <h2>filter (a level lane)</h2>
+    <input type="range" id="cc" min="0" max="127" value="88">
+    <div class="hint" style="margin-top:4px">
+      This is <code>cc</code>: <code>caps.loopState:'carry'</code>. It survives every wrap.
+      The notes are <code>'rearm'</code> and do not. One boundary, two behaviours.
+    </div>
+    <h2>timing</h2>
+    <table id="t-time"></table>
+    <h2>the two clocks</h2>
+    <table id="t-lat"></table>
+    <h2 id="h-peer" hidden>room</h2>
+    <table id="t-peer" hidden></table>
+  </aside>
+</main>
+
+<script type="module">
+import { createLooper, loadSession, stats, midiHz } from './looper.mjs';
+import { createVoices } from './synth.mjs';
+import { workerTickHost } from '../../timeline/transport.mjs';
+import { createPeer, broadcastTransport, wsTransport, epochNow } from './peer.mjs';
+
+// ?room=NAME turns this page into one PEER of a shared loop. Same instrument,
+// same code; the only difference is which clock it is built on and where a
+// committed layer goes when the pedal comes up.
+const PARAMS = new URLSearchParams(location.search);
+const ROOM = PARAMS.get('room');
+const PEER_ID = PARAMS.get('me') || `p-${Math.random().toString(36).slice(2, 7)}`;
+const RELAY = PARAMS.get('relay');            // ws:// URL, if a real hop is wanted
+let peer = null;
+
+const $ = (s) => document.querySelector(s);
+const LAYER_COLORS = ['#7aa2f7', '#bb9af7', '#7dcfff', '#e0af68', '#f7768e', '#9ece6a'];
+
+// --- the keyboard as a piano ------------------------------------------------
+const FULL_KEYMAP = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12, l:14 };
+const BLACK = new Set([1, 3, 6, 8, 10]);
+const COARSE = matchMedia('(pointer: coarse)').matches;
+// ONE OCTAVE ON A THUMB, not nine white keys squeezed into a phone. Dropping
+// the ninth white (`l`, a ninth above the root) takes each key from 38 to
+// ~43 px on a 390 px device — still under the 44 px guideline, but the
+// alternative is a piano nobody can hit. The keys removed are the ones a
+// player reaches for last, and `z`/`x` still move the octave.
+const KEYMAP = COARSE
+  ? Object.fromEntries(Object.entries(FULL_KEYMAP).filter(([k]) => k !== 'l'))
+  : FULL_KEYMAP;
+let octave = 4;
+const noteOf = (k) => 12 * (octave + 1) + KEYMAP[k];
+
+const keysEl = $('#keys');
+const keyEls = new Map();
+{
+  // Whites first, in order, so flex lays them out; then blacks placed at the
+  // boundary between the whites they sit between. One pass, no magic numbers.
+  const entries = Object.entries(KEYMAP);
+  const whites = entries.filter(([, semi]) => !BLACK.has(semi % 12));
+  const blacks = entries.filter(([, semi]) => BLACK.has(semi % 12));
+  for (const [k] of whites) {
+    const el = document.createElement('div');
+    el.className = 'k'; el.dataset.key = k;
+    keysEl.appendChild(el); keyEls.set(k, el);
+  }
+  for (const [k, semi] of blacks) {
+    const before = whites.filter(([, s2]) => s2 < semi).length;   // whites to its left
+    const el = document.createElement('div');
+    el.className = 'k blk'; el.dataset.key = k;
+    el.style.left = `${(before / whites.length) * 100}%`;
+    keysEl.appendChild(el); keyEls.set(k, el);
+  }
+}
+/** On a phone the letters name keys on a keyboard that is not there, so the
+ *  keys say what they SOUND — pitch class, which does not move with the octave. */
+const PITCH = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+function relabelKeys() {
+  for (const [k, el] of keyEls) el.textContent = COARSE ? PITCH[noteOf(k) % 12] : k;
+}
+// called HERE, not inside the build block above: `relabelKeys` hoists but the
+// `const PITCH` it reads does not, so calling it earlier is a TDZ error that
+// takes the whole module down — and a module that throws leaves `window.__L`
+// undefined, which reads as "audio failed to start".
+relabelKeys();
+
+// --- state ------------------------------------------------------------------
+let ctx = null, voices = null, looper = null, ear = null;
+const onsets = [];        // every scheduled onset, both paths
+const earOnsets = [];     // what the render thread actually heard
+let ccValue = 88;
+
+async function boot() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+  await ctx.resume();
+  await ctx.audioWorklet.addModule('./onset-worklet.js');
+  ear = new AudioWorkletNode(ctx, 'onset-detect');
+  ear.connect(ctx.destination);          // must be connected or it is not pulled
+
+  voices = createVoices(ctx, { dest: ear, onOnset: (r) => { onsets.push(r); } });
+
+  // THE CLOCK IS THE WHOLE DIFFERENCE between solo and shared. Solo runs on
+  // `performance.now()`, which is private to this document. A room runs on
+  // epoch time corrected by a peer-to-peer skew estimate, because two documents
+  // cannot compare `performance.now()` at all — their origins differ — and a
+  // relay's idea of the time was measured at ±50 ms of BIAS, which at a 2 s
+  // loop is 2.5 % of the circle and an audible flam.
+  if (ROOM) {
+    peer = createPeer({
+      id: PEER_ID,
+      transport: RELAY ? wsTransport(RELAY) : broadcastTransport(`elektron-looper:${ROOM}`),
+      onLayer: receiveLayer,
+      onLive: (row) => { if (row.type === 'note-on') voices.monitorOn({ ...row, layer: 'mon' }); else if (row.type === 'note-off') voices.monitorOff(row); },
+    });
+    $('#h-peer').hidden = false; $('#t-peer').hidden = false;
+  }
+  const clock = peer ? peer.clock : { domain: 'wall', now: () => performance.now() };
+
+  // A shared session runs a tighter servo: see looper.mjs — the dead band is
+  // per-peer position error, and two peers' bands do not cancel.
+  looper = createLooper({ clock, newHost: () => workerTickHost(), voices, ctx,
+                          toleranceMs: peer ? 1 : 5, onLayer: renderLayers });
+  looper.start(clock.now());
+  window.__L = { looper, voices, ctx, ear, onsets, earOnsets, drainEar, press, release, setCc,
+                 peer, room: ROOM, id: PEER_ID, remote: [], audioAnchor };
+
+  // Once audio is running this button can do nothing but take up a row of a
+  // phone screen, so it leaves rather than sitting there greyed out.
+  $('#start').hidden = true;
+  for (const b of ['#rec', '#clear', '#save', '#load']) $(b).disabled = false;
+  requestAnimationFrame(frame);
+  setInterval(drainEar, 500);
+}
+$('#start').onclick = boot;
+
+/**
+ * THE UNLOCK. An AudioContext starts suspended on iOS and `resume()` only works
+ * inside a user gesture — so the first gesture of ANY kind arms it, not just a
+ * press of the button that happens to say so. Capture phase, once, and it does
+ * not swallow the gesture.
+ *
+ * ⚠ HONESTLY UNTESTED: headless Chrome runs with
+ * `--autoplay-policy=no-user-gesture-required`, which makes this path DEAD CODE
+ * in every harness we have (mobile-2026-08 §9.2 calls it the single largest
+ * untested surface in the mobile work). It is written from the documented
+ * behaviour and has never executed under a real refusal.
+ */
+for (const ev of ['pointerdown', 'touchend', 'keydown']) {
+  addEventListener(ev, function armAudio() {
+    for (const e2 of ['pointerdown', 'touchend', 'keydown']) removeEventListener(e2, armAudio, true);
+    if (!ctx) boot().catch(showAudioRefusal);
+    else if (ctx.state === 'suspended') ctx.resume().catch(showAudioRefusal);
+  }, { capture: true, once: false });
+}
+function showAudioRefusal(err) {
+  // A silent fallback and a silent failure look identical — so name it.
+  $('#warn').textContent = `audio refused (${err && err.name ? err.name : 'unknown'}) — tap CLICK TO START AUDIO. `
+    + `On iOS check Silent Mode and Low Power Mode; each refuses differently.`;
+  $('#start').disabled = false;
+  $('#start').textContent = 'TAP TO START AUDIO';
+}
+
+/**
+ * The pair that lets one page's EAR be compared with another's. An onset
+ * detector reports in AudioContext seconds, which are private to a document;
+ * this samples that clock against shared time in the same breath, keeping the
+ * reading with the tightest bracket. Same min-RTT idea as the peer skew
+ * estimator, applied to two clocks inside one process instead of two machines.
+ */
+function audioAnchor(n = 7) {
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    const a = peer ? peer.now() : performance.now();
+    const audio = ctx.currentTime;
+    const b = peer ? peer.now() : performance.now();
+    if (!best || b - a < best.spread) best = { shared: (a + b) / 2, audio, spread: b - a };
+  }
+  return best;
+}
+
+function drainEar() {
+  if (!ear) return;
+  ear.port.postMessage('drain');
+}
+if (window.AudioWorkletNode) {
+  // set up the listener once the node exists
+  const iv = setInterval(() => {
+    if (!ear) return;
+    clearInterval(iv);
+    ear.port.onmessage = (e) => { for (const t of e.data.onsets) earOnsets.push(t); };
+  }, 100);
+}
+
+// --- input ------------------------------------------------------------------
+const down = new Set();
+
+/** THE SOURCE STAMP. `e.timeStamp` is the instant the UA received the input;
+ *  `performance.now()` here is the instant our handler ran. The library is
+ *  handed the first and shown the second, and the distance between them is the
+ *  number the "never re-stamp at handler time" law is actually about. */
+/** An input event's source stamp, in whatever domain the looper is running in.
+ *  `ev.timeStamp` is in this document's `performance.now()` domain, so a shared
+ *  session has to lift it into shared epoch time — the shift is exact and it is
+ *  applied ONCE, here, which is still not a re-stamp. */
+const stampOf = (ev) => {
+  const local = ev ? ev.timeStamp : performance.now();
+  return peer ? local + performance.timeOrigin + peer.offsetMs() : local;
+};
+const nowStamp = () => (peer ? peer.now() : performance.now());
+/** what actually produced this event — 'touch' and 'kbd' have different input
+ *  latencies and a trace that calls them both 'kbd' cannot tell them apart */
+const sourceOf = (ev) => (!ev ? 'synthetic'
+  : ev.pointerType ? (ev.pointerType === 'mouse' ? 'pointer' : ev.pointerType)
+  : 'kbd');
+
+function press(key, ev) {
+  if (!looper || down.has(key)) return;
+  down.add(key);
+  const el = keyEls.get(key); if (el) el.classList.add('down');
+  const row = {
+    at: stampOf(ev),
+    handlerAt: nowStamp(),
+    type: 'note-on', note: noteOf(key), vel: 100, source: sourceOf(ev),
+    layer: looper.layers.length,
+  };
+  looper.capture(row);
+  if (peer) peer.publishLive(row);          // LIVE PLANE: fire and forget
+}
+function release(key, ev) {
+  if (!looper || !down.has(key)) return;
+  down.delete(key);
+  const el = keyEls.get(key); if (el) el.classList.remove('down');
+  const row = { at: stampOf(ev), handlerAt: nowStamp(),
+    type: 'note-off', note: noteOf(key), source: sourceOf(ev),
+    layer: looper.layers.length };
+  looper.capture(row);
+  if (peer) peer.publishLive(row);
+}
+function setCc(v, ev) {
+  ccValue = v;
+  if (!looper) return;
+  looper.capture({ at: stampOf(ev), handlerAt: nowStamp(),
+    type: 'cc', ctrl: 74, value: v, layer: looper.layers.length });
+}
+
+addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); pedal(e); return; }
+  if (k === 'z') { setOctave(-1); return; }
+  if (k === 'x') { setOctave(1); return; }
+  if (k in KEYMAP) { e.preventDefault(); press(k, e); }
+});
+addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k in KEYMAP) release(k, e);
+});
+/**
+ * TOUCH IS POLYPHONIC AND THE OLD HANDLER WAS NOT. A single window-level
+ * `pointerup` that released every held key is correct for a mouse (there is one
+ * of them) and wrong for fingers: lifting one thumb silenced the chord the
+ * other one was holding. Each pointer now owns exactly the key it pressed, and
+ * `setPointerCapture` guarantees the release lands on this element even if the
+ * finger has drifted off the key by the time it lifts — a real finger rolls
+ * 5–10 px after the player believes they have let go (mobile-2026-08 §9.6).
+ *
+ * `pointercancel` matters as much as `pointerup`: the browser sends it when it
+ * decides a gesture was really a scroll, and a note whose cancel is ignored is
+ * a stuck note.
+ */
+const byPointer = new Map();          // pointerId -> key
+keysEl.addEventListener('pointerdown', (e) => {
+  const k = e.target.dataset && e.target.dataset.key;
+  if (!k) return;
+  e.preventDefault();
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+  byPointer.set(e.pointerId, k);
+  press(k, e);
+});
+const liftPointer = (e) => {
+  const k = byPointer.get(e.pointerId);
+  if (k === undefined) return;
+  byPointer.delete(e.pointerId);
+  release(k, e);
+};
+keysEl.addEventListener('pointerup', liftPointer);
+keysEl.addEventListener('pointercancel', liftPointer);
+// a mouse that leaves the window mid-press still has to let go
+addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') liftPointer(e); });
+addEventListener('blur', () => { for (const [id, k] of [...byPointer]) { byPointer.delete(id); release(k, null); } });
+$('#cc').addEventListener('input', (e) => setCc(+e.target.value, e));
+
+// --- Web MIDI, if a device happens to be there ------------------------------
+if (navigator.requestMIDIAccess) {
+  navigator.requestMIDIAccess().then((m) => {
+    let n = 0;
+    for (const input of m.inputs.values()) {
+      n++;
+      input.onmidimessage = (e) => {
+        const [st, d1, d2] = e.data;
+        const cmd = st & 0xf0;
+        // e.timeStamp on a MIDIMessageEvent is the UA's own receive instant —
+        // the real source stamp, and the reason this path exists at all.
+        const base = { at: e.timeStamp, handlerAt: performance.now(), source: 'midi', layer: looper ? looper.layers.length : 0 };
+        if (cmd === 0x90 && d2 > 0) looper && looper.capture({ ...base, type: 'note-on', note: d1, vel: d2 });
+        else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) looper && looper.capture({ ...base, type: 'note-off', note: d1 });
+        else if (cmd === 0xb0) looper && looper.capture({ ...base, type: 'cc', ctrl: d1, value: d2 });
+      };
+    }
+    if (n) $('#warn').textContent = `${n} MIDI input(s) connected — source stamps come from the device path.`;
+  }).catch(() => {});
+}
+
+// --- the pedal --------------------------------------------------------------
+function pedal(ev) {
+  if (!looper) return;
+  const at = stampOf(ev);
+  if (!looper.recording()) {
+    looper.armRecord(at);
+    $('#rec').classList.add('armed');
+    $('#rec').textContent = looper.layers.length === 0 ? '● RECORDING (sets length)' : '● OVERDUBBING';
+  } else {
+    const layer = looper.commitLayer(at);
+    resize();
+    $('#rec').classList.remove('armed');
+    $('#rec').textContent = '● OVERDUB';
+    renderLayers();
+    // LOOP PLANE: the committed layer goes out ONCE, as a value. How long it
+    // takes to arrive changes which pass it starts on for the other peer and
+    // nothing else at all.
+    if (peer && layer) {
+      if (!peer.grid()) peer.setGrid(looper.loopMs(), looper.origin());
+      const bytes = peer.publishLayer(looper.toSession({ id: `${PEER_ID}-L${layer.index}` }),
+                                      { peer: PEER_ID, layer: layer.index });
+      $('#warn').textContent = `published layer ${layer.index} — ${bytes} B`;
+    }
+  }
+}
+$('#rec').onclick = () => pedal(null);
+$('#clear').onclick = () => location.reload();
+
+// --- save / load: the same bytes a remote peer would receive ----------------
+// Not a convenience feature. This is plan-looper.md's loop plane, exercised by
+// hand: what SAVE writes is exactly what a peer would be sent, and what LOAD
+// does is exactly what a peer would do with it.
+$('#save').onclick = () => {
+  if (!looper.layers.length) return;
+  const json = looper.toSessionJSON({ id: `take-${new Date().toISOString().slice(0, 19)}` });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  a.download = `looper-${looper.layers.length}L-${Math.round(looper.loopMs())}ms.json`;
+  a.click();
+  $('#warn').textContent = `saved ${json.length} B — ${Math.round(json.length / looper.layers.length)} B per layer`;
+};
+$('#load').onclick = () => $('#file').click();
+const setOctave = (d) => { octave = Math.max(1, Math.min(7, octave + d)); relabelKeys();
+  $('#warn').textContent = `octave ${octave}`; };
+$('#octDown').onclick = () => setOctave(-1);
+$('#octUp').onclick = () => setOctave(1);
+$('#file').onchange = async (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const json = await file.text();
+  // ORIGIN OVERRIDE = the epoch grid, jam-core's rule: the boundary is a
+  // property of the wall clock, not of whoever saved the file. So a loaded
+  // session lands in phase with anything else anchored to the same grid — which
+  // is how a remote peer's layer will arrive too.
+  const L = JSON.parse(json).loopMs;
+  const origin = Math.ceil(performance.now() / L) * L;
+  const old = looper;
+  const next = loadSession(json, {
+    clock: { domain: 'wall', now: () => performance.now() },
+    newHost: () => workerTickHost(), voices, ctx, originOverride: origin,
+  });
+  old.dispose(); voices.allOff();
+  looper = next; window.__L.looper = next;
+  next.start(origin);
+  renderLayers();
+  $('#warn').textContent = `loaded ${next.layers.length} layer(s), ${Math.round(next.loopMs())} ms, anchored to the epoch grid at ${Math.round(origin)}`;
+  e.target.value = '';
+};
+
+// --- receiving a peer's layer ----------------------------------------------
+const remoteLoopers = [];
+function receiveLayer(rec) {
+  // START AT NOW, NEVER AT THE BOUNDARY. Seeking to "the next downbeat" moves
+  // the CLOCK, and moving the clock desynchronises this peer by exactly the
+  // amount it was moved (measured: one loop minus the link delay). The loop is
+  // epoch-anchored and infinite, so it is already at the right phase; waiting
+  // for the downbeat is a MUTE, lifted by a timer at the boundary.
+  const entry = peer.entryFor(rec.session.loopMs, rec.session.origin, peer.now());
+  const l = loadSession(rec.session, {
+    clock: peer.clock, newHost: () => workerTickHost(), voices, ctx, toleranceMs: 1,
+  });
+  l.start(peer.now());
+  for (let i = 0; i < l.layers.length; i++) l.setLayerMuted(i, true);
+  setTimeout(() => { for (let i = 0; i < l.layers.length; i++) l.setLayerMuted(i, false); },
+             Math.max(0, entry.at - peer.now() - 1));
+  remoteLoopers.push({ from: rec.from, looper: l, entry, rec });
+  window.__L.remote = remoteLoopers;
+  $('#warn').textContent = `${rec.from} sent ${rec.bytes} B in ${rec.deliveryMs.toFixed(0)} ms — joins on pass ${entry.iteration}`;
+  renderLayers();
+}
+
+// --- the loop display -------------------------------------------------------
+const cv = $('#loop'), g = cv.getContext('2d');
+let cvH = 300;
+/**
+ * iOS changes the VISIBLE viewport when the URL bar slides away and does NOT
+ * fire `resize` — an element sized from `innerHeight` keeps a height the user
+ * can no longer see. `visualViewport` is the event that actually fires
+ * (mobile-2026-08 §3), so the canvas listens to both.
+ *
+ * Height is derived rather than fixed at 300: on a phone the loop display gets
+ * whatever is left after the keybed and the transport, with a floor so it never
+ * collapses to nothing.
+ */
+function resize() {
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  const vh = (window.visualViewport && window.visualViewport.height) || innerHeight;
+  // SIZE TO CONTENT, not to a constant. 300 px of empty lane is free on a
+  // desktop and expensive on a phone — it pushes the keys off the screen. The
+  // display is the header plus one lane per layer, floored so an empty
+  // instrument still shows its grid, and capped so a stack of layers scrolls
+  // rather than swallowing the keybed.
+  const lanes = Math.max(1, looper ? looper.layers.length
+    + remoteLoopers.reduce((a, r) => a + r.looper.layers.length, 0) : 1);
+  const needed = 26 + lanes * 34 + 18;
+  cvH = coarse ? Math.max(96, Math.min(needed, Math.max(96, vh - 430))) : Math.max(160, Math.min(300, needed));
+  cv.style.height = `${cvH}px`;
+  cv.width = cv.clientWidth * devicePixelRatio;
+  cv.height = cvH * devicePixelRatio;
+  g.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+}
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 150));
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', resize);
+  visualViewport.addEventListener('scroll', resize);
+}
+resize();
+
+function frame() {
+  requestAnimationFrame(frame);
+  const W = cv.clientWidth, H = cvH;
+  g.clearRect(0, 0, W, H);
+  const L = looper.loopMs();
+  const phase = looper.phase();
+  const pad = 14, laneH = 34, top = 26;
+
+  g.font = '11px ui-monospace,monospace'; g.fillStyle = '#8a95a3';
+  const anyLoop = looper.layers.length || remoteLoopers.length;
+  const shownL = looper.layers.length ? L : (remoteLoopers[0] ? remoteLoopers[0].looper.loopMs() : L);
+  g.fillText(anyLoop ? `${(shownL / 1000).toFixed(3)} s loop · pass ${looper.layers.length ? looper.pass() : (remoteLoopers[0] ? remoteLoopers[0].looper.pass() : 0)}`
+                     : 'no loop yet — the trace is still just a trace', pad, 16);
+
+  // the pass grid
+  g.strokeStyle = '#1a2029'; g.lineWidth = 1;
+  for (let i = 0; i <= 8; i++) {
+    const x = pad + (W - 2 * pad) * (i / 8);
+    g.beginPath(); g.moveTo(x, top - 4); g.lineTo(x, top + Math.max(1, looper.layers.length + remoteLoopers.reduce((a, r) => a + r.looper.layers.length, 0)) * laneH + 4); g.stroke();
+  }
+
+  // Local layers, then every layer a peer sent. A received layer is an ordinary
+  // layer — same object, same drawing code — because rule 7g made a remote
+  // overdub structurally identical to a local one.
+  const drawn = [
+    ...looper.layers.map((l) => ({ layer: l, who: null })),
+    ...remoteLoopers.flatMap((r) => r.looper.layers.map((l) => ({ layer: l, who: r.from }))),
+  ];
+  drawn.forEach(({ layer, who }, i) => {
+    const y = top + i * laneH;
+    const col = who ? '#7ee787' : LAYER_COLORS[i % LAYER_COLORS.length];
+    g.fillStyle = '#0e1216'; g.fillRect(pad, y, W - 2 * pad, laneH - 6);
+    g.strokeStyle = '#1f2732'; g.strokeRect(pad + .5, y + .5, W - 2 * pad - 1, laneH - 7);
+    for (const it of layer.items) {
+      if (it.payload.off) continue;
+      const x = pad + (W - 2 * pad) * (it.at / L);
+      const w = Math.max(2, (W - 2 * pad) * ((it.payload.durMs || 40) / L));
+      const nn = it.payload.note;
+      const h = 4 + 14 * (1 - Math.min(1, Math.max(0, (nn - 36) / 48)));
+      g.fillStyle = col;
+      g.globalAlpha = layer.muted ? .22 : .85;
+      g.fillRect(x, y + h, w, 10);
+      g.globalAlpha = 1;
+      if (it.payload.trimmed) {                     // the splice, drawn
+        g.strokeStyle = '#ff6b6b'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(x + w, y + h - 2); g.lineTo(x + w, y + h + 12); g.stroke();
+        g.lineWidth = 1;
+      }
+    }
+    g.fillStyle = '#8a95a3'; g.font = '10px ui-monospace,monospace';
+    g.fillText(who ? `${who}` : `L${i}`, pad + 4, y + laneH - 10);
+  });
+
+  // the playhead — one playhead, because there is one shared position
+  if (anyLoop) {
+    const ph = looper.layers.length ? phase : (remoteLoopers[0] ? remoteLoopers[0].looper.phase() : 0);
+    const x = pad + (W - 2 * pad) * (ph / shownL);
+    g.strokeStyle = '#ffcc66'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(x, top - 6); g.lineTo(x, top + drawn.length * laneH + 4); g.stroke();
+    g.lineWidth = 1;
+  }
+
+  // if we are recording, show the live trace growing
+  if (looper.recording()) {
+    const y = top + looper.layers.length * laneH;
+    g.fillStyle = 'rgba(255,107,107,.10)';
+    const w = looper.layers.length ? (W - 2 * pad) * (phase / L) : W - 2 * pad;
+    g.fillRect(pad, y, w, laneH - 6);
+    g.strokeStyle = '#ff6b6b'; g.strokeRect(pad + .5, y + .5, w - 1, laneH - 7);
+  }
+
+  // readouts
+  $('#p-pass').textContent = looper.layers.length ? `pass ${looper.pass()} · ${(phase / 1000).toFixed(2)}s` : 'pass —';
+  $('#p-len').textContent = looper.layers.length ? `loop ${(L / 1000).toFixed(3)}s` : 'loop —';
+  $('#p-voices').textContent = `${voices.voiceCount()} voices`;
+  $('#p-voices').className = 'pill' + (voices.voiceCount() ? ' on' : '');
+
+  const st = looper.stats();
+  const skew = stats(looper.trace.map((r) => r.stampSkewMs));
+  const loopOn = onsets.filter((o) => o.path === 'loop');
+  const late = stats(loopOn.map((o) => o.deltaMs));
+  $('#t-loop').innerHTML = row('layers', st.layers) + row('notes quoted', st.notes)
+    + row('trace rows', st.traceRows) + row('cut at the splice', st.trimmed)
+    + row('length set by playing', st.lengthSetByPlaying ? 'yes' : '—')
+    + row('wraps', st.wraps.join(' / ') || '—');
+  $('#t-time').innerHTML = row('handler − source (p50)', fmt(skew.p50) + ' ms')
+    + row('handler − source (p95)', fmt(skew.p95) + ' ms')
+    + row('fire lateness p50', fmt(late.p50) + ' ms')
+    + row('fire lateness p95', fmt(late.p95) + ' ms')
+    + row('sample-accurate fires', `${loopOn.filter((o) => o.sampleAccurate).length}/${loopOn.length}`)
+    + row('onsets heard by the ear', earOnsets.length);
+  for (const r of remoteLoopers) r.looper.nest.servo();
+  if (peer) {
+    const st = peer.stats();
+    $('#t-peer').innerHTML = row('room', ROOM) + row('me', PEER_ID)
+      + row('peers', st.peers) + row('min RTT', fmt(st.minRttMs) + ' ms')
+      + row('clock offset', fmt(peer.offsetMs()) + ' ms')
+      + row('skew samples', st.skewSamples)
+      + row('layers received', st.layersReceived)
+      + row('delivery', st.deliveryMs.map((d) => d.toFixed(0)).join(', ') || '—');
+  }
+  const lat = voices.latency();
+  $('#t-lat').innerHTML = row('baseLatency', fmt(lat.base * 1000) + ' ms')
+    + row('outputLatency', fmt(lat.output * 1000) + ' ms')
+    + row('total output latency', fmt(lat.totalMs) + ' ms')
+    + row('sampleRate', lat.sampleRate + ' Hz');
+}
+const fmt = (x) => (x == null || Number.isNaN(x) ? '—' : (+x).toFixed(2));
+const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+
+function renderLayers() {
+  const host = $('#layers');
+  const rows = [
+    ...looper.layers.map((l, i) => ({ l, i, owner: looper, who: null })),
+    ...remoteLoopers.flatMap((r) => r.looper.layers.map((l, i) => ({ l, i, owner: r.looper, who: r.from }))),
+  ];
+  if (!rows.length) return;
+  host.innerHTML = '';
+  rows.forEach(({ l, i, owner, who }, k) => {
+    const d = document.createElement('div'); d.className = 'layer';
+    d.innerHTML = `<span class="swatch" style="background:${who ? '#7ee787' : LAYER_COLORS[k % LAYER_COLORS.length]}"></span>`
+      + `<span class="n">${who ? `${who}·L${i}` : `L${i}`} · ${l.notes} notes${l.trimmed ? ` · ${l.trimmed} cut` : ''}</span>`;
+    const b = document.createElement('button');
+    b.textContent = l.muted ? 'UNMUTE' : 'MUTE';
+    b.onclick = () => { owner.setLayerMuted(i, !l.muted); b.textContent = l.muted ? 'UNMUTE' : 'MUTE'; };
+    d.appendChild(b); host.appendChild(d);
+  });
+}
+</script>

@@ -53,6 +53,21 @@ const FILES = [
   // 4. flipper (live ERR channels; streams are CORS-clear, no proxy)
   ['proto/flipper/index.html', 'proto/flipper/index.html'],
   ['proto/flipper/hls.min.js', 'proto/flipper/hls.min.js'],
+
+  // 5. looper — an INSTRUMENT, not a viewer, and the first page here with no
+  // upstream of any kind: no ERR, no proxy, no Durable Object, no network at
+  // all once loaded. It needs three more library modules than the viewers do,
+  // and the AudioWorklet processor, which is fetched at runtime by URL
+  // (`addModule('./onset-worklet.js')`) rather than imported — easy to forget,
+  // and the failure mode is a silent ear that detects nothing.
+  ['timeline/nested.mjs', 'timeline/nested.mjs'],
+  ['timeline/score.mjs', 'timeline/score.mjs'],
+  ['timeline/logdeck.mjs', 'timeline/logdeck.mjs'],       // nested.mjs imports pstats
+  ['proto/looper/index.html', 'proto/looper/index.html'],
+  ['proto/looper/looper.mjs', 'proto/looper/looper.mjs'],
+  ['proto/looper/synth.mjs', 'proto/looper/synth.mjs'],
+  ['proto/looper/peer.mjs', 'proto/looper/peer.mjs'],
+  ['proto/looper/onset-worklet.js', 'proto/looper/onset-worklet.js'],
 ];
 
 // ── deployed-copy rewrites ──────────────────────────────────────────────────
