@@ -10,7 +10,14 @@ products is marketing with no method attached:
 - ⚠️ **unverified** — inferred, single-sourced, or untested; treat as hypothesis
 
 Chronological session journal (what happened in order, including mistakes and dead ends):
-**`PROGRESS.md`**. This document is the current-state reference.
+**`PROGRESS.md`**. This document is the current-state reference **for the
+streaming stack** — transports, players, traps, mysteries solved.
+
+⚠ **It is no longer the current-state reference for the project.** Since
+2026-08-26 the work has converged on the timeline substrate; start at
+`HANDOFF.md`, then `SUMMARY.md`, then `plan-timeline.md` §7–§9. What is here is
+still true of the stack and is still the place to look up a transport number —
+with one exception, flagged in §11b, that touches numbers printed in this file.
 
 ---
 
@@ -644,6 +651,23 @@ record locally with a NATIVE T₀ → segmented upload to R2 → replay from R2.
 - **T₀-native vs content truth: −15 ms** (within half a frame) — the stamp at first-frame-written IS
   the anchor; NO calibration, NO burned strip, NO audio assumed. (Trap: ffmpeg's `-progress`
   first-frame report is +4.3 s late — stamp the input-side write, never ffmpeg's own report.)
+  ⚠ **CORRECTION (2026-08-30, session 7): −15 ms is not a constant and is not
+  the anchor's true value.** Chasing the studio's −45.3 ms version of this same
+  quantity showed it has a **~95 ms-wide, frame-quantised distribution** — −45.3
+  and −15 are two draws one frame apart at 30 fps. Two causes, both measured:
+  `Page.startScreencast`'s frame 0 is a **stale re-capture stamped `now`** (20–36
+  ms old, where frames 1+ are 6–9 ms), and the encoder **swallows whole source
+  frames at start-up** — *the local-record path has MORE of this artefact, not
+  less*. On top of that, `replay.html`'s content anchor carries **~one frame of
+  bias of its own** (`decodeNow()` reads the frame on the glass while
+  `meta.mediaTime` is the PTS of the frame about to be shown — the rVFC
+  pair-vs-single trap in plan-timeline §7.6). **So every content-anchor number
+  in this file carries that bias**, including this one and the 59/77/95 ms cue
+  figures below. The design conclusion is unchanged and if anything stronger —
+  content-derived T₀ still beats metadata by three orders of magnitude — but do
+  not quote any of these as exact until they are re-measured together, after the
+  one-line `replay.html` fix in `studio/NOTES.md`. Stamping on CDP frame-swap
+  took the studio's per-cue replay abs p95 from 39 to 19–26 ms.
 - Cue replay from R2: **p50 77 / p95 95 ms** — and an honesty correction: the earlier "59 ms" was
   partly ALIASING (integer-second cue spacing phase-locks the 100 ms poll); 54–95 ms is the true
   engine band. Both runs comfortably under the 150 ms target.
