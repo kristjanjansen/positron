@@ -88,6 +88,26 @@ const run = async () => {
                             { timeout: 15000 });
   check("console-one-url", true, `${BASE}/ shows phase=idle`);
 
+  // ---- SOUND: the 5 s check, clicked on the real button, BEFORE the show ---
+  // A sound check that does not traverse the real publish path is theatre, so
+  // this one records with the show's own encode, uploads through the real
+  // wrangler→R2 transport and fetches the result back over public HTTPS. The
+  // configured source here is SILENT, and the check must call that a PASS —
+  // a silent show is a valid show — while still being able to tell it from a
+  // silently broken one (it measures the level at both ends to do so).
+  const tSc = Date.now();
+  await con.click("#btnCheck");
+  await con.waitForFunction(
+    () => /^[✓✗]/.test(document.getElementById("soundVerdict").textContent), { timeout: 180000 });
+  const scText = await con.textContent("#soundVerdict");
+  const scStatus = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  const sc = scStatus.sound.lastCheck;
+  check("soundcheck-through-the-real-publish-path",
+        sc && sc.ok && sc.legs.every((l) => l.ok) && sc.afterR2 && sc.afterR2.frames > 0,
+        `${Date.now() - tSc} ms · ${sc && sc.legs.map((l) => l.name + ":" + (l.ok ? "ok" : "FAIL")).join(" ")}`);
+  check("soundcheck-calls-a-silent-show-valid", /^✓/.test(scText) && /SILENT/.test(scText),
+        scText.split("\n")[0].slice(0, 110));
+
   // ---- GO LIVE: a real click on the real button ---------------------------
   const tGo = Date.now();
   await con.click("#btnGo");
@@ -99,6 +119,60 @@ const run = async () => {
   check("go-live", !!T0 && st0.t0Exact, `T0=${T0} native, click→live ${timeToLive} ms`);
   check("legs-up", ["source", "record", "archive", "room"].every((l) => st0.legs[l] && st0.legs[l].up),
         Object.entries(st0.legs).map(([k, v]) => `${k}:${v.up ? "up" : "down"}`).join(" "));
+
+  // ---- SOUND while live: the meter must be honest about a SILENT show ------
+  await con.waitForFunction(() => /SILENT|dBFS/.test(document.getElementById("vuTxt").textContent),
+                            { timeout: 20000 }).catch(() => {});
+  const vuTxt = await con.textContent("#vuTxt");
+  const vuStat = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  check("vu-meter-reads-the-record-leg",
+        vuStat.sound.meter && vuStat.sound.meter.frames > 0,
+        `${vuStat.sound.meter && vuStat.sound.meter.frames} metered frames from the record leg's own astats`);
+  check("vu-says-silent-BY-CONFIGURATION-not-fault", /SILENT — as configured/.test(vuTxt || ""), vuTxt);
+
+  // ---- ROOM: the roster, a real promote/demote, the permission window ------
+  // The source page joins the room as `stage` (role audience), so there is a
+  // real face to click without inventing a participant.
+  await con.waitForFunction(() => document.querySelectorAll("#roster .who").length > 0,
+                            { timeout: 20000 }).catch(() => {});
+  const roster0 = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  const ids = (roster0.roster ? roster0.roster.participants : []).map((p) => p.id);
+  check("roster-folds-the-DO-deltas", ids.includes("engine") && ids.includes("stage"),
+        `roster=${ids.join(",")} (engine=operator, stage=the source page)`);
+
+  await con.click('#roster .who[data-id="stage"]');
+  await con.click('#tierBox button[data-tier="featured"]');
+  await con.waitForFunction(
+    () => /featured/.test(document.querySelector('#roster .who[data-id="stage"]').textContent),
+    { timeout: 8000 }).catch(() => {});
+  const afterPromote = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  const stage = afterPromote.roster.participants.find((p) => p.id === "stage");
+  check("promote-through-the-real-UI", stage && stage.tier === "featured" &&
+        afterPromote.lastTier && afterPromote.lastTier.echoMs != null,
+        `stage → ${stage && stage.tier}, DO echo ${afterPromote.lastTier && afterPromote.lastTier.echoMs} ms`);
+  await con.click('#tierBox button[data-tier="wall"]');
+  await new Promise((r) => setTimeout(r, 1500));
+  const afterDemote = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  const stage2 = afterDemote.roster.participants.find((p) => p.id === "stage");
+  check("demote-through-the-real-UI", stage2 && stage2.tier === "wall",
+        `stage → ${stage2 && stage2.tier}, echo ${afterDemote.lastTier && afterDemote.lastTier.echoMs} ms`);
+
+  await con.uncheck("#permWin");
+  await new Promise((r) => setTimeout(r, 1200));
+  const permOff = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  const closed = permOff.roster.perm.publish.audience === false &&
+                 permOff.roster.participants.find((p) => p.id === "stage").mayPublish === false;
+  // The checkbox mirrors the ENGINE's fold, not the click, so it flips back for
+  // the ~40 ms until the DO echoes. Wait for the mirror to settle or `check()`
+  // is a no-op on an already-checked box and sends nothing.
+  await con.waitForFunction(() => document.getElementById("permWin").checked === false,
+                            { timeout: 6000 }).catch(() => {});
+  await con.check("#permWin");
+  await new Promise((r) => setTimeout(r, 1200));
+  const permOn = await fetch(`${BASE}/api/status`).then((r) => r.json());
+  check("permission-window-toggles-and-resolves-per-participant", closed &&
+        permOn.roster.participants.find((p) => p.id === "stage").mayPublish === true,
+        `closed→stage.mayPublish=false, reopened→true (DO order: per-participant → per-role → open)`);
 
   // ---- cues, typed into the cue box at FRACTIONAL offsets ------------------
   const fired = [];
@@ -204,20 +278,34 @@ const run = async () => {
         rows.filter((r) => !r.fired).map((r) => r.id).join(",") || `all ${rows.length}`);
   check("all-fire-frames-decoded", rows.every((r) => !r.fired || r.errMs != null), "decOk on every fire");
   check("cue-abs-p95-under-150ms", summary.absP95 <= 150, `absP95=${summary.absP95} ms`);
-  // ANCHOR GATE — read the comment before touching the number.
-  // proto/archive measured content−native = −15 ms (half a frame) and gated at
-  // ±34 ms = one frame at 30 fps. THIS ENGINE MEASURES −42…−45 ms, on two
-  // independent runs, one of which (the autopilot show) had no console browser
-  // open at all — so it is systematic to this engine's screencast path, not
-  // machine contention, and it is NOT yet explained. See NOTES.md §anchor.
-  // The gate is therefore restated on the budget that actually matters: the
-  // anchor may consume at most a THIRD of the 150 ms cue budget, leaving the
-  // engine lane the rest. The one-frame comparison is still printed, so no
-  // reader can mistake this engine's anchor for the archive rig's.
+  // ANCHOR GATE — read the comment before touching the number. CLOSED
+  // 2026-08-30 by studio/anchor-probe.mjs; NOTES.md §anchor has the full trail.
+  //
+  // content−native is FRAME-QUANTISED and was never a constant: it is the sum
+  // of (a) how stale the pixels of the frame we stamp are, and (b) how many
+  // source frames the encoder swallows before media t=0 exists. Measured over
+  // 11 identical legacy runs its support was ~95 ms wide (−24…+42), in 33 ms
+  // steps. The old −45.3 here and the −15 in proto/archive are ONE FRAME apart
+  // at 30 fps — two draws from that distribution, not two rigs disagreeing.
+  //
+  // The engine now (1) discards the stale re-capture Page.startScreencast
+  // returns first and (2) stamps the CDP frame-SWAP time of the first frame it
+  // actually writes. That is asserted below as a construction, not as a
+  // statistic. The value gate stays on the budget that matters — a third of the
+  // 150 ms cue budget — because the browser's own content anchor carries a
+  // ~one-frame rVFC pairing bias of its own (see NOTES), so its absolute value
+  // is not ground truth. The number that IS ground truth is the per-cue error.
   say(`ANCHOR content−native = ${anchorDelta} ms ` +
-      `(proto/archive rig: −15 ms; one frame @30fps = 33 ms; spread ${s.t0.spreadMs} ms)`);
+      `(one frame @30fps = 33 ms; spread ${s.t0.spreadMs} ms; ` +
+      `offline cross-check: node studio/anchor-probe.mjs --run=${show.runId})`);
   check("native-anchor-under-third-of-cue-budget", anchorDelta != null && Math.abs(anchorDelta) <= 50,
-        `content−native=${anchorDelta} ms (regression vs the archive rig's −15 — open item)`);
+        `content−native=${anchorDelta} ms`);
+  // The regression guard for the fix — deterministic, so it cannot flake at n=5.
+  const anc = meta.anchor || {};
+  check("anchor-is-the-swap-of-a-written-frame",
+        anc.mode === "swap" && anc.skippedFirstFrame === true &&
+        anc.swapMinusArriveMs != null && Math.abs(anc.swapMinusArriveMs) <= 25,
+        `mode=${anc.mode} skippedFirst=${anc.skippedFirstFrame} swap−arrive=${anc.swapMinusArriveMs} ms`);
   check("burn-decode-rate", s.rvfc.samples > 0 && s.rvfc.validClock / s.rvfc.samples > 0.95,
         `${s.rvfc.validClock}/${s.rvfc.samples}`);
 

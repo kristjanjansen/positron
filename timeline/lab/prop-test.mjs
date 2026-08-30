@@ -1597,6 +1597,252 @@ const FUZZY = [
   deck.dispose();
 }
 
+// ---------------------------------------------------------------------------
+// suite 8: THE FIRE-SIDE FIREWALL and deck.assertState (v0.7, plan-timeline
+// §8.8's two named seams). Suite 6 proves the READ side: under 'attested' a
+// query cannot be TOLD something invented. This proves the other half: under
+// 'attested' something invented cannot HAPPEN.
+//   8a  THE PROPERTY, over random traces: the set of actuations of an
+//       'attested' deck holding derived lanes is IDENTICAL to that of a deck
+//       that never had them — and so is the drift channel, which is what makes
+//       the identity possible (a refusal writes no drift row).
+//   8b  the refusal is VISIBLE: status 'gated', degradations(), gateAccounting(),
+//       the onGate() channel, and request({actuate}) as a pre-flight.
+//   8c  actuation's SECOND door: the seek fold's assertState() is refused too,
+//       so reduceAt() and the seek path can no longer disagree about one lane.
+//   8d  a policy change mid-play is a STATE change: tighten -> silence(),
+//       loosen -> re-assert; a lane that cannot go quiet says so.
+//   8e  deck.assertState(kind, state, info): assert-then-fold-forward equals
+//       reduce(<= t) (the MIDI-chase property), the snapshot moves, no drift row
+//       is written, and a VERIFIED disagreement is reported as 'asserted-over'.
+// ---------------------------------------------------------------------------
+
+// --- 8a: THE PROPERTY — an attested performance is the performance of a deck
+// with no restoration in it, over random traces ----------------------------
+for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
+  const rand = mulberry32(seed * 31337 + 7);
+  const n = 40 + Math.floor(rand() * 60);
+  const items = Array.from({ length: n }, (_, i) => ({
+    at: +(rand() * 20000).toFixed(3), kind: 'k', id: `a${i}`, payload: { v: 1 + Math.floor(rand() * 9) },
+  })).sort((a, b) => a.at - b.at);
+  const tEnd = 20500;
+  // drawn ONCE, outside run(): the two arms must differ in exactly one thing
+  const seekTo = +(rand() * 10000).toFixed(3);
+
+  const run = (withDerived) => {
+    const vr = createVirtualRuntime(1_000_000);
+    const trace = [];
+    const deck = createDeck({
+      clock: vr.clock, tickHost: vr.host, range: [0, tEnd + 500], evidence: 'attested',
+      items: items.map((i) => ({ ...i })),
+      adapters: { k: { caps: { catchUp: 'reduce' },
+        actuate: (p, rec) => trace.push(['fire', 'k', p.v, rec.at, rec.origin]),
+        reduce: (ps) => ps.length,
+        assertState: (s, info) => trace.push(['assert', 'k', s, +info.pos.toFixed(3)]) } },
+    });
+    if (withDerived) {
+      for (const tier of [1, 2, 3]) {
+        const rc = deck.registerReconstructor(`r${tier}`, {
+          from: 'k', into: `k~r${tier}`, tier, method: `m${tier}`,
+          plan: ({ aAt, bAt }) => (bAt - aAt > 1 ? [aAt + (bAt - aAt) * (0.2 + 0.2 * tier)] : []),
+          derive: (pos) => ({ v: -tier, pos }), confidence: () => 0.5,
+          actuate: (p, rec) => trace.push(['fire', `k~r${tier}`, p.v, rec.at, rec.origin]),
+        });
+        rc.run();
+      }
+    }
+    deck.play(1);
+    // FRACTIONAL cadence, coprime with the 25 ms tick
+    for (let t = 0; t < tEnd; t += 7.331) vr.advanceTo(vr.now() + 7.331);
+    deck.pause();
+    // a seek back, so the assert door is exercised too
+    deck.seek(seekTo);
+    const drift = deck.drift().map((d) => [d.id, d.kind, d.at, d.intendedUs, d.deltaMs, d.origin]);
+    const gate = deck.gateAccounting();
+    const acct = deck.evidenceAccounting();
+    deck.dispose();
+    return { trace, drift, gate, acct };
+  };
+  const withD = run(true), noD = run(false);
+  check('gate-prop', seed, JSON.stringify(withD.trace) === JSON.stringify(noD.trace),
+    `an 'attested' deck's ACTUATION TRACE must be bit-identical to the same deck with no restoration in it (${withD.trace.length} vs ${noD.trace.length} rows)`);
+  check('gate-prop', seed, JSON.stringify(withD.drift) === JSON.stringify(noD.drift),
+    `and so must the DRIFT CHANNEL — a refusal writes no drift row (${withD.drift.length} vs ${noD.drift.length})`);
+  check('gate-prop', seed, withD.acct.restored > 0 && withD.gate.refusedFires > 0 && noD.gate.refusedFires === 0,
+    `…while the restoration really is there and really was refused: ${withD.acct.restored} derived rows, ${withD.gate.refusedFires} refusals`);
+  check('gate-prop', seed, withD.gate.gated.length === 3,
+    `all three tiers must be gated under 'attested': ${JSON.stringify(withD.gate.gated)}`);
+}
+
+// --- 8b/8c: the refusal is visible, and the SECOND door ---------------------
+{
+  const vr = sharedVR();
+  const t = [];
+  const deck = createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), range: [0, 4000], evidence: 'attested',
+    items: [0, 200.5, 400.25, 600.75, 800.125].map((at, i) => ({ at, kind: 'n', id: `n${i}`, payload: { i } })),
+    adapters: { n: { caps: { catchUp: 'reduce' }, actuate: (p) => t.push(['n', p.i]), reduce: (ps) => ps.length, assertState: (s) => t.push(['assert-n', s]) } },
+  });
+  const rc = deck.registerReconstructor('d', {
+    from: 'n', into: 'n~d', tier: 3, method: 'generative-infill',
+    plan: ({ aAt, bAt }) => [(aAt + bAt) / 2], derive: (pos) => ({ pos }), confidence: () => 0.1,
+  });
+  const emitted = rc.run().emitted;
+  // give the derived lane the reduce+assertState pair that opens the second door
+  deck.sched.registerAdapter('n~d', {
+    caps: { tier: 3, catchUp: 'reduce', assertOnSeek: true },
+    actuate: (p) => t.push(['derived', p.pos]),
+    reduce: (ps) => ps.length, assertState: (s) => t.push(['assert-derived', s]),
+  });
+  const seen = [];
+  const offGate = deck.onGate((g) => seen.push(g));
+  const pre = deck.request('n~d', { actuate: true });
+  check('gate-see', 0, pre.chose === 'gated' && pre.degraded,
+    `request({actuate}) must answer the fire-side gate BEFORE a performance, not after: ${JSON.stringify({ chose: pre.chose })}`);
+  check('gate-see', 0, deck.request('n', { actuate: true }).chose === true,
+    'and it must say yes for the attested lane');
+  deck.play(1);
+  for (let x = 0; x < 1000; x += 7.331) vr.advanceTo(vr.now() + 7.331);
+  deck.pause();
+  const st = deck.stats();
+  const ga = deck.gateAccounting();
+  check('gate-see', 1, !t.some((r) => r[0] === 'derived') && ga.refusedFires === emitted,
+    `no derived row may reach an actuator under 'attested': ${ga.refusedFires}/${emitted} refused, ${t.filter((r) => r[0] === 'derived').length} actuated`);
+  check('gate-see', 1, st.counts.gated === emitted && st.counts.dropped === 0,
+    `a refused row takes the terminal status 'gated' — not fired, not dropped, not reduced: ${JSON.stringify(st.counts)}`);
+  check('gate-see', 2, deck.degradations('n~d').reports.some((r) => r.chose === 'not-actuated' && /NOT ACTUATED/.test(r.reason)),
+    'the refusal must be in the honesty ledger, in the {wanted, chose, degraded, reason} shape everything else uses');
+  check('gate-see', 2, seen.length === emitted && seen.every((g) => g.gate === 'fire' && g.kind === 'n~d'),
+    `and on the live onGate() channel, once per refused row: ${seen.length}`);
+  check('gate-see', 2, deck.isGated('n~d') && !deck.isGated('n'),
+    'isGated must name exactly the refused lanes');
+  // 8c — THE SECOND DOOR. A seek must not push a state folded from the refused
+  // lane into its actuator while reduceAt() answers null for the same lane.
+  t.length = 0;
+  deck.seek(700.5);
+  check('gate-door', 0, t.some((r) => r[0] === 'assert-n') && !t.some((r) => r[0] === 'assert-derived'),
+    `the seek fold's assertState() is ACTUATION and must be gated with fire(): ${JSON.stringify(t)}`);
+  check('gate-door', 0, deck.reduceAt('n~d', 700.5) === null && ga.refusedFolds + deck.gateAccounting().refusedFolds > 0,
+    'and reduceAt() must give the SAME answer through the read door — one lane, one answer');
+  check('gate-door', 1, deck.degradations('n~d').reports.some((r) => r.chose === 'not-asserted'),
+    'the refused fold must say so by name');
+  offGate();
+  deck.dispose();
+}
+
+// --- 8d: a policy change mid-play is a STATE change ------------------------
+{
+  const vr = sharedVR();
+  const t = [];
+  const deck = createDeck({
+    clock: vr.clock, tickHost: vr.newHost(), range: [0, 4000], evidence: 'all',
+    items: Array.from({ length: 10 }, (_, i) => ({ at: +(i * 150 + 20.5).toFixed(1), kind: 'n', id: `n${i}`, payload: { i } })),
+    adapters: { n: { caps: { catchUp: 'reduce' }, actuate: () => t.push('n'), reduce: (ps) => ps.length, assertState: () => {} } },
+  });
+  const rc = deck.registerReconstructor('d', {
+    from: 'n', into: 'n~d', tier: 2, method: 'inpaint',
+    plan: ({ aAt, bAt }) => [(aAt + bAt) / 2], derive: (pos) => ({ pos }), confidence: () => 0.4,
+  });
+  rc.run();
+  deck.sched.registerAdapter('n~d', {
+    caps: { tier: 2, catchUp: 'reduce', absentState: 'silence', assertOnSeek: true },
+    actuate: () => t.push('derived'),
+    reduce: (ps) => ps.length,
+    assertState: (s, info) => t.push(`assert-derived:${info.reason}`),
+    silence: (i) => t.push(`silence:${i.reason}`),
+  });
+  deck.play(1);
+  for (let x = 0; x < 500; x += 7.331) vr.advanceTo(vr.now() + 7.331);
+  const before = t.filter((x) => x === 'derived').length;
+  deck.setEvidence('attested');                      // TIGHTEN, mid-play
+  for (let x = 0; x < 400; x += 7.331) vr.advanceTo(vr.now() + 7.331);
+  const after = t.filter((x) => x === 'derived').length;
+  const gT = deck.gateAccounting();
+  check('gate-mid', 0, before > 0 && after === before,
+    `tightening the policy mid-play must stop the derived lane DEAD: ${before} -> ${after} (${gT.refusedFires} refused)`);
+  check('gate-mid', 0, t.includes('silence:evidence-gated'),
+    'and must ask the lane to GO QUIET through the caps.absentState seam that already exists for a quotation edge — the gate can refuse the future, not un-play the past');
+  deck.setEvidence({ restored: { maxTier: 2 } });     // LOOSEN, mid-play
+  const rearmed = deck.gateAccounting().transitions.find((x) => x.gate === 'loosen');
+  for (let x = 0; x < 900; x += 7.331) vr.advanceTo(vr.now() + 7.331);
+  check('gate-mid', 1, t.includes('assert-derived:evidence-ungated') && t.filter((x) => x === 'derived').length > after,
+    `loosening it must RE-ASSERT the lane at the playhead and let it back in: ${JSON.stringify(t.slice(-6))}`);
+  check('gate-mid', 1, rearmed && rearmed.rearmed > 0,
+    `…and rows AHEAD of the playhead that scan() had already marked 'gated' must go back to 'pending', or nothing would ever revisit them: ${JSON.stringify(rearmed)}`);
+  const tr = deck.gateAccounting().transitions.map((x) => `${x.gate}:${x.action}`);
+  check('gate-mid', 1, same(tr, ['tighten:silenced', 'loosen:reasserted']),
+    `both transitions must be on the ledger: ${JSON.stringify(tr)}`);
+  deck.dispose();
+
+  // a lane that cannot go quiet must SAY so rather than pretend the toggle was clean
+  const vr2 = sharedVR();
+  const d2 = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 2000], evidence: 'all',
+    items: [{ at: 10.5, kind: 'q', payload: {} }], adapters: { q: { caps: {}, actuate() {} } } });
+  d2.sched.registerAdapter('q~r', { caps: { tier: 3 }, actuate() {} });
+  d2.schedule({ at: 20.5, kind: 'q~r', payload: {}, provenance: { source: 'reconstructor-z', tier: 3, refs: [] } });
+  d2.setEvidence('attested');
+  check('gate-mid', 2, d2.degradations('q~r').reports.some((r) => r.chose === 'gated-but-held'),
+    'a gated lane with no caps.absentState must report that it keeps ringing');
+  d2.dispose();
+}
+
+// --- 8e: deck.assertState — the MIDI-chase property ------------------------
+for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
+  const rand = mulberry32(seed * 15485863 + 3);
+  const events = genTrace(rand);
+  const t1 = +(2000 + rand() * 10000).toFixed(3);
+  const t2 = +(t1 + 1000 + rand() * 10000).toFixed(3);
+  const vr = createVirtualRuntime(1_000_000);
+  let held = null, asserts = 0;
+  const deck = createDeck({
+    clock: vr.clock, tickHost: vr.host, range: [0, 40000],
+    items: events.map((e, i) => ({ at: e.at, kind: 'ctr', id: `e${i}`, payload: { op: e.op, idx: e.idx } })),
+    adapters: { ctr: { caps: { catchUp: 'reduce' },
+      // FORWARD fold from info.from — the mode assertState exists to serve
+      reduce: (payloads, pos, info) => {
+        let s = info.from.state === undefined ? 0 : info.from.state;
+        for (const e of info.since) s = apply(s, e.payload.op);
+        return s;
+      },
+      actuate() {},
+      assertState: (s) => { held = s; asserts++; } } },
+  });
+  const truth1 = reduce(events, t1).state;
+  const truth2 = reduce(events, t2).state;
+
+  // THE ENTRY POINT: push authoritative state in at t1 without replaying it
+  const rep = deck.assertState('ctr', truth1, { pos: t1, reason: 'external-sync', source: 'test' });
+  check('assert', seed, rep.applied && held === truth1 && asserts === 1,
+    `assertState must reach the adapter exactly once and carry the state: ${JSON.stringify({ applied: rep.applied, held })}`);
+  const snap = deck.snapshotOf('ctr');
+  check('assert', seed, snap && snap.pos === t1 && snap.state === truth1,
+    `…and must MOVE THE REDUCE SNAPSHOT, which is what makes the next forward fold start from the assertion: ${JSON.stringify(snap)}`);
+  check('assert', seed, deck.drift().length === 0 && deck.asserts().total === 1,
+    'an assert must write NO drift row — a drift row is one EVENT\'s lateness and an assert has no event; it has its own channel');
+
+  // THE PROPERTY: assert(reduce(<= t1)) then fold forward to t2 === reduce(<= t2)
+  const forward = deck.reduceAt('ctr', t2);
+  check('assert', seed, forward === truth2,
+    `THE MIDI-CHASE PROPERTY: assertState(reduce(<= ${t1})) then a forward fold to ${t2} must equal reduce(<= ${t2}) — ${forward} vs ${truth2}`);
+  // and the library's own seek path must agree with it
+  deck.assertAt(t2, 'ctr');
+  check('assert', seed, held === truth2,
+    `and the seek path (assertAt) must land on the same state: ${held} vs ${truth2}`);
+
+  // VERIFICATION is opt-in, and a disagreement is on the record
+  const good = deck.assertState('ctr', deck.reduceAt('ctr', t1), { pos: t1, verify: true });
+  const bad = deck.assertState('ctr', 'not-a-state', { pos: t1, verify: true });
+  check('assert', seed, good.verified && good.agreed === true && good.chose === 'asserted',
+    `{verify:true} must confirm an agreeing assertion silently: ${JSON.stringify({ agreed: good.agreed, chose: good.chose })}`);
+  check('assert', seed, bad.agreed === false && bad.chose === 'asserted-over' && bad.applied &&
+    deck.degradations('ctr').reports.some((r) => r.chose === 'asserted-over'),
+    'a DISAGREEING assertion must still be applied (the caller is the authority) and must be reported — silently preferring one of two answers is the failure mode this library keeps refusing');
+  const quiet = deck.assertState('ctr', 'anything', { pos: t1 });
+  check('assert', seed, quiet.verified === false && quiet.agreed === null && !quiet.degraded,
+    'and WITHOUT {verify:true} nothing is folded — verifying costs exactly the replay assertState exists to avoid, and silence here cannot fabricate: the caller IS the authority');
+  deck.dispose();
+}
+
 const basicRuns = NSEEDS, gymRuns = Math.ceil(NSEEDS / 2), seamRuns = Math.ceil(NSEEDS / 3);
 if (failures) {
   console.error(`prop-test: ${failures} VIOLATION(S) across ${basicRuns} basic + ${gymRuns} gymnastics seeds + seams + nesting`);
@@ -1609,3 +1855,4 @@ console.log('evidence OK: attested never interpolates (and is reported when it h
 console.log("uncertainty OK: a `when` row fires ONCE at when.earliest and never moves the sort (a twin deck of plain anchors is identical) / the anchoring is on the record as 'anchored' and rides the fire + the drift row / the bracket is frozen, nine fields, PER ROW (never interned) and refuses a zero-width bracket, an unversioned rule and an inner bound outside the outer one / possible vs necessary differ correctly on a hand-built fuzzy set, the INNER bracket recovers 'certainly 1965' from a decade-wide row, and necessary is UNANSWERABLE-AND-SAYS-SO without one / the default is 'possible' / all four cells of evidence x certainty are populated and neither restriction implies the other / positionAccounting sums BY RULE");
 console.log('seams v0.6 OK: caps.series splits a multi-controller lane into per-series cursors (the merged lane interpolated 200->100 across two controllers and said nothing; now it says so, and {series} answers correctly) / two-phase seek locates immediately, holds only the ROLL, FAILS OPEN on timeout with the laggard named, is re-armed by a locate mid-roll inheriting the true rolling state, and carries MustRoll/MustStop/RollIfAppropriate — a deck with no slowSync adapter never builds a barrier');
 console.log('continuous OK: sampleAt vs analytic curve (hold > linear > catmull, C1 degrades to linear without a neighbourhood) / cursor O(1) forward + O(log n) on seek and random access / info.next makes an interpolated reduce expressible and it equals sampleAt / caps read + refusals reported / followsTransport (play,rate,pause; never seek, never sync) / logdeck at-clobber regression');
+console.log(`fire-side firewall OK (${gymRuns} gate seeds + ${seamRuns} assert seeds): an 'attested' deck's ACTUATION TRACE and DRIFT CHANNEL are bit-identical to a deck that never held a restoration, while the restoration is really there and really refused / the refusal is VISIBLE — status 'gated', degradations(), gateAccounting(), the onGate() channel and request({actuate}) as a pre-flight / actuation's SECOND door is closed: the seek fold's assertState() is gated with fire(), so reduceAt() and the seek path can no longer give one lane two answers / a policy change mid-play is a STATE change (tighten -> silence(), loosen -> re-assert; a lane that cannot go quiet says so) / deck.assertState(reduce(<= t1)) then a forward fold to t2 equals reduce(<= t2), moves the snapshot, writes no drift row, and reports a verified disagreement as 'asserted-over'`);

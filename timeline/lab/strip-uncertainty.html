@@ -1,0 +1,247 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>strip — ambiguation, the three states, and deep time</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; --bg:#0b0d12; --ink:#c9d2e4; --dim:#7a8291; --line:#232838; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:13px/1.5 ui-monospace, Menlo, monospace; padding:14px 16px 60px; }
+  h1 { font-size:14px; margin:0 0 2px; letter-spacing:.04em; }
+  h2 { font-size:12px; margin:22px 0 4px; color:#9fb0c8; letter-spacing:.06em; text-transform:uppercase; }
+  p.note { color:var(--dim); margin:2px 0 8px; max-width:105ch; font-size:11.5px; }
+  /* a canvas with a width but no CSS height scales by its INTRINSIC ratio, and
+     the strip rewrites the intrinsic size every resize() for DPR — so the height
+     must be stated in CSS or the page grows to 4670 px. Found by screenshot. */
+  canvas { width:100%; display:block; background:#0b0d12; border:1px solid var(--line); border-radius:3px; }
+  #real { height:218px } #synth { height:150px } #kind { height:112px } #deep { height:120px }
+  .hud { color:var(--dim); font-size:11px; margin:4px 0 0; min-height:16px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 0; }
+  button { background:#141a24; color:var(--ink); border:1px solid var(--line); border-radius:3px;
+           padding:3px 9px; font:inherit; font-size:11px; cursor:pointer; }
+  button[data-on="1"] { background:#1d4b5c; border-color:#2f7f97; }
+  .legend { display:flex; gap:18px; flex-wrap:wrap; color:var(--dim); font-size:11px; margin:6px 0 0; }
+  .legend b { color:var(--ink); font-weight:600; }
+</style>
+
+<h1>strip.mjs — ambiguation, the three answers of <code>necessary</code>, and deep time</h1>
+<p class="note">
+  Everything below is drawn by the shipped component from <b>deck queries</b>. No row is pushed into a lane.
+  The Kurenniemi panel is the real 22-row corpus, whose <code>innerFrom</code>/<code>innerTo</code> are null on
+  every row — so the "saturated certain core" of two-tone ambiguation is <b>empty for the whole archive</b>,
+  and the panel exists to prove that an empty core is drawn as a statement rather than as an absence.
+</p>
+
+<h2>1 — the real corpus (22 rows, 22/22 smeared, 0/22 with a core)</h2>
+<p class="note">
+  Skirt = the possible flanks. The <b>error bar</b> is the empty core: bounds known, extent within them
+  unrecorded — Gschwandtner et al.'s other recommended encoding for the same task, used because ambiguation
+  degenerates to one tone when the core is empty. Hard terminators + the small caret = <code>kind:'ignorance'</code>
+  (a real day the catalogue lost; narrowing it is a repair). The stepped silhouette is the aoristic sum with
+  its method printed on the canvas.
+</p>
+<canvas id="real" height="218"></canvas>
+<div class="hud" id="real-hud"></div>
+<div class="row">
+  <button id="c-poss" data-on="1">certainty: possible</button>
+  <button id="c-nec">certainty: necessary (ghosts what it cannot decide)</button>
+  <button id="zoom-out">fit</button>
+  <button id="zoom-1965">zoom to 1965</button>
+</div>
+
+<h2>2 — the three states side by side (synthetic, so all three can exist at once)</h2>
+<p class="note">
+  Same bracket in every lane. <b>core</b>: an ordered inner pair, so inner containment answers exactly —
+  the one state where a saturated rectangle is a true statement. <b>outer</b>: no inner pair, bracket inside
+  the window → sound but incomplete. <b>unanswerable</b>: no inner pair and the bracket is not contained →
+  undecidable, ghosted rather than deleted. <b>crisp</b>: no <code>when</code> at all, a note-on/note-off pair.
+</p>
+<canvas id="synth" height="150"></canvas>
+<div class="hud" id="synth-hud"></div>
+
+<h2>3 — <code>when.kind</code>: the edge is the claim</h2>
+<p class="note">
+  Identical brackets, identical positions, one flag apart. <b>ignorance</b> — there IS a boundary and the
+  catalogue lost it, so the bound is a fact: hard terminator, narrowing caret. <b>vagueness</b> — there is no
+  boundary, so a hard edge would be the falsification: feathered, and no affordance at all. Never a dash for
+  either; dash is tratteggio's ink, one axis down.
+</p>
+<canvas id="kind" height="112"></canvas>
+<div class="hud" id="kind-hud"></div>
+
+<h2>4 — deep time: 13.8 Gyr on the same axis as a MIDI phrase</h2>
+<p class="note">
+  Same component, same absolute-ms position domain, same tick LOD. Before the ladder reached past 100 y this
+  view chose <code>major = 100 y</code> at 1.0e-5 px and the axis loop ran <b>138,000,000</b> times a frame.
+  The regime swap is ChronoZoom's: the span selects the tick source, it never warps the axis.
+</p>
+<canvas id="deep" height="120"></canvas>
+<div class="hud" id="deep-hud"></div>
+<div class="row">
+  <button id="d-fit">13.8 Gyr</button>
+  <button id="d-cambrian">Cambrian</button>
+  <button id="d-deepest">zoom to the float's floor</button>
+</div>
+
+<script type="module">
+import { createStrip, ulpMs, zoomCeilingPps, whenState, aoristic, spansOf } from '/timeline/strip.mjs';
+import { createDeck } from '/timeline/transport.mjs';
+
+const $ = (s) => document.querySelector(s);
+const YR = 365.2425 * 24 * 3600 * 1000;
+
+// ---------------------------------------------------------------------------
+// 1 — the real corpus
+// ---------------------------------------------------------------------------
+const corpus = await (await fetch('/proto/kurenniemi/corpus.json')).json();
+const items = corpus.items;
+const KIND = (it) => (it.kind === 'life' ? 'life' : 'tape');
+const realItems = items.map((it) => ({ kind: KIND(it), id: it.id, payload: it, when: it.when }));
+const T0 = Math.min(...items.map((i) => i.when.earliest));
+const T1 = Math.max(...items.map((i) => i.when.latest));
+const realDeck = createDeck({ items: realItems, range: [T0, T1], tickHost: 'timer', positionHz: 10 });
+
+const realStrip = createStrip($('#real'), realDeck, {
+  gutter: 108, follow: false, hud: $('#real-hud'), absolute: true,
+  lanes: [
+    { id: 'tape', kind: 'tape', label: 'tapes & works', as: 'spans', height: 100,
+      color: '#57c6e0', slots: 10, labels: false },
+    { id: 'life', kind: 'life', label: 'life', as: 'spans', height: 30,
+      color: '#e0a457', stack: false, labels: false },
+    // the statistic gets its OWN lane: individuals and the aggregate over them
+    // are two claims and must not fight for the same pixels.
+    { id: 'density', kind: 'tape', label: 'aoristic sum', as: 'spans', height: 52,
+      bars: false, aggregate: true, aggregateColor: '#7f93b0' },
+  ],
+});
+
+$('#c-poss').onclick = () => { realStrip.setCertainty('possible'); flag(); };
+$('#c-nec').onclick = () => { realStrip.setCertainty('necessary'); flag(); };
+function flag() {
+  const c = realStrip.certainty();
+  $('#c-poss').dataset.on = c === 'possible' ? '1' : '0';
+  $('#c-nec').dataset.on = c === 'necessary' ? '1' : '0';
+}
+$('#zoom-out').onclick = () => realStrip.fit();
+$('#zoom-1965').onclick = () => realStrip.fit(Date.UTC(1965, 0, 1), Date.UTC(1966, 0, 1));
+
+// ---------------------------------------------------------------------------
+// 2 — the three states, built so all three are on screen at once
+// ---------------------------------------------------------------------------
+const S0 = Date.UTC(1960, 0, 1);
+const yr = (y) => Date.UTC(y, 0, 1);
+const synthItems = [];
+// core: an inner pair inside the outer bracket
+for (let i = 0; i < 4; i++) {
+  synthItems.push({ kind: 'core', id: `core${i}`, payload: { i },
+    when: { verbatim: `certainly ${1964 + i}`, edtf: `${1963 + i}/${1966 + i}`,
+      earliest: yr(1963 + i), latest: yr(1966 + i),
+      innerFrom: yr(1964 + i), innerTo: yr(1965 + i),
+      rule: 'synthetic-core@1', kind: 'ignorance', note: 'CRM P81 instantiated' } });
+}
+// outer / unanswerable: identical rows, and WHICH ONE THEY ARE depends on the window
+for (let i = 0; i < 4; i++) {
+  synthItems.push({ kind: 'outer', id: `outer${i}`, payload: { i },
+    when: { verbatim: `${1963 + i}`, edtf: `${1963 + i}`,
+      earliest: yr(1963 + i), latest: yr(1966 + i), innerFrom: null, innerTo: null,
+      rule: 'synthetic-outer@1', kind: 'ignorance', note: 'CRM P81 not instantiated' } });
+}
+// crisp: no `when` at all, paired by phase — a recording that ran
+for (let i = 0; i < 4; i++) {
+  synthItems.push({ kind: 'crisp', id: `on${i}`, at: yr(1963 + i), payload: { phase: 'enter', lane: `c${i}` } });
+  synthItems.push({ kind: 'crisp', id: `off${i}`, at: yr(1964 + i), payload: { phase: 'exit', lane: `c${i}` } });
+}
+const synthDeck = createDeck({ items: synthItems, range: [yr(1961), yr(1972)], tickHost: 'timer', positionHz: 10 });
+const synthStrip = createStrip($('#synth'), synthDeck, {
+  gutter: 108, follow: false, hud: $('#synth-hud'), absolute: true,
+  view: { originTime: yr(1961), pxPerSecond: 0, scrollX: 0 },
+  lanes: [
+    { id: 'core', kind: 'core', label: 'core', as: 'spans', height: 44, color: '#7fd18c', slots: 4, labels: false },
+    { id: 'outer', kind: 'outer', label: 'outer / ghost', as: 'spans', height: 44, color: '#57c6e0', slots: 4, labels: false },
+    { id: 'crisp', kind: 'crisp', label: 'crisp', as: 'spans', height: 42, color: '#c8a2ff', slots: 4, labels: false },
+  ],
+});
+synthStrip.fit(yr(1961), yr(1972));
+
+// ---------------------------------------------------------------------------
+// 3 — ignorance vs vagueness on IDENTICAL brackets
+// ---------------------------------------------------------------------------
+const kindItems = [];
+for (const k of ['ignorance', 'vagueness']) {
+  for (let i = 0; i < 3; i++) {
+    kindItems.push({ kind: k, id: `${k}${i}`, payload: { i },
+      when: { verbatim: k === 'ignorance' ? `${1964 + i * 2}` : 'the late sessions',
+        edtf: `${1964 + i * 2}/${1966 + i * 2}`,
+        earliest: yr(1964 + i * 2), latest: yr(1966 + i * 2), innerFrom: null, innerTo: null,
+        rule: 'synthetic-kind@1', kind: k, note: null } });
+  }
+}
+const kindDeck = createDeck({ items: kindItems, range: [yr(1963), yr(1970)], tickHost: 'timer', positionHz: 10 });
+const kindStrip = createStrip($('#kind'), kindDeck, {
+  gutter: 108, follow: false, hud: $('#kind-hud'), absolute: true,
+  lanes: [
+    { id: 'ign', kind: 'ignorance', label: 'ignorance', as: 'spans', height: 44, color: '#e0a457', slots: 3, labels: false },
+    { id: 'vag', kind: 'vagueness', label: 'vagueness', as: 'spans', height: 44, color: '#e0a457', slots: 3, labels: false },
+  ],
+});
+kindStrip.fit(yr(1963), yr(1971));
+
+// ---------------------------------------------------------------------------
+// 4 — deep time
+// ---------------------------------------------------------------------------
+const GA = (g) => -g * 1e9 * YR;            // g billions of years ago, in ms
+const MA = (m) => -m * 1e6 * YR;
+const deepItems = [
+  { kind: 'cosmos', id: 'bb', payload: { t: 'Big Bang' },
+    when: { verbatim: '13.787 ± 0.020 Gyr', edtf: null, earliest: GA(13.807), latest: GA(13.767),
+            innerFrom: null, innerTo: null, rule: 'planck-2018@1', kind: 'ignorance', note: null } },
+  { kind: 'cosmos', id: 'stars', payload: { t: 'first stars' },
+    when: { verbatim: '100–400 Myr after the Big Bang', edtf: null,
+            earliest: GA(13.7), latest: GA(13.4), innerFrom: null, innerTo: null,
+            rule: 'cosmology-window@1', kind: 'vagueness', note: 'no sharp boundary: "first" is a threshold, not an event' } },
+  { kind: 'earth', id: 'earth', payload: { t: 'Earth forms' },
+    when: { verbatim: '4.54 ± 0.05 Gyr', edtf: null, earliest: GA(4.59), latest: GA(4.49),
+            innerFrom: null, innerTo: null, rule: 'radiometric@1', kind: 'ignorance', note: null } },
+  { kind: 'earth', id: 'life', payload: { t: 'earliest life' },
+    when: { verbatim: '3.5–4.1 Gyr', edtf: null, earliest: GA(4.1), latest: GA(3.5),
+            innerFrom: null, innerTo: null, rule: 'palaeo-window@1', kind: 'vagueness', note: null } },
+  { kind: 'earth', id: 'cambrian', payload: { t: 'Cambrian explosion' },
+    when: { verbatim: '538.8–485.4 Ma', edtf: null, earliest: MA(538.8), latest: MA(485.4),
+            innerFrom: MA(530), innerTo: MA(515), rule: 'ics-chart@1', kind: 'ignorance',
+            note: 'the one row in this deck with an inner bracket' } },
+  { kind: 'earth', id: 'kpg', payload: { t: 'K–Pg' },
+    when: { verbatim: '66.043 ± 0.043 Ma', edtf: null, earliest: MA(66.086), latest: MA(66.0),
+            innerFrom: null, innerTo: null, rule: 'ar-ar@1', kind: 'ignorance', note: null } },
+  { kind: 'human', id: 'hs', payload: { t: 'H. sapiens' },
+    when: { verbatim: '~300 ka', edtf: null, earliest: -350e3 * YR, latest: -250e3 * YR,
+            innerFrom: null, innerTo: null, rule: 'jebel-irhoud@1', kind: 'vagueness', note: null } },
+  { kind: 'human', id: 'ek', payload: { t: 'Kurenniemi tapes' },
+    when: { verbatim: '1963/1973', edtf: '1963/1973', earliest: Date.UTC(1963, 0, 1), latest: Date.UTC(1973, 0, 1),
+            innerFrom: null, innerTo: null, rule: 'corpus-range@1', kind: 'ignorance', note: null } },
+];
+const deepDeck = createDeck({ items: deepItems, range: [GA(13.807), Date.UTC(1973, 0, 1)], tickHost: 'timer', positionHz: 4 });
+const deepStrip = createStrip($('#deep'), deepDeck, {
+  gutter: 108, follow: false, hud: $('#deep-hud'), absolute: false,
+  lanes: [
+    { id: 'cosmos', kind: 'cosmos', label: 'cosmos', as: 'spans', height: 30, color: '#8f8fe0', stack: false, labels: false },
+    { id: 'earth', kind: 'earth', label: 'earth', as: 'spans', height: 30, color: '#57c6e0', stack: false, labels: false },
+    { id: 'human', kind: 'human', label: 'human', as: 'spans', height: 30, color: '#e0a457', stack: false, labels: false },
+  ],
+});
+deepStrip.fit(GA(13.807), 0);
+$('#d-fit').onclick = () => deepStrip.fit(GA(13.807), 0);
+$('#d-cambrian').onclick = () => deepStrip.fit(MA(560), MA(470));
+$('#d-deepest').onclick = () => {
+  // walk the zoom until the component refuses: the refusal is the deliverable
+  for (let i = 0; i < 400; i++) deepStrip.zoomAt(2, 700);
+};
+
+// the harness's handle. Everything a test needs is an API call, never a pixel
+// read — except the ink probes, which are pixel reads on purpose.
+window.__su = {
+  strips: { real: realStrip, synth: synthStrip, kind: kindStrip, deep: deepStrip },
+  decks: { real: realDeck, synth: synthDeck, kind: kindDeck, deep: deepDeck },
+  corpus, YR, GA, MA, yr, ulpMs, zoomCeilingPps, whenState, aoristic, spansOf,
+};
+window.__ready = true;
+</script>

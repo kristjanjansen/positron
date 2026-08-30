@@ -9,7 +9,8 @@
 // The browser half of the determinism proof: the SAME renderDeck(), but with a
 // REAL OfflineAudioContext behind the audio lane instead of a stub, so the
 // deliverable is an actual PCM hash of an actual rendered buffer.
-import { offlineDeck, renderDeck, renderDeckAudio, hashAudioBuffer, hashText } from '/timeline/render.mjs';
+import { offlineDeck, offlineNest, renderDeck, renderDeckAudio, renderNest,
+         createRenderRuntime, hashAudioBuffer, hashText } from '/timeline/render.mjs';
 
 const out = document.getElementById('out');
 const cvs = document.getElementById('c'), cx = cvs.getContext('2d');
@@ -112,6 +113,59 @@ async function oneDsp() {
   return out;
 }
 
+// ===========================================================================
+// THE NEST, through a REAL OfflineAudioContext. plan-timeline §8.8's last seam
+// was "renderDeck cannot see a nest"; this is the audio half of closing it. A
+// LOOPED quotation with its own audio lane must repeat its pass in the rendered
+// PCM — same samples, three times — and two renders must be bit-identical.
+// The impulse arm proves the sample arithmetic; the DSP arm proves it survives
+// real float DSP (a memcpy is not evidence of a deterministic renderer).
+// ===========================================================================
+const N_LOOP_IN = 0, N_LOOP_OUT = 1000, N_PASSES = 3;
+const N_CLICKS = [100, 600];              // in the CHILD's domain
+const N_PARENT_CLICK = 250;               // in the PARENT's domain
+
+async function oneNest(makeNode, mode = 'expand') {
+  const rt = createRenderRuntime(0);
+  const sink = { fired: [], asserts: 0 };
+  const child = offlineDeck({
+    runtime: rt, range: [-10, 3000], autoStart: false,
+    items: [{ at: 0, kind: 'cue', id: 'DOWN', payload: { op: 'add', v: 1 } },
+            { at: 400, kind: 'cue', id: 'MID', payload: { op: 'add', v: 2 } },
+            { at: N_LOOP_OUT + 5, kind: 'cue', id: 'TAIL', payload: { op: 'add', v: 100 } }],
+    adapters: { cue: { caps: { catchUp: 'reduce', reducible: true, seekable: true, deterministic: true },
+      actuate: (p) => { sink.fired.push(p.v); }, reduce: (ps) => ps.reduce(applyOp, 0),
+      assertState: () => { sink.asserts++; } } },
+  });
+  const parent = offlineDeck({ runtime: rt, range: [0, 8000], items: [], autoStart: false });
+  const nest = offlineNest(parent, { runtime: rt });
+  nest.add({ id: 'q', at: 0, rate: 1, deck: child, in: N_LOOP_IN, out: N_LOOP_OUT, repeat: N_PASSES });
+  const childPos = [];
+  const r = await renderDeckAudio(parent, {
+    fps: FPS, sampleRate: SR, channels: makeNode ? 2 : 1,
+    audioItems: [{ at: N_PARENT_CLICK, kind: 'click', id: 'P0' }],
+    childAudio: [{ span: 'q', makeNode, mode,
+      items: N_CLICKS.map((at, i) => ({ at, kind: makeNode ? 'voice' : 'click', id: `c${i}` })) }],
+    onFrame: ({ children }) => childPos.push(+children[0].pos.toFixed(6)),
+  });
+  const digest = childPos.join(',');
+  const out = {
+    traceHash: r.traceHash, renderHash: r.renderHash, traceBytes: r.traceText.length,
+    traceText: r.traceText, wrapsHash: r.nest.wrapsHash, wrapsText: r.nest.wrapsText,
+    wraps: r.nest.wraps, wrapsByReason: r.nest.wrapsByReason,
+    childEvents: r.nest.events, childByKind: r.nest.byKind,
+    parentEvents: r.events, from: r.from, to: r.to,
+    boundary: r.nest.loops[0].boundary, servo: r.nest.servo,
+    audio: { ...r.audio }, childPosDigestHash: hashText(digest),
+    fired: sink.fired.join(','), audit: r.audit.ok, mode,
+    childLane: r.audio.children.map((c) => ({ label: c.label, mode: c.mode, expanded: c.expanded, laneStats: c.laneStats })),
+    impulses: makeNode ? null : impulseIndices(r.buffer),
+  };
+  delete out.audio.scheduled; delete out.audio.children;
+  parent.dispose(); child.dispose();
+  return out;
+}
+
 function impulseIndices(buf) {
   const d = buf.getChannelData(0), out = [];
   for (let i = 0; i < d.length; i++) if (Math.abs(d[i]) > 1e-4) out.push({ i, v: +d[i].toFixed(6), ms: +(i / buf.sampleRate * 1000).toFixed(4) });
@@ -127,6 +181,21 @@ function impulseIndices(buf) {
     const d2 = await oneDsp();
     const want = CLICKS.map((c) => Math.round(c / 1000 * SR));
     const got = a.impulses.map((x) => x.i);
+
+    // --- the NEST arms ------------------------------------------------------
+    const n1 = await oneNest(null), n2 = await oneNest(null);
+    const nd1 = await oneNest(dspNode), nd2 = await oneNest(dspNode);
+    // THE NEGATIVE CONTROL: the same composition with the child lane bound to
+    // the CHILD's transport, which cancels its own committed nodes at every
+    // wrap. It renders, reproducibly, and it is nearly silent.
+    const nLane = await oneNest(null, 'lane');
+    const nestWant = [];
+    for (let k = 0; k < N_PASSES; k++)
+      for (const c of N_CLICKS) nestWant.push(Math.round(((c + k * (N_LOOP_OUT - N_LOOP_IN)) / 1000) * SR));
+    nestWant.push(Math.round((N_PARENT_CLICK / 1000) * SR));
+    nestWant.sort((x, y) => x - y);
+    const nestGot = n1.impulses.map((x) => x.i);
+
     window.__done = {
       identicalTrace: a.traceText === b.traceText,
       identicalTraceHash: a.traceHash === b.traceHash,
@@ -138,6 +207,22 @@ function impulseIndices(buf) {
       dsp1: d1, dsp2: d2, dspIdentical: d1.hash === d2.hash && d1.rmsish === d2.rmsish,
       clicksExact: JSON.stringify(want) === JSON.stringify(got),
       sampleRate: SR, fps: FPS, span: SPAN,
+      nest: {
+        run1: { ...n1, traceText: undefined, wrapsText: undefined },
+        run2: { ...n2, traceText: undefined, wrapsText: undefined, impulses: undefined },
+        identicalTrace: n1.traceText === n2.traceText,
+        identicalWraps: n1.wrapsText === n2.wrapsText,
+        identicalRenderHash: n1.renderHash === n2.renderHash,
+        identicalAudioHash: n1.audio.hash === n2.audio.hash,
+        identicalChildPos: n1.childPosDigestHash === n2.childPosDigestHash,
+        impulsesWant: nestWant, impulsesGot: nestGot,
+        impulsesExact: JSON.stringify(nestWant) === JSON.stringify(nestGot),
+        laneMode: { impulses: nLane.impulses.map((x) => x.i), audio: nLane.audio,
+                    childLane: nLane.childLane, traceHash: nLane.traceHash },
+        dsp1: nd1.audio, dsp2: nd2.audio,
+        dspIdentical: nd1.audio.hash === nd2.audio.hash && nd1.audio.rmsish === nd2.audio.rmsish,
+        passes: N_PASSES, loopMs: N_LOOP_OUT - N_LOOP_IN,
+      },
     };
     out.textContent = JSON.stringify(window.__done, null, 1);
   } catch (e) {

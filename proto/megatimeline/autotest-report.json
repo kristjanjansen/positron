@@ -1,5 +1,5 @@
 {
- "at": "2026-08-28T10:45:49.599Z",
+ "at": "2026-08-30T07:09:50.408Z",
  "steps": {
   "boot": {
    "tier": "decades",
@@ -21,10 +21,10 @@
    }
   },
   "flight": {
-   "frames": 602,
+   "frames": 603,
    "p50": 8.3,
-   "p95": 9.6,
-   "max": 10.3
+   "p95": 9.8,
+   "max": 10.4
   },
   "dive": {
    "tier": "days",
@@ -49,8 +49,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 1.6,
-      "firstImgMs": 171
+      "mountMs": 0.6,
+      "firstImgMs": 5
      }
     ]
    }
@@ -78,8 +78,8 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 1.6,
-      "firstImgMs": 171
+      "mountMs": 0.6,
+      "firstImgMs": 5
      }
     ]
    }
@@ -107,13 +107,13 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 1.6,
-      "firstImgMs": 171
+      "mountMs": 0.6,
+      "firstImgMs": 5
      },
      {
       "newCards": 33,
-      "mountMs": 1.6,
-      "firstImgMs": 53
+      "mountMs": 1.1,
+      "firstImgMs": 10
      }
     ]
    }
@@ -141,17 +141,37 @@
     "mounts": [
      {
       "newCards": 36,
-      "mountMs": 1.6,
-      "firstImgMs": 171
+      "mountMs": 0.6,
+      "firstImgMs": 5
      },
      {
       "newCards": 33,
-      "mountMs": 1.6,
-      "firstImgMs": 53
+      "mountMs": 1.1,
+      "firstImgMs": 10
      }
     ]
    }
-  }
+  },
+  "aoristic": [
+   {
+    "lane": "VIDEO",
+    "n": 74,
+    "peak": 0.23684210526334937,
+    "colDays": 0.059210526315789595
+   },
+   {
+    "lane": "AUDIO",
+    "n": 114,
+    "peak": 0.5328947368425361,
+    "colDays": 0.059210526315789595
+   },
+   {
+    "lane": "PHOTO",
+    "n": 0,
+    "peak": 0,
+    "colDays": 0.059210526315789595
+   }
+  ]
  },
  "consoleErrors": [],
  "asserts": {
@@ -159,10 +179,11 @@
   "thumbLoaded": true,
   "cardsWithinCap": true,
   "apiBudget": true,
-  "consoleClean": true
+  "consoleClean": true,
+  "aoristicIsAStatistic": true
  },
  "serverStats": {
-  "startedAt": "2026-08-28T10:45:49.685Z",
+  "startedAt": "2026-08-30T07:09:50.501Z",
   "upstreamSearch": 0,
   "upstreamContent": 0,
   "cacheHitSearch": 9,

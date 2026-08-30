@@ -164,6 +164,20 @@ try {
   await sleep(1500);
   report.steps.deepAfter = await evaluate('__mt.snapshot()');
 
+  // 3c. THE AGGREGATE IS A STATISTIC, not an alpha. The lane sum used to be
+  // `globalAlpha = min(0.4, 0.05 + 0.02*n)` — +1 per item regardless of span,
+  // clipped at n=18. It is now timeline/strip.mjs' aoristic(): one bin per pixel
+  // column, mass 1/(b−a), drawn as height, with its population and bin width
+  // readable. Assert the numbers exist and are sane rather than trusting a pixel.
+  report.steps.aoristic = await evaluate('__mt.aoristic()');
+  console.log('aoristic:', JSON.stringify(report.steps.aoristic));
+  const ao = report.steps.aoristic || [];
+  // A lane with n=0 is an HONEST ABSENCE (Q1 1965 holds ~3 photos in the whole
+  // archive), so the assert is: every lane that summed anything reports a
+  // fractional peak — a MASS, which a +1-per-item count can never be.
+  const live_ = ao.filter((a) => a.n > 0);
+  const aoOk = live_.length > 0 && live_.every((a) => a.peak > 0 && a.colDays > 0 && a.peak !== Math.round(a.peak));
+
   // 4. politeness + integrity asserts
   const stats = await (await fetch(`http://localhost:${PORT}/api/stats`)).json();
   report.serverStats = stats;
@@ -174,6 +188,7 @@ try {
     cardsWithinCap: snap.liveCards <= 300 && deep.liveCards <= 300,
     apiBudget: stats.upstreamTotal <= 15,
     consoleClean: report.consoleErrors.length === 0,
+    aoristicIsAStatistic: aoOk,
   };
   report.ok = Object.values(report.asserts).every(Boolean);
   console.log('asserts:', JSON.stringify(report.asserts));

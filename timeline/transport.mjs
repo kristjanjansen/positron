@@ -153,6 +153,58 @@
 // `when` bracket is CONTIGUOUS and that is NOT a guarantee about the world);
 // Monte Carlo; competing authorities (one `when` per row); transaction time;
 // and `when` on spans (the span type does not exist yet).
+//
+// v0.7 — THE FIRE-SIDE FIREWALL and deck.assertState (plan-timeline §8.8's two
+// named seams). v0.5's firewall gates READS. It does not gate ACTUATION, so an
+// evidence-only PERFORMANCE — the thing a heritage institution would stand
+// behind — was the adapter's own job, i.e. unenforced. Measured on the shipped
+// code: under `evidence:'attested'` a tier-3 generative lane fired 3/3 of its
+// rows, and a seek pushed a state folded from those same rows into
+// `adapter.assertState()` while `deck.reduceAt()` for that lane returned null.
+// ONE LANE, TWO ANSWERS, decided by which door the query came through.
+//   G1. ACTUATION HAS TWO DOORS, and both are now gated: `fire()` (the
+//       scheduled actuation) and `applyReduce()`'s `assertState()` call (the
+//       seek/catch-up actuation). A lane whose tier exceeds the policy is
+//       REFUSED at both, exactly as `window()` EXCLUDES it.
+//   G2. UNCONDITIONAL, NOT `caps.evidenceGated`. An opt-in cap reproduces the
+//       `caps.series` failure with the sign flipped: the safe behaviour would
+//       depend on every adapter author remembering to declare it, and the
+//       guarantee an archive needs cannot rest on that. It is also unnecessary:
+//       the gate can only bite where the client ALREADY made §5b's forced
+//       choice (an unset policy is EV_UNSET, maxTier Infinity, nothing gated),
+//       so it never surprises a client who never chose. And it costs nothing:
+//       LANE PURITY means the gate is a per-LANE Set, so the hot path is
+//       `gatedKinds.size !== 0` — one integer compare for every deck that holds
+//       no restoration at all, which is every deck that existed before v0.5.
+//   G3. REFUSED, NEVER SILENT. A gated row takes a new terminal status
+//       'gated' — it is not fired, not dropped and not reduced — and the
+//       refusal surfaces three ways: `degradations()` in the same
+//       {wanted, chose, degraded, reason} shape, `gateAccounting()`, and the
+//       `onGate()` channel. It emits NO drift row, because drift is the record
+//       of what reached a transducer and a refusal did not; that absence is
+//       what makes the actuation trace of an 'attested' deck BIT-IDENTICAL to
+//       the trace of a deck from which the derived lanes were physically
+//       removed.
+//   G4. TIGHTENING MID-PLAY RE-ASSERTS. `setEvidence()` is a state change, not
+//       a filter: a lane that becomes gated is asked to go quiet
+//       (`caps.absentState:'silence'` → `silence({reason:'evidence-gated'})`;
+//       without the cap it HOLDS and says so), and a lane that becomes ungated
+//       is re-asserted at the playhead (reduce + assertState) so it catches up
+//       on the prefix it was refused. Committed one-shots on a newly gated lane
+//       are cancelled at the transition, so the tighten is immediate rather
+//       than one tick late.
+//   G5. deck.assertState(kind, state, info) — §7.5's DAW "MIDI chase" / ETC
+//       Eos "Assert", at the DECK level: push authoritative state IN without
+//       replaying a prefix (after an external sync, a media-master handover, a
+//       policy change, a loop wrap). It moves the reduce snapshot to
+//       {pos, state}, so a forward-folding reducer's `info.from`/`info.since`
+//       continue from the assertion. It writes NO drift row (an assert has no
+//       event and no intended instant; a synthetic row would poison every
+//       lateness statistic in the repo). Verification is OPT-IN
+//       (`{verify:true}`): checking costs exactly the fold assertState exists
+//       to avoid, and unlike the evidence policy, silence here cannot fabricate
+//       — the caller IS the authority. When asked, a disagreement with
+//       reduce(<= pos) is reported as 'asserted-over'.
 
 // ---------------------------------------------------------------------------
 // Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
@@ -636,6 +688,23 @@ export function createScheduler(transport, {
   let driftTotal = 0, driftDropped = 0;
   let busyMs = 0;               // accumulated scheduler+fire callback self-time
   let lastTickAt = null, maxTickGapMs = 0;
+  // G1/G2 — THE FIRE-SIDE FIREWALL. `gatedKinds` is the set of lanes whose
+  // ACTUATION the current policy refuses. It is a per-LANE set and not a
+  // per-row test because of LANE PURITY (a lane is attested or derived, never
+  // both) — the same invariant that makes the read side O(1). The hot path in
+  // scan()/fire() is therefore `gatedKinds.size !== 0`: one integer compare for
+  // every deck that holds no restoration, which is every deck that existed
+  // before v0.5. Recomputed only when the lane set changes (a first derived row
+  // or a tier rise) or the policy changes — never per row, never per tick.
+  let gatedKinds = new Set();
+  let gateGen = 0;
+  const gateStats = { fires: 0, folds: 0, asserts: 0, silenced: 0, held: 0, reasserted: 0, byKind: new Map() };
+  const gateLog = [];           // bounded transition log (policy changes only)
+  const gateCbs = new Set();
+  // G5 — the assert channel. Deliberately NOT the drift channel: a drift row is
+  // {id, at, intendedUs, deltaMs} for one EVENT, and an assert has no event.
+  const assertLog = [];
+  let assertTotal = 0, assertDropped = 0;
 
   function insertInto(arr, at, s) {
     let lo = 0, hi = arr.length;
@@ -753,6 +822,12 @@ export function createScheduler(transport, {
   }
 
   function fire(ev, origin) {
+    // G1 — the first of actuation's two doors. One integer compare when nothing
+    // is gated; a Set hit otherwise. scan() refuses earlier still (so no timer
+    // is ever armed for a gated row), but this guard is load-bearing and not
+    // belt-and-braces: a committed one-shot armed BEFORE a mid-play tighten, and
+    // the overdub path in scheduleEvent(), both arrive here directly.
+    if (gatedKinds.size !== 0 && gatedKinds.has(ev.kind)) return gateRefuse(ev, origin);
     const firedT = clock.now();
     const intended = transport.timeAt(ev.at);
     ev.status = 'fired'; ev.fires++; ev.cancel = null;
@@ -857,6 +932,7 @@ export function createScheduler(transport, {
       if (!a) sm.set(k, a = []);
       a.splice(insertInto(a, at, ev.seq), 0, ev);
     }
+    const tierBefore = lp.tier, derivedBefore = lp.derived;
     if (prov) {
       lp.derived++; derivedTotal++;
       lp.tier = Math.max(lp.tier, prov.tier);
@@ -867,6 +943,11 @@ export function createScheduler(transport, {
         lp.confMax = lp.confMax === null ? prov.confidence : Math.max(lp.confMax, prov.confidence);
       }
     } else lp.attested++;
+    // G2: the gated-lane set only ever changes when a lane BECOMES derived or
+    // its tier RISES — one recompute per lane over a whole restoration, not one
+    // per row. Must run before the overdub fire below, which goes through the
+    // gate like any other actuation.
+    if (prov && (derivedBefore === 0 || lp.tier !== tierBefore)) recomputeGate('lane-tier');
     if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
     return ev.id;
   }
@@ -908,12 +989,17 @@ export function createScheduler(transport, {
     // advance firstLive past finalized prefix
     while (firstLive < events.length) {
       const s = events[firstLive].status;
-      if (s === 'fired' || s === 'passed' || s === 'dropped' || s === 'reduced') firstLive++; else break;
+      if (s === 'fired' || s === 'passed' || s === 'dropped' || s === 'reduced' || s === 'gated') firstLive++; else break;
     }
+    const gating = gatedKinds.size !== 0;   // G2: hoisted out of the row loop
     for (let i = firstLive; i < events.length; i++) {
       const ev = events[i];
       if (ev.at > horizonPos) break;
       if (ev.status !== 'pending') continue;
+      // G1 — refuse HERE rather than at the commit, so a gated lane never arms
+      // a timer at all. Strictly cheaper than firing: no drift row, no actuate,
+      // no fire callbacks, no one-shot.
+      if (gating && gatedKinds.has(ev.kind)) { gateRefuse(ev, 'scan'); continue; }
       if (ev.at <= pos) {
         const lateMs = (pos - ev.at) / rate;
         if (lateMs <= lateGraceMs) { fire(ev, 'tick-late'); continue; }
@@ -986,6 +1072,16 @@ export function createScheduler(transport, {
     return out;
   }
   function applyReduce(kind, missed, pos, now, reason) {
+    // G1 — ACTUATION'S SECOND DOOR, and the one that was invisible. This path
+    // ends in `ad.assertState(state, info)`, which is an actuation: it is how a
+    // seek puts held notes back. Before v0.7 it folded the WHOLE prefix of an
+    // over-cap derived lane and asserted it, while `reduceAt()` on the same lane
+    // and the same position returned null — one lane, two answers, decided by
+    // the door. Measured on the shipped code: a tier-3 lane under 'attested'
+    // asserted a state folded from three generative rows. It is EXCLUDED here
+    // for exactly the reason evExcludes() excludes it from a read.
+    if (gatedKinds.size !== 0 && gatedKinds.has(kind) && reason !== 'evidence-ungated')
+      return gateRefuseFold(kind, pos, reason);
     const ad = adapters.get(kind), pol = policies.get(kind);
     const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
     const prefix = prefixEvents(kind, pos).map(publicEv);
@@ -1112,6 +1208,292 @@ export function createScheduler(transport, {
   function evRestrictsFold(kind, ev) {
     const t = adapterTier(kind);
     return t >= 1 && t > ev.maxTier;
+  }
+
+  // -------------------------------------------------------------------------
+  // G1–G4 — THE FIRE-SIDE FIREWALL.
+  //
+  // The read side asks "is the caller willing to be TOLD something invented?".
+  // This asks the other half of the same question: *is the caller willing for
+  // something invented to HAPPEN?* — which is what an evidence-only performance
+  // means, and what the read side alone could not deliver.
+  //
+  // WHY UNCONDITIONAL AND NOT `caps.evidenceGated` (the shape §8.8 asked for,
+  // refuted here):
+  //   · An opt-in cap makes the SAFE behaviour the one an adapter author has to
+  //     remember. That is `caps.series` with the sign flipped — declared and
+  //     unread produced "150, a value belonging to neither controller", in
+  //     silence; undeclared and unenforced produces a dreamed note in an
+  //     archival performance, in silence. The same failure, and this one is
+  //     the one an institution would be asked to stand behind.
+  //   · It cannot surprise anyone. The gate reads `evPolicy`, which is null
+  //     until the client makes §5b's FORCED choice; an unqualified deck is
+  //     EV_UNSET (maxTier Infinity) and nothing is ever gated. A client that
+  //     wrote `evidence:'attested'` has already said this in words.
+  //   · The cost argument for opt-in does not survive LANE PURITY: the gate is
+  //     one Set of kinds, so the price on the hot path is `size !== 0`.
+  //   · And it would be indefensible beside the read side, which excludes an
+  //     over-cap lane from window() without asking the adapter's permission.
+  // What the adapter DOES get a say in is not *whether* it is refused but what
+  // the refusal SOUNDS like: caps.absentState / silence(), below.
+  // -------------------------------------------------------------------------
+  function gateStatOf(kind) {
+    let g = gateStats.byKind.get(kind);
+    if (!g) {
+      const lp = laneProv.get(kind);
+      gateStats.byKind.set(kind, g = { kind, fires: 0, folds: 0, asserts: 0, tier: lp ? lp.tier : 0,
+                                       source: lp ? lp.source : null, method: lp ? lp.method : null });
+    }
+    return g;
+  }
+  /** MEMOIZED PER (lane, policy generation), and the memo is not a micro-
+   *  optimisation — it was measured. The first cut built this sentence on every
+   *  refused row and made REFUSING 37 % more expensive than FIRING (8000 tier-3
+   *  rows: 3.7 ms refused vs 2.7 ms fired), which is an absurd shape for a gate
+   *  whose whole job is to do less. The memo is sound because the string is a
+   *  function of exactly (kind, tier, source, method, policy) — and because
+   *  noteDegraded() already folds consecutive identical reports, so the rows
+   *  were sharing one report anyway; only the string was being rebuilt. */
+  const gateWhy = (kind, pol) => {
+    const g = gateStatOf(kind);
+    if (g.whyGen === gateGen && g.why) return g.why;
+    const lp = laneProv.get(kind);
+    g.whyGen = gateGen;
+    return (g.why =
+      `lane '${kind}' is tier-${lp ? lp.tier : '?'} restoration from ${lp ? lp.source : '?'} (${lp ? lp.method : '?'}); ` +
+      `'${pol.label}' allows tier <= ${pol.maxTier}, so the row is NOT ACTUATED — a restoration is never performed under a policy that excludes it, ` +
+      `exactly as window() excludes it from a read. The refusal is on this ledger and in gateAccounting(); it writes no drift row, because drift is ` +
+      `the record of what reached a transducer and this did not (§5b / §8.8: the firewall is no longer read-side only).`);
+  };
+  /** The refused-fire report is likewise ONE object per (lane, policy gen):
+   *  noteDegraded folds identical consecutive reports into `n`, so allocating a
+   *  fresh record per row bought nothing but garbage. */
+  function gateReport(kind, pol) {
+    const g = gateStatOf(kind);
+    if (g.repGen === gateGen && g.rep) return g.rep;
+    g.repGen = gateGen;
+    return (g.rep = { wanted: `actuation under '${pol.label}'`, chose: 'not-actuated', degraded: true, reason: gateWhy(kind, pol) });
+  }
+  /** G3: a scheduled row the policy refuses. Terminal status 'gated' — not
+   *  fired (nothing happened), not dropped (the transport was not late), not
+   *  reduced (nothing was folded). A backward seek puts it back to 'pending'
+   *  through the ordinary reconcile, so loosening the policy and replaying is
+   *  all it takes to hear it. */
+  function gateRefuse(ev, origin) {
+    ev.cancel && ev.cancel(); ev.cancel = null;
+    ev.status = 'gated';
+    const pol = evPolicy || EV_UNSET;
+    gateStats.fires++; gateStatOf(ev.kind).fires++;
+    const rep = gateReport(ev.kind, pol);
+    rep.pos = ev.at;
+    noteDegraded(ev.kind, rep);
+    if (gateCbs.size) {
+      const rec = { gate: 'fire', kind: ev.kind, id: ev.id, at: ev.at, origin, policy: pol.label, tier: laneTier(ev.kind) };
+      for (const cb of gateCbs) cb(rec);
+    }
+  }
+  /** G1: the same refusal at actuation's other door. */
+  function gateRefuseFold(kind, pos, reason) {
+    const pol = evPolicy || EV_UNSET;
+    gateStats.folds++; gateStatOf(kind).folds++;
+    noteDegraded(kind, {
+      wanted: `reduce+assertState under '${pol.label}'`, chose: 'not-asserted', degraded: true, pos,
+      reason: `${gateWhy(kind, pol)} This was the ${reason} fold: assertState() is an ACTUATION (it is how a seek puts held state back), so it is refused for the same reason fire() is — otherwise the same lane answers null to reduceAt() and asserts a folded state through the seek path.`,
+    });
+    if (gateCbs.size) for (const cb of gateCbs) cb({ gate: 'fold', kind, pos, reason, policy: pol.label, tier: laneTier(kind) });
+  }
+
+  /** Recompute the gated-lane set. Called ONLY when the lane set changes (a
+   *  lane's first derived row, or a tier rise, or a dropped restoration) or
+   *  when the policy changes — never per row and never per tick.
+   *  `transitions` runs G4's mid-play handlers; the lane-set path passes false
+   *  because a lane that has just come into existence holds nothing. */
+  function recomputeGate(reason, { transitions = false } = {}) {
+    const pol = evPolicy || EV_UNSET;
+    const next = new Set();
+    for (const [k, lp] of laneProv) if (lp.derived > 0 && lp.tier > pol.maxTier) next.add(k);
+    const prev = gatedKinds;
+    if (next.size === prev.size) {                 // cheap identity check
+      let same = true;
+      for (const k of next) if (!prev.has(k)) { same = false; break; }
+      if (same && !transitions) return gatedKinds;
+      if (same) { gatedKinds = next; return gatedKinds; }
+    }
+    gatedKinds = next; gateGen++;
+    if (!transitions) return gatedKinds;
+    const pos = transport.position();
+    for (const k of next) if (!prev.has(k)) gateTighten(k, pol, pos, reason);
+    for (const k of prev) if (!next.has(k)) gateLoosen(k, pol, pos, reason);
+    return gatedKinds;
+  }
+
+  const noteGate = (rec) => {
+    gateLog.push(rec);
+    if (gateLog.length > 256) gateLog.shift();
+    if (gateCbs.size) for (const cb of gateCbs) cb(rec);
+    return rec;
+  };
+
+  /** G4 — THE POLICY TIGHTENED WHILE PLAYING. This is a state change, not a
+   *  filter: the lane may be holding a note the policy now forbids, and simply
+   *  refusing its FUTURE rows would leave the forbidden material ringing —
+   *  which is precisely the failure `caps.absentState` was invented for at a
+   *  quotation edge. Same mechanism, new reason. An adapter that cannot go
+   *  quiet HOLDS and says so; it is never guessed at. */
+  function gateTighten(kind, pol, pos, reason) {
+    // cancel anything this lane already has committed, so the tighten is
+    // immediate rather than one tick late (the one-shot would reach fire()'s
+    // guard and be refused there, correctly, but a tick later).
+    for (const ev of laneOf(kind)) {
+      if (ev.status === 'committed') { ev.cancel && ev.cancel(); ev.cancel = null; ev.status = 'gated'; gateStats.fires++; gateStatOf(kind).fires++; }
+      else if (ev.status === 'pending' && ev.at > pos) { /* left pending; scan() will refuse it */ }
+    }
+    const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
+    const lp = laneProv.get(kind);
+    const base = { gate: 'tighten', kind, pos, policy: pol.label, tier: lp ? lp.tier : 0, source: lp ? lp.source : null, reason };
+    if (ad && caps.absentState === 'silence' && typeof ad.silence === 'function') {
+      const t = clock.now();
+      ad.silence({ kind, pos, reason: 'evidence-gated', policy: pol.label, tier: base.tier, source: base.source });
+      busyMs += clock.now() - t;
+      gateStats.silenced++;
+      return noteGate({ ...base, action: 'silenced' });
+    }
+    gateStats.held++;
+    noteDegraded(kind, {
+      wanted: `an evidence-only performance from this instant ('${pol.label}')`, chose: 'gated-but-held', degraded: true, pos,
+      reason: `lane '${kind}' (tier ${base.tier}, ${base.source}) stops ACTUATING immediately, but it declares no caps.absentState 'silence'${ad ? " (or implements no silence())" : ' (no adapter registered)'}, so whatever it was already holding KEEPS RINGING under the tightened policy. The gate can refuse the future; it cannot un-play the past. Declare caps.absentState:'silence' + silence(info) to make the toggle audible at the instant it is thrown.`,
+    });
+    return noteGate({ ...base, action: 'held' });
+  }
+
+  /** G4 — THE POLICY LOOSENED. The lane was refused; its actuator has missed
+   *  everything up to `pos`. Rows AHEAD of the playhead that scan() already
+   *  marked 'gated' go back to 'pending' (nothing else would ever revisit
+   *  them), and the lane is re-asserted at the playhead so it catches up on the
+   *  prefix it was not allowed to see. A lane with no reduce()+assertState()
+   *  cannot be caught up — it resumes at its next row, and that is REPORTED. */
+  function gateLoosen(kind, pol, pos, reason) {
+    let rearmed = 0;
+    for (const ev of laneOf(kind)) if (ev.status === 'gated' && ev.at > pos) { ev.status = 'pending'; rearmed++; }
+    if (rearmed) firstLive = 0;                    // statuses moved; next scan re-advances
+    const ad = adapters.get(kind);
+    const lp = laneProv.get(kind);
+    const base = { gate: 'loosen', kind, pos, policy: pol.label, tier: lp ? lp.tier : 0, source: lp ? lp.source : null, reason, rearmed };
+    if (ad && typeof ad.reduce === 'function' && typeof ad.assertState === 'function') {
+      applyReduce(kind, [], pos, clock.now(), 'evidence-ungated');
+      gateStats.reasserted++;
+      return noteGate({ ...base, action: 'reasserted' });
+    }
+    noteDegraded(kind, {
+      wanted: 'catch up on the prefix it was refused', chose: 'resumes-from-next-row', degraded: true, pos,
+      reason: `lane '${kind}' is actuable again under '${pol.label}', but it has no reduce()+assertState() pair, so there is nothing to re-assert: it resumes at its next row (${rearmed} row(s) ahead of the playhead re-armed) and everything it was refused stays unheard until a seek replays it. This is the same shape as nested.mjs's caps.loopState 'carry' refusal — a lane the transport cannot re-fold cannot be caught up, and saying so is the whole of the honesty.`,
+    });
+    return noteGate({ ...base, action: 'resumes' });
+  }
+
+  // -------------------------------------------------------------------------
+  // G5 — deck.assertState(kind, state, info). §7.5's honest positioning applies
+  // in full: this is DAW MIDI chase / ETC Eos "Assert", thirty-year-old shipped
+  // practice, and what was missing was not the idea but the DECK-LEVEL entry
+  // point. `assertAt(pos, kind)` folds AND asserts; a client that already KNOWS
+  // the state — after an external sync, a media-master handover, a policy
+  // change, a loop wrap that ended at `out` while the playhead sits at `in` —
+  // has no prefix to replay and no reason to pay for one.
+  //
+  // WHAT IT TOUCHES:
+  //   · adapter.assertState(state, info) — the actuation.
+  //   · the reduce SNAPSHOT, set to {pos, state}, so a forward-folding reducer's
+  //     info.from/info.since continue from the assertion rather than from a
+  //     boundary that no longer describes anything.
+  // WHAT IT DOES NOT TOUCH:
+  //   · THE DRIFT CHANNEL. A drift row is {id, at, intendedUs, firedUs,
+  //     deltaMs} for one EVENT. An assert has no event and no intended instant,
+  //     so a synthetic row would be a fabricated zero-lateness sample in every
+  //     p50/p95 in this repo. Asserts have their own channel (asserts(),
+  //     onGate is for the gate). Symmetric with the reason `sync()` is not
+  //     `seek()`: a correction is not an event.
+  //   · POSITION AND STATUSES. Asserting state is not seeking. Conflating them
+  //     is the distinction sync()/seek() already exists to keep.
+  // VERIFICATION IS OPT-IN, and that is a considered default, not laziness:
+  // checking the assertion means folding the prefix, which is exactly the cost
+  // assertState exists to avoid. The asymmetry with the evidence policy is the
+  // same one §7.9 already drew — silence that can FABRICATE throws (evidence),
+  // silence that merely trusts or widens defaults (certainty, and this). The
+  // caller IS the authority here by construction. Ask with {verify:true} and a
+  // disagreement with reduce(<= pos) lands in degradations() as 'asserted-over'.
+  // -------------------------------------------------------------------------
+  function sameValue(a, b) {
+    if (a === b) return true;
+    if (typeof a === 'number' && typeof b === 'number') return Number.isNaN(a) && Number.isNaN(b);
+    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (!sameValue(a[i], b[i])) return false;
+      return true;
+    }
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) { if (!Object.prototype.hasOwnProperty.call(b, k)) return false; if (!sameValue(a[k], b[k])) return false; }
+    return true;
+  }
+
+  function assertStateInto(kind, state, info = {}) {
+    const nowUs = Math.round(clock.now() * 1000);
+    const pos = info.pos !== undefined && Number.isFinite(Number(info.pos)) ? Number(info.pos) : transport.position();
+    const reason = info.reason || 'assert';
+    const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
+    const out = { kind, pos, reason, wanted: 'assert authoritative state', chose: 'asserted',
+                  degraded: false, applied: false, verified: false, agreed: null, expected: undefined,
+                  from: { pos: snap.pos, state: snap.state }, nowUs };
+    const refuse = (chose, why) => {
+      out.chose = chose; out.degraded = true; out.reason = why;
+      noteDegraded(kind, { wanted: 'deck.assertState()', chose, degraded: true, pos, reason: why });
+      return out;
+    };
+    const ad = adapters.get(kind);
+    if (!ad) return refuse('no-adapter', `deck.assertState('${kind}'): no adapter registered for that kind, so there is nothing to assert INTO. The snapshot is left alone — writing one for a kind nobody actuates would make reduce()'s info.from lie about a boundary that never happened.`);
+    if (gatedKinds.size !== 0 && gatedKinds.has(kind)) {
+      const pol = evPolicy || EV_UNSET;
+      gateStats.asserts++; gateStatOf(kind).asserts++;
+      return refuse('gated', `${gateWhy(kind, pol)} deck.assertState() is the third and most direct way into the actuator, so it is refused with the other two — a client that could push a dreamed state in by hand would make the fire-side gate decorative.`);
+    }
+    if (typeof ad.assertState !== 'function')
+      return refuse('no-assertState', `adapter '${kind}' implements no assertState(state, info) — §7.5: an adapter that wants seek (or an external sync, or a loop carry) to mean anything has to implement it. The snapshot is NOT moved, because moving it would make the next forward fold resume from a state nothing ever received.`);
+    if (info.verify === true && typeof ad.reduce === 'function') {
+      const ev2 = softEvidence(kind, 'assert');
+      const restrict = evRestrictsFold(kind, ev2);
+      const prefix = prefixEvents(kind, pos).map(publicEv);
+      const nexts = restrict ? [] : successorEvents(kind, pos, 1 + (((ad.caps) || {}).neighbourhood || 0));
+      const t0 = clock.now();
+      out.expected = ad.reduce(prefix.map((e) => e.payload), pos, {
+        kind, pos, reason: 'assert-verify', count: prefix.length, nowUs,
+        missed: [], prefix, since: prefix.filter((e) => e.at > snap.pos), from: { pos: snap.pos, state: snap.state },
+        next: nexts[0] || null, nexts, evidence: ev2, attestedOnly: restrict,
+      });
+      busyMs += clock.now() - t0;
+      out.verified = true;
+      out.agreed = sameValue(out.expected, state);
+      if (!out.agreed) {
+        out.degraded = true; out.chose = 'asserted-over';
+        noteDegraded(kind, {
+          wanted: 'agreement with reduce(<= pos)', chose: 'asserted-over', degraded: true, pos,
+          reason: `deck.assertState('${kind}', …, {verify:true}) at ${pos}: the caller's authoritative state and the deck's own reduce(prefix <= pos) DISAGREE. The caller wins — that is what "authoritative" means, and it is the whole reason the entry point exists (an external clock master or a hardware surface knows things the log does not). But a disagreement is exactly the "silently wrong" shape this library keeps refusing to ship, so it is on the record with both values. If the log is right and the caller is wrong, the assertion has just diverged the deck from its own trace; if the caller is right, the trace is incomplete and should say so.`,
+        });
+      }
+    }
+    const full = { ...info, kind, pos, reason, nowUs, asserted: true, source: info.source ?? null,
+                   from: { pos: snap.pos, state: snap.state }, count: 0, missed: [], prefix: [], since: [],
+                   next: null, nexts: [], replayed: false, verified: out.verified, agreed: out.agreed };
+    const t = clock.now();
+    ad.assertState(state, full);
+    busyMs += clock.now() - t;
+    snapshots.set(kind, { pos, state });
+    out.applied = true;
+    assertTotal++;
+    assertLog.push({ kind, pos, reason, nowUs, verified: out.verified, agreed: out.agreed, source: full.source });
+    if (assertLog.length > 4096) assertDropped += assertLog.splice(0, assertLog.length - 4096).length;
+    return out;
   }
 
   // -------------------------------------------------------------------------
@@ -1336,6 +1718,17 @@ export function createScheduler(transport, {
           chose = 'attested'; deg = true;
           reason = `'${want.label}' asks for restoration, but kind '${kind}' has none to give (no derived lane, and its adapter declares no caps.tier)`;
         } else chose = want.label;
+      } else if (k === 'actuate') {
+        // G3 — ASK THE FIRE-SIDE GATE, before a performance rather than after.
+        // request({evidence}) answers what this lane will SERVE; this answers
+        // whether it will HAPPEN, which the read-side answer never implied.
+        const pol = normalizeEvidence(want.evidence, "request({actuate})") || evPolicy || EV_UNSET;
+        const lt = laneIsDerived(kind) ? laneTier(kind) : 0;
+        if (v === false || v === undefined || v === null) chose = false;
+        else if (lt > pol.maxTier) {
+          chose = 'gated'; deg = true;
+          reason = `lane '${kind}' is tier-${lt} restoration; under '${pol.label}' its rows are NOT ACTUATED — fire(), the seek fold's assertState(), and deck.assertState() all refuse it. This is the fire-side firewall, and it is what makes an evidence-only PERFORMANCE the library's job rather than the adapter's (§8.8).`;
+        } else chose = true;
       } else if (v === true && caps[k] !== true) {
         chose = caps[k] === undefined ? false : caps[k];
         deg = true; reason = `adapter ${kind} does not declare caps.${k}`;
@@ -1598,6 +1991,47 @@ export function createScheduler(transport, {
     },
     /** Re-fold + re-assert reducible kinds at pos (seek does this for you). */
     assertAt,
+    /** G5: push AUTHORITATIVE state in, without replaying a prefix.
+     *  -> {kind, pos, chose, degraded, applied, verified, agreed, expected, from}
+     *  `info`: {pos?, reason?, source?, verify?} — everything else is passed
+     *  through to adapter.assertState(state, info). */
+    assertState: assertStateInto,
+    /** G5: the assert channel (deliberately NOT the drift channel). */
+    asserts(fromTotal = 0) {
+      const skip = Math.max(0, fromTotal - (assertTotal - assertLog.length));
+      return { total: assertTotal, retained: assertLog.length, dropped: assertDropped, rows: assertLog.slice(skip) };
+    },
+    /** the reduce boundary for a kind — {pos, state} — which assertState() moves
+     *  and a forward-folding reducer reads back as info.from. */
+    snapshotOf(kind) { const s = snapshots.get(kind); return s ? { pos: s.pos, state: s.state } : null; },
+    /** G3: the fire-side firewall's own accounting — the twin of
+     *  evidenceAccounting() on the ACTUATION axis. "How much of what you are
+     *  about to look at was invented" has a sibling: "how much of what was
+     *  about to happen was refused". */
+    gateAccounting(kind) {
+      const pol = evPolicy || EV_UNSET;
+      const ks = kind === undefined ? [...gateStats.byKind.keys()] : (Array.isArray(kind) ? kind : [kind]);
+      const lanes = [];
+      let fires = 0, folds = 0, asserts = 0;
+      for (const k of ks) {
+        const g = gateStats.byKind.get(k);
+        if (!g) continue;
+        fires += g.fires; folds += g.folds; asserts += g.asserts;
+        lanes.push({ ...g, gated: gatedKinds.has(k) });
+      }
+      return {
+        policy: pol.label, implicit: !evPolicy, gen: gateGen,
+        gated: [...gatedKinds], gatedLanes: gatedKinds.size,
+        refusedFires: fires, refusedFolds: folds, refusedAsserts: asserts,
+        silenced: gateStats.silenced, held: gateStats.held, reasserted: gateStats.reasserted,
+        lanes, transitions: gateLog.slice(),
+      };
+    },
+    /** G3: the refusal as a live channel, for a UI that must SHOW the gate
+     *  rather than discover it in a ledger afterwards. */
+    onGate(cb) { gateCbs.add(cb); return () => gateCbs.delete(cb); },
+    /** G1: is this lane's actuation currently refused? */
+    isGated(kind) { return gatedKinds.has(kind); },
     /** reduce(prefix <= pos) for one kind, without asserting — the expected
      *  state a harness compares against (the C2 left-hand side). §5b's
      *  `reduce()` with an evidence policy: under a policy that forbids
@@ -1735,7 +2169,14 @@ export function createScheduler(transport, {
     /** E3: the deck-level evidence policy — the explicit choice every omitting
      *  query resolves to. null means the client never made one. */
     evidence() { return evPolicy ? { ...evPolicy } : null; },
-    setEvidence(p) { evPolicy = normalizeEvidence(p, 'setEvidence'); return evPolicy && { ...evPolicy }; },
+    /** G4: a policy change is a STATE CHANGE, not a filter. Lanes that become
+     *  gated are asked to go quiet; lanes that become ungated are re-asserted
+     *  at the playhead. Both transitions are on gateAccounting()'s log. */
+    setEvidence(p) {
+      evPolicy = normalizeEvidence(p, 'setEvidence');
+      recomputeGate('setEvidence', { transitions: true });
+      return evPolicy && { ...evPolicy };
+    },
     /** E1: the provenance rollup for a lane (or every lane). */
     provenanceOf(kind) {
       const one = (lp) => ({
@@ -1876,6 +2317,7 @@ export function createScheduler(transport, {
           seriesLanes.delete(into);
           derivedTotal -= n;
           firstLive = 0;                       // indices moved; the next scan re-advances
+          recomputeGate('reconstructor-drop'); // G2: the lane is gone, so is its gate
           return { dropped: n };
         },
         rows: (opts) => (byKind.get(into) || []).map(publicEv),
@@ -1914,6 +2356,7 @@ export function createScheduler(transport, {
       laneProv.clear(); derivedTotal = 0;      // E1: the provenance ledger is the log's
       lanePos.clear(); smearedTotal = 0;       // U4: and so is the position ledger
       seriesLanes.clear();                     // U5
+      recomputeGate('clear');                  // G2: no lanes, no gate
     },
     /** SEAM 6: non-destructive drift reads. */
     onDrift(cb) { driftCbs.add(cb); return () => driftCbs.delete(cb); },
@@ -1927,7 +2370,7 @@ export function createScheduler(transport, {
      *  onDrift()/peekDrift() so draining does not blind them. */
     drainDrift() { return driftLog.splice(0); },
     stats() {
-      const counts = { pending: 0, committed: 0, fired: 0, passed: 0, dropped: 0, reduced: 0 };
+      const counts = { pending: 0, committed: 0, fired: 0, passed: 0, dropped: 0, reduced: 0, gated: 0 };
       for (const ev of events) counts[ev.status]++;
       // E1: `total` counts every row in the deck; `attested` and `derived` split
       // it, so a client asserting "my capture is intact" compares against
@@ -2170,6 +2613,16 @@ export function createDeck({
     resetDrift() { sched.drainDrift(); drift = []; pendingRows = []; },
     reduceAt: (kind, pos, opts) => sched.reduceAt(kind, pos, opts),
     assertAt: (pos, kind) => sched.assertAt(pos, kind),
+    /** v0.7 G5 — push AUTHORITATIVE state in without replaying a prefix (an
+     *  external sync, a media-master handover, a policy change, a loop wrap).
+     *  Moves the reduce snapshot; writes NO drift row; verification opt-in. */
+    assertState: (kind, state, info) => sched.assertState(kind, state, info),
+    asserts: (from) => sched.asserts(from),
+    snapshotOf: (kind) => sched.snapshotOf(kind),
+    /** v0.7 G3 — the fire-side firewall's accounting and its live channel. */
+    gateAccounting: (kind) => sched.gateAccounting(kind),
+    onGate: (cb) => sched.onGate(cb),
+    isGated: (kind) => sched.isGated(kind),
     /** v0.4 CONTINUOUS KINDS — the interpolated value at any position (C1), the
      *  raw straddling pair (C2), honest capability negotiation (C6).
      *  v0.5 THE EVIDENCE FIREWALL — all four take {evidence} (E3). */

@@ -33,12 +33,12 @@
     {
       "name": "the session PLAYS in its arrangement slot (notes fire, its own audio runs)",
       "ok": true,
-      "detail": "{\"parentS\":34.92,\"childS\":4.92,\"mapErrMs\":0.1,\"fires\":23,\"mediaCurrentTimeS\":4.666,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":1,\"childSpanFires\":1,\"innerSyncCalls\":571,\"innerCorrections\":2,\"outerCorrections\":2}"
+      "detail": "{\"parentS\":34.96,\"childS\":4.96,\"mapErrMs\":0,\"fires\":24,\"mediaCurrentTimeS\":4.674,\"mediaReadyState\":4,\"mediaPaused\":false,\"mediaRestarts\":0,\"childSpanFires\":1,\"innerSyncCalls\":570,\"innerCorrections\":1,\"outerCorrections\":1}"
     },
     {
       "name": "child position tracks the parent mapping while the CHILD masters",
       "ok": true,
-      "detail": "map error 0.1 ms"
+      "detail": "map error 0 ms"
     },
     {
       "name": "a parent seek lands EXACTLY inside the nested session (position + held-note reduce)",
@@ -58,17 +58,17 @@
     {
       "name": "rate 2x composes: parent AND nested child both advance ~2x wall, child media at 2.00x",
       "ok": true,
-      "detail": "{\"wallMs\":3002,\"parentAdvancedMs\":6010,\"childAdvancedMs\":6010,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":2.002,\"childRatio\":2.002}"
+      "detail": "{\"wallMs\":3005,\"parentAdvancedMs\":6012,\"childAdvancedMs\":6012,\"childMediaRate\":2,\"archiveRates\":[2,2],\"parentRatio\":2.001,\"childRatio\":2.001}"
     },
     {
       "name": "a composed rate off the child lattice DEGRADES HONESTLY (chose it, said so, suspended mastering)",
       "ok": true,
-      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":300,\"childCorrections\":198,\"parentRatio\":1.5,\"childMapErrMs\":4.8,\"childAdvancedMs\":3757,\"wallMs\":2502,\"childMediaOffsetMs\":139}"
+      "detail": "{\"wanted\":1.5,\"chose\":2,\"degraded\":true,\"allowed\":[0.25,0.5,1,2,4],\"reason\":\"child caps.rates lattice\",\"childLattice\":[0.25,0.5,1,2,4],\"archiveLattice\":[0.5,0.75,1,1.5,2],\"childTarget\":2,\"masterSuspended\":301,\"childCorrections\":201,\"parentRatio\":1.5,\"childMapErrMs\":32.7,\"childAdvancedMs\":3795,\"wallMs\":2508,\"childMediaOffsetMs\":-2}"
     },
     {
       "name": "outside the span the session is ABSENT (silent, paused, frozen) while an archive layer keeps playing",
       "ok": true,
-      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.49,\"advancedMs\":2492},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.93,\"advancedMs\":0}],\"parentAdvancedMs\":2504}"
+      "detail": "{\"present\":false,\"childPlaying\":false,\"childPosDriftMs\":0,\"childHeld\":[],\"childMediaPaused\":true,\"childFiresWhileAbsent\":0,\"archive\":[{\"tag\":\"A1\",\"inSpan\":true,\"paused\":false,\"ct\":62.49,\"advancedMs\":2490},{\"tag\":\"A2\",\"inSpan\":false,\"paused\":true,\"ct\":36.99,\"advancedMs\":0}],\"parentAdvancedMs\":2507}"
     },
     {
       "name": "drift NESTS: the child channel stays in the child domain",
@@ -262,18 +262,18 @@
     "back": "nested cycle: the child already contains this parent"
   },
   "playsInSlot": {
-    "parentS": 34.92,
-    "childS": 4.92,
-    "mapErrMs": 0.1,
-    "fires": 23,
-    "mediaCurrentTimeS": 4.666,
+    "parentS": 34.96,
+    "childS": 4.96,
+    "mapErrMs": 0,
+    "fires": 24,
+    "mediaCurrentTimeS": 4.674,
     "mediaReadyState": 4,
     "mediaPaused": false,
-    "mediaRestarts": 1,
+    "mediaRestarts": 0,
     "childSpanFires": 1,
-    "innerSyncCalls": 571,
-    "innerCorrections": 2,
-    "outerCorrections": 2
+    "innerSyncCalls": 570,
+    "innerCorrections": 1,
+    "outerCorrections": 1
   },
   "probeSummary": {
     "n": 14,
@@ -315,16 +315,16 @@
       }
     },
     "run": {
-      "wallMs": 3002,
-      "parentAdvancedMs": 6010,
-      "childAdvancedMs": 6010,
+      "wallMs": 3005,
+      "parentAdvancedMs": 6012,
+      "childAdvancedMs": 6012,
       "childMediaRate": 2,
       "archiveRates": [
         2,
         2
       ],
-      "parentRatio": 2.002,
-      "childRatio": 2.002
+      "parentRatio": 2.001,
+      "childRatio": 2.001
     },
     "degrade": {
       "wanted": 1.5,
@@ -353,13 +353,13 @@
         2
       ],
       "childTarget": 2,
-      "masterSuspended": 300,
-      "childCorrections": 198,
+      "masterSuspended": 301,
+      "childCorrections": 201,
       "parentRatio": 1.5,
-      "childMapErrMs": 4.8,
-      "childAdvancedMs": 3757,
-      "wallMs": 2502,
-      "childMediaOffsetMs": 139
+      "childMapErrMs": 32.7,
+      "childAdvancedMs": 3795,
+      "wallMs": 2508,
+      "childMediaOffsetMs": -2
     }
   },
   "absence": {
@@ -375,17 +375,17 @@
         "inSpan": true,
         "paused": false,
         "ct": 62.49,
-        "advancedMs": 2492
+        "advancedMs": 2490
       },
       {
         "tag": "A2",
         "inSpan": false,
         "paused": true,
-        "ct": 36.93,
+        "ct": 36.99,
         "advancedMs": 0
       }
     ],
-    "parentAdvancedMs": 2504
+    "parentAdvancedMs": 2507
   },
   "drift": {
     "kind": "deck-span",
@@ -429,6 +429,7 @@
           "quotedFraction": 1,
           "reason": null
         },
+        "loop": null,
         "marks": null,
         "absent": {
           "mode": "hold",
@@ -456,23 +457,23 @@
         },
         "degradations": 0,
         "hardSeeks": 3,
-        "masterSuspended": 300,
+        "masterSuspended": 301,
         "parentCorrections": {
-          "n": 5,
-          "p50": 45.93,
-          "p95": 55.82,
-          "min": 42.5,
-          "max": 55.82
+          "n": 3,
+          "p50": 52.76,
+          "p95": 55.4,
+          "min": 41.56,
+          "max": 55.4
         },
         "childCorrections": {
-          "n": 198,
-          "p50": 113.08,
-          "p95": 238,
-          "min": 40.34,
-          "max": 247.93
+          "n": 201,
+          "p50": 107.04,
+          "p95": 235.42,
+          "min": 41.55,
+          "max": 249.73
         },
         "child": {
-          "fires": 126,
+          "fires": 129,
           "range": [
             0,
             18644
@@ -484,17 +485,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 6.2,
-              "p95": 6.2,
-              "min": 6.2,
-              "max": 6.2
+              "p50": 0.9,
+              "p95": 0.9,
+              "min": 0.9,
+              "max": 0.9
             },
             "midi-actuated": {
-              "n": 125,
-              "p50": 4.36,
-              "p95": 8.47,
-              "min": -0.32,
-              "max": 25.05
+              "n": 128,
+              "p50": 4.14,
+              "p95": 8.4,
+              "min": -0.56,
+              "max": 31.8
             }
           }
         }
@@ -539,6 +540,7 @@
           "quotedFraction": 0.536366,
           "reason": null
         },
+        "loop": null,
         "marks": null,
         "absent": {
           "mode": "hold",
@@ -582,7 +584,7 @@
           "max": null
         },
         "child": {
-          "fires": 126,
+          "fires": 129,
           "range": [
             0,
             18644
@@ -594,17 +596,17 @@
           "kinds": {
             "media-span": {
               "n": 1,
-              "p50": 6.2,
-              "p95": 6.2,
-              "min": 6.2,
-              "max": 6.2
+              "p50": 0.9,
+              "p95": 0.9,
+              "min": 0.9,
+              "max": 0.9
             },
             "midi-actuated": {
-              "n": 125,
-              "p50": 4.36,
-              "p95": 8.47,
-              "min": -0.32,
-              "max": 25.05
+              "n": 128,
+              "p50": 4.14,
+              "p95": 8.4,
+              "min": -0.56,
+              "max": 31.8
             }
           }
         }
@@ -612,7 +614,7 @@
     ]
   },
   "childDrift": {
-    "fires": 126,
+    "fires": 129,
     "range": [
       0,
       18644
@@ -624,17 +626,17 @@
     "kinds": {
       "media-span": {
         "n": 1,
-        "p50": 6.2,
-        "p95": 6.2,
-        "min": 6.2,
-        "max": 6.2
+        "p50": 0.9,
+        "p95": 0.9,
+        "min": 0.9,
+        "max": 0.9
       },
       "midi-actuated": {
-        "n": 125,
-        "p50": 4.36,
-        "p95": 8.47,
-        "min": -0.32,
-        "max": 25.05
+        "n": 128,
+        "p50": 4.14,
+        "p95": 8.4,
+        "min": -0.56,
+        "max": 31.8
       }
     }
   },

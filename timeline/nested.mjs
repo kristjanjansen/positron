@@ -177,6 +177,14 @@ function depth(deck, edge) {
 
 /** Throws if linking parent -> child would make a cycle or exceed the depth
  *  cap. Exported so a client can ask before it builds. */
+/** The nest a deck is the PARENT of, or null. Exported so the offline renderer
+ *  can FOLD a nest it was not handed: `renderDeck(parent)` on a deck that has a
+ *  nest must render the composition, not the two span markers. The map is
+ *  already maintained (`NESTS`) — this only makes it readable, and it is the
+ *  whole of the seam plan-timeline §8.8 called "`renderDeck` cannot see a
+ *  nest". Recursive by construction: `nestOf(child)` walks one level down. */
+export function nestOf(deck) { return (deck && NESTS.get(deck)) || null; }
+
 export function checkNestable(parent, child) {
   if (parent === child) throw new Error('nested cycle: a deck cannot contain itself');
   if (walk(child, kids).has(parent)) throw new Error('nested cycle: the child already contains this parent');
@@ -483,7 +491,19 @@ export function createNest(parent, {
       }
     }
     sp.deck.seek(want);                                    // 2 — the re-seek
-    for (const k of lanes.carry) sp.deck.assertAt(sp.c1, k);  // 3 — the carry
+    // 3 — THE CARRY. Fold at `out` (the level the iteration ended in) but
+    // assert at the PLAYHEAD, which is where the child now is. `assertAt(c1, k)`
+    // did both in one call and therefore reported `out` as the position — the
+    // "works; slightly untrue" seam proto/loops recorded and could not close,
+    // because `deck.assertState(kind, state, info)` did not exist until v0.7.
+    // Guarded, not assumed: `reduceAt` returns null/undefined for a lane the
+    // evidence policy excludes, and asserting that would push a null into a
+    // level lane's actuator — the exact shape of the fire-side hole v0.7 closed.
+    for (const k of lanes.carry) {
+      const state = sp.deck.reduceAt(k, sp.c1);
+      if (state === undefined || state === null) continue;
+      sp.deck.assertState(k, state, { pos: want, reason: 'loop-carry', source: sp.id });
+    }
     sp.iter = toIter; sp.wraps++; sp.lastWrap = info;
     if (lanes.degraded.length) for (const d of lanes.degraded) if (!sp.loopDegradations.some((x) => x.kind === d.kind && x.wanted === d.wanted)) sp.loopDegradations.push(d);
     for (const cb of [...wrapCbs]) { try { cb(info); } catch (e) { sp.wrapErrors.push(String(e.message)); } }
@@ -553,7 +573,7 @@ export function createNest(parent, {
   /** Put the child exactly where the parent says it should be. This IS what a
    *  seek means one level down (rule 3) — a real child seek, so the child's own
    *  reduce/assertState runs and holds. */
-  function assertSpan(sp, parentPos, present) {
+  function assertSpan(sp, parentPos, present, entry = null) {
     const inside = present && inSpan(sp, parentPos);
     if (!inside) {
       if (sp.loop) disarmWrap(sp);
@@ -596,7 +616,33 @@ export function createNest(parent, {
     // (you started there). For a loop it would make pass 1 the only pass
     // missing its downbeat, so entry takes the same hair-before-`in` lead a
     // wrap takes, and every repetition sounds identical.
-    sp.deck.seek(sp.loop && phaseOf(sp, parentPos).off === 0 ? wrapSeekTarget(sp) : toChild(sp, parentPos));
+    //
+    // ✦ FOUND BY THE OFFLINE RENDERER (2026-08-30). The test used to be
+    // `phaseOf(pos).off === 0` — an exact float equality that holds only when
+    // the ENTER event is actuated at EXACTLY `at`. On a virtual clock it always
+    // is (a committed one-shot fires at its due instant), so every property arm
+    // passed. In WALL-CLOCK playback the enter fire carries the scheduler's
+    // ordinary lateness, `off` was a few ms, and pass 1 — and only pass 1 —
+    // folded its downbeat: the same score rendered 8 onsets offline and played
+    // 7 in real time. The wrap was never the problem; the ENTRY was.
+    //
+    // The distinguisher is ARRIVED vs JUMPED, and the adapter contract already
+    // hands it over: `actuate(payload, rec)` with `phase:'enter'` IS an
+    // arrival; an `assertState` after a seek JUMPED, and rule 10a says a jump
+    // folds ("you jumped, you did not arrive"). The only remaining question is
+    // whether the arrival is too late to still play the head of its pass, and
+    // `wrapGraceMs` is already the library's answer to exactly that question —
+    // the identical bound `wrapSpan` uses, for the identical reason.
+    //
+    // (The first attempt at this bounded `off` by the fire's own `rec.deltaMs`
+    // and FAILED: `deltaMs` is sampled at the top of fire() and `off` is read
+    // from `parent.position()` a few instructions later, so `off > deltaMs`
+    // ALWAYS, by the cost of the intervening reads — measured, the entry seek
+    // went to child 0.98876953125 instead of −1e-6. A bound that is beaten by
+    // its own measurement overhead is not a bound.)
+    const off = sp.loop ? phaseOf(sp, parentPos).off : 0;
+    const entryLead = !!(sp.loop && entry && off <= wrapGraceMs);
+    sp.deck.seek(sp.loop && (off === 0 || entryLead) ? wrapSeekTarget(sp) : toChild(sp, parentPos));
     // rule 10a: a SEEK is a seek, at any depth and into any repetition. It
     // lands in whichever iteration the arithmetic says and folds there; it does
     // NOT wrap, so nothing carries — you jumped, you did not arrive.
@@ -616,9 +662,13 @@ export function createNest(parent, {
       syncToleranceMs: toleranceMs, hardSeekMs, maxDepth: MAX_NEST_DEPTH,
       anchor: 'nested-offset (childPos = (parentPos - at) * rate)',
     },
-    actuate(p) {
+    actuate(p, rec) {
       const sp = spans.get(p.ref);
-      if (sp) assertSpan(sp, parent.position(), p.phase === 'enter');
+      // `rec.deltaMs` is how late THIS fire is — the transport has measured it
+      // since v0.3 and the nest never read it. It is what tells an ENTRY apart
+      // from a seek that happens to land on the same position (see assertSpan).
+      if (sp) assertSpan(sp, parent.position(), p.phase === 'enter',
+        p.phase === 'enter' ? { lateMs: (rec && Number.isFinite(rec.deltaMs)) ? rec.deltaMs : 0 } : null);
     },
     /** play / pause / rate are NOT seeks — nothing re-asserts on them, but the
      *  child still has to follow the parent's transport (rule 4, follow half).
@@ -634,7 +684,18 @@ export function createNest(parent, {
           continue;
         }
         const r = applyRate(sp);
-        if (parent.playing() && r.chose > 0) sp.deck.play(); else sp.deck.pause();
+        // `sp.present !== false` — A SPAN THE PLAYHEAD HAS NOT ENTERED YET MUST
+        // NOT BE STARTED, even when the playhead is inside its window by the
+        // eps tolerance. Found by rendering a NEST INSIDE A NEST: an outer wrap
+        // seeks the middle deck to `in − 1e-6`, which is inside the inner
+        // span's window (eps 0.5 ms) but BEFORE its enter event, so the inner
+        // child was still parked at `c0` (rule 7c's absent park) — and starting
+        // it there made an event sitting exactly on `c0` fire 'tick-late', then
+        // fire AGAIN when the enter actuated and re-seeked a hair before `c0`.
+        // Two fires of one event, which breaks exactly-once. `present === null`
+        // (never asserted) still plays: that is a deck that was never seeked,
+        // and refusing it would be the regression.
+        if (parent.playing() && r.chose > 0 && sp.present !== false) sp.deck.play(); else sp.deck.pause();
         // play/pause/rate move the boundary's WALL time without moving its
         // POSITION, so the committed one-shot has to be re-armed here.
         if (sp.loop) armWrap(sp);
@@ -661,6 +722,16 @@ export function createNest(parent, {
 
   const nest = {
     kind, adapter, toleranceMs, hardSeekMs,
+    /** the deck this nest arranges INTO. A renderer handed a nest needs the
+     *  deck whose transport it must step; a nest handed a deck needs nothing.
+     *  (`nestOf(parent) === nest` is the other direction of the same edge.) */
+    parent,
+    /** rule 10a, reported: is the wrap boundary COMMITTED on a tick host, or
+     *  discovered by whatever loop calls `servo()`? An offline render must be
+     *  able to ask, because 'polled' offline is not a timing artefact — it is a
+     *  DIFFERENT EVENT SET, and a render that quietly produced one would be
+     *  reproducible and wrong. */
+    boundary: () => (boundaryHost ? 'lookahead' : 'polled'),
 
     /** Add a nested/offset span, optionally QUOTING A FRAGMENT of the child
      *  (`in`/`out`, rule 7). Throws on cycle / depth (rule 6), on `in >= out`,
@@ -799,7 +870,6 @@ export function createNest(parent, {
       CHILDREN.get(parent).add(deck);
       if (!PARENTS.has(deck)) PARENTS.set(deck, new Set());
       PARENTS.get(deck).add(parent);
-      NESTS.set(parent, nest);
 
       // one span, TWO items — a span is an interval, not an instant
       parent.schedule({ at, kind, id: `${kind}-${id}-in`,
@@ -875,7 +945,11 @@ export function createNest(parent, {
     masterId: () => masterId,
     /** the child position the parent's playhead currently implies */
     childPos: (id) => { const sp = spans.get(id); return sp ? toChild(sp, parent.position()) : null; },
-    parentPos: (id, cpos) => { const sp = spans.get(id); return sp ? toParent(sp, cpos) : null; },
+    /** The inverse map. A LOOP has one parent position per repetition, so
+     *  `iter` selects which; it defaults to the span's current one. The offline
+     *  renderer calls this once per (item, iteration) to EXPAND a loop's audio,
+     *  which is why the parameter is public and not just internal. */
+    parentPos: (id, cpos, iter) => { const sp = spans.get(id); return sp ? toParent(sp, cpos, iter === undefined ? (sp.iter || 0) : iter) : null; },
     present: (id) => { const sp = spans.get(id); return !!(sp && inSpan(sp, parent.position())); },
     rateReport: (id) => { const sp = spans.get(id); return sp ? sp.rateReport : null; },
     /** rule 7: the quoted fragment [in, out] in the CHILD's domain, and the
@@ -1027,6 +1101,12 @@ export function createNest(parent, {
       NESTS.delete(parent);
     },
   };
+  // Registered HERE, not in add(): `nestOf(parent)` is how the offline renderer
+  // discovers a composition, and a nest with no spans yet is still a nest — a
+  // deck that HAS one must not look flat just because it is empty. (It used to
+  // be set in add(), which made `renderDeck(parent)` on an empty nest fail with
+  // "needs finite {from, to}" instead of rendering the parent's own range.)
+  NESTS.set(parent, nest);
   return nest;
 }
 
