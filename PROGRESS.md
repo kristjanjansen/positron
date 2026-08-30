@@ -1,4 +1,224 @@
-# Progress log — 2026-08-25 → 27
+# Progress log — 2026-08-25 → 30  (newest first)
+
+## Session 7 (2026-08-30) — the looper, local and remote (user: "build midi looper … in parallel fix 2 3 5. also 4")
+
+Four agents on the four open HANDOFF items in parallel, the looper in the main
+session. File ownership was disjoint by design (transport / strip+megatimeline /
+render+nested / studio / proto-looper) and nothing collided.
+
+### THE LOOPER (proto/looper) — ✅ 39 virtual + 17 real-clock asserts
+- **A looper needs NO new library feature.** `nest.add()` fixes `{in,out,repeat}`
+  and there is no `retrigger()`, which looked fatal for "press the pedal, play,
+  press again, the length of what you played becomes the loop". It is not,
+  because **the quotation is authored AFTER the trace exists**: TRACE = every
+  input event, source-stamped, absolute, never looped; SCORE = the second press,
+  which declares `{ref, in:0, out:L, repeat:'infinite'}`. C10's trace/authoring
+  split is the looper's user interface, not a constraint it works around.
+- Overdub layers are **separate decks** (rule 7g) — N overdubs = N tape
+  machines, the constraint that also made phasing need two. Cross-layer phase
+  error max 2.4e-4 ms over 100 iterations: both spans re-derive from one parent
+  vector, so there is nothing to drift.
+- **`caps.audio` DOES NOTHING WITHOUT A LEAD** — the headline. A fire that lands
+  late has no future instant to schedule, and the wall lane lands late by p50
+  6.3 ms, so **1/36 notes reached the sample grid at `leadMs: 0` vs 27/27 at 30**.
+  Measured at the OUTPUT by an onset detector on the render thread, against the
+  instant each note was *meant* to sound: **sd 4.38 → 0.38 ms, spread 16.9 →
+  1.1 ms.** The trade is free for a loop and only for a loop — a constant shift
+  of a circle has nothing to be heard against. Now the default (30 ms), and
+  `verify.mjs` arm A is a deliberate downgrade so the A/B survives.
+- **Stamp at source, as a distribution**: handler − source p50 0.30 / max 1.00 ms
+  with a **0.90 ms spread**. The point is the spread — it is not a constant
+  anyone could subtract afterwards, which is exactly why the lineage's law is
+  "never re-stamp".
+- **"No stuck notes" comes from the REDUCER, not the wrap callback.** Disabling
+  `loopWrap()` changes nothing (0 stuck either way); removing the lane's
+  `reduce()`/`assertState()` strands 3 voices forever. nested.mjs says so in
+  prose — step 2 is the wrap's own `child.seek(in)` — and this measures it.
+- **Overdub latency compensation**: `leadMs + base + output`, subtracted from
+  captured note stamps. Against a simulated performer who plays what they HEAR
+  (the instant read out of the system, not assumed): **67.40 → 0.0000 ms**. The
+  trap is that a *uniform* shift is a no-op — phases are differences — so the
+  notes move and **the origin must not**. A note dragged before the origin wraps
+  to the end of the loop; outside the compensation window it is still refused.
+- Session round-trip: byte-identical **twice** (the null-id trap needs the second
+  pass), **1,698 B per layer**, no trace in the envelope. Two independent players
+  from one score, zero messages: **480 onsets, identical (iteration, layer, note,
+  phase)**.
+- Frozen tab (ticks AND timers suppressed): 0 fired over 30 s, 1205 ticks
+  dropped, iteration advanced by 15 with nothing to count with, 0 burst on
+  return, phase error one epoch ulp.
+- Two of my own bugs that looked exactly like library bugs: **a virtual clock
+  runs backwards** if you `advanceTo` a stale instant (artefact: one event
+  48.7 ms late, first pass only, isolating perfectly to "only when a note
+  straddles the splice"); and **`advanceTo` is not a blur** — it runs every
+  intervening tick, so the first blur test "proved" a 120-onset burst that was
+  15 passes playing normally in fast-forward.
+- Seam in code not mine: **`nest.add()` on an already-playing parent silently
+  never enters** — it pauses the deck and relies on an `enter` event already in
+  the past; the child sits at rate 0 while the nest counts wraps around it.
+
+### THE REMOTE LOOPER (proto/looper/peer.mjs) — ✅ 12 simulated + 12 two-tab
+- **The claim held: a committed loop is a VALUE, so the network is used once per
+  layer and never per note.** Identical phase sets, to the last decimal, across
+  links of 1.1 / 12.7 / 89.3 / 402.6 / 2500.4 / 4700.8 ms. The cost of a slow
+  link is paid in PASSES (joins pass 2 vs pass 4), never in timing. At 25 % loss
+  the loop is unharmed: the loop plane is ONE message, so it either lands and is
+  perfect forever or never starts. There is no partial loop.
+- **Clock agreement is the hard problem, not latency.** Skew is estimated peer to
+  peer, min-RTT-of-N, never against a relay (the worker `/time` path was measured
+  at ±50 ms of BIAS). Recovery is exact at every injected skew (0 → 5000.3 ms)
+  and every link speed (1.3 → 311.2 ms) — worst error 9.8e-5 ms. **min-RTT is
+  scale-free**, which is why the relay's latency never had to be small.
+- **Negative control**: correction off → the flam is *exactly* the injected skew
+  (137.4 ms = 6.9 % of a 2 s circle). That control was itself broken first —
+  comparing each peer's own timestamps CANCELS the skew under test and scored a
+  perfect 0.0 ms until the conversion into one true domain existed.
+- **A late layer is GATED, never SEEKED.** Starting a received layer at "the next
+  downbeat" by seeking there moves the clock into the future and desynchronises
+  the peer by exactly the amount it moved (measured: one loop minus the link
+  delay). And the gate must be armed as a one-shot — polling lifted it late and
+  the downbeat was gone (first audible note at phase 251.3 instead of 3.7). That
+  is proto/loops' wrap defect at a different boundary in a different file.
+- Two real tabs, real audio, real BroadcastChannel: 1,608 B in 0.25 ms, the
+  second tab rebuilt the loop **from bytes alone**, identical phase sets, and
+  **ear to ear (both onset detectors anchored into shared time): p50 −5.77 / p95
+  −1.52 ms, sd 10.17, 31 mutually-paired, 0 unpaired**.
+- ⚠ **max 28.39 ms and the tail is NOT explained.** Part is a real finding — the
+  servo's dead band is a *per-peer* position error, invisible solo and a
+  cross-peer flam when shared (5 → 1 ms moved p50 from −8.24 to −5.77) — and
+  part is not. First thing to chase.
+- What two tabs CANNOT show: they share a system clock, so the estimator has
+  nothing to find. Stated in the file so the ~0 offset is not over-read.
+
+### ITEM 2 — FIRE-SIDE EVIDENCE FIREWALL (transport v0.7) — ✅ prop-test suite 8 + firewall.mjs 32
+- **The hole was worse than §8.8 said: TWO doors.** Beside `fire()`,
+  `applyReduce()` → `adapter.assertState()` folded a derived lane's whole prefix
+  into its actuator under `'attested'`. `reduceAt()` correctly returned `null`
+  while `seek()` silently asserted tier 3. **One lane, two answers, decided by
+  which door the query came through.**
+- **`caps.evidenceGated` REFUTED** — the gate is unconditional. Opt-in would
+  reproduce `caps.series` with the sign flipped (declared-and-unread returned a
+  value belonging to neither controller; undeclared-and-unenforced returns a
+  dreamed note in an archival performance). *Asking the adapter's permission on
+  one side of a firewall and not the other is not a firewall.*
+- Proof: an `attested` deck's **actuation trace AND drift channel** are
+  bit-identical to a deck that never held the restorations (110 rows, 4,165
+  bytes, one string) and to one after a physical `drop()`. 462 fires refused
+  across 11 lanes; 12 repetitions of the attested performance carry ONE distinct
+  signature where `'all'` plays 558 onsets vs 96.
+- `deck.assertState(kind, state, info)` built: 1.48 µs unverified vs 81.4 µs
+  verified (55×), which is why verification is opt-in.
+- **A measurement thrown away**: difference-of-p50s gave +11.4 / +0.8 / +9.8 %
+  on the *same two builds*; rebuilt as paired differences against a
+  byte-identical-copy control, the effect sits inside the control band, so the
+  honest claim is an upper bound, not a value.
+- Negative result that changed the code: the first gate made **refusing 37 % more
+  expensive than firing** (a 500-char reason string per refused row) → memoised,
+  79 % cheaper.
+- Main session applied the one cross-file change requested: `nested.mjs`
+  `wrapSpan()` step 3 now folds at `out` and asserts at the **playhead**, closing
+  proto/loops seam #2 ("works; slightly untrue").
+
+### ITEM 3+5a — THE STRIP RENDERER + DEEP TIME — ✅ strip-verify 32/32
+- **Ambiguation was already shipping as a lie**: `outer` (a wholly unknown
+  position) and `crisp` (an attested duration) fell into one `else` branch at
+  α 0.70 and were **identical in ink**. Now **51.6 % separated** (crisp 3,360 px
+  @ α 215 vs outer 11,456 px @ α 104).
+- The empty core is confirmed on real data: `core: 0` in every window at every
+  zoom on the Kurenniemi corpus. The fix is not to invent a core — ambiguation
+  *degenerates* when the core is empty, so it falls back to the same study's
+  other recommendation for the same task (error bars over the outer bracket),
+  which cannot be misread as a core because it is not a filled region.
+- **The third state is a property of the row AND THE WINDOW**: 1930–2000 gives
+  19 sound / 0 undecidable; 1965 gives 2 / 12; June 1965 gives 0 / 11. The
+  epistemics are a property of the *question*, and on a zoomable axis the wheel
+  is what asks it. Undecidable rows **ghost** rather than vanish.
+- **`when.kind` broke the measuring instrument**: a feathered vagueness edge
+  keeps its pixels above the 8/255 gate, so alpha mass differs 8.8 % where the
+  pixel COUNT differs 1.8 %. `laneInk` grew a `sum` mode.
+- **One third of the aggregate brief does not exist**: mass `1/(b−a)` and
+  "divide by the overlapping-period count" are the SAME operation at one bin per
+  pixel column (`maxAbsDiff = 0` exactly) — the column *is* the period.
+  Applying both would have halved every mass twice. Also: points were silently
+  dropped, and the curve drew `lineTo` between column tops — a linear
+  interpolation across the bin boundary, the exact invention PeriodO refused.
+- megatimeline's alpha **saturated at n = 18**: a year holding 20 items and one
+  holding 6,808 painted identical grey.
+- **Deep time: the bug was not the predicted one.** The precision ceiling is real
+  (ulp at 13.8 Gyr = 65.5 s; `t += 1` stalls at ~295 kyr) but what would have
+  killed the tab first was a draw loop asking for **138,000,000 major ticks per
+  frame** (now 14) — and `formatTime` handed deep positions to `Date`, where
+  `new Date(-4.35e20).toISOString()` **throws**. Verdict: a documented measured
+  ceiling; ms stays the position domain. Zoom ceiling derived from IEEE-754
+  (`1000/ulp(t)`), and a surprise: the existing 1e7 px/s cap was already **2.4×
+  past the double's resolution** for every absolute deck we ship.
+
+### ITEM 5b — renderDeck SEES A NEST — ✅ prop-render 999 checks/100 seeds, browser 17/17
+- Closed by **running the shipped nest**, not re-deriving it: the renderer
+  supplies only the two things a nest takes from a host (a TickHost for the wrap,
+  a loop to call `servo()` from).
+- Byte-identical twice — trace, wrap set, `renderHash`, per-frame child position,
+  child-adapter order — for a fragment, a loop, two levels deep, and a score
+  round-tripped twice then loaded from bytes alone. Four hashes identical
+  **across two separate Chrome processes**. Render lateness **0.000/0.000 ms**
+  vs playback's 0.044/0.325 wrap-adjacent — **§8.8's inversion reproduced
+  independently**. Cost: nest = 1.9× a flat render.
+- **The polled artefact INVERTED.** In playback, polling lost a downbeat
+  (2100/2400). Offline it loses nothing and **leaks**: the child free-runs past
+  `out`, 3–5 of 8 tails at 24–60 fps, 0 at 120 fps (aliasing). And the polled
+  render is byte-identical **to itself** — *determinism is not correctness*.
+- **The audio seam only findable by building it**: a child lane rendered 1
+  nonzero sample of an expected 7, because `createAudioLane` cancels committed
+  nodes on every transport state change and **a wrap IS a `child.seek()`**. Fix
+  is not a flag: offline, **a loop is EXPANDED, not replayed**. Corollary: a stub
+  context is blind to the whole bug class (7/7 stub vs 1/7 real), now asserted.
+- Two bugs in already-green code, both guarded by arms verified to fail when
+  reverted: the entry downbeat was lost **in wall-clock playback only** (`off ===
+  0` is an exact float test a virtual clock always satisfies, but a real enter
+  fire is ~1 ms late) — 8 rendered, 7 played; and a span the playhead had not
+  entered was being started, breaking exactly-once two levels down. **A
+  virtual-clock suite structurally cannot produce "the fire was 1 ms late".**
+
+### ITEM 4 — STUDIO v1 + THE −45 ms ANCHOR — ✅ verify 24/24 (was 14/15)
+- **The anchor was NEVER A CONSTANT.** `content anchor − native T₀` has a
+  ~95 ms-wide, frame-quantised distribution; −45.3 and −15 are two draws one
+  frame apart at 30 fps. "Systematic, reproduced with a negative control" was two
+  samples that happened to land near each other — the control ruled out machine
+  contention, but contention was never the variable.
+- The discriminating instrument (`studio/anchor-probe.mjs`) reproduces
+  replay.html's median rule **offline** via one ffmpeg pass, so pixels and PTS
+  cannot mis-align. Identity `anchorOffline − T₀ = swallow − pixelAge` held
+  within ±4 ms on all 23 runs. Two causes: **`Page.startScreencast` frame 0 is a
+  stale re-capture stamped `now`** (20–36 ms old; frames 1+ are 6–9 ms), and the
+  encoder **swallows whole source frames at start-up** (0 or 33 ms; the archive
+  rig has MORE of this artefact, not less).
+- Fixed by stamping on the CDP frame-swap of the first frame actually written:
+  per-cue replay abs p95 **39 → 19–26 ms**.
+- **Two negative results worth as much as the fix**: `-fps_mode passthrough`
+  makes the swallow structurally impossible and made the result **twice as bad**,
+  because the `fps=30` grid was also smoothing ±20 ms of pipe-read jitter out of
+  the media timeline. And **replay.html's content anchor carries ~one frame of
+  bias of its own** (`decodeNow()` reads the frame on the glass while
+  `meta.mediaTime` is the PTS of the frame about to be shown — the documented
+  rVFC pair-vs-single trap), so **every content-anchor number this project has
+  printed carries it, including the archive rig's −15**.
+- SOUND: the VU is the record leg's own `astats` (the samples being encoded, not
+  a second capture); the 5 s check **is** the publish path, R2 and back, and
+  discriminates four states — silent → "a silent show is a valid show"; tone →
+  AAC 96k costs **2.7 dB**.
+- ROOM: `studio/roster.mjs` **is** the roster adapter plan-studio §5 promised and
+  that had never been written. Promote/demote echo **32–47 ms**. Three things the
+  DO's shape forced: a rejected promote produces no error frame at all (the echo
+  is the only ack), `perm.publish` is one flat namespace, and a rejoin emits no
+  `left`. Dead tiles get a 3 s watchdog whose `unknown` is a real answer.
+- Grid archive wired end to end, 8/8; one real bug found (the static server owed
+  `/hls.min.js` the alias `collector.mjs` gives it, so the grid discovered every
+  tile and died on `Hls is not defined`).
+- Two bugs the verifier caught rather than inspection: the console VU read "no
+  audio frames yet" for a whole show (status only pushed on events), and putting
+  the roster on the cue deck folded overdub fires into "cue engine drift",
+  turning p95 1.7 → 22.5 ms.
+
 
 ## Session 6 (2026-08-27) — grid-archive A/B: self-recording vs central (user: "build 2 protos")
 

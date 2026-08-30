@@ -1,4 +1,4 @@
-# elektron — compact summary (start → 2026-08-27)
+# elektron — compact summary (start → 2026-08-30)
 
 One paragraph: a measured live-streaming + performance platform on Cloudflare
 (LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
@@ -24,7 +24,7 @@ with an operator studio app as its first build and cultural-heritage archives
 | Grid (Realtime SFU) | 74–96 ms glass-to-glass; no ceiling through N=54 media / 1003 sessions @40/s; deployed `elektron-rtc` Worker: RtcRoom DO, kill→`left` 38–126 ms |
 | Fast tier (MoQ) | 26–33 ms browser↔browser; full device scorecard ✅ (Chromium/Safari/iPhone-4G ~31 ms/4K30 47 ms/audio skew −4 ms); draft-16 relay: auth + namespace push work |
 | Cues | DO relay 27 ms; cue→video sync p50 65–98 ms; VOD replay p50 59 ms with seeks green |
-| Archive | LOCAL segmented + native T₀ (−15 ms from truth) → R2; O(1) disk, ~25× cheaper than Stream; grid archive = per-participant self-recording + event log |
+| Archive | LOCAL segmented + native T₀ (−15 ms from truth ⚠ **see session 7: that number carries ~one frame of bias and the anchor is a ~95 ms-wide distribution, not a constant**) → R2; O(1) disk, ~25× cheaper than Stream; grid archive = per-participant self-recording + event log |
 | Show control | JSON score conducts the grid: 88/88 asserts, drift p50 0 ms; composite recording without OBS (CDP→ffmpeg→RTMPS, 0 dropped frames) |
 
 Platform truths that cost real work: encoder socket close mints a NEW video UID
@@ -74,14 +74,21 @@ polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
 
 ## Open items
 
+*(kept current — the live list is HANDOFF.md "Next, in order")*
+
 1. **Rotate secrets**: CF API token pasted in chat (session 1); draft-16 relay
    tokens (transited chat/logs); token + RTMPS key in public `studio` repo;
-   token in `maria_old` git history (was also client-side).
-2. Build MERGED V0 (plan-studio §5): timeline lib → engine.mjs → console
-   (~3 sessions; replay-page refactor is the regression gate).
+   token in `maria_old` git history (was also client-side). **Still open.**
+2. ~~Build MERGED V0~~ — **done**; studio v0 *and* v1 ship (session 7, all five
+   panels, verify 24/24).
 3. ThreatLocker approval for OBS (else Option C relay path stands); camera
    still wedged (sudo killall or reboot); eyeball src/demo.html.
-4. Two-clock house-sound policy = first human rehearsal decision.
+4. Two-clock house-sound policy = first human rehearsal decision. **Nothing has
+   still ever been used by a human** — and as of session 7 there is a playable
+   instrument as well as a studio, so this is the binding constraint on the
+   whole project rather than one open question inside it.
+5. Re-measure every content anchor after the `replay.html` one-frame fix — see
+   the warning at the end of this file.
 
 ## Session 6 (2026-08-27) — archive instruments, participant pipeline, networked music
 
@@ -144,3 +151,63 @@ collapses at export, so the real claim is that **the firewall dies at the door
 and ours has to survive it.** No ecosystem tool can currently read a temporal
 region at all.
 
+
+## Session 7 (2026-08-30) — an instrument, and the four open library items closed
+
+**The looper** (`proto/looper`) — a MIDI looper with a polyphonic synth, on the
+library, playable by a human, alone or with a peer in another browser. It is the
+first client to put capture, projection, quotation and actuation on one clock at
+once, and the design result is that **a looper needs no new library feature**:
+the quotation is authored AFTER the trace exists, so the length is known before
+the quotation is built. C10's trace/authoring split turns out to be the looper's
+user interface rather than a constraint it works around — the strongest evidence
+yet that §8.1 put `repeat` in the right layer. Overdub layers are separate decks
+by rule 7g (N overdubs = N tape machines, the constraint that also made phasing
+need two).
+
+Numbers: **`caps.audio` is inert without a lead** (1/36 notes reach the sample
+grid at `leadMs: 0`, 27/27 at 30; sd 4.38 → 0.38 ms, bought with a constant
+offset a loop cannot hear — now the default). Stamp-at-source vs stamp-at-handler
+is p50 0.30 ms with a **0.90 ms spread**, so the gap is not a constant anyone
+could subtract later — the lineage's law, finally with a distribution.
+Overdub compensation **67.40 → 0.00 ms**; the trap is that a *uniform* shift is a
+no-op, so the notes move and the origin must not. "No stuck notes" comes from
+the **reducer**, not the wrap callback.
+
+**The remote looper** (`peer.mjs`, `plan-looper.md` P0+P1 done) — the claim was
+that a committed loop is a VALUE, so the network is used once per layer and
+never per note. It held: identical loops across links from 1.1 ms to 4700.8 ms,
+the cost of a slow link paid in PASSES rather than timing, and 25 % packet loss
+changing nothing because the loop plane is one message. **Clock agreement, not
+latency, is the hard problem** — skew is estimated peer to peer (min-RTT is
+scale-free, so a 311 ms link estimates as well as a 1.3 ms one), and the
+negative control is decisive: with the correction off, the flam is *exactly* the
+injected skew. Two real tabs: 1,608 B in 0.25 ms, ear-to-ear p50 −5.77 / p95
+−1.52 ms. A late layer is **gated, never seeked**.
+
+**The four HANDOFF items, all closed** —
+*Item 2*: the fire-side firewall had TWO doors; beside `fire()`, a seek's
+`assertState()` pushed a derived lane's whole prefix into its actuator under
+`attested`. `caps.evidenceGated` refuted — *asking the adapter's permission on
+one side of a firewall and not the other is not a firewall*. An attested deck's
+actuation trace and drift channel are now bit-identical to a deck that never
+held the restorations.
+*Item 3+5a*: ambiguation was shipping as a lie (`outer` and `crisp` identical in
+ink; now 51.6 % separated); the undecidable state is a property of the row AND
+the window; the aggregate brief had one factor too many; deep time's real killer
+was 138,000,000 ticks per frame and a `Date` that throws.
+*Item 5b*: `renderDeck` folds a nest by RUNNING the shipped nest — byte-identical
+twice, four hashes equal across two Chrome processes. The polled artefact
+INVERTED (offline it leaks rather than losing) and **determinism is not
+correctness**: the polled render is byte-identical to itself and still wrong.
+*Item 4*: the studio's −45 ms anchor **was never a constant** — a ~95 ms-wide
+frame-quantised distribution whose two known samples were one frame apart.
+Causes: a stale first screencast frame stamped as fresh, plus encoder frame
+swallow. p95 39 → 19–26 ms, and the obvious remedy made it twice as bad. Plus
+SOUND and ROOM panels, the roster adapter that had never been written, grid
+archive 8/8, verify 14/15 → 24/24.
+
+⚠ **The correction that reaches backwards**: `replay.html`'s content anchor
+carries ~one frame of bias of its own, so **every content-anchor number in this
+document carries it**, including the archive's −15 ms. Fix and caveat are in
+`studio/NOTES.md`; re-measure them in one breath before quoting any as exact.

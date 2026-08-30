@@ -1,91 +1,141 @@
-# Handoff — 2026-08-30 (end of session 6)
+# Handoff — 2026-08-30 (end of session 7)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
-(newest first) → the plan you're touching. `plan-timeline.md` §7–§8 is the
-current state of the library and OVERRIDES §§1–6 where they disagree.
+(newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
+current state of the library and OVERRIDES §§1–6 where they disagree; §9 is
+newest and wins over §7–§8.
 
 ## One line
 
-The timeline library is built, measured, and has **thirteen clients**; the
-studio runs a complete show; the archive viewers are live on the public web.
-**Nothing has ever been used by a human.**
+The timeline library is built, measured, and has **fourteen clients**; the
+studio runs a complete show with all five panels; the archive viewers are live;
+and there is now **an instrument a human can actually play, alone or with
+someone else in another browser.** No human has played it yet.
 
 ## Nothing is in flight. Everything below is committed and green.
 
 ## What exists
 
-**`timeline/`** — `transport.mjs` v0.6 (vector + lookahead, worker tick default,
+**`timeline/`** — `transport.mjs` v0.7 (vector + lookahead, worker tick default,
 sample-accurate audio lane, adapter registry with caps the library READS,
-evidence firewall + provenance, `when` uncertainty, `caps.series`, two-phase
-seek) · `nested.mjs` (nested decks, fragment quotation, loops) · `score.mjs`
-(a quotation is a VALUE; scores round-trip byte-identically; marks survive a
-re-cut) · `strip.mjs` (the component, lanes are deck queries, tick LOD over ten
-orders of magnitude, touch) · `store.mjs` (memory/JSONL/DO; 1M rows in 3.8 MB;
-fire-late miss policy) · `render.mjs` (deterministic offline render,
-60–86k× real time) · `media-master.mjs` · `osc.mjs` · `keepalive.mjs` · `lab/`
-(prop-test, prop-nested, prop-store, prop-render — all green at 100 seeds).
+**evidence firewall on BOTH sides — read and fire**, `deck.assertState`,
+provenance, `when` uncertainty, `caps.series`, two-phase seek) · `nested.mjs`
+(nested decks, fragment quotation, loops, carry asserted at the playhead) ·
+`score.mjs` (a quotation is a VALUE; scores round-trip byte-identically) ·
+`strip.mjs` (**ambiguation, `when.kind` edges, a correct aoristic aggregate,
+deep time to 10 Gyr with a measured ceiling**) · `store.mjs` (1M rows in 3.8 MB)
+· `render.mjs` (**renders a NEST** — fragment, loop, two levels; 60–86k× real
+time flat, 1.9× that for a nest) · `media-master.mjs` · `osc.mjs` ·
+`keepalive.mjs` · `lab/` (prop-test, prop-nested, prop-store, prop-render,
+firewall, strip-verify — all green).
 
-**`studio/`** — `node studio/engine.mjs` + one URL runs a complete show.
-GO LIVE 3.0 s · stop→replay-link 20.9 s · cue drift p50 1.1 ms · per-cue replay
-abs p95 39 ms vs a 150 ms target.
+**`proto/looper/`** — the instrument. `node proto/looper/server.mjs`, then
+`http://127.0.0.1:8891/proto/looper/`. Space = pedal, letter keys = piano.
+Add `?room=NAME` in two windows and it is a shared loop. 39 + 17 + 12 + 12
+asserts.
 
-**Deployed**: `elektron-view` (the four archive viewers, public, DO-gated ERR
-proxy) · `elektron-rtc` · `elektron-selfrec` · `elektron-jam` ·
-`elektron-instrument` (EU-pinned) · `elektron-osc`.
+**`studio/`** — `node studio/engine.mjs` + one URL runs a complete show with
+GO LIVE · SHOW · ROOM · SOUND · ARCHIVE. verify 24/24.
+
+**Deployed** (unchanged this session): `elektron-view` (four archive viewers,
+public) · `elektron-rtc` · `elektron-selfrec` · `elektron-jam` ·
+`elektron-instrument` · `elektron-osc`.
 **Public link**: https://elektron-view.kristjan-jansen.workers.dev
 
-**Protos**: megatimeline · remixer (+compose) · kurenniemi · flipper · jam
-(+interval) · instrument (+host-check) · automation · paths · text · loops ·
-osc · selfrec · replay · archive · m2m.
+## The numbers worth remembering
 
-## The four hard numbers worth remembering
+- Cue sync **16 ms p50** (the old 59 was ONE LOCKED PHASE SAMPLE — real old
+  margin ~11 %, presented as 60 %).
+- Remote instrument **35.8 ms** key→ear over MoQ vs 77.7 ms over WebRTC.
+- Loop wraps are the **most** precise instant in a loop (0.10 ms vs 4.50 ms),
+  0.000 ms/wrap over 600 wraps — **and the offline renderer reproduced the
+  inversion independently.**
+- MoQ **group-per-bundle = 100 % OSC integrity**; message-per-group = 0 %.
+- **`caps.audio` does nothing without a lead**: 1/36 notes reach the sample grid
+  at `leadMs: 0`, 27/27 at 30 — sd 4.38 → 0.38 ms for a constant offset a loop
+  cannot hear.
+- **A remote loop is latency-indifferent**: identical loops over links from
+  1.1 ms to 4700.8 ms; the cost is paid in PASSES. Clock skew, not latency, is
+  the hard problem — uncorrected, the flam is *exactly* the skew.
+- **The studio anchor was never a constant**: a ~95 ms-wide frame-quantised
+  distribution. Fixed to p95 19–26 ms (was 39).
 
-- Cue sync **16 ms p50** on the library (was 59 — and that 59 was ONE LOCKED
-  PHASE SAMPLE, not a distribution: real old margin ~11 %, presented as 60 %).
-- Remote instrument **35.8 ms** key→ear over MoQ vs 77.7 ms over WebRTC, where
-  the jitter buffer is 98.6 % of the loop and cannot be hinted away.
-- Loop wraps are the **most** precise instant in a loop (wrap-adjacent lateness
-  p50 0.10 ms vs 4.50 ms elsewhere; 0.000 ms/wrap accumulation over 600 wraps).
-- MoQ **group-per-bundle = 100 % OSC bundle integrity**; message-per-group = 0 %
-  — and the sparse arm showed 0 % message loss with 9.2 % integrity, which any
-  message-counting metric would have called lossless.
+## ⚠ A correction that reaches backwards
+
+**Every content-anchor number this project has printed carries ~one frame of
+bias**, including the archive rig's −15 ms. `replay.html`'s `decodeNow()` reads
+the frame on the glass while `meta.mediaTime` is the PTS of the frame about to
+be shown — the `rVFC` pair-vs-single trap already documented in §7.6. The
+one-line fix and the "re-measure everything in the same breath" caveat are in
+`studio/NOTES.md`. Do not quote an old content-anchor number as exact.
 
 ## Next, in order
 
-1. **Run a real show.** Everything measured is synthetic — canvas sources, fake
-   devices, headless Chrome, burned clocks. Twenty minutes with a real camera,
-   real cues and one other person watching would teach more than any module.
-2. **Close the read-side-only evidence firewall** — nothing stops a derived lane
-   from FIRING under `attested`; an evidence-only *performance* is currently the
-   adapter's job. Wants `fire()` gating or `caps.evidenceGated`.
-3. **The renderer gap** — the transport can say what it does not know; the strip
-   still cannot show it. Ambiguation (settled by a controlled study) is unbuilt;
-   the megatimeline aggregate is still a miscomputed `+1`-per-item sum.
-4. Studio v1: ROOM/SOUND panels, grid-archive wiring, and the unexplained
-   **−45 ms** native anchor (vs the archive rig's −15 ms, reproduced with a
-   negative control, systematic, unexplained).
-5. Deep time in the strip; `deck.assertState`; `renderDeck` seeing a nest.
+1. **Play it. Run a show.** Still the top item and now sharper: there is a
+   playable instrument and a five-panel studio, and everything measured is
+   synthetic — canvas sources, injected keys, headless Chrome, burned clocks.
+   Twenty minutes with a real camera, a real keyboard and one other person
+   would teach more than any module.
+2. **The unexplained cross-peer tail** — two tabs playing one loop agree at
+   p50 −5.77 / p95 −1.52 ms but the max is 28.39 ms. Part is the servo's dead
+   band (a per-peer position error, invisible solo, a flam when shared:
+   5 → 1 ms moved p50 from −8.24 to −5.77). The rest is not explained.
+3. **Re-measure the content anchors** together, after the `replay.html` fix.
+4. **`createAudioLane` does not consult the evidence gate** — a derived lane
+   routed through it would still sound. Also wanted:
+   `createAudioLane(…, {onStateChange: 'cancel' | 'keep'})` so a child lane can
+   render a loop directly instead of by expansion (default must stay `cancel`).
+5. **Remote P2/P3** (`plan-looper.md`) — over the deployed `elektron-jam` DO,
+   then over real distance. P2's point is that the loop plane should be
+   INDISTINGUISHABLE from P1; if it is not, the claim is wrong, which is the
+   most valuable possible outcome. P3 needs the one unmeasured number: min-RTT
+   skew over a real link rather than loopback.
+6. Still owed by §−1: `when` on spans, competing authorities (the deferral most
+   likely to be regretted), non-contiguous brackets, the trapezoid interior.
 
 ## Yours alone
 
 Rotate the leaked secrets (`SECRETS-ROTATION.md`) · `elektron.studio` is
-drop-caught and for sale via the Afternic lander (expiry 2027-02-08) · an
-iPhone capture probe before phones join a grid · the macOS **IAC MIDI toggle**
-(the one unmeasured cell: Web MIDI send precision) · ask ERR about the **Finna
-CDN edge rule** (not policy — it blocks three Kurenniemi sources) · and the ERR
-licence conversation, which gates anything public.
+drop-caught and for sale via Afternic (expiry 2027-02-08) · an iPhone capture
+probe · the macOS **IAC MIDI toggle** — the looper's Web MIDI path is wired and
+has never seen a device, so M1's stamp numbers are the *keyboard* path · ask ERR
+about the **Finna CDN edge rule** (not policy — it blocks three Kurenniemi
+sources) · and the ERR licence conversation, which gates anything public.
 
 ## Traps that cost hours (do not re-derive)
 
-A DO runs OLD class code after deploy (~1 min) — a smoke test straight after
-`wrangler deploy` lies · CORS allow-headers must carry `X-Chunk-Sha256` when
-copying the upload pipeline · backstop ordering is correctness (once anything
-parks, everything parks) · CDP `packetLoss` is a no-op in Chrome 151 (use
-netem) · `--use-fake-ui-for-media-devices` is insufficient under headless=new
-(needs `Browser.grantPermissions`) · Chrome hands an AudioWorklet an EMPTY input
-array when it latches a bus silent (fix: a started `ConstantSourceNode(0)`) ·
-**iOS refuses to autoplay an UNMUTED video** (this is why flipper's featured
-tile rendered black) · one MoQ group = one QUIC uni-stream · `-bf 0` for
-repackaged MediaRecorder streams · a codec is not testable against itself (our
-OSC padding bug round-tripped perfectly and died on the first real packet) ·
-Docker-esbuild is GONE (`cd proto/jam/moq && npm run build`, 1.1 s).
+**Platform.** A DO runs OLD class code for ~1 min after deploy — a smoke test
+straight after `wrangler deploy` LIES · CORS allow-headers must carry
+`X-Chunk-Sha256` · CDP `packetLoss` is a no-op in Chrome 151 (use netem) ·
+`--use-fake-ui-for-media-devices` is insufficient under `headless=new` (needs
+`Browser.grantPermissions`) · **`Page.startScreencast` frame 0 is a stale
+re-capture stamped `now`** (20–36 ms old; frames 1+ are 6–9 ms) · `-bf 0` for
+repackaged MediaRecorder streams · one MoQ group = one QUIC uni-stream ·
+Docker-esbuild is GONE (`cd proto/jam/moq && npm run build`).
+
+**Audio.** Chrome hands an AudioWorklet an EMPTY input array when it latches a
+bus silent (fix: a started `ConstantSourceNode(0)`) · **iOS refuses to autoplay
+an UNMUTED video** · **`caps.audio` is inert without `leadMs`** — a late fire
+has no future instant to schedule and silently falls back to `currentTime` ·
+Web Audio is `[Exposed=Window]`, so offline audio cannot leave a document's main
+thread.
+
+**The library.** Backstop ordering is correctness (once anything parks,
+everything parks) · **`nest.add()` on an already-playing parent silently never
+enters** — it pauses the deck and relies on an `enter` event already in the
+past; fix with `parent.seek(parent.position()); nest.servo()` · a boundary must
+be a COMMITTED one-shot, never polled — this has now bitten three times, at the
+wrap, at the offline wrap, and at a remote layer's gate · **a late layer is
+GATED, never seeked** (seeking to the next downbeat moves the clock and desyncs
+by the amount it moved) · `loopPhase(x, L)` answers `off: 0` for negative `x`,
+which stacks a pre-roll into a chord · `new Date(-4.35e20).toISOString()`
+**throws** — deep time must never reach `Date`.
+
+**Measuring.** A codec is not testable against itself · **a virtual clock runs
+BACKWARDS without complaint** if you `advanceTo` a stale instant (the artefact
+looks exactly like a scheduler defect) · **`advanceTo` is not a tab blur** — it
+runs every intervening tick, so a real freeze must suppress ticks AND timers ·
+comparing two peers' own timestamps CANCELS the skew under test · use
+FRACTIONAL offsets in every cadence · **determinism is not correctness** (a
+polled render is byte-identical to itself and still wrong) · a stub context is
+blind to a whole class of audio bug (7/7 stub vs 1/7 real).
