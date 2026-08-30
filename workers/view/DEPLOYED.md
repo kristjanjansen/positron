@@ -1,13 +1,14 @@
 # elektron-view — DEPLOYED
 
 **URL:** `https://elektron-view.kristjan-jansen.workers.dev`
-**Deployed:** 2026-08-28 (version `09366c36-2c0c-4c3b-baaa-545707f24d54`).
+**Deployed:** 2026-08-30 (version `913f128a-1db8-48fa-9f14-3dc5831c1030`);
+previously 2026-08-28 (`09366c36-…`).
 Status: **live and verified** — **38/38** checks green from `verify.mjs`, one
 headless Chrome at **390 × 844** with touch emulation and `pointer: coarse`
 forced, driven against this URL (not a local server).
 
-The repo's four public viewing surfaces on one phone-openable link, behind a
-menu. Free tier, workers.dev, no custom domain, no secrets, ≈ $0.
+The repo's public surfaces on one phone-openable link, behind a menu. Free
+tier, workers.dev, no custom domain, no secrets, ≈ $0.
 
 | # | page | URL |
 |---|---|---|
@@ -16,6 +17,43 @@ menu. Free tier, workers.dev, no custom domain, no secrets, ≈ $0.
 | 2 | remixer | `…/proto/remixer/` |
 | 3 | kurenniemi | `…/proto/kurenniemi/` |
 | 4 | flipper | `…/proto/flipper/` |
+| 5 | **looper** | `…/proto/looper/` |
+
+## The looper (added 2026-08-30)
+
+The first page here that is an **instrument rather than a viewer**, and the
+first with **no upstream of any kind**: no ERR, no proxy, no Durable Object, no
+network at all once the page has loaded. That is also the answer to "why did it
+need a node script to run" — it never did. `proto/looper/server.mjs` is a local
+static file server that exists only because a browser will not load ES modules
+from a `file://` path. There is no backend to deploy, only files to serve.
+
+Added to the allowlist: `proto/looper/{index.html, looper.mjs, synth.mjs,
+peer.mjs, onset-worklet.js}` plus three more library modules the viewers did not
+need (`timeline/{nested,score,logdeck}.mjs`). **`onset-worklet.js` is fetched at
+runtime by URL** (`addModule('./onset-worklet.js')`) rather than imported, so
+nothing would have flagged its absence — the failure mode is an ear that
+silently detects nothing.
+
+**Verified against this URL**, one headless Chrome at 390 × 844 with touch
+emulation: page loads, `AudioContext` running, 13 keys, worklet loaded, **0
+failed requests, 0 exceptions**, and a real `Input.dispatchTouchEvent` on a key
+produced a trace row *and* an onset detected in the output samples. Reported
+output latency 37.3 ms.
+
+⚠ **Rooms (`?room=NAME`) are same-browser only as deployed.** The default
+transport is a `BroadcastChannel`, which does not cross devices. Cross-device
+play needs a relay: the page accepts `?relay=wss://…`, and `elektron-jam` is
+deployed and does exactly this job — but it is **token-gated**, and a token
+pasted into a public page is a published token. So cross-device rooms are a
+deliberate gap, not an oversight; closing it means either a tokenless
+rate-limited relay or a per-room capability URL.
+
+⚠ **Two things this deploy does not prove**: Safari (the verification is Blink
+with a small viewport), and the **audio unlock** — headless Chrome runs with
+`--autoplay-policy=no-user-gesture-required`, so the suspended-context path is
+dead code in every harness we have. On a real iPhone it is the first thing that
+can fail.
 
 ## Shape
 
