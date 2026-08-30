@@ -1,0 +1,139 @@
+{
+  "v": 1,
+  "runId": "studio-20260830T073207",
+  "room": "studio-20260830T073207",
+  "bucket": "elektron-archive-test",
+  "prefix": "shows/studio-20260830T073207",
+  "pubBase": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev",
+  "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T073207/index.m3u8",
+  "timelineUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T073207/timeline.jsonl",
+  "T0native": 1788075130498,
+  "t0Exact": true,
+  "anchor": {
+    "mode": "swap",
+    "skippedFirstFrame": true,
+    "t0swap": 1788075130498,
+    "t0arrive": 1788075130504,
+    "swapMinusArriveMs": -6
+  },
+  "tGoPressed": 1788075127899,
+  "tStop": 1788075212918,
+  "timeToLiveMs": 2599,
+  "durationMs": 82420,
+  "source": "page",
+  "audio": "silent",
+  "score": null,
+  "segments": 20,
+  "cues": 5,
+  "cueDriftMs": {
+    "n": 9,
+    "p50": 1.967,
+    "p95": 7.75,
+    "max": 7.75
+  },
+  "cueList": [
+    {
+      "id": "CUE-40840",
+      "at": 1788075140991,
+      "sentAt": 1788075140994,
+      "lateMs": 3,
+      "label": null
+    },
+    {
+      "id": "CUE-53239",
+      "at": 1788075153390,
+      "sentAt": 1788075153394,
+      "lateMs": 4,
+      "label": null
+    },
+    {
+      "id": "CUE-65640",
+      "at": 1788075165790,
+      "sentAt": 1788075165793,
+      "lateMs": 3,
+      "label": null
+    },
+    {
+      "id": "CUE-79431",
+      "at": 1788075179581,
+      "sentAt": 1788075179585,
+      "lateMs": 4,
+      "label": null
+    },
+    {
+      "id": "CUE-92832",
+      "at": 1788075192982,
+      "sentAt": 1788075192986,
+      "lateMs": 4,
+      "label": null
+    }
+  ],
+  "timeline": {
+    "rows": 132,
+    "pages": 1,
+    "indexBytes": 173
+  },
+  "uploader": {
+    "segments": 21,
+    "allVerified": true,
+    "degraded": false,
+    "lagMs": {
+      "p50": 4865,
+      "p95": 6282,
+      "min": 2008,
+      "max": 6322
+    },
+    "diskHighWater": {
+      "bytes": 1901541,
+      "segments": 2,
+      "samples": 108
+    },
+    "totalBytes": 18850350
+  },
+  "cuelogCount": 5,
+  "replay": {
+    "anchor": "stamp",
+    "t0": 1788075130498,
+    "url": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260830T073207%2Findex.m3u8&room=studio-20260830T073207&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1788075130498"
+  },
+  "grid": null,
+  "reconcile": {
+    "prefix": "shows/studio-20260830T073207",
+    "checks": [
+      {
+        "name": "playlist-in-r2",
+        "ok": true,
+        "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T073207/index.m3u8"
+      },
+      {
+        "name": "playlist-ended",
+        "ok": true,
+        "detail": "21 segments"
+      },
+      {
+        "name": "every-segment-present",
+        "ok": true,
+        "detail": "21/21, 18.0 MB"
+      },
+      {
+        "name": "sidecar-timeline.jsonl",
+        "ok": true
+      },
+      {
+        "name": "sidecar-timeline.idx.json",
+        "ok": true
+      },
+      {
+        "name": "sidecar-show.json",
+        "ok": true
+      }
+    ],
+    "ok": true,
+    "t": 1788075226668,
+    "segments": 21,
+    "bytes": 18849632,
+    "missing": []
+  },
+  "recdir": "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/studio-rec-20260830T073207",
+  "stopToReplayMs": 20239
+}

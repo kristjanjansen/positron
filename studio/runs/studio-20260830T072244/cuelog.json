@@ -1,0 +1,140 @@
+{
+  "count": 8,
+  "cues": [
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-start-0",
+        "at": 1788074570437,
+        "sentAt": 1788074570438,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "start",
+          "source": "p1",
+          "at": 1788074570437,
+          "skewEst": 104,
+          "rttMin": 38,
+          "mediaRef": "selfrec/studio-20260830T072244/p1/",
+          "mimeType": "video/webm;codecs=h264",
+          "timesliceMs": 2000
+        },
+        "serverAt": 1788074570546
+      },
+      "doRecvTs": 1788074570546
+    },
+    {
+      "from": "engine",
+      "cue": {
+        "id": "CUE-01",
+        "at": 1788074575740,
+        "sentAt": 1788074575743,
+        "data": {
+          "text": "CUE-01",
+          "mode": "scored"
+        },
+        "serverAt": 1788074575854
+      },
+      "doRecvTs": 1788074575854
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-1",
+        "at": 1788074580444,
+        "sentAt": 1788074580444,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 0
+        },
+        "serverAt": 1788074580555
+      },
+      "doRecvTs": 1788074580555
+    },
+    {
+      "from": "engine",
+      "cue": {
+        "id": "CUE-02",
+        "at": 1788074588140,
+        "sentAt": 1788074588143,
+        "data": {
+          "text": "CUE-02",
+          "mode": "scored"
+        },
+        "serverAt": 1788074588253
+      },
+      "doRecvTs": 1788074588253
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-2",
+        "at": 1788074590445,
+        "sentAt": 1788074590445,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 1
+        },
+        "serverAt": 1788074590551
+      },
+      "doRecvTs": 1788074590551
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-beat-3",
+        "at": 1788074600442,
+        "sentAt": 1788074600442,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "beat",
+          "source": "p1",
+          "seq": 2
+        },
+        "serverAt": 1788074600554
+      },
+      "doRecvTs": 1788074600554
+    },
+    {
+      "from": "engine",
+      "cue": {
+        "id": "CUE-03",
+        "at": 1788074600540,
+        "sentAt": 1788074600543,
+        "data": {
+          "text": "CUE-03",
+          "mode": "scored"
+        },
+        "serverAt": 1788074600658
+      },
+      "doRecvTs": 1788074600658
+    },
+    {
+      "from": "p1",
+      "cue": {
+        "id": "p1-span-end-4",
+        "at": 1788074610180,
+        "sentAt": 1788074610180,
+        "kind": "media-span",
+        "data": {
+          "kind": "media-span",
+          "phase": "end",
+          "source": "p1",
+          "at": 1788074610180,
+          "dur": 39003,
+          "chunkCount": 20,
+          "degraded": false
+        },
+        "serverAt": 1788074610311
+      },
+      "doRecvTs": 1788074610311
+    }
+  ]
+}

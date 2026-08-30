@@ -1,19 +1,19 @@
 {
-  "t": 1787905285751,
-  "runId": "studio-20260828T081827",
-  "room": "studio-20260828T081827",
-  "replayUrl": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260828T081827%2Findex.m3u8&room=studio-20260828T081827&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1787905110334",
+  "t": 1788075888466,
+  "runId": "studio-20260830T074151",
+  "room": "studio-20260830T074151",
+  "replayUrl": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260830T074151%2Findex.m3u8&room=studio-20260830T074151&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1788075714397",
   "headline": {
-    "timeToLiveMs": 2992,
-    "stopClickToReplayLinkMs": 20898,
+    "timeToLiveMs": 2502,
+    "stopClickToReplayLinkMs": 20001,
     "uploadLagMs": {
-      "p50": 5000,
-      "p95": 6082,
-      "min": 2339,
-      "max": 6424
+      "p50": 4617,
+      "p95": 5942,
+      "min": 2507,
+      "max": 6295
     },
     "diskHighWater": {
-      "bytes": 1877447,
+      "bytes": 1903865,
       "segments": 2,
       "samples": 109
     },
@@ -21,68 +21,68 @@
     "durationMs": 82412,
     "cueEngineDriftMs": {
       "n": 5,
-      "p50": 1.116,
-      "p95": 1.478,
-      "max": 1.478
+      "p50": 0.664,
+      "p95": 2.11,
+      "max": 2.11
     },
     "replayCueErrMs": {
       "n": 5,
-      "p50": -37,
-      "p95": -5,
-      "absP50": 37,
-      "absP95": 39,
-      "min": -39,
-      "max": -5
+      "p50": -10,
+      "p95": 22,
+      "absP50": 20,
+      "absP95": 22,
+      "min": -21,
+      "max": 22
     },
-    "contentMinusNativeMs": -45.3,
+    "contentMinusNativeMs": -29.3,
     "timelineRows": {
-      "rows": 119,
+      "rows": 132,
       "pages": 1,
       "indexBytes": 173
     }
   },
   "perCue": [
     {
-      "id": "CUE-20662",
-      "at": 1787905120813,
+      "id": "CUE-24714",
+      "at": 1788075724864,
       "fired": true,
-      "errMs": -5,
-      "engineLateMs": 5
+      "errMs": 22,
+      "engineLateMs": 3
     },
     {
-      "id": "CUE-33070",
-      "at": 1787905133220,
+      "id": "CUE-37123",
+      "at": 1788075737273,
       "fired": true,
-      "errMs": -37,
+      "errMs": -10,
+      "engineLateMs": 8
+    },
+    {
+      "id": "CUE-49540",
+      "at": 1788075749691,
+      "fired": true,
+      "errMs": -21,
       "engineLateMs": 2
     },
     {
-      "id": "CUE-45469",
-      "at": 1787905145620,
+      "id": "CUE-63324",
+      "at": 1788075763474,
       "fired": true,
-      "errMs": -29,
+      "errMs": -8,
+      "engineLateMs": 12
+    },
+    {
+      "id": "CUE-76733",
+      "at": 1788075776883,
+      "fired": true,
+      "errMs": -20,
       "engineLateMs": 2
-    },
-    {
-      "id": "CUE-59270",
-      "at": 1787905159421,
-      "fired": true,
-      "errMs": -39,
-      "engineLateMs": 5
-    },
-    {
-      "id": "CUE-72670",
-      "at": 1787905172821,
-      "fired": true,
-      "errMs": -39,
-      "engineLateMs": 4
     }
   ],
   "checks": [
     {
       "name": "engine-one-command",
       "ok": true,
-      "detail": "http://127.0.0.1:8899 up in 268 ms"
+      "detail": "http://127.0.0.1:8899 up in 275 ms"
     },
     {
       "name": "console-one-url",
@@ -90,9 +90,19 @@
       "detail": "http://127.0.0.1:8899/ shows phase=idle"
     },
     {
+      "name": "soundcheck-through-the-real-publish-path",
+      "ok": true,
+      "detail": "19964 ms · encode:ok segments-written:ok uploaded-to-r2:ok decoded-from-r2:ok"
+    },
+    {
+      "name": "soundcheck-calls-a-silent-show-valid",
+      "ok": true,
+      "detail": "✓ SILENT — confirmed silent at the encoder AND after the R2 round trip. A silent show is a valid show; the pat"
+    },
+    {
       "name": "go-live",
       "ok": true,
-      "detail": "T0=1787905110334 native, click→live 2992 ms"
+      "detail": "T0=1788075714397 native, click→live 2502 ms"
     },
     {
       "name": "legs-up",
@@ -100,14 +110,44 @@
       "detail": "room:up record:up source:up archive:up"
     },
     {
+      "name": "vu-meter-reads-the-record-leg",
+      "ok": true,
+      "detail": "579 metered frames from the record leg's own astats"
+    },
+    {
+      "name": "vu-says-silent-BY-CONFIGURATION-not-fault",
+      "ok": true,
+      "detail": "SILENT — as configured"
+    },
+    {
+      "name": "roster-folds-the-DO-deltas",
+      "ok": true,
+      "detail": "roster=engine,stage (engine=operator, stage=the source page)"
+    },
+    {
+      "name": "promote-through-the-real-UI",
+      "ok": true,
+      "detail": "stage → featured, DO echo 34 ms"
+    },
+    {
+      "name": "demote-through-the-real-UI",
+      "ok": true,
+      "detail": "stage → wall, echo 47 ms"
+    },
+    {
+      "name": "permission-window-toggles-and-resolves-per-participant",
+      "ok": true,
+      "detail": "closed→stage.mayPublish=false, reopened→true (DO order: per-participant → per-role → open)"
+    },
+    {
       "name": "strip-reads-drift-channel",
       "ok": true,
-      "detail": "deck.drift() n=5 · driftStats {\"total\":5,\"retained\":5,\"dropped\":0,\"limit\":20000}"
+      "detail": "deck.drift() n=9 · driftStats {\"total\":9,\"retained\":9,\"dropped\":0,\"limit\":20000}"
     },
     {
       "name": "replay-link-appears-at-stop",
       "ok": true,
-      "detail": "after 20898 ms"
+      "detail": "after 20001 ms"
     },
     {
       "name": "reconcile-green",
@@ -117,12 +157,12 @@
     {
       "name": "timeline-jsonl-indexed-and-readable",
       "ok": true,
-      "detail": "119 rows, 173 B sidecar"
+      "detail": "132 rows, 173 B sidecar"
     },
     {
       "name": "timeline-uploaded-beside-show",
       "ok": true,
-      "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/timeline.jsonl"
+      "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T074151/timeline.jsonl"
     },
     {
       "name": "cuelog-has-every-cue",
@@ -142,33 +182,45 @@
     {
       "name": "cue-abs-p95-under-150ms",
       "ok": true,
-      "detail": "absP95=39 ms"
+      "detail": "absP95=22 ms"
     },
     {
-      "name": "native-anchor-within-one-frame",
-      "ok": false,
-      "detail": "content−native=-45.3 ms"
+      "name": "native-anchor-under-third-of-cue-budget",
+      "ok": true,
+      "detail": "content−native=-29.3 ms"
+    },
+    {
+      "name": "anchor-is-the-swap-of-a-written-frame",
+      "ok": true,
+      "detail": "mode=swap skippedFirst=true swap−arrive=-4 ms"
     },
     {
       "name": "burn-decode-rate",
       "ok": true,
-      "detail": "2114/2114"
+      "detail": "2105/2105"
     }
   ],
   "show": {
     "v": 1,
-    "runId": "studio-20260828T081827",
-    "room": "studio-20260828T081827",
+    "runId": "studio-20260830T074151",
+    "room": "studio-20260830T074151",
     "bucket": "elektron-archive-test",
-    "prefix": "shows/studio-20260828T081827",
+    "prefix": "shows/studio-20260830T074151",
     "pubBase": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev",
-    "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/index.m3u8",
-    "timelineUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/timeline.jsonl",
-    "T0native": 1787905110334,
+    "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T074151/index.m3u8",
+    "timelineUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T074151/timeline.jsonl",
+    "T0native": 1788075714397,
     "t0Exact": true,
-    "tGoPressed": 1787905107687,
-    "tStop": 1787905192746,
-    "timeToLiveMs": 2647,
+    "anchor": {
+      "mode": "swap",
+      "skippedFirstFrame": true,
+      "t0swap": 1788075714397,
+      "t0arrive": 1788075714401,
+      "swapMinusArriveMs": -4
+    },
+    "tGoPressed": 1788075711910,
+    "tStop": 1788075796809,
+    "timeToLiveMs": 2487,
     "durationMs": 82412,
     "source": "page",
     "audio": "silent",
@@ -177,49 +229,49 @@
     "cues": 5,
     "cueDriftMs": {
       "n": 5,
-      "p50": 1.116,
-      "p95": 1.478,
-      "max": 1.478
+      "p50": 0.664,
+      "p95": 2.11,
+      "max": 2.11
     },
     "cueList": [
       {
-        "id": "CUE-20662",
-        "at": 1787905120813,
-        "sentAt": 1787905120814,
+        "id": "CUE-24714",
+        "at": 1788075724864,
+        "sentAt": 1788075724866,
+        "lateMs": 2,
+        "label": null
+      },
+      {
+        "id": "CUE-37123",
+        "at": 1788075737273,
+        "sentAt": 1788075737274,
         "lateMs": 1,
         "label": null
       },
       {
-        "id": "CUE-33070",
-        "at": 1787905133220,
-        "sentAt": 1787905133222,
-        "lateMs": 2,
+        "id": "CUE-49540",
+        "at": 1788075749691,
+        "sentAt": 1788075749696,
+        "lateMs": 5,
         "label": null
       },
       {
-        "id": "CUE-45469",
-        "at": 1787905145620,
-        "sentAt": 1787905145622,
-        "lateMs": 2,
+        "id": "CUE-63324",
+        "at": 1788075763474,
+        "sentAt": 1788075763477,
+        "lateMs": 3,
         "label": null
       },
       {
-        "id": "CUE-59270",
-        "at": 1787905159421,
-        "sentAt": 1787905159422,
-        "lateMs": 1,
-        "label": null
-      },
-      {
-        "id": "CUE-72670",
-        "at": 1787905172821,
-        "sentAt": 1787905172823,
-        "lateMs": 2,
+        "id": "CUE-76733",
+        "at": 1788075776883,
+        "sentAt": 1788075776887,
+        "lateMs": 4,
         "label": null
       }
     ],
     "timeline": {
-      "rows": 119,
+      "rows": 132,
       "pages": 1,
       "indexBytes": 173
     },
@@ -228,31 +280,32 @@
       "allVerified": true,
       "degraded": false,
       "lagMs": {
-        "p50": 5000,
-        "p95": 6082,
-        "min": 2339,
-        "max": 6424
+        "p50": 4617,
+        "p95": 5942,
+        "min": 2507,
+        "max": 6295
       },
       "diskHighWater": {
-        "bytes": 1877447,
+        "bytes": 1903865,
         "segments": 2,
         "samples": 109
       },
-      "totalBytes": 18667802
+      "totalBytes": 18662726
     },
     "cuelogCount": 5,
     "replay": {
       "anchor": "stamp",
-      "t0": 1787905110334,
-      "url": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260828T081827%2Findex.m3u8&room=studio-20260828T081827&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1787905110334"
+      "t0": 1788075714397,
+      "url": "http://127.0.0.1:8899/proto/replay/replay.html?src=https%3A%2F%2Fpub-b8d50fdb5f6a41dbba072e433903705d.r2.dev%2Fshows%2Fstudio-20260830T074151%2Findex.m3u8&room=studio-20260830T074151&token=dae4e3d4c7e705580a02691082f53cc2&remote=https%3A%2F%2Felektron-rtc.kristjan-jansen.workers.dev&anchor=stamp&t0=1788075714397"
     },
+    "grid": null,
     "reconcile": {
-      "prefix": "shows/studio-20260828T081827",
+      "prefix": "shows/studio-20260830T074151",
       "checks": [
         {
           "name": "playlist-in-r2",
           "ok": true,
-          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260828T081827/index.m3u8"
+          "detail": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/studio-20260830T074151/index.m3u8"
         },
         {
           "name": "playlist-ended",
@@ -278,11 +331,12 @@
         }
       ],
       "ok": true,
-      "t": 1787905207607,
+      "t": 1788075810749,
       "segments": 21,
-      "bytes": 18667084,
+      "bytes": 18662008,
       "missing": []
     },
-    "stopToReplayMs": 20872
+    "recdir": "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/studio-rec-20260830T074151",
+    "stopToReplayMs": 19978
   }
 }

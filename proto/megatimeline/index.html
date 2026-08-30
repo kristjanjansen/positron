@@ -152,6 +152,11 @@ import {
   worldToScreenX, worldToScreenY, visibleX, fitX, animateFitX, cancelAnim,
 } from './viewport.mjs';
 import { attachGestures, panWasDrag } from './gesture.mjs';
+// ONE implementation of the aoristic sum, shared with timeline/strip.mjs. This
+// surface used to carry its own — `globalAlpha = Math.min(0.4, 0.05 + 0.02*n)`
+// — which was an aoristic sum in disguise with two of research §4's named
+// pathologies baked in (see the call site below).
+import { aoristic } from '/timeline/strip.mjs';
 
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -502,6 +507,12 @@ function laneFor(L, it) {
 const canvas = $('field');
 const ctx = canvas.getContext('2d');
 let hitRects = [];   // [{x,y,w,h,item}] rebuilt per draw at years/days tiers
+// the aggregate's STATED METHOD, rebuilt per draw. A statistic whose bin width
+// and population are invisible is a silhouette, and PeriodO refused those in
+// words: "natural language is already a compact and easily indexable way to
+// represent imprecision … rather than imposing an arbitrary mapping to
+// parameterized curves". So the number goes in the HUD, next to the picture.
+let aoristicStat = [];
 
 function resize() {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -528,6 +539,7 @@ function draw() {
   const w = innerWidth, h = innerHeight;
   ctx.clearRect(0, 0, w, h);
   hitRects = [];
+  aoristicStat = [];
   const [d0, d1] = visibleX();
   const tier = tierOf(viewport.zx);
   const L = layoutLanes();
@@ -565,7 +577,8 @@ function draw() {
   // years tier + days tier: ticks and precision bands, item routed to its lane
   if (tier !== 'decades') {
     const y0v = Math.max(1908, yearOfDay(d0)), y1v = Math.min(2026, yearOfDay(d1));
-    const yearAgg = new Map();   // lane -> Map(year -> count) for the faint bands
+    const yearAgg = new Map();   // lane -> Set(year) — PRESENCE, not a count
+    const laneSpans = new Map(); // lane -> [{from,to}] in world days, for the sum
     for (const trk of ['video', 'audio', 'photo']) {
       const color = trackOf[trk].color;      // item keeps its TYPE color in any lane
       for (let y = y0v; y <= y1v; y++) {
@@ -578,10 +591,21 @@ function draw() {
           if (!lane) continue;
           const g = lane.geom, ty = yOff + lane.y;
           const b = decodeItem(it);
+          // EVERY item is a bracket in world days — a day-precise one is one day
+          // wide, a year-precise one is 365. The old aggregate only ever saw the
+          // year-precision rows, so the density it drew was over a subset it
+          // never named.
+          {
+            let arr = laneSpans.get(lane);
+            if (!arr) laneSpans.set(lane, (arr = []));
+            arr.push(b.prec === 'year' ? { from: dayUTC(b.Y), to: dayUTC(b.Y + 1) }
+              : b.prec === 'month' ? { from: dayUTC(b.Y, b.M - 1, 1), to: dayUTC(b.Y, b.M, 1) }
+              : { from: it.d, to: it.d + 1 });
+          }
           if (b.prec === 'year') {
             let m = yearAgg.get(lane);
-            if (!m) yearAgg.set(lane, (m = new Map()));
-            m.set(b.Y, (m.get(b.Y) || 0) + 1);
+            if (!m) yearAgg.set(lane, (m = new Set()));
+            m.add(b.Y);
             continue;
           }
           if (b.prec === 'month') {
@@ -605,15 +629,67 @@ function draw() {
         }
       }
     }
-    // aggregated year-only bands per lane: one faint full-year band, alpha by count
-    for (const [lane, m] of yearAgg) {
+    // ── PRESENCE ─────────────────────────────────────────────────────────────
+    // One flat full-year band per (lane, year), at a FIXED alpha. research §8.4.1
+    // keeps the flat band: individually every year-only item is a smear that
+    // claims nothing, and the band is the true calendar year in world space.
+    // What the band must NOT do is carry the count, which is what it used to:
+    //
+    //   ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n)
+    //
+    // That was an aoristic sum in disguise with both of §4's named pathologies
+    // in one expression. It added +1 PER ITEM REGARDLESS OF SPAN, so a
+    // day-precise row and a decade-precise row voted equally (overlapping-
+    // precision bias); and it CLIPPED AT 0.4, saturating at n = 18, so a year
+    // holding 20 items and one holding 6,808 (audio 2020, from our own census)
+    // painted the identical grey. Alpha is also the wrong channel twice over —
+    // it is spoken for by density, and it composites, so two overlapping bands
+    // read as a third value nobody computed.
+    for (const [lane, years] of yearAgg) {
       const g = lane.geom;
       ctx.fillStyle = lane.color;
-      for (const [Y, n] of m) {
+      ctx.globalAlpha = 0.30;                       // ambiguation's skirt tone
+      for (const Y of years) {
         const x0 = worldToScreenX(dayUTC(Y)), x1 = worldToScreenX(dayUTC(Y + 1));
-        ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n);
         ctx.fillRect(x0, yOff + lane.y + g.yearY, x1 - x0, g.yearH);
       }
+      ctx.globalAlpha = 1;
+    }
+    // ── DENSITY ──────────────────────────────────────────────────────────────
+    // …and the count goes where a count belongs: an aoristic sum, one bin per
+    // PIXEL COLUMN (M4's discipline — w is bounded by the display, never by n),
+    // total mass 1 per item spread as 1/(b−a), drawn as HEIGHT because height
+    // does not clip. Same aoristic() the strip calls; the world unit here is
+    // DAYS, and the function is unit-agnostic.
+    aoristicStat = [];
+    for (const [lane, spans] of laneSpans) {
+      const cols = Math.max(1, Math.round(w));
+      const a = aoristic(spans, d0, d1, cols);
+      aoristicStat.push({ lane: lane.label || lane.key, n: a.counted, peak: a.max, colDays: a.colMs });
+      if (!a.max) continue;
+      const g = lane.geom;
+      const base = yOff + lane.y + g.yearY + g.yearH;
+      const h = Math.min(26, Math.max(10, lane.h * 0.24));
+      ctx.fillStyle = lane.color;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, base);
+      for (let i = 0; i < cols; i++) {
+        const top = base - (a.mass[i] / a.max) * h;
+        ctx.lineTo(i, top); ctx.lineTo(i + 1, top);     // a STEP, never a ramp:
+      }                                                  // interpolating between
+      ctx.lineTo(cols, base); ctx.closePath(); ctx.fill();  // bins invents a
+      ctx.globalAlpha = 1;                                 // density we did not
+      // …and the RUG of individuals (§9.5, rcarbon's barCodes), so the          // compute
+      // silhouette can never claim a population the rows do not have.
+      ctx.strokeStyle = lane.color; ctx.globalAlpha = 0.55; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const s of spans) {
+        const px = Math.round(worldToScreenX(s.from)) + 0.5;
+        if (px < 0 || px > w) continue;
+        ctx.moveTo(px, base - 3); ctx.lineTo(px, base);
+      }
+      ctx.stroke();
       ctx.globalAlpha = 1;
     }
   }
@@ -1029,6 +1105,11 @@ function updateHud() {
     ` · view <b>${S.view}</b> · lanes <b>${layoutLanes().lanes.length}</b>` +
     ` · zx ${viewport.zx.toFixed(3)} px/day · cards <b>${live.size}</b>` +
     ` · api search ${S.apiSearch} item ${S.apiItem}` +
+    (aoristicStat.length
+      ? ` · <b>aoristic Σ 1/(b−a)</b> 1 bin/px, ${(aoristicStat[0].colDays).toPrecision(3)} d/col · ` +
+        aoristicStat.map((a) => `${a.lane} n=${a.n} peak ${a.peak.toFixed(3)}`).join(' · ') +
+        ' <span style="color:#667">(over LOADED items only — the census bars are the whole archive)</span>'
+      : '') +
     (S.census ? '' : ' · <span style="color:#e66">NO CENSUS — run census.mjs</span>');
 }
 
@@ -1108,6 +1189,9 @@ window.__mt = {
     return { frames: rec.length, p50: q(0.5), p95: q(0.95), max: deltas.length ? +deltas[deltas.length - 1].toFixed(2) : null };
   },
   snapshot: () => snapshot(),
+  /** the aggregate as a STATISTIC a test can read: per lane, the population it
+   *  actually summed, the peak column mass and the bin width. */
+  aoristic: () => aoristicStat.slice(),
 };
 function snapshot() {
   const imgs = [...cardsEl.querySelectorAll('img')];

@@ -201,3 +201,64 @@ whole module and every symbol after the throw silently never existed.
 
 `node timeline/lab/mobile-verify.mjs megatimeline` — 11/11.
 Screenshot: `results/mobile/megatimeline-390x844.png`.
+
+## Step 9 — the lane aggregate was a KNOWN-WRONG NUMBER on screen (2026-08-30)
+
+The faint full-year bands were painted with
+
+```js
+ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n);   // :614, gone
+```
+
+which is an **aoristic sum in disguise** carrying both of the pathologies
+research §4 names:
+
+* **`+1` per item regardless of span** — a day-precise row and a decade-precise
+  row voted equally (overlapping-precision bias);
+* **clipped at 0.4, saturating at n = 18** — so a year holding 20 items and one
+  holding **6,808** (audio 2020, from *our own census*) painted the identical
+  grey. Ratcliffe's CRAN clamp in a different costume.
+
+Alpha was also the wrong channel twice over: it is spoken for by density, and it
+**composites**, so two overlapping bands read as a third value nobody computed.
+
+Now, and split into the two claims it always was:
+
+* **PRESENCE** — one flat full-year band per (lane, year) at a **fixed** α 0.30.
+  research §8.4.1 keeps the flat band: individually a year-only item is a smear
+  that claims nothing, and the band is the true calendar year in world space.
+* **DENSITY** — `aoristic()` **imported from `/timeline/strip.mjs`** (the server
+  now serves `/timeline/*` from the repo root, so this page uses the SHIPPED
+  library and not a copy — "fixed in both places" has to be checkable). One bin
+  per **pixel column** (M4: `w` is bounded by the display, never by `n`), total
+  mass 1 per item spread as `1/(b−a)`, drawn as **HEIGHT** because height does
+  not clip, as a **step** and never a ramp (interpolating between bins invents a
+  density we did not compute — the thing PeriodO refused in words), paired with a
+  **rug of individuals** (rcarbon's `barCodes`).
+  Every item now contributes, not only the year-precision ones: a day-precise
+  row is a one-day bracket, a month row a month, a year row a year.
+
+**The method is stated in the HUD**, because a statistic whose bin width and
+population are invisible is a silhouette:
+
+```
+aoristic Σ 1/(b−a) 1 bin/px, 0.240 d/col · VIDEO n=298 peak 1.441 ·
+AUDIO n=500 peak 2.169 · PHOTO n=11 peak 0.961
+(over LOADED items only — the census bars are the whole archive)
+```
+
+That parenthesis is load-bearing: the aoristic sum can only see items actually
+fetched, while the census histogram behind it is all 447,618. Two populations on
+one lane, and only one of them was ever named before.
+
+`__mt.aoristic()` exposes `{lane, n, peak, colDays}` per lane and
+`autotest.mjs` gained **`aoristicIsAStatistic`**: every lane that summed anything
+must report a *fractional* peak — a mass, which a `+1`-per-item count can never
+be. A lane with `n = 0` is an honest absence (Q1 1965 holds ~3 photos in the
+whole archive) and is not asserted against.
+
+**Autotest after: 6/6 asserts, 0 console errors, upstreamTotal 0, flight
+p50 8.3 / p95 9.5 / max 10.4 ms** (was p95 9.7). Full account of the shared
+arithmetic, including the finding that aoristAAR's `period_correction` and
+Ratcliffe's `1/(b−a)` are the SAME operation once the bin is a pixel column:
+`timeline/lab/NOTES-strip.md` §12.4.

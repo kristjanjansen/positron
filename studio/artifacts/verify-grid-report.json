@@ -1,0 +1,126 @@
+{
+  "t": 1788074867149,
+  "runId": "studio-20260830T072626",
+  "replayUrl": "http://127.0.0.1:8899/proto/selfrec/replay-grid.html?show=studio-20260830T072626&room=studio-20260830T072626&token=REDACTED",
+  "participants": [
+    {
+      "pid": "p1",
+      "phases": [
+        "start",
+        "beat",
+        "beat",
+        "beat",
+        "end"
+      ],
+      "T0": 1788074791704,
+      "skewEst": 96,
+      "mimeType": "video/webm;codecs=h264",
+      "durMs": 39002,
+      "chunkCount": 20,
+      "degraded": false
+    }
+  ],
+  "postshow": {
+    "exit": 0,
+    "participants": [
+      {
+        "pid": "p1",
+        "phases": [
+          "start",
+          "beat",
+          "beat",
+          "beat",
+          "end"
+        ],
+        "T0": 1788074791704,
+        "skewEst": 96,
+        "mimeType": "video/webm;codecs=h264",
+        "durMs": 39002,
+        "chunkCount": 20,
+        "degraded": false
+      }
+    ],
+    "report": null
+  },
+  "gridState": {
+    "phase": "running",
+    "error": null,
+    "mode": "show",
+    "cueLane": "cuelog",
+    "rangeT": [
+      1788074789704,
+      1788074830706
+    ],
+    "tiles": [
+      "p1"
+    ],
+    "cues": 3,
+    "masterPid": null,
+    "hostName": "worker"
+  },
+  "advance": {
+    "playhead": 1788074795699.6,
+    "playing": true,
+    "master": "p1",
+    "stats": {
+      "counts": {
+        "pending": 4,
+        "committed": 0,
+        "fired": 1,
+        "passed": 0,
+        "dropped": 0,
+        "reduced": 0,
+        "gated": 0
+      },
+      "total": 5,
+      "attested": 5,
+      "derived": 0,
+      "crisp": 5,
+      "smeared": 0,
+      "busyMs": 3.7,
+      "maxTickGapMs": 62.1
+    }
+  },
+  "checks": [
+    {
+      "name": "show-completed",
+      "ok": true,
+      "detail": "engine exit 0"
+    },
+    {
+      "name": "grid-detected-from-cuelog",
+      "ok": true,
+      "detail": "1 participant(s): p1 phases=start/beat/beat/beat/end"
+    },
+    {
+      "name": "postshow-ran",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "grid-replay-url",
+      "ok": true,
+      "detail": "http://127.0.0.1:8899/proto/selfrec/replay-grid.html?show=studio-20260830T072626&room=studio-20260830T072626&token=REDACTED"
+    },
+    {
+      "name": "grid-replay-composes",
+      "ok": true,
+      "detail": "phase=running tiles=p1 cues=3 cueLane=cuelog master=null error=-"
+    },
+    {
+      "name": "grid-tiles-match-participants",
+      "ok": true,
+      "detail": "1/1"
+    },
+    {
+      "name": "grid-range-covers-the-show",
+      "ok": true,
+      "detail": "41 s window"
+    },
+    {
+      "name": "grid-playhead-advances-on-the-clock-master",
+      "ok": true,
+      "detail": "+6 s in 6 s · master=p1 playing=true"
+    }
+  ]
+}

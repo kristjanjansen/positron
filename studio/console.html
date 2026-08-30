@@ -89,6 +89,43 @@
   .log{margin-top:12px;max-height:118px;overflow:auto;font-size:11px;color:var(--dim);
        border-top:1px solid var(--line);padding-top:9px;white-space:pre-wrap}
   .err{color:var(--stop)}
+  /* ---- SOUND ---- */
+  .vu{position:relative;height:26px;border:1px solid var(--line);border-radius:5px;
+      background:#080a0c;overflow:hidden;margin-top:4px}
+  .vu i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--go);
+        transition:width .08s linear}
+  .vu i.hot{background:var(--stop)}
+  .vu b{position:absolute;top:0;bottom:0;width:2px;background:var(--amber)}
+  .vu span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      font-size:11px;letter-spacing:.1em;color:var(--ink);text-shadow:0 0 4px #000}
+  .vu.silent i{background:#2b333d}
+  .verdict{margin-top:10px;font-size:11px;line-height:1.5;padding:9px;border-radius:5px;
+      border:1px solid var(--line);background:#0a0d11;color:var(--dim)}
+  .verdict.ok{border-color:var(--go);color:#a9e3c6}
+  .verdict.bad{border-color:var(--stop);color:#f0b3b0}
+  /* ---- ROOM ---- */
+  .roster{margin-top:4px;display:flex;flex-direction:column;gap:6px;
+      max-height:290px;overflow:auto}
+  .who{display:flex;align-items:center;gap:9px;padding:6px;border-radius:6px;
+      border:1px solid var(--line);background:#0a0d11;cursor:pointer}
+  .who:hover{border-color:var(--dim)}
+  .who.stalled{border-color:var(--stop);background:#1a0f0f}
+  .face{width:44px;height:26px;border-radius:3px;background:#161b22;object-fit:cover;flex:none;
+      display:block}
+  .who .nm{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .who .nm em{color:var(--dim);font-style:normal;font-size:10px;display:block;
+      letter-spacing:.06em;text-transform:uppercase}
+  .badge{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;
+      border-radius:99px;border:1px solid var(--line);color:var(--dim);flex:none}
+  .badge.featured{border-color:var(--amber);color:var(--amber);background:#2a2113}
+  .badge.live{border-color:var(--go);color:var(--go);background:#12251c}
+  .badge.wall{border-color:var(--line);color:var(--dim)}
+  .badge.stalled{border-color:var(--stop);color:var(--stop);background:#2a1414}
+  .badge.blocked{border-color:var(--stop);color:var(--stop)}
+  .tierpick{display:flex;gap:6px;margin-top:6px}
+  .tierpick button{margin:0;padding:7px;font-size:11px;letter-spacing:.08em}
+  .empty{font-size:11px;color:var(--dim);padding:10px;text-align:center;
+      border:1px dashed var(--line);border-radius:6px}
 </style>
 </head>
 <body>
@@ -161,6 +198,70 @@
     <div class="log" id="log"></div>
   </section>
 
+  <!-- ================= SOUND ================= -->
+  <section>
+    <h2>Sound</h2>
+    <label>Level at the encoder <span id="soundSrc" class="meta"></span></label>
+    <div class="vu" id="vu"><i id="vuBar"></i><b id="vuHold" style="left:0"></b><span id="vuTxt">—</span></div>
+    <div class="check"><input type="checkbox" id="monitor"><label for="monitor"
+      style="margin:0;text-transform:none;letter-spacing:0">Monitor on this machine
+      (headphones — monitoring a mic through speakers is a feedback loop)</label></div>
+    <div class="row" style="margin-top:12px">
+      <button class="small" id="btnCheck" style="flex:1">5 s sound check</button>
+    </div>
+    <div class="verdict" id="soundVerdict">Not checked. The check records 5 s with the
+      configured source, publishes it to R2 through the real uploader transport, fetches it
+      back over public HTTPS and measures the level at both ends — so it can tell a
+      deliberately silent show from a silently broken one.</div>
+    <dl style="margin-top:12px">
+      <dt>at the encoder</dt><dd id="scSrc">—</dd>
+      <dt>after the R2 round trip</dt><dd id="scOut">—</dd>
+      <dt>encode / upload / return</dt><dd id="scTime">—</dd>
+    </dl>
+  </section>
+
+  <!-- ================= ROOM ================= -->
+  <section>
+    <h2>Room</h2>
+    <label>Roster <span id="rosterMeta" class="meta"></span></label>
+    <div class="roster" id="roster"></div>
+    <div id="tierBox" style="display:none">
+      <label>Selected: <span id="selWho"></span></label>
+      <div class="tierpick">
+        <button class="small" data-tier="featured">Featured</button>
+        <button class="small" data-tier="live">Live</button>
+        <button class="small" data-tier="wall">Wall</button>
+      </div>
+    </div>
+    <div class="check"><input type="checkbox" id="permWin"><label for="permWin"
+      style="margin:0;text-transform:none;letter-spacing:0">Permission window OPEN for
+      <code>audience</code> (off = only the cast may publish)</label></div>
+    <dl style="margin-top:10px">
+      <dt>featured / live / wall</dt><dd id="rTiers">—</dd>
+      <dt>publishing</dt><dd id="rPub">—</dd>
+      <dt>stalled (no tile &gt; 6 s)</dt><dd id="rStall">—</dd>
+      <dt>last tier change echo</dt><dd id="rEcho">—</dd>
+    </dl>
+  </section>
+
+  <!-- ================= GRID ARCHIVE ================= -->
+  <section>
+    <h2>Grid archive</h2>
+    <label>Participant link — each browser records ITSELF</label>
+    <input type="text" id="joinUrl" readonly value="" placeholder="appears when the show is live">
+    <div class="row" style="margin-top:8px">
+      <button class="small" id="btnCopyJoin" style="flex:1">Copy link</button>
+      <button class="small" id="btnAddPart" style="flex:1">Add headless recorder</button>
+    </div>
+    <div class="roster" id="recorders" style="max-height:150px"></div>
+    <a class="replay hidden" id="gridReplay" target="_blank" rel="noopener">Open grid replay ▸</a>
+    <div class="verdict" id="gridNote">Per-participant self-recording, not a central
+      composite: measured, central recording costs 8.1–8.6× the grid's live budget at
+      N=54 and every join/leave cuts a 130–172 ms gap into every OTHER participant's
+      file. Off camera = zero bytes. The composite is a derived artifact, rendered
+      on demand.</div>
+  </section>
+
   <!-- ================= STRIP ================= -->
   <div class="stripwrap">
     <h2 style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin:0 0 10px">
@@ -198,6 +299,15 @@ function connect() {
       if (f.row.kind === "marker") log(`▸ ${f.row.payload.marker} ${f.row.payload.leg || f.row.payload.why || ""}`); }
     else if (f.type === "error") log(`✗ ${f.op}: ${f.error}`, true);
     else if (f.type === "ack" && f.op === "score") log(`score loaded: ${f.result.title} (${f.result.loaded} events)`);
+    else if (f.type === "ack" && f.op === "tier")
+      log(f.result.echoMs == null
+        ? `⚠ ${f.result.op} ${f.result.participantId}→${f.result.tier} NOT echoed in 4 s — the room drops a rejected tier change silently`
+        : `${f.result.op} ${f.result.participantId} → ${f.result.tier} (echo ${f.result.echoMs} ms)`,
+        f.result.echoMs == null);
+    else if (f.type === "ack" && f.op === "perm")
+      log(`permission window: ${f.result.participantId || f.result.role} publish=${f.result.publish}`);
+    else if (f.type === "ack" && f.op === "soundcheck")
+      log(`sound check ${f.result.ok ? "OK" : "FAIL"} in ${f.result.timings.totalMs} ms`, !f.result.ok);
   };
 }
 const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
@@ -236,8 +346,142 @@ fetch("/api/scores").then((r) => (r.ok ? r.json() : Promise.reject(new Error("HT
     $("score").innerHTML = `<option disabled>no engine — ${String(e.message).slice(0, 40)}</option>`;
   });
 
+// ---- SOUND -----------------------------------------------------------------
+// Everything here is the ENGINE's number. The VU is the record leg's own astats
+// on the samples it is encoding into the archive — not a second capture in this
+// page, which would meter a different stream and prove nothing.
+$("monitor").onchange = () => send({ op: "monitor", on: $("monitor").checked });
+$("btnCheck").onclick = () => {
+  $("btnCheck").disabled = true;
+  $("soundVerdict").className = "verdict";
+  $("soundVerdict").textContent = "running 5 s through the real publish path: encode → R2 → back down…";
+  send({ op: "soundcheck", secs: 5 });
+};
+const DB_FLOOR = -60;
+function renderSound() {
+  const s = ST.sound; if (!s) return;
+  $("soundSrc").textContent = s.configured === "silent"
+    ? "· SILENT is the configured source" : "· " + s.configured;
+  const m = s.meter;
+  const vu = $("vu"), bar = $("vuBar"), hold = $("vuHold"), txt = $("vuTxt");
+  if (!m || !m.frames) {
+    vu.classList.remove("silent"); bar.style.width = "0%";
+    txt.textContent = ST.phase === "live" ? "no audio frames yet" : "meter runs while live";
+    hold.style.left = "0";
+  } else if (m.silent) {
+    // A silent show is a valid show. Say WHICH silence this is.
+    vu.classList.add("silent"); bar.style.width = "100%"; hold.style.left = "0";
+    txt.textContent = m.expectedSilent ? "SILENT — as configured" : "SILENT — but audio was expected";
+    vu.style.borderColor = m.expectedSilent ? "" : "var(--stop)";
+  } else {
+    vu.classList.remove("silent"); vu.style.borderColor = "";
+    const pc = (db) => Math.max(0, Math.min(100, ((db - DB_FLOOR) / -DB_FLOOR) * 100));
+    bar.style.width = pc(m.rmsDb) + "%";
+    bar.className = m.peakDb > -1 ? "hot" : "";
+    hold.style.left = pc(m.peakHoldDb) + "%";
+    txt.textContent = `${m.rmsDb.toFixed(1)} dBFS rms · peak hold ${m.peakHoldDb.toFixed(1)}`;
+  }
+  if ($("monitor").checked !== !!s.monitor) $("monitor").checked = !!s.monitor;
+  $("btnCheck").disabled = !!s.checking || ST.phase === "live";
+  if (ST.phase === "live" && !s.checking && !s.lastCheck)
+    $("btnCheck").textContent = "5 s check — before the show, not during";
+  const c = s.lastCheck;
+  if (c) {
+    $("soundVerdict").className = "verdict " + (c.ok ? "ok" : "bad");
+    $("soundVerdict").textContent = (c.ok ? "✓ " : "✗ ") + c.verdict + "\n" +
+      c.legs.map((l) => `${l.ok ? "ok" : "FAIL"} ${l.name} — ${l.detail}`).join("\n");
+    const db = (x) => (!x ? "—" : x.peakDb <= -120 ? "digital silence" :
+      `${x.rmsDb.toFixed(1)} rms / ${x.peakDb.toFixed(1)} peak dBFS`);
+    $("scSrc").textContent = db(c.source);
+    $("scOut").textContent = db(c.afterR2);
+    $("scTime").textContent = `${c.timings.encodeMs} / ${c.timings.uploadMs} / ${c.timings.roundTripMs} ms`;
+  }
+}
+
+// ---- ROOM ------------------------------------------------------------------
+// The roster is the ENGINE's fold of the DO's deltas (studio/roster.mjs), not a
+// copy this page patches. Faces are the room DO's snapshot tiles.
+let selected = null, rosterSig = "";
+function renderRoom() {
+  const r = ST.roster;
+  const box = $("roster");
+  // Rebuild only when the roster actually changed. A status frame lands about
+  // once a second; re-creating the faces each time would re-fetch every tile
+  // and, worse, detach the element under a click that is already in flight.
+  const sig = r ? JSON.stringify(r.participants.map((p) =>
+    [p.id, p.tier, p.liveness, p.publishing, p.mayPublish, Math.round((p.tileAgeMs || 0) / 2000)])) : "";
+  if (sig === rosterSig && r && r.participants.length) { renderRoomCounts(r); return; }
+  rosterSig = sig;
+  if (!r || !r.participants.length) {
+    box.innerHTML = `<div class="empty">${ST.phase === "live"
+      ? "nobody in the room but the engine" : "roster appears when the room is joined"}</div>`;
+    $("tierBox").style.display = "none";
+    $("rosterMeta").textContent = ""; return;
+  }
+  $("rosterMeta").textContent = `· ${r.participants.length} in ${r.room}`;
+  box.innerHTML = r.participants.map((p) => {
+    const stall = p.liveness === "stalled";
+    const face = `${ST.remote || ""}/tile/${r.room}/${encodeURIComponent(p.id)}`;
+    return `<div class="who ${stall ? "stalled" : ""}" data-id="${p.id}" title="${p.id}">
+      <img class="face" alt="" src="${face}?t=${Math.floor(Date.now() / 4000)}"
+           onerror="this.style.visibility='hidden'">
+      <span class="nm">${p.name || p.id}<em>${p.role}${p.publishing ? " · publishing" : ""}</em></span>
+      ${stall ? `<span class="badge stalled">stalled ${Math.round((p.tileAgeMs || 0) / 1000)}s</span>` : ""}
+      ${p.mayPublish ? "" : `<span class="badge blocked">blocked</span>`}
+      <span class="badge ${p.tier}">${p.tier}</span></div>`;
+  }).join("");
+  for (const el of box.querySelectorAll(".who")) el.onclick = () => {
+    selected = el.dataset.id;
+    $("selWho").textContent = selected;
+    $("tierBox").style.display = "";
+  };
+  if (selected && !r.participants.some((p) => p.id === selected)) {
+    selected = null; $("tierBox").style.display = "none";      // they left
+  }
+  renderRoomCounts(r);
+}
+function renderRoomCounts(r) {
+  const c = r.counts;
+  $("rTiers").textContent = `${c.featured} / ${c.live} / ${c.wall}`;
+  $("rPub").textContent = String(c.publishing);
+  $("rStall").textContent = String(c.stalled);
+  $("rEcho").textContent = ST.lastTier
+    ? (ST.lastTier.echoMs == null ? "not echoed (rejected?)"
+       : `${ST.lastTier.echoMs} ms · ${ST.lastTier.participantId}→${ST.lastTier.tier}`) : "—";
+  const open = r.perm && r.perm.publish && r.perm.publish.audience;
+  $("permWin").checked = open === undefined ? true : !!open;
+}
+for (const b of document.querySelectorAll("#tierBox button"))
+  b.onclick = () => { if (selected) send({ op: "tier", participantId: selected, tier: b.dataset.tier }); };
+$("permWin").onchange = () => send({ op: "perm", role: "audience", publish: $("permWin").checked });
+
+// ---- GRID ARCHIVE ----------------------------------------------------------
+$("btnCopyJoin").onclick = () => {
+  const el = $("joinUrl"); el.select();
+  navigator.clipboard ? navigator.clipboard.writeText(el.value).then(() => log("participant link copied"))
+                      : document.execCommand("copy");
+};
+$("btnAddPart").onclick = () => send({ op: "participants", n: 1, durationS: 120 });
+function renderGrid() {
+  const g = ST.grid; if (!g) return;
+  $("joinUrl").value = g.joinUrl || "";
+  $("btnCopyJoin").disabled = !g.joinUrl;
+  $("btnAddPart").disabled = !g.joinUrl || !g.tokenConfigured;
+  if (!g.tokenConfigured) $("btnAddPart").textContent = "no SELFREC_TOKEN";
+  $("recorders").innerHTML = g.recorders.length
+    ? g.recorders.map((r) => `<div class="who"><span class="nm">${r.pid}
+        <em>${r.chunks} chunks · ${(r.bytes / 1048576).toFixed(1)} MB${r.headless ? " · headless" : ""}</em></span>
+        <span class="badge ${r.degraded ? "stalled" : "live"}">${r.degraded ? "degraded" : "recording"}</span></div>`).join("")
+    : `<div class="empty">no self-recording participants yet</div>`;
+  if (g.replayUrl) { $("gridReplay").href = g.replayUrl; $("gridReplay").classList.remove("hidden"); }
+  else $("gridReplay").classList.add("hidden");
+  if (g.report) $("gridNote").textContent =
+    `postshow exit ${g.report.exit} · ${g.report.participants.length} participant(s): ` +
+    g.report.participants.map((p) => `${p.pid} ${p.chunkCount ?? "?"} chunks${p.degraded ? " DEGRADED" : ""}`).join(", ");
+}
+
 // ---- render ----------------------------------------------------------------
-const LEGS = ["source", "record", "stage", "archive", "room"];
+const LEGS = ["source", "record", "stage", "archive", "room", "monitor"];
 function render() {
   if (!ST) return;
   const live = ST.phase === "live";
@@ -273,7 +517,9 @@ function render() {
   const d = ST.deck;
   $("sCues").textContent = (ST.cues || []).length;
   if (d) {
-    const deltas = d.drift.map((x) => Math.abs(x.deltaMs)).filter(Number.isFinite).sort((a, b) => a - b);
+    // cue lane only — a roster delta is an overdub by construction (see stop())
+    const deltas = d.drift.filter((x) => x.kind === "cue")
+      .map((x) => Math.abs(x.deltaMs)).filter(Number.isFinite).sort((a, b) => a - b);
     const q = (p) => deltas.length ? deltas[Math.min(deltas.length - 1, Math.floor(p * deltas.length))].toFixed(1) : "—";
     $("sDrift").textContent = deltas.length ? `${q(.5)} / ${q(.95)} ms` : "—";
     $("sArmed").textContent = `${d.audit.armed} / ${d.driftStats.retained} (${d.driftStats.total} total)`;
@@ -284,6 +530,9 @@ function render() {
   if (ST.replayUrl) { $("replay").href = ST.replayUrl; $("replay").classList.remove("hidden"); }
   else $("replay").classList.add("hidden");
   if (ST.error) log("engine error: " + ST.error, true);
+  renderSound();
+  renderRoom();
+  renderGrid();
 }
 const fmt = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 setInterval(() => {
@@ -366,6 +615,7 @@ function drawStrip() {
       if (!fired) { cx.fillStyle = "#e8b44a"; cx.fillRect(x - 2, LANE.cue, 4, 4); }
     }
     for (const rec of d.drift) {
+      if (rec.kind !== "cue") continue;          // roster deltas are overdubs
       const at = rec.intendedUs != null ? rec.intendedUs / 1000 : null;
       if (at == null) continue;
       const x = X(at), mag = Math.min(24, Math.abs(rec.deltaMs) * 1.2);

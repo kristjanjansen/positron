@@ -1599,6 +1599,83 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `an unbounded quotation reports ONE pass and flags itself, rather than inventing an end: ${JSON.stringify(ur[0])}`);
 }
 
+// --- 14k — TWO BUGS THE OFFLINE RENDERER FOUND (2026-08-30) -----------------
+// Both were invisible to every arm above, and both were invisible for the same
+// reason: a virtual clock fires a committed one-shot at EXACTLY its due instant,
+// so `deltaMs === 0` and every "is this the top of the pass?" test that compares
+// floats for equality passes. Rendering a nest is what put a second, differently
+// timed observer on the same code.
+{
+  // (1) THE ENTRY DOWNBEAT. `assertSpan` took the hair-before-`in` lead only
+  // when `phaseOf(pos).off === 0` — true on a virtual clock, false in wall-clock
+  // playback where the enter event fires a few ms late. Result: pass 1, and only
+  // pass 1, folded its downbeat. Measured as 8 onsets rendered vs 7 played.
+  // The test therefore has to introduce LATENESS deliberately, which on a
+  // virtual clock means entering at a position that is not exactly `at`.
+  const AT = 3000, IN = 800, OUT = 2700;      // IN === a note-on in LNOTES
+  for (const [label, jog] of [['arrive exactly', 0], ['arrive 7 ms late', 7]]) {
+    const r = loopRig({ ref: `tape-entry-${label.replace(/\W+/g, '')}` });
+    r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 3 });
+    const downs = [];
+    const off = r.child.sched.onFire((ev) => { if (ev.at === IN) downs.push(ev.id); });
+    r.parent.seek(AT - 500); r.parent.play(1);
+    runFor(r.vr, r.nest, 400);
+    // MANUFACTURE THE LATENESS. A virtual runtime fires a committed one-shot at
+    // EXACTLY its due instant, so `parent.position() === at` and the old
+    // `off === 0` test passed — which is the entire reason this bug survived
+    // 389 green checks. Stopping the scheduler across `at` and restarting it
+    // makes the enter arrive through `scan()` as 'tick-late', deltaMs > 0,
+    // exactly as a real 25 ms tick delivers it in playback.
+    if (jog) {
+      r.parent.sched.stop();
+      r.vr.advanceTo(r.vr.now() + 100 + jog);
+      r.parent.sched.start();
+      r.vr.advanceTo(r.vr.now() + 1); r.nest.servo();
+    } else runFor(r.vr, r.nest, 100);
+    runFor(r.vr, r.nest, 3 * (OUT - IN));
+    off();
+    check('loop-entry', 0, downs.length === 3,
+      `${label}: the note sitting exactly on \`in\` must fire on ALL 3 passes INCLUDING THE FIRST — got ${downs.length}/3`);
+  }
+  // …and the honest inverse: a SEEK into the middle of a pass still FOLDS,
+  // because rule 10a says a jump is not an arrival.
+  const s = loopRig({ ref: 'tape-entry-seek' });
+  s.nest.add({ id: 'q', at: AT, rate: 1, deck: s.child, in: IN, out: OUT, repeat: 3 });
+  s.parent.seek(AT + 5);                              // jumped, did not arrive
+  check('loop-entry', 0, Math.abs(s.child.position() - (IN + 5)) < 1e-6,
+    `a SEEK 5 ms into pass 1 lands at in+5 and folds — it does not rewind to the downbeat (child at ${s.child.position()})`);
+
+  // (2) A SPAN THE PLAYHEAD HAS NOT ENTERED MUST NOT BE STARTED. Found by
+  // rendering a NEST INSIDE A NEST: an outer wrap seeks the middle deck to
+  // `in − 1e-6`, which is inside an inner span's window by the eps tolerance but
+  // BEFORE its enter event — so `adapter.transport` started a child that was
+  // still parked at `c0`, an event sitting exactly on `c0` fired 'tick-late',
+  // and then fired AGAIN when the enter actuated and re-seeked a hair earlier.
+  // Two fires of one event: exactly-once, broken, two levels down.
+  const vr = sharedVR(9_000_000);
+  const grandFires = [];
+  const grand = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [-10, 2000],
+    items: [{ at: 0, kind: 'g', id: 'G0', payload: {} }, { at: 400, kind: 'g', id: 'G1', payload: {} }],
+    adapters: { g: { caps: { catchUp: 'reduce', reducible: true, seekable: true },
+      actuate: () => {}, reduce: (ps) => ps.length, assertState: () => {} } } });
+  const offG = grand.sched.onFire((ev) => grandFires.push(ev.id));
+  const mid = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [-10, 4000], items: [],
+    adapters: {} });
+  const inner = createNest(mid, { tickHost: vr.newHost() });
+  inner.add({ id: 'in', at: 0, rate: 1, deck: grand, in: 0, out: 800, repeat: 2 });
+  const par = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [0, 30000], items: [] });
+  const outer = createNest(par, { tickHost: vr.newHost() });
+  outer.add({ id: 'out', at: 100, rate: 1, deck: mid, in: 0, out: 1690, repeat: 2 });
+  par.seek(0); par.play(1);
+  for (let t = 0; t < 100 + 2 * 1690 + 50; t += 5) {
+    vr.advanceTo(vr.now() + 5); outer.servo(); inner.servo();
+  }
+  par.pause(); offG();
+  check('loop-deep', 0, grandFires.join(',') === 'G0,G1,G0,G1,G0,G1,G0,G1',
+    `2 outer passes x 2 inner passes x 2 events, each EXACTLY ONCE — a span the playhead has not entered must not be started (${grandFires.length}: ${grandFires.join(',')})`);
+  par.dispose(); mid.dispose(); grand.dispose();
+}
+
 if (failures) {
   console.error(`prop-nested: ${failures} VIOLATION(S) in ${checks} checks`);
   process.exit(1);

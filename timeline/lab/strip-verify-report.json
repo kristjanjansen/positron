@@ -1,0 +1,476 @@
+{
+  "when": "2026-08-30T07:10:34.024Z",
+  "checks": 32,
+  "fails": 0,
+  "facts": {
+    "C3": {
+      "exactIntegerMsCeiling": 9007199254740991,
+      "exactIntegerMsCeilingYears": 285426.78186223406,
+      "bigBangMs": 435485937600000000000,
+      "ulpAtBigBangMs": 65536,
+      "ulpAt2026EpochMs": 0.000244140625,
+      "zoomCeilingAtBigBangPps": 0.0152587890625,
+      "zoomCeilingAt2026EpochPps": 4096000,
+      "stallMsFor1msStep": 9313225746154788,
+      "stallMsFor1sStep": 9223372036854776000,
+      "deepestHonestSpanAtBigBangHours": 25.48622222222222
+    },
+    "C1": {
+      "oldTicks": 138000000,
+      "newTicks": 14,
+      "newMajorYears": 1000000000,
+      "label": "-6.9 Ga"
+    },
+    "B2": {
+      "maxAbsDiff": 0,
+      "total": 3.999999999999979
+    },
+    "B3": {
+      "years": [
+        1,
+        2,
+        5,
+        20,
+        60
+      ],
+      "oldAlpha": [
+        0.07,
+        0.09,
+        0.15000000000000002,
+        0.4,
+        0.4
+      ]
+    },
+    "A1": [
+      {
+        "label": "wide",
+        "t0": -315619200000,
+        "t1": 315532800000,
+        "agree": 19,
+        "disagree": 0,
+        "nPossible": 19,
+        "nNecessary": 19,
+        "states": {
+          "core": 0,
+          "outer": 19,
+          "unanswerable": 0,
+          "crisp": 0
+        }
+      },
+      {
+        "label": "1965",
+        "t0": -157766400000,
+        "t1": -126230400000,
+        "agree": 12,
+        "disagree": 0,
+        "nPossible": 12,
+        "nNecessary": 2,
+        "states": {
+          "core": 0,
+          "outer": 2,
+          "unanswerable": 10,
+          "crisp": 0
+        }
+      },
+      {
+        "label": "corpus",
+        "t0": -220924800000,
+        "t1": 126230400000,
+        "agree": 19,
+        "disagree": 0,
+        "nPossible": 19,
+        "nNecessary": 19,
+        "states": {
+          "core": 0,
+          "outer": 19,
+          "unanswerable": 0,
+          "crisp": 0
+        }
+      }
+    ],
+    "A3": [
+      {
+        "label": "1930-2000",
+        "n": 19,
+        "crisp": 0,
+        "core": 0,
+        "outer": 19,
+        "unanswerable": 0,
+        "ignorance": 19,
+        "vagueness": 0,
+        "smeared": 19,
+        "window": [
+          -1306483776000,
+          990864576000
+        ]
+      },
+      {
+        "label": "1963-1974 (the corpus range)",
+        "n": 19,
+        "crisp": 0,
+        "core": 0,
+        "outer": 19,
+        "unanswerable": 0,
+        "ignorance": 19,
+        "vagueness": 0,
+        "smeared": 19,
+        "window": [
+          -227867904000,
+          133173504000
+        ]
+      },
+      {
+        "label": "1965 only",
+        "n": 14,
+        "crisp": 0,
+        "core": 0,
+        "outer": 2,
+        "unanswerable": 12,
+        "ignorance": 14,
+        "vagueness": 0,
+        "smeared": 14,
+        "window": [
+          -158397120000,
+          -125599680000
+        ]
+      },
+      {
+        "label": "June 1965",
+        "n": 11,
+        "crisp": 0,
+        "core": 0,
+        "outer": 0,
+        "unanswerable": 11,
+        "ignorance": 11,
+        "vagueness": 0,
+        "smeared": 11,
+        "window": [
+          -144771840000,
+          -142076160000
+        ]
+      }
+    ],
+    "ink": {
+      "core": {
+        "count": 11456,
+        "sum": 1401717,
+        "states": {
+          "n": 4,
+          "crisp": 0,
+          "core": 4,
+          "outer": 0,
+          "unanswerable": 0,
+          "ignorance": 4,
+          "vagueness": 0,
+          "smeared": 4,
+          "window": [
+            -290938176000,
+            70013376000
+          ]
+        }
+      },
+      "outer": {
+        "count": 11456,
+        "sum": 1191738,
+        "states": {
+          "n": 4,
+          "crisp": 0,
+          "core": 0,
+          "outer": 4,
+          "unanswerable": 0,
+          "ignorance": 4,
+          "vagueness": 0,
+          "smeared": 4,
+          "window": [
+            -290938176000,
+            70013376000
+          ]
+        }
+      },
+      "crisp": {
+        "count": 3360,
+        "sum": 722463,
+        "states": {
+          "n": 4,
+          "crisp": 4,
+          "core": 0,
+          "outer": 0,
+          "unanswerable": 0,
+          "ignorance": 0,
+          "vagueness": 0,
+          "smeared": 0,
+          "window": [
+            -290938176000,
+            70013376000
+          ]
+        }
+      },
+      "ign": {
+        "count": 11152,
+        "sum": 1064559,
+        "states": {
+          "n": 3,
+          "crisp": 0,
+          "core": 0,
+          "outer": 3,
+          "unanswerable": 0,
+          "ignorance": 3,
+          "vagueness": 0,
+          "smeared": 3,
+          "window": [
+            -225974016000,
+            36585216000
+          ]
+        }
+      },
+      "vag": {
+        "count": 10946,
+        "sum": 971236,
+        "states": {
+          "n": 3,
+          "crisp": 0,
+          "core": 0,
+          "outer": 3,
+          "unanswerable": 0,
+          "ignorance": 0,
+          "vagueness": 3,
+          "smeared": 3,
+          "window": [
+            -225974016000,
+            36585216000
+          ]
+        }
+      },
+      "tape": {
+        "count": 13326,
+        "sum": 1488150,
+        "states": {
+          "n": 20,
+          "crisp": 0,
+          "core": 0,
+          "outer": 20,
+          "unanswerable": 0,
+          "ignorance": 20,
+          "vagueness": 0,
+          "smeared": 20,
+          "window": [
+            -946581120000,
+            1541531520000
+          ]
+        }
+      },
+      "ghost": {
+        "count": 31265,
+        "sum": 1446489,
+        "states": {
+          "n": 3,
+          "crisp": 0,
+          "core": 0,
+          "outer": 0,
+          "unanswerable": 3,
+          "ignorance": 3,
+          "vagueness": 0,
+          "smeared": 3,
+          "window": [
+            -190021248000,
+            -157133952000
+          ]
+        }
+      }
+    },
+    "narrow": {
+      "tape": [
+        {
+          "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3",
+          "rule": "corpus-range@1",
+          "verbatim": null,
+          "edtf": "1963/1973",
+          "widthMs": 347155200000,
+          "key": "ia:videoplayback-13_202304/Erkki Kurenniemi - Inventio _ Outventio (64 kbps).mp3"
+        },
+        {
+          "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3",
+          "rule": "corpus-range@1",
+          "verbatim": null,
+          "edtf": "1963/1973",
+          "widthMs": 347155200000,
+          "key": "ia:videoplayback-13_202304/Erkki Kurenniemi - Mix Master Universe 2 (64 kbps).mp3"
+        },
+        {
+          "id": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3",
+          "rule": "corpus-range@1",
+          "verbatim": null,
+          "edtf": "1963/1973",
+          "widthMs": 347155200000,
+          "key": "ia:videoplayback-13_202304/Erkki Kurenniemi - Saharan uni I (64 kbps).mp3"
+        }
+      ],
+      "tapeN": 20,
+      "ign": 3,
+      "vag": 0,
+      "rules": [
+        "corpus-range@1",
+        "wikidata-precision@1",
+        "ia-filename-year@1",
+        "wikidata-title-match@1",
+        "edm-literal-length@1"
+      ]
+    },
+    "agg": {
+      "fit": {
+        "method": "aoristic Σ 1/(b−a) · 1 bin/px (1360 cols, 21.2 d/col)",
+        "colMs": 1829494588.235294,
+        "cols": 1360,
+        "max": 0.16345544044547836,
+        "peakCol": 433,
+        "total": 19.999999999999808,
+        "items": 20,
+        "counted": 20,
+        "open": 0,
+        "points": 0,
+        "clipped": 0
+      },
+      "zoom": {
+        "method": "aoristic Σ 1/(b−a) · 1 bin/px (1360 cols, 6.70 h/col)",
+        "colMs": 24115764.70588235,
+        "cols": 1360,
+        "max": 0.0021546130647398546,
+        "peakCol": 29,
+        "total": 2.91016447842644,
+        "items": 14,
+        "counted": 14,
+        "open": 0,
+        "points": 0,
+        "clipped": 12
+      }
+    },
+    "deep": {
+      "full": {
+        "ticks": {
+          "minor": 143,
+          "major": 15,
+          "clamped": false
+        },
+        "major": 31556952000000000000,
+        "label": "-6.9 Ga",
+        "errors": []
+      },
+      "camb": {
+        "ticks": {
+          "minor": 187,
+          "major": 19,
+          "clamped": false
+        },
+        "label": "-520.0 Ma"
+      },
+      "deepest": {
+        "zoom": {
+          "pps": 0.030517578125,
+          "wanted": 0.06103515625,
+          "ceilingPps": 0.030517578125,
+          "ulpMs": 32768,
+          "clamped": true,
+          "by": "float-resolution"
+        },
+        "pps": 0.030517578125,
+        "ticks": {
+          "minor": 148,
+          "major": 13,
+          "clamped": false
+        }
+      },
+      "states": {
+        "n": 4,
+        "crisp": 0,
+        "core": 1,
+        "outer": 3,
+        "unanswerable": 0,
+        "ignorance": 3,
+        "vagueness": 1,
+        "smeared": 4,
+        "window": [
+          -444420972989280000000,
+          8714136725279998000
+        ]
+      }
+    },
+    "cost": {
+      "smeared200": {
+        "p50": 0.1,
+        "p95": 0.2,
+        "max": 0.2,
+        "states": {
+          "n": 200,
+          "crisp": 0,
+          "core": 0,
+          "outer": 200,
+          "unanswerable": 0,
+          "ignorance": 100,
+          "vagueness": 100,
+          "smeared": 200,
+          "window": [
+            -2291037696000,
+            1975504896000.0005
+          ]
+        }
+      },
+      "crisp200": {
+        "p50": 0.2,
+        "p95": 0.5,
+        "max": 0.7,
+        "states": {
+          "n": 200,
+          "crisp": 200,
+          "core": 0,
+          "outer": 0,
+          "unanswerable": 0,
+          "ignorance": 0,
+          "vagueness": 0,
+          "smeared": 0,
+          "window": [
+            -2291037696000,
+            1975504896000.0005
+          ]
+        }
+      },
+      "smeared2000": {
+        "p50": 0.3,
+        "p95": 0.5,
+        "max": 0.6,
+        "states": {
+          "n": 2000,
+          "crisp": 0,
+          "core": 0,
+          "outer": 2000,
+          "unanswerable": 0,
+          "ignorance": 1000,
+          "vagueness": 1000,
+          "smeared": 2000,
+          "window": [
+            -2291037696000,
+            1975504896000.0005
+          ]
+        }
+      },
+      "crisp2000": {
+        "p50": 1.3,
+        "p95": 1.6,
+        "max": 1.7,
+        "states": {
+          "n": 2000,
+          "crisp": 2000,
+          "core": 0,
+          "outer": 0,
+          "unanswerable": 0,
+          "ignorance": 0,
+          "vagueness": 0,
+          "smeared": 0,
+          "window": [
+            -2291037696000,
+            1975504896000.0005
+          ]
+        }
+      }
+    }
+  }
+}

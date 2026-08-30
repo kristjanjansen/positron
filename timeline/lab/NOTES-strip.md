@@ -34,13 +34,16 @@ const strip = createStrip(canvas, deck, {
 
 Returns: `setLanes/lanes/show`, `view/setView/fit/zoomAt/zoomIn/zoomOut`,
 `setFollow/follow`, `armWall/wallPos/gapMs`, `setEvidence/evidence`,
-`readout/invalidate/draw`, `timeToX/xToTime/tickLOD`, `inkOf/ink`, `dispose`.
+`setCertainty/certainty`, `spanStates(id)`, `narrowable(id)`,
+`aggregateStat(id)`, `readout/invalidate/draw`, `timeToX/xToTime/tickLOD`,
+`inkOf(id, {mode})`/`ink`, `dispose`.
 
 Also exported as free functions, because a client with its own *projection*
 (paths draws these lanes in x/y space, and again at 14×) must reuse the
 styling rather than re-derive it: `strokePoly`, `styleFor`, `hatchFor`,
 `HATCH`, `idToColor`, `laneInk`, `tickLOD`, `TICK_LADDER`, `formatTime`,
-`aoristic`, `spansOf`, `registerRenderer`.
+`aoristic`, `spansOf`, `whenState`, `ulpMs`, `zoomCeilingPps`, `DATE_WALL_MS`,
+`registerRenderer`.
 
 ## 3. LANES ARE QUERIES, NOT CONTAINERS
 
@@ -51,7 +54,8 @@ styling rather than re-derive it: `strokePoly`, `styleFor`, `hatchFor`,
   render(ctx, L, C),                // the declared escape hatch
   value(payload), min, max, dots,   // continuous
   phase(row), group(row), span(row), slots, slotOf(s), labels, labelOf(s),
-    aggregate, stack, allSkirt,     // spans
+    aggregate, aggregateColor, aggregateLegend, rug, bars, narrowable,
+    stack, allSkirt,                // spans
   peaks(row), durOf(row),           // waveform
   latch, firedColor,                // ticks
   color, width, alpha, dash }
@@ -133,7 +137,10 @@ below, which is the acceptance test:
 | 5000 | 10.0 | 100.0 | 10 | `0.06` |
 
 Ten orders of magnitude, minor spacing 7–25 px, major 72–120 px, no branch.
-The ladder runs 1 ms → 100 years (MIDI jitter → the ERR archive horizon).
+~~The ladder runs 1 ms → 100 years~~ — **1 ms → 10 Gyr since 2026-08-30 (§12.5).
+The eight rows above are bit-identical after the extension**: extra rungs above
+cannot perturb a first-that-clears search, and the table was re-run to prove it
+rather than reasoned about.
 
 `absolute` (is the position domain wall-clock epoch ms, as replay-grid's is, or
 0-based, as jam's is?) is a **declaration**, defaulted from
@@ -167,20 +174,21 @@ TVCG 2016): **ambiguation for "when / how long", gradient/density only for "how
 likely at t"**. So:
 
 * per span row: a **two-tone bar** — outer band at α 0.30 (the possible
-  flanks), inner core at α 0.88 (the certain part). No `when` → the whole band
-  is skirt, which §8.4.3 says is honest and needs no special case;
+  flanks), inner core at α 0.88 (the certain part);
 * **never a dash for uncertainty** (§8.4.5). Dash is spoken for by tratteggio,
   which encodes inferred *payload* — a different axis. If the edge is soft, the
   edge moves;
 * an unterminated span (a recording still running) is drawn to the window edge
   with a **feathered** right edge, not a hard one;
 * `lane.aggregate` draws the §8.4.2 **aoristic sum as HEIGHT** (height does not
-  clip the way `globalAlpha = min(0.4, …)` did in proto/megatimeline): one bin
-  per **pixel column**, each item contributing total mass 1 spread as
-  `1/(b−a)`. `aoristic()` returns `{mass, n, norm, max, colMs}` — `n` is the
-  overlapping-period count per column, `norm = mass/n`, so a caller who wants
-  the mean divides instead of clipping. Verified: one fully-visible span sums
-  to exactly 1.000000.
+  clip the way `globalAlpha = min(0.4, …)` did in proto/megatimeline).
+
+⚠️ **Everything below §12 supersedes this section where they disagree.** §7 was
+written before the `when` sibling landed, and two of its sentences turned out to
+be wrong in the way that matters: "no `when` → the whole band is skirt … needs
+no special case" is the design that renders the only real archive we have as a
+lie by omission, and the aggregate as written dropped points and open spans in
+silence.
 
 ## 8. Adoption — the only proof offered
 
@@ -219,20 +227,14 @@ draw, and nobody told it about the quotation.
 * **jam's lazy strip** (`deckIfAny()` — with no recording the readout says "no
   recording yet" rather than showing a dead strip). The component draws an
   empty axis instead.
-* **`when.kind` edge treatment** (§8.4.4): `'ignorance'` → hard edges + a
-  "narrow this" affordance; `'vagueness'` → feathered edges and *no* affordance.
-  `spansOf` carries `when.kind` through to the hover detail; the renderer does
-  not yet vary the edge by it. Waiting on the `when` sibling to land.
+* ~~**`when.kind` edge treatment**~~ — BUILT, §12.3.
 * **`score.mjs` marks** are not a lane kind yet.
 * Keyboard nudge, selection/range brush, and a minimap are absent by choice.
 
 ## 10. Degradations, stated
 
-* `when` had **not landed** in `timeline/transport.mjs` when this was written.
-  The two-tone ambiguation is implemented and reachable (`payload.when`,
-  `lane.span(row).when`) and unit-checked against a synthetic row, but no
-  shipped client feeds it yet, so every span in both adoptions renders as
-  **all-skirt** — which §8.4.3 says is the honest reading, not a placeholder.
+* ~~`when` had **not landed**~~ — it has (transport v0.6), and the "honest
+  reading" claim in this bullet was **wrong**. See §12.1.
 * `deck.driftStats()` is on the *scheduler*, not the deck; the readout reaches
   it via `deck.sched.driftStats()` and would prefer it promoted.
 * `sampleAt` on a *derived* lane has no adapter, so the continuous renderer's
@@ -283,3 +285,283 @@ Bench + harness: `timeline/lab/strip-touch.html`,
 at **2 px wide** at a 390 px viewport, so the component cannot be exercised
 there at all; the harness diagnoses it explicitly rather than blaming the
 component. Full account in `research/mobile-2026-08.md`.
+
+---
+
+# 12. AMBIGUATION, THE THREE STATES, THE AGGREGATE, DEEP TIME (2026-08-30)
+
+plan-timeline §7.9's one line was the whole brief: *"the transport can now say
+what it does not know; the strip still cannot show it."* It can now. Harness:
+`timeline/lab/strip-uncertainty.html` + `node timeline/lab/strip-verify.mjs`
+(**32/32**, one headless Chrome, two screenshots, `strip-verify-report.json`).
+Everything below carries a number produced by that run.
+
+## 12.1 The empty core is the hard case, and it is not a styling problem
+
+**All 22 Kurenniemi rows have `innerFrom`/`innerTo` null.** So the "saturated
+certain core" of two-tone ambiguation is **empty for the entire archive** —
+`spanStates()` reports `core 0` in every window we tried, at every zoom
+(A5, A3). A two-tone design that draws "no core" as an *absence* therefore
+renders our only real corpus as one flat tone, and §7's own sentence ("the whole
+band is skirt, which is honest") was the lie: **the reader cannot tell that band
+from a crisp attested span, from `allSkirt`, or from a bug.**
+
+That was not a theory. It was in the shipped code and it is measured:
+
+> **crisp 3,360 px / mean α 215.0 vs outer 11,456 px / mean α 104.0** — a
+> 51.6 % separation *now*. Before, both fell into the renderer's single
+> `else` branch at α 0.70 and were **pixel-identical in ink density**.
+> (A2, `strip.inkOf(id, {mode:'both'})`.)
+
+**The fix is not to invent a core.** It is that ambiguation *degenerates* when
+the core is empty — with one tone it is not an encoding — so we fall back to the
+**same study's other recommendation for the same task**. Gschwandtner et al.
+recommend "ambiguation **or error bars** for judging durations and temporal
+bounds". An error bar spanning the outer bracket says exactly what the row says:
+*bounds known, extent within them unrecorded*. It cannot be misread as a core,
+because it is not a filled region at all. Staying inside the study rather than
+inventing a third mark is the point.
+
+## 12.2 `necessary` has THREE answers, so the renderer has four states
+
+`whenState(span, t0, t1)` — exported, pure — is a **transcription** of
+transport.mjs's `certAccepts()`, not a paraphrase:
+
+| state | when | mark |
+| --- | --- | --- |
+| `crisp` | no `when` at all (note-on/note-off, enter/exit) | one tone, full strength, hard edges |
+| `core` | ordered inner pair → inner containment answers exactly | ambiguation: α 0.30 skirt + α 0.88 core rect |
+| `outer` | no inner pair, bracket ⊆ window → **sound but incomplete** | skirt + **error bar** with caps |
+| `unanswerable` | no inner pair, bracket ⊄ window → **undecidable** | **ghost**: α 0.10 fill + outline, no bar |
+
+**A1: the strip's classifier agrees with the transport's predicate on 50/50 rows
+across three windows, 0 disagreements** — asserted against
+`deck.window(kind, t0, t1, {certainty:'necessary'})`, so if the two ever drift a
+test fails instead of a picture lying.
+
+**The finding worth keeping is that the third state is a property of the row AND
+THE WINDOW.** On the real corpus, `spanStates('tape')`:
+
+| window | core | outer (sound) | UNDECIDABLE | n |
+| --- | --- | --- | --- | --- |
+| 1930–2000 | 0 | 19 | 0 | 19 |
+| 1963–1974 (the corpus range) | 0 | 19 | 0 | 19 |
+| 1965 only | 0 | **2** | **12** | 14 |
+| June 1965 | 0 | **0** | **11** | 11 |
+
+Zoom out and outer containment answers "certainly in view" for every row; zoom to
+a month and the same rows become undecidable. **The epistemics are a property of
+the question, and on a zoomable axis the wheel is what asks it.** research §9.7
+says nobody has shipped an interactive, zoomable, uncertainty-native timeline;
+this is the specific thing that only exists once you have one.
+
+`setCertainty('necessary')` therefore does **not** hide what it cannot answer —
+it ghosts it (ghost mean α 46.3, **38 % of a core's density**, still 31,265 px on
+the canvas) and puts the count in the quality line: `in view: 0 core · 2
+outer-sound · 12 UNDECIDABLE`. A query that silently answers "no" to a question
+it cannot answer is the failure mode research §9.7 found in *every* surveyed
+renderer; a ghost you have to notice is not a report, so the number ships too.
+
+## 12.3 `when.kind` — the edge IS the claim
+
+Identical brackets, identical positions, one flag apart:
+
+* **ignorance** — there *is* a boundary and the catalogue lost it, so the bound
+  is a **fact**: hard 1 px terminators at both outer bounds, capped error bar,
+  and a 4 px **"narrow this" caret**. `strip.narrowable(laneId)` is the data half
+  — 20 rows on the real corpus, by rule `corpus-range@1`,
+  `wikidata-precision@1`, `ia-filename-year@1`, `wikidata-title-match@1`,
+  `edm-literal-length@1`, widest bracket first. The smear is a **defect record**
+  and the rule names who to argue with.
+* **vagueness** — there is no boundary, so a hard edge would be the
+  *falsification*. Feathered band (gradient ramp, ≤22 px or 34 % of the width),
+  the error bar drawn as a **fading rule with NO caps** (a capped bar would put
+  hard endpoints on a concept that has none), and **zero** narrowing affordance:
+  `narrowable()` returns 3/3 for ignorance and **0/3** for vagueness.
+
+**A4, and it forced a change to the measurement instrument:** ignorance 11,152 px
+/ alpha mass 1,064,559 vs vagueness 10,946 px / 971,236. **Mass differs by 8.8 %
+where the pixel COUNT differs by only 1.8 %** — a feathered edge keeps almost
+every pixel above `laneInk`'s 8/255 gate, so *a pixel count cannot see the
+difference between a hard edge and a soft one*. Hence `laneInk(…, {mode:'sum'|
+'both'})` and `inkOf(id, opts)`. This is the first claim in the repo that the
+original ink probe was too blunt to close.
+
+## 12.4 The aggregate: a STATISTIC with a stated method
+
+`aoristic()` was already one-bin-per-pixel-column with mass `1/(b−a)`. What was
+wrong was everything around it.
+
+* **The brief's third factor does not exist.** §7.4/§9.5 read as *three*
+  operations — mass `1/(b−a)`, **and** "divided by the overlapping-period count"
+  (aoristAAR's `period_correction`). **Measured (B2): with one bin per pixel
+  column those are the SAME operation, agreeing to `maxAbsDiff = 0` (exactly, not
+  approximately) on column-aligned items.** The pixel column *is* the period; an
+  item overlaps `(b−a)/colMs` of them; `1 ÷ that count` is exactly the
+  `colMs/(b−a)` the weight already deposits per column. There is no third factor
+  to apply, and applying one would have halved every mass twice.
+* **…and the two DO diverge in one case, where `1/(b−a)` is the correct one:** a
+  span half off-screen deposits **0.500000**, because the divisor is the item's
+  *true* duration. Dividing by *visible* columns would have deposited 1.0 and
+  invented half an item.
+* `norm = mass/n` is kept, is a **different** statistic (mean mass per
+  contributing item), and must **not** drive the height — dividing by the count
+  deletes the count, which is the quantity a histogram is for.
+* **Points were being dropped** (`!s.point && Number.isFinite(s.to)`), which made
+  a crisp archive read as empty next to a smeared one. They now carry mass 1 in
+  their own column. **Open spans contribute 0** — that is the arithmetic
+  (`1/∞`), not a policy — and are **counted and reported** (`open`), because
+  "dropped 3 open spans" and "3 spans added nothing" are the same fact and only
+  one of them is visible.
+* **It is drawn as a STEP, never a ramp.** The old `lineTo(i, top)` between
+  column tops is a linear interpolation *across the bin boundary* — the exact
+  invention PeriodO refused ("natural language is already a compact and easily
+  indexable way to represent imprecision … rather than imposing an arbitrary
+  mapping to parameterized curves"). Paired with a **rug of individuals**
+  (§9.5, rcarbon's `barCodes`) so the silhouette can never claim a population the
+  rows do not have.
+* **The method is printed on the canvas** and readable as
+  `strip.aggregateStat(id)`:
+  `aoristic Σ 1/(b−a) · 1 bin/px (1360 cols, 21.2 d/col) · peak 0.163 · n=20`,
+  and at the 1965 zoom `6.70 h/col`, `n=14`, `clipped 12`, `total 2.910` — the
+  bin width follows the display, never `n` (M4's discipline).
+* `bars:false` gives the aggregate **its own lane**. Individuals and a statistic
+  over them are two claims and lose if they share pixels.
+
+**`proto/megatimeline` now imports the same `aoristic()`** (its server serves
+`/timeline/*` from the repo root so the page uses the shipped library, not a
+copy). What it replaced, and why it was worse than "a bit off":
+
+> `ctx.globalAlpha = Math.min(0.4, 0.05 + 0.02 * n)`
+>
+> **+1 per item regardless of span** (a day-precise and a decade-precise row vote
+> equally) **and clipped at 0.4, saturating at n = 18** — so a year holding 20
+> items and one holding 6,808 (audio 2020, from our own census) painted the
+> **identical grey**. Alpha is also the wrong channel twice: it is spoken for by
+> density, and it composites, so two overlapping bands read as a third value
+> nobody computed.
+
+The flat full-year band **stays** (§8.4.1) but at a **fixed** α 0.30 — it is a
+*presence* mark; the count went to the sum. New autotest assert
+`aoristicIsAStatistic` (every lane that summed anything reports a *fractional*
+peak — a mass, which a `+1` count can never be). Megatimeline: **6/6 asserts,
+0 console errors, flight p95 9.5 ms** (was 9.7), and the HUD now reads
+`aoristic Σ 1/(b−a) 1 bin/px, 0.240 d/col · VIDEO n=298 peak 1.441 · AUDIO n=500
+peak 2.169 · PHOTO n=11 peak 0.961 (over LOADED items only — the census bars are
+the whole archive)`.
+
+## 12.5 Deep time — and the bug was NOT the one we were told to look for
+
+The brief said to check the arithmetic, expecting the position domain to break.
+**It does break, and that is not what would have taken the tab down.**
+
+**The measured ceiling of "absolute ms" as a position domain:**
+
+| quantity | measured |
+| --- | --- |
+| integer ms exact to | `2^53` = **9.007e15 ms = 285,426.8 years** |
+| ulp at a 2026 epoch stamp (1.77e12 ms) | 0.000244 ms |
+| 13.8 Gyr in ms | 4.3549e20 |
+| **ulp at 13.8 Gyr** | **65,536 ms = 65.536 s** (rel. err 1.50e-16) |
+| `t += 1` stalls (`t+1 === t`) at | **9.313e15 ms ≈ 295.1 kyr** |
+| `t += 1000` stalls at | 9.223e18 ms ≈ 292 Myr |
+| JS `Date.toISOString()` wall | ±8.64e15 ms = ±273,790 y — **throws past it** |
+
+So: **a millisecond span at the Big Bang does not exist as a number.** §7.9's
+"ms spans are useless at 13.8 Gyr" is confirmed with the exact figure.
+
+**But the failure that bites first is a draw loop, not a float.** With the ladder
+stopping at 100 y, fitting 13.8 Gyr into 1400 px chose `major = 100 y` at
+**1.0e-5 px**, and `drawAxis()` asked for **138,000,000 major ticks per frame**,
+each a `moveTo` + `lineTo` + `fillText`, all 0.00001 px apart. That is minutes to
+hours of one frame. Fixed by:
+
+1. **more rungs, not a different projection** — `TICK_LADDER` now runs 1 ms →
+   10 Gyr (200 y, 500 y, ka×5, Ma×9, Ga×4). ChronoZoom's rule, read from its
+   source: *the log of the span selects the tick source; it never warps the
+   axis.* 13.8 Gyr now draws **14 major ticks** and reads `-6.9 Ga`; the Cambrian
+   view reads `-520.0 Ma`. **The §5 acceptance table is bit-identical** at all
+   eight of its zooms — extra rungs above cannot perturb a `first-that-clears`
+   search;
+2. **regime-swapped labels** — unit follows the MAJOR interval (`ka`/`Ma`/`Ga`),
+   so one axis reads in one unit. The old ladder printed `-6900000000y`;
+3. **the axis loop is index-based (`first + i·step`) and count-bounded**
+   (`MAX_TICKS = 4096`, and the clamp is *reported*). Accumulation would not
+   merely drift at deep time — it **stalls**, and a stalled `for` loop is a hang;
+4. **`formatTime` no longer hands a deep-time position to `Date`.** It did, and
+   `new Date(-4.35e20).toISOString()` throws `RangeError` — an absolute
+   deep-time deck would have taken the axis down on the first frame. Past the
+   wall it degrades to the deep-time regime.
+
+**The zoom ceiling is derived from IEEE-754, not authored per era.**
+`zoomCeilingPps(t) = 1000/ulpMs(t)` — stop where one pixel is finer than one
+representable step. ChronoZoom hand-writes `deeperZoomConstraints` for this; the
+float gives it for free, and it says two surprising things:
+
+* at 13.8 Gyr the ceiling is **0.0153 px/s** — 400 doublings of zoom stop dead
+  and report `clamped by 'float-resolution', 1 px = 32,768 ms`. The deepest
+  honest view still spans **1400 px × 65.536 s = 25.5 hours**: *you cannot zoom
+  to a minute inside the Hadean, but you can zoom to a day*;
+* **at a 2026 wall-clock epoch stamp the ceiling is 4.096e6 px/s, so the
+  component's pre-existing hard cap of 1e7 px/s was ALREADY 2.4× past the
+  double's resolution for every `absolute` deck we ship.** Nobody had zoomed
+  there, so nobody had seen it.
+
+**The verdict asked for: a documented, measured ceiling is the right answer, and
+ms stays the position domain.** An offset+scale representation buys nothing a
+heritage deck needs — 65.5 s of quantisation at 13.8 Gyr is 1.5e-16 relative, and
+the *only* consequence is a zoom limit that is now enforced and reported rather
+than silently violated. What would force a change is a deck that needs
+millisecond resolution *and* a Gyr span in one position domain, which is not a
+timeline, it is two.
+
+## 12.6 What the honesty costs
+
+Full redraw of a lane of **2,000 smeared spans** with everything on — state
+classification, ambiguation, per-kind edges, feather gradients, error bars, the
+aoristic sum, the rug and the per-frame state tally:
+**p50 0.3 ms / p95 0.5 ms / max 0.5 ms** (200 spans: p50 0.1 ms), n=40 redraws,
+1360×160 canvas, headless Chrome.
+⚠️ The crisp arm in the same bench (p50 1.4 / p95 2.4 ms) is **not** a fair
+comparison and must not be read as one: a phase-paired lane carries two rows per
+span, so it pairs 4,000 rows through a `Map` where the smeared arm reads 2,000
+frozen brackets. It is reported because omitting it would have let the first
+number read as a speed-up.
+
+Every previously measured number held exactly: **prop-test green** ·
+**mobile-verify strip 18/18** (pinch midpoint drift still 0.00 px) ·
+**proto/paths 14/14** with ink `evidence=4690 stored=5529 linear=17973
+smooth=7203` and evidence-only `linear=0 smooth=0`, deviation
+`24.19 / 0.679 / 0.0357` · **compose 20/20** · **loops 14/14** with tratteggio
+ink still `294 px under 'all', 0 px under 'attested'`.
+
+## 12.7 Seams left open, honestly
+
+* **`certainty` is inert on a span lane's QUERY**, and the strip says so in a
+  comment: span lanes ask `(−∞, ∞)` so they can pair, and every bracket is
+  contained in that, so `necessary` accepts everything at query time. The strip
+  re-derives the predicate per *visible window* instead. A1 exists precisely
+  because that is two implementations of one rule.
+* **`visibleStates()` runs per frame over the whole lane, not the visible part**
+  — bounded by the same full-lane scan `spansFor()` already pays for pairing, so
+  it changes no complexity class, but a million-row span lane would feel both.
+  The fix, if it ever matters, is to tally during the draw (which already visits
+  every drawn span and sets `s.state`) and let the readout read the tally.
+* **`when` on SPANS is still absent in the transport** — a `when` row is a span,
+  but a span row cannot carry a `when` for its *start* and another for its *end*.
+  PlanningLines' six quantities collapse to four here. Nothing the strip can fix.
+* **Competing authorities** (one `when` per row) — the deferral §7.9 calls the
+  one most likely to be regretted. Two institutions dating the same tape
+  differently currently means two rows, and the strip would draw them as two
+  things that happened.
+* **Non-contiguous brackets** (`[1667,1668,1670..1672]`) render as their hull,
+  which over-claims. The renderer has no mark for "one of these, definitely not
+  the others".
+* **The narrowing affordance is a caret and a list, not an action.** Clicking it
+  does nothing; `narrowable()` hands a client the rule and the verbatim string
+  and stops there.
+* **Sub-pixel deep-time rows**: at 13.8 Gyr all of recorded human history is one
+  1.5 px mark (PeriodO's 1-px clamp, already in). It is honest and it is also
+  unreadable; a "there is more here than you can see" mark is unbuilt.
+* `strip.narrate(laneId)` (§9), `score.mjs` marks as a lane kind, keyboard nudge,
+  brush and minimap — still absent, still by choice.

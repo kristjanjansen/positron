@@ -175,11 +175,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // static
+  // static. `/timeline/*` is served from the REPO ROOT so the page imports the
+  // SHIPPED library (timeline/strip.mjs' aoristic()) rather than a copy — the
+  // aggregate this surface draws and the one the strip draws must be the same
+  // arithmetic, or "fixed in both" is a claim nobody can check.
   let file = url.pathname === '/' ? '/index.html' : url.pathname;
   file = normalize(file).replace(/^(\.\.[/\\])+/, '');
+  const base = file.startsWith('/timeline/') ? join(ROOT, '../..') : ROOT;
   try {
-    const data = await readFile(join(ROOT, file));
+    const data = await readFile(join(base, file));
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream' });
     res.end(data);
   } catch {

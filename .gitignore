@@ -21,3 +21,10 @@ __pycache__/
 proto/megatimeline/*-cache.jsonl
 proto/kurenniemi/.chrome-verify/
 proto/loops/.chrome-verify/
+
+# headless Chrome profiles (verify rigs) — never artifacts
+**/.chrome-verify/
+**/.chrome-remote/
+
+# studio run logs: transient, and the run artifacts under studio/runs are the record
+studio/logs/
