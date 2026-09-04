@@ -108,13 +108,23 @@ export function mount({
   };
 }
 
-/** Inline favicon — otherwise every demo logs a /favicon.ico 404. */
+/**
+ * Inline favicon — otherwise every demo logs a /favicon.ico 404.
+ *
+ * e+ : the positron. Same geometry as workers/view/build.mjs plots into
+ * favicon.ico — a ring with a lower-right aperture, a crossbar to make it an
+ * 'e', and the superscript plus that is the charge and the name.
+ */
 function favicon() {
   if (document.querySelector('link[rel="icon"]')) return;
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">' +
-    '<rect width="16" height="16" fill="%230b0e14"/>' +
-    '<rect x="2" y="7" width="12" height="2" fill="%23ffd400"/>' +
-    '<rect x="7" y="3" width="2" height="10" fill="%23ffd400"/></svg>';
+  const BG = '%230b0e14', HI = '%23ffd400';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+    `<rect width="32" height="32" fill="${BG}"/>` +
+    `<circle cx="12.2" cy="19.6" r="7.45" fill="none" stroke="${HI}" stroke-width="4.3"/>` +
+    `<path d="M12.2 19.6L23.3 24.1L32 32L12.6 32Z" fill="${BG}"/>` +
+    `<rect x="3.6" y="17.7" width="17.2" height="3.2" fill="${HI}"/>` +
+    `<rect x="21" y="7" width="9" height="3" fill="${HI}"/>` +
+    `<rect x="24" y="4" width="3" height="9" fill="${HI}"/></svg>`;
   document.head.append(el('link', '', null, { rel: 'icon', href: 'data:image/svg+xml,' + svg }));
 }
 

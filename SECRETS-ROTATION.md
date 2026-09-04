@@ -46,7 +46,10 @@ env -u CF_API_TOKEN wrangler r2 bucket list   # from proto/archive (no .env ther
 ```
 
 ## Worker secrets currently set (rotate only if suspected)
-`SELFREC_TOKEN` (elektron-selfrec), `JAM_TOKEN` (elektron-jam), `CUES_TOKEN`,
+`SELFREC_TOKEN` (elektron-selfrec), `CUES_TOKEN`,
+~~`JAM_TOKEN`~~ (elektron-jam was RETIRED 2026-09-04 and replaced by the
+tokenless `positron-ws`; nothing reads JAM_TOKEN any more, so it needs no
+rotation — but delete it from `.env` and from any Worker secret store),
 `ROOM_TOKEN`, `OPERATOR_TOKEN` (elektron-rtc/cues — CUES_TOKEN already rotated
 once after a log echo). Rotate with:
 `wrangler secret put <NAME> --name <worker>` from a no-.env dir.

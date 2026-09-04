@@ -1,0 +1,25 @@
+{
+  "name": "positron-ws",
+  // ws.positron.studio — the project's ONE verbatim WebSocket relay.
+  //
+  // Supersedes elektron-jam, which did the same job token-gated. That rename was
+  // safe where the others were not: JamRoom held NO durable storage (its only
+  // mention of the word is the comment saying "NO storage"), so there was no
+  // Durable Object state to abandon — unlike rtc's cuelog or view's ERR cache.
+  //
+  // Tokenless on purpose. A token pasted into a public page is a published
+  // token, which is why the looper's cross-device rooms were a deliberate gap.
+  // The price is paid in limits instead: see src/index.js.
+  "routes": [{ "pattern": "ws.positron.studio", "custom_domain": true }],
+  "workers_dev": true,
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "Relay" }]
+  },
+  // SQLite-backed because the account no longer allows key-value backed DO
+  // namespaces (API 10099). Nothing is stored either way — the class holds only
+  // live socket sets and an in-memory token bucket.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Relay"] }],
+  "observability": { "enabled": true }
+}
