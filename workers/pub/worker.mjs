@@ -78,6 +78,12 @@ export class Pub extends Container {
 
   viewers() { return this.ctx.getWebSockets().length; }
 
+  /** tunable without a redeploy of the image */
+  #size() {
+    const n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    return { w: n(this.env.PUB_W, 1280), h: n(this.env.PUB_H, 720), fps: n(this.env.PUB_FPS, 30) };
+  }
+
   async #ensureAlarm() {
     const at = await this.ctx.storage.getAlarm();
     if (at === null) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
@@ -93,7 +99,7 @@ export class Pub extends Container {
         await super.fetch(new Request('http://c/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ key }),
+          body: JSON.stringify({ key, bg: this.env.PUB_BG || 'testsrc2', ...this.#size() }),
         }));
       } catch { /* container still waking; the sweep retries */ }
     }
@@ -102,7 +108,7 @@ export class Pub extends Container {
         await super.fetch(new Request('http://c/start-whip', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ url: whip }),
+          body: JSON.stringify({ url: whip, bg: this.env.PUB_BG || 'testsrc2', ...this.#size() }),
         }));
       } catch { /* same */ }
     }
