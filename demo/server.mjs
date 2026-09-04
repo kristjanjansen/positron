@@ -31,9 +31,14 @@ export function serve(port = PORT) {
     if (rel.includes('..')) { res.writeHead(400).end('no'); return; }
     if (rel === '') rel = 'demo/index.html';
     if (rel.endsWith('/')) rel = join(rel, 'index.html');
-    const file = join(ROOT, rel);
+    // LOCAL == DEPLOYED. On the worker, demo/<x> is served at /<x>, so a page
+    // asking for /shell/shell.css or /06-llhls/ must resolve here too — try the
+    // repo root first, then inside demo/.
+    let file = join(ROOT, rel);
     try {
-      const body = await readFile(file);
+      let body;
+      try { body = await readFile(file); }
+      catch { file = join(ROOT, 'demo', rel); body = await readFile(file); }
       res.writeHead(200, {
         'content-type': MIME[extname(file)] || 'application/octet-stream',
         'cache-control': 'no-store',

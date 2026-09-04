@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
+  .hold { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
+  .hold[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
+</style>
+<script src="/proto/remixer/hls.min.js"></script>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
+  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
+
+  const d = mount({
+    n: '06',
+    name: 'llhls',
+    what: 'The tuned low-latency player against a live input. Opening this page is what starts the stream.',
+    readout: { latency: 's', target: 's', rate: '×', stalls: '' },
+    controls: [
+      { id: 'go', label: 'Start the stream and play', primary: true },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  const badge = el('span', 'hold', 'publisher: idle');
+  badge.dataset.on = '0';
+  d.head.append(badge);
+
+  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
+  video.muted = true;
+  d.el.append(video);
+
+  let player = null, ws = null, stalls = 0, rebuilds = 0, resyncs = 0, last = null;
+
+  d.on('go', async () => {
+    if (player) return;
+
+    // The socket IS the reference count. Holding it starts the container's
+    // ffmpeg; dropping it (closing the tab) is how the publisher learns nobody
+    // is watching and shuts down after its grace period.
+    ws = holdPublisher((s) => {
+      badge.dataset.on = s.held ? '1' : '0';
+      badge.textContent = s.held ? `publisher: held${s.viewers ? ` (${s.viewers})` : ''}` : 'publisher: idle';
+    });
+    d.log('holding the publisher open');
+
+    // Container wake + ffmpeg + Stream ingest is not instant; 204 means
+    // Cloudflare has nothing yet, 200 means it is serving.
+    const w = await waitForManifest({
+      onTick: ({ status, waitedMs }) => d.log(`manifest ${status} at ${(waitedMs / 1000).toFixed(0)}s`),
+    });
+    if (!w.ok) { d.log(`manifest never came up in ${(w.waitedMs / 1000).toFixed(0)}s`, 'bad'); return; }
+    d.log(`manifest live after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
+
+    // THE PLAYER IS src/low-latency-player.js, unchanged — the v6 that fixed
+    // the 26 s park. This demo is not a reimplementation of it; it is the
+    // measured artefact with a readout attached.
+    player = createLowLatencyPlayer(video, llhls())
+      .on('latency', ({ latency, target, playbackRate }) => {
+        // A stream that came up 30 s ago legitimately stalls while Cloudflare's
+        // LL-HLS pipeline fills; the v6 watchdog rebuilding then is it WORKING.
+        // So the counters start at the first good sample and the assert is
+        // about staying stable once playing, not about a clean startup.
+        if (!last) { stalls = 0; rebuilds = 0; resyncs = 0; d.log('playing — stability counters start here', 'hi'); }
+        last = { latency, target, playbackRate };
+        d.set('latency', latency, latency <= target + 0.5 ? 'ok' : latency <= target + 2 ? '' : 'bad');
+        d.set('target', target);
+        d.set('rate', playbackRate);
+      })
+      .on('stall', (x) => { stalls++; d.set('stalls', stalls); d.log(`stall ${JSON.stringify(x).slice(0, 90)}`, 'bad'); })
+      .on('rebuild', () => { rebuilds++; d.log('instance rebuilt (source-stall watchdog)', 'bad'); })
+      .on('resync', () => { resyncs++; d.log('resynced to the live edge'); })
+      .on('error', (e) => d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad'))
+      .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
+
+    await video.play().catch((e) => d.log(`play refused: ${e.name}`, 'bad'));
+  });
+
+  d.on('check', async () => {
+    d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
+    const r = await fetch(llhls(), { cache: 'no-store' }).then((x) => x.status).catch(() => 0);
+    d.assert('manifest is being served', r === 200, `HTTP ${r}`);
+    d.assert('player attached', !!player);
+    if (last) {
+      // 2.4-4.0 s is what rig/ measured for this config; the assert is looser
+      // than that so a slow colo does not read as a regression
+      d.assert('latency inside the measured envelope', last.latency > 0 && last.latency < 8,
+        `${last.latency.toFixed(2)} s (target ${last.target})`);
+      d.assert('playback rate near 1x', Math.abs(last.playbackRate - 1) < 0.2,
+        String(last.playbackRate));
+    } else {
+      d.log('no latency sample yet — press Start first');
+    }
+    d.assert('stable once playing', rebuilds === 0,
+      `${rebuilds} rebuild(s), ${stalls} stall(s), ${resyncs} resync(s) since the first sample`);
+  });
+
+  d.log('nothing is publishing until you press Start; it stops when you leave');
+  d.ready();
+</script>
+</html>

@@ -37,8 +37,12 @@ export class Pub extends Container {
       this.ctx.acceptWebSocket(pair[1]);           // hibernatable
       this.#idleTicks = 0;
       await this.#ensureAlarm();
-      // first viewer starts the publish
-      if (this.viewers() === 1) await this.#startPublish();
+      // FIRE AND FORGET. Awaiting the publish here delayed the 101 by the
+      // container's cold start, so the viewer's own onopen did not fire until
+      // ffmpeg was already running — a connection blocking on a video encoder.
+      // The alarm sweep retries if this fails, so nothing is lost by not
+      // waiting for it.
+      if (this.viewers() === 1) this.#startPublish().catch(() => { /* sweep retries */ });
       try {
         pair[1].send(JSON.stringify({ t: 'hello', viewers: this.viewers() }));
       } catch { /* raced a close */ }
@@ -81,17 +85,31 @@ export class Pub extends Container {
 
   async #startPublish() {
     const key = this.env.STREAM_KEY;
-    if (!key) return;                              // secret not set: stay dark
-    try {
-      await super.fetch(new Request('http://c/start', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ key }),
-      }));
-    } catch { /* container still waking; the sweep retries */ }
+    const whip = this.env.WHIP_URL;
+    // Both legs, same refcount. Cloudflare cannot serve WHEP from an RTMPS
+    // input, so 06 and 07 need separate inputs fed the same pattern.
+    if (key) {
+      try {
+        await super.fetch(new Request('http://c/start', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ key }),
+        }));
+      } catch { /* container still waking; the sweep retries */ }
+    }
+    if (whip) {
+      try {
+        await super.fetch(new Request('http://c/start-whip', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ url: whip }),
+        }));
+      } catch { /* same */ }
+    }
   }
 
   async #stopPublish() {
+    // /stop stops both legs
     try { await super.fetch(new Request('http://c/stop', { method: 'POST' })); }
     catch { /* already gone */ }
   }
@@ -105,7 +123,8 @@ export class Pub extends Container {
       try {
         const r = await super.fetch(new Request('http://c/status'));
         const s = await r.json();
-        if (!s.publishing) await this.#startPublish();   // crashed: restart
+        // either leg dying under a live viewer gets restarted
+        if (!s.publishing || !s.whip?.publishing) await this.#startPublish();
       } catch { /* waking */ }
       await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
       return;

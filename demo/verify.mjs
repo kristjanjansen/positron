@@ -67,6 +67,7 @@ await S('Page.enable'); await S('Runtime.enable'); await S('Log.enable'); await 
 
 let errors = [];
 let failedReqs = [];
+let abortedReqs = [];
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Runtime.exceptionThrown') {
@@ -78,7 +79,15 @@ listeners.push((m) => {
   if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error') {
     errors.push(m.params.entry.text);
   }
-  if (m.method === 'Network.loadingFailed') failedReqs.push(m.params.errorText);
+  if (m.method === 'Network.loadingFailed') {
+    // ERR_ABORTED is what a media element's in-flight segment requests do
+    // when the page unloads — it means WE navigated, not that the page
+    // failed. Every page that plays media produces these on teardown, so
+    // counting them made a working demo look broken. Recorded separately
+    // rather than ignored.
+    if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
+    else failedReqs.push(m.params.errorText);
+  }
 });
 
 async function ev(expr) {
@@ -96,8 +105,8 @@ const ok = (label, cond, detail) => {
 
 for (const t of targets) {
   console.log(`\n[${t.n}] ${t.name}`);
-  errors = []; failedReqs = [];
-  await S('Page.navigate', { url: `${BASE}/demo/${t.n}-${t.name}/` });
+  errors = []; failedReqs = []; abortedReqs = [];
+  await S('Page.navigate', { url: `${BASE}/${t.n}-${t.name}/` });
   await sleep(1400);
 
   // ready, with a bounded wait — never a bare sleep
@@ -161,9 +170,22 @@ for (const t of targets) {
   const labels = await ev('[...document.querySelectorAll(".d-controls button")].map(b => b.textContent)');
   for (let i = 0; i < (labels || []).length; i++) {
     await ev(`document.querySelectorAll(".d-controls button")[${i}].click()`);
-    await sleep(650);
+    // A demo whose first control brings up LIVE infrastructure needs that to
+    // finish before the later controls mean anything. settleMs is declared per
+    // demo in the manifest rather than guessed here.
+    await sleep(i === 0 && t.settleMs ? t.settleMs : 650);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
+
+  // Some checks are async (14 fetches the manifest before asserting), so a
+  // fixed sleep either flakes or wastes time. Wait for the assert count to
+  // stop growing instead.
+  let prev = -1, n = await ev('(window.__demo && __demo.asserts.length) || 0');
+  for (let i = 0; i < 12 && n !== prev; i++) {
+    prev = n;
+    await sleep(400);
+    n = await ev('(window.__demo && __demo.asserts.length) || 0');
+  }
 
   const asserts = await ev('__demo.asserts');
   ok('page asserted something', (asserts || []).length > 0, String((asserts || []).length));
@@ -171,6 +193,9 @@ for (const t of targets) {
 
   ok('no console errors', errors.length === 0, errors.slice(0, 2).join(' | ') || '0');
   ok('no failed requests', failedReqs.length === 0, failedReqs.slice(0, 2).join(' | ') || '0');
+  if (abortedReqs.length) {
+    console.log(`        (${abortedReqs.length} aborted on teardown — expected for a media page)`);
+  }
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);

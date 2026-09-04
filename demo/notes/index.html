@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON · notes</title>
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 <link rel="icon" href="/favicon.ico">
 <style>
   .md { max-width: 100%; }
@@ -129,7 +129,7 @@
   const doc = new URLSearchParams(location.search).get('doc') || 'uuu-positron';
   const safe = /^[a-z0-9-]+$/.test(doc) ? doc : 'uuu-positron';
   try {
-    const r = await fetch(`/demo/notes/${safe}.md`, { cache: 'no-store' });
+    const r = await fetch(`/notes/${safe}.md`, { cache: 'no-store' });
     if (!r.ok) throw new Error(`${r.status}`);
     const src = await r.text();
     document.getElementById('md').innerHTML = render(src);

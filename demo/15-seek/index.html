@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 <style>
   video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 8px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 4px; margin: 0 0 10px; }
@@ -19,12 +19,12 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/demo/shell/shell.mjs';
-  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
-  import { createStripView } from '/demo/shell/strip.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { ARCHIVE, CUES, cueItems } from '/demo/shell/archive.mjs';
+  import { ARCHIVE, CUES, cueItems } from '/shell/archive.mjs';
 
   const d = mount({
     n: '15',
