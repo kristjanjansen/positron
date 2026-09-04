@@ -1,0 +1,27 @@
+{
+  "name": "positron-pub",
+  // pub.positron.studio — the ffmpeg publisher for the Act 1 demos, alive
+  // exactly as long as somebody holds /watch.
+  //
+  // instance_type "standard", not the obs-cloud rig's "standard-4": that image
+  // exists to compose SCENES (OBS + browser source + llvmpipe fixes, ~190% of a
+  // core, 11.6 s cold wake). A test pattern with a burned-in epoch pushed at
+  // Stream is ffmpeg's job at a quarter of the instance.
+  "routes": [{ "pattern": "pub.positron.studio", "custom_domain": true }],
+  "workers_dev": true,
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "containers": [
+    {
+      "class_name": "Pub",
+      "image": "./container/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "standard"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "PUB", "class_name": "Pub" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Pub"] }],
+  "observability": { "enabled": true }
+}

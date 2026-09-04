@@ -30,3 +30,6 @@ proto/loops/.chrome-verify/
 studio/logs/
 
 **/.chrome-mobile/
+
+# workers/pub pulls @cloudflare/containers
+workers/pub/node_modules/

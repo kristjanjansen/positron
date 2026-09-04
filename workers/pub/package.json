@@ -1,0 +1,5 @@
+{
+  "name": "positron-pub",
+  "private": true,
+  "dependencies": { "@cloudflare/containers": "^0.0.28" }
+}

@@ -87,6 +87,8 @@ const FILES = [
   ['demo/shell/strip.mjs', 'demo/shell/strip.mjs'],
   ['demo/shell/fixture.mjs', 'demo/shell/fixture.mjs'],
   ['demo/shell/archive.mjs', 'demo/shell/archive.mjs'],
+  ['demo/notes/index.html', 'demo/notes/index.html'],
+  ['demo/notes/uuu-positron.md', 'demo/notes/uuu-positron.md'],
   ...demoFiles(),
 ];
 
@@ -223,12 +225,19 @@ await mkdir(OUT, { recursive: true });
 // GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
-  const rows = DEMO_MANIFEST.map((d) => {
-    const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
-    return href
-      ? `  <li class="d-row"><a href="${href}"><span class="n">${d.n}</span><span class="nm">${d.name}</span></a></li>`
-      : `  <li class="d-row todo"><a><span class="n">${d.n}</span><span class="nm">${d.name}</span></a></li>`;
-  }).join('\n');
+  function rowHTML(d) {
+  const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
+  const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
+  const why = !href && d.why ? `<span class="d-why">${d.why}</span>` : '';
+  const open = href ? `<a href="${href}">` : '<a>';
+  return `<li class="d-row${href ? '' : ' todo'}">${open}`
+    + `<span class="n">${d.n}</span>`
+    + `<span class="nm">${d.name}</span>`
+    + `<span class="d-one">${d.one || ''}</span>`
+    + `<span class="d-meta">${tags}${why}</span>`
+    + '</a></li>';
+}
+  const rows = DEMO_MANIFEST.map((d) => '  ' + rowHTML(d)).join('\n');
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
   await writeFile(join(OUT, 'index.html'), menu.replace('<!--DEMOS-->', rows));
