@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* NO transport bar here on purpose: space is the loop pedal, and the shell's
      transport table binds space to play/pause. One key, one meaning. */
@@ -25,8 +25,8 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el } from '/demo/shell/shell.mjs';
-  import { createStripView } from '/demo/shell/strip.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createStripView } from '/shell/strip.mjs';
   import { workerTickHost } from '/timeline/transport.mjs';
   import { createLooper, stats, phaseErrors } from '/proto/looper/looper.mjs';
   import { createVoices } from '/proto/looper/synth.mjs';

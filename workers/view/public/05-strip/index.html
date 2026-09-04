@@ -5,15 +5,15 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 
 <script type="module">
-  import { mount, guard } from '/demo/shell/shell.mjs';
-  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
-  import { createStripView } from '/demo/shell/strip.mjs';
+  import { mount, guard } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { zoomCeilingPps, ulpMs, DATE_WALL_MS, tickLOD, formatTime, aoristic } from '/timeline/strip.mjs';
-  import { markAdapter } from '/demo/shell/fixture.mjs';
+  import { markAdapter } from '/shell/fixture.mjs';
 
   const YEAR = 365.2425 * 24 * 3600 * 1000;
   const SPAN = 2000 * YEAR;                 // two millennia, so the ladder has work to do

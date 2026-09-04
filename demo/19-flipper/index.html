@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* ONE grid, EQUAL cells. TV and radio are the same size on purpose: a radio
      station is a channel, not a smaller kind of channel. */
@@ -31,9 +31,9 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/demo/shell/shell.mjs';
-  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
-  import { createStripView } from '/demo/shell/strip.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
@@ -195,9 +195,17 @@
       chans.filter((c) => !c.media.muted).length <= 1,
       String(chans.filter((c) => !c.media.muted).length));
     if (started) {
-      const open = chans.filter((c) => !c.media.paused);
-      d.assert('exactly the selected channel is open', open.length === 1 && open[0] === chans[sel],
-        open.map((c) => c.id).join(',') || 'none');
+      // "open" is the wrong bar: a channel that is still fetching its first
+      // segment is legitimately paused with readyState 0, so demanding it be
+      // playing made a working page flake on a slow fetch. What must hold is
+      // that NO OTHER channel is consuming bandwidth.
+      const others = chans.filter((c, i) => i !== sel && (!c.media.paused || c.media.readyState > 0));
+      d.assert('no channel but the selected one is loaded', others.length === 0,
+        others.map((c) => c.id).join(',') || 'none');
+      const c = chans[sel];
+      d.assert('the selected channel is open or loading',
+        !c.media.paused || c.media.readyState > 0 || !!c.hls,
+        `${c.id} paused=${c.media.paused} readyState=${c.media.readyState}`);
     }
     d.log(`sel ${chans[sel].name} · dvr window ${d.api.readout.window} min`);
   });

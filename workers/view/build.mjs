@@ -79,16 +79,18 @@ const FILES = [
   // commit 3647696 without it ever being allowlisted — which is why
   // megatimeline has been dead on the public URL. Adding it fixes both.
   ['timeline/strip.mjs', 'timeline/strip.mjs'],
-  ['demo/index.html', 'demo/index.html'],
-  ['demo/manifest.mjs', 'demo/manifest.mjs'],
-  ['demo/shell/shell.css', 'demo/shell/shell.css'],
-  ['demo/shell/shell.mjs', 'demo/shell/shell.mjs'],
-  ['demo/shell/transport-bar.mjs', 'demo/shell/transport-bar.mjs'],
-  ['demo/shell/strip.mjs', 'demo/shell/strip.mjs'],
-  ['demo/shell/fixture.mjs', 'demo/shell/fixture.mjs'],
-  ['demo/shell/archive.mjs', 'demo/shell/archive.mjs'],
-  ['demo/notes/index.html', 'demo/notes/index.html'],
-  ['demo/notes/uuu-positron.md', 'demo/notes/uuu-positron.md'],
+  ['demo/manifest.mjs', 'manifest.mjs'],
+  ['demo/shell/shell.css', 'shell/shell.css'],
+  ['demo/shell/shell.mjs', 'shell/shell.mjs'],
+  ['demo/shell/transport-bar.mjs', 'shell/transport-bar.mjs'],
+  ['demo/shell/strip.mjs', 'shell/strip.mjs'],
+  ['demo/shell/fixture.mjs', 'shell/fixture.mjs'],
+  ['demo/shell/archive.mjs', 'shell/archive.mjs'],
+  ['demo/shell/live.mjs', 'shell/live.mjs'],
+  // 06 imports the v6 player UNCHANGED rather than reimplementing it
+  ['src/low-latency-player.js', 'src/low-latency-player.js'],
+  ['demo/notes/index.html', 'notes/index.html'],
+  ['demo/notes/uuu-positron.md', 'notes/uuu-positron.md'],
   ...demoFiles(),
 ];
 
@@ -112,7 +114,8 @@ function demoFiles() {
     for (const e of entries) {
       if (!e.isFile()) continue;
       if (!OK.has(extname(e.name))) continue;
-      out.push([`${dir}/${e.name}`, `${dir}/${e.name}`]);
+      // deployed WITHOUT the demo/ prefix: the public URL is /<nn>-<name>/
+      out.push([`${dir}/${e.name}`, `${dir.replace(/^demo\//, '')}/${e.name}`]);
     }
   }
   return out;
@@ -226,15 +229,15 @@ await mkdir(OUT, { recursive: true });
 // place to forget. Number and name only; a row with no target renders greyed.
 {
   function rowHTML(d) {
-  const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
+  const href = d.built ? `/${d.n}-${d.name}/` : (d.page || null);
   const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
-  const why = !href && d.why ? `<span class="d-why">${d.why}</span>` : '';
+  const why = '';   // no warning badges on the index
   const open = href ? `<a href="${href}">` : '<a>';
   return `<li class="d-row${href ? '' : ' todo'}">${open}`
     + `<span class="n">${d.n}</span>`
     + `<span class="nm">${d.name}</span>`
     + `<span class="d-one">${d.one || ''}</span>`
-    + `<span class="d-meta">${tags}${why}</span>`
+    + `<span class="d-meta">${tags}</span>`
     + '</a></li>';
 }
   const rows = DEMO_MANIFEST.map((d) => '  ' + rowHTML(d)).join('\n');
@@ -263,6 +266,16 @@ for (const [src, dst] of FILES) {
     console.log(`  rewrote ${dst} (${rewrites.length} substitution(s))`);
   } else {
     await copyFile(join(REPO, src), to);
+  }
+}
+{
+  // Stripping the demo/ prefix on deploy made it possible for two sources to
+  // land on one destination (demo/index.html and the generated menu both wanted
+  // index.html). Refuse rather than let the later copy win silently.
+  const seen = new Map();
+  for (const [src, dst] of FILES) {
+    if (seen.has(dst)) throw new Error(`duplicate destination ${dst}: ${seen.get(dst)} and ${src}`);
+    seen.set(dst, src);
   }
 }
 console.log(`copied ${FILES.length} files`);

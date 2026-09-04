@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON</title>
-<link rel="stylesheet" href="/demo/shell/shell.css">
+<link rel="stylesheet" href="/shell/shell.css">
 <link rel="icon" href="/favicon.ico">
 
 <div class="d-head">
@@ -16,17 +16,17 @@
 <ol class="d-acts" id="rows"></ol>
 
 <script type="module">
-  import { DEMOS } from '/demo/manifest.mjs';
+  import { DEMOS } from '/manifest.mjs';
   function rowHTML(d) {
-  const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
+  const href = d.built ? `/${d.n}-${d.name}/` : (d.page || null);
   const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
-  const why = !href && d.why ? `<span class="d-why">${d.why}</span>` : '';
+  const why = '';
   const open = href ? `<a href="${href}">` : '<a>';
   return `<li class="d-row${href ? '' : ' todo'}">${open}`
     + `<span class="n">${d.n}</span>`
     + `<span class="nm">${d.name}</span>`
     + `<span class="d-one">${d.one || ''}</span>`
-    + `<span class="d-meta">${tags}${why}</span>`
+    + `<span class="d-meta">${tags}</span>`
     + '</a></li>';
 }
   document.getElementById('rows').innerHTML = DEMOS.map(rowHTML).join('');

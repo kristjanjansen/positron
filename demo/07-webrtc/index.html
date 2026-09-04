@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
+  .hold { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
+  .hold[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { whep, holdPublisher, waitForWhip } from '/shell/live.mjs';
+
+  const d = mount({
+    n: '07',
+    name: 'webrtc',
+    what: 'The same live input over WHEP instead of HLS. Same burned-in clock, so the two are comparable.',
+    readout: { rtt: 'ms', jitter: 'ms', fps: '', state: '' },
+    controls: [
+      { id: 'go', label: 'Start the stream and play', primary: true },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  const badge = el('span', 'hold', 'publisher: idle');
+  badge.dataset.on = '0';
+  d.head.append(badge);
+
+  const video = el('video', '', null, { playsinline: '', muted: '', autoplay: '', controls: '' });
+  video.muted = true;
+  d.el.append(video);
+
+  let pc = null, ws = null, started = 0;
+
+  // A WHEP client is small: offer recvonly, POST the SDP, take the answer.
+  async function whepPlay(url) {
+    pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    pc.ontrack = (e) => { if (video.srcObject !== e.streams[0]) video.srcObject = e.streams[0]; };
+    pc.onconnectionstatechange = () => d.log(`pc ${pc.connectionState}`);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    // wait for ICE gathering so the offer is complete (no trickle to WHEP)
+    if (pc.iceGatheringState !== 'complete') {
+      await new Promise((res) => {
+        const t = setTimeout(res, 3000);
+        pc.addEventListener('icegatheringstatechange', () => {
+          if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
+        });
+      });
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/sdp' },
+      body: pc.localDescription.sdp,
+    });
+    if (!res.ok) throw new Error(`WHEP ${res.status}`);
+    const answer = await res.text();
+    await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+    return res.headers.get('location');
+  }
+
+  d.on('go', async () => {
+    if (pc) return;
+    ws = holdPublisher((s) => {
+      badge.dataset.on = s.held ? '1' : '0';
+      badge.textContent = s.held ? `publisher: held${s.viewers ? ` (${s.viewers})` : ''}` : 'publisher: idle';
+    });
+    d.log('holding the publisher open');
+
+    // Wait for the WHIP LEG, not the HLS manifest — they are different inputs.
+    const w = await waitForWhip({
+      onTick: ({ waitedMs, err }) => d.log(`whip leg not up at ${(waitedMs / 1000).toFixed(0)}s${err ? ` (${err})` : ''}`),
+    });
+    if (!w.ok) { d.log(w.aborted ? 'page left' : 'whip leg never came up', 'bad'); return; }
+    d.log(`whip leg publishing after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
+
+    // ffmpeg reaching DTLS state=10 is not the same as Cloudflare being ready
+    // to answer a WHEP offer, so a 409 here is "not yet" rather than "no".
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        started = performance.now();
+        await whepPlay(whep());
+        d.log(`WHEP negotiated in ${Math.round(performance.now() - started)} ms`, 'hi');
+        await video.play().catch((e) => d.log(`play refused: ${e.name}`, 'bad'));
+        return;
+      } catch (e) {
+        try { pc?.close(); } catch { /* fine */ }
+        pc = null;
+        d.log(`whep attempt ${attempt}: ${e.message}`, 'bad');
+        if (attempt === 6) { d.fail(e); return; }
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+  });
+
+  setInterval(async () => {
+    if (!pc) return;
+    d.set('state', pc.connectionState, pc.connectionState === 'connected' ? 'ok' : 'bad');
+    const stats = await pc.getStats().catch(() => null);
+    if (!stats) return;
+    for (const s of stats.values()) {
+      if (s.type === 'inbound-rtp' && s.kind === 'video') {
+        if (Number.isFinite(s.framesPerSecond)) d.set('fps', s.framesPerSecond);
+        if (Number.isFinite(s.jitter)) d.set('jitter', s.jitter * 1000);
+      }
+      if (s.type === 'candidate-pair' && s.state === 'succeeded' && Number.isFinite(s.currentRoundTripTime)) {
+        d.set('rtt', s.currentRoundTripTime * 1000);
+      }
+    }
+  }, 1000);
+
+  d.on('check', () => {
+    d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
+    d.assert('peer connection created', !!pc);
+    if (pc) {
+      d.assert('peer connection connected', pc.connectionState === 'connected', pc.connectionState);
+      d.assert('a track arrived', !!video.srcObject, video.srcObject ? 'yes' : 'no');
+      d.assert('video is advancing', video.currentTime > 0, `${video.currentTime.toFixed(1)}s`);
+    }
+  });
+
+  d.log('WHEP: one POST of an SDP offer, one answer back');
+  d.ready();
+</script>
+</html>

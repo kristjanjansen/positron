@@ -36,14 +36,16 @@ export const DEMOS = [
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
 
-  { n: '06', name: 'llhls', act: 1, built: false,
-    one: 'the tuned low-latency HLS player',
-    tags: ['LL-HLS', 'Stream'],
-    why: 'live input provisioned, nothing publishing to it' },
-  { n: '07', name: 'webrtc', act: 1, built: false,
-    one: 'WHIP/WHEP glass-to-glass',
-    tags: ['WebRTC', 'Stream'],
-    why: 'same live input, no publisher' },
+  { n: '06', name: 'llhls', act: 1, built: true,
+    one: 'the tuned v6 player on a live input this page starts and stops',
+    tags: ['LL-HLS', 'Stream', 'container'],
+    // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
+    // harness asserts against a 204 and calls a working demo broken
+    settleMs: 75000 },
+  { n: '07', name: 'webrtc', act: 1, built: true,
+    one: 'the same live input over WHEP; same burned-in clock as 06',
+    tags: ['WebRTC', 'WHEP', 'Stream'],
+    settleMs: 75000 },
   { n: '08', name: 'moq', act: 1, built: false,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport'],
@@ -91,7 +93,8 @@ export const DEMOS = [
 
   { n: '19', name: 'flipper', act: 5, built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
-    tags: ['HLS', 'icecast', 'DVR'] },
+    tags: ['HLS', 'icecast', 'DVR'],
+    settleMs: 14000 },
   { n: '20', name: 'kurenniemi', act: 5, built: false, page: '/proto/kurenniemi/',
     one: "Erkki Kurenniemi's corpus, media from archive.org",
     tags: ['timeline', 'not shelled'] },
@@ -111,4 +114,4 @@ export const DEMOS = [
 export const byN = (n) => DEMOS.find((d) => d.n === n);
 
 /** the link target for a row, or null when it has none */
-export const targetOf = (d) => (d.built ? `/demo/${d.n}-${d.name}/` : d.page || null);
+export const targetOf = (d) => (d.built ? `/${d.n}-${d.name}/` : d.page || null);

@@ -18,6 +18,12 @@ import { spawn } from 'node:child_process';
 const PORT = 8080;
 const BOOT = Date.now();
 
+// TWO INDEPENDENT LEGS, because Cloudflare requires it. Its docs are explicit:
+// "WHIP and WHEP must be used together: we do not yet support inputs using
+// RTMP/SRT to be played using WHEP". One input cannot serve both 06 (LL-HLS off
+// RTMPS) and 07 (WHEP), so each leg publishes the SAME burned-in test pattern to
+// its OWN input — which is exactly what makes 09 able to compare them.
+const legs = { rtmps: null, whip: null };
 let ff = null;
 let startedAt = 0;
 let lastError = null;
@@ -54,6 +60,69 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
     '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
     '-f', 'flv', `rtmps://live.cloudflare.com:443/live/${key}`,
   ];
+}
+
+/**
+ * WHIP args as MEASURED in rig/whep/WHIP-FFMPEG-NOTES.md, not invented:
+ *  · libopus, not aac — the whip muxer defaults h264+opus
+ *  · baseline/3.1 offers profile-level-id=42001f, which Cloudflare ACCEPTS and
+ *    echoes verbatim; the 42e01f in the docs is a documentation value, not a
+ *    negotiation gate (run 1 of those notes proved it first try)
+ *  · -bf 0 for the same reason as the RTMPS leg
+ */
+function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
+  const gop = fps * 2;
+  const epoch = (Date.now() / 1000).toFixed(6);
+  const draw = [
+    'drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+    `text='%{pts\\:flt\\:${epoch}}'`,
+    'x=40', 'y=40', 'fontsize=56', 'fontcolor=black',
+    'box=1', 'boxcolor=white', 'boxborderw=14',
+  ].join(':');
+  return [
+    '-hide_banner', '-loglevel', 'warning',
+    '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
+    '-re', '-f', 'lavfi', '-i', 'sine=frequency=440',
+    '-vf', draw,
+    '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1',
+    '-bf', '0', '-pix_fmt', 'yuv420p', '-g', String(gop), '-b:v', bitrate,
+    '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
+    '-f', 'whip', url,
+  ];
+}
+
+function startLeg(name, argv) {
+  if (legs[name]) return { already: true };
+  const p = spawn('ffmpeg', argv, { stdio: ['ignore', 'ignore', 'pipe'] });
+  const st = { proc: p, startedAt: Date.now(), stderr: '', error: null, stopping: false };
+  legs[name] = st;
+  p.stderr.on('data', (b) => { st.stderr = (st.stderr + b.toString()).slice(-1200); });
+  p.on('exit', (code, sig) => {
+    const clean = st.stopping || code === 0 || code === null || sig === 'SIGTERM' || code === 255;
+    if (!clean) st.error = `exit ${code}${sig ? ' ' + sig : ''}`;
+    const keep = st.error;
+    legs[name] = keep ? { ...st, proc: null, dead: true } : null;
+  });
+  return { started: true };
+}
+
+function stopLeg(name) {
+  const st = legs[name];
+  if (!st || !st.proc) { legs[name] = null; return { already: true }; }
+  st.stopping = true;
+  try { st.proc.kill('SIGTERM'); } catch { /* gone */ }
+  return { stopped: true };
+}
+
+function legState(name) {
+  const st = legs[name];
+  if (!st) return { publishing: false, uptimeS: 0, error: null };
+  return {
+    publishing: !!st.proc,
+    uptimeS: st.proc ? Math.round((Date.now() - st.startedAt) / 1000) : 0,
+    error: st.error,
+    stderrTail: st.stderr.slice(-300) || null,
+  };
 }
 
 function start(opts) {
@@ -104,6 +173,7 @@ createServer(async (req, res) => {
       pid: ff ? ff.pid : null,
       lastError,
       stderrTail: lastStderr.slice(-400) || null,
+      whip: legState('whip'),
     });
   }
 
@@ -116,7 +186,21 @@ createServer(async (req, res) => {
     return json(res, start(opts));
   }
 
-  if (url.pathname === '/stop' && req.method === 'POST') return json(res, stop());
+  if (url.pathname === '/stop' && req.method === 'POST') {
+    stopLeg('whip');
+    return json(res, stop());
+  }
+
+  if (url.pathname === '/start-whip' && req.method === 'POST') {
+    let body = '';
+    for await (const ch of req) body += ch;
+    let o = {};
+    try { o = JSON.parse(body || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
+    if (!o.url) return json(res, { error: 'url required' }, 400);
+    return json(res, startLeg('whip', whipArgs(o)));
+  }
+
+  if (url.pathname === '/stop-whip' && req.method === 'POST') return json(res, stopLeg('whip'));
 
   return json(res, { error: 'use /start /stop /status' }, 404);
 }).listen(PORT, () => console.log(`pub container on :${PORT}`));

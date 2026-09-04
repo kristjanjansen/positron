@@ -15,7 +15,7 @@ export function mount({
   what = '',
   readout = {},          // key -> unit string ('ms', 's', '' …)
   controls = [],         // [{id, label, primary?}]
-  index = '/demo/',
+  index = '/',
 } = {}) {
   document.title = `POSITRON · ${n} ${name}`;
   favicon();
