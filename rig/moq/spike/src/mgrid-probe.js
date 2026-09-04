@@ -37,7 +37,7 @@ setInterval(() => {
 }, 2000);
 
 const wall = () => Math.round(performance.timeOrigin + performance.now());
-const short = (ns) => ns.replace("elektron-mgrid-", "");
+const short = (ns) => ns.replace("positron-mgrid-", "");
 
 const grid = document.getElementById("grid");
 const report = (window.__report = { pubs: 0, live: 0, decoded: 0, decodeErrors: 0, races: 0, closes: 0, silents: 0 });

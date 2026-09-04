@@ -157,7 +157,7 @@ underruns 0.9 % at a 60 ms cushion). 📄 Safari/iOS ship WebCodecs AudioDecoder
 the cross-browser audio codec**, the mirror of H.264 for video). ✅ Trap for implementers: browsers
 REGENERATE AudioDecoder output timestamps (join-skip becomes a permanent phantom offset) — sync on
 encoded-chunk/container timestamps via FIFO map, never `AudioData.timestamp`. The deployed test
-page now probes AudioDecoder on every load and plays audio from `?namespace=elektron-audio-test`
+page now probes AudioDecoder on every load and plays audio from `?namespace=positron-audio-test`
 (iPhone verdict = one page visit). **The MoQ fast tier now has: video ✅, 4K ✅, Safari ✅,
 iOS-on-4G ✅, audio ✅ — remaining gates: draft-16 relay provisioning (USER), ~~catalog shim~~,
 UDP-hostile-network fallback.**
@@ -266,7 +266,7 @@ adoption (≥26.4) and UDP-hostile wifi.
 **✅ SAFARI VERIFIED (2026-08-26, RUNBOOK §8): desktop Safari 26.6.2 PLAYS live MoQ video** —
 connected 131 ms, negotiated moq-transport-14, H.264 decode, 2309 frames / 0 errors over 4 min
 (background-tab-throttled to burst delivery; foreground + iPhone verdicts await the user at
-https://elektron-moq-safari.kristjan-jansen.workers.dev — self-reporting page, beacons via
+https://moq.positron.studio — self-reporting page, beacons via
 `wrangler tail elektron-moq-safari`). KEY TRAP found+fixed: `@moq/net` 0.3.3 **UA-blocks all
 Safari** (`safari:"<0"`, citing WebKit bug 319818) — bypass by passing a self-built `WebTransport`
 via `connect(url,{transport})`; no flow-control stall observed in 4 min. H.264 `avc1.42001f`
@@ -561,7 +561,7 @@ lifecycle is now measured end to end.**
 
 **Phase 2 — ✅ CORE DONE (2026-08-26 session 5): production signaling + tiered grid, deployed and
 validated end-to-end.**
-- **`elektron-rtc` Worker live** at elektron-rtc.kristjan-jansen.workers.dev (workers/rtc/, protocol
+- **`elektron-rtc` Worker live** at rtc.positron.studio (workers/rtc/, protocol
   in DEPLOYED.md): RtcRoom DO (hibernating WS, roster, instant `left`), /cf/ SFU proxy (secret
   server-side; pull API p50 257–281 ms — FASTER than the local python proxy's 413), snapshot-tile
   store (colo cache 28 ms + DO fallback), ROOM_TOKEN auth. Signaling measured: join→roster 33 ms,

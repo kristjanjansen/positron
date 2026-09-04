@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron selfrec participant</title>
+<title>positron selfrec participant</title>
 <style>
 html,body{margin:0;padding:0;background:#000;overflow:hidden}
 #stage{display:block;width:1280px;height:720px}
@@ -38,8 +38,8 @@ const PART = q.get("participant") || "p1";
 const DURATION_S = parseInt(q.get("duration") || "90", 10);
 const TIMESLICE = parseInt(q.get("timeslice") || "2000", 10);
 const TOKEN = q.get("token") || "";
-const BASE = q.get("base") || "https://elektron-selfrec.kristjan-jansen.workers.dev";
-const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const BASE = q.get("base") || "https://selfrec.positron.studio";
+const PUB = q.get("pub") || "https://archive.positron.studio";
 const COLLECTOR = q.get("collector") || (location.origin + "/beacon");
 const KBPS = parseInt(q.get("kbps") || "1200", 10);
 // SYNC leg params (all optional — page still runs standalone as in PROTO A):
@@ -48,7 +48,7 @@ const KBPS = parseInt(q.get("kbps") || "1200", 10);
 //   mime    — preferred MediaRecorder mime (falls back down PROBE_MIMES)
 const ROOM = q.get("room") || "";
 const ROOM_TOKEN = q.get("roomtoken") || "";
-const RTCBASE = q.get("rtcbase") || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const RTCBASE = q.get("rtcbase") || "https://rtc.positron.studio";
 const MIME_PREF = q.get("mime") || "";
 
 // row geometry — shared contract with proto/replay (do not change one side)

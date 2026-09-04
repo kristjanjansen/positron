@@ -7,7 +7,7 @@
      becomes a 340 px one. `viewport-fit=cover` lets the safe-area insets below
      do their job on a notched device. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>elektron VOD replay + cues</title>
+<title>positron VOD replay + cues</title>
 <style>
 :root{--bg:#0d0f12;--panel:#14171c;--edge:#242a33;--ink:#cfd6df;--dim:#6b7683;
       --vidmax:854px}
@@ -62,7 +62,7 @@ h1{font-size:14px;margin:0 0 10px}
 </style>
 </head>
 <body>
-<h1>elektron · synced VOD replay with cues</h1>
+<h1>positron · synced VOD replay with cues</h1>
 <div id="wrap">
   <div id="vidbox">
     <!-- playsinline is MANDATORY on iOS: without it the video is torn out into
@@ -129,7 +129,7 @@ import { mediaMaster } from "/timeline/media-master.mjs";
 
 const q = new URLSearchParams(location.search);
 const SRC        = q.get("src");
-const REMOTE     = q.get("remote") || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE     = q.get("remote") || "https://rtc.positron.studio";
 const ROOM       = q.get("room") || "replay-test";
 const TOKEN      = q.get("token") || "";
 const T0_PARAM   = q.get("t0") ? parseFloat(q.get("t0")) : null;   // stamp anchor

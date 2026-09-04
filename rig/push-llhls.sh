@@ -3,7 +3,7 @@
 # Cloudflare LL-HLS requires: H.264, CBR, fixed GOP 2-4s, B-frames = 0.
 set -e
 FF=${FF:-/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg}
-SCRATCH=${SCRATCH:-/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad}
+SCRATCH=${SCRATCH:-/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad}
 mkdir -p "$SCRATCH"
 KEY=$(cat /tmp/li_key.txt)
 FONT=/System/Library/Fonts/Supplemental/Courier\ New\ Bold.ttf

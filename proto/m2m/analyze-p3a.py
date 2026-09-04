@@ -12,7 +12,7 @@ import statistics as st
 from collections import defaultdict
 
 PATH = sys.argv[1] if len(sys.argv) > 1 else \
-    "~/personal/elektron/results/m2m-p3a-control.jsonl"
+    "~/personal/positron/results/m2m-p3a-control.jsonl"
 
 rows = []
 with open(PATH) as f:

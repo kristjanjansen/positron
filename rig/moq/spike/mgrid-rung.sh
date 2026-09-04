@@ -8,7 +8,7 @@
 set -e
 N=$1; RUNG=$2; PFX=$3; K=${4:-5}
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-cd ~/personal/elektron/rig/moq/spike
+cd ~/personal/positron/rig/moq/spike
 
 pkill -9 -f 'moq-mgrid-.*-udd' 2>/dev/null || true
 sleep 1

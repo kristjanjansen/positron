@@ -1,11 +1,11 @@
 // SAFARI MoQ TEST publisher: canvas (burned-ms binary row + human clock) -> WebCodecs
 // H.264 (annexb, baseline) -> hang legacy container -> @moq/net -> CF draft-14 relay.
-// Long-lived: runs forever in headless Chrome; namespace elektron-safari-test.
+// Long-lived: runs forever in headless Chrome; namespace positron-safari-test.
 import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("ns") ?? "elektron-safari-test";
+const NS = params.get("ns") ?? "positron-safari-test";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 // Baseline profile level 3.1 (720p30-capable) — the safe cross-browser H.264 flavor.
 const CODEC = params.get("codec") ?? "avc1.42001f";
@@ -47,7 +47,7 @@ function draw() {
 	for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
 	ctx.font = "bold 72px monospace";
 	ctx.fillStyle = "#ffd400";
-	ctx.fillText("ELEKTRON MOQ TEST", 60, 300);
+	ctx.fillText("POSITRON MOQ TEST", 60, 300);
 	ctx.fillStyle = "#fff";
 	ctx.font = "bold 96px monospace";
 	ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

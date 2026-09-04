@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron composite</title>
+<title>positron composite</title>
 <style>
 *{box-sizing:border-box}
 body{background:#000;color:#cfd6df;font:12px/1.4 monospace;margin:0;padding:0}
@@ -22,7 +22,7 @@ body{background:#000;color:#cfd6df;font:12px/1.4 monospace;margin:0;padding:0}
 <script>
 "use strict";
 // ============================================================================
-// elektron COMPOSITE PARTICIPANT (phase 3b) — the OBS replacement.
+// positron COMPOSITE PARTICIPANT (phase 3b) — the OBS replacement.
 // A silent subscriber joins the room, pulls ALL featured+live SFU tracks +
 // wall snapshots, and draws everything onto ONE 1280x720 canvas at 30 fps:
 //     [ featured "1" 640x360 UNSCALED ][ featured "2" 640x360 UNSCALED ]
@@ -571,7 +571,7 @@ function drawClockRow(ms) {
   cctx.fillText("COMPOSITE " + MY_ID + "  " + new Date(ms).toISOString().slice(11, 23) +
                 "  f" + drawCounter, 32, 700);
   cctx.font = "12px monospace";
-  cctx.fillText("elektron p3b · room " + ROOM, 1050, 700);
+  cctx.fillText("positron p3b · room " + ROOM, 1050, 700);
 }
 
 function slotLabel(name, x, y, w) {

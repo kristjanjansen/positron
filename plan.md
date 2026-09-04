@@ -619,7 +619,7 @@ Cloudflare strips all in-band metadata, so messages ride a side channel aligned 
   `attachSubtitleTrack()` (native VTTCue subtitles, CC button on iOS) and `attachMetadataTrack()`
   (kind=metadata, mode=hidden — invisible frame-accurate events).
 - `workers/cues/` — Durable Object relay, deployed ✅ at
-  `https://elektron-cues.kristjan-jansen.workers.dev` (`/room/<name>/ws`). WebSocket hibernation,
+  `https://cues.positron.studio` (`/room/<name>/ws`). WebSocket hibernation,
   500-cue backlog for late joiners, ping/pong probes. No domain needed; free plan suffices.
 - ✅ **Measured relay latency** (`rig/do-lag.mjs`, one-clock method): one-way publisher→DO→viewer
   **p50 27 ms / p95 42 ms** after moving broadcast before storage.put (was 62 ms when persistence
@@ -673,7 +673,7 @@ record locally with a NATIVE T₀ → segmented upload to R2 → replay from R2.
   engine band. Both runs comfortably under the 150 ms target.
 - **Disk O(1)**: high-water 2 segments resident regardless of show length. Upload lag p50 5.5 s
   (near-live archive). Cost ~**25× cheaper than Stream storage** + zero egress. Proof show kept:
-  pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8 (t0=1787745030511).
+  archive.positron.studio/shows/archive-test/index.m3u8 (t0=1787745030511).
 - Verification freebie: **R2's ETag == plain MD5** for single-part puts — integrity check for free.
 - Wrangler trap SHARPENED: wrangler auto-loads `.env` from its CWD — env-unsetting is not enough;
   run from a directory without .env (scripts pin cwd). Stream recording demoted to backup-when-
@@ -702,8 +702,8 @@ channel with no extra tooling.
 
 ## 13. OBS integration (added later this session)
 
-OBS 32.2 installed (`brew install --cask obs`) with a dedicated profile **`elektron-lowlatency`**
-(`~/Library/Application Support/obs-studio/basic/profiles/elektron-lowlatency/`) — default profile
+OBS 32.2 installed (`brew install --cask obs`) with a dedicated profile **`positron-lowlatency`**
+(`~/Library/Application Support/obs-studio/basic/profiles/positron-lowlatency/`) — default profile
 untouched. Pre-set: x264 **Tune = zerolatency**, **keyframe interval 2 s**, CBR 3000k, 720p30,
 Cloudflare RTMPS server + stream key in `service.json`.
 
@@ -739,11 +739,11 @@ survive within `timeoutSeconds`). Test: stream from OBS, run the chaos/kill sequ
 |---|---|
 | `src/low-latency-player.js` | chaos-tested v5: 5/5 recoveries, median 15.4 s, at-target latency, zero crashes |
 | `src/timed-messages.js` | PDT-synced cues + subtitles + hidden metadata + transport telemetry; e2e verified 65 ms p50 |
-| `workers/cues/` | deployed: elektron-cues.kristjan-jansen.workers.dev; one-way p50 27 ms |
+| `workers/cues/` | deployed: cues.positron.studio; one-way p50 27 ms |
 | `rig/` | latency, resilience (chaos), DO-lag, kill-mode, cue-sync, handover harnesses |
 | `rig/relay/` | gapless slate-failover PoC: socket + switching proven; TS-splice defect documented |
 | `rig/overlay-bridge.mjs` | DO room → text file → drawtext burn-in bridge |
-| OBS + `elektron-lowlatency` profile | installed, pre-configured, unlaunched |
+| OBS + `positron-lowlatency` profile | installed, pre-configured, unlaunched |
 | Machine changes | ffmpeg 7.1.1→9.0.1 + ffmpeg@7 + mediamtx + OBS installed; chrony recommended, not installed; clock stepped to ~+1 ms via sntp |
 | Credentials | `.env` (chmod 600, gitignored); ⚠️ API token still needs rotation (pasted in chat) |
 | Cloudflare resources | live inputs `4c93bc4b…`, `5cfa5053…` (+ pre-existing "Maria"); Calls app "flabbergaster"; cues Worker + DO |
@@ -780,7 +780,7 @@ Client (`timed-messages.js`) now sends bare-string pings with local t0 (one in f
 
 ### OBS launch saga — findings
 - **OBS was already on this machine** (logs from Feb 2025) — the cask was a re-install over live config.
-  The new `elektron-lowlatency` profile is additive; global.ini/user.ini untouched.
+  The new `positron-lowlatency` profile is additive; global.ini/user.ini untouched.
   ⚠️ `plugin_config/obs-websocket/config.json` was overwritten (now: enabled, localhost, no auth) —
   if a password was configured there before, it needs restoring.
 - **Actual launch blocker (user-identified): ThreatLocker** — corporate application allowlisting kills

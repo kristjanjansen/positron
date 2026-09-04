@@ -2,7 +2,7 @@
 // Co-tenancy: ONE page runs K publisher pipelines (?ids=p1,p2,p3,p4,p5) — each
 // pipeline has its OWN Connection (own WebTransport/QUIC session, so relay
 // fan-in semantics = one session per publisher), own namespace
-// elektron-mgrid-p{N}, own 320x180@15 canvas (id + burned-ms row), H.264
+// positron-mgrid-p{N}, own 320x180@15 canvas (id + burned-ms row), H.264
 // baseline annexb ~300 kbps, catalog republish every 2 s (§7.1 trap 1).
 // Self-registers each ns into the local roster (draft-14 has no
 // SUBSCRIBE_NAMESPACE -> discovery shim). headless=new rejects multiple URLs
@@ -62,7 +62,7 @@ function drawFrame(ctx, id, hue, frameCounter) {
 
 async function runPublisher(id) {
 	const log = mklog(id);
-	const NS = `elektron-mgrid-${id}`;
+	const NS = `positron-mgrid-${id}`;
 	const cv = document.createElement("canvas");
 	cv.width = W; cv.height = H;
 	document.getElementById("grid").appendChild(cv);

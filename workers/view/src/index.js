@@ -21,7 +21,7 @@
 // honest statement of what it does and does not guarantee.
 
 const UPSTREAM = 'https://arhiiv.err.ee';
-const UA = 'elektron-view/1.0 (+https://elektron-view.kristjan-jansen.workers.dev; archive viewer prototype; contact kristjan.jansen@gmail.com)';
+const UA = 'elektron-view/1.0 (+https://positron.studio; archive viewer prototype; contact kristjan.jansen@gmail.com)';
 
 // The archive sends 2-day cache headers on its own responses. We honour them
 // rather than inventing our own TTL.
@@ -72,7 +72,7 @@ function memoPut(k, body) {
 // ── the shared read path: memo → committed asset → DO cache → gated upstream ─
 async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin }) {
   const hit = memoGet(cacheKey);
-  if (hit) return json(hit, 200, { 'x-elektron-cache': 'memo', 'x-elektron-upstream': '0' });
+  if (hit) return json(hit, 200, { 'x-positron-cache': 'memo', 'x-positron-upstream': '0' });
 
   // committed cache: shipped in the repo, exploded into public/cache/ at build
   // time. Permanent, global, free, and the reason a normal visit costs ERR
@@ -81,7 +81,7 @@ async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin 
   if (asset.ok) {
     const body = await asset.text();
     memoPut(cacheKey, body);
-    return json(body, 200, { 'x-elektron-cache': 'committed', 'x-elektron-upstream': '0' });
+    return json(body, 200, { 'x-positron-cache': 'committed', 'x-positron-upstream': '0' });
   }
 
   const gate = env.GATE.get(env.GATE.idFromName('err'));
@@ -92,7 +92,7 @@ async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin 
   if (cached.status === 200) {
     const body = await cached.text();
     memoPut(cacheKey, body);
-    return json(body, 200, { 'x-elektron-cache': 'durable', 'x-elektron-upstream': '0' });
+    return json(body, 200, { 'x-positron-cache': 'durable', 'x-positron-upstream': '0' });
   }
 
   // miss → ask the global gate for a slot
@@ -102,7 +102,7 @@ async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin 
     return json(
       { error: 'upstream gated', reason: slot.reason, detail: slot.detail },
       503,
-      { 'retry-after': String(Math.ceil((slot.waitMs ?? 2000) / 1000)), 'x-elektron-cache': 'gated' },
+      { 'retry-after': String(Math.ceil((slot.waitMs ?? 2000) / 1000)), 'x-positron-cache': 'gated' },
     );
   }
   if (slot.waitMs > 0) await sleep(slot.waitMs);
@@ -126,9 +126,9 @@ async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin 
     );
   }
   return json(body, up.status, {
-    'x-elektron-cache': 'miss',
-    'x-elektron-upstream': '1',
-    'x-elektron-gate-wait-ms': String(slot.waitMs),
+    'x-positron-cache': 'miss',
+    'x-positron-upstream': '1',
+    'x-positron-gate-wait-ms': String(slot.waitMs),
     'x-upstream-ms': String(Date.now() - t0),
   });
 }

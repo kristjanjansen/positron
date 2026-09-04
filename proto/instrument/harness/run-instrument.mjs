@@ -25,7 +25,7 @@ import { CDP } from '../../jam/harness/cdp.mjs';     // reused verbatim, not cop
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
-const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
+const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 8899, DBG = 9241;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -144,7 +144,7 @@ async function main() {
   await sleep(800);
 
   // ---- 2. it appears in the public catalog, online ----
-  const cat = await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json();
+  const cat = await (await fetch('https://instrument.positron.studio/instruments')).json();
   const mine = cat.instruments.find((i) => i.id === INST);
   check('appears in public GET /instruments as online', mine && mine.online === true && mine.busy === false, mine && { online: mine.online, busy: mine.busy, name: mine.name });
 
@@ -158,7 +158,7 @@ async function main() {
   const ps0 = await cdpP.eval('window.player.state()');
   check('session accepted and media connected', ps0.pc === 'connected' && ps0.ch === 'open', { pc: ps0.pc, ch: ps0.ch, setupMs: ps0.setupMs });
 
-  const busy = (await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json())
+  const busy = (await (await fetch('https://instrument.positron.studio/instruments')).json())
     .instruments.find((i) => i.id === INST);
   check('registry now reports busy + who holds it', busy.busy === true && busy.player === 'alice', { busy: busy.busy, player: busy.player });
 
@@ -218,13 +218,13 @@ async function main() {
   const hEnd = await cdpH.eval('window.host.state()');
   check('all-notes-off fires when the session ends', hEnd.panics > panicsBefore, { before: panicsBefore, after: hEnd.panics });
   check('instrument returns to free in the registry',
-    !(await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json()).instruments.find((i) => i.id === INST).busy);
+    !(await (await fetch('https://instrument.positron.studio/instruments')).json()).instruments.find((i) => i.id === INST).busy);
 
   // ==========================================================================
   // 8b. SESSION STORAGE — the notes are durable, the audio is in R2, and both
   //     are deletable by either party.
   // ==========================================================================
-  const WK = 'https://elektron-instrument.kristjan-jansen.workers.dev';
+  const WK = 'https://instrument.positron.studio';
   const SID = await cdpP.eval('window.player.sid()');
   console.log('session id =', SID);
   // let the last flush + /end + the host's recorder finalize land
@@ -658,13 +658,13 @@ async function main() {
   // ---- 9. owner offline -> auto-offline via socket close ----
   await cdpH.eval('window.host.goOffline()');
   await sleep(1200);
-  const off = (await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json()).instruments.find((i) => i.id === INST);
+  const off = (await (await fetch('https://instrument.positron.studio/instruments')).json()).instruments.find((i) => i.id === INST);
   check('auto-offline on socket close', off.online === false, { online: off.online });
 
   // ---- 10. the owner can leave the catalog entirely ----
   await cdpH.eval('window.host.unlist()');
   await sleep(800);
-  const gone = (await (await fetch('https://elektron-instrument.kristjan-jansen.workers.dev/instruments')).json()).instruments;
+  const gone = (await (await fetch('https://instrument.positron.studio/instruments')).json()).instruments;
   check('unlist removes it from the public catalog', !gone.find((i) => i.id === INST), { remaining: gone.length });
 
   // ---- 11. console cleanliness (read AFTER everything, including storage) ----

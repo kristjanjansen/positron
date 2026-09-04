@@ -18,9 +18,9 @@ const execP = promisify(execFile);
 const now = () => performance.timeOrigin + performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const resultsDir = fileURLToPath(new URL("../../results/", import.meta.url));
-const scratch = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
+const scratch = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const PLAYER = "https://elektron-moq-safari.kristjan-jansen.workers.dev/";
+const PLAYER = "https://moq.positron.studio/";
 
 // tokens live in .env (chmod 600, gitignored) — read, never print
 function envToken(name) {

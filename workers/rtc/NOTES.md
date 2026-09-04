@@ -14,7 +14,7 @@ Spec: plan-m2m.md §3; template: workers/cues (deployed, untouched).
   `wrangler.jsonc` (DO binding ROOMS→RtcRoom, migration v1 new_sqlite_classes, app id as var).
   ROOM_TOKEN generated (openssl rand -hex 16) and appended to .env (confirmed gitignored).
 
-- **2026-08-26 07:18** — **DEPLOYED**: https://elektron-rtc.kristjan-jansen.workers.dev
+- **2026-08-26 07:18** — **DEPLOYED**: https://rtc.positron.studio
   (version b8842387). DEPLOYED.md written immediately for the polling UI agent.
   **Auth gotcha found**: `CLOUDFLARE_API_TOKEN=$CF_API_TOKEN` fails (code 10000 — that token has
   no Workers-write scope; it's the Stream/API token), AND merely `source`-ing .env breaks wrangler

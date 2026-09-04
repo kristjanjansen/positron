@@ -99,7 +99,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             "Authorization": "Bearer " + APP_SECRET,
             "Content-Type": "application/json",
             # Cloudflare's edge 1010-blocks the default Python-urllib UA
-            "User-Agent": "elektron-m2m-rig/1.0 (curl-compatible)",
+            "User-Agent": "positron-m2m-rig/1.0 (curl-compatible)",
         })
         t0 = time.time()
         try:

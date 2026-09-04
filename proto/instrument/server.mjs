@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const JAM = join(ROOT, '..', 'jam');
 const PORT = +(process.env.PORT || 8899);
-const WORKER = process.env.WORKER || 'https://elektron-instrument.kristjan-jansen.workers.dev';
+const WORKER = process.env.WORKER || 'https://instrument.positron.studio';
 
 const anchorUs = Date.now() * 1000 - Number(process.hrtime.bigint() / 1000n);
 const nowUs = () => anchorUs + Number(process.hrtime.bigint() / 1000n);

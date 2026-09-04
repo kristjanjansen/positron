@@ -28,7 +28,7 @@ Stream live inputs). Namespaces: fresh obscloud-<ts> per StartStream (§13.4).
 
 ## Checkpoint 1 — PART 1 VERDICT: OUTCOME A. QUIC/MoQ egress from CF Containers WORKS.
 The contradiction is resolved by direct measurement (13:55–13:56 UTC):
-- App `elektron-obscloud-quic` (quic-test/, instance "basic", image = node:22-slim
+- App `positron-obscloud-quic` (quic-test/, instance "basic", image = node:22-slim
   + amd64 moq-clock-ietf 8.5 MB stripped, built from rig/moq/moq-rs-draft14 src).
   Deploy → /health 200 in ~3 s wall (fra20, 1 visible EPYC core, 1219 MB).
 - **/quic self-test (pub + sub both INSIDE the container, d14 public relay):
@@ -81,7 +81,7 @@ creatable via obs-websocket (local rig finding). Stream slot stays obs-moq.
   rtmps:// URLs; ffmpeg output uses librtmp/TLS).
 
 ## Checkpoint 3 — PART 2: OBS RAN IN A CF CONTAINER AND PUBLISHED MoQ. Measured.
-App `elektron-obscloud` (obs-worker/ + obs/Dockerfile = obsdock 1.08 GB image +
+App `positron-obscloud` (obs-worker/ + obs/Dockerfile = obsdock 1.08 GB image +
 plugin/profile/pages layers ≈ 1.25 GB), **standard-4** (4 vCPU/12 GiB, accepted
 by wrangler 4.75). Worker routes /obsws → container:4455 (WS passthrough via
 containerFetch — control.mjs drives cloud OBS UNCHANGED via
@@ -141,16 +141,16 @@ no log endpoint existed yet to pin it; same fix cured everything observed.)
   total (one streaming). Raw ≈ $0.04 (9.4 k GiB-s mem + ~0.7 k vCPU-s + disk);
   deep inside included allotments → **$0.00 beyond the $5 Workers Paid base**.
   No egress of note (image push is ingress; d14 relay egress isn't ours).
-- Deleted + verified: container apps `elektron-obscloud-obscloud`
-  (a03521cb) and `elektron-obscloud-quic-quictest` (a03e146e) →
+- Deleted + verified: container apps `positron-obscloud-obscloud`
+  (a03521cb) and `positron-obscloud-quic-quictest` (a03e146e) →
   `wrangler containers list` = []; all 4 registry image tags → `images list`
-  empty; Workers `elektron-obscloud` + `elektron-obscloud-quic` →
+  empty; Workers `positron-obscloud` + `positron-obscloud-quic` →
   workers.dev URLs 404. No other CF resources were created (no Stream inputs,
   no R2/KV/DO beyond the apps' own wrappers, now gone).
 - Local: mediamtx + collector killed; ports 1935/4455/8554/8890/8891 free;
   docker images obscloud/obsdock-obs/quicbuild + registry tags + alpine
   removed (rebuild paths documented below); pre-existing images (moq-dev,
-  rust, elektron-cnt-test-repacktest) untouched; volumes moq-target14/16 kept.
+  rust, positron-cnt-test-repacktest) untouched; volumes moq-target14/16 kept.
 - Kept (this dir): NOTES.md, quic-test/ (Dockerfile, server.mjs, worker.mjs,
   wrangler.jsonc, moq-clock-ietf amd64 binary 8.5 MB — the redeployable
   probe), obs/ (Dockerfile, start-cloud.sh, serve-cloud.mjs, pages.conf,

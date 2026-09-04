@@ -125,7 +125,7 @@ GET vod.err.ee/file/etv2saated/818864.mp4  Range 0-2047 → 206 of 414863579, AC
 10 s TS segments, `#EXT-X-PLAYLIST-TYPE:VOD`, absolute segment URLs, single
 64 kbps AAC variant for archive audio. No PDT / no internal timecode in
 manifests — **sync anchor = airdate + elapsed**, per-item offset from t=0
-(elektron's native-T₀ discipline applies unchanged). openresty origin, 2-day
+(positron's native-T₀ discipline applies unchanged). openresty origin, 2-day
 cache headers, no cookies on vod.err.ee (arhiiv.err.ee API sits behind
 Cloudflare, cookies harmless). Images (arhiiv-images.err.ee, s.err.ee): plain
 200, ⚠️ **no ACAO header** — fine in `<img>`, taints canvas.
@@ -159,7 +159,7 @@ restriction seen on the API paths ⚠️); embedding/hotlinking of streams; what
 "avalik kasutus" means for a non-commercial art platform that *streams from
 their origin rather than copying*. The load-bearing distinction in their text
 is copies-vs-links: sharing/linking/viewing is blessed, redistribution of
-copies is not. **A public elektron/Radio Tallinn show should get a license
+copies is not. **A public positron/Radio Tallinn show should get a license
 conversation anyway** — provenance discipline (§−1) wants the rights status
 explicit per span, and ERR's own channel for that exists and answers in a week.
 

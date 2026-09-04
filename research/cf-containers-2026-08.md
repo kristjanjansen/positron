@@ -177,8 +177,8 @@ vs 400 k incl).
 
 ## Cleanup (verified)
 
-- Deleted: container app `elektron-cnt-test-repacktest` (a0340f9f), Worker
-  `elektron-cnt-test`, both registry image tags (`:047ffc6d`, `:09de6025`), local docker
+- Deleted: container app `positron-cnt-test-repacktest` (a0340f9f), Worker
+  `positron-cnt-test`, both registry image tags (`:047ffc6d`, `:09de6025`), local docker
   image + smoke container. Verified: `wrangler containers list` → `[]`, `images list` →
   empty, workers.dev URL → 404. R2 untouched (job wrote nothing back). Session cost:
   ~25 min standard-1 + 2 transcodes ≈ deep inside included allotments → $0 beyond the $5

@@ -15292,7 +15292,7 @@ var Producer4 = class {
 
 // src/safari-play.js
 var params = new URLSearchParams(location.search);
-var NS = params.get("namespace") ?? params.get("ns") ?? "elektron-safari-test";
+var NS = params.get("namespace") ?? params.get("ns") ?? "positron-safari-test";
 var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 var CODEC_OVERRIDE = params.get("codec");
 var LOG_URL = params.get("log");

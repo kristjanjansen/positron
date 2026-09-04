@@ -619,7 +619,7 @@ async function aRunLocal({ runId = 'local', scale = 1 }) {
 // ---------------- transports ----------------
 const ENV = await (await fetch('/env.json')).json();
 async function cf(method, sub, body) {
-  const r = await fetch('https://elektron-rtc.kristjan-jansen.workers.dev/cf/' + sub, {
+  const r = await fetch('https://rtc.positron.studio/cf/' + sub, {
     method, headers: { Authorization: 'Bearer ' + ENV.ROOM_TOKEN, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });

@@ -67,7 +67,7 @@ so viewers see a still image, not black.
 ## Timed messages, subtitles, invisible events
 
 `timed-messages.js` + the deployed relay
-(`https://elektron-cues.kristjan-jansen.workers.dev/room/<name>/ws`) deliver
+(`https://cues.positron.studio/room/<name>/ws`) deliver
 cues synced to the *stream moment* via `EXT-X-PROGRAM-DATE-TIME`:
 
 The relay now requires a token: `?token=<CUES_TOKEN>` (or Authorization Bearer)
@@ -80,7 +80,7 @@ bad ones with `{type:'error'}` instead of relaying.
 ```js
 import { createTimedMessages } from './timed-messages.js';
 const cues = createTimedMessages(player, videoEl, { onMessage: showOverlay, token: CUES_TOKEN });
-cues.connect('wss://elektron-cues.kristjan-jansen.workers.dev/room/show1/ws');
+cues.connect('wss://cues.positron.studio/room/show1/ws');
 cues.attachSubtitleTrack('et');          // visible: native subtitle rendering
 cues.attachMetadataTrack(onEvent);       // invisible: exact-time events
 cues.add({ at: Date.now() + 5000, until: Date.now() + 9000,

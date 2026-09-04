@@ -19,7 +19,7 @@ research/music-jamming-2026-08.md — not touched here.
     (§1.5 loopback ordering point confirmed live). Probe: a→relay→b string in
     ~52 ms wall. **Binary frames dropped** (4-byte send: neither client
     received) → legacy arm is JSON/text only.
-  - `GET https://elektron-selfrec….workers.dev/time` → 200 {now} (the skew
+  - `GET https://selfrec.positron.studio/time` → 200 {now} (the skew
     endpoint, tokenless).
   - Machine: node v25.9 (built-in WebSocket client — CDP without deps), Docker
     28.5, Chrome present, wrangler 4.75.
@@ -29,7 +29,7 @@ research/music-jamming-2026-08.md — not touched here.
     so datagram mode is expected NO-OP over CF (will verify cheaply).
 
 - **C1 (infra built)**: elektron-jam DEPLOYED
-  (https://elektron-jam.kristjan-jansen.workers.dev, version 3cd1242f, JAM_TOKEN
+  (https://jam.positron.studio, version 3cd1242f, JAM_TOKEN
   secret set + appended to repo .env). Node probe: text+binary relayed to all
   incl sender, one-way ~41 ms, autoresponse ping RTT 39 ms (matches cues band).
   server.mjs (:8893 static+µs-clock+mailboxes+result sink), relay-local.mjs

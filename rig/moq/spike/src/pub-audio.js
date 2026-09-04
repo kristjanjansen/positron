@@ -1,8 +1,8 @@
 // AUDIO SPIKE publisher (RUNBOOK §10): video (720p30 H.264, burned-ms row — same
 // geometry as pub-safari.js) PLUS WebAudio-synthesized audio -> AudioEncoder
 // (Opus 48k stereo, AAC fallback) -> hang legacy container -> @moq/net -> CF
-// draft-14 relay. Namespace elektron-audio-test (own namespace — never the
-// sibling-owned elektron-safari-test). NO getUserMedia anywhere: audio samples
+// draft-14 relay. Namespace positron-audio-test (own namespace — never the
+// sibling-owned positron-safari-test). NO getUserMedia anywhere: audio samples
 // are synthesized directly into AudioData objects.
 //
 // Audio signal (so the player can measure latency + A/V sync from content alone):
@@ -17,7 +17,7 @@ import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("ns") ?? "elektron-audio-test";
+const NS = params.get("ns") ?? "positron-audio-test";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const VCODEC = params.get("codec") ?? "avc1.42001f";
 const FPS = 30, GOP = 30;
@@ -58,7 +58,7 @@ function draw() {
 	for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
 	ctx.font = "bold 72px monospace";
 	ctx.fillStyle = "#00d4ff";
-	ctx.fillText("ELEKTRON AUDIO TEST", 60, 300);
+	ctx.fillText("POSITRON AUDIO TEST", 60, 300);
 	ctx.fillStyle = "#fff";
 	ctx.font = "bold 96px monospace";
 	ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

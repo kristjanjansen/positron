@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>elektron — live demo: stream + messages</title>
+<title>positron — live demo: stream + messages</title>
 <style>
   :root{color-scheme:dark}
   *{box-sizing:border-box}
@@ -36,7 +36,7 @@
   .hint{font-size:11.5px;color:#5c6f79;margin-top:8px;line-height:1.5}
 </style>
 
-<h1>elektron — live stream + synced messages</h1>
+<h1>positron — live stream + synced messages</h1>
 
 <div>
   <div class="stage">
@@ -78,7 +78,7 @@ const uid = q.get('uid') || '5cfa5053fffe478fffbb9b5c65773d34';
 const room = q.get('room') || 'demo';
 const token = q.get('token') || '';   // CUES_TOKEN — the worker requires it
 const src = `https://customer-mwuu1cmlyif6eluy.cloudflarestream.com/${uid}/manifest/video.m3u8?protocol=llhls`;
-const WS = `wss://elektron-cues.kristjan-jansen.workers.dev/room/${room}/ws` +
+const WS = `wss://cues.positron.studio/room/${room}/ws` +
            (token ? `?token=${encodeURIComponent(token)}` : '');
 
 const $ = (id) => document.getElementById(id);

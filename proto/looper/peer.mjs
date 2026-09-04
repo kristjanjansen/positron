@@ -242,7 +242,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
 // ===========================================================================
 
 /** Two tabs of one browser. Zero infrastructure, a real cross-context hop. */
-export function broadcastTransport(name = 'elektron-looper') {
+export function broadcastTransport(name = 'positron-looper') {
   const ch = new BroadcastChannel(name);
   return {
     send(obj) { ch.postMessage(obj); },

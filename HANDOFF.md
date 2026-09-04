@@ -12,6 +12,67 @@ studio runs a complete show with all five panels; the archive viewers are live;
 and there is now **an instrument a human can actually play, alone or with
 someone else in another browser.** No human has played it yet.
 
+## 2026-09-04 — renamed to `positron`, moved to `positron.studio`
+
+Working dir `~/personal/elektron` → `~/personal/positron`. The domain is on
+Cloudflare Registrar (zone `1ead979d8f29aaecbd02d701fb557f8e`, created
+2026-09-04). **Eight deployed Workers now answer on the domain**, via Workers
+custom domains attached with `wrangler triggers deploy` (routes only — no code
+re-upload):
+
+| hostname | worker script |
+|---|---|
+| `positron.studio`, `www.positron.studio` | `elektron-view` |
+| `rtc.positron.studio` | `elektron-rtc` |
+| `jam.positron.studio` | `elektron-jam` |
+| `cues.positron.studio` | `elektron-cues` |
+| `instrument.positron.studio` | `elektron-instrument` |
+| `selfrec.positron.studio` | `elektron-selfrec` |
+| `osc.positron.studio` | `elektron-osc` |
+| `moq.positron.studio` | `elektron-moq-safari` |
+| `archive.positron.studio` | R2 bucket `elektron-archive-test` |
+
+**`workers_dev: true` is set on every one on purpose** — the `*.workers.dev`
+hostnames still serve, so the move is additive and no pre-move link died. The
+`pub-b8d50fdb….r2.dev` archive URL likewise still works.
+
+### Why the Worker SCRIPT names are still `elektron-*`
+
+Renaming a Worker script does not rename anything — it creates a **new** Worker
+at a new hostname and **abandons the Durable Objects** of the old one
+(`RtcRoom`, `JamRoom`, `Hub`, `Sessions`, `BeaconStore`, `Gate` — the last
+holds the durable ERR cache). A custom domain decouples public identity from
+script name, so the names stay and cost nothing: nobody types them. Same for
+the R2 bucket — **R2 buckets cannot be renamed at all**, and its objects and
+public URL are bucket-bound.
+
+Three rig Workers turned out to have **zero deployments** (`obs-cloud/obs-worker`,
+`obs-cloud/quic-test`, `rig/containers`), so those script names *were* free to
+change and are now `positron-obscloud`, `positron-obscloud-quic`,
+`positron-cnt-test`. They remain undeployed; no custom domain was attached.
+
+### Deliberately NOT renamed
+
+`elektronstudio` (v3/v4/ws/lab/archive), `elektron-nuxt`, `elektron.art`,
+`data.elektron.art` — these name the **real predecessor project**, which exists
+under that name and is not on this Cloudflare account. Rewriting them would make
+the prior-art notes false, so they stand as citations, including the Estonian
+genitive `elektron.arti` in quoted sources.
+`research/elektron-participation-2026-08.md` keeps its filename for the same
+reason: it is named for its subject, not for this repo.
+
+### Two consequences worth remembering
+
+- **The Cache API is no longer a no-op.** `caches.default` does nothing on
+  `*.workers.dev`; on a custom domain it is a real edge cache. `workers/view`
+  still does not use it (the durable cache spans colos, which `caches.default`
+  does not) — but that is now a choice, not a constraint.
+- **A fresh `.studio` name can be negatively cached for an hour.** The `.studio`
+  SOA minimum TTL is 3600 s, so any resolver that was asked for
+  `positron.studio` before registration will answer `NXDOMAIN` for up to an hour
+  afterwards. Cloudflare, Google, Quad9 and OpenDNS all resolved it within
+  minutes; a home router that had cached the miss did not. Not a misconfiguration.
+
 ## Nothing is in flight. Everything below is committed and green.
 
 ## What exists
@@ -40,7 +101,7 @@ GO LIVE · SHOW · ROOM · SOUND · ARCHIVE. verify 24/24.
 **Deployed** (unchanged this session): `elektron-view` (four archive viewers,
 public) · `elektron-rtc` · `elektron-selfrec` · `elektron-jam` ·
 `elektron-instrument` · `elektron-osc`.
-**Public link**: https://elektron-view.kristjan-jansen.workers.dev
+**Public link**: https://positron.studio
 
 ## The numbers worth remembering
 
@@ -95,7 +156,7 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 ## Yours alone
 
-Rotate the leaked secrets (`SECRETS-ROTATION.md`) · `elektron.studio` is
+Rotate the leaked secrets (`SECRETS-ROTATION.md`) · `positron.studio` is
 drop-caught and for sale via Afternic (expiry 2027-02-08) · an iPhone capture
 probe · the macOS **IAC MIDI toggle** — the looper's Web MIDI path is wired and
 has never seen a device, so M1's stamp numbers are the *keyboard* path · ask ERR

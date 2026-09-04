@@ -1,6 +1,12 @@
 # elektron-instrument — DEPLOYED
 
-**URL:** `https://elektron-instrument.kristjan-jansen.workers.dev`
+> Public hostname is **`instrument.positron.studio`** (custom domain, 2026-09-04). The
+> Worker script name is still `elektron-instrument` — renaming a script creates a NEW
+> Worker and abandons its Durable Objects, so the name stays and the domain
+> carries the identity. `*.workers.dev` is still enabled as a fallback.
+
+
+**URL:** `https://instrument.positron.studio`
 **Deployed:** 2026-08-27 (version `6473040f-b035-433e-a928-126815e8de6d`).
 Status: **live and verified** — **54/54** end-to-end checks green from
 `proto/instrument/harness/run-instrument.mjs` (one headless Chrome, three tabs,

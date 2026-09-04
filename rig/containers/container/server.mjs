@@ -16,7 +16,7 @@ import fs from "fs";
 import os from "os";
 import { spawnSync } from "child_process";
 
-const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const PUB = "https://archive.positron.studio";
 const SHOW = "sync-20260827T093613";
 const BOOT = Date.now();
 const PORT = process.env.PORT || 8080;

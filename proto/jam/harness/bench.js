@@ -52,7 +52,7 @@ async function calibrate() {
     let bd = { rtt: Infinity, off: 0 };
     for (let i = 0; i < 8; i++) {
       const a = epochUsRaw();
-      const j = await (await fetch('https://elektron-selfrec.kristjan-jansen.workers.dev/time', { cache: 'no-store' })).json();
+      const j = await (await fetch('https://selfrec.positron.studio/time', { cache: 'no-store' })).json();
       const b = epochUsRaw();
       const rtt = b - a;
       if (rtt < bd.rtt) bd = { rtt, off: j.now * 1000 + rtt / 2 - b };
@@ -229,7 +229,7 @@ const arms = {
   'sfu-dc': {
     async setup(spec) {
       const cf = async (method, sub, body) => {
-        const r = await fetch('https://elektron-rtc.kristjan-jansen.workers.dev/cf/' + sub, {
+        const r = await fetch('https://rtc.positron.studio/cf/' + sub, {
           method, headers: { Authorization: 'Bearer ' + ENV.ROOM_TOKEN, 'Content-Type': 'application/json' },
           body: body ? JSON.stringify(body) : undefined,
         });
@@ -332,7 +332,7 @@ const arms = {
   // and elektron-jam (verbatim relay: JSON text vs 16-B binary)
   'do-cues': {
     async setup(spec) {
-      const ws = new WebSocket(`wss://elektron-cues.kristjan-jansen.workers.dev/room/jam-${spec.session}/ws?token=${ENV.CUES_TOKEN}`);
+      const ws = new WebSocket(`wss://cues.positron.studio/room/jam-${spec.session}/ws?token=${ENV.CUES_TOKEN}`);
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('cues ws error')); });
       state.ws = ws;
       log('do-cues ws open');
@@ -358,7 +358,7 @@ const arms = {
 
   'do-jam': {
     async setup(spec) {
-      const ws = new WebSocket(`wss://elektron-jam.kristjan-jansen.workers.dev/room/jam-${spec.session}/ws?token=${ENV.JAM_TOKEN}`);
+      const ws = new WebSocket(`wss://jam.positron.studio/room/jam-${spec.session}/ws?token=${ENV.JAM_TOKEN}`);
       ws.binaryType = 'arraybuffer';
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('jam ws error')); });
       state.ws = ws;

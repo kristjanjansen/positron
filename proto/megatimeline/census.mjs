@@ -43,7 +43,7 @@ function post(body) {
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
-          'User-Agent': 'elektron-megatimeline-proto/0.1',
+          'User-Agent': 'positron-megatimeline-proto/0.1',
         },
       },
       (res) => {

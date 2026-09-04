@@ -26,7 +26,7 @@ arhiiv.err.ee (recipes from research/err-archives-2026-08.md).
 ## Step 2 — build ✅
 
 - server.mjs: port 8891, static + POST /api/search proxy (1 s serialized gate,
-  UA elektron-remixer-proto/0.1, not an open proxy — fixed upstream path) +
+  UA positron-remixer-proto/0.1, not an open proxy — fixed upstream path) +
   /report sink. No media proxying, nothing cached to disk.
 - index.html: year dial 1908–2026 → 20 audio + 20 video items; honest date
   badges (heuristic italic → content-confirmed solid); year strip (day ticks /

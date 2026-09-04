@@ -256,7 +256,7 @@ async function boot() {
   if (ROOM) {
     peer = createPeer({
       id: PEER_ID,
-      transport: RELAY ? wsTransport(RELAY) : broadcastTransport(`elektron-looper:${ROOM}`),
+      transport: RELAY ? wsTransport(RELAY) : broadcastTransport(`positron-looper:${ROOM}`),
       onLayer: receiveLayer,
       onLive: (row) => { if (row.type === 'note-on') voices.monitorOn({ ...row, layer: 'mon' }); else if (row.type === 'note-off') voices.monitorOff(row); },
     });

@@ -489,7 +489,7 @@ node --expose-gc timeline/lab/prop-store.mjs     # exact heap numbers
 node timeline/lab/bench-store.mjs [--rows N]     # the bench table alone
 ```
 
-Fixtures cache outside the repo (`$STORE_FIXTURES` or `$TMPDIR/elektron-store-fx`);
+Fixtures cache outside the repo (`$STORE_FIXTURES` or `$TMPDIR/positron-store-fx`);
 the 1M-row log is 69.7 MB and builds in ~1 s. The lab's Range server binds
 **127.0.0.1:8892** and is closed in a `finally`. **39 checks, 0 violations.**
 
