@@ -23,7 +23,7 @@
   const d = mount({
     n: '04',
     name: 'score',
-    what: 'A quotation is a value. Round-trip it and the bytes must not move.',
+    what: 'A quotation is a value: serialise it, parse it back, and the bytes must be identical.',
     readout: { bytes: 'B', quotations: '', roundtrip: '', refs: '' },
     controls: [
       { id: 'roundtrip', label: 'Round-trip', primary: true },
@@ -53,7 +53,7 @@
   d.set('quotations', s.quotations.length);
   d.set('refs', scoreRefs(s).length);
 
-  d.on('roundtrip', () => {
+  function runRoundtrip() {
     const a = scoreToJSON(s);
     const back = parseScore(a);
     const b = scoreToJSON(back);
@@ -65,15 +65,21 @@
       quotationEquals(s.quotations[0], back.quotations[0]),
       quotationKey(s.quotations[0]).slice(0, 40));
     d.assert('a second round-trip is stable', scoreToJSON(parseScore(b)) === b);
-  });
+  }
+  d.on('roundtrip', runRoundtrip);
 
   // a value that can be edited is not a value
-  d.on('mutate', () => {
+  function checkFrozen() {
     let threw = false;
     try { s.quotations[0].at = 999; } catch { threw = true; }
     const moved = s.quotations[0].at !== 0;
     d.assert('frozen against mutation', threw || !moved, threw ? 'threw' : `at=${s.quotations[0].at}`);
-  });
+  }
+  d.on('mutate', checkFrozen);
+
+  // a demo should not need a button press to show its one number
+  runRoundtrip();
+  checkFrozen();
 
   d.log(`ns ${NS}`);
   d.ready();

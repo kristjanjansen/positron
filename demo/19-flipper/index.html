@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+<style>
+  /* ONE grid, EQUAL cells. TV and radio are the same size on purpose: a radio
+     station is a channel, not a smaller kind of channel. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin: 0 0 10px; }
+  .cell {
+    position: relative; aspect-ratio: 16 / 9; background: #000;
+    border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .cell.on { border-color: var(--hi); }
+  .cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell .lbl {
+    position: absolute; left: 5px; bottom: 4px; z-index: 2;
+    font: 600 10px/1.4 var(--mono); letter-spacing: .06em;
+    color: var(--fg); background: #0b0e14aa; border-radius: 3px; padding: 1px 5px;
+  }
+  .cell.on .lbl { color: #0b0e14; background: var(--hi); }
+  /* a radio cell draws its level instead of a picture */
+  .cell .bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; padding: 10px 8px 20px; }
+  .cell .bars i { flex: 1; background: var(--line2); border-radius: 1px; height: 4%; }
+  .cell.on .bars i { background: var(--hi); }
+</style>
+<script src="/proto/remixer/hls.min.js"></script>
+
+<script type="module">
+  import { mount, guard, el } from '/demo/shell/shell.mjs';
+  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  const DVR_MS = 2 * 60 * 60 * 1000;          // ERR keeps ~2 h
+
+  const TV = [
+    { id: 'etv', name: 'ETV', url: 'https://live.err.ee/live/etv.m3u8' },
+    { id: 'etv2', name: 'ETV2', url: 'https://live.err.ee/live/etv2.m3u8' },
+    { id: 'etvpluss', name: 'ETV+', url: 'https://live.err.ee/live/etvpluss.m3u8' },
+  ];
+  const RADIO = [
+    { id: 'vikerraadio', name: 'Vikerraadio' },
+    { id: 'raadio2', name: 'Raadio 2' },
+    { id: 'klassikaraadio', name: 'Klassikaraadio' },
+    { id: 'raadio4', name: 'Raadio 4' },
+    { id: 'raadiotallinn', name: 'Raadio Tallinn' },
+  ];
+
+  const d = mount({
+    n: '19',
+    name: 'flipper',
+    what: 'Eight live ERR channels in equal cells. One plays at a time; the bar scrubs its 2 h DVR.',
+    readout: { channel: '', behind: 's', window: 'min', state: '' },
+    controls: [
+      { id: 'start', label: 'Start channels', primary: true },
+      { id: 'live', label: 'Jump to live edge' },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  // ── the grid ────────────────────────────────────────────────────────────
+  const grid = el('div', 'grid');
+  d.el.append(grid);
+
+  const chans = [];
+  for (const ch of TV) {
+    const cell = el('div', 'cell');
+    const v = el('video', '', null, { playsinline: '', muted: '', preload: 'none' });
+    v.muted = true;
+    cell.append(v, el('span', 'lbl', ch.name));
+    grid.append(cell);
+    chans.push({ ...ch, kind: 'tv', cell, media: v, hls: null });
+  }
+  for (const ch of RADIO) {
+    const cell = el('div', 'cell');
+    const bars = el('div', 'bars');
+    for (let i = 0; i < 12; i++) bars.append(el('i'));
+    // MUTED AT BIRTH, like the videos. An unmuted audio element cannot autoplay,
+    // so play() rejected into a silent catch and every radio cell stayed dead.
+    // select() unmutes the chosen one, which is allowed because Start is a gesture.
+    const a = el('audio', '', null, { preload: 'none' });
+    a.muted = true;
+    cell.append(bars, a, el('span', 'lbl', ch.name));
+    grid.append(cell);
+    chans.push({ ...ch, kind: 'radio', cell, media: a, bars, hls: null });
+  }
+
+  // ── the deck rides the SELECTED channel's DVR window ────────────────────
+  // Live has no fixed duration, so the range moves: setRange() in place, and
+  // the transport bar re-derives off rangeGen() rather than caching it.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, DVR_MS] });
+  createTransportBar(d.el, deck);
+  createStripView(d.el, deck, { size: 'mini', lanes: [] });
+
+  let sel = 0, master = null, started = false;
+
+  async function select(i) {
+    if (i === sel && started) return;
+    const prev = chans[sel];
+    sel = i;
+    chans.forEach((c, j) => c.cell.classList.toggle('on', j === i));
+    d.set('channel', chans[i].name);
+    if (!started) return;
+    if (prev && prev !== chans[i]) teardown(prev);
+    await open(chans[i]);
+    attachMaster();
+  }
+  chans.forEach((c, i) => c.cell.addEventListener('click', () => select(i)));
+
+  function attachMaster() {
+    master?.detach?.();
+    master = null;
+    const c = chans[sel];
+    if (c.kind !== 'tv' || !c.hls) { d.set('window', 0); return; }
+    master = mediaMaster(deck, c.media, { anchorMs: 0 });
+  }
+
+  function teardown(c) {
+    try { c.hls?.destroy(); } catch { /* already gone */ }
+    c.hls = null;
+    c.media.pause();
+    c.media.removeAttribute('src');
+    c.media.load();
+  }
+
+  async function open(c) {
+    if (c.kind === 'tv') {
+      if (c.media.canPlayType('application/vnd.apple.mpegurl')) c.media.src = c.url;
+      else if (window.Hls?.isSupported()) {
+        c.hls = new window.Hls({ maxBufferLength: 12, backBufferLength: 4, liveSyncDurationCount: 3 });
+        c.hls.loadSource(c.url);
+        c.hls.attachMedia(c.media);
+        c.hls.on(window.Hls.Events.ERROR, (_e, x) => { if (x.fatal) d.log(`${c.id}: ${x.details}`, 'bad'); });
+      }
+    } else {
+      c.media.src = `https://icecast.err.ee/${c.id}.mp3`;
+    }
+    c.media.muted = false;
+    await c.media.play().catch((e) => d.log(`${c.id} play refused: ${e.name}`, 'bad'));
+  }
+
+  d.on('start', async () => {
+    started = true;
+    await open(chans[sel]);
+    attachMaster();
+    d.log(`playing ${chans[sel].name}`);
+  });
+
+  d.on('live', () => {
+    const c = chans[sel];
+    const edge = c.hls?.liveSyncPosition;
+    if (Number.isFinite(edge)) { c.media.currentTime = edge; d.log('jumped to the live edge'); }
+  });
+
+  setInterval(() => {
+    const c = chans[sel];
+    d.set('state', c.media.paused ? 'paused' : (c.media.readyState >= 3 ? 'playing' : 'buffering'),
+      c.media.paused ? 'bad' : 'ok');
+    if (c.kind === 'tv' && c.hls) {
+      const edge = c.hls.liveSyncPosition;
+      if (Number.isFinite(edge)) {
+        const start = Math.max(0, edge - DVR_MS / 1000);
+        // the window MOVES; range identity is stable so the scrubber follows
+        deck.setRange([start * 1000, edge * 1000]);
+        d.set('window', Math.round((edge - start) / 60));
+        d.set('behind', Math.max(0, edge - c.media.currentTime));
+      }
+    } else {
+      d.set('window', 0);
+      d.set('behind', 0);
+    }
+    // radio cells show a cheap level so a playing station is not a dead box
+    for (const r of chans) {
+      if (r.kind !== 'radio' || !r.bars) continue;
+      const live = !r.media.paused && r.media.readyState >= 2;
+      [...r.bars.children].forEach((b, k) => {
+        b.style.height = live ? `${8 + Math.abs(Math.sin(performance.now() / 320 + k)) * 70}%` : '4%';
+      });
+    }
+  }, 250);
+
+  d.on('check', () => {
+    d.assert('eight equal cells', grid.children.length === 8, `${grid.children.length}`);
+    const sizes = [...grid.children].map((c) => Math.round(c.getBoundingClientRect().width));
+    d.assert('every cell the same width', new Set(sizes).size === 1, sizes.join(','));
+    d.assert('a channel is selected', chans.some((c) => c.cell.classList.contains('on')), chans[sel].name);
+    d.assert('exactly one channel audible',
+      chans.filter((c) => !c.media.muted).length <= 1,
+      String(chans.filter((c) => !c.media.muted).length));
+    if (started) {
+      const open = chans.filter((c) => !c.media.paused);
+      d.assert('exactly the selected channel is open', open.length === 1 && open[0] === chans[sel],
+        open.map((c) => c.id).join(',') || 'none');
+    }
+    d.log(`sel ${chans[sel].name} · dvr window ${d.api.readout.window} min`);
+  });
+
+  select(0);
+  d.log('tap a cell to switch; only the open channel loads');
+  d.ready();
+</script>
+</html>
