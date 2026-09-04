@@ -10,7 +10,7 @@
 import fs from "fs";
 import crypto from "crypto";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/m2m`;
 const RESULTS = `${ROOT}/results/m2m-p3a-control.jsonl`;
 const STATUS = `${HERE}/logs/p3a-status.json`;
@@ -27,7 +27,7 @@ const APP_ID = env.CF_REALTIME_APP_ID, SECRET = env.CF_REALTIME_APP_SECRET;
 if (!APP_ID || !SECRET) { console.error("missing CF creds"); process.exit(1); }
 const BASE = `https://rtc.live.cloudflare.com/v1/apps/${APP_ID}`;
 // CF's edge 1010-blocks default UAs (phase-1 trap) — custom UA required.
-const UA = "elektron-m2m-rig/1.0 (p3a-soak)";
+const UA = "positron-m2m-rig/1.0 (p3a-soak)";
 
 const RAMP_N = parseInt(process.env.RAMP_N || "200", 10);
 const RAMP_S = parseInt(process.env.RAMP_S || "60", 10);

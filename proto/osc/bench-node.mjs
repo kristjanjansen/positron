@@ -81,7 +81,7 @@ async function armDo(shape, n, room) {
     .split('\n').filter((l) => l.includes('=')).map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]));
   const tok = env.OSC_TOKEN;
   if (!tok) throw new Error('OSC_TOKEN missing from .env');
-  const url = `wss://elektron-osc.kristjan-jansen.workers.dev/room/${room}/ws?token=${tok}`;
+  const url = `wss://osc.positron.studio/room/${room}/ws?token=${tok}`;
   const pub = new WebSocket(url), sub = new WebSocket(url);
   pub.binaryType = sub.binaryType = 'arraybuffer';
   await Promise.all([pub, sub].map((w) => new Promise((res, rej) => {

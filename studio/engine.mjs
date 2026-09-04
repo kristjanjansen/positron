@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ===========================================================================
-// ELEKTRON STUDIO — ENGINE (plan-studio.md §5 Session B)
+// POSITRON STUDIO — ENGINE (plan-studio.md §5 Session B)
 //
 //   git pull && node studio/engine.mjs      →  http://127.0.0.1:8899/
 //
@@ -61,12 +61,12 @@ import { makeRosterAdapter, rosterView, TIERS } from "./roster.mjs";
 const ROOT = path.resolve(new URL(".", import.meta.url).pathname, "..");
 const HERE = `${ROOT}/studio`;
 const PORT = parseInt(process.env.STUDIO_PORT || "8899", 10);
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE = "https://rtc.positron.studio";
 const BUCKET = process.env.BUCKET || "elektron-archive-test";       // EXISTING
-const PUBBASE = process.env.PUBBASE || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const PUBBASE = process.env.PUBBASE || "https://archive.positron.studio";
 const WRANGLER_CWD = `${ROOT}/proto/archive`;   // a dir with NO .env (the trap)
 const SCRATCH = process.env.STUDIO_SCRATCH ||
-  "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+  "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
 const RUNS = `${HERE}/runs`;
 const LOGS = `${HERE}/logs`;
 for (const d of [RUNS, LOGS, SCRATCH]) fs.mkdirSync(d, { recursive: true });

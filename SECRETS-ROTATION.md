@@ -38,7 +38,7 @@ ever goes public.
 ## Post-rotation smoke (5 min)
 ```sh
 # workers still authed (they use bindings/secrets, not the API token)
-curl -s -o /dev/null -w '%{http_code}\n' https://elektron-selfrec.kristjan-jansen.workers.dev/time
+curl -s -o /dev/null -w '%{http_code}\n' https://selfrec.positron.studio/time
 # d16 relay with the NEW tokens
 bash rig/moq/test-d16-auth.sh          # expects moq-transport-16 negotiated
 # R2 path unaffected (OAuth, not token)

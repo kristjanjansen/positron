@@ -1498,13 +1498,13 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
   in Chromium; Safari decodes both since 26.0 per WebKit research 2025-09).
 - ✅ Implementer trap: browsers regenerate AudioDecoder timestamps → FIFO-map
   encoded-chunk timestamps or a join-skip becomes a permanent +534 ms phantom.
-- Deployed page: audio probe on every load + plays ?namespace=elektron-audio-test
+- Deployed page: audio probe on every load + plays ?namespace=positron-audio-test
   (iPhone audio verdict = one visit). Audio publisher LEFT RUNNING
   (moq-audio-pub-udd + audioserver.py :8896; §10.5 restart). RUNBOOK §10.
 
 ### 4K/framerate matrix — ✅ 4K30 CLEAN AT 47 ms; RELAY NEVER THE LIMIT
 - ✅ 720p30 33 ms · 1080p60 33 ms (60 fps ≠ faster: burn-at-capture cancels
-  quantization) · **4K30 47/78 ms clean, now LIVE on elektron-safari-test** ·
+  quantization) · **4K30 47/78 ms clean, now LIVE on positron-safari-test** ·
   4K60 ❌ local VideoToolbox ~50 fps ceiling (200 ms plateau, zero relay errors).
 - ✅ Stress: 22.9 Mbps sustained through CF flawlessly. Levels per spec. Datum:
   draft-14 accepts duplicate publish (first session wins). Deployed page needed
@@ -1522,7 +1522,7 @@ grid → WHIP → recorded Stream input; cue-driven rotating-grid choreography;
   Chromium ✅ 33 ms, desktop Safari ✅, mobile Safari-on-4G ✅ ~31 ms.
 
 ### Safari MoQ rig (user request) — ✅ DEPLOYED; desktop Safari OBSERVED PLAYING
-- URL: https://elektron-moq-safari.kristjan-jansen.workers.dev (Worker + beacon
+- URL: https://moq.positron.studio (Worker + beacon
   sink → wrangler tail shows any device's session). H.264 publisher LEFT RUNNING
   on this Mac (stop: pkill -f moq-safari-pub-udd; pkill -f pubserver.py; dies on
   sleep/reboot — restart block RUNBOOK §8.6).
@@ -2017,7 +2017,7 @@ Provenance: ✅ measured here · 📄 documented by vendor · ⚠️ unverified.
 
 - ✅ OBS was already on this machine (logs from Feb 2025) — cask was a re-install.
   ⚠️ `plugin_config/obs-websocket/config.json` overwritten (now localhost/no-auth).
-- Pre-staged: `elektron-lowlatency` profile (Tune=zerolatency — the one-dropdown
+- Pre-staged: `positron-lowlatency` profile (Tune=zerolatency — the one-dropdown
   LL setting; keyframe 2 s manual; CBR; Cloudflare RTMPS + key in service.json).
 - Launch blocked: quarantine flag (stripped ✓), locked screen (environmental),
   and finally **ThreatLocker** (user-identified) — corporate allowlisting kills

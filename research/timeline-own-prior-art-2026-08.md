@@ -10,7 +10,7 @@ itself.
 
 ## 0. Corrections to the record
 
-- **The lineage is longer than "four generations".** elektron 2020's `store:
+- **The lineage is longer than "four generations".** positron 2020's `store:
   true` → Redis history → `CHAT_SYNC` replay was the FIRST record/replay
   implementation; and `~/personal/visualia/plans/lineage.md` (559 lines,
   2026-06) already traces a 16-thread, nine-year idea history including a
@@ -112,7 +112,7 @@ itself.
 12. **Sessions/rooms shape** (maria_old streams API): `GET /sessions →
     [{id, joinUrls, live status}]` + a Copyable join-credential component.
     maria itself had NO rooms — one global bus, `type` string as the only
-    namespace. elektron's room DO supersedes, but the discovery-list shape and
+    namespace. positron's room DO supersedes, but the discovery-list shape and
     credential UX are the missing operator surface.
 
 ## 2. Laws sharpened by documented failure
@@ -300,5 +300,5 @@ Beyond `{capture?, actuate, reducer?, interpolate?, caps}`:
   .output) — the "multi-user free" memory claim is about the ws relay, not a
   deployed app.
 - The wss://data.elektron.art relay contract (6 lines, echoes-to-sender, no
-  rooms, no stamps) is load-bearing for maria-era demos; elektron's room DO
+  rooms, no stamps) is load-bearing for maria-era demos; positron's room DO
   replaces it, but §1.5's ordering trick should survive the migration.

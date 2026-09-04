@@ -31,11 +31,11 @@ import fs from "fs";
 import { repackageParticipant } from "./repackage.mjs";
 import { indexParticipant } from "./indexer.mjs";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/selfrec`;
-const BASE = "https://elektron-selfrec.kristjan-jansen.workers.dev";
-const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
-const RTC = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const BASE = "https://selfrec.positron.studio";
+const PUB = "https://archive.positron.studio";
+const RTC = "https://rtc.positron.studio";
 const SHOW = process.env.SHOW;
 const ROOM = process.env.ROOM || (SHOW ? `selfrec${SHOW}` : null);
 const FORCE = !!process.env.FORCE;

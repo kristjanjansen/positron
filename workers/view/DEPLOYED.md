@@ -1,18 +1,43 @@
-# elektron-view — DEPLOYED
+# positron.studio — DEPLOYED
 
-**URL:** `https://elektron-view.kristjan-jansen.workers.dev`
-**Deployed:** 2026-08-30 (version `913f128a-1db8-48fa-9f14-3dc5831c1030`);
-previously 2026-08-28 (`09366c36-…`).
-Status: **live and verified** — **38/38** checks green from `verify.mjs`, one
-headless Chrome at **390 × 844** with touch emulation and `pointer: coarse`
-forced, driven against this URL (not a local server).
+> Worker **script name** is still `elektron-view`. That is deliberate: renaming a
+> script creates a NEW Worker and abandons the `Gate` Durable Object holding the
+> durable ERR cache. The public identity is the custom domain; the script name is
+> an internal handle nobody types.
+
+**URL:** `https://positron.studio`
+**Deployed:** 2026-09-04 (version `956b3e28-069d-4c68-acec-cd1b87ff0006` — the
+positron rename: 4 asset files); previously 2026-08-30
+(`913f128a-…`), 2026-08-28 (`09366c36-…`).
+
+Status: **live**, with **two known failures in `verify.mjs`, both predating the
+rename** — the "38/38 green" claim above dated from `2dcc0cb` and no longer holds:
+
+1. `index · lists all four pages` — the assert hardcodes `links.length === 4`,
+   but the menu has had **five** cards since looper landed (2026-08-30). Stale
+   assert, not a page fault.
+2. `megatimeline · boot completed (__mt.ready)` — **`/timeline/strip.mjs` 404s.**
+   `proto/megatimeline/index.html` began importing `/timeline/strip.mjs` in
+   `3647696`, but that file was never added to the `build.mjs` allowlist, so it
+   is absent from `public/`. The module graph fails, `window.__mt` is never set,
+   and the page is **dead on the public URL — since 2026-08-30, not since the
+   rename** (its assets were byte-identical across the rename deploy).
+   Fix is one line: add `['timeline/strip.mjs', 'timeline/strip.mjs']` to the
+   `FILES` allowlist in `workers/view/build.mjs`, rebuild, redeploy.
+
+Verified by hand after the move: apex + `www` 200 serving
+`POSITRON — viewing surfaces`, `/proto/looper/` 200, `positron-looper` channel
+name live in the shipped `peer.mjs`, `/api/stats` 200. (`/api/search` 404s on the
+old `*.workers.dev` hostname too — pre-existing, not a move regression.)
 
 The repo's public surfaces on one phone-openable link, behind a menu. Free
-tier, workers.dev, no custom domain, no secrets, ≈ $0.
+tier, **custom domain `positron.studio` + `www`** (added 2026-09-04; zone on
+Cloudflare Registrar), no secrets, ≈ $0. The `*.workers.dev` hostname is **still
+enabled** (`workers_dev: true`), so every pre-move link still resolves.
 
 | # | page | URL |
 |---|---|---|
-| — | menu | `https://elektron-view.kristjan-jansen.workers.dev/` |
+| — | menu | `https://positron.studio/` |
 | 1 | megatimeline | `…/proto/megatimeline/` |
 | 2 | remixer | `…/proto/remixer/` |
 | 3 | kurenniemi | `…/proto/kurenniemi/` |
@@ -147,9 +172,13 @@ Honest limits:
 * The daily cap and the spacing are **enforced, but generous by design**. This
   is a prototype menu, not a scraper; 400/day is a ceiling to make abuse
   bounded, not a budget anyone should reach.
-* **`caches.default` is not used.** The Cache API is a no-op on `workers.dev`
+* **`caches.default` is not used.** It *was* a no-op on `workers.dev`
   subdomains, so relying on it would have been a cache that silently did
-  nothing. The durable cache below is used instead, and is real.
+  nothing. The durable cache below is used instead, and is real. **The
+  2026-09-04 move to `positron.studio` reversed that premise** — a custom
+  domain has a real edge cache, so the Cache API is now an available option
+  rather than a dead end. Still unused, but now by choice: the durable cache
+  spans isolates and colos, which `caches.default` does not.
 * The **in-isolate memo** (60 entries) is genuinely per-isolate and lost on
   eviction. It is a nicety in front of the durable cache, never the guarantee.
 
@@ -163,8 +192,8 @@ Honest limits:
    bodies over 1 MB skipped. This is what stops N visitors becoming N calls.
 3. **Memo** — per-isolate, 60 entries.
 
-Every response says which layer answered: `x-elektron-cache:
-committed|durable|memo|miss` and `x-elektron-upstream: 0|1`.
+Every response says which layer answered: `x-positron-cache:
+committed|durable|memo|miss` and `x-positron-upstream: 0|1`.
 
 ## Deployed-copy rewrites (the protos are NOT modified)
 

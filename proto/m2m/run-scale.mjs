@@ -15,9 +15,9 @@ import { execSync } from "child_process";
 const N = parseInt(process.env.N || "8", 10);
 const DURATION_S = parseInt(process.env.DURATION || "90", 10);
 const BASE = "http://127.0.0.1:8897";
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-udd";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-udd";
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const PROBES = ["1", "2"];

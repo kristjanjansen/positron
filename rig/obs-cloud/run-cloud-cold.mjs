@@ -8,11 +8,11 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ObsClient } from "../obs-docker/control.mjs";
 
-const BASE = process.argv[2] || "https://elektron-obscloud.kristjan-jansen.workers.dev";
+const BASE = process.argv[2] || "https://positron-obscloud.kristjan-jansen.workers.dev";
 const SECS = Number(process.argv[3] || 60);
 const WS = BASE.replace("https://", "wss://") + "/obsws";
-const PLAYER = "https://elektron-moq-safari.kristjan-jansen.workers.dev/";
-const scratch = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
+const PLAYER = "https://moq.positron.studio/";
+const scratch = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/";
 const resultsDir = fileURLToPath(new URL("../../results/", import.meta.url));
 const now = () => performance.timeOrigin + performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

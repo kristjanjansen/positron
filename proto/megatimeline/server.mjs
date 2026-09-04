@@ -85,7 +85,7 @@ function upstream(options, body) {
       {
         host: 'arhiiv.err.ee',
         headers: {
-          'User-Agent': 'elektron-megatimeline-proto/0.1',
+          'User-Agent': 'positron-megatimeline-proto/0.1',
           ...(body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}),
         },
         ...options,

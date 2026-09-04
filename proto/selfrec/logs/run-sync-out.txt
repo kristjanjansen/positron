@@ -1,4 +1,4 @@
-09:36:13.549 sync| SHOW=sync-20260827T093613 ROOM=selfrecsync-20260827T093613 results=/Users/s32863/personal/elektron/results/selfrec-sync.jsonl
+09:36:13.549 sync| SHOW=sync-20260827T093613 ROOM=selfrecsync-20260827T093613 results=/Users/s32863/personal/positron/results/selfrec-sync.jsonl
 09:36:16.544 sync| p1 T0=1787823376294 mime=video/webm;codecs=h264 skewEst=42 rttMin=24
 09:36:23.391 sync| p2 T0=1787823383116 (stagger 6822 ms) mime=video/webm;codecs=vp8 skewEst=41.5
 09:36:36.294 sync| cue RCUE-20 sent at=1787823396294 (T0+20.00s)

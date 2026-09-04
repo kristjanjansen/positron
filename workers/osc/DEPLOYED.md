@@ -1,8 +1,14 @@
 # elektron-osc — DEPLOYED
 
+> Public hostname is **`osc.positron.studio`** (custom domain, 2026-09-04). The
+> Worker script name is still `elektron-osc` — renaming a script creates a NEW
+> Worker and abandons its Durable Objects, so the name stays and the domain
+> carries the identity. `*.workers.dev` is still enabled as a fallback.
+
+
 ```
-https://elektron-osc.kristjan-jansen.workers.dev
-wss://elektron-osc.kristjan-jansen.workers.dev/room/<name>/ws?token=<OSC_TOKEN>
+https://osc.positron.studio
+wss://osc.positron.studio/room/<name>/ws?token=<OSC_TOKEN>
 GET  /room/<name>/stats?token=<OSC_TOKEN>   -> {sockets, relayed, dropped, bytes}
 ```
 

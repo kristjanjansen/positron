@@ -1,8 +1,8 @@
-11:50:27.716 ARCHIVE RECORD room=archive-test nopub=false duration=190s offsets=15,36.3,57.7,78.1,99.9,120.4,141.6,162.8 rec=/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:50:27.716 ARCHIVE RECORD room=archive-test nopub=false duration=190s offsets=15,36.3,57.7,78.1,99.9,120.4,141.6,162.8 rec=/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
 11:50:30.496 show page RUNNING (+2020 ms)
-11:50:30.502 screencast started -> ffmpeg -> local HLS /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
+11:50:30.502 screencast started -> ffmpeg -> local HLS /private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec
 11:50:30.511 FIRST FRAME -> ffmpeg: T0stamp=1787745030511 T0meta=1787745030506 (delta 5 ms)
-  11:50:30.591 up| watching /private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec -> r2://elektron-archive-test/shows/archive-test (verify via https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev)
+  11:50:30.591 up| watching /private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec -> r2://elektron-archive-test/shows/archive-test (verify via https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev)
 11:50:31.507 T0 native (first frame -> ffmpeg) = 1787745030511
   op| 11:50:31.789 operator joined room archive-test; sending 8 cues (base 1787745030511)
 11:50:34.768 ffmpeg first encoded frame reported: tFfFirstProgress=1787745034768 (+4257 ms after first write)
@@ -85,7 +85,7 @@
   op| 11:53:11.314 sent CUE-08 mode=scheduled at=1787745193311 (nominal 1787745193311, drift 0 ms)
   11:53:11.318 up| seg00038.ts 871 KB put=2014ms lag=4722ms resident=1seg/0.9MB
 11:53:11.637 steady +161s drawFps=30 cues recv=8 fired=7 cur=CUE-07 sc=4885/drop0
-  op| 11:53:12.318 operator done — log /Users/s32863/personal/elektron/proto/archive/artifacts/operator-log.json
+  op| 11:53:12.318 operator done — log /Users/s32863/personal/positron/proto/archive/artifacts/operator-log.json
 11:53:12.335 operator exited 0
   11:53:15.718 up| seg00039.ts 878 KB put=2012ms lag=5127ms resident=1seg/0.9MB
 11:53:16.641 steady +166s drawFps=30 cues recv=8 fired=8 cur=CUE-08 sc=5036/drop0

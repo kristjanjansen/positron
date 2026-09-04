@@ -16152,7 +16152,7 @@ var require_pub_4k = __commonJS({
     init_net();
     init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "elektron-4k-test-dev";
+    var NS = params.get("ns") ?? "positron-4k-test-dev";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var CODEC = params.get("codec") ?? "avc1.42001f";
     var W = parseInt(params.get("w") ?? "1280", 10);
@@ -16227,7 +16227,7 @@ var require_pub_4k = __commonJS({
       for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
       ctx.font = "bold 72px monospace";
       ctx.fillStyle = "#ffd400";
-      ctx.fillText("ELEKTRON MOQ " + W + "x" + H + "@" + FPS, 60, 300);
+      ctx.fillText("POSITRON MOQ " + W + "x" + H + "@" + FPS, 60, 300);
       ctx.fillStyle = "#fff";
       ctx.font = "bold 96px monospace";
       ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

@@ -13,12 +13,12 @@
 import { readFileSync } from 'fs';
 const cuesToken = () => {
   try {
-    const l = readFileSync('/Users/s32863/personal/elektron/.env', 'utf8')
+    const l = readFileSync('/Users/s32863/personal/positron/.env', 'utf8')
       .split('\n').find((x) => x.startsWith('CUES_TOKEN='));
     return l ? l.slice(11).trim() : '';
   } catch { return ''; }
 };
-let URL_ = process.argv[2] || 'wss://elektron-cues.kristjan-jansen.workers.dev/room/lagtest/ws';
+let URL_ = process.argv[2] || 'wss://cues.positron.studio/room/lagtest/ws';
 if (!/[?&]token=/.test(URL_)) {
   const t = cuesToken();       // the worker requires CUES_TOKEN since the review fixes
   if (t) URL_ += (URL_.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);

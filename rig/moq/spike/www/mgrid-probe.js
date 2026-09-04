@@ -16584,7 +16584,7 @@ var require_mgrid_probe = __commonJS({
       });
     }, 2e3);
     var wall = () => Math.round(performance.timeOrigin + performance.now());
-    var short = (ns) => ns.replace("elektron-mgrid-", "");
+    var short = (ns) => ns.replace("positron-mgrid-", "");
     var grid = document.getElementById("grid");
     var report = window.__report = { pubs: 0, live: 0, decoded: 0, decodeErrors: 0, races: 0, closes: 0, silents: 0 };
     var pubs = /* @__PURE__ */ new Map();

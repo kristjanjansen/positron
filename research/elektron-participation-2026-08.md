@@ -1,4 +1,4 @@
-# elektron audience-participation archaeology — the research instrument we already built (2026-08-28)
+# positron audience-participation archaeology — the research instrument we already built (2026-08-28)
 
 Companion to `research/timeline-own-prior-art-2026-08.md`. That doc surveyed the
 elektronstudio message vocabulary and the 176-line ws relay. This one goes after
@@ -98,7 +98,7 @@ as a comment in **`elektronstudio/ws/index.js:63`**:
 which the relay stores verbatim as a `store: true` message (`ws/index.js:66–76`):
 
 ```js
-const message = createMessage({ type: "VIDEO", channel: "elektron",
+const message = createMessage({ type: "VIDEO", channel: "positron",
                                 value: req.body, store: true });
 redis.rpush(messagesList, message);
 ```
@@ -138,7 +138,7 @@ One thing it gets **right**, and we should keep it: **the anchor travels with th
 artefact.** The filename survives re-hosting, CDN migration, and the death of the
 platform's metadata API. Six months later `lab` can still derive a T₀ from a bare
 URL with no API call. That is exactly the property our content-derived T₀ has and
-platform metadata does not — the elektron trick was reaching for the right
+platform metadata does not — the positron trick was reaching for the right
 *invariant* (self-describing media) with the wrong *sample* (transcode mtime).
 
 ### The tell that they knew it was loose ✅
@@ -247,7 +247,7 @@ commented out inside the file** (`<!-- … -->`). It has three things v4 does no
 - **`show: pre` — a phase field**, splitting a *pre-show questionnaire* from
   in-performance controls: `controls.filter((c) => c.show === "pre")`.
 - **One-shot submission per channel**, persisted client-side:
-  `const submitted = useStorage("elektron_submitted", [])`, with a
+  `const submitted = useStorage("positron_submitted", [])`, with a
   `Tagasi küsimuste juurde` ("back to the questions") escape hatch.
 
 So the original design was **survey + continuous telemetry** — a pre-show
@@ -323,7 +323,7 @@ Two further mechanisms with no analogue on our side, both worth taking seriously
 
 ### Versus our `cc` adapter
 
-| | elektron controls | our `cc` adapter (`proto/automation/cc-core.js`) |
+| | positron controls | our `cc` adapter (`proto/automation/cc-core.js`) |
 |---|---|---|
 | kinds | `slider`, `text`, later `button` — **all level-valued**; edges faked as a 10→0 pulse | level-valued CCs **and** `SWITCHES` (64–69, 120–127) that are genuinely edge-valued |
 | ordering | `id: randomString()`, no sequence — same-ms pairs unorderable | `u32 seq` in the 16-byte frame |
@@ -526,7 +526,7 @@ Nothing in the current client set exercises the research shape. Concretely:
   first-class read at the playhead for any continuous kind.
 - **Graph → transport seek.** Every finding starts as "what is that spike" and
   ends as "put the video there". `lab` never had it; our transport can.
-- **Per-source clock-offset as a declared property of a lane.** The elektron defect
+- **Per-source clock-offset as a declared property of a lane.** The positron defect
   is not fixable in analysis because the offset was never estimated. A research
   client needs `offsetMs` per participant — even if it is only ever 0 with a
   tombstone saying "unknown, client-stamped".
@@ -585,7 +585,7 @@ the analysis machine), and **erasability** (is there a key that deletes one
 subject's rows without deleting the corpus). A store keyed only by arrival order,
 as Redis-`rpush` was, forecloses all three. If `timeline/store.mjs` is to serve a
 research client, **subject-keyed deletion has to be a store primitive, not an
-afterthought** — that is the single clearest lesson the elektron platform hands us,
+afterthought** — that is the single clearest lesson the positron platform hands us,
 and it hands it to us by not having it.
 
 ---
@@ -610,7 +610,7 @@ and it hands it to us by not having it.
 Preservica. A `teater.ee` citation still lists the 2025 pre-defence manuscript.
 
 **It names the platform, and it names the author of this codebase.** 23 mentions of
-elektron; `elektron.live` once; **`data.elektron.art` zero times**.
+positron; `positron.live` once; **`data.elektron.art` zero times**.
 
 > *"„Memento“ digitaalne etendusruum loodi elektron.arti veebilehele
 > erilahendusena, kus lisaks tavalisele video- ja vestlusaknale lisati

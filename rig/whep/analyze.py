@@ -5,7 +5,7 @@ import json
 import sys
 import statistics as st
 
-PATH = "/Users/s32863/personal/elektron/results/whep.jsonl"
+PATH = "/Users/s32863/personal/positron/results/whep.jsonl"
 WARMUP_S = float(sys.argv[1]) if len(sys.argv) > 1 else 10.0
 
 samples, play_stats, pub_stats, events = [], [], [], []

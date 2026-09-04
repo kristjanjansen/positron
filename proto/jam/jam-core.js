@@ -254,7 +254,7 @@ export function makeJam(opts) {
     },
     async do() {
       const env = await (await fetch('/env.json')).json();
-      const ws = new WebSocket(`wss://elektron-jam.kristjan-jansen.workers.dev/room/duet-${session}-${mode}/ws?token=${env.JAM_TOKEN}`);
+      const ws = new WebSocket(`wss://jam.positron.studio/room/duet-${session}-${mode}/ws?token=${env.JAM_TOKEN}`);
       ws.binaryType = 'arraybuffer';
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('do ws failed')); });
       ws.onmessage = (e) => { if (e.data instanceof ArrayBuffer) onWire(e.data); };

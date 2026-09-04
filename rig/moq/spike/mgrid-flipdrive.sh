@@ -7,7 +7,7 @@
 set -e
 FID=$1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-cd /Users/s32863/personal/elektron/rig/moq/spike
+cd /Users/s32863/personal/positron/rig/moq/spike
 
 rm -rf "logs/moq-mgrid-$FID-udd"
 nohup "$CH" --headless=new --user-data-dir="$PWD/logs/moq-mgrid-$FID-udd" --no-first-run \
@@ -28,7 +28,7 @@ grep "MGFLIP $FID " logs/moq-mgrid.log | tail -2
 sleep 5
 TPOST=$(python3 -c 'import time;print(int(time.time()*1000))')
 curl -s -X POST http://127.0.0.1:8887/cmd -d "{\"id\":\"$FID\",\"action\":\"publish\"}" > /dev/null
-echo "{\"k\":\"flip\",\"id\":\"$FID\",\"ev\":\"cmd_post\",\"t\":$TPOST}" >> /Users/s32863/personal/elektron/results/moq-mgrid-flips.jsonl
+echo "{\"k\":\"flip\",\"id\":\"$FID\",\"ev\":\"cmd_post\",\"t\":$TPOST}" >> /Users/s32863/personal/positron/results/moq-mgrid-flips.jsonl
 
 # wait until BOTH probes decoded the flip pub (FIRST_FRAME fN) or 30 s
 t0=$SECONDS
@@ -40,5 +40,5 @@ sleep 3   # let jsonl buffers flush
 
 # teardown: kill flip page, deregister
 pkill -9 -f "moq-mgrid-$FID-udd" || true
-curl -s -X POST http://127.0.0.1:8887/roster -d "{\"action\":\"remove\",\"ns\":\"elektron-mgrid-$FID\"}" > /dev/null
+curl -s -X POST http://127.0.0.1:8887/roster -d "{\"action\":\"remove\",\"ns\":\"positron-mgrid-$FID\"}" > /dev/null
 echo "flip $FID complete"

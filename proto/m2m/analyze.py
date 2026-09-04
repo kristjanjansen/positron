@@ -10,7 +10,7 @@ import sys
 import statistics as st
 from collections import defaultdict
 
-PATH = sys.argv[1] if len(sys.argv) > 1 else "/Users/s32863/personal/elektron/results/m2m-sfu.jsonl"
+PATH = sys.argv[1] if len(sys.argv) > 1 else "/Users/s32863/personal/positron/results/m2m-sfu.jsonl"
 WARMUP_S = float(sys.argv[2]) if len(sys.argv) > 2 else 10.0
 
 samples, stats_rows, events, cpu_rows, mesh_rows = [], [], [], [], []

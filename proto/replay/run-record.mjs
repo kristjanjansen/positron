@@ -15,10 +15,10 @@ const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE = "https://rtc.positron.studio";
 // Fresh room PER RUN by default (per-room cuelog is append-only — a reused
 // room name replays stale cues into the next run). meta.room carries the
 // generated name to run-measure.mjs; explicit ROOM= still overrides.
@@ -27,7 +27,7 @@ const ROOM = process.env.ROOM || `replay-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "200", 10);
 const POLL_S = parseInt(process.env.POLL_S || "300", 10);
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd";
 const LOGDIR = `${HERE}/logs`;
 fs.mkdirSync(LOGDIR, { recursive: true });
 fs.mkdirSync(`${HERE}/artifacts`, { recursive: true });
@@ -55,7 +55,7 @@ function killByUddPrefix(prefix) {
 }
 async function cfStream(path) {
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}${path}`, {
-    headers: { Authorization: `Bearer ${CF_API_TOKEN}`, "User-Agent": "elektron-replay-rig/1.0" },
+    headers: { Authorization: `Bearer ${CF_API_TOKEN}`, "User-Agent": "positron-replay-rig/1.0" },
   });
   return r.json();
 }

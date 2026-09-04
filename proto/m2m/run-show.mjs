@@ -24,12 +24,12 @@ const SMOKE = process.env.SMOKE === "1";
 const STAG = process.env.STAG === "1";
 const LABEL = process.env.LABEL || (SMOKE ? "smoke" : "main");
 const SCORE_FILE = process.env.SCORE || (SMOKE ? "scores/smoke-score.json" : "scores/demo-score.json");
-const REMOTE_URL = process.env.REMOTE_URL || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE_URL = process.env.REMOTE_URL || "https://rtc.positron.studio";
 const BASE = "http://127.0.0.1:8893";
 const ROOM = "score-show";
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3c-udd";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3c-udd";
 const LS = 4;
 const T0_LEAD_MS = 22000;          // all-running -> t0 (setup cast + ready inside this)
 fs.mkdirSync(LOGDIR, { recursive: true });
@@ -37,7 +37,7 @@ fs.mkdirSync(LOGDIR, { recursive: true });
 const score = JSON.parse(fs.readFileSync(`${HERE}/${SCORE_FILE}`, "utf8"));
 
 function roomToken(key = "ROOM_TOKEN") {
-  const line = fs.readFileSync("/Users/s32863/personal/elektron/.env", "utf8")
+  const line = fs.readFileSync("/Users/s32863/personal/positron/.env", "utf8")
     .split("\n").find(l => l.startsWith(key + "="));
   return line ? line.slice(key.length + 1).trim() : "";
 }

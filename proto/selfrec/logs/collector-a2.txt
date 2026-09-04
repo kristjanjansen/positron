@@ -1,2 +1,2 @@
-selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-a2.jsonl
-selfrec-collector on :8894 -> /Users/s32863/personal/elektron/results/selfrec-a2.jsonl
+selfrec-collector on :8894 -> /Users/s32863/personal/positron/results/selfrec-a2.jsonl
+selfrec-collector on :8894 -> /Users/s32863/personal/positron/results/selfrec-a2.jsonl

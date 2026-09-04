@@ -43,7 +43,7 @@ decades view, virtualized DOM <img> thumbnail cards.
 
 - `census.mjs`: one POST /search per year 1908–2026 (limit 1, type 'all'),
   direct upstream (node-side, no CORS), 1.1 s spacing, UA
-  elektron-megatimeline-proto/0.1. Resumable: skips years already in
+  positron-megatimeline-proto/0.1. Resumable: skips years already in
   census.json, rewrites the file (atomic tmp+rename) after every year.
 - **Run: 119/119 years, 119 requests, ~2.3 min, zero errors** → census.json.
 - Whole-archive totals (per-type count sums over all years):

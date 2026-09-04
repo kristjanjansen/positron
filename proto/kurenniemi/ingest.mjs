@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const UA = 'elektron-timeline-research/0.1 (https://elektron.art; kristjan.jansen@gmail.com)';
+const UA = 'positron-timeline-research/0.1 (https://elektron.art; kristjan.jansen@gmail.com)';
 const RETRIEVED = new Date().toISOString().slice(0, 10);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -1,5 +1,10 @@
 {
   "name": "elektron-cues",
+  // Public hostname(s) on positron.studio (Cloudflare Registrar zone, added
+  // 2026-09-04). workers_dev stays TRUE on purpose: the .workers.dev name keeps
+  // serving, so the move is additive and every old link still resolves.
+  "routes": [{ "pattern": "cues.positron.studio", "custom_domain": true }],
+  "workers_dev": true,
   "main": "src/index.js",
   "compatibility_date": "2026-08-01",
   "durable_objects": {

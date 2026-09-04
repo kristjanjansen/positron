@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron selfrec composed replay</title>
+<title>positron selfrec composed replay</title>
 <style>
 html,body{margin:0;padding:0;background:#0b0e12;color:#dfe5ec;font:13px monospace}
 #tiles{display:flex;gap:8px;padding:8px}
@@ -88,8 +88,8 @@ const q = new URLSearchParams(location.search);
 const SHOWID = q.get("show");
 const ROOMQ = q.get("room");
 const TOKEN = q.get("token") || "";
-const RTCBASE = q.get("rtcbase") || "https://elektron-rtc.kristjan-jansen.workers.dev";
-const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const RTCBASE = q.get("rtcbase") || "https://rtc.positron.studio";
+const PUB = q.get("pub") || "https://archive.positron.studio";
 // Default mapping is LINEAR (span.at + skewEst), not per-chunk re-anchored:
 // measured on the sync regression, the re-anchor's byte->time interpolation
 // noise (clusters every ~3.5 s, VBR bytes) is ±100-270 ms — BIGGER than the

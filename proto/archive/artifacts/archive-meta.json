@@ -1,6 +1,6 @@
 {
   "room": "archive-test",
-  "recdir": "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec",
+  "recdir": "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/archive-rec",
   "bucket": "elektron-archive-test",
   "prefix": "shows/archive-test",
   "hlsUrl": "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8",

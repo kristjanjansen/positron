@@ -5,7 +5,7 @@ PROTO B (proto/centralrec, :8893) untouched.
 
 ## Checkpoint 1 — worker deployed + smoke green (2026-08-27 ~08:31 UTC)
 
-- **Worker `elektron-selfrec` DEPLOYED: https://elektron-selfrec.kristjan-jansen.workers.dev**
+- **Worker `elektron-selfrec` DEPLOYED: https://selfrec.positron.studio**
   (version 57d220f0). Source `workers/selfrec/` (new — workers/rtc untouched).
 - Routes (all Bearer `SELFREC_TOKEN`, secret set; token in
   `proto/selfrec/.env.selfrec`, gitignored via `.env.*`):
@@ -19,7 +19,7 @@ PROTO B (proto/centralrec, :8893) untouched.
   - `POST /delete/<show>` → deletes whole `selfrec/<show>/` prefix — the
     consent story in one call (smoke debris deleted this way, 3 objects).
 - Public read via the bucket's existing dev URL
-  `https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/selfrec/...` — HEAD
+  `https://archive.positron.studio/selfrec/...` — HEAD
   shows Content-Length + ETag(==md5, single-part, proven in proto/archive);
   bucket CORS already allows GET/HEAD `*` (proto/archive/cors.json).
 - Wrangler ran from `workers/selfrec` (no .env) with CF_*/CLOUDFLARE_* env
@@ -80,11 +80,11 @@ PROTO B (proto/centralrec, :8893) untouched.
 ## Kept / deleted
 
 - KEPT worker: `elektron-selfrec` @
-  https://elektron-selfrec.kristjan-jansen.workers.dev (57d220f0, secret
+  https://selfrec.positron.studio (57d220f0, secret
   SELFREC_TOKEN; token in proto/selfrec/.env.selfrec, gitignored).
 - KEPT proof show: `r2://elektron-archive-test/selfrec/a1-20260827T083642/p1/`
   — 46 objects = chunk-00000..00044.webm + manifest.json, **13,144,496 B**.
-  Manifest: https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/selfrec/a1-20260827T083642/p1/manifest.json
+  Manifest: https://archive.positron.studio/selfrec/a1-20260827T083642/p1/manifest.json
 - DELETED debris (all via POST /delete/<show>, spot 404-verified):
   smoke (11 obj), a2 rev1 (46), a2 rev2 (46), a3 (22), a4 (16) — R2 net kept
   = 13.1 MB, far under the 200 MB budget.

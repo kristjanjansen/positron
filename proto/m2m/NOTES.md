@@ -741,7 +741,7 @@ probing; spec: status ∈ active|inactive|waiting).
     REMOTE=1 LABEL=x DURATION=120 node run-grid.mjs  # full program vs Worker
     python3 analyze-grid.py ../../results/m2m-grid-x.jsonl
   Manual browsing: open http://127.0.0.1:8897/grid.html?id=Q&name=You&role=operator
-  (+ &remote=https://elektron-rtc.kristjan-jansen.workers.dev&token=<ROOM_TOKEN>
+  (+ &remote=https://rtc.positron.studio&token=<ROOM_TOKEN>
   for production). gUM deliberately NOT wired (camera wedged) — source
   abstraction marked in grid.html (makeSyntheticSource -> makeCameraSource).
 - CLEANUP: server :8897 stopped, 0 m2m-grid-udd chromes (verified by path),
@@ -1235,7 +1235,7 @@ SFU 4K MATRIX (all arms: 2160p locked, resChanges 0, qlDur.bandwidth 0.0 s):
 vs 720p SFU baseline p50 74-95 ms and MoQ 4K30 47 ms / 30 fps (same machine, RUNBOOK §9).
 
 ### Checkpoint 4K-B1 — Stream HLS: 4K ingest ACCEPTED, output CAPPED at 1080p (10:37-10:38 EEST)
-Own input 8c1e9933855ea875e64cdfe6c82f9141 (elektron-4k-hls-test, preferLowLatency true,
+Own input 8c1e9933855ea875e64cdfe6c82f9141 (positron-4k-hls-test, preferLowLatency true,
 recording automatic — REQUIRED for live playback manifests; brief said "recording off" but an
 off-mode input has no playback URLs to measure). Push: ffmpeg@7 (ffmpeg 9 dropped
 -filter_script), testsrc2 3840x2160@30, x264 superfast High 5.1 CBR 13 Mbps, GOP 60, epoch

@@ -56,7 +56,7 @@ function upstreamSearch(body) {
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
-          'User-Agent': 'elektron-remixer-proto/0.1',
+          'User-Agent': 'positron-remixer-proto/0.1',
         },
       },
       (res) => {

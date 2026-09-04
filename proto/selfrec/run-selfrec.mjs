@@ -28,11 +28,11 @@ import fs from "fs";
 import crypto from "crypto";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/selfrec`;
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
-const BASE = "https://elektron-selfrec.kristjan-jansen.workers.dev";
-const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+const BASE = "https://selfrec.positron.studio";
+const PUB = "https://archive.positron.studio";
 const SCENARIO = (process.env.SCENARIO || "smoke").toLowerCase();
 const RUNTS = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
 const PART = "p1";

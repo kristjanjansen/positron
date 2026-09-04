@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ELEKTRON MoQ Safari Test</title>
+<title>POSITRON MoQ Safari Test</title>
 <style>
 	* { margin: 0; padding: 0; box-sizing: border-box; }
 	body { background: #0b0e14; color: #e6e6e6; font-family: -apple-system, "SF Pro", Helvetica, monospace, sans-serif; padding: 14px; padding-bottom: 40px; }
@@ -18,7 +18,7 @@
 	#tap { font-size: 34px; font-weight: bold; padding: 30px 50px; background: #ffd400; color: #000; border: none; border-radius: 14px; cursor: pointer; }
 </style>
 <body>
-	<h1>ELEKTRON MOQ TEST</h1>
+	<h1>POSITRON MOQ TEST</h1>
 	<div id="st-ua" class="st dim"></div>
 	<div id="st-wt" class="st wait">Checking WebTransport…</div>
 	<div id="st-codec" class="st wait">Checking H.264 decoder…</div>
@@ -38,7 +38,7 @@
 		const $ = (id) => document.getElementById(id);
 		const params = new URLSearchParams(location.search);
 		const codec = params.get("codec") ?? "avc1.42001f";
-		const ns = params.get("namespace") ?? params.get("ns") ?? "elektron-safari-test";
+		const ns = params.get("namespace") ?? params.get("ns") ?? "positron-safari-test";
 		const relay = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 		$("st-meta").textContent = `namespace=${ns} · relay=${relay.replace("https://", "")} · codec=${codec}`;
 		$("st-ua").textContent = navigator.userAgent;

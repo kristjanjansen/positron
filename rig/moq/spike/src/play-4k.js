@@ -7,7 +7,7 @@ import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("ns") ?? "elektron-4k-test-dev";
+const NS = params.get("ns") ?? "positron-4k-test-dev";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const NAME = params.get("name") ?? "dev";
 const CODEC_OVERRIDE = params.get("codec");

@@ -13,10 +13,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const BASE = process.env.VIEW_BASE || 'https://elektron-view.kristjan-jansen.workers.dev';
+const BASE = process.env.VIEW_BASE || 'https://positron.studio';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9412;
-const PROFILE = '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/view-chrome-profile';
+const PROFILE = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/view-chrome-profile';
 const SHOTS = join(HERE, 'shots');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -172,7 +172,7 @@ async function common(page) {
 // ── 0. index menu ───────────────────────────────────────────────────────────
 console.log('\n[0] index menu');
 await goto('/', { settle: 600 });
-ok('index', 'served 200 html', await evaluate(`document.title`) === 'ELEKTRON — viewing surfaces', await evaluate(`document.title`));
+ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON — viewing surfaces', await evaluate(`document.title`));
 const links = await evaluate(`[...document.querySelectorAll('a.card')].map(a => a.getAttribute('href'))`);
 ok('index', 'lists all four pages', links.length === 4 && links.every((h) => h.startsWith('/proto/')), links.join(' '));
 const tap = await evaluate(`(() => { const r = document.querySelector('a.card').getBoundingClientRect(); return Math.round(r.height); })()`);
@@ -217,7 +217,7 @@ ok('megatimeline', 'dive loads items from committed cache', dived.items > 0, `ti
 // "never goes upstream" — it is "nothing bypasses the gate and nothing is
 // refused", so measure that, and report the split honestly.
 const mtSearch = netlog.filter((n) => n.url.includes('/api/search'));
-const mtCached = mtSearch.map((n) => n.headers['x-elektron-cache']);
+const mtCached = mtSearch.map((n) => n.headers['x-positron-cache']);
 const nCached = mtCached.filter((c) => c !== 'miss').length;
 ok('megatimeline', 'every dive search answered 200 (none gate-refused)',
   mtSearch.length > 0 && mtSearch.every((n) => n.status === 200),
@@ -237,7 +237,7 @@ try {
 await sleep(4000);
 const searchResponses = netlog.filter((n) => n.url.includes('/api/search'));
 ok('remixer', 'search round-trips through the proxy', searchResponses.length > 0 && searchResponses.every((r) => r.status === 200),
-  searchResponses.map((r) => `${r.status} cache=${r.headers['x-elektron-cache']} upstream=${r.headers['x-elektron-upstream']}`).join(' | ') || 'no /api/search seen ' + (searched ?? ''));
+  searchResponses.map((r) => `${r.status} cache=${r.headers['x-positron-cache']} upstream=${r.headers['x-positron-upstream']}`).join(' | ') || 'no /api/search seen ' + (searched ?? ''));
 const remixState = await evaluate(`(() => { const s = window.__remix.S; return { year: s.year, layers: window.__remix.layers().length, apiCalls: window.__remix.apiLog().length, errors: window.__remix.errors().length }; })()`);
 ok('remixer', 'search produced state', remixState.apiCalls > 0, JSON.stringify(remixState));
 await common('remixer');

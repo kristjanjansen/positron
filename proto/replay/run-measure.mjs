@@ -16,11 +16,11 @@ const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
-const UDD = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd-measure";
+const REMOTE = "https://rtc.positron.studio";
+const UDD = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/replay-test-udd-measure";
 const LOGDIR = `${HERE}/logs`;
 
 function envVal(k) {
@@ -51,10 +51,10 @@ function assertCheck(name, ok, detail) {
 
 // ---- 0. manifest PDT check --------------------------------------------------
 async function pdtCheck() {
-  const main = await (await fetch(HLS, { headers: { "User-Agent": "elektron-replay-rig/1.0" } })).text();
+  const main = await (await fetch(HLS, { headers: { "User-Agent": "positron-replay-rig/1.0" } })).text();
   const rendPath = main.split("\n").find(l => l && !l.startsWith("#"));
   const rendUrl = new URL(rendPath, HLS).href;
-  const rend = await (await fetch(rendUrl, { headers: { "User-Agent": "elektron-replay-rig/1.0" } })).text();
+  const rend = await (await fetch(rendUrl, { headers: { "User-Agent": "positron-replay-rig/1.0" } })).text();
   const hasPdt = main.includes("PROGRAM-DATE-TIME") || rend.includes("PROGRAM-DATE-TIME");
   assertCheck("vod-manifest-has-no-PDT", !hasPdt, `main ${main.length} B, rendition ${rend.length} B`);
   return !hasPdt;

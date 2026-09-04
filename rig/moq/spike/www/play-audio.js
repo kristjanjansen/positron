@@ -16552,7 +16552,7 @@ var require_play_audio = __commonJS({
     init_net();
     init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "elektron-audio-test";
+    var NS = params.get("ns") ?? "positron-audio-test";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var RUN_S = Number(params.get("dur") ?? 90);
     var NBLOCKS = 56;

@@ -52,7 +52,7 @@
 import { createNest } from './nested.mjs';
 
 export const SCORE_VERSION = 1;
-export const NS = 'org.elektron.timeline';
+export const NS = 'org.positron.timeline';
 
 // ---------------------------------------------------------------------------
 // 1. DECK IDENTITY — a ref is a string, and a deck is an object. The WeakMap is
@@ -637,7 +637,7 @@ export function exportProvenance(subject, opts = {}) {
 // --- (a) C2PA-shaped -------------------------------------------------------
 
 function c2paDoc(rows, opts) {
-  const agent = opts.softwareAgent || { name: 'elektron/timeline', version: '0.5' };
+  const agent = opts.softwareAgent || { name: 'positron/timeline', version: '0.5' };
   const ns = opts.ns || NS;
   const actions = [], ingredients = [];
   for (const r of rows) {
@@ -770,13 +770,13 @@ const C2PA_CAVEATS = [
 
 /** RFC 8216 §4.3.2.7. `X-` is *"a namespace reserved for client-defined
  *  attributes"*, and clients *"SHOULD use a reverse-DNS syntax"*. Our namespace
- *  is X-ORG-ELEKTRON-*. hls.js surfaces these already
+ *  is X-ORG-POSITRON-*. hls.js surfaces these already
  *  (`enableDateRangeMetadataCues`, default true) as metadata TextTrack cues. */
 function hlsDoc(rows, opts) {
   const anchor = opts.anchor === undefined ? 0
     : (opts.anchor instanceof Date ? opts.anchor.getTime() : (typeof opts.anchor === 'string' ? Date.parse(opts.anchor) : Number(opts.anchor)));
   if (!Number.isFinite(anchor)) throw new Error('exportProvenance(hls): `anchor` must be a Date/ISO string/epoch ms — EXT-X-DATERANGE START-DATE is WALL CLOCK, not a media offset');
-  const pfx = (opts.xPrefix || 'X-ORG-ELEKTRON').toUpperCase();
+  const pfx = (opts.xPrefix || 'X-ORG-POSITRON').toUpperCase();
   const cls = opts.class || `${NS}.quotation`;
   const tags = [], attrs = [];
   for (const r of rows) {
@@ -829,7 +829,7 @@ const HLS_CAVEATS = [
 
 /** OTIO has NO provenance in its schema; the sanctioned hook is the namespaced
  *  per-object `metadata` dict (Clip, Track, Timeline, MediaReference all have
- *  one). We put the whole quotation value there under `org.elektron.timeline`,
+ *  one). We put the whole quotation value there under `org.positron.timeline`,
  *  which means an OTIO round trip through any conforming tool preserves it
  *  verbatim — the one carrier that loses NOTHING, and the one nothing acts on.
  *  RationalTime rate is 1000 (ms), so no 23.976 rounding exists here at all. */
@@ -851,7 +851,7 @@ function otioDoc(rows, opts) {
       enabled: true,
       // source_range is in the SOURCE's domain — which is exactly our in/out.
       source_range: TR(r.childIn, r.childOut - r.childIn),
-      media_reference: { OTIO_SCHEMA: 'ExternalReference.1', target_url: `elektron:deck/${r.ref}`,
+      media_reference: { OTIO_SCHEMA: 'ExternalReference.1', target_url: `positron:deck/${r.ref}`,
         metadata: { [NS]: { ref: r.ref, unit: 'ms' } } },
       effects: r.rate !== 1 ? [{ OTIO_SCHEMA: 'LinearTimeWarp.1', name: `rate ${r.rate}`, effect_name: 'LinearTimeWarp', time_scalar: r.rate }] : [],
       markers: (r.marks ? Object.entries(r.marks) : []).filter(([, m]) => m && m.mark).map(([where, m]) => ({
@@ -873,7 +873,7 @@ function otioDoc(rows, opts) {
   }
   const doc = {
     OTIO_SCHEMA: 'Timeline.1',
-    name: opts.title || 'elektron score',
+    name: opts.title || 'positron score',
     global_start_time: RT(0),
     metadata: { [NS]: { v: SCORE_VERSION, unit: 'ms', rate, generator: 'timeline/score.mjs' } },
     tracks: {

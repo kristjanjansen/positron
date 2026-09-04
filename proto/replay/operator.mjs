@@ -8,11 +8,11 @@
 // Usage: BASE_MS=<epoch ms> [ROOM=replay-test] [OUT=…/operator-log.json] node operator.mjs
 import fs from "fs";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const ENV = fs.readFileSync(`${ROOT}/.env`, "utf8").split("\n");
 const TOKEN = ENV.find(l => l.startsWith("ROOM_TOKEN=")).slice(11).trim();
 const OP_TOKEN = (ENV.find(l => l.startsWith("OPERATOR_TOKEN=")) || "").slice(15).trim();
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE = "https://rtc.positron.studio";
 const ROOM = process.env.ROOM || "replay-test";
 const BASE = parseInt(process.env.BASE_MS || "0", 10);
 const OUT = process.env.OUT || `${ROOT}/proto/replay/artifacts/operator-log.json`;

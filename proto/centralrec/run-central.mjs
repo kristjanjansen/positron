@@ -25,16 +25,16 @@ const KILL_AT_S = parseInt(process.env.KILL_AT_S || "30", 10);
 const REJOIN_AFTER_S = parseInt(process.env.REJOIN_AFTER_S || "10", 10);
 const RID = process.env.RID || "";
 const SIMUL = process.env.SIMUL === "1";
-const REMOTE_URL = process.env.REMOTE_URL || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE_URL = process.env.REMOTE_URL || "https://rtc.positron.studio";
 const PORT = 8893;
 const BASE = `http://127.0.0.1:${PORT}`;
-const HERE = "/Users/s32863/personal/elektron/proto/centralrec";
-const ROOT = "/Users/s32863/personal/elektron";
+const HERE = "/Users/s32863/personal/positron/proto/centralrec";
+const ROOT = "/Users/s32863/personal/positron";
 const LOGDIR = `${HERE}/logs`;
 const ROOM = `centralrec-${LABEL}-${Date.now().toString(36)}`;   // fresh per run (rerun-poison rule)
 const RESULTS = `${ROOT}/results/centralrec-${LABEL}.jsonl`;
 const RECDIR = `${HERE}/recordings/${LABEL}`;
-const UDD_BASE = `/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/centralrec-udd-${LABEL}`;
+const UDD_BASE = `/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/centralrec-udd-${LABEL}`;
 fs.mkdirSync(LOGDIR, { recursive: true });
 fs.mkdirSync(RECDIR, { recursive: true });
 

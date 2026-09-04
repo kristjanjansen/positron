@@ -1,6 +1,12 @@
 # elektron-rtc — DEPLOYED
 
-**URL:** `https://elektron-rtc.kristjan-jansen.workers.dev`
+> Public hostname is **`rtc.positron.studio`** (custom domain, 2026-09-04). The
+> Worker script name is still `elektron-rtc` — renaming a script creates a NEW
+> Worker and abandons its Durable Objects, so the name stays and the domain
+> carries the identity. `*.workers.dev` is still enabled as a fallback.
+
+
+**URL:** `https://rtc.positron.studio`
 **Deployed:** 2026-08-26 07:17 (version b8842387). Status: **live and verified** (node WS clients,
 2026-08-26 07:21). Protocol below is exactly as implemented — no changes were needed during
 verification.

@@ -23,11 +23,11 @@ const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/archive`;
 const REPLAY = `${ROOT}/proto/replay`;
 const BASE = "http://127.0.0.1:8885";
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE = "https://rtc.positron.studio";
 // Fresh room + recdir + R2 prefix PER RUN by default (timestamp suffix): the
 // cuelog, local segments and R2 objects of one run can never poison a rerun
 // (per-room cuelog is append-only; a reused prefix would clobber/mix segments).
@@ -37,12 +37,12 @@ const ROOM = process.env.ROOM || `archive-test-${RUNTS}`;
 const NOPUB = process.env.NOPUB === "1";
 const DURATION_S = parseInt(process.env.DURATION || "190", 10);
 const OFFSETS = process.env.OFFSETS || "15,36,57,78,99,120,141,162";   // 8 cues, now/sched alternating
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
+const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
 const RECDIR = process.env.RECDIR || `${SCRATCH}/archive-rec-${RUNTS}`;
 const UDD_BASE = `${SCRATCH}/archive-test-udd`;
 const BUCKET = "elektron-archive-test";
 const PREFIX = `shows/${ROOM}`;
-const PUBBASE = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const PUBBASE = "https://archive.positron.studio";
 const LOGDIR = `${HERE}/logs`;
 fs.mkdirSync(LOGDIR, { recursive: true });
 fs.mkdirSync(`${HERE}/artifacts`, { recursive: true });

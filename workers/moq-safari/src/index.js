@@ -231,7 +231,7 @@ export class BeaconStore {
 	td.ok { color:#4ade80; }
 	td.err { color:#f87171; max-width: 340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
-<h1>ELEKTRON MoQ — device verdicts (${rows.length})</h1>
+<h1>POSITRON MoQ — device verdicts (${rows.length})</h1>
 <p>One row per test-page load, newest first, last ${MAX_SESSIONS} kept. Times UTC; hover a row's
 time for last-seen + session id, hover the browser for the full UA. <a style="color:#ffd400" href="/results?json=1">raw json</a></p>
 <div class="wrap"><table>

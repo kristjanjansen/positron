@@ -86,12 +86,12 @@ This is the ONLY way to create a relay until Cloudflare publishes the MoQ API pe
 2. In the left sidebar go to **Media → Realtime → MoQ Relay** (docs name this exact path; the
    Realtime section is the one that already holds the "flabbergaster" Calls app).
 3. Click **Create relay** (beta — free at any scale during beta). Give it a recognisable name,
-   e.g. `elektron-rig`.
+   e.g. `positron-rig`.
 4. **The creation screen is shown ONCE and secrets are never retrievable again.** It returns:
    - the **relay ID**,
    - **two default tokens**: one with `publish+subscribe` operations, one `subscribe`-only.
    Copy all three **before leaving the page**.
-5. Save them into `/Users/s32863/personal/elektron/.env` (already chmod 600, gitignored) as:
+5. Save them into `/Users/s32863/personal/positron/.env` (already chmod 600, gitignored) as:
    ```
    MOQ_RELAY_ID=…
    MOQ_TOKEN_PUBSUB=…   # publish+subscribe default token
@@ -168,7 +168,7 @@ All commands run in Docker (native builds are killed by ThreatLocker — §3.5).
 (✅ done, repeatable):
 
 ```bash
-cd /Users/s32863/personal/elektron/rig/moq
+cd /Users/s32863/personal/positron/rig/moq
 docker build -t moq-dev -f Dockerfile.moq-dev .            # rust:1-bookworm + ffmpeg
 # draft-14 worktree: git -C moq-rs fetch origin draft-ietf-moq-transport-14:refs/remotes/origin/draft-ietf-moq-transport-14
 #                    git -C moq-rs worktree add ../moq-rs-draft14 origin/draft-ietf-moq-transport-14
@@ -186,9 +186,9 @@ docker run --rm -v "$PWD":/moq -v moq-target16:/target -e CARGO_TARGET_DIR=/targ
 
 ```bash
 # canned tests (clock latency / media e2e):
-docker run --rm -v /Users/s32863/personal/elektron/rig/moq:/moq -v moq-target14:/target \
+docker run --rm -v /Users/s32863/personal/positron/rig/moq:/moq -v moq-target14:/target \
   moq-dev bash /moq/test-draft14-inner.sh clock 40
-docker run --rm -v /Users/s32863/personal/elektron/rig/moq:/moq -v moq-target14:/target \
+docker run --rm -v /Users/s32863/personal/positron/rig/moq:/moq -v moq-target14:/target \
   moq-dev bash /moq/test-draft14-inner.sh media 30
 
 # raw shapes (inside the container; binaries at /target/release):
@@ -470,7 +470,7 @@ catalog-fetch step and looks shimmable in ~100 lines."**
 
 ### 8.1 The URL
 
-**https://elektron-moq-safari.kristjan-jansen.workers.dev** — open it in Safari (desktop or
+**https://moq.positron.studio** — open it in Safari (desktop or
 iPhone), tap **TAP TO START**. Query overrides: `?relay=`, `?namespace=` (alias `?ns=`),
 `?codec=`, `?auto=1` (skip the tap gate), `?log=<url>` (extra POST log collector for rig runs).
 
@@ -486,11 +486,11 @@ a phone in someone's hand is observed from this machine.
 ### 8.2 Architecture
 
 - **Publisher (this Mac, long-lived)**: headless Chrome → `rig/moq/spike/www/pub-safari.html`
-  (bundle of `spike/src/pub-safari.js`) — canvas 1280x720@30 ("ELEKTRON MOQ TEST", UTC clock,
+  (bundle of `spike/src/pub-safari.js`) — canvas 1280x720@30 ("POSITRON MOQ TEST", UTC clock,
   burned-ms binary row, motion blocks) → WebCodecs **H.264 `avc1.42001f` annexb** (baseline —
   the Safari-safe codec; annexb keeps SPS/PPS in-band so the decoder needs NO description)
   → hang legacy container → `@moq/net` → `https://draft-14.cloudflare.mediaoverquic.com`,
-  namespace **`elektron-safari-test`**. Catalog republished every 2 s (§7.1 trap 1);
+  namespace **`positron-safari-test`**. Catalog republished every 2 s (§7.1 trap 1);
   self-heals by page-reload on connection loss. Page served by `spike/pubserver.py` on :8890
   (also collects the publisher's own POST /log into `spike/logs/moq-safari-pub.log`).
 - **Player (deployed)**: Worker **`elektron-moq-safari`** (`workers/moq-safari/`) — static
@@ -541,7 +541,7 @@ this is from /beacon in `wrangler tail`):
 pkill -f moq-safari-pub-udd            # the headless-Chrome publisher
 pkill -f pubserver.py                  # its page/log server on :8890
 # START (both detached, survive shell exit):
-cd /Users/s32863/personal/elektron/rig/moq/spike
+cd /Users/s32863/personal/positron/rig/moq/spike
 nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
 nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
   --user-data-dir="$PWD/logs/moq-safari-pub-udd" --no-first-run \
@@ -564,7 +564,7 @@ UA, stage, fps, errors — the verdict writes itself from one screen on each sid
 
 ### 8.8 Persistent verdicts — no live tail needed (✅ deployed + verified 2026-08-26 06:40 UTC)
 
-**https://elektron-moq-safari.kristjan-jansen.workers.dev/results** (`?json=1` for raw) —
+**https://moq.positron.studio/results** (`?json=1` for raw) —
 beacons now ALSO persist into a SQLite Durable Object (BeaconStore, last 200 sessions), so the
 page works as an **async device-verdict collector**: forward the test URL to anyone (Android
 owners etc.), read their row here later. One row per page load (per-load `sid` added to both
@@ -584,7 +584,7 @@ H264:✓ / connect 159 ms / first frame 401 ms / 30 fps / g2g p50 44 ms / 0 erro
 
 Question: from this Mac, through CF's draft-14 relay, how far can resolution/framerate go — 4K? 60 fps? — and
 what does it do to latency? Method: parameterized clones of the §8 pipeline (`src/pub-4k.js` / `src/play-4k.js`,
-bundles in `www/`, served by `matrixserver.py :8894`), one namespace per config (`elektron-4k-test-<cfg>`),
+bundles in `www/`, served by `matrixserver.py :8894`), one namespace per config (`positron-4k-test-<cfg>`),
 90–100 s each, H.264 annexb hw-encode (VideoToolbox via WebCodecs `hardwareAcceleration:"prefer-hardware"` —
 probed per config, all TRUE incl. 4K60 High 5.2), measured by a local headless-Chromium player running the same
 code path as the deployed page (per-frame burned-row g2g → `results/moq-4k-<cfg>.jsonl`).
@@ -634,7 +634,7 @@ code path as the deployed page (per-frame burned-row g2g → `results/moq-4k-<cf
   UNTESTED → the §9.5 swap still did stop-old-first.
 
 ### 9.4 What runs NOW (since 2026-08-26 07:00 UTC)
-**`elektron-safari-test` carries 4K30** — `pub-4k.html?ns=elektron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000`,
+**`positron-safari-test` carries 4K30** — `pub-4k.html?ns=positron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000`,
 headless Chrome udd `logs/moq-4k-pub-udd`, page still served by `pubserver.py :8890` (kept alive — it serves the
 new publisher page and collects its `/log` into `logs/moq-safari-pub.log`, same file, lines now prefixed `PUB4K`).
 The old 720p30 publisher Chrome (`moq-safari-pub-udd`) was stopped only AFTER the deployed workers.dev page was
@@ -644,7 +644,7 @@ errors, g2g p50 47 / p95 66–80 ms, first frame 437 ms, catalog codec auto-pick
 
 ### 9.5 Restart commands (publisher dies with sleep/reboot — §8.6 caveat applies)
 ```bash
-cd /Users/s32863/personal/elektron/rig/moq/spike
+cd /Users/s32863/personal/positron/rig/moq/spike
 # page/log server (if not already up):
 nohup python3 pubserver.py 8890 > logs/moq-safari-pub-server.out 2>&1 & disown
 # the 4K30 publisher:
@@ -653,11 +653,11 @@ nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=
   --autoplay-policy=no-user-gesture-required --window-size=1300,760 \
   --disable-background-timer-throttling --disable-renderer-backgrounding \
   --disable-backgrounding-occluded-windows \
-  "http://127.0.0.1:8890/pub-4k.html?ns=elektron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000" \
+  "http://127.0.0.1:8890/pub-4k.html?ns=positron-safari-test&codec=avc1.640033&w=3840&h=2160&fps=30&bitrate=12000000&statsms=60000" \
   > logs/moq-4k-pub-chrome.log 2>&1 & disown
 # STOP: pkill -f moq-4k-pub-udd    (fall back to 720p30: §8.6 START block, unchanged)
 # Re-run the matrix: python3 matrixserver.py 8894 &  then pub-4k.html/play-4k.html with
-# ?ns=elektron-4k-test-<cfg>&codec=&w=&h=&fps=&bitrate=[&cbr=1&noise=1]; player JSONL lands in
+# ?ns=positron-4k-test-<cfg>&codec=&w=&h=&fps=&bitrate=[&cbr=1&noise=1]; player JSONL lands in
 # results/moq-4k-<name>.jsonl via &name=. Rebuild after src edits: §6.3 docker esbuild, entries
 # src/pub-4k.js / src/play-4k.js.
 ```
@@ -666,8 +666,8 @@ nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=
 
 ⏱ 2026-08-26 ~07:00–07:20 UTC (audio-spike agent). Status: ✅ built + measured in Chromium;
 ✅ deployed page extended with an audio probe + audio playback; Safari verdict = research says
-YES (26.0+), device probe live and awaiting a phone visit. Own namespace **`elektron-audio-test`**
-(the sibling-owned `elektron-safari-test` and its publisher untouched).
+YES (26.0+), device probe live and awaiting a phone visit. Own namespace **`positron-audio-test`**
+(the sibling-owned `positron-safari-test` and its publisher untouched).
 
 ### 10.0 Research — WebCodecs audio in Safari/WebKit (📄 sources, checked 2026-08-26)
 
@@ -697,7 +697,7 @@ Publisher `spike/src/pub-audio.js` (page `www/pub-audio.html`, server `spike/aud
 JS (48 kHz stereo f32-planar, 960-frame/20 ms chunks, generated *behind* real time on a 10 ms
 timer like a capture device) → **AudioEncoder Opus 48k stereo 96 kbps** (AAC-LC fallback coded
 but unused — Chromium supports opus) → hang legacy container track `audio` (new group per 1 s)
-alongside the §8-style H.264 720p30 `video` track, namespace `elektron-audio-test`. Catalog =
+alongside the §8-style H.264 720p30 `video` track, namespace `positron-audio-test`. Catalog =
 hang RootSchema with BOTH sections; audio rendition carries the encoder's OpusHead as base64
 `description`. Signal design: 4-note background sequence (330/392/440/494 Hz, 250 ms each, amp
 0.08) + **6 ms 2 kHz tick at amp 0.9 whenever wall-clock ms crosses a 500 ms boundary**; audio
@@ -764,11 +764,11 @@ will sooner or later be seconds off without knowing it.**
   Op:/AAC: flags in features. NOTE: on phones aLat carries the device-clock offset (like g2g),
   but **avSkew subtracts the video delta so the clock offset cancels — skew is exact on any
   device**.
-- Default namespace unchanged (`elektron-safari-test` — video-only, sibling-owned); audio is
-  reachable on any device via **`?namespace=elektron-audio-test`**.
+- Default namespace unchanged (`positron-safari-test` — video-only, sibling-owned); audio is
+  reachable on any device via **`?namespace=positron-audio-test`**.
 
 **What the user does on the iPhone**: open
-`https://elektron-moq-safari.kristjan-jansen.workers.dev/?namespace=elektron-audio-test`
+`https://moq.positron.studio/?namespace=positron-audio-test`
 in Safari, tap TAP TO START, listen for ~30 s (expect the 4-note loop + 2 ticks/s alongside
 the video). Then check `/results` from anywhere: the phone's row shows Op:/AAC: probe verdicts
 (these alone settle "does iOS decode WebCodecs audio"), audioCodec/audioState (a `susp` marker
@@ -788,7 +788,7 @@ WT ✓ H264 ✓ live) predate the audio deploy by 3 min — a revisit will fill 
 pkill -f moq-audio-pub-udd
 pkill -f audioserver.py
 # START again (both detached):
-cd /Users/s32863/personal/elektron/rig/moq/spike
+cd /Users/s32863/personal/positron/rig/moq/spike
 nohup python3 audioserver.py 8896 > logs/moq-audio-server.out 2>&1 & disown
 nohup "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
   --user-data-dir="$PWD/logs/moq-audio-pub-udd" --no-first-run \
@@ -809,7 +809,7 @@ the hang container over CF's draft-14 relay measures g2g p50 32.6 ms / p95 41.6 
 0 decode errors in 90 s, 0.9 % late chunks at a 60 ms jitter cushion. Safari decode: research
 says YES since Safari/iOS 26.0 (2025-09-15 — AudioDecoder Opus ≤2ch + AAC-LC, WebKit source
 confirms), and the deployed test page now probes + plays + beacons audio on any device —
-iPhone row in /results pending a user visit with ?namespace=elektron-audio-test. Watch out:
+iPhone row in /results pending a user visit with ?namespace=positron-audio-test. Watch out:
 (a) decoder output timestamps are regenerated — sync on container timestamps, never on
 AudioData.timestamp (§10.2); (b) Opus is the cross-browser audio codec (Chromium lacks AAC,
 Safari has both); (c) Safari's AAC *encoder* description is broken (WebKit #302253) — publish
@@ -836,7 +836,7 @@ new explicit on-page line + beacon). New big on-page verdict line `st-averdict`
 ("AUDIO: SOUNDING — level −25 dB"). New beacon/row fields `audioLevelDb, silentSeconds, pcmDb`
 (+ `audioState` now a verdict, not the raw ctx state); /results audio cell shows
 `opus SOUNDING −25dB …` / `no-track` / `SILENT⚠ Ns`. Verified headless (rows in /results,
-udd `moq-sndchk`, killed after): `?namespace=elektron-audio-test` → row `7fe1f0dc` opus
+udd `moq-sndchk`, killed after): `?namespace=positron-audio-test` → row `7fe1f0dc` opus
 **sounding −25 dB** (pcm −21 dB, aLat 40 ms, skew −2 ms, 0 dec errors); default video-only 4K
 namespace → row `4adfed8f` **no-track** (live, 0 errors). Publishers untouched.
 
@@ -916,7 +916,7 @@ mediamtx 1.20.1's MoQ server is NOT WARP/CMAF. What it actually speaks, from
 ## 13. Multi-publisher + role flip — CF relay fan-IN, viewer→publisher, publisher death
 
 ⏱ START 2026-08-26 07:40 UTC (multi-publisher agent; this agent owns §13 only, port 8887,
-udd prefix `moq-mgrid`, namespaces `elektron-mgrid-*`). Comparator: the SFU grid
+udd prefix `moq-mgrid`, namespaces `positron-mgrid-*`). Comparator: the SFU grid
 (plan-m2m §6 — N=54 clean / p95 ~158 ms flat; promote cmd→video ~0.5 s; death 38–126 ms
 via DO `left`; rejoin ~3–3.9 s).
 
@@ -927,7 +927,7 @@ via DO `left`; rejoin ~3–3.9 s).
   (→ `results/moq-mgrid-*.jsonl`) + **/roster** + **/cmd**. Publishers: 320x180@15 canvas
   (id + burned row = 32-bit low wall-ms + 8-bit XOR in 40×8 px blocks), H.264 baseline
   `avc1.42001f` annexb 300 kbps, GOP 1 s, catalog republish 2 s, `latencyMax:2000`,
-  one namespace `elektron-mgrid-p{N}` per participant, sw encode (no VT preference —
+  one namespace `positron-mgrid-p{N}` per participant, sw encode (no VT preference —
   keeps hw sessions free at tiny res). Probes: 2 pages, each ONE MoQ connection,
   subscribe-all-in-roster (1 s poll), per-pub VideoDecoder + row decode, per-frame
   `{k:"f",pub,t,d}` + race/close/silent events (silence watchdog: >500 ms without a
@@ -1035,12 +1035,12 @@ WT out, draft-19) → headless Chrome 151 shim player. Data: `results/moq-mtx-lo
 one-clock g2g stays valid) | HOST ffmpeg (h264 baseline -g 30 zerolatency + aac, fMP4
 `empty_moov+frag_every_frame+separate_moof+omit_tfhd_offset`) | Docker `moq-pub`
 (draft-14, §4 recipe) → `https://draft-14.cloudflare.mediaoverquic.com`, namespace
-`elektron-shim-test` (`rig/moq/mtx/run-cfpub.sh`; Docker clock resynced first, §4 trap).
-Player: the IDENTICAL bundle, `?url=…cloudflare…&ns=elektron-shim-test&fp=0`.
+`positron-shim-test` (`rig/moq/mtx/run-cfpub.sh`; Docker clock resynced first, §4 trap).
+Player: the IDENTICAL bundle, `?url=…cloudflare…&ns=positron-shim-test&fp=0`.
 
 - WARP catalog observed off CF (verbatim, first bytes ever decoded cross-ecosystem):
   `{"version":1,"streamingFormat":1,"streamingFormatVersion":"0.2","supportsDeltaUpdates":
-  true,"commonTrackFields":{"namespace":"/elektron-shim-test","packaging":"cmaf",
+  true,"commonTrackFields":{"namespace":"/positron-shim-test","packaging":"cmaf",
   "renderGroup":1},"tracks":[{"name":"1.m4s","initTrack":"0.mp4","selectionParams":
   {"codec":"avc1.42C01F","width":1280,"height":720}},{"name":"2.m4s","initTrack":"0.mp4",
   "selectionParams":{"codec":"mp4a.40.2",…}}]}`
@@ -1293,7 +1293,7 @@ Cleanup (08:35Z): ALL moq-mgrid Chromes killed (pubs, probes, victims, checkers,
 mgridserver.py :8887 stopped; roster gone with it. Siblings verified untouched and running
 after cleanup: 4K publisher (moq-4k-pub-udd) + pubserver :8890, audio publisher
 (moq-audio-pub-udd) + audioserver :8896, the §12 agent's mediamtx/ffmpeg stack, ports
-8888/8889 agents. Namespaces elektron-mgrid-* left to relay GC (all publishers dead;
+8888/8889 agents. Namespaces positron-mgrid-* left to relay GC (all publishers dead;
 free-beta relay, no persistent resources). No plan-file edits; §13 only.
 
 ⏱ END 2026-08-26 08:36 UTC — ~56 min active.

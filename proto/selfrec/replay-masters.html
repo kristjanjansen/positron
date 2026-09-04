@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron selfrec masters replay (Range+MSE, no ffmpeg)</title>
+<title>positron selfrec masters replay (Range+MSE, no ffmpeg)</title>
 <style>
 html,body{margin:0;padding:0;background:#0b0e12;color:#dfe5ec;font:13px monospace}
 #wrap{padding:8px}
@@ -46,7 +46,7 @@ video{width:640px;height:360px;background:#000;border:1px solid #2a3340;display:
 // ============================================================================
 const q = new URLSearchParams(location.search);
 const SHOW = q.get("show"), PID = q.get("pid");
-const PUB = q.get("pub") || "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const PUB = q.get("pub") || "https://archive.positron.studio";
 const WINDOW = parseInt(q.get("window") || "8000", 10);
 const video = document.querySelector("video");
 const bar = document.getElementById("bar");

@@ -16552,7 +16552,7 @@ var require_play_4k = __commonJS({
     init_net();
     init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "elektron-4k-test-dev";
+    var NS = params.get("ns") ?? "positron-4k-test-dev";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var NAME = params.get("name") ?? "dev";
     var CODEC_OVERRIDE = params.get("codec");

@@ -7,7 +7,7 @@ import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("ns") ?? "elektron-4k-test-dev";
+const NS = params.get("ns") ?? "positron-4k-test-dev";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const CODEC = params.get("codec") ?? "avc1.42001f";
 const W = parseInt(params.get("w") ?? "1280", 10);
@@ -80,7 +80,7 @@ function draw() {
 	for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
 	ctx.font = "bold 72px monospace";
 	ctx.fillStyle = "#ffd400";
-	ctx.fillText("ELEKTRON MOQ " + W + "x" + H + "@" + FPS, 60, 300);
+	ctx.fillText("POSITRON MOQ " + W + "x" + H + "@" + FPS, 60, 300);
 	ctx.fillStyle = "#fff";
 	ctx.font = "bold 96px monospace";
 	ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

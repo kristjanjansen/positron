@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron grid</title>
+<title>positron grid</title>
 <style>
 :root{
   --bg:#0d0f12; --panel:#14171c; --edge:#242a33; --ink:#cfd6df; --dim:#6b7683;
@@ -50,7 +50,7 @@ section h2 .cnt{color:#3d4550;margin-left:6px}
 </head>
 <body>
 <header>
-  <h1>elektron · grid</h1>
+  <h1>positron · grid</h1>
   <span class="pill" id="roominfo">room —</span>
   <span class="pill"><span class="dot" id="sigdot"></span><span id="sigtxt">signaling</span></span>
   <span class="pill" id="pageinfo">live page –</span>
@@ -69,7 +69,7 @@ section h2 .cnt{color:#3d4550;margin-left:6px}
 <script>
 "use strict";
 // ============================================================================
-// elektron SHOW GRID (phase 3c — P3C SCORE agent's copy of grid.html; the
+// positron SHOW GRID (phase 3c — P3C SCORE agent's copy of grid.html; the
 // grid agent owns the original, room-churn copy-not-edit precedent).
 // DELTAS vs grid.html:
 //   1. `cue` frame handler — operator score commands {cmd:'rotate'|
@@ -84,7 +84,7 @@ section h2 .cnt{color:#3d4550;margin-left:6px}
 //      identical, for the A/B baseline.
 //   3. window.__roster() export — per-event programmatic state assertions.
 // ============================================================================
-// elektron TIERED GRID (phase 2) — three tiers on one page:
+// positron TIERED GRID (phase 2) — three tiers on one page:
 //   FEATURED  up to 2, full 640x360@30-class SFU tracks (1.2 Mbps)
 //   LIVE      paged, up to `ls` visible low-cost SFU tracks; pull-on-visible /
 //             tracks-close-on-hidden (plan-m2m §3 discipline, phase-1d proven)
@@ -94,7 +94,7 @@ section h2 .cnt{color:#3d4550;margin-left:6px}
 // DEPLOYED.md — flat join, trackNames, promote/demote operator frames,
 // everyone joins at tier wall). The local stub (grid-server.py) speaks the
 // SAME protocol at the SAME paths, so switching to production is one param:
-//   ?remote=https://elektron-rtc.kristjan-jansen.workers.dev&token=<ROOM_TOKEN>
+//   ?remote=https://rtc.positron.studio&token=<ROOM_TOKEN>
 // Death = `left` broadcast (socket close) + a 3 s
 // stats-stall watchdog. Publish leg carries the proven connect-retry
 // (room-churn.html: 8 s timeout -> teardown -> fresh session, 3 attempts,

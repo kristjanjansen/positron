@@ -1318,7 +1318,7 @@ carriers can hold and what no shipping tool reads.
   `c2pa.ingredient.v3` per quotation whose `metadata.regionOfInterest` is the
   portion of the SOURCE used. That sentence is the archival-quotation case
   written down by a standards body.
-- **`EXT-X-DATERANGE`**: one tag per claim, `X-ORG-ELEKTRON-*` reverse-DNS client
+- **`EXT-X-DATERANGE`**: one tag per claim, `X-ORG-POSITRON-*` reverse-DNS client
   attributes (RFC 8216 §4.3.2.7), off a required wall-clock `anchor` — an HLS
   export with no anchor is REJECTED, because START-DATE is not a media offset.
   hls.js surfaces these as metadata cues today (`enableDateRangeMetadataCues`),
@@ -1346,7 +1346,7 @@ this is the Kurenniemi segment, 0.5 on where it starts"). C2PA has exactly one
 confidence field and no way to say which part of a claim it qualifies, so a
 boundary certainty is exported as its OWN `c2pa.areaOfInterest` region widened by
 `widthMs` — the lossy mapping made visible instead of dropped — and the
-unquantised original rides along under `parameters["org.elektron.timeline"]`.
+unquantised original rides along under `parameters["org.positron.timeline"]`.
 
 **What a real implementation needs, stated in the export itself** (every doc
 carries a `caveats` array): signing (a c2pa Builder — `@contentauth/c2pa-web`

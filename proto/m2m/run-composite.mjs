@@ -29,11 +29,11 @@ const POLL_S = parseInt(process.env.POLL_S || "300", 10);   // recording-poll bu
 const NOPUB = process.env.NOPUB === "1";                    // smoke: no WHIP/ffmpeg at all
 const BASE = "http://127.0.0.1:8895";
 const ROOM = `p3b-${LABEL}`;
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
-const ROOT = "/Users/s32863/personal/elektron";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
+const ROOT = "/Users/s32863/personal/positron";
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3b-udd";
-const REMOTE_URL = "https://elektron-rtc.kristjan-jansen.workers.dev";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-p3b-udd";
+const REMOTE_URL = "https://rtc.positron.studio";
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 function envVal(key) {
@@ -91,7 +91,7 @@ function killByUddPrefix(prefix) {
 }
 async function cfStream(path) {
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}${path}`, {
-    headers: { "Authorization": `Bearer ${CF_API_TOKEN}`, "User-Agent": "elektron-p3b-rig/1.0" }
+    headers: { "Authorization": `Bearer ${CF_API_TOKEN}`, "User-Agent": "positron-p3b-rig/1.0" }
   });
   return r.json();
 }

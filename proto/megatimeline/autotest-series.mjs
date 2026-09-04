@@ -16,7 +16,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const PORT = 8892;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PROFILE = process.env.MT_CHROME_PROFILE ||
-  '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/mt-series-chrome-profile';
+  '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/mt-series-chrome-profile';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ─── spawn server ───────────────────────────────────────────────────────────

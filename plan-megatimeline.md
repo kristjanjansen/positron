@@ -124,7 +124,7 @@ that makes "tracks are queries, not containers" visibly true at archive scale.
   1908→2026 flight, decade→day dive into 1965, thumbs loading lazily, zero
   API hammering.
 - **v1**: click-to-remixer handoff; series/query tracks; aggregation smears
-  pre-rendered per tier; elektron's own shows as a track (the archive and the
+  pre-rendered per tier; positron's own shows as a track (the archive and the
   live platform on ONE surface — the §−1 continuum made visible).
 - **v2 (only on measured jank)**: thumbnail field onto canvas behind the
   image proxy; visualia RectsPass/texture-cache as spare parts.

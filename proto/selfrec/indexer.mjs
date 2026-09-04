@@ -38,10 +38,10 @@
 // ============================================================================
 import fs from "fs";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/selfrec`;
-const BASE = "https://elektron-selfrec.kristjan-jansen.workers.dev";
-const PUB = "https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev";
+const BASE = "https://selfrec.positron.studio";
+const PUB = "https://archive.positron.studio";
 
 function ts() { return new Date().toISOString().slice(11, 23); }
 function say(...a) { console.log(ts(), "idx|", ...a); }

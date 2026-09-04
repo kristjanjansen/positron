@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>elektron replay-test show</title>
+<title>positron replay-test show</title>
 <style>
 html,body{margin:0;padding:0;background:#000;overflow:hidden}
 #stage{display:block;width:1280px;height:720px}  /* MUST fill viewport exactly (CDP screencast) */
@@ -121,7 +121,7 @@ function draw() {
   // background + header
   ctx.fillStyle = "#0d0f12"; ctx.fillRect(0, 0, 1280, 585);
   ctx.fillStyle = "#57c973"; ctx.font = "bold 26px monospace";
-  ctx.fillText("elektron SYNCED-REPLAY TEST · room " + ROOM, 32, 46);
+  ctx.fillText("positron SYNCED-REPLAY TEST · room " + ROOM, 32, 46);
   ctx.fillStyle = "#6b7683"; ctx.font = "16px monospace";
   ctx.fillText("stage " + MY_ID + " · ws " + window.__state.wsState + " · f" + frames, 32, 74);
 
@@ -159,7 +159,7 @@ function draw() {
   ctx.fillStyle = "#3d4550"; ctx.font = "12px monospace";
   ctx.fillText("clock row: 48-bit ms + 'S' + ck", 32, 712);
   ctx.fillText(current ? ("cue row: firedAt + seq " + current.seq) : "cue row: (dark until first cue)", 460, 712);
-  ctx.fillText("elektron replay-test", 1080, 712);
+  ctx.fillText("positron replay-test", 1080, 712);
 
   frames++; window.__state.drawFrames = frames;
   const p = performance.now();

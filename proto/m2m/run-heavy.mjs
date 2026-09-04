@@ -32,11 +32,11 @@ const FEAT = { w: process.env.FEATW || "1280", h: process.env.FEATH || "720",
                fps: process.env.FEATFPS || "30", kbps: process.env.FEATKBPS || "2500",
                hint: "motion", cls: "feat" };
 const BASE = "http://127.0.0.1:8897";
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
 const LOGDIR = `${HERE}/logs`;
 // DISTINCT prefix from run.mjs/run-scale.mjs AND from the churn sibling — we
 // kill stale chromes ONLY under this exact prefix.
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-heavy-udd";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-heavy-udd";
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const PROBES = ["1", "2"];

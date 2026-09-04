@@ -141,7 +141,7 @@ node run-measure-archive.mjs                          # replay from R2, measured
 ```
 
 Proof artifact (kept): room `archive-test`, 48 segments + playlist at
-**https://pub-b8d50fdb5f6a41dbba072e433903705d.r2.dev/shows/archive-test/index.m3u8**
+**https://archive.positron.studio/shows/archive-test/index.m3u8**
 — watch it with cues:
 `http://127.0.0.1:8885/proto/replay/replay.html?src=<that m3u8>&room=archive-test&token=<ROOM_TOKEN>&anchor=stamp&t0=1787745030511`
 (or drop `anchor`/`t0` for content anchoring — both land within 15 ms).

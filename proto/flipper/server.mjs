@@ -30,7 +30,7 @@ const icyCache = new Map(); // mount -> { at, promise|value }
 function fetchIcy(mount) {
   return new Promise((resolve, reject) => {
     const req = https.get(
-      { host: 'icecast.err.ee', path: '/' + mount, headers: { 'Icy-MetaData': '1', 'User-Agent': 'elektron-flipper-proto/0.1' } },
+      { host: 'icecast.err.ee', path: '/' + mount, headers: { 'Icy-MetaData': '1', 'User-Agent': 'positron-flipper-proto/0.1' } },
       (res) => {
         const metaint = parseInt(res.headers['icy-metaint'] || '0', 10);
         const name = res.headers['icy-name'] || mount;

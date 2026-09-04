@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { CDP } from './cdp.mjs';
 
 const LAB = dirname(fileURLToPath(import.meta.url));
-const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
+const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const BASE = 'http://127.0.0.1:8896';
 const CDP_PORT = 9321;

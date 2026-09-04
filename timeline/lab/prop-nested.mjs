@@ -1042,10 +1042,10 @@ function arrangement(make) {
   check('export-hls', 0, h.validation.ok, `HLS tags must validate: ${JSON.stringify(h.validation.errors)}`);
   check('export-hls', 0, h.tags.length === 2 && h.tags.every((t) => t.startsWith('#EXT-X-DATERANGE:')),
     `one tag per claim: ${h.tags.length}`);
-  check('export-hls', 0, /ID="A",CLASS="org\.elektron\.timeline\.quotation",START-DATE="2026-08-28T09:00:05\.000Z"/.test(h.tags[0]),
+  check('export-hls', 0, /ID="A",CLASS="org\.positron\.timeline\.quotation",START-DATE="2026-08-28T09:00:05\.000Z"/.test(h.tags[0]),
     `START-DATE is WALL CLOCK (anchor + parent position): ${h.tags[0]}`);
-  check('export-hls', 0, /X-ORG-ELEKTRON-REF="kurenniemi-1972"/.test(h.tags[0]) &&
-    /X-ORG-ELEKTRON-IN=0\.9/.test(h.tags[0]) && /X-ORG-ELEKTRON-CERT-START=0\.5/.test(h.tags[0]),
+  check('export-hls', 0, /X-ORG-POSITRON-REF="kurenniemi-1972"/.test(h.tags[0]) &&
+    /X-ORG-POSITRON-IN=0\.9/.test(h.tags[0]) && /X-ORG-POSITRON-CERT-START=0\.5/.test(h.tags[0]),
     `client attributes must be reverse-DNS X- and carry the TEI loci: ${h.tags[0]}`);
   check('export-hls', 0, /DURATION=2\.7/.test(h.tags[0]), `DURATION is decimal SECONDS of parent time: ${h.tags[0]}`);
   check('export-hls', 0, !validateProvenance(['#EXT-X-DATERANGE:CLASS="x",X_BAD=1'], 'hls').ok,
@@ -1062,16 +1062,16 @@ function arrangement(make) {
     `two clips and a real Gap between them: ${track.children.map((x) => x.OTIO_SCHEMA)}`);
   check('export-otio', 0, clips[0].source_range.start_time.value === 900 && clips[0].source_range.start_time.rate === 1000,
     `source_range is in the SOURCE's domain at rate 1000 (ms — no 23.976 rounding class exists here): ${JSON.stringify(clips[0].source_range)}`);
-  check('export-otio', 0, clips[0].media_reference.target_url === 'elektron:deck/kurenniemi-1972',
+  check('export-otio', 0, clips[0].media_reference.target_url === 'positron:deck/kurenniemi-1972',
     'the media reference must name the deck by the same ref a score uses');
   check('export-otio', 0, clips[1].effects[0].OTIO_SCHEMA === 'LinearTimeWarp.1' && clips[1].effects[0].time_scalar === 2,
     `a rate != 1 must become a LinearTimeWarp: ${JSON.stringify(clips[1].effects)}`);
-  check('export-otio', 0, clips[0].metadata['org.elektron.timeline'].certainty.some((x) => x.locus === 'start'),
+  check('export-otio', 0, clips[0].metadata['org.positron.timeline'].certainty.some((x) => x.locus === 'start'),
     'the namespaced metadata dict is the only carrier that loses NOTHING');
   check('export-otio', 0, clips[0].markers.length === 2 && clips[0].markers[0].OTIO_SCHEMA === 'Marker.2',
     `mark addresses must surface as OTIO markers: ${JSON.stringify(clips[0].markers.map((m) => m.name))}`);
   const badOtio = JSON.parse(JSON.stringify(o.doc));
-  badOtio.tracks.children[0].children.find((x) => x.OTIO_SCHEMA === 'Clip.2').metadata = { elektron: {} };
+  badOtio.tracks.children[0].children.find((x) => x.OTIO_SCHEMA === 'Clip.2').metadata = { positron: {} };
   check('export-otio', 0, !validateProvenance(badOtio, 'otio').ok,
     'NEGATIVE CONTROL: a non-namespaced metadata key must fail (reverse-DNS is the convention that makes the hook safe)');
 
@@ -1109,7 +1109,7 @@ function arrangement(make) {
   check('export-deck', 0, d.rows[0].confidence !== null && d.rows[0].confidence <= 1,
     `the reconstructor's own confidence curve must reach the export: ${d.rows[0].confidence}`);
   const h = exportProvenance(deck, { carrier: 'hls', anchor: 0 });
-  check('export-deck', 0, h.validation.ok && /X-ORG-ELEKTRON-TIER=1/.test(h.tags[0]),
+  check('export-deck', 0, h.validation.ok && /X-ORG-POSITRON-TIER=1/.test(h.tags[0]),
     `…and onto the live lane as an X- attribute: ${h.tags[0]}`);
   deck.dispose();
 }
@@ -1586,7 +1586,7 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-score', 0, c2.caveats.some((x) => /REPEAT DOES NOT SURVIVE/.test(x)),
     'and says out loud that no carrier has a word for a loop');
   const hl = exportProvenance(r.nest, { carrier: 'hls', anchor: 0 });
-  check('loop-score', 0, hl.validation.ok && /X-ORG-ELEKTRON-REPEAT="9"/.test(hl.tags[0]), `HLS X- attribute: ${hl.tags[0]}`);
+  check('loop-score', 0, hl.validation.ok && /X-ORG-POSITRON-REPEAT="9"/.test(hl.tags[0]), `HLS X- attribute: ${hl.tags[0]}`);
   const ot = exportProvenance(r.nest, { carrier: 'otio' });
   check('loop-score', 0, ot.validation.ok && ot.doc.tracks.children[0].children.find((c) => c.name === 'q').metadata[NS].repeat === 9,
     'OTIO namespaced metadata carries it verbatim (and no OTIO tool will act on it)');

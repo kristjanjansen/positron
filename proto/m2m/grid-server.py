@@ -227,7 +227,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req = urllib.request.Request(url, data=body, method=method, headers={
             "Authorization": "Bearer " + APP_SECRET,
             "Content-Type": "application/json",
-            "User-Agent": "elektron-m2m-rig/1.0 (curl-compatible)",
+            "User-Agent": "positron-m2m-rig/1.0 (curl-compatible)",
         })
         t0 = time.time()
         try:

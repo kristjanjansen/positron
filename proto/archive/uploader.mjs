@@ -30,7 +30,7 @@ const PUBBASE = process.env.PUBBASE;               // https://pub-….r2.dev
 const OUTDIR = process.env.OUTDIR;                 // report json dir
 const RESULTS = process.env.RESULTS;               // jsonl append
 const POLL_MS = parseInt(process.env.POLL_MS || "500", 10);
-const WRANGLER_CWD = "/Users/s32863/personal/elektron/proto/archive"; // no .env here
+const WRANGLER_CWD = "/Users/s32863/personal/positron/proto/archive"; // no .env here
 if (!RECDIR || !PUBBASE || !OUTDIR || !RESULTS) { console.error("uploader: missing env"); process.exit(1); }
 
 const cleanEnv = { ...process.env };

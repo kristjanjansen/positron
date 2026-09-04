@@ -25,7 +25,7 @@ const { chromium } = require("playwright");
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/studio`;
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
 const DURATION = parseInt(arg("duration", "50"), 10);

@@ -16,11 +16,11 @@ const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/archive`;
 const BASE = "http://127.0.0.1:8885";
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
+const REMOTE = "https://rtc.positron.studio";
+const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad";
 const UDD = `${SCRATCH}/archive-test-udd-measure`;
 const LOGDIR = `${HERE}/logs`;
 const RESULTS = `${ROOT}/results/archive-replay.jsonl`;

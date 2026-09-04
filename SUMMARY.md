@@ -1,4 +1,4 @@
-# elektron — compact summary (start → 2026-08-30)
+# positron — compact summary (start → 2026-09-04)
 
 One paragraph: a measured live-streaming + performance platform on Cloudflare
 (LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
@@ -15,6 +15,13 @@ with an operator studio app as its first build and cultural-heritage archives
   (+ 9-amendment self-critique) → prior-art research (technical + artistic).
 - **08-27** — own prior-art mine (5 repos of previous experiments) +
   Radio Tallinn 1965 theses = the first named client.
+
+- **09-04** — renamed `elektron` → **`positron`** and moved onto
+  **`positron.studio`** (Cloudflare Registrar). Eight Workers got custom domains;
+  `*.workers.dev` kept live alongside, so nothing broke. Worker *script* names
+  stay `elektron-*` deliberately — renaming a script abandons its Durable
+  Objects. Prior-art references to `elektronstudio`/`elektron.art` are left
+  intact on purpose. See HANDOFF.md for the hostname table and the reasoning.
 
 ## The stack, with its numbers
 
@@ -59,7 +66,7 @@ polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
   vector. Artistic canon deep (Zenph, Marclay, Morrison, Hsieh…), shared
   infrastructure EMPTY — that gap is the project.
 - **Own prior art** (research/timeline-own-prior-art-2026-08.md): lineage is
-  5+ generations since elektron 2020 (map: visualia/plans/lineage.md). Steal
+  5+ generations since positron 2020 (map: visualia/plans/lineage.md). Steal
   list: pre-roll ring buffer, command-sourcing + undoable commands (cheap
   backward seek), per-kind quantization, ACT/DISPLAY split, drift channel,
   gate() recognizer, loopback ordering, wall-clock-in-frame test pattern.
@@ -118,7 +125,7 @@ deployed end-to-end (registry worker, host/player pages, session-as-timeline-log
 50× slower); OBS in Docker and in a CF Container both proven, obs-moq publishes on d14 and d16
 (149 ms — fastest chain measured); dual MoQ+RTMP from one OBS.
 
-**Open**: 4 secret rotations (SECRETS-ROTATION.md), elektron.studio purchase, iPhone capture
+**Open**: 4 secret rotations (SECRETS-ROTATION.md), positron.studio purchase, iPhone capture
 probe, Web MIDI precision (needs IAC toggle), hardware jam/instrument run.
 
 ## Session 6 continued (2026-08-28/30) — the library became a platform
@@ -140,7 +147,7 @@ phasing needs two decks exactly as Reich needed two tape machines;
 disintegration climbs 0 → 90.6 % invented while the attested count never moves).
 
 **Reach**: the four archive viewers are live at
-https://elektron-view.kristjan-jansen.workers.dev behind a globally-gated,
+https://positron.studio behind a globally-gated,
 politeness-first ERR proxy, and work on a phone.
 
 **Honest positioning**: an adversarial survey refuted two of our three

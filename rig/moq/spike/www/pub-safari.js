@@ -16152,7 +16152,7 @@ var require_pub_safari = __commonJS({
     init_net();
     init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "elektron-safari-test";
+    var NS = params.get("ns") ?? "positron-safari-test";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var CODEC = params.get("codec") ?? "avc1.42001f";
     var FPS = 30;
@@ -16198,7 +16198,7 @@ var require_pub_safari = __commonJS({
       for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
       ctx.font = "bold 72px monospace";
       ctx.fillStyle = "#ffd400";
-      ctx.fillText("ELEKTRON MOQ TEST", 60, 300);
+      ctx.fillText("POSITRON MOQ TEST", 60, 300);
       ctx.fillStyle = "#fff";
       ctx.font = "bold 96px monospace";
       ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

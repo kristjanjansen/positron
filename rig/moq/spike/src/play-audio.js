@@ -1,4 +1,4 @@
-// AUDIO SPIKE measurement player (RUNBOOK §10): subscribes elektron-audio-test,
+// AUDIO SPIKE measurement player (RUNBOOK §10): subscribes positron-audio-test,
 // decodes BOTH tracks (VideoDecoder -> canvas + burned-row read; AudioDecoder ->
 // WebAudio jitter-buffered playback), and measures:
 //   aLat      = audio "glass-to-glass" analog: decode-output wall - tick wall time
@@ -12,7 +12,7 @@ import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("ns") ?? "elektron-audio-test";
+const NS = params.get("ns") ?? "positron-audio-test";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const RUN_S = Number(params.get("dur") ?? 90);
 

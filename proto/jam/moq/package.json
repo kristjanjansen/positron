@@ -4,7 +4,7 @@
     "@moq/net": "^0.3.3",
     "esbuild-wasm": "^0.28.2"
   },
-  "name": "elektron-moq-bundles",
+  "name": "positron-moq-bundles",
   "private": true,
   "type": "module",
   "scripts": {

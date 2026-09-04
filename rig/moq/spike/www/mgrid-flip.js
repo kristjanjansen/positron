@@ -16646,7 +16646,7 @@ var require_mgrid_flip = __commonJS({
     init_container();
     var params = new URLSearchParams(location.search);
     var ID = params.get("id") ?? "f0";
-    var NS = `elektron-mgrid-${ID}`;
+    var NS = `positron-mgrid-${ID}`;
     var NAME = params.get("name") ?? "flips";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var CODEC = "avc1.42001f";

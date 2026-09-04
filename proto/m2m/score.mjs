@@ -19,16 +19,16 @@ import fs from "fs";
 const args = {};
 for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, "")] = process.argv[i + 1];
 const SCORE_PATH = args.score || "scores/demo-score.json";
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
 const score = JSON.parse(fs.readFileSync(SCORE_PATH.startsWith("/") ? SCORE_PATH : `${HERE}/${SCORE_PATH}`, "utf8"));
 const ROOM = args.room || score.room || "score-show";
 const T0 = parseInt(args.t0 || `${Date.now() + 15000}`, 10);
 const BASE = args.base || "http://127.0.0.1:8893";
-const REMOTE_URL = args.remote || "https://elektron-rtc.kristjan-jansen.workers.dev";
+const REMOTE_URL = args.remote || "https://rtc.positron.studio";
 const OP_ID = "OP";
 
 function envToken(key) {
-  const line = fs.readFileSync("/Users/s32863/personal/elektron/.env", "utf8")
+  const line = fs.readFileSync("/Users/s32863/personal/positron/.env", "utf8")
     .split("\n").find(l => l.startsWith(key + "="));
   return line ? line.slice(key.length + 1).trim() : "";
 }

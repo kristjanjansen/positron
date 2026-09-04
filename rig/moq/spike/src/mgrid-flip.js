@@ -10,7 +10,7 @@ import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
 const ID = params.get("id") ?? "f0";
-const NS = `elektron-mgrid-${ID}`;
+const NS = `positron-mgrid-${ID}`;
 const NAME = params.get("name") ?? "flips";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const CODEC = "avc1.42001f", W = 320, H = 180, FPS = 15, BITRATE = 300000, GOP = FPS;

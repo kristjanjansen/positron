@@ -1,4 +1,4 @@
-# Elektron Studio — operator app plan (2026-08-26)
+# Positron Studio — operator app plan (2026-08-26)
 
 Goal: collapse all measured pathways into ONE operator surface with ~three buttons.
 Audience/participants never install anything (their pages exist). Only the operator
@@ -128,7 +128,7 @@ timeline transport UI. One build, not two.
 - **DoD-B**: `node studio/engine.mjs` + `go` runs stage + archive end-to-end
   unattended; `stop` yields an R2 show whose replay works (D below).
 
-**Session C — console + replay** (deploy Worker `elektron-studio`):
+**Session C — console + replay** (deploy Worker `positron-studio`):
 - GO LIVE panel → engine WS (source picker, audio source incl. SILENT, one
   button, per-leg lights from `health` events).
 - SHOW panel = the strip component live on the room DO feed + cue send box +
@@ -158,7 +158,7 @@ the archive rig's −15 ms.** See `studio/NOTES.md` for the one-line fix and the
   as v2.
 - Two-clock policy is an aesthetic decision — console ships a "house sound follows
   which tier" toggle for the rehearsal to decide.
-- iPhone MoQ AUDIO verdict pending (one visit to ?namespace=elektron-audio-test).
+- iPhone MoQ AUDIO verdict pending (one visit to ?namespace=positron-audio-test).
 - UDP-hostile-network rate unknown → the MoQ auto-upgrade must fail fast + silent
   to SFU (already the probe design).
 - Token rotation + draft-16 relay still on the user (unchanged).

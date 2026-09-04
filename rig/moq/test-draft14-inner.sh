@@ -6,7 +6,7 @@ set -u
 MODE="${1:-clock}"
 DUR="${2:-40}"
 URL="${MOQ_URL:-https://draft-14.cloudflare.mediaoverquic.com}"
-NS="elektron-$(date +%s)-$$"
+NS="positron-$(date +%s)-$$"
 BIN=/target/release
 OUT=/moq/results-draft14
 mkdir -p "$OUT"

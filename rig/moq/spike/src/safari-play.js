@@ -6,7 +6,7 @@ import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
 const params = new URLSearchParams(location.search);
-const NS = params.get("namespace") ?? params.get("ns") ?? "elektron-safari-test";
+const NS = params.get("namespace") ?? params.get("ns") ?? "positron-safari-test";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
 const CODEC_OVERRIDE = params.get("codec"); // force decoder codec string
 const LOG_URL = params.get("log"); // optional extra log collector (local rig runs)

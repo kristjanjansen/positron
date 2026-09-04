@@ -2,11 +2,11 @@
 
 The universal substrate under studio/replay/archive. Synthesis of two lineages:
 the user's four timeline experiments (~/personal/{time,demo,maria,tracker}) and
-elektron's measured machinery. Each supplies what the other lacks.
+positron's measured machinery. Each supplies what the other lacks.
 
 ## −1. ORIGIN — the cultural-heritage horizon (added 2026-08-26, from the user)
 
-The idea predates elektron: it comes from cultural-heritage work — media reuse,
+The idea predates positron: it comes from cultural-heritage work — media reuse,
 remix, restoration, storage, archival, preservation — via a PhD project whose
 case study is **Erkki Kurenniemi**: the Finnish electronic-music pioneer whose
 instruments (the DIMI sequencer-synthesizers) were event-capture machines AND
@@ -64,7 +64,7 @@ Four prior generations (time→demo→maria→tracker) independently settled on:
 replay is "from the top, forward". `timeline-emitter.js` declares playbackRate/
 seekOffset and never uses them.
 
-**Elektron supplies exactly that missing piece, measured:** the timed-messages
+**Positron supplies exactly that missing piece, measured:** the timed-messages
 crossing engine + catch-up = state reconstruction at any playhead (seek tests
 green, ±80 ms replay accuracy), plus native-T₀ anchoring (−15 ms), sender-stamp
 discipline (DO clocks lie), DO persistence w/ backlog, R2 media segments as the
@@ -83,7 +83,7 @@ sensor (Max/OSC)        sender-stamped, absolute ms     canvas/DOM/interp
 STORE   live: room DO (broadcast-then-persist, backlog on join)
         archive: JSONL + media segments in R2; anchor = native T₀
 TRANSPORT  maria's six functions + the missing four:
-        seek(t)  – reconstruct state at t via per-kind reducers (elektron's
+        seek(t)  – reconstruct state at t via per-kind reducers (positron's
                    catch-up generalized: reducer(events≤t) → state; media kinds
                    seek their element; heavy kinds may keyframe/snapshot)
         pause/resume – position-preserving (accumulated offset, time/demo9 model)
@@ -101,7 +101,7 @@ an actuate half (render an Event), an optional reducer (state at t), an optional
 interpolator (between sparse samples). Registry-based, like visualia's
 registerSteppable seam.
 
-## 2. What it unifies in elektron (v1 targets)
+## 2. What it unifies in positron (v1 targets)
 
 cues, chat, roster/tier changes, score commands, per-participant media segments,
 sensor/OSC from Max — all become kinds on ONE log. The replay page becomes the
@@ -116,7 +116,7 @@ timeline merged with the live one.
   (port from timed-messages) + 3 adapters (cue, mouse, media-clip) + the strip
   visualizer component + trace-replay tests (simulate_typing.mjs rule: synthetic
   and real traces share one shape — no humans needed in CI).
-- **v1 — elektron on it**: cuelog/roster/chat migrate to kinds; replay page →
+- **v1 — positron on it**: cuelog/roster/chat migrate to kinds; replay page →
   timeline player; per-participant archive replay (plan-studio grid-archive)
   rides the roster reducer.
 - **v2 — the tight lane**: tracker's lookahead scheduler as the audio/MIDI lane;

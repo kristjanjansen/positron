@@ -16152,7 +16152,7 @@ var require_pub_audio = __commonJS({
     init_net();
     init_container();
     var params = new URLSearchParams(location.search);
-    var NS = params.get("ns") ?? "elektron-audio-test";
+    var NS = params.get("ns") ?? "positron-audio-test";
     var RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
     var VCODEC = params.get("codec") ?? "avc1.42001f";
     var FPS = 30;
@@ -16202,7 +16202,7 @@ var require_pub_audio = __commonJS({
       for (let i = 0; i < NBLOCKS; i++) if (bits[i]) ctx.fillRect(ROW_X + i * BLOCK_W, ROW_Y, BLOCK_W, ROW_H);
       ctx.font = "bold 72px monospace";
       ctx.fillStyle = "#00d4ff";
-      ctx.fillText("ELEKTRON AUDIO TEST", 60, 300);
+      ctx.fillText("POSITRON AUDIO TEST", 60, 300);
       ctx.fillStyle = "#fff";
       ctx.font = "bold 96px monospace";
       ctx.fillText(new Date(ms).toISOString().slice(11, 23) + " UTC", 60, 430);

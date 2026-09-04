@@ -19,8 +19,8 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const ROOT = '/Users/s32863/personal/elektron';
-const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
+const ROOT = '/Users/s32863/personal/positron';
+const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
 const MEDIA = `${SCRATCH}/media`;
 const UDD = `${SCRATCH}/tl-sensor-udd`;
 const PORT = 8894;

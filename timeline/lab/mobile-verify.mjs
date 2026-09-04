@@ -31,7 +31,7 @@ import { CDP } from './cdp-ev.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
-const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
+const SCRATCH = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const DBG = 9345;
 const UDD = `${SCRATCH}/mobile-udd`;
@@ -80,7 +80,7 @@ function replayPath() {
     const env = readFileSync(join(REPO, '.env'), 'utf8').split('\n').find((l) => l.startsWith('ROOM_TOKEN='));
     const qp = new URLSearchParams({
       src: meta.hlsUrl, room: meta.room, token: env ? env.slice('ROOM_TOKEN='.length).trim() : '',
-      remote: 'https://elektron-rtc.kristjan-jansen.workers.dev',
+      remote: 'https://rtc.positron.studio',
       anchor: 'stamp', t0: String(meta.T0native), startAt: '0',
     });
     return '/proto/replay/replay.html?' + qp;

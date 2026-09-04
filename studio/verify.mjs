@@ -23,12 +23,12 @@ const { chromium } = require("playwright");
 import fs from "node:fs";
 import { spawn, execSync } from "node:child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/studio`;
 const PORT = 8899;
 const BASE = `http://127.0.0.1:${PORT}`;
-const REMOTE = "https://elektron-rtc.kristjan-jansen.workers.dev";
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+const REMOTE = "https://rtc.positron.studio";
+const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
 const ART = `${HERE}/artifacts`;
 fs.mkdirSync(ART, { recursive: true });
 

@@ -344,7 +344,7 @@ async function testB(n = N_B, gapMs = 150) {
   let token = '';
   try { token = (await (await fetch('/env.json')).json()).JAM_TOKEN || ''; } catch {}
   const room = 'hostcheck-' + Math.random().toString(36).slice(2, 9);
-  const url = `wss://elektron-jam.kristjan-jansen.workers.dev/room/${room}/ws?token=${token}`;
+  const url = `wss://jam.positron.studio/room/${room}/ws?token=${token}`;
   const ws = new WebSocket(url);
   ws.binaryType = 'arraybuffer';
   const rtts = [];

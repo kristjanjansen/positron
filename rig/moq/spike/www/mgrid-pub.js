@@ -16205,7 +16205,7 @@ var require_mgrid_pub = __commonJS({
     }
     async function runPublisher(id) {
       const log = mklog(id);
-      const NS = `elektron-mgrid-${id}`;
+      const NS = `positron-mgrid-${id}`;
       const cv = document.createElement("canvas");
       cv.width = W;
       cv.height = H;

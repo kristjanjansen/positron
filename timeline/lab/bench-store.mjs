@@ -4,7 +4,7 @@
 //
 //   node timeline/lab/bench-store.mjs [--rows 1000000] [--no-do] [--no-http]
 //
-// Fixtures live outside the repo (STORE_FIXTURES or $TMPDIR/elektron-store-fx)
+// Fixtures live outside the repo (STORE_FIXTURES or $TMPDIR/positron-store-fx)
 // and are CACHED: a 1M-row log is ~58 MB and takes ~20 s to make once.
 // MACHINE RULE: this file's HTTP server binds 8892 (mine), nothing else.
 
@@ -17,9 +17,9 @@ import { performance } from 'node:perf_hooks';
 
 import { memoryStore, jsonlStore, doStore, buildJsonlIndex, DEFAULT_PAGE_ROWS } from '../store.mjs';
 
-export const FX = process.env.STORE_FIXTURES || path.join(os.tmpdir(), 'elektron-store-fx');
+export const FX = process.env.STORE_FIXTURES || path.join(os.tmpdir(), 'positron-store-fx');
 export const PORT = 8892;
-export const DO_BASE = process.env.INSTRUMENT_BASE || 'https://elektron-instrument.kristjan-jansen.workers.dev';
+export const DO_BASE = process.env.INSTRUMENT_BASE || 'https://instrument.positron.studio';
 export const DO_SESSION = process.env.INSTRUMENT_SESSION || 'smtc1hu37j5yeph';   // the KEPT proof session
 
 export function mulberry32(seed) {

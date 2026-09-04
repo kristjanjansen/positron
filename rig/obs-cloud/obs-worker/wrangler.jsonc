@@ -1,5 +1,5 @@
 {
-  "name": "elektron-obscloud",
+  "name": "positron-obscloud",
   "main": "worker.mjs",
   "compatibility_date": "2026-08-01",
   "observability": { "enabled": true },

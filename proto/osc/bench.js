@@ -192,7 +192,7 @@ async function setupMoq(arm, rx) {
 
 async function setupDo(arm, rx) {
   const env = await (await fetch('/env.json')).json();
-  const ws = new WebSocket(`wss://elektron-osc.kristjan-jansen.workers.dev/room/osc-${SESSION}-${arm}/ws?token=${env.OSC_TOKEN}`);
+  const ws = new WebSocket(`wss://osc.positron.studio/room/osc-${SESSION}-${arm}/ws?token=${env.OSC_TOKEN}`);
   ws.binaryType = 'arraybuffer';
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('do ws failed')); });
   // the relay echoes to the sender too; peer b is the one that scores

@@ -18,9 +18,9 @@ const { chromium } = require("playwright");
 import fs from "fs";
 import { execSync, spawn } from "child_process";
 
-const ROOT = "/Users/s32863/personal/elektron";
+const ROOT = "/Users/s32863/personal/positron";
 const HERE = `${ROOT}/proto/selfrec`;
-const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-elektron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
+const SCRATCH = "/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad";
 const SHOW = process.env.SHOW || "sync-20260827T093613";
 const RESULTS = `${ROOT}/results/selfrec-playback.jsonl`;
 const UDD = `${SCRATCH}/selfrec-udd-masters`;

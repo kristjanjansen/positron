@@ -21,9 +21,9 @@ import { execSync } from "child_process";
 
 const MODE = process.env.MODE || "happy";
 const BASE = "http://127.0.0.1:8896";
-const HERE = "/Users/s32863/personal/elektron/proto/m2m";
+const HERE = "/Users/s32863/personal/positron/proto/m2m";
 const LOGDIR = `${HERE}/logs`;
-const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-elektron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-churn-udd";
+const UDD_BASE = "/private/tmp/claude-501/-Users-s32863-personal-positron/3e55abee-40f5-4628-b7fd-775f7a2bfd0b/scratchpad/m2m-churn-udd";
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const CFG = {

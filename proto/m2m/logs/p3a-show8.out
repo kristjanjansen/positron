@@ -33,4 +33,4 @@
 05:16:52.294 CPU total=562.1% ours=165.3% otherChrome=287.6% rss=3235MB freeRAM=12.06GB
 05:16:57.305 1:running v=7/7 a=7/7 lat[64..92] | 2:running v=7/7 a=7/7 lat[70..97] || pubs {"running":6} fps[26..29]
 05:17:02.312 1:running v=7/7 a=7/7 lat[89..106] | 2:running v=7/7 a=7/7 lat[57..74] || pubs {"running":6} fps[24..31]
-05:17:04.288 run done — analyze with: python3 /Users/s32863/personal/elektron/proto/m2m/analyze-heavy.py <results.jsonl> <server.log>
+05:17:04.288 run done — analyze with: python3 /Users/s32863/personal/positron/proto/m2m/analyze-heavy.py <results.jsonl> <server.log>

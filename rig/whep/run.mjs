@@ -10,7 +10,7 @@ import fs from "fs";
 
 const DURATION_S = parseInt(process.env.DURATION || "30", 10);
 const BASE = "http://127.0.0.1:8897";
-const LOGDIR = "/Users/s32863/personal/elektron/rig/whep/logs";
+const LOGDIR = "/Users/s32863/personal/positron/rig/whep/logs";
 fs.mkdirSync(LOGDIR, { recursive: true });
 
 const ARGS = [

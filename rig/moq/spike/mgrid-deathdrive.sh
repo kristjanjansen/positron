@@ -7,8 +7,8 @@
 set -e
 R=$1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-cd /Users/s32863/personal/elektron/rig/moq/spike
-RES=/Users/s32863/personal/elektron/results/moq-mgrid-death.jsonl
+cd /Users/s32863/personal/positron/rig/moq/spike
+RES=/Users/s32863/personal/positron/results/moq-mgrid-death.jsonl
 
 TK0=$(python3 -c 'import time;print(int(time.time()*1000))')
 pkill -9 -f "moq-mgrid-victim${R}-udd"
@@ -18,7 +18,7 @@ echo "killed victim round=$R at $TK0 (kill took $((TK1-TK0)) ms)"
 
 # wait for both probes to log a close OR silent for p10, cap 60 s
 t0=$SECONDS
-until [ "$(grep -aE '"k":"(close|silent)","pub":"p10"' /Users/s32863/personal/elektron/results/moq-mgrid-death-run.jsonl 2>/dev/null | awk -v T=$TK0 -F'"t":' '{split($2,a,/[,}]/); if (a[1]+0>=T) c++} END {print c+0}')" -ge 2 ]; do
+until [ "$(grep -aE '"k":"(close|silent)","pub":"p10"' /Users/s32863/personal/positron/results/moq-mgrid-death-run.jsonl 2>/dev/null | awk -v T=$TK0 -F'"t":' '{split($2,a,/[,}]/); if (a[1]+0>=T) c++} END {print c+0}')" -ge 2 ]; do
   [ $((SECONDS - t0)) -gt 60 ] && { echo "WARN: <2 death events after 60s"; break }
   sleep 1
 done
