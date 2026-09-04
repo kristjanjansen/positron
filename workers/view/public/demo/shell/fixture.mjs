@@ -19,10 +19,13 @@ export function markAdapter({ rates = [0.25, 0.5, 1, 2, 4], onFire } = {}) {
         fired.push({ at: ev?.at ?? null, payload });
         onFire?.(payload, ev);
       },
-      /** state at a position = every mark at or before it */
-      reduce(rows, pos) {
-        const seen = rows.filter((r) => r.at <= pos);
-        return { count: seen.length, last: seen.length ? seen[seen.length - 1].payload : null };
+      /** state at a position = every mark at or before it.
+       *
+       * reduceAt() hands us the PREFIX already (rows <= pos), and each row is
+       * the PAYLOAD rather than the event, so there is nothing left to filter
+       * and no `r.at` to filter on. */
+      reduce(rows) {
+        return { count: rows.length, last: rows.length ? rows[rows.length - 1] : null };
       },
       assertState(state) {
         fired.length = 0;

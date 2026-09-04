@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+<style>
+  /* NO transport bar here on purpose: space is the loop pedal, and the shell's
+     transport table binds space to play/pause. One key, one meaning. */
+  .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
+  .k {
+    flex: 1 1 0; min-width: 0; height: 84px; border-radius: 4px;
+    background: var(--card2); border: 1px solid var(--line2);
+    display: grid; place-items: end center; padding-bottom: 8px;
+    font: 500 10px/1 var(--mono); color: var(--dim2);
+    -webkit-tap-highlight-color: transparent; user-select: none; cursor: pointer;
+  }
+  .k.sharp { background: #0e1219; color: var(--dim2); }
+  .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
+  .lay { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
+  .lay b { color: var(--fg); font-weight: 500; }
+  .lay .m { color: var(--bad); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/demo/shell/shell.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { workerTickHost } from '/timeline/transport.mjs';
+  import { createLooper, stats, phaseErrors } from '/proto/looper/looper.mjs';
+  import { createVoices } from '/proto/looper/synth.mjs';
+
+  // WebAudio only. No MIDI, no Web MIDI permission, no hardware — 17 instrument
+  // is where MIDI lives.
+  const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
+  const SHARP = new Set(['w', 'e', 't', 'y', 'u']);
+  const BASE = 60;
+
+  const d = mount({
+    n: '16',
+    name: 'looper',
+    what: 'Keyboard into a WebAudio synth, then loop it. No MIDI, no network.',
+    readout: { latency: 'ms', layers: '', onsets: '', phase: 'ms' },
+    controls: [
+      { id: 'boot', label: 'Start audio', primary: true },
+      { id: 'pedal', label: 'Rec / commit' },
+      { id: 'demo', label: 'Play a bar' },
+      { id: 'check', label: 'Check' },
+    ],
+  });
+  guard(d);
+
+  let ctx = null, ear = null, voices = null, looper = null, strip = null;
+  const onsets = [];
+  const down = new Set();
+  const keyEls = new Map();
+
+  // ── keys ────────────────────────────────────────────────────────────────
+  const kb = el('div', 'keys');
+  for (const k of Object.keys(KEYMAP)) {
+    const b = el('div', `k${SHARP.has(k) ? ' sharp' : ''}`, k);
+    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); press(k, e); });
+    b.addEventListener('pointerup', (e) => release(k, e));
+    b.addEventListener('pointercancel', (e) => release(k, e));
+    keyEls.set(k, b);
+    kb.append(b);
+  }
+  d.el.append(kb);
+  const layEl = el('p', 'lay', 'no layers');
+  d.el.append(layEl);
+
+  const nowStamp = () => performance.now();
+  const stampOf = (ev) => (ev && Number.isFinite(ev.timeStamp) && ev.timeStamp > 0 ? ev.timeStamp : nowStamp());
+  const noteOf = (k) => BASE + KEYMAP[k];
+
+  function press(k, ev) {
+    if (!looper || down.has(k)) return;
+    down.add(k);
+    keyEls.get(k)?.classList.add('down');
+    looper.capture({ at: stampOf(ev), handlerAt: nowStamp(), type: 'note-on',
+                     note: noteOf(k), vel: 100, source: 'kbd', layer: looper.layers.length });
+  }
+  function release(k, ev) {
+    if (!looper || !down.has(k)) return;
+    down.delete(k);
+    keyEls.get(k)?.classList.remove('down');
+    looper.capture({ at: stampOf(ev), handlerAt: nowStamp(), type: 'note-off',
+                     note: noteOf(k), source: 'kbd', layer: looper.layers.length });
+  }
+
+  addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k === ' ') { e.preventDefault(); pedal(); return; }
+    if (k in KEYMAP) { e.preventDefault(); press(k, e); }
+  });
+  addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (k in KEYMAP) release(k, e);
+  });
+
+  // ── boot ────────────────────────────────────────────────────────────────
+  async function boot() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    await ctx.resume();
+    // fetched by URL at runtime, so nothing static would flag its absence and
+    // the failure mode is an ear that silently hears nothing
+    await ctx.audioWorklet.addModule('/proto/looper/onset-worklet.js');
+    ear = new AudioWorkletNode(ctx, 'onset-detect');
+    ear.connect(ctx.destination);            // must be connected or it is not pulled
+
+    voices = createVoices(ctx, { dest: ear, onOnset: (r) => onsets.push(r) });
+    const clock = { domain: 'wall', now: () => performance.now() };
+    looper = createLooper({ clock, newHost: () => workerTickHost(), voices, ctx,
+                            toleranceMs: 5, onLayer: renderLayers });
+    looper.start(clock.now());
+
+    const lat = { base: ctx.baseLatency || 0, output: ctx.outputLatency || 0 };
+    d.set('latency', (lat.output || lat.base) * 1000, 'ok');
+    const pdeck = looper.parent;
+    if (pdeck && pdeck.transport) {
+      strip = createStripView(d.el, pdeck, {
+        size: 'mini',
+        lanes: [{ id: 'note', kind: 'note', height: 40, as: 'ticks' }],
+      });
+    } else {
+      d.log(`no parent deck to draw (${typeof pdeck})`);
+    }
+    d.log(`audio ${ctx.state} · base ${(lat.base * 1000).toFixed(1)} ms · out ${(lat.output * 1000).toFixed(1)} ms`);
+    window.__L = { looper, voices, ctx, onsets };
+  }
+
+  function renderLayers() {
+    if (!looper) return;
+    const n = looper.layers.length;
+    d.set('layers', n);
+    layEl.innerHTML = n === 0 ? 'no layers'
+      : looper.layers.map((l, i) => `<b>L${i}</b> ${Math.round(l.loopMs ?? looper.loopMs)}ms`).join(' · ');
+  }
+
+  // armRecord / commitLayer, exactly as proto/looper/index.html drives it
+  function pedal() {
+    if (!looper) { d.log('press Start audio first', 'bad'); return; }
+    const at = performance.now();
+    if (!looper.recording()) {
+      looper.armRecord(at);
+      d.log(looper.layers.length === 0 ? 'recording — sets the loop length' : 'overdubbing', 'hi');
+    } else {
+      const layer = looper.commitLayer(at);
+      d.log(`committed L${looper.layers.length - 1} · ${Math.round(looper.loopMs)} ms`, 'hi');
+      if (!layer) d.log('nothing captured in that pass', 'bad');
+    }
+    renderLayers();
+  }
+
+  d.on('boot', () => boot().catch((e) => d.fail(e)));
+  d.on('pedal', pedal);
+
+  // a deterministic bar so a harness (and a human without a keyboard) can play
+  d.on('demo', async () => {
+    await boot().catch((e) => d.fail(e));
+    if (!looper) return;
+    const seq = ['a', 'd', 'f', 'h'];
+    for (let i = 0; i < seq.length; i++) {
+      setTimeout(() => { press(seq[i]); setTimeout(() => release(seq[i]), 140); }, i * 250);
+    }
+    d.log(`played ${seq.length} notes`);
+  });
+
+  d.on('check', () => {
+    d.assert('audio context running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
+    d.assert('WebAudio voices', !!voices);
+    const heard = onsets.length;
+    d.set('onsets', heard);
+    d.assert('synth produced onsets', heard > 0, String(heard));
+    const lanes = looper?.loopLanes?.() ?? null;
+    if (looper && looper.layers.length) {
+      const pe = phaseErrors(onsets.filter((o) => Number.isFinite(o.phase)), { loopMs: looper.loopMs });
+      if (pe.length) {
+        const st = stats(pe);
+        d.set('phase', st.p50);
+        d.assert('phase error under tolerance', Math.abs(st.p50) < 25, `p50 ${st.p50.toFixed(1)} ms`);
+      }
+    } else {
+      d.log('no layers yet — press Rec / commit twice around some notes');
+    }
+    d.log(`lanes ${JSON.stringify(lanes)?.slice(0, 120)}`);
+  });
+
+  setInterval(() => { d.set('onsets', onsets.length); }, 300);
+
+  d.log('keys a w s e d f t g y h u j k · space = pedal');
+  d.ready();
+</script>
+</html>
