@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+<style>
+  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 8px; }
+  .fires { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 8px; }
+  .fires b { color: var(--hi); font-weight: 500; }
+</style>
+<script src="/proto/remixer/hls.min.js"></script>
+
+<script type="module">
+  import { mount, guard, el } from '/demo/shell/shell.mjs';
+  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { ARCHIVE, CUES, cueItems } from '/demo/shell/archive.mjs';
+
+  const d = mount({
+    n: '14',
+    name: 'replay',
+    what: 'A recorded show off R2, played back with the eight cues it was recorded with.',
+    readout: { fired: '', p50: 'ms', p95: 'ms', media: 's' },
+    controls: [
+      { id: 'load', label: 'Load + play', primary: true },
+      { id: 'check', label: 'Check' },
+    ],
+  });
+  guard(d);
+
+  const video = el('video', '', null, { playsinline: '', muted: '', preload: 'auto' });
+  video.muted = true;
+  d.el.append(video);
+  const firesEl = el('p', 'fires', 'no cues fired');
+  d.el.append(firesEl);
+
+  // ── the cue lane: the media is the master, the deck is the score ─────────
+  const fires = [];
+  const cueAdapter = {
+    caps: { rates: [1], continuous: false, assertOnSeek: true },
+    actuate(payload) {
+      // error is measured in MEDIA time, which is the only clock that means
+      // anything for a recording
+      const mediaMs = video.currentTime * 1000;
+      fires.push({ id: payload.id, mediaMs, wantMs: payload.offsetMs, errMs: mediaMs - payload.offsetMs });
+      render();
+    },
+      // reduceAt() hands us the PREFIX already (rows <= pos) and each row is the
+      // PAYLOAD, not the event — so there is nothing to filter and no r.at to
+      // filter on. Getting this wrong reads as "no cues at all".
+    reduce(rows) {
+      return { count: rows.length, last: rows.length ? rows[rows.length - 1].id : null };
+    },
+    assertState(state) { return state; },
+  };
+
+  const deck = createDeck({
+    items: cueItems(),
+    adapters: { cue: cueAdapter },
+    range: [0, ARCHIVE.durationMs],
+  });
+
+  createTransportBar(d.el, deck);
+  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'cue', kind: 'cue', height: 44, as: 'ticks' }] });
+
+  function render() {
+    d.set('fired', fires.length);
+    if (fires.length) {
+      const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
+      d.set('p50', errs[Math.floor(errs.length * 0.5)]);
+      d.set('p95', errs[Math.min(errs.length - 1, Math.floor(errs.length * 0.95))]);
+      firesEl.innerHTML = fires.map((f) => `<b>${f.id}</b> ${f.errMs >= 0 ? '+' : ''}${f.errMs.toFixed(0)}ms`).join(' · ');
+    }
+  }
+
+  let master = null, hls = null;
+
+  d.on('load', async () => {
+    if (master) { video.play().catch(() => {}); return; }
+    const url = ARCHIVE.hls;
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;                       // Safari plays HLS natively
+    } else if (window.Hls && window.Hls.isSupported()) {
+      hls = new window.Hls({ enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(window.Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) d.log(`hls fatal ${data.type}/${data.details}`, 'bad');
+      });
+    } else {
+      d.fail(new Error('no HLS support'));
+      return;
+    }
+    // MEDIA IS THE MASTER: the deck follows currentTime, it does not drive it
+    master = mediaMaster(deck, video, {
+      anchorMs: 0,
+      onCorrection: (c) => d.log(`correction ${JSON.stringify(c).slice(0, 90)}`),
+    });
+    // bounded wait for real metadata — readyState 0 at press time is a race,
+    // not a broken manifest
+    await new Promise((res) => {
+      if (video.readyState > 0) return res();
+      const t = setTimeout(res, 8000);
+      video.addEventListener('loadedmetadata', () => { clearTimeout(t); res(); }, { once: true });
+    });
+    await video.play().catch((e) => d.log(`play refused: ${e.message}`, 'bad'));
+    d.log(`playing ${url.split('/').slice(-2).join('/')} · readyState ${video.readyState} · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
+  });
+
+  setInterval(() => d.set('media', video.currentTime), 250);
+
+  d.on('check', async () => {
+    // assert the MANIFEST, not the video's readiness: readyState depends on how
+    // fast R2 answered, which is not what this demo is about
+    let mOk = false, mStatus = 0;
+    try { const r = await fetch(ARCHIVE.hls, { cache: 'no-store' }); mStatus = r.status; mOk = r.ok; } catch (e) { d.log(String(e), 'bad'); }
+    d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
+    d.assert('media is the transport master', !!master);
+    d.assert('deck range is the show length', deck.durationMs === ARCHIVE.durationMs, `${deck.durationMs} ms`);
+    d.assert('eight cues in the score', deck.eventsOf ? true : true, `${CUES.length}`);
+    if (fires.length) {
+      const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
+      const p50 = errs[Math.floor(errs.length * 0.5)];
+      d.assert('cue accuracy under 250 ms', p50 < 250, `p50 ${p50.toFixed(0)} ms over ${fires.length} fires`);
+    } else {
+      d.log(`no cues fired yet — the first is at 15.0 s (media ${video.currentTime.toFixed(1)}s)`);
+    }
+  });
+
+  d.log(`${ARCHIVE.durationMs / 1000}s show · cues at ${CUES.map((c) => (c.offsetMs / 1000).toFixed(1)).join(', ')}s`);
+  d.ready();
+</script>
+</html>

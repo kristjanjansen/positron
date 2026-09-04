@@ -30,10 +30,10 @@ export const DEMOS = [
   { n: '12', name: 'cues',         act: 2, built: false, shows: 'fire one cue' },
 
   { n: '13', name: 'record',       act: 3, built: false, shows: 'local, then R2' },
-  { n: '14', name: 'replay',       act: 3, built: false, shows: 'back, with its cues' },
-  { n: '15', name: 'seek',         act: 3, built: false, shows: 'cues re-fire correctly' },
+  { n: '14', name: 'replay',       act: 3, built: true,  shows: 'R2 show + its 8 cues' },
+  { n: '15', name: 'seek',         act: 3, built: true,  shows: 'the fold is exact' },
 
-  { n: '16', name: 'looper',       act: 4, built: false, shows: 'no network at all' },
+  { n: '16', name: 'looper',       act: 4, built: true,  shows: 'keyboard + WebAudio, no MIDI' },
   { n: '17', name: 'instrument',   act: 4, built: false, shows: 'remote MIDI' },
   { n: '18', name: 'jam',          act: 4, built: false, shows: 'two players, one pulse' },
 

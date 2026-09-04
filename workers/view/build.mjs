@@ -86,6 +86,7 @@ const FILES = [
   ['demo/shell/transport-bar.mjs', 'demo/shell/transport-bar.mjs'],
   ['demo/shell/strip.mjs', 'demo/shell/strip.mjs'],
   ['demo/shell/fixture.mjs', 'demo/shell/fixture.mjs'],
+  ['demo/shell/archive.mjs', 'demo/shell/archive.mjs'],
   ...demoFiles(),
 ];
 
