@@ -1,4 +1,4 @@
-# Handoff — 2026-08-30 (end of session 7)
+# Handoff — 2026-09-04 (end of session 8)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
@@ -7,10 +7,11 @@ newest and wins over §7–§8.
 
 ## One line
 
-The timeline library is built, measured, and has **fourteen clients**; the
-studio runs a complete show with all five panels; the archive viewers are live;
-and there is now **an instrument a human can actually play, alone or with
-someone else in another browser.** No human has played it yet.
+The project is **positron**, live on **positron.studio**, and the work is now
+visible: a shared demo shell and **18 demos, 239/239 green** against the
+deployed URL — including the latency ladder measured on a page anyone can open
+(**rtt 25 ms WHEP vs 3.49 s LL-HLS**), the seek fold asserted at every cue
+boundary, and a publisher container that runs only while somebody is watching.
 
 ## 2026-09-04 — renamed to `positron`, moved to `positron.studio`
 
@@ -72,6 +73,62 @@ reason: it is named for its subject, not for this repo.
   `positron.studio` before registration will answer `NXDOMAIN` for up to an hour
   afterwards. Cloudflare, Google, Quad9 and OpenDNS all resolved it within
   minutes; a home router that had cached the miss did not. Not a misconfiguration.
+
+## Where things stand (session 8)
+
+**Live.** `positron.studio` is the demo index, generated from
+`demo/manifest.mjs`. Demos are at `/<nn>-<name>/`, notes at `/notes/`.
+
+| worker | hostname | what |
+|---|---|---|
+| `elektron-view` | `positron.studio`, `www` | the index, the demos, the archive pages |
+| `positron-ws` | `ws.positron.studio` | tokenless verbatim relay (superseded `elektron-jam`, retired) |
+| `positron-pub` | `pub.positron.studio` | ffmpeg publisher container, alive only while `/watch` is held |
+| `elektron-rtc` etc. | `rtc|cues|instrument|selfrec|osc|moq.positron.studio` | unchanged; script names stay for their DO state |
+| R2 `elektron-archive-test` | `archive.positron.studio` | the show archive |
+
+**Built (18):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
+`09` ladder · `10` room · `11` grid · `12` cues · `13` record · `14` replay ·
+`15` seek · `16` looper · `17` instrument · `18` jam · `19` flipper.
+
+**Not built (5):**
+- `08 moq` — needs `moq-pub` compiled into the publisher image (Rust/musl
+  multi-stage). Feasible: QUIC egress from Containers is already measured
+  working, and `moq-pub` has `src/main.rs`.
+- `20 kurenniemi`, `21 megatimeline`, `22 remixer` — the pages WORK and are
+  linked from the index; they are not re-shelled. `21` is the big one at 1220
+  lines. They get an appended back link in the deployed copy only.
+- `23 studio` — now assembly rather than engineering: every panel it consumes
+  (`10`–`14`) exists and is verified.
+
+**Open, with a named next step:**
+- **LL-HLS jank on iOS.** The player chases a 1.50 s target with a 2.0 s GOP
+  and sits at 2.78 s, nudging at 1.01× and resyncing past `seekThreshold: 2.0`.
+  A target shorter than one keyframe interval is unreachable and 2 s is
+  Cloudflare's shortest recommended GOP, so raise the target rather than
+  shorten the GOP. A container-vs-local publisher A/B on segment inter-arrival
+  jitter separates parameter mismatch from CPU starvation.
+- **The Cache API.** `caches.default` is no longer a no-op now that we are off
+  workers.dev. Highest value in front of the single serialized `Gate` DO.
+- **`.env` still holds the exposed legacy `CF_API_TOKEN`** (Stream/Calls/
+  Realtime only — it cannot do Workers/DNS/R2 work). Use machine OAuth from a
+  dir without `.env`. Re-confirmed unrotated 2026-09-04. `JAM_TOKEN` is now
+  moot; delete it.
+- **`vain.md.later`** — the Väin philosophy note, unlinked for now.
+
+## How to run and check things
+
+```sh
+node demo/server.mjs                       # :8890, serves the repo; / == deployed
+node demo/verify.mjs                       # every built demo, locally
+DEMO_BASE=https://positron.studio node demo/verify.mjs   # against the deploy
+cd workers/view && node build.mjs && npx wrangler deploy  # ALWAYS build first
+```
+
+Wrangler traps that cost time: `.env` in the cwd shadows machine OAuth, so run
+from a dir without one (`proto/archive`) or `env -u CF_API_TOKEN
+-u CLOUDFLARE_API_TOKEN`. And `build.mjs` now REFUSES duplicate destinations —
+stripping the `demo/` prefix let two sources collide on `index.html`.
 
 ## Nothing is in flight. Everything below is committed and green.
 

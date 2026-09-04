@@ -1,53 +1,18 @@
 # plan-demos — one coherent demo story, one UI
 
-Status: **8 of 23 demos built and deployed** (2026-09-04) — Act 0 complete, plus
-`14 replay`, `15 seek`, `16 looper`. 118/118 green against the deployed URL.
-Read `HANDOFF.md` first for what exists.
+Status: **18 of 23 built and deployed** (2026-09-04), 239/239 green against
+https://positron.studio. Demos live at `/<nn>-<name>/`, notes at `/notes/`.
 
-**Built:** `demo/shell/` (shell.css · shell.mjs · transport-bar.mjs · strip.mjs ·
-fixture.mjs), the `__demo` contract, `demo/manifest.mjs` as the single source of
-story order, `demo/server.mjs` (:8890), `demo/verify.mjs` (the CDP harness that
-replaces the harness *pages*), and **Act 0 complete** — `01 transport`,
-`02 lanes`, `03 nest`, `04 score`, `05 strip`.
+Built: `01`–`05` `06` `07` `09` `10` `11` `12` `13` `14` `15` `16` `17` `18` `19`.
+Left: `08 moq` (needs moq-pub in the publisher image), `20`–`22` (the pages
+work and are linked; not re-shelled), `23 studio` (assembly now — `10`–`14`
+all exist).
 
-**Verified:** 75/75 green from `demo/verify.mjs` run against the DEPLOYED URL,
-and `workers/view` back to 38/38. Live at `positron.studio/demo/`.
-`workers/view/build.mjs`'s allowlist is now generated from `demo/manifest.mjs`
-for the demo half (step 8, partially done).
+The routing question in "Open questions" is ANSWERED: no `/demo/` prefix, the
+demos are the root. And the token question is answered too — `ws.positron.
+studio` is tokenless, so Acts 2 and 4 needed no secret in a public page.
 
-`16 looper` is built and is **keyboard → WebAudio `createVoices`, no MIDI at
-all** — MIDI belongs to `17 instrument`. It mounts a strip and the pedal but
-**no transport bar**, because space is the loop pedal and the shell's transport
-table binds space to play/pause. One key, one meaning.
-
-`14 replay` and `15 seek` run against the REAL archive: the 190 s show on
-`archive.positron.studio/shows/archive-test/` with its eight recorded cues,
-generated into `demo/shell/archive.mjs` from
-`proto/archive/artifacts/{archive-meta,archive-cuelog}.json`. T0 is the native
-anchor (measured −15 ms), so the offsets are real, not calibrated.
-
-**`15 seek` asserts the thesis directly**: `deck.reduceAt('cue', t)` at every
-cue boundary ±1 ms — 24 probes, 0 wrong — plus a five-stop seek sweep checking
-the fold and counting retroactive fires (a cue actuating >1.5 s after its own
-position, i.e. a seek that replayed a backlog instead of folding it).
-
-## Still blocked on a decision, not on work
-
-- **Acts 2 and 4 (`10 room`, `11 grid`, `12 cues`, `17 instrument`, `18 jam`)** —
-  the workers are deployed and answering, but token-gated. A token in a public
-  page is a published token. Needs the open question above answered: local-only,
-  or a tokenless rate-limited relay.
-- **`06 llhls`, `07 webrtc`, `09 ladder`** — need a LIVE Cloudflare Stream input.
-  None is provisioned, and provisioning one costs money.
-- **`08 moq`** — needs a publisher running on this Mac; the RUNBOOK's publishers
-  die with laptop sleep and are not up.
-- **`13 record`** — is a node harness (CDP → ffmpeg), not a browser page, so it
-  does not fit the demo shell as-is.
-
-## Not blocked, just not done
-
-`19`–`22` (the archive four) are re-shells of pages that already work, and
-`23 studio` consumes everything above it.
+See `PROGRESS.md` session 8 for what was measured on the way.
 
 ## The diagnosis
 
