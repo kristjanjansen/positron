@@ -23,7 +23,7 @@
     n: '06',
     name: 'llhls',
     what: 'The tuned low-latency player against a live input. Opening this page is what starts the stream.',
-    readout: { latency: 's', target: 's', rate: '×', stalls: '' },
+    readout: { latency: 's', target: 's', rate: '×', stalls: '', switches: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -81,6 +81,12 @@
       .on('rebuild', () => { rebuilds++; d.log('instance rebuilt (source-stall watchdog)', 'bad'); })
       .on('resync', () => { resyncs++; d.log('resynced to the live edge'); })
       .on('error', (e) => d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad'))
+      .on('level', ({ switches, width, height }) => {
+        // Every switch has to wait for the next INDEPENDENT part — once per
+        // 2.0 s — so churn here is visible as jank even with a healthy feed.
+        d.set('switches', switches);
+        d.log(`level -> ${width}x${height}`);
+      })
       .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
 
     await playOrPrompt(video, d);
@@ -102,7 +108,7 @@
       d.log('no latency sample yet — press Start first');
     }
     d.assert('stable once playing', rebuilds === 0,
-      `${rebuilds} rebuild(s), ${stalls} stall(s), ${resyncs} resync(s) since the first sample`);
+      `${rebuilds} rebuild(s), ${stalls} stall(s), ${resyncs} resync(s), ${player?.levelSwitches ?? 0} level switch(es) since the first sample`);
   });
 
   d.log('nothing is publishing until you press Start; it stops when you leave');
