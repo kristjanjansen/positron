@@ -91,6 +91,7 @@ const FILES = [
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
   ['demo/notes/index.html', 'notes/index.html'],
   ['demo/notes/uuu-positron.md', 'notes/uuu-positron.md'],
+  ['demo/notes/vain.md', 'notes/vain.md'],
   ...demoFiles(),
 ];
 

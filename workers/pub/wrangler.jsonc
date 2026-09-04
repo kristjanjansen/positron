@@ -16,12 +16,49 @@
       "class_name": "Pub",
       "image": "./container/Dockerfile",
       "max_instances": 1,
-      "instance_type": "standard"
+      // CUSTOM, not a predefined type, because the predefined ones are wrong in
+      // both directions here.
+      //
+      // "standard" is an alias for standard-1 = HALF a vCPU, which is what
+      // stalled the stream: two x264 encodes on half a core ran at ~40 % of
+      // realtime and Cloudflare starved (the container logged lags of 59 s and
+      // 83 s). And its 4 GiB is 8x more memory than needed — two 360p encodes
+      // completed inside a 512 MiB cap.
+      //
+      // MEMORY AND VCPU ARE COUPLED: the platform refuses less than 3 GiB per
+      // vCPU ("With 2 vCPU(s), you need at least 6 GiB of memory"), so asking
+      // for 2 vCPU / 1 GiB is rejected even though two 360p encodes fit in
+      // 512 MiB. 3 GiB here is the FLOOR for 1 vCPU, not a request.
+      //
+      // Given that, the economics: CPU bills on ACTIVE USAGE, so two encodes
+      // cost the same vCPU-seconds however they are split — parallel instances
+      // would just pay memory and disk TWICE for the same CPU. What is left to
+      // save is the over-provisioning: this is 1 vCPU (double standard-1's half)
+      // with 3 GiB instead of standard-2's 6 GiB and 2 GB of disk instead of
+      // 12 GB. Same CPU as standard-2, half the memory, a sixth of the disk.
+      "instance_type": { "vcpu": 1, "memory_mib": 3072, "disk_mb": 2048 }
     }
   ],
   "durable_objects": {
     "bindings": [{ "name": "PUB", "class_name": "Pub" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Pub"] }],
+  "vars": {
+    // life | testsrc2 | mandelbrot | etv
+    //
+    // mandelbrot starved the encoder at 720p30 (the container logged a 141 s
+    // lag and the stream stalled). life moves just as visibly and costs far
+    // less; testsrc2 is the cheapest.
+    //
+    // "etv" restreams ERR's live broadcast into a PUBLIC Stream input. It works
+    // — a frame decodes from inside the container — but that is rebroadcasting
+    // someone else's copyrighted signal, and the tint does not change it. Left
+    // opt-in on purpose; mandelbrot moves just as visibly and is nobody's.
+    "PUB_BG": "testsrc2",
+    // Both legs encode at once on ONE instance, so this is the real budget.
+    // 720p30 is affordable on testsrc2 (cost index 0.45) but NOT on life
+    // (1.21): the generator was the expense, not the resolution.
+    "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30"
+  },
   "observability": { "enabled": true }
 }

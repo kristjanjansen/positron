@@ -30,10 +30,62 @@ let lastError = null;
 let lastStderr = '';
 let stopping = false;   // a SIGTERM exit is not a fault
 
+/**
+ * BACKGROUNDS. testsrc2 barely appears to move, which makes a latency demo hard
+ * to read — you cannot see that a picture is late if nothing in it is moving.
+ * All four of these were decoded in this image with the tint and clock applied.
+ *
+ * `etv` restreams ERR's live broadcast. It WORKS (a frame decoded at 1.5 MB
+ * from inside the container), but publishing it to a public Stream input is
+ * rebroadcasting someone else's copyrighted signal, and a tint does not change
+ * that. So it is opt-in and never the default; mandelbrot moves just as
+ * obviously and is nobody's property.
+ */
+const BACKGROUNDS = {
+  mandelbrot: (w, h, fps) => ['-f', 'lavfi', '-i', `mandelbrot=size=${w}x${h}:rate=${fps}`],
+  life: (w, h, fps) => ['-f', 'lavfi', '-i', `life=size=${w}x${h}:rate=${fps}:mold=10:ratio=0.1`],
+  testsrc2: (w, h, fps) => ['-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`],
+  // no -re: a live HLS source already arrives in real time, and pacing it again
+  // makes it drift behind
+  etv: () => ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5',
+    '-i', 'https://live.err.ee/live/etv.m3u8'],
+};
+
+/**
+ * The tint existed to keep the clock legible over a real broadcast. A synthetic
+ * source does not need it, and it is not free: eq + colorbalance are two
+ * per-pixel passes on every frame of 720p30, on top of a redundant scale of a
+ * source already generated at the target size. Adding all three at once is what
+ * starved the encoder — the container logged "Resumed reading ... after a lag of
+ * 141.751s" and the stream stalled.
+ *
+ * So: only tint what needs tinting.
+ */
+const TINT = 'eq=brightness=-0.12:saturation=0.45';
+const needsTint = (bg) => bg === 'etv';
+
 // Encoder settings Cloudflare LL-HLS requires: H.264, CBR, fixed GOP, and
 // B-frames OFF (they break LL-HLS). GOP == segment length; 2 s is the shortest
 // Cloudflare recommends.
-function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
+/**
+ * FULL 720p30, on the cheap generator. Measured cost index — two seconds of
+ * video per case on one cpu, so the emulation penalty cancels and only the
+ * ratios matter:
+ *
+ *   testsrc2  640x360@20   0.16
+ *   testsrc2 1280x720@20   0.36
+ *   testsrc2 1280x720@30   0.45   <- here
+ *   life      640x360@20   0.47   <- what we were paying
+ *   life     1280x720@20   1.21
+ *
+ * Dropping life buys FOUR TIMES the pixels and half again the frames for
+ * slightly less cpu than 360p20 with life was costing. The generator was the
+ * expense, not the resolution — life computes every pixel of every frame.
+ *
+ * testsrc2 moves on its own, and the burned-in epoch moves regardless, so
+ * "live and moving" survives the swap.
+ */
+function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, bg = 'testsrc2' }) {
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
@@ -43,15 +95,19 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
     // that makes glass-to-glass measurable
     `drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf`,
     `text='%{pts\\:flt\\:${epoch}}'`,
-    'x=40', 'y=40', 'fontsize=56', 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=14',
+    'x=36', 'y=36', 'fontsize=52', 'fontcolor=black',
+    'box=1', 'boxcolor=white', 'boxborderw=13',
   ].join(':');
+  const source = (BACKGROUNDS[bg] || BACKGROUNDS.testsrc2)(w, h, fps);
+  const live = bg === 'etv';
   return [
     '-hide_banner', '-loglevel', 'warning',
-    '-re',
-    '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
+    ...(live ? [] : ['-re']),
+    ...source,
     '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
-    '-vf', draw,
+    // A live source is whatever resolution it feels like, so it gets scaled and
+    // tinted. A generated one is already the right size and needs neither.
+    '-vf', live ? `scale=${w}:${h},${TINT},${draw}` : draw,
     '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
     '-profile:v', 'main', '-pix_fmt', 'yuv420p',
     '-b:v', bitrate, '-minrate', bitrate, '-maxrate', bitrate, '-bufsize', bitrate,
@@ -70,20 +126,22 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
  *    negotiation gate (run 1 of those notes proved it first try)
  *  · -bf 0 for the same reason as the RTMPS leg
  */
-function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
+function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, bg = 'testsrc2' }) {
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   const draw = [
     'drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
     `text='%{pts\\:flt\\:${epoch}}'`,
-    'x=40', 'y=40', 'fontsize=56', 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=14',
+    'x=36', 'y=36', 'fontsize=52', 'fontcolor=black',
+    'box=1', 'boxcolor=white', 'boxborderw=13',
   ].join(':');
+  const source = (BACKGROUNDS[bg] || BACKGROUNDS.testsrc2)(w, h, fps);
+  const live = bg === 'etv';
   return [
     '-hide_banner', '-loglevel', 'warning',
-    '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
+    ...(live ? [] : ['-re']), ...source,
     '-re', '-f', 'lavfi', '-i', 'sine=frequency=440',
-    '-vf', draw,
+    '-vf', live ? `scale=${w}:${h},${TINT},${draw}` : draw,
     '-c:v', 'libx264', '-profile:v', 'baseline', '-level', '3.1',
     '-bf', '0', '-pix_fmt', 'yuv420p', '-g', String(gop), '-b:v', bitrate,
     '-c:a', 'libopus', '-ar', '48000', '-ac', '2',
@@ -125,8 +183,11 @@ function legState(name) {
   };
 }
 
+let bgName = 'testsrc2';
+
 function start(opts) {
   if (ff) return { already: true };
+  bgName = BACKGROUNDS[opts.bg] ? opts.bg : 'testsrc2';
   lastError = null;
   lastStderr = '';
   stopping = false;
@@ -173,6 +234,8 @@ createServer(async (req, res) => {
       pid: ff ? ff.pid : null,
       lastError,
       stderrTail: lastStderr.slice(-400) || null,
+      bg: bgName,
+      backgrounds: Object.keys(BACKGROUNDS),
       whip: legState('whip'),
     });
   }
