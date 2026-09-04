@@ -1,5 +1,5 @@
 {
-  // elektron-view — the repo's public viewing surfaces on one phone-openable
+  // elektron-view — the demo sequence on one phone-openable
   // URL: a menu at / plus four pages under /proto/*.
   //
   // public/ is ASSEMBLED BY build.mjs from an explicit allowlist, never from a
