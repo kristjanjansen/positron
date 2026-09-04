@@ -99,7 +99,7 @@ export class Pub extends Container {
         await super.fetch(new Request('http://c/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ key, bg: this.env.PUB_BG || 'testsrc2', ...this.#size() }),
+          body: JSON.stringify({ key, ...this.#size() }),
         }));
       } catch { /* container still waking; the sweep retries */ }
     }
@@ -108,7 +108,7 @@ export class Pub extends Container {
         await super.fetch(new Request('http://c/start-whip', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ url: whip, bg: this.env.PUB_BG || 'testsrc2', ...this.#size() }),
+          body: JSON.stringify({ url: whip, ...this.#size() }),
         }));
       } catch { /* same */ }
     }

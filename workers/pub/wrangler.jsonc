@@ -44,20 +44,9 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Pub"] }],
   "vars": {
-    // life | testsrc2 | mandelbrot | etv
-    //
-    // mandelbrot starved the encoder at 720p30 (the container logged a 141 s
-    // lag and the stream stalled). life moves just as visibly and costs far
-    // less; testsrc2 is the cheapest.
-    //
-    // "etv" restreams ERR's live broadcast into a PUBLIC Stream input. It works
-    // — a frame decodes from inside the container — but that is rebroadcasting
-    // someone else's copyrighted signal, and the tint does not change it. Left
-    // opt-in on purpose; mandelbrot moves just as visibly and is nobody's.
-    "PUB_BG": "testsrc2",
     // Both legs encode at once on ONE instance, so this is the real budget.
-    // 720p30 is affordable on testsrc2 (cost index 0.45) but NOT on life
-    // (1.21): the generator was the expense, not the resolution.
+    // Tunable without rebuilding the image, which is how the stall got
+    // diagnosed: half a vCPU could not hold two 720p30 encodes.
     "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30"
   },
   "observability": { "enabled": true }
