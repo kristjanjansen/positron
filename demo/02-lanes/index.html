@@ -20,7 +20,7 @@
   const d = mount({
     n: '02',
     name: 'lanes',
-    what: 'Two lanes, one transport. The data lane rides the tick; audio is scheduled ahead.',
+    what: 'Two lanes on one transport. Skew is how far apart they land at the same position.',
     readout: { skew: 'ms', audio: '', data: '', ctx: '' },
     controls: [
       { id: 'unlock', label: 'Enable sound', primary: true },
@@ -65,14 +65,26 @@
     d.set('audio', sched.length);
     const st = lane.stats();
     d.log(`audio status ${JSON.stringify(st)}`);
-    // skew = how far the audio lane's intended wall time sits from its position
-    const anchored = sched.filter((x) => Number.isFinite(x.intendedUs));
-    if (anchored.length) {
-      const errs = anchored.map((x) => Math.abs(x.intendedUs / 1000 - x.at));
-      const p50 = errs.slice().sort((a, b) => a - b)[Math.floor(errs.length / 2)];
+    // SKEW between the two lanes at the SAME POSITION.
+    //
+    // `intendedUs` is an ABSOLUTE WALL time in microseconds, not an offset — so
+    // `intendedUs/1000 - at` subtracts a 0-based position from an epoch and
+    // renders the epoch. The comparable pair is: the audio lane's intended wall
+    // time vs the wall time the data lane actually fired the same position.
+    const byPos = new Map(fired.filter((f) => f.at !== null).map((f) => [Math.round(f.at), f.wall]));
+    const pairs = sched
+      .filter((x) => Number.isFinite(x.intendedUs) && byPos.has(Math.round(x.at)))
+      .map((x) => byPos.get(Math.round(x.at)) - x.intendedUs / 1000);
+    if (pairs.length) {
+      const abs = pairs.map(Math.abs).sort((a, b) => a - b);
+      const p50 = abs[Math.floor(abs.length / 2)];
       d.set('skew', p50);
-      d.assert('audio schedule anchored', true, `${anchored.length} events`);
+      d.assert('lanes agree within 50 ms at the same position', p50 < 50,
+        `p50 ${p50.toFixed(1)} ms over ${pairs.length} paired positions`);
+    } else {
+      d.log(`no paired positions yet (audio ${sched.length}, data ${fired.length})`);
     }
+    d.assert('audio schedule anchored', sched.length > 0, `${sched.length} committed`);
     d.assert('both lanes advanced', fired.length > 0 && sched.length > 0, `data ${fired.length} / audio ${sched.length}`);
   });
 

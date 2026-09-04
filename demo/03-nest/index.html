@@ -21,9 +21,12 @@
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'A deck quoted inside another deck. Twice, one of them looping.',
-    readout: { childPos: 'ms', iteration: '', drift: 'ms', spans: '' },
-    controls: [{ id: 'check', label: 'Check nest', primary: true }],
+    what: 'A deck quoted twice inside another. The second quotation loops three times — watch pass and wraps.',
+    readout: { childPos: 'ms', pass: '', wraps: '', drift: 'ms' },
+    controls: [
+      { id: 'loop', label: 'Play the loop', primary: true },
+      { id: 'check', label: 'Check nest' },
+    ],
   });
   guard(d);
 
@@ -52,6 +55,17 @@
   nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 12000, in: 0, out: 2000,
                        repeat: 3 }));
 
+  // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
+  // rather than shown. onWrap is the event that makes it observable.
+  let wraps = 0;
+  const wrapLog = [];
+  nest.onWrap((ev) => {
+    wraps++;
+    wrapLog.push(ev);
+    d.set('wraps', wraps);
+    d.log(`wrap -> pass ${(nest.iteration('loop') ?? 0) + 1} of 3`, 'hi');
+  });
+
   createTransportBar(d.el, parent);
   createStripView(d.el, parent, {
     size: 'default',
@@ -62,11 +76,18 @@
   });
 
   setInterval(() => {
-    d.set('childPos', nest.childPos?.('frag') ?? nest.childPos?.('loop') ?? null);
+    d.set('childPos', nest.childPos?.('loop') ?? nest.childPos?.('frag') ?? null);
     const it = nest.iteration?.('loop');
-    d.set('iteration', it === null || it === undefined ? '—' : it);
-    d.set('spans', nest.spans().length);
-  }, 150);
+    d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
+  }, 120);
+
+  // the loop starts at 12 s; jump there so a visitor is not waiting for it
+  d.el.querySelector('.tbar') && null;
+
+  d.on('loop', () => {
+    const at = nest.iterationAt?.('loop', 0);
+    if (at !== null && at !== undefined) { parent.seek(at); parent.play(); d.log(`jumped to the loop at ${(at / 1000).toFixed(1)}s`); }
+  });
 
   d.on('check', () => {
     const spans = nest.spans();
@@ -79,7 +100,14 @@
     d.assert('nest reports drift', dr !== undefined && dr !== null, JSON.stringify(dr).slice(0, 80));
     d.assert('quotations round-trip out of the nest',
       nest.quotationsOf(child).length === 2, String(nest.quotationsOf(child).length));
-    d.log(`spans ${JSON.stringify(spans.map((s) => ({ id: s.id, at: s.at })))}`);
+    // the first wrap is one PASS after the loop starts, not at the loop start —
+    // asserting against 12000 called 0 wraps a failure at 12652 ms, when the
+    // boundary was still 1.3 s away
+    const firstWrap = nest.iterationAt?.('loop', 1);
+    const reached = Number.isFinite(firstWrap) && parent.position() >= firstWrap;
+    d.assert('wraps observed once past the first boundary', wraps > 0 || !reached,
+      `${wraps} wraps · pos ${Math.round(parent.position())} · first boundary ${firstWrap}`);
+    d.log(`spans ${JSON.stringify(spans.map((s) => ({ id: s.id, at: s.at, repeat: s.repeat ?? null })))}`);
   });
 
   d.log(`parent ${PARENT / 1000}s, child ${CHILD / 1000}s quoted twice`);

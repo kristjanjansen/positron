@@ -24,8 +24,8 @@
   const d = mount({
     n: '14',
     name: 'replay',
-    what: 'A recorded show off R2, played back with the eight cues it was recorded with.',
-    readout: { fired: '', p50: 'ms', p95: 'ms', media: 's' },
+    what: 'A recorded show off R2 with the eight cues it was recorded with. desync is deck vs picture.',
+    readout: { fired: '', lateBy: 'ms', desync: 'ms', media: 's' },
     controls: [
       { id: 'load', label: 'Load + play', primary: true },
       { id: 'check', label: 'Check' },
@@ -66,14 +66,19 @@
   });
 
   createTransportBar(d.el, deck);
-  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'cue', kind: 'cue', height: 44, as: 'ticks' }] });
+  createStripView(d.el, deck, { size: 'default', lanes: [{
+      id: 'cue', kind: 'cue', height: 44, as: 'ticks',
+      // idToColor('cue') came out near-black on the dark ground, so the ticks
+      // were there but invisible. latch + firedColor is built into the ticks
+      // renderer: a cue turns green once the playhead has passed it.
+      color: '#ffd400', width: 2.5, latch: true, firedColor: '#8fd6a8',
+    }] });
 
   function render() {
     d.set('fired', fires.length);
     if (fires.length) {
       const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
-      d.set('p50', errs[Math.floor(errs.length * 0.5)]);
-      d.set('p95', errs[Math.min(errs.length - 1, Math.floor(errs.length * 0.95))]);
+      d.set('lateBy', errs[Math.floor(errs.length * 0.5)]);
       firesEl.innerHTML = fires.map((f) => `<b>${f.id}</b> ${f.errMs >= 0 ? '+' : ''}${f.errMs.toFixed(0)}ms`).join(' · ');
     }
   }
@@ -108,11 +113,25 @@
       const t = setTimeout(res, 8000);
       video.addEventListener('loadedmetadata', () => { clearTimeout(t); res(); }, { once: true });
     });
+    // start the deck FROM the picture. mediaMaster reads currentTime and never
+    // writes it, so if the two start apart the cues fire against the wrong
+    // frame — which is exactly what a 12.4 s desync looked like.
+    deck.seek(video.currentTime * 1000);
     await video.play().catch((e) => d.log(`play refused: ${e.message}`, 'bad'));
     d.log(`playing ${url.split('/').slice(-2).join('/')} · readyState ${video.readyState} · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
   });
 
-  setInterval(() => d.set('media', video.currentTime), 250);
+  // WATCHDOG. media-master's own rule L2: inside jumpMs an error is frame
+  // quantisation and syncs; past it the element has MOVED and it must seek.
+  // Enforced here too, and shown, so a desync is never hidden inside lateBy.
+  setInterval(() => {
+    d.set('media', video.currentTime);
+    if (!master || video.readyState < 2) return;
+    const mediaMs = video.currentTime * 1000;
+    const off = mediaMs - deck.position();
+    d.set('desync', off, Math.abs(off) > 250 ? 'bad' : 'ok');
+    if (Math.abs(off) > 250) { deck.seek(mediaMs); d.log(`resync ${off.toFixed(0)} ms`, 'bad'); }
+  }, 400);
 
   d.on('check', async () => {
     // assert the MANIFEST, not the video's readiness: readyState depends on how
@@ -126,7 +145,8 @@
     if (fires.length) {
       const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
       const p50 = errs[Math.floor(errs.length * 0.5)];
-      d.assert('cue accuracy under 250 ms', p50 < 250, `p50 ${p50.toFixed(0)} ms over ${fires.length} fires`);
+      d.assert('cues land within 250 ms of the picture', p50 < 250,
+        `p50 ${p50.toFixed(0)} ms over ${fires.length} fires`);
     } else {
       d.log(`no cues fired yet — the first is at 15.0 s (media ${video.currentTime.toFixed(1)}s)`);
     }

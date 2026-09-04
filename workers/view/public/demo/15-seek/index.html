@@ -30,12 +30,12 @@
     n: '15',
     name: 'seek',
     what: 'Seek inside the recording. The fold at the new position must be exact — no retroactive burst, no skipped cue.',
-    readout: { seeks: '', folds: '', wrong: '', retro: '' },
+    readout: { jumps: '', asked: '', wrong: '', lateBurst: '' },
     controls: [
-      { id: 'load', label: 'Load', primary: true },
-      { id: 'fold', label: 'Fold at every cue' },
-      { id: 'sweep', label: 'Seek sweep' },
-      { id: 'check', label: 'Check' },
+      { id: 'load', label: 'Load the recording', primary: true },
+      { id: 'fold', label: 'Ask "which cues by now?" at 24 points' },
+      { id: 'sweep', label: 'Jump to 5 places and re-ask' },
+      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -84,7 +84,13 @@
   });
 
   createTransportBar(d.el, deck);
-  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'cue', kind: 'cue', height: 44, as: 'ticks' }] });
+  createStripView(d.el, deck, { size: 'default', lanes: [{
+      id: 'cue', kind: 'cue', height: 44, as: 'ticks',
+      // idToColor('cue') came out near-black on the dark ground, so the ticks
+      // were there but invisible. latch + firedColor is built into the ticks
+      // renderer: a cue turns green once the playhead has passed it.
+      color: '#ffd400', width: 2.5, latch: true, firedColor: '#8fd6a8',
+    }] });
 
   const expectedAt = (pos) => CUES.filter((c) => c.offsetMs <= pos).length;
 
@@ -121,7 +127,7 @@
         if (got !== want) { wrong++; d.log(`fold@${probe} want ${want} got ${got}`, 'bad'); }
       }
     }
-    d.set('folds', folds);
+    d.set('asked', folds);
     d.set('wrong', wrong, wrong ? 'bad' : 'ok');
     d.assert('fold is exact at every cue boundary', wrong === 0, `${folds} probes, ${wrong} wrong`);
   });
@@ -132,7 +138,7 @@
     for (const t of stops) {
       deck.seek(t);
       seeks++;
-      d.set('seeks', seeks);
+      d.set('jumps', seeks);
       await new Promise((r) => setTimeout(r, 700));
       const st = deck.reduceAt ? deck.reduceAt('cue', deck.position()) : null;
       const want = expectedAt(deck.position());
@@ -141,7 +147,7 @@
       d.log(`seek ${(t / 1000).toFixed(0)}s -> media ${video.currentTime.toFixed(1)}s, fold ${got}/${want}`);
     }
     d.set('wrong', wrong, wrong ? 'bad' : 'ok');
-    d.set('retro', retro, retro ? 'bad' : 'ok');
+    d.set('lateBurst', retro, retro ? 'bad' : 'ok');
     d.assert('every seek folds to the right cue count', wrong === 0, `${seeks} seeks, ${wrong} wrong`);
     d.assert('no retroactive cue burst', retro === 0, `${retro} fires >1.5 s late`);
   });

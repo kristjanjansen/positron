@@ -16,7 +16,10 @@ export function markAdapter({ rates = [0.25, 0.5, 1, 2, 4], onFire } = {}) {
     adapter: {
       caps: { rates, continuous: false, assertOnSeek: true },
       actuate(payload, ev) {
-        fired.push({ at: ev?.at ?? null, payload });
+        // `at` is a POSITION; `wall` is when it actually happened. Comparing a
+        // lane against anything needs the second one — the audio lane logs
+        // intendedUs in the same wall domain.
+        fired.push({ at: ev?.at ?? null, wall: Date.now(), payload });
         onFire?.(payload, ev);
       },
       /** state at a position = every mark at or before it.

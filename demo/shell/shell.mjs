@@ -139,6 +139,8 @@ export function el(tag, cls, text, attrs) {
 
 export function fmtNum(x) {
   if (!Number.isFinite(x)) return String(x);
+  // a count is a count: 32, not 32.0
+  if (Number.isInteger(x)) return Math.abs(x) >= 10000 ? x.toLocaleString('en-US') : String(x);
   const a = Math.abs(x);
   if (a >= 1000) return Math.round(x).toLocaleString('en-US');
   if (a >= 100) return x.toFixed(0);

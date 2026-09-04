@@ -78,6 +78,19 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
 
   function paint({ pos }) {
     if (deck.rangeGen && deck.rangeGen() !== gen) { gen = deck.rangeGen(); range = deck.range; }
+
+    // STOP AT THE END. Nothing in the library halts a bounded transport when it
+    // reaches range[1] — it keeps counting while the scrub bar sits pinned, so
+    // the readout showed 0:23.415 / 0:16.000. A bounded deck ends at its end;
+    // an unbounded (live) one has no end to reach, hence the seekable guard.
+    if (seekable && !dragging && pos >= range[1] && deck.playing?.()) {
+      deck.pause();
+      deck.seek(range[1]);
+      pos = range[1];
+      note('end');
+    } else if (badge.textContent === 'end' && pos < range[1]) {
+      clearNote();
+    }
     if (!dragging && seekable) {
       const f = posToFrac(pos);
       fill.style.width = `${f * 100}%`;
