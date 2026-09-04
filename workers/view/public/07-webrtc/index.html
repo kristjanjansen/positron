@@ -14,14 +14,14 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { whep, holdPublisher, waitForWhip } from '/shell/live.mjs';
 
   const d = mount({
     n: '07',
     name: 'webrtc',
     what: 'The same live input over WHEP instead of HLS. Same burned-in clock, so the two are comparable.',
-    readout: { rtt: 'ms', jitter: 'ms', fps: '', state: '' },
+    readout: { rtt: 'ms', fps: '', video: '', paused: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -44,7 +44,24 @@
     pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
-    pc.ontrack = (e) => { if (video.srcObject !== e.streams[0]) video.srcObject = e.streams[0]; };
+    // A WEBRTC TRACK ARRIVES MUTED and unmutes only once media actually
+    // flows. Assigning srcObject before that gives iOS a stream with no
+    // frames yet, and it paints black and stays there even though decoding
+    // later succeeds — which is exactly what the phone showed: rtt 16 ms,
+    // 26 fps inbound, and a black rectangle.
+    pc.ontrack = (e) => {
+      const [stream] = e.streams;
+      const attach = async () => {
+        if (video.srcObject !== stream) video.srcObject = stream;
+        // play AFTER attaching a live stream, not before
+        try { await video.play(); d.log(`attached on ${e.track.kind} unmute`); }
+        catch (err) { await playOrPrompt(video, d); }
+      };
+      if (e.track.muted) e.track.addEventListener("unmute", attach, { once: true });
+      else attach();
+      // some builds never fire unmute; metadata is a second chance
+      video.addEventListener("loadedmetadata", () => video.play().catch(() => {}), { once: true });
+    };
     pc.onconnectionstatechange = () => d.log(`pc ${pc.connectionState}`);
 
     const offer = await pc.createOffer();
@@ -71,6 +88,7 @@
 
   d.on('go', async () => {
     if (pc) return;
+    armVideo(video);          // before any await, or iOS refuses later
     ws = holdPublisher((s) => {
       badge.dataset.on = s.held ? '1' : '0';
       badge.textContent = s.held ? `publisher: held${s.viewers ? ` (${s.viewers})` : ''}` : 'publisher: idle';
@@ -91,7 +109,7 @@
         started = performance.now();
         await whepPlay(whep());
         d.log(`WHEP negotiated in ${Math.round(performance.now() - started)} ms`, 'hi');
-        await video.play().catch((e) => d.log(`play refused: ${e.name}`, 'bad'));
+        await playOrPrompt(video, d);
         return;
       } catch (e) {
         try { pc?.close(); } catch { /* fine */ }
@@ -105,13 +123,17 @@
 
   setInterval(async () => {
     if (!pc) return;
-    d.set('state', pc.connectionState, pc.connectionState === 'connected' ? 'ok' : 'bad');
+    // the element's own view, which is where the black frame actually lives
+    d.set('video', video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame',
+      video.videoWidth ? 'ok' : 'bad');
+    d.set('paused', video.paused ? `paused rs${video.readyState}` : `playing rs${video.readyState}`,
+      video.paused ? 'bad' : 'ok');
     const stats = await pc.getStats().catch(() => null);
     if (!stats) return;
     for (const s of stats.values()) {
       if (s.type === 'inbound-rtp' && s.kind === 'video') {
         if (Number.isFinite(s.framesPerSecond)) d.set('fps', s.framesPerSecond);
-        if (Number.isFinite(s.jitter)) d.set('jitter', s.jitter * 1000);
+
       }
       if (s.type === 'candidate-pair' && s.state === 'succeeded' && Number.isFinite(s.currentRoundTripTime)) {
         d.set('rtt', s.currentRoundTripTime * 1000);
@@ -126,6 +148,10 @@
       d.assert('peer connection connected', pc.connectionState === 'connected', pc.connectionState);
       d.assert('a track arrived', !!video.srcObject, video.srcObject ? 'yes' : 'no');
       d.assert('video is advancing', video.currentTime > 0, `${video.currentTime.toFixed(1)}s`);
+      // decoding is not rendering: this is the assert the black frame failed
+      d.assert('frames are actually RENDERED', video.videoWidth > 0,
+        video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame reached the element');
+      d.assert('element is playing', !video.paused, video.paused ? `paused rs${video.readyState}` : 'playing');
     }
   });
 

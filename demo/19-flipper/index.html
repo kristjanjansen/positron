@@ -31,7 +31,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -148,6 +148,10 @@
 
   d.on('start', async () => {
     started = true;
+    // ONLY the selected one. Arming all three called play() on all three,
+    // which loaded all three — defeating the single-channel design the whole
+    // demo is built on, and breaking its own assert.
+    armVideo(chans[sel].media);
     await open(chans[sel]);
     attachMaster();
     d.log(`playing ${chans[sel].name}`);

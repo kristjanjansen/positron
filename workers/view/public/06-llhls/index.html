@@ -15,7 +15,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
@@ -43,6 +43,7 @@
 
   d.on('go', async () => {
     if (player) return;
+    armVideo(video);          // spend the activation while it is still live
 
     // The socket IS the reference count. Holding it starts the container's
     // ffmpeg; dropping it (closing the tab) is how the publisher learns nobody
@@ -82,7 +83,7 @@
       .on('error', (e) => d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad'))
       .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
 
-    await video.play().catch((e) => d.log(`play refused: ${e.name}`, 'bad'));
+    await playOrPrompt(video, d);
   });
 
   d.on('check', async () => {

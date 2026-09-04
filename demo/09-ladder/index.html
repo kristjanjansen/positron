@@ -21,7 +21,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { llhls, whep, holdPublisher, waitForManifest, waitForWhip } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
@@ -64,9 +64,18 @@
     pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
+    // attach on unmute, for the same reason as 07: a muted track assigned
+    // early paints black on iOS and stays there
     const ms = new MediaStream();
-    legs.webrtc.video.srcObject = ms;
-    pc.ontrack = (e) => ms.addTrack(e.track);
+    pc.ontrack = (e) => {
+      const add = () => {
+        ms.addTrack(e.track);
+        if (legs.webrtc.video.srcObject !== ms) legs.webrtc.video.srcObject = ms;
+        legs.webrtc.video.play().catch(() => {});
+      };
+      if (e.track.muted) e.track.addEventListener('unmute', add, { once: true });
+      else add();
+    };
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     if (pc.iceGatheringState !== 'complete') {
@@ -84,6 +93,7 @@
 
   d.on('go', async () => {
     if (player || pc) return;
+    for (const k of ['llhls', 'webrtc']) armVideo(legs[k].video);
     holdPublisher((s) => d.set('legs', s.held ? `held ${s.viewers ?? 1}` : 'idle', s.held ? 'ok' : 'bad'));
     d.log('holding the publisher; both legs start together');
 
@@ -104,7 +114,7 @@
           if (rtt !== null) d.set('gap', `${(latency - rtt / 1000).toFixed(2)} s`);
         });
       up++;
-      await legs.llhls.video.play().catch(() => {});
+      await playOrPrompt(legs.llhls.video, d);
     }
     if (w.ok) {
       for (let i = 1; i <= 6; i++) {
@@ -116,7 +126,7 @@
           if (i < 6) await new Promise((r) => setTimeout(r, 4000));
         }
       }
-      await legs.webrtc.video.play().catch(() => {});
+      await playOrPrompt(legs.webrtc.video, d);
     }
     d.log(`${up}/2 legs playing`, up === 2 ? 'hi' : 'bad');
   });
@@ -140,6 +150,8 @@
     d.assert('hls leg playing', !!player && legs.llhls.video.currentTime > 0,
       `${legs.llhls.video.currentTime.toFixed(1)}s`);
     d.assert('whep leg connected', !!pc && pc.connectionState === 'connected', pc?.connectionState ?? 'none');
+    d.assert('whep leg is RENDERING, not just decoding', legs.webrtc.video.videoWidth > 0,
+      legs.webrtc.video.videoWidth ? `${legs.webrtc.video.videoWidth}x${legs.webrtc.video.videoHeight}` : 'no frame');
     if (hlsLat !== null && rtt !== null) {
       // The ORDER is the claim, not the exact figures: HLS is seconds behind,
       // WebRTC is milliseconds. If that ever inverts, something is wrong.

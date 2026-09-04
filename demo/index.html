@@ -16,7 +16,7 @@
 <ol class="d-acts" id="rows"></ol>
 
 <script type="module">
-  import { DEMOS } from '/manifest.mjs';
+  import { DEMOS, NOTES } from '/manifest.mjs';
   function rowHTML(d) {
   const href = d.built ? `/${d.n}-${d.name}/` : (d.page || null);
   const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
@@ -30,5 +30,14 @@
     + '</a></li>';
 }
   document.getElementById('rows').innerHTML = DEMOS.map(rowHTML).join('');
+  function noteHTML(n) {
+    return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
+      + '<span class="n">·</span>'
+      + '<span class="nm">' + n.title + '</span>'
+      + '<span class="d-one">' + n.one + '</span>'
+      + '</a></li>';
+  }
+  document.body.insertAdjacentHTML('beforeend',
+    '<h2 class="d-act-h">notes</h2><ol class="d-acts">' + NOTES.map(noteHTML).join('') + '</ol>');
 </script>
 </html>

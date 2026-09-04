@@ -1,14 +1,9 @@
-# positron and U: — two answers to one problem
+# positron and U:
 
-Written 2026-09-04 from reading the code, not the pitch: `tarmoj/radio1965`
-cloned locally, plus the other 40 repos read over the GitHub API. U: is the
-organisation behind `uuu.ee`; ECCM (Estonian Centre of Contemporary Music) is
-who `radio1965` is built for.
-
-Both projects spend their effort on **making media happen at the right time in
-more than one place at once**. They have arrived at genuinely different answers,
-and the differences are not accidents of taste — each follows from where the
-work is meant to happen.
+Read from the code, not the pitch: `tarmoj/radio1965` cloned, the other 40
+repos read over the API. Both projects make media happen at the right time in
+more than one place. They answer it differently, and each answer follows from
+where the work happens.
 
 ---
 
@@ -169,18 +164,60 @@ touching their schema.
 
 ### 3. Compile vClick scores into quotations
 
-vClick encodes tempo, bar numbers, fermatas and stops as a Csound score, and its
-README admits the catch: playback can start from any bar *"if the vClick score is
-done well"*. In positron that property is not a matter of care — `15 seek`
-asserts the fold at every cue boundary ±1 ms, 24 probes, 0 wrong, because
-`deck.reduceAt(kind, pos)` recomputes state from the rows rather than replaying
-them.
+**What a Csound score is.** Csound splits a piece in two: an *orchestra* of
+numbered instruments built from opcodes, and a *score* of flat, absolutely
+timed event lines plus a tempo map.
+
+```
+i 1   0.0   2.0   8000   440
+; |   |     |     +------+-- p4, p5: whatever that instrument reads
+; |   |     +-- p3: duration
+; |   +-- p2: start time, ABSOLUTE
+; +-- p1: which instrument
+t 0 120  30 90                ; tempo: 120 bpm at 0, 90 bpm at beat 30
+```
+
+**What vClick does with it.** The server runs Csound over that score, but the
+events do not only make sound — they carry bar, beat and tempo, which the
+server pushes to the players over OSC on wifi. A wire-free click track: no
+headphones, no cables, no mixer. It can fire backing tracks from the same
+score. Their README: *"Every piece requires its own written out score."*
+
+It is a shrewd choice. `t` gives real accelerandi, absolute `p2` means the
+piece is a precomputed timeline with nothing inferred at runtime, and Csound
+already schedules sample-accurately.
+
+**Three places it runs out, each answered by machinery that exists:**
+
+- **No quotation.** A score is flat events, so "this passage is that passage,
+  at half speed, three times" has to be written out again — which is exactly
+  why every piece needs its own score. `nested.mjs` makes a repeat a
+  REFERENCE: `quotation({ ref, at, in, out, repeat: 3 })`.
+- **Seek is not a property of the format.** To start at bar 47 you need the
+  state AT bar 47: which tempo is in force, what is still ringing, where a
+  backing track has got to. The score carries no fold, hence the README's
+  *"if the vClick score is done well"*. `deck.reduceAt(kind, pos)` computes
+  that state from the rows, which is why `15 seek` can assert it at every cue
+  boundary ±1 ms — 24 probes, 0 wrong.
+- **Tempo lives in the score, not the transport.** So a client cannot derive
+  "where are we now" for itself; the server must tell it, which puts the
+  network in the critical path of every beat. positron derives position from
+  a shared clock, so a blip costs nothing already delivered.
+
+**The mapping is mechanical:**
+
+| Csound score | positron |
+|---|---|
+| `t` statements | the transport tempo map |
+| `i` lines | deck items — `p2`→`at`, `p3`→duration, `p1`→`kind` |
+| fermatas, stops | a hold, or a `when` bracket |
+| repeated material | a **quotation**, not duplicated lines |
+| bar/beat readout | a DERIVED lane off the tempo map, not pushed over OSC |
 
 A vClick-to-quotation compiler would give them seek-from-anywhere as a
-guarantee, and give positron a real corpus of notated pieces — which is exactly
-what the timeline lacks. Their scores are the client `plan-timeline` has been
-waiting for.
-
+guarantee rather than a discipline, and give positron a real corpus of notated
+pieces — which is exactly what the timeline lacks. Their scores are the client
+`plan-timeline` has been waiting for.
 ### 4. Borrow their LAN, which positron does not have
 
 Their in-room Host/Guest with UDP discovery is genuinely missing here. positron
@@ -203,6 +240,120 @@ and an aoristic statistic that *names what it dropped* — which matters for
 material whose dates are uncertain, and which the Radio Tallinn 1965 theses
 demand anyway.
 
+---
+
+## What positron can offer a LAN setup
+
+Everything U: builds assumes a wifi network you can see, and positron is
+internet-first — so the obvious answer is "nothing". That is wrong, and the
+reason is one design decision made early for a different purpose.
+
+### The relay was always optional
+
+`proto/looper/peer.mjs` has three interchangeable transports behind one
+interface (`send` / `onMessage` / `close`):
+
+```js
+broadcastTransport(name)   // same browser, no network at all
+wsTransport(url)           // ANY websocket relay
+pairTransports({ delayMs, jitterMs, lossRate })   // in-process, chosen latency
+```
+
+`wsTransport` does not know or care that `ws.positron.studio` is a Cloudflare
+Durable Object. Point it at `ws://192.168.1.50:8080` and the whole clock and
+score machinery runs on a laptop in the hall with no internet. That is a
+one-line change, not a port — and the third transport exists precisely because
+latency had to be a number the test chose, which is also what makes a LAN
+trivial to model before you are in the room.
+
+### The clock is the part worth taking, and it beats a Host
+
+VideoSync elects a **Host device** and everyone follows it. That means the
+reference is one machine's clock: if it drifts, everyone drifts with it, and
+if it leaves, the reference leaves.
+
+`peer.mjs` elects **the lowest peer id** as reference, with no election
+protocol, no leader heartbeat and no split brain, and every peer computes the
+same correction independently:
+
+```js
+const rtt    = t2 - t0;
+const offset = m.t1 - (t0 + t2) / 2;
+if (rtt < p.rttMs) { p.rttMs = rtt; p.offsetMs = offset; }   // keep the FASTEST only
+```
+
+No device is privileged, and on a LAN where RTT is under 2 ms it converges
+almost immediately — the same machinery that was built to survive the open
+internet is simply *easy* on a local network. Their nudge-then-seek drift
+correction then sits on top of a derived shared clock instead of a nominated
+machine.
+
+### A shipped score survives the network dropping
+
+vClick has a server that plays the score and pushes OSC to the players. If
+wifi stutters, a player stops receiving events — the network is in the
+critical path of every note.
+
+positron inverts that. A committed layer goes out **once, as a value**, and
+each client schedules locally against the shared clock:
+
+```js
+/** LOOP PLANE. One committed layer, as a value. Latency-indifferent. */
+function publishLayer(session, meta = {}) { … }
+```
+
+A quotation whose `at` has already passed does not misfire; it starts on the
+next grid boundary. So a blip loses nothing already delivered. In a hall with
+contended wifi — which is every hall — that is a material difference, and it
+is why the live plane and the loop plane are separated at all: a lost live
+note is a note nobody hears once, while a lost layer would be a lost piece.
+
+### Seek-from-any-bar, as a guarantee rather than a hope
+
+vClick's README is candid: playback can start from any bar *"if the vClick
+score is done well"*. In a rehearsal that is the most-used feature there is —
+nobody rehearses a piece from the top.
+
+`15 seek` makes it a property of the machinery instead of the notation:
+`deck.reduceAt(kind, pos)` recomputes state from the rows rather than replaying
+them, asserted at every cue boundary ±1 ms — 24 probes, 0 wrong — plus a
+sweep that counts retroactive fires (a cue landing more than 1.5 s after its
+own position, which is what a seek that replayed a backlog produces).
+
+### The measurement is probably worth more than the software
+
+The word `drift` appears **once** across all 40 U: repos, in a README, as a
+feature description. There is no harness anywhere.
+
+`rig/` runs unchanged against a LAN chain: burn a clock into the pixels and
+the glass-to-glass number is readable from a screenshot. The local-venue
+measurement already exists — ffmpeg-WHIP into mediamtx into a browser measured
+**20.6 / 52.1 / 57.9 / 67.0 ms** p50/p90/p95/p99 with **+12 ms** A/V skew and
+zero dropped frames (2653 decoded of 2653 on the wire, 30 fps flat).
+
+That is the fastest chain in the whole campaign and the only one needing no
+internet — but state it precisely: **everything in that run was loopback**, one
+machine, so it is the FLOOR rather than a LAN figure. A real wifi hop to a second
+device adds to it, and the RUNBOOK is explicit that the p90 tail (~52 ms) is
+x264/WHIP-side batching rather than transport. What it establishes is that the
+local path is not the bottleneck — which is the thing worth knowing before
+wiring a hall.
+
+### What runs on the LAN and what does not
+
+| | on a LAN with no internet |
+|---|---|
+| `timeline/` — transport, nested, score, strip, store, render | **yes**, no network in it at all |
+| `peer.mjs` shared clock + planes | **yes**, via `wsTransport` at a local relay |
+| the demo shell and Act 0 | **yes**, `demo/server.mjs` serves the repo |
+| `16 looper` | **yes**, it has no upstream by design |
+| `ws.positron.studio` relay | **no** — a Durable Object cannot run on a laptop. Swap in a ~40-line local WS server; the client code does not change |
+| `06`–`09`, `14`, `15` | **no**, they are Cloudflare Stream and R2 by definition |
+| LAN discovery | **no, and this is theirs to lend** — positron has no equivalent of VideoSync's UDP broadcast Host-finding |
+
+So the honest split for a room: their discovery and their Qt clients find each
+other, positron's clock and score decide when things happen, and `rig/` says
+whether it worked. None of that needs an uplink.
 ---
 
 ## One thing to be careful about

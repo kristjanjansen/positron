@@ -72,6 +72,13 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .d-body { margin: 0 0 14px; }
 .d-body:empty { display: none; }
 
+/* a refused play() must be visible, not a black rectangle */
+.d-tap {
+  display: block; width: 100%; margin: 0 0 10px;
+  color: #0b0e14; background: var(--hi); border-color: var(--hi);
+  font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+}
+
 /* ── log ──────────────────────────────────────────────────────────────── */
 .d-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);

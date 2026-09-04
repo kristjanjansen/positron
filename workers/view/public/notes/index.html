@@ -132,8 +132,11 @@
     const r = await fetch(`/notes/${safe}.md`, { cache: 'no-store' });
     if (!r.ok) throw new Error(`${r.status}`);
     const src = await r.text();
-    document.getElementById('md').innerHTML = render(src);
+    // The leading h1 becomes the PAGE title, so rendering it again in the body
+    // printed the heading twice. Strip it from the body instead.
     const h1 = src.match(/^#\s+(.+)$/m);
+    const body = h1 ? src.replace(/^#\s+.+$/m, '') : src;
+    document.getElementById('md').innerHTML = render(body);
     if (h1) { document.getElementById('t').textContent = h1[1]; document.title = `POSITRON · ${h1[1]}`; }
   } catch (e) {
     document.getElementById('md').innerHTML = `<p>could not load <code>${safe}.md</code> — ${e.message}</p>`;
