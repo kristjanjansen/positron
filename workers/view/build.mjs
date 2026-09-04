@@ -219,8 +219,20 @@ function favicon() {
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
-// the menu page — the only page this worker authors itself
-await copyFile(join(HERE, 'menu.html'), join(OUT, 'index.html'));
+// the menu page — the only page this worker authors itself. Its list is
+// GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
+// place to forget. Number and name only; a row with no target renders greyed.
+{
+  const rows = DEMO_MANIFEST.map((d) => {
+    const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
+    return href
+      ? `  <li class="d-row"><a href="${href}"><span class="n">${d.n}</span><span class="nm">${d.name}</span></a></li>`
+      : `  <li class="d-row todo"><a><span class="n">${d.n}</span><span class="nm">${d.name}</span></a></li>`;
+  }).join('\n');
+  const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
+  if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
+  await writeFile(join(OUT, 'index.html'), menu.replace('<!--DEMOS-->', rows));
+}
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for
 // every page whether or not the HTML asks for one; without this the four

@@ -26,7 +26,7 @@ Two faults found while verifying the rename, both **predating it**, both now fix
 2. **`verify.mjs` asserted `links.length === 4`** while the menu has had five
    cards since looper landed. A stale assert, not a page fault; now five.
 
-The repo's public surfaces on one phone-openable link, behind a menu. Free
+The demo sequence on one phone-openable link. Free
 tier, **custom domain `positron.studio` + `www`** (added 2026-09-04; zone on
 Cloudflare Registrar), no secrets, ≈ $0. The `*.workers.dev` hostname is **still
 enabled** (`workers_dev: true`), so every pre-move link still resolves.

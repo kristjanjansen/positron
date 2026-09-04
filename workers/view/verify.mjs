@@ -172,11 +172,18 @@ async function common(page) {
 // ── 0. index menu ───────────────────────────────────────────────────────────
 console.log('\n[0] index menu');
 await goto('/', { settle: 600 });
-ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON — viewing surfaces', await evaluate(`document.title`));
-const links = await evaluate(`[...document.querySelectorAll('a.card')].map(a => a.getAttribute('href'))`);
-// FIVE since looper landed 2026-08-30; this assert still said four.
-ok('index', 'lists all five pages', links.length === 5 && links.every((h) => h.startsWith('/proto/')), links.join(' '));
-const tap = await evaluate(`(() => { const r = document.querySelector('a.card').getBoundingClientRect(); return Math.round(r.height); })()`);
+ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON', await evaluate(`document.title`));
+// The menu is now the DEMO LIST, generated from demo/manifest.mjs, so the old
+// `a.card` markup and the four-then-five `/proto/` count are both gone. Assert
+// on what the generator promises instead: 23 rows, and every LINKED row points
+// at a real target.
+const rows = await evaluate(`[...document.querySelectorAll('li.d-row')].length`);
+const links = await evaluate(`[...document.querySelectorAll('li.d-row a[href]')].map(a => a.getAttribute('href'))`);
+ok('index', 'lists every demo row', rows === 23, `${rows} rows`);
+ok('index', 'linked rows point at demo or proto',
+   links.length > 0 && links.every((h) => h.startsWith('/demo/') || h.startsWith('/proto/')),
+   `${links.length} linked: ${links.join(' ')}`);
+const tap = await evaluate(`(() => { const r = document.querySelector('li.d-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');
 await shot('0-index');
