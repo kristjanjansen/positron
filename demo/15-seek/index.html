@@ -19,7 +19,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -104,6 +104,7 @@
 
   d.on('load', async () => {
     if (master) return;
+    armVideo(video);
     const url = ARCHIVE.hls;
     if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
     else if (window.Hls?.isSupported()) {
@@ -112,7 +113,7 @@
       hls.on(window.Hls.Events.ERROR, (_e, x) => { if (x.fatal) d.log(`hls fatal ${x.details}`, 'bad'); });
     }
     master = mediaMaster(deck, video, { anchorMs: 0 });
-    await video.play().catch((e) => d.log(`play refused: ${e.message}`, 'bad'));
+    await playOrPrompt(video, d);
     d.log('loaded; media is the master');
   });
 

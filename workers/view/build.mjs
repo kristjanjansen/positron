@@ -30,7 +30,7 @@ const REPO = join(HERE, '..', '..');
 const OUT = join(HERE, 'public');
 
 // the demo story order, single-sourced from demo/manifest.mjs
-const { DEMOS: DEMO_MANIFEST } = await import(new URL('../../demo/manifest.mjs', import.meta.url));
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST } = await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -91,7 +91,6 @@ const FILES = [
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
   ['demo/notes/index.html', 'notes/index.html'],
   ['demo/notes/uuu-positron.md', 'notes/uuu-positron.md'],
-  ['demo/notes/vain.md', 'notes/vain.md'],
   ...demoFiles(),
 ];
 
@@ -126,6 +125,27 @@ function demoFiles() {
 // The ONLY edits made to any proto's bytes, applied to the COPY in public/.
 // The files in proto/ are not touched. Each one exists because the source
 // hardcodes a dev-server localhost URL that cannot resolve from a phone.
+// ── appended to the deployed copy ───────────────────────────────────────────
+// A BACK LINK for the archive pages, which predate the index and have no way
+// to reach it — on a phone the only exit is the browser gesture.
+//
+// APPENDED rather than substituted, deliberately: the first attempt used
+// REWRITES with "</html>" as the anchor and build.mjs correctly refused,
+// because proto/megatimeline/index.html has no closing tag. A position:fixed
+// anchor works wherever it lands in the body, so it needs no anchor at all.
+//
+// Deployed copy only: under each proto's own dev server "/" is the repo root,
+// not the index, so the link would point at nothing there.
+const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:99999;'
+  + 'font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;'
+  + 'color:#ffd400;background:#0b0e14cc;border:1px solid #2b3546;border-radius:4px;'
+  + 'padding:7px 10px;text-decoration:none">\u2190 demos</a>';
+
+const APPEND = {
+  'proto/kurenniemi/index.html': BACK,
+  'proto/megatimeline/index.html': BACK,
+  'proto/remixer/index.html': BACK,
+};
 const REWRITES = {
   'proto/megatimeline/index.html': [
     // megatimeline's "PLAY IN REMIXER ↗" hand-off opens `${REMIXER}/?play=…`.
@@ -242,9 +262,20 @@ await mkdir(OUT, { recursive: true });
     + '</a></li>';
 }
   const rows = DEMO_MANIFEST.map((d) => '  ' + rowHTML(d)).join('\n');
+  function noteHTML(n) {
+    return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
+      + '<span class="n">·</span>'
+      + '<span class="nm">' + n.title + '</span>'
+      + '<span class="d-one">' + n.one + '</span>'
+      + '</a></li>';
+  }
+  const notes = '<h2 class="d-act-h">notes</h2>\n<ol class="d-acts">'
+    + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
-  await writeFile(join(OUT, 'index.html'), menu.replace('<!--DEMOS-->', rows));
+  if (!menu.includes('<!--NOTES-->')) throw new Error('menu.html lost its <!--NOTES--> marker');
+  await writeFile(join(OUT, 'index.html'),
+    menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes));
 }
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for
@@ -257,14 +288,16 @@ for (const [src, dst] of FILES) {
   const to = join(OUT, dst);
   await mkdir(dirname(to), { recursive: true });
   const rewrites = REWRITES[src];
-  if (rewrites) {
+  const append = APPEND[src];
+  if (rewrites || append) {
     let text = await readFile(join(REPO, src), 'utf8');
-    for (const [from, into] of rewrites) {
+    for (const [from, into] of rewrites || []) {
       if (!text.includes(from)) throw new Error(`rewrite target vanished in ${src}: ${from}`);
       text = text.split(from).join(into);
     }
+    if (append) text += '\n' + append + '\n';
     await writeFile(to, text);
-    console.log(`  rewrote ${dst} (${rewrites.length} substitution(s))`);
+    console.log(`  ${rewrites ? `rewrote ${dst} (${rewrites.length} substitution(s))` : `copied ${dst}`}${append ? ' + back link' : ''}`);
   } else {
     await copyFile(join(REPO, src), to);
   }

@@ -149,6 +149,51 @@ export function fmtNum(x) {
   return x.toFixed(3);
 }
 
+/**
+ * ARM A VIDEO INSIDE THE GESTURE.
+ *
+ * iOS grants autoplay only while a user activation is live. Every live demo
+ * here does work first — wait for the publisher, wait for the manifest or the
+ * whip leg, negotiate WHEP — and by the time it calls play() the activation
+ * is long gone. On a real iPhone that produced:
+ *
+ *   11.65  WHEP negotiated in 1952 ms
+ *   11.65  play refused: NotAllowedError
+ *
+ * with the connection healthy behind it (rtt 16 ms, 31 fps) and a black box
+ * in front. Calling play() synchronously in the handler, before any await,
+ * spends the activation while it still exists; the element then keeps playing
+ * when a source arrives later.
+ */
+export function armVideo(v) {
+  v.muted = true;                 // property, not just the attribute
+  v.playsInline = true;
+  v.autoplay = true;
+  // rejects on an element with no source yet, which is fine and expected —
+  // the point is to consume the activation, not to start anything
+  try { const p = v.play(); if (p && p.catch) p.catch(() => {}); } catch { /* no source */ }
+}
+
+/**
+ * Play, or ask. A refused play() must never leave a black rectangle with no
+ * explanation — that is indistinguishable from a broken stream.
+ */
+export async function playOrPrompt(v, d) {
+  try { await v.play(); return true; } catch (e) {
+    d?.log(`play refused (${e.name}) — tap the picture`, "bad");
+    const tap = el("button", "d-tap", "tap to play");
+    tap.type = "button";
+    const go = async () => {
+      try { await v.play(); tap.remove(); d?.log("playing"); }
+      catch (err) { d?.log(`still refused: ${err.name}`, "bad"); }
+    };
+    tap.addEventListener("click", go);
+    v.addEventListener("click", go);
+    v.parentNode?.insertBefore(tap, v.nextSibling);
+    return false;
+  }
+}
+
 /** Surface a thrown error instead of a silently dead page. */
 export function guard(d) {
   addEventListener('error', (e) => d.fail(e.error || e.message));

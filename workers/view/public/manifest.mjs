@@ -105,6 +105,12 @@ export const DEMOS = [
     why: 'consumes 10 through 14' },
 ];
 
+/** Written notes, rendered by /notes/ from markdown. */
+export const NOTES = [
+  { doc: 'uuu-positron', title: 'positron and U:',
+    one: 'two answers to one problem, where they already agree, and six ways to cowork' },
+];
+
 export const byN = (n) => DEMOS.find((d) => d.n === n);
 
 /** the link target for a row, or null when it has none */

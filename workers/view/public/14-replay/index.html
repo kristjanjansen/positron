@@ -14,7 +14,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -86,7 +86,8 @@
   let master = null, hls = null;
 
   d.on('load', async () => {
-    if (master) { video.play().catch(() => {}); return; }
+    armVideo(video);
+    if (master) { playOrPrompt(video, d); return; }
     const url = ARCHIVE.hls;
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = url;                       // Safari plays HLS natively
@@ -117,7 +118,7 @@
     // writes it, so if the two start apart the cues fire against the wrong
     // frame — which is exactly what a 12.4 s desync looked like.
     deck.seek(video.currentTime * 1000);
-    await video.play().catch((e) => d.log(`play refused: ${e.message}`, 'bad'));
+    await playOrPrompt(video, d);
     d.log(`playing ${url.split('/').slice(-2).join('/')} · readyState ${video.readyState} · dur ${video.duration?.toFixed?.(1)}s · ${CUES.length} cues`);
   });
 
