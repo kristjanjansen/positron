@@ -17,13 +17,18 @@
 
 <script type="module">
   import { DEMOS } from '/demo/manifest.mjs';
-  const root = document.getElementById('rows');
-  for (const d of DEMOS) {
-    const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
-    const li = document.createElement('li');
-    li.className = href ? 'd-row' : 'd-row todo';
-    li.innerHTML = `<a${href ? ` href="${href}"` : ''}><span class="n">${d.n}</span><span class="nm">${d.name}</span></a>`;
-    root.append(li);
-  }
+  function rowHTML(d) {
+  const href = d.built ? `/demo/${d.n}-${d.name}/` : (d.page || null);
+  const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
+  const why = !href && d.why ? `<span class="d-why">${d.why}</span>` : '';
+  const open = href ? `<a href="${href}">` : '<a>';
+  return `<li class="d-row${href ? '' : ' todo'}">${open}`
+    + `<span class="n">${d.n}</span>`
+    + `<span class="nm">${d.name}</span>`
+    + `<span class="d-one">${d.one || ''}</span>`
+    + `<span class="d-meta">${tags}${why}</span>`
+    + '</a></li>';
+}
+  document.getElementById('rows').innerHTML = DEMOS.map(rowHTML).join('');
 </script>
 </html>
