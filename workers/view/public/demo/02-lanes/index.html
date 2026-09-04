@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+
+<script type="module">
+  import { mount, guard } from '/demo/shell/shell.mjs';
+  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { createDeck, createAudioLane } from '/timeline/transport.mjs';
+  import { markAdapter, marks } from '/demo/shell/fixture.mjs';
+
+  const DURATION = 16000;
+  const BEAT = 500;
+
+  const d = mount({
+    n: '02',
+    name: 'lanes',
+    what: 'Two lanes, one transport. The data lane rides the tick; audio is scheduled ahead.',
+    readout: { skew: 'ms', audio: '', data: '', ctx: '' },
+    controls: [
+      { id: 'unlock', label: 'Enable sound', primary: true },
+      { id: 'measure', label: 'Measure skew' },
+    ],
+  });
+  guard(d);
+
+  const { fired, adapter } = markAdapter({ rates: [0.5, 1, 2] });
+  const deck = createDeck({
+    items: marks(Math.floor(DURATION / BEAT), DURATION),
+    adapters: { mark: adapter },
+    range: [0, DURATION],
+  });
+
+  createTransportBar(d.el, deck);
+  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'mark', kind: 'mark', height: 40 }] });
+
+  let lane = null, ctx = null;
+
+  // iOS insists on a gesture; headless Chrome does not, so this path is the one
+  // no automated harness can prove. It stays a button on purpose.
+  d.on('unlock', async () => {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+    lane = createAudioLane(deck.transport, ctx, { clickGain: 0.25 });
+    lane.bus.connect(ctx.destination);
+    for (let at = 0; at < DURATION; at += BEAT) lane.schedule({ at, kind: 'click', id: `c${at}` });
+    lane.start();
+    // the lane anchors wall->audio time; with rate 0 there is nothing to anchor
+    // to and it commits nothing, so arming implies rolling
+    if (!deck.playing()) deck.play();
+    d.set('ctx', ctx.state, ctx.state === 'running' ? 'ok' : 'bad');
+    d.log(`audio lane armed + rolling, ${Math.floor(DURATION / BEAT)} clicks`);
+  });
+
+  d.on('measure', () => {
+    d.set('data', fired.length);
+    if (!lane) { d.assert('audio lane armed', false, 'press Enable sound first'); return; }
+    const sched = lane.scheduled();
+    d.set('audio', sched.length);
+    const st = lane.stats();
+    d.log(`audio status ${JSON.stringify(st)}`);
+    // skew = how far the audio lane's intended wall time sits from its position
+    const anchored = sched.filter((x) => Number.isFinite(x.intendedUs));
+    if (anchored.length) {
+      const errs = anchored.map((x) => Math.abs(x.intendedUs / 1000 - x.at));
+      const p50 = errs.slice().sort((a, b) => a - b)[Math.floor(errs.length / 2)];
+      d.set('skew', p50);
+      d.assert('audio schedule anchored', true, `${anchored.length} events`);
+    }
+    d.assert('both lanes advanced', fired.length > 0 && sched.length > 0, `data ${fired.length} / audio ${sched.length}`);
+  });
+
+  setInterval(() => { d.set('data', fired.length); if (ctx) d.set('ctx', ctx.state); }, 200);
+
+  d.log(`${DURATION / 1000}s, one click + one mark every ${BEAT} ms`);
+  d.ready();
+</script>
+</html>

@@ -1,31 +1,31 @@
 {
  "base": "https://elektron-view.kristjan-jansen.workers.dev",
- "at": "2026-08-28T15:03:53.551Z",
+ "at": "2026-09-04T08:38:42.543Z",
  "asserts": {
   "pass": 38,
   "fail": 0
  },
- "upstreamCost": 0,
+ "upstreamCost": 1,
  "gateBefore": {
   "spacingMs": 1000,
   "dayCapUtc": 400,
-  "day": "2026-08-28",
-  "upstreamToday": 8,
-  "upstreamTotal": 8,
+  "day": "2026-09-04",
+  "upstreamToday": 12,
+  "upstreamTotal": 20,
   "refusedBusy": 0,
   "refusedCap": 0,
-  "durableCacheRows": 8,
+  "durableCacheRows": 13,
   "nextSlotInMs": 0
  },
  "gateAfter": {
   "spacingMs": 1000,
   "dayCapUtc": 400,
-  "day": "2026-08-28",
-  "upstreamToday": 8,
-  "upstreamTotal": 8,
+  "day": "2026-09-04",
+  "upstreamToday": 13,
+  "upstreamTotal": 21,
   "refusedBusy": 0,
   "refusedCap": 0,
-  "durableCacheRows": 8,
+  "durableCacheRows": 13,
   "nextSlotInMs": 0
  },
  "results": [
@@ -37,9 +37,9 @@
   },
   {
    "page": "index",
-   "name": "lists all four pages",
+   "name": "lists all five pages",
    "ok": true,
-   "detail": "/proto/megatimeline/ /proto/remixer/ /proto/kurenniemi/ /proto/flipper/"
+   "detail": "/proto/megatimeline/ /proto/remixer/ /proto/kurenniemi/ /proto/flipper/ /proto/looper/"
   },
   {
    "page": "index",
@@ -135,7 +135,7 @@
    "page": "megatimeline",
    "name": "every dive search answered 200 (none gate-refused)",
    "ok": true,
-   "detail": "9/9 from cache, 0 gated upstream"
+   "detail": "8/9 from cache, 1 gated upstream"
   },
   {
    "page": "remixer",
@@ -153,7 +153,7 @@
    "page": "remixer",
    "name": "search round-trips through the proxy",
    "ok": true,
-   "detail": "200 cache=durable upstream=0 | 200 cache=durable upstream=0"
+   "detail": "200 cache=memo upstream=0 | 200 cache=memo upstream=0"
   },
   {
    "page": "remixer",
@@ -261,7 +261,7 @@
    "page": "flipper",
    "name": "note: live.err.ee segment CORS/HTTP failures (upstream)",
    "ok": true,
-   "detail": "4× — log(javascript): Access to XMLHttpRequest at 'https://live.err.ee/live/hls/etv-video=454400-931213240.m4s' from origin 'https://elektron-view.kristjan-jansen.workers.dev' has been blocked by CORS poli"
+   "detail": "4× — log(javascript): Access to XMLHttpRequest at 'https://live.err.ee/live/hls/etv2-video=454400-931516203.m4s' from origin 'https://elektron-view.kristjan-jansen.workers.dev' has been blocked by CORS pol"
   }
  ]
 }

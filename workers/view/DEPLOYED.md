@@ -6,29 +6,25 @@
 > an internal handle nobody types.
 
 **URL:** `https://positron.studio`
-**Deployed:** 2026-09-04 (version `956b3e28-069d-4c68-acec-cd1b87ff0006` — the
-positron rename: 4 asset files); previously 2026-08-30
-(`913f128a-…`), 2026-08-28 (`09366c36-…`).
+**Deployed:** 2026-09-04 (version `2c810777-48a0-4516-ab68-9e4921c05a1f` — the
+positron rename, the demo shell, and Act 0); previously `913f128a-…` (2026-08-30),
+`09366c36-…` (2026-08-28).
 
-Status: **live**, with **two known failures in `verify.mjs`, both predating the
-rename** — the "38/38 green" claim above dated from `2dcc0cb` and no longer holds:
+Status: **live and verified — 38/38 green** from `verify.mjs` against the
+deployed URL, one headless Chrome at 390 × 844 with touch emulation and
+`pointer: coarse` forced. Plus **75/75 green** from `demo/verify.mjs` against
+the same deploy, covering the five Act 0 demos.
 
-1. `index · lists all four pages` — the assert hardcodes `links.length === 4`,
-   but the menu has had **five** cards since looper landed (2026-08-30). Stale
-   assert, not a page fault.
-2. `megatimeline · boot completed (__mt.ready)` — **`/timeline/strip.mjs` 404s.**
-   `proto/megatimeline/index.html` began importing `/timeline/strip.mjs` in
-   `3647696`, but that file was never added to the `build.mjs` allowlist, so it
-   is absent from `public/`. The module graph fails, `window.__mt` is never set,
-   and the page is **dead on the public URL — since 2026-08-30, not since the
-   rename** (its assets were byte-identical across the rename deploy).
-   Fix is one line: add `['timeline/strip.mjs', 'timeline/strip.mjs']` to the
-   `FILES` allowlist in `workers/view/build.mjs`, rebuild, redeploy.
+Two faults found while verifying the rename, both **predating it**, both now fixed:
 
-Verified by hand after the move: apex + `www` 200 serving
-`POSITRON — viewing surfaces`, `/proto/looper/` 200, `positron-looper` channel
-name live in the shipped `peer.mjs`, `/api/stats` 200. (`/api/search` 404s on the
-old `*.workers.dev` hostname too — pre-existing, not a move regression.)
+1. **`/timeline/strip.mjs` 404 → megatimeline was dead on the public URL.**
+   `proto/megatimeline/index.html` began importing it in `3647696` but it was
+   never added to `build.mjs`'s allowlist, so the module graph failed and
+   `window.__mt` was never set. Broken 2026-08-30 → 2026-09-04. Fixed by
+   allowlisting `timeline/strip.mjs` (the Act 0 demos need it too). megatimeline
+   now boots: census 119 years, 1927 lit canvas samples, zero upstream calls.
+2. **`verify.mjs` asserted `links.length === 4`** while the menu has had five
+   cards since looper landed. A stale assert, not a page fault; now five.
 
 The repo's public surfaces on one phone-openable link, behind a menu. Free
 tier, **custom domain `positron.studio` + `www`** (added 2026-09-04; zone on

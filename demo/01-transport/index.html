@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+
+<script type="module">
+  import { mount, guard } from '/demo/shell/shell.mjs';
+  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { markAdapter, marks } from '/demo/shell/fixture.mjs';
+
+  const DURATION = 20000;
+
+  const d = mount({
+    n: '01',
+    name: 'transport',
+    what: 'One clock. Play, pause, rate, seek — and what it costs in drift.',
+    readout: { drift: 'ms', fires: '', rate: '×', pos: 'ms' },
+    controls: [{ id: 'check', label: 'Check drift', primary: true }],
+  });
+  guard(d);
+
+  const { fired, adapter } = markAdapter();
+  const deck = createDeck({
+    items: marks(20, DURATION),
+    adapters: { mark: adapter },
+    range: [0, DURATION],
+    onDrift: (x) => d.set('drift', typeof x === 'number' ? x : x?.ms ?? 0),
+  });
+
+  createTransportBar(d.el, deck);
+  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'mark', kind: 'mark', height: 40 }] });
+
+  setInterval(() => {
+    d.set('pos', deck.position());
+    d.set('rate', deck.rate());
+    d.set('fires', fired.length);
+  }, 100);
+
+  // drift is the number this demo exists for: scheduled vs actual fire time
+  d.on('check', () => {
+    const s = deck.stats?.() ?? {};
+    const dr = deck.drift?.();
+    d.set('drift', typeof dr === 'number' ? dr : dr?.p50 ?? dr?.ms ?? 0);
+    d.assert('deck reports drift', dr !== undefined && dr !== null, JSON.stringify(dr));
+    d.assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
+    d.log(`stats ${JSON.stringify(s).slice(0, 160)}`);
+  });
+
+  d.log(`${DURATION / 1000}s, 20 marks, lattice ${JSON.stringify(adapter.caps.rates)}`);
+  d.ready();
+</script>
+</html>

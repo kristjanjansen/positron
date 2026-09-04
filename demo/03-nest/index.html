@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+
+<script type="module">
+  import { mount, guard } from '/demo/shell/shell.mjs';
+  import { createTransportBar } from '/demo/shell/transport-bar.mjs';
+  import { createStripView } from '/demo/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createNest, nestedDrift } from '/timeline/nested.mjs';
+  import { refDeck, quotation } from '/timeline/score.mjs';
+  import { markAdapter, marks } from '/demo/shell/fixture.mjs';
+
+  const PARENT = 24000, CHILD = 6000;
+
+  const d = mount({
+    n: '03',
+    name: 'nest',
+    what: 'A deck quoted inside another deck. Twice, one of them looping.',
+    readout: { childPos: 'ms', iteration: '', drift: 'ms', spans: '' },
+    controls: [{ id: 'check', label: 'Check nest', primary: true }],
+  });
+  guard(d);
+
+  // ── the child: quoted by identity, never by object ──────────────────────
+  const kidMarks = markAdapter({ rates: [0.5, 1, 2] });
+  const child = createDeck({
+    items: marks(12, CHILD),
+    adapters: { mark: kidMarks.adapter },
+    range: [0, CHILD],
+    autoStart: false,
+  });
+  refDeck(child, 'kurenniemi-1972');
+
+  // ── the parent ──────────────────────────────────────────────────────────
+  const own = markAdapter({ rates: [0.5, 1, 2] });
+  const parent = createDeck({
+    items: marks(8, PARENT),
+    adapters: { mark: own.adapter },
+    range: [0, PARENT],
+  });
+
+  const nest = createNest(parent, { resolve: (ref) => (ref === 'kurenniemi-1972' ? child : null) });
+
+  // a plain fragment, then the same source looped three times
+  nest.add(quotation({ id: 'frag', ref: 'kurenniemi-1972', at: 2000, in: 1000, out: 5000 }));
+  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 12000, in: 0, out: 2000,
+                       repeat: 3 }));
+
+  createTransportBar(d.el, parent);
+  createStripView(d.el, parent, {
+    size: 'default',
+    lanes: [
+      { id: 'mark', kind: 'mark', height: 34, as: 'ticks' },
+      { id: 'deck-span', kind: 'deck-span', height: 44, as: 'spans' },
+    ],
+  });
+
+  setInterval(() => {
+    d.set('childPos', nest.childPos?.('frag') ?? nest.childPos?.('loop') ?? null);
+    const it = nest.iteration?.('loop');
+    d.set('iteration', it === null || it === undefined ? '—' : it);
+    d.set('spans', nest.spans().length);
+  }, 150);
+
+  d.on('check', () => {
+    const spans = nest.spans();
+    d.assert('two spans registered', spans.length === 2, spans.map((s) => s.id).join(','));
+    const loop = spans.find((s) => s.id === 'loop');
+    d.assert('loop declares 3 passes', loop && (loop.repeat === 3 || loop.repeat?.times === 3),
+      JSON.stringify(loop && loop.repeat));
+    const dr = nestedDrift(parent);
+    d.set('drift', typeof dr === 'number' ? dr : dr?.p50 ?? dr?.ms ?? 0);
+    d.assert('nest reports drift', dr !== undefined && dr !== null, JSON.stringify(dr).slice(0, 80));
+    d.assert('quotations round-trip out of the nest',
+      nest.quotationsOf(child).length === 2, String(nest.quotationsOf(child).length));
+    d.log(`spans ${JSON.stringify(spans.map((s) => ({ id: s.id, at: s.at })))}`);
+  });
+
+  d.log(`parent ${PARENT / 1000}s, child ${CHILD / 1000}s quoted twice`);
+  d.ready();
+</script>
+</html>
