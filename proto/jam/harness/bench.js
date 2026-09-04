@@ -358,7 +358,7 @@ const arms = {
 
   'do-jam': {
     async setup(spec) {
-      const ws = new WebSocket(`wss://jam.positron.studio/room/jam-${spec.session}/ws?token=${ENV.JAM_TOKEN}`);
+      const ws = new WebSocket(`wss://ws.positron.studio/room/jam-${spec.session}/ws`);
       ws.binaryType = 'arraybuffer';
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('jam ws error')); });
       state.ws = ws;

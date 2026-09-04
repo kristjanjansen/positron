@@ -24,7 +24,7 @@ re-upload):
 |---|---|
 | `positron.studio`, `www.positron.studio` | `elektron-view` |
 | `rtc.positron.studio` | `elektron-rtc` |
-| `jam.positron.studio` | `elektron-jam` |
+| `ws.positron.studio` | `positron-ws` (tokenless relay; superseded `elektron-jam`, retired 2026-09-04) |
 | `cues.positron.studio` | `elektron-cues` |
 | `instrument.positron.studio` | `elektron-instrument` |
 | `selfrec.positron.studio` | `elektron-selfrec` |
@@ -99,7 +99,7 @@ asserts.
 GO LIVE · SHOW · ROOM · SOUND · ARCHIVE. verify 24/24.
 
 **Deployed** (unchanged this session): `elektron-view` (four archive viewers,
-public) · `elektron-rtc` · `elektron-selfrec` · `elektron-jam` ·
+public) · `elektron-rtc` · `elektron-selfrec` · `positron-ws` ·
 `elektron-instrument` · `elektron-osc`.
 **Public link**: https://positron.studio
 

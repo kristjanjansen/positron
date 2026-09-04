@@ -254,11 +254,14 @@ export function makeJam(opts) {
     },
     async do() {
       const env = await (await fetch('/env.json')).json();
-      const ws = new WebSocket(`wss://jam.positron.studio/room/duet-${session}-${mode}/ws?token=${env.JAM_TOKEN}`);
+      // elektron-jam was retired 2026-09-04; positron-ws does the same job
+      // tokenless (ws.positron.studio). The 34.5 ms p50 recorded in
+      // plan-looper.md was measured against elektron-jam and keeps that name.
+      const ws = new WebSocket(`wss://ws.positron.studio/room/duet-${session}-${mode}/ws`);
       ws.binaryType = 'arraybuffer';
       await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('do ws failed')); });
       ws.onmessage = (e) => { if (e.data instanceof ArrayBuffer) onWire(e.data); };
-      return { send: (buf) => ws.readyState === 1 && ws.send(buf), label: 'DO relay (elektron-jam, binary)' };
+      return { send: (buf) => ws.readyState === 1 && ws.send(buf), label: 'DO relay (positron-ws, binary)' };
     },
     async moq() {
       if (!window.MoqJam) throw new Error('MoqJam bundle missing');

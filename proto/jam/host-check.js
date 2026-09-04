@@ -344,7 +344,9 @@ async function testB(n = N_B, gapMs = 150) {
   let token = '';
   try { token = (await (await fetch('/env.json')).json()).JAM_TOKEN || ''; } catch {}
   const room = 'hostcheck-' + Math.random().toString(36).slice(2, 9);
-  const url = `wss://jam.positron.studio/room/${room}/ws?token=${token}`;
+  // positron-ws is tokenless; `token` is ignored and kept only so callers
+  // written against elektron-jam still run.
+  const url = `wss://ws.positron.studio/room/${room}/ws`;
   const ws = new WebSocket(url);
   ws.binaryType = 'arraybuffer';
   const rtts = [];

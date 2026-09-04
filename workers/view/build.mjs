@@ -157,21 +157,35 @@ async function queryHash(queryParams) {
 }
 
 // ── favicon: a 32x32 PNG wrapped in an ICO container, built here ────────────
-// Dark ground, one yellow timeline rule with three ticks — the menu's palette.
+// e+ — the positron. A bold lowercase 'e' (a ring with a lower-right aperture
+// plus a crossbar) and a superscript plus, in the menu's palette.
 function favicon() {
   const N = 32, px = Buffer.alloc(N * N * 4);
   const put = (x, y, [r, g, b]) => {
+    if (x < 0 || y < 0 || x >= N || y >= N) return;
     const i = (y * N + x) * 4;
     px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = 255;
   };
-  const BG = [0x0b, 0x0e, 0x14], HI = [0xff, 0xd4, 0x00], DIM = [0x37, 0x3b, 0x45];
+  const BG = [0x0b, 0x0e, 0x14], HI = [0xff, 0xd4, 0x00];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) put(x, y, BG);
-  for (let x = 3; x < N - 3; x++) { put(x, 16, HI); put(x, 17, HI); }      // the rule
-  for (const [x, h] of [[7, 11], [15, 7], [23, 9], [11, 5], [19, 5], [27, 4]])
-    for (let y = 17 - h; y < 17; y++) for (let w = 0; w < 2; w++)
-      put(x + w, y, h > 6 ? HI : DIM);                                      // ticks
-  for (const [x, h] of [[9, 5], [17, 8], [25, 4]])
-    for (let y = 18; y < 18 + h; y++) for (let w = 0; w < 2; w++) put(x + w, y, DIM);
+
+  // the 'e': an annulus with the lower-right wedge removed
+  const cx = 12.2, cy = 19.6, R = 9.6, r = 5.3;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const d = Math.hypot(x - cx, y - cy);
+    if (d > R || d < r) continue;
+    const a = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;   // y down: +90 = down
+    if (a > 22 && a < 88) continue;                            // the aperture
+    put(x, y, HI);
+  }
+  // the crossbar is what makes a ring an 'e'
+  for (let y = Math.round(cy - 1.9); y <= Math.round(cy + 1.3); y++)
+    for (let x = Math.round(cx - R + 1); x <= Math.round(cx + R - 1); x++) put(x, y, HI);
+
+  // the superscript plus — the charge, and the whole name
+  const pxc = 25, pyc = 8, arm = 4, th = 1;
+  for (let x = pxc - arm; x <= pxc + arm; x++) for (let y = pyc - th; y <= pyc + th; y++) put(x, y, HI);
+  for (let y = pyc - arm; y <= pyc + arm; y++) for (let x = pxc - th; x <= pxc + th; x++) put(x, y, HI);
 
   const raw = Buffer.alloc(N * (N * 4 + 1));
   for (let y = 0; y < N; y++) {
