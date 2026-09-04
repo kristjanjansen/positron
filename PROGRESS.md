@@ -1,4 +1,192 @@
-# Progress log — 2026-08-25 → 30  (newest first)
+# Progress log — 2026-08-25 → 09-04  (newest first)
+
+## Session 8 (2026-09-04) — positron, positron.studio, and the demo spine (user: "rename cwd to positron" → "do all")
+
+Renamed, moved onto a domain, built a demo shell and 18 demos on it, added a
+tokenless relay and a viewer-refcounted publisher container. Everything below is
+measured or quoted from a doc, not assumed.
+
+### THE RENAME AND THE DOMAIN
+- `~/personal/elektron` → `~/personal/positron`; 252 files carried the old name.
+- **Worker SCRIPT names stay `elektron-*` on purpose.** Renaming a script makes a
+  NEW Worker and abandons its Durable Objects — `RtcRoom`, `JamRoom`, `Hub`,
+  `Sessions`, `BeaconStore`, `Gate` (the last holds the durable ERR cache). A
+  custom domain decouples public identity from script name, so the rename costs
+  no state. R2 buckets cannot be renamed at all.
+- Three rig Workers had **zero deployments** (`obs-cloud/obs-worker`,
+  `obs-cloud/quic-test`, `rig/containers`), so those names WERE free →
+  `positron-*`. My earlier reading of their 404s as "live" was wrong: a
+  nonexistent workers.dev subdomain 404s identically to a deployed API worker.
+- `elektronstudio`, `elektron-nuxt`, `elektron.art` are **prior art and stay** —
+  they name a real predecessor not on this account. `elektron.arti` in a quoted
+  Estonian source is a genitive, not a typo.
+- A fresh `.studio` name is negatively cached up to **1 h** (SOA min TTL 3600):
+  Cloudflare/Google/Quad9/OpenDNS all resolved within minutes, a home router
+  that had cached the pre-registration miss did not. Not a misconfiguration.
+- **`caches.default` stopped being a no-op.** It does nothing on `*.workers.dev`;
+  on a custom domain it is a real edge cache. `workers/view` still does not use
+  it (the durable cache spans colos, which `caches.default` does not) — but that
+  is now a choice. Highest-value place for it: in front of the single serialized
+  `Gate` DO.
+
+### FIXED A PRE-EXISTING BREAK
+- **`/timeline/strip.mjs` 404 → megatimeline was dead on the public URL** since
+  `3647696`. It began importing strip.mjs and nobody added it to `build.mjs`'s
+  allowlist, so the module graph failed and `window.__mt` was never set. The Act
+  0 demos need strip.mjs too, so allowlisting it repaired both. megatimeline now
+  boots: census 119 years, 1927 lit canvas samples, zero upstream ERR calls.
+- `workers/view/verify.mjs` asserted `links.length === 4` when the menu had five
+  cards since looper. The documented "38/38 green" was already stale.
+
+### THE DEMO SPINE — 18 demos, 239/239 green against the deployed URL
+- One shell (`demo/shell/`), one stylesheet, and `window.__demo` as the harness
+  contract. The root cause it fixes: **a page was either human-facing or
+  machine-facing, never both**, so every capability got built twice. Asserting on
+  transport state instead of DOM ids is what made ~25 harness pages redundant.
+- `createStrip` already existed and was adopted, not rebuilt — its own header
+  records being hand-drawn FIVE times with none of the five agreeing.
+- **Custom elements for lifecycle, no shadow DOM**: `disconnectedCallback` makes
+  teardown structural (the m2m pages hand-roll 48 teardown calls and rotate
+  panels), while shadow DOM would fight the one-stylesheet goal and break
+  `document.querySelector` for CDP.
+- `09 ladder` measured live: **rtt 25 ms (WHEP) vs 3.49 s (LL-HLS)**.
+- `12 cues` over the tokenless relay: **p50 79–80 ms**, 9/9 echoed.
+- `06 llhls` on the deployed page: **4.06 / 1.71 / 2.99 s** across runs against
+  the 2.4–4.0 s rig envelope.
+- `11 grid` holds the tiering at **54** — 1 featured, 5 live capped, 48 wall.
+- `13 record`: MediaRecorder's timeslice IS the segmenter; ship-then-delete keeps
+  the high-water at 2 segments, O(1) rather than O(show).
+- Six library API shapes I had wrong, ALL caught by the library's own firewall
+  rather than by me: `repeat` is a bare integer not `{times:n}`; `when.rule` is
+  required and must be `<name>@<int>`; `aoristic()` returns a stat object with a
+  ledger and reads `{from,to}` not `{t0,t1}`; `nest.quotationsOf` takes a deck;
+  **`deck.reduceAt(KIND, pos)`** — kind first; and `reduce(rows)` is handed the
+  PREFIX already, where each row is the PAYLOAD, so filtering on `r.at` inside it
+  matches nothing and reads as "no cues at all".
+
+### THE TOKENLESS RELAY — ws.positron.studio
+- `positron-ws` supersedes `elektron-jam`, which is RETIRED (deleted). Safe where
+  renaming the others is not: `JamRoom` held **no durable storage** — its only
+  mention of the word was the comment saying "NO storage".
+- The measured numbers keep the `elektron-jam` name (34.5–34.9 ms p50 vs cues'
+  37.8 and the SFU's 16.1). They say what was measured.
+- **Three faults found by testing the deployed relay, not by reading it:**
+  `msg.byteLength > 4096` never fires for TEXT (`byteLength` is undefined on a
+  string); checking `String.length` instead counts UTF-16 CODE UNITS, so 4000
+  units of emoji = 8000 UTF-8 bytes sailed through; and the 4 KiB roof itself was
+  wrong here — `peer.mjs` publishes a committed layer as ONE message carrying the
+  material at ~98 bytes per note row, so 2 layers × 16 notes ≈ 7 KB and 8 × 32 ≈
+  52 KB. A 4 KiB roof passes the tiny live-note plane and silently eats the loop
+  plane. Now 256 KiB per message with a **bytes-per-second** budget, because the
+  real cost is FAN-OUT AMPLIFICATION (one message × N sockets).
+- **Hibernation is kept deliberately.** It is what makes an idle room free, and
+  `setWebSocketAutoResponse` exists only on the hibernatable API — losing it means
+  an RTT probe measures network + DO wake instead of pure network. Verified: a
+  peer in the same room never sees the `ping`. Cost is in-memory buckets
+  (harmless: to hibernate you must stop sending) and per-wake counters, which
+  `/stats` now reports as `sinceWakeMs` rather than dressing up as lifetime.
+
+### THE PUBLISHER CONTAINER — pub.positron.studio
+- **Viewer-refcounted lifetime.** Viewers hold a hibernatable WebSocket on
+  `/watch`; first in starts, last out stops after a 2-sweep grace.
+  `sleepAfter` alone CANNOT do this: the Container base sleeps on REQUEST
+  idleness and ffmpeg generates no incoming requests, so it would kill a stream
+  somebody is watching. Measured: viewers=0 idle → A connects → publishing → A
+  leaves, B stays → still publishing → B leaves → +70 s → stopped, input
+  `disconnected / client_disconnect`.
+- **`standard` is an ALIAS FOR `standard-1` = HALF a vCPU.** Two simultaneous
+  x264 encodes on half a core ran at ~40 % of realtime; the container logged
+  "Resumed reading at pts 37.500 … after a lag of 141.751s" and the stream
+  starved. Now a custom 1 vCPU / 3 GiB / 2 GB instance.
+- **The platform refuses less than 3 GiB per vCPU** ("With 2 vCPU(s), you need at
+  least 6 GiB of memory"), so CPU cannot be bought without memory — my 2 vCPU /
+  1 GiB proposal was rejected outright even though two 360p encodes fit in
+  512 MiB.
+- **Upgrade, not parallel.** CPU bills on ACTIVE USAGE, so two encodes cost the
+  same vCPU-seconds however split; memory and disk bill on PROVISIONED. Two
+  instances would pay memory and disk TWICE for identical CPU. Custom 1 vCPU /
+  3 GiB / 2 GB beats `standard-2` (1 vCPU / 6 GiB / 12 GB): same CPU, half the
+  memory, a sixth of the disk, 8.3 h/month inside the included 25 GiB-hours
+  instead of 4.2.
+- **The generator was the expense, not the resolution.** Cost index, 2 s of video
+  per case on one cpu (relative, so the emulation penalty cancels):
+  `testsrc2 640x360@20` 0.16 · `testsrc2 1280x720@20` 0.36 ·
+  `testsrc2 1280x720@30` **0.45** · `life 640x360@20` 0.47 ·
+  `life 1280x720@20` 1.21. So 720p30 on testsrc2 is CHEAPER than 360p20 on life.
+  Backgrounds were then removed entirely — testsrc2 moves and the burned epoch
+  moves regardless.
+- **A local Docker benchmark on this Mac is worthless for capacity**:
+  `--platform linux/amd64` is QEMU x86 emulation and showed EVERY source at
+  ~0.2× realtime. Only the container's own stderr and same-machine ratios count.
+- `ttf-dejavu` installs to `/usr/share/fonts/dejavu`, NOT `.../ttf-dejavu`; an
+  unresolvable `fontfile` makes drawtext fail and the epoch never reaches the
+  pixels. And drawtext needs the value BOTH single-quoted AND colon-escaped:
+  `text='%{pts\:flt\:EPOCH}'`. Quoted-but-unescaped fails to parse.
+- ffmpeg returns **255** for a SIGTERM it handled, i.e. exactly what an
+  intentional `/stop` looks like — a clean shutdown was reporting itself as an
+  error.
+
+### CLOUDFLARE STREAM: WHIP AND WHEP MUST BE USED TOGETHER
+- Their docs, verbatim: *"we do not yet support inputs using RTMP/SRT to be
+  played using WHEP"*. Asking the RTMPS input for WHEP returns **409**. So one
+  input cannot serve both `06` and `07`; the container runs TWO independent legs
+  of the same burned-in pattern to two inputs, which is also what lets `09`
+  compare them.
+- WHIP args lifted from `rig/whep/WHIP-FFMPEG-NOTES.md` where they were measured:
+  **libopus not aac**, and baseline/3.1 offering `profile-level-id=42001f` which
+  Cloudflare ACCEPTS and echoes verbatim — the `42e01f` in the docs is a
+  documentation value, not a negotiation gate.
+- ffmpeg reaching DTLS `state=10` is NOT the same as Cloudflare being ready to
+  answer a WHEP offer, so a 409 is "not yet" and wants retries.
+- `07` first waited on the HLS manifest — a signal about input A while about to
+  play input B. It now waits on the publisher's own `whip.publishing`.
+
+### iOS — TWO BUGS NO HARNESS COULD FIND
+- **Autoplay activation expires.** Every live demo does work first and calls
+  `play()` ~11 s after the tap: `play refused: NotAllowedError`, with the
+  connection healthy behind it (rtt 16 ms, 31 fps) and a black box in front.
+  `armVideo()` spends the activation synchronously in the handler;
+  `playOrPrompt()` shows a tap button rather than an unexplained black rectangle.
+  Headless runs with `--autoplay-policy=no-user-gesture-required`, so this is the
+  surface proto/looper already calls "the single largest untested surface".
+- **A WebRTC track arrives MUTED** and unmutes only when media flows. Assigning
+  `srcObject` before that hands iOS a frameless stream and it paints black
+  permanently — 26 fps inbound, `videoWidth` 0. Attach on `unmute`.
+  **Decoding is not rendering**, and only the second is what a viewer sees; `07`
+  now asserts `videoWidth > 0` separately.
+- OPEN: LL-HLS jank on iOS. The player chases a **1.50 s target with a 2.0 s
+  GOP** and sits at 2.78 s, nudging at 1.01× (= `catchUpRate`) and resyncing each
+  time it passes `seekThreshold: 2.0`. A target shorter than one keyframe
+  interval is unreachable, and Cloudflare's guidance is that 2 s is the SHORTEST
+  recommended GOP — so the fix is likely to raise the target, not shorten the
+  GOP. A container-vs-local publisher A/B on segment inter-arrival jitter is the
+  test that separates parameter mismatch from CPU starvation.
+
+### THE OTHER TEAM (tarmoj / U: / ECCM), read from the code
+- `radio1965` is a **live community-radio app**, not the archival platform. Every
+  occurrence of "1965" is a NAME: an Icecast mount, an API path, a window title,
+  the FastAPI service title, cron log names, and the literal test password
+  `"1965"`. No 1965 material, no historical metadata, no date model before now;
+  its "Archive" is a visibility STATUS. Five declared Icecast mounts is an
+  architectural capacity ceiling. Its best idea: `<on-connect>` POSTs to the same
+  `/events/publish` the editor uses, so going on air creates its own catalogue
+  row and notification.
+- **VideoSync converges with us independently**: "playback rate is nudged (±5 %)
+  when drift is small; hard seek is used when drift exceeds 500 ms" — the same
+  structure as `media-master.mjs` rule L2 at 250 ms. Two codebases, no contact.
+- **Icecast join latency MEASURED**, since "a few seconds" is not a number. ERR's
+  five mounts, 12 s each, splitting the burst from the real-time tail: 128 kbps,
+  62–63 KiB burst, **3.97–4.05 s behind live**. 64 KiB ÷ 16 KB/s = 4.0 s exactly
+  — the default `burst-size` over the bitrate, ±0.04 s across five independent
+  mounts, so a config constant not network variance (ttfb 262–315 ms). No
+  catch-up: Icecast has no live edge to chase. It is a knob U: already owns.
+- `uuu.ee` is NOT in version control: it appears only as a `deploy.sh` target,
+  and the sole infra code anywhere is radio1965's two Icecast hooks plus an nginx
+  snippet pasted into markdown.
+- Written up in `demo/notes/uuu-positron.md` (live at positron.studio/notes/),
+  including what positron can offer a LAN setup: `wsTransport` does not care that
+  the relay is a Durable Object, so pointing it at `ws://192.168.x.x` runs the
+  clock and score machinery with no internet.
 
 ## Session 7 (2026-08-30) — the looper, local and remote (user: "build midi looper … in parallel fix 2 3 5. also 4")
 
