@@ -21,12 +21,16 @@
 
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, extname } from 'node:path';
+import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
 const OUT = join(HERE, 'public');
+
+// the demo story order, single-sourced from demo/manifest.mjs
+const { DEMOS: DEMO_MANIFEST } = await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -68,7 +72,48 @@ const FILES = [
   ['proto/looper/synth.mjs', 'proto/looper/synth.mjs'],
   ['proto/looper/peer.mjs', 'proto/looper/peer.mjs'],
   ['proto/looper/onset-worklet.js', 'proto/looper/onset-worklet.js'],
+
+  // ── the demo sequence (plan-demos.md) ─────────────────────────────────────
+  // strip.mjs is REQUIRED here: every Act 0 demo imports it, and
+  // proto/megatimeline/index.html has imported /timeline/strip.mjs since
+  // commit 3647696 without it ever being allowlisted — which is why
+  // megatimeline has been dead on the public URL. Adding it fixes both.
+  ['timeline/strip.mjs', 'timeline/strip.mjs'],
+  ['demo/index.html', 'demo/index.html'],
+  ['demo/manifest.mjs', 'demo/manifest.mjs'],
+  ['demo/shell/shell.css', 'demo/shell/shell.css'],
+  ['demo/shell/shell.mjs', 'demo/shell/shell.mjs'],
+  ['demo/shell/transport-bar.mjs', 'demo/shell/transport-bar.mjs'],
+  ['demo/shell/strip.mjs', 'demo/shell/strip.mjs'],
+  ['demo/shell/fixture.mjs', 'demo/shell/fixture.mjs'],
+  ...demoFiles(),
 ];
+
+/**
+ * Allowlist entries for every BUILT demo, generated from demo/manifest.mjs so
+ * the list stops being hand-maintained (plan-demos.md, order of work step 8).
+ *
+ * This reads a directory, which the rule above forbids — but the rule exists
+ * because the REPO ROOT holds .env. Enumeration here is confined to
+ * demo/<nn>-<name>/ and filtered to web extensions, so there is no path by
+ * which a secret enters public/.
+ */
+function demoFiles() {
+  const out = [];
+  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json']);
+  for (const d of DEMO_MANIFEST) {
+    if (!d.built) continue;
+    const dir = `demo/${d.n}-${d.name}`;
+    let entries = [];
+    try { entries = readdirSync(join(REPO, dir), { withFileTypes: true }); } catch { continue; }
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      if (!OK.has(extname(e.name))) continue;
+      out.push([`${dir}/${e.name}`, `${dir}/${e.name}`]);
+    }
+  }
+  return out;
+}
 
 // ── deployed-copy rewrites ──────────────────────────────────────────────────
 // The ONLY edits made to any proto's bytes, applied to the COPY in public/.

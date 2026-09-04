@@ -174,7 +174,8 @@ console.log('\n[0] index menu');
 await goto('/', { settle: 600 });
 ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON — viewing surfaces', await evaluate(`document.title`));
 const links = await evaluate(`[...document.querySelectorAll('a.card')].map(a => a.getAttribute('href'))`);
-ok('index', 'lists all four pages', links.length === 4 && links.every((h) => h.startsWith('/proto/')), links.join(' '));
+// FIVE since looper landed 2026-08-30; this assert still said four.
+ok('index', 'lists all five pages', links.length === 5 && links.every((h) => h.startsWith('/proto/')), links.join(' '));
 const tap = await evaluate(`(() => { const r = document.querySelector('a.card').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/demo/shell/shell.css">
+<style>
+  .sc { font: 400 11.5px/1.6 var(--mono); color: var(--dim); background: var(--card);
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px;
+        overflow-x: auto; margin: 0 0 8px; white-space: pre; }
+  .sc b { color: var(--hi); font-weight: 500; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/demo/shell/shell.mjs';
+  import {
+    score, quotation, scoreToJSON, parseScore, isScore,
+    quotationEquals, quotationKey, scoreRefs, NS,
+  } from '/timeline/score.mjs';
+
+  const d = mount({
+    n: '04',
+    name: 'score',
+    what: 'A quotation is a value. Round-trip it and the bytes must not move.',
+    readout: { bytes: 'B', quotations: '', roundtrip: '', refs: '' },
+    controls: [
+      { id: 'roundtrip', label: 'Round-trip', primary: true },
+      { id: 'mutate', label: 'Try to mutate' },
+    ],
+  });
+  guard(d);
+
+  // a score naming its sources by IDENTITY, never by object
+  const s = score({
+    id: 'demo-04',
+    meta: { ns: NS },
+    quotations: [
+      quotation({ id: 'q1', ref: 'kurenniemi-1972', at: 0, in: 1200, out: 8400 }),
+      quotation({ id: 'q2', ref: 'kurenniemi-1972', at: 8400, in: 0, out: 3000, rate: 0.5 }),
+      quotation({ id: 'q3', ref: 'err-1965-radio', at: 12000, in: 500, out: 4500,
+                  repeat: 3 }),
+    ],
+  });
+
+  const json = scoreToJSON(s, 2);
+  const pre = el('pre', 'sc');
+  pre.textContent = json;
+  d.el.append(pre);
+
+  d.set('bytes', new TextEncoder().encode(json).length);
+  d.set('quotations', s.quotations.length);
+  d.set('refs', scoreRefs(s).length);
+
+  d.on('roundtrip', () => {
+    const a = scoreToJSON(s);
+    const back = parseScore(a);
+    const b = scoreToJSON(back);
+    const same = a === b;
+    d.set('roundtrip', same ? 'byte-identical' : 'DIFFERS', same ? 'ok' : 'bad');
+    d.assert('parses back to a score', isScore(back));
+    d.assert('bytes in == bytes out', same, `${a.length} vs ${b.length}`);
+    d.assert('quotation equality is by value',
+      quotationEquals(s.quotations[0], back.quotations[0]),
+      quotationKey(s.quotations[0]).slice(0, 40));
+    d.assert('a second round-trip is stable', scoreToJSON(parseScore(b)) === b);
+  });
+
+  // a value that can be edited is not a value
+  d.on('mutate', () => {
+    let threw = false;
+    try { s.quotations[0].at = 999; } catch { threw = true; }
+    const moved = s.quotations[0].at !== 0;
+    d.assert('frozen against mutation', threw || !moved, threw ? 'threw' : `at=${s.quotations[0].at}`);
+  });
+
+  d.log(`ns ${NS}`);
+  d.ready();
+</script>
+</html>
