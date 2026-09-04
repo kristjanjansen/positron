@@ -36,32 +36,13 @@ team being clever. It is also the natural place to start talking.
 
 | | U: / tarmoj | positron |
 |---|---|---|
-| a piece is | **an application** | **a value** |
-| evidence | one repo per composition | one player, many scores |
 | sync authority | a Host device on the LAN | shared skew-corrected epoch, or media-as-master |
-| reach | one room, one wifi | internet, colo-distributed |
+| reach | one room, one wifi | anywhere with a network path |
 | score format | **Csound** (vClick) | JSON quotations (`score.mjs`) |
 | control transport | OSC and WebSocket over LAN | WS relay + Durable Object |
 | infrastructure | a hand-administered VPS | versioned; one command deploys |
 | measurement | none in any repo | the whole `rig/` |
 | time model | now, plus `publish_at` / `shelf_at` | deep time, uncertainty brackets |
-
-### A piece is an app, or a piece is a value
-
-This is the real divergence. `u-varyplayer-above`, `-audiomelt`,
-`-poinofview` are **12–13 KB repositories, one per composition** — Elis Hallik,
-Taivo Lints, Age Veeroos — hanging off a 1.46 GB master that holds the media.
-Each has a README template still reading "Description...". vClick says it
-plainly: *"Every piece requires its own written out score."*
-
-positron went the other way. `04 score` exists to prove that a quotation is a
-value: serialise it, parse it back, and the bytes are identical (417 in, 417
-out), and the object refuses mutation. A piece is data the one player reads.
-
-Neither is wrong. One app per piece gives a composer total freedom and costs a
-new codebase each time. One player plus scores costs a general model up front
-and then costs nothing per piece. The first scales with people; the second
-scales with pieces.
 
 ### One room, or the internet
 
@@ -86,6 +67,79 @@ description. There is no harness anywhere.
 
 That is not a criticism of craft; it is a difference in what the work is for. A
 piece that runs once in a hall is verified by the performance. A platform is not.
+
+---
+
+## Icecast, since both projects lean on it
+
+Icecast is a shoutcast-style audio server, and its model is the opposite of
+HLS's. A **source client** opens one HTTP request to a **mountpoint** and then
+writes MP3 frames forever; a **listener** does a plain `GET` on the same path
+and the server copies bytes to them. No manifest, no segments, no playlist —
+which is why `<audio src="https://icecast.err.ee/vikerraadio.mp3">` needs no
+library at all, and equally why there is no seeking and no DVR.
+
+Three things follow in `radio1965`:
+
+- **The mounts are declared in advance, and that is the capacity limit.**
+  `icecast.xml` defines five — `radio1965`, `user1`–`user4` — and a mount holds
+  one source at a time. Five simultaneous broadcasters is architectural, not a
+  knob. The app polls `status-json.xsl` to grey out the occupied ones.
+- **The Qt app is a source client, hand-written.** `icecastbroadcaster.cpp`
+  does `QAudioSource` → libmp3lame → raw `QTcpSocket`, speaking the Icecast
+  source protocol itself, with libmp3lame cross-compiled through the Android NDK.
+- **The hooks are the best idea in the repo.** `<on-connect>` runs a script when
+  anyone starts broadcasting, and it POSTs a `livestream` event to the same
+  `/events/publish` the editor uses; `<on-disconnect>` shelves it. Going on air
+  creates its own catalogue row and its own push notification — the broadcast
+  and the database record are one act.
+
+### Measured, because "a few seconds" is not a number
+
+There is no reference signal in a live radio stream, so glass-to-glass is not
+available. But the dominant term is: Icecast sends a **burst** from its backlog
+the instant you connect, so a listener starts that far behind live. Probing
+ERR's five mounts for 12 s each, splitting the initial burst from the
+real-time-paced tail:
+
+| mount | measured | burst | behind live at join |
+|---|---|---|---|
+| vikerraadio | 128 kbps | 63 KiB | **4.04 s** |
+| raadio2 | 128 kbps | 63 KiB | **4.05 s** |
+| klassikaraadio | 128 kbps | 62 KiB | **3.97 s** |
+| raadio4 | 128 kbps | 62 KiB | **3.97 s** |
+| raadiotallinn | 128 kbps | 62 KiB | **3.99 s** |
+
+64 KiB ÷ 16 KB/s = **4.0 s**. That is Icecast's default `burst-size` of 65536
+bytes divided by the bitrate, and the spread across five independent mounts is
+±0.04 s — a configuration constant, not network variance. Time to first byte was
+262–315 ms, so the delay is not the network.
+
+And there is no catch-up: Icecast has no notion of a live edge to chase, so a
+listener stays wherever they joined, playing at 1×.
+
+**Which makes it a knob U: already owns.** `burst-size` is in their
+`icecast.xml`. Lowering it moves join latency down proportionally, at the cost of
+a client having less to chew on before playback starts.
+
+### Where it sits against the other transports
+
+| | Icecast | LL-HLS | WebRTC | MoQ |
+|---|---|---|---|---|
+| latency | **4.0 s measured** | 2.4–4.0 s | 74 ms | 26 ms |
+| seek / DVR | none | yes (2 h on ERR) | no | no |
+| media | audio only | audio + video | audio + video | audio + video |
+| client | `<audio src>` | hls.js | SDP negotiation | WebTransport stack |
+| capacity | one source per declared mount | per input | per room | per namespace |
+
+Icecast's virtue is that it is boring in the best way: no build step, no library,
+no negotiation, and it plays in every browser and every podcast app. For a radio
+station that is a good trade. It just cannot do the two things positron is built
+around — low latency and seeking backwards.
+
+The same asymmetry is visible inside `19 flipper`: ERR's five radio stations are
+Icecast MP3 and their cells have no scrub track, while the three TV channels are
+HLS and theirs scrub two hours.
 
 ---
 
