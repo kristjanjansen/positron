@@ -100,12 +100,30 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
   ];
 }
 
+// ── secret hygiene ────────────────────────────────────────────────────────
+// The header above claims the key is "never logged". Truncating a tail is not
+// redaction: ffmpeg echoes the FULL RTMPS URL in its error messages ("Error
+// opening output files"), and /status serves that tail publicly. Measured on
+// 2026-09-04: a failed run leaked the key verbatim into plain output. Scrub at
+// the point of capture so an unredacted secret is never held in memory.
+const secrets = new Set();
+const remember = (v) => { if (typeof v === 'string' && v.length >= 8) secrets.add(v); };
+function redact(s) {
+  if (!s) return s;
+  let out = s;
+  for (const sec of secrets) out = out.split(sec).join('<redacted>');
+  // belt and braces: scrub the URL shapes even for a secret never registered
+  out = out.replace(/(rtmps?:\/\/[^\s/]+\/live\/)[^\s'"]+/gi, '$1<redacted>');
+  out = out.replace(/([?&](?:token|key|signature)=)[^\s&'"]+/gi, '$1<redacted>');
+  return out;
+}
+
 function startLeg(name, argv) {
   if (legs[name]) return { already: true };
   const p = spawn('ffmpeg', argv, { stdio: ['ignore', 'ignore', 'pipe'] });
   const st = { proc: p, startedAt: Date.now(), stderr: '', error: null, stopping: false };
   legs[name] = st;
-  p.stderr.on('data', (b) => { st.stderr = (st.stderr + b.toString()).slice(-1200); });
+  p.stderr.on('data', (b) => { st.stderr = redact(st.stderr + b.toString()).slice(-1200); });
   p.on('exit', (code, sig) => {
     const clean = st.stopping || code === 0 || code === null || sig === 'SIGTERM' || code === 255;
     if (!clean) st.error = `exit ${code}${sig ? ' ' + sig : ''}`;
@@ -130,7 +148,7 @@ function legState(name) {
     publishing: !!st.proc,
     uptimeS: st.proc ? Math.round((Date.now() - st.startedAt) / 1000) : 0,
     error: st.error,
-    stderrTail: st.stderr.slice(-300) || null,
+    stderrTail: redact(st.stderr).slice(-300) || null,
   };
 }
 
@@ -143,7 +161,7 @@ function start(opts) {
   startedAt = Date.now();
   ff.stderr.on('data', (b) => {
     // keep a tail only; ffmpeg is chatty and the key must never be echoed
-    lastStderr = (lastStderr + b.toString()).slice(-1500);
+    lastStderr = redact(lastStderr + b.toString()).slice(-1500);
   });
   ff.on('exit', (code, sig) => {
     // 255 is what ffmpeg returns for a SIGTERM it handled — i.e. exactly what
@@ -181,7 +199,7 @@ createServer(async (req, res) => {
       containerUpS: Math.round((Date.now() - BOOT) / 1000),
       pid: ff ? ff.pid : null,
       lastError,
-      stderrTail: lastStderr.slice(-400) || null,
+      stderrTail: redact(lastStderr).slice(-400) || null,
       whip: legState('whip'),
     });
   }
@@ -192,6 +210,7 @@ createServer(async (req, res) => {
     let opts = {};
     try { opts = JSON.parse(body || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
     if (!opts.key) return json(res, { error: 'key required' }, 400);
+    remember(opts.key);
     return json(res, start(opts));
   }
 
@@ -206,6 +225,7 @@ createServer(async (req, res) => {
     let o = {};
     try { o = JSON.parse(body || '{}'); } catch { return json(res, { error: 'bad json' }, 400); }
     if (!o.url) return json(res, { error: 'url required' }, 400);
+    remember(o.url);
     return json(res, startLeg('whip', whipArgs(o)));
   }
 

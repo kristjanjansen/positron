@@ -33,6 +33,14 @@
  *   no stream yet      -> rebuild on a steady cadence until it exists
  *   tab became visible -> seek to live edge (hidden tabs always come back stale)
  *
+ * v7: liveSyncSeconds overrides PART-HOLD-BACK, because a target inside one
+ * keyframe interval is structurally unreachable (measured: 1 INDEPENDENT part
+ * per 2.0 s segment) and chasing it is the iOS jank. Level switches are now
+ * reported. Also observed and deliberately NOT acted on: Cloudflare emits
+ * non-monotonic EXT-X-PROGRAM-DATE-TIME during startup (56.935 -> 56.604,
+ * i.e. 331 ms backwards), which only matters here if pdtDriftTrigger is on —
+ * it is off by default.
+ *
  * v6: split the paused/readyState tick gate (re-play() when visible; starved
  * hole-skip with the stall clock left counting — fixes the measured 18.5–20 s
  * readyState-1 park after same-broadcast resumes), escalate repeated silent
@@ -54,6 +62,27 @@ const DEFAULTS = {
   nudgeThreshold: 0.3,
   /** Max playback rate while catching up. 1.05 is imperceptible. */
   catchUpRate: 1.05,
+  /**
+   * Latency target in seconds, OVERRIDING the manifest's PART-HOLD-BACK.
+   *
+   * Cloudflare advertises PART-HOLD-BACK=1.5 with PART-TARGET=0.5, but
+   * measured on our own stream (2026-09-04) only ONE part per segment carries
+   * INDEPENDENT=YES — 10 of 38 — because our GOP is 2.0 s. So the player can
+   * APPEND at 0.5 s granularity but can only START DECODING every 2.0 s. A
+   * target inside one keyframe interval is unreachable: it overshoots, nudges
+   * at catchUpRate, crosses seekThreshold, resyncs, and repeats. That loop is
+   * the iOS jank.
+   *
+   * The publisher was ruled out FIRST, not assumed: the container and this Mac
+   * publishing the identical command both gave segment inter-arrival jitter
+   * 0.40 and EXTINF sd 0.003 s (2.000-2.021). Encoder starvation wobbles
+   * declared durations; these do not.
+   *
+   * 3.0 s == 1.5 GOPs. hls.js honours this only when passed at construction
+   * (its targetLatency getter tests hls.userConfig.liveSyncDuration).
+   * Set null to obey whatever the manifest advertises.
+   */
+  liveSyncSeconds: 3.0,
   /** Fallback latency target if the manifest advertises no hold-back. */
   fallbackTarget: 3.0,
   /** Drift/watchdog evaluation cadence (ms). */
@@ -121,6 +150,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   let rebuilds = 0;
   let consecutiveFailures = 0;   // rebuilds since last successfully buffered frag
   let everPlayed = false;
+  let levelSwitches = 0;
   let cooldownUntil = 0;
 
   // watchdog state
@@ -211,6 +241,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       fragLoadingRetryDelay: 500,
       fragLoadingMaxRetryTimeout: 4000,
       maxLiveSyncPlaybackRate: cfg.catchUpRate,
+      // A target shorter than one keyframe interval cannot be held; see
+      // liveSyncSeconds. Must be in userConfig, hence here and not a setter.
+      ...(cfg.liveSyncSeconds != null ? { liveSyncDuration: cfg.liveSyncSeconds } : {}),
       ...(opts.hlsConfig || {}),
     });
 
@@ -231,6 +264,17 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     });
 
     hls.on(Hls.Events.LEVEL_LOADED, () => { mediaRecoveries = 0; });
+
+    // ABR churn is the other jank candidate and it is UNMEASURED on the
+    // device that showed the problem. The stream carries four renditions
+    // (720/480/360/240) with tightly clustered BANDWIDTH, and a switch at
+    // the live edge cannot present a frame until the next INDEPENDENT part
+    // — once per 2.0 s. Report switches so the phone can answer it.
+    hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+      const l = hls.levels?.[data.level];
+      levelSwitches++;
+      emit('level', { level: data.level, switches: levelSwitches, width: l?.width, height: l?.height });
+    });
 
     hls.on(Hls.Events.FRAG_BUFFERED, () => { everPlayed = true; consecutiveFailures = 0; });
 
@@ -412,6 +456,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     get target() { return targetLatency(); },
     get hls() { return hls; },
     get rebuilds() { return rebuilds; },
+    get levelSwitches() { return levelSwitches; },
     syncToEdge: () => syncToEdge('manual'),
     on,
     destroy() {

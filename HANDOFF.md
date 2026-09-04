@@ -102,14 +102,45 @@ reason: it is named for its subject, not for this repo.
   (`10`–`14`) exists and is verified.
 
 **Open, with a named next step:**
-- **LL-HLS jank on iOS.** The player chases a 1.50 s target with a 2.0 s GOP
-  and sits at 2.78 s, nudging at 1.01× and resyncing past `seekThreshold: 2.0`.
-  A target shorter than one keyframe interval is unreachable and 2 s is
-  Cloudflare's shortest recommended GOP, so raise the target rather than
-  shorten the GOP. A container-vs-local publisher A/B on segment inter-arrival
-  jitter separates parameter mismatch from CPU starvation.
+- **LL-HLS jank — mechanism found, fixed, NOT yet confirmed on a real iPhone.**
+  The publisher was ruled out by A/B first: container and local Mac publishing
+  the identical command both gave inter-arrival jitter **0.40** and EXTINF
+  **sd 0.003 s** (2.000–2.021). Starvation wobbles declared durations; these
+  don't. Then the manifest gave the cause: Cloudflare advertises
+  `PART-HOLD-BACK=1.5` with `PART-TARGET=0.5`, but only **one part per segment**
+  carries `INDEPENDENT=YES` (10 of 38) because our GOP is 2.0 s. The player can
+  APPEND every 0.5 s but can only START DECODING every 2.0 s, so a 1.5 s target
+  is unreachable — it overshoots to ~2.78 s, nudges at `catchUpRate`, crosses
+  `seekThreshold: 2.0`, resyncs, repeats. Fix: `liveSyncSeconds: 3.0` (1.5 GOPs)
+  passed as hls.js `liveSyncDuration` **at construction** — its `targetLatency`
+  getter only honours the override from `hls.userConfig`. Measured after, on the
+  deploy: latency **3.33 s** against target **4.0** (hls.js adds
+  `liveSyncOnStallIncrease` per internal stall, capped at one targetduration),
+  rate **1.0**, **0 resyncs**, 1 level switch. Cost: ~0.5 s more latency.
+  **Still to do:** open `/06-llhls/` on the iPhone and read `switches`. The
+  arithmetic is device-independent, but the jank was reported on iOS and only
+  that device can confirm it. iPhone does take the hls.js path — bundled hls.js
+  is 1.7.1 and its `getMediaSource` returns `ManagedMediaSource` when
+  `MediaSource` is absent, which is iOS 17.1+ Safari.
+- **ABR churn is the remaining unmeasured suspect.** The stream carries four
+  renditions (720/480/360/240) with tightly clustered BANDWIDTH, and a switch at
+  the live edge cannot present a frame until the next INDEPENDENT part — once
+  per 2.0 s. `06` now reports `switches` so the phone can answer it. Deliberately
+  NOT tuned on a hunch; `capLevelToPlayerSize` was rejected because it would pin
+  a phone to 240p.
+- **Cloudflare emits non-monotonic PDT at startup** — measured `56.935` →
+  `56.604`, 331 ms backwards. Inert here (`pdtDriftTrigger` is off by default);
+  recorded because anything that starts trusting PDT will trip on it.
 - **The Cache API.** `caches.default` is no longer a no-op now that we are off
   workers.dev. Highest value in front of the single serialized `Gate` DO.
+- **Fixed 2026-09-04: the publisher leaked the stream key.**
+  `container/server.mjs` said the key is "never logged" and its stderr handler
+  even said "the key must never be echoed" — but both only TRUNCATED a tail,
+  and `/status` serves that tail publicly. ffmpeg echoes the full RTMPS URL on
+  any output error, so a failed encode published the key. Now redacted at the
+  point of capture (accumulate-then-redact, so a secret split across two
+  stderr chunks is still caught) and again on read, with a URL-shape fallback
+  for secrets that were never registered. The local A/B run is what exposed it.
 - **`.env` still holds the exposed legacy `CF_API_TOKEN`** (Stream/Calls/
   Realtime only — it cannot do Workers/DNS/R2 work). Use machine OAuth from a
   dir without `.env`. Re-confirmed unrotated 2026-09-04. `JAM_TOKEN` is now

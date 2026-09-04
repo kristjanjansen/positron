@@ -188,6 +188,80 @@ measured or quoted from a doc, not assumed.
   the relay is a Durable Object, so pointing it at `ws://192.168.x.x` runs the
   clock and score machinery with no internet.
 
+### The iOS jank, run to ground (2026-09-04, end of session 8)
+
+The user asked the right question — *"Is it a streamer thing? Compare local and
+container one"* — so the publisher got ruled out before anything was tuned.
+
+| | container (1 vCPU, 2 legs) | local Mac (all cores, 1 leg) |
+|---|---|---|
+| segments seen | 37 | 38 |
+| inter-arrival p50 | 1974 ms | 1991 ms |
+| inter-arrival sd | 799 | 798 |
+| **jitter** (sd/p50) | **0.40** | **0.40** |
+| EXTINF range | 2.000–2.021 s | 2.000–2.021 s |
+| **EXTINF sd** | **0.003 s** | **0.003 s** |
+
+Identical. And EXTINF sd 0.003 s is the number that matters: a CPU-starved
+encoder produces wobbling segment durations, not durations exact to 3 ms. The
+container is not the problem. (The 0.40 jitter itself is mostly the measurement
+— a 250 ms poll against a playlist that gains segments in bursts, `min 0` — and
+it is the same on both sides, which is the whole point of an A/B.)
+
+Two false starts worth keeping:
+
+- The first local leg died on `such filter: 'drawtext'`. The default homebrew
+  ffmpeg has no libfreetype — which `src/publish.sh` already documented
+  (`FF=/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg # needs libfreetype for the clock
+  overlay`). The pin was not decoration.
+- That failure printed the full RTMPS URL, i.e. **the stream key**, into the
+  output. It reached only a scratchpad file and was scrubbed, but the same
+  string is served publicly by the container's `/status`. Fixed properly: see
+  the redaction note in HANDOFF.
+
+With the publisher exonerated, the manifest was read instead of guessed:
+
+```
+#EXT-X-PART-INF:PART-TARGET=0.5
+#EXT-X-SERVER-CONTROL:PART-HOLD-BACK=1.5,CAN-BLOCK-RELOAD=YES
+#EXT-X-TARGETDURATION:3        (segments are 2.000)
+INDEPENDENT=YES on 10 of 38 parts   <- one per segment: the keyframe part
+four renditions: 1280x720, 854x480, 640x360, 426x240
+PROGRAM-DATE-TIME: …56.935 -> …56.604   <- 331 ms BACKWARDS
+```
+
+So the target is Cloudflare's 1.5 s, and the player can append at 0.5 s
+granularity but can only start decoding every 2.0 s. **A latency target inside
+one keyframe interval is structurally unreachable.** The player overshoots to
+~2.78 s, nudges at `catchUpRate`, crosses `seekThreshold: 2.0`, resyncs, and
+does it again forever. That loop is the jank — not the encoder.
+
+Fix (player v7): `liveSyncSeconds: 3.0` = 1.5 GOPs, passed to hls.js as
+`liveSyncDuration` **at construction**, because the deminified 1.7.1
+`targetLatency` getter only takes the override from `hls.userConfig`:
+
+```js
+let target = (lowLatencyMode && partHoldBack) || holdBack;
+if (this._targetLatencyUpdated || userConfig.liveSyncDuration || …) target = liveSyncDuration ?? …;
+return target + Math.min(this.stallCount * config.liveSyncOnStallIncrease, targetduration);
+```
+
+That last line also explains the measured target of 4.0 rather than 3.0 — hls.js
+raises its own target by one second per internal stall, capped at one
+targetduration. Result on the deploy: latency **3.33 s**, target **4.0**, rate
+**1.0**, **0 resyncs**, 1 level switch. Drift is now negative, so the nudge and
+the resync never arm. Cost: about half a second of latency.
+
+**Not claimed:** this was measured through CDP on desktop, not on an iPhone. The
+arithmetic is device-independent and iPhone does take the hls.js path (hls.js
+1.7.1 resolves `ManagedMediaSource` when `MediaSource` is absent, i.e. iOS 17.1+),
+but the report came from iOS and only iOS can close it. `06` now reports a
+`switches` count for exactly that visit — ABR churn across those four
+clustered-BANDWIDTH renditions is the one suspect still without a number, and it
+was left untuned rather than guessed at.
+
+242/242 green locally and against https://positron.studio.
+
 ## Session 7 (2026-08-30) — the looper, local and remote (user: "build midi looper … in parallel fix 2 3 5. also 4")
 
 Four agents on the four open HANDOFF items in parallel, the looper in the main
