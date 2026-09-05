@@ -1,8 +1,10 @@
 # positron
 
-Live at **https://positron.studio**. 20 of 24 demos built, 276/276 green. Read `HANDOFF.md` for
-current state, `LESSONS.md` for why the rules below exist, `PROGRESS.md` for what
-was measured when.
+Live at **https://positron.studio**. 21 of 25 demos built, 289/291 green — the
+two reds are `19 flipper`, which now gets a 403 from ERR and which takes the
+dead native-HLS path in desktop Chrome (see the `canPlayType` fact below).
+Read `HANDOFF.md` for current state, `LESSONS.md` for why the rules below
+exist, `PROGRESS.md` for what was measured when.
 
 ## Run and check
 
@@ -53,6 +55,22 @@ them first.** Do not pick between them on plausibility.
 this — `BUILD` matched inside `REBUILD`; `LOG_KEEP` and `#log` were satisfied by
 the code just inserted. Guard on the exact declaration, or assert the effect
 afterwards. Printing "ok" is not evidence.
+
+**`verify.mjs` stops collecting 400 ms after the last assert.** Its stabiliser
+waits only while the count is still GROWING, so a check whose FIRST assert sits
+behind a wait reports "asserted nothing" (a page that is working reads as
+broken), and one that pauses mid-way silently loses every assert after the
+pause. Slow work — going live, a recording, resolving a WebM duration — belongs
+behind control 0, which is the only control that gets `settleMs`.
+
+**`grep` returns nothing on `timeline/transport.mjs`.** It held two literal NUL
+bytes (a cache-key separator typed raw instead of `\u0000`), so BSD grep called
+the file binary and printed nothing — not "binary file matches", nothing. Every
+search of the timeline core answered "not there", including for `createDeck`,
+which is exported ~40 lines from where the search claimed nothing was. The NULs
+are now escaped. If a search for a symbol you are sure exists comes back empty,
+suspect the file before the symbol: `node -e "…indexOf(…)"` is the second
+opinion.
 
 **Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
 reports `tail`'s exit status, not `cmd`'s.
@@ -139,6 +157,11 @@ to recover.
 - **MediaRecorder output reports `duration: Infinity`**, which leaves a
   transport bar with no range to scrub. Seek far past the end, let the browser
   resolve the duration, then come back.
+- **A remote `MediaStream` carries the SENDER's msid.** After a hop,
+  `remote.id === local.id` and the track ids match too, so "is this the received
+  stream or the source?" cannot be answered by id — it is answered by object
+  identity against `pc.getReceivers()[i].track`. An id comparison passes
+  vacuously in both directions.
 - **`candidate-pair` RTT is not media latency.** Quoting WHEP's 25 ms RTT
   beside MoQ's 20 ms glass-to-glass flattered WHEP by ~3x. Measured the same
   way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
