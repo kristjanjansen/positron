@@ -490,10 +490,42 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // path reports the SAME quantities as the hls.js path. Comparing two players
   // on two different measurements would be worthless.
   if (useNative) {
-    emit('engine', {
+    // Deferred, exactly as on the hls.js path: boot happens inside
+    // createLowLatencyPlayer, before the caller can chain .on(), so a
+    // synchronous emit reaches nobody. The iPhone log came back with no ENGINE
+    // line and that was this bug reintroduced, not a device signal.
+    setTimeout(() => emit('engine', {
       player: 'native', managedMediaSource: !!self.ManagedMediaSource,
       plainMediaSource: !!self.MediaSource, nativeHls, hls: null,
-    });
+    }), 0);
+    // RECOVERY, which this path had none of. Measured on an iPhone at t=153 s:
+    // MEDIA-ERROR code 3 "Media failed to decode", then currentTime back to 0
+    // and nothing further. The hls.js path carries every watchdog; here we set
+    // src and walked away. And Cloudflare mints a NEW video UID on every
+    // encoder reconnect (5265d9d9, 8cce2ccd, d0390546, 11e6883c observed today),
+    // which a bare <video src> cannot survive at all.
+    //
+    // A reload is the only lever native HLS gives us, so use it — rate limited,
+    // because a reload storm is worse than a stall.
+    let nativeLastEdge = -1;
+    let nativeEdgeMoved = Date.now();
+    let nativeReloads = 0;
+    let lastReloadAt = 0;
+    function nativeReload(why) {
+      if (destroyed) return;
+      const since = Date.now() - lastReloadAt;
+      if (since < cfg.nativeReloadCooldownMs) return;
+      lastReloadAt = Date.now();
+      nativeReloads++;
+      emit('rebuild', { why, attempt: nativeReloads, player: 'native' });
+      try {
+        video.removeAttribute('src');
+        video.load();
+        video.src = url;
+        video.play().catch(() => {});
+      } catch { /* the element is gone */ }
+    }
+
     video.src = url;
     video.play().catch((e) => emit('error', e));
 
@@ -509,6 +541,18 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     timer = setInterval(() => {
       if (destroyed) return;
       const rates = measureRates();
+
+      // Source watchdog. The edge freezing means the broadcast died or the UID
+      // changed underneath us; neither recovers on its own here.
+      const edge = seekableEnd();
+      if (edge != null && edge > nativeLastEdge + 0.01) { nativeLastEdge = edge; nativeEdgeMoved = Date.now(); }
+      if (nativeLastEdge > 0 && Date.now() - nativeEdgeMoved > cfg.sourceStallTimeout) {
+        emit('stall', { kind: 'source', frozenMs: Date.now() - nativeEdgeMoved, player: 'native' });
+        nativeEdgeMoved = Date.now();
+        nativeReload('source-stall');
+        return;
+      }
+
       const latency = nativeLatency();
       if (latency == null) return;
       // No target to chase: AVFoundation runs its own catch-up against the
@@ -524,14 +568,18 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     video.addEventListener('error', () => {
       const e = video.error;
       emit('media-error', { code: e?.code, message: String(e?.message || '').slice(0, 120) });
+      // MEDIA_ERR_DECODE (3) and MEDIA_ERR_SRC_NOT_SUPPORTED (4) are terminal
+      // for the element; only a reload clears them.
+      if (e?.code === 3 || e?.code === 4) nativeReload(`media-error-${e.code}`);
     });
     video.addEventListener('waiting', () => emit('waiting', { ct: +video.currentTime.toFixed(2), ahead: bufferReport().ahead }));
+    video.addEventListener('ended', () => nativeReload('ended'));
 
     return {
       get latency() { return nativeLatency(); },
       get target() { return cfg.fallbackTarget; },
       get hls() { return null; },
-      get rebuilds() { return 0; },
+      get rebuilds() { return nativeReloads; },
       get levelSwitches() { return 0; },
       get targetBias() { return 0; },
       get advanceCaps() { return 0; },

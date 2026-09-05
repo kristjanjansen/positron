@@ -147,11 +147,24 @@ reason: it is named for its subject, not for this repo.
   moot; delete it.
 - **`vain.md.later`** — the Väin philosophy note, unlinked for now.
 
+## Read LESSONS.md first
+
+Written at the end of session 9. Method lessons that each cost real time —
+measure the quantity in question rather than an adjacent one; a green suite can
+mean zero coverage; attribute a run to a build before iterating on it — plus
+platform facts (iOS 17.1 ManagedMediaSource silently disabling native-HLS
+fallbacks, `video.buffered` being the INTERSECTION of source buffers, `-re`
+being per-input, MoQ relays being impossible in a Container).
+
+The blunt version: our own recovery layer caused more of the iOS stutter than
+hls.js did.
+
 ## How to run and check things
 
 ```sh
 node demo/server.mjs                       # :8890, serves the repo; / == deployed
 node demo/verify.mjs                       # every built demo, locally
+node demo/verify-native.mjs                # the iPhone code path — verify.mjs CANNOT reach it
 DEMO_BASE=https://positron.studio node demo/verify.mjs   # against the deploy
 cd workers/view && node build.mjs && npx wrangler deploy  # ALWAYS build first
 ```
