@@ -165,6 +165,19 @@
         d.log(`target raised to ${x.target}s — device cannot hold the lower one`, 'bad');
         ship(`TARGET-RAISED ${JSON.stringify(x)}`);
       })
+      .on('start', (x) => {
+        d.log(`playing with ${x.ahead}s buffered after ${(x.waitedMs / 1000).toFixed(1)}s`
+          + (x.forced ? ' (timed out waiting for audio)' : ''), x.forced ? 'bad' : 'hi');
+        ship(`START ${JSON.stringify(x)}`);
+      })
+      .on('audio-lag', (x) => {
+        d.log(`audio behind video by ${x.videoAhead}s — waiting instead of seeking`, 'bad');
+        ship(`AUDIO-LAG ${JSON.stringify(x)}`);
+      })
+      .on('advance-capped', (x) => {
+        d.log(`playhead at ${x.advance}x — capped to ${x.height}p (level ${x.to})`, 'bad');
+        ship(`ADV-CAP ${JSON.stringify(x)}`);
+      })
       .on('fps-drop', (x) => {
         d.log(`fps drop ${x.dropped}/${x.decoded} — hls.js may step the level down`, 'bad');
         ship(`FPS-DROP ${JSON.stringify(x)}`);

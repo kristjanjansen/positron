@@ -33,6 +33,20 @@
  *   no stream yet      -> rebuild on a steady cadence until it exists
  *   tab became visible -> seek to live edge (hidden tabs always come back stale)
  *
+ * v10: do not play until the AUDIO/VIDEO intersection is playable, and do not
+ * let the starved watchdog seek over an audio-only shortfall. Cloudflare lands
+ * audio seconds behind video at startup; video.buffered is the intersection,
+ * so the element had 0.05 s to play while video held 5 s. Playing there stalls,
+ * the seek that follows opens a hole, and the hole outlives the lag. The lag
+ * itself is transient — advance recovers to 1.0 and stays.
+ *
+ * v9: cap the rendition on ADVANCE. capLevelOnFPSDrop keys on dropped frames
+ * and the stuttering iPhone drops 3 of 507 — it advances the media clock at
+ * 0.16-0.41x with 5-10 s buffered and the edge moving at 1.0x. Frames are not
+ * discarded; time crawls. Also recorded: on that device AUDIO carries holes
+ * that video does not, and video.buffered being their intersection inherits
+ * them.
+ *
  * v8: a drift-seek must earn itself — minimum interval, minimum buffered
  * runway, and it yields by RAISING the target when the device proves it
  * cannot hold one. Setting currentTime aborts in-flight fragment loads, and
@@ -87,6 +101,41 @@ const DEFAULTS = {
   driftHeldBeforeYield: 3,
   /** How far the target may drift upward when the device cannot hold it (s). */
   maxTargetBias: 6,
+  /**
+   * Step the level down when the playhead cannot keep up with wall time.
+   *
+   * hls.js's own capLevelOnFPSDrop is enabled below, but it is INERT for this
+   * failure: it keys on droppedVideoFrames, and the iPhone that stutters drops
+   * almost nothing — 3 frames out of 507. What it does instead is advance the
+   * media clock at 0.16-0.41x while the live edge advances at 1.0x and 5-10 s
+   * sit buffered. Frames are not being discarded; time itself crawls.
+   *
+   * So cap on the symptom that is actually present. Below this ratio, for this
+   * many consecutive ticks, drop one rendition.
+   */
+  advanceFloor: 0.8,
+  advanceTicksBeforeCap: 6,
+  /**
+   * Do not start playing until there is a real INTERSECTION to play.
+   *
+   * Measured on desktop Chrome and on iOS alike: at startup Cloudflare lands
+   * the AUDIO track seconds behind the video track —
+   *   video [[2.83,4.83],[8.83,21.83]]   audio [[2.85,3.36],[8.84,16.84]]
+   * — and video.buffered is their INTERSECTION, so the element had 0.05 s to
+   * play while video held 5 s. Playing there stalls at once, the starved
+   * watchdog seeks to the edge, and THAT seek leaves a 5.5 s hole (3.36->8.84)
+   * which was still visible as an orphan range 40 s later. The lag is
+   * transient — advance climbed 0.26 -> 1.0 by t=36 s and stayed — so the whole
+   * stutter is a startup cascade that begins with playing too early.
+   */
+  startBuffer: 1.0,
+  startBufferTimeoutMs: 8000,
+  /**
+   * Ticks the starved watchdog waits before seeking, when the shortfall is
+   * AUDIO ONLY (video has data past the playhead, the intersection does not).
+   * Seeking forward cannot make an audio segment arrive; it only opens a hole.
+   */
+  audioLagTicks: 12,
   /** Seek instead of nudging once we are this far past target (seconds). */
   seekThreshold: 2.0,
   /** Nudge playback rate for drift above this but below seekThreshold. */
@@ -185,6 +234,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // Raised when the device demonstrates it cannot hold the target. Smooth at
   // 8 s beats jerky at 6 s, and this is what stops the seek loop re-arming.
   let targetBias = 0;
+  let slowTicks = 0;
+  let audioLagWaits = 0;
+  let advanceCaps = 0;
   let lastDriftSeekAt = 0;
   let driftHeld = 0;
   let cooldownUntil = 0;
@@ -321,7 +373,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         video.style.aspectRatio = `${best.width} / ${best.height}`;
         emit('dimensions', { width: best.width, height: best.height, aspectRatio: best.width / best.height });
       }
-      video.play().catch((e) => emit('error', e));
+      startWhenPlayable();
     });
 
     hls.on(Hls.Events.LEVEL_LOADED, () => { mediaRecoveries = 0; });
@@ -475,6 +527,23 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     };
   }
 
+  /** Play once the intersection is playable, or after the timeout regardless. */
+  function startWhenPlayable() {
+    const t0 = Date.now();
+    const attempt = () => {
+      if (destroyed) return;
+      const ahead = bufferReport().ahead;
+      const waited = Date.now() - t0;
+      if (ahead >= cfg.startBuffer || waited > cfg.startBufferTimeoutMs) {
+        emit('start', { ahead: +ahead.toFixed(2), waitedMs: waited, forced: ahead < cfg.startBuffer });
+        video.play().catch((e) => emit('error', e));
+        return;
+      }
+      setTimeout(attempt, 100);
+    };
+    attempt();
+  }
+
   function seekableEnd() {
     return video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
   }
@@ -528,9 +597,24 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         }
       } else beachedTicks = 0;
       if (Date.now() - lastAdvance > cfg.stallTimeout) {
+        // Is the shortfall AUDIO ONLY? Video holding seconds past the playhead
+        // while the intersection holds nothing means the missing piece is an
+        // audio segment. A seek forward cannot conjure one — it just opens a
+        // hole, which is exactly how the 5.5 s orphan range got made. Wait.
+        const rep = bufferReport();
+        const vr = rep.tracks?.video;
+        const vEnd = vr?.length ? vr[vr.length - 1][1] : null;
+        if (vEnd != null && vEnd > video.currentTime + 2 && rep.ahead < 0.5
+            && audioLagWaits < cfg.audioLagTicks) {
+          audioLagWaits++;
+          emit('audio-lag', { videoAhead: +(vEnd - video.currentTime).toFixed(2),
+            intersection: rep.ahead, waits: audioLagWaits });
+          return;
+        }
+        audioLagWaits = 0;
         lastAdvance = Date.now();
         failedSeeks++;
-        emit('stall', { kind: 'starved', attempt: failedSeeks, buffer: bufferReport() });
+        emit('stall', { kind: 'starved', attempt: failedSeeks, buffer: rep });
         // Nothing buffered ahead to skip to: seek to the live edge; escalate
         // to a rebuild if that keeps failing or starvation repeats.
         if (failedSeeks > cfg.seeksBeforeReload || !syncToEdge('starved')) rebuild('starved');
@@ -556,6 +640,25 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
     // -- latency control ----------------------------------------------------
     const rates = measureRates();
+    // A resync jumps currentTime, so the EMA needs a moment to be meaningful
+    // again; only judge when the buffer is healthy and we are actually playing.
+    if (rates.advance != null && !video.paused && bufferReport().ahead > 2) {
+      if (rates.advance < cfg.advanceFloor) slowTicks++;
+      else slowTicks = Math.max(0, slowTicks - 1);
+      if (slowTicks >= cfg.advanceTicksBeforeCap && hls?.levels?.length > 1) {
+        const cur = hls.currentLevel >= 0 ? hls.currentLevel : hls.levels.length - 1;
+        const next = Math.max(0, cur - 1);
+        if (next !== cur && (hls.autoLevelCapping === -1 || hls.autoLevelCapping > next)) {
+          hls.autoLevelCapping = next;
+          advanceCaps++;
+          slowTicks = 0;
+          emit('advance-capped', {
+            advance: rates.advance, from: cur, to: next,
+            height: hls.levels[next]?.height, caps: advanceCaps,
+          });
+        } else slowTicks = 0;
+      }
+    }
     const latency = currentLatency();
     if (latency == null) return;
     const target = targetLatency();
@@ -629,6 +732,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     get rebuilds() { return rebuilds; },
     get levelSwitches() { return levelSwitches; },
     get targetBias() { return targetBias; },
+    get advanceCaps() { return advanceCaps; },
     syncToEdge: () => syncToEdge('manual'),
     bufferReport,
     engineReport,

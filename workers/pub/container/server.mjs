@@ -42,7 +42,24 @@ let stopping = false;   // a SIGTERM exit is not a fault
 // simultaneous encodes on a half-vCPU instance stalled the stream, and
 // being able to drop the budget without rebuilding the image is how that
 // got diagnosed.
-function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
+// A quiet open-fifth triad (A3 + E4 + A4) breathing on a 4 s cycle, instead of
+// a bare 440 Hz sine at full scale. The sine was correct and unlistenable; the
+// burned-in video clock is what carries the measurement, so the audio only has
+// to be present, paced, and not painful.
+const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*PI*440*t))"
+  + "*(0.75+0.25*sin(2*PI*0.25*t))':s=48000:c=stereo";
+
+/**
+ * tracks: "av" (default), "v" (video only) or "a" (audio only).
+ *
+ * This exists to settle a specific question rather than for variety. At startup
+ * Cloudflare lands the audio track seconds behind the video track, and
+ * video.buffered in the browser is their INTERSECTION — so the element has
+ * ~0.05 s to play while video holds 5 s, which is what makes 06 stutter for the
+ * first ~20 s. A video-only stream has no audio group at all. If the stutter
+ * disappears there, audio is the cause; if it survives, it is not.
+ */
+function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av' }) {
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
@@ -55,6 +72,8 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
     'x=36', 'y=36', 'fontsize=52', 'fontcolor=black',
     'box=1', 'boxcolor=white', 'boxborderw=13',
   ].join(':');
+  const wantV = tracks !== 'a';
+  const wantA = tracks !== 'v';
   return [
     '-hide_banner', '-loglevel', 'warning',
     // -re IS A PER-INPUT OPTION. It was on the video only, so lavfi's sine was
@@ -66,15 +85,17 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
     //
     // The container-vs-local A/B could not have caught this: the local arm was
     // given these same args, so both sides shared the defect.
-    '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
-    '-re', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
-    '-vf', draw,
-    '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
-    '-profile:v', 'main', '-pix_fmt', 'yuv420p',
-    '-b:v', bitrate, '-minrate', bitrate, '-maxrate', bitrate, '-bufsize', bitrate,
-    '-g', String(gop), '-keyint_min', String(gop), '-sc_threshold', '0',
-    '-bf', '0',                                  // B-frames OFF for LL-HLS
-    '-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2',
+    ...(wantV ? ['-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`] : []),
+    ...(wantA ? ['-re', '-f', 'lavfi', '-i', CHORD] : []),
+    ...(wantV ? ['-vf', draw] : []),
+    ...(wantV ? [
+      '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
+      '-profile:v', 'main', '-pix_fmt', 'yuv420p',
+      '-b:v', bitrate, '-minrate', bitrate, '-maxrate', bitrate, '-bufsize', bitrate,
+      '-g', String(gop), '-keyint_min', String(gop), '-sc_threshold', '0',
+      '-bf', '0',                                // B-frames OFF for LL-HLS
+    ] : []),
+    ...(wantA ? ['-c:a', 'aac', '-b:a', '128k', '-ar', '48000', '-ac', '2'] : []),
     '-f', 'flv', `rtmps://live.cloudflare.com:443/live/${key}`,
   ];
 }
@@ -160,11 +181,14 @@ function legState(name) {
   };
 }
 
+let tracksMode = null;
+
 function start(opts) {
   if (ff) return { already: true };
   lastError = null;
   lastStderr = '';
   stopping = false;
+  tracksMode = opts.tracks || 'av';
   ff = spawn('ffmpeg', args(opts), { stdio: ['ignore', 'ignore', 'pipe'] });
   startedAt = Date.now();
   ff.stderr.on('data', (b) => {
@@ -207,6 +231,7 @@ createServer(async (req, res) => {
       containerUpS: Math.round((Date.now() - BOOT) / 1000),
       pid: ff ? ff.pid : null,
       lastError,
+      tracks: tracksMode,
       stderrTail: redact(lastStderr).slice(-400) || null,
       whip: legState('whip'),
     });

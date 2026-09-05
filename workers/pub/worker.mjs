@@ -112,8 +112,12 @@ export class Pub extends Container {
     }
 
     if (url.pathname === '/start' && request.method === 'POST') {
-      await this.#startPublish();
-      return json({ ok: true, viewers: this.viewers() });
+      // ?tracks=av|v|a — a manual override for the audio-lag experiment. The
+      // question it answers: a video-only stream has no audio group, so if the
+      // startup stutter vanishes there, the audio track is the cause.
+      const tracks = url.searchParams.get('tracks');
+      await this.#startPublish(tracks ? { tracks } : undefined);
+      return json({ ok: true, viewers: this.viewers(), tracks: tracks || 'av' });
     }
     if (url.pathname === '/stop' && request.method === 'POST') {
       await this.#stopPublish();
@@ -136,7 +140,7 @@ export class Pub extends Container {
     if (at === null) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
   }
 
-  async #startPublish() {
+  async #startPublish(extra) {
     const key = this.env.STREAM_KEY;
     const whip = this.env.WHIP_URL;
     // Both legs, same refcount. Cloudflare cannot serve WHEP from an RTMPS
@@ -146,7 +150,7 @@ export class Pub extends Container {
         await super.fetch(new Request('http://c/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ key, ...this.#size() }),
+          body: JSON.stringify({ key, ...this.#size(), ...(extra || {}) }),
         }));
       } catch { /* container still waking; the sweep retries */ }
     }
