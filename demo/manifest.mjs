@@ -102,6 +102,9 @@ export const DEMOS = [
     one: 'the operator surface: go live, fire cues, archive the show',
     tags: ['WebRTC', 'DO', 'R2'],
     why: 'consumes 10 through 14' },
+  { n: '24', name: 'capture', act: 4, built: true, settleMs: 26000,
+    one: 'camera in, segments out, played back on the timeline',
+    tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */

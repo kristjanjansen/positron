@@ -1,0 +1,25 @@
+{
+	// positron-ingest — the ONE tokenless write path to R2. Deliberately its own
+	// worker: workers/selfrec has the same bucket binding but gates every route
+	// on Bearer SELFREC_TOKEN, and adding one unauthenticated route there would
+	// make the auth story "all of them except this one".
+	//
+	// Caps live in worker.mjs (LIMITS) and are enforced in the Quota Durable
+	// Object, so parallel uploads cannot both pass the same check.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "positron-ingest",
+	"main": "worker.mjs",
+	"compatibility_date": "2026-09-01",
+	"routes": [{ "pattern": "ingest.positron.studio", "custom_domain": true }],
+	"workers_dev": true,
+	"r2_buckets": [
+		{ "binding": "ARCHIVE", "bucket_name": "elektron-archive-test" }
+	],
+	"durable_objects": {
+		"bindings": [{ "name": "QUOTA", "class_name": "Quota" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["Quota"] }],
+	// The TTL is enforced, not documented: this sweep deletes expired sessions.
+	"triggers": { "crons": ["17 * * * *"] },
+	"observability": { "enabled": true }
+}
