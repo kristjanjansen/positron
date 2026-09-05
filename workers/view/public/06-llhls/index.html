@@ -15,7 +15,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt, BUILD } from '/shell/shell.mjs';
   import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
@@ -78,6 +78,18 @@
   // FPS capping above is the fix rather than a guess.
   const capH = Number(new URLSearchParams(location.search).get('cap')) || 0;
 
+  // ?player=native|hlsjs forces the engine. On an iPhone 'auto' now resolves to
+  // native (AVFoundation) — see the decision block in low-latency-player.js.
+  // This is how the two get compared on ONE device reporting the same numbers.
+  const forced = new URLSearchParams(location.search).get('player');
+  const preferNative = forced === 'native' ? true : forced === 'hlsjs' ? false : 'auto';
+
+  // Stamped FIRST and unconditionally: a log that cannot be attributed to a
+  // build is worth very little. Asked for after a run whose result could not be
+  // told apart from a fix that never loaded.
+  d.log(`build ${BUILD}${forced ? ` — player forced to ${forced}` : ''}`);
+  ship(`BUILD ${BUILD} player=${forced || 'auto'} ua=${navigator.userAgent.slice(0, 58)}`);
+
   d.on('go', async () => {
     if (player) return;
     armVideo(video);          // spend the activation while it is still live
@@ -103,7 +115,7 @@
     // THE PLAYER IS src/low-latency-player.js, unchanged — the v6 that fixed
     // the 26 s park. This demo is not a reimplementation of it; it is the
     // measured artefact with a readout attached.
-    player = createLowLatencyPlayer(video, llhls())
+    player = createLowLatencyPlayer(video, llhls(), { preferNative })
       .on('latency', ({ latency, target, playbackRate, buffer, rates }) => {
         // A stream that came up 30 s ago legitimately stalls while Cloudflare's
         // LL-HLS pipeline fills; the v6 watchdog rebuilding then is it WORKING.
@@ -174,6 +186,13 @@
         d.log(`audio behind video by ${x.videoAhead}s — waiting instead of seeking`, 'bad');
         ship(`AUDIO-LAG ${JSON.stringify(x)}`);
       })
+      .on('ms', (x) => {
+        d.log(`mediasource ${x.event} rs=${x.readyState}`          + (x.streaming === null ? '' : ` streaming=${x.streaming}`),
+          x.event === 'sourceclose' ? 'bad' : '');
+        ship(`MS ${JSON.stringify(x)}`);
+      })
+      .on('media-error', (x) => ship(`MEDIA-ERROR ${JSON.stringify(x)}`))
+      .on('waiting', (x) => ship(`WAITING ${JSON.stringify(x)}`))
       .on('advance-capped', (x) => {
         d.log(`playhead at ${x.advance}x — capped to ${x.height}p (level ${x.to})`, 'bad');
         ship(`ADV-CAP ${JSON.stringify(x)}`);
@@ -183,7 +202,7 @@
         ship(`FPS-DROP ${JSON.stringify(x)}`);
       })
       .on('engine', (x) => {
-        d.log(`engine ${x.gatedBySafari ? 'ManagedMediaSource (Safari gates loading)' : x.managedMediaSource ? 'MMS available' : 'MediaSource'}`);
+        d.log(`engine ${x.player || '?'}${x.gatedBySafari ? ' — ManagedMediaSource, Safari gates loading' : ''}`, x.player === 'native' ? 'hi' : '');
         ship(`ENGINE ${JSON.stringify(x)} ua=${navigator.userAgent}`);
       })
       .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
