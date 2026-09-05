@@ -33,6 +33,12 @@
  *   no stream yet      -> rebuild on a steady cadence until it exists
  *   tab became visible -> seek to live edge (hidden tabs always come back stale)
  *
+ * v8: a drift-seek must earn itself — minimum interval, minimum buffered
+ * runway, and it yields by RAISING the target when the device proves it
+ * cannot hold one. Setting currentTime aborts in-flight fragment loads, and
+ * on an iPhone that abort-per-seek loop ran every 2-3 s for two minutes and
+ * was itself the jerkiness. Smooth at 8 s beats jerky at 6 s.
+ *
  * v7: liveSyncSeconds overrides PART-HOLD-BACK, because a target inside one
  * keyframe interval is structurally unreachable (measured: 1 INDEPENDENT part
  * per 2.0 s segment) and chasing it is the iOS jank. Level switches are now
@@ -56,6 +62,31 @@
  */
 
 const DEFAULTS = {
+  /**
+   * A DRIFT-SEEK IS NOT FREE. Setting currentTime aborts every in-flight
+   * fragment load, and the abort is what stops the buffer from ever growing.
+   *
+   * Measured on an iPhone (iOS 18.7, Safari 26.6.1, ManagedMediaSource,
+   * Safari gating loads): RESYNC drift fired every 2-3 s for two solid
+   * minutes, each one immediately followed by "ERR aborted" on BOTH tracks.
+   * Latency oscillated across the trigger — 8.25 -> seek -> 6.90 -> 8.34 ->
+   * seek — and some seeks went out with buf=0.02, i.e. with no runway to land
+   * on, which guarantees the stall it was trying to cure. The jerkiness was
+   * this control loop, not the stream: the publisher A/B was clean and the
+   * page had segments 0.8 s after asking.
+   *
+   * So a drift-seek now has to earn itself three ways: enough time since the
+   * last one, enough buffered runway to survive it, and a target that the
+   * device has not already proved it cannot hold.
+   */
+  /** Never drift-seek more often than this (ms). */
+  minDriftSeekMs: 10000,
+  /** Refuse to drift-seek with less than this much buffer ahead (s). */
+  driftSeekMinBuffer: 1.5,
+  /** Refusals in a row before we stop fighting and raise our own target. */
+  driftHeldBeforeYield: 3,
+  /** How far the target may drift upward when the device cannot hold it (s). */
+  maxTargetBias: 6,
   /** Seek instead of nudging once we are this far past target (seconds). */
   seekThreshold: 2.0,
   /** Nudge playback rate for drift above this but below seekThreshold. */
@@ -151,6 +182,11 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   let consecutiveFailures = 0;   // rebuilds since last successfully buffered frag
   let everPlayed = false;
   let levelSwitches = 0;
+  // Raised when the device demonstrates it cannot hold the target. Smooth at
+  // 8 s beats jerky at 6 s, and this is what stops the seek loop re-arming.
+  let targetBias = 0;
+  let lastDriftSeekAt = 0;
+  let driftHeld = 0;
   let cooldownUntil = 0;
 
   // watchdog state
@@ -324,7 +360,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // ---- latency + stall control (runs across rebuilds) ------------------------
   function targetLatency() {
     const t = hls?.targetLatency;
-    return typeof t === 'number' && t > 0 ? t : cfg.fallbackTarget;
+    const base = typeof t === 'number' && t > 0 ? t : cfg.fallbackTarget;
+    return base + targetBias;
   }
 
   function currentLatency() {
@@ -476,20 +513,40 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       && (hls?.liveSyncPosition ?? -Infinity) - video.currentTime > cfg.seekThreshold;
 
     if (drift > cfg.seekThreshold || pdtDrift) {
-      // syncToEdge fails silently when liveSyncPosition is null or behind the
-      // playhead (stale level). A failing drift-seek must escalate, not no-op
-      // forever with playbackRate parked at 1.
-      if (!syncToEdge('drift')) {
-        failedDriftSeeks++;
-        if (failedDriftSeeks >= 6) { failedDriftSeeks = 0; rebuild('drift-seek-wedged'); return; }
-      } else failedDriftSeeks = 0;
+      const sinceSeek = Date.now() - lastDriftSeekAt;
+      const runway = bufferReport().ahead;
+      // Both of these were violated on the iPhone: seeks every ~2.5 s, and
+      // seeks issued with 0.02 s of buffer ahead.
+      if (sinceSeek < cfg.minDriftSeekMs || runway < cfg.driftSeekMinBuffer) {
+        driftHeld++;
+        if (driftHeld >= cfg.driftHeldBeforeYield && targetBias < cfg.maxTargetBias) {
+          driftHeld = 0;
+          targetBias = Math.min(cfg.maxTargetBias, targetBias + 1);
+          emit('target-raised', { bias: targetBias, target: targetLatency(), latency, runway });
+        }
+        // fall through to the nudge: playbackRate is invisible, a seek is not
+        if (drift > cfg.nudgeThreshold) {
+          const r = Math.min(cfg.catchUpRate, 1 + drift / 100);
+          if (video.playbackRate !== r) video.playbackRate = r;
+        }
+      } else {
+        driftHeld = 0;
+        lastDriftSeekAt = Date.now();
+        // syncToEdge fails silently when liveSyncPosition is null or behind the
+        // playhead (stale level). A failing drift-seek must escalate, not no-op
+        // forever with playbackRate parked at 1.
+        if (!syncToEdge('drift')) {
+          failedDriftSeeks++;
+          if (failedDriftSeeks >= 6) { failedDriftSeeks = 0; rebuild('drift-seek-wedged'); return; }
+        } else failedDriftSeeks = 0;
+      }
     } else if (drift > cfg.nudgeThreshold) {
       const rate = Math.min(cfg.catchUpRate, 1 + drift / 100);
       if (video.playbackRate !== rate) video.playbackRate = rate;
     } else if (video.playbackRate !== 1) {
       video.playbackRate = 1;
     }
-    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate, buffer: bufferReport() });
+    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate, buffer: bufferReport(), targetBias });
   }
 
   function onVisibility() {
@@ -513,6 +570,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     get hls() { return hls; },
     get rebuilds() { return rebuilds; },
     get levelSwitches() { return levelSwitches; },
+    get targetBias() { return targetBias; },
     syncToEdge: () => syncToEdge('manual'),
     bufferReport,
     engineReport,
