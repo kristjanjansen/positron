@@ -73,9 +73,11 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .d-body:empty { display: none; }
 
 /* a refused play() must be visible, not a black rectangle */
+/* Outlined, not filled: this is a fallback, and a second solid yellow button
+   competes with the page's actual primary control. */
 .d-tap {
   display: block; width: 100%; margin: 0 0 10px;
-  color: #0b0e14; background: var(--hi); border-color: var(--hi);
+  color: var(--hi); background: transparent; border-color: var(--hi);
   font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
 

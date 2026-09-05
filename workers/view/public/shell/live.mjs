@@ -85,6 +85,34 @@ export async function waitForWhip({ timeoutMs = 90000, onTick } = {}) {
 }
 
 /** Poll the manifest until Cloudflare is actually serving it (204 -> 200). */
+/**
+ * Does the media playlist actually carry segments yet?
+ *
+ * Cloudflare serves the MASTER manifest with HTTP 200 as soon as ingest
+ * starts — before the child playlist has a single #EXTINF. Starting the
+ * player then makes it request fragments that do not exist: measured on an
+ * iPhone as a continuous fragLoadError flood (loaded=0, total=0) with
+ * rebuilds every 2-6 s for the best part of a minute, ending in playback
+ * once the pipeline finally filled. "A long time with stalls, then finally
+ * good playback" was this, not the encoder and not the latency target.
+ *
+ * Two segments, not one: one is a single GOP with nothing behind it, so the
+ * player arrives at the live edge with nothing to decode into.
+ */
+async function segmentsReady(signal, want = 2) {
+  const top = await fetch(llhls(), { cache: 'no-store', signal });
+  if (top.status !== 200) return { ok: false, status: top.status };
+  const text = await top.text();
+  const rel = text.split('\n').find((x) => x.trim() && !x.startsWith('#'));
+  if (!rel) return { ok: false, status: 'no variants' };
+  const media = new URL(rel.trim(), top.url || llhls()).toString();
+  const child = await fetch(media, { cache: 'no-store', signal });
+  if (child.status !== 200) return { ok: false, status: `child ${child.status}` };
+  const body = await child.text();
+  const segs = (body.match(/^#EXTINF:/gm) || []).length;
+  return { ok: segs >= want, status: `${segs} segment(s)`, segs };
+}
+
 export async function waitForManifest({ timeoutMs = 90000, onTick } = {}) {
   const t0 = Date.now();
   // Tie the poll to the page. Without this the loop kept fetching after
@@ -95,8 +123,11 @@ export async function waitForManifest({ timeoutMs = 90000, onTick } = {}) {
   addEventListener('pagehide', stop, { once: true });
   for (let i = 0; Date.now() - t0 < timeoutMs && !ac.signal.aborted; i++) {
     try {
-      const r = await fetch(llhls(), { cache: 'no-store', signal: ac.signal });
-      if (r.status === 200) { removeEventListener('pagehide', stop); return { ok: true, waitedMs: Date.now() - t0 }; }
+      const r = await segmentsReady(ac.signal);
+      if (r.ok) {
+        removeEventListener('pagehide', stop);
+        return { ok: true, waitedMs: Date.now() - t0, segs: r.segs };
+      }
       onTick?.({ status: r.status, waitedMs: Date.now() - t0 });
     } catch (e) {
       if (ac.signal.aborted) return { ok: false, aborted: true, waitedMs: Date.now() - t0 };

@@ -57,9 +57,17 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720 }) {
   ].join(':');
   return [
     '-hide_banner', '-loglevel', 'warning',
-    '-re',
-    '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
-    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+    // -re IS A PER-INPUT OPTION. It was on the video only, so lavfi's sine was
+    // read unpaced and ffmpeg raced audio ahead of video into the muxer queue —
+    // on a demuxed LL-HLS stream that is exactly what makes audio and video
+    // ranges stop overlapping at the client, and video.buffered on a
+    // MediaSource is their INTERSECTION. The WHIP leg below always had it on
+    // both, and so does src/publish.sh; only this leg was wrong.
+    //
+    // The container-vs-local A/B could not have caught this: the local arm was
+    // given these same args, so both sides shared the defect.
+    '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
+    '-re', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
     '-vf', draw,
     '-c:v', 'libx264', '-preset', 'veryfast', '-tune', 'zerolatency',
     '-profile:v', 'main', '-pix_fmt', 'yuv420p',

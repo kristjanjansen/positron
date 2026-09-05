@@ -5,6 +5,9 @@
 //                                      publish; last one out stops it.
 //   GET  /status                       viewers + container + ffmpeg state
 //   POST /start /stop                  manual override (debugging)
+//   POST /log                          a device reports what it saw
+//   GET  /logs[?format=text]           read those reports back
+//   POST /logs/clear                   drop them
 //
 // WHY REFERENCE COUNTING AND NOT sleepAfter ALONE: the Container base class
 // sleeps on REQUEST idleness, and ffmpeg publishing generates no incoming
@@ -17,6 +20,8 @@ import { Container, getContainer } from '@cloudflare/containers';
 const SWEEP_MS = 30_000;   // alarm cadence
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
 const NAME = 'p1';
+const LOG_KEEP = 400;          // ring buffer of device reports
+const LOG_MAX_BODY = 2000;     // one report cannot flood the rest out
 
 export class Pub extends Container {
   defaultPort = 8080;
@@ -24,6 +29,8 @@ export class Pub extends Container {
   sleepAfter = '10m';
 
   #idleTicks = 0;
+  /** Ring buffer of device reports. Diagnostic; dies with the DO. */
+  #log = [];
 
   async fetch(request) {
     const url = new URL(request.url);
@@ -62,6 +69,46 @@ export class Pub extends Container {
         sweepMs: SWEEP_MS,
         container,
       });
+    }
+
+    // ── a device reporting what it actually saw ────────────────────────────
+    // A phone cannot be attached to a debugger from here, and the numbers that
+    // matter (buffer length, hole seeks) are only observable on the device. So
+    // the page posts them and this holds a ring buffer. Diagnostic only: no
+    // secrets, capped hard, dropped when the DO goes away.
+    if (url.pathname === '/log' && request.method === 'POST') {
+      const body = (await request.text()).slice(0, LOG_MAX_BODY);
+      const ua = request.headers.get('user-agent') || '';
+      const ip = request.headers.get('cf-connecting-ip') || '';
+      const line = {
+        at: new Date().toISOString(),
+        // never store the address itself, only enough to group one device's
+        // lines together across posts
+        who: await shortHash(ip + ua),
+        ios: /iPhone|iPad|iPod/.test(ua),
+        body,
+      };
+      this.#log.push(line);
+      if (this.#log.length > LOG_KEEP) this.#log.splice(0, this.#log.length - LOG_KEEP);
+      return json({ ok: true, kept: this.#log.length });
+    }
+
+    if (url.pathname === '/logs') {
+      if (url.searchParams.get('format') === 'text') {
+        const txt = this.#log
+          .map((l) => `${l.at} ${l.ios ? 'iOS' : '   '} ${l.who} ${l.body}`)
+          .join('\n');
+        return new Response(txt || '(nothing reported)', {
+          headers: { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' },
+        });
+      }
+      return json({ lines: this.#log.length, log: this.#log });
+    }
+
+    if (url.pathname === '/logs/clear' && request.method === 'POST') {
+      const had = this.#log.length;
+      this.#log = [];
+      return json({ ok: true, cleared: had });
     }
 
     if (url.pathname === '/start' && request.method === 'POST') {
@@ -152,6 +199,14 @@ export class Pub extends Container {
   }
   async webSocketError() {}
   async webSocketMessage() {}
+}
+
+// Group one device's lines without storing who it is: truncated SHA-256 of
+// ip+ua. Enough to tell two phones apart in the log, not enough to identify
+// either of them.
+async function shortHash(v) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
+  return [...new Uint8Array(d)].slice(0, 3).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 const json = (o, status = 200) =>

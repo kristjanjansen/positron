@@ -128,12 +128,21 @@
       video.videoWidth ? 'ok' : 'bad');
     d.set('paused', video.paused ? `paused rs${video.readyState}` : `playing rs${video.readyState}`,
       video.paused ? 'bad' : 'ok');
+    notePresented();
     const stats = await pc.getStats().catch(() => null);
     if (!stats) return;
     for (const s of stats.values()) {
       if (s.type === 'inbound-rtp' && s.kind === 'video') {
         if (Number.isFinite(s.framesPerSecond)) d.set('fps', s.framesPerSecond);
-
+        // Keep these: "videoWidth is 0" alone cannot tell apart "no video RTP
+        // arrived at all" from "packets arrived and the decoder produced
+        // nothing" from "frames decoded but never presented". They are three
+        // different bugs and the assert used to report all three the same way.
+        lastVideoRtp = {
+          received: s.framesReceived, decoded: s.framesDecoded, dropped: s.framesDropped,
+          packets: s.packetsReceived, bytes: s.bytesReceived, w: s.frameWidth, h: s.frameHeight,
+          decoder: s.decoderImplementation, keyframes: s.keyFramesDecoded,
+        };
       }
       if (s.type === 'candidate-pair' && s.state === 'succeeded' && Number.isFinite(s.currentRoundTripTime)) {
         d.set('rtt', s.currentRoundTripTime * 1000);
@@ -141,16 +150,49 @@
     }
   }, 1000);
 
+  /**
+   * Did the element EVER present a frame? Latched, not sampled.
+   *
+   * Two wrong versions preceded this one. Sampling videoWidth at check time
+   * is a race — the assert failed three runs, then passed when two unrelated
+   * lines were inserted ahead of it. Awaiting the frame INSIDE the check is
+   * worse: the harness stops when asserts stop growing, so a 4 s await made it
+   * tear down mid-check and four asserts silently vanished from the suite
+   * (07 went 13 -> 9 while still reporting all green).
+   *
+   * A latch is both deterministic and synchronous: `resize` is the canonical
+   * signal that videoWidth became known, and the 1 s stats interval already
+   * running below is a second chance if it is missed.
+   */
+  let framePresented = null;
+  function notePresented() {
+    if (!framePresented && video.videoWidth > 0) {
+      framePresented = `${video.videoWidth}x${video.videoHeight}`;
+    }
+  }
+  video.addEventListener('resize', notePresented);
+  video.addEventListener('loadeddata', notePresented);
+  let lastVideoRtp = null;
+
   d.on('check', () => {
     d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
     d.assert('peer connection created', !!pc);
     if (pc) {
       d.assert('peer connection connected', pc.connectionState === 'connected', pc.connectionState);
-      d.assert('a track arrived', !!video.srcObject, video.srcObject ? 'yes' : 'no');
+      const tracks = video.srcObject?.getTracks?.() || [];
+      d.assert('a track arrived', tracks.length > 0,
+        tracks.map((t) => `${t.kind}${t.muted ? ':muted' : ''}:${t.readyState}`).join(' ') || 'none');
+      d.assert('a VIDEO track arrived', tracks.some((t) => t.kind === 'video'),
+        tracks.filter((t) => t.kind === 'video').length ? 'yes' : 'audio only');
       d.assert('video is advancing', video.currentTime > 0, `${video.currentTime.toFixed(1)}s`);
       // decoding is not rendering: this is the assert the black frame failed
-      d.assert('frames are actually RENDERED', video.videoWidth > 0,
-        video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame reached the element');
+      notePresented();
+      d.assert('frames are actually RENDERED', !!framePresented,
+        framePresented
+          ? framePresented
+          : lastVideoRtp
+            ? `nothing presented — rtp says ${JSON.stringify(lastVideoRtp)}`
+            : 'nothing presented and NO inbound video rtp at all');
       d.assert('element is playing', !video.paused, video.paused ? `paused rs${video.readyState}` : 'playing');
     }
   });
