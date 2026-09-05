@@ -1,4 +1,173 @@
-# Progress log — 2026-08-25 → 09-04  (newest first)
+# Progress log — 2026-08-25 → 09-05  (newest first)
+
+## Session 9 (2026-09-05) — the iOS stutter, MoQ, Safari, and a tokenless write path (user: "See logs" → "save status to md's")
+
+**274/274 green.** 20 of 24 demos built (`08 moq` and `24 capture` new). Two new
+harnesses, because the main suite could not see either platform that mattered.
+
+### The iOS stutter: six wrong answers, then the right one
+
+The session began with "still v stuttet in ios" and cost most of a day. Worth
+recording as a sequence, because four of the six fixes were real and none of
+them was the binding constraint:
+
+| fix | real? | fixed it? |
+|---|---|---|
+| latency target inside one GOP (`liveSyncSeconds: 3.0`) | yes, arithmetically | no |
+| page playing before segments existed | **no** — it already had 3 | no |
+| drift-seek loop aborting fragment loads | yes, 16 seeks in 2 min | fewer seeks, still janky |
+| `capLevelOnFPSDrop` | enabled correctly | **inert** — needs dropped frames; the phone dropped 3 of 507 |
+| gate playback on the audio/video intersection | yes | no |
+| **prefer NATIVE HLS on WebKit** | yes | **yes** |
+
+The answer came from the user asking "why not safari using its own player?".
+`low-latency-player.js` only fell back to native when `Hls.isSupported()` was
+FALSE — a correct proxy for "iPhone" until **iOS 17.1 added
+ManagedMediaSource**, after which it returns true there and the fallback
+silently stopped firing. So the one platform with AVFoundation was being put on
+the MMS path, where Safari **closes the MediaSource** under us
+(`mediaSourceRequiresReset`, three runs running) and every buffer is dumped —
+the visible flash.
+
+The instrumentation that finally separated the hypotheses was playhead advance
+per wall second beside edge advance per wall second: `ADV=0.284 EDGE=1.025` says
+the device, not the edge. Before that it was guesswork.
+
+### What the phone taught, in order
+
+- `video.buffered` on MSE is the **intersection** of the source buffers. Desktop
+  Chrome: video `[[2.83,4.83],[8.83,21.83]]` against audio
+  `[[2.85,3.36],[8.84,16.84]]` — 0.05 s to play while video held 5 s.
+- That audio lag is the **browser's**, not ours. Measured per track at the
+  ORIGIN: first segment 2 ms apart, then `v-a = 0.00 s` over 12 samples. The
+  first A/B had measured video cadence to answer a question whose answer lived
+  in audio, and both arms shared the `-re` defect.
+- `-re` IS A PER-INPUT ffmpeg OPTION. The RTMPS leg had it on video only, so
+  lavfi's sine was read unpaced. The WHIP leg and `publish.sh` always had both.
+- `totalVideoFrames` froze at 67 across four seconds while the buffer grew to
+  5.95 s. Not slow — stopped.
+
+### Desktop Safari, driven over WebDriver (`demo/verify-safari.mjs`)
+
+`verify.mjs` speaks CDP, which Safari does not, so the whole WebKit family was
+untested — and macOS Safari is the only platform with BOTH a plain MediaSource
+and native HLS, i.e. the only place the engine choice is a judgement. Same page,
+same 40 s:
+
+| | native | hls.js |
+|---|---|---|
+| advance | **0.961x** | 0.344x |
+| latency | **5.25 s** | 7.71 s |
+| errors | **0** | 2 (`aborted` 4.7 s, `levelLoadTimeOut` 40 s) |
+| buffered | contiguous | hole `[[16,18.01],[20.01,26.5]]` |
+
+It found four bugs in one sitting, all mine — including a v13 watchdog that was
+**reloading healthy streams**, because under native HLS `currentTime` does not
+share a timeline with `seekable` (currentTime 38.42 against seekableEnd 23.5
+while playing at exactly 1.000x). It was manufacturing the fault it watched for.
+
+**The gate is `ManagedMediaSource`, not `canPlayType`.**
+`canPlayType('application/vnd.apple.mpegurl')` returns `"maybe"` in BOTH Safari
+and Chrome, so it cannot tell them apart — gating on its truthiness briefly put
+Chrome on the native path and broke five asserts.
+
+### 08 moq — built, and the blocker did not exist
+
+The manifest said "needs a MoQ publisher running on a machine" and 09 said
+"needs moq-pub in the publisher image". Both wrong: a relay cannot live in a
+Container (no inbound QUIC), and IETF `moq-pub` does not interoperate with hang
+at the catalog layer — but browser→relay→browser was already proven. No
+container, no Rust build. **p50 20.3 ms / p95 35.5 ms, n=600**, every burned row
+checksum-clean. 09 gains it as a third rung and says out loud that MoQ is
+published by the browser while the other two share the container source.
+
+### MoQ on Safari: unusable, and a reconnect does not rescue it
+
+WebTransport shipped in Safari 26.4 and reaches Cloudflare's relay in 140 ms —
+but `@moq/net` blocks Safari by user agent (`safari: '<0'`, unsatisfiable) citing
+**WebKit 319818**: the QUIC flow-control window never refills. Forced, twice,
+150 s each: **7 and 8 frames**, first stall at 20 s, and a full page reload with
+a fresh WebTransport stalled identically. The published bug report leaves the
+reconnect question open; it is answered now, negatively. Not the encoder —
+Safari does VP8 720p at 370 fps.
+
+Cloudflare's relay also has **no WebSocket listener**, so the qmux fallback has
+nothing to negotiate with.
+
+### WHEP vs MoQ, both measured browser→CF→browser with burned pixels
+
+Re-ran the WHEP rig same-day (n=17,501, 300 s): **p50 67.0 / p95 76.9 / p99
+84.1 ms**, against 73.6 ms on 2026-08-25 — reproduces within 9%.
+
+| | MoQ | WHEP |
+|---|---|---|
+| p50 | **26.2 ms** | 67.0 ms |
+| p95 | **42.4 ms** | 76.9 ms |
+| p99 | 104.8 ms | **84.1 ms** |
+| freezes | 0 | 41 (8.8 s / 300 s) |
+
+Adjusting MoQ up one vsync for the display step it omits gives ~35–42 ms, so
+**~1.6–1.9x, not the 3x** the older comparison implied. The p99 inversion is
+confirmed: WebRTC's jitter buffer costs 12 ms at the median and buys a tighter
+tail. `abs-capture-time` refused by Cloudflare again — 0 of 17,501 samples.
+
+**Correction to earlier reporting:** "WHEP rtt 25 ms" was being quoted beside
+"MoQ 20 ms" as if comparable. It is `candidate-pair` RTT, not media latency, and
+flattered WHEP by ~3x.
+
+### Stream storage: a wall, not a bill
+
+183 recordings, **559.97 of 1000** storage-minutes, every one automatic, today's
+testing alone 225.7 min — about two days from a hard cap that breaks recordings
+and therefore playback. Cleared 175 (524 min), then 5 more on request:
+**559.97 → 15.81**.
+
+What cannot be done: recording `mode: off` **also disables HLS playback** of a
+live input, and `preferLowLatency` requires `automatic`. So 06 and 09 depend on
+it and the lever is deletion, not the mode. `deleteRecordingAfterDays` has a
+minimum of 30, far too coarse for 225 min/day.
+
+Archival proven on one recording: `POST /downloads` → poll → **105.8 MB MP4,
+byte-exact in R2** (content-length matched), publicly served.
+
+### 24 capture + a tokenless write path
+
+`workers/ingest` (`ingest.positron.studio`) is the one unauthenticated write
+path, deliberately its own worker because `selfrec` gates every route on a token
+and "all of them except this one" is how auth stories get misread. The server
+mints the session id, so a client cannot pick its prefix; a segment, a session
+and an address are each capped, enforced in the DO that does the accounting.
+**All eleven caps verified firing**, and a cron sweep enforces the 6-hour TTL.
+
+`24 capture`: canvas by default, camera on request, MediaRecorder timeslice as
+the segmenter, each closed segment PUT and freed (high-water 2), then assembled
+and driven on a real `createDeck` + transport bar. Measured through the deployed
+page with `?r2=1`: 4 segments / 158 KiB up, 4 fetched back, **6.15 s on the
+deck**.
+
+### Method, the expensive part
+
+- **A green suite can mean zero coverage.** 261/261 while 06 was fatally broken
+  on iPhone — a TDZ that threw every tick and rendered nothing — because desktop
+  Chrome never enters that branch. Hence `verify-native.mjs`.
+- **Attribution before iteration.** The user asked for a deploy id in the logs;
+  it paid for itself in one round by proving a fix had loaded and not worked.
+- **Three substring-guard bugs in one day**: `BUILD` matched inside `REBUILD`,
+  `LOG_KEEP` and `#log` satisfied by the code just inserted. Each printed "ok".
+- **Verify the deploy propagated** before asking anyone to retest; the edge
+  served the previous build for seconds.
+- **Assert both modes.** Adding a uniform mode to 11 grid silently dropped it
+  from 11 asserts to 10 while still reading green.
+
+### Open
+
+- **iOS is unconfirmed since the native switch.** The user reported "seems to
+  work" on v12, then a TDZ of mine broke it, then v13/v14 added native recovery
+  and fixed three native-path bugs. Nobody has re-tested a phone since.
+- **The archival cron** needs a Stream-scoped token. `.env` holds the
+  known-exposed legacy credential; mint a fresh one rather than deploying that.
+- Still unbuilt: `20 kurenniemi`, `21 megatimeline`, `22 remixer` (pages work and
+  are linked, not re-shelled) and `23 studio` (assembly — every panel exists).
 
 ## Session 8 (2026-09-04) — positron, positron.studio, and the demo spine (user: "rename cwd to positron" → "do all")
 

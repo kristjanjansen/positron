@@ -1,6 +1,6 @@
 # positron
 
-Live at **https://positron.studio**. 19 of 23 demos built. Read `HANDOFF.md` for
+Live at **https://positron.studio**. 20 of 24 demos built, 274/274 green. Read `HANDOFF.md` for
 current state, `LESSONS.md` for why the rules below exist, `PROGRESS.md` for what
 was measured when.
 
@@ -11,6 +11,7 @@ node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
 node demo/verify.mjs 06 09               # just these
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
+node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
 
 cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
@@ -20,6 +21,7 @@ cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
 `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy`.
 
 Device logs from any phone: `https://pub.positron.studio/logs?format=text`.
+Every 06 log opens with `BUILD <sha>-<hhmmss>`, so a report can be attributed.
 Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold start
 — that is expected, not a hang.
 
@@ -125,6 +127,27 @@ to recover.
   source alternative) or `sourceopen` never fires. There is no published
   low-latency guidance for MMS — native HLS is the documented low-latency path
   on WebKit, which is why the player prefers it there.
+
+- **Stream recording cannot be turned off.** `mode: off` also disables HLS
+  playback of a live input, and `preferLowLatency` requires `automatic`, so 06
+  and 09 depend on it. Storage is bounded by DELETING recordings; the account
+  cap is 1000 storage-minutes and testing adds ~225/day.
+  `deleteRecordingAfterDays` minimum is 30 — too coarse to help.
+- **`ingest.positron.studio` is the only tokenless write path.** Server-minted
+  session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
+  with a cron sweep. `selfrec` stays token-gated; keep the two separate.
+- **MediaRecorder output reports `duration: Infinity`**, which leaves a
+  transport bar with no range to scrub. Seek far past the end, let the browser
+  resolve the duration, then come back.
+- **`candidate-pair` RTT is not media latency.** Quoting WHEP's 25 ms RTT
+  beside MoQ's 20 ms glass-to-glass flattered WHEP by ~3x. Measured the same
+  way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
+
+## Assert both modes, and watch the assert COUNT
+
+A demo that branches must assert every branch on every run. Adding a uniform
+mode to 11 grid silently dropped it from 11 asserts to 10 while still reading
+green. Diff per-demo counts against the last known total after any change.
 
 ## Conventions
 
