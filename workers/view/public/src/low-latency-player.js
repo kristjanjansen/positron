@@ -33,6 +33,15 @@
  *   no stream yet      -> rebuild on a steady cadence until it exists
  *   tab became visible -> seek to live edge (hidden tabs always come back stale)
  *
+ * v14: three fixes to the native path, all found by driving DESKTOP SAFARI
+ * over WebDriver (demo/verify-safari.mjs) — a browser the CDP harness cannot
+ * reach at all. Native HLS plays at exactly 1.000x sustained; what looked
+ * like 0.29x was the aftermath of v13's own source watchdog reloading a
+ * healthy stream, because under native HLS currentTime does not share a
+ * timeline with seekable. The watchdog now needs BOTH frozen, telemetry no
+ * longer hides behind getStartDate(), and bufferReport says null rather
+ * than 0 when it cannot tell.
+ *
  * v12: PREFER NATIVE HLS ON IPHONE. The old check only fell back to native
  * when hls.js was UNSUPPORTED, which was a correct proxy for "iPhone" until
  * iOS 17.1 added ManagedMediaSource — after which Hls.isSupported() returns
@@ -239,8 +248,42 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // MediaSource and no native HLS.
   const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
   const onlyManagedMse = typeof self !== 'undefined' && !self.MediaSource && !!self.ManagedMediaSource;
+  // ANY browser with native HLS, not just iPhone. The first version of this
+  // required onlyManagedMse, which excluded macOS Safari because it has a plain
+  // MediaSource too — on the theory that hls.js is worth having wherever it
+  // works, for the level capping and latency control.
+  //
+  // Measured on desktop Safari 26.6.2 over WebDriver, same page, same 40 s:
+  //
+  //             native      hls.js
+  //   advance    0.961x      0.344x
+  //   latency    5.25 s      7.71 s
+  //   errors     0           2 (aborted at 4.7 s, levelLoadTimeOut at 40 s)
+  //   buffered   contiguous  hole [[16,18.01],[20.01,26.5]]
+  //
+  // The hls.js log also showed "resynced to the live edge" at 4741 ms and
+  // "aborted" at 4751 ms — the drift-seek killing its own fragment loads, 10 ms
+  // apart. Control we cannot use well is worth less than a player that works,
+  // so WebKit gets AVFoundation. Chrome and Firefox have no native HLS, so this
+  // leaves them on hls.js without needing a browser check.
+  // THE GATE IS ManagedMediaSource, not canPlayType.
+  //
+  // canPlayType('application/vnd.apple.mpegurl') returns "maybe" in BOTH Safari
+  // and Chrome (measured on both, 2026-09-05) — so it cannot tell them apart at
+  // all, and using its truthiness put Chrome on the native path, where it cannot
+  // play HLS and the whole suite broke. ManagedMediaSource is WebKit-only:
+  //
+  //                      ManagedMediaSource   MediaSource
+  //   Safari macOS              true             true
+  //   Safari iOS                true             false
+  //   Chrome                    false            true
+  //
+  // So it is a capability test for "Apple's media stack is here", which is
+  // exactly the thing worth preferring, with no brand sniffing. Safari older
+  // than 17.1 has no MMS and keeps hls.js — the previous behaviour.
+  const webkitMedia = typeof self !== 'undefined' && !!self.ManagedMediaSource;
   const useNative = cfg.preferNative === true
-    || (cfg.preferNative === 'auto' && nativeHls && onlyManagedMse);
+    || (cfg.preferNative === 'auto' && webkitMedia);
 
   const Hls = window.Hls;
   if (!Hls?.isSupported()) throw new Error('HLS is not supported in this browser');
@@ -256,6 +299,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // never takes that branch. State both branches share must be declared before
   // either branch can return.
   let advEma = null, edgeEma = null, lastAdvT = 0, lastAdvCt = -1, lastEdgeV = -1;
+  let advRefT = 0, advRefCt = -1, edgeRefT = 0, edgeRefV = -1;
   let rebuildTimer = null;
   let rebuilds = 0;
   let consecutiveFailures = 0;   // rebuilds since last successfully buffered frag
@@ -349,6 +393,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       gatedBySafari: mms && !(typeof self !== 'undefined' && self.MediaSource),
       hls: window.Hls?.version || null,
       player: useNative ? 'native' : 'hls.js',
+      webkitMedia,
     };
   }
 
@@ -508,6 +553,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     // A reload is the only lever native HLS gives us, so use it — rate limited,
     // because a reload storm is worse than a stall.
     let nativeLastEdge = -1;
+    let nativeLastCt = -1;
+    let nativeCtMoved = Date.now();
     let nativeEdgeMoved = Date.now();
     let nativeReloads = 0;
     let lastReloadAt = 0;
@@ -542,24 +589,41 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       if (destroyed) return;
       const rates = measureRates();
 
-      // Source watchdog. The edge freezing means the broadcast died or the UID
-      // changed underneath us; neither recovers on its own here.
+      // Source watchdog — and it needs BOTH signals frozen, not one.
+      //
+      // Measured in desktop Safari over WebDriver: under native HLS,
+      // currentTime does NOT share a timeline with seekable the way it does
+      // under MSE. A healthy stream showed currentTime 38.42 against
+      // seekableEnd 23.5, so an edge-only check declared the source dead and
+      // reloaded a stream that was playing at exactly 1.000x — and the reload
+      // is what then produced the misaligned, apparently-stalled state. The
+      // watchdog was manufacturing the fault it was watching for.
+      //
+      // If the playhead is advancing, the source is alive by definition.
       const edge = seekableEnd();
       if (edge != null && edge > nativeLastEdge + 0.01) { nativeLastEdge = edge; nativeEdgeMoved = Date.now(); }
-      if (nativeLastEdge > 0 && Date.now() - nativeEdgeMoved > cfg.sourceStallTimeout) {
+      const ctMoving = video.currentTime > nativeLastCt + 0.01;
+      if (ctMoving) { nativeLastCt = video.currentTime; nativeCtMoved = Date.now(); }
+      if (nativeLastEdge > 0
+          && Date.now() - nativeEdgeMoved > cfg.sourceStallTimeout
+          && Date.now() - nativeCtMoved > cfg.sourceStallTimeout) {
         emit('stall', { kind: 'source', frozenMs: Date.now() - nativeEdgeMoved, player: 'native' });
         nativeEdgeMoved = Date.now();
         nativeReload('source-stall');
         return;
       }
 
+      // NOT gated behind latency. getStartDate() can be unavailable for a while,
+      // and the first Safari run reported an entirely empty readout for 45 s
+      // because every field sat behind it — exactly when the numbers were most
+      // wanted. Latency is allowed to be null; everything else still reports.
       const latency = nativeLatency();
-      if (latency == null) return;
       // No target to chase: AVFoundation runs its own catch-up against the
       // manifest's PART-HOLD-BACK, which is Apple's own spec. Report what it
       // achieves rather than pretending we steer it.
       emit('latency', {
-        latency, target: cfg.fallbackTarget, drift: latency - cfg.fallbackTarget,
+        latency, target: cfg.fallbackTarget,
+        drift: latency == null ? null : latency - cfg.fallbackTarget,
         pdtLatency: latency, playbackRate: video.playbackRate,
         buffer: bufferReport(), targetBias: 0, rates,
       });
@@ -648,7 +712,13 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     for (let i = 0; i < b.length; i++) {
       if (b.start(i) <= t + 0.1 && b.end(i) > t) { ahead = b.end(i) - t; break; }
     }
-    const rep = { ahead: +ahead.toFixed(2), ranges: fmt(b) };
+    // NULL, not 0, when the playhead sits outside every buffered range. Under
+    // native HLS that is normal rather than starvation — Safari reported
+    // currentTime 38.42 against buffered [[18,25]] on a stream playing at
+    // 1.000x — and reporting 0 there reads as "starved" and drives the wrong
+    // decisions. 0 means measured-and-empty; null means cannot tell.
+    const inRange = ahead > 0;
+    const rep = { ahead: inRange ? +ahead.toFixed(2) : null, ranges: fmt(b) };
     // hls.js keeps the per-type buffers here. Undocumented, so guarded.
     try {
       const tracks = hls?.bufferController?.tracks;
@@ -687,12 +757,36 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       if (dt > 0.2) {
         if (lastAdvCt >= 0 && !video.paused) {
           const r = (ct - lastAdvCt) / dt;
-          // ignore seeks: a jump is not a playback rate
-          if (r >= -0.1 && r < 3) advEma = advEma == null ? r : advEma * 0.7 + r * 0.3;
+          // A LONG BASELINE, not an EMA.
+          //
+          // The EMA was seeded while currentTime was still 0 (before play) and
+          // then crawled toward the truth: it read 0.624 on desktop Safari at
+          // t=35 s while a direct two-point measurement of the same player gave
+          // 1.000 sustained. An exponential average of a quantity with a long
+          // startup transient is mostly a report on the transient.
+          //
+          // So measure against a reference point instead, and move the reference
+          // only when the playhead jumps (a seek is not a playback rate) or when
+          // the baseline gets stale.
+          if (r < -0.1 || r >= 3) {
+            advRefT = now; advRefCt = ct;          // a jump: restart the baseline
+          } else if (advRefT === 0) {
+            advRefT = now; advRefCt = ct;
+          } else {
+            const span = (now - advRefT) / 1000;
+            if (span > 1) advEma = (ct - advRefCt) / span;
+            if (span > 30) { advRefT = now; advRefCt = ct; }   // keep it fresh
+          }
         }
         if (lastEdgeV >= 0 && edge != null) {
           const e = (edge - lastEdgeV) / dt;
-          if (e >= -0.1 && e < 3) edgeEma = edgeEma == null ? e : edgeEma * 0.7 + e * 0.3;
+          if (e < -0.1 || e >= 3) { edgeRefT = now; edgeRefV = edge; }
+          else if (edgeRefT === 0) { edgeRefT = now; edgeRefV = edge; }
+          else {
+            const span = (now - edgeRefT) / 1000;
+            if (span > 1) edgeEma = (edge - edgeRefV) / span;
+            if (span > 30) { edgeRefT = now; edgeRefV = edge; }
+          }
         }
         lastAdvT = now; lastAdvCt = ct; lastEdgeV = edge ?? -1;
       }
@@ -716,7 +810,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     const t0 = Date.now();
     const attempt = () => {
       if (destroyed) return;
-      const ahead = bufferReport().ahead;
+      const ahead = bufferReport().ahead ?? 0;
       const waited = Date.now() - t0;
       if (ahead >= cfg.startBuffer || waited > cfg.startBufferTimeoutMs) {
         emit('start', { ahead: +ahead.toFixed(2), waitedMs: waited, forced: ahead < cfg.startBuffer });
@@ -819,7 +913,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         const rep = bufferReport();
         const vr = rep.tracks?.video;
         const vEnd = vr?.length ? vr[vr.length - 1][1] : null;
-        if (vEnd != null && vEnd > video.currentTime + 2 && rep.ahead < 0.5
+        if (vEnd != null && vEnd > video.currentTime + 2 && (rep.ahead ?? 0) < 0.5
             && audioLagWaits < cfg.audioLagTicks) {
           audioLagWaits++;
           emit('audio-lag', { videoAhead: +(vEnd - video.currentTime).toFixed(2),
@@ -857,7 +951,10 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     const rates = measureRates();
     // A resync jumps currentTime, so the EMA needs a moment to be meaningful
     // again; only judge when the buffer is healthy and we are actually playing.
-    if (rates.advance != null && !video.paused && bufferReport().ahead > 2) {
+    // ?? 0 is explicit rather than relying on `null > 2` being false: ahead is
+    // null when the playhead sits outside every range, and "cannot tell" must
+    // not be read as "plenty buffered".
+    if (rates.advance != null && !video.paused && (bufferReport().ahead ?? 0) > 2) {
       if (rates.advance < cfg.advanceFloor) slowTicks++;
       else slowTicks = Math.max(0, slowTicks - 1);
       if (slowTicks >= cfg.advanceTicksBeforeCap && hls?.levels?.length > 1) {
@@ -890,7 +987,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
     if (drift > cfg.seekThreshold || pdtDrift) {
       const sinceSeek = Date.now() - lastDriftSeekAt;
-      const runway = bufferReport().ahead;
+      const runway = bufferReport().ahead ?? 0;
       // Both of these were violated on the iPhone: seeks every ~2.5 s, and
       // seeks issued with 0.02 s of buffer ahead.
       if (sinceSeek < cfg.minDriftSeekMs || runway < cfg.driftSeekMinBuffer) {

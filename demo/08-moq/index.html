@@ -15,7 +15,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { startMoq, MOQ_RELAY } from '/shell/moq.mjs';
+  import { startMoq, MOQ_RELAY, moqSupport } from '/shell/moq.mjs';
 
   const q = new URLSearchParams(location.search);
   // loopback publishes AND subscribes one namespace, so a single device measures
@@ -43,10 +43,19 @@
   const out = el('canvas');
   d.el.append(out);
 
+  // Checked BEFORE the button does anything. Safari has no WebTransport and
+  // the relay refuses WebSocket, so there is nothing to attempt — say that
+  // instead of showing a black rectangle and a raw library error.
+  const support = moqSupport();
+
   let leg = null, lastDecoded = 0;
 
   d.on('go', async () => {
     if (leg) return;
+    if (!support.ok) {
+      d.log(`MoQ needs WebTransport — ${support.why}. Try Chrome or Edge.`, 'bad');
+      return;
+    }
     d.log(`relay ${new URL(MOQ_RELAY).host} — role ${role}, namespace ${ns}`);
     leg = await startMoq({ out, ns, role, log: (m, k) => d.log(m, k) });
     pill.dataset.on = '1';
@@ -65,6 +74,13 @@
   });
 
   d.on('check', () => {
+    // On a browser without WebTransport the honest assertion is that the page
+    // DETECTED that, not that a connection exists.
+    if (!support.ok) {
+      d.assert('correctly reports that MoQ cannot run here', !!support.why, support.why);
+      d.assert('no transport was attempted', !leg);
+      return;
+    }
     d.assert('connected to the relay', !!leg);
     if (!leg) return;
     const s = leg.stats;
@@ -92,6 +108,7 @@
     }
   });
 
+  if (!support.ok) d.log(`${support.why} — this demo needs Chrome or Edge`, 'bad');
   d.log(role === 'loopback'
     ? 'loopback: one page publishes and subscribes the same namespace, so one clock times the whole path'
     : `role ${role} — pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);

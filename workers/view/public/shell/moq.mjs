@@ -24,6 +24,34 @@ import { Connection, Path, Broadcast, Container } from '/08-moq/moq-vendor.js';
 export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
 
 /**
+ * Can this browser reach the relay at all?
+ *
+ * MoQ needs WebTransport, and SAFARI DOES NOT HAVE IT (checked on iOS 18.7 /
+ * Safari 26.6: the page failed with "no transport available; WebTransport not
+ * supported and WebSocket is disabled").
+ *
+ * @moq/net does carry a WebSocket fallback, mapping https:->wss: on the same
+ * host with the qmux-02/01/00 subprotocols. It cannot help here: Cloudflare
+ * draft-14 refuses a WebSocket handshake outright — measured 2026-09-05, all
+ * three subprotocols AND no subprotocol, four failures out of four. So the
+ * fallback stays disabled deliberately, and the honest answer on Safari is
+ * "not available here" rather than a black rectangle and a red error.
+ */
+export function moqSupport() {
+  const wt = typeof self !== 'undefined' && typeof self.WebTransport !== 'undefined';
+  const codecs = typeof self !== 'undefined' && typeof self.VideoEncoder !== 'undefined'
+    && typeof self.VideoDecoder !== 'undefined';
+  return {
+    ok: wt && codecs,
+    webTransport: wt,
+    webCodecs: codecs,
+    why: !wt ? 'this browser has no WebTransport (Safari does not support it yet)'
+      : !codecs ? 'this browser has no WebCodecs'
+      : null,
+  };
+}
+
+/**
  * Burned-row geometry, byte-identical to rig/whep/publish.html.
  *
  * That identity is the whole point: the same 48-bit millisecond clock plus
