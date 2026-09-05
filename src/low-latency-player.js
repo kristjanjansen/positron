@@ -220,6 +220,19 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     rebuildTimer = setTimeout(() => { rebuildTimer = null; rebuild(why); }, delay);
   }
 
+  /** Which MediaSource implementation is live, and does Safari gate loading? */
+  function engineReport() {
+    const mms = typeof self !== 'undefined' && !!self.ManagedMediaSource;
+    return {
+      managedMediaSource: mms,
+      plainMediaSource: typeof self !== 'undefined' && !!self.MediaSource,
+      // no MediaSource + ManagedMediaSource present == iPhone Safari 17.1+,
+      // where Safari decides when we may load at all
+      gatedBySafari: mms && !(typeof self !== 'undefined' && self.MediaSource),
+      hls: window.Hls?.version || null,
+    };
+  }
+
   function boot() {
     hls = new Hls({
       lowLatencyMode: true,
@@ -248,6 +261,11 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     });
 
     let mediaRecoveries = 0;
+    // NOT emitted synchronously: boot() runs inside createLowLatencyPlayer,
+    // before the caller has had a chance to chain .on(), so a synchronous
+    // emit reaches nobody. The iOS report came back with no ENGINE line at
+    // all and that was this bug, not a device signal.
+    if (rebuilds === 0) setTimeout(() => emit('engine', engineReport()), 0);
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
       // Dimensions live in the master manifest (#EXT-X-STREAM-INF RESOLUTION):
@@ -326,6 +344,44 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     return true;
   }
 
+  /**
+   * What is actually buffered, and per source buffer.
+   *
+   * video.buffered on a MediaSource is the INTERSECTION of every source
+   * buffer, so a demuxed stream (this one carries a separate AUDIO group)
+   * reports len 0 the moment audio and video ranges stop overlapping — even
+   * with both tracks holding seconds of data. Measured on an iPhone:
+   * bufferStalledError with bufferInfo.len 0 while sitting 7.15 s behind the
+   * live edge, i.e. content was available and not landing contiguously.
+   * Reporting the tracks SEPARATELY is what tells those two cases apart.
+   */
+  function bufferReport() {
+    const fmt = (tr) => {
+      const out = [];
+      for (let i = 0; i < tr.length; i++) out.push([+tr.start(i).toFixed(2), +tr.end(i).toFixed(2)]);
+      return out;
+    };
+    const t = video.currentTime;
+    const b = video.buffered;
+    let ahead = 0;
+    for (let i = 0; i < b.length; i++) {
+      if (b.start(i) <= t + 0.1 && b.end(i) > t) { ahead = b.end(i) - t; break; }
+    }
+    const rep = { ahead: +ahead.toFixed(2), ranges: fmt(b) };
+    // hls.js keeps the per-type buffers here. Undocumented, so guarded.
+    try {
+      const tracks = hls?.bufferController?.tracks;
+      if (tracks) {
+        rep.tracks = {};
+        for (const k of Object.keys(tracks)) {
+          const buf = tracks[k]?.buffer;
+          if (buf?.buffered) rep.tracks[k] = fmt(buf.buffered);
+        }
+      }
+    } catch { /* internals moved; the intersection above still stands */ }
+    return rep;
+  }
+
   function seekableEnd() {
     return video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
   }
@@ -339,7 +395,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     const edge = seekableEnd();
     if (edge != null && edge > lastEdge + 0.01) { lastEdge = edge; lastEdgeMove = Date.now(); }
     if (everPlayed && Date.now() - lastEdgeMove > cfg.sourceStallTimeout) {
-      emit('stall', { kind: 'source', frozenMs: Date.now() - lastEdgeMove });
+      emit('stall', { kind: 'source', frozenMs: Date.now() - lastEdgeMove, buffer: bufferReport() });
       rebuild('source-stall');
       return;
     }
@@ -381,7 +437,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       if (Date.now() - lastAdvance > cfg.stallTimeout) {
         lastAdvance = Date.now();
         failedSeeks++;
-        emit('stall', { kind: 'starved', attempt: failedSeeks });
+        emit('stall', { kind: 'starved', attempt: failedSeeks, buffer: bufferReport() });
         // Nothing buffered ahead to skip to: seek to the live edge; escalate
         // to a rebuild if that keeps failing or starvation repeats.
         if (failedSeeks > cfg.seeksBeforeReload || !syncToEdge('starved')) rebuild('starved');
@@ -399,7 +455,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     } else if (Date.now() - lastAdvance > cfg.stallTimeout) {
       lastAdvance = Date.now();
       failedSeeks++;
-      emit('stall', { kind: 'player', frozenMs: cfg.stallTimeout, attempt: failedSeeks });
+      emit('stall', { kind: 'player', frozenMs: cfg.stallTimeout, attempt: failedSeeks, buffer: bufferReport() });
       if (failedSeeks > cfg.seeksBeforeReload || !syncToEdge('stall')) rebuild('player-stall');
       return;
     }
@@ -433,7 +489,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     } else if (video.playbackRate !== 1) {
       video.playbackRate = 1;
     }
-    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate });
+    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate, buffer: bufferReport() });
   }
 
   function onVisibility() {
@@ -458,6 +514,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     get rebuilds() { return rebuilds; },
     get levelSwitches() { return levelSwitches; },
     syncToEdge: () => syncToEdge('manual'),
+    bufferReport,
+    engineReport,
     on,
     destroy() {
       destroyed = true;

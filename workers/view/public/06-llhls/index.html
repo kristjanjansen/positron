@@ -23,7 +23,7 @@
     n: '06',
     name: 'llhls',
     what: 'The tuned low-latency player against a live input. Opening this page is what starts the stream.',
-    readout: { latency: 's', target: 's', rate: '×', stalls: '', switches: '' },
+    readout: { latency: 's', target: 's', rate: '×', buffer: 's', holes: '', stalls: '', switches: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -39,7 +39,38 @@
   video.muted = true;
   d.el.append(video);
 
-  let player = null, ws = null, stalls = 0, rebuilds = 0, resyncs = 0, last = null;
+  // ── report what this device sees ────────────────────────────────────────
+  // A phone cannot be attached to a debugger from here, so it posts instead.
+  // Batched and fire-and-forget: diagnostics must never be able to make the
+  // page worse than the problem being diagnosed.
+  const pending = [];
+  let shipTimer = null;
+  let shipTick = 0;
+  let lastShipped = '';
+  let repeat = 0;
+  function ship(line) {
+    // The phone emitted the SAME fragLoadError ~30x in one run, which pushed
+    // everything useful out of the ring buffer. Collapse repeats.
+    const key = line.replace(/^[\d.]+ /, '').slice(0, 60);
+    if (key === lastShipped) { repeat++; return; }
+    if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; }
+    lastShipped = key;
+    pending.push(`${(performance.now() / 1000).toFixed(2)} ${line}`);
+    if (shipTimer) return;
+    shipTimer = setTimeout(async () => {
+      shipTimer = null;
+      const batch = pending.splice(0, pending.length).join('\n');
+      if (!batch) return;
+      try {
+        await fetch('https://pub.positron.studio/log', {
+          method: 'POST', body: batch, keepalive: true,
+          headers: { 'content-type': 'text/plain' },
+        });
+      } catch { /* diagnostics are never load-bearing */ }
+    }, 2000);
+  }
+
+  let player = null, ws = null, stalls = 0, rebuilds = 0, resyncs = 0, holes = 0, last = null;
 
   d.on('go', async () => {
     if (player) return;
@@ -60,32 +91,69 @@
       onTick: ({ status, waitedMs }) => d.log(`manifest ${status} at ${(waitedMs / 1000).toFixed(0)}s`),
     });
     if (!w.ok) { d.log(`manifest never came up in ${(w.waitedMs / 1000).toFixed(0)}s`, 'bad'); return; }
-    d.log(`manifest live after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
+    d.log(`stream ready after ${(w.waitedMs / 1000).toFixed(1)}s (${w.segs} segments)`, 'hi');
+    ship(`READY after ${(w.waitedMs / 1000).toFixed(1)}s with ${w.segs} segments`);
 
     // THE PLAYER IS src/low-latency-player.js, unchanged — the v6 that fixed
     // the 26 s park. This demo is not a reimplementation of it; it is the
     // measured artefact with a readout attached.
     player = createLowLatencyPlayer(video, llhls())
-      .on('latency', ({ latency, target, playbackRate }) => {
+      .on('latency', ({ latency, target, playbackRate, buffer }) => {
         // A stream that came up 30 s ago legitimately stalls while Cloudflare's
         // LL-HLS pipeline fills; the v6 watchdog rebuilding then is it WORKING.
         // So the counters start at the first good sample and the assert is
         // about staying stable once playing, not about a clean startup.
         if (!last) { stalls = 0; rebuilds = 0; resyncs = 0; d.log('playing — stability counters start here', 'hi'); }
-        last = { latency, target, playbackRate };
+        last = { latency, target, playbackRate, buffer };
         d.set('latency', latency, latency <= target + 0.5 ? 'ok' : latency <= target + 2 ? '' : 'bad');
         d.set('target', target);
         d.set('rate', playbackRate);
+        // the buffer is the number the iPhone was missing: it reported
+        // bufferInfo.len 0 while sitting 7 s behind the edge
+        const bt = last.buffer;
+        if (bt) d.set('buffer', bt.ahead, bt.ahead > 1.5 ? 'ok' : bt.ahead > 0.5 ? '' : 'bad');
+        if (++shipTick % 8 === 0) {   // ~1 line per 4 s
+          ship(`lat=${latency.toFixed(2)} tgt=${target} rate=${playbackRate.toFixed(2)} `
+            + `buf=${bt ? bt.ahead : '?'} ranges=${bt ? JSON.stringify(bt.ranges) : '?'} `
+            + `tracks=${bt?.tracks ? JSON.stringify(bt.tracks) : '?'}`);
+        }
       })
-      .on('stall', (x) => { stalls++; d.set('stalls', stalls); d.log(`stall ${JSON.stringify(x).slice(0, 90)}`, 'bad'); })
-      .on('rebuild', () => { rebuilds++; d.log('instance rebuilt (source-stall watchdog)', 'bad'); })
-      .on('resync', () => { resyncs++; d.log('resynced to the live edge'); })
-      .on('error', (e) => d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad'))
+      .on('stall', (x) => {
+        stalls++; d.set('stalls', stalls);
+        d.log(`stall ${JSON.stringify(x).slice(0, 90)}`, 'bad');
+        ship(`STALL ${JSON.stringify(x)}`);
+      })
+      .on('rebuild', ({ why }) => { rebuilds++; d.log('instance rebuilt (source-stall watchdog)', 'bad'); ship(`REBUILD ${why}`); })
+      .on('resync', ({ reason, to }) => { resyncs++; d.log('resynced to the live edge'); ship(`RESYNC ${reason} -> ${to?.toFixed?.(2)}`); })
+      .on('error', (e) => {
+        // bufferSeekOverHole / bufferStalledError are the iPhone's actual
+        // complaint; count them separately from everything else
+        const det = e?.details || '';
+        if (det === 'bufferSeekOverHole' || det === 'bufferStalledError') d.set('holes', ++holes, 'bad');
+        d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad');
+        // A blind JSON.stringify().slice(300) cut off response.code — the one
+        // field that says WHY a fragment load failed. Name the fields instead.
+        const parts = [`ERR ${det || e?.type || 'unknown'}`];
+        if (e?.response) parts.push(`http=${e.response.code ?? '?'} ${String(e.response.text ?? '').slice(0, 60)}`);
+        const u = e?.frag?.url || e?.frag?.relurl || e?.url || e?.context?.url;
+        // strip Cloudflare's signature blob: it is 400 chars of noise here
+        if (u) parts.push(`url=${String(u).split('?')[0].slice(-72)}`);
+        if (e?.frag) parts.push(`sn=${e.frag.sn} part=${e.frag.part ?? '-'} type=${e.frag.type}`);
+        if (e?.loader?.stats) parts.push(`loaded=${e.loader.stats.loaded}`);
+        if (e?.error?.message) parts.push(`msg=${String(e.error.message).slice(0, 80)}`);
+        if (e?.fatal) parts.push('FATAL');
+        ship(parts.join(' '));
+      })
       .on('level', ({ switches, width, height }) => {
         // Every switch has to wait for the next INDEPENDENT part — once per
         // 2.0 s — so churn here is visible as jank even with a healthy feed.
         d.set('switches', switches);
         d.log(`level -> ${width}x${height}`);
+        ship(`LEVEL ${width}x${height} (switch ${switches})`);
+      })
+      .on('engine', (x) => {
+        d.log(`engine ${x.gatedBySafari ? 'ManagedMediaSource (Safari gates loading)' : x.managedMediaSource ? 'MMS available' : 'MediaSource'}`);
+        ship(`ENGINE ${JSON.stringify(x)} ua=${navigator.userAgent}`);
       })
       .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
 

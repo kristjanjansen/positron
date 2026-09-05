@@ -178,9 +178,23 @@ export function armVideo(v) {
  * Play, or ask. A refused play() must never leave a black rectangle with no
  * explanation — that is indistinguishable from a broken stream.
  */
+/**
+ * Play, and offer a tap ONLY if the browser refused for policy reasons.
+ *
+ * It used to prompt on any rejection, which produced a second full-width
+ * yellow button competing with the page's own primary control — and worse, a
+ * button that could not work: the measured iOS failure rejected play() for
+ * having no data, and no amount of tapping conjures a fragment. Only
+ * NotAllowedError is a permission problem. Everything else is the player's
+ * job and its watchdogs are already on it.
+ */
 export async function playOrPrompt(v, d) {
   try { await v.play(); return true; } catch (e) {
-    d?.log(`play refused (${e.name}) — tap the picture`, "bad");
+    if (e.name !== "NotAllowedError") {
+      d?.log(`play failed (${e.name}) — not a permission problem, leaving it to the player`, "bad");
+      return false;
+    }
+    d?.log("autoplay refused — tap to start", "bad");
     const tap = el("button", "d-tap", "tap to play");
     tap.type = "button";
     const go = async () => {
