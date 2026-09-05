@@ -68,6 +68,7 @@ await S('Page.enable'); await S('Runtime.enable'); await S('Log.enable'); await 
 let errors = [];
 let failedReqs = [];
 let abortedReqs = [];
+let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Runtime.exceptionThrown') {
@@ -77,7 +78,16 @@ listeners.push((m) => {
     errors.push(m.params.args.map((a) => a.value ?? a.description).join(' '));
   }
   if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error') {
-    errors.push(m.params.entry.text);
+    const e = m.params.entry;
+    // A 404 on an LL-HLS PART is normal at the live edge — players request
+    // parts as they are born and hls.js retries; src/low-latency-player.js
+    // says so where it sets fragLoadingMaxRetry. Same treatment as
+    // ERR_ABORTED above: recorded separately, NOT ignored. The assert below
+    // still fails past a ceiling, because silence here would hide a real
+    // outage as "normal churn".
+    if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
+      edgeMisses.push(e.url);
+    } else errors.push(e.text);
   }
   if (m.method === 'Network.loadingFailed') {
     // ERR_ABORTED is what a media element's in-flight segment requests do
@@ -105,7 +115,7 @@ const ok = (label, cond, detail) => {
 
 for (const t of targets) {
   console.log(`\n[${t.n}] ${t.name}`);
-  errors = []; failedReqs = []; abortedReqs = [];
+  errors = []; failedReqs = []; abortedReqs = []; edgeMisses = [];
   await S('Page.navigate', { url: `${BASE}/${t.n}-${t.name}/` });
   await sleep(1400);
 
@@ -191,7 +201,15 @@ for (const t of targets) {
   ok('page asserted something', (asserts || []).length > 0, String((asserts || []).length));
   for (const a of asserts || []) ok(`page: ${a.label}`, a.pass, a.detail ?? undefined);
 
-  ok('no console errors', errors.length === 0, errors.slice(0, 2).join(' | ') || '0');
+  // Folded into this one assert rather than added as a new one: a conditional
+  // assert would make the suite total vary run to run, and a shrinking total
+  // is exactly how four asserts went missing unnoticed earlier.
+  const EDGE_CEILING = 25;
+  const edgeOk = edgeMisses.length <= EDGE_CEILING;
+  ok('no console errors', errors.length === 0 && edgeOk,
+    (errors.slice(0, 2).join(' | ') || '0')
+    + (edgeMisses.length ? `  (+${edgeMisses.length} live-edge part 404${edgeMisses.length > 1 ? 's' : ''}`
+      + `${edgeOk ? ', normal' : ` — OVER the ceiling of ${EDGE_CEILING}`})` : ''));
   ok('no failed requests', failedReqs.length === 0, failedReqs.slice(0, 2).join(' | ') || '0');
   if (abortedReqs.length) {
     console.log(`        (${abortedReqs.length} aborted on teardown — expected for a media page)`);

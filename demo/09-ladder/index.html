@@ -24,14 +24,15 @@
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { llhls, whep, holdPublisher, waitForManifest, waitForWhip } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
+  import { startMoq } from '/shell/moq.mjs';
 
   const d = mount({
     n: '09',
     name: 'ladder',
-    what: 'One source, two transports, the same clock burned into both pictures. Read the gap off the screen.',
-    readout: { llhls: 's', webrtc: 'ms', gap: '', legs: '' },
+    what: 'Three transports, the same clock burned into every picture. Read the gap off the screen.',
+    readout: { llhls: 's', webrtc: 'ms', moq: 'ms', gap: '', legs: '' },
     controls: [
-      { id: 'go', label: 'Start both', primary: true },
+      { id: 'go', label: 'Start all three', primary: true },
       { id: 'check', label: 'Run the checks' },
     ],
   });
@@ -41,7 +42,15 @@
   // their pixels, so the difference between the two on-screen clocks IS the
   // latency difference — no instrumentation, readable from a screenshot.
   d.el.append(el('p', 'note',
-    'both pictures carry an absolute epoch; the difference between them is the latency gap'));
+    'every picture carries an absolute epoch; the difference between them is the latency gap'));
+  // HONESTY: the first two legs come from the publisher container. The MoQ leg
+  // CANNOT — IETF moq-pub and the hang media layer disagree at the catalog layer
+  // (track name, schema and container declaration all differ; rig/moq/RUNBOOK.md
+  // §7.2, §7.3), so a container-sourced MoQ leg needs a WARP-to-hang shim that
+  // does not exist yet. Its source is this browser. The order of magnitude is
+  // comparable; the journey is not, and the page says so rather than implying it.
+  d.el.append(el('p', 'note',
+    'MoQ is published by this browser, not the container — the other two share one source'));
 
   const pair = el('div', 'pair');
   const legs = {};
@@ -56,9 +65,22 @@
     pair.append(box);
     legs[k] = { video: v, val };
   }
+  // MoQ decodes through WebCodecs into a canvas, not a <video>
+  const moqBox = el('div', 'leg');
+  const moqCanvas = el('canvas');
+  moqCanvas.style.width = '100%';
+  moqCanvas.style.display = 'block';
+  moqCanvas.style.background = '#000';
+  const moqCap = el('div', 'cap');
+  const moqVal = el('span', '', '—');
+  moqCap.append(el('b', '', 'MoQ'), moqVal);
+  moqBox.append(moqCanvas, moqCap);
+  pair.append(moqBox);
+
   d.el.append(pair);
 
   let player = null, pc = null, up = 0, hlsLat = null, rtt = null;
+  let moqLeg = null;
 
   async function whepPlay(url) {
     pc = new RTCPeerConnection({ bundlePolicy: 'max-bundle' });
@@ -128,10 +150,31 @@
       }
       await playOrPrompt(legs.webrtc.video, d);
     }
-    d.log(`${up}/2 legs playing`, up === 2 ? 'hi' : 'bad');
+    d.log(`${up}/2 container legs playing`, up === 2 ? 'hi' : 'bad');
+
+    // The MoQ leg is independent of the publisher container entirely: this
+    // browser is both ends of it, through the Cloudflare draft-14 relay.
+    try {
+      moqLeg = await startMoq({
+        out: moqCanvas,
+        ns: `positron-09-${Math.random().toString(36).slice(2, 8)}`,
+        log: (m, k) => d.log(`moq: ${m}`, k),
+      });
+      d.log(`moq leg up on ${moqLeg.version}`, 'hi');
+    } catch (e) { d.log(`moq leg failed: ${String(e?.message ?? e).slice(0, 80)}`, 'bad'); }
   });
 
   setInterval(async () => {
+    // The MoQ leg is polled FIRST and unconditionally: it does not depend on the
+    // WebRTC peer connection, and an early `if (!pc) return` would have hidden it
+    // whenever the WHEP leg was down.
+    if (moqLeg) {
+      const p50 = moqLeg.pct(0.5);
+      if (p50 != null) {
+        d.set('moq', p50, 'ok');
+        moqVal.textContent = `${p50} ms glass-to-glass`;
+      }
+    }
     if (!pc) return;
     const stats = await pc.getStats().catch(() => null);
     if (!stats) return;
@@ -146,7 +189,7 @@
   }, 1000);
 
   d.on('check', () => {
-    d.assert('both legs attempted', up >= 1, `${up}/2`);
+    d.assert('both container legs attempted', up >= 1, `${up}/2`);
     d.assert('hls leg playing', !!player && legs.llhls.video.currentTime > 0,
       `${legs.llhls.video.currentTime.toFixed(1)}s`);
     d.assert('whep leg connected', !!pc && pc.connectionState === 'connected', pc?.connectionState ?? 'none');
@@ -158,10 +201,22 @@
       d.assert('webrtc is the faster tier', rtt / 1000 < hlsLat,
         `rtt ${rtt.toFixed(0)} ms vs hls ${hlsLat.toFixed(2)} s`);
     }
-    d.log('the true glass-to-glass comparison is the two burned clocks in a screenshot');
+    if (moqLeg) {
+      const s = moqLeg.stats;
+      d.assert('moq leg decoded frames', s.decoded > 0, `${s.decoded} decoded`);
+      const mp = moqLeg.pct(0.5);
+      if (mp != null && hlsLat !== null) {
+        // The claim is the ORDER OF MAGNITUDE — milliseconds against seconds.
+        // Deliberately NOT asserting moq < whep: the two do not share a source,
+        // so ranking them against each other would be measuring two journeys.
+        d.assert('moq is milliseconds where hls is seconds', mp / 1000 < hlsLat / 2,
+          `moq ${mp} ms vs hls ${hlsLat.toFixed(2)} s`);
+      }
+    }
+    d.log('the true glass-to-glass comparison is the burned clocks in a screenshot');
   });
 
-  d.log('MoQ would be the third rung; it needs moq-pub in the publisher image');
+  d.log('three rungs: LL-HLS and WHEP from the container, MoQ from this browser');
   d.ready();
 </script>
 </html>
