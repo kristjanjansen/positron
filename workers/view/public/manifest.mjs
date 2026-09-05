@@ -105,6 +105,11 @@ export const DEMOS = [
   { n: '24', name: 'capture', act: 4, built: true, settleMs: 26000,
     one: 'camera in, segments out, played back on the timeline',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
+  // the first page where all three legs meet: live over a real WebRTC hop, the
+  // FAR END of that hop recorded, and the recording scrubbed on the deck
+  { n: '25', name: 'show', act: 3, built: true, settleMs: 9000,
+    one: 'live over WebRTC, recorded off the far end of that hop, replayed on the timeline',
+    tags: ['WebRTC', 'MediaRecorder', 'timeline'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */

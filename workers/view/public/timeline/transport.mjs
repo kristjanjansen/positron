@@ -1598,9 +1598,9 @@ export function createScheduler(transport, {
     if (!rows || !rows.length) {
       noteDegraded(kind, { wanted: `series=${JSON.stringify(want)}`, chose: 'empty', degraded: true,
         reason: `kind '${kind}' holds no rows for series '${k}' — known series are [${[...m.keys()].join(', ')}]` });
-      return { rows: [], key: `${kind} ${k}`, series: k };
+      return { rows: [], key: `${kind}\u0000${k}`, series: k };
     }
-    return { rows, key: `${kind} ${k}`, series: k };
+    return { rows, key: `${kind}\u0000${k}`, series: k };
   }
 
   function cursorForRows(cacheKey, rows) {

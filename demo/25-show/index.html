@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 6px; margin: 0 0 10px; }
+  .box { position: relative; }
+  .box canvas, .box video { width: 100%; display: block; background: #000;
+                            border: 1px solid var(--line); border-radius: 3px; }
+  .box .lbl { position: absolute; left: 5px; bottom: 5px; font: 600 10px/1.4 var(--mono);
+              letter-spacing: .08em; text-transform: uppercase;
+              color: var(--fg); background: #0b0e14aa; border-radius: 3px; padding: 1px 5px; }
+  video.back { width: 100%; display: block; background: #000; border: 1px solid var(--line);
+               border-radius: 3px; margin: 0 0 10px; }
+  .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2); margin: 0 0 8px;
+          display: flex; flex-wrap: wrap; gap: 3px; }
+  .segs i { font-style: normal; border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; }
+</style>
+
+<script type="module">
+  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  // THE WHOLE CHAIN IN ONE PAGE: a source goes live over WebRTC, the FAR END of
+  // that hop is what gets recorded, and the recording is played back on the
+  // deck. 10 room already shows many peers and 24 capture already records a
+  // local source; the one thing neither shows is that the bytes you archive can
+  // be the bytes that came off the wire.
+  //
+  // The peer is a second RTCPeerConnection in this same page. That is a real
+  // WebRTC hop — offer/answer, ICE, encode, packetize, decode — and it is the
+  // only shape that is deterministic enough for the suite to assert on with one
+  // browser. `?room=NAME` additionally offers the stream to the relay, so a
+  // second copy of this page anywhere joins as a genuine remote peer; that leg
+  // is logged and never asserted, because an assert that needs a second human
+  // is an assert that varies the suite total.
+
+  // A SHORT SHOW ON PURPOSE. verify.mjs stops waiting once the assert count
+  // stops growing (~4.8 s of slack), so a check that waits out the recording
+  // has to fit inside that. 3.2 s at a 1 s timeslice is four segments, a
+  // scrubbable archive, and a whole run inside the harness's patience.
+  const SEG_MS = 1000;
+  const REC_MS = 3200;
+  const ROOM = new URLSearchParams(location.search).get('room');
+  const ID = Math.random().toString(36).slice(2, 8);
+
+  const d = mount({
+    n: '25',
+    name: 'show',
+    what: 'Live over WebRTC, recorded off the far end of that hop, replayed on the timeline.',
+    readout: { source: '', live: 'ms', fps: '', segments: '', kib: 'KiB', dur: 's' },
+    // ONE primary that does the whole capture leg, and it is FIRST on purpose.
+    // verify.mjs sleeps `settleMs` only after control 0 and 650 ms after every
+    // other one, and it stops collecting asserts as soon as 400 ms pass with no
+    // new one. So anything slow — going live, a 3 s recording, resolving a
+    // WebM duration — has to happen behind control 0, never inside the checks.
+    controls: [
+      { id: 'run', label: 'Go live and record 3 s', primary: true },
+      { id: 'camera', label: 'Use the camera' },
+      { id: 'play', label: 'Play it back' },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  // ── the source ───────────────────────────────────────────────────────────
+  // A canvas by default: no permission prompt, and a burned-in clock, so what
+  // arrives at the far end can be read against when it was drawn. The camera
+  // draws INTO the same canvas, so one capture path serves both sources.
+  const pair = el('div', 'pair');
+  const srcBox = el('div', 'box');
+  const canvas = el('canvas');
+  canvas.width = 640; canvas.height = 360;
+  const g = canvas.getContext('2d');
+  srcBox.append(canvas, el('span', 'lbl', 'source'));
+  const liveBox = el('div', 'box');
+  const liveVideo = el('video', '', null, { playsinline: '', autoplay: '' });
+  liveVideo.muted = true;
+  liveBox.append(liveVideo, el('span', 'lbl', 'received over webrtc'));
+  pair.append(srcBox, liveBox);
+  d.el.append(pair);
+
+  const back = el('video', 'back', null, { playsinline: '', muted: '', controls: '' });
+  back.muted = true;
+  back.style.display = 'none';
+  d.el.append(back);
+  const segsEl = el('div', 'segs');
+  d.el.append(segsEl);
+
+  let camStream = null;
+  d.set('source', 'canvas');
+  setInterval(() => {
+    if (camStream) return;
+    const t = Date.now();
+    g.fillStyle = '#11151d'; g.fillRect(0, 0, 640, 360);
+    g.fillStyle = '#ffd400';
+    g.font = 'bold 32px ui-monospace, monospace';
+    g.fillText(new Date(t).toISOString().slice(11, 23), 22, 56);
+    g.fillStyle = '#2b3546'; g.fillRect(22, 86, 596, 10);
+    g.fillStyle = '#ffd400'; g.fillRect(22, 86, (t / 12) % 596, 10);
+  }, 40);
+
+  d.on('camera', async () => {
+    if (camStream) { d.log('camera already on'); return; }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 360, frameRate: 25 }, audio: false,
+      });
+      const t = camStream.getVideoTracks()[0];
+      d.set('source', 'camera');
+      d.log(`camera: ${t.label || 'default'}`, 'hi');
+      const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
+      pv.muted = true; pv.srcObject = camStream;
+      await pv.play().catch(() => {});
+      const draw = () => {
+        if (!camStream) return;
+        g.drawImage(pv, 0, 0, 640, 360);
+        g.fillStyle = '#000a'; g.fillRect(0, 0, 260, 34);
+        g.fillStyle = '#ffd400';
+        g.font = 'bold 20px ui-monospace, monospace';
+        g.fillText(new Date().toISOString().slice(11, 23), 10, 24);
+        requestAnimationFrame(draw);
+      };
+      draw();
+      // the track already published keeps flowing: the canvas is the source of
+      // truth for the wire, so switching sources needs no renegotiation
+    } catch (e) {
+      d.log(`camera refused: ${e.name} — staying on the canvas`, 'bad');
+    }
+  });
+
+  // ── the live leg ─────────────────────────────────────────────────────────
+  let srcStream = null, pcOut = null, pcIn = null, remote = null;
+  let liveAt = null, framesDecoded = 0;
+
+  // One shared promise, not a boolean: a second caller must WAIT for the first
+  // negotiation, not sail past it. A flag set at the top of the function makes
+  // `await goLive()` return before there is anything to receive, and the
+  // recorder then finds no stream.
+  let livePromise = null;
+  const goLive = () => (livePromise ||= goLiveOnce());
+
+  async function goLiveOnce() {
+    srcStream = canvas.captureStream(25);
+    pcOut = new RTCPeerConnection();
+    pcIn = new RTCPeerConnection();
+    // Loopback trickle: each end's candidates are the other's. Host candidates
+    // only — there is no NAT between a page and itself.
+    pcOut.onicecandidate = (e) => e.candidate && pcIn.addIceCandidate(e.candidate).catch(() => {});
+    pcIn.onicecandidate = (e) => e.candidate && pcOut.addIceCandidate(e.candidate).catch(() => {});
+    pcIn.ontrack = (e) => {
+      remote = e.streams[0];
+      liveVideo.srcObject = remote;
+      liveVideo.play().catch(() => {});
+    };
+    pcOut.onconnectionstatechange = () => d.log(`live leg: ${pcOut.connectionState}`);
+
+    const t0 = performance.now();
+    for (const t of srcStream.getTracks()) pcOut.addTrack(t, srcStream);
+    const offer = await pcOut.createOffer();
+    await pcOut.setLocalDescription(offer);
+    await pcIn.setRemoteDescription(offer);
+    const answer = await pcIn.createAnswer();
+    await pcIn.setLocalDescription(answer);
+    await pcOut.setRemoteDescription(answer);
+
+    // First DECODED frame, not first byte: the readout should mean "a picture
+    // arrived", which is what a viewer would call being live.
+    // requestVideoFrameCallback is the precise sensor and the throttled one: a
+    // background tab delivers ~1 frame/s, so the readout read blank for seven
+    // seconds while the leg was up. Poll videoWidth alongside it and take
+    // whichever says "a picture exists" first.
+    await new Promise((res) => {
+      let iv = null;
+      const done = () => {
+        if (liveAt == null) { liveAt = performance.now() - t0; d.set('live', Math.round(liveAt)); }
+        clearInterval(iv); res();
+      };
+      liveVideo.requestVideoFrameCallback?.(done);
+      liveVideo.addEventListener('loadeddata', done, { once: true });
+      iv = setInterval(() => { if (liveVideo.videoWidth > 0) done(); }, 100);
+      setTimeout(() => { clearInterval(iv); res(); }, 5000);
+    });
+    d.log(`live in ${liveAt == null ? '>5000' : Math.round(liveAt)} ms — ${liveVideo.videoWidth}x${liveVideo.videoHeight}`, 'hi');
+    if (ROOM) joinRoom();
+  }
+
+  // Decoded-frame rate off the receiver's own stats. Deliberately NOT the
+  // candidate-pair RTT: on a loopback hop that number is ~0 and would read as a
+  // latency claim this demo has not earned.
+  let lastFrames = 0, lastStatsAt = 0, saidThrottled = false;
+  setInterval(async () => {
+    if (!pcIn) return;
+    const stats = await pcIn.getStats();
+    for (const s of stats.values()) {
+      if (s.type !== 'inbound-rtp' || s.kind !== 'video') continue;
+      framesDecoded = s.framesDecoded ?? 0;
+      const now = performance.now();
+      let fps = null;
+      if (lastStatsAt) {
+        fps = (framesDecoded - lastFrames) / ((now - lastStatsAt) / 1000);
+        d.set('fps', Math.round(fps * 10) / 10, fps > 15 ? 'ok' : fps > 5 ? '' : 'bad');
+      }
+      // A BACKGROUND TAB IS NOT A BROKEN DEMO. Chrome throttles the source
+      // canvas's timer to ~1 Hz when the tab is hidden, so the encoder sees
+      // ~1 fps and the recording comes out a few KiB. Say so once, or the next
+      // reader measures the throttle and files it as a bug.
+      if (!saidThrottled && fps != null && fps < 5 && document.visibilityState === 'hidden') {
+        saidThrottled = true;
+        d.log('tab is in the background — the source canvas is throttled to ~1 fps, not the wire', 'bad');
+      }
+      lastFrames = framesDecoded; lastStatsAt = now;
+    }
+  }, 1000);
+
+  /**
+   * The optional real remote leg. Logged, never asserted — see the header.
+   *
+   * It BOTH offers and answers. The first cut only offered, which meant two
+   * copies of this page each sent an offer into the room and neither ever
+   * replied: a signalling leg that could not connect to the only page that
+   * speaks its protocol. A peer's picture lands in its own tile, so the
+   * loopback hop this demo records off is left exactly as it was.
+   */
+  function joinRoom() {
+    const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
+    const peers = new Map();
+    const send = (o) => ws.readyState === 1 && ws.send(JSON.stringify({ ...o, from: ID }));
+    const wire = (peer, pc) => {
+      peers.set(peer, pc);
+      pc.onicecandidate = (e) => e.candidate && send({ t: 'ice', to: peer, c: e.candidate });
+      pc.onconnectionstatechange = () => d.log(`peer ${peer}: ${pc.connectionState}`);
+      pc.ontrack = (e) => peerTile(peer).srcObject = e.streams[0];
+      for (const t of srcStream.getTracks()) pc.addTrack(t, srcStream);
+    };
+    const offerTo = async (peer) => {
+      if (peers.has(peer)) return;
+      const pc = new RTCPeerConnection();
+      wire(peer, pc);
+      const o = await pc.createOffer();
+      await pc.setLocalDescription(o);
+      send({ t: 'offer', to: peer, sdp: o.sdp });
+    };
+    ws.onopen = () => { d.log(`offering this show to room ${ROOM} as ${ID}`); send({ t: 'hello' }); };
+    ws.onmessage = async (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.from === ID || (m.to && m.to !== ID)) return;
+      if (m.t === 'hello') { send({ t: 'here' }); offerTo(m.from); return; }
+      if (m.t === 'here') { offerTo(m.from); return; }
+      if (m.t === 'offer') {
+        // Glare: both sides offer on hello/here. Whoever's id sorts lower keeps
+        // its own offer; the other drops it and answers, so exactly one
+        // negotiation survives instead of two half-built ones.
+        if (peers.has(m.from) && ID < m.from) return;
+        peers.get(m.from)?.close();
+        const pc = new RTCPeerConnection();
+        wire(m.from, pc);
+        await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+        const a = await pc.createAnswer();
+        await pc.setLocalDescription(a);
+        send({ t: 'answer', to: m.from, sdp: a.sdp });
+        return;
+      }
+      if (m.t === 'answer') {
+        const pc = peers.get(m.from);
+        if (pc?.signalingState === 'have-local-offer') await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+        return;
+      }
+      if (m.t === 'ice') { try { await peers.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
+    };
+    addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
+  }
+
+  /** One tile per remote peer, appended beside the source and the loopback. */
+  const peerTiles = new Map();
+  function peerTile(peer) {
+    if (!peerTiles.has(peer)) {
+      const box = el('div', 'box');
+      const v = el('video', '', null, { playsinline: '', autoplay: '' });
+      v.muted = true;
+      box.append(v, el('span', 'lbl', `peer ${peer}`));
+      pair.append(box);
+      peerTiles.set(peer, v);
+    }
+    return peerTiles.get(peer);
+  }
+
+  // ── recording the FAR END ────────────────────────────────────────────────
+  // MediaRecorder is pointed at the RECEIVED stream, not at the canvas. That is
+  // the whole point of this demo: what lands in the archive is what came off
+  // the wire, decode losses and all, rather than a second clean copy of the
+  // source that no viewer ever saw.
+  const segs = [];
+  let recording = false, recTrack = null, mime = null, bytes = 0;
+
+  function paintSegs() {
+    d.set('segments', segs.length);
+    d.set('kib', Math.round(bytes / 1024));
+    segsEl.replaceChildren(...segs.slice(-20).map((b, i) =>
+      el('i', '', `${segs.length - Math.min(20, segs.length) + i}:${Math.round(b.size / 1024)}k`)));
+  }
+
+  async function record() {
+    if (recording) return;
+    await goLive();
+    if (!remote) { d.log('no received stream to record', 'bad'); return; }
+    segs.length = 0; bytes = 0; assembling = null; duration = null; paintSegs();
+    mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find((m) => MediaRecorder.isTypeSupported(m));
+    if (!mime) { d.fail(new Error('no webm MediaRecorder support')); return; }
+    const rec = new MediaRecorder(remote, { mimeType: mime, videoBitsPerSecond: 800_000 });
+    // WHAT is being recorded, kept as the object itself. Not its id: a remote
+    // MediaStream carries the SENDER's msid, so `remote.id === srcStream.id`
+    // and `track.id` matches too. An id comparison here passed nothing and
+    // failed the first run — the only honest test is object identity against
+    // the RTP receiver's own track.
+    recTrack = remote.getVideoTracks()[0] || null;
+    rec.ondataavailable = (e) => {
+      if (!e.data?.size) return;
+      segs.push(e.data); bytes += e.data.size; paintSegs();
+    };
+    rec.onerror = (e) => d.log(`recorder: ${e.error?.name ?? 'error'}`, 'bad');
+    recording = true;
+    rec.start(SEG_MS);
+    d.log(`recording the received stream — ${mime}, ${SEG_MS / 1000}s segments`, 'hi');
+    await new Promise((r) => setTimeout(r, REC_MS));
+    rec.stop();
+    await new Promise((r) => setTimeout(r, 400));
+    recording = false;
+    d.log(`recorded ${segs.length} segments off the wire, ${Math.round(bytes / 1024)} KiB`);
+    // Resolve the duration and raise the transport bar HERE, not in the checks:
+    // an assert that has to wait for a WebM duration is an assert the harness
+    // has already stopped listening for. It also reads better — the bar appears
+    // exactly when there is something to scrub.
+    await buildDeck();
+  }
+
+  const settled = async () => { for (let i = 0; i < 100 && recording; i++) await new Promise((r) => setTimeout(r, 200)); };
+
+  // ── playback, on the deck ────────────────────────────────────────────────
+  let deck = null, master = null, duration = null;
+
+  /**
+   * Timeslice chunks concatenate into one playable WebM. Such a file usually
+   * reports duration Infinity, which leaves the transport bar with no range to
+   * scrub — seek far past the end, let the browser resolve it, come back.
+   */
+  let assembling = null;
+  const assemble = () => (assembling ||= assembleOnce());
+
+  async function assembleOnce() {
+    if (!segs.length) return null;
+    back.src = URL.createObjectURL(new Blob(segs, { type: mime || 'video/webm' }));
+    await new Promise((res) => {
+      back.addEventListener('loadedmetadata', res, { once: true });
+      setTimeout(res, 4000);
+    });
+    if (!Number.isFinite(back.duration)) {
+      back.currentTime = 1e6;
+      await new Promise((res) => {
+        const on = () => { if (Number.isFinite(back.duration)) { back.removeEventListener('timeupdate', on); res(); } };
+        back.addEventListener('timeupdate', on);
+        setTimeout(res, 3000);
+      });
+      back.currentTime = 0;
+    }
+    duration = Number.isFinite(back.duration) ? back.duration : null;
+    if (duration != null) d.set('dur', Math.round(duration * 100) / 100);
+    return duration;
+  }
+
+  /** One deck for the recording, built once the duration is known. */
+  async function buildDeck() {
+    const dur = await assemble();
+    if (dur == null) return null;
+    if (!deck) {
+      deck = createDeck({ items: [], adapters: {}, range: [0, Math.round(dur * 1000)] });
+      // THE PICTURE IS THE MASTER: mediaMaster reads currentTime and never
+      // writes it (media-master.mjs L1), so the deck follows the video.
+      master = mediaMaster(deck, back, {});
+      // The seam that law leaves open: L1 binds the HELPER, not the page —
+      // somebody still has to apply a scrub to the picture, or the transport
+      // bar moves a vector the video ignores and snaps back one tick later
+      // (media-master L2, which reads a page-side jump as "the element moved").
+      // Every seek path — the bar, its keyboard table, the checks below — goes
+      // through deck.seek(), so wrapping it once is the whole of it.
+      const seek = deck.seek.bind(deck);
+      deck.seek = (p, opts) => {
+        const q = seek(p, opts);
+        if (Number.isFinite(q)) back.currentTime = q / 1000;
+        return q;
+      };
+      createTransportBar(d.el, deck);
+    }
+    return deck;
+  }
+
+  d.on('run', record);          // record() goes live first if it has to
+
+  d.on('play', async () => {
+    await settled();                       // pressed mid-recording: wait it out
+    armVideo(back);
+    if (!(await buildDeck())) { d.log('nothing recorded yet — press Record first', 'bad'); return; }
+    pair.style.display = 'none';
+    back.style.display = '';
+    await playOrPrompt(back, d);
+    deck.play?.();
+    d.log(`playing back ${duration.toFixed(2)}s of the received stream — scrub it`, 'hi');
+  });
+
+  d.on('check', async () => {
+    await goLive();
+    // ORDER MATTERS, and not for readability: verify.mjs waits only while the
+    // assert count is still GROWING. Putting the recording's wait first means
+    // the harness sees 0 asserts, gives up, and reports a working page as
+    // having asserted nothing. Land the immediate ones first, then wait.
+    d.assert('the live leg is connected', pcOut?.connectionState === 'connected'
+      && pcIn?.connectionState === 'connected', `${pcOut?.connectionState}/${pcIn?.connectionState}`);
+    d.assert('a picture arrived at the far end', liveVideo.videoWidth > 0,
+      `${liveVideo.videoWidth}x${liveVideo.videoHeight}`);
+    for (let i = 0; i < 25 && framesDecoded === 0; i++) await new Promise((r) => setTimeout(r, 200));
+    d.assert('frames decoded off the wire', framesDecoded > 0, `${framesDecoded} frame(s)`);
+    await settled();
+    const rxTrack = pcIn?.getReceivers().find((r) => r.track?.kind === 'video')?.track ?? null;
+    const txTrack = srcStream?.getVideoTracks()[0] ?? null;
+    d.assert('the recording is the RECEIVER\'s track, not the source',
+      !!recTrack && recTrack === rxTrack && recTrack !== txTrack,
+      `receiver ${recTrack === rxTrack ? 'yes' : 'NO'}, source ${recTrack === txTrack ? 'YES' : 'no'}`
+      + ` (ids are equal by msid: ${String(remote?.id).slice(0, 8)})`);
+    d.assert('segments closed', segs.length > 0, `${segs.length} segment(s), ${Math.round(bytes / 1024)} KiB`);
+    const dk = await buildDeck();
+    d.assert('the recording resolves a duration', duration != null && duration > 0,
+      duration == null ? 'Infinity — unscrubbable' : `${duration.toFixed(2)}s`);
+    // deck.range is the span ARRAY (mutated in place by setRange), not a getter
+    d.assert('the deck spans the recording', !!dk
+      && Math.abs(dk.range[1] - duration * 1000) < 1500,
+      dk ? `${dk.range[1]} ms vs ${Math.round(duration * 1000)} ms` : 'no deck');
+    // the seek has to move the PICTURE, not just the vector: a deck that seeks
+    // alone reads green while the video plays on, which is the failure the
+    // wrapper above exists to prevent
+    const mid = Math.round((duration ?? 0) * 500);
+    dk?.seek(mid);
+    // poll rather than sleep: currentTime is set synchronously but may land on
+    // a keyframe, and a fixed 400 ms sleep is exactly the gap after which the
+    // harness stops collecting
+    for (let i = 0; i < 6 && Math.abs(back.currentTime * 1000 - mid) > 400; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    d.assert('the seek moves the picture', !!dk && Math.abs(back.currentTime * 1000 - mid) < 400,
+      `${Math.round(back.currentTime * 1000)} ms ~ ${mid} ms`);
+    // the archive is a FILE, not a live stream: a page that quietly replayed the
+    // live element would pass every assert above and show nothing archived
+    d.assert('playback is off the recording, not the live stream',
+      back.srcObject == null && String(back.src).startsWith('blob:'), String(back.src).slice(0, 24));
+  });
+
+  d.log(ROOM
+    ? `room ${ROOM}: this page also offers the show to real peers`
+    : 'the peer is a second connection in this page — add ?room=NAME to offer it to a real one');
+  d.ready();
+</script>
+</html>

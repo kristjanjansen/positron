@@ -7,7 +7,7 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**, **20 of 24 demos built, 276/276 green**. This
+Live on **positron.studio**, **21 of 25 demos built, 289/291 green**. This
 session found why iOS stuttered — our own drift-seek, then a stale check that
 had silently stopped preferring native HLS since iOS 17.1 added
 ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
@@ -78,7 +78,7 @@ reason: it is named for its subject, not for this repo.
 
 ## Where things stand (session 9)
 
-**276/276 green.** 20 of 24 built; `20`–`22` are archive pages that work and are
+**289/291 green.** 21 of 25 built; `20`–`22` are archive pages that work and are
 linked but not re-shelled, `23 studio` is assembly.
 
 | worker | hostname | what |
@@ -93,7 +93,7 @@ linked but not re-shelled, `23 studio` is assembly.
 ### Three harnesses, because one cannot see everything
 
 ```sh
-node demo/verify.mjs          # every built demo, CDP/Chrome — 276 asserts
+node demo/verify.mjs          # every built demo, CDP/Chrome — 291 asserts
 node demo/verify-native.mjs   # the IPHONE code path; verify.mjs CANNOT reach it
 node demo/verify-safari.mjs   # desktop Safari over WebDriver, both engines
 ```
@@ -147,14 +147,12 @@ candidate-pair RTT, not media latency.
 | `elektron-rtc` etc. | `rtc|cues|instrument|selfrec|osc|moq.positron.studio` | unchanged; script names stay for their DO state |
 | R2 `elektron-archive-test` | `archive.positron.studio` | the show archive |
 
-**Built (18):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
-`09` ladder · `10` room · `11` grid · `12` cues · `13` record · `14` replay ·
-`15` seek · `16` looper · `17` instrument · `18` jam · `19` flipper.
+**Built (21):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
+`08` moq · `09` ladder · `10` room · `11` grid · `12` cues · `13` record ·
+`14` replay · `15` seek · `16` looper · `17` instrument · `18` jam ·
+`19` flipper · `24` capture · `25` show.
 
-**Not built (5):**
-- `08 moq` — needs `moq-pub` compiled into the publisher image (Rust/musl
-  multi-stage). Feasible: QUIC egress from Containers is already measured
-  working, and `moq-pub` has `src/main.rs`.
+**Not built (4):**
 - `20 kurenniemi`, `21 megatimeline`, `22 remixer` — the pages WORK and are
   linked from the index; they are not re-shelled. `21` is the big one at 1220
   lines. They get an appended back link in the deployed copy only.
