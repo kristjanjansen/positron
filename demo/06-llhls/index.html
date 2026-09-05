@@ -151,6 +151,10 @@
         d.log(`level -> ${width}x${height}`);
         ship(`LEVEL ${width}x${height} (switch ${switches})`);
       })
+      .on('target-raised', (x) => {
+        d.log(`target raised to ${x.target}s — device cannot hold the lower one`, 'bad');
+        ship(`TARGET-RAISED ${JSON.stringify(x)}`);
+      })
       .on('engine', (x) => {
         d.log(`engine ${x.gatedBySafari ? 'ManagedMediaSource (Safari gates loading)' : x.managedMediaSource ? 'MMS available' : 'MediaSource'}`);
         ship(`ENGINE ${JSON.stringify(x)} ua=${navigator.userAgent}`);

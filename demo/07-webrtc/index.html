@@ -49,10 +49,19 @@
     // frames yet, and it paints black and stays there even though decoding
     // later succeeds — which is exactly what the phone showed: rtt 16 ms,
     // 26 fps inbound, and a black rectangle.
+    // ONE stream that we own, and every arriving track gets added to it.
+    //
+    // Adopting e.streams[0] per track loses tracks: Cloudflare delivers audio
+    // and video with different msids, so the second ontrack REPLACED srcObject
+    // and threw the first track away. Whichever unmuted last won, which is a
+    // race — the suite showed "video:live" alone on one run and "audio:live"
+    // alone on the next, while getStats() reported 2125 video frames decoded at
+    // 1280x720 either way. Same bug, opposite faces.
+    const inbound = new MediaStream();
     pc.ontrack = (e) => {
-      const [stream] = e.streams;
+      inbound.addTrack(e.track);
       const attach = async () => {
-        if (video.srcObject !== stream) video.srcObject = stream;
+        if (video.srcObject !== inbound) video.srcObject = inbound;
         // play AFTER attaching a live stream, not before
         try { await video.play(); d.log(`attached on ${e.track.kind} unmute`); }
         catch (err) { await playOrPrompt(video, d); }
