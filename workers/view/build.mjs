@@ -22,7 +22,7 @@
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, join, extname } from 'node:path';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -80,13 +80,11 @@ const FILES = [
   // megatimeline has been dead on the public URL. Adding it fixes both.
   ['timeline/strip.mjs', 'timeline/strip.mjs'],
   ['demo/manifest.mjs', 'manifest.mjs'],
-  ['demo/shell/shell.css', 'shell/shell.css'],
-  ['demo/shell/shell.mjs', 'shell/shell.mjs'],
-  ['demo/shell/transport-bar.mjs', 'shell/transport-bar.mjs'],
-  ['demo/shell/strip.mjs', 'shell/strip.mjs'],
-  ['demo/shell/fixture.mjs', 'shell/fixture.mjs'],
-  ['demo/shell/archive.mjs', 'shell/archive.mjs'],
-  ['demo/shell/live.mjs', 'shell/live.mjs'],
+  // demo/shell is ENUMERATED, not listed: see shellFiles() below. A hand-kept
+  // list meant a new shell module deployed as a 404 while local verify passed,
+  // because the dev server serves the repo directly and only the deploy strips
+  // to public/. That is a silent break, so the list is gone.
+  ...shellFiles(),
   // 06 imports the v6 player UNCHANGED rather than reimplementing it
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
   ['demo/notes/index.html', 'notes/index.html'],
@@ -103,6 +101,60 @@ const FILES = [
  * demo/<nn>-<name>/ and filtered to web extensions, so there is no path by
  * which a secret enters public/.
  */
+/**
+ * Every web file in demo/shell, deployed flat at /shell/.
+ *
+ * Same containment argument as demoFiles(): a single known subdirectory,
+ * filtered to web extensions, so no secret can reach public/.
+ */
+function shellFiles() {
+  const out = [];
+  const OK = new Set(['.mjs', '.js', '.css']);
+  let entries = [];
+  try { entries = readdirSync(join(REPO, 'demo/shell'), { withFileTypes: true }); }
+  catch { return out; }
+  for (const e of entries) {
+    if (!e.isFile() || !OK.has(extname(e.name))) continue;
+    out.push([`demo/shell/${e.name}`, `shell/${e.name}`]);
+  }
+  return out;
+}
+
+/**
+ * Refuse to ship a demo whose /shell/… or ./… import has no file in public/.
+ *
+ * This is the check that would have caught the 404 above before it went out:
+ * the page imported /shell/moq.mjs, the copy list did not carry it, and
+ * nothing complained until a browser asked for it on the live site.
+ */
+function checkImports(copied) {
+  const have = new Set(copied.map(([, dst]) => dst));
+  const missing = [];
+  for (const [src, dst] of copied) {
+    if (extname(dst) !== '.html') continue;
+    let text = '';
+    try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
+    const dir = dirname(dst);
+    for (const m of text.matchAll(/(?:import[^'"]*?|from\s*)['"](\.\/[^'"]+|\/[^'"]+)['"]/g)) {
+      const spec = m[1];
+      if (spec.startsWith('./')) {
+        const rel = (dir === '.' ? '' : dir + '/') + spec.slice(2);
+        if (!have.has(rel)) missing.push(`${dst} imports ${spec} -> ${rel}`);
+      } else {
+        const rel = spec.replace(/^\//, '').split('?')[0];
+        // /src/… and /proto/… are carried by the explicit list above; only
+        // flag it when nothing in the copy set provides it.
+        if (!have.has(rel)) missing.push(`${dst} imports ${spec} -> ${rel}`);
+      }
+    }
+  }
+  if (missing.length) {
+    console.error('\nBUILD REFUSED — imports with no deployed file:');
+    for (const m of missing) console.error('  ' + m);
+    process.exit(1);
+  }
+}
+
 function demoFiles() {
   const out = [];
   const OK = new Set(['.html', '.mjs', '.js', '.css', '.json']);
@@ -312,6 +364,9 @@ for (const [src, dst] of FILES) {
     seen.set(dst, src);
   }
 }
+// Same spirit as the duplicate-destination guard above, for the other silent
+// break: an import with nothing deployed behind it.
+checkImports(FILES);
 console.log(`copied ${FILES.length} files`);
 
 // explode the committed JSONL caches into addressable static assets

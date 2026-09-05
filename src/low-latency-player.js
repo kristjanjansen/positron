@@ -290,6 +290,13 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       fragLoadingRetryDelay: 500,
       fragLoadingMaxRetryTimeout: 4000,
       maxLiveSyncPlaybackRate: cfg.catchUpRate,
+      // MEASURED on an iPhone: with 5-7 s buffered and loading keeping up at
+      // ~0.9x, the playhead advanced 0.94 s in 4.04 s of wall time — 0.23x
+      // realtime on the 1280x720 rendition. Loading was never the problem;
+      // presentation was. hls.js has exactly this control: FPS_DROP watches
+      // droppedVideoFrames against decoded and steps the level down when the
+      // ratio exceeds fpsDroppedMonitoringThreshold. Off by default.
+      capLevelOnFPSDrop: true,
       // A target shorter than one keyframe interval cannot be held; see
       // liveSyncSeconds. Must be in userConfig, hence here and not a setter.
       ...(cfg.liveSyncSeconds != null ? { liveSyncDuration: cfg.liveSyncSeconds } : {}),
@@ -419,6 +426,55 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     return rep;
   }
 
+  /**
+   * How fast is the playhead ACTUALLY advancing per wall second?
+   *
+   * On an iPhone, latency and buffer grew together — latency 6.39 -> 10.81 s
+   * while runway grew 5.0 -> 7.6 s — which means 4.42 s of latency accrued
+   * over 6.05 s of wall time with data sitting ready. Either the device
+   * presents frames far slower than realtime, or the live edge is running away
+   * and hls.latency is reporting THAT as our lag. Those have opposite fixes,
+   * and this is the number that tells them apart:
+   *
+   *   advance ~= 1.0 and latency still climbing  -> the EDGE is running away
+   *   advance << 1.0                             -> the DEVICE cannot keep up
+   *
+   * edgeRate is the same question asked of the live edge itself.
+   */
+  let advEma = null, edgeEma = null, lastAdvT = 0, lastAdvCt = -1, lastEdgeV = -1;
+  function measureRates() {
+    const now = Date.now();
+    const ct = video.currentTime;
+    const edge = seekableEnd();
+    if (lastAdvT && now > lastAdvT) {
+      const dt = (now - lastAdvT) / 1000;
+      if (dt > 0.2) {
+        if (lastAdvCt >= 0 && !video.paused) {
+          const r = (ct - lastAdvCt) / dt;
+          // ignore seeks: a jump is not a playback rate
+          if (r >= -0.1 && r < 3) advEma = advEma == null ? r : advEma * 0.7 + r * 0.3;
+        }
+        if (lastEdgeV >= 0 && edge != null) {
+          const e = (edge - lastEdgeV) / dt;
+          if (e >= -0.1 && e < 3) edgeEma = edgeEma == null ? e : edgeEma * 0.7 + e * 0.3;
+        }
+        lastAdvT = now; lastAdvCt = ct; lastEdgeV = edge ?? -1;
+      }
+    } else { lastAdvT = now; lastAdvCt = ct; lastEdgeV = edge ?? -1; }
+    let q = null;
+    try {
+      const g = video.getVideoPlaybackQuality?.();
+      if (g) q = { total: g.totalVideoFrames, dropped: g.droppedVideoFrames, corrupted: g.corruptedVideoFrames };
+      else if (video.webkitDecodedFrameCount != null) q = { total: video.webkitDecodedFrameCount, dropped: video.webkitDroppedFrameCount };
+    } catch { /* not everywhere */ }
+    return {
+      advance: advEma == null ? null : +advEma.toFixed(3),
+      edgeRate: edgeEma == null ? null : +edgeEma.toFixed(3),
+      rate: video.playbackRate,
+      quality: q,
+    };
+  }
+
   function seekableEnd() {
     return video.seekable.length ? video.seekable.end(video.seekable.length - 1) : null;
   }
@@ -483,6 +539,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     }
 
     beachedTicks = 0; lastHoleSkipTo = -1;
+    measureRates();   // keep the EMA warm across the early ticks
 
     // -- player watchdog: is the playhead moving? ---------------------------
     if (video.currentTime > lastTime + 0.01) {
@@ -498,6 +555,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     }
 
     // -- latency control ----------------------------------------------------
+    const rates = measureRates();
     const latency = currentLatency();
     if (latency == null) return;
     const target = targetLatency();
@@ -546,7 +604,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     } else if (video.playbackRate !== 1) {
       video.playbackRate = 1;
     }
-    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate, buffer: bufferReport(), targetBias });
+    emit('latency', { latency, target, drift, pdtLatency, playbackRate: video.playbackRate, buffer: bufferReport(), targetBias, rates });
   }
 
   function onVisibility() {
