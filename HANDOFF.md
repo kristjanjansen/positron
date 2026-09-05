@@ -7,7 +7,7 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**, **21 of 25 demos built, 289/291 green**. This
+Live on **positron.studio**, **21 of 25 demos built, 291/291 green**. This
 session found why iOS stuttered — our own drift-seek, then a stale check that
 had silently stopped preferring native HLS since iOS 17.1 added
 ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
@@ -78,7 +78,7 @@ reason: it is named for its subject, not for this repo.
 
 ## Where things stand (session 9)
 
-**289/291 green.** 21 of 25 built; `20`–`22` are archive pages that work and are
+**291/291 green.** 21 of 25 built; `20`–`22` are archive pages that work and are
 linked but not re-shelled, `23 studio` is assembly.
 
 | worker | hostname | what |

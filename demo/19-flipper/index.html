@@ -56,7 +56,7 @@
     n: '19',
     name: 'flipper',
     what: 'Eight live ERR channels in equal cells. One plays at a time; the bar scrubs its 2 h DVR.',
-    readout: { channel: '', behind: 's', window: 'min', state: '' },
+    readout: { channel: '', behind: 's', window: 'min', blocked: 'min', state: '' },
     controls: [
       { id: 'start', label: 'Start channels', primary: true },
       { id: 'live', label: 'Jump to live edge' },
@@ -130,14 +130,123 @@
     c.media.load();
   }
 
+  // PREFER NATIVE HLS ON WEBKIT ONLY, and gate it on ManagedMediaSource.
+  // `canPlayType('application/vnd.apple.mpegurl')` answers "maybe" in Chrome as
+  // well as Safari, so gating on its truthiness put Chrome on the native path,
+  // where `video.src = <m3u8>` sits at readyState 0 forever. The suite never
+  // saw it: headless Chrome answers "" and took the hls.js branch, so the page
+  // read green while being dead in the browser a human uses. MMS is
+  // WebKit-only, which makes this a capability test rather than a brand check —
+  // same trap and same fix as src/low-latency-player.js.
+  const NATIVE_HLS = 'ManagedMediaSource' in window
+    && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+
+  // ── ERR BLOCKS SEGMENTS BY PROGRAMME, NOT BY AGE ─────────────────────────
+  // Measured 2026-09-06 by sweeping each 2 h window at 13 points
+  // (`.` = 200, `#` = 403, oldest on the left, live edge on the right):
+  //
+  //     etv       ........#####     the newest ~45 min refused
+  //     etv2      #########....     the OLDEST ~78 min refused, the edge fine
+  //     etvpluss  .............     everything served
+  //
+  // So it is per-programme rights, it moves with the schedule, and it is NOT
+  // always at the edge — there is no constant offset to hard-code. A refused
+  // segment answers 403 with no `access-control-allow-origin`, so in a browser
+  // it arrives as a CORS failure; hls.js then holds an empty buffer and shows
+  // a black cell with no error a viewer can read.
+  //
+  // A served segment answers 200 with ACAO and honours Range, so TWO BYTES are
+  // enough to ask "will you serve this one?". Sweep back from the edge, start
+  // where ERR will actually serve, and put what it refused in the readout.
+  const PROBE_STEPS = 8;
+  // How far BEFORE the boundary to start. Three segments left six seconds of
+  // material and then the playhead walked into the wall, where hls.js retried
+  // blocked fragments 1794 times in one run. The blackout is contiguous from
+  // its boundary to the live edge, so there is always a wall — this just buys
+  // enough picture to be a demo, and the wall handler below stops the storm.
+  const WALL_BACKOFF_S = 90;
+
+  async function servedStart(c) {
+    try {
+      const master = await (await fetch(c.url, { cache: 'no-store' })).text();
+      const variant = master.split(/\r?\n/).find((l) => l && !l.startsWith('#'));
+      if (!variant) return null;
+      const plUrl = new URL(variant, c.url).href;
+      const pl = await (await fetch(plUrl, { cache: 'no-store' })).text();
+      const segs = pl.split(/\r?\n/).filter((l) => l && !l.startsWith('#'));
+      if (!segs.length) return null;
+      const dur = Number(pl.match(/#EXTINF:([\d.]+)/)?.[1]) || 2;
+      const last = segs.length - 1;
+      for (let k = 0; k < PROBE_STEPS; k++) {
+        const i = Math.max(0, last - Math.round((k * last) / (PROBE_STEPS - 1)));
+        const url = new URL(segs[i], plUrl).href;
+        // .ok is false for a 403 that DOES carry ACAO; .catch() is the 403 that
+        // does not, which is what ERR actually sends. Both mean "refused".
+        const served = await fetch(url, { headers: { range: 'bytes=0-1' }, cache: 'no-store' })
+          .then((r) => r.ok).catch(() => false);
+        if (!served) continue;
+        // The edge itself is served: leave the live-edge policy to hls.js
+        // rather than pinning a position on top of it.
+        if (k === 0) return { blockedMin: 0 };
+        const at = Math.max(0, i - Math.round(WALL_BACKOFF_S / dur));
+        // The SN, not the index: positions slide as the window rolls, and a
+        // later probe's index means nothing in the timeline hls.js is holding.
+        // The sequence number is the one coordinate both agree on.
+        const sn = Number(segs[at].match(/-(\d+)\.[a-z0-9]+$/)?.[1]);
+        return { position: at * dur, sn, blockedMin: ((last - at) * dur) / 60 };
+      }
+      return { blockedMin: ((last + 1) * dur) / 60, none: true };
+    } catch { return null; }
+  }
+
   async function open(c) {
+    c.atWall = false;
     if (c.kind === 'tv') {
-      if (c.media.canPlayType('application/vnd.apple.mpegurl')) c.media.src = c.url;
+      if (NATIVE_HLS) c.media.src = c.url;
       else if (window.Hls?.isSupported()) {
-        c.hls = new window.Hls({ maxBufferLength: 12, backBufferLength: 4, liveSyncDurationCount: 3 });
+        const served = await servedStart(c);
+        c.served = served;
+        d.set('blocked', served ? Math.round(served.blockedMin) : null,
+          !served || served.none ? 'bad' : served.blockedMin ? '' : 'ok');
+        if (served?.none) {
+          d.log(`${c.id}: ERR refuses every segment in the window (rights) — nothing to play`, 'bad');
+        } else if (served?.position != null) {
+          d.log(`${c.id}: ERR refuses the newest ${Math.round(served.blockedMin)} min (rights) — starting behind it`, 'bad');
+        } else if (served) {
+          d.log(`${c.id}: ERR serves to the live edge`);
+        }
+        c.hls = new window.Hls({
+          maxBufferLength: 12, backBufferLength: 4, liveSyncDurationCount: 3,
+          ...(served?.position != null ? { startPosition: served.position } : {}),
+        });
         c.hls.loadSource(c.url);
         c.hls.attachMedia(c.media);
-        c.hls.on(window.Hls.Events.ERROR, (_e, x) => { if (x.fatal) d.log(`${c.id}: ${x.details}`, 'bad'); });
+        // THE WALL. Play forward from inside a served region and the playhead
+        // reaches the blackout; every fragment after it is 403 and hls.js
+        // retries — 1794 refused requests in one run before this existed. Three
+        // failures is enough to tell a wall from a blip, and stopLoad() is what
+        // turns "the demo is hammering ERR" into "the demo says why it stopped".
+        // CONSECUTIVE failures, not three failures ever: a counter that never
+        // resets turns three unlucky blips across an hour into a false wall.
+        let wall = 0;
+        c.hls.on(window.Hls.Events.FRAG_LOADED, () => { wall = 0; });
+        c.hls.on(window.Hls.Events.ERROR, (_e, x) => {
+          if (x.details === 'fragLoadError' || x.details === 'fragLoadTimeOut') {
+            if (++wall !== 3) return;
+            // stopLoad, NOT pause: the buffer already holds real material and
+            // pausing threw away ~113 s of picture that was there to watch.
+            // Stop asking for what ERR refuses, play out what it gave.
+            c.hls?.stopLoad();
+            c.atWall = true;                 // the readout tick below reads this
+            const left = c.media.buffered.length
+              ? c.media.buffered.end(c.media.buffered.length - 1) - c.media.currentTime : 0;
+            d.log(`${c.id}: reached what ERR refuses (rights) — stopped asking, ${left.toFixed(0)}s left to play`, 'bad');
+            return;
+          }
+          if (x.fatal) d.log(`${c.id}: ${x.details}`, 'bad');
+        });
+      } else {
+        d.log(`${c.id}: no HLS engine — neither native nor MSE`, 'bad');
       }
     } else {
       c.media.src = `https://icecast.err.ee/${c.id}.mp3`;
@@ -157,16 +266,40 @@
     d.log(`playing ${chans[sel].name}`);
   });
 
-  d.on('live', () => {
+  // "Live edge" means the newest frame ERR will actually SERVE. Jumping to
+  // liveSyncPosition when the newest 52 minutes are rights-blocked lands the
+  // playhead in the blackout and kills a picture that was playing — so re-probe
+  // (the boundary moves with the schedule) and say where it actually landed.
+  d.on('live', async () => {
     const c = chans[sel];
-    const edge = c.hls?.liveSyncPosition;
+    // radio is a live icecast pipe: no DVR, no window, nothing to jump to
+    if (c.kind !== 'tv') { d.log(`${c.id} is a live stream with no DVR`); return; }
+    if (!c.hls) { d.log('nothing playing', 'bad'); return; }
+    const served = await servedStart(c);
+    c.served = served ?? c.served;
+    d.set('blocked', served ? Math.round(served.blockedMin) : null,
+      !served || served.none ? 'bad' : served.blockedMin ? '' : 'ok');
+    if (served && served.sn != null) {
+      const frags = c.hls.levels?.[c.hls.currentLevel >= 0 ? c.hls.currentLevel : c.hls.loadLevel]?.details?.fragments;
+      const frag = frags?.find((f) => f.sn === served.sn);
+      if (frag) {
+        c.media.currentTime = frag.start;
+        d.log(`jumped to the newest served frame — ERR refuses the ${Math.round(served.blockedMin)} min after it`);
+        return;
+      }
+    }
+    const edge = c.hls.liveSyncPosition;
     if (Number.isFinite(edge)) { c.media.currentTime = edge; d.log('jumped to the live edge'); }
   });
 
   setInterval(() => {
     const c = chans[sel];
-    d.set('state', c.media.paused ? 'paused' : (c.media.readyState >= 3 ? 'playing' : 'buffering'),
-      c.media.paused ? 'bad' : 'ok');
+    // 'blocked' outranks 'paused': the picture stopped because ERR refuses what
+    // comes next, and a readout that only said "paused" would hide the reason.
+    const moving = !c.media.paused && c.media.readyState >= 3;
+    d.set('state', moving ? 'playing'
+      : c.atWall ? 'blocked' : (c.media.paused ? 'paused' : 'buffering'),
+      moving ? 'ok' : 'bad');
     if (c.kind === 'tv' && c.hls) {
       const edge = c.hls.liveSyncPosition;
       if (Number.isFinite(edge)) {
