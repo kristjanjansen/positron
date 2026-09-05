@@ -128,8 +128,6 @@ looked like a caching bug. Assets propagate; wait and confirm.
 
 Both comments were correct and both were telling me something I ignored.
 
----
-
 ### 11. An error string cannot tell "absent" from "blocked"
 
 `@moq/net` emits the same "WebTransport not supported" whether the API is
@@ -154,6 +152,8 @@ it from 11 asserts to 10 — the other branch silently stopped being tested whil
 the suite still read green. Same failure shape as #2, one layer down. Compare
 per-demo counts against the last known total after any change.
 
+---
+
 ## Platform facts worth keeping
 
 ### iOS / MSE
@@ -161,8 +161,15 @@ per-demo counts against the last known total after any change.
 - **iOS 17.1 added `ManagedMediaSource`.** `Hls.isSupported()` is therefore
   **true** on iPhone, which silently disables any native-HLS fallback written as
   `if (!Hls.isSupported() && canPlayType(...))`. That check was a correct proxy
-  for "iPhone" for years and then quietly stopped being one. Decide on the real
-  question: native HLS available **and** no plain `MediaSource` is iPhone.
+  for "iPhone" for years and then quietly stopped being one.
+- **Prefer native HLS on ALL WebKit, gated on `ManagedMediaSource`.** The first
+  fix here used "native available AND no plain MediaSource", i.e. iPhone only,
+  on the theory that hls.js is worth keeping wherever it works. Desktop Safari
+  says otherwise: native 0.961x advance / 5.25 s / 0 errors against hls.js
+  0.344x / 7.71 s / 2 errors. And `canPlayType('application/vnd.apple.mpegurl')`
+  returns `"maybe"` in BOTH Safari and Chrome, so it cannot tell them apart —
+  gating on its truthiness put Chrome on a path it cannot play. MMS is
+  WebKit-only, so it is a capability test rather than a brand check.
 - **Safari can close a ManagedMediaSource under you** — `mediaSourceRequiresReset`,
   "MediaSource closed while media attached". Every buffer is dumped; that is the
   visible flash. MMS also *gates loading* via `startstreaming`/`endstreaming`.
