@@ -130,6 +130,30 @@ Both comments were correct and both were telling me something I ignored.
 
 ---
 
+### 11. An error string cannot tell "absent" from "blocked"
+
+`@moq/net` emits the same "WebTransport not supported" whether the API is
+missing or merely refused by its own user-agent policy. I read that string and
+asserted iOS had no WebTransport. It shipped in Safari 26.4, on iOS too, and on
+desktop it connects to Cloudflare in 140 ms. Report the capability, not the
+error — and when a library says "unsupported", check whether it means "I will
+not" rather than "I cannot".
+
+### 12. A library's blanket exclusion usually has a reason. Read it before routing around it
+
+The block was `safari: "<0"` — unsatisfiable, so permanent — and its source
+comment cited WebKit 319818: the QUIC flow-control window never refills. I built
+a bypass anyway on the assumption it was merely conservative, and reproduced the
+bug exactly: 7 and 8 frames per 150 s across two runs, and a fresh page did not
+clear it. The bypass is now opt-in, for measuring the bug.
+
+### 13. Assert every branch, and diff the assert COUNT
+
+Adding a mode to a demo made its check assert only the active branch, dropping
+it from 11 asserts to 10 — the other branch silently stopped being tested while
+the suite still read green. Same failure shape as #2, one layer down. Compare
+per-demo counts against the last known total after any change.
+
 ## Platform facts worth keeping
 
 ### iOS / MSE

@@ -1,4 +1,4 @@
-# Handoff — 2026-09-04 (end of session 8)
+# Handoff — 2026-09-05 (end of session 9)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
@@ -7,11 +7,13 @@ newest and wins over §7–§8.
 
 ## One line
 
-The project is **positron**, live on **positron.studio**, and the work is now
-visible: a shared demo shell and **18 demos, 239/239 green** against the
-deployed URL — including the latency ladder measured on a page anyone can open
-(**rtt 25 ms WHEP vs 3.49 s LL-HLS**), the seek fold asserted at every cue
-boundary, and a publisher container that runs only while somebody is watching.
+Live on **positron.studio**, **20 of 24 demos built, 274/274 green**. This
+session found why iOS stuttered — our own drift-seek, then a stale check that
+had silently stopped preferring native HLS since iOS 17.1 added
+ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
+**24 capture** (camera to R2 to timeline through a tokenless capped ingest),
+and cleared Stream storage from **559.97 to 15.81** of a 1000-minute cap it was
+two days from hitting.
 
 ## 2026-09-04 — renamed to `positron`, moved to `positron.studio`
 
@@ -74,7 +76,65 @@ reason: it is named for its subject, not for this repo.
   afterwards. Cloudflare, Google, Quad9 and OpenDNS all resolved it within
   minutes; a home router that had cached the miss did not. Not a misconfiguration.
 
-## Where things stand (session 8)
+## Where things stand (session 9)
+
+**274/274 green.** 20 of 24 built; `20`–`22` are archive pages that work and are
+linked but not re-shelled, `23 studio` is assembly.
+
+| worker | hostname | what |
+|---|---|---|
+| `elektron-view` | `positron.studio` | the index, the demos, the archive pages |
+| `positron-ws` | `ws.positron.studio` | tokenless verbatim relay |
+| `positron-pub` | `pub.positron.studio` | publisher container + device log sink (`/logs?format=text`) |
+| **`positron-ingest`** | **`ingest.positron.studio`** | **the one tokenless WRITE path to R2, capped** |
+| `elektron-selfrec` | `selfrec.positron.studio` | token-gated R2 recorder (Bearer SELFREC_TOKEN) |
+| R2 `elektron-archive-test` | `archive.positron.studio` | shows, plus `demo/ingest/<session>/` |
+
+### Three harnesses, because one cannot see everything
+
+```sh
+node demo/verify.mjs          # every built demo, CDP/Chrome — 274 asserts
+node demo/verify-native.mjs   # the IPHONE code path; verify.mjs CANNOT reach it
+node demo/verify-safari.mjs   # desktop Safari over WebDriver, both engines
+```
+
+`verify.mjs` reported 261/261 while 06 was fatally broken on iPhone, because
+desktop Chrome never enters that branch. Run all three after touching
+`src/low-latency-player.js`.
+
+### The numbers worth remembering
+
+| path | glass-to-glass | how |
+|---|---|---|
+| MoQ | **p50 26.2 / p95 42.4 ms** | browser→CF→browser, burned pixels |
+| WHEP | **p50 67.0 / p95 76.9 / p99 84.1 ms** | same method, n=17,501, re-measured 09-05 |
+| LL-HLS | ~3.3 s | the compatibility tier |
+
+MoQ is ~1.6–1.9x faster at the median once you add the vsync its measurement
+omits — NOT 3x. WHEP wins p99 (84 vs 105 ms): the jitter buffer costs the median
+and buys the tail. "WHEP rtt 25 ms" is NOT comparable to these; it is
+candidate-pair RTT, not media latency.
+
+### Open, with a named next step
+
+- **iOS is UNCONFIRMED since the native switch.** "Seems to work" was reported on
+  v12; then a TDZ of mine broke the page entirely, and v13/v14 added native
+  recovery plus three native-path fixes. No phone has been tested since. Open
+  `positron.studio/06-llhls/` and read the first log line for the build id.
+- **The archival cron.** Copying Stream recordings to R2 is PROVEN (105.8 MB MP4,
+  byte-exact, publicly served). The worker needs a Stream-scoped token; `.env`
+  holds the known-exposed legacy one — mint a fresh token rather than deploying
+  it. Without the cron, storage climbs ~225 min/day under testing toward a hard
+  1000-minute cap that breaks playback.
+- **Recording mode cannot be turned off.** It also disables HLS playback of a
+  live input, and `preferLowLatency` requires `automatic`. 06 and 09 depend on
+  it. Deletion is the only lever; `deleteRecordingAfterDays` minimum is 30.
+- **MoQ is Chromium/Firefox only.** Safari has WebTransport since 26.4 but
+  WebKit 319818 deadlocks the session; measured 7–8 frames per 150 s, and a
+  reconnect does not clear it. Safari and iOS get WHEP.
+- **`.env` still holds the exposed legacy `CF_API_TOKEN`** (Stream/Calls only).
+
+## Where things stand (session 8 — superseded above)
 
 **Live.** `positron.studio` is the demo index, generated from
 `demo/manifest.mjs`. Demos are at `/<nn>-<name>/`, notes at `/notes/`.
