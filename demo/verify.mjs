@@ -8,6 +8,7 @@
 // Raw CDP over node's global WebSocket, no deps — house harness style.
 
 import { spawn } from 'node:child_process';
+import { rm } from 'node:fs/promises';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 
@@ -24,6 +25,13 @@ if (!targets.length) { console.error('nothing to verify'); process.exit(1); }
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${HTTP_PORT}`;
 console.log(`base ${BASE}`);
+
+// EMPTY CACHE EVERY RUN. A media element loading `video.src = <m3u8>` stores a
+// no-cors (opaque) entry for that URL; when a demo later switches to hls.js,
+// its XHR for the SAME url is served from that entry and rejected as a CORS
+// failure — on a URL that answers 200 with `access-control-allow-origin: *`.
+// Two demos read red for exactly that reason and nothing in the page was wrong.
+await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() => {});
 
 const chrome = spawn(CHROME, [
   '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`,
@@ -69,8 +77,11 @@ let errors = [];
 let failedReqs = [];
 let abortedReqs = [];
 let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
+let rightsBlocks = [];   // ERR segments refused by programme rights: same treatment
+const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
+  if (m.method === 'Network.requestWillBeSent') reqUrl.set(m.params.requestId, m.params.request?.url || '');
   if (m.method === 'Runtime.exceptionThrown') {
     errors.push(m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text);
   }
@@ -87,6 +98,13 @@ listeners.push((m) => {
     // outage as "normal churn".
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
       edgeMisses.push(e.url);
+    } else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`)
+               && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
+      // ERR refuses segments by PROGRAMME rights — 403 with no ACAO, so the
+      // browser reports CORS. 19 flipper probes for this deliberately and says
+      // in its readout how much was refused, so the requests are expected.
+      // Capped, not ignored: past the ceiling this is an outage, not rights.
+      rightsBlocks.push(e.url);
     } else errors.push(e.text);
   }
   if (m.method === 'Network.loadingFailed') {
@@ -95,8 +113,10 @@ listeners.push((m) => {
     // failed. Every page that plays media produces these on teardown, so
     // counting them made a working demo look broken. Recorded separately
     // rather than ignored.
+    const url = reqUrl.get(m.params.requestId) || '';
     if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
-    else failedReqs.push(m.params.errorText);
+    else if (m.params.corsErrorStatus && /live\.err\.ee/.test(url)) rightsBlocks.push(url);
+    else failedReqs.push(`${m.params.errorText}${url ? ` ${url.slice(0, 70)}` : ''}`);
   }
 });
 
@@ -115,7 +135,7 @@ const ok = (label, cond, detail) => {
 
 for (const t of targets) {
   console.log(`\n[${t.n}] ${t.name}`);
-  errors = []; failedReqs = []; abortedReqs = []; edgeMisses = [];
+  errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; rightsBlocks = []; reqUrl.clear();
   await S('Page.navigate', { url: `${BASE}/${t.n}-${t.name}/` });
   await sleep(1400);
 
@@ -205,11 +225,15 @@ for (const t of targets) {
   // assert would make the suite total vary run to run, and a shrinking total
   // is exactly how four asserts went missing unnoticed earlier.
   const EDGE_CEILING = 25;
+  const RIGHTS_CEILING = 40;      // 19 flipper sweeps 8 per probe, twice, + hls.js's own tries
   const edgeOk = edgeMisses.length <= EDGE_CEILING;
-  ok('no console errors', errors.length === 0 && edgeOk,
+  const rightsOk = rightsBlocks.length <= RIGHTS_CEILING;
+  ok('no console errors', errors.length === 0 && edgeOk && rightsOk,
     (errors.slice(0, 2).join(' | ') || '0')
     + (edgeMisses.length ? `  (+${edgeMisses.length} live-edge part 404${edgeMisses.length > 1 ? 's' : ''}`
-      + `${edgeOk ? ', normal' : ` — OVER the ceiling of ${EDGE_CEILING}`})` : ''));
+      + `${edgeOk ? ', normal' : ` — OVER the ceiling of ${EDGE_CEILING}`})` : '')
+    + (rightsBlocks.length ? `  (+${rightsBlocks.length} ERR segment${rightsBlocks.length > 1 ? 's' : ''} refused`
+      + `${rightsOk ? ' by rights, expected' : ` — OVER the ceiling of ${RIGHTS_CEILING}`})` : ''));
   ok('no failed requests', failedReqs.length === 0, failedReqs.slice(0, 2).join(' | ') || '0');
   if (abortedReqs.length) {
     console.log(`        (${abortedReqs.length} aborted on teardown — expected for a media page)`);

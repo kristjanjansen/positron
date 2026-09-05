@@ -1,10 +1,8 @@
 # positron
 
-Live at **https://positron.studio**. 21 of 25 demos built, 289/291 green — the
-two reds are `19 flipper`, which now gets a 403 from ERR and which takes the
-dead native-HLS path in desktop Chrome (see the `canPlayType` fact below).
-Read `HANDOFF.md` for current state, `LESSONS.md` for why the rules below
-exist, `PROGRESS.md` for what was measured when.
+Live at **https://positron.studio**. 21 of 25 demos built, 291/291 green. Read
+`HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
+`PROGRESS.md` for what was measured when.
 
 ## Run and check
 
@@ -72,6 +70,15 @@ are now escaped. If a search for a symbol you are sure exists comes back empty,
 suspect the file before the symbol: `node -e "…indexOf(…)"` is the second
 opinion.
 
+**An engine switch invalidates the harness's HTTP cache.** A media element
+loading `video.src = <m3u8>` stores a no-cors (opaque) entry for that URL; the
+moment a page switches to hls.js, its XHR for the SAME url is served from that
+entry and rejected as a CORS failure — on a URL that answers 200 with
+`access-control-allow-origin: *`, and while the page's own `fetch` of it
+succeeds in the same run. Two demos read red for exactly this and nothing in
+either page was wrong. `verify.mjs` now deletes its profile's Cache before
+every run.
+
 **Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
 reports `tail`'s exit status, not `cmd`'s.
 
@@ -99,7 +106,12 @@ to recover.
   on a path it cannot play. MMS is WebKit-only, so it is a capability test rather
   than a brand check. Measured on desktop Safari, same page, same 40 s: native
   advance 0.961x / latency 5.25 s / 0 errors, against hls.js 0.344x / 7.71 s /
-  2 errors.
+  2 errors. **HEADLESS Chrome answers `"maybe"` too**, so the suite cannot tell
+  the two paths apart: `14 replay`, `15 seek` and `19 flipper` all ran
+  `video.src = <m3u8>` on a Chrome that cannot play it — dead picture, green
+  suite, because their asserts were about decks and cue folds, not about frames.
+  All three now gate on MMS (2026-09-06). Grep for `canPlayType` before trusting
+  any HLS page.
 - **Safari can close a ManagedMediaSource under you.** Every buffer is dumped.
   MMS also gates loading via `startstreaming`/`endstreaming`.
 - **`video.buffered` on MSE is the INTERSECTION of the source buffers.** With
@@ -157,6 +169,16 @@ to recover.
 - **MediaRecorder output reports `duration: Infinity`**, which leaves a
   transport bar with no range to scrub. Seek far past the end, let the browser
   resolve the duration, then come back.
+- **ERR blocks live segments by PROGRAMME, not by age.** The playlists are open
+  (200 + `access-control-allow-origin: *`), the segments under `/live/hls/` can
+  be 403 with NO ACAO — which reaches a browser as a CORS failure, so hls.js
+  holds an empty buffer and the cell just stays black. Swept at 13 points
+  across each 2 h window on 2026-09-06: `etv` refused its newest ~45 min,
+  `etv2` refused its OLDEST ~78 min and served the edge, `etvpluss` served
+  everything. It moves with the schedule and it is not always at the edge, so
+  there is no offset to hard-code. A served segment honours Range, so a 2-byte
+  GET asks "will you serve this one?" — `19 flipper` sweeps back from the edge,
+  starts where ERR will serve, and puts the refused minutes in its readout.
 - **A remote `MediaStream` carries the SENDER's msid.** After a hop,
   `remote.id === local.id` and the track ids match too, so "is this the received
   stream or the source?" cannot be answered by id — it is answered by object

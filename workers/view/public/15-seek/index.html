@@ -102,11 +102,21 @@
 
   let master = null, hls = null;
 
+  // NATIVE HLS ONLY ON WEBKIT, gated on ManagedMediaSource. `canPlayType(
+  // 'application/vnd.apple.mpegurl')` answers "maybe" in Chrome as well as
+  // Safari, so the old `if (canPlayType(...))` put Chrome on the native path,
+  // where `video.src = <m3u8>` sits at readyState 0 forever. Headless Chrome
+  // answers "" and takes the hls.js branch, which is why the suite stayed green
+  // over a page that was dead in the browser a human uses. Same rule as
+  // src/low-latency-player.js.
+  const NATIVE_HLS = 'ManagedMediaSource' in window
+    && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+
   d.on('load', async () => {
     if (master) return;
     armVideo(video);
     const url = ARCHIVE.hls;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
+    if (NATIVE_HLS) video.src = url;         // WebKit plays HLS natively
     else if (window.Hls?.isSupported()) {
       hls = new window.Hls({ enableWorker: true });
       hls.loadSource(url); hls.attachMedia(video);
