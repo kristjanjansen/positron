@@ -9,195 +9,128 @@
 <style>
   .tier { font: 600 10px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
           color: var(--hi); margin: 12px 0 5px; }
-  .row { display: grid; gap: 5px; margin: 0 0 4px; }
-  .row.featured { grid-template-columns: 1fr; }
-  .row.live { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-  .row.wall { grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); }
-  /* every tile identical: one grid, one size, one paint rate */
-  .row.uniform { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+  /* one grid, one size — there is no second row to differ from */
+  .row { display: grid; gap: 5px; margin: 0 0 4px;
+         grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
   .t { position: relative; aspect-ratio: 16/9; background: #000; border: 1px solid var(--line);
        border-radius: 3px; overflow: hidden; }
   .t canvas { width: 100%; height: 100%; display: block; }
   .t .n { position: absolute; left: 3px; bottom: 2px; font: 600 9px/1.3 var(--mono);
           color: var(--fg); background: #0b0e14aa; padding: 0 3px; border-radius: 2px; }
-  .row.featured .t .n { font-size: 13px; padding: 2px 6px; }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
 
-  // The tiers are the measured design from plan-m2m: ONE featured, a handful
-  // live, the rest a wall. It exists because attaching every participant at
-  // full rate does not scale — the wall is deliberately cheap.
-  const TIERS = { featured: 1, live: 5 };
+  // ONE TIER. The featured/live/wall tiering is gone — no featured tile, no
+  // capped live row, no cheap wall drawn at a lower rate. Every participant
+  // gets the same box, the same backing store, and the same paint on every
+  // tick, so there is no per-tile quality to argue about.
+  //
+  // What that costs is NOT visible here. These tiles are synthetic canvases,
+  // so paint ms is a FLOOR: at 54 tiles it reads a fraction of a millisecond,
+  // which says nothing about an SFU delivering and a device decoding 54
+  // streams at full rate. The tiering existed because that part does not
+  // scale (plan-m2m: N=54 = 106 tracks on one PeerConnection, SFU p50 flat
+  // 122-137 ms — the SFU held, the client tier was the lever). Removing it
+  // here removes it from the RENDER only. Do not read this page as evidence
+  // that uniform quality is free end to end.
 
   const d = mount({
     n: '11',
     name: 'grid',
-    what: 'N participants, tiered — one featured, a few live, the rest a wall. Toggle uniform to render them all alike.',
-    readout: { n: '', featured: '', live: '', wall: '', paint: 'ms' },
+    what: 'N participants in one grid — every tile the same size, the same rate, the same quality.',
+    readout: { n: '', tile: 'px', paint: 'ms' },
     controls: [
       { id: 'add', label: 'Add four', primary: true },
       { id: 'many', label: 'Go to 54' },
-      { id: 'rotate', label: 'Rotate the featured' },
-      { id: 'uniform', label: 'All same quality' },
       { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
 
-  const rows = {};
-  const tierLabels = {};
-  for (const name of ['featured', 'live', 'wall']) {
-    tierLabels[name] = el('div', 'tier', name);
-    d.el.append(tierLabels[name]);
-    rows[name] = el('div', `row ${name}`);
-    d.el.append(rows[name]);
-  }
-  // UNIFORM MODE. Asked for, and kept as a toggle rather than a replacement,
-  // because the tiering is the measured design from plan-m2m: attaching every
-  // participant at full rate is what does not scale.
-  //
-  // The readout reports paint ms, but be careful what it means: these tiles are
-  // synthetic canvases, so it is a FLOOR and not the real cost. At 54 uniform
-  // tiles it reads ~0.26 ms here, which says nothing about an SFU decoding 54
-  // streams. The honest claim is "uniform renders fine"; the expensive part is
-  // elsewhere and this demo does not measure it.
-  let uniform = false;
-  const uniformLabel = el('div', 'tier', 'all participants, same quality');
-  const uniformRow = el('div', 'row uniform');
-  uniformLabel.style.display = 'none';
-  uniformRow.style.display = 'none';
-  d.el.append(uniformLabel, uniformRow);
+  d.el.append(el('div', 'tier', 'all participants, same quality'));
+  const row = el('div', 'row');
+  d.el.append(row);
 
   const parts = [];
-  let featuredIdx = 0, painting = null;
 
   function addParticipant(i) {
     const c = el('canvas');
-    c.width = 160; c.height = 90;
+    c.width = 160; c.height = 90;          // same backing store for everyone
     const box = el('div', 't');
     box.append(c, el('span', 'n', `p${i}`));
     parts.push({ i, canvas: c, box, ctx: c.getContext('2d') });
   }
 
   function layout() {
-    for (const name of ['featured', 'live', 'wall']) {
-      tierLabels[name].style.display = uniform ? 'none' : '';
-      rows[name].style.display = uniform ? 'none' : '';
-    }
-    uniformLabel.style.display = uniform ? '' : 'none';
-    uniformRow.style.display = uniform ? '' : 'none';
-
-    for (const r of Object.values(rows)) r.replaceChildren();
-    uniformRow.replaceChildren();
-    if (uniform) {
-      // one tier for everyone: same box, same paint rate, same styling
-      for (const p of parts) { p.tier = 'same'; uniformRow.append(p.box); }
-      d.set('n', parts.length);
-      d.set('featured', 0);
-      d.set('live', parts.length);
-      d.set('wall', 0);
-      return;
-    }
-    parts.forEach((p, idx) => {
-      // rank relative to the featured one, so rotating is a re-rank not a rebuild
-      const rank = (idx - featuredIdx + parts.length) % parts.length;
-      const tier = rank < TIERS.featured ? 'featured' : rank < TIERS.featured + TIERS.live ? 'live' : 'wall';
-      p.tier = tier;
-      rows[tier].append(p.box);
-    });
-    const count = (t) => parts.filter((p) => p.tier === t).length;
+    row.replaceChildren();
+    for (const p of parts) row.append(p.box);
     d.set('n', parts.length);
-    d.set('featured', count('featured'));
-    d.set('live', count('live'));
-    d.set('wall', count('wall'));
+    const w = row.firstChild ? Math.round(row.firstChild.getBoundingClientRect().width) : null;
+    d.set('tile', w);
   }
 
-  // The wall is drawn at a lower rate on purpose: that asymmetry IS the tiering.
-  let paintEma = null;
+  // Every tile, every tick. `painted` is what the checks assert on: the old
+  // wall skipped frames on purpose, and the only proof that is gone is a count
+  // of what the last tick actually drew.
+  let paintEma = null, painted = 0;
   function paint() {
     const t0 = performance.now();
     const now = Date.now();
+    let n = 0;
     for (const p of parts) {
-      // In uniform mode NOTHING is cheap: no skipped frames, no smaller type,
-      // no dimmer palette. Every tile gets what the featured one gets.
-      const big = uniform || p.tier === 'featured';
-      const slow = !uniform && p.tier === 'wall';
-      if (slow && now % 500 > 60) continue;
       const g = p.ctx;
-      g.fillStyle = big ? '#151b26' : '#11151d';
+      g.fillStyle = '#151b26';
       g.fillRect(0, 0, 160, 90);
-      g.fillStyle = big ? '#ffd400' : '#8b93a1';
-      g.font = `bold ${uniform ? 15 : p.tier === 'featured' ? 22 : 13}px ui-monospace, monospace`;
+      g.fillStyle = '#ffd400';
+      g.font = 'bold 15px ui-monospace, monospace';
       g.fillText(`p${p.i}`, 8, 26);
       g.fillStyle = '#2b3546';
       g.fillRect(8, 40, 144, 4);
-      g.fillStyle = big ? '#ffd400' : '#6a7280';
+      g.fillStyle = '#ffd400';
       g.fillRect(8, 40, ((now / 20 + p.i * 17) % 144), 4);
+      n++;
     }
+    painted = n;
     const ms = performance.now() - t0;
     paintEma = paintEma == null ? ms : paintEma * 0.9 + ms * 0.1;
-    // 40 ms is the tick; past that the wall cannot hold its rate
+    // 40 ms is the tick; past that the grid cannot hold its rate
     d.set('paint', Math.round(paintEma * 100) / 100,
       paintEma < 8 ? 'ok' : paintEma < 20 ? '' : 'bad');
   }
 
   d.on('add', () => { for (let k = 0; k < 4; k++) addParticipant(parts.length + 1); layout(); });
-  d.on('many', () => { while (parts.length < 54) addParticipant(parts.length + 1); layout(); d.log('54 participants — the p95 the SFU held flat'); });
-  d.on('rotate', () => { if (parts.length) { featuredIdx = (featuredIdx + 1) % parts.length; layout(); d.log(`featured -> p${parts[featuredIdx].i}`); } });
-
-  d.on('uniform', () => {
-    uniform = !uniform;
+  d.on('many', () => {
+    while (parts.length < 54) addParticipant(parts.length + 1);
     layout();
-    d.log(uniform
-      ? `uniform: all ${parts.length} rendered alike`
-      : 'tiered: 1 featured, 5 live, the rest a cheap wall');
-    // Say what the number is NOT. These tiles are synthetic canvases, so paint
-    // ms is a FLOOR — the real cost of uniform quality is decoding N WebRTC
-    // streams, which this demo does not do. Presenting 0.26 ms as "what uniform
-    // costs" would be exactly the kind of misleading number worth avoiding.
-    if (uniform) d.log('paint ms is canvas only — the real cost is N decoded streams, not measured here');
+    d.log('54 participants, all at the same quality — paint ms is canvas only, not N decoded streams');
   });
 
   d.on('check', () => {
     d.assert('participants present', parts.length > 0, String(parts.length));
-    // BOTH MODES, every run. Asserting only the active one dropped this demo
-    // from 11 asserts to 10 the moment uniform mode landed — the tiered
-    // invariants silently stopped being tested while the suite still read
-    // green. layout() is synchronous, so exercising both is deterministic.
-    const restore = uniform;
-    for (const mode of [false, true]) {
-      uniform = mode;
-      layout();
-      if (mode) {
-        d.assert('uniform: every participant in one tier', parts.every((p) => p.tier === 'same'),
-          [...new Set(parts.map((p) => p.tier))].join(','));
-        const w = [...uniformRow.children].map((b) => Math.round(b.getBoundingClientRect().width));
-        d.assert('uniform: every tile the same width', new Set(w).size <= 1, w.slice(0, 8).join(','));
-      } else {
-        const ff = parts.filter((p) => p.tier === 'featured').length;
-        d.assert('tiered: exactly one featured', ff === Math.min(1, parts.length), String(ff));
-        const ll = parts.filter((p) => p.tier === 'live').length;
-        d.assert('tiered: live tier capped', ll <= TIERS.live, `${ll} <= ${TIERS.live}`);
-      }
-    }
-    uniform = restore;
-    layout();
+    d.assert('every participant has a tile', row.children.length === parts.length,
+      `${row.children.length}/${parts.length}`);
+    const boxes = [...row.children].map((b) => b.getBoundingClientRect());
+    const w = boxes.map((r) => Math.round(r.width));
+    const h = boxes.map((r) => Math.round(r.height));
+    d.assert('every tile the same width', new Set(w).size <= 1, w.slice(0, 8).join(','));
+    d.assert('every tile the same height', new Set(h).size <= 1, h.slice(0, 8).join(','));
+    // one backing store size for all — a smaller canvas would be a quality tier
+    // by another name, which is exactly what this demo no longer has
+    const res = parts.map((p) => `${p.canvas.width}x${p.canvas.height}`);
+    d.assert('every tile the same resolution', new Set(res).size <= 1, res[0] ?? '—');
+    d.assert('the last tick painted every tile', painted === parts.length,
+      `${painted}/${parts.length}`);
     d.assert('paint cost reported', paintEma != null, `${Math.round(paintEma * 100) / 100} ms`);
-    if (uniform) return;
-    const total = parts.filter((p) => p.tier).length;
-    d.assert('every participant is in exactly one tier', total === parts.length, `${total}/${parts.length}`);
-    if (parts.length > TIERS.featured + TIERS.live) {
-      d.assert('the overflow becomes a wall',
-        parts.filter((p) => p.tier === 'wall').length === parts.length - TIERS.featured - TIERS.live);
-    }
+    d.assert('paint fits the 40 ms tick', paintEma != null && paintEma < 40,
+      `${Math.round(paintEma * 100) / 100} < 40 ms`);
   });
 
   for (let k = 0; k < 4; k++) addParticipant(k + 1);
   layout();
-  painting = setInterval(paint, 40);
-  d.log('tiers from plan-m2m: 1 featured, 5 live, the rest a cheap wall');
+  setInterval(paint, 40);
+  d.log('one grid: every participant the same size, the same rate, the same quality');
   d.ready();
 </script>
 </html>

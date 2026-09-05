@@ -7,7 +7,7 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**, **20 of 24 demos built, 274/274 green**. This
+Live on **positron.studio**, **20 of 24 demos built, 276/276 green**. This
 session found why iOS stuttered — our own drift-seek, then a stale check that
 had silently stopped preferring native HLS since iOS 17.1 added
 ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
@@ -78,7 +78,7 @@ reason: it is named for its subject, not for this repo.
 
 ## Where things stand (session 9)
 
-**274/274 green.** 20 of 24 built; `20`–`22` are archive pages that work and are
+**276/276 green.** 20 of 24 built; `20`–`22` are archive pages that work and are
 linked but not re-shelled, `23 studio` is assembly.
 
 | worker | hostname | what |
@@ -93,7 +93,7 @@ linked but not re-shelled, `23 studio` is assembly.
 ### Three harnesses, because one cannot see everything
 
 ```sh
-node demo/verify.mjs          # every built demo, CDP/Chrome — 274 asserts
+node demo/verify.mjs          # every built demo, CDP/Chrome — 276 asserts
 node demo/verify-native.mjs   # the IPHONE code path; verify.mjs CANNOT reach it
 node demo/verify-safari.mjs   # desktop Safari over WebDriver, both engines
 ```
