@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '84dceb4-124058';
+export const BUILD = 'b8a28a4-130015';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -217,4 +217,41 @@ export async function playOrPrompt(v, d) {
 export function guard(d) {
   addEventListener('error', (e) => d.fail(e.error || e.message));
   addEventListener('unhandledrejection', (e) => d.fail(e.reason));
+}
+
+/**
+ * Batched, fire-and-forget device reporting.
+ *
+ * A phone cannot be attached to a debugger, so the page posts instead. The sink
+ * is the publisher Durable Object, whose lifetime is already "somebody is
+ * watching": POST /log, read back with GET /logs?format=text.
+ *
+ * Lives here because two demos have now needed it and the second one called it
+ * before noticing it was local to the first. Diagnostics must never be able to
+ * make the page worse than the problem being diagnosed, hence the swallowed
+ * failure, the 2 s batch, and the repeat collapsing — one phone sent the same
+ * fragLoadError ~30x in a run and pushed everything useful out of the ring.
+ */
+export function createShipper(url = 'https://pub.positron.studio/log') {
+  const pending = [];
+  let timer = null, lastKey = '', repeat = 0;
+  return function ship(line) {
+    const key = String(line).slice(0, 60);
+    if (key === lastKey) { repeat++; return; }
+    if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; }
+    lastKey = key;
+    pending.push(`${(performance.now() / 1000).toFixed(2)} ${line}`);
+    if (timer) return;
+    timer = setTimeout(async () => {
+      timer = null;
+      const batch = pending.splice(0, pending.length).join('\n');
+      if (!batch) return;
+      try {
+        await fetch(url, {
+          method: 'POST', body: batch, keepalive: true,
+          headers: { 'content-type': 'text/plain' },
+        });
+      } catch { /* diagnostics are never load-bearing */ }
+    }, 2000);
+  };
 }

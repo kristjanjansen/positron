@@ -95,6 +95,24 @@ to recover.
   IETF `moq-pub` does not interoperate with hang at the catalog layer; but
   browser→relay→browser works today at p50 ~20 ms, with no container and no Rust
   build.
+- **MoQ on Safari is blocked for a good reason.** WebTransport shipped in Safari
+  26.4 (macOS and iOS) and connects to Cloudflare's relay in 140 ms — but
+  `@moq/net` blocks Safari by user agent (`safari: '<0'`) because of
+  [WebKit 319818](https://bugs.webkit.org/show_bug.cgi?id=319818): the QUIC
+  flow-control window never refills, deadlocking after ~16 MiB or ~7,600
+  streams. MoQ opens one stream per group, so that is about two minutes.
+  Bypassing it (`08-moq/?transport=force`) reproduces the bug exactly — 6 frames
+  then nothing. Not the encoder: Safari does VP8 720p at 370 fps.
+- **Cloudflare's MoQ relay has no WebSocket listener**, so the qmux fallback
+  cannot help. `moq-relay` (self-hosted) does, via `[web.http] listen`.
+- **An error string cannot tell "API absent" from "API blocked".** `@moq/net`
+  emits the same "WebTransport not supported" either way, which is how a claim
+  that iOS lacks WebTransport got made without anyone checking `typeof
+  WebTransport` on the device. Report the capability, not the error.
+- **ManagedMediaSource needs `disableRemotePlayback = true`** (or an AirPlay
+  source alternative) or `sourceopen` never fires. There is no published
+  low-latency guidance for MMS — native HLS is the documented low-latency path
+  on WebKit, which is why the player prefers it there.
 
 ## Conventions
 

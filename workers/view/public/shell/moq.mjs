@@ -26,29 +26,93 @@ export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
 /**
  * Can this browser reach the relay at all?
  *
- * MoQ needs WebTransport, and SAFARI DOES NOT HAVE IT (checked on iOS 18.7 /
- * Safari 26.6: the page failed with "no transport available; WebTransport not
- * supported and WebSocket is disabled").
+ * CORRECTED TWICE on 2026-09-05. First I claimed Safari has no WebTransport;
+ * that was wrong. Then I built a bypass on the assumption the library's block
+ * was merely conservative; that was wrong too. What is actually true:
  *
- * @moq/net does carry a WebSocket fallback, mapping https:->wss: on the same
- * host with the qmux-02/01/00 subprotocols. It cannot help here: Cloudflare
- * draft-14 refuses a WebSocket handshake outright — measured 2026-09-05, all
- * three subprotocols AND no subprotocol, four failures out of four. So the
- * fallback stays disabled deliberately, and the honest answer on Safari is
- * "not available here" rather than a black rectangle and a red error.
+ *  1. macOS Safari 26.6.2 HAS WebTransport and it connects. Asked directly,
+ *     `new WebTransport('https://draft-14.cloudflare.mediaoverquic.com')`
+ *     reached ready in 140 ms and created a bidirectional stream. WebTransport
+ *     shipped in Safari 26.4 (24 Mar 2026) on macOS AND iOS.
+ *  2. @moq/net blocks it by USER-AGENT, `bowser.satisfies({ safari: '<0' })`,
+ *     which no Safari version can satisfy — a permanent blanket block.
+ *  3. THE BLOCK IS CORRECT. Its source comment cites WebKit bug 319818:
+ *     Safari's QUIC flow-control window never refills, so a session deadlocks
+ *     after ~16 MiB or ~7,600 streams, whichever comes first. MoQ opens one
+ *     stream per group, which reaches that in about two minutes.
+ *     https://bugs.webkit.org/show_bug.cgi?id=319818 (NEW, P2, Aug 2026)
+ *     Also open: 322201, `WebTransport.datagrams` undefined on iOS.
+ *
+ * Bypassing it reproduces the bug exactly. Measured here: connect 87 ms,
+ * catalog fine, first frame at 0.79 s — then SIX frames total in 30 s and
+ * nothing more. And it is not the encoder: Safari's WebCodecs does VP8 1280x720
+ * at 370 fps (h264 72, vp9 345), so encoding had ~12x headroom.
+ *
+ * So the bypass is OPT-IN ONLY (`?transport=force` on demo 08), for measuring
+ * the bug rather than for shipping. Default behaviour respects the block.
+ *
+ * The WebSocket route would work — qmux over WebSocket is a real draft
+ * (draft-lcurley-qmux-websocket-00) and moq-relay implements a listener — but
+ * CLOUDFLARE'S RELAY HAS NO WEBSOCKET LISTENER, so there is nothing to
+ * negotiate with. Confirmed by handshake test (four failures out of four) and
+ * by cloudflare/moq-rs documenting only WebTransport and raw QUIC. Note for any
+ * retest: the correct subprotocols are the cross product, e.g.
+ * `qmux-01.moq-lite-05`, NOT the bare `qmux-0N` I tried; and qmux-02 does not
+ * exist. The conclusion is unchanged — no listener is no listener.
+ *
+ * The WebSocket fallback is separately useless here: @moq/net can map
+ * https:->wss: with the qmux-02/01/00 subprotocols, but Cloudflare draft-14
+ * refuses a WebSocket handshake outright — measured, all three subprotocols AND
+ * no subprotocol, four failures out of four.
  */
 export function moqSupport() {
-  const wt = typeof self !== 'undefined' && typeof self.WebTransport !== 'undefined';
+  const wt = typeof self !== 'undefined' && typeof self.WebTransport === 'function';
   const codecs = typeof self !== 'undefined' && typeof self.VideoEncoder !== 'undefined'
     && typeof self.VideoDecoder !== 'undefined';
   return {
     ok: wt && codecs,
     webTransport: wt,
     webCodecs: codecs,
-    why: !wt ? 'this browser has no WebTransport (Safari does not support it yet)'
+    // Reported so a device can SETTLE this. The library emits the same
+    // "WebTransport not supported" message whether the API is absent OR merely
+    // UA-blocked, so the error string alone cannot tell them apart — which is
+    // how I came to assert iOS lacked it without ever checking.
+    webkit: typeof self !== 'undefined' && !!self.ManagedMediaSource,
+    why: !wt ? 'this browser has no WebTransport'
       : !codecs ? 'this browser has no WebCodecs'
       : null,
   };
+}
+
+/** The exact ALPN list @moq/net offers, so Safari negotiates as Chrome does. */
+const MOQ_ALPN = [
+  'moq-lite-05', 'moq-lite-04', 'moq-lite-03', 'moql',
+  'moqt-19', 'moqt-18', 'moqt-17', 'moqt-16', 'moqt-15',
+];
+
+/**
+ * A WebTransport we built ourselves, for browsers the library blocklists.
+ *
+ * OFF unless explicitly forced. Returns undefined otherwise, so the library
+ * decides — which is what should happen, both because the block is well-founded
+ * and because the library also handles the http:// certificate-fingerprint path
+ * we do not. When forced, only WebKit-with-WebTransport takes this route:
+ * ManagedMediaSource is the WebKit tell (Chrome lacks it), and Cloudflare
+ * negotiates none of the ALPNs above anyway, falling back to the compat
+ * CLIENT_SETUP — byte-identical to Chrome, just past the UA check.
+ */
+async function webTransportFor(url, force) {
+  if (!force) return undefined;                    // the block is correct; see above
+  if (typeof self === 'undefined' || typeof self.WebTransport !== 'function') return undefined;
+  const webkit = !!self.ManagedMediaSource;
+  if (!webkit) return undefined;
+  const t = new self.WebTransport(url, {
+    allowPooling: false,
+    congestionControl: 'low-latency',
+    protocols: MOQ_ALPN,
+  });
+  await t.ready;
+  return t;
 }
 
 /**
@@ -123,7 +187,7 @@ export function readBurned(ctx) {
  * @param role   'loopback' (publish AND subscribe — one device, one clock, so
  *               the latency delta is exact), 'pub', or 'watch'.
  */
-export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {} }) {
+export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false }) {
   const gop = fps;                                 // 1 s
   const src = document.createElement('canvas');
   src.width = w; src.height = h;
@@ -141,7 +205,13 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
 
   const startedAt = performance.timeOrigin + performance.now();
   const t0 = performance.now();
-  const conn = await Connection.connect(new URL(MOQ_RELAY), { websocket: { enabled: false } });
+  const relayUrl = new URL(MOQ_RELAY);
+  const transport = await webTransportFor(relayUrl, forceTransport);
+  if (transport) log('FORCED a self-built WebTransport — expect a flow-control deadlock, WebKit 319818', 'bad');
+  const conn = await Connection.connect(relayUrl, {
+    websocket: { enabled: false },
+    ...(transport ? { transport } : {}),
+  });
   st.version = conn.version;
   st.sessionMs = Math.round(performance.now() - t0);
   log(`session in ${st.sessionMs}ms, negotiated ${st.version}`, 'hi');
