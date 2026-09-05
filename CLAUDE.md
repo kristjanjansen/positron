@@ -1,0 +1,115 @@
+# positron
+
+Live at **https://positron.studio**. 19 of 23 demos built. Read `HANDOFF.md` for
+current state, `LESSONS.md` for why the rules below exist, `PROGRESS.md` for what
+was measured when.
+
+## Run and check
+
+```sh
+node demo/server.mjs                     # :8890, serves the repo; / == deployed
+node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
+node demo/verify.mjs 06 09               # just these
+node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
+DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
+
+cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
+```
+
+`.env` in the cwd shadows machine OAuth. Deploy from a directory without one, or
+`env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy`.
+
+Device logs from any phone: `https://pub.positron.studio/logs?format=text`.
+Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold start
+— that is expected, not a hang.
+
+## Rules that cost real time to learn
+
+**Measure the quantity in question, not one adjacent to it.** An A/B where both
+arms share the bug returns "identical", which reads as "fine". Before running a
+comparison, ask what defect it could NOT detect.
+
+**A green suite can mean zero coverage.** `verify.mjs` reported 261/261 while a
+demo was fatally broken on iPhone, because desktop Chrome never enters that
+branch. After any change to `src/low-latency-player.js`, run
+`demo/verify-native.mjs` too.
+
+**Attribute a run to a build before iterating on it.** Every 06 log opens with
+`BUILD <sha>-<hhmmss>`, substituted into the deployed `shell.mjs` by
+`build.mjs`. Without it, "still broken" and "the fix never loaded" are the same
+observation. **Confirm the stamp changed before asking anyone to retest** — the
+edge serves the previous build for a few seconds after deploy.
+
+**Being right about a mechanism says nothing about whether it dominates.** State
+what you expect to see if your cause is the real one, then check that you see it,
+before shipping a fix.
+
+**When two hypotheses have opposite fixes, build the measurement that separates
+them first.** Do not pick between them on plausibility.
+
+**Never guard a patch on `s.includes(<substring>)`.** Three bugs in one day from
+this — `BUILD` matched inside `REBUILD`; `LOG_KEEP` and `#log` were satisfied by
+the code just inserted. Guard on the exact declaration, or assert the effect
+afterwards. Printing "ok" is not evidence.
+
+**Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
+reports `tail`'s exit status, not `cmd`'s.
+
+**Long measurements: no pipes, no dangling promises.** `node x.mjs | tail` buffers
+until exit and looks hung — write to a file. An un-awaited `fetch` keeps the
+event loop alive forever.
+
+**Read the comments already in the file.** `src/publish.sh` pins `ffmpeg@7`
+("needs libfreetype for the clock overlay") and the publisher says "the key must
+never be echoed". Both were correct and both were ignored, each costing a run.
+
+**A recovery action is not free.** Rate-limit it, require it to have somewhere to
+land, and make it yield rather than retry forever — see `low-latency-player.js`,
+where a drift-seek every 2–3 s aborted the in-flight fragment loads it was trying
+to recover.
+
+## Platform facts
+
+- **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()` is now TRUE on
+  iPhone. Any fallback written `if (!Hls.isSupported() && canPlayType(...))`
+  silently stopped firing. Prefer native HLS there: native available AND no plain
+  `MediaSource` is exactly iPhone.
+- **Safari can close a ManagedMediaSource under you.** Every buffer is dumped.
+  MMS also gates loading via `startstreaming`/`endstreaming`.
+- **`video.buffered` on MSE is the INTERSECTION of the source buffers.** With
+  demuxed audio+video it reads 0.05 s while video holds 5 s. Never diagnose a
+  "starved" player without splitting the tracks.
+- **Native HLS has no recovery hooks** — no `liveSyncDuration`, no level capping,
+  no `hls.latency`. Reload is the only lever, so watchdogs must be hand-built.
+- **A latency target inside one keyframe interval is unreachable.** Cloudflare
+  advertises `PART-HOLD-BACK=1.5` with a 2.0 s GOP, and only one part per segment
+  is `INDEPENDENT`.
+- **LL-HLS deliberately does not specify how a client picks its live position.**
+  Every player invents a policy; that is why this tier is fiddly.
+- **A live-edge part 404 is normal.** Separate it with a ceiling; do not silence
+  it.
+- **Cloudflare mints a new video UID on every encoder reconnect.** Cached media
+  URLs 404 afterwards.
+- **`-re` is a per-input ffmpeg option.** `-re -i a -i b` paces only `a`.
+- **MoQ:** a relay cannot live in a Container (no inbound QUIC — dial-out only);
+  IETF `moq-pub` does not interoperate with hang at the catalog layer; but
+  browser→relay→browser works today at p50 ~20 ms, with no container and no Rust
+  build.
+
+## Conventions
+
+- Demos are `demo/<nn>-<name>/index.html`, deployed at `/<nn>-<name>/`. Order and
+  metadata live in `demo/manifest.mjs`; `built: false` hides one from the index.
+- Every demo mounts the shell (`demo/shell/shell.mjs`) and publishes
+  `window.__demo` — human-openable and CDP-drivable from the same page. Assert on
+  `__demo`, never on DOM ids.
+- Shared demo code goes in `demo/shell/`, which `build.mjs` **enumerates**. It
+  also refuses the build when a page imports a file nothing deploys, and when two
+  sources collide on one destination.
+- Transport UI is `demo/shell/transport-bar.mjs` and nothing else. Playhead from
+  `observePosition`, seek only via `deck.seek()`, rates from intersected
+  `caps.rates`.
+- Secrets never reach a log. The publisher redacts at the point of capture, so a
+  secret split across two stderr chunks is still caught.
+- Prefer terse UI. No explanatory prose in demo pages; one line saying what the
+  demo does, and a readout of real numbers.
