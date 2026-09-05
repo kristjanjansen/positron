@@ -23,6 +23,7 @@ import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, join, extname } from 'node:path';
 import { readdirSync, readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -198,7 +199,15 @@ const APPEND = {
   'proto/megatimeline/index.html': BACK,
   'proto/remixer/index.html': BACK,
 };
+// A build id the browser can report back. git sha + build time; the sha alone
+// is not enough because an uncommitted edit deploys under the previous one.
+const BUILD_STAMP = `${execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim()}`
+  + `-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}`;
+
 const REWRITES = {
+  'demo/shell/shell.mjs': [
+    [`export const BUILD = 'dev';`, `export const BUILD = '${BUILD_STAMP}';`],
+  ],
   'proto/megatimeline/index.html': [
     // megatimeline's "PLAY IN REMIXER ↗" hand-off opens `${REMIXER}/?play=…`.
     // Hardcoded to the dev server's port, which is nothing on a phone.

@@ -33,6 +33,22 @@
  *   no stream yet      -> rebuild on a steady cadence until it exists
  *   tab became visible -> seek to live edge (hidden tabs always come back stale)
  *
+ * v12: PREFER NATIVE HLS ON IPHONE. The old check only fell back to native
+ * when hls.js was UNSUPPORTED, which was a correct proxy for "iPhone" until
+ * iOS 17.1 added ManagedMediaSource — after which Hls.isSupported() returns
+ * true there and the fallback silently stopped firing. So the one platform with
+ * a first-class native HLS stack (AVFoundation, hardware decode, Apple's own
+ * LL-HLS) was being put on the MMS path, where Safari closes the MediaSource
+ * under us and dumps every buffer. Now decided on the real question, and
+ * overridable with preferNative for a same-numbers A/B.
+ *
+ * v11: startFragPrefetch + initialLiveManifestSize 3 + startOnSegmentBoundary,
+ * the three hls.js knobs that all default against us and all push the same way:
+ * begin with more material, on a boundary. These target the one failure here
+ * that is really hls.js — its audio controller starting behind the main one.
+ * UNCONFIRMED on a device as of writing; the startup gate in v10 is the
+ * belt-and-braces version of the same idea and stays either way.
+ *
  * v10: do not play until the AUDIO/VIDEO intersection is playable, and do not
  * let the starved watchdog seek over an audio-only shortfall. Cloudflare lands
  * audio seconds behind video at startup; video.buffered is the intersection,
@@ -162,6 +178,13 @@ const DEFAULTS = {
    * (its targetLatency getter tests hls.userConfig.liveSyncDuration).
    * Set null to obey whatever the manifest advertises.
    */
+  /**
+   * Which player: 'auto' (default), true to force native HLS, false to force
+   * hls.js. 'auto' picks native only where it is clearly better — an iPhone,
+   * detected as "native HLS available and no plain MediaSource". See the
+   * decision block in the body for why the old check stopped working.
+   */
+  preferNative: 'auto',
   liveSyncSeconds: 3.0,
   /** Fallback latency target if the manifest advertises no hold-back. */
   fallbackTarget: 3.0,
@@ -200,25 +223,24 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
   let destroyed = false;
 
-  // ---- Safari: native HLS manages its own live edge correctly. -------------
-  if (!window.Hls?.isSupported?.() && video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = url;
-    video.play().catch((e) => emit('error', e));
-    const api = {
-      get latency() {
-        const start = video.getStartDate?.();
-        if (!start || isNaN(start)) return null;
-        return (Date.now() - (start.getTime() + video.currentTime * 1000)) / 1000;
-      },
-      get target() { return cfg.fallbackTarget; },
-      get hls() { return null; },
-      syncToEdge() {
-        if (video.seekable.length) video.currentTime = video.seekable.end(video.seekable.length - 1);
-      },
-      on, destroy() { video.removeAttribute('src'); video.load(); },
-    };
-    return api;
-  }
+  // ---- which player? ------------------------------------------------------
+  //
+  // This used to read `if (!Hls.isSupported() && canPlayType(hls))`, which was
+  // a correct proxy for "this is an iPhone" only while iPhone had NO MSE at all.
+  // iOS 17.1 added ManagedMediaSource, so Hls.isSupported() now returns TRUE
+  // there and the check silently stopped firing — putting the one platform with
+  // an excellent native HLS stack (AVFoundation, hardware decode, and Apple's
+  // own LL-HLS implementation) onto the MMS path instead, where Safari closes
+  // the MediaSource under us and every buffer is dumped.
+  //
+  // So decide on the real question. Native HLS available AND no plain
+  // MediaSource is exactly iPhone: macOS/iPad Safari have both and keep the
+  // hls.js path (which gives us level capping and latency control), Chrome has
+  // MediaSource and no native HLS.
+  const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+  const onlyManagedMse = typeof self !== 'undefined' && !self.MediaSource && !!self.ManagedMediaSource;
+  const useNative = cfg.preferNative === true
+    || (cfg.preferNative === 'auto' && nativeHls && onlyManagedMse);
 
   const Hls = window.Hls;
   if (!Hls?.isSupported()) throw new Error('HLS is not supported in this browser');
@@ -318,6 +340,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       // where Safari decides when we may load at all
       gatedBySafari: mms && !(typeof self !== 'undefined' && self.MediaSource),
       hls: window.Hls?.version || null,
+      player: useNative ? 'native' : 'hls.js',
     };
   }
 
@@ -349,6 +372,35 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       // droppedVideoFrames against decoded and steps the level down when the
       // ratio exceeds fpsDroppedMonitoringThreshold. Off by default.
       capLevelOnFPSDrop: true,
+
+      // ── starting with enough material, aligned ───────────────────────
+      // The one failure in this file that is genuinely hls.js behaviour is
+      // that its AUDIO stream controller starts after the main one and
+      // trails at the live edge. video.buffered is the INTERSECTION of the
+      // source buffers, so the element gets 0.05 s to play while video holds
+      // 5 s. All three knobs below default AGAINST us and all three push in
+      // the same direction: begin with more material, on a boundary.
+      //
+      // Defaults read off the bundled 1.7.1, not recalled:
+      //   startFragPrefetch       false
+      //   initialLiveManifestSize 1
+      //   startOnSegmentBoundary  false
+
+      // Fetch the first fragment before media attach, so both loaders are
+      // already moving when playback is allowed to begin.
+      startFragPrefetch: true,
+
+      // Refuse to start until the playlist carries 3 segments. The AUDIO
+      // playlist is then populated too — measured at the origin, the two
+      // tracks advance in exact lockstep (v-a = 0.00 s over 12 samples), so
+      // waiting for depth in one waits for depth in both.
+      initialLiveManifestSize: 3,
+
+      // Start at a segment boundary rather than mid-segment. With exactly one
+      // INDEPENDENT part per 2 s segment (measured: 10 of 38), a boundary is
+      // the only place both tracks are simultaneously decodable from scratch.
+      // Costs up to one segment of latency; buys alignment.
+      startOnSegmentBoundary: true,
       // A target shorter than one keyframe interval cannot be held; see
       // liveSyncSeconds. Must be in userConfig, hence here and not a setter.
       ...(cfg.liveSyncSeconds != null ? { liveSyncDuration: cfg.liveSyncSeconds } : {}),
@@ -356,6 +408,15 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     });
 
     let mediaRecoveries = 0;
+
+    // ── why did Safari close the MediaSource? ──────────────────────────
+    // "mediaSourceRequiresReset — MediaSource closed while media attached"
+    // has now appeared in three separate iPhone runs, and each time every
+    // buffer is dumped (tracks {} immediately after) — which is the visible
+    // flash. ManagedMediaSource also GATES loading via startstreaming /
+    // endstreaming, and hls.js 1.7.1 wires both. None of that is observable
+    // from the outside, so observe it directly.
+    watchMediaSource();
     // NOT emitted synchronously: boot() runs inside createLowLatencyPlayer,
     // before the caller has had a chance to chain .on(), so a synchronous
     // emit reaches nobody. The iOS report came back with no ENGINE line at
@@ -414,6 +475,74 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     const sep = url.includes('?') ? '&' : '?';
     hls.loadSource(cfg.cacheBust ? `${url}${sep}rb=${Date.now()}` : url);
     hls.attachMedia(video);
+  }
+
+  // ---- native HLS (AVFoundation) -------------------------------------------
+  // Deliberately AFTER bufferReport()/measureRates() are defined, so the native
+  // path reports the SAME quantities as the hls.js path. Comparing two players
+  // on two different measurements would be worthless.
+  if (useNative) {
+    emit('engine', {
+      player: 'native', managedMediaSource: !!self.ManagedMediaSource,
+      plainMediaSource: !!self.MediaSource, nativeHls, hls: null,
+    });
+    video.src = url;
+    video.play().catch((e) => emit('error', e));
+
+    // Native HLS exposes no hls.latency; EXT-X-PROGRAM-DATE-TIME reaches us as
+    // getStartDate(), and wall - (start + currentTime) is the true lag.
+    const nativeLatency = () => {
+      const start = video.getStartDate?.();
+      if (!start || isNaN(start)) return null;
+      const l = (Date.now() - (start.getTime() + video.currentTime * 1000)) / 1000;
+      return l > 0 ? l : null;
+    };
+
+    timer = setInterval(() => {
+      if (destroyed) return;
+      const rates = measureRates();
+      const latency = nativeLatency();
+      if (latency == null) return;
+      // No target to chase: AVFoundation runs its own catch-up against the
+      // manifest's PART-HOLD-BACK, which is Apple's own spec. Report what it
+      // achieves rather than pretending we steer it.
+      emit('latency', {
+        latency, target: cfg.fallbackTarget, drift: latency - cfg.fallbackTarget,
+        pdtLatency: latency, playbackRate: video.playbackRate,
+        buffer: bufferReport(), targetBias: 0, rates,
+      });
+    }, cfg.interval);
+
+    video.addEventListener('error', () => {
+      const e = video.error;
+      emit('media-error', { code: e?.code, message: String(e?.message || '').slice(0, 120) });
+    });
+    video.addEventListener('waiting', () => emit('waiting', { ct: +video.currentTime.toFixed(2), ahead: bufferReport().ahead }));
+
+    return {
+      get latency() { return nativeLatency(); },
+      get target() { return cfg.fallbackTarget; },
+      get hls() { return null; },
+      get rebuilds() { return 0; },
+      get levelSwitches() { return 0; },
+      get targetBias() { return 0; },
+      get advanceCaps() { return 0; },
+      get player() { return 'native'; },
+      bufferReport,
+      engineReport,
+      syncToEdge: () => {
+        if (!video.seekable.length) return false;
+        video.currentTime = video.seekable.end(video.seekable.length - 1);
+        return true;
+      },
+      on,
+      destroy() {
+        destroyed = true;
+        clearInterval(timer);
+        video.removeAttribute('src');
+        video.load();
+      },
+    };
   }
 
   // ---- latency + stall control (runs across rebuilds) ------------------------
@@ -542,6 +671,37 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       setTimeout(attempt, 100);
     };
     attempt();
+  }
+
+  let msWatched = null;
+  function watchMediaSource() {
+    // hls.js keeps it on the bufferController; undocumented, so guarded, and
+    // retried because it does not exist at the instant boot() runs.
+    let tries = 0;
+    const grab = () => {
+      if (destroyed || tries++ > 40) return;
+      const ms = hls?.bufferController?.mediaSource;
+      if (!ms || ms === msWatched) { setTimeout(grab, 250); return; }
+      msWatched = ms;
+      emit('ms', { event: 'attached', readyState: ms.readyState, kind: ms.constructor?.name });
+      for (const ev of ['sourceopen', 'sourceended', 'sourceclose', 'startstreaming', 'endstreaming']) {
+        try {
+          ms.addEventListener(ev, () => {
+            emit('ms', {
+              event: ev,
+              readyState: ms.readyState,
+              // MMS.streaming is the flag Safari flips to gate our loading
+              streaming: typeof ms.streaming === 'boolean' ? ms.streaming : null,
+              ct: +video.currentTime.toFixed(2),
+              ahead: bufferReport().ahead,
+              hidden: document.hidden,
+            });
+          });
+        } catch { /* not every impl exposes every event */ }
+      }
+      setTimeout(grab, 1000);          // a rebuild makes a new MediaSource
+    };
+    grab();
   }
 
   function seekableEnd() {
@@ -721,6 +881,14 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     }
   }
 
+  // The element's own error object names decode failures that never reach
+  // hls.js as an ERROR event.
+  video.addEventListener('error', () => {
+    const e = video.error;
+    emit('media-error', { code: e?.code, message: String(e?.message || '').slice(0, 120) });
+  });
+  video.addEventListener('waiting', () => emit('waiting', { ct: +video.currentTime.toFixed(2), ahead: bufferReport().ahead }));
+
   boot();
   timer = setInterval(tick, cfg.interval);
   document.addEventListener('visibilitychange', onVisibility);
@@ -733,6 +901,7 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     get levelSwitches() { return levelSwitches; },
     get targetBias() { return targetBias; },
     get advanceCaps() { return advanceCaps; },
+    get player() { return 'hls.js'; },
     syncToEdge: () => syncToEdge('manual'),
     bufferReport,
     engineReport,
