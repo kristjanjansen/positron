@@ -58,7 +58,7 @@ export const DEMOS = [
     one: 'join a room and see the others; peer to peer, the relay only signals',
     tags: ['WebRTC', 'relay'] },
   { n: '11', name: 'grid', act: 2, built: true,
-    one: 'N participants, tiered: one featured, a few live, the rest a wall',
+    one: 'N participants in one grid — every tile the same size and the same quality',
     tags: ['WebRTC', 'SFU', 'canvas'] },
   { n: '12', name: 'cues', act: 2, built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',

@@ -1,6 +1,6 @@
 # positron
 
-Live at **https://positron.studio**. 20 of 24 demos built, 274/274 green. Read `HANDOFF.md` for
+Live at **https://positron.studio**. 20 of 24 demos built, 276/276 green. Read `HANDOFF.md` for
 current state, `LESSONS.md` for why the rules below exist, `PROGRESS.md` for what
 was measured when.
 
@@ -147,7 +147,10 @@ to recover.
 
 A demo that branches must assert every branch on every run. Adding a uniform
 mode to 11 grid silently dropped it from 11 asserts to 10 while still reading
-green. Diff per-demo counts against the last known total after any change.
+green — and worse, because `verify.mjs` presses every control the toggle was ON
+at check time, so only 6 of that page's 8 asserts ever ran in the suite.
+(11 grid no longer branches: one grid, one quality, 8/8 run.) Diff per-demo
+counts against the last known total after any change.
 
 ## Conventions
 
