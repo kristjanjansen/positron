@@ -147,19 +147,48 @@ function redact(s) {
   return out;
 }
 
+/**
+ * How long to leave a failed leg alone before retrying it.
+ *
+ * Cloudflare holds a WHIP input against a stale publisher: a leg that died with
+ * "Error muxing a packet / Resource temporarily unavailable" (exit 245) cannot
+ * be restarted immediately — measured, it needs roughly 45 s before the input
+ * accepts a new session.
+ */
+const LEG_RETRY_MS = 45_000;
+
 function startLeg(name, argv) {
-  if (legs[name]) return { already: true };
+  const cur = legs[name];
+  if (cur?.proc) return { already: true };
+  // A DEAD leg used to stay in `legs` forever, and `if (legs[name])` above then
+  // reported {already: true} — so the Worker's 30 s sweep believed the leg was
+  // running and NEVER restarted it. The WHIP leg died with exit 245 and stayed
+  // down until a human ran /stop, waited for publishing:false, waited another
+  // 45 s and ran /start. That ritual is now the code's job.
+  if (cur?.dead) {
+    const since = Date.now() - (cur.diedAt || 0);
+    if (since < LEG_RETRY_MS) {
+      return { retryIn: Math.ceil((LEG_RETRY_MS - since) / 1000), error: cur.error };
+    }
+    legs[name] = null;                       // eligible again
+  }
   const p = spawn('ffmpeg', argv, { stdio: ['ignore', 'ignore', 'pipe'] });
-  const st = { proc: p, startedAt: Date.now(), stderr: '', error: null, stopping: false };
+  const st = {
+    proc: p, startedAt: Date.now(), stderr: '', error: null, stopping: false,
+    restarts: (cur?.restarts || 0) + (cur?.dead ? 1 : 0),
+  };
   legs[name] = st;
   p.stderr.on('data', (b) => { st.stderr = redact(st.stderr + b.toString()).slice(-1200); });
   p.on('exit', (code, sig) => {
     const clean = st.stopping || code === 0 || code === null || sig === 'SIGTERM' || code === 255;
     if (!clean) st.error = `exit ${code}${sig ? ' ' + sig : ''}`;
-    const keep = st.error;
-    legs[name] = keep ? { ...st, proc: null, dead: true } : null;
+    // Keep the record so the retry timer has something to measure from, but
+    // mark WHEN it died so the sweep can act on its own.
+    legs[name] = st.error
+      ? { ...st, proc: null, dead: true, diedAt: Date.now() }
+      : null;
   });
-  return { started: true };
+  return { started: true, restarts: st.restarts };
 }
 
 function stopLeg(name) {
@@ -173,12 +202,19 @@ function stopLeg(name) {
 function legState(name) {
   const st = legs[name];
   if (!st) return { publishing: false, uptimeS: 0, error: null };
-  return {
+  const out = {
     publishing: !!st.proc,
     uptimeS: st.proc ? Math.round((Date.now() - st.startedAt) / 1000) : 0,
     error: st.error,
+    restarts: st.restarts || 0,
     stderrTail: redact(st.stderr).slice(-300) || null,
   };
+  if (st.dead) {
+    const since = Date.now() - (st.diedAt || 0);
+    out.dead = true;
+    out.retryInS = Math.max(0, Math.ceil((LEG_RETRY_MS - since) / 1000));
+  }
+  return out;
 }
 
 let tracksMode = null;

@@ -13,6 +13,8 @@
   .row.featured { grid-template-columns: 1fr; }
   .row.live { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .row.wall { grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); }
+  /* every tile identical: one grid, one size, one paint rate */
+  .row.uniform { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
   .t { position: relative; aspect-ratio: 16/9; background: #000; border: 1px solid var(--line);
        border-radius: 3px; overflow: hidden; }
   .t canvas { width: 100%; height: 100%; display: block; }
@@ -32,23 +34,41 @@
   const d = mount({
     n: '11',
     name: 'grid',
-    what: 'N participants, tiered. One featured, a few live, the rest a wall.',
-    readout: { n: '', featured: '', live: '', wall: '' },
+    what: 'N participants, tiered — one featured, a few live, the rest a wall. Toggle uniform to render them all alike.',
+    readout: { n: '', featured: '', live: '', wall: '', paint: 'ms' },
     controls: [
       { id: 'add', label: 'Add four', primary: true },
       { id: 'many', label: 'Go to 54' },
       { id: 'rotate', label: 'Rotate the featured' },
+      { id: 'uniform', label: 'All same quality' },
       { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
 
   const rows = {};
+  const tierLabels = {};
   for (const name of ['featured', 'live', 'wall']) {
-    d.el.append(el('div', 'tier', name));
+    tierLabels[name] = el('div', 'tier', name);
+    d.el.append(tierLabels[name]);
     rows[name] = el('div', `row ${name}`);
     d.el.append(rows[name]);
   }
+  // UNIFORM MODE. Asked for, and kept as a toggle rather than a replacement,
+  // because the tiering is the measured design from plan-m2m: attaching every
+  // participant at full rate is what does not scale.
+  //
+  // The readout reports paint ms, but be careful what it means: these tiles are
+  // synthetic canvases, so it is a FLOOR and not the real cost. At 54 uniform
+  // tiles it reads ~0.26 ms here, which says nothing about an SFU decoding 54
+  // streams. The honest claim is "uniform renders fine"; the expensive part is
+  // elsewhere and this demo does not measure it.
+  let uniform = false;
+  const uniformLabel = el('div', 'tier', 'all participants, same quality');
+  const uniformRow = el('div', 'row uniform');
+  uniformLabel.style.display = 'none';
+  uniformRow.style.display = 'none';
+  d.el.append(uniformLabel, uniformRow);
 
   const parts = [];
   let featuredIdx = 0, painting = null;
@@ -62,7 +82,24 @@
   }
 
   function layout() {
+    for (const name of ['featured', 'live', 'wall']) {
+      tierLabels[name].style.display = uniform ? 'none' : '';
+      rows[name].style.display = uniform ? 'none' : '';
+    }
+    uniformLabel.style.display = uniform ? '' : 'none';
+    uniformRow.style.display = uniform ? '' : 'none';
+
     for (const r of Object.values(rows)) r.replaceChildren();
+    uniformRow.replaceChildren();
+    if (uniform) {
+      // one tier for everyone: same box, same paint rate, same styling
+      for (const p of parts) { p.tier = 'same'; uniformRow.append(p.box); }
+      d.set('n', parts.length);
+      d.set('featured', 0);
+      d.set('live', parts.length);
+      d.set('wall', 0);
+      return;
+    }
     parts.forEach((p, idx) => {
       // rank relative to the featured one, so rotating is a re-rank not a rebuild
       const rank = (idx - featuredIdx + parts.length) % parts.length;
@@ -78,34 +115,77 @@
   }
 
   // The wall is drawn at a lower rate on purpose: that asymmetry IS the tiering.
+  let paintEma = null;
   function paint() {
+    const t0 = performance.now();
     const now = Date.now();
     for (const p of parts) {
-      const slow = p.tier === 'wall';
+      // In uniform mode NOTHING is cheap: no skipped frames, no smaller type,
+      // no dimmer palette. Every tile gets what the featured one gets.
+      const big = uniform || p.tier === 'featured';
+      const slow = !uniform && p.tier === 'wall';
       if (slow && now % 500 > 60) continue;
       const g = p.ctx;
-      g.fillStyle = p.tier === 'featured' ? '#151b26' : '#11151d';
+      g.fillStyle = big ? '#151b26' : '#11151d';
       g.fillRect(0, 0, 160, 90);
-      g.fillStyle = p.tier === 'featured' ? '#ffd400' : '#8b93a1';
-      g.font = `bold ${p.tier === 'featured' ? 22 : 13}px ui-monospace, monospace`;
+      g.fillStyle = big ? '#ffd400' : '#8b93a1';
+      g.font = `bold ${uniform ? 15 : p.tier === 'featured' ? 22 : 13}px ui-monospace, monospace`;
       g.fillText(`p${p.i}`, 8, 26);
       g.fillStyle = '#2b3546';
       g.fillRect(8, 40, 144, 4);
-      g.fillStyle = p.tier === 'featured' ? '#ffd400' : '#6a7280';
+      g.fillStyle = big ? '#ffd400' : '#6a7280';
       g.fillRect(8, 40, ((now / 20 + p.i * 17) % 144), 4);
     }
+    const ms = performance.now() - t0;
+    paintEma = paintEma == null ? ms : paintEma * 0.9 + ms * 0.1;
+    // 40 ms is the tick; past that the wall cannot hold its rate
+    d.set('paint', Math.round(paintEma * 100) / 100,
+      paintEma < 8 ? 'ok' : paintEma < 20 ? '' : 'bad');
   }
 
   d.on('add', () => { for (let k = 0; k < 4; k++) addParticipant(parts.length + 1); layout(); });
   d.on('many', () => { while (parts.length < 54) addParticipant(parts.length + 1); layout(); d.log('54 participants — the p95 the SFU held flat'); });
   d.on('rotate', () => { if (parts.length) { featuredIdx = (featuredIdx + 1) % parts.length; layout(); d.log(`featured -> p${parts[featuredIdx].i}`); } });
 
+  d.on('uniform', () => {
+    uniform = !uniform;
+    layout();
+    d.log(uniform
+      ? `uniform: all ${parts.length} rendered alike`
+      : 'tiered: 1 featured, 5 live, the rest a cheap wall');
+    // Say what the number is NOT. These tiles are synthetic canvases, so paint
+    // ms is a FLOOR — the real cost of uniform quality is decoding N WebRTC
+    // streams, which this demo does not do. Presenting 0.26 ms as "what uniform
+    // costs" would be exactly the kind of misleading number worth avoiding.
+    if (uniform) d.log('paint ms is canvas only — the real cost is N decoded streams, not measured here');
+  });
+
   d.on('check', () => {
     d.assert('participants present', parts.length > 0, String(parts.length));
-    const f = parts.filter((p) => p.tier === 'featured').length;
-    d.assert('exactly one featured', f === Math.min(1, parts.length), String(f));
-    const lv = parts.filter((p) => p.tier === 'live').length;
-    d.assert('live tier capped', lv <= TIERS.live, `${lv} <= ${TIERS.live}`);
+    // BOTH MODES, every run. Asserting only the active one dropped this demo
+    // from 11 asserts to 10 the moment uniform mode landed — the tiered
+    // invariants silently stopped being tested while the suite still read
+    // green. layout() is synchronous, so exercising both is deterministic.
+    const restore = uniform;
+    for (const mode of [false, true]) {
+      uniform = mode;
+      layout();
+      if (mode) {
+        d.assert('uniform: every participant in one tier', parts.every((p) => p.tier === 'same'),
+          [...new Set(parts.map((p) => p.tier))].join(','));
+        const w = [...uniformRow.children].map((b) => Math.round(b.getBoundingClientRect().width));
+        d.assert('uniform: every tile the same width', new Set(w).size <= 1, w.slice(0, 8).join(','));
+      } else {
+        const ff = parts.filter((p) => p.tier === 'featured').length;
+        d.assert('tiered: exactly one featured', ff === Math.min(1, parts.length), String(ff));
+        const ll = parts.filter((p) => p.tier === 'live').length;
+        d.assert('tiered: live tier capped', ll <= TIERS.live, `${ll} <= ${TIERS.live}`);
+      }
+    }
+    uniform = restore;
+    layout();
+    d.assert('paint cost reported', paintEma != null, `${Math.round(paintEma * 100) / 100} ms`);
+    if (uniform) return;
     const total = parts.filter((p) => p.tier).length;
     d.assert('every participant is in exactly one tier', total === parts.length, `${total}/${parts.length}`);
     if (parts.length > TIERS.featured + TIERS.live) {
