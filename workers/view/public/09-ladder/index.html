@@ -24,7 +24,7 @@
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { llhls, whep, holdPublisher, waitForManifest, waitForWhip } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
-  import { startMoq } from '/shell/moq.mjs';
+  import { startMoq, moqSupport } from '/shell/moq.mjs';
 
   const d = mount({
     n: '09',
@@ -154,7 +154,15 @@
 
     // The MoQ leg is independent of the publisher container entirely: this
     // browser is both ends of it, through the Cloudflare draft-14 relay.
+    // Safari cannot carry this leg — see demo/shell/moq.mjs. Skip it with a
+    // caption rather than letting the library throw into the log.
+    const moqOk = moqSupport();
+    if (!moqOk.ok) {
+      moqVal.textContent = 'not available in this browser';
+      d.log(`moq leg skipped — ${moqOk.why}`, 'bad');
+    }
     try {
+      if (!moqOk.ok) throw new Error(moqOk.why);
       moqLeg = await startMoq({
         out: moqCanvas,
         ns: `positron-09-${Math.random().toString(36).slice(2, 8)}`,
@@ -201,7 +209,9 @@
       d.assert('webrtc is the faster tier', rtt / 1000 < hlsLat,
         `rtt ${rtt.toFixed(0)} ms vs hls ${hlsLat.toFixed(2)} s`);
     }
-    if (moqLeg) {
+    if (!moqSupport().ok) {
+      d.assert('moq leg correctly skipped where it cannot run', !moqLeg, moqSupport().why);
+    } else if (moqLeg) {
       const s = moqLeg.stats;
       d.assert('moq leg decoded frames', s.decoded > 0, `${s.decoded} decoded`);
       const mp = moqLeg.pct(0.5);

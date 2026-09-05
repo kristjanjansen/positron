@@ -107,8 +107,14 @@ to recover.
   [WebKit 319818](https://bugs.webkit.org/show_bug.cgi?id=319818): the QUIC
   flow-control window never refills, deadlocking after ~16 MiB or ~7,600
   streams. MoQ opens one stream per group, so that is about two minutes.
-  Bypassing it (`08-moq/?transport=force`) reproduces the bug exactly — 6 frames
-  then nothing. Not the encoder: Safari does VP8 720p at 370 fps.
+  Bypassing it (`08-moq/?transport=force`) is worse than the bug report implies.
+  Measured twice, 150 s each on desktop Safari: **6-8 frames total**, first
+  stall at 20 s, and **a full page reload with a fresh WebTransport does not
+  help** (7 frames then 8). The window refills at roughly one frame per minute
+  rather than never. So "reconnect every N seconds" is NOT a workaround — a
+  question the published bug report leaves open. Not the encoder either: Safari
+  does VP8 720p realtime at 370 fps. MoQ on Safari is unusable today; Safari
+  gets WHEP (25 ms measured) instead.
 - **Cloudflare's MoQ relay has no WebSocket listener**, so the qmux fallback
   cannot help. `moq-relay` (self-hosted) does, via `[web.http] listen`.
 - **An error string cannot tell "API absent" from "API blocked".** `@moq/net`
