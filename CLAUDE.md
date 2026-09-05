@@ -72,8 +72,14 @@ to recover.
 
 - **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()` is now TRUE on
   iPhone. Any fallback written `if (!Hls.isSupported() && canPlayType(...))`
-  silently stopped firing. Prefer native HLS there: native available AND no plain
-  `MediaSource` is exactly iPhone.
+  silently stopped firing.
+- **Prefer native HLS on all WebKit, and gate it on `ManagedMediaSource`.**
+  `canPlayType('application/vnd.apple.mpegurl')` returns `"maybe"` in BOTH Safari
+  and Chrome, so it cannot tell them apart — gating on its truthiness put Chrome
+  on a path it cannot play. MMS is WebKit-only, so it is a capability test rather
+  than a brand check. Measured on desktop Safari, same page, same 40 s: native
+  advance 0.961x / latency 5.25 s / 0 errors, against hls.js 0.344x / 7.71 s /
+  2 errors.
 - **Safari can close a ManagedMediaSource under you.** Every buffer is dumped.
   MMS also gates loading via `startstreaming`/`endstreaming`.
 - **`video.buffered` on MSE is the INTERSECTION of the source buffers.** With
