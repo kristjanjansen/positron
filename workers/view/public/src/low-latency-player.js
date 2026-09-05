@@ -248,6 +248,14 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // ---- state shared across rebuilds ----------------------------------------
   let hls = null;
   let timer = null;
+  // Rate-measurement state, hoisted HERE on purpose. It used to sit beside
+  // measureRates() further down, which is AFTER the native-HLS branch returns —
+  // so on an iPhone the declarations never executed and the native path's own
+  // interval threw "Cannot access 'lastAdvT' before initialization" every tick.
+  // The page showed nothing. Local verify could not catch it: desktop Chrome
+  // never takes that branch. State both branches share must be declared before
+  // either branch can return.
+  let advEma = null, edgeEma = null, lastAdvT = 0, lastAdvCt = -1, lastEdgeV = -1;
   let rebuildTimer = null;
   let rebuilds = 0;
   let consecutiveFailures = 0;   // rebuilds since last successfully buffered frag
@@ -622,7 +630,6 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
    *
    * edgeRate is the same question asked of the live edge itself.
    */
-  let advEma = null, edgeEma = null, lastAdvT = 0, lastAdvCt = -1, lastEdgeV = -1;
   function measureRates() {
     const now = Date.now();
     const ct = video.currentTime;
