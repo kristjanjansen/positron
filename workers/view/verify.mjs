@@ -12,6 +12,12 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The row count comes from the manifest, not from a number typed here: this
+// file has now been stale twice (four cards when there were five, 23 rows when
+// there were 25), each time reporting green against a page it had stopped
+// describing. A generated list deserves a generated assert.
+const { DEMOS, NOTES } = await import(new URL('../../demo/manifest.mjs', import.meta.url));
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.VIEW_BASE || 'https://positron.studio';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -173,16 +179,19 @@ async function common(page) {
 console.log('\n[0] index menu');
 await goto('/', { settle: 600 });
 ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON', await evaluate(`document.title`));
-// The menu is now the DEMO LIST, generated from demo/manifest.mjs, so the old
-// `a.card` markup and the four-then-five `/proto/` count are both gone. Assert
-// on what the generator promises instead: 23 rows, and every LINKED row points
-// at a real target.
+// The menu is the DEMO LIST, generated from demo/manifest.mjs. Assert what the
+// generator promises: one row per manifest entry, and every LINKED row pointing
+// at a real target. Deployed demos live at /<nn>-<name>/ — build.mjs strips the
+// `demo/` prefix — so the old `/demo/` check could not have passed either.
 const rows = await evaluate(`[...document.querySelectorAll('li.d-row')].length`);
 const links = await evaluate(`[...document.querySelectorAll('li.d-row a[href]')].map(a => a.getAttribute('href'))`);
-ok('index', 'lists every demo row', rows === 23, `${rows} rows`);
-ok('index', 'linked rows point at demo or proto',
-   links.length > 0 && links.every((h) => h.startsWith('/demo/') || h.startsWith('/proto/')),
-   `${links.length} linked: ${links.join(' ')}`);
+// Notes render as `li.d-row` too, so the expected count is both lists — which
+// is exactly the kind of detail a typed-in number gets wrong the first time.
+ok('index', 'lists every demo and note row', rows === DEMOS.length + NOTES.length,
+   `${rows} rows, manifest has ${DEMOS.length} demos + ${NOTES.length} notes`);
+ok('index', 'linked rows point at a demo, a proto or a note',
+   links.length > 0 && links.every((h) => /^\/\d\d-[a-z]+\/$/.test(h) || h.startsWith('/proto/') || h.startsWith('/notes/')),
+   `${links.length} linked: ${links.slice(0, 6).join(' ')}…`);
 const tap = await evaluate(`(() => { const r = document.querySelector('li.d-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');

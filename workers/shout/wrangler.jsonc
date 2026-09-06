@@ -1,0 +1,14 @@
+{
+  // positron-shout — the Icecast relay. Its own worker because it is the only
+  // one that holds a connection open for the length of a listen: an origin
+  // stream that never ends is a different failure surface from a request that
+  // returns, and it should be able to fall over without taking a route the rest
+  // of the site depends on with it.
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "positron-shout",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "shout.positron.studio", "custom_domain": true }],
+  "workers_dev": true,
+  "observability": { "enabled": true }
+}

@@ -1,0 +1,132 @@
+// positron-shout — an Icecast/SHOUTcast stream, relayed through Cloudflare.
+//
+// WHY A RELAY AT ALL. The origin (Icecast 2.4.4 at icecast.err.ee) sends NO
+// `access-control-allow-origin`, so a browser can put it in an <audio> element
+// and nothing else: no fetch, no WebAudio graph, no reading `icy-metaint`, no
+// measuring anything. `<audio src>` is a no-cors load — it plays and stays
+// opaque. The relay's entire job is to hand the same bytes back with CORS on
+// them, which is what turns a radio stream into something a page can measure.
+//
+// NOT AN OPEN PROXY. STATIONS is an allowlist; anything else is 404. An
+// unbounded URL parameter here would make this worker a bandwidth laundromat
+// for whoever finds it, and the account's egress is the project's.
+//
+// The body is passed through UNTOUCHED and UNBUFFERED: `new Response(up.body)`
+// hands Cloudflare the upstream ReadableStream, so bytes leave as they arrive.
+// Anything that reads the stream here (a TransformStream that inspects ICY
+// metadata, say) would add a hop of latency to every byte for no gain — the
+// metadata is already in the frames the client parses.
+
+const ORIGIN = 'https://icecast.err.ee';
+
+/** id -> upstream path. ERR's five public radio streams, 128 kbps MP3. */
+const STATIONS = {
+  vikerraadio: '/vikerraadio.mp3',
+  raadio2: '/raadio2.mp3',
+  klassikaraadio: '/klassikaraadio.mp3',
+  raadio4: '/raadio4.mp3',
+  raadiotallinn: '/raadiotallinn.mp3',
+};
+
+// Everything a client needs to read about the stream, including the ICY fields
+// that only exist on this protocol. Without expose-headers a browser sees the
+// response but not one header of it.
+const EXPOSE = [
+  'icy-name', 'icy-description', 'icy-genre', 'icy-br', 'icy-url', 'icy-pub',
+  'icy-metaint', 'content-type', 'x-shout-ttfb', 'x-shout-station',
+].join(',');
+
+const cors = (h = {}) => ({
+  'access-control-allow-origin': '*',
+  'access-control-expose-headers': EXPOSE,
+  'cache-control': 'no-store',
+  ...h,
+});
+
+export default {
+  async fetch(req) {
+    const url = new URL(req.url);
+
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: cors({
+        'access-control-allow-methods': 'GET,HEAD,OPTIONS',
+        'access-control-allow-headers': 'icy-metadata,range',
+      }) });
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return new Response('method not allowed', { status: 405, headers: cors() });
+    }
+
+    if (url.pathname === '/' || url.pathname === '/stations') {
+      return Response.json({ stations: Object.keys(STATIONS), origin: ORIGIN },
+        { headers: cors() });
+    }
+
+    const id = url.pathname.replace(/^\/+/, '').replace(/\.mp3$/, '');
+    const path = STATIONS[id];
+    if (!path) return new Response('no such station', { status: 404, headers: cors() });
+
+    // `?bytes=N` closes the connection after N bytes. A radio stream never
+    // ends, so without a bound every probe — the demo's, the harness's — has to
+    // decide when to hang up, and a harness that forgets leaves a socket
+    // holding the origin open for the length of the run.
+    const bytes = Math.min(Number(url.searchParams.get('bytes')) || 0, 4 << 20);
+
+    const t0 = Date.now();
+    // ALWAYS GET UPSTREAM, even for a HEAD. Icecast 2.4.4 answers HEAD with
+    // `400 Bad Request` — measured against every mount — so forwarding the
+    // method verbatim made the relay report a healthy station as a 502, and
+    // every uptime checker that HEADs a URL would have believed it. The relay
+    // does the GET, keeps the headers, and cancels the body before a frame of
+    // audio is paid for.
+    const up = await fetch(ORIGIN + path, {
+      method: 'GET',
+      headers: {
+        // ICY metadata is opt-in and the client's choice, not ours: asking for
+        // it when the client did not would splice 16-byte-aligned metadata
+        // blocks into bytes the client is about to treat as pure MP3.
+        ...(req.headers.get('icy-metadata') === '1' ? { 'Icy-MetaData': '1' } : {}),
+        'user-agent': 'positron-shout/1 (+https://positron.studio)',
+      },
+      // The origin is Icecast: an infinite body, `Connection: Close`, HTTP/1.0.
+      // No cache, ever — a cached radio stream is a contradiction.
+      cf: { cacheEverything: false, cacheTtl: 0 },
+    });
+    const ttfb = Date.now() - t0;
+
+    if (!up.ok || !up.body) {
+      return new Response(`origin ${up.status}`, { status: 502, headers: cors() });
+    }
+
+    const headers = cors({
+      'content-type': up.headers.get('content-type') || 'audio/mpeg',
+      'x-shout-ttfb': String(ttfb),          // what the relay itself waited for
+      'x-shout-station': id,
+    });
+    for (const k of ['icy-name', 'icy-description', 'icy-genre', 'icy-br', 'icy-url', 'icy-pub', 'icy-metaint']) {
+      const v = up.headers.get(k);
+      if (v) headers[k] = v;
+    }
+    if (req.method === 'HEAD') {
+      up.body.cancel?.();          // hang up on the origin; nobody is listening
+      return new Response(null, { headers });
+    }
+
+    return new Response(bytes ? cap(up.body, bytes) : up.body, { headers });
+  },
+};
+
+/** Pass bytes through until `limit`, then close — the stream itself never will. */
+function cap(body, limit) {
+  let sent = 0;
+  return body.pipeThrough(new TransformStream({
+    transform(chunk, ctrl) {
+      const room = limit - sent;
+      if (room <= 0) { ctrl.terminate(); return; }
+      if (chunk.byteLength <= room) { sent += chunk.byteLength; ctrl.enqueue(chunk); return; }
+      ctrl.enqueue(chunk.subarray(0, room));
+      sent = limit;
+      ctrl.terminate();
+    },
+  }));
+}
