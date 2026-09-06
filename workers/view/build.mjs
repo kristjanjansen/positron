@@ -67,6 +67,7 @@ const FILES = [
   // and the failure mode is a silent ear that detects nothing.
   ['timeline/nested.mjs', 'timeline/nested.mjs'],
   ['timeline/score.mjs', 'timeline/score.mjs'],
+  ['timeline/csound.mjs', 'timeline/csound.mjs'],         // 28 vclick compiles a score in the page
   ['timeline/logdeck.mjs', 'timeline/logdeck.mjs'],       // nested.mjs imports pstats
   ['proto/looper/index.html', 'proto/looper/index.html'],
   ['proto/looper/looper.mjs', 'proto/looper/looper.mjs'],

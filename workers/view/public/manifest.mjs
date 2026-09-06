@@ -123,6 +123,12 @@ export const DEMOS = [
   { n: '27', name: 'tracks', act: 1, built: true, settleMs: 125000,
     one: 'the same input as video, audio or both — what drops is the bytes, not the latency',
     tags: ['LL-HLS', 'WHEP', 'Stream'] },
+
+  // Act 0 with 04 score: this is library machinery with a picture on it, not a
+  // network demo — it touches nothing outside the page.
+  { n: '28', name: 'vclick', act: 0, built: true,
+    one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
+    tags: ['timeline', 'Csound', 'WebAudio'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
