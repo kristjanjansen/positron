@@ -1,6 +1,6 @@
 # positron
 
-Live at **https://positron.studio**. 22 of 26 demos built, 305/305 green. Read
+Live at **https://positron.studio**. 23 of 27 demos built, 318/318 green. Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when.
 
@@ -119,6 +119,21 @@ to recover.
   "starved" player without splitting the tracks.
 - **Native HLS has no recovery hooks** — no `liveSyncDuration`, no level capping,
   no `hls.latency`. Reload is the only lever, so watchdogs must be hand-built.
+- **Audio-only LL-HLS is not lower latency on Cloudflare Stream — it is only
+  smaller.** The audio rendition and every video rendition carry the same
+  `PART-TARGET=0.5`, the same `PART-HOLD-BACK=1.5`, the same `TARGETDURATION=3`,
+  and — the giveaway — the same INDEPENDENT cadence: 11 of 41 parts on BOTH,
+  though every AAC frame is independently decodable and audio could mark them
+  all. Measured with that packaging: audio-only 3.88 s against video-only
+  3.82 s, the same, while the bytes go 418 kbps against 11.8 Mbps. What
+  actually costs latency is running BOTH renditions at once (8.8 s on raw
+  hls.js) — the demuxed intersection problem `low-latency-player.js` exists to
+  fight. `27 tracks` asserts the packaging from the playlists, so the claim
+  needs no stopwatch.
+- **Cloudflare WHEP refuses a single-track offer.** One recvonly transceiver —
+  audio alone or video alone — is `HTTP 400`, both ways, while video+audio
+  negotiates in the same second. So "is audio-only WHEP lower latency" has no
+  answer to measure on this provider; you cannot subscribe to it.
 - **A latency target inside one keyframe interval is unreachable.** Cloudflare
   advertises `PART-HOLD-BACK=1.5` with a 2.0 s GOP, and only one part per segment
   is `INDEPENDENT`.

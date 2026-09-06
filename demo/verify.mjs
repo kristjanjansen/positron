@@ -77,7 +77,12 @@ let errors = [];
 let failedReqs = [];
 let abortedReqs = [];
 let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
-let rightsBlocks = [];   // ERR segments refused by programme rights: same treatment
+// Upstream refusals a demo asks for ON PURPOSE — ERR's rights-blocked segments
+// (19 flipper sweeps for them) and Cloudflare WHEP's 400 on a single-track
+// offer (27 tracks asserts on it). Counted and capped, never ignored: the
+// label has to name what they are, or the next reader believes a WHEP refusal
+// was a radio station.
+let probed = [];
 const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
 listeners.push((m) => {
   if (m.sessionId !== sessionId) return;
@@ -98,13 +103,19 @@ listeners.push((m) => {
     // outage as "normal churn".
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
       edgeMisses.push(e.url);
+    } else if (/webRTC\/play/.test(e.url || '') && /\b400\b/.test(e.text || '')) {
+      // 27 tracks asks Cloudflare WHEP for one track at a time on purpose and
+      // gets a 400 both times. The refusal IS the measurement — the page
+      // asserts on it — so the request is expected. Capped like the others:
+      // more than a handful means something other than the probe is failing.
+      probed.push(e.url);
     } else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
       // ERR refuses segments by PROGRAMME rights — 403 with no ACAO, so the
       // browser reports CORS. 19 flipper probes for this deliberately and says
       // in its readout how much was refused, so the requests are expected.
       // Capped, not ignored: past the ceiling this is an outage, not rights.
-      rightsBlocks.push(e.url);
+      probed.push(e.url);
     } else errors.push(e.text);
   }
   if (m.method === 'Network.loadingFailed') {
@@ -115,7 +126,7 @@ listeners.push((m) => {
     // rather than ignored.
     const url = reqUrl.get(m.params.requestId) || '';
     if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
-    else if (m.params.corsErrorStatus && /live\.err\.ee/.test(url)) rightsBlocks.push(url);
+    else if (m.params.corsErrorStatus && /live\.err\.ee/.test(url)) probed.push(url);
     else failedReqs.push(`${m.params.errorText}${url ? ` ${url.slice(0, 70)}` : ''}`);
   }
 });
@@ -135,7 +146,7 @@ const ok = (label, cond, detail) => {
 
 for (const t of targets) {
   console.log(`\n[${t.n}] ${t.name}`);
-  errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; rightsBlocks = []; reqUrl.clear();
+  errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
   await S('Page.navigate', { url: `${BASE}/${t.n}-${t.name}/` });
   await sleep(1400);
 
@@ -225,15 +236,15 @@ for (const t of targets) {
   // assert would make the suite total vary run to run, and a shrinking total
   // is exactly how four asserts went missing unnoticed earlier.
   const EDGE_CEILING = 25;
-  const RIGHTS_CEILING = 40;      // 19 flipper sweeps 8 per probe, twice, + hls.js's own tries
+  const PROBE_CEILING = 40;      // 19 flipper sweeps 8 per probe, twice, + hls.js's own tries
   const edgeOk = edgeMisses.length <= EDGE_CEILING;
-  const rightsOk = rightsBlocks.length <= RIGHTS_CEILING;
-  ok('no console errors', errors.length === 0 && edgeOk && rightsOk,
+  const probedOk = probed.length <= PROBE_CEILING;
+  ok('no console errors', errors.length === 0 && edgeOk && probedOk,
     (errors.slice(0, 2).join(' | ') || '0')
     + (edgeMisses.length ? `  (+${edgeMisses.length} live-edge part 404${edgeMisses.length > 1 ? 's' : ''}`
       + `${edgeOk ? ', normal' : ` — OVER the ceiling of ${EDGE_CEILING}`})` : '')
-    + (rightsBlocks.length ? `  (+${rightsBlocks.length} ERR segment${rightsBlocks.length > 1 ? 's' : ''} refused`
-      + `${rightsOk ? ' by rights, expected' : ` — OVER the ceiling of ${RIGHTS_CEILING}`})` : ''));
+    + (probed.length ? `  (+${probed.length} upstream refusal${probed.length > 1 ? 's' : ''} the demos probe for`
+      + `${probedOk ? ', expected' : ` — OVER the ceiling of ${PROBE_CEILING}`})` : ''));
   ok('no failed requests', failedReqs.length === 0, failedReqs.slice(0, 2).join(' | ') || '0');
   if (abortedReqs.length) {
     console.log(`        (${abortedReqs.length} aborted on teardown — expected for a media page)`);

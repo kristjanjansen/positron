@@ -117,6 +117,12 @@ export const DEMOS = [
   { n: '26', name: 'shout', act: 5, built: true, settleMs: 12000,
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
     tags: ['Icecast', 'Workers', 'WebAudio'] },
+
+  // settleMs covers a cold container AND three measured modes behind control 0:
+  // ~80 s for the publisher, then 3 x 8 s of measurement plus negotiation.
+  { n: '27', name: 'tracks', act: 1, built: true, settleMs: 125000,
+    one: 'the same input as video, audio or both — what drops is the bytes, not the latency',
+    tags: ['LL-HLS', 'WHEP', 'Stream'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
