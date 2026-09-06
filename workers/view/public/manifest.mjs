@@ -114,10 +114,9 @@ export const DEMOS = [
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
   // radio, and both are here because the archive work needs the live end of the
   // same pipe. `built` flips the moment positron-shout answers.
-  { n: '26', name: 'shout', act: 5, built: false, settleMs: 12000,
+  { n: '26', name: 'shout', act: 5, built: true, settleMs: 12000,
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
-    tags: ['Icecast', 'Workers', 'WebAudio'],
-    why: 'needs the positron-shout worker deployed (workers/shout)' },
+    tags: ['Icecast', 'Workers', 'WebAudio'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
