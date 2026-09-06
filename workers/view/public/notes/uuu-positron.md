@@ -218,6 +218,20 @@ A vClick-to-quotation compiler would give them seek-from-anywhere as a
 guarantee rather than a discipline, and give positron a real corpus of notated
 pieces — which is exactly what the timeline lacks. Their scores are the client
 `plan-timeline` has been waiting for.
+
+**It exists now: `timeline/csound.mjs`** (`timeline/lab/csound-test.mjs`, 22/22).
+`t` statements become a beat↔ms map, `i` lines become rows, `m`/`n` become
+quotation values that round-trip through `score.mjs` byte-identically, and the
+fold is exact at 57 probes and either side of all 16 notes. The `.` carry, `+`
+and `^+x` shorthands are handled, because real scores use them.
+
+One thing the compiler had to get right that a parser would not have: **p2 and
+p3 are BEATS, and Csound interpolates tempo linearly in beat**, so the beat→time
+map is the integral of 60/tempo — closed-form and logarithmic. On `t 0 120
+30 90` the true answer is 17.2609 s at beat 30 and the mean-tempo answer is
+17.1429 s. A compiler that reached for the average would put every later note
+118 ms early, and nothing in its output would look wrong. The test asserts both
+numbers so the naive answer can never quietly return.
 ### 4. Borrow their LAN, which positron does not have
 
 Their in-room Host/Guest with UDP discovery is genuinely missing here. positron
