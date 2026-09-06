@@ -1,6 +1,6 @@
 # positron
 
-Live at **https://positron.studio**. 23 of 27 demos built, 318/318 green. Read
+Live at **https://positron.studio**. 24 of 28 demos built, 332/332 green. Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when.
 
@@ -78,6 +78,16 @@ entry and rejected as a CORS failure — on a URL that answers 200 with
 succeeds in the same run. Two demos read red for exactly this and nothing in
 either page was wrong. `verify.mjs` now deletes its profile's Cache before
 every run.
+
+**Never let sound gate the work.** `audio.play()` and `AudioContext.resume()`
+both wait on a user gesture in a real browser, and neither REJECTS — awaiting
+one before doing the real work is a hang, not an error. It cost two demos in one
+session: 26 shout spent five seconds buffering an element before its measurement
+opened, pushing the whole run past the harness's settle, and 28 vclick awaited a
+suspended context and never compiled, never built its deck, never raised its
+transport bar — while looking fine, because the readout had been filled at load.
+Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.
+Fire them and move on; sound is allowed to be late, the timeline is not.
 
 **Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
 reports `tail`'s exit status, not `cmd`'s.

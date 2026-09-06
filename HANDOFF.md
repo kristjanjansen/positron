@@ -7,7 +7,7 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**, **23 of 27 demos built, 318/318 green**. This
+Live on **positron.studio**, **24 of 28 demos built, 332/332 green**. This
 session found why iOS stuttered — our own drift-seek, then a stale check that
 had silently stopped preferring native HLS since iOS 17.1 added
 ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
@@ -78,7 +78,7 @@ reason: it is named for its subject, not for this repo.
 
 ## Where things stand (session 9)
 
-**318/318 green.** 23 of 27 built; `20`–`22` are archive pages that work and are
+**332/332 green.** 24 of 28 built; `20`–`22` are archive pages that work and are
 linked but not re-shelled, `23 studio` is assembly.
 
 | worker | hostname | what |
@@ -93,7 +93,7 @@ linked but not re-shelled, `23 studio` is assembly.
 ### Three harnesses, because one cannot see everything
 
 ```sh
-node demo/verify.mjs          # every built demo, CDP/Chrome — 318 asserts
+node demo/verify.mjs          # every built demo, CDP/Chrome — 332 asserts
 node demo/verify-native.mjs   # the IPHONE code path; verify.mjs CANNOT reach it
 node demo/verify-safari.mjs   # desktop Safari over WebDriver, both engines
 ```
@@ -150,7 +150,7 @@ candidate-pair RTT, not media latency.
 **Built (21):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
 `08` moq · `09` ladder · `10` room · `11` grid · `12` cues · `13` record ·
 `14` replay · `15` seek · `16` looper · `17` instrument · `18` jam ·
-`19` flipper · `24` capture · `25` show · `26` shout · `27` tracks.
+`19` flipper · `24` capture · `25` show · `26` shout · `27` tracks · `28` vclick.
 
 **Not built (4):**
 - `20 kurenniemi`, `21 megatimeline`, `22 remixer` — the pages WORK and are
