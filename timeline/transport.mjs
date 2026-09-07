@@ -698,6 +698,7 @@ export function createScheduler(transport, {
   // or a tier rise) or the policy changes — never per row, never per tick.
   let gatedKinds = new Set();
   let gateGen = 0;
+  let adapterGen = 0;
   const gateStats = { fires: 0, folds: 0, asserts: 0, silenced: 0, held: 0, reasserted: 0, byKind: new Map() };
   const gateLog = [];           // bounded transition log (policy changes only)
   const gateCbs = new Set();
@@ -1936,9 +1937,11 @@ export function createScheduler(transport, {
           reason: `adapter ${kind} interpolates between samples but declares no caps.tier — its between-sample values are unqualified restoration and the evidence firewall cannot gate them (§5b: declare caps.tier 1|2|3)` });
       adapters.set(kind, adapter);
       policies.set(kind, catchUp);
+      adapterGen++;
       return () => {
         if (adapters.get(kind) !== adapter) return;
         adapters.delete(kind); policies.delete(kind); snapshots.delete(kind); seriesLanes.delete(kind);
+        adapterGen++;
       };
     },
     /** U6: the two-phase seek entry point. Returns {report, promise} — the
@@ -1947,6 +1950,13 @@ export function createScheduler(transport, {
     /** U6: the barrier in flight (or the last one). */
     seekBarrier() { return barrier ? { ...barrier.report, promise: barrier.promise } : null; },
     hasSlowSync,
+    /** How many times the adapter registry has changed. The same idea as
+     *  `rangeGen`, for the same reason: a client that derived something from
+     *  the registry (the transport bar derives its rate lattice) needs to know
+     *  cheaply that its derivation is stale. A nest registers its adapter on
+     *  the parent AFTER construction, so anything computed once at build time
+     *  describes a deck that does not exist yet. */
+    adapterGen() { return adapterGen; },
     adapterCaps(kind) {
       if (kind !== undefined) { const a = adapters.get(kind); return a ? a.caps || {} : null; }
       const out = {};
@@ -2645,6 +2655,10 @@ export function createDeck({
     eventsOf: (kind) => sched.eventsOf(kind),
     cursorStats: (kind) => sched.cursorStats(kind),
     caps: (kind) => sched.adapterCaps(kind),
+    /** bumps whenever an adapter is registered or removed — a nest installs one
+     *  on its parent AFTER construction, so anything derived from the registry
+     *  at build time is describing a deck that does not exist yet */
+    adapterGen: () => sched.adapterGen(),
     /** the adapter registry, readable — including adapters registered AFTER
      *  construction, which `deck.adapters` (the constructor object) never held. */
     adapter: (kind) => sched.adapter(kind),

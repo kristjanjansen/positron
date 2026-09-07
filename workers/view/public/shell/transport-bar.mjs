@@ -40,18 +40,35 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   bar.append(toggle, scrub, time, rates, badge);
   host.append(bar);
 
+  // Declared BEFORE buildRates() runs: it calls syncRates(), which reads this.
+  // A `let` below the first call is a temporal dead zone, and the suite caught
+  // it as "__demo.ready false" on six pages at once rather than as anything
+  // resembling a rate bug.
+  let armedRate = 1;
+
   // ── rates: intersect every declared caps.rates lattice ──────────────────
-  const lattice = latticeFor(deck);
-  if (lattice && lattice.length) {
-    for (const r of lattice) {
-      const b = el('button', '', `${r}x`, { type: 'button', 'aria-pressed': 'false' });
-      b.addEventListener('click', () => applyRate(r));
-      b.dataset.rate = String(r);
-      rates.append(b);
+  // Rebuilt whenever the adapter registry moves. A nest registers its adapter
+  // on the parent AFTER this bar is constructed, and a page that swaps one
+  // arrangement for another changes the answer again — so a lattice computed
+  // once describes a deck that has not been assembled yet.
+  let lattice = null, agen = -1;
+  function buildRates() {
+    agen = deck.adapterGen?.() ?? 0;
+    lattice = latticeFor(deck);
+    rates.replaceChildren();
+    if (lattice && lattice.length) {
+      for (const r of lattice) {
+        const b = el('button', '', `${r}x`, { type: 'button', 'aria-pressed': 'false' });
+        b.addEventListener('click', () => applyRate(r));
+        b.dataset.rate = String(r);
+        rates.append(b);
+      }
+    } else {
+      rates.append(el('span', 'tbar-rate1', '1x'));   // honest: no lattice, no choice
     }
-  } else {
-    rates.append(el('span', 'tbar-rate1', '1x'));   // honest: no lattice, no choice
+    syncRates();
   }
+  buildRates();
 
   const seekable = Number.isFinite(deck.durationMs) && deck.durationMs > 0;
   bar.dataset.seekable = seekable ? '1' : '0';
@@ -77,7 +94,6 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   // at zero — so comparing buttons against it left NONE of them selected
   // whenever the deck was not rolling, which is exactly when someone is looking
   // at the row deciding what to press. Remember the last rate that was real.
-  let armedRate = 1;
   function syncRates() {
     const live = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
     if (live > 0) armedRate = live;
@@ -100,6 +116,7 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
 
   function paint({ pos }) {
     if (deck.rangeGen && deck.rangeGen() !== gen) { gen = deck.rangeGen(); range = deck.range; }
+    if (deck.adapterGen && deck.adapterGen() !== agen) buildRates();   // one integer compare
 
     if (!dragging && seekable) {
       const f = posToFrac(pos);
@@ -275,12 +292,28 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   };
 }
 
-/** Intersection of every declared caps.rates lattice. null = none declared. */
+/**
+ * Intersection of every declared caps.rates lattice. null = none declared.
+ *
+ * READ THE LIVE REGISTRY, not `deck.adapters`. That property is the object
+ * handed to `createDeck` and it never holds an adapter registered afterwards —
+ * which is every adapter a NEST installs on its parent. So a nest parent's
+ * lattice read as "none declared" and the bar showed its honest static 1x for
+ * a deck that could in fact be played at four rates. `transport.mjs` says as
+ * much beside `deck.adapter()`; the bar was the one client not listening.
+ *
+ * `deck.caps()` with no kind returns `{kind: caps}` over everything currently
+ * registered, which is the question actually being asked.
+ */
 function latticeFor(deck) {
-  const kinds = deck.adapters instanceof Map ? [...deck.adapters.keys()] : Object.keys(deck.adapters || {});
+  let capsByKind = null;
+  try { capsByKind = typeof deck.caps === 'function' ? deck.caps() : null; } catch { capsByKind = null; }
+  const list = capsByKind && typeof capsByKind === 'object' && !Array.isArray(capsByKind)
+    ? Object.values(capsByKind)
+    : (deck.adapters instanceof Map ? [...deck.adapters.keys()] : Object.keys(deck.adapters || {}))
+        .map((k) => deck.caps?.(k));
   let acc = null;
-  for (const k of kinds) {
-    const c = deck.caps?.(k);
+  for (const c of list) {
     const r = c && Array.isArray(c.rates) ? c.rates : null;
     if (!r) continue;
     acc = acc === null ? [...r] : acc.filter((x) => r.includes(x));
