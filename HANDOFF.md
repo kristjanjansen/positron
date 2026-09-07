@@ -443,7 +443,50 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 ## Next, in order
 
-0. **`sched.running()` does not exist**, so "is this deck's scheduler actually
+0. **Measure min-RTT clock skew over a REAL LINK.** Twenty minutes, one phone on
+   cellular, and it settles the last unmeasured number in the whole timing
+   story — the one every multi-device claim rests on.
+
+   Why it is now first rather than filed under the looper: the vClick work made
+   clock agreement the load-bearing quantity. Compiling a score moves the
+   network out of the TIMING path (each client derives its own position from the
+   beat↔ms map instead of being told every beat), which is what lets a click
+   track survive a blip. What it does NOT remove is the network — band members
+   need clicks in their ears, together — so accuracy stops depending on network
+   jitter and starts depending entirely on how well two devices agree what time
+   it is. That agreement is now the thing the design leans on, and it has only
+   ever been measured on loopback.
+
+   **The estimator already exists and is measured**, in `proto/looper/peer.mjs`:
+   NTP's, keeping the sample with the MINIMUM round trip and never an average
+   (an average is dragged by every queued packet; the minimum is the one that
+   got through cleanly). Both options were compared and the choice is not
+   arbitrary — against a Worker `/time` endpoint it is **±50 ms and that is
+   BIAS**, edge/worker path asymmetry rather than jitter, which at a 2 s loop is
+   2.5 % of the circle and an audible constant flam. Peer to peer it is
+   **±0.15 ms, drift 7 µs / 25 min**. Note that the ±50 was itself a revision:
+   the plan's optimistic ±25 ms was corrected by measurement.
+
+   **What to run.** Two devices that are not on one machine — the second on
+   cellular, so the path is genuinely asymmetric — exchanging pings through the
+   deployed relay, with `peer.mjs`'s own skew log drained at the end. Report the
+   min RTT, the offset it settled on, and the spread across a run of several
+   minutes.
+
+   **What would falsify the design**: min-RTT being scale-free is the claim, and
+   the supporting evidence is that a 311 ms link estimated as well as a 1.3 ms
+   one — but that was still loopback-shaped. If a real link's offset spread is
+   materially worse than ±0.15 ms, then peer-to-peer estimation alone does not
+   carry a multi-device click track, and the plan needs a correction path rather
+   than an assumption.
+
+   **Do not apply a correction by jumping.** Already paid for: a late layer is
+   GATED, never seeked, because seeking to the next downbeat moves the clock and
+   desyncs by exactly the amount it moved. And the servo's dead band is not
+   free — tightening it from 5 ms to 1 ms moved cross-peer p50 from −8.24 to
+   −5.77 ms.
+
+1. **`sched.running()` does not exist**, so "is this deck's scheduler actually
    ticking?" cannot be asserted — and that is not hypothetical. `03`'s child
    deck was created `autoStart: false`, which reads as "the nest drives it" and
    is true of the TRANSPORT while being false of the SCHEDULER. The recording's
@@ -453,49 +496,49 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    addition makes it guardable; the alternative (assert the child fired) has to
    wait for playback and would be written tolerantly, which is LESSONS #27.
 
-1. **Play it. Run a show.** Still the top item and now the sharpest it has been:
+2. **Play it. Run a show.** The oldest item here and still the sharpest:
    the demo spine is finished — 24 demos, an instrument, a five-panel studio —
    and **nothing has still ever been used by a human.** Everything measured is
    synthetic: canvas sources, injected keys, headless Chrome, burned clocks.
    Twenty minutes with a real camera, a real keyboard and one other person
    would teach more than any module.
-2. **Confirm iOS on a real phone.** Unchanged since session 9 and now two
+3. **Confirm iOS on a real phone.** Unchanged since session 9 and now two
    sessions stale: the native-HLS switch has never been seen on the device it
    was written for. Open `positron.studio/06-llhls/` and read the `BUILD` on the
    first log line before believing anything about it.
-3. **Re-run the suite somewhere with UDP egress.** 332/332 is the committed
+4. **Re-run the suite somewhere with UDP egress.** 332/332 is the committed
    number; the last run available read 301/313 because WebRTC and QUIC could not
    leave the machine. Until then `07`, `08`, `09` and `25` are unverified, and
    `17 instrument`'s `relay open — 0` is unexplained by that cause.
-4. **The archival cron** needs a fresh Stream-scoped token — `.env` holds the
+5. **The archival cron** needs a fresh Stream-scoped token — `.env` holds the
    known-exposed legacy one, so mint rather than deploy it. Without the cron,
    storage climbs ~225 min/day under testing toward a hard 1000-minute cap that
    breaks recordings and therefore playback. Deletion is the only lever;
    `mode: off` also disables HLS playback and `deleteRecordingAfterDays`
    bottoms out at 30.
-5. **Cap `26 shout` before its link goes anywhere public.** 128 kbps is
+6. **Cap `26 shout` before its link goes anywhere public.** 128 kbps is
    ~57.6 MB per listener-hour, all billable and none of it cacheable (the origin
    sends `no-cache, no-store`). Nothing throttles or counts listeners today.
-6. **Rotate the leaked secrets** (`SECRETS-ROTATION.md`) — four items, open
+7. **Rotate the leaked secrets** (`SECRETS-ROTATION.md`) — four items, open
    since session 1.
-7. **The four unbuilt demos.** `20 kurenniemi`, `21 megatimeline`, `22 remixer`
+8. **The four unbuilt demos.** `20 kurenniemi`, `21 megatimeline`, `22 remixer`
    work and are linked but are not re-shelled (`21` is 1220 lines); `23 studio`
    is assembly now rather than engineering — every panel it consumes exists and
    is verified.
-8. **The unexplained cross-peer tail** — two tabs playing one loop agree at
+9. **The unexplained cross-peer tail** — two tabs playing one loop agree at
    p50 −5.77 / p95 −1.52 ms but the max is 28.39 ms. Part is the servo's dead
    band (a per-peer position error, invisible solo, a flam when shared:
    5 → 1 ms moved p50 from −8.24 to −5.77). The rest is not explained.
-9. **Re-measure the content anchors** together, after the `replay.html` fix.
-10. **`createAudioLane` does not consult the evidence gate** — a derived lane
+10. **Re-measure the content anchors** together, after the `replay.html` fix.
+11. **`createAudioLane` does not consult the evidence gate** — a derived lane
    routed through it would still sound. Also wanted:
    `createAudioLane(…, {onStateChange: 'cancel' | 'keep'})` so a child lane can
    render a loop directly instead of by expansion (default must stay `cancel`).
-11. **Remote P2/P3** (`plan-looper.md`) — over the deployed `elektron-jam` DO,
+12. **Remote P2/P3** (`plan-looper.md`) — over the deployed `elektron-jam` DO,
    then over real distance. P2's point is that the loop plane should be
    INDISTINGUISHABLE from P1; if it is not, the claim is wrong, which is the
-   most valuable possible outcome. P3 needs the one unmeasured number: min-RTT
-   skew over a real link rather than loopback.
+   most valuable possible outcome. P3 needs the real-link skew number,
+   which is item 0 above.
 12. Still owed by §−1: `when` on spans, competing authorities (the deferral most
    likely to be regretted), non-contiguous brackets, the trapezoid interior.
 
