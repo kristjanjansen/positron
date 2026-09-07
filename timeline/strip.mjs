@@ -542,7 +542,12 @@ registerRenderer('spans', (ctx, L, C) => {
     const prov = s.row && s.row.provenance;
     const st = whenState(s, C.t0, C.t1);
     s.state = st;                               // read back by spanStates()/hover
-    const bw = Math.max(1.5, xb - xa);
+    // `barGap` insets the DRAWN bar without touching the span's real extent.
+    // Adjacent spans — the passes of a loop — share an edge exactly, and two
+    // rounded rectangles meeting at a shared edge still read as one long bar.
+    // A hairline of lane between them is what makes three things three.
+    const gap = L.barGap ?? 0;
+    const bw = Math.max(1.5, xb - xa - gap);
     const soft = s.kind === 'vagueness';
     // EDGE = when.kind, and the two are opposite claims about the world (§7):
     //   ignorance — there IS a boundary, the catalogue lost it. The bound is a
@@ -666,7 +671,11 @@ registerRenderer('spans', (ctx, L, C) => {
     if (L.labels !== false && xb - xa > 46 && barH >= 9) {
       ctx.globalAlpha = 0.95; ctx.fillStyle = '#04121a';
       ctx.font = '10px ui-monospace, Menlo, monospace';
-      ctx.fillText(String(L.labelOf ? L.labelOf(s) : s.key), xa + 4, y + barH - 2.5);
+      // TOP-LEFT. A label on the baseline of a tall bar floats in the middle of
+      // nothing and drifts as the bar's height changes; anchored to the corner
+      // it stays where the eye goes first and is the same distance from the
+      // edge whatever height the lane is given.
+      ctx.fillText(String(L.labelOf ? L.labelOf(s) : s.key), xa + 5, y + 11.5);
     }
   }
   ctx.restore();

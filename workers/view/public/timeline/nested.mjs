@@ -562,6 +562,26 @@ export function createNest(parent, {
   }
   const armAll = () => { for (const [, sp] of spans) if (sp.loop) armWrap(sp); };
 
+  // PRESENCE IS AN EVENT, not only a counter. `sp.enters`/`sp.exits` have always
+  // been incremented here and there was no way to subscribe to them, so a client
+  // could see that a quotation had come and gone but never when — which for a
+  // score made of quotations is the arrival and departure of every piece in it.
+  // Symmetric with onWrap: fire-and-forget, and a throwing listener is the
+  // listener's problem, never the nest's.
+  const presenceCbs = new Set();
+  function firePresence(sp, present, pos, reason) {
+    if (!presenceCbs.size) return;
+    const info = { span: sp.id, ref: deckRef(sp.deck) || null, present, parentPos: pos, reason,
+                   enters: sp.enters, exits: sp.exits };
+    for (const cb of presenceCbs) { try { cb(info); } catch { /* listener's problem */ } }
+  }
+  const setPresent = (sp, present, pos, reason) => {
+    if (sp.present === present) return;
+    sp.present = present;
+    if (present) sp.enters++; else sp.exits++;
+    firePresence(sp, present, pos, reason);
+  };
+
   function applyRate(sp) {
     const r = composeRate(parent.targetRate(), sp.rate, sp.allowed);
     if (r.degraded && (!sp.rateReport || sp.rateReport.chose !== r.chose)) sp.degradations++;
@@ -580,7 +600,7 @@ export function createNest(parent, {
       // rule 7g: a sibling quotation of the same deck owns the child right now.
       // Parking would drag it out from under the span that IS present.
       if (otherPresentOn(sp, parentPos)) {
-        if (sp.present !== false) { sp.present = false; sp.exits++; }
+        setPresent(sp, false, parentPos, 'sibling');
         return;
       }
       if (sp.deck.playing()) sp.deck.pause();
@@ -606,7 +626,7 @@ export function createNest(parent, {
         // once per park position (a re-park at a different edge re-asks).
         if (sp.silencedAt !== park) { silenceChild(sp, park, 'absent'); sp.silencedAt = park; }
       }
-      if (sp.present !== false) { sp.present = false; sp.exits++; }
+      setPresent(sp, false, parentPos, 'outside');
       return;
     }
     applyRate(sp);
@@ -648,7 +668,7 @@ export function createNest(parent, {
     // NOT wrap, so nothing carries — you jumped, you did not arrive.
     if (sp.loop) { sp.iter = iterAt(sp, parentPos); armWrap(sp); }
     sp.silencedAt = null;                    // present again: the fold re-asserts
-    if (sp.present !== true) { sp.present = true; sp.enters++; }
+    setPresent(sp, true, parentPos, 'inside');
     if (parent.playing() && sp.rateReport.chose > 0) sp.deck.play(); else sp.deck.pause();
   }
 
@@ -994,6 +1014,10 @@ export function createNest(parent, {
      *  event would make an infinite loop an infinite log — §8.7's store
      *  question answered by not creating the problem. */
     onWrap(cb) { wrapCbs.add(cb); return () => wrapCbs.delete(cb); },
+    /** A quotation arriving or leaving: {span, ref, present, parentPos, reason,
+     *  enters, exits}. `reason` is 'inside' | 'outside' | 'sibling' — the last
+     *  being rule 7g, another quotation of the same deck holding it right now. */
+    onPresence(cb) { presenceCbs.add(cb); return () => presenceCbs.delete(cb); },
     /** the current repetition index (0-based) of a looping span */
     iteration: (id) => { const sp = spans.get(id); return sp ? (sp.loop ? iterAt(sp, parent.position()) : 0) : null; },
     /** the parent position at which repetition `iter` of `id` begins */
