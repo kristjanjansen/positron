@@ -68,9 +68,16 @@ const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*
 // watching. src/publish.sh has used a monospace bold all along.
 const FONT = '/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf';
 
-// FROZEN — byte-identical to demo/shell/pattern.mjs and rig/whep/publish.html.
 // 48-bit epoch ms, MSB first, then the 8-bit XOR of those six bytes.
-const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: 40, Y: 100, H: 80 };
+//
+// MUST MATCH demo/shell/pattern.mjs, because readBurned() THERE reads the row
+// ffmpeg draws HERE. Moved with it on 2026-09-07 (was X:40 Y:100) so the bed
+// sits PAD from the top and is centred on a 1280 frame. `rig/whep/*` and
+// `rig/obs-docker/*` still hold the old geometry; each of those is a burner and
+// a reader that agree with each other, so they keep working — but "byte-
+// identical everywhere" is no longer true and this comment no longer says it.
+const PAD = 60;
+const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: PAD + 20, Y: PAD + 20, H: 80 };
 
 /** Single-quote a filtergraph option value; the inner escapes are drawtext's. */
 const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
@@ -123,11 +130,17 @@ function rowFilters(epoch) {
  * result to int failed" — measured. Hence the unit printed beside the number.
  */
 function drawFilters({ epoch, hue = 0, row = false }) {
-  const text = (t, y, size) => [
+  // Same typography as the browser canvas: a small brand-yellow word over a big
+  // light number, on a dark scrim rather than a white slab. Not hue-rotated —
+  // `hue=` is applied to the source first and drawtext paints after it, so
+  // #ffd400 is the shell's #ffd400 on every leg whatever its rotation.
+  const text = (t, y, size, colour) => [
     `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
-    'x=40', `y=${y}`, `fontsize=${size}`, 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=12',
+    `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
+    'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
+  const LABEL = '0xFFD400';
+  const VALUE = '0xE9EEF7';
   return [
     // hue FIRST: rotating chroma afterwards would tint the white boxes and,
     // with the row on, the row itself — which readBurned thresholds on.
@@ -137,17 +150,17 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     // twice. No source label — the hue says which publisher this is, and a name
     // burned into a picture is a small text nobody can read at the size a demo
     // shows it.
-    text('ABSOLUTE', 250, 34),
+    text('ABSOLUTE', 230, 34, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, 292, 76),
-    text('LOCAL', 440, 34),
+    text(`%{pts\\:flt\\:${epoch}} s`, 272, 76, VALUE),
+    text('LOCAL', 420, 34, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 482, 104),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 462, 104, VALUE),
   ].join(',');
 }
 

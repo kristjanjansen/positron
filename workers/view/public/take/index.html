@@ -35,7 +35,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { burn } from '/shell/pattern.mjs';
+  import { burn, videoHue } from '/shell/pattern.mjs';
 
   const CAP_MS   = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
@@ -89,13 +89,14 @@
   const randSeed = () => Math.floor(Math.random() * 10000);
   let nextSeed = randSeed();
 
-  // …but the HUE comes from the take's INDEX, by golden angle, not from the
-  // seed. Two random hues can land five degrees apart, and then two parts on
-  // the line are indistinguishable — which is the exact failure the seed exists
-  // to prevent. So: index picks a colour that is guaranteed far from its
-  // neighbours', and the seed picks the pattern inside it and is printed in the
-  // frame. Both properties hold, neither is left to luck.
-  const hueOf = (i) => (32 + i * 137.508) % 360;
+  // …but the HUE comes from the take's INDEX, not from the seed. Two random
+  // hues can land five degrees apart, and then two parts on the line are
+  // indistinguishable — the exact failure the seed exists to prevent. So the
+  // index picks a colour guaranteed far from its neighbours'. `videoHue` keeps
+  // it inside the shared video band, so a take is recognisably the same family
+  // as everything else this project generates, and the strip paints its lane
+  // from the same number.
+  const hueOf = (i) => videoHue(i);
 
   // Declared HERE, above `drawFrame`, because the first frame is painted
   // during module evaluation and a `let` further down is in its temporal dead

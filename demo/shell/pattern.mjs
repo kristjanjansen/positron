@@ -30,8 +30,27 @@
 // pages, and it is NOT interchangeable with this one. Do not unify them by
 // editing constants; that would move numbers those rigs have already published.
 
-/** Frozen. See above. */
-export const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: 40, Y: 100, H: 80 };
+/**
+ * The margin every element on the frame keeps from the top and the left. One
+ * number, because two that happen to differ read as a mistake — the row used to
+ * sit 20 px from the left edge and 80 px from the top, and off-centre besides
+ * (20 px of margin on the left against 100 on the right).
+ */
+export const PAD = 60;
+
+/**
+ * MOVED 2026-09-07, from X:40 Y:100 — so the bed sits PAD from the top and is
+ * CENTRED: 56 x 20 = 1120 of blocks, plus the bed's own 20 px ringing margin,
+ * is 1160 wide on a 1280 frame, which leaves exactly PAD either side.
+ *
+ * `workers/pub/container/server.mjs` carries the same numbers and MUST move with
+ * this, because `readBurned()` here reads the row that file's ffmpeg draws.
+ * `rig/obs-docker/*` and `rig/whep/*` each hold a burner and a reader that agree
+ * with EACH OTHER on the old geometry; they are self-contained rigs and are
+ * deliberately left alone. So "byte-identical everywhere" is no longer true and
+ * this comment says so rather than letting the next reader assume it.
+ */
+export const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: PAD + 20, Y: PAD + 20, H: 80 };
 
 /** 48 bits of epoch milliseconds, MSB first, then the 8-bit XOR of those bytes. */
 export const CLOCK_BITS = 48;
@@ -56,17 +75,43 @@ export function bitsFor(ms) {
 }
 
 /**
- * A stable hue for any string, so two sources pick different colours unaided.
- *
- * The point of the hue is that a person can tell two publishers apart at a
- * glance without reading anything; deriving it from the namespace or the take
- * name means nobody has to allocate them.
+ * THE KEY COLOUR FOR VIDEO. `--hi` in shell.css is #ffd400, which is hue 50, so
+ * that is what a picture this project generated looks like — the same colour the
+ * transport bar's playhead and the primary buttons use.
+ */
+export const VIDEO_HUE = 50;
+
+/**
+ * The band video hues are allowed to occupy: wide enough that two sources are
+ * obviously different, narrow enough that everything still reads as one family
+ * rather than a bag of random colours. An earlier version spread hues over the
+ * whole circle, which put `record` on magenta and `capture` on green — two
+ * pictures with nothing to say to each other and neither of them ours.
+ */
+const BAND = 100;   // degrees, centred on VIDEO_HUE
+
+/**
+ * The nth distinct video hue. Offsets rather than an angle step, so consecutive
+ * takes are far apart INSIDE the band — a plain step of BAND/n puts take 1 and
+ * take 2 next to each other, which is the one case the colour exists to tell
+ * apart. Index 0 is the key colour itself.
+ */
+const SPREAD = [0, 42, -18, 60, -40, 22];
+export function videoHue(i = 0) {
+  return (VIDEO_HUE + SPREAD[((i % SPREAD.length) + SPREAD.length) % SPREAD.length] + 360) % 360;
+}
+
+/**
+ * A stable hue for any string, so two sources pick different colours unaided —
+ * now INSIDE the video band, so a MoQ publisher and a local recording are
+ * recognisably the same kind of thing. A person can still tell two publishers
+ * apart at a glance, and nobody has to allocate a colour by hand.
  */
 export function hueFor(s) {
   let h = 2166136261;
   const str = String(s ?? '');
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return (h >>> 0) % 360;
+  return (VIDEO_HUE - BAND / 2 + ((h >>> 0) % BAND) + 360) % 360;
 }
 
 const pad = (n, k = 2) => String(n).padStart(k, '0');
@@ -147,17 +192,17 @@ export function burn(ctx, w, h, frame, opts = {}) {
 
   ctx.font = `bold 34px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText('ABSOLUTE', 40, 285);
+  ctx.fillText('ABSOLUTE', PAD, 265);
   ctx.font = `bold 76px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), 40, 380);
+  ctx.fillText(String(ms), PAD, 360);
 
   ctx.font = `bold 34px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText(second.label, 40, 470);
+  ctx.fillText(second.label, PAD, 450);
   ctx.font = `bold 104px ${MONO}`;
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, 40, 588);
+  ctx.fillText(second.text, PAD, 568);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -175,8 +220,9 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // read and no arithmetic. At 30 fps it still advances ~4 px a frame, which is
   // more motion than the row's low bits gave the encoder anyway.
   const SWEEP_MS = 10000;
+  const SQ = 60;                       // square, and the same 60 as PAD
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - 60), h - 58, 60, 44);
+  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), h - PAD - SQ, SQ, SQ);
   return ms;
 }
 
@@ -304,12 +350,22 @@ export function rowFilters(epoch) {
 export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false } = {}) {
   if (!epoch) throw new Error('ffmpegFilters: epoch required');
   if (!font) throw new Error('ffmpegFilters: fontfile required — drawtext without one fails silently');
-  const text = (t, y, size) => [
+  // SAME TYPOGRAPHY AS THE CANVAS: a small brand-yellow word over a big light
+  // number, not black text in a white box. The box stays, but as a dark scrim
+  // rather than a white slab — testsrc2 is a bright, busy background and plain
+  // white text on it is unreadable, which is why the white box existed at all.
+  //
+  // These colours are NOT hue-rotated: `hue=` is applied first, to the source,
+  // and drawtext paints after it. So #ffd400 here is the same #ffd400 the shell
+  // uses, on every publisher, whatever its hue rotation.
+  const text = (t, y, size, colour) => [
     `drawtext=fontfile=${q(font)}`,
     `text=${q(t)}`,
-    'x=40', `y=${y}`, `fontsize=${size}`, 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=12',
+    `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
+    'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
+  const LABEL = '0xFFD400';   // --hi
+  const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
     // hue FIRST: rotating chroma after the overlays would tint the white boxes
     // and, with row=1, the row itself.
@@ -322,7 +378,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // There is no source label any more: the hue says which publisher this is,
     // and a name burned into a picture is a small text that cannot be read at
     // the size a demo shows it.
-    text('ABSOLUTE', 250, 34),
+    text('ABSOLUTE', 230, 34, LABEL),
     // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
@@ -330,8 +386,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, 292, 76),
-    text('LOCAL', 440, 34),
+    text(`%{pts\\:flt\\:${epoch}} s`, 272, 76, VALUE),
+    text('LOCAL', 420, 34, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -342,7 +398,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 482, 104),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 462, 104, VALUE),
   ].join(',');
 }
 
