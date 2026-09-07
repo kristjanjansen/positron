@@ -269,9 +269,17 @@ counts against the last known total after any change.
   readout key with a sentence under it explaining it is lateness in
   milliseconds, and that it is NOT stream latency — a reader assumed exactly
   that, which is what prompted this rule.
-- Numbers in a `how` line come from the same constants the page passes to the
-  library, never typed twice — a description that can disagree with the config
-  is worse than none.
+- **A constant belongs beside the thing it governs, not in a header.** `how()`
+  took a spec line of real values (`looks 100 ms ahead · re-checks every 25 ms`)
+  on the theory that constants beat prose. They do — when someone is looking for
+  them. Above a paragraph they are one more thing to parse before reaching the
+  sentence that says what is going on. The numbers now sit under the lane whose
+  behaviour they describe, in the strip's gutter. Wherever a number IS printed,
+  read it from the same constant the page hands the library, never typed twice:
+  a description that can disagree with the config is worse than none.
+- **Per-lane numbers go in that lane's gutter** (`subLabel`), never in a
+  separate table or a readout row. Joining a figure to its ink across two
+  elements is what makes a legend necessary; put them together and it is not.
 - **A tooltip is two or three short lines, never a sentence.** It is drawn ON
   TOP of the thing it describes and is read every time you point at one, so a
   paragraph there covers the picture and gets re-read twenty times. Budget

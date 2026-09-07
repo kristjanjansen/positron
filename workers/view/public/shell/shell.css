@@ -35,14 +35,10 @@ body {
 }
 .d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; }
 
-/* how it works — a spec line of real values, then plain language under it */
-.d-how { margin: 10px 0 0; }
+/* how it works — one plain paragraph */
+.d-how { margin: 8px 0 0; }
 .d-how:empty { display: none; }
-.d-how-spec {
-  font: 500 10.5px/1.6 var(--mono); letter-spacing: .04em;
-  color: var(--dim2); font-variant-numeric: tabular-nums;
-}
-.d-how-note { margin-top: 3px; color: var(--dim); font-size: 13px; max-width: 60ch; }
+.d-how-note { color: var(--dim); font-size: 13px; max-width: 62ch; }
 
 /* ── readout ──────────────────────────────────────────────────────────── */
 .d-readout {
@@ -169,7 +165,12 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 }
 .tbar-rates { flex: none; display: flex; gap: 4px; }
 .tbar-rates button { padding: 5px 7px; font-size: 11px; }
-.tbar-rates button[aria-pressed="true"] { color: var(--hi); border-color: var(--hi); }
+/* the armed rate has to be findable at a glance, so it gets a fill as well as
+   an edge — colour alone on a 30 px button in a row of five reads as noise */
+.tbar-rates button[aria-pressed="true"] {
+  color: var(--hi); border-color: var(--hi);
+  background: color-mix(in oklab, var(--hi) 16%, var(--card2));
+}
 .tbar-rate1 { font: 500 11px/1 var(--mono); color: var(--dim2); }
 .tbar-badge {
   flex: none; font: 500 10px/1.5 var(--mono); letter-spacing: .06em;
