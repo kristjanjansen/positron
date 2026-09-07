@@ -177,6 +177,86 @@ from "one container, three languages". Two demos, one substrate.
 
 ---
 
+## 4b. P5 — media parts, which are the point rather than an extension
+
+A video or audio snippet IS a quotation:
+
+```jsonc
+{ "part": "err-1965-05-12", "at": 0, "in": 3600000, "out": 3720000 }
+```
+
+— two minutes starting an hour into a broadcast. This is not a generalisation of
+the format, it is the use case the project exists for: the heritage horizon
+(ERR, Radio Tallinn 1965) is "slots = a score of spans", and three demos already
+do it without a format — `19 flipper` over ERR channels, `22 remixer` playing
+1965 clips together, `14 replay` and `15 seek` on video decks.
+`timeline/media-master.mjs` already slaves a deck's vector to an
+HTMLMediaElement and states the laws: **the master is never nudged**, and
+**drift is a `sync()` while a discontinuity is a `seek()`**.
+
+Four things change, and they are the whole of the work.
+
+### 1. A part stops being rows
+
+The container needs a second part KIND:
+
+```jsonc
+"parts": {
+  "verse":            { "lang": "csound", "rows": [ … ] },
+  "err-1965-05-12":   { "lang": "media", "src": "…", "durMs": 7200000,
+                        "gopMs": 2000, "codec": "h264" }
+}
+```
+
+Not pretending a video is a list of notes is §1's rule one level up: normalize
+the envelope, never the payload. A `media` part carries what a PLAYER needs to
+honour a quotation and nothing that pretends to be an event.
+
+### 2. `in` becomes a request, not a fact
+
+A note starts exactly where it is put. A video seeks to the nearest keyframe —
+and with a 2.0 s GOP **only one part per segment is `INDEPENDENT`** (10 of 38
+measured), so `in: 3600000` may land at 3599800. That is not an error and must
+not be hidden.
+
+**The score records what was ASKED; the player reports what it GOT.** Both
+halves already exist: `{degraded, reason}` throughout the library, and the trim
+report `quotation()` produces when `in`/`out` are clamped to the deck's range.
+A media use needs the same report for keyframe rounding, so a reader can see
+that a 2-minute quotation actually began 200 ms early.
+
+### 3. Rate is narrower and repeat is expensive
+
+`rate: 2` over note rows is arithmetic. Over video it is a decoder constraint
+plus AV sync, and the honest `caps.rates` for a media part is much shorter than
+`[0.25, 0.5, 1, 2, 4]`. `repeat: 3` costs nothing on rows and is three keyframe
+seeks on media — and `nested.mjs` already treats a wrap as a re-seek, so the
+cost lands on a boundary that is otherwise cheap.
+
+Consequence for the format: nothing. Consequence for the demo: do not put a
+looping video beside a looping note part and imply they cost the same.
+
+### 4. Resolution failing is the NORMAL case
+
+**ERR blocks its own segments by PROGRAMME, not by age** — the playlists answer
+200 with `access-control-allow-origin: *` while the segments under `/live/hls/`
+return 403 with NO ACAO, which reaches a browser as a CORS failure. Swept at 13
+points across each 2 h window: `etv` refused its newest ~45 min, `etv2` refused
+its OLDEST ~78 min, `etvpluss` served everything. It moves with the schedule.
+
+So a use can resolve to a part that exists and refuses, and that is ordinary.
+`loadScore`'s report already carries which refs resolved and which marks moved;
+a media score needs a third answer — **resolved, and will not serve** — because
+"missing" and "present but refused" are different facts about an archive and
+collapsing them is the error this project has already made once, with iOS and
+WebTransport.
+
+### Done when
+
+A document holds a Csound part and a media part; a use of the media part reports
+the keyframe rounding it actually got; and a refused segment is reported as
+refused rather than as absent.
+
 ## 5. Traps
 
 - **Do not normalize payloads.** §1. The first pull will be toward a `note`

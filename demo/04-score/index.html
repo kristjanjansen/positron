@@ -7,81 +7,318 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .sc { font: 400 11.5px/1.6 var(--mono); color: var(--dim); background: var(--card);
+  .sc { font: 400 11px/1.75 var(--mono); background: var(--card);
         border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px;
-        overflow-x: auto; margin: 0 0 8px; white-space: pre; }
-  .sc b { color: var(--hi); font-weight: 500; }
+        overflow-x: auto; margin: 0 0 8px; }
+  .sc-l { display: block; white-space: pre; color: var(--dim2);
+          border-left: 2px solid transparent; padding-left: 8px; }
+  /* played once and still on the page: the score reads as a trail, not a blink */
+  .sc-l[data-state="past"] { color: var(--dim); border-left-color: #3f6a4d; }
+  .sc-l[data-state="now"]  { color: var(--fg); border-left-color: var(--hi);
+                             background: color-mix(in oklab, var(--hi) 9%, transparent); }
+  .sc-n { color: var(--dim2); }
+  .sc-l[data-state="now"] .sc-n { color: var(--hi); }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck, workerTickHost } from '/timeline/transport.mjs';
   import {
-    score, quotation, scoreToJSON, parseScore, isScore,
-    quotationEquals, quotationKey, scoreRefs, NS,
+    scoreDoc, quotation, refDeck, partItems, partRangeMs, loadScoreDoc,
+    scoreDocToJSON, parseScoreDoc, scoreDocToJSONL, parseScoreDocJSONL,
   } from '/timeline/score.mjs';
+  import { csoundPart, tempoMap } from '/timeline/csound.mjs';
 
   const d = mount({
     n: '04',
     name: 'score',
-    what: 'A quotation is a value: serialise it, parse it back, and the bytes must be identical.',
-    readout: { bytes: 'B', quotations: '', roundtrip: '', refs: '' },
-    controls: [
-      { id: 'roundtrip', label: 'Round-trip', primary: true },
-      { id: 'mutate', label: 'Try to mutate' },
-    ],
+    what: 'One document holding two kinds of score. Watch the line that is playing light up — and the loop stay one line.',
+    readout: { bytes: 'B', lines: '', rows: '', plays: '' },
+    // the numbers that matter are under the lane they describe; this row would
+    // repeat them with less context. Still published for CDP.
+    showReadout: false,
+    controls: [],
   });
   guard(d);
 
-  // a score naming its sources by IDENTITY, never by object
-  const s = score({
+  d.how(
+    `A score written in one language cannot hold one written in another, so ` +
+    `this document standardises only when a thing happens and how long it ` +
+    `lasts, and carries the rest exactly as written. The Csound part keeps its ` +
+    `p-fields, the MIDI part keeps its channel and velocity, and neither is ` +
+    `translated into the other. Repeats stay repeats: the loop below is one ` +
+    `line saying "three times", not three lines.`,
+  );
+
+  // ── the document ────────────────────────────────────────────────────────
+  const CSOUND = [
+    '; a few notes, in beats',
+    't 0 120',
+    'i 1 0   1   8000 440',
+    'i 1 1   0.5 8000 550',
+    'i 1 1.5 0.5 8000 660',
+    'f 1 0 8192 10 1        ; an f-table carries no timeline row',
+  ].join('\n');
+
+  const cp = csoundPart(CSOUND);
+
+  // The MIDI part is here as DATA, to show the container carrying two languages
+  // without flattening either. Nothing is sent to a port — that needs a device
+  // and is a later phase. Its rows land on the timeline; they do not sound.
+  const MIDI_ROWS = [
+    { id: 'm1', at: 0,    dur: 0.25, kind: 'note', payload: { ch: 0, note: 60, vel: 100 } },
+    { id: 'm2', at: 0.5,  dur: 0.25, kind: 'note', payload: { ch: 0, note: 64, vel: 88 } },
+    { id: 'm3', at: 1,    dur: 0.25, kind: 'note', payload: { ch: 0, note: 67, vel: 96 } },
+  ];
+
+  const doc = scoreDoc({
     id: 'demo-04',
-    meta: { ns: NS },
-    quotations: [
-      quotation({ id: 'q1', ref: 'kurenniemi-1972', at: 0, in: 1200, out: 8400 }),
-      quotation({ id: 'q2', ref: 'kurenniemi-1972', at: 8400, in: 0, out: 3000, rate: 0.5 }),
-      quotation({ id: 'q3', ref: 'err-1965-radio', at: 12000, in: 500, out: 4500,
-                  repeat: 3 }),
+    tempo: cp.tempo,
+    parts: {
+      verse: cp.part,
+      pulse: { lang: 'midi', rows: MIDI_ROWS },
+    },
+    uses: [
+      quotation({ id: 'u1', ref: 'verse', at: 0, in: 0, out: 2 }),
+      // ONE ENTRY WITH A COUNT. This is the whole argument against a flat event
+      // list, and the thing the highlight below has to make visible: three
+      // passes light the same line, because there is only one.
+      quotation({ id: 'u2', ref: 'verse', at: 3, in: 0, out: 2, repeat: 3 }),
+      quotation({ id: 'u3', ref: 'pulse', at: 10, in: 0, out: 1.5 }),
     ],
   });
 
-  const json = scoreToJSON(s, 2);
+  const CANON = scoreDocToJSON(doc);
+  const JSONL = scoreDocToJSONL(doc);
+  const LINES = JSONL.split('\n');
+
+  // ── which score line is which row / use ─────────────────────────────────
+  // Built from the view itself rather than from the document, so a line number
+  // shown to a reader is the line they are looking at.
+  const lineOfRow = new Map();          // `${part}#${rowId}` -> line index
+  const lineOfUse = new Map();          // use id -> line index
+  LINES.forEach((text, i) => {
+    const rec = JSON.parse(text);
+    if (rec.t === 'row') lineOfRow.set(`${rec.part}#${rec.id}`, i);
+    else if (rec.t === 'use' && rec.id) lineOfUse.set(rec.id, i);
+  });
+
+  // ── the decks the document names ────────────────────────────────────────
+  const plays = new Map();              // `${part}#${rowId}` -> times it has fired
+  const fired = [];
+
+  function partAdapter(part) {
+    return {
+      caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+      actuate(payload) {
+        const key = `${part}#${payload.row}`;
+        plays.set(key, (plays.get(key) || 0) + 1);
+        fired.push(key);
+        lightRow(key);
+      },
+      reduce(rows) { return { count: rows.length }; },
+      assertState(state) { return state; },
+    };
+  }
+
+  const decks = {};
+  for (const name of Object.keys(doc.parts)) {
+    const items = partItems(doc, name, { tempoMap });
+    const deck = createDeck({
+      items,
+      adapters: { note: partAdapter(name) },
+      range: partRangeMs(doc, name, { tempoMap }),
+    });
+    refDeck(deck, name);
+    decks[name] = deck;
+  }
+
+  // the parent the uses are arranged into
+  const parent = createDeck({ items: [], adapters: {}, range: [0, 7000] });
+
+  const loaded = loadScoreDoc(doc, (name) => decks[name], {
+    parent, tempoMap, tickHost: workerTickHost(),
+  });
+  const nest = loaded.nest;
+
+  nest.onPresence(({ span, present, parentPos }) => {
+    const line = lineOfUse.get(span);
+    if (line !== undefined) lightLine(line, present ? 'now' : 'past');
+    d.log(`${span} ${present ? 'starts' : 'ends'} at ${(parentPos / 1000).toFixed(2)}s`,
+      present ? 'hi' : 'info');
+  });
+
+  // ── the picture ─────────────────────────────────────────────────────────
+  createTransportBar(d.el, parent, { scrub: false });
+
+  const PART_INK = { verse: '#ffd400', pulse: '#7fb8e0' };
+  const NOT_YET = '#3b424e', PLAYED = '#8fd6a8';
+
+  const view = createStripView(d.el, parent, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    lanes: [
+      // one slice per pass, exactly as 03 draws a loop
+      { id: 'deck-span', kind: 'deck-span', label: 'uses', height: 52, barPad: 8,
+        as: 'spans', stack: false, barGap: 3, terse: true, color: '#c9a0ff', alpha: 0.9,
+        rows: () => {
+          const out = [];
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const from = nest.iterationAt(sp.id, i);
+              const to = nest.iterationAt(sp.id, i + 1);
+              const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.c1 - sp.c0));
+              if (!Number.isFinite(from) || !(end > from)) continue;
+              out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
+                         payload: { durMs: end - from, pass: i + 1, of: n, use: sp.id,
+                                    part: deckPartOf(sp) } });
+            }
+          }
+          return out;
+        },
+        labelOf: (sp) => {
+          const p = sp.row?.payload || {};
+          return p.of > 1 ? `${p.part} ${p.pass}/${p.of}` : String(p.part);
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          const where = lineOfUse.get(p.use);
+          return p.of > 1
+            ? [`${p.part}, pass ${p.pass} of ${p.of}`, `all three are line ${where}`]
+            : [`${p.part}, played once`, `line ${where}`];
+        } },
+      // where each part's own rows land inside each use
+      { id: 'rows', kind: 'note', label: 'rows', height: 46, width: 2, as: 'ticks',
+        color: NOT_YET, terse: true,
+        subLabel: ['from the parts,', 'placed by the uses'],
+        rows: () => {
+          const out = [];
+          for (const sp of nest.spans()) {
+            const part = deckPartOf(sp);
+            const items = partItems(doc, part, { tempoMap });
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const base = nest.iterationAt(sp.id, i);
+              if (!Number.isFinite(base)) continue;
+              for (const it of items) {
+                if (it.at < sp.c0 || it.at >= sp.c1) continue;
+                out.push({ at: base + (it.at - sp.c0) / (sp.rate || 1),
+                           id: `${sp.id}#${i}:${it.id}`, kind: 'note',
+                           payload: { part, row: it.payload.row } });
+              }
+            }
+          }
+          return out;
+        },
+        colorOfRow: (r) => {
+          const p = r.payload || {};
+          return plays.get(`${p.part}#${p.row}`) ? PLAYED : NOT_YET;
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          const line = lineOfRow.get(`${p.part}#${p.row}`);
+          const n = plays.get(`${p.part}#${p.row}`) || 0;
+          return [`line ${line} · ${p.part}`, n ? `played ${n}x` : 'not played yet'];
+        } },
+    ],
+  });
+
+  /** which part a span quotes — the nest holds the deck, the doc holds the name */
+  function deckPartOf(sp) {
+    for (const [name, deck] of Object.entries(decks)) if (deck === sp.deck) return name;
+    return '?';
+  }
+
+  // ── the score, one record per line ──────────────────────────────────────
   const pre = el('pre', 'sc');
-  pre.textContent = json;
+  const lineEls = LINES.map((text, i) => {
+    const row = el('span', 'sc-l');
+    row.append(el('span', 'sc-n', String(i).padStart(2, ' ') + '  '), document.createTextNode(text));
+    pre.append(row);
+    return row;
+  });
   d.el.append(pre);
 
-  d.set('bytes', new TextEncoder().encode(json).length);
-  d.set('quotations', s.quotations.length);
-  d.set('refs', scoreRefs(s).length);
-
-  function runRoundtrip() {
-    const a = scoreToJSON(s);
-    const back = parseScore(a);
-    const b = scoreToJSON(back);
-    const same = a === b;
-    d.set('roundtrip', same ? 'byte-identical' : 'DIFFERS', same ? 'ok' : 'bad');
-    d.assert('parses back to a score', isScore(back));
-    d.assert('bytes in == bytes out', same, `${a.length} vs ${b.length}`);
-    d.assert('quotation equality is by value',
-      quotationEquals(s.quotations[0], back.quotations[0]),
-      quotationKey(s.quotations[0]).slice(0, 40));
-    d.assert('a second round-trip is stable', scoreToJSON(parseScore(b)) === b);
+  let clearing = null;
+  function lightLine(i, state) {
+    const l = lineEls[i];
+    if (l) l.dataset.state = state;
   }
-  d.on('roundtrip', runRoundtrip);
-
-  // a value that can be edited is not a value
-  function checkFrozen() {
-    let threw = false;
-    try { s.quotations[0].at = 999; } catch { threw = true; }
-    const moved = s.quotations[0].at !== 0;
-    d.assert('frozen against mutation', threw || !moved, threw ? 'threw' : `at=${s.quotations[0].at}`);
+  function lightRow(key) {
+    const i = lineOfRow.get(key);
+    if (i === undefined) return;
+    lightLine(i, 'now');
+    // fade to the trail after a moment, so a rapid line reads as a pulse rather
+    // than staying lit and hiding the next one
+    clearTimeout(clearing);
+    clearing = setTimeout(() => {
+      for (const l of lineEls) if (l.dataset.state === 'now' && !l.dataset.use) l.dataset.state = 'past';
+    }, 240);
+    d.set('plays', fired.length);
   }
-  d.on('mutate', checkFrozen);
 
-  // a demo should not need a button press to show its one number
-  runRoundtrip();
-  checkFrozen();
+  // ── the numbers, under the lane that owns them ──────────────────────────
+  const rowCount = Object.values(doc.parts).reduce((n, p) => n + p.rows.length, 0);
+  d.set('bytes', new TextEncoder().encode(CANON).length);
+  d.set('lines', LINES.length);
+  d.set('rows', rowCount);
+  d.set('plays', 0);
 
-  d.log(`ns ${NS}`);
+  const useLane = view.strip.lanes().find((l) => l.id === 'deck-span');
+  if (useLane) useLane.subLabel = [`${doc.uses.length} uses of ${Object.keys(doc.parts).length} parts`,
+                                   `${doc.uses.filter((u) => u.repeat).length} of them repeat`];
+  const rowLane = view.strip.lanes().find((l) => l.id === 'rows');
+  if (rowLane) rowLane.subLabel = [`${rowCount} rows in the document`, 'each one a line below'];
+  view.strip.invalidate();
+
+  // ── asserts: structural, once, and about the MECHANISM ──────────────────
+  //
+  // Not "did something eventually happen" — a tolerant assert is how 03 spent
+  // its whole life not looping. Every one of these is decidable at load.
+  const back = parseScoreDoc(JSON.parse(CANON));
+  d.assert('the document round-trips byte-identically',
+    scoreDocToJSON(back) === CANON, `${CANON.length} bytes`);
+
+  d.assert('the JSONL view round-trips to the same document',
+    scoreDocToJSON(parseScoreDocJSONL(JSONL)) === CANON, `${LINES.length} lines`);
+
+  const repeats = doc.uses.filter((u) => u.repeat);
+  const useLines = LINES.filter((l) => JSON.parse(l).t === 'use');
+  d.assert('the loop is ONE line, not three',
+    repeats.length === 1 && repeats[0].repeat === 3 && useLines.length === doc.uses.length,
+    `${useLines.length} use lines for ${doc.uses.length} uses, ${repeats.length} repeating`);
+
+  // If the repeat had been expanded into rows, the part would carry its notes
+  // three times over. It carries them once.
+  d.assert('the repeat was not expanded into rows',
+    doc.parts.verse.rows.length === cp.part.rows.length,
+    `${doc.parts.verse.rows.length} rows`);
+
+  const vp = doc.parts.verse.rows[0].payload, mp = doc.parts.pulse.rows[0].payload;
+  d.assert('two languages, neither translated into the other',
+    doc.parts.verse.lang === 'csound' && doc.parts.pulse.lang === 'midi'
+      && Array.isArray(vp.p) && Number.isFinite(mp.vel) && vp.vel === undefined && mp.p === undefined,
+    `csound keeps p[${vp.p.length}], midi keeps vel=${mp.vel}`);
+
+  d.assert('the compiler\'s warnings survive into the document',
+    Array.isArray(doc.parts.verse.warnings) && doc.parts.verse.warnings.length === 1,
+    doc.parts.verse.warnings?.[0]);
+
+  d.assert('every use resolved to a part',
+    loaded.spans.length === doc.uses.length,
+    `${loaded.spans.length} spans`);
+
+  // the loop's three passes are three slices of ONE line — the mechanism, not
+  // a wait for three fires to have happened
+  const loopSpan = loaded.spans.find((s) => s.id === 'u2');
+  d.assert('the loop plays one line three times',
+    !!loopSpan && loopSpan.iterations === 3 && lineOfUse.get('u2') !== undefined,
+    `line ${lineOfUse.get('u2')} · ${loopSpan?.iterations} passes`);
+
+  d.log(`${LINES.length} lines · ${rowCount} rows · ${doc.uses.length} uses`);
+  if (doc.parts.verse.warnings) for (const w of doc.parts.verse.warnings) d.log(w);
   d.ready();
 </script>
 </html>
