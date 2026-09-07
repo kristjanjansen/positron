@@ -517,7 +517,11 @@ registerRenderer('spans', (ctx, L, C) => {
   // `slots` caps the stack (compose stacked 128 MIDI notes into 8 rows by hand);
   // `slotOf` lets a lane place a span on a real axis — pitch, participant, tier.
   const nSlots = Math.max(1, Math.min(L.slots || Infinity, rowsByKey.size));
-  const barH = L.stack === false ? L.height - 6 : Math.max(3, (L.height - 6) / nSlots - 2);
+  // `barPad` is the breathing room above and below the bar in its slot. A
+  // span sitting hard against its lane edges reads as a background band
+  // rather than as an object with ends.
+  const barPad = L.barPad ?? 3;
+  const barH = L.stack === false ? L.height - barPad * 2 : Math.max(3, (L.height - barPad * 2) / nSlots - 2);
   ctx.save();
   // `bars:false` gives the AGGREGATE ITS OWN LANE. A stacked span lane and a
   // per-column silhouette want the same pixels, and the silhouette loses — the
@@ -548,9 +552,19 @@ registerRenderer('spans', (ctx, L, C) => {
     //     so the band is feathered and there is NO narrowing affordance at all.
     // Never a dash for either (§8.4.5): dash is tratteggio's, one axis down.
     const feather = soft ? Math.min(22, Math.max(2, bw * 0.34)) : 0;
+    // A slice is a THING, and a thing has ends. Square corners let adjacent
+    // slices — the three passes of a loop — melt into one bar, which is exactly
+    // the reading the picture must not give. The radius is small and capped at
+    // a third of the width so a narrow span stays a bar rather than a pill.
+    const rad = Math.min(2, bw / 3, barH / 3);
     const band = (alpha, x0 = xa, w0 = bw) => {
       ctx.globalAlpha = alpha; ctx.fillStyle = col;
-      if (!feather) { ctx.fillRect(x0, y, w0, barH); return; }
+      if (!feather) {
+        if (rad > 0.5 && ctx.roundRect) {
+          ctx.beginPath(); ctx.roundRect(x0, y, w0, barH, rad); ctx.fill();
+        } else ctx.fillRect(x0, y, w0, barH);
+        return;
+      }
       const g = ctx.createLinearGradient(x0, 0, x0 + w0, 0);
       const f = Math.min(0.49, feather / w0);
       g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(f, col);

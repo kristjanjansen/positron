@@ -146,7 +146,28 @@ eye, which took one attempt.
 Same family as #1: I was measuring the quantity next to the one in question —
 the SVG's geometry rather than the ICO's pixels.
 
-### 27. Do not show one mechanism's lookahead and hide another's
+### 27. A tolerant assert is how a page's whole subject goes missing
+
+`03 nest` is a page about looping, and it was not looping. Three passes, zero
+wraps, for the entire life of the demo. `createNest` arms each boundary on a
+TickHost and, given none, falls back to discovering it inside `servo()` — and
+SAYS SO, `nest.loop(id).boundary === 'polled'`. The page passed no host and
+never called `servo()` either, so the boundary was neither committed nor polled.
+It simply never happened.
+
+Two things hid it. The picture drew a 3-pass loop as ONE span carrying
+`repeat: 3`, so "looping" was implied rather than shown. And the assert read
+`wraps > 0 || !reached` — tolerant of "the playhead has not got there yet",
+which in every harness run it had not. **It passed vacuously on every run.** A
+human pressing play found it in one go.
+
+Two fixes, and the second generalises: expand the loop into one span per pass so
+the picture cannot imply what it is not showing, and assert the MECHANISM
+(`boundary() === 'lookahead'`) rather than its downstream effect. A mechanism
+assert is deterministic; an effect assert has to wait, and **an assert that has
+to wait is an assert that gets written tolerantly.**
+
+### 28. Do not show one mechanism's lookahead and hide another's
 
 `02` drew the sound row green as soon as a click was handed over — up to 100 ms
 ahead of the playhead — which reads as the other lane lagging. The wall
