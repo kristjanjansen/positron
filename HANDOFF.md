@@ -436,6 +436,16 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 ## Next, in order
 
+0. **`sched.running()` does not exist**, so "is this deck's scheduler actually
+   ticking?" cannot be asserted — and that is not hypothetical. `03`'s child
+   deck was created `autoStart: false`, which reads as "the nest drives it" and
+   is true of the TRANSPORT while being false of the SCHEDULER. The recording's
+   own marks therefore never fired at all, for the whole life of the demo, and
+   nothing on screen could contradict it. It surfaced only when the marks were
+   asked to log themselves and the log came back empty. A one-line library
+   addition makes it guardable; the alternative (assert the child fired) has to
+   wait for playback and would be written tolerantly, which is LESSONS #27.
+
 1. **Play it. Run a show.** Still the top item and now the sharpest it has been:
    the demo spine is finished — 24 demos, an instrument, a five-panel studio —
    and **nothing has still ever been used by a human.** Everything measured is
