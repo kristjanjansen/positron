@@ -20,6 +20,12 @@ the better scrubber. `01` and `02` are fixed and are the worked examples; the
 other 22 have not had the pass. **127/127 green** across the eight strip demos,
 per-demo counts unchanged.
 
+**Three lanes now measure themselves on one page**: bg worker +1.50 ms typical,
+sound card **+0.01 ms** (an AudioWorklet timestamping the output sample — 1–2
+samples at 48 kHz, reproducing the lab's Arm E independently), midi in +0.40 ms
+over the IAC loopback. `midi out` is the only one with no feedback path at all;
+its error is bounded by the round trip, not observed.
+
 New: `demo/shell/hardware.mjs` (one gesture buys sound + MIDI out, capability
 reported rather than error), `createMidiLane` in `timeline/transport.mjs` — which spent its first
 run scheduling every note **fifty-six years into the future**, because

@@ -105,6 +105,7 @@
     // the input did, and only because both ends happen to be the same loopback
     // device. A lane may only be coloured by evidence it produced.
     if (id === 'midiin') return loopOf.get(Math.round(r.at));
+    if (id === 'sound') return soundOf.get(Math.round(r.at));
     return undefined;
   }
   function outcomeOf(id, r) {
@@ -136,7 +137,9 @@
         if (r.at > deck.position()) { line('not played yet'); continue; }
         if (L.id === 'midiin' && !loopOf.has(Math.round(r.at))) { line('nothing arrived'); continue; }
         const m = metricOf(L.id, r);
-        line(m === undefined ? 'played · no feedback' : `${m >= 0 ? '+' : ''}${m.toFixed(2)} ms`);
+        if (m !== undefined) { line(`${m >= 0 ? '+' : ''}${m.toFixed(2)} ms`); continue; }
+        const rt = L.id === 'midi' ? loopOf.get(Math.round(r.at)) : undefined;
+        line(rt === undefined ? 'sent · no way to check' : `sent · at most ${sign(rt)} ms`);
       }
       return lines;
     },
@@ -151,7 +154,7 @@
     view.strip.setLanes(next);
   };
 
-  let audio = null, midi = null, out = null;
+  let audio = null, midi = null, out = null, probe = null, impulse = null, hold = null;
 
   /**
    * AN AUDIBLE CLICK, not the lab's one.
@@ -171,6 +174,18 @@
     g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
     osc.connect(g); g.connect(out);
     osc.start(at); osc.stop(at + 0.06);
+
+    // AND a one-sample impulse at the SAME instant, into the probe bus only.
+    // The ear needs an edge it can find to the sample; the blip above has a
+    // 2 ms ramp, and a threshold crossing on a ramp lags ~0.75 ms — twenty
+    // times the quantity being measured. This one is never heard: the probe
+    // bus ends in a silent sink.
+    if (probe) {
+      const tick = ctx.createBufferSource();
+      tick.buffer = impulse;
+      tick.connect(probe);
+      tick.start(at);
+    }
     return osc;                       // the lane watches this node's onended
   };
 
@@ -179,6 +194,32 @@
       out = ctx.createGain();
       out.gain.value = 1;
       out.connect(ctx.destination);
+
+      // THE EAR. Everything the sound card actually renders on the probe bus
+      // is timestamped on the audio thread, to the sample. This is the only
+      // way this lane can report on itself: Web Audio has no per-note
+      // callback, and `outputLatency` is an estimate of the device leg, not a
+      // measurement of when a note rendered.
+      impulse = ctx.createBuffer(1, 2, ctx.sampleRate);
+      impulse.getChannelData(0)[0] = 1;
+      probe = ctx.createGain();
+      probe.gain.value = 1;
+      // Chrome latches a silent bus and then hands the worklet an EMPTY input
+      // array. A started ConstantSourceNode at 0 keeps it live without adding
+      // a sound. Documented trap; it cost this project a session once already.
+      hold = ctx.createConstantSource();
+      hold.offset.value = 0;
+      hold.connect(probe);
+      hold.start();
+      ctx.audioWorklet.addModule('/shell/impulse-worklet.js').then(() => {
+        const ear = new AudioWorkletNode(ctx, 'impulse-detect');
+        ear.port.onmessage = (e) => heard.push(e.data.at);
+        const mute = ctx.createGain();
+        mute.gain.value = 0;                 // pulled by the graph, heard by nobody
+        probe.connect(ear); ear.connect(mute); mute.connect(ctx.destination);
+        d.log('ear listening on the audio thread');
+      }).catch((e) => d.log(`no ear: ${e.name} — sound card stays unmeasured`, 'bad'));
+
       audio = createAudioLane(deck.transport, ctx, { horizonMs: AHEAD, makeNode: audibleClick });
       for (let at = 0; at < DURATION; at += BEAT) audio.schedule({ at, kind: 'click', id: `c${at}` });
       audio.start();
@@ -222,6 +263,24 @@
    * the only observable there is without external hardware. It is emphatically
    * not send → a synth on a cable.
    */
+  const heard = [];                   // audio-domain seconds, from the ear
+  const soundOf = new Map();          // position -> render error, ms
+  function pairHeard() {
+    if (!heard.length || !audio) return;
+    const want = audio.scheduled();
+    for (const t of heard.splice(0)) {
+      let best = null, bd = Infinity;
+      for (const x of want) {
+        const d0 = Math.abs(x.intendedAudioT - t);
+        if (d0 < bd) { bd = d0; best = x; }
+      }
+      // intendedAudioT is the instant the lane asked the audio thread for, in
+      // the audio clock's own domain — so this subtraction never leaves that
+      // domain and never touches the main thread's idea of the time.
+      if (best && bd < 0.25) soundOf.set(Math.round(best.at), (t - best.intendedAudioT) * 1000);
+    }
+  }
+
   const backlog = [];
   let listening = null;
   function listenOn(input) {
@@ -301,12 +360,24 @@
 
     if (!take('worker', [...driftOf.values()])) say('worker', 'not started');
 
+    pairHeard();
     const sched = audio ? audio.scheduled() : [];
     if (!audio) say('sound', 'not enabled');
-    else say('sound', `${sched.length} sent`, 'cannot report back');
+    else if (!take('sound', [...soundOf.values()])) say('sound', `${sched.length} sent`, 'ear not listening yet');
 
+    // MIDI out has no feedback path of any kind — send() is fire-and-forget,
+    // there is no completion callback and no "sent at" report. But it is not
+    // unbounded: the loopback round trip is out + in, and neither leg can be
+    // negative, so out is AT MOST the round trip. That is derived, not observed,
+    // so it is worded as a ceiling and the lane stays uncoloured — a lane is
+    // only coloured by evidence it produced itself.
     if (!midi) say('midi', 'no device');
-    else say('midi', `${midi.scheduled().length} sent`, 'cannot report back');
+    else {
+      const back = [...loopOf.values()];
+      const bound = back.length ? summarise(back).p50 : null;
+      say('midi', `${midi.scheduled().length} sent`,
+        bound === null ? 'no way to check' : `at most ${sign(bound)} ms`);
+    }
 
     if (!listening) say('midiin', 'no device');
     else if (!take('midiin', [...loopOf.values()])) say('midiin', 'nothing arrived');
