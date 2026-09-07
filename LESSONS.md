@@ -113,7 +113,40 @@ output with no device attached. State what the loopback does NOT cover
 (send → CoreMIDI → receive, not send → a synth on a cable) and it is a floor
 worth having rather than a claim.
 
-### 24. Do not show one mechanism's lookahead and hide another's
+### 24. One fabricated zero is a bug; three is a class
+
+`dr?.p50 ?? dr?.ms ?? 0` printed a confident 0 in 01, and then in 03, because
+both `deck.drift()` and `nestedDrift()` return something with no `p50` on it —
+an array in one case, `{fires, range, pos, kinds:{…}}` in the other. Both
+asserts passed every time, because both only checked non-null.
+
+The third one was not found by looking at the page. It was found because the
+pattern had a name by then. **When a defect has a shape, grep for the shape
+before reviewing anything else** — `?? 0` is a fifteen-second search that would
+have found all three on the first day.
+
+### 25. A scrub is not an observation
+
+Three demos coloured their marks with `latch`, which recolours from the
+PLAYHEAD, so dragging backwards turned measured marks grey again — as if moving
+the cursor un-measured them. Colour that encodes a measurement must come from
+the measurement. Navigation is not evidence, and the picture should only change
+when something new is learned.
+
+### 26. A second implementation has to be LOOKED AT, not reasoned about
+
+The favicon exists twice: an SVG, and a pixel loop that writes `favicon.ico`.
+The parameters that gave a clean 'e' as an SVG gave a squashed counter, a
+terminal curled into a hook, and a glyph touching the left edge as pixels — a
+rasteriser and a nearest-neighbour plot are not the same function. Two rounds of
+"adjust the numbers and hope" both shipped something broken. What worked was
+rendering the .ico at 16x beside three candidate parameter sets and choosing by
+eye, which took one attempt.
+
+Same family as #1: I was measuring the quantity next to the one in question —
+the SVG's geometry rather than the ICO's pixels.
+
+### 27. Do not show one mechanism's lookahead and hide another's
 
 `02` drew the sound row green as soon as a click was handed over — up to 100 ms
 ahead of the playhead — which reads as the other lane lagging. The wall
