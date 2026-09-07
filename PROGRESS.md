@@ -233,6 +233,47 @@ thread → our JS handler, so it includes the main-thread event loop and is an
 UPPER BOUND on delivery. It is also the only observable available without
 external hardware, and it is the first MIDI measurement this project has.
 
+### The sound card can report on itself after all
+
+"Cannot report back" was true of the wiring and false of the platform. Web Audio
+has no per-note callback and `outputLatency` is an estimate of the device leg,
+not a measurement of when a note rendered — but an **AudioWorklet on the render
+thread** can timestamp the exact output sample, which is how `timeline/lab`
+measured this lane at 10–40 µs in the first place and which no demo had ever
+carried.
+
+`demo/shell/impulse-worklet.js` reports `currentFrame + i` for any sample over
+threshold. Two details decide whether the number means anything:
+
+- **A threshold, not an envelope.** An envelope follower has an attack time, and
+  an attack time is a bias in exactly the quantity under test.
+- **A separate silent impulse.** The audible click has a 2 ms ramp, and a
+  threshold crossing on a ramp lags ~0.75 ms — twenty times the effect being
+  measured. So the page schedules a one-sample impulse at the IDENTICAL instant
+  into a probe bus that ends in a muted sink. The ear hears an edge; the human
+  hears the blip.
+- A started `ConstantSourceNode(0)` holds the probe bus live, because Chrome
+  hands a worklet an EMPTY input array once it latches a bus silent — the trap
+  already in this file, met again.
+
+Measured on the deployed page, 16 s, one click every 500 ms:
+
+| lane | typical | worst |
+|---|---|---|
+| bg worker | +1.50 ms | +2.90 ms |
+| **sound card** | **+0.01 ms** | **+0.04 ms** |
+| midi out | 31 sent · cannot report back | |
+| midi in | +0.40 ms | +0.80 ms |
+
+**10 µs typical, 40 µs worst — 1–2 samples at 48 kHz.** That reproduces Arm E's
+lab figure independently, in a page anyone can open, and it puts three orders of
+magnitude between the worker lane and the sound card on one screen.
+
+`midi out` remains the one lane with no feedback path of any kind: `send()` is
+fire-and-forget. Its accuracy is bounded rather than observed — the loopback
+round trip is out + in, both non-negative, so out ≤ 0.4 ms typical. Derived, and
+the page does not print it as though it were measured.
+
 ### MIDI in, as its own lane
 
 The IAC loopback returns everything written to it, so `02` gained a fourth row
