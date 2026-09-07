@@ -131,12 +131,21 @@ function shellFiles() {
  * This is the check that would have caught the 404 above before it went out:
  * the page imported /shell/moq.mjs, the copy list did not carry it, and
  * nothing complained until a browser asked for it on the live site.
+ *
+ * IT SCANS MODULES, NOT JUST PAGES, and it did not always. While it read HTML
+ * only, `demo/shell/moq.mjs` went on importing `/08-moq/moq-vendor.js` for the
+ * whole life of the slug rename — a 404 that killed the module, so `moq` and
+ * `ladder` never reached `__demo.ready` and asserted NOTHING. Both read as red
+ * for a plausible wrong reason (no relay on this network) and stayed that way.
+ * A page is not the only thing that can import; the check has to follow the
+ * imports wherever they live.
  */
 function checkImports(copied) {
   const have = new Set(copied.map(([, dst]) => dst));
   const missing = [];
+  const SCAN = new Set(['.html', '.mjs', '.js']);
   for (const [src, dst] of copied) {
-    if (extname(dst) !== '.html') continue;
+    if (!SCAN.has(extname(dst))) continue;
     let text = '';
     try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
     const dir = dirname(dst);

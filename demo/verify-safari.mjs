@@ -61,7 +61,7 @@ if (!ready) {
 let failures = 0;
 
 for (const engine of ENGINES) {
-  const url = `${BASE}/06-llhls/?player=${engine}`;
+  const url = `${BASE}/llhls/?player=${engine}`;
   console.log(`\n=== desktop Safari, player=${engine} ===`);
   console.log(`    ${url}`);
 
