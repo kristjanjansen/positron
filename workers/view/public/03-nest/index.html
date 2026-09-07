@@ -11,30 +11,33 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
-  import { createDeck } from '/timeline/transport.mjs';
+  import { createDeck, workerTickHost } from '/timeline/transport.mjs';
   import { createNest, nestedDrift } from '/timeline/nested.mjs';
   import { refDeck, quotation } from '/timeline/score.mjs';
   import { markAdapter, marks } from '/shell/fixture.mjs';
 
-  const PARENT = 24000, CHILD = 6000;
+  const PARENT = 12000, CHILD = 6000;
 
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'A short piece placed twice inside a longer one — once as a slice, once looping three times.',
+    what: 'One short piece, used twice in a longer one: once as a slice, once looping three times.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
     showReadout: false,
-    controls: [{ id: 'loop', label: 'Jump to the loop', primary: true }],
+    // No skip button. It existed because the subject started 12 s into a 24 s
+    // piece — which is a reason to shorten the piece, not to add a control that
+    // apologises for its length.
+    controls: [],
   });
   guard(d);
 
   d.how(
-    `Nothing is copied. The inner piece is referred to by name, so the same ` +
-    `thing plays in two places, and the loop is one reference with a repeat ` +
-    `count rather than three duplicates. Green means a mark landed as ` +
-    `expected; amber to red, late.`,
+    `The inner piece exists once. Both places on the timeline point at it by ` +
+    `name — like citing a paragraph instead of retyping it — so there is one ` +
+    `source and two uses. The second use says "three times", which is why you ` +
+    `see three slices and still only one source.`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
@@ -61,11 +64,25 @@
     onDrift: (_rows, all) => report(all),
   });
 
-  const nest = createNest(parent, { resolve: (ref) => (ref === 'kurenniemi-1972' ? child : null) });
+  // A WRAP IS A COMMITTED ONE-SHOT, AND WITHOUT A HOST IT IS NOTHING.
+  //
+  // `createNest` arms each loop boundary on a TickHost — the same object
+  // `createDeck({tickHost})` takes — so a wrap has the same firing-error
+  // distribution as any other event. Given none, the library falls back to
+  // discovering the boundary inside `servo()` and SAYS SO
+  // (`nest.loop(id).boundary === 'polled'`). This page passed no host and never
+  // called servo() either, so the boundary was neither committed nor polled: it
+  // simply never happened. Three passes, zero wraps, and a page whose whole
+  // subject is looping quietly not looping. The assert that should have caught
+  // it was tolerant of "not reached yet" and passed vacuously every run.
+  const nest = createNest(parent, {
+    resolve: (ref) => (ref === 'kurenniemi-1972' ? child : null),
+    tickHost: workerTickHost(),
+  });
 
   // a plain fragment, then the same source looped three times
-  nest.add(quotation({ id: 'frag', ref: 'kurenniemi-1972', at: 2000, in: 1000, out: 5000 }));
-  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 12000, in: 0, out: 2000,
+  nest.add(quotation({ id: 'frag', ref: 'kurenniemi-1972', at: 1000, in: 1000, out: 4000 }));
+  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 5500, in: 0, out: 1800,
                        repeat: 3 }));
 
   // Same bands as 01 and 02: colour says HOW IT LANDED, never which lane.
@@ -75,12 +92,11 @@
 
   // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
   // rather than shown. onWrap is the event that makes it observable.
-  let wraps = 0;
-  nest.onWrap(() => {
-    wraps++;
-    d.set('wraps', wraps);
-    d.log(`wrap → pass ${(nest.iteration('loop') ?? 0) + 1} of 3`, 'hi');
-  });
+  // A WRAP IS A TRANSITION, so logging only wraps starts the story at pass 2 —
+  // the first pass has no wrap in front of it. The log follows the PASS instead,
+  // which is the thing a reader is counting.
+  let wraps = 0, lastPass = null;
+  nest.onWrap(() => { wraps++; d.set('wraps', wraps); });
 
   createTransportBar(d.el, parent, { scrub: false });
   const view = createStripView(d.el, parent, {
@@ -99,9 +115,31 @@
           if (!m) return 'not played yet';
           return `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${bandFor(m.deltaMs)[2]}`;
         } },
-      { id: 'deck-span', kind: 'deck-span', label: 'quoted', height: 54, as: 'spans',
-        terse: true, color: '#c9a0ff', alpha: 0.85,
-        describeRow: () => 'the same inner piece, referred to by name' },
+      // ONE SLICE PER PASS. A 3-pass loop is a single row carrying repeat:3, so
+      // the strip drew one long bar and the looping — the entire subject of this
+      // page — was invisible. `rows` may return MORE rows than it was given, so
+      // each pass becomes its own span and the loop reads as [ ][ ][ ].
+      { id: 'deck-span', kind: 'deck-span', label: 'quoted', height: 62, barPad: 7, as: 'spans',
+        terse: true, color: '#c9a0ff', alpha: 0.9,
+        rows: () => {
+          const out = [];
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const from = nest.iterationAt(sp.id, i);
+              const to = nest.iterationAt(sp.id, i + 1);
+              const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.out - sp.in));
+              if (!Number.isFinite(from) || !(end > from)) continue;
+              out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
+                         payload: { durMs: end - from, pass: i + 1, of: n, quo: sp.id } });
+            }
+          }
+          return out;
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          return p.of > 1 ? `${p.quo} · pass ${p.pass} of ${p.of}` : `${p.quo} · played once`;
+        } },
     ],
   });
 
@@ -125,6 +163,10 @@
   setInterval(() => {
     const it = nest.iteration?.('loop');
     d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
+    if (it !== lastPass) {
+      if (it !== null && it !== undefined) d.log(`pass ${it + 1} of 3`, 'hi');
+      lastPass = it;
+    }
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
       L.subLabel = ['2 uses, 1 source', wraps ? `${wraps} wraps` : 'loop not reached'];
@@ -143,6 +185,10 @@
     const k = dr?.kinds?.mark;
     d.assert('nest reports drift as rows, not as a scalar',
       !!k && Number.isFinite(k.p50), JSON.stringify(k));
+    // The guard for the bug above: a loop with no committed boundary reports
+    // 'polled', and a polled boundary nobody polls never fires at all.
+    d.assert('the loop boundary is committed, not polled',
+      nest.boundary() === 'lookahead', nest.boundary());
     d.assert('quotations round-trip out of the nest',
       nest.quotationsOf(child).length === 2, String(nest.quotationsOf(child).length));
     // the first wrap is one PASS after the loop starts, not at the loop start —
@@ -154,17 +200,7 @@
       `${wraps} wraps · pos ${Math.round(parent.position())} · first boundary ${firstWrap}`);
   }
 
-  // the loop starts at 12 s, so a visitor would otherwise wait for it
-  d.on('loop', () => {
-    const at = nest.iterationAt?.('loop', 0);
-    if (at !== null && at !== undefined) {
-      parent.seek(at);
-      parent.play();
-      d.log(`jumped to the loop at ${(at / 1000).toFixed(1)}s`);
-    }
-  });
-
-  d.log(`parent ${PARENT / 1000}s, inner piece ${CHILD / 1000}s, used twice`);
+  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s source · used twice`);
   d.ready();
 </script>
 </html>
