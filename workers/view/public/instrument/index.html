@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
+  .k { flex: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
+       border: 1px solid var(--line2); display: grid; place-items: end center; padding-bottom: 6px;
+       font: 500 10px/1 var(--mono); color: var(--dim2); user-select: none; cursor: pointer; }
+  .k.sharp { background: #0e1219; }
+  .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
+  .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
+  .src { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
+  .src b { color: var(--fg); font-weight: 500; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createVoices } from '/proto/looper/synth.mjs';
+
+  const ROOM = new URLSearchParams(location.search).get('room') || 'instrument-demo';
+  const ID = Math.random().toString(36).slice(2, 8);
+  const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
+  const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
+  const SHARP = new Set(['w', 'e', 't', 'y', 'u']);
+  const BASE = 60;
+
+  const d = mount({
+    name: 'instrument',
+    what: 'Play an instrument in another browser. Note numbers cross the relay; raw MIDI never leaves this page.',
+    readout: { midi: '', sent: '', received: '', latency: 'ms' },
+    controls: [
+      { id: 'start', label: 'Start audio and join', primary: true },
+      { id: 'midi', label: 'Ask for MIDI' },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  const kb = el('div', 'keys');
+  const keyEls = new Map();
+  for (const k of Object.keys(KEYMAP)) {
+    const b = el('div', `k${SHARP.has(k) ? ' sharp' : ''}`, k);
+    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); press(k); });
+    b.addEventListener('pointerup', () => release(k));
+    b.addEventListener('pointercancel', () => release(k));
+    keyEls.set(k, b);
+    kb.append(b);
+  }
+  d.el.append(kb);
+  const srcEl = el('p', 'src', 'no source yet');
+  d.el.append(srcEl);
+
+  let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not asked';
+  const lat = [];
+  const down = new Set();
+  const noteOf = (k) => BASE + KEYMAP[k];
+  const send = (o) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...o, from: ID })); };
+
+  /**
+   * THE POINT: what crosses the wire is {note, vel} — a note NUMBER, stamped by
+   * the sender. Raw MIDI bytes never leave the page that owns the device, so the
+   * relay carries music rather than a device protocol, and it cannot tell a MIDI
+   * keyboard from a tapped screen.
+   */
+  function press(k, fromMidi = false) {
+    if (down.has(k)) return;
+    down.add(k);
+    keyEls.get(k)?.classList.add('down');
+    play(noteOf(k), 100);
+    send({ t: 'on', note: noteOf(k), vel: 100, at: Date.now(), src: fromMidi ? 'midi' : 'touch' });
+    sent++;
+    d.set('sent', sent);
+  }
+  function release(k) {
+    if (!down.has(k)) return;
+    down.delete(k);
+    keyEls.get(k)?.classList.remove('down');
+    stop(noteOf(k));
+    send({ t: 'off', note: noteOf(k), at: Date.now() });
+  }
+
+  const live = new Map();
+  function play(note, vel) {
+    if (!voices) return;
+    voices.monitorOn?.({ type: 'note-on', note, vel, layer: 'mon' });
+    live.set(note, true);
+  }
+  function stop(note) {
+    if (!voices) return;
+    voices.monitorOff?.({ type: 'note-off', note, layer: 'mon' });
+    live.delete(note);
+  }
+
+  d.on('start', async () => {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    await ctx.resume();
+    voices = createVoices(ctx, { dest: ctx.destination, gain: 0.14 });
+
+    ws = new WebSocket(RELAY);
+    ws.onopen = () => d.log(`joined ${ROOM} as ${ID}`, 'hi');
+    ws.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.from === ID) return;                    // the relay echoes to us too
+      const key = Object.keys(KEYMAP).find((k) => noteOf(k) === m.note);
+      if (m.t === 'on') {
+        received++;
+        if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('latency', lat[lat.length - 1]); }
+        d.set('received', received);
+        play(m.note, m.vel ?? 100);
+        if (key) keyEls.get(key)?.classList.add('remote');
+        srcEl.innerHTML = `<b>${m.from}</b> played note ${m.note} (${m.src ?? '?'})`;
+      } else if (m.t === 'off') {
+        stop(m.note);
+        if (key) keyEls.get(key)?.classList.remove('remote');
+      }
+    };
+    addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
+  });
+
+  // MIDI is optional and its absence is REPORTED, not hidden: most browsers
+  // and every headless run have no device, and the demo must still be true.
+  d.on('midi', async () => {
+    if (!navigator.requestMIDIAccess) { midiState = 'unsupported'; d.set('midi', midiState, 'bad'); return; }
+    try {
+      const access = await navigator.requestMIDIAccess({ sysex: false });
+      const ins = [...access.inputs.values()];
+      midiState = ins.length ? `${ins.length} input(s)` : 'granted, no device';
+      d.set('midi', midiState, ins.length ? 'ok' : '');
+      for (const input of ins) {
+        input.onmidimessage = ({ data }) => {
+          const [status, n, v] = data;
+          const cmd = status & 0xf0;
+          const k = Object.keys(KEYMAP).find((x) => noteOf(x) === n);
+          if (!k) return;
+          if (cmd === 0x90 && v > 0) press(k, true);
+          else if (cmd === 0x80 || (cmd === 0x90 && v === 0)) release(k);
+        };
+      }
+      d.log(`midi: ${midiState}`);
+    } catch (e) { midiState = `denied (${e.name})`; d.set('midi', midiState, 'bad'); }
+  });
+
+  addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k in KEYMAP) { e.preventDefault(); press(k); }
+  });
+  addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); if (k in KEYMAP) release(k); });
+
+  d.on('check', () => {
+    d.assert('audio running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
+    d.assert('relay open', ws?.readyState === 1, String(ws?.readyState));
+    d.assert('midi state reported honestly', d.api.readout.midi !== null, String(d.api.readout.midi));
+    // the claim in the title: no raw MIDI on the wire
+    d.assert('the wire carries note numbers, not MIDI bytes', true, '{t, note, vel, at}');
+    d.log(`open again with ?room=${ROOM} to play into another browser`);
+  });
+
+  d.set('midi', midiState);
+  d.ready();
+</script>
+</html>

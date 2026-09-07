@@ -162,7 +162,7 @@ function demoFiles() {
   const OK = new Set(['.html', '.mjs', '.js', '.css', '.json']);
   for (const d of DEMO_MANIFEST) {
     if (!d.built) continue;
-    const dir = `demo/${d.n}-${d.name}`;
+    const dir = `demo/${d.name}`;
     let entries = [];
     try { entries = readdirSync(join(REPO, dir), { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
@@ -324,19 +324,21 @@ await mkdir(OUT, { recursive: true });
 // GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
-  function rowHTML(d) {
-  const href = d.built ? `/${d.n}-${d.name}/` : (d.page || null);
+  function rowHTML(d, i) {
+  const href = d.built ? `/${d.name}/` : (d.page || null);
   const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
   const why = '';   // no warning badges on the index
   const open = href ? `<a href="${href}">` : '<a>';
   return `<li class="d-row${href ? '' : ' todo'}">${open}`
-    + `<span class="n">${d.n}</span>`
+    // numbered by POSITION, for scanning. Display, not identity — reordering
+    // the manifest renumbers the list and renames nothing.
+    + `<span class="n">${String(i + 1).padStart(2, '0')}</span>`
     + `<span class="nm">${d.name}</span>`
     + `<span class="d-one">${d.one || ''}</span>`
     + `<span class="d-meta">${tags}</span>`
     + '</a></li>';
 }
-  const rows = DEMO_MANIFEST.map((d) => '  ' + rowHTML(d)).join('\n');
+  const rows = DEMO_MANIFEST.map((d, i) => '  ' + rowHTML(d, i)).join('\n');
   function noteHTML(n) {
     return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
       + '<span class="n">·</span>'

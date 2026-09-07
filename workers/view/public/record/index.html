@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  canvas.src { width: 100%; max-width: 420px; display: block; background: #000;
+               border: 1px solid var(--line); border-radius: 4px; margin: 0 0 10px; }
+  .segs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 10px; }
+  .segs i { font: 500 9.5px/1.6 var(--mono); color: var(--dim2); border: 1px solid var(--line);
+            border-radius: 2px; padding: 1px 5px; }
+  .segs i.held { color: var(--hi); border-color: var(--hi); }
+  .segs i.shipped { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, var(--line)); }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+
+  const SEG_MS = 2000;
+
+  const d = mount({
+    name: 'record',
+    what: 'Record in segments and ship each closed one, so disk stays flat instead of growing with the show.',
+    readout: { segments: 'closed', held: 'on disk', peak: 'high-water', total: 'KiB' },
+    controls: [
+      { id: 'rec', label: 'Start recording', primary: true },
+      { id: 'stop', label: 'Stop' },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  // A canvas source, so this needs no camera and no permission: the point of
+  // the demo is the DISK BEHAVIOUR, not where the pixels come from.
+  const canvas = el('canvas', 'src');
+  canvas.width = 640; canvas.height = 360;
+  const g = canvas.getContext('2d');
+  d.el.append(canvas);
+  const segsEl = el('div', 'segs');
+  d.el.append(segsEl);
+
+  setInterval(() => {
+    const t = Date.now();
+    g.fillStyle = '#11151d'; g.fillRect(0, 0, 640, 360);
+    g.fillStyle = '#ffd400';
+    g.font = 'bold 34px ui-monospace, monospace';
+    g.fillText(new Date(t).toISOString().slice(11, 23), 24, 60);
+    g.fillStyle = '#2b3546'; g.fillRect(24, 90, 592, 10);
+    g.fillStyle = '#ffd400'; g.fillRect(24, 90, (t / 12) % 592, 10);
+  }, 40);
+
+  let rec = null, closed = 0, held = 0, peak = 0, totalBytes = 0;
+  const disk = new Map();
+
+  function paintSegs() {
+    d.set('segments', closed);
+    d.set('held', held);
+    d.set('peak', peak, peak <= 2 ? 'ok' : 'bad');
+    d.set('total', Math.round(totalBytes / 1024));
+    segsEl.replaceChildren(...[...disk.entries()].slice(-24).map(([n, s]) =>
+      el('i', s.shipped ? 'shipped' : 'held', `${n}:${Math.round(s.bytes / 1024)}k`)));
+  }
+
+  /**
+   * THE FINDING THIS DEMO EXISTS FOR (proto/archive): a closed segment is
+   * shipped and then DELETED, so the disk high-water is two segments — the one
+   * being written and the one being shipped — no matter how long the show runs.
+   * 1.8 MB instead of 40 MB for the measured show, and O(1) rather than O(t).
+   */
+  function ship(n) {
+    const s = disk.get(n);
+    if (!s || s.shipped) return;
+    s.shipped = true;
+    held--;
+    paintSegs();
+  }
+
+  d.on('rec', () => {
+    if (rec) return;
+    const stream = canvas.captureStream(25);
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find((m) => MediaRecorder.isTypeSupported(m));
+    if (!mime) { d.fail(new Error('no webm MediaRecorder support')); return; }
+    rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      closed++;
+      held++;
+      totalBytes += e.data.size;
+      peak = Math.max(peak, held);
+      disk.set(closed, { bytes: e.data.size, shipped: false });
+      paintSegs();
+      // "upload" then delete — the ship is what keeps the disk flat
+      setTimeout(() => ship(closed), 300);
+    };
+    rec.onerror = (e) => d.log(`recorder: ${e.error?.name ?? 'error'}`, 'bad');
+    // timeslice IS the segmenter: each tick closes a chunk
+    rec.start(SEG_MS);
+    d.log(`recording ${mime}, ${SEG_MS / 1000}s segments`, 'hi');
+  });
+
+  d.on('stop', () => {
+    if (!rec) return;
+    rec.stop();
+    rec = null;
+    d.log(`stopped after ${closed} segment(s)`);
+  });
+
+  d.on('check', async () => {
+    d.assert('MediaRecorder available', typeof MediaRecorder !== 'undefined');
+    // a 2 s timeslice needs 2 s to produce anything
+    for (let i = 0; i < 40 && closed === 0; i++) await new Promise((r) => setTimeout(r, 200));
+    d.assert('segments are closing', closed > 0, `${closed} closed`);
+    d.assert('disk high-water is bounded', peak <= 2, `${peak} segment(s) at once`);
+    d.assert('shipping frees the disk', held <= 2, `${held} held`);
+    d.assert('cost is O(1), not O(show length)', peak <= 2 && closed >= 1,
+      `${closed} segments recorded, never more than ${peak} on disk`);
+    d.log('the R2 leg is proto/archive’s node harness; this page is the disk behaviour');
+  });
+
+  d.log('the ship-then-delete is the point: disk stays flat as the show grows');
+  d.ready();
+</script>
+</html>

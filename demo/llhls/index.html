@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
+  .hold { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
+  .hold[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
+</style>
+<script src="/proto/remixer/hls.min.js"></script>
+
+<script type="module">
+  import { mount, guard, el, armVideo, playOrPrompt, BUILD } from '/shell/shell.mjs';
+  import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
+  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
+
+  const d = mount({
+    name: 'llhls',
+    what: 'The tuned low-latency player against a live input. Opening this page is what starts the stream.',
+    readout: { latency: 's', target: 's', advance: '×', buffer: 's', holes: '', stalls: '', switches: '' },
+    controls: [
+      { id: 'go', label: 'Start the stream and play', primary: true },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  const badge = el('span', 'hold', 'publisher: idle');
+  badge.dataset.on = '0';
+  d.head.append(badge);
+
+  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
+  video.muted = true;
+  d.el.append(video);
+
+  // ── report what this device sees ────────────────────────────────────────
+  // A phone cannot be attached to a debugger from here, so it posts instead.
+  // Batched and fire-and-forget: diagnostics must never be able to make the
+  // page worse than the problem being diagnosed.
+  const pending = [];
+  let shipTimer = null;
+  let shipTick = 0;
+  let lastShipped = '';
+  let repeat = 0;
+  function ship(line) {
+    // The phone emitted the SAME fragLoadError ~30x in one run, which pushed
+    // everything useful out of the ring buffer. Collapse repeats.
+    const key = line.replace(/^[\d.]+ /, '').slice(0, 60);
+    if (key === lastShipped) { repeat++; return; }
+    if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; }
+    lastShipped = key;
+    pending.push(`${(performance.now() / 1000).toFixed(2)} ${line}`);
+    if (shipTimer) return;
+    shipTimer = setTimeout(async () => {
+      shipTimer = null;
+      const batch = pending.splice(0, pending.length).join('\n');
+      if (!batch) return;
+      try {
+        await fetch('https://pub.positron.studio/log', {
+          method: 'POST', body: batch, keepalive: true,
+          headers: { 'content-type': 'text/plain' },
+        });
+      } catch { /* diagnostics are never load-bearing */ }
+    }, 2000);
+  }
+
+  let player = null, ws = null, stalls = 0, rebuilds = 0, resyncs = 0, holes = 0, last = null;
+
+  // ?cap=360 pins the ladder at or below 360p. This is the CONTROL for the
+  // decode-bound reading: if the same phone advances at ~1.0x on 360p and
+  // ~0.2x on 720p, the bottleneck is the device presenting frames, and the
+  // FPS capping above is the fix rather than a guess.
+  const capH = Number(new URLSearchParams(location.search).get('cap')) || 0;
+
+  // ?player=native|hlsjs forces the engine. On an iPhone 'auto' now resolves to
+  // native (AVFoundation) — see the decision block in low-latency-player.js.
+  // This is how the two get compared on ONE device reporting the same numbers.
+  const forced = new URLSearchParams(location.search).get('player');
+  const preferNative = forced === 'native' ? true : forced === 'hlsjs' ? false : 'auto';
+
+  // Stamped FIRST and unconditionally: a log that cannot be attributed to a
+  // build is worth very little. Asked for after a run whose result could not be
+  // told apart from a fix that never loaded.
+  d.log(`build ${BUILD}${forced ? ` — player forced to ${forced}` : ''}`);
+  ship(`BUILD ${BUILD} player=${forced || 'auto'} ua=${navigator.userAgent.slice(0, 58)}`);
+
+  d.on('go', async () => {
+    if (player) return;
+    armVideo(video);          // spend the activation while it is still live
+
+    // The socket IS the reference count. Holding it starts the container's
+    // ffmpeg; dropping it (closing the tab) is how the publisher learns nobody
+    // is watching and shuts down after its grace period.
+    ws = holdPublisher((s) => {
+      badge.dataset.on = s.held ? '1' : '0';
+      badge.textContent = s.held ? `publisher: held${s.viewers ? ` (${s.viewers})` : ''}` : 'publisher: idle';
+    });
+    d.log('holding the publisher open');
+
+    // Container wake + ffmpeg + Stream ingest is not instant; 204 means
+    // Cloudflare has nothing yet, 200 means it is serving.
+    const w = await waitForManifest({
+      onTick: ({ status, waitedMs }) => d.log(`manifest ${status} at ${(waitedMs / 1000).toFixed(0)}s`),
+    });
+    if (!w.ok) { d.log(`manifest never came up in ${(w.waitedMs / 1000).toFixed(0)}s`, 'bad'); return; }
+    d.log(`stream ready after ${(w.waitedMs / 1000).toFixed(1)}s (${w.segs} segments)`, 'hi');
+    ship(`READY after ${(w.waitedMs / 1000).toFixed(1)}s with ${w.segs} segments`);
+
+    // THE PLAYER IS src/low-latency-player.js, unchanged — the v6 that fixed
+    // the 26 s park. This demo is not a reimplementation of it; it is the
+    // measured artefact with a readout attached.
+    player = createLowLatencyPlayer(video, llhls(), { preferNative })
+      .on('latency', ({ latency, target, playbackRate, buffer, rates }) => {
+        // A stream that came up 30 s ago legitimately stalls while Cloudflare's
+        // LL-HLS pipeline fills; the v6 watchdog rebuilding then is it WORKING.
+        // So the counters start at the first good sample and the assert is
+        // about staying stable once playing, not about a clean startup.
+        if (!last) { stalls = 0; rebuilds = 0; resyncs = 0; d.log('playing — stability counters start here', 'hi'); }
+        last = { latency, target, playbackRate, buffer, rates };
+        d.set('latency', latency, latency == null ? '' : latency <= target + 0.5 ? 'ok' : latency <= target + 2 ? '' : 'bad');
+        d.set('target', target);
+        // advance is the diagnostic, not playbackRate: 1.0 means the playhead
+        // keeps up with wall time, well under 1.0 means the device cannot.
+        if (rates?.advance != null) d.set('advance', rates.advance,
+          rates.advance > 0.95 ? 'ok' : rates.advance > 0.8 ? '' : 'bad');
+        // the buffer is the number the iPhone was missing: it reported
+        // bufferInfo.len 0 while sitting 7 s behind the edge
+        const bt = last.buffer;
+        if (bt) d.set('buffer', bt.ahead, bt.ahead > 1.5 ? 'ok' : bt.ahead > 0.5 ? '' : 'bad');
+        if (++shipTick % 8 === 0) {   // ~1 line per 4 s
+          ship(`lat=${latency == null ? '?' : latency.toFixed(2)} tgt=${target} rate=${playbackRate.toFixed(2)} `
+            + `ADV=${rates?.advance} EDGE=${rates?.edgeRate} q=${JSON.stringify(rates?.quality)} `
+            + `buf=${bt ? bt.ahead : '?'} ranges=${bt ? JSON.stringify(bt.ranges) : '?'} `
+            + `tracks=${bt?.tracks ? JSON.stringify(bt.tracks) : '?'}`);
+        }
+      })
+      .on('stall', (x) => {
+        stalls++; d.set('stalls', stalls);
+        d.log(`stall ${JSON.stringify(x).slice(0, 90)}`, 'bad');
+        ship(`STALL ${JSON.stringify(x)}`);
+      })
+      .on('rebuild', ({ why }) => { rebuilds++; d.log('instance rebuilt (source-stall watchdog)', 'bad'); ship(`REBUILD ${why}`); })
+      .on('resync', ({ reason, to }) => { resyncs++; d.log('resynced to the live edge'); ship(`RESYNC ${reason} -> ${to?.toFixed?.(2)}`); })
+      .on('error', (e) => {
+        // bufferSeekOverHole / bufferStalledError are the iPhone's actual
+        // complaint; count them separately from everything else
+        const det = e?.details || '';
+        if (det === 'bufferSeekOverHole' || det === 'bufferStalledError') d.set('holes', ++holes, 'bad');
+        d.log(`player error ${JSON.stringify(e).slice(0, 110)}`, 'bad');
+        // A blind JSON.stringify().slice(300) cut off response.code — the one
+        // field that says WHY a fragment load failed. Name the fields instead.
+        const parts = [`ERR ${det || e?.type || 'unknown'}`];
+        if (e?.response) parts.push(`http=${e.response.code ?? '?'} ${String(e.response.text ?? '').slice(0, 60)}`);
+        const u = e?.frag?.url || e?.frag?.relurl || e?.url || e?.context?.url;
+        // strip Cloudflare's signature blob: it is 400 chars of noise here
+        if (u) parts.push(`url=${String(u).split('?')[0].slice(-72)}`);
+        if (e?.frag) parts.push(`sn=${e.frag.sn} part=${e.frag.part ?? '-'} type=${e.frag.type}`);
+        if (e?.loader?.stats) parts.push(`loaded=${e.loader.stats.loaded}`);
+        if (e?.error?.message) parts.push(`msg=${String(e.error.message).slice(0, 80)}`);
+        if (e?.fatal) parts.push('FATAL');
+        ship(parts.join(' '));
+      })
+      .on('level', ({ switches, width, height }) => {
+        // Every switch has to wait for the next INDEPENDENT part — once per
+        // 2.0 s — so churn here is visible as jank even with a healthy feed.
+        d.set('switches', switches);
+        d.log(`level -> ${width}x${height}`);
+        ship(`LEVEL ${width}x${height} (switch ${switches})`);
+      })
+      .on('target-raised', (x) => {
+        d.log(`target raised to ${x.target}s — device cannot hold the lower one`, 'bad');
+        ship(`TARGET-RAISED ${JSON.stringify(x)}`);
+      })
+      .on('start', (x) => {
+        d.log(`playing with ${x.ahead}s buffered after ${(x.waitedMs / 1000).toFixed(1)}s`
+          + (x.forced ? ' (timed out waiting for audio)' : ''), x.forced ? 'bad' : 'hi');
+        ship(`START ${JSON.stringify(x)}`);
+      })
+      .on('audio-lag', (x) => {
+        d.log(`audio behind video by ${x.videoAhead}s — waiting instead of seeking`, 'bad');
+        ship(`AUDIO-LAG ${JSON.stringify(x)}`);
+      })
+      .on('ms', (x) => {
+        d.log(`mediasource ${x.event} rs=${x.readyState}`          + (x.streaming === null ? '' : ` streaming=${x.streaming}`),
+          x.event === 'sourceclose' ? 'bad' : '');
+        ship(`MS ${JSON.stringify(x)}`);
+      })
+      .on('media-error', (x) => ship(`MEDIA-ERROR ${JSON.stringify(x)}`))
+      .on('waiting', (x) => ship(`WAITING ${JSON.stringify(x)}`))
+      .on('advance-capped', (x) => {
+        d.log(`playhead at ${x.advance}x — capped to ${x.height}p (level ${x.to})`, 'bad');
+        ship(`ADV-CAP ${JSON.stringify(x)}`);
+      })
+      .on('fps-drop', (x) => {
+        d.log(`fps drop ${x.dropped}/${x.decoded} — hls.js may step the level down`, 'bad');
+        ship(`FPS-DROP ${JSON.stringify(x)}`);
+      })
+      .on('engine', (x) => {
+        d.log(`engine ${x.player || '?'}${x.gatedBySafari ? ' — ManagedMediaSource, Safari gates loading' : ''}`, x.player === 'native' ? 'hi' : '');
+        ship(`ENGINE ${JSON.stringify(x)} ua=${navigator.userAgent}`);
+      })
+      .on('dimensions', ({ width, height }) => d.log(`${width}x${height}`));
+
+    await playOrPrompt(video, d);
+  });
+
+  if (capH) {
+    setInterval(() => {
+      const H2 = player?.hls;
+      if (!H2?.levels?.length) return;
+      const idx = H2.levels.map((l, i) => [l.height, i]).filter(([hh]) => hh <= capH)
+        .sort((a, b) => b[0] - a[0])[0]?.[1];
+      if (idx != null && H2.autoLevelCapping !== idx) {
+        H2.autoLevelCapping = idx;
+        d.log(`capped to <=${capH}p (level ${idx})`);
+        ship(`CAP <=${capH}p level=${idx}`);
+      }
+    }, 1000);
+  }
+
+  d.on('check', async () => {
+    d.assert('publisher held by this page', badge.dataset.on === '1', badge.textContent);
+    const r = await fetch(llhls(), { cache: 'no-store' }).then((x) => x.status).catch(() => 0);
+    d.assert('manifest is being served', r === 200, `HTTP ${r}`);
+    d.assert('player attached', !!player);
+    if (last) {
+      // 2.4-4.0 s is what rig/ measured for this config; the assert is looser
+      // than that so a slow colo does not read as a regression
+      // latency is null until getStartDate() is available on the native path, so
+    // the assert waits for a sample rather than failing on its absence.
+    d.assert('latency inside the measured envelope', last.latency == null || (last.latency > 0 && last.latency < 20),
+        `${last.latency == null ? 'n/a' : last.latency.toFixed(2) + ' s'} (target ${last.target})`);
+      d.assert('playback rate near 1x', Math.abs(last.playbackRate - 1) < 0.2,
+        String(last.playbackRate));
+    } else {
+      d.log('no latency sample yet — press Start first');
+    }
+    d.assert('stable once playing', rebuilds === 0,
+      `${rebuilds} rebuild(s), ${stalls} stall(s), ${resyncs} resync(s), ${player?.levelSwitches ?? 0} level switch(es) since the first sample`);
+  });
+
+  d.log('nothing is publishing until you press Start; it stops when you leave');
+  d.ready();
+</script>
+</html>

@@ -9,7 +9,7 @@ Live at **https://positron.studio**. 24 of 28 demos built, 332/332 green. Read
 ```sh
 node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
-node demo/verify.mjs 06 09               # just these
+node demo/verify.mjs llhls ladder        # just these, by slug
 node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
 node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
 DEMO_BASE=https://positron.studio node demo/verify.mjs      # against the deploy
@@ -82,8 +82,8 @@ every run.
 **Never let sound gate the work.** `audio.play()` and `AudioContext.resume()`
 both wait on a user gesture in a real browser, and neither REJECTS — awaiting
 one before doing the real work is a hang, not an error. It cost two demos in one
-session: 26 shout spent five seconds buffering an element before its measurement
-opened, pushing the whole run past the harness's settle, and 05 vclick awaited a
+session: shout spent five seconds buffering an element before its measurement
+opened, pushing the whole run past the harness's settle, and vclick awaited a
 suspended context and never compiled, never built its deck, never raised its
 transport bar — while looking fine, because the readout had been filled at load.
 Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.
@@ -117,7 +117,7 @@ to recover.
   than a brand check. Measured on desktop Safari, same page, same 40 s: native
   advance 0.961x / latency 5.25 s / 0 errors, against hls.js 0.344x / 7.71 s /
   2 errors. **HEADLESS Chrome answers `"maybe"` too**, so the suite cannot tell
-  the two paths apart: `14 replay`, `15 seek` and `19 flipper` all ran
+  the two paths apart: `replay`, `seek` and `flipper` all ran
   `video.src = <m3u8>` on a Chrome that cannot play it — dead picture, green
   suite, because their asserts were about decks and cue folds, not about frames.
   All three now gate on MMS (2026-09-06). Grep for `canPlayType` before trusting
@@ -138,7 +138,7 @@ to recover.
   3.82 s, the same, while the bytes go 418 kbps against 11.8 Mbps. What
   actually costs latency is running BOTH renditions at once (8.8 s on raw
   hls.js) — the demuxed intersection problem `low-latency-player.js` exists to
-  fight. `27 tracks` asserts the packaging from the playlists, so the claim
+  fight. `tracks` asserts the packaging from the playlists, so the claim
   needs no stopwatch.
 - **Cloudflare WHEP refuses a single-track offer.** One recvonly transceiver —
   audio alone or video alone — is `HTTP 400`, both ways, while video+audio
@@ -202,7 +202,7 @@ to recover.
   `etv2` refused its OLDEST ~78 min and served the edge, `etvpluss` served
   everything. It moves with the schedule and it is not always at the edge, so
   there is no offset to hard-code. A served segment honours Range, so a 2-byte
-  GET asks "will you serve this one?" — `19 flipper` sweeps back from the edge,
+  GET asks "will you serve this one?" — `flipper` sweeps back from the edge,
   starts where ERR will serve, and puts the refused minutes in its readout.
 - **A remote `MediaStream` carries the SENDER's msid.** After a hop,
   `remote.id === local.id` and the track ids match too, so "is this the received
@@ -216,16 +216,21 @@ to recover.
 ## Assert both modes, and watch the assert COUNT
 
 A demo that branches must assert every branch on every run. Adding a uniform
-mode to 11 grid silently dropped it from 11 asserts to 10 while still reading
+mode to grid silently dropped it from 11 asserts to 10 while still reading
 green — and worse, because `verify.mjs` presses every control the toggle was ON
 at check time, so only 6 of that page's 8 asserts ever ran in the suite.
-(11 grid no longer branches: one grid, one quality, 8/8 run.) Diff per-demo
+(grid no longer branches: one grid, one quality, 8/8 run.) Diff per-demo
 counts against the last known total after any change.
 
 ## Conventions
 
-- Demos are `demo/<nn>-<name>/index.html`, deployed at `/<nn>-<name>/`. Order and
-  metadata live in `demo/manifest.mjs`; `built: false` hides one from the index.
+- Demos are `demo/<slug>/index.html`, deployed at `/<slug>/`. **A demo's identity
+  is its slug and its ORDER is its position in `DEMOS`** — there is no number in
+  the directory, the URL, or the page. There used to be, in five places at once,
+  and keeping them in step is what made reordering expensive enough to get
+  wrong: the 05/28 swap left one page still declaring its old number inside its
+  own `mount()`, which only the full sweep caught. Moving a demo is now moving a
+  line in the array. `built: false` hides one from the index.
 - Every demo mounts the shell (`demo/shell/shell.mjs`) and publishes
   `window.__demo` — human-openable and CDP-drivable from the same page. Assert on
   `__demo`, never on DOM ids.
@@ -256,7 +261,7 @@ counts against the last known total after any change.
 - **A background agent must not commit.** `git add -A` in a shared checkout
   sweeps another agent's in-flight work into an unrelated commit. It happened
   twice in one session: `timeline/score.mjs` and `csound.mjs` — the whole score
-  container — landed inside a commit about `03 nest`, and `04-score/index.html`
+  container — landed inside a commit about `loops`, and `04-score/index.html`
   inside one about a plan document. The code was right and the history lied
   about it, which is worse than either being wrong on its own, because a reader
   doing archaeology trusts the message. Repaired with `git notes` rather than a

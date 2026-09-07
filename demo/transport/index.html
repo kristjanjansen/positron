@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  import { mount, guard } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { markAdapter, marks } from '/shell/fixture.mjs';
+
+  const DURATION = 20000;
+
+  const d = mount({
+    name: 'transport',
+    what: 'Twenty things are set to happen, one a second. Press play and see how close they land.',
+    readout: { typical: 'ms', worst: 'ms', fires: '', pos: 'ms' },
+    // the numbers live under the lane they describe, in the strip's gutter;
+    // this row would repeat them somewhere with less context. Still published
+    // for CDP.
+    showReadout: false,
+    controls: [],
+  });
+  guard(d);
+
+  // Handed to createDeck below AND printed in the HOW line, from these same
+  // constants — so the page cannot describe a setting it does not use.
+  const TICK = 25, HORIZON = 100, GRACE = 150;
+
+  const { fired, adapter } = markAdapter();
+  const deck = createDeck({
+    items: marks(20, DURATION),
+    adapters: { mark: adapter },
+    range: [0, DURATION],
+    tickMs: TICK, horizonMs: HORIZON, lateGraceMs: GRACE,
+    // onDrift hands us (newRows, allRows). It is an ARRAY of per-event rows —
+    // reading it as a scalar is how this readout used to print a confident 0
+    // while holding twenty real measurements.
+    onDrift: (_rows, all) => report(all),
+  });
+
+  // id -> its measured row, so the strip can colour each mark by how late it
+  // actually was and say so on hover.
+  const measured = new Map();
+
+  // LATE AGAINST WHAT? The first version of this scale used one absolute
+  // threshold (5 ms) and painted eighteen of twenty marks amber on a busy
+  // machine, which says "this is going badly" about a run that was working —
+  // and the project's own lab measures the shipped worker host at p50 5.0 ms,
+  // so an absolute 5 ms scale paints the DOCUMENTED BASELINE amber. A scale
+  // whose normal reading is a warning has no warning left to give.
+  //
+  // So each mark is judged against what its own way of firing promises: a
+  // committed timer is aiming at the instant and lands within a few ms; a mark
+  // the sweep caught was never given a timer at all and can be anywhere inside
+  // the check interval — being in there is the mechanism WORKING.
+  const budgetFor = (m) => (m.origin === 'tick-late' ? TICK : 5);
+  const BANDS = [
+    [1, '#8fd6a8', 'as expected'],
+    [2, '#ffd400', 'over'],
+    [4, '#e0b060', 'well over'],
+    [Infinity, '#e0908a', 'far over'],
+  ];
+  const bandFor = (m) => {
+    const over = Math.abs(m.deltaMs) / budgetFor(m);
+    return BANDS.find(([lim]) => over < lim);
+  };
+
+  /** `typical` is the median (half the marks came in under it) and `worst` is
+   *  the largest, because a typical value alone
+   *  hides the one bad fire that is the whole reason to look. The count of
+   *  marks the sweep caught used to sit here and was dropped: it is
+   *  structurally 1 — the mark due at position 0 cannot have a timer, since
+   *  play had not been pressed when the timers were set — so it read as a
+   *  measurement while being a constant. It is in the strip instead, as the
+   *  thicker bar. Both live; nothing here is behind a button. */
+  function report(rows) {
+    for (const r of rows) measured.set(r.id, r);
+    const xs = rows.map((r) => r.deltaMs).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!xs.length) return;
+    const typical = xs[xs.length >> 1], worst = xs[xs.length - 1];
+    d.set('typical', typical);
+    d.set('worst', worst);
+    // under the lane, beside its own ink — same treatment as 02
+    const L = view.strip.lanes()[0];
+    if (L) {
+      L.subLabel = [`typical +${typical.toFixed(2)} ms`, `worst +${worst.toFixed(2)} ms`];
+      view.strip.invalidate();
+    }
+    // Assert on the FIRST row, not a comfortable sample: verify.mjs plays for
+    // 500 ms, which is one mark. A threshold of 5 read as "asserted nothing".
+    if (!asserted && xs.length >= 1) {
+      asserted = true;
+      d.assert('every mark reports a real lateness', xs.every(Number.isFinite), `n=${xs.length} typical=${xs[xs.length >> 1]}`);
+      d.assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
+    }
+  }
+  let asserted = false;
+
+  d.how(
+    `The clock only sets timers for the next fraction of a second, and can ` +
+    `still cancel them — which is why pause really stops and dragging really ` +
+    `skips. Green landed as expected; amber to red, late.`,
+  );
+
+  // No slider: the strip below IS the position surface. Click or drag it.
+  createTransportBar(d.el, deck, { scrub: false });
+  // Grey until the playhead reaches it, yellow after — `latch` recolours from
+  // the position every frame, so rewinding un-fires them. Without a colour the
+  // lane falls back to a hash of the kind name, which lands wherever it lands
+  // and here landed somewhere you cannot see.
+  const view = createStripView(d.el, deck, {
+    size: 'auto',
+    gutter: 132,
+    // follow:false — the strip auto-scrolls to keep the playhead at 82% of the
+    // width, which slides its axis out from under the bar above it and leaves
+    // the two disagreeing about where a second is. A bounded piece has nowhere
+    // to run to, so it holds the whole range instead.
+    follow: false,
+    // armWall:false — the wall-clock cursor measures how far the piece has
+    // fallen behind real time since it first played. That is the number to
+    // watch on a live feed and noise on a 20 s fixture, where after the end it
+    // just counts how long ago you finished.
+    armWall: false,
+    lanes: [{
+      // NO `latch`. It recolours from the PLAYHEAD, so scrubbing back turned
+      // measured marks grey again — as if moving the cursor un-measured them.
+      // A mark's colour is a fact about what was observed, and navigation is
+      // not an observation. Colour comes from the measurement map instead, so
+      // the picture only ever changes when something new is measured.
+      id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2,
+      color: '#6a7280',
+      terse: true,        // no id/kind/attested lines: nothing here is restored
+      colorOfRow: (r) => {
+        const m = measured.get(r.id);
+        return m ? bandFor(m)[1] : '#3b424e';          // grey: no measurement yet
+      },
+      // Two short lines. A tooltip sits ON TOP of the thing it describes and is
+      // read every time you point at one; the sentences belong in the `how`
+      // block above, which is read once.
+      describeRow: (r) => {
+        const m = measured.get(r.id);
+        if (!m) return 'not played yet';   // no measurement, not "behind the playhead"
+        const [, , verdict] = bandFor(m);
+        return [
+          `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${verdict}`,
+          m.origin === 'tick-late' ? `no timer · ${TICK} ms check caught it` : 'timer set ahead',
+        ];
+      },
+      // NO WIDTH CHANNEL. A thicker bar marked "no timer was set", which is
+      // structurally always the first mark — the one due at position 0 cannot
+      // have a timer, because play had not been pressed when the timers were
+      // set. So it was a permanent oddity that raised a question the picture
+      // never answered, the same defect as the `missed` cell it replaced. The
+      // fact survives where it is actually asked for: the tooltip.
+    }],
+  });
+
+  setInterval(() => {
+    d.set('pos', deck.position());
+    d.set('fires', fired.length);
+  }, 100);
+
+  d.log(`${DURATION / 1000}s, 20 marks, speeds ${adapter.caps.rates.join('/')}x`);
+  d.ready();
+</script>
+</html>

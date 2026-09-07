@@ -1,7 +1,7 @@
 // demo/verify.mjs — drives every BUILT demo through the __demo contract.
 //
 //   node demo/verify.mjs            # all built demos
-//   node demo/verify.mjs 01 03      # just these
+//   node demo/verify.mjs transport loops   # just these, by slug
 //
 // This file is what replaces the ~25 harness pages: it asserts on
 // window.__demo, never on DOM ids, so it does not care how any page is built.
@@ -18,7 +18,7 @@ const PROFILE = '/private/tmp/claude-501/demo-verify-udd';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2);
-const targets = DEMOS.filter((d) => d.built && (!want.length || want.includes(d.n)));
+const targets = DEMOS.filter((d) => d.built && (!want.length || want.includes(d.name)));
 if (!targets.length) { console.error('nothing to verify'); process.exit(1); }
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
@@ -145,9 +145,9 @@ const ok = (label, cond, detail) => {
 };
 
 for (const t of targets) {
-  console.log(`\n[${t.n}] ${t.name}`);
+  console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
-  await S('Page.navigate', { url: `${BASE}/${t.n}-${t.name}/` });
+  await S('Page.navigate', { url: `${BASE}/${t.name}/` });
   await sleep(1400);
 
   // ready, with a bounded wait — never a bare sleep
@@ -159,8 +159,8 @@ for (const t of targets) {
   ok('__demo.ready', ready);
   if (!ready) { console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`); continue; }
 
-  const meta = await ev('({ n: __demo.n, name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport })');
-  ok('identity matches manifest', meta.n === t.n && meta.name === t.name, `${meta.n} ${meta.name}`);
+  const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport })');
+  ok('identity matches manifest', meta.name === t.name, meta.name);
   ok('declares a readout', meta.keys.length > 0, meta.keys.join(','));
 
   if (meta.hasT) {
