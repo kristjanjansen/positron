@@ -207,25 +207,53 @@ for (const t of targets) {
   }
 
   // exercise every control the demo declared, in order — a multi-step demo
-  // (arm, then measure) does not put its asserts behind the first button
-  const labels = await ev('[...document.querySelectorAll(".d-controls button")].map(b => b.textContent)');
+  // (arm, then measure) does not put its asserts behind the first button.
+  //
+  // `.tbar-x` too: a page may put a control INSIDE the transport bar when it is
+  // a transport verb rather than a side action (`take` puts Record there). A
+  // control the harness cannot press is a subject the suite cannot reach, which
+  // is how three pages stayed green while never playing a frame.
+  const SEL = '.d-controls button, .tbar-x';
+  const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
-    await ev(`document.querySelectorAll(".d-controls button")[${i}].click()`);
+    await ev(`document.querySelectorAll(${JSON.stringify(SEL)})[${i}].click()`);
     // A demo whose first control brings up LIVE infrastructure needs that to
     // finish before the later controls mean anything. settleMs is declared per
-    // demo in the manifest rather than guessed here.
+    // demo in the manifest rather than guessed here. Note it lands on control 0
+    // ONLY — and that it now does a second job further down, sizing the wait for
+    // a page's first assert. A demo whose slow control is not the first gets
+    // nothing from it here and is carried entirely by that second use.
     await sleep(i === 0 && t.settleMs ? t.settleMs : 650);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
-  // Some checks are async (14 fetches the manifest before asserting), so a
-  // fixed sleep either flakes or wastes time. Wait for the assert count to
+  // Some checks are async (`replay` fetches the manifest before asserting), so
+  // a fixed sleep either flakes or wastes time. Wait for the assert count to
   // stop growing instead.
-  let prev = -1, n = await ev('(window.__demo && __demo.asserts.length) || 0');
+  //
+  // BUT ZERO NEVER GROWS. The loop below used to exit the moment the count
+  // stopped changing, and a count of 0 stops changing immediately — so a demo
+  // whose FIRST assert sits behind a wait reported "asserted nothing", which
+  // reads as a broken page rather than a slow one. CLAUDE.md records the trap;
+  // the loop did not honour it. `take` made it concrete: recording runs to a
+  // 10 s cap and every assert is behind it.
+  //
+  // So there are two phases. While the count is still zero, wait up to the
+  // demo's own declared `settleMs` — the page has already said it is slow, and
+  // this is the same budget for the same reason. Once anything has been
+  // asserted, fall back to the cheap "stop when it stops growing".
+  const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
+  let n = await countAsserts();
+  const firstBudget = Math.ceil((t.settleMs || 0) / 400);
+  for (let i = 0; i < firstBudget && n === 0; i++) {
+    await sleep(400);
+    n = await countAsserts();
+  }
+  let prev = -1;
   for (let i = 0; i < 12 && n !== prev; i++) {
     prev = n;
     await sleep(400);
-    n = await ev('(window.__demo && __demo.asserts.length) || 0');
+    n = await countAsserts();
   }
 
   const asserts = await ev('__demo.asserts');

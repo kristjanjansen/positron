@@ -75,10 +75,14 @@ export const DEMOS = [
   // adds exactly one thing — `record` adds disk economics, `replay` and `seek`
   // add a pre-existing show and an exact fold, `show` adds a real WebRTC hop.
   //
-  // settleMs covers a 4 s take plus the duration-resolution dance plus a seek,
-  // all behind control 0 — the only control that gets it.
-  { name: 'take', act: 3, built: true, settleMs: 16000,
-    one: 'record four seconds and scrub them, with nothing on the wire',
+  // settleMs does TWO jobs here and only the second one matters. The harness
+  // gives it to control 0 (`Use the camera`), which needs none of it; what
+  // earns the 13 s is that the same number sizes the wait for the FIRST
+  // assert, and every assert on this page sits behind a recording that runs to
+  // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
+  // page broken.
+  { name: 'take', act: 3, built: true, settleMs: 13000,
+    one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['MediaRecorder', 'timeline', 'local only'] },
   { name: 'record', act: 3, built: true,
     one: 'record in segments and ship each one, so disk stays flat',

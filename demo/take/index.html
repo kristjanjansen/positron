@@ -7,193 +7,393 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  video, canvas.src { width: 100%; max-width: 460px; display: block; background: #000;
-                      border: 1px solid var(--line); border-radius: 3px; margin: 0 0 10px; }
+  /* Layout only. The border, radius and background come from `shell.css`'s one
+     `video` rule now, so this page looks like the cards around it instead of
+     carrying its own frame; the canvas matches it by hand because a shell-wide
+     `canvas` rule would hit the strip. */
+  .stage { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
+  .stage figure { margin: 0; }
+  .stage canvas { display: block; width: 300px; background: var(--card);
+                  border: 1px solid var(--line); border-radius: 4px; }
+  /* ONE VIEWPORT for the whole sequence: every part's element is stacked in the
+     same box and only the one under the playhead is shown. Parts laid end to
+     end mean exactly one is live at a time, so a gallery of N pictures would
+     draw a claim the timeline does not make. */
+  .seq { position: relative; width: 300px; height: 169px; }
+  .seq video { position: absolute; inset: 0; width: 300px; height: 169px; }
+  .seq video[hidden] { display: none; }
 </style>
 
+
 <script type="module">
-  import { mount, guard, recorderMime, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { mount, guard, recorderMime, el, armVideo } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
-  const TAKE_MS = 4000;      // a fixed short take, so the page has an end
+  const CAP_MS   = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
 
   const d = mount({
     name: 'take',
-    what: 'Record four seconds and scrub it. Nothing leaves this page — no upload, no fetch, no server.',
-    readout: { mime: '', chunks: '', kib: 'KiB', recorded: 's', file: 's', follow: '' },
-    // the numbers live under the lane that owns them; this row would repeat
-    // them somewhere with less context. Still published for CDP.
-    showReadout: false,
-    controls: [
-      { id: 'rec', label: 'Record 4 seconds', primary: true },
-      { id: 'camera', label: 'Use the camera' },
-    ],
+    what: 'Record, then record again. Each take is laid on the line after the one before it, and the whole thing plays and scrubs as one.',
+    readout: { takes: '', line: 's', mime: '', kib: 'KiB', handovers: '' },
+    controls: [{ id: 'camera', label: 'Use the camera' }],
   });
   guard(d);
 
   d.how(
-    `The picture is the clock here, not the bar — the video plays and the ` +
-    `timeline bends to follow it, because a recording knows where it is and a ` +
-    `counter only thinks it does. Drag the strip to scrub. A recorded file ` +
-    `will not say how long it is until it is asked twice, so the length you ` +
-    `see is measured rather than believed.`,
+    `Every frame says where it sits on the line, in big digits, and the two ` +
+    `rows of cells under them count the same number without digits. So when you ` +
+    `drag the line, the picture tells you itself whether it went where you asked ` +
+    `— no arithmetic, nothing to take on trust. Each take gets a random look of ` +
+    `its own, which is how you tell which one you are inside. Recording stops ` +
+    `when you say so, or after ten seconds. Press Record twice to get two parts, ` +
+    `then drag the line across the join.`,
   );
 
-  // ── the source: a canvas by default, the camera on request ───────────────
-  // Canvas first because `verify.mjs` grants no camera permission — no
-  // `--use-fake-ui-for-media-devices`, and HANDOFF records that the flag is
-  // insufficient under headless=new anyway. A demo that only works with a
-  // camera is a demo the suite cannot enter, which is how three pages stayed
-  // green while failing on a phone.
-  const canvas = el('canvas', 'src');
-  canvas.width = 480; canvas.height = 270;
+  // ── the generated source ─────────────────────────────────────────────────
+  //
+  // A CANVAS, not a camera, so the page has a picture with no permission and
+  // the suite can reach the thing this demo is about. The camera is an option
+  // that draws UNDERNEATH: the burned clock survives either way, because the
+  // clock is the whole reason a scrub is checkable by eye rather than trusted.
+  //
+  // The burn is this project's own technique — the MoQ and WHEP glass-to-glass
+  // numbers were read off burned pixels — and the spelling is `record`'s and
+  // `capture`'s, not a third one.
+  const W = 640, H = 360;
+  const canvas = el('canvas');
+  canvas.width = W; canvas.height = H;
   const g = canvas.getContext('2d');
-  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
-  video.muted = true;
-  video.style.display = 'none';
-  d.el.append(canvas, video);
 
+  const stage = el('div', 'stage');
+  const srcFig = el('figure');
+  srcFig.append(canvas, el('figcaption', 'd-cap', 'source · recorded as you see it'));
+  const seqFig = el('figure');
+  const seq = el('div', 'seq');
+  const seqCap = el('figcaption', 'd-cap', 'the line — nothing on it yet');
+  seqFig.append(seq, seqCap);
+  stage.append(srcFig, seqFig);
+  d.el.append(stage);
+
+  // A SEED PER TAKE, drawn ONCE when the take starts — never per frame, or the
+  // recording would flicker and the same take would not look like itself twice.
+  const randSeed = () => Math.floor(Math.random() * 10000);
+  let nextSeed = randSeed();
+
+  // …but the HUE comes from the take's INDEX, by golden angle, not from the
+  // seed. Two random hues can land five degrees apart, and then two parts on
+  // the line are indistinguishable — which is the exact failure the seed exists
+  // to prevent. So: index picks a colour that is guaranteed far from its
+  // neighbours', and the seed picks the pattern inside it and is printed in the
+  // frame. Both properties hold, neither is left to luck.
+  const hueOf = (i) => (32 + i * 137.508) % 360;
+
+  // Declared HERE, above `drawFrame`, because the first frame is painted
+  // during module evaluation and a `let` further down is in its temporal dead
+  // zone at that moment — which surfaces as `__demo.ready false`, not as a
+  // drawing bug. That exact mistake cost six pages once already.
+  const parts = [];   // { n, seed, hue, mime, chunks[], blobs[], bytes, recordedMs,
+                      //   fileMs, startMs, lenMs, video }
+  let recording = null;
+  let totalMs = 0;    // where the line currently ends — the next take's start
   let camStream = null;
-  let source = 'canvas';
+  const ink = (h, s, l, a = 1) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
 
-  setInterval(() => {
-    if (camStream) return;                    // the camera draws its own picture
-    const t = Date.now();
-    g.fillStyle = '#11151d'; g.fillRect(0, 0, 480, 270);
-    g.fillStyle = '#ffd400';
-    g.font = 'bold 26px ui-monospace, monospace';
-    g.fillText(new Date(t).toISOString().slice(11, 23), 18, 46);
-    g.fillStyle = '#2b3546'; g.fillRect(18, 70, 444, 8);
-    g.fillStyle = '#ffd400'; g.fillRect(18, 70, (t / 12) % 444, 8);
-  }, 40);
+  // WHAT IS BURNED IS THE POSITION, not the time of day. `record` and `capture`
+  // burn `toISOString()` because their question is glass-to-glass — "how long
+  // did this frame take to arrive" — and wall time is exactly right for that.
+  // The question HERE is "did the seek land", and the only number that answers
+  // it without arithmetic is where the frame sits on the line. A reader drags
+  // to 6.5 s, reads 6.5 off the picture, and the claim checks itself.
+  //
+  // The offset is known at record time: parts are appended, so a take starting
+  // now starts at `totalMs`, and only one recording runs at a time.
+  let previewT0 = performance.now();
 
+  function drawFrame() {
+    const rec = recording;
+    const seed = rec ? rec.part.seed : nextSeed;
+    const hue = rec ? rec.part.hue : hueOf(parts.length);
+    const n = rec ? rec.part.n : parts.length + 1;
+    const start = rec ? rec.part.startMs : totalMs;
+    // How far into THIS take. While recording that is real elapsed time; in
+    // preview it is a REHEARSAL of the same number, wrapped at the cap — an
+    // unwrapped preview counter reads `35.42s ON THE LINE` on a 13 s line,
+    // which is the page contradicting its own transport bar.
+    const raw = performance.now() - (rec ? rec.t0 : previewT0);
+    const into = rec ? raw : raw % CAP_MS;
+    const line = start + into;                // where that sits on the line
+    const wall = Date.now();
+
+    g.fillStyle = ink(hue, 26, 7); g.fillRect(0, 0, W, H);
+
+    // the camera underneath, if it was asked for, scrimmed so the burn stays legible
+    if (camStream && live.readyState >= 2) {
+      g.drawImage(live, 0, 0, W, H);
+      g.fillStyle = ink(hue, 40, 6, 0.62); g.fillRect(0, 0, W, H);
+    }
+
+    // MOTION, so a still frame and a playing one are not the same picture.
+    // Speed and slant come off the seed; the offset comes off the position, so
+    // even the background moves with the quantity everything else states.
+    const slant = 0.25 + (seed % 7) * 0.14;
+    const period = 70 + (seed % 5) * 22;
+    const off = (line / (5 + (seed % 4))) % period;
+    g.strokeStyle = ink(hue, 45, 16); g.lineWidth = 2 + (seed % 3);
+    for (let x = -H * slant - period; x < W + period; x += period) {
+      g.beginPath(); g.moveTo(x + off, 0); g.lineTo(x + off + H * slant, H); g.stroke();
+    }
+    // a marker sweeping the full width once a second of LINE time
+    const sx = ((line % 1000) / 1000) * W;
+    g.fillStyle = ink(hue, 90, 62, 0.9); g.fillRect(sx - 1.5, 0, 3, H);
+
+    // THE NUMBER THE EYE LANDS ON: position on the line, the same quantity the
+    // transport bar is showing, so the two can be read against each other.
+    g.fillStyle = '#000'; g.globalAlpha = 0.45; g.fillRect(18, 22, 500, 118); g.globalAlpha = 1;
+    g.fillStyle = ink(hue, 95, 78);
+    g.font = 'bold 54px ui-monospace, Menlo, monospace';
+    g.fillText(`${(line / 1000).toFixed(2)}s`, 26, 76);
+    g.fillStyle = ink(hue, 45, 56);
+    g.font = 'bold 17px ui-monospace, Menlo, monospace';
+    g.fillText('ON THE LINE', 240, 76);
+    // …and where that is INSIDE this take, which is the other half a frozen
+    // frame needs to place itself
+    g.fillStyle = ink(hue, 70, 66);
+    g.font = 'bold 24px ui-monospace, Menlo, monospace';
+    g.fillText(`take ${n} · ${(into / 1000).toFixed(2)}s in`, 26, 112);
+    g.fillStyle = ink(hue, 35, 46);
+    g.font = '17px ui-monospace, Menlo, monospace';
+    g.fillText(`seed #${String(seed).padStart(4, '0')}`, 26, 134);
+
+    // THE SAME QUANTITY WITHOUT DIGITS — line position, never wall time. Two
+    // rows counting something the digits do not show would be a second clock
+    // that disagrees with the first. Top row: whole seconds of the line, mod
+    // ten. Bottom row: tenths. A frozen frame is readable to 100 ms at arm's
+    // length, and that is what makes a scrub checkable by eye.
+    const cells = (lit, y, h) => {
+      for (let i = 0; i < 10; i++) {
+        const x = 26 + i * 44, on = i === lit, past = i < lit;
+        g.fillStyle = on ? ink(hue, 95, 70) : past ? ink(hue, 55, 30) : ink(hue, 25, 14);
+        g.fillRect(x, y, 38, h);
+      }
+    };
+    cells(Math.floor(line / 1000) % 10, 158, 26);
+    cells(Math.floor((line % 1000) / 100), 192, 40);
+    g.fillStyle = ink(hue, 35, 42);
+    g.font = '15px ui-monospace, Menlo, monospace';
+    g.fillText('seconds (mod 10)', 470, 178);
+    g.fillText('tenths', 470, 218);
+
+    // wall time, small and labelled: a recording that says when it was made is
+    // not useless, but it is not the number this page is about
+    g.fillStyle = ink(hue, 20, 34);
+    g.font = '15px ui-monospace, Menlo, monospace';
+    g.fillText(`recorded at ${new Date(wall).toISOString().slice(11, 23)} UTC`, 26, 330);
+    g.fillStyle = rec ? '#e0908a' : ink(hue, 25, 34);
+    g.font = 'bold 17px ui-monospace, Menlo, monospace';
+    g.fillText(rec ? '● REC' : 'preview — not on the line yet', 26, 306);
+  }
+  setInterval(drawFrame, 40);
+  drawFrame();
+
+  // the camera preview never reaches the timeline; it is a texture for the burn
+  const live = el('video', '', null, { playsinline: '', muted: '' });
+  live.muted = true; live.hidden = true;
+  d.el.append(live);
   d.on('camera', async () => {
-    if (camStream) { d.log('camera already on'); return; }
+    if (camStream) return;
     try {
       camStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 480, height: 270, frameRate: 25 }, audio: false,
+        video: { width: 640, height: 360, frameRate: 25 }, audio: false,
       });
-      source = 'camera';
-      const t = camStream.getVideoTracks()[0];
-      d.log(`camera on: ${t.label || 'default'}`, 'hi');
-      const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
-      pv.muted = true; pv.srcObject = camStream;
-      await pv.play().catch(() => {});
-      // draw the camera INTO the same canvas, so one recording path serves both
-      // sources and everything measured below is identical either way
-      const draw = () => {
-        if (!camStream) return;
-        g.drawImage(pv, 0, 0, 480, 270);
-        requestAnimationFrame(draw);
-      };
-      draw();
+      live.srcObject = camStream;
+      live.play().catch(() => {});
+      d.button('camera').disabled = true;
+      d.button('camera').textContent = 'Camera on';
+      d.log(`camera on: ${camStream.getVideoTracks()[0].label || 'default'}`, 'hi');
     } catch (e) {
-      // report the CAPABILITY, not an error string — the lesson @moq/net taught
-      d.log(`camera refused: ${e.name} — staying on the canvas`, 'bad');
+      // report the CAPABILITY, not an error string — the lesson @moq/net taught.
+      // The page keeps working: the generated picture is the source either way.
+      camStream = null;
+      d.log(`camera: ${e.name} — staying on the generated picture`, 'bad');
     }
   });
 
-  // ── recording ────────────────────────────────────────────────────────────
-  // Every chunk is stamped when it ARRIVES, which is the only instant this API
-  // gives us. It is NOT when the frames inside it were captured: MediaRecorder
-  // publishes no capture timestamp per chunk, so "how old is this blob's oldest
-  // frame" is not observable here and this page does not pretend to know it.
-  const chunks = [];        // { at, size, gapMs } — at is wall ms since record start
-  let blobs = [];
-  let mime = null, bytes = 0, recording = false;
-  let recordedMs = null;    // wall clock: stop - start
-  let fileMs = null;        // what the file itself says, once resolved
+  // ── the line ─────────────────────────────────────────────────────────────
+  //
+  // ONE DECK for the page's life — the bar and the strip bind theirs at
+  // construction, so a deck built later leaves both pointing at something
+  // nobody is playing. `setRange` grows as takes are appended.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, CAP_MS] });
+  let active = null;                 // the part under the playhead
+  const handovers = [];              // every change of that
 
-  const paint = () => {
-    d.set('mime', mime ? mime.replace('video/', '') : null);
-    d.set('chunks', chunks.length);
-    d.set('kib', bytes ? Math.round(bytes / 1024) : null);
-    d.set('recorded', recordedMs === null ? null : Math.round(recordedMs) / 1000);
-    d.set('file', fileMs === null ? null : Math.round(fileMs) / 1000);
-    // no `?? 0` anywhere here: a number this page has not observed renders as
-    // an em dash, never as a confident zero
-    lanes();
+  const partAt = (ms) => {
+    for (let i = parts.length - 1; i >= 0; i--) if (ms >= parts[i].startMs) return parts[i];
+    return parts[0] || null;
   };
+  const localOf = (p, ms) =>
+    Math.max(0, Math.min((p.lenMs ?? 0) - 40, ms - p.startMs)) / 1000;
 
-  d.on('rec', async () => {
-    if (recording) return;
-    chunks.length = 0; blobs = []; bytes = 0; recordedMs = null; fileMs = null;
-    seeks.length = 0;
-    master?.dispose(); master = null;
-    deck.pause?.(); deck.seek?.(0); deck.setRange([0, TAKE_MS]);
+  // WHICH ELEMENT MASTERS THE CLOCK — and this layout is the reason it has an
+  // answer at all. `media-master` L1 says the picture is ground truth and the
+  // vector is what bends; two pictures playing at once give that law two
+  // ground truths and it has no answer. Laid end to end, EXACTLY ONE part is
+  // under the playhead, so the part being played is the master, the law holds
+  // unchanged, and the handover below is the only new thing to get right.
+  const mm = mediaMaster(deck, () => {
+    const p = active;
+    if (!p || !p.video) return null;
+    return { el: p.video, pos: p.startMs + p.video.currentTime * 1000, key: `take${p.n}` };
+  }, {
+    autoPlayPause: false,            // a part ENDING is a handover here, not a stop
+    onEvent: (e) => d.log(`clock: ${e.reason}${e.key ? ` · ${e.key}` : ''}`),
+  });
 
-    const stream = canvas.captureStream(25);
-    // NEGOTIATED, never assumed. Three demos hard-coded a WebM-only list and
-    // stopped dead on WebKit, which records MP4 and never WebM.
-    mime = recorderMime(d);
+  function handOver(p, pos, why) {
+    const from = active;
+    if (from && from.video) { from.video.pause(); from.video.hidden = true; }
+    active = p;
+    if (!p) { seqCap.textContent = 'the line — nothing on it'; return; }
+    p.video.hidden = false;
+    const want = localOf(p, pos);
+    if (Math.abs(p.video.currentTime - want) > 0.08) p.video.currentTime = want;
+    seqCap.textContent = `take ${p.n} · seed #${String(p.seed).padStart(4, '0')} · the clock`;
+    if (from !== p) handovers.push({ at: pos, from: from ? from.n : null, to: p.n, why });
+    mm.release('handover');          // a clean re-acquire on the new key
+  }
+
+  // EVERY SEEK IS A COMMAND TO THE ELEMENT. The strip, the bar's restart and
+  // the checks all call `deck.seek()`, and with a media master attached that
+  // alone does nothing visible — L1 means mediaMaster reads the picture, sees
+  // the vector has wandered, and pulls it straight back. So one mirror, here,
+  // for every seek that did not come from the servo itself (L2's own
+  // `deck.seek` on a jump would otherwise chase its tail).
+  const seeks = [];
+  let pendingSeek = null, inServo = false;
+  deck.transport.onState((st) => {
+    if (st.reason !== 'seek' || inServo || !parts.length) return;
+    const pos = st.p0;
+    const p = partAt(pos);
+    if (!p) return;
+    if (p !== active) handOver(p, pos, 'seek');
+    pendingSeek = pos;
+    p.video.currentTime = localOf(p, pos);
+  });
+
+  function onSeeked(p) {
+    if (pendingSeek === null || p !== active) return;
+    const got = p.startMs + p.video.currentTime * 1000;
+    seeks.push({ asked: pendingSeek, got, offMs: got - pendingSeek, part: p.n });
+    pendingSeek = null;
+    paint();
+  }
+
+  let rafOn = false;
+  function tick() {
+    if (!parts.length) return;
+    const playing = deck.playing();
+    let pos = deck.position();
+
+    // A PART RUNNING OUT IS A HANDOVER, not a stop — and it has to be resolved
+    // BEFORE the servo reads an ended element as the clock, or the playhead
+    // pins itself to the boundary and the rest of the line never plays.
+    if (active && active.video.ended) {
+      const next = parts[parts.indexOf(active) + 1];
+      if (next) pos = next.startMs;
+      else if (playing) { deck.pause(); d.log('the line ran out'); }
+    }
+    const want = partAt(pos);
+    if (want && want !== active) handOver(want, pos, 'boundary');
+
+    if (active && active.video) {
+      if (playing && active.video.paused && !active.video.ended) active.video.play().catch(() => {});
+      if (!playing && !active.video.paused) active.video.pause();
+    }
+    inServo = true;
+    try { mm.tick(); } finally { inServo = false; }
+  }
+
+  // ── recording ────────────────────────────────────────────────────────────
+  // Every chunk is stamped when it ARRIVES, the only instant this API offers.
+  // It is NOT when the frames inside it were captured: MediaRecorder publishes
+  // no per-chunk capture timestamp, so "how old is this blob's oldest frame" is
+  // not observable here and this page does not pretend to know it.
+  function startRecording(capMs = CAP_MS) {
+    if (recording) { d.log('already recording'); return; }
+    const mime = recorderMime(d);
     if (!mime) return;
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
-
+    const stream = canvas.captureStream(25);
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 });
+    const part = {
+      n: parts.length + 1, seed: nextSeed, hue: hueOf(parts.length), mime,
+      chunks: [], blobs: [], bytes: 0, recordedMs: null, fileMs: null,
+      // KNOWN NOW, not when it lands: a take is appended, so it starts where
+      // the line currently ends — and only one recording runs at a time, so
+      // nothing can move it underneath. This is what lets the frames carry
+      // their own position on the line rather than their offset into the take.
+      startMs: totalMs, lenMs: null, video: null, capMs,
+    };
+    nextSeed = randSeed();
     const t0 = performance.now();
     let lastAt = 0;
     rec.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
       const at = performance.now() - t0;
-      chunks.push({ at, size: e.data.size, gapMs: chunks.length ? at - lastAt : at });
+      part.chunks.push({ at, size: e.data.size, gapMs: part.chunks.length ? at - lastAt : at });
       lastAt = at;
-      blobs.push(e.data);
-      bytes += e.data.size;
+      part.blobs.push(e.data);
+      part.bytes += e.data.size;
       paint();
     };
     rec.onerror = (ev) => d.log(`recorder: ${ev.error?.name ?? 'error'}`, 'bad');
+    rec.onstop = async () => {
+      part.recordedMs = performance.now() - t0;
+      recording = null;
+      previewT0 = performance.now();
+      setRecUI(false);
+      for (const t of stream.getTracks()) t.stop();
+      await new Promise((r) => setTimeout(r, 250));      // let the last chunk land
+      await landPart(part);
+      await runChecks();
+    };
 
-    recording = true;
+    recording = { rec, part, t0 };
     rec.start(SLICE_MS);
-    d.log(`recording ${mime} from the ${source}, ${SLICE_MS} ms slices`, 'hi');
-    await new Promise((r) => setTimeout(r, TAKE_MS));
-    rec.stop();
-    recordedMs = performance.now() - t0;
-    recording = false;
-    // the delay from stop() to the final chunk — a real number, and a DIFFERENT
-    // one from capture-to-available latency, which this API cannot report
-    await new Promise((r) => setTimeout(r, 300));
-    paint();
-    d.log(`stopped after ${(recordedMs / 1000).toFixed(2)}s — ${chunks.length} chunks, ${Math.round(bytes / 1024)} KiB`);
-    await putOnTimeline();
-    runChecks();
-  });
+    setRecUI(true);
+    d.log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like — ${capMs / 1000}s cap`, 'hi');
+    // The cap is a BACKSTOP and it is said before it bites, not after. It exists
+    // so a forgotten take cannot grow without bound, which is the moment these
+    // blobs go anywhere but memory.
+    recording.capTimer = setTimeout(() => {
+      if (recording?.rec === rec) { d.log(`take ${part.n}: hit the ${capMs / 1000}s cap`); stopRecording(); }
+    }, capMs);
+  }
 
-  // ── the take, on a timeline ──────────────────────────────────────────────
-  //
-  // ONE DECK, for the page's whole life. The strip and the bar bind their deck
-  // at construction, so a deck built later would leave both pointing at
-  // something else — and a page with no timeline until you press record has
-  // nothing to show you what it is about. It starts on the length we are about
-  // to record and `setRange`s to what the file turns out to say.
-  const deck = createDeck({ items: [], adapters: {}, range: [0, TAKE_MS] });
-  let master = null, rafOn = false;
+  function stopRecording() {
+    if (!recording) return;
+    clearTimeout(recording.capTimer);
+    try { recording.rec.stop(); } catch { /* already stopped */ }
+  }
 
-  /**
-   * `duration: Infinity`, turned into a measurement rather than hidden.
-   *
-   * A MediaRecorder file usually reports Infinity, which leaves the transport
-   * bar with no range — its seekability test is exactly
-   * `Number.isFinite(deck.durationMs) && deck.durationMs > 0`. The known dance
-   * is to seek far past the end, let the browser resolve the real duration,
-   * then come back.
-   *
-   * So the deck is built IMMEDIATELY on the wall-clock length we already know,
-   * and `setRange` moves it once the file answers. The range has not been fixed
-   * at construction since v0.5, `deck.range` stays one stable reference, and
-   * `rangeGen()` moves — which the transport bar already re-derives from, so
-   * this costs the bar nothing. The difference between the two lengths goes on
-   * the page instead of being swallowed.
-   */
-  async function resolveDuration() {
+  function setRecUI(on) {
+    const b = bar.extra('rec');
+    if (b) { b.dataset.on = on ? '1' : ''; b.textContent = on ? 'Stop' : 'Record'; }
+  }
+
+  async function resolveDuration(video) {
     await new Promise((res) => {
       video.addEventListener('loadedmetadata', res, { once: true });
       setTimeout(res, 4000);
     });
     if (!Number.isFinite(video.duration)) {
+      // the documented dance: a MediaRecorder file reports duration Infinity
+      // until it is asked from past the end, which leaves the transport bar
+      // with no range at all — its test is exactly
+      // `Number.isFinite(deck.durationMs) && deck.durationMs > 0`
       video.currentTime = 1e6;
       await new Promise((res) => {
         const on = () => {
@@ -207,214 +407,261 @@
     return Number.isFinite(video.duration) ? video.duration * 1000 : null;
   }
 
-  async function putOnTimeline() {
-    if (!blobs.length) { d.log('nothing recorded', 'bad'); return; }
-    const blob = new Blob(blobs, { type: mime });
-    video.src = URL.createObjectURL(blob);
-    video.style.display = '';
-    canvas.style.display = 'none';
-    armVideo(video);
+  /** a landed take becomes a PART, appended where the last one finished */
+  async function landPart(part) {
+    if (!part.blobs.length) { d.log(`take ${part.n}: nothing recorded`, 'bad'); return; }
+    part.url = URL.createObjectURL(new Blob(part.blobs, { type: part.mime }));
 
-    // the range is the length we measured, the moment the take exists
-    deck.setRange([0, Math.round(recordedMs)]);
-    // L1: the master is never nudged. The video's currentTime is READ; nothing
-    // in this file ever writes it from the deck. The one place currentTime is
-    // written is the seek handler below, which is the client issuing a seek
-    // COMMAND — L4b's explicit exception — not the vector driving the picture.
-    master?.dispose();
-    master = mediaMaster(deck, video, { onEvent: (e) => d.log(`master: ${e.reason}`) });
-    if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); master?.tick(); })(); }
+    const v = el('video', '', null, { playsinline: '', muted: '' });
+    v.muted = true; v.hidden = true; v.src = part.url;
+    seq.append(v);
+    part.video = v;
+    armVideo(v);
+    v.addEventListener('seeked', () => onSeeked(part));
 
-    fileMs = await resolveDuration();
-    if (fileMs !== null) deck.setRange([0, Math.round(fileMs)]);
+    part.fileMs = await resolveDuration(v);
+    part.lenMs = Math.round(part.fileMs ?? part.recordedMs);
+    // END TO END. `startMs` was fixed when recording began; if the line moved
+    // under it, the burned numbers in the frames are lying and everything that
+    // reads them is lying with them — so it is checked, not assumed.
+    if (part.startMs !== totalMs) {
+      d.log(`take ${part.n}: the line moved under it (${part.startMs} vs ${totalMs}) — burned positions are stale`, 'bad');
+      part.startMs = totalMs;
+    }
+    totalMs += part.lenMs;
+    parts.push(part);
+    deck.setRange([0, Math.round(totalMs)]);
+
+    if (!active) handOver(part, 0, 'first');
+    if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); tick(); })(); }
     paint();
-    await playOrPrompt(video, d);
-    d.log(fileMs === null
-      ? 'the file will not say how long it is — the bar keeps the recorded length'
-      : `recorded ${(recordedMs / 1000).toFixed(2)}s, the file says ${(fileMs / 1000).toFixed(2)}s`, 'hi');
+    d.log(`take ${part.n} landed: ${(part.lenMs / 1000).toFixed(2)}s at `
+      + `${(part.startMs / 1000).toFixed(2)}s, ${Math.round(part.bytes / 1024)} KiB`
+      + (part.fileMs === null ? ' — the file would not say its length' : ''), 'hi');
   }
 
-  // ── seeks: asked against got ─────────────────────────────────────────────
-  // `in` is a request, not a fact. With a 2 s GOP only one part per segment is
-  // INDEPENDENT, so a seek lands on a keyframe rather than the instant asked
-  // for. That is the element being honest, not an error.
-  const seeks = [];         // { asked, got, offMs }
-  video.addEventListener('seeked', () => {
-    if (pendingSeek === null) return;
-    const got = video.currentTime * 1000;
-    seeks.push({ asked: pendingSeek, got, offMs: got - pendingSeek });
-    pendingSeek = null;
-    paint();
-  });
-  let pendingSeek = null;
-  /** the client's seek COMMAND — L4b: rVFC observes, currentTime commands */
-  function askSeek(ms) {
-    if (!Number.isFinite(video.duration)) return false;
-    pendingSeek = ms;
-    video.currentTime = ms / 1000;
-    return true;
-  }
-
-  // ── the picture ──────────────────────────────────────────────────────────
+  // ── the strip ────────────────────────────────────────────────────────────
   const NOT_YET = '#3b424e';
-  const BANDS = [
-    [1, '#8fd6a8', 'on cadence'],
-    [2, '#ffd400', 'late'],
-    [Infinity, '#e0908a', 'well late'],
-  ];
-  const bandFor = (ms) => BANDS.find(([lim]) => Math.abs(ms) / SLICE_MS < lim);
-
-  function laneSpecs() {
-    return [
-      {
-        // one mark per chunk, coloured by how close its arrival was to the
-        // timeslice we asked for. Colour means HOW IT LANDED, never which lane.
-        id: 'chunks', kind: 'chunk', label: 'chunks', height: 52, width: 2,
-        as: 'ticks', color: NOT_YET, terse: true,
-        rows: () => chunks.map((c, i) => ({
-          at: c.at, id: `c${i}`, kind: 'chunk', payload: { i, ...c },
-        })),
-        colorOfRow: (r) => bandFor(r.payload.gapMs - SLICE_MS)[1],
-        describeRow: (r) => {
-          const p = r.payload;
-          const off = p.gapMs - SLICE_MS;
-          return [`${Math.round(p.size / 1024)} KiB`,
-                  `${off >= 0 ? '+' : ''}${off.toFixed(0)} ms off the ${SLICE_MS} ms slice`];
-        },
-      },
-      {
-        // empty until you scrub, and the gutter says so rather than showing a
-        // zero for something nobody has asked for yet
-        id: 'seeks', kind: 'seek', label: 'seeks', height: 44, width: 2,
-        as: 'ticks', color: NOT_YET, terse: true,
-        rows: () => seeks.map((s, i) => ({
-          at: s.asked, id: `s${i}`, kind: 'seek', payload: { i, ...s },
-        })),
-        colorOfRow: (r) => (Math.abs(r.payload.offMs) < 40 ? '#8fd6a8'
-          : Math.abs(r.payload.offMs) < 250 ? '#ffd400' : '#e0908a'),
-        describeRow: (r) => {
-          const p = r.payload;
-          return [`asked ${(p.asked / 1000).toFixed(2)}s, got ${(p.got / 1000).toFixed(2)}s`,
-                  `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms — the nearest keyframe`];
-        },
-      },
-    ];
-  }
-
-  createTransportBar(d.el, deck, { scrub: false });
-  const view = createStripView(d.el, deck, {
-    size: 'auto', follow: false, armWall: false, gutter: 150,
-    // A SCRUB IS A COMMAND TO THE ELEMENT, not the vector driving the picture.
-    //
-    // The strip's default is `deck.seek()`, and with a media master attached
-    // that does nothing you can see: L1 says the master is never nudged, so
-    // mediaMaster reads the video, sees the vector has wandered, and pulls it
-    // straight back. Driven in a browser, dragging moved the deck and the
-    // picture carried on playing — the deck's numbers advanced at exactly
-    // real time, which is the tell.
-    //
-    // L4b names the exception: rVFC observes, `currentTime` commands. So the
-    // drag issues a real element seek and mediaMaster reconciles the deck to
-    // it as a jump, which is the direction the laws want.
-    onSeek: (pos) => { if (!askSeek(pos)) deck.seek(pos); },
-    lanes: laneSpecs(),
-  });
-
+  const BANDS = [[1, '#8fd6a8'], [2, '#ffd400'], [Infinity, '#e0908a']];
+  const bandFor = (ms) => BANDS.find(([lim]) => Math.abs(ms) / SLICE_MS < lim)[1];
   const median = (xs) => {
     if (!xs.length) return null;
     const a = [...xs].sort((p, q) => p - q);
     return a[a.length >> 1];
   };
 
+  // ONE LANE OF PARTS, in recording order. Cubase's vocabulary, the same as
+  // `loops`: a PART is a container placed on the timeline. The seed's colour is
+  // what lets two slices tell each other apart at a glance — and it is the same
+  // colour that is burned into the frames inside them.
+  const partLane = {
+    id: 'parts', kind: 'part', label: 'parts', height: 52, barPad: 8,
+    as: 'spans', stack: false, barGap: 3, terse: true, alpha: 0.9,
+    colorOf: (s) => ink(s.row?.payload?.hue ?? 210, 62, 68),
+    labelOf: (s, { bw }) => {
+      const p = s.row?.payload || {};
+      return bw > 128 ? `take ${p.n} · #${String(p.seed).padStart(4, '0')} · ${(p.lenMs / 1000).toFixed(2)}s`
+        : bw > 66 ? `take ${p.n} · ${(p.lenMs / 1000).toFixed(1)}s` : `${p.n}`;
+    },
+    rows: () => parts.map((p) => ({
+      at: p.startMs, id: `take${p.n}`, kind: 'part',
+      payload: { durMs: p.lenMs, n: p.n, seed: p.seed, hue: p.hue, lenMs: p.lenMs,
+                 kib: Math.round(p.bytes / 1024) },
+    })),
+    describeRow: (r) => {
+      const p = r.payload;
+      return [`seed #${String(p.seed).padStart(4, '0')} · ${p.kib} KiB`,
+              `${(p.lenMs / 1000).toFixed(2)}s of the line`];
+    },
+  };
+
+  const chunkLane = {
+    id: 'chunks', kind: 'chunk', label: 'events', height: 40, width: 2,
+    as: 'ticks', color: NOT_YET, terse: true,
+    // colour means HOW IT LANDED against the timeslice we asked for, never
+    // which take it came from — that is the part lane's job and its colour.
+    rows: () => parts.flatMap((p) => p.chunks.map((c, i) => ({
+      at: p.startMs + c.at, id: `p${p.n}c${i}`, kind: 'chunk', payload: { n: p.n, ...c },
+    }))),
+    colorOfRow: (r) => bandFor(r.payload.gapMs - SLICE_MS),
+    describeRow: (r) => {
+      const p = r.payload, off = p.gapMs - SLICE_MS;
+      return [`take ${p.n} · ${Math.round(p.size / 1024)} KiB`,
+              `${off >= 0 ? '+' : ''}${off.toFixed(0)} ms off the ${SLICE_MS} ms slice`];
+    },
+  };
+
+  const seekLane = {
+    id: 'seeks', kind: 'seek', label: 'seeks', height: 38, width: 2,
+    as: 'ticks', color: NOT_YET, terse: true,
+    rows: () => seeks.map((s, i) => ({ at: s.asked, id: `s${i}`, kind: 'seek', payload: { i, ...s } })),
+    colorOfRow: (r) => (Math.abs(r.payload.offMs) < 40 ? '#8fd6a8'
+      : Math.abs(r.payload.offMs) < 250 ? '#ffd400' : '#e0908a'),
+    describeRow: (r) => {
+      const p = r.payload;
+      return [`asked ${(p.asked / 1000).toFixed(2)}s, got ${(p.got / 1000).toFixed(2)}s`,
+              `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms apart · landed in take ${p.part}`];
+    },
+  };
+
+  const bar = createTransportBar(d.el, deck, {
+    scrub: false,          // the strip is the only position surface on this page
+    // recording is a TRANSPORT verb here, not a side action beside the page
+    extras: [{ id: 'rec', label: 'Record', primary: true,
+               title: `stop when you like — ${CAP_MS / 1000}s cap`,
+               onClick: () => (recording ? stopRecording() : startRecording(CAP_MS)) }],
+  });
+
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    lanes: [partLane, chunkLane, seekLane],
+  });
+
+  function paint() {
+    d.set('takes', parts.length || null);
+    d.set('line', totalMs ? (totalMs / 1000).toFixed(2) : null);
+    d.set('mime', parts[0] ? parts[0].mime.replace('video/', '') : null);
+    const kib = parts.reduce((a, p) => a + p.bytes, 0);
+    d.set('kib', kib ? Math.round(kib / 1024) : null);
+    // no `?? 0` anywhere: a number this page has not observed is an em dash
+    d.set('handovers', handovers.length || null);
+    lanes();
+  }
+
   function lanes() {
+    // A GUTTER CARRIES WHAT ITS LANE MEASURED. Not "press Record", not "drag
+    // the line" — that is help text, it repeats the how() paragraph, it crowds
+    // out the figures the slot exists for, and it TRUNCATED, which is the tell.
+    // The budget is real: ~21 characters at this gutter width, and three lines
+    // on a 52 px lane, two on a 40 px one. Written to fit, not trimmed to fit.
     const L = view.strip.lanes();
-    const c = L.find((l) => l.id === 'chunks');
-    if (c) {
-      if (!chunks.length) c.subLabel = ['nothing recorded yet'];
-      else {
-        const offs = chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS));
-        const typ = median(offs), worst = offs.length ? Math.max(...offs) : null;
-        c.subLabel = typ === null
-          ? [`${chunks.length} chunk`, `${Math.round(bytes / 1024)} KiB, in memory`]
-          : [`typical ${typ.toFixed(0)} ms off`, `worst ${worst.toFixed(0)} ms · ${Math.round(bytes / 1024)} KiB`];
-      }
-    }
-    const s = L.find((l) => l.id === 'seeks');
-    if (s) {
-      if (!seeks.length) s.subLabel = ['drag the strip', 'to ask for a position'];
-      else {
-        const offs = seeks.map((x) => Math.abs(x.offMs));
-        s.subLabel = [`typical ${median(offs).toFixed(0)} ms off`,
-                      `worst ${Math.max(...offs).toFixed(0)} ms`];
-      }
-    }
-    // `jumps` and `corrections` both move; `lastCorrectionMs` sat at an em dash
-    // for a whole session because a correction only happens OUTSIDE the dead
-    // band, and a short take inside tolerance never produces one. A cell that
-    // can only ever be blank is not a measurement.
-    const st = master?.stats?.();
-    d.set('follow', st ? `${st.jumps} jumps · ${st.corrections} corr` : null);
+    const P = L.find((l) => l.id === 'parts');
+    if (P) P.subLabel = parts.length
+      ? [`${parts.length} part${parts.length > 1 ? 's' : ''} · ${(totalMs / 1000).toFixed(2)}s`,
+         `shortest ${(Math.min(...parts.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
+         `longest ${(Math.max(...parts.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
+      : ['no parts', 'nothing recorded yet'];
+
+    const C = L.find((l) => l.id === 'chunks');
+    const offs = parts.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
+    if (C) C.subLabel = offs.length
+      ? [`${offs.length + parts.length} blobs, ${median(offs).toFixed(0)} ms typ`,
+         `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
+      : ['no blobs', 'nothing recorded yet'];
+
+    const S = L.find((l) => l.id === 'seeks');
+    const so = seeks.map((x) => Math.abs(x.offMs));
+    if (S) S.subLabel = so.length
+      ? [`${seeks.length} asked, ${median(so).toFixed(0)} ms typ`,
+         `worst ${Math.max(...so).toFixed(0)} ms off`]
+      : ['no seeks yet', 'asked-vs-got needs one'];
     view.strip.invalidate();
   }
-  setInterval(lanes, 250);
+  setInterval(paint, 250);
 
-  // ── the checks, on their own ─────────────────────────────────────────────
-  // They run when a take exists rather than behind a button, and they assert
-  // the MECHANISM: that a mime was negotiated, that the range became seekable,
-  // that a seek reports what it actually got. An assert that has to wait gets
-  // written tolerantly, and a tolerant assert is how `loops` spent its whole
-  // life not looping.
-  let asserted = false;
+  // ── the checks ───────────────────────────────────────────────────────────
+  // They run when a take lands rather than behind a button, and they assert the
+  // MECHANISM. An assert that has to wait gets written tolerantly, and a
+  // tolerant assert is how `loops` spent its whole life not looping.
+  let didRecording = false, didSequence = false;
+
+  function seekAndWait(ms) {
+    return new Promise((res) => {
+      const before = seeks.length;
+      deck.seek(ms);
+      let i = 0;
+      const iv = setInterval(() => {
+        if (seeks.length > before || ++i > 40) { clearInterval(iv); res(seeks[seeks.length - 1] || null); }
+      }, 100);
+    });
+  }
+
   async function runChecks() {
-    if (asserted) return;
-    asserted = true;
+    if (!parts.length) return;
+    const p1 = parts[0];
 
-    d.assert('the mime was negotiated, not assumed',
-      typeof mime === 'string' && /^video\//.test(mime), String(mime));
-    d.assert('chunks arrived with sizes', chunks.length > 0 && chunks.every((c) => c.size > 0),
-      `${chunks.length} chunks, ${Math.round(bytes / 1024)} KiB`);
-    d.assert('every chunk is stamped on arrival',
-      chunks.every((c) => Number.isFinite(c.at) && Number.isFinite(c.gapMs)),
-      `first at ${chunks[0] ? Math.round(chunks[0].at) : '—'} ms`);
+    if (!didRecording) {
+      didRecording = true;
+      d.assert('the mime was negotiated, not assumed',
+        typeof p1.mime === 'string' && /^video\//.test(p1.mime), String(p1.mime));
+      d.assert('chunks arrived with sizes',
+        p1.chunks.length > 0 && p1.chunks.every((c) => c.size > 0),
+        `${p1.chunks.length} chunks, ${Math.round(p1.bytes / 1024)} KiB`);
+      d.assert('every chunk is stamped on arrival',
+        p1.chunks.every((c) => Number.isFinite(c.at) && Number.isFinite(c.gapMs)),
+        `first at ${p1.chunks[0] ? Math.round(p1.chunks[0].at) : '—'} ms`);
+      d.assert('the take is seekable — a finite range, not Infinity',
+        Number.isFinite(deck.durationMs) && deck.durationMs > 0, `${deck.durationMs} ms`);
+      d.assert('the recorded length and the file length are both known',
+        Number.isFinite(p1.recordedMs) && (p1.fileMs === null || Number.isFinite(p1.fileMs)),
+        p1.fileMs === null
+          ? `recorded ${Math.round(p1.recordedMs)} ms, the file would not say`
+          : `recorded ${Math.round(p1.recordedMs)} ms, file ${Math.round(p1.fileMs)} ms, `
+            + `${Math.round(p1.fileMs - p1.recordedMs)} ms apart`);
+      d.assert('the cap is a backstop, not the mechanism',
+        Number.isFinite(p1.recordedMs) && p1.recordedMs <= p1.capMs + 1500,
+        `${Math.round(p1.recordedMs)} ms against a ${p1.capMs} ms cap`);
+    }
 
-    // the range test the transport bar actually applies
-    const seekable = Number.isFinite(deck.durationMs) && deck.durationMs > 0;
-    d.assert('the take is seekable — a finite range, not Infinity', seekable,
+    // THE SEQUENCE ASSERTS NEED TWO PARTS to mean anything, and a vacuous pass
+    // on one is exactly how a subject goes missing. They stay un-run and the
+    // page says so out loud, so "6 asserts" reads as "half the page" rather
+    // than as "the page".
+    if (parts.length < 2) {
+      d.log(`${parts.length} take on the line — the eight sequence checks (end to end, `
+        + 'boundary handover, one clock) need a second one. Press Record again.', 'hi');
+    }
+    if (parts.length < 2 || didSequence) { paint(); return; }
+    didSequence = true;
+
+    d.assert('parts are laid end to end — no gap, no overlap',
+      parts.every((p, i) => (i === 0 ? p.startMs === 0 : p.startMs === parts[i - 1].startMs + parts[i - 1].lenMs)),
+      parts.map((p) => `${p.n}@${p.startMs}+${p.lenMs}`).join(' '));
+    d.assert('the line is as long as the takes put together',
+      deck.durationMs === parts.reduce((a, p) => a + p.lenMs, 0),
       `${deck.durationMs} ms`);
 
-    d.assert('the recorded length and the file length are both known',
-      Number.isFinite(recordedMs) && (fileMs === null || Number.isFinite(fileMs)),
-      fileMs === null
-        ? `recorded ${Math.round(recordedMs)} ms, the file would not say`
-        : `recorded ${Math.round(recordedMs)} ms, file ${Math.round(fileMs)} ms, ${Math.round(fileMs - recordedMs)} ms apart`);
+    const b = parts[1].startMs;
+    const before = await seekAndWait(Math.max(0, b - 400));
+    const inFirst = active;
+    const after = await seekAndWait(b + 400);
+    const inSecond = active;
 
-    // the picture masters the deck: mediaMaster is driving, and nothing here
-    // writes currentTime from the vector
-    d.assert('the picture masters the deck', !!master && typeof master.tick === 'function',
-      master ? `driving ${master.driving()}` : 'no master');
-
-    // a seek is a request; report what came back
-    if (Number.isFinite(video.duration)) {
-      const asked = Math.round(deck.durationMs * 0.5);
-      const before = seeks.length;
-      askSeek(asked);
-      for (let i = 0; i < 40 && seeks.length === before; i++) await new Promise((r) => setTimeout(r, 100));
-      const got = seeks[seeks.length - 1];
-      d.assert('a seek reports what it actually got, not what it asked for',
-        !!got && Number.isFinite(got.got),
-        got ? `asked ${Math.round(got.asked)} ms, got ${Math.round(got.got)} ms, ${Math.round(got.offMs)} ms apart`
-            : 'no seeked event');
-    }
+    d.assert('crossing a boundary hands the picture over',
+      inFirst === parts[0] && inSecond === parts[1],
+      `${b - 400} ms → take ${inFirst ? inFirst.n : '—'}, ${b + 400} ms → take ${inSecond ? inSecond.n : '—'}`);
+    d.assert('exactly one part is under the playhead',
+      parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
+      `at ${Math.round(deck.position())} ms`);
+    d.assert('the part under the playhead is the one driving the clock',
+      mm.key() === `take${inSecond ? inSecond.n : '?'}` && mm.driving(),
+      `${mm.key()}, driving ${mm.driving()}`);
+    d.assert('the new part plays its OWN time, not the line\'s',
+      Math.abs(parts[1].video.currentTime * 1000 - 400) < 300,
+      `${Math.round(parts[1].video.currentTime * 1000)} ms into take 2, `
+        + `which sits at ${Math.round(b)} ms on the line`);
+    d.assert('a seek reports what it actually got, not what it asked for',
+      !!after && Number.isFinite(after.got),
+      after ? `asked ${Math.round(after.asked)} ms, got ${Math.round(after.got)} ms, `
+              + `${Math.round(after.offMs)} ms apart` : 'no seeked event');
+    d.assert('the handover was recorded, not inferred',
+      handovers.some((h) => h.from === 1 && h.to === 2),
+      handovers.map((h) => `${h.from ?? '·'}→${h.to}@${Math.round(h.at)}`).join(' '));
     paint();
   }
 
   // WHAT THIS PAGE CANNOT ANSWER, said rather than quietly missing:
   //   · capture-to-available latency — MediaRecorder publishes no capture
   //     timestamp per chunk, so how old the oldest frame in a blob is cannot be
-  //     observed from this API.
+  //     observed from this API. The burned clock says when the frame was DRAWN,
+  //     which is not the same instant and is not offered as one.
   //   · any content anchor — "the wall-clock instant this frame was captured,
   //     against timeline zero". plan-glass P0 blocks it: every anchor number
   //     this project has printed carries about one frame of rVFC bias.
+  //   · takes playing AT THE SAME TIME. They are laid end to end on purpose:
+  //     one picture under the playhead is what gives `media-master` L1 a single
+  //     ground truth. A multitrack surface is a different demo.
+  d.log(`press Record, then press it again — two takes is where the line starts being a line · ${CAP_MS / 1000}s cap each`, 'hi');
   d.log('nothing here leaves the page: no upload, no fetch, no server');
   d.log('it cannot tell you how old a chunk\'s oldest frame is, or anchor a frame to the wall clock — neither is observable here');
   d.ready();
