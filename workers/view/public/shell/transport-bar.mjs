@@ -40,12 +40,6 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   bar.append(toggle, scrub, time, rates, badge);
   host.append(bar);
 
-  // Declared BEFORE buildRates() runs: it calls syncRates(), which reads this.
-  // A `let` below the first call is a temporal dead zone, and the suite caught
-  // it as "__demo.ready false" on six pages at once rather than as anything
-  // resembling a rate bug.
-  let armedRate = 1;
-
   // ── rates: intersect every declared caps.rates lattice ──────────────────
   // Rebuilt whenever the adapter registry moves. A nest registers its adapter
   // on the parent AFTER this bar is constructed, and a page that swaps one
@@ -89,16 +83,19 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
     syncRates();
   }
 
-  // THE ARMED RATE, not the current one. `deck.rate()` is 0 while paused — it
-  // is the transport vector's rate, and a paused transport genuinely advances
-  // at zero — so comparing buttons against it left NONE of them selected
-  // whenever the deck was not rolling, which is exactly when someone is looking
-  // at the row deciding what to press. Remember the last rate that was real.
+  // `targetRate`, which is the library's own answer and was here all along:
+  // "the rate play() would resume at — WHAT A PAUSED UI DISPLAYS"
+  // (transport.mjs, beside setRate). `deck.rate()` is 0 while paused, because a
+  // paused transport genuinely advances at zero, so comparing buttons against
+  // it selected none of them exactly when someone is reading the row deciding
+  // what to press — and worse, pressing one changed nothing visible, since
+  // setRate on a paused deck arms the rate and stays paused. An earlier fix
+  // here tracked its own "last real rate", which reinvented targetRate and got
+  // it wrong: it only ever updated while rolling.
   function syncRates() {
-    const live = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
-    if (live > 0) armedRate = live;
+    const armed = deck.targetRate?.() ?? (typeof deck.rate === 'function' ? deck.rate() : deck.rate);
     for (const b of rates.querySelectorAll('button')) {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === armedRate));
+      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === armed));
     }
   }
 

@@ -33,11 +33,8 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
-  import { createDeck, workerTickHost } from '/timeline/transport.mjs';
-  import {
-    scoreDoc, quotation, refDeck, partItems, partRangeMs, loadScoreDoc,
-    scoreDocToJSON, scoreDocToJSONL,
-  } from '/timeline/score.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { scoreDoc, quotation, scoreDocToJSONL } from '/timeline/score.mjs';
   import { csoundPart, compileCsound, tempoMap } from '/timeline/csound.mjs';
 
   // A WRITTEN SCORE, MADE SEEKABLE — demo/notes/uuu-positron.md §3, on the
@@ -52,13 +49,28 @@
   //   · `m`/`n` is a repeat, and a repeat is a REFERENCE. It compiles to a use
   //     in the document, not to four more lines of notes.
   //
+  // THE DOCUMENT AND THE DECK ARE DIFFERENT THINGS, and this page is where the
+  // difference bites. plan-timeline C10: the timeline is a TRACE format, never
+  // an AUTHORING one — a score is a program, the timeline is what a performance
+  // of it leaves behind. So the document keeps the repeat as ONE use, and the
+  // deck is built from the EXPANDED compile with every note at its real time.
+  //
+  // It has to be. Under a changing tempo "that passage again" is not the same
+  // passage in time: the second pass here spans 4.75 beats of a ramp and comes
+  // out 578 ms longer than the first. Playing it as a quotation at rate 1
+  // replays the FIRST pass's millisecond spacing, shifted — which is what this
+  // page did until it was measured against `compileCsound(expand: true)`, and
+  // the last note landed 578 ms early. A single `rate` on the quotation cannot
+  // fix that either: a scalar is a constant speed and the tempo is moving
+  // inside the span, so it would match the ends and drift through the middle.
+  //
   // And the seek is the claim neither 04 nor anything else here makes: a score
   // file cannot answer "what is in force at bar 9" — it carries events, not
   // state. `deck.reduceAt(kind, pos)` answers it at any position.
 
   const DEFAULT_SCORE = [
     '; a fragment in the shape vClick scores are written in',
-    't 0 120  16 72          ; a real accelerando: 120 bpm easing to 72 by beat 16',
+    't 0 120  4.75 120  9.5 72   ; steady through part 1, then eases to 72 across part 2',
     '',
     'm theme',
     'i 1 0    0.5  8000 440',
@@ -88,10 +100,11 @@
 
   d.how(
     `Csound counts in beats, not seconds, and a tempo that changes makes the ` +
-    `two come apart — evenly numbered beats, unevenly spaced in time. The grey ` +
-    `line is the tempo the score asks for. Edit the score and everything below ` +
-    `recompiles; drop the playhead anywhere and the count of what has already ` +
-    `sounded is exact, which a file of notes on its own cannot tell you.`,
+    `two come apart — evenly numbered beats, unevenly spaced in time. Part 2 ` +
+    `is part 1 again, the same seven lines, played slower because it falls ` +
+    `under the slowing tempo: same music, wider on the timeline. Edit the ` +
+    `score and everything recompiles; drop the playhead anywhere and the count ` +
+    `of what has sounded is exact, which a file of notes cannot tell you.`,
   );
 
   // ── ink: one hue per part, the same in the strip and in the document ─────
@@ -99,10 +112,10 @@
   const DERIVED = '#6f7d94';        // 02 and 03's slate: shown, never measured
 
   const parent = createDeck({ items: [], adapters: {}, range: [0, 1000] });
-  const boundaryHost = workerTickHost();
 
   let doc = null, part = null, tm = null, compiled = null, structural = null;
-  let child = null, nest = null, loaded = null;
+  // the TRACE: every note of the expanded compile, at the time it really sounds
+  let traceItems = [];
   let LINES = [], lineEls = [], lineOfRow = new Map(), lineOfUse = new Map();
   const plays = new Map();
   let sounded = 0, ctx = null, soundAsserted = false;
@@ -139,21 +152,18 @@
     lanes: [
       { id: 'deck-span', kind: 'deck-span', label: 'part', height: 46, barPad: 7,
         as: 'spans', stack: false, barGap: 3, terse: true, color: INK.on,
+        // Each use measured THROUGH THE TEMPO MAP, so a part that falls under
+        // the ramp draws wider than the one that does not — which is the whole
+        // point and used to be invisible, because both were drawn from the
+        // same un-stretched material.
         rows: () => {
-          if (!nest) return [];
-          const out = [];
-          for (const sp of nest.spans()) {
-            const n = sp.iterations || 1;
-            for (let i = 0; i < n; i++) {
-              const from = nest.iterationAt(sp.id, i);
-              const to = nest.iterationAt(sp.id, i + 1);
-              const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.c1 - sp.c0));
-              if (!Number.isFinite(from) || !(end > from)) continue;
-              out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
-                         payload: { durMs: end - from, use: sp.id, repeat: !!sp.quotation?.meta?.repeat } });
-            }
-          }
-          return out;
+          if (!doc || !tm) return [];
+          return doc.uses.map((u) => {
+            const b0 = Number(u.at), b1 = b0 + (Number(u.out) - Number(u.in));
+            const from = tm.msAt(b0), to = tm.msAt(b1);
+            return { at: from, id: u.id, kind: 'deck-span',
+                     payload: { durMs: to - from, use: u.id, beats: b1 - b0 } };
+          });
         },
         labelOf: (s, { bw } = {}) => {
           const id = s.row?.payload?.use || '';
@@ -162,35 +172,21 @@
         describeRow: (r) => {
           const p = r.payload || {};
           const line = lineOfUse.get(p.use);
-          return [String(p.use), line === undefined ? 'a use' : `line ${line}`];
+          return [`${p.use} · ${Math.round(p.durMs)} ms`,
+                  line === undefined ? 'a use' : `line ${line}`];
         } },
       { id: 'rows', kind: 'note', label: 'event', height: 42, width: 2, as: 'ticks',
         color: INK.off, terse: true,
-        rows: () => {
-          if (!nest || !doc) return [];
-          const out = [];
-          const items = partItems(doc, 'theme', { tempoMap });
-          for (const sp of nest.spans()) {
-            const n = sp.iterations || 1;
-            for (let i = 0; i < n; i++) {
-              const base = nest.iterationAt(sp.id, i);
-              if (!Number.isFinite(base)) continue;
-              for (const it of items) {
-                if (it.at < sp.c0 || it.at >= sp.c1) continue;
-                out.push({ at: base + (it.at - sp.c0) / (sp.rate || 1),
-                           id: `${sp.id}#${i}:${it.id}`, kind: 'note',
-                           payload: { row: it.payload.row } });
-              }
-            }
-          }
-          return out;
-        },
+        // the notes the deck will actually fire, at the times it will fire them
+        rows: () => traceItems.map((it) => ({ at: it.at, id: it.id, kind: 'note',
+                                              payload: it.payload })),
         colorOfRow: (r) => (plays.get(r.payload?.row) ? INK.on : INK.off),
         describeRow: (r) => {
-          const row = r.payload?.row;
-          const line = lineOfRow.get(row);
-          const n = plays.get(row) || 0;
-          return [`line ${line}`, n ? `played ${n}x` : 'not played yet'];
+          const p = r.payload || {};
+          const line = lineOfRow.get(p.row);
+          const n = plays.get(p.row) || 0;
+          return [`line ${line} · beat ${Math.round(p.beat * 100) / 100}`,
+                  n ? `played ${n}x` : 'not played yet'];
         } },
       // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
       // rows to draw it is deriving a picture, not observing one — so it takes
@@ -231,6 +227,21 @@
     fading.set(i, setTimeout(() => { setState(i, 'played'); fading.delete(i); }, 450));
   }
 
+  /** A use line lights because a note INSIDE it fired, not because a timer
+   *  noticed the playhead was in range. It stays lit until a different use
+   *  takes over, since a use lasts as long as its notes do. */
+  let litUse = null;
+  function lightUse(useId) {
+    if (useId === undefined || useId === litUse) return;
+    if (litUse !== undefined && litUse !== null) {
+      const prev = lineOfUse.get(litUse);
+      if (prev !== undefined) setState(prev, 'played');
+    }
+    litUse = useId;
+    const i = lineOfUse.get(useId);
+    if (i !== undefined) setState(i, 'now');
+  }
+
   /** One short tone per row, so a seek is audible as well as assertable. */
   function voice(p) {
     if (!ctx) return;
@@ -261,6 +272,7 @@
     actuate(payload) {
       plays.set(payload.row, (plays.get(payload.row) || 0) + 1);
       lightRow(payload.row);
+      lightUse(payload.use);
       voice(payload.p);
       view.strip.invalidate();
     },
@@ -270,6 +282,11 @@
     reduce: (rows) => ({ count: rows.length }),
     assertState: (s) => s,
   };
+
+  // one deck, one adapter, registered once. Registering bumps the scheduler's
+  // adapter generation, which is what lets the transport bar find this deck's
+  // rate lattice — it is built before any of this exists.
+  parent.sched.registerAdapter('note', noteAdapter);
 
   /**
    * CSOUND'S m/n INTO THE CONTAINER'S `uses`.
@@ -285,26 +302,25 @@
     let cursor = 0, at = 0, i = 0;
     for (const r of [...cp.repeats].sort((a, b) => a.atBeat - b.atBeat)) {
       if (r.atBeat > cursor) {
-        uses.push(quotation({ id: `u${++i}`, ref: 'theme', at, in: cursor, out: r.atBeat }));
+        uses.push(quotation({ id: `part${++i}`, ref: 'theme', at, in: cursor, out: r.atBeat }));
         at += r.atBeat - cursor;
         cursor = r.atBeat;
       }
       const span = r.outBeat - r.inBeat;
       if (span > 0) {
-        uses.push(quotation({ id: `${r.name}${++i}`, ref: 'theme', at, in: r.inBeat, out: r.outBeat }));
+        uses.push(quotation({ id: `part${++i}`, ref: 'theme', at, in: r.inBeat, out: r.outBeat }));
         at += span;
       }
     }
-    if (lastBeat > cursor) uses.push(quotation({ id: `u${++i}`, ref: 'theme', at, in: cursor, out: lastBeat }));
+    if (lastBeat > cursor) uses.push(quotation({ id: `part${++i}`, ref: 'theme', at, in: cursor, out: lastBeat }));
     return uses;
   }
 
   function teardown() {
-    if (nest) { nest.dispose(); nest = null; }
-    if (child) { child.dispose(); child = null; }
     for (const t of fading.values()) clearTimeout(t);
     fading.clear();
     plays.clear();
+    litUse = null;
   }
 
   /**
@@ -355,22 +371,34 @@
       return row;
     });
 
-    child = createDeck({
-      items: partItems(doc, 'theme', { tempoMap }),
-      adapters: { note: noteAdapter },
-      range: partRangeMs(doc, 'theme', { tempoMap }),
-    });
-    refDeck(child, 'theme');
+    // ── THE TRACE. Every note the expanded compile produces, at the time the
+    // tempo map puts it. A repeat under a ramp is genuinely different material
+    // in time, which is why Csound expands it and why quoting the first pass at
+    // rate 1 was wrong by 578 ms at the end.
+    //
+    // The join back to the document is the SOURCE LINE: an expanded note keeps
+    // the line it was written on, so the second pass lights the same seven
+    // lines the first one did. Expanding for playback is what preserves the
+    // one-line repeat, not what breaks it.
+    const rowIdByLine = new Map(cp.part.rows.map((r) => [r.line, r.id]));
+    const useSpans = doc.uses.map((u) => ({
+      id: u.id, from: Number(u.at), to: Number(u.at) + (Number(u.out) - Number(u.in)),
+    }));
+    const useAtBeat = (b) => {
+      const hit = useSpans.find((u) => b >= u.from - 1e-9 && b < u.to - 1e-9);
+      return (hit || useSpans[useSpans.length - 1] || {}).id;
+    };
+
+    parent.sched.clear();
+    traceItems = exp.items.map((it, i) => ({
+      at: it.at, kind: 'note', id: `t${i + 1}`,
+      payload: { row: rowIdByLine.get(it.payload.line), use: useAtBeat(it.payload.beat),
+                 p: it.payload.p, beat: it.payload.beat },
+    }));
+    for (const it of traceItems) parent.schedule(it);
 
     const endBeat = Math.max(...doc.uses.map((u) => Number(u.at) + (Number(u.out) - Number(u.in))));
     parent.setRange([0, Math.ceil(tm.msAt(endBeat) + 300)]);
-
-    loaded = loadScoreDoc(doc, () => child, { parent, tempoMap, tickHost: boundaryHost });
-    nest = loaded.nest;
-    nest.onPresence(({ span, present }) => {
-      const line = lineOfUse.get(span);
-      if (line !== undefined) setState(line, present ? 'now' : 'played');
-    });
 
     // THE BEND, in closed form against the shortcut. Tempo linear in beat gives
     // dt = (60/k)·ln(m1/m0); averaging the tempo gives a straight line. The
@@ -391,7 +419,9 @@
     }
     const partLane = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (partLane) partLane.subLabel = [`${doc.uses.length} of them,`,
-      `${structural.repeats.length} from a repeat`];
+      structural.repeats.length
+        ? `${structural.repeats.length} a repeat, played slower`
+        : 'none a repeat'];
     const eventLane = view.strip.lanes().find((l) => l.id === 'rows');
     if (eventLane) eventLane.subLabel = [`${part.rows.length} written,`, 'each one a line below'];
 
@@ -415,10 +445,10 @@
   });
 
   setInterval(() => {
-    if (!child || !tm) return;
-    const pos = child.position();
+    if (!tm || !traceItems.length) return;
+    const pos = parent.position();
     d.set('beat', Math.round(tm.beatAtMs(pos) * 100) / 100);
-    const fold = child.reduceAt('note', pos);
+    const fold = parent.reduceAt('note', pos);
     d.set('fold', fold && Number.isFinite(fold.count) ? fold.count : '—');
   }, 200);
 
@@ -458,6 +488,31 @@
       && part.rows.length === structural.items.length,
     `${structural.repeats.length} repeat, ${doc.uses.length} uses, ${part.rows.length} rows written`);
 
+  // THE GUARD FOR THE BUG THIS PAGE SHIPPED WITH. Every note has to be
+  // scheduled where the tempo map puts it — not where the same material landed
+  // on its first pass. Quoting the first pass at rate 1 satisfies "the repeat
+  // is one use" and every structural check, and still plays the second pass
+  // 578 ms early. This compares the SCHEDULED time of every note against the
+  // map, and reports the stretch so a reader sees what was at stake.
+  {
+    let worst = 0;
+    for (const t of traceItems) worst = Math.max(worst, Math.abs(t.at - tm.msAt(t.payload.beat)));
+    // where the last note would land if the repeat merely replayed the first
+    // pass's spacing, shifted — the wrong answer, quantified
+    const late = traceItems[traceItems.length - 1];
+    const firstUse = doc.uses[0] && doc.uses[0].id;
+    const firstPass = new Map();
+    for (const t of traceItems) if (t.payload.use === firstUse && !firstPass.has(t.payload.row)) firstPass.set(t.payload.row, t.at);
+    const lateUse = doc.uses.find((u) => u.id === late.payload.use);
+    const naive = lateUse && firstPass.has(late.payload.row)
+      ? tm.msAt(Number(lateUse.at)) + firstPass.get(late.payload.row) - tm.msAt(Number(doc.uses[0].at))
+      : null;
+    const stretch = naive === null ? null : Math.round(late.at - naive);
+    d.assert('every note is scheduled where the tempo map puts it', worst < 2,
+      `worst ${worst.toFixed(2)} ms`
+      + (stretch === null ? '' : ` · the repeat is stretched ${stretch} ms, not merely moved`));
+  }
+
   d.assert('the deck spans the score', parent.range[1] > 0
     && Math.abs(parent.range[1] - compiled.durationMs) < 1500,
     `${parent.range[1]} vs ${Math.round(compiled.durationMs)} ms`);
@@ -465,14 +520,14 @@
   // THE FOLD, either side of every note — the same probe 15 seek runs against a
   // recording, run here against a written score.
   {
-    const items = partItems(doc, 'theme', { tempoMap });
+    const items = traceItems;
     let wrong = 0, probes = 0;
     for (const it of items) {
       for (const at of [it.at - 1, it.at, it.at + 1]) {
         if (at < 0) continue;
         probes++;
         const want = items.filter((x) => x.at <= at).length;
-        const got = child.reduceAt('note', at);
+        const got = parent.reduceAt('note', at);
         if (!got || got.count !== want) wrong++;
       }
     }
@@ -483,13 +538,15 @@
   // A seek that lands inside the repeat: the position the score cannot describe.
   {
     const rep = structural.repeats[0];
-    const use = rep && doc.uses.find((u) => u.id.startsWith(rep.name));
+    const use = rep && [...doc.uses]
+      .filter((u) => Math.abs(Number(u.in) - rep.inBeat) < 1e-9
+                  && Math.abs(Number(u.out) - rep.outBeat) < 1e-9)
+      .sort((a, b) => Number(b.at) - Number(a.at))[0];
     const mid = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2) : null;
     if (mid !== null) parent.seek(mid);
-    const pos = child.position();
-    const items = partItems(doc, 'theme', { tempoMap });
-    const want = items.filter((x) => x.at <= pos).length;
-    const got = child.reduceAt('note', pos);
+    const pos = parent.position();
+    const want = traceItems.filter((x) => x.at <= pos).length;
+    const got = parent.reduceAt('note', pos);
     d.assert('a seek into the repeat folds correctly', !!got && got.count === want,
       `at ${Math.round(pos)} ms, fold ${got && got.count} of ${want}`);
   }
