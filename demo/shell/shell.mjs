@@ -9,13 +9,12 @@ export const BUILD = 'dev';
 // Everything it shows a human it has already published for a CDP script on
 // window.__demo — that is the point: one page, both audiences.
 //
-//   const d = mount({ n:'01', name:'transport', what:'…', readout:{drift:'ms'} });
+//   const d = mount({ name:'transport', what:'…', readout:{drift:'ms'} });
 //   d.set('drift', 0.4);  d.log('seeked');  d.ready();
 
 const LOG_CAP = 400;
 
 export function mount({
-  n = '--',
   name = 'demo',
   what = '',
   readout = {},          // key -> unit string ('ms', 's', '' …)
@@ -23,13 +22,13 @@ export function mount({
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
-  document.title = `POSITRON · ${n} ${name}`;
+  document.title = `POSITRON · ${name}`;
   favicon();
 
   const head = el('div', 'd-head');
   if (index) head.append(el('a', 'd-back', '← demos', { href: index }));
   const title = el('div', 'd-title');
-  title.append(el('span', 'd-n', n), el('h1', 'd-name', name));
+  title.append(el('h1', 'd-name', name));
   head.append(title);
   if (what) head.append(el('p', 'd-what', what));
 
@@ -77,7 +76,7 @@ export function mount({
 
   // ── the machine contract ────────────────────────────────────────────────
   const api = {
-    n, name,
+    name,
     ready: false,
     failed: null,
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  canvas { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
+  .pill { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+          border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
+  .pill[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
+</style>
+
+<script type="module">
+  import { mount, guard, el, createShipper } from '/shell/shell.mjs';
+  import { startMoq, MOQ_RELAY, moqSupport } from '/shell/moq.mjs';
+
+  const q = new URLSearchParams(location.search);
+  // loopback publishes AND subscribes one namespace, so a single device measures
+  // the whole path and both ends share one clock — the delta is exact, not an
+  // estimate. pub/watch split the same leg across two devices.
+  const role = q.get('role') || 'loopback';
+  const ns = q.get('ns') || `positron-08-${Math.random().toString(36).slice(2, 8)}`;
+
+  const d = mount({
+    name: 'moq',
+    what: 'Browser to browser over MoQ. The clock is burned into the pixels, so the latency is read back off the picture.',
+    readout: { latency: 'ms', p95: 'ms', fps: '', frames: '', version: '' },
+    controls: [
+      { id: 'go', label: 'Connect and publish', primary: true },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+
+  const pill = el('span', 'pill', 'relay: idle');
+  pill.dataset.on = '0';
+  d.head.append(pill);
+
+  const out = el('canvas');
+  d.el.append(out);
+
+  // Checked BEFORE the button does anything. Safari has no WebTransport and
+  // the relay refuses WebSocket, so there is nothing to attempt — say that
+  // instead of showing a black rectangle and a raw library error.
+  const ship = createShipper();
+  const support = moqSupport();
+  // ?transport=force bypasses @moq/net's Safari user-agent block. For MEASURING
+  // WebKit bug 319818 (flow control never refills; deadlocks after ~16 MiB or
+  // ~7,600 streams), not for shipping — see demo/shell/moq.mjs.
+  const forceTransport = new URLSearchParams(location.search).get('transport') === 'force';
+
+  let leg = null, lastDecoded = 0;
+
+  d.on('go', async () => {
+    if (leg) return;
+    ship(`MOQ-SUPPORT ${JSON.stringify(support)}`);
+    if (!support.ok && !forceTransport) {
+      d.log(`MoQ needs WebTransport — ${support.why}. Try Chrome or Edge.`, 'bad');
+      return;
+    }
+    d.log(`relay ${new URL(MOQ_RELAY).host} — role ${role}, namespace ${ns}`);
+    leg = await startMoq({ out, ns, role, forceTransport, log: (m, k) => d.log(m, k) });
+    pill.dataset.on = '1';
+    pill.textContent = `relay: ${leg.version}`;
+    d.set('version', leg.version);
+
+    setInterval(() => {
+      const s = leg.stats;
+      d.set('frames', s.decoded);
+      d.set('fps', s.decoded - lastDecoded);
+      lastDecoded = s.decoded;
+      const p50 = leg.pct(0.5), p95 = leg.pct(0.95);
+      if (p50 != null) d.set('latency', p50, p50 < 100 ? 'ok' : p50 < 400 ? '' : 'bad');
+      if (p95 != null) d.set('p95', p95);
+    }, 1000);
+  });
+
+  d.on('check', () => {
+    // On a browser without WebTransport the honest assertion is that the page
+    // DETECTED that, not that a connection exists.
+    if (!support.ok) {
+      d.assert('correctly reports that MoQ cannot run here', !!support.why, support.why);
+      d.assert('no transport was attempted', !leg);
+      return;
+    }
+    d.assert('connected to the relay', !!leg);
+    if (!leg) return;
+    const s = leg.stats;
+    d.assert('negotiated an IETF MoQT version', /moq-transport-1\d/.test(String(leg.version)), String(leg.version));
+    if (role !== 'watch') {
+      d.assert('broadcast published', s.published);
+      d.assert('no encoder errors', s.encErrs === 0, String(s.encErrs));
+    }
+    if (role !== 'pub') {
+      d.assert('catalog round-tripped through the relay', !!s.catalog, s.catalog ? 'yes' : 'never arrived');
+      d.assert('frames arrived over the wire', s.wireFrames > 0, `${s.wireFrames} frame(s)`);
+      d.assert('frames decoded', s.decoded > 0, `${s.decoded} decoded`);
+      d.assert('no decoder errors', s.decErrs === 0, String(s.decErrs));
+    }
+    if (role === 'loopback') {
+      d.assert('burned clock read back from the picture', s.samples > 0,
+        `${s.samples} clean row(s), ${s.badRows} unreadable`);
+      if (s.samples) {
+        // rig/moq measured p50 26.2 / p95 42.4 ms on a desktop. This asserts an
+        // ENVELOPE wide enough for a phone or a loaded CI box, not that figure —
+        // the claim being tested is "milliseconds, not seconds".
+        d.assert('glass-to-glass in milliseconds, not seconds', leg.pct(0.5) < 2000,
+          `p50 ${leg.pct(0.5)}ms, p95 ${leg.pct(0.95)}ms, n=${s.samples}`);
+      }
+    }
+  });
+
+  if (!support.ok) d.log(`${support.why} — this demo needs Chrome or Edge`, 'bad');
+  d.log(role === 'loopback'
+    ? 'loopback: one page publishes and subscribes the same namespace, so one clock times the whole path'
+    : `role ${role} — pair it with ?role=${role === 'pub' ? 'watch' : 'pub'}&ns=${ns}`);
+  d.ready();
+</script>
+</html>

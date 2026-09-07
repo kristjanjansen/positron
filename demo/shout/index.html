@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  audio { width: 100%; display: block; margin: 0 0 10px; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 54px; margin: 0 0 10px;
+          border: 1px solid var(--line); border-radius: 3px; padding: 5px; background: #0d1117; }
+  .bars i { flex: 1; background: var(--hi); min-height: 1px; border-radius: 1px; opacity: .85; }
+  .who { font: 500 10.5px/1.5 var(--mono); color: var(--dim2); margin: 0 0 8px; word-break: break-all; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+
+  // SHOUTcast/Icecast is the oldest live protocol still in daily use: one HTTP
+  // response that never ends, MP3 frames as fast as the wall clock, no
+  // manifest, no segments, no seek. This demo asks what Cloudflare costs in
+  // front of one — and what it buys.
+  //
+  // What it buys is the whole page below. The origin (Icecast 2.4.4) sends no
+  // `access-control-allow-origin`, so a browser can put it in an <audio> tag
+  // and NOTHING else: no fetch, no byte counting, no WebAudio graph, no reading
+  // `icy-name`. Every number on this page is measurable only because the relay
+  // re-serves the same bytes with CORS on them. The audio is identical; the
+  // observability is entirely the relay's doing.
+  //
+  // What it costs is measured in rig/shout/measure.mjs, not here, and for a
+  // reason: the honest question is "how much later does the SAME BYTE arrive
+  // through Cloudflare", which needs both paths open at once — and the direct
+  // path is exactly the one a browser may not read. The page measures the relay
+  // it can see; the rig measures the difference it cannot.
+
+  const q = new URLSearchParams(location.search);
+  const BASE = q.get('base') || 'https://shout.positron.studio';
+  const STATION = q.get('station') || 'raadiotallinn';
+  const NOMINAL_KBPS = 128;
+  const MEASURE_MS = 7000;
+  const UNDERRUN_MS = 1000;
+
+  const d = mount({
+    name: 'shout',
+    what: 'An Icecast stream through Cloudflare. The relay adds CORS, which is what makes every number here readable.',
+    readout: { station: '', ttfb: 'ms', kbps: '', ahead: 's', gap95: 'ms', level: '' },
+    // The measurement is 9 s long, so it lives behind control 0 — the only
+    // control the harness gives settleMs to, and the only place a wait does not
+    // cost the checks their asserts.
+    controls: [
+      { id: 'go', label: 'Play and measure 7 s', primary: true },
+      { id: 'check', label: 'Run the checks' },
+    ],
+  });
+  guard(d);
+  d.set('station', STATION);
+
+  const who = el('div', 'who', `${BASE}/${STATION}.mp3`);
+  d.el.append(who);
+
+  // crossOrigin is the whole point: it makes the media load a CORS load, which
+  // the origin would refuse and the relay allows — and only a CORS-loaded
+  // element may be wired into a WebAudio graph.
+  const audio = el('audio', '', null, { controls: '', preload: 'none' });
+  audio.crossOrigin = 'anonymous';
+  d.el.append(audio);
+
+  const bars = el('div', 'bars');
+  const BAR_N = 48;
+  for (let i = 0; i < BAR_N; i++) bars.append(el('i'));
+  d.el.append(bars);
+
+  let ctx = null, analyser = null, srcNode = null, rmsPeak = 0, painting = null;
+
+  function listen() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    srcNode = ctx.createMediaElementSource(audio);
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    srcNode.connect(analyser);
+    analyser.connect(ctx.destination);      // still audible; the tap is passive
+    const freq = new Uint8Array(analyser.frequencyBinCount);
+    const time = new Uint8Array(analyser.fftSize);
+    painting = setInterval(() => {
+      analyser.getByteFrequencyData(freq);
+      analyser.getByteTimeDomainData(time);
+      let sum = 0;
+      for (const v of time) { const c = (v - 128) / 128; sum += c * c; }
+      const rms = Math.sqrt(sum / time.length);
+      rmsPeak = Math.max(rmsPeak, rms);
+      d.set('level', Math.round(rms * 1000) / 1000, rms > 0.001 ? 'ok' : '');
+      const step = Math.floor(freq.length / BAR_N) || 1;
+      [...bars.children].forEach((b, i) => {
+        b.style.height = `${Math.max(1, (freq[i * step] / 255) * 100)}%`;
+      });
+    }, 60);
+  }
+
+  // ── the measurement, byte by byte ────────────────────────────────────────
+  // Same shape as rig/shout/measure.mjs so the two are comparable: time to
+  // first byte, time to first audio byte, the burst Icecast hands a new
+  // listener, and the gaps between chunks — a gap past a listener's jitter
+  // buffer is a stall, and a mean bitrate hides them completely.
+  let m = null;
+
+  async function measure() {
+    const t0 = performance.now();
+    const ctrl = new AbortController();
+    const stop = setTimeout(() => ctrl.abort(), MEASURE_MS);
+    const rec = { ttfb: null, first: null, bytes: 0, chunks: 0, gaps: [], marks: [], headers: {}, status: 0, error: null };
+    try {
+      const res = await fetch(`${BASE}/${STATION}.mp3`, { signal: ctrl.signal, cache: 'no-store' });
+      rec.ttfb = performance.now() - t0;
+      rec.status = res.status;
+      for (const k of ['icy-name', 'icy-br', 'icy-metaint', 'content-type', 'x-shout-ttfb']) {
+        const v = res.headers.get(k);
+        if (v) rec.headers[k] = v;
+      }
+      const reader = res.body.getReader();
+      let last = performance.now();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const now = performance.now();
+        if (rec.first === null) rec.first = now - t0; else rec.gaps.push(now - last);
+        last = now;
+        rec.bytes += value.byteLength;
+        rec.chunks++;
+        rec.marks.push([rec.bytes, now - t0]);
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') rec.error = `${e.name}: ${e.message}`;
+    } finally {
+      clearTimeout(stop);
+    }
+    const secs = (performance.now() - t0) / 1000;
+    rec.kbps = (rec.bytes * 8) / 1000 / secs;
+    // Icecast sends FASTER than realtime on connect to prime the buffer, so a
+    // reading above nominal is the burst, not a fast link.
+    rec.aheadS = rec.bytes / ((NOMINAL_KBPS * 1000) / 8) - secs;
+    // MEAN BITRATE OVER A SHORT WINDOW IS THE BURST, NOT THE STREAM. Seven
+    // seconds of a 128 kbps station read 195 kbps here purely because ~64 KiB
+    // of it arrived at once on connect; the rig's 30 s window read 144 for the
+    // same reason, smaller. So the rate worth asserting on is measured AFTER
+    // the burst has landed — everything from 40 % of the window onwards.
+    const from = rec.marks.find((mk) => mk[1] >= (rec.first ?? 0) + (secs * 1000 - (rec.first ?? 0)) * 0.4);
+    const end = rec.marks.at(-1);
+    rec.steadyKbps = from && end && end[1] > from[1]
+      ? ((end[0] - from[0]) * 8) / 1000 / ((end[1] - from[1]) / 1000) : null;
+    const sorted = rec.gaps.slice().sort((a, b) => a - b);
+    rec.gap95 = sorted.length ? sorted[Math.floor(sorted.length * 0.95)] : null;
+    rec.underruns = rec.gaps.filter((g) => g > UNDERRUN_MS).length;
+    m = rec;
+
+    d.set('ttfb', Math.round(rec.ttfb ?? 0), rec.ttfb < 400 ? 'ok' : '');
+    d.set('kbps', Math.round(rec.steadyKbps ?? rec.kbps),
+      rec.steadyKbps != null && Math.abs(rec.steadyKbps - NOMINAL_KBPS) < NOMINAL_KBPS * 0.2 ? 'ok' : 'bad');
+    d.set('ahead', Math.round(rec.aheadS * 100) / 100);
+    d.set('gap95', Math.round(rec.gap95 ?? 0), rec.underruns ? 'bad' : 'ok');
+    d.log(`${Math.round(rec.bytes / 1024)} KiB in ${rec.chunks} chunks · ${Math.round(rec.steadyKbps ?? 0)} kbps steady `
+      + `(${Math.round(rec.kbps)} kbps counting the burst) · ttfb ${Math.round(rec.ttfb)} ms `
+      + `(relay's own upstream ttfb ${rec.headers['x-shout-ttfb'] ?? '?'} ms)`, 'hi');
+    if (rec.headers['icy-name']) d.log(`icy-name "${rec.headers['icy-name']}" — readable only because the relay exposes it`);
+    if (rec.error) d.log(rec.error, 'bad');
+    return rec;
+  }
+
+  d.on('go', async () => {
+    audio.src = `${BASE}/${STATION}.mp3`;
+    listen();
+    ctx.resume().catch(() => {});
+    // Play is NOT awaited. Playback and the measurement are two separate
+    // connections to the same station on purpose — reading the element's own
+    // bytes is not possible, and a measurement that stole the player's stream
+    // would measure itself — and awaiting the element first spent five seconds
+    // buffering before the measurement even opened, which pushed the whole
+    // thing past the harness's settle and left the checks asserting on nothing.
+    audio.play().catch((e) => d.log(`play refused (${e.name})`, 'bad'));
+    await measure();
+  });
+
+  d.on('check', () => {
+    d.assert('the relay answered', m?.status === 200, `HTTP ${m?.status ?? '—'}`);
+    // The origin sends no ACAO at all, so a body the page could READ is itself
+    // the proof that the relay's CORS is doing its job.
+    d.assert('the page could read the bytes (CORS)', (m?.bytes ?? 0) > 0,
+      `${Math.round((m?.bytes ?? 0) / 1024)} KiB`);
+    d.assert('icy metadata survives the relay', !!m?.headers['icy-name'],
+      m?.headers['icy-name'] || 'absent');
+    d.assert('steady bitrate is the station\'s', m?.steadyKbps != null
+      && Math.abs(m.steadyKbps - NOMINAL_KBPS) < NOMINAL_KBPS * 0.2,
+      `${Math.round(m?.steadyKbps ?? 0)} vs ${NOMINAL_KBPS} kbps nominal`);
+    // The burst is real audio, handed over faster than realtime, and it is what
+    // a listener's buffer is made of. Bounded on both sides: none of it means
+    // the relay is starving the client, an implausible amount of it means the
+    // window is being measured wrong.
+    d.assert('icecast burst is present and bounded', (m?.aheadS ?? -1) > 0.5 && m.aheadS < 12,
+      `${(m?.aheadS ?? 0).toFixed(2)} s of audio beyond realtime`);
+    d.assert('no gap past a 1 s jitter buffer', (m?.underruns ?? 1) === 0,
+      `${m?.underruns ?? '—'} over ${UNDERRUN_MS} ms, p95 ${Math.round(m?.gap95 ?? 0)} ms`);
+    d.assert('the element is playing', audio.currentTime > 0 && !audio.paused,
+      `t=${audio.currentTime.toFixed(2)}s paused=${audio.paused}`);
+    // Impossible against the origin: a media element without CORS cannot be
+    // connected to a WebAudio graph, and reads as digital silence if forced.
+    d.assert('WebAudio can see the audio', rmsPeak > 0.0005, `peak rms ${rmsPeak.toFixed(4)}`);
+  });
+
+  d.log(`relay ${BASE} · station ${STATION} — ?base= and ?station= override both`);
+  d.ready();
+</script>
+</html>

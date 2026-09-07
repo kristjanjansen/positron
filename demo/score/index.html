@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Twelve lines, and it HOLDS at twelve. The longest of the five scores is
+     exactly twelve lines, so the padding alone would have been coincidence —
+     a thirteenth would silently grow the block again and put the reflow back.
+     max-height is 12 lines of this exact font plus the padding. */
+  .sc { max-height: calc(12 * 1.75em + 22px); overflow-y: auto;
+        font: 400 11px/1.75 var(--mono); background: var(--card);
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0;
+        overflow-x: auto; margin: 0 0 8px; }
+  /* TWO CHANNELS, TWO FACTS, and they must not fight:
+       the LEFT BORDER carries which part a line belongs to — one hue per part,
+         the same hue that part's slices and events use in the strip above;
+       the TEXT carries whether it has played — dim, then bright, then lit.
+     Hue never means "played" and lightness never means "which part". */
+  /* an empty line still occupies one, so the block holds its height */
+  .sc-pad { color: transparent; }
+  .sc-l { display: block; white-space: pre; color: var(--dim2);
+          border-left: 3px solid transparent; padding: 0 12px 0 9px; }
+  .sc-l[data-state="played"] { color: var(--dim); }
+  .sc-l[data-state="now"]    { color: var(--fg);
+                               background: color-mix(in oklab, var(--hi) 10%, transparent); }
+  .sc-n { color: var(--dim2); }
+  .sc-l[data-state="now"] .sc-n { color: var(--fg); }
+  /* the selector: same "armed" treatment the transport bar gives its rate */
+  .d-controls button[aria-pressed="true"] {
+    color: var(--hi); border-color: var(--hi);
+    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
+  }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck, workerTickHost } from '/timeline/transport.mjs';
+  import {
+    scoreDoc, quotation, refDeck, partItems, partRangeMs, loadScoreDoc,
+    scoreDocToJSON, parseScoreDoc, scoreDocToJSONL, parseScoreDocJSONL,
+  } from '/timeline/score.mjs';
+  import { csoundPart, tempoMap } from '/timeline/csound.mjs';
+
+  // ── five documents, each adding exactly one idea to the one before ───────
+  const cs = (lines) => csoundPart(lines.join('\n'));
+  const tempoOf = (cp) => (cp.tempo.length ? cp.tempo : [[0, 60]]);
+
+  const SCORES = [
+    {
+      id: 'one', label: 'one note',
+      note: 'The least a score can be: one instruction, played once. No tempo, so a beat is a second.',
+      build() {
+        const cp = cs(['i 1 0 1 8000 440']);
+        return scoreDoc({ id: 'one-note', tempo: tempoOf(cp),
+          parts: { tune: cp.part },
+          uses: [quotation({ id: 'u1', ref: 'tune', at: 0, in: 0, out: 1 })] });
+      },
+    },
+    {
+      id: 'bar', label: 'a bar',
+      note: 'Four instructions and a tempo. At 120 the beats are half-seconds, so the same numbers mean different times.',
+      build() {
+        const cp = cs(['t 0 120',
+          'i 1 0 0.5 8000 440', 'i 1 1 0.5 8000 550',
+          'i 1 2 0.5 8000 660', 'i 1 3 0.5 8000 880']);
+        return scoreDoc({ id: 'a-bar', tempo: tempoOf(cp),
+          parts: { tune: cp.part },
+          uses: [quotation({ id: 'u1', ref: 'tune', at: 0, in: 0, out: 4 })] });
+      },
+    },
+    {
+      id: 'ramp', label: 'tempo ramp',
+      note: 'The tempo falls from 120 to 60 across eight beats. The beats are evenly numbered and the gaps get longer — that is why a score is compiled, not read.',
+      build() {
+        const cp = cs(['t 0 120 8 60',
+          ...Array.from({ length: 8 }, (_, i) => `i 1 ${i} 0.4 8000 ${440 + i * 55}`)]);
+        return scoreDoc({ id: 'tempo-ramp', tempo: tempoOf(cp),
+          parts: { tune: cp.part },
+          uses: [quotation({ id: 'u1', ref: 'tune', at: 0, in: 0, out: 8 })] });
+      },
+    },
+    {
+      id: 'loop', label: 'a loop',
+      note: 'One part, used twice — the second time it says "twice". Both passes light the SAME line below, because there is only one.',
+      build() {
+        const cp = cs(['t 0 120',
+          'i 1 0 0.5 8000 440', 'i 1 0.5 0.5 8000 550',
+          'i 1 1 0.5 8000 660', 'i 1 1.5 0.5 8000 550']);
+        return scoreDoc({ id: 'a-loop', tempo: tempoOf(cp),
+          parts: { tune: cp.part },
+          uses: [
+            quotation({ id: 'u1', ref: 'tune', at: 0, in: 0, out: 2 }),
+            quotation({ id: 'u2', ref: 'tune', at: 3, in: 0, out: 2, repeat: 2 }),
+          ] });
+      },
+    },
+    {
+      id: 'two', label: 'two languages',
+      note: 'A Csound part and a MIDI part in one document. The Csound rows keep their p-fields, the MIDI rows keep channel and velocity, and neither is translated into the other.',
+      build() {
+        const cp = cs(['t 0 120',
+          'i 1 0   1   8000 440', 'i 1 1   0.5 8000 550', 'i 1 1.5 0.5 8000 660',
+          'f 1 0 8192 10 1        ; an f-table carries no timeline row']);
+        // The MIDI part is DATA. Nothing is sent to a port — that needs a device
+        // and is a later phase. Its rows land on the timeline; they do not sound.
+        const midi = { lang: 'midi', rows: [
+          { id: 'm1', at: 0,   dur: 0.25, kind: 'note', payload: { ch: 0, note: 60, vel: 100 } },
+          { id: 'm2', at: 0.5, dur: 0.25, kind: 'note', payload: { ch: 0, note: 64, vel: 88 } },
+          { id: 'm3', at: 1,   dur: 0.25, kind: 'note', payload: { ch: 0, note: 67, vel: 96 } },
+        ] };
+        return scoreDoc({ id: 'two-languages', tempo: tempoOf(cp),
+          parts: { verse: cp.part, pulse: midi },
+          uses: [
+            quotation({ id: 'u1', ref: 'verse', at: 0, in: 0, out: 2 }),
+            quotation({ id: 'u2', ref: 'verse', at: 3, in: 0, out: 2, repeat: 2 }),
+            quotation({ id: 'u3', ref: 'pulse', at: 7, in: 0, out: 1.5 }),
+          ] });
+      },
+    },
+  ];
+
+  const DOCS = SCORES.map((s) => s.build());
+
+  const d = mount({
+    name: 'score',
+    what: 'One document format for scores written in different languages. Pick one and press play — the line that is sounding lights up.',
+    readout: { bytes: 'B', lines: '', rows: '', plays: '' },
+    // the numbers sit under the lane that owns them; this row would repeat them
+    // with less context. Still published for CDP.
+    showReadout: false,
+    controls: SCORES.map((s) => ({ id: s.id, label: s.label })),
+  });
+  guard(d);
+
+  d.how(
+    `A score written in one language cannot hold one written in another, so ` +
+    `this document agrees only on when a thing happens and how long it lasts, ` +
+    `and carries the rest exactly as written. Repeats stay repeats: a loop is ` +
+    `one line saying how many times, never the same line copied out.`,
+  );
+
+  // ── ink: one hue per part, used in three places so no legend is needed ───
+  // The strip's slices, the strip's events, and the score lines below all take
+  // the same hue for the same part. LIGHTNESS carries whether a thing has
+  // played; hue never does.
+  const INK = [
+    { on: '#ffd400', off: '#6b5a12' },
+    { on: '#7fb8e0', off: '#37526a' },
+    { on: '#c9a0ff', off: '#584a72' },
+  ];
+  let inkOf = {};                       // part name -> {on, off}
+  const DERIVED = '#6f7d94';            // 02 and 03's slate: shown, never measured
+
+  /** bpm at a beat, interpolated linearly IN BEAT exactly as Csound does */
+  function bpmAtBeat(points, beat) {
+    if (!points.length) return 60;
+    for (let i = 0; i < points.length; i++) {
+      const [b0, m0] = points[i], next = points[i + 1];
+      if (!next) return m0;
+      if (beat <= next[0]) {
+        const span = next[0] - b0;
+        return span <= 0 ? m0 : m0 + ((next[1] - m0) * (beat - b0)) / span;
+      }
+    }
+    return points[points.length - 1][1];
+  }
+
+  /** does the tempo actually go anywhere? a flat line is a constant, not a fact */
+  const tempoVaries = (points) => points.length > 1
+    && points.some(([, m]) => Math.abs(m - points[0][1]) > 1e-9);
+
+  // ── one parent, one boundary host, rebuilt contents ─────────────────────
+  // The parent deck and the transport bar outlive a score change; only the
+  // children, the nest and the drawing are rebuilt. A worker tick host per
+  // switch would be five workers by the time a reader reaches the end.
+  const parent = createDeck({ items: [], adapters: {}, range: [0, 1000] });
+  const boundaryHost = workerTickHost();
+
+  let doc = null, decks = {}, nest = null, loaded = null;
+  const SCORE_LINES = 12;          // the block never changes height
+  let LINES = [], lineEls = [], lineOfRow = new Map(), lineOfUse = new Map();
+  const plays = new Map();              // `${part}#${rowId}` -> times fired
+  let playCount = 0;
+
+  createTransportBar(d.el, parent, { scrub: false });
+
+  const pre = el('pre', 'sc');
+
+  const view = createStripView(d.el, parent, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    lanes: [
+      // one slice per pass, exactly as 03 draws a loop
+      { id: 'deck-span', kind: 'deck-span', label: 'part', height: 52, barPad: 8,
+        as: 'spans', stack: false, barGap: 3, terse: true,
+        rows: () => {
+          if (!nest) return [];
+          const out = [];
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const from = nest.iterationAt(sp.id, i);
+              const to = nest.iterationAt(sp.id, i + 1);
+              const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.c1 - sp.c0));
+              if (!Number.isFinite(from) || !(end > from)) continue;
+              out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
+                         payload: { durMs: end - from, pass: i + 1, of: n, use: sp.id,
+                                    part: partOfSpan(sp) } });
+            }
+          }
+          return out;
+        },
+        colorOf: (s) => (inkOf[s.row?.payload?.part] || INK[0]).on,
+        labelOf: (s, { bw } = {}) => {
+          const p = s.row?.payload || {};
+          const pass = p.of > 1 ? `${p.pass}/${p.of}` : '';
+          if (bw && bw < 84) return pass || String(p.part);
+          return [p.part, pass].filter(Boolean).join(' ');
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          const where = lineOfUse.get(p.use);
+          return p.of > 1
+            ? [`${p.part}, pass ${p.pass} of ${p.of}`, `every pass is line ${where}`]
+            : [`${p.part}, played once`, `line ${where}`];
+        } },
+      // where each part's own rows land inside each use
+      { id: 'rows', kind: 'note', label: 'event', height: 46, width: 2, as: 'ticks',
+        color: '#3b424e', terse: true,
+        rows: () => {
+          if (!nest || !doc) return [];
+          const out = [];
+          for (const sp of nest.spans()) {
+            const part = partOfSpan(sp);
+            const items = partItems(doc, part, { tempoMap });
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const base = nest.iterationAt(sp.id, i);
+              if (!Number.isFinite(base)) continue;
+              for (const it of items) {
+                if (it.at < sp.c0 || it.at >= sp.c1) continue;
+                out.push({ at: base + (it.at - sp.c0) / (sp.rate || 1),
+                           id: `${sp.id}#${i}:${it.id}`, kind: 'note',
+                           payload: { part, row: it.payload.row } });
+              }
+            }
+          }
+          return out;
+        },
+        // hue = which part · lightness = whether it has played
+        colorOfRow: (r) => {
+          const p = r.payload || {};
+          const ink = inkOf[p.part] || INK[0];
+          return plays.get(`${p.part}#${p.row}`) ? ink.on : ink.off;
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          const line = lineOfRow.get(`${p.part}#${p.row}`);
+          const n = plays.get(`${p.part}#${p.row}`) || 0;
+          return [`line ${line} · ${p.part}`, n ? `played ${n}x` : 'not played yet'];
+        } },
+      // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
+      // rows to draw it is deriving a picture, not observing one — so it takes
+      // the slate 02 and 03 use for "shown, never measured" and the gutter says
+      // so. REMOVED, not flattened, when the tempo does not vary: four of these
+      // five scores are flat, and a flat line is a constant dressed as a
+      // measurement — the defect the `missed` readout cell was deleted for.
+      { id: 'tempo', kind: 'note', label: 'tempo', height: 44, as: 'continuous',
+        color: DERIVED, terse: true, dots: false, show: false,
+        value: (p) => p.bpm,
+        rows: () => {
+          if (!doc) return [];
+          const pts = doc.tempo;
+          if (!tempoVaries(pts)) return [];
+          const tm = tempoMap(pts);
+          const [lo, hi] = parent.range;
+          const out = [];
+          for (let i = 0; i <= 120; i++) {
+            const ms = lo + ((hi - lo) * i) / 120;
+            out.push({ at: ms, id: `t${i}`, kind: 'note',
+                       payload: { bpm: bpmAtBeat(pts, tm.beatAtMs(ms)) } });
+          }
+          return out;
+        },
+        describeRow: (r) => [`${Math.round(r.payload?.bpm ?? 0)} bpm`, 'read off the score'] },
+    ],
+  });
+
+  d.el.append(pre);
+
+  /** which part a span quotes — the nest holds the deck, the doc holds the name */
+  function partOfSpan(sp) {
+    for (const [name, deck] of Object.entries(decks)) if (deck === sp.deck) return name;
+    return '?';
+  }
+
+  // ── highlighting, driven by the deck and never by a timer ───────────────
+  //
+  // THE BUG THIS REPLACES: one shared fade timer demoted every line that was
+  // 'now' — including the USE lines, which are not events and should stay lit
+  // for as long as the use is present. It guarded on `dataset.use`, which
+  // nothing ever set. So a use lit for 240 ms of a three-second span.
+  //
+  // Now each channel owns its own lines: `onPresence` owns the use lines and
+  // holds them for the whole span, and an event line fades on its own timer.
+  const fading = new Map();             // line index -> timeout id
+
+  function setState(i, state) {
+    const l = lineEls[i];
+    if (l) l.dataset.state = state;
+  }
+
+  function lightEvent(key) {
+    const i = lineOfRow.get(key);
+    if (i === undefined) return;
+    setState(i, 'now');
+    clearTimeout(fading.get(i));
+    fading.set(i, setTimeout(() => { setState(i, 'played'); fading.delete(i); }, 450));
+  }
+
+  function partAdapter(part) {
+    return {
+      caps: { rates: [0.25, 0.5, 1, 2], continuous: false, assertOnSeek: true },
+      actuate(payload) {
+        const key = `${part}#${payload.row}`;
+        plays.set(key, (plays.get(key) || 0) + 1);
+        playCount++;
+        d.set('plays', playCount);
+        lightEvent(key);
+        view.strip.invalidate();
+      },
+      reduce(rows) { return { count: rows.length }; },
+      assertState(state) { return state; },
+    };
+  }
+
+  // ── loading a score ─────────────────────────────────────────────────────
+  function teardown() {
+    if (nest) { nest.dispose(); nest = null; }
+    for (const deck of Object.values(decks)) deck.dispose();
+    decks = {};
+    for (const t of fading.values()) clearTimeout(t);
+    fading.clear();
+    plays.clear();
+    playCount = 0;
+  }
+
+  function load(index) {
+    parent.pause();
+    teardown();
+
+    doc = DOCS[index];
+    inkOf = {};
+    Object.keys(doc.parts).forEach((name, i) => { inkOf[name] = INK[i % INK.length]; });
+
+    // the score, one record per line, coloured by the part it belongs to
+    LINES = scoreDocToJSONL(doc).split('\n');
+    lineOfRow = new Map();
+    lineOfUse = new Map();
+    pre.replaceChildren();
+    lineEls = LINES.map((text, i) => {
+      const rec = JSON.parse(text);
+      const row = el('span', 'sc-l');
+      const part = rec.t === 'row' ? rec.part
+        : rec.t === 'part' ? rec.part
+        : rec.t === 'use' ? rec.ref : null;
+      if (part && inkOf[part]) row.style.borderLeftColor = inkOf[part].on;
+      if (rec.t === 'row') lineOfRow.set(`${rec.part}#${rec.id}`, i);
+      else if (rec.t === 'use' && rec.id) lineOfUse.set(rec.id, i);
+      row.append(el('span', 'sc-n', String(i).padStart(2, ' ') + '  '),
+                 document.createTextNode(text));
+      pre.append(row);
+      return row;
+    });
+    // A FIXED TWELVE LINES, padded when the score is shorter. The five scores
+    // run from one line to eleven, and letting the block grow and shrink moved
+    // the timeline up and down the page under the reader's cursor every time
+    // they picked a different one. Padding rather than scrolling, so a short
+    // score still reads as short — the empty lines are visibly empty.
+    for (let i = LINES.length; i < SCORE_LINES; i++) pre.append(el('span', 'sc-l sc-pad', ' '));
+
+    for (const name of Object.keys(doc.parts)) {
+      const deck = createDeck({
+        items: partItems(doc, name, { tempoMap }),
+        adapters: { note: partAdapter(name) },
+        range: partRangeMs(doc, name, { tempoMap }),
+      });
+      refDeck(deck, name);
+      decks[name] = deck;
+    }
+
+    const tm = tempoMap(doc.tempo);
+    const endBeat = Math.max(...doc.uses.map((u) => {
+      const span = (Number(u.out) - Number(u.in)) * (u.repeat || 1);
+      return Number(u.at) + span;
+    }));
+    parent.setRange([0, Math.ceil(tm.msAt(endBeat) + 400)]);
+
+    loaded = loadScoreDoc(doc, (name) => decks[name], {
+      parent, tempoMap, tickHost: boundaryHost,
+    });
+    nest = loaded.nest;
+
+    nest.onPresence(({ span, present, parentPos }) => {
+      const line = lineOfUse.get(span);
+      // the use line is owned HERE and by nothing else: lit while present,
+      // dimmed to its trail when the span ends
+      if (line !== undefined) setState(line, present ? 'now' : 'played');
+      d.log(`${span} ${present ? 'starts' : 'ends'} at ${(parentPos / 1000).toFixed(2)}s`,
+        present ? 'hi' : 'info');
+    });
+
+    const rowCount = Object.values(doc.parts).reduce((n, p) => n + p.rows.length, 0);
+    d.set('bytes', new TextEncoder().encode(scoreDocToJSON(doc)).length);
+    d.set('lines', LINES.length);
+    d.set('rows', rowCount);
+    d.set('plays', 0);
+
+    const partLane = view.strip.lanes().find((l) => l.id === 'deck-span');
+    if (partLane) partLane.subLabel = [
+      `${doc.uses.length} of them, ${Object.keys(doc.parts).length} source${Object.keys(doc.parts).length === 1 ? '' : 's'}`,
+      doc.uses.some((u) => u.repeat) ? 'one of them repeats' : 'none repeat'];
+    const eventLane = view.strip.lanes().find((l) => l.id === 'rows');
+    if (eventLane) eventLane.subLabel = [`${rowCount} in the document,`, 'each one a line below'];
+    const varies = tempoVaries(doc.tempo);
+    const tempoLane = view.strip.lanes().find((l) => l.id === 'tempo');
+    if (tempoLane) {
+      tempoLane.show = varies;
+      tempoLane.subLabel = varies
+        ? [`${Math.round(doc.tempo[0][1])} → ${Math.round(doc.tempo[doc.tempo.length - 1][1])} bpm`,
+           'drawn from the score']
+        : null;
+    }
+    view.strip.fit();
+    view.strip.invalidate();
+
+    for (const [i, s] of SCORES.entries()) {
+      const b = d.button(s.id);
+      if (b) b.setAttribute('aria-pressed', String(i === index));
+    }
+    d.log(SCORES[index].note, 'hi');
+  }
+
+  for (const [i, s] of SCORES.entries()) d.on(s.id, () => load(i));
+
+  load(0);
+
+  // ── asserts: over every document, once, and about the MECHANISM ─────────
+  //
+  // Run across all five at load rather than only the one on screen, so
+  // switching scores adds none — and so the loop and the two languages are
+  // asserted whichever score a reader happens to be looking at. Every one is
+  // decidable without waiting for playback: a tolerant assert that waits is how
+  // 03 spent its whole life not looping.
+  const canon = DOCS.map(scoreDocToJSON);
+
+  d.assert('every document round-trips byte-identically',
+    DOCS.every((doc0, i) => scoreDocToJSON(parseScoreDoc(JSON.parse(canon[i]))) === canon[i]),
+    `${DOCS.length} documents, ${canon.reduce((n, c) => n + c.length, 0)} bytes`);
+
+  d.assert('every JSONL view round-trips to the same document',
+    DOCS.every((doc0, i) => scoreDocToJSON(parseScoreDocJSONL(scoreDocToJSONL(doc0))) === canon[i]),
+    `${DOCS.reduce((n, x) => n + scoreDocToJSONL(x).split('\n').length, 0)} lines`);
+
+  const loopDoc = DOCS[3];
+  const loopUses = scoreDocToJSONL(loopDoc).split('\n').filter((l) => JSON.parse(l).t === 'use');
+  d.assert('the loop is ONE line saying twice, not two lines',
+    loopUses.length === loopDoc.uses.length
+      && loopDoc.uses.filter((u) => u.repeat).length === 1
+      && loopDoc.uses.find((u) => u.repeat).repeat === 2,
+    `${loopUses.length} use lines for ${loopDoc.uses.length} uses`);
+
+  d.assert('the repeat was never expanded into rows',
+    loopDoc.parts.tune.rows.length === 4, `${loopDoc.parts.tune.rows.length} rows`);
+
+  const two = DOCS[4];
+  const vp = two.parts.verse.rows[0].payload, mp = two.parts.pulse.rows[0].payload;
+  d.assert('two languages, neither translated into the other',
+    two.parts.verse.lang === 'csound' && two.parts.pulse.lang === 'midi'
+      && Array.isArray(vp.p) && Number.isFinite(mp.vel)
+      && vp.vel === undefined && mp.p === undefined,
+    `csound keeps p[${vp.p.length}], midi keeps vel=${mp.vel}`);
+
+  d.assert('the compiler\'s warnings survive into the document',
+    Array.isArray(two.parts.verse.warnings) && two.parts.verse.warnings.length === 1,
+    two.parts.verse.warnings[0]);
+
+  // THE RAMP, in closed form. Tempo falling 120 -> 60 over 8 beats is the
+  // logarithmic integral csound.mjs exists for:
+  //   dt = (60/k)*ln(m1/m0),  k = (60-120)/8 = -7.5  ->  5.545177 s
+  // A mean-tempo shortcut would say 8 beats at 90 bpm = 5.333 s, which looks
+  // fine and puts every later note 212 ms early.
+  const ramp = tempoMap(DOCS[2].tempo);
+  const rampMs = ramp.msAt(8);
+  d.assert('the tempo ramp integrates in closed form, not by averaging',
+    Math.abs(rampMs - 5545.18) < 1, `beat 8 at ${rampMs.toFixed(2)} ms (mean-tempo would say 5333)`);
+
+  d.assert('every use in every score resolves to a part it names',
+    DOCS.every((doc0) => doc0.uses.every((u) => !!doc0.parts[u.ref])),
+    `${DOCS.reduce((n, x) => n + x.uses.length, 0)} uses`);
+
+  d.log(`${SCORES.length} scores · pick one above`);
+  d.ready();
+</script>
+</html>
