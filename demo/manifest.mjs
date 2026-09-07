@@ -70,6 +70,16 @@ export const DEMOS = [
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
 
+  // The only network-free row in Act 3, and the act's simplest complete
+  // instance: make a recording yourself, then scrub it. Everything after this
+  // adds exactly one thing — `record` adds disk economics, `replay` and `seek`
+  // add a pre-existing show and an exact fold, `show` adds a real WebRTC hop.
+  //
+  // settleMs covers a 4 s take plus the duration-resolution dance plus a seek,
+  // all behind control 0 — the only control that gets it.
+  { name: 'take', act: 3, built: true, settleMs: 16000,
+    one: 'record four seconds and scrub them, with nothing on the wire',
+    tags: ['MediaRecorder', 'timeline', 'local only'] },
   { name: 'record', act: 3, built: true,
     one: 'record in segments and ship each one, so disk stays flat',
     tags: ['MediaRecorder', 'R2'] },

@@ -30,6 +30,19 @@ it three ways and diverged:
 > **L1. THE MASTER IS NEVER NUDGED.** Its rate and its `currentTime` are read,
 > never written. The picture is the ground truth; the vector is what bends.
 
+**CORRECTED BY BUILDING IT.** As written this contradicted P3's own Done-when —
+*"dragging the strip moves the picture"* — and both cannot hold while the strip
+seeks the deck. The first drive looked fine and meant nothing: the drag moved
+the vector, mediaMaster read the video, saw the vector had wandered and pulled
+it straight back. L1 working exactly as designed, numbers advancing at real
+time, and the picture never moved.
+
+The resolution is L4b's own exception — **rVFC observes, `currentTime`
+commands** — routed through `createStripView`'s `onSeek`, so a USER seek writes
+the element and the deck reconciles to it as a `master: jump`. The rule below is
+about the SERVO, not about the user: nothing derived from the vector may nudge
+the element; an explicit seek is a command and belongs to the picture.
+
 So: `mediaMaster(deck, video, …)`, and **never write `video.currentTime` from
 the deck**. The temptation runs the other way — a transport bar looks like it
 should drive the video — and giving in inverts the master and reopens the
@@ -165,7 +178,7 @@ one can observe four, and must not pretend to a fifth.
 |---|---|---|
 | **chunk cadence** | `dataavailable` inter-arrival vs the requested timeslice | yes — both sides ours |
 | **recorded vs file duration** | wall clock at stop vs resolved `video.duration` | yes — §4 |
-| **seek: asked vs got** | requested position vs `currentTime` once `seeked` fires | yes — and it is `plan-score` §4b's *"`in` is a request, not a fact"* made visible |
+| **seek: asked vs got** | requested position vs `currentTime` once `seeked` fires | yes — and it is `plan-score` §4b's *"`in` is a request, not a fact"* made visible. **MEASURED: 0–1 ms, not keyframe-granular.** See below. |
 | **sync corrections** | `mediaMaster.stats()` — `syncs`, `corrections`, `jumps`, `lastCorrectionMs` | yes — `replay-grid` measured 1169 syncs, 0 corrections over tolerance |
 | **bytes on disk** | blob sizes, and the IndexedDB total | yes, and it makes §2 concrete |
 
@@ -191,6 +204,32 @@ one can observe four, and must not pretend to a fifth.
 cannot observe are named as absent rather than quietly missing.
 
 ---
+
+## 5b. What building it falsified
+
+**The keyframe prediction did not hold here.** §5 and `plan-score` P5 both lean
+on *"only one part per segment is INDEPENDENT"* and expect a seek to land on a
+keyframe, tens or hundreds of milliseconds from what was asked. Measured on this
+demo: **0–1 ms off, repeatedly.** VP9 out of `MediaRecorder` at a 500 ms
+timeslice seeks precisely on desktop Chrome.
+
+So the demo shows the MECHANISM honestly — asked, got, and the gap named — while
+the gap is currently about zero. A reader has to take the keyframe lesson on
+faith, which is the opposite of what this page is for. It may appear on a long
+take, another codec, or a phone; until it does, do not claim the page teaches
+it. The 2.0 s GOP figure that lesson came from is Cloudflare's LL-HLS
+packaging, which is a different pipeline entirely.
+
+**One deck for the page, not one per take.** §4 implies rebuilding. The strip
+and the transport bar bind their deck at construction, so a later deck leaves
+both pointing at something nobody is playing. `setRange` moves the range
+instead — and the recorded length and the file length then differ by 50–70 ms
+consistently, which is worth showing rather than hiding.
+
+**`lastCorrectionMs` was a cell that could never change.** In a short
+in-tolerance take the servo never corrects, so it could only ever be an em dash
+— the constant-dressed-as-a-measurement defect. `jumps · corrections` replaced
+it; both move.
 
 ## 6. Phases
 
@@ -267,7 +306,9 @@ should lose the pipeline, not the one that should gain it.
 
 ## 7. Traps, most already paid for
 
-- **Never write `video.currentTime` from the deck.** §1, L1.
+- **Never write `video.currentTime` from the deck's SERVO.** §1, L1 — and see
+  the correction there: a user's explicit seek is a command, not a nudge, and
+  goes through `onSeek`. Conflating the two makes a strip that cannot scrub.
 - **A seeking element is not a clock** (L5) — while seeking, `currentTime` is a
   target, not a position; driving from it fights the seek in progress.
 - **rVFC inside `mediaMaster` is an OBSERVATION primitive, never a seek
