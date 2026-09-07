@@ -77,8 +77,8 @@ await send('Runtime.enable', {}, sessionId);
 await send('Page.enable', {}, sessionId);
 
 const url = process.env.DEMO_BASE
-  ? `${process.env.DEMO_BASE}/06-llhls/?player=native`
-  : 'http://127.0.0.1:8890/demo/06-llhls/?player=native';
+  ? `${process.env.DEMO_BASE}/llhls/?player=native`
+  : 'http://127.0.0.1:8890/demo/llhls/?player=native';
 await send('Page.navigate', { url }, sessionId);
 await sleep(4000);
 
