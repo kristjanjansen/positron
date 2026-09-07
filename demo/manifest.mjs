@@ -32,9 +32,9 @@ export const DEMOS = [
   { n: '04', name: 'score', act: 0, built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
     tags: ['timeline'] },
-  { n: '05', name: 'strip', act: 0, built: true,
-    one: 'deep time, uncertain dates, and a statistic that names what it dropped',
-    tags: ['timeline', 'canvas'] },
+  { n: '05', name: 'vclick', act: 0, built: true,
+    one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
+    tags: ['timeline', 'Csound', 'WebAudio'] },
 
   { n: '06', name: 'llhls', act: 1, built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
@@ -126,9 +126,9 @@ export const DEMOS = [
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { n: '28', name: 'vclick', act: 0, built: true,
-    one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
-    tags: ['timeline', 'Csound', 'WebAudio'] },
+  { n: '28', name: 'strip', act: 0, built: true,
+    one: 'deep time, uncertain dates, and a statistic that names what it dropped',
+    tags: ['timeline', 'canvas'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
