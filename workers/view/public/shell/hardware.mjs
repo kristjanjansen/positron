@@ -27,7 +27,7 @@
 import { el } from './shell.mjs';
 
 export function createHardware(d, {
-  label = 'Enable sound & MIDI', onAudio, onMidi, onMidiIn,
+  label = 'Enable soundcard / MIDI and play', onAudio, onMidi, onMidiIn,
 } = {}) {
   const btn = el('button', 'd-pri', label, { type: 'button' });
   // TWO pickers, each labelled in the UI with its direction. MIDI in and MIDI

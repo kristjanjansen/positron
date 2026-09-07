@@ -129,30 +129,36 @@
     // just counts how long ago you finished.
     armWall: false,
     lanes: [{
-      id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2, latch: true,
+      // NO `latch`. It recolours from the PLAYHEAD, so scrubbing back turned
+      // measured marks grey again — as if moving the cursor un-measured them.
+      // A mark's colour is a fact about what was observed, and navigation is
+      // not an observation. Colour comes from the measurement map instead, so
+      // the picture only ever changes when something new is measured.
+      id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2,
       color: '#6a7280',
       terse: true,        // no id/kind/attested lines: nothing here is restored
-      colorOfRow: (r, fired) => {
-        if (!fired) return null;                       // grey: not played yet
+      colorOfRow: (r) => {
         const m = measured.get(r.id);
-        return m ? bandFor(m)[1] : '#8fd6a8';
+        return m ? bandFor(m)[1] : '#3b424e';          // grey: no measurement yet
       },
       // Two short lines. A tooltip sits ON TOP of the thing it describes and is
       // read every time you point at one; the sentences belong in the `how`
       // block above, which is read once.
       describeRow: (r) => {
         const m = measured.get(r.id);
-        if (!m) return 'not played yet';
+        if (!m) return 'not played yet';   // no measurement, not "behind the playhead"
         const [, , verdict] = bandFor(m);
         return [
           `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${verdict}`,
           m.origin === 'tick-late' ? `no timer · ${TICK} ms check caught it` : 'timer set ahead',
         ];
       },
-      // Second channel, same lane: a mark the clock never got to set a timer
-      // for is drawn thicker. It is an annotation on these marks, not a
-      // separate subject, so it does not get a row of its own.
-      widthOfRow: (r) => (measured.get(r.id)?.origin === 'tick-late' ? 5 : 2),
+      // NO WIDTH CHANNEL. A thicker bar marked "no timer was set", which is
+      // structurally always the first mark — the one due at position 0 cannot
+      // have a timer, because play had not been pressed when the timers were
+      // set. So it was a permanent oddity that raised a question the picture
+      // never answered, the same defect as the `missed` cell it replaced. The
+      // fact survives where it is actually asked for: the tooltip.
     }],
   });
 
