@@ -31,7 +31,10 @@ const REPO = join(HERE, '..', '..');
 const OUT = join(HERE, 'public');
 
 // the demo story order, single-sourced from demo/manifest.mjs
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST } = await import(new URL('../../demo/manifest.mjs', import.meta.url));
+// rowHTML/noteHTML come from the manifest too. They used to be duplicated here
+// AND in demo/index.html, so fixing one left the other printing `undefined`.
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, rowHTML, noteHTML } =
+  await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -324,28 +327,7 @@ await mkdir(OUT, { recursive: true });
 // GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
-  function rowHTML(d, i) {
-  const href = d.built ? `/${d.name}/` : (d.page || null);
-  const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
-  const why = '';   // no warning badges on the index
-  const open = href ? `<a href="${href}">` : '<a>';
-  return `<li class="d-row${href ? '' : ' todo'}">${open}`
-    // numbered by POSITION, for scanning. Display, not identity — reordering
-    // the manifest renumbers the list and renames nothing.
-    + `<span class="n">${String(i + 1).padStart(2, '0')}</span>`
-    + `<span class="nm">${d.name}</span>`
-    + `<span class="d-one">${d.one || ''}</span>`
-    + `<span class="d-meta">${tags}</span>`
-    + '</a></li>';
-}
   const rows = DEMO_MANIFEST.map((d, i) => '  ' + rowHTML(d, i)).join('\n');
-  function noteHTML(n) {
-    return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
-      + '<span class="n">·</span>'
-      + '<span class="nm">' + n.title + '</span>'
-      + '<span class="d-one">' + n.one + '</span>'
-      + '</a></li>';
-  }
   const notes = '<h2 class="d-act-h">notes</h2>\n<ol class="d-acts">'
     + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');

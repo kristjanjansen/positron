@@ -157,3 +157,36 @@ export const bySlug = (name) => DEMOS.find((d) => d.name === name);
 
 /** the link target for a row, or null when it has none */
 export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
+
+/**
+ * ONE renderer for an index row, because there were two.
+ *
+ * `demo/index.html` and `workers/view/build.mjs` each carried their own copy of
+ * this function. Dropping the `n` field fixed the build's copy and left the
+ * local one printing `undefined` over every demo name — the exact failure this
+ * file's own header claims cannot happen ("no second place to forget a row").
+ * The header was aspirational; now it is true.
+ *
+ * `i` is the row's POSITION, and the number shown is display rather than
+ * identity: reorder the array and the list renumbers while nothing is renamed.
+ */
+export function rowHTML(d, i) {
+  const href = targetOf(d);
+  const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
+  const open = href ? `<a href="${href}">` : '<a>';
+  return `<li class="d-row${href ? '' : ' todo'}">${open}`
+    + `<span class="n">${String(i + 1).padStart(2, '0')}</span>`
+    + `<span class="nm">${d.name}</span>`
+    + `<span class="d-one">${d.one || ''}</span>`
+    + `<span class="d-meta">${tags}</span>`
+    + '</a></li>';
+}
+
+/** and the note row, for the same reason */
+export function noteHTML(n) {
+  return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
+    + '<span class="n">·</span>'
+    + '<span class="nm">' + n.title + '</span>'
+    + '<span class="d-one">' + n.one + '</span>'
+    + '</a></li>';
+}
