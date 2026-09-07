@@ -16,8 +16,12 @@ render loop, so a hidden tab let a 20 s deck reach **91,001 ms** while still
 reporting `playing: true`. The transport bar **overflowed a 390 px phone by
 94 px and clipped two rate buttons off the edge**. And the page carried two
 horizontal time axes that disagreed, one of which — the strip — had always been
-the better scrubber. `01` and `02` are fixed and are the worked examples; the
-other 22 have not had the pass. **127/127 green** across the eight strip demos,
+the better scrubber. `01`, `02` and `03` are fixed and are the worked
+examples; the other 21 have not had the pass. **Before reviewing any of them,
+grep the fabricated-zero class**: `dr?.p50 ?? dr?.ms ?? 0` printed a confident 0
+on two separate pages while their asserts passed, because both only checked
+non-null. Three instances of one shape; `grep -rn '?? 0' demo/` is fifteen
+seconds. **127/127 green** across the eight strip demos,
 per-demo counts unchanged.
 
 **Three lanes now measure themselves on one page**: bg worker +1.50 ms typical,

@@ -396,16 +396,88 @@ the field instead of running off the bottom-right corner. **Both copies** — th
 SVG in `demo/shell/shell.mjs` and the pixel plotter in `workers/view/build.mjs`
 that generates `favicon.ico` — with a comment on each to keep them in sync.
 
+### Continued — 03, the favicon, and three rules that came out of it
+
+Seven commits: `8495428` `74d54f2` `fe2699b` `463840b` `8561780` `0b6e9be`
+`5a14d9b`. All deployed to positron.studio.
+
+**03 nest got the same treatment, and the fabricated zero turned out to be a
+CLASS.** `nestedDrift()` returns `{fires, range, pos, kinds:{…}}` with no
+top-level `p50`, so `dr?.p50 ?? dr?.ms ?? 0` printed a confident 0 there for
+exactly the reason it did in 01 — and its assert passed every time, because it
+only ever checked non-null. Third page, one shape. It was not found by looking
+at 03; it was found because the pattern already had a name. **`grep -rn '?? 0'`
+across the remaining demos is now an obvious move rather than a guess.**
+03 asserts the SHAPE now and reports `kinds.mark`'s real distribution: 17/17,
+the count it always had.
+
+**A scrub is not an observation.** 01, 02 and 03 all used `latch`, which
+recolours marks from the PLAYHEAD — so dragging backwards turned measured marks
+grey again, as if moving the cursor un-measured them. A mark's colour is a fact
+about what was observed. Every lane now colours from its own evidence: 01 and 03
+from their drift maps, 02 from `driftOf / soundOf / sentOf / loopOf` per lane.
+`midi out` needed a separate record of having acted at all, being the only lane
+that acts without being able to report.
+
+**A separate implementation has to be LOOKED AT, not reasoned about.** The
+favicon exists twice — an SVG in `demo/shell/shell.mjs` and a pixel loop in
+`workers/view/build.mjs` that generates `favicon.ico`. Matching parameters do
+not produce matching pictures: the same numbers that gave a clean 'e' as an SVG
+gave a squashed counter, a terminal curled into a hook, and a glyph touching the
+left edge as pixels. Fixed by rendering the .ico at 16x beside three candidate
+parameter sets and choosing by eye. Two rounds of "adjust the numbers and hope"
+preceded that and both shipped something broken.
+
+**Also dropped:** 01's width channel (a thicker bar meant "no timer was set",
+which is structurally always the first mark — a permanent oddity raising a
+question the picture never answered, the same defect as the `missed` cell it
+replaced); the `END` badge (the toggle already turns into a restart glyph); and
+`how()`'s spec line — `looks 100 ms ahead · re-checks every 25 ms` was
+constants-beat-prose reasoning, right when someone is looking for them and one
+more thing to parse when they are not. The constants moved under the lane whose
+behaviour they describe.
+
+**The rate row finally shows which rate is armed.** `deck.rate()` is 0 while
+paused — correctly; the transport vector really is advancing at zero — so
+comparing the buttons against it left NONE selected exactly when someone is
+looking at the row deciding what to press. This was the `RATE 0×` finding from
+the first hour of the review, unfixed until the last.
+
+**`plan-glass.md`** — `requestVideoFrameCallback` as a fifth lane type, written
+and deliberately not started. Two things it pins down: a glass lane is a
+CAPTURE lane like MIDI in, not a schedule lane (audio and MIDI are told when to
+act; the compositor cannot be told, it only reports what it decided), and it is
+BLOCKED behind the rVFC pair-vs-single bias in `studio/NOTES.md` — building on
+the current reading would inherit that one-frame error and launder it into a
+fifth place.
+
+### Library additions this session, all opt-in and falsy-safe
+
+| where | what |
+|---|---|
+| `strip.mjs` | `colorOfRow`, `widthOfRow`, `describeRow`, `describeHit`, `terse`, `subLabel`, `autoHeight` |
+| `shell.mjs` | `d.how(note)`, `showReadout` |
+| `transport-bar.mjs` | `scrub: false`, live coalesced scrubbing, committed end-stop, restart-at-end, armed-rate display |
+| `transport.mjs` | `createMidiLane` |
+| new files | `demo/shell/hardware.mjs`, `demo/shell/impulse-worklet.js` |
+
+A lane's client `subLabel` REPLACES the derived caps line rather than queueing
+behind it: that line names the lane's clock domain, which is worth having when
+nothing better is on offer and noise once real numbers exist — and on a 46 px
+lane it pushed the numbers out of the row entirely.
+
 ### Open
 
+- **21 demos have not had the pass.** `01`, `02`, `03` are the worked examples.
+- **Grep the fabricated-zero class** before reviewing any of them individually.
 - The end-stop timer should be armed on the scheduler's worker host rather than
   a main-thread `setTimeout`; `createDeck` does not expose the host.
-- `createMidiLane` has run once by hand on IAC loopback; the `midi back`
-  round-trip number has not been read yet, and no HARDWARE synth has ever been
-  on the other end.
-- The remaining 22 built demos have not had the plain-language pass. `01` and
-  `02` are the worked examples.
-- Nothing is deployed. All of this is in the working tree.
+- `createMidiLane` has been measured only through the IAC loopback to our own
+  JS handler. No hardware synth has ever been on the other end.
+- `plan-glass.md` P0: fix the rVFC pair and re-measure every content anchor in
+  the same breath.
+- Full suite 298/313 — 12 are this shell having no UDP egress, three are strip
+  ink flakes that pass on a targeted re-run.
 
 ## Session 10 (2026-09-06) — the demo spine finished: one grid, a show that archives its own wire, ERR's rights wall, Icecast, and a compiled score (user: "Etv2 errors")
 
