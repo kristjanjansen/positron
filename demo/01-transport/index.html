@@ -21,6 +21,10 @@
     name: 'transport',
     what: 'Twenty things are set to happen, one a second. Press play and see how close they land.',
     readout: { typical: 'ms', worst: 'ms', fires: '', pos: 'ms' },
+    // the numbers live under the lane they describe, in the strip's gutter;
+    // this row would repeat them somewhere with less context. Still published
+    // for CDP.
+    showReadout: false,
     controls: [],
   });
   guard(d);
@@ -80,8 +84,15 @@
     for (const r of rows) measured.set(r.id, r);
     const xs = rows.map((r) => r.deltaMs).filter(Number.isFinite).sort((a, b) => a - b);
     if (!xs.length) return;
-    d.set('typical', xs[xs.length >> 1]);
-    d.set('worst', xs[xs.length - 1]);
+    const typical = xs[xs.length >> 1], worst = xs[xs.length - 1];
+    d.set('typical', typical);
+    d.set('worst', worst);
+    // under the lane, beside its own ink — same treatment as 02
+    const L = view.strip.lanes()[0];
+    if (L) {
+      L.subLabel = [`typical +${typical.toFixed(2)} ms`, `worst +${worst.toFixed(2)} ms`];
+      view.strip.invalidate();
+    }
     // Assert on the FIRST row, not a comfortable sample: verify.mjs plays for
     // 500 ms, which is one mark. A threshold of 5 read as "asserted nothing".
     if (!asserted && xs.length >= 1) {
@@ -93,7 +104,6 @@
   let asserted = false;
 
   d.how(
-    `looks ${HORIZON} ms ahead · re-checks every ${TICK} ms · off the main thread`,
     `The clock only sets timers for the next fraction of a second, and can ` +
     `still cancel them — which is why pause really stops and dragging really ` +
     `skips. Green landed as expected; amber to red, late.`,
@@ -105,8 +115,9 @@
   // the position every frame, so rewinding un-fires them. Without a colour the
   // lane falls back to a hash of the kind name, which lands wherever it lands
   // and here landed somewhere you cannot see.
-  createStripView(d.el, deck, {
+  const view = createStripView(d.el, deck, {
     size: 'auto',
+    gutter: 132,
     // follow:false — the strip auto-scrolls to keep the playhead at 82% of the
     // width, which slides its axis out from under the bar above it and leaves
     // the two disagreeing about where a second is. A bounded piece has nowhere
@@ -118,7 +129,7 @@
     // just counts how long ago you finished.
     armWall: false,
     lanes: [{
-      id: 'mark', kind: 'mark', height: 72, width: 2, latch: true,
+      id: 'mark', kind: 'mark', label: 'marks', height: 72, width: 2, latch: true,
       color: '#6a7280',
       terse: true,        // no id/kind/attested lines: nothing here is restored
       colorOfRow: (r, fired) => {

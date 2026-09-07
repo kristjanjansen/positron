@@ -72,10 +72,17 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
     syncRates();
   }
 
+  // THE ARMED RATE, not the current one. `deck.rate()` is 0 while paused — it
+  // is the transport vector's rate, and a paused transport genuinely advances
+  // at zero — so comparing buttons against it left NONE of them selected
+  // whenever the deck was not rolling, which is exactly when someone is looking
+  // at the row deciding what to press. Remember the last rate that was real.
+  let armedRate = 1;
   function syncRates() {
-    const cur = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
+    const live = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
+    if (live > 0) armedRate = live;
     for (const b of rates.querySelectorAll('button')) {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === cur));
+      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === armedRate));
     }
   }
 
@@ -146,7 +153,9 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   }
   // re-armed on every play / pause / rate / seek, because each one moves the
   // instant at which range[1] arrives
-  const offState = deck.transport?.onState ? deck.transport.onState(armEnd) : null;
+  const offState = deck.transport?.onState
+    ? deck.transport.onState(() => { armEnd(); syncRates(); })
+    : null;
 
   // ── interaction ─────────────────────────────────────────────────────────
   // Parked at the end, the play button REPLAYS. This is what a sequencer does:
