@@ -88,36 +88,29 @@ const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
  * @param w,h    canvas size (the ROW is drawn at frozen absolute coordinates)
  * @param frame  frame counter — drives the motion
  * @param opts   { hue, label, position, ms }
- *   hue       0..359, drives the background and the decoration ONLY
- *   label     what this source is, printed in the header
+ *   hue       0..359, drives the field and the two labels ONLY — never the row
  *   position  seconds — when given, the second clock shows POSITION instead of
  *             the viewer's wall time. Two clocks, and the frame says which.
+ *   field     false to skip the background fill, when the caller has already
+ *             painted the frame (a camera, say). Everything else still draws.
  *   ms        override the clock (tests)
  */
 export function burn(ctx, w, h, frame, opts = {}) {
   const ms = opts.ms ?? Math.round(performance.timeOrigin + performance.now());
-  const hue = (((opts.hue ?? 205) % 360) + 360) % 360;
-  const label = opts.label ?? 'positron';
+  // ROUNDED. A caller deriving hues by golden angle hands in 307.0160000000001,
+  // and the header printed every digit of it — a number with thirteen decimals
+  // in a picture reads as a bug, because it is one.
+  const hue = Math.round((((opts.hue ?? 205) % 360) + 360) % 360);
 
   // ── field ────────────────────────────────────────────────────────────────
-  // Dark and hue-tinted rather than the old flat #404040: the hue has to be
-  // visible from across a room, and the white digits need something to sit on.
-  ctx.fillStyle = `hsl(${hue} 26% 12%)`;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = `hsl(${hue} 30% 16%)`;
-  ctx.fillRect(0, 0, w, 60);
-  ctx.fillStyle = `hsl(${hue} 78% 52%)`;
-  ctx.fillRect(0, 60, w, 3);
-
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `bold 26px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 60% 78%)`;
-  ctx.fillText(String(label).toUpperCase(), 40, 41);
-  ctx.font = `500 17px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 22% 58%)`;
-  ctx.textAlign = 'right';
-  ctx.fillText(`${w}x${h}  hue ${pad(hue, 3)}`, w - 40, 41);
-  ctx.textAlign = 'left';
+  // `field: false` skips ONLY this fill, for a caller that has already painted
+  // the frame — `take` puts the camera there and scrims it. Everything else
+  // still draws, including the row's black bed, which must stay opaque or the
+  // clock stops being readable back.
+  if (opts.field !== false) {
+    ctx.fillStyle = `hsl(${hue} 26% 12%)`;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // ── the frozen row ───────────────────────────────────────────────────────
   // Black bed with a 20 px margin so compression ringing has somewhere to go,
@@ -130,76 +123,60 @@ export function burn(ctx, w, h, frame, opts = {}) {
     if (bits[i]) ctx.fillRect(ROW.X + i * ROW.BLOCK_W, ROW.Y, ROW.BLOCK_W, ROW.H);
   }
 
-  // Everything below is OUTSIDE the bed, which ends at ROW.Y + ROW.H + 20 = 200.
-  // Nothing hue-coloured may cross that line, so these start at 212.
-  const bedBottom = ROW.Y + ROW.H + 20;
-  ctx.font = `500 15px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 18% 52%)`;
-  ctx.fillText('48-BIT EPOCH MS  ·  8-BIT XOR  ·  MACHINE READABLE', ROW.X, bedBottom + 24);
-
-  // A second hand under the caption: the fraction of the current second, in
-  // hue. It also changes on every single frame, which is the second reason it
-  // is here — see the motion note below.
-  const rowW = ROW.NBLOCKS * ROW.BLOCK_W;
-  ctx.fillStyle = `hsl(${hue} 20% 22%)`;
-  ctx.fillRect(ROW.X, bedBottom + 38, rowW, 5);
-  ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  ctx.fillRect(ROW.X, bedBottom + 38, rowW * ((ms % 1000) / 1000), 5);
-
   // ── two clocks, and which is which ───────────────────────────────────────
-  // Two unlabelled numbers are worse than one. The first is EXACTLY what the
-  // row above encodes; the second is the same instant for a human.
+  // EVERYTHING ON THIS FRAME IS BIG, and there is nothing on it that is not a
+  // clock. The pattern carried a header, a caption, a moving second-hand, a
+  // rule under the header and a footer; all of them rendered between 3 and 8 px
+  // once the picture was displayed at the size a demo actually shows it, which
+  // is to say they were decoration that cost legibility and gave nothing back.
+  // A picture whose whole job is to be READ off a small pane has room for two
+  // labelled numbers and no more.
+  ctx.textBaseline = 'alphabetic';
   const d = new Date(ms);
   const second = Number.isFinite(opts.position)
     ? {
-        label: 'POSITION  seconds on this deck',
+        label: 'POSITION',
         text: `${pad(Math.floor(opts.position / 60))}:${pad(Math.floor(opts.position % 60))}`
           + `.${pad(Math.floor((opts.position % 1) * 1000), 3)}`,
       }
     : {
-        label: `LOCAL  wall clock, ${zoneLabel(d)}`,
+        label: 'LOCAL',
         text: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
           + `.${pad(d.getMilliseconds(), 3)}`,
       };
 
-  ctx.font = `500 19px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 45% 66%)`;
-  ctx.fillText('ABSOLUTE  epoch ms, the number burned above', 40, 288);
+  ctx.font = `bold 34px ${MONO}`;
+  ctx.fillStyle = `hsl(${hue} 55% 70%)`;
+  ctx.fillText('ABSOLUTE', 40, 285);
   ctx.font = `bold 76px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), 40, 366);
+  ctx.fillText(String(ms), 40, 380);
 
-  ctx.font = `500 19px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 45% 66%)`;
-  ctx.fillText(second.label, 40, 428);
-  ctx.font = `bold 58px ${MONO}`;
+  ctx.font = `bold 34px ${MONO}`;
+  ctx.fillStyle = `hsl(${hue} 55% 70%)`;
+  ctx.fillText(second.label, 40, 470);
+  ctx.font = `bold 104px ${MONO}`;
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, 40, 494);
+  ctx.fillText(second.text, 40, 588);
 
-  // ── motion ───────────────────────────────────────────────────────────────
-  // A travelling block, so the encoder never dedupes a static frame down to
-  // nothing. This is an ENCODER CONSTRAINT, not decoration: server.mjs uses
-  // testsrc2 for the same reason ("moves on its own"). The row's low bits do
-  // change every frame, but they are 8 blocks in a corner of the picture and a
-  // rate-controlled encoder is entitled to spend almost nothing on them.
+  // ── motion, and it MEANS something ───────────────────────────────────────
+  // The block has to move, or a rate-controlled encoder dedupes a near-static
+  // frame down to nothing (server.mjs picks testsrc2 for the same reason). It
+  // used to travel at `frame * 7` px, which satisfies the encoder and says
+  // nothing — a moving thing on a measuring instrument that is not measuring
+  // anything.
   //
-  // Same travel as the pattern has always had — (frame * 7) px per frame — with
-  // a track drawn under it, so it reads as a mechanism rather than a stray box.
-  const by = Math.round(h * 0.83);
-  ctx.fillStyle = `hsl(${hue} 20% 20%)`;
-  ctx.fillRect(0, by + 39, w, 2);
+  // It now crosses the frame ONCE EVERY 10 SECONDS of the burned clock. So it
+  // is a coarse second hand you can read at a glance from across a room and at
+  // any size, when the digits are too small to resolve — and, because it is
+  // driven by the absolute clock rather than a frame counter, TWO PICTURES OF
+  // THE SAME INSTANT PUT IT IN THE SAME PLACE. Two sources side by side, one
+  // block visibly behind the other, is the delay between them, with nothing to
+  // read and no arithmetic. At 30 fps it still advances ~4 px a frame, which is
+  // more motion than the row's low bits gave the encoder anyway.
+  const SWEEP_MS = 10000;
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  ctx.fillRect((frame * 7) % Math.max(1, w - 80), by, 80, 80);
-
-  // ── footer ───────────────────────────────────────────────────────────────
-  ctx.fillStyle = `hsl(${hue} 30% 16%)`;
-  ctx.fillRect(0, h - 36, w, 36);
-  ctx.font = `500 15px ${MONO}`;
-  ctx.fillStyle = `hsl(${hue} 30% 62%)`;
-  ctx.fillText('positron test pattern', 40, h - 13);
-  ctx.textAlign = 'right';
-  ctx.fillText(`frame ${frame}`, w - 40, h - 13);
-  ctx.textAlign = 'left';
+  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - 60), h - 58, 60, 44);
   return ms;
 }
 
@@ -321,11 +298,10 @@ export function rowFilters(epoch) {
  * @param hue     0..359 — a ROTATION applied to the source's colours, not an
  *                absolute hue: testsrc2 has no single hue to set. Two publishers
  *                with different values look different, which is the requirement.
- * @param label   printed beside the absolute clock
  * @param font    fontfile path — REQUIRED, see the trap above
  * @param row     draw the 56-block row too (default false; see rowFilters)
  */
-export function ffmpegFilters({ epoch, hue = 0, label = 'positron', font = FFMPEG_FONT, row = false } = {}) {
+export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false } = {}) {
   if (!epoch) throw new Error('ffmpegFilters: epoch required');
   if (!font) throw new Error('ffmpegFilters: fontfile required — drawtext without one fails silently');
   const text = (t, y, size) => [
@@ -334,20 +310,28 @@ export function ffmpegFilters({ epoch, hue = 0, label = 'positron', font = FFMPE
     'x=40', `y=${y}`, `fontsize=${size}`, 'fontcolor=black',
     'box=1', 'boxcolor=white', 'boxborderw=12',
   ].join(':');
-  const safe = String(label).replace(/[^A-Za-z0-9 _-]/g, '');
   return [
     // hue FIRST: rotating chroma after the overlays would tint the white boxes
     // and, with row=1, the row itself.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
     ...(row ? rowFilters(epoch) : []),
-    // ABSOLUTE — pts-derived, and the same instant the row encodes.
+    // FOUR draws, mirroring burn()'s layout: a small word, then a big number,
+    // twice. It used to be two lines with the word and the number sharing one
+    // box, which is not what the canvas does — and the two have to LOOK the
+    // same or "one pattern, two renderings" is a claim nothing supports.
+    // There is no source label any more: the hue says which publisher this is,
+    // and a name burned into a picture is a small text that cannot be read at
+    // the size a demo shows it.
+    text('ABSOLUTE', 250, 34),
+    // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
     // drawtext's `%{expr_int_format:…:d}` clamps at INT32_MAX, so epoch ms
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`ABS %{pts\\:flt\\:${epoch}} s  ${safe}`, 240, 46),
+    text(`%{pts\\:flt\\:${epoch}} s`, 292, 76),
+    text('LOCAL', 440, 34),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -358,11 +342,11 @@ export function ffmpegFilters({ epoch, hue = 0, label = 'positron', font = FFMPE
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('UTC %{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 320, 40),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 482, 104),
   ].join(',');
 }
 
-// CLI: `node demo/shell/pattern.mjs --epoch=… [--hue=…] [--label=…] [--font=…] [--row]`
+// CLI: `node demo/shell/pattern.mjs --epoch=… [--hue=…] [--font=…] [--row]`
 // which is how src/publish.sh gets its filter — one spec, two renderings.
 //
 // The guard is an EXACT url match, demo/server.mjs's idiom, not
@@ -377,7 +361,6 @@ if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv
   process.stdout.write(ffmpegFilters({
     epoch: arg('epoch'),
     hue: Number(arg('hue', 0)),
-    label: arg('label', 'positron'),
     font: arg('font', FFMPEG_FONT),
     row: process.argv.includes('--row'),
   }));

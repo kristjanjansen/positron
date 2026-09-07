@@ -122,27 +122,32 @@ function rowFilters(epoch) {
  * (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of floating-point
  * result to int failed" — measured. Hence the unit printed beside the number.
  */
-function drawFilters({ epoch, hue = 0, label = 'positron', row = false }) {
+function drawFilters({ epoch, hue = 0, row = false }) {
   const text = (t, y, size) => [
     `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
     'x=40', `y=${y}`, `fontsize=${size}`, 'fontcolor=black',
     'box=1', 'boxcolor=white', 'boxborderw=12',
   ].join(':');
-  const safe = String(label).replace(/[^A-Za-z0-9 _-]/g, '');
   return [
     // hue FIRST: rotating chroma afterwards would tint the white boxes and,
     // with the row on, the row itself — which readBurned thresholds on.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
     ...(row ? rowFilters(epoch) : []),
-    // ABSOLUTE — pts-derived, the same instant the row encodes.
-    text(`ABS %{pts\\:flt\\:${epoch}} s  ${safe}`, 240, 46),
+    // FOUR draws, mirroring burn()'s layout: a small word, then a big number,
+    // twice. No source label — the hue says which publisher this is, and a name
+    // burned into a picture is a small text nobody can read at the size a demo
+    // shows it.
+    text('ABSOLUTE', 250, 34),
+    // pts-derived, the same instant the row encodes.
+    text(`%{pts\\:flt\\:${epoch}} s`, 292, 76),
+    text('LOCAL', 440, 34),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('UTC %{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 320, 40),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 482, 104),
   ].join(',');
 }
 
@@ -160,7 +165,7 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
   const gop = fps * 2;
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = drawFilters({ epoch, hue: 0, label: 'rtmps', row });
+  const draw = drawFilters({ epoch, hue: 0, row });
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
   return [
@@ -203,7 +208,7 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, row = f
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
   // processes on two Cloudflare inputs — the page already says so — and 09
   // ladder shows them side by side, where telling them apart is the point.
-  const draw = drawFilters({ epoch, hue: 150, label: 'whip', row });
+  const draw = drawFilters({ epoch, hue: 150, row });
   return [
     '-hide_banner', '-loglevel', 'warning',
     '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,

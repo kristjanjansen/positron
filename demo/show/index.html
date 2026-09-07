@@ -7,7 +7,11 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* 380, not 240: the shared pattern is drawn on a 1280 grid, and below about
+     400 px of display width its clocks stop being readable. At 380 the pair
+     stacks on a normal card instead of sitting side by side too small to read,
+     which is the right trade for a picture whose whole job is to be read. */
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
           gap: 6px; margin: 0 0 10px; }
   .box { position: relative; }
   .box canvas, .box video { width: 100%; display: block; background: #000;
@@ -24,6 +28,7 @@
 
 <script type="module">
   import { mount, guard, recorderMime, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { burn, hueFor } from '/shell/pattern.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -76,7 +81,9 @@
   const pair = el('div', 'pair');
   const srcBox = el('div', 'box');
   const canvas = el('canvas');
-  canvas.width = 640; canvas.height = 360;
+  // the shared pattern's machine-readable row is frozen on a 1280 grid
+  const W = 1280, H = 720;
+  canvas.width = W; canvas.height = H;
   const g = canvas.getContext('2d');
   srcBox.append(canvas, el('span', 'lbl', 'source'));
   const liveBox = el('div', 'box');
@@ -95,15 +102,10 @@
 
   let camStream = null;
   d.set('source', 'canvas');
+  let frame = 0;
   setInterval(() => {
     if (camStream) return;
-    const t = Date.now();
-    g.fillStyle = '#11151d'; g.fillRect(0, 0, 640, 360);
-    g.fillStyle = '#ffd400';
-    g.font = 'bold 32px ui-monospace, monospace';
-    g.fillText(new Date(t).toISOString().slice(11, 23), 22, 56);
-    g.fillStyle = '#2b3546'; g.fillRect(22, 86, 596, 10);
-    g.fillStyle = '#ffd400'; g.fillRect(22, 86, (t / 12) % 596, 10);
+    burn(g, W, H, frame++, { hue: hueFor('show') });
   }, 40);
 
   d.on('camera', async () => {
@@ -118,13 +120,13 @@
       const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
       pv.muted = true; pv.srcObject = camStream;
       await pv.play().catch(() => {});
+      // the camera goes UNDER the same pattern, scrimmed, so a camera frame and
+      // a generated one carry the same readable clock
       const draw = () => {
         if (!camStream) return;
-        g.drawImage(pv, 0, 0, 640, 360);
-        g.fillStyle = '#000a'; g.fillRect(0, 0, 260, 34);
-        g.fillStyle = '#ffd400';
-        g.font = 'bold 20px ui-monospace, monospace';
-        g.fillText(new Date().toISOString().slice(11, 23), 10, 24);
+        g.drawImage(pv, 0, 0, W, H);
+        g.fillStyle = 'rgba(6,8,12,0.62)'; g.fillRect(0, 0, W, H);
+        burn(g, W, H, frame++, { hue: hueFor('show'), field: false });
         requestAnimationFrame(draw);
       };
       draw();

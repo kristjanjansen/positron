@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  video, canvas.src { width: 100%; max-width: 520px; display: block; background: #000;
+  video, canvas.src { width: 100%; max-width: 440px; display: block; background: #000;
                       border: 1px solid var(--line); border-radius: 3px; margin: 0 0 10px; }
   .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2); margin: 0 0 8px;
           display: flex; flex-wrap: wrap; gap: 3px; }
@@ -18,6 +18,7 @@
 
 <script type="module">
   import { mount, guard, recorderMime, el, armVideo, playOrPrompt, createShipper } from '/shell/shell.mjs';
+  import { burn, hueFor } from '/shell/pattern.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -52,7 +53,9 @@
   // deterministic. The canvas carries a wall clock so a replay can be checked
   // against the moment it was recorded.
   const canvas = el('canvas', 'src');
-  canvas.width = 640; canvas.height = 360;
+  // the shared pattern's machine-readable row is frozen on a 1280 grid
+  const W = 1280, H = 720;
+  canvas.width = W; canvas.height = H;
   const g = canvas.getContext('2d');
   const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
   video.muted = true;
@@ -62,15 +65,10 @@
   const urlEl = el('div', 'url');
   d.el.append(segsEl, urlEl);
 
+  let frame = 0;
   setInterval(() => {
     if (camStream) return;                     // the camera is its own picture
-    const t = Date.now();
-    g.fillStyle = '#11151d'; g.fillRect(0, 0, 640, 360);
-    g.fillStyle = '#ffd400';
-    g.font = 'bold 32px ui-monospace, monospace';
-    g.fillText(new Date(t).toISOString().slice(11, 23), 22, 56);
-    g.fillStyle = '#2b3546'; g.fillRect(22, 86, 596, 10);
-    g.fillStyle = '#ffd400'; g.fillRect(22, 86, (t / 12) % 596, 10);
+    burn(g, W, H, frame++, { hue: hueFor('capture') });
   }, 40);
 
   let camStream = null;
@@ -90,13 +88,13 @@
       const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
       pv.muted = true; pv.srcObject = camStream;
       await pv.play().catch(() => {});
+      // the camera goes UNDER the same pattern, scrimmed, so a camera frame and
+      // a generated one carry the same readable clock
       const draw = () => {
         if (!camStream) return;
-        g.drawImage(pv, 0, 0, 640, 360);
-        g.fillStyle = '#000a'; g.fillRect(0, 0, 260, 34);
-        g.fillStyle = '#ffd400';
-        g.font = 'bold 20px ui-monospace, monospace';
-        g.fillText(new Date().toISOString().slice(11, 23), 10, 24);
+        g.drawImage(pv, 0, 0, W, H);
+        g.fillStyle = 'rgba(6,8,12,0.62)'; g.fillRect(0, 0, W, H);
+        burn(g, W, H, frame++, { hue: hueFor('capture'), field: false });
         requestAnimationFrame(draw);
       };
       draw();
