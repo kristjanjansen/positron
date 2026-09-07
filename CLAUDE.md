@@ -296,6 +296,13 @@ counts against the last known total after any change.
 - **Per-lane numbers go in that lane's gutter** (`subLabel`), never in a
   separate table or a readout row. Joining a figure to its ink across two
   elements is what makes a legend necessary; put them together and it is not.
+- **A gutter carries what its lane MEASURED, never instructions.** `typical
+  +1.20 ms` / `worst +2.90 ms`, or an honest `no way to check` — not "press
+  Record", not "drag the line". Help text belongs in the one `how()` paragraph,
+  and if a reader still cannot tell what to press, fix the control's LABEL.
+  Instructions in a gutter crowd out the numbers, repeat the paragraph above,
+  and do not fit. **Anything that truncates with an ellipsis is in the wrong
+  place** — that is the signal, not a styling problem to widen your way out of.
 - **A tooltip is two or three short lines, never a sentence.** It is drawn ON
   TOP of the thing it describes and is read every time you point at one, so a
   paragraph there covers the picture and gets re-read twenty times. Budget
