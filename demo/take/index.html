@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  video, canvas.src { width: 100%; max-width: 460px; display: block; background: #000;
+                      border: 1px solid var(--line); border-radius: 3px; margin: 0 0 10px; }
+</style>
+
+<script type="module">
+  import { mount, guard, recorderMime, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  const TAKE_MS = 4000;      // a fixed short take, so the page has an end
+  const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
+
+  const d = mount({
+    name: 'take',
+    what: 'Record four seconds and scrub it. Nothing leaves this page — no upload, no fetch, no server.',
+    readout: { mime: '', chunks: '', kib: 'KiB', recorded: 's', file: 's', follow: '' },
+    // the numbers live under the lane that owns them; this row would repeat
+    // them somewhere with less context. Still published for CDP.
+    showReadout: false,
+    controls: [
+      { id: 'rec', label: 'Record 4 seconds', primary: true },
+      { id: 'camera', label: 'Use the camera' },
+    ],
+  });
+  guard(d);
+
+  d.how(
+    `The picture is the clock here, not the bar — the video plays and the ` +
+    `timeline bends to follow it, because a recording knows where it is and a ` +
+    `counter only thinks it does. Drag the strip to scrub. A recorded file ` +
+    `will not say how long it is until it is asked twice, so the length you ` +
+    `see is measured rather than believed.`,
+  );
+
+  // ── the source: a canvas by default, the camera on request ───────────────
+  // Canvas first because `verify.mjs` grants no camera permission — no
+  // `--use-fake-ui-for-media-devices`, and HANDOFF records that the flag is
+  // insufficient under headless=new anyway. A demo that only works with a
+  // camera is a demo the suite cannot enter, which is how three pages stayed
+  // green while failing on a phone.
+  const canvas = el('canvas', 'src');
+  canvas.width = 480; canvas.height = 270;
+  const g = canvas.getContext('2d');
+  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
+  video.muted = true;
+  video.style.display = 'none';
+  d.el.append(canvas, video);
+
+  let camStream = null;
+  let source = 'canvas';
+
+  setInterval(() => {
+    if (camStream) return;                    // the camera draws its own picture
+    const t = Date.now();
+    g.fillStyle = '#11151d'; g.fillRect(0, 0, 480, 270);
+    g.fillStyle = '#ffd400';
+    g.font = 'bold 26px ui-monospace, monospace';
+    g.fillText(new Date(t).toISOString().slice(11, 23), 18, 46);
+    g.fillStyle = '#2b3546'; g.fillRect(18, 70, 444, 8);
+    g.fillStyle = '#ffd400'; g.fillRect(18, 70, (t / 12) % 444, 8);
+  }, 40);
+
+  d.on('camera', async () => {
+    if (camStream) { d.log('camera already on'); return; }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 270, frameRate: 25 }, audio: false,
+      });
+      source = 'camera';
+      const t = camStream.getVideoTracks()[0];
+      d.log(`camera on: ${t.label || 'default'}`, 'hi');
+      const pv = el('video', '', null, { playsinline: '', muted: '', autoplay: '' });
+      pv.muted = true; pv.srcObject = camStream;
+      await pv.play().catch(() => {});
+      // draw the camera INTO the same canvas, so one recording path serves both
+      // sources and everything measured below is identical either way
+      const draw = () => {
+        if (!camStream) return;
+        g.drawImage(pv, 0, 0, 480, 270);
+        requestAnimationFrame(draw);
+      };
+      draw();
+    } catch (e) {
+      // report the CAPABILITY, not an error string — the lesson @moq/net taught
+      d.log(`camera refused: ${e.name} — staying on the canvas`, 'bad');
+    }
+  });
+
+  // ── recording ────────────────────────────────────────────────────────────
+  // Every chunk is stamped when it ARRIVES, which is the only instant this API
+  // gives us. It is NOT when the frames inside it were captured: MediaRecorder
+  // publishes no capture timestamp per chunk, so "how old is this blob's oldest
+  // frame" is not observable here and this page does not pretend to know it.
+  const chunks = [];        // { at, size, gapMs } — at is wall ms since record start
+  let blobs = [];
+  let mime = null, bytes = 0, recording = false;
+  let recordedMs = null;    // wall clock: stop - start
+  let fileMs = null;        // what the file itself says, once resolved
+
+  const paint = () => {
+    d.set('mime', mime ? mime.replace('video/', '') : null);
+    d.set('chunks', chunks.length);
+    d.set('kib', bytes ? Math.round(bytes / 1024) : null);
+    d.set('recorded', recordedMs === null ? null : Math.round(recordedMs) / 1000);
+    d.set('file', fileMs === null ? null : Math.round(fileMs) / 1000);
+    // no `?? 0` anywhere here: a number this page has not observed renders as
+    // an em dash, never as a confident zero
+    lanes();
+  };
+
+  d.on('rec', async () => {
+    if (recording) return;
+    chunks.length = 0; blobs = []; bytes = 0; recordedMs = null; fileMs = null;
+    seeks.length = 0;
+    master?.dispose(); master = null;
+    deck.pause?.(); deck.seek?.(0); deck.setRange([0, TAKE_MS]);
+
+    const stream = canvas.captureStream(25);
+    // NEGOTIATED, never assumed. Three demos hard-coded a WebM-only list and
+    // stopped dead on WebKit, which records MP4 and never WebM.
+    mime = recorderMime(d);
+    if (!mime) return;
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
+
+    const t0 = performance.now();
+    let lastAt = 0;
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      const at = performance.now() - t0;
+      chunks.push({ at, size: e.data.size, gapMs: chunks.length ? at - lastAt : at });
+      lastAt = at;
+      blobs.push(e.data);
+      bytes += e.data.size;
+      paint();
+    };
+    rec.onerror = (ev) => d.log(`recorder: ${ev.error?.name ?? 'error'}`, 'bad');
+
+    recording = true;
+    rec.start(SLICE_MS);
+    d.log(`recording ${mime} from the ${source}, ${SLICE_MS} ms slices`, 'hi');
+    await new Promise((r) => setTimeout(r, TAKE_MS));
+    rec.stop();
+    recordedMs = performance.now() - t0;
+    recording = false;
+    // the delay from stop() to the final chunk — a real number, and a DIFFERENT
+    // one from capture-to-available latency, which this API cannot report
+    await new Promise((r) => setTimeout(r, 300));
+    paint();
+    d.log(`stopped after ${(recordedMs / 1000).toFixed(2)}s — ${chunks.length} chunks, ${Math.round(bytes / 1024)} KiB`);
+    await putOnTimeline();
+    runChecks();
+  });
+
+  // ── the take, on a timeline ──────────────────────────────────────────────
+  //
+  // ONE DECK, for the page's whole life. The strip and the bar bind their deck
+  // at construction, so a deck built later would leave both pointing at
+  // something else — and a page with no timeline until you press record has
+  // nothing to show you what it is about. It starts on the length we are about
+  // to record and `setRange`s to what the file turns out to say.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, TAKE_MS] });
+  let master = null, rafOn = false;
+
+  /**
+   * `duration: Infinity`, turned into a measurement rather than hidden.
+   *
+   * A MediaRecorder file usually reports Infinity, which leaves the transport
+   * bar with no range — its seekability test is exactly
+   * `Number.isFinite(deck.durationMs) && deck.durationMs > 0`. The known dance
+   * is to seek far past the end, let the browser resolve the real duration,
+   * then come back.
+   *
+   * So the deck is built IMMEDIATELY on the wall-clock length we already know,
+   * and `setRange` moves it once the file answers. The range has not been fixed
+   * at construction since v0.5, `deck.range` stays one stable reference, and
+   * `rangeGen()` moves — which the transport bar already re-derives from, so
+   * this costs the bar nothing. The difference between the two lengths goes on
+   * the page instead of being swallowed.
+   */
+  async function resolveDuration() {
+    await new Promise((res) => {
+      video.addEventListener('loadedmetadata', res, { once: true });
+      setTimeout(res, 4000);
+    });
+    if (!Number.isFinite(video.duration)) {
+      video.currentTime = 1e6;
+      await new Promise((res) => {
+        const on = () => {
+          if (Number.isFinite(video.duration)) { video.removeEventListener('timeupdate', on); res(); }
+        };
+        video.addEventListener('timeupdate', on);
+        setTimeout(res, 3000);
+      });
+      video.currentTime = 0;
+    }
+    return Number.isFinite(video.duration) ? video.duration * 1000 : null;
+  }
+
+  async function putOnTimeline() {
+    if (!blobs.length) { d.log('nothing recorded', 'bad'); return; }
+    const blob = new Blob(blobs, { type: mime });
+    video.src = URL.createObjectURL(blob);
+    video.style.display = '';
+    canvas.style.display = 'none';
+    armVideo(video);
+
+    // the range is the length we measured, the moment the take exists
+    deck.setRange([0, Math.round(recordedMs)]);
+    // L1: the master is never nudged. The video's currentTime is READ; nothing
+    // in this file ever writes it from the deck. The one place currentTime is
+    // written is the seek handler below, which is the client issuing a seek
+    // COMMAND — L4b's explicit exception — not the vector driving the picture.
+    master?.dispose();
+    master = mediaMaster(deck, video, { onEvent: (e) => d.log(`master: ${e.reason}`) });
+    if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); master?.tick(); })(); }
+
+    fileMs = await resolveDuration();
+    if (fileMs !== null) deck.setRange([0, Math.round(fileMs)]);
+    paint();
+    await playOrPrompt(video, d);
+    d.log(fileMs === null
+      ? 'the file will not say how long it is — the bar keeps the recorded length'
+      : `recorded ${(recordedMs / 1000).toFixed(2)}s, the file says ${(fileMs / 1000).toFixed(2)}s`, 'hi');
+  }
+
+  // ── seeks: asked against got ─────────────────────────────────────────────
+  // `in` is a request, not a fact. With a 2 s GOP only one part per segment is
+  // INDEPENDENT, so a seek lands on a keyframe rather than the instant asked
+  // for. That is the element being honest, not an error.
+  const seeks = [];         // { asked, got, offMs }
+  video.addEventListener('seeked', () => {
+    if (pendingSeek === null) return;
+    const got = video.currentTime * 1000;
+    seeks.push({ asked: pendingSeek, got, offMs: got - pendingSeek });
+    pendingSeek = null;
+    paint();
+  });
+  let pendingSeek = null;
+  /** the client's seek COMMAND — L4b: rVFC observes, currentTime commands */
+  function askSeek(ms) {
+    if (!Number.isFinite(video.duration)) return false;
+    pendingSeek = ms;
+    video.currentTime = ms / 1000;
+    return true;
+  }
+
+  // ── the picture ──────────────────────────────────────────────────────────
+  const NOT_YET = '#3b424e';
+  const BANDS = [
+    [1, '#8fd6a8', 'on cadence'],
+    [2, '#ffd400', 'late'],
+    [Infinity, '#e0908a', 'well late'],
+  ];
+  const bandFor = (ms) => BANDS.find(([lim]) => Math.abs(ms) / SLICE_MS < lim);
+
+  function laneSpecs() {
+    return [
+      {
+        // one mark per chunk, coloured by how close its arrival was to the
+        // timeslice we asked for. Colour means HOW IT LANDED, never which lane.
+        id: 'chunks', kind: 'chunk', label: 'chunks', height: 52, width: 2,
+        as: 'ticks', color: NOT_YET, terse: true,
+        rows: () => chunks.map((c, i) => ({
+          at: c.at, id: `c${i}`, kind: 'chunk', payload: { i, ...c },
+        })),
+        colorOfRow: (r) => bandFor(r.payload.gapMs - SLICE_MS)[1],
+        describeRow: (r) => {
+          const p = r.payload;
+          const off = p.gapMs - SLICE_MS;
+          return [`${Math.round(p.size / 1024)} KiB`,
+                  `${off >= 0 ? '+' : ''}${off.toFixed(0)} ms off the ${SLICE_MS} ms slice`];
+        },
+      },
+      {
+        // empty until you scrub, and the gutter says so rather than showing a
+        // zero for something nobody has asked for yet
+        id: 'seeks', kind: 'seek', label: 'seeks', height: 44, width: 2,
+        as: 'ticks', color: NOT_YET, terse: true,
+        rows: () => seeks.map((s, i) => ({
+          at: s.asked, id: `s${i}`, kind: 'seek', payload: { i, ...s },
+        })),
+        colorOfRow: (r) => (Math.abs(r.payload.offMs) < 40 ? '#8fd6a8'
+          : Math.abs(r.payload.offMs) < 250 ? '#ffd400' : '#e0908a'),
+        describeRow: (r) => {
+          const p = r.payload;
+          return [`asked ${(p.asked / 1000).toFixed(2)}s, got ${(p.got / 1000).toFixed(2)}s`,
+                  `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms — the nearest keyframe`];
+        },
+      },
+    ];
+  }
+
+  createTransportBar(d.el, deck, { scrub: false });
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    // A SCRUB IS A COMMAND TO THE ELEMENT, not the vector driving the picture.
+    //
+    // The strip's default is `deck.seek()`, and with a media master attached
+    // that does nothing you can see: L1 says the master is never nudged, so
+    // mediaMaster reads the video, sees the vector has wandered, and pulls it
+    // straight back. Driven in a browser, dragging moved the deck and the
+    // picture carried on playing — the deck's numbers advanced at exactly
+    // real time, which is the tell.
+    //
+    // L4b names the exception: rVFC observes, `currentTime` commands. So the
+    // drag issues a real element seek and mediaMaster reconciles the deck to
+    // it as a jump, which is the direction the laws want.
+    onSeek: (pos) => { if (!askSeek(pos)) deck.seek(pos); },
+    lanes: laneSpecs(),
+  });
+
+  const median = (xs) => {
+    if (!xs.length) return null;
+    const a = [...xs].sort((p, q) => p - q);
+    return a[a.length >> 1];
+  };
+
+  function lanes() {
+    const L = view.strip.lanes();
+    const c = L.find((l) => l.id === 'chunks');
+    if (c) {
+      if (!chunks.length) c.subLabel = ['nothing recorded yet'];
+      else {
+        const offs = chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS));
+        const typ = median(offs), worst = offs.length ? Math.max(...offs) : null;
+        c.subLabel = typ === null
+          ? [`${chunks.length} chunk`, `${Math.round(bytes / 1024)} KiB, in memory`]
+          : [`typical ${typ.toFixed(0)} ms off`, `worst ${worst.toFixed(0)} ms · ${Math.round(bytes / 1024)} KiB`];
+      }
+    }
+    const s = L.find((l) => l.id === 'seeks');
+    if (s) {
+      if (!seeks.length) s.subLabel = ['drag the strip', 'to ask for a position'];
+      else {
+        const offs = seeks.map((x) => Math.abs(x.offMs));
+        s.subLabel = [`typical ${median(offs).toFixed(0)} ms off`,
+                      `worst ${Math.max(...offs).toFixed(0)} ms`];
+      }
+    }
+    // `jumps` and `corrections` both move; `lastCorrectionMs` sat at an em dash
+    // for a whole session because a correction only happens OUTSIDE the dead
+    // band, and a short take inside tolerance never produces one. A cell that
+    // can only ever be blank is not a measurement.
+    const st = master?.stats?.();
+    d.set('follow', st ? `${st.jumps} jumps · ${st.corrections} corr` : null);
+    view.strip.invalidate();
+  }
+  setInterval(lanes, 250);
+
+  // ── the checks, on their own ─────────────────────────────────────────────
+  // They run when a take exists rather than behind a button, and they assert
+  // the MECHANISM: that a mime was negotiated, that the range became seekable,
+  // that a seek reports what it actually got. An assert that has to wait gets
+  // written tolerantly, and a tolerant assert is how `loops` spent its whole
+  // life not looping.
+  let asserted = false;
+  async function runChecks() {
+    if (asserted) return;
+    asserted = true;
+
+    d.assert('the mime was negotiated, not assumed',
+      typeof mime === 'string' && /^video\//.test(mime), String(mime));
+    d.assert('chunks arrived with sizes', chunks.length > 0 && chunks.every((c) => c.size > 0),
+      `${chunks.length} chunks, ${Math.round(bytes / 1024)} KiB`);
+    d.assert('every chunk is stamped on arrival',
+      chunks.every((c) => Number.isFinite(c.at) && Number.isFinite(c.gapMs)),
+      `first at ${chunks[0] ? Math.round(chunks[0].at) : '—'} ms`);
+
+    // the range test the transport bar actually applies
+    const seekable = Number.isFinite(deck.durationMs) && deck.durationMs > 0;
+    d.assert('the take is seekable — a finite range, not Infinity', seekable,
+      `${deck.durationMs} ms`);
+
+    d.assert('the recorded length and the file length are both known',
+      Number.isFinite(recordedMs) && (fileMs === null || Number.isFinite(fileMs)),
+      fileMs === null
+        ? `recorded ${Math.round(recordedMs)} ms, the file would not say`
+        : `recorded ${Math.round(recordedMs)} ms, file ${Math.round(fileMs)} ms, ${Math.round(fileMs - recordedMs)} ms apart`);
+
+    // the picture masters the deck: mediaMaster is driving, and nothing here
+    // writes currentTime from the vector
+    d.assert('the picture masters the deck', !!master && typeof master.tick === 'function',
+      master ? `driving ${master.driving()}` : 'no master');
+
+    // a seek is a request; report what came back
+    if (Number.isFinite(video.duration)) {
+      const asked = Math.round(deck.durationMs * 0.5);
+      const before = seeks.length;
+      askSeek(asked);
+      for (let i = 0; i < 40 && seeks.length === before; i++) await new Promise((r) => setTimeout(r, 100));
+      const got = seeks[seeks.length - 1];
+      d.assert('a seek reports what it actually got, not what it asked for',
+        !!got && Number.isFinite(got.got),
+        got ? `asked ${Math.round(got.asked)} ms, got ${Math.round(got.got)} ms, ${Math.round(got.offMs)} ms apart`
+            : 'no seeked event');
+    }
+    paint();
+  }
+
+  // WHAT THIS PAGE CANNOT ANSWER, said rather than quietly missing:
+  //   · capture-to-available latency — MediaRecorder publishes no capture
+  //     timestamp per chunk, so how old the oldest frame in a blob is cannot be
+  //     observed from this API.
+  //   · any content anchor — "the wall-clock instant this frame was captured,
+  //     against timeline zero". plan-glass P0 blocks it: every anchor number
+  //     this project has printed carries about one frame of rVFC bias.
+  d.log('nothing here leaves the page: no upload, no fetch, no server');
+  d.log('it cannot tell you how old a chunk\'s oldest frame is, or anchor a frame to the wall clock — neither is observable here');
+  d.ready();
+</script>
+</html>
