@@ -1,4 +1,4 @@
-# plan-uuu-local — U:'s scores through our compiler, with the network out of the beat path
+# plan-uuu-local — U:'s scores through our compiler, with the network out of the TIMING path
 
 Status: **not started, and mostly already true.** Written 2026-09-07 out of the
 question "could uuu's local material run through the vClick compiler, and does
@@ -12,17 +12,46 @@ is only the plan that follows from it. `timeline/csound.mjs`'s header cites that
 
 ## 0. One line
 
-**The network does not kill it. The compiler is what removes the network** —
-vClick puts a server in the critical path of every beat, and compiling the
-tempo map once hands the client the beat↔ms map so it can answer "where are we
-now" for itself. A single-device vClick page needs **no network at all**, and
-`demo/vclick/` already is one: it imports nothing but `/shell/` and `/timeline/`
-and makes no `fetch`, no `WebSocket`, no HTTP request of any kind.
+**The network stays. What leaves is the network's place in the TIMING path.**
 
-What still needs a network is per-PIECE and per-SESSION, never per-beat:
-distributing the score once, agreeing a shared clock if more than one device is
-playing, and finding the other devices at all. The third of those is the one
-positron does not have and U: does.
+An earlier draft of this file said "the compiler removes the network", and that
+is wrong in a way worth recording, because the correction is the actual point.
+vClick has a server and a client for a reason that compiling does not touch:
+**band members need click tracks, in their ears, together.** Several humans on
+several devices hearing one pulse is the whole job. No amount of compiling makes
+that a single-device problem.
+
+What compiling changes is WHAT the network carries and how much timing depends
+on it:
+
+| | vClick today | compiled |
+|---|---|---|
+| the score | executed server-side | distributed once, held by each client |
+| position | pushed every beat over OSC | derived locally from the beat↔ms map |
+| a network blip | a missed beat | costs nothing already delivered |
+| what timing depends on | network jitter | **clock agreement** |
+
+So the network's remaining jobs are per-PIECE and per-SESSION, never per-beat:
+distribute the score once, agree a start instant, carry transport commands when
+an operator jumps to bar 47 in rehearsal, and let devices find each other at
+all. That last is the one positron does not have and U: does.
+
+**This is not a smaller claim than the one it replaces — it is a different and
+better-supported one.** This project has already measured what it buys: a
+committed loop is a VALUE, and identical loops held across links from 1.1 ms to
+4700.8 ms, with 25% packet loss changing nothing, because the loop plane is one
+message rather than a stream of them. The cost of a slow link is paid in
+PASSES, not in timing. And the negative control is decisive — with the skew
+correction off, the flam is *exactly* the injected skew.
+
+Which names the real hard problem, and it is not bandwidth or latency:
+**clock agreement between devices.** HANDOFF still lists min-RTT skew over a
+real link as the one unmeasured number; everything so far is loopback.
+
+A single device needs no network at all, and `demo/vclick/` already is one — it
+imports nothing but `/shell/` and `/timeline/` and makes no `fetch`, no
+`WebSocket`, no HTTP request of any kind. That is the existence proof for the
+derivation, not a proposal to play alone.
 
 ---
 
