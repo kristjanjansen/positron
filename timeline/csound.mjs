@@ -307,3 +307,41 @@ export function repeatsAsQuotations(compiled, { ref, quotation }) {
     rate: 1,
   }));
 }
+
+/**
+ * A Csound score as a score-document PART (plan-score.md P1).
+ *
+ * `compileCsound` already computes everything this needs; the only work here is
+ * re-shaping it into the container's envelope, which is deliberately narrow:
+ * when, how long, what kind, which line. The p-fields go under `payload`
+ * VERBATIM. There is no attempt to name p5 "frequency" or p4 "amplitude" —
+ * only the instrument knows, and a container that guessed would be lying in a
+ * field a reader would trust.
+ *
+ * IN BEATS, because that is what the document stores and what a Csound score
+ * is written in. `expand: false` on purpose: a repeat belongs in `uses` as one
+ * entry with a count, and expanding it into rows here would throw away the only
+ * thing this format has over a flat event list.
+ *
+ * @returns {{part, tempo, repeats, durationMs}} — `tempo` is the [beat, bpm]
+ *          pair list the document carries, `repeats` the `n` statements ready
+ *          for `repeatsAsQuotations`.
+ */
+export function csoundPart(text, { kind = 'note' } = {}) {
+  const compiled = compileCsound(text, { kind, expand: false });
+  const rows = compiled.items.map((it, i) => ({
+    id: `n${i + 1}`,
+    at: it.payload.beat,
+    dur: it.payload.durBeats,
+    kind: it.kind,
+    line: it.payload.line,
+    // verbatim, and tagged by the part's `lang` rather than translated
+    payload: { instr: it.payload.instr, p: it.payload.p },
+  }));
+  return {
+    part: { lang: 'csound', rows, warnings: compiled.warnings },
+    tempo: compiled.tempo.points.map(([b, m]) => [b, m]),
+    repeats: compiled.repeats,
+    durationMs: compiled.durationMs,
+  };
+}
