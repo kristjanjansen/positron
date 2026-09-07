@@ -82,7 +82,6 @@
     showReadout: false,
     controls: [
       { id: 'sound', label: 'Play with sound', primary: true },
-      { id: 'seek', label: 'Jump into the repeat' },
     ],
   });
   guard(d);
@@ -433,18 +432,11 @@
     d.log('playing with sound', 'hi');
   });
 
-  d.on('seek', () => {
-    const rep = structural?.repeats?.[0];
-    if (!rep) { d.log('this score has no m/n repeat to jump into', 'bad'); return; }
-    const use = doc.uses.find((u) => u.id.startsWith(rep.name));
-    if (!use) { d.log('the repeat is not in the document', 'bad'); return; }
-    const mid = tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2);
-    parent.seek(mid);
-    const fold = child.reduceAt('note', child.position());
-    d.log(`jumped to ${(mid / 1000).toFixed(2)}s — inside the repeat, beat `
-      + `${tm.beatAtMs(child.position()).toFixed(2)}, fold ${fold?.count}`, 'hi');
-  });
-
+  // No "jump into the repeat" button. Seeking into the score IS this page's
+  // claim, but the button only did by hand what two asserts already do on
+  // their own — `the fold is exact either side of every note` probes twenty
+  // positions, and `a seek into the repeat folds correctly` lands inside it —
+  // and the strip is a position surface you can drag there yourself.
   compile();
 
   // ── the checks, carried over from vclick and adapted to the container ────
