@@ -49,6 +49,103 @@ let stopping = false;   // a SIGTERM exit is not a fault
 const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*PI*440*t))"
   + "*(0.75+0.25*sin(2*PI*0.25*t))':s=48000:c=stereo";
 
+// ── the burned pattern ──────────────────────────────────────────────────────
+//
+// A COPY of demo/shell/pattern.mjs's ffmpegFilters(), which is where the spec
+// lives — the same file draws the browser-canvas version, so the two publishers
+// cannot drift apart on the geometry that 09 ladder compares. It is duplicated
+// here ONLY because the image is built from `COPY server.mjs .`, one file, with
+// nothing to import from. src/publish.sh does NOT duplicate it; it generates
+// its filter from pattern.mjs directly. If you change one, change the other.
+//
+// TRAP: drawtext with no `fontfile` resolves to nothing and FAILS SILENTLY, so
+// the epoch never reaches the pixels — the one thing that makes glass-to-glass
+// measurable. The path below is in ttf-dejavu, which the Dockerfile installs
+// (verified against node:22-alpine + ttf-dejavu, 2026-09-07).
+//
+// MONOSPACE, not DejaVuSans-Bold: in a proportional face the digits shift
+// sideways as they change, which is jitter in exactly the region a reader is
+// watching. src/publish.sh has used a monospace bold all along.
+const FONT = '/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf';
+
+// FROZEN — byte-identical to demo/shell/pattern.mjs and rig/whep/publish.html.
+// 48-bit epoch ms, MSB first, then the 8-bit XOR of those six bytes.
+const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: 40, Y: 100, H: 80 };
+
+/** Single-quote a filtergraph option value; the inner escapes are drawtext's. */
+const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
+
+/**
+ * The 56-block row as 57 drawboxes, each gated by an `enable` expression.
+ *
+ * MEASURED 2026-09-07, ffmpeg@7, 1280x720@30 through these exact x264 settings,
+ * decoded back out with readBurned()'s own algorithm: 150 of 150 frames
+ * checksum-clean, worst error 0 ms, and a deliberately corrupted block IS
+ * rejected. Cost: +16 % encoder-process CPU (utime 3.095 s -> 3.598 s per 20 s
+ * of video).
+ *
+ * OFF BY DEFAULT ANYWAY. This box is 1 vCPU running TWO 720p30 encodes, and
+ * half a vCPU already stalled that pair once (wrangler.jsonc). +16 % on each leg
+ * is a real bite out of a budget nobody has re-measured on the actual instance,
+ * and the only way to find out is to switch it on for one run and watch EXTINF
+ * sd — which is 0.003 s today and is what a starved encoder wrecks first.
+ * Flip PUB_ROW=1 in the worker's vars; no image rebuild needed.
+ */
+function rowFilters(epoch) {
+  const ms = `floor((t+${epoch})*1000)`;
+  const bit = (n) => `mod(floor(${ms}/${2 ** n}),2)`;
+  const exprs = [];
+  for (let i = 0; i < 48; i++) exprs.push(bit(47 - i));
+  for (let i = 48; i < ROW.NBLOCKS; i++) {
+    // XOR of one bit position across six bytes is the parity of their sum,
+    // which the expression language CAN do — it has no xor.
+    const k = ROW.NBLOCKS - 1 - i;
+    exprs.push(`mod(${[0, 1, 2, 3, 4, 5].map((m) => bit(8 * m + k)).join('+')},2)`);
+  }
+  return [
+    `drawbox=x=${ROW.X - 20}:y=${ROW.Y - 20}:w=${ROW.NBLOCKS * ROW.BLOCK_W + 40}`
+      + `:h=${ROW.H + 40}:color=black:t=fill`,
+    ...exprs.map((e, i) => `drawbox=x=${ROW.X + i * ROW.BLOCK_W}:y=${ROW.Y}`
+      + `:w=${ROW.BLOCK_W}:h=${ROW.H}:color=white:t=fill:enable='${e}'`),
+  ];
+}
+
+/**
+ * The whole -vf chain: hue, optional row, and TWO LABELLED CLOCKS.
+ *
+ * `hue` is a ROTATION of the source's colours, not an absolute hue — testsrc2
+ * has no single hue to set. It exists so two publishers are distinguishable at
+ * a glance, which is why the two legs below pass different values.
+ *
+ * The absolute clock is in SECONDS where the canvas prints milliseconds. Not a
+ * choice: drawtext's `%{expr_int_format:…:d}` clamps at INT32_MAX, so epoch ms
+ * (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of floating-point
+ * result to int failed" — measured. Hence the unit printed beside the number.
+ */
+function drawFilters({ epoch, hue = 0, label = 'positron', row = false }) {
+  const text = (t, y, size) => [
+    `drawtext=fontfile=${q(FONT)}`, `text=${q(t)}`,
+    'x=40', `y=${y}`, `fontsize=${size}`, 'fontcolor=black',
+    'box=1', 'boxcolor=white', 'boxborderw=12',
+  ].join(':');
+  const safe = String(label).replace(/[^A-Za-z0-9 _-]/g, '');
+  return [
+    // hue FIRST: rotating chroma afterwards would tint the white boxes and,
+    // with the row on, the row itself — which readBurned thresholds on.
+    ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
+    ...(row ? rowFilters(epoch) : []),
+    // ABSOLUTE — pts-derived, the same instant the row encodes.
+    text(`ABS %{pts\\:flt\\:${epoch}} s  ${safe}`, 240, 46),
+    // LEGIBLE — this box's own wall clock, for a human with a watch. The two
+    // drifting apart is real information: it is encoder drift.
+    // The triple backslash is not a typo: gmtime's strftime argument has to
+    // survive drawtext's expansion parser, which splits `%{name:args}` on a
+    // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
+    // with "%{gmtime} requires at most 1 arguments".
+    text('UTC %{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 320, 40),
+  ].join(',');
+}
+
 /**
  * tracks: "av" (default), "v" (video only) or "a" (audio only).
  *
@@ -59,19 +156,11 @@ const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*
  * first ~20 s. A video-only stream has no audio group at all. If the stutter
  * disappears there, audio is the cause; if it survives, it is not.
  */
-function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av' }) {
+function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av', row = false }) {
   const gop = fps * 2;
-  const epoch = (Date.now() / 1000).toFixed(6);
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
-  const draw = [
-    // explicit fontfile: drawtext with no font resolves to nothing and the
-    // epoch never reaches the pixels — a silent failure of the one thing
-    // that makes glass-to-glass measurable
-    `drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf`,
-    `text='%{pts\\:flt\\:${epoch}}'`,
-    'x=36', 'y=36', 'fontsize=52', 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=13',
-  ].join(':');
+  const epoch = (Date.now() / 1000).toFixed(6);
+  const draw = drawFilters({ epoch, hue: 0, label: 'rtmps', row });
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
   return [
@@ -108,15 +197,13 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
  *    negotiation gate (run 1 of those notes proved it first try)
  *  · -bf 0 for the same reason as the RTMPS leg
  */
-function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
+function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, row = false }) {
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = [
-    'drawtext=fontfile=/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
-    `text='%{pts\\:flt\\:${epoch}}'`,
-    'x=36', 'y=36', 'fontsize=52', 'fontcolor=black',
-    'box=1', 'boxcolor=white', 'boxborderw=13',
-  ].join(':');
+  // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
+  // processes on two Cloudflare inputs — the page already says so — and 09
+  // ladder shows them side by side, where telling them apart is the point.
+  const draw = drawFilters({ epoch, hue: 150, label: 'whip', row });
   return [
     '-hide_banner', '-loglevel', 'warning',
     '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
