@@ -62,6 +62,57 @@ then a stale check that had silently stopped preferring native HLS since iOS
 **A re-run on 2026-09-07 read 301/313** — no UDP egress in that shell, so every
 WebRTC/QUIC leg failed. See the re-verification note below before quoting 332.
 
+### Later on 2026-09-07 — `take`, one pattern module, and three dead paths
+
+**`take` is a local video timeline.** Record is in the transport bar (on this
+page it is a transport verb, not a side control — `createTransportBar` grew an
+`extras` list for it, defaulting to empty). Two takes lie end to end on one
+line, so exactly one part is ever under the playhead, which is why
+`media-master` L1 holds: **the part being played IS the master.** Every frame
+burns its POSITION ON THE LINE, not wall time, with two rows of cells counting
+the same number, so a seek checks itself with no arithmetic. Driven by hand with
+two takes: **14 page asserts green**, including the boundary handover, which
+element drives the clock, local-vs-line time, and asked-vs-got. The suite
+presses each control once, makes ONE take, and so **8 of those cannot run** —
+there is no boundary to cross; the page logs which are outstanding rather than
+reading green over the gap.
+
+**`demo/shell/pattern.mjs`** is now the one burned-clock implementation for
+canvas and ffmpeg (`publish.sh` generates its filter by calling it). Verified
+600/600 exact off the canvas and **300/300 through VP8** at the demo's own
+settings. Checked before unifying: **the copies do NOT all agree** — three
+specs, not one drifting one, and families B (`proto/m2m`, +1 peer-id byte) and C
+(`proto/replay`, +a cue row) each document themselves as deliberate
+derivatives. So nothing published was broken, and nothing under `proto/`,
+`rig/` or `studio/` was touched. The ffmpeg bar row works (150/150 clean,
+survives a transcode ladder to 6.7 px blocks) and **ships OFF at `PUB_ROW=0`**:
++16 % encoder CPU on a 1 vCPU box already logging lag. ffmpeg cannot print epoch
+MILLISECONDS (`expr_int_format` clamps at INT32_MAX), so its clock is epoch
+seconds with the unit beside it — and it reads the container's machine, so the
+two numbers are not the same kind of number.
+
+**Three dead paths from the slug rename**, all found by looking rather than by a
+test going red:
+
+- `demo/shell/moq.mjs` imported `/08-moq/moq-vendor.js`. The 404 killed the
+  module, so **`moq` and `ladder` asserted NOTHING** for the life of the rename.
+  The harness had been printing `FAIL __demo.ready` / `0/1 green` — one line,
+  perfectly clear — and it was read as "relay/WebRTC in headless", which is
+  independently true of both pages. See LESSONS #29; the tell is the
+  DENOMINATOR, `0/1` versus `13/17`.
+- `verify-native.mjs` and `verify-safari.mjs` both fetched `/06-llhls/`, a 404.
+  **That is the iPhone code path**, the one harness `verify.mjs` cannot reach.
+
+`workers/view/build.mjs` refuses an import with no deployed file but **read HTML
+only**, so the dead one — inside a module — was never checked. It now scans
+`.mjs`/`.js`, proved by restoring the bad path and watching the build refuse.
+
+Two `verify.mjs` changes: `.tbar-x` joins the control selector (a control the
+harness cannot press is a subject it cannot reach), and the assert stabiliser
+now waits while the count is still ZERO — it used to exit as soon as the count
+stopped changing, and **zero never changes**, so a page whose first assert sits
+behind a wait read as "asserted nothing".
+
 ## 2026-09-04 — renamed to `positron`, moved to `positron.studio`
 
 Working dir `~/personal/elektron` → `~/personal/positron`. The domain is on

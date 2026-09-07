@@ -195,7 +195,19 @@ for (const t of targets) {
 
   const strip = await ev('!!document.querySelector("canvas.d-strip")');
   if (strip) {
-    const ink = await ev(`(() => {
+    // SAMPLE AFTER A FRAME, and more than once. `resize()` in strip.mjs assigns
+    // canvas.width, which CLEARS the canvas, and only then schedules a redraw —
+    // so there is a real window in which a working strip is blank, and a
+    // ResizeObserver can open it at any time (a readout value getting wider, a
+    // log line wrapping). Sampling one instant caught that window about one run
+    // in ten and reported `0 lit samples`, which reads as a dead page.
+    //
+    // This is a retry, not a tolerance: a strip that never draws still fails,
+    // because every try lands after a fresh frame. The count is in the detail
+    // so a strip that needs several tries is visible rather than silently
+    // passing.
+    const sample = () => ev(`(async () => {
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const c = document.querySelector('canvas.d-strip');
       const g = c.getContext('2d');
       const d = g.getImageData(0, 0, c.width, c.height).data;
@@ -203,7 +215,9 @@ for (const t of targets) {
       for (let i = 0; i < d.length; i += 4 * 53) if (d[i] + d[i+1] + d[i+2] > 90) lit++;
       return lit;
     })()`);
-    ok('strip has ink', ink > 0, `${ink} lit samples`);
+    let ink = 0, tries = 0;
+    for (; tries < 3 && !ink; tries++) ink = await sample();
+    ok('strip has ink', ink > 0, `${ink} lit samples${tries > 1 ? ` (${tries} tries)` : ''}`);
   }
 
   // exercise every control the demo declared, in order — a multi-step demo
@@ -238,13 +252,20 @@ for (const t of targets) {
   // the loop did not honour it. `take` made it concrete: recording runs to a
   // 10 s cap and every assert is behind it.
   //
-  // So there are two phases. While the count is still zero, wait up to the
-  // demo's own declared `settleMs` — the page has already said it is slow, and
-  // this is the same budget for the same reason. Once anything has been
-  // asserted, fall back to the cheap "stop when it stops growing".
+  // So there are two phases. While the count is still zero, wait — then fall
+  // back to the cheap "stop when it stops growing" once anything has landed.
+  //
+  // CAPPED, and not at `settleMs`. That number sizes a COLD CONTAINER (`tracks`
+  // declares 125 s), which is a control-0 concern and has already been waited
+  // out above. Reusing it here makes a page that will never assert — because
+  // its live leg is down — burn the whole budget a SECOND time, turning one
+  // demo into four minutes of a run. What this phase covers is a first assert
+  // sitting behind work the PAGE does (`take` records to a 10 s cap), which is
+  // a much smaller quantity, so it gets its own ceiling.
+  const FIRST_ASSERT_CEIL = 30000;
   const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
   let n = await countAsserts();
-  const firstBudget = Math.ceil((t.settleMs || 0) / 400);
+  const firstBudget = Math.ceil(Math.min(t.settleMs || 0, FIRST_ASSERT_CEIL) / 400);
   for (let i = 0; i < firstBudget && n === 0; i++) {
     await sleep(400);
     n = await countAsserts();
