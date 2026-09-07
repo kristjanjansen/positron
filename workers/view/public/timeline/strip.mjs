@@ -668,14 +668,17 @@ registerRenderer('spans', (ctx, L, C) => {
       g.addColorStop(0, col); g.addColorStop(1, 'transparent');
       ctx.globalAlpha = 0.5; ctx.fillStyle = g; ctx.fillRect(xb - 24, y, 24, barH);
     }
-    if (L.labels !== false && xb - xa > 46 && barH >= 9) {
+    // `labelOf` is handed the bar's WIDTH. Without it the narrowest span is
+    // the one that loses its label — and the narrowest span is often the one
+    // whose label matters most, since narrow is usually the thing being shown.
+    if (L.labels !== false && xb - xa > 30 && barH >= 9) {
       ctx.globalAlpha = 0.95; ctx.fillStyle = '#04121a';
       ctx.font = '10px ui-monospace, Menlo, monospace';
       // TOP-LEFT. A label on the baseline of a tall bar floats in the middle of
       // nothing and drifts as the bar's height changes; anchored to the corner
       // it stays where the eye goes first and is the same distance from the
       // edge whatever height the lane is given.
-      ctx.fillText(String(L.labelOf ? L.labelOf(s) : s.key), xa + 5, y + 11.5);
+      ctx.fillText(String(L.labelOf ? L.labelOf(s, { bw }) : s.key), xa + 5, y + 11.5);
     }
   }
   ctx.restore();
