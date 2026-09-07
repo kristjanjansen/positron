@@ -35,9 +35,10 @@
 
   d.how(
     `The inner piece exists once. Both places on the timeline point at it by ` +
-    `name — like citing a paragraph instead of retyping it — so there is one ` +
-    `source and two uses. The second use says "three times", which is why you ` +
-    `see three slices and still only one source.`,
+    `name — like citing a paragraph instead of retyping it. The first use ` +
+    `takes a slice of it. The second says "three times", so the three slices ` +
+    `you see side by side are one source played over and over, not three ` +
+    `copies of anything.`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
@@ -98,6 +99,16 @@
   let wraps = 0, lastPass = null;
   nest.onWrap(() => { wraps++; d.set('wraps', wraps); });
 
+  // A QUOTATION ARRIVING AND LEAVING IS AN EVENT. The nest counted enters and
+  // exits and had no way to subscribe to them, so a score made of quotations
+  // could be watched only by polling for it. `onPresence` is new and symmetric
+  // with `onWrap`; here it is what makes the structure audible in the log
+  // rather than only visible in the picture.
+  nest.onPresence(({ span, present, parentPos }) => {
+    d.log(`${span} ${present ? 'starts' : 'ends'} at ${(parentPos / 1000).toFixed(2)}s`,
+      present ? 'hi' : 'info');
+  });
+
   createTransportBar(d.el, parent, { scrub: false });
   const view = createStripView(d.el, parent, {
     size: 'auto', follow: false, armWall: false, gutter: 150,
@@ -119,7 +130,12 @@
       // the strip drew one long bar and the looping — the entire subject of this
       // page — was invisible. `rows` may return MORE rows than it was given, so
       // each pass becomes its own span and the loop reads as [ ][ ][ ].
-      { id: 'deck-span', kind: 'deck-span', label: 'quoted', height: 62, barPad: 7, as: 'spans',
+      { id: 'deck-span', kind: 'deck-span', label: 'quoted', height: 52, barPad: 8, as: 'spans',
+        // ONE ROW. The stack gives every distinct span key its own slot, which
+        // is right for things that overlap and wrong for four that never do:
+        // the three passes of a loop are one thing happening three times, and
+        // stairs down the lane read as four unrelated events.
+        stack: false, barGap: 3,
         terse: true, color: '#c9a0ff', alpha: 0.9,
         rows: () => {
           const out = [];
@@ -160,8 +176,18 @@
     if (!asserted) { asserted = true; check(); }
   }
 
+  // `iteration()` answers 0 wherever the playhead is, including before the loop
+  // has started — so the log announced "pass 1 of 3" at 0.25 s for a loop that
+  // begins at 5.5 s. A pass only exists while the playhead is inside the span.
+  const inLoop = () => {
+    const from = nest.iterationAt?.('loop', 0);
+    const to = nest.iterationAt?.('loop', 3);
+    const p = parent.position();
+    return Number.isFinite(from) && Number.isFinite(to) && p >= from && p < to;
+  };
+
   setInterval(() => {
-    const it = nest.iteration?.('loop');
+    const it = inLoop() ? nest.iteration?.('loop') : null;
     d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
     if (it !== lastPass) {
       if (it !== null && it !== undefined) d.log(`pass ${it + 1} of 3`, 'hi');
