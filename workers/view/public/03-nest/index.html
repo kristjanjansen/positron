@@ -16,12 +16,12 @@
   import { refDeck, quotation } from '/timeline/score.mjs';
   import { markAdapter, marks } from '/shell/fixture.mjs';
 
-  const PARENT = 12000, CHILD = 6000;
+  const PARENT = 12000, CHILD = 2000;
 
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'One recording, used three ways — nothing is copied. The bottom row is where its own marks land each time.',
+    what: 'One two-second recording, played three ways — nothing is copied. The bottom row is the four marks inside it, each time.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
@@ -34,11 +34,10 @@
   guard(d);
 
   d.how(
-    `Every use is the same kind of thing: a pointer at the recording by name, ` +
-    `with a start and an end — like citing a paragraph instead of retyping it. ` +
-    `What differs is the settings. The second use plays the same three seconds ` +
-    `at double speed, so it is half as wide and its marks are twice as close ` +
-    `together. The third takes a shorter piece and says "three times".`,
+    `All three uses point at the whole recording, so the same four marks turn ` +
+    `up in each — that is the bottom row. The middle one plays at double ` +
+    `speed, so it is half as wide and its marks are twice as close together. ` +
+    `The last one says "twice".`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
@@ -56,7 +55,12 @@
       d.log(`recording mark at ${(ev.at / 1000).toFixed(1)}s`);
     },
   });
-  const childItems = marks(12, CHILD);      // also projected into the parent below
+  // FOUR marks, at 0 / 0.5 / 1.0 / 1.5 s. Every use below takes the WHOLE
+  // recording, so all four appear in all of them and the only things that
+  // differ are width and repetition. The previous fixture had one use take 3 s
+  // of it and another 1.5 s, which changed the mark COUNT as well as the speed —
+  // two variables at once, and the reader could not tell which caused what.
+  const childItems = marks(4, CHILD);      // also projected into the parent below
   const child = createDeck({
     items: childItems,
     adapters: { mark: kidMarks.adapter },
@@ -106,11 +110,13 @@
   // carries. Same slice twice at two speeds is what makes "faster" a WIDTH you
   // can see rather than a word: six marks in three seconds, then the same six
   // in one and a half.
-  nest.add(quotation({ id: 'plain', ref: 'kurenniemi-1972', at: 500, in: 0, out: 3000 }));
-  nest.add(quotation({ id: 'fast', ref: 'kurenniemi-1972', at: 4200, in: 0, out: 3000,
+  // All three take 0–2s, the whole recording, and start on a whole second so
+  // the ruler above reads them without arithmetic.
+  nest.add(quotation({ id: 'plain', ref: 'kurenniemi-1972', at: 1000, in: 0, out: CHILD }));
+  nest.add(quotation({ id: 'fast', ref: 'kurenniemi-1972', at: 4000, in: 0, out: CHILD,
                        rate: 2 }));
-  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 6600, in: 0, out: 1500,
-                       repeat: 3 }));
+  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 6000, in: 0, out: CHILD,
+                       repeat: 2 }));
 
   // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
   // rather than shown. `onWrap` is what counts the passes; the log is left to
@@ -137,7 +143,7 @@
       // the strip drew one long bar and the looping — the entire subject of this
       // page — was invisible. `rows` may return MORE rows than it was given, so
       // each pass becomes its own span and the loop reads as [ ][ ][ ].
-      { id: 'deck-span', kind: 'deck-span', label: 'quoted', height: 52, barPad: 8, as: 'spans',
+      { id: 'deck-span', kind: 'deck-span', label: 'the recording', height: 52, barPad: 8, as: 'spans',
         // ONE ROW. The stack gives every distinct span key its own slot, which
         // is right for things that overlap and wrong for four that never do:
         // the three passes of a loop are one thing happening three times, and
@@ -165,13 +171,18 @@
         // see and does not need — and it made the two look like two KINDS of
         // thing. They are not: both are a pointer at the recording with a start
         // and an end. Only one of them also repeats.
-        labelOf: (sp) => {
+        // `labelOf` is handed the bar WIDTH, because the narrowest slice is the
+        // one whose label matters most — narrow IS the thing being shown. On a
+        // 2x slice the range goes and the speed stays; a later pass keeps its
+        // number and drops the rest.
+        labelOf: (sp, { bw } = {}) => {
           const p = sp.row?.payload || {};
-          // compact: a slice at 2x is half as wide and the label has to fit in
-          // it, so trailing zeros go rather than the speed
           const n = (ms) => String(+(ms / 1000).toFixed(1));
-          const at = `${n(p.from)}–${n(p.to)}s`;
-          return p.rate && p.rate !== 1 ? `${at} @${p.rate}x` : at;
+          const range = `${n(p.from)}–${n(p.to)}s`;
+          const fast = p.rate && p.rate !== 1 ? `@${p.rate}x` : '';
+          const pass = p.of > 1 ? `${p.pass}/${p.of}` : '';
+          if (bw && bw < 84) return fast || pass || range;
+          return [range, fast, pass].filter(Boolean).join(' ');
         },
         describeRow: (r) => {
           const p = r.payload || {};
@@ -187,9 +198,9 @@
       // Slate, not green: these are positions DERIVED from the score, not
       // observations. Colour on this site means how something landed, and
       // nothing here was measured.
-      { id: 'from-source', kind: 'mark', label: 'the recording', height: 44, width: 2,
+      { id: 'from-source', kind: 'mark', label: "what's in it", height: 44, width: 2,
         as: 'ticks', color: '#6f7d94', terse: true,
-        subLabel: ['its own marks,', 'each time it is used'],
+        subLabel: ['the same four marks,', 'every time it plays'],
         rows: () => {
           const out = [];
           for (const sp of nest.spans()) {
@@ -238,18 +249,18 @@
   // begins at 5.5 s. A pass only exists while the playhead is inside the span.
   const inLoop = () => {
     const from = nest.iterationAt?.('loop', 0);
-    const to = nest.iterationAt?.('loop', 3);
+    const to = nest.iterationAt?.('loop', 2);
     const p = parent.position();
     return Number.isFinite(from) && Number.isFinite(to) && p >= from && p < to;
   };
 
   setInterval(() => {
     const it = inLoop() ? nest.iteration?.('loop') : null;
-    d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
+    d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/2`);
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
-      L.subLabel = [`${nest.spans().length} uses, 1 source`,
-                    wraps ? `${wraps} wraps` : 'loop not reached'];
+      L.subLabel = [`played ${nest.spans().length} ways`,
+                    wraps ? `${wraps} wrap${wraps === 1 ? '' : 's'} so far` : 'one source'];
       view.strip.invalidate();
     }
   }, 200);
@@ -259,7 +270,7 @@
     const spans = nest.spans();
     d.assert('three uses registered', spans.length === 3, spans.map((s) => s.id).join(','));
     const loop = spans.find((s) => s.id === 'loop');
-    d.assert('loop declares 3 passes', loop && (loop.repeat === 3 || loop.repeat?.times === 3),
+    d.assert('loop declares 2 passes', loop && (loop.repeat === 2 || loop.repeat?.times === 2),
       JSON.stringify(loop && loop.repeat));
     const dr = nestedDrift(parent);
     const k = dr?.kinds?.mark;
@@ -287,7 +298,7 @@
       `${wraps} wraps · pos ${Math.round(parent.position())} · first boundary ${firstWrap}`);
   }
 
-  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s recording · used three ways`);
+  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s recording of ${childItems.length} marks · used three ways`);
   d.ready();
 </script>
 </html>
