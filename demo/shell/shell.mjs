@@ -153,18 +153,25 @@ export function mount({
  * superscript plus that is the charge and the name. The aperture is a WEDGE
  * FROM THE CENTRE (~11° to ~59°), not a quadrilateral down to the bottom edge:
  * the earlier version sliced the whole lower arc away and read as a damaged
- * circle rather than an 'e' at any size below 64 px. Checked at 16/24/32/64.
+ * circle rather than an 'e' at any size below 64 px.
+ *
+ * The .ico is a SEPARATE IMPLEMENTATION — a pixel loop, not a rasteriser — so
+ * matching parameters do not guarantee a matching picture, and it has to be
+ * LOOKED AT rather than reasoned about. Rendered at 16x and compared against
+ * three alternatives: too large a ring squashed the counter to a sliver and
+ * curled the terminal into a hook, while touching the left edge. These numbers
+ * leave ~4 px of margin on every side and an open bowl.
  */
 function favicon() {
   if (document.querySelector('link[rel="icon"]')) return;
   const BG = '%230b0e14', HI = '%23ffd400';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     `<rect width="32" height="32" rx="6" fill="${BG}"/>` +
-    `<circle cx="13" cy="19.4" r="8.4" fill="none" stroke="${HI}" stroke-width="3.4"/>` +
-    `<path d="M13 19.4L30 22.6L22.5 35Z" fill="${BG}"/>` +
-    `<rect x="4.6" y="17.7" width="16.8" height="3.4" fill="${HI}"/>` +
-    `<rect x="21.4" y="6.4" width="7.2" height="2.4" fill="${HI}"/>` +
-    `<rect x="23.8" y="4" width="2.4" height="7.2" fill="${HI}"/></svg>`;
+    `<circle cx="13.5" cy="19.3" r="7" fill="none" stroke="${HI}" stroke-width="3.2"/>` +
+    `<path d="M13.5 19.3L28.9 20.7L20.8 33Z" fill="${BG}"/>` +
+    `<rect x="5.6" y="17.9" width="15.4" height="2.5" fill="${HI}"/>` +
+    `<rect x="21.3" y="6.9" width="6.4" height="2.2" fill="${HI}"/>` +
+    `<rect x="23.4" y="4.8" width="2.2" height="6.4" fill="${HI}"/></svg>`;
   document.head.append(el('link', '', null, { rel: 'icon', href: 'data:image/svg+xml,' + svg }));
 }
 

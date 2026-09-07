@@ -81,7 +81,7 @@
     rows: L.onlyMeasured ? (rows) => rows.filter((r) => loopOf.has(Math.round(r.at))) : undefined,
     colorOfRow: (r, fired) => (!fired ? NOT_YET : outcomeOf(L.id, r)),
     describeRow: (r) => {
-      if (r.at > deck.position()) return 'not played yet';
+      if (!happened(L.id, r)) return 'not played yet';
       const v = verdictOf(L.id, r);
       return v ? [L.note, v] : [L.note, 'no per-note feedback from this lane'];
     },
@@ -105,9 +105,22 @@
     if (id === 'sound') return soundOf.get(Math.round(r.at));
     return undefined;
   }
+  // Did this lane DO anything at this position, whether or not it can say how
+  // well? `midi out` is the only lane that acts without being able to report,
+  // so it is the only one that needs a separate record of having acted.
+  const sentOf = new Set();
+  function happened(id, r) {
+    const at = Math.round(r.at);
+    if (id === 'worker') return driftOf.has(r.at) || driftOf.has(at);
+    if (id === 'sound') return soundOf.has(at);
+    if (id === 'midi') return sentOf.has(at);
+    if (id === 'midiin') return loopOf.has(at);
+    return false;
+  }
   function outcomeOf(id, r) {
     const m = metricOf(id, r);
-    return m === undefined ? UNMEASURED : bandColour(m);
+    if (m !== undefined) return bandColour(m);
+    return happened(id, r) ? UNMEASURED : NOT_YET;   // acted, but cannot say / nothing yet
   }
   function verdictOf(id, r) {
     const m = metricOf(id, r);
@@ -131,8 +144,7 @@
         if (!shown.includes(L.id)) continue;
         const name = L.label.padEnd(PAD);
         const line = (t) => lines.push({ text: `${name}${t}`, colour: L.swatch });
-        if (r.at > deck.position()) { line('not played yet'); continue; }
-        if (L.id === 'midiin' && !loopOf.has(Math.round(r.at))) { line('nothing arrived'); continue; }
+        if (!happened(L.id, r)) { line(L.id === 'midiin' ? 'nothing arrived' : 'not played yet'); continue; }
         const m = metricOf(L.id, r);
         if (m !== undefined) { line(`${m >= 0 ? '+' : ''}${m.toFixed(2)} ms`); continue; }
         const rt = L.id === 'midi' ? loopOf.get(Math.round(r.at)) : undefined;
@@ -368,6 +380,7 @@
     // negative, so out is AT MOST the round trip. That is derived, not observed,
     // so it is worded as a ceiling and the lane stays uncoloured — a lane is
     // only coloured by evidence it produced itself.
+    if (midi) for (const x of midi.scheduled()) sentOf.add(Math.round(x.at));
     if (!midi) say('midi', 'no device');
     else {
       const back = [...loopOf.values()];

@@ -27,13 +27,20 @@ body {
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); text-decoration: none; display: inline-block; margin-bottom: 10px;
 }
+/* the head is the only place on the page with nothing to do, so it is where
+   the page gets to breathe. Phones keep the tight version — there the scarce
+   thing is height, not calm. */
+@media (min-width: 600px) {
+  .d-back { margin-bottom: 30px; }
+  .d-what { margin-top: 12px; }
+}
 .d-back:hover { color: var(--hi); }
 .d-title { display: flex; align-items: baseline; gap: 10px; }
 .d-n { font: 600 11px/1.4 var(--mono); color: var(--hi); font-variant-numeric: tabular-nums; }
 .d-name {
   font: 600 17px/1.2 var(--mono); letter-spacing: .01em; margin: 0;
 }
-.d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; }
+.d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
 
 /* how it works — one plain paragraph */
 .d-how { margin: 8px 0 0; }
