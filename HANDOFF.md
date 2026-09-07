@@ -1,4 +1,4 @@
-# Handoff — 2026-09-05 (end of session 9)
+# Handoff — 2026-09-07 (end of session 11)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
@@ -7,13 +7,50 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**, **24 of 28 demos built, 332/332 green**. This
-session found why iOS stuttered — our own drift-seek, then a stale check that
-had silently stopped preferring native HLS since iOS 17.1 added
-ManagedMediaSource — built **08 moq** (p50 20.3 ms, no container needed) and
-**24 capture** (camera to R2 to timeline through a tokenless capped ingest),
-and cleared Stream storage from **559.97 to 15.81** of a 1000-minute cap it was
-two days from hitting.
+Live on **positron.studio**. Session 11 was a **UI/UX review of the demos, one
+at a time**, and it found that a reader's every "I don't understand this"
+named a real defect rather than a wording preference. `01 transport` was
+**printing a fabricated `0` for the one number it exists to report** — and its
+assert passed on the empty array that caused it. The stop-at-end lived in the
+render loop, so a hidden tab let a 20 s deck reach **91,001 ms** while still
+reporting `playing: true`. The transport bar **overflowed a 390 px phone by
+94 px and clipped two rate buttons off the edge**. And the page carried two
+horizontal time axes that disagreed, one of which — the strip — had always been
+the better scrubber. `01` and `02` are fixed and are the worked examples; the
+other 22 have not had the pass. **127/127 green** across the eight strip demos,
+per-demo counts unchanged.
+
+New: `demo/shell/hardware.mjs` (one gesture buys sound + MIDI out, capability
+reported rather than error), `createMidiLane` in `timeline/transport.mjs` — which spent its first
+run scheduling every note **fifty-six years into the future**, because
+`MIDIOutput.send()` speaks `performance.now()` and the transport's clock is
+epoch ms. Its own counter went up regardless: **it counts what we QUEUED, not
+what the port accepted.** Fixed, and then MEASURED through the IAC loopback: **p50 0.4 / p95 0.6 /
+max 3.7 ms, n=31** — send to our own JS handler, an upper bound that includes
+the event loop, never send to a synth on a cable. `e.timeStamp` is useless for
+this (exactly 0.000 five times out of five: CoreMIDI passes the send stamp
+through). `verify.mjs` still cannot reach any of it, since headless Chrome
+needs `Browser.grantPermissions` for midi to enumerate a port at all, and
+`d.how()` in the shell. `CLAUDE.md`'s writing conventions were rewritten: the
+old "no explanatory prose" rule is what produced pages only their author could
+read.
+
+
+### Session 10, for context
+
+Live on **positron.studio**, **24 of 28 demos built, 332/332 green** when
+session 10 closed. That session finished the demo spine — `25 show` (recorded
+off the received stream), `26 shout` (Icecast through a Worker, −0.8 ms of
+carry), `27 tracks` (audio-only LL-HLS is smaller, not faster) and `28 vclick`
+(a Csound score compiled into something you can seek into) — simplified
+`11 grid` to one tier, and found that **291 asserts had been green across three
+pages that never once played a frame of HLS in Chrome**, because they gated on
+`canPlayType`. Session 9 before it found why iOS stuttered: our own drift-seek,
+then a stale check that had silently stopped preferring native HLS since iOS
+17.1 added ManagedMediaSource.
+
+**A re-run on 2026-09-07 read 301/313** — no UDP egress in that shell, so every
+WebRTC/QUIC leg failed. See the re-verification note below before quoting 332.
 
 ## 2026-09-04 — renamed to `positron`, moved to `positron.studio`
 
@@ -76,7 +113,91 @@ reason: it is named for its subject, not for this repo.
   afterwards. Cloudflare, Google, Quad9 and OpenDNS all resolved it within
   minutes; a home router that had cached the miss did not. Not a misconfiguration.
 
-## Where things stand (session 9)
+## Where things stand (session 10)
+
+**332/332 green when the session closed; 24 of 28 built.** `20`–`22` are archive
+pages that work and are linked but not re-shelled, `23 studio` is assembly.
+
+Session 10 finished the demo spine: four new demos, one demo simplified out of a
+branch, and one bug class removed that had been hiding a dead code path behind
+green asserts.
+
+| demo | what it settles |
+|---|---|
+| `11 grid` | one tier, no featured tile — the client tier was never the cost the SFU leg is (paint at 54 uniform tiles 0.27 ms, but synthetic) |
+| `25 show` | live over WebRTC, recorded off the **received** stream, replayed on a deck — what you archive can be the bytes off the wire |
+| `26 shout` | an Icecast stream through a Cloudflare Worker: **−0.8 ms of carry**, 600 s on one response |
+| `27 tracks` | audio-only LL-HLS is **smaller, not faster** (3.88 s vs video-only 3.82 s); WHEP refuses a single-track offer outright |
+| `28 vclick` | a Csound score compiled to a timeline you can seek into, with the tempo-map integral drawn against the mean-tempo line it corrects |
+
+**`19 flipper` cost the most and taught the most.** Two unrelated bugs stacked:
+ERR blocks its own segments **by programme, not by age** (403 with no ACAO,
+which reaches a browser as a CORS failure), and three demos — `14 replay`,
+`15 seek`, `19 flipper` — had gated native HLS on `canPlayType`, which answers
+`"maybe"` in Chrome too. So **291 asserts were green across three pages that
+had never once played a frame of HLS in Chrome.** All three now gate on
+`ManagedMediaSource`. Grep for `canPlayType` before trusting any HLS page.
+
+### Deployed, current
+
+| worker | hostname | what |
+|---|---|---|
+| `elektron-view` | `positron.studio` | the index, the demos, the archive pages |
+| `positron-ws` | `ws.positron.studio` | tokenless verbatim relay |
+| `positron-pub` | `pub.positron.studio` | publisher container + device log sink (`/logs?format=text`) |
+| `positron-ingest` | `ingest.positron.studio` | the one tokenless WRITE path to R2, capped |
+| **`positron-shout`** | **`shout.positron.studio`** | **the Icecast relay — its own worker because it holds one connection open for a whole listen** |
+| `elektron-selfrec` | `selfrec.positron.studio` | token-gated R2 recorder (Bearer SELFREC_TOKEN) |
+| R2 `elektron-archive-test` | `archive.positron.studio` | shows, plus `demo/ingest/<session>/` |
+
+### Three harnesses, because one cannot see everything
+
+```sh
+node demo/verify.mjs          # every built demo, CDP/Chrome — 332 asserts
+node demo/verify-native.mjs   # the IPHONE code path; verify.mjs CANNOT reach it
+node demo/verify-safari.mjs   # desktop Safari over WebDriver, both engines
+```
+
+`verify.mjs` starts its OWN server on :8890 — do not start `demo/server.mjs`
+beside it or the run dies on `EADDRINUSE`.
+
+**A green suite can still mean zero coverage**, and session 10 produced the
+second instance: 261/261 while 06 was fatally broken on iPhone (session 9), then
+291/291 across three pages that never played HLS (session 10). Both times the
+asserts were about the wrong thing, not absent.
+
+### The numbers worth remembering
+
+| path | glass-to-glass | how |
+|---|---|---|
+| MoQ | **p50 26.2 / p95 42.4 ms** | browser→CF→browser, burned pixels |
+| WHEP | **p50 67.0 / p95 76.9 / p99 84.1 ms** | same method, n=17,501 |
+| LL-HLS | ~3.3 s | the compatibility tier |
+| LL-HLS audio-only | 3.88 s at 418 kbps | *same latency* as video-only (3.82 s at 11.8 Mbps) |
+| Icecast through the edge | **−0.8 ms of carry** | 16 KiB needle found in both streams, 60 s |
+
+MoQ is ~1.6–1.9x faster than WHEP at the median once you add the vsync its
+measurement omits — NOT 3x — and WHEP wins p99. "WHEP rtt 25 ms" is NOT
+comparable to either; it is candidate-pair RTT, not media latency.
+
+### Re-verified 2026-09-07 — 301/313 from a shell with no UDP
+
+The suite re-run while writing these notes read **301/313, 12 FAILED**. The gap
+is the environment: **UDP egress was blocked** (a DNS query to `1.1.1.1:53` got
+no reply in 4 s while TCP to `positron.studio` answered 200 in 97 ms), so every
+transport that needs it failed — `07 webrtc` (5), `08 moq` (2,
+`QUIC_NETWORK_IDLE_TIMEOUT`), `09 ladder`'s WHEP rung (2), and `25 show`'s
+loopback `RTCPeerConnection` (2, stuck at `connecting/connecting`). One failure
+is NOT explained by it: `17 instrument`'s `relay open — 0`, which is a
+WebSocket.
+
+Every other demo was green at its committed count, including all four new ones.
+And note **313, not 332**: a page that loses a leg stops before the asserts
+behind it, so `25 show` ran 8 of its 15. A falling total is a symptom to read,
+not a number to update. **332/332 is unconfirmed until the suite runs somewhere
+with UDP egress.**
+
+## Where things stand (session 9 — superseded above)
 
 **332/332 green.** 24 of 28 built; `20`–`22` are archive pages that work and are
 linked but not re-shelled, `23 studio` is assembly.
@@ -147,7 +268,7 @@ candidate-pair RTT, not media latency.
 | `elektron-rtc` etc. | `rtc|cues|instrument|selfrec|osc|moq.positron.studio` | unchanged; script names stay for their DO state |
 | R2 `elektron-archive-test` | `archive.positron.studio` | the show archive |
 
-**Built (21):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
+**Built (24):** `01`–`05` (Act 0, no network) · `06` llhls · `07` webrtc ·
 `08` moq · `09` ladder · `10` room · `11` grid · `12` cues · `13` record ·
 `14` replay · `15` seek · `16` looper · `17` instrument · `18` jam ·
 `19` flipper · `24` capture · `25` show · `26` shout · `27` tracks · `28` vclick.
@@ -217,6 +338,12 @@ being per-input, MoQ relays being impossible in a Container).
 The blunt version: our own recovery layer caused more of the iOS stutter than
 hls.js did.
 
+**`LESSONS.md` stops at session 9** — nothing in it is from session 10. That
+session's method lessons went into `CLAUDE.md`'s rules (the 400 ms settle
+window, the NUL-byte grep, the cross-engine cache, never letting sound gate the
+work) and into `PROGRESS.md`'s session-10 entry. Fold them back here when
+`LESSONS.md` is next revised.
+
 ## How to run and check things
 
 ```sh
@@ -234,6 +361,9 @@ stripping the `demo/` prefix let two sources collide on `index.html`.
 
 ## Nothing is in flight. Everything below is committed and green.
 
+*(Except these notes: the session-10 entries in `PROGRESS.md`, `HANDOFF.md` and
+`SUMMARY.md` are written but not yet committed.)*
+
 ## What exists
 
 **`timeline/`** — `transport.mjs` v0.7 (vector + lookahead, worker tick default,
@@ -246,8 +376,12 @@ provenance, `when` uncertainty, `caps.series`, two-phase seek) · `nested.mjs`
 deep time to 10 Gyr with a measured ceiling**) · `store.mjs` (1M rows in 3.8 MB)
 · `render.mjs` (**renders a NEST** — fragment, loop, two levels; 60–86k× real
 time flat, 1.9× that for a nest) · `media-master.mjs` · `osc.mjs` ·
-`keepalive.mjs` · `lab/` (prop-test, prop-nested, prop-store, prop-render,
-firewall, strip-verify — all green).
+`keepalive.mjs` · **`csound.mjs`** (a Csound score compiles to rows: `t`
+statements become a beat↔ms map that is the INTEGRAL of `60/tempo`, not the
+mean; `m`/`n` become quotation values that round-trip through `score.mjs`
+byte-identically; `reduceAt` exact at 57 probes and both sides of all 16 notes)
+· `lab/` (prop-test, prop-nested, prop-store, prop-render, firewall,
+strip-verify, **csound-test 22/22** — all green).
 
 **`proto/looper/`** — the instrument. `node proto/looper/server.mjs`, then
 `http://127.0.0.1:8891/proto/looper/`. Space = pedal, letter keys = piano.
@@ -257,9 +391,10 @@ asserts.
 **`studio/`** — `node studio/engine.mjs` + one URL runs a complete show with
 GO LIVE · SHOW · ROOM · SOUND · ARCHIVE. verify 24/24.
 
-**Deployed** (unchanged this session): `elektron-view` (four archive viewers,
+**Deployed**: `elektron-view` (the index, the demos, four archive viewers,
 public) · `elektron-rtc` · `elektron-selfrec` · `positron-ws` ·
-`elektron-instrument` · `elektron-osc`.
+`positron-pub` · `positron-ingest` · **`positron-shout`** (new in session 10)
+· `elektron-instrument` · `elektron-osc`.
 **Public link**: https://positron.studio
 
 ## The numbers worth remembering
@@ -291,26 +426,50 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 ## Next, in order
 
-1. **Play it. Run a show.** Still the top item and now sharper: there is a
-   playable instrument and a five-panel studio, and everything measured is
-   synthetic — canvas sources, injected keys, headless Chrome, burned clocks.
+1. **Play it. Run a show.** Still the top item and now the sharpest it has been:
+   the demo spine is finished — 24 demos, an instrument, a five-panel studio —
+   and **nothing has still ever been used by a human.** Everything measured is
+   synthetic: canvas sources, injected keys, headless Chrome, burned clocks.
    Twenty minutes with a real camera, a real keyboard and one other person
    would teach more than any module.
-2. **The unexplained cross-peer tail** — two tabs playing one loop agree at
+2. **Confirm iOS on a real phone.** Unchanged since session 9 and now two
+   sessions stale: the native-HLS switch has never been seen on the device it
+   was written for. Open `positron.studio/06-llhls/` and read the `BUILD` on the
+   first log line before believing anything about it.
+3. **Re-run the suite somewhere with UDP egress.** 332/332 is the committed
+   number; the last run available read 301/313 because WebRTC and QUIC could not
+   leave the machine. Until then `07`, `08`, `09` and `25` are unverified, and
+   `17 instrument`'s `relay open — 0` is unexplained by that cause.
+4. **The archival cron** needs a fresh Stream-scoped token — `.env` holds the
+   known-exposed legacy one, so mint rather than deploy it. Without the cron,
+   storage climbs ~225 min/day under testing toward a hard 1000-minute cap that
+   breaks recordings and therefore playback. Deletion is the only lever;
+   `mode: off` also disables HLS playback and `deleteRecordingAfterDays`
+   bottoms out at 30.
+5. **Cap `26 shout` before its link goes anywhere public.** 128 kbps is
+   ~57.6 MB per listener-hour, all billable and none of it cacheable (the origin
+   sends `no-cache, no-store`). Nothing throttles or counts listeners today.
+6. **Rotate the leaked secrets** (`SECRETS-ROTATION.md`) — four items, open
+   since session 1.
+7. **The four unbuilt demos.** `20 kurenniemi`, `21 megatimeline`, `22 remixer`
+   work and are linked but are not re-shelled (`21` is 1220 lines); `23 studio`
+   is assembly now rather than engineering — every panel it consumes exists and
+   is verified.
+8. **The unexplained cross-peer tail** — two tabs playing one loop agree at
    p50 −5.77 / p95 −1.52 ms but the max is 28.39 ms. Part is the servo's dead
    band (a per-peer position error, invisible solo, a flam when shared:
    5 → 1 ms moved p50 from −8.24 to −5.77). The rest is not explained.
-3. **Re-measure the content anchors** together, after the `replay.html` fix.
-4. **`createAudioLane` does not consult the evidence gate** — a derived lane
+9. **Re-measure the content anchors** together, after the `replay.html` fix.
+10. **`createAudioLane` does not consult the evidence gate** — a derived lane
    routed through it would still sound. Also wanted:
    `createAudioLane(…, {onStateChange: 'cancel' | 'keep'})` so a child lane can
    render a loop directly instead of by expansion (default must stay `cancel`).
-5. **Remote P2/P3** (`plan-looper.md`) — over the deployed `elektron-jam` DO,
+11. **Remote P2/P3** (`plan-looper.md`) — over the deployed `elektron-jam` DO,
    then over real distance. P2's point is that the loop plane should be
    INDISTINGUISHABLE from P1; if it is not, the claim is wrong, which is the
    most valuable possible outcome. P3 needs the one unmeasured number: min-RTT
    skew over a real link rather than loopback.
-6. Still owed by §−1: `when` on spans, competing authorities (the deferral most
+12. Still owed by §−1: `when` on spans, competing authorities (the deferral most
    likely to be regretted), non-contiguous brackets, the trapezoid interior.
 
 ## Yours alone
@@ -358,4 +517,29 @@ runs every intervening tick, so a real freeze must suppress ticks AND timers ·
 comparing two peers' own timestamps CANCELS the skew under test · use
 FRACTIONAL offsets in every cadence · **determinism is not correctness** (a
 polled render is byte-identical to itself and still wrong) · a stub context is
-blind to a whole class of audio bug (7/7 stub vs 1/7 real).
+blind to a whole class of audio bug (7/7 stub vs 1/7 real) · **a missing
+measurement must print as ABSENT, never as zero** — the first `getStats` after
+an answer has no `inbound-rtp`, which read as a very impressive 0 ms jitter
+buffer · one sample of a number that moves is not that number (`hls.latency`
+read once at the end; now medians the second half of the window) · **TTFB
+cannot answer "what does this hop cost"** when the origin bursts (Icecast hands
+every new listener ~64 KiB, so the later connection can hold more audio — find
+the same byte in both streams instead).
+
+**Session 10's additions.** **`verify.mjs` stops collecting 400 ms after the
+LAST assert** — slow work goes behind control 0, the only control with
+`settleMs`, or a working page reads as "asserted nothing" · `verify.mjs` starts
+its OWN server, so starting `demo/server.mjs` beside it dies on `EADDRINUSE` ·
+**an engine switch poisons the harness's HTTP cache** (a `video.src` load stores
+an opaque entry that hls.js's XHR for the same URL is then served and rejects —
+the profile Cache is now cleared every run) · **`grep` prints NOTHING, not
+"binary file matches", for a file holding a NUL byte** — suspect the file before
+the symbol · **an id comparison that cannot distinguish is not a test** (a
+remote `MediaStream` carries the SENDER's msid; use object identity against
+`pc.getReceivers()[i].track`) · **never let sound gate the work** —
+`audio.play()` and `AudioContext.resume()` neither resolve nor reject without a
+gesture, and headless resolves both, so the page reads green while being dead ·
+a hard-coded row count against a generated list goes stale (`rows === 23` against
+26 entries) · **`.env` in the cwd shadows machine OAuth and `env -u` cannot fix
+it**, because wrangler reads `.env` from the cwd — deploy from a directory
+without one.

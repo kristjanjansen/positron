@@ -9,6 +9,119 @@ Ordered by how much they cost, not by topic.
 
 ---
 
+## Session 11 — a reader who does not work here
+
+Written 2026-09-07, from a UI/UX review of the demos. Every entry started as
+somebody saying "I don't understand this" and turned out to be a defect.
+
+### 14. "I don't understand this" is a bug report, not a copy edit
+
+Six reader questions, six real faults: *what is drift* (the page never defined
+its headline number — and was fabricating it); *green but late???* (a colour
+scale calibrated against an absolute ideal rather than the mechanism); *what
+alarm??* (a metaphor introduced in one paragraph and reused in a tooltip read
+on its own); *what is attested?* (a provenance line leaking into a demo with no
+restorations, inviting the conclusion that the colour meant attested); *where
+is the missed one?* (a readout counting something invisible); *why do I need
+the slider?* (two position surfaces, one of which scrubbed better). None was
+fixed by rewording alone.
+
+### 15. A page can display a fabricated number and read green
+
+`01 transport` printed `0` for drift because `deck.drift()` returns an ARRAY and
+the page read `dr?.p50 ?? dr?.ms ?? 0`. Every branch missed; the literal zero
+won. The assert passed too — `dr !== undefined && dr !== null` is satisfied by
+`[]`. Twenty real measurements were in memory the whole time (p50 1.0, max
+1.7 ms). **An assert on "did we get an answer" must require the SHAPE of the
+answer**, not merely a non-null.
+
+### 16. A boundary in the render loop is not a boundary
+
+Fourth instance of a rule this project already had. Stop-at-end lived in
+`paint()`, driven by rAF; in a hidden tab a 20 s deck reached **91,001 ms** and
+still reported `playing: true`, while the bar's clock sat frozen at 0:00.000.
+The scheduler kept perfect time throughout — the only broken thing was asking
+the renderer to enforce a rule. When you move one out, say what the replacement
+CANNOT do: ours is a main-thread `setTimeout`, so a hidden tab clamps it to
+~1 Hz. Bounded error beats unbounded, and the caveat belongs in the source.
+
+### 17. A colour scale whose normal reading is a warning has no warning left
+
+An absolute 5 ms threshold painted 18 of 20 marks amber — while our own lab
+measures the shipped worker host at p50 5.0 ms, so the DOCUMENTED BASELINE was
+amber. Calibrate against what the mechanism promises, not against an ideal.
+Derive the colour and the words from ONE table, so a green bar can never be
+described in language that sounds like a failure.
+
+### 18. Every readout cell must be able to change
+
+`MISSED` was structurally 1 — the mark due at position 0 can never have a timer,
+because play had not been pressed when the timers were set. A constant dressed
+as a measurement teaches a reader to ignore the whole row.
+
+### 19. A control the harness cannot reach reads as a broken page
+
+`verify.mjs` presses buttons in `.d-controls` and nothing else. A hardware
+button mounted in the page body produced `page asserted something — 0`, which
+looks exactly like a demo that does not work. Same shape as #2 and #13: the
+suite was not wrong, it was not reaching the thing.
+
+### 20. Match the assert threshold to what the harness actually exercises
+
+Gating 01's asserts on five drift rows read as "asserted nothing", because
+`verify.mjs` plays for 500 ms — which is one mark. Assert on the first row.
+
+### 21. A default built for measurement is not a default built for a human
+
+`createAudioLane` emits a ONE-SAMPLE impulse so threshold detection can find its
+exact sample. At 48 kHz that is 20 µs, i.e. inaudible, so `02 lanes` appeared to
+do nothing when you turned the sound on. The measurement default was right and
+the demo needed `makeNode`. Ask who the default is for.
+
+### 22. A counter that counts INTENT reads exactly like one that counts DELIVERY
+
+`createMidiLane` scheduled every note about fifty-six years out — `send()` takes
+a `performance.now()` timestamp and the transport's clock is epoch ms — and
+nothing threw, nothing logged, and `midi out: 31` climbed exactly as if it had
+worked. That counter was the length of our own scheduled-log. I reported "the
+first MIDI this project has ever sent" on the strength of it. Before quoting a
+count as evidence, ask which side of the boundary it is counted on.
+
+What exposed it was a screenshot of a DASH: the loopback readout empty on a page
+whose log said it was listening. Two symptoms, one root cause, which is what
+made it findable at all.
+
+### 23. A loopback is a measurement instrument — but not with the stamp it hands you
+
+MIDI out looked unmeasurable without hardware. macOS's IAC driver returns
+everything written to it, so the page can watch its own output.
+
+The trap is which clock you read. `MIDIMessageEvent.timeStamp` came back
+**exactly equal to the send timestamp, 0.000 ms, five times out of five** —
+CoreMIDI carries the stamp in the packet and Chrome passes it through, so
+comparing them measures nothing and looks perfect. `performance.now()` sampled
+in the handler is on our side of the trip and does not cancel: p50 0.4 / p95
+0.6 / max 3.7 ms over 31 notes. State what the loopback does NOT cover — this
+one includes the main-thread event loop and excludes every cable — and it is a
+bound worth having rather than a claim.
+
+MIDI out looked unmeasurable without hardware. macOS's IAC driver returns
+everything written to it on the input of the same name, and
+`MIDIMessageEvent.timeStamp` lands in `performance.now()`'s domain — the same
+domain the lane records `intendedUs` in — so the page can measure its own
+output with no device attached. State what the loopback does NOT cover
+(send → CoreMIDI → receive, not send → a synth on a cable) and it is a floor
+worth having rather than a claim.
+
+### 24. Do not show one mechanism's lookahead and hide another's
+
+`02` drew the sound row green as soon as a click was handed over — up to 100 ms
+ahead of the playhead — which reads as the other lane lagging. The wall
+scheduler commits ahead by the same 100 ms; only one lane's lookahead was
+visible. Colour now says WHICH LANE and nothing else.
+
+---
+
 ## Method
 
 ### 1. Measure the quantity in question, not one adjacent to it

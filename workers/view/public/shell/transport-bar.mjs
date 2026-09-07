@@ -15,7 +15,18 @@
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
 
-export function createTransportBar(host, deck, { absolute = false } = {}) {
+/**
+ * `scrub: false` — ONE POSITION SURFACE PER PAGE.
+ *
+ * A page that also mounts a strip has two horizontal time axes stacked on each
+ * other, at different scales, with different left origins, and no way for a
+ * reader to know they are the same axis. The strip is strictly the better of
+ * the two: it carries the content as well as the position, and it has always
+ * seeked on press AND on drag, which this bar did not. So where there is a
+ * strip, the bar keeps what only it has — play/pause, the clock, the rates, the
+ * degraded badge — and gives up the slider.
+ */
+export function createTransportBar(host, deck, { absolute = false, scrub: wantScrub = true } = {}) {
   const bar = el('div', 'tbar');
 
   const toggle = el('button', 'tbar-toggle', '', { type: 'button', 'aria-label': 'play/pause' });
@@ -44,6 +55,10 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
 
   const seekable = Number.isFinite(deck.durationMs) && deck.durationMs > 0;
   bar.dataset.seekable = seekable ? '1' : '0';
+  // seekable stays TRUE with the slider hidden: the deck is still seekable, by
+  // the strip and by the keyboard table below. Hiding a control is not a
+  // capability change, and `api.seekable` is what the harness reads.
+  bar.dataset.scrub = seekable && wantScrub ? '1' : '0';
 
   // ── state the bar owns; everything else is read from the deck ───────────
   let gen = deck.rangeGen?.() ?? 0;
@@ -79,18 +94,6 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
   function paint({ pos }) {
     if (deck.rangeGen && deck.rangeGen() !== gen) { gen = deck.rangeGen(); range = deck.range; }
 
-    // STOP AT THE END. Nothing in the library halts a bounded transport when it
-    // reaches range[1] — it keeps counting while the scrub bar sits pinned, so
-    // the readout showed 0:23.415 / 0:16.000. A bounded deck ends at its end;
-    // an unbounded (live) one has no end to reach, hence the seekable guard.
-    if (seekable && !dragging && pos >= range[1] && deck.playing?.()) {
-      deck.pause();
-      deck.seek(range[1]);
-      pos = range[1];
-      note('end');
-    } else if (badge.textContent === 'end' && pos < range[1]) {
-      clearNote();
-    }
     if (!dragging && seekable) {
       const f = posToFrac(pos);
       fill.style.width = `${f * 100}%`;
@@ -100,11 +103,63 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
       ? `${clock(pos, absolute)} / ${clock(range[1] - range[0], false)}`
       : clock(pos, absolute);
     const playing = deck.playing?.() ?? false;
-    toggle.dataset.state = playing ? 'playing' : 'paused';
+    toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
   }
 
+  // ── the end of a bounded piece ──────────────────────────────────────────
+  // A BOUNDARY IS A COMMITTED ONE-SHOT, NEVER A POLL. This used to live inside
+  // paint(), which observePosition drives off requestAnimationFrame — so in a
+  // hidden tab it never ran: measured, a 20 s deck reached 91,001 ms and was
+  // still reporting `playing: true`, while the bar's clock sat frozen at
+  // 0:00.000. The deck's own scheduler was keeping perfect time throughout;
+  // the only broken thing was asking the renderer to enforce a rule.
+  //
+  // CAVEAT, because it should not be discovered later: this timer is a plain
+  // setTimeout on the main thread, so a hidden tab clamps it to ~1 Hz and the
+  // stop can be up to a second late. That is a bounded error instead of an
+  // unbounded one. The exact fix is to arm it on the scheduler's own worker
+  // host, which createDeck does not currently expose.
+  let endTimer = null, atEnd = false;
+  const clearEnd = () => { if (endTimer) { clearTimeout(endTimer); endTimer = null; } };
+
+  function hitEnd() {
+    endTimer = null;
+    if (!deck.playing?.()) return;
+    deck.pause();
+    deck.seek(range[1]);
+    atEnd = true;
+    note('end');
+  }
+
+  function armEnd() {
+    clearEnd();
+    if (!seekable || !(deck.playing?.() ?? false)) return;
+    const rate = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
+    if (!(rate > 0)) return;                       // paused or reversed: no end to reach
+    const t = deck.transport;
+    const due = t?.timeAt ? t.timeAt(range[1]) : null;
+    if (due === null || due === undefined) return;
+    const delay = due - t.clock.now();
+    if (delay <= 0) return hitEnd();
+    endTimer = setTimeout(hitEnd, delay);
+  }
+  // re-armed on every play / pause / rate / seek, because each one moves the
+  // instant at which range[1] arrives
+  const offState = deck.transport?.onState ? deck.transport.onState(armEnd) : null;
+
   // ── interaction ─────────────────────────────────────────────────────────
-  toggle.addEventListener('click', () => (deck.playing?.() ? deck.pause() : deck.play()));
+  // Parked at the end, the play button REPLAYS. This is what a sequencer does:
+  // stop at the end and leave the playhead there — the final state is worth
+  // looking at, and here it is literally the fold of every event — then send
+  // the transport back to the start when you ask for play again. Restarting is
+  // well defined in this library in a way it is not for a media element: a
+  // backward seek replays each event exactly once.
+  toggle.addEventListener('click', () => {
+    if (deck.playing?.()) return deck.pause();
+    if (atEnd || (seekable && deck.position() >= range[1])) leaveEnd(range[0]);
+    deck.play();
+  });
+  function leaveEnd(to) { atEnd = false; clearNote(); deck.seek(to); }
 
   function seekFromEvent(e) {
     const r = scrub.getBoundingClientRect();
@@ -113,18 +168,49 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
     headDot.style.left = `${f * 100}%`;
     return fracToPos(f);
   }
+  // SCRUB LIVE, NOT ON RELEASE. seekFromEvent() only repaints this bar's own
+  // fill; until pointerup the deck never moved, so the strip's playhead, the
+  // readout and every lane sat still while the handle slid — the bar looked
+  // like the only thing on the page connected to anything.
+  //
+  // Coalesced to one seek per frame: a pointermove stream can arrive faster
+  // than a frame, and deck.seek() is two-phase (reduce + assertState), so
+  // seeking per event asks a lane to re-fold work nobody will ever see.
+  let pendingSeek = null, seekRaf = 0;
+  function liveSeek(pos) {
+    pendingSeek = pos;
+    if (seekRaf) return;
+    seekRaf = requestAnimationFrame(() => {
+      seekRaf = 0;
+      if (pendingSeek !== null) doSeek(pendingSeek);
+      pendingSeek = null;
+    });
+  }
+  function endDrag() {
+    dragging = false;
+    if (seekRaf) { cancelAnimationFrame(seekRaf); seekRaf = 0; }
+    pendingSeek = null;
+  }
+
   scrub.addEventListener('pointerdown', (e) => {
     if (!seekable) return;
-    dragging = true; scrub.setPointerCapture(e.pointerId); seekFromEvent(e);
+    dragging = true;
+    try { scrub.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
+    liveSeek(seekFromEvent(e));
   });
-  scrub.addEventListener('pointermove', (e) => { if (dragging) seekFromEvent(e); });
+  scrub.addEventListener('pointermove', (e) => { if (dragging) liveSeek(seekFromEvent(e)); });
   scrub.addEventListener('pointerup', (e) => {
     if (!dragging) return;
-    dragging = false;
-    doSeek(seekFromEvent(e));
+    const pos = seekFromEvent(e);
+    endDrag();
+    doSeek(pos);          // land exactly where the finger lifted, uncoalesced
   });
+  // A cancelled gesture (the page took the scroll, the window lost focus) used
+  // to leave `dragging` true forever, which silently froze the playhead paint.
+  scrub.addEventListener('pointercancel', endDrag);
 
   function doSeek(pos) {
+    if (atEnd && pos < range[1]) { atEnd = false; clearNote(); }
     const res = deck.seek(pos);
     if (res && res.degraded) note(res.reason);
   }
@@ -170,6 +256,8 @@ export function createTransportBar(host, deck, { absolute = false } = {}) {
     note,
     destroy() {
       stop();
+      clearEnd();
+      offState && offState();
       removeEventListener('keydown', onKey);
       bar.remove();
       if (window.__demo && window.__demo.transport === api) window.__demo.transport = null;

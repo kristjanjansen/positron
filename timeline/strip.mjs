@@ -487,8 +487,17 @@ registerRenderer('ticks', (ctx, L, C) => {
   for (const r of C.rows) {
     const px = Math.round(x(r.at)) + 0.5;
     const fired = L.latch && r.at <= C.pos;
-    ctx.strokeStyle = fired ? (L.firedColor || '#7fd18c') : style.color;
-    ctx.lineWidth = style.width ?? 1.4;
+    // `colorOfRow(row, fired)` is the per-row hook the spans renderer has had
+    // as `colorOf` since the start; ticks only ever offered one colour for the
+    // whole latched half, which cannot say WHICH mark went wrong. Falsy falls
+    // straight back to the two-colour behaviour, so no existing lane changes.
+    ctx.strokeStyle = (L.colorOfRow && L.colorOfRow(r, fired))
+      || (fired ? (L.firedColor || '#7fd18c') : style.color);
+    // The SECOND per-row channel. One lane, two facts: colour for the value,
+    // width for a property of the row itself. Cheaper and clearer than a second
+    // lane, which needs a label, occupies height forever, and reads as a
+    // separate subject rather than an annotation on this one.
+    ctx.lineWidth = (L.widthOfRow && L.widthOfRow(r, fired)) || style.width || 1.4;
     if (style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(px, y0 + 2); ctx.lineTo(px, y0 + h - 2); ctx.stroke();
   }
@@ -1151,9 +1160,18 @@ export function createStrip(canvas, deck, opts = {}) {
       else if (caps && caps.domain) sub.push(caps.domain);
       if (caps && caps.audible === false) sub.push('silent');
       if (st.tier) sub.push(`tier ${st.tier}`);
-      if (sub.length && L.height >= 22) {
-        ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
-        ctx.fillText(clip(sub.join(' · ')), 11, L.y + 24);
+      // A lane's OWN NUMBERS belong beside its own ink, not in a table
+      // somewhere else that the reader has to join up by colour. `subLabel` is
+      // the client's line (or lines) under the label — typical and worst, or
+      // "no feedback" for a lane that cannot say.
+      const client = L.subLabel === undefined || L.subLabel === null ? []
+        : [].concat(L.subLabel).filter(Boolean).map(String);
+      const all = [...(sub.length ? [sub.join(' · ')] : []), ...client];
+      ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
+      for (let i = 0; i < all.length; i++) {
+        const y = L.y + 24 + i * 11;
+        if (y > L.y + L.height - 2) break;         // never spill into the next lane
+        ctx.fillText(clip(all[i]), 11, y);
       }
       ctx.globalAlpha = 1;
     }
@@ -1250,6 +1268,17 @@ export function createStrip(canvas, deck, opts = {}) {
     if (S.disposed) return;
     resize();
     layout();
+    // AUTOFIT. layout() already knows the exact height the lanes need — axis
+    // plus every visible lane — so a fixed canvas height is either dead space
+    // below the last lane or a lane clipped off the bottom. Both happened: 01
+    // ran a 72 px lane in a 120 px box, and 02 grew a third lane when a MIDI
+    // device appeared and pushed it out of view. Re-resize once after setting
+    // the height, so this frame draws at the new size rather than the next one.
+    if (opts.autoHeight && Math.abs(parseFloat(canvas.style.height || '0') - S.contentH) > 0.5) {
+      canvas.style.height = `${S.contentH}px`;
+      resize();
+      layout();
+    }
     S.pos = deck.position ? deck.position() : 0;
     followTick();
     const g = ctx;
@@ -1298,15 +1327,34 @@ export function createStrip(canvas, deck, opts = {}) {
     if (!h || !h.text) return;
     g.save();
     g.font = '10px ui-monospace, Menlo, monospace';
-    const lines = h.text.split('\n');
-    const w = Math.max(...lines.map((l) => g.measureText(l).width)) + 10;
-    const bh = lines.length * 12 + 6;
-    let bx = h.px + 8, by = Math.max(2, h.py - bh - 6);
-    if (bx + w > plotW()) bx = h.px - w - 8;
-    g.fillStyle = 'rgba(8,10,16,.92)'; g.strokeStyle = T.axis;
+    // A line may be a plain string or {text, colour}. A coloured line gets the
+    // same swatch its lane's marks carry, which is the join between a number in
+    // here and the ink out there — the lane-stats table earns its readability
+    // the same way, and a tooltip listing four lanes needs it more.
+    const lines = (h.lines || h.text.split('\n')).map((l) => (typeof l === 'string' ? { text: l } : l));
+    // A thin BAR, the same 3 px mark the gutter puts beside a lane name, not a
+    // square — the tooltip and the gutter are labelling the same lanes and a
+    // reader should not have to learn two shapes for one idea.
+    const PAD = 9, LH = 13, SW = 3, SH = 9, GAP = 7;
+    const swatched = lines.some((l) => l.colour);
+    const indent = swatched ? SW + GAP : 0;
+    const w = Math.max(...lines.map((l) => g.measureText(l.text).width)) + PAD * 2 + indent;
+    const bh = lines.length * LH + PAD * 2 - 3;
+    let bx = h.px + 10, by = Math.max(2, h.py - bh - 8);
+    if (bx + w > plotW()) bx = h.px - w - 10;
+    g.fillStyle = 'rgba(8,10,16,.94)'; g.strokeStyle = T.axis;
     g.fillRect(bx, by, w, bh); g.strokeRect(bx + 0.5, by + 0.5, w, bh);
-    g.fillStyle = T.ink;
-    lines.forEach((l, i) => g.fillText(l, bx + 5, by + 12 + i * 12));
+    lines.forEach((l, i) => {
+      const y = by + PAD + 8 + i * LH;
+      if (l.colour) {
+        g.fillStyle = l.colour;
+        g.fillRect(bx + PAD, y - SH + 1, SW, SH);
+      }
+      g.fillStyle = l.dim ? T.dim : T.ink;
+      // a line with no swatch is not a lane, so it starts at the margin rather
+      // than in the column the lanes share
+      g.fillText(l.text, bx + PAD + (l.colour ? indent : 0), y);
+    });
     g.restore();
   }
 
@@ -1385,12 +1433,38 @@ export function createStrip(canvas, deck, opts = {}) {
       if (s.verbatim) out.push(`verbatim ${String(s.verbatim).slice(0, 48)}`);
     }
     if (r) {
-      out.push(`id ${r.id ?? '–'}  kind ${r.kind ?? L.kind ?? '–'}`);
-      if (r.provenance) out.push(`RESTORED tier ${r.provenance.tier} · ${r.provenance.method} · conf ${(+r.provenance.confidence).toFixed(3)}`);
-      else out.push('attested');
+      // `terse` drops the identity and provenance lines. They exist for the
+      // heritage case, where "attested" against "RESTORED tier 2" is the whole
+      // point — and on a lane with no restorations in it they are noise that
+      // reads as a claim: a reader seeing a green bar labelled `attested` will
+      // reasonably conclude the COLOUR means attested. It does not.
+      if (!L.terse) {
+        out.push(`id ${r.id ?? '–'}  kind ${r.kind ?? L.kind ?? '–'}`);
+        if (r.provenance) out.push(`RESTORED tier ${r.provenance.tier} · ${r.provenance.method} · conf ${(+r.provenance.confidence).toFixed(3)}`);
+        else out.push('attested');
+      } else if (r.provenance) {
+        out.push(`restored, not observed — tier ${r.provenance.tier}`);
+      }
       const p = r.payload || {};
-      const keys = Object.keys(p).filter((k) => k !== 'i' && k !== 'at' && k !== 'atUs').slice(0, 4);
+      const keys = L.terse ? [] : Object.keys(p).filter((k) => k !== 'i' && k !== 'at' && k !== 'atUs').slice(0, 4);
       if (keys.length) out.push(keys.map((k) => `${k}=${fmtVal(p[k])}`).join(' '));
+      // What the row MEASURED is not in the row: drift, arrival, decode time all
+      // live beside the log. `describeRow` lets the lane say it without any of
+      // that leaking into the strip.
+      if (L.describeRow) { const x = L.describeRow(r); if (x) out.push(...[].concat(x)); }
+    }
+    // A UNIFIED TOOLTIP. Some pages are ABOUT the relationship between lanes,
+    // and there the per-lane tooltip answers the wrong question: it tells you
+    // about the row you happened to touch, when what you want is every lane at
+    // that instant, side by side. `describeHit` replaces the whole block; the
+    // default lines are handed over so a client can extend rather than replace.
+    if (opts.describeHit) {
+      const custom = opts.describeHit(hit, out);
+      if (custom) {
+        const lines = [].concat(custom);
+        const text = lines.map((l) => (typeof l === 'string' ? l : l.text)).join('\n');
+        return { ...hit, text, detail: lines, lines };
+      }
     }
     return { ...hit, text: out.join('\n'), detail: out };
   }

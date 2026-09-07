@@ -255,10 +255,22 @@ function favicon() {
     px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = 255;
   };
   const BG = [0x0b, 0x0e, 0x14], HI = [0xff, 0xd4, 0x00];
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) put(x, y, BG);
+  // rounded corners, drawn by leaving the four corner arcs transparent — the
+  // same 6 px radius the SVG in demo/shell/shell.mjs uses. KEEP THE TWO IN
+  // SYNC: this is the .ico a bare browser asks for, that one is what a demo
+  // page declares, and a user sees whichever the tab happens to have.
+  const RAD = 6;
+  const inRounded = (x, y) => {
+    const dx = Math.min(x, N - 1 - x), dy = Math.min(y, N - 1 - y);
+    if (dx >= RAD || dy >= RAD) return true;
+    return Math.hypot(RAD - dx, RAD - dy) <= RAD + 0.5;
+  };
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (inRounded(x, y)) put(x, y, BG);
 
-  // the 'e': an annulus with the lower-right wedge removed
-  const cx = 12.2, cy = 19.6, R = 9.6, r = 5.3;
+  // the 'e': an annulus with the lower-right wedge removed. Smaller than it
+  // was, so the whole glyph sits inside the rounded field instead of running
+  // off the bottom-right corner.
+  const cx = 12.6, cy = 19.4, R = 8.6, r = 4.8;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const d = Math.hypot(x - cx, y - cy);
     if (d > R || d < r) continue;
@@ -271,9 +283,10 @@ function favicon() {
     for (let x = Math.round(cx - R + 1); x <= Math.round(cx + R - 1); x++) put(x, y, HI);
 
   // the superscript plus — the charge, and the whole name
-  const pxc = 25, pyc = 8, arm = 4, th = 1;
-  for (let x = pxc - arm; x <= pxc + arm; x++) for (let y = pyc - th; y <= pyc + th; y++) put(x, y, HI);
-  for (let y = pyc - arm; y <= pyc + arm; y++) for (let x = pxc - th; x <= pxc + th; x++) put(x, y, HI);
+  const pxc = 24.5, pyc = 8, arm = 3.4, th = 1.1;
+  const R2 = (v) => Math.round(v);
+  for (let x = R2(pxc - arm); x <= R2(pxc + arm); x++) for (let y = R2(pyc - th); y <= R2(pyc + th); y++) put(x, y, HI);
+  for (let y = R2(pyc - arm); y <= R2(pyc + arm); y++) for (let x = R2(pxc - th); x <= R2(pxc + th); x++) put(x, y, HI);
 
   const raw = Buffer.alloc(N * (N * 4 + 1));
   for (let y = 0; y < N; y++) {
