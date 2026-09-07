@@ -1,4 +1,4 @@
-# positron — compact summary (start → 2026-09-04)
+# positron — compact summary (start → 2026-09-06)
 
 One paragraph: a measured live-streaming + performance platform on Cloudflare
 (LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
@@ -22,6 +22,38 @@ with an operator studio app as its first build and cultural-heritage archives
   stay `elektron-*` deliberately — renaming a script abandons its Durable
   Objects. Prior-art references to `elektronstudio`/`elektron.art` are left
   intact on purpose. See HANDOFF.md for the hostname table and the reasoning.
+
+- **09-05, session 9** — the iOS stutter, through six wrong answers to one right
+  one. Four of the six fixes were real and none was the binding constraint; the
+  answer was that **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()`
+  became true on iPhone and a native-HLS fallback written
+  `if (!Hls.isSupported() && …)` had silently stopped firing for years. Prefer
+  native on ALL WebKit, gated on MMS (desktop Safari, same page, same 40 s:
+  native 0.961x advance / 5.25 s / 0 errors against hls.js 0.344x / 7.71 s /
+  2 errors). **Our own recovery layer was most of the problem** — a drift-seek
+  every 2–3 s aborting the fragment loads it was trying to recover. Also built
+  `08 moq` (p50 20.3 ms; the "needs a container" blocker did not exist) and
+  `24 capture`, re-measured WHEP against MoQ properly (p50 67.0 vs 26.2 ms, but
+  WHEP wins p99), and cleared Stream storage 559.97 → 15.81 of a 1000-minute cap
+  it was two days from hitting. Two new harnesses, because `verify.mjs` had read
+  261/261 while 06 was fatally broken on a phone.
+
+- **09-06, session 10** — the demo spine finished: 24 of 28 built, **332/332**.
+  `25 show` (recorded off the RECEIVED stream, so the archive is the bytes off
+  the wire), `26 shout` (Icecast through a Worker — **−0.8 ms of carry**, 600 s
+  on one response, and the relay's whole product is putting CORS on bytes that
+  have none), `27 tracks` (**audio-only LL-HLS is smaller, not faster** — 3.88 s
+  against video-only's 3.82 s, asserted from the playlists rather than a
+  stopwatch; and Cloudflare WHEP refuses a single-track offer outright),
+  `28 vclick` + `timeline/csound.mjs` (a Csound score compiled into rows you can
+  seek into; the tempo map is the INTEGRAL of `60/tempo`, and the mean-tempo
+  shortcut puts every later note 118 ms early while looking fine). `11 grid`
+  lost its tiering. And the session's real lesson, one layer down from session
+  9's: **291 asserts were green across three pages that had never once played a
+  frame of HLS in Chrome**, because `canPlayType('…mpegurl')` answers `"maybe"`
+  there too — in headless Chrome as well, so the suite could not tell the paths
+  apart. ⚠ A re-run on 09-07 read 301/313, from a shell with no UDP egress;
+  332/332 needs re-confirming somewhere WebRTC and QUIC can leave the machine.
 
 ## The stack, with its numbers
 

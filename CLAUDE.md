@@ -235,7 +235,63 @@ counts against the last known total after any change.
 - Transport UI is `demo/shell/transport-bar.mjs` and nothing else. Playhead from
   `observePosition`, seek only via `deck.seek()`, rates from intersected
   `caps.rates`.
+- **One meaning for colour across every demo.** A mark's colour says HOW IT
+  LANDED, never which lane it is in — lane identity is the row, the label and
+  the gutter swatch, three channels that already carry it. Grey = not played,
+  slate = played and this lane cannot say how well, green = inside what its way
+  of firing promises, amber/red = later. "Played, unmeasured" gets its own
+  colour rather than borrowing green: colouring an unchecked thing as if it
+  passed is an assertion nothing made.
+- **A number belongs to the lane that can answer for it.** Report each lane's
+  error against the score, not against another lane; every pairwise gap is a
+  subtraction away. Give every lane a row even when it has nothing to say, and
+  let it say so in words — a blank cell collapses "we did not look" and "we
+  looked and it was fine". Never let a lane with no feedback count as 0 in an
+  aggregate: it must not be able to improve the score.
+- **A count is only evidence on the far side of the boundary.**
+  `createMidiLane`'s `scheduled()` counted what the page QUEUED and read
+  identically to delivery — while every note was being scheduled fifty-six
+  years out. Ask which side of the wire a counter is counted on before quoting
+  it.
 - Secrets never reach a log. The publisher redacts at the point of capture, so a
   secret split across two stderr chunks is still caught.
-- Prefer terse UI. No explanatory prose in demo pages; one line saying what the
-  demo does, and a readout of real numbers.
+- **Write for someone who does not work here.** Terse, but understandable —
+  those are not in tension, and the old rule ("no explanatory prose, one line
+  and a readout") produced pages that only their author could read. A demo page
+  carries three things: one line saying what happens in plain words, a `d.how()`
+  block saying how it is done and what the number means, and a readout of real
+  numbers.
+- **No jargon in anything a visitor sees.** Not in `what`, not in `how`, not in
+  a readout key, not in `manifest.mjs`'s `one` line. Banned unless the page
+  defines it on the spot: lookahead, horizon, one-shot, tick, host, commit,
+  actuate, lattice, deck, lane, fold, adapter, evidence gate. Say what it does,
+  not what it is called internally. `drift` survives only because it is a
+  readout key with a sentence under it explaining it is lateness in
+  milliseconds, and that it is NOT stream latency — a reader assumed exactly
+  that, which is what prompted this rule.
+- Numbers in a `how` line come from the same constants the page passes to the
+  library, never typed twice — a description that can disagree with the config
+  is worse than none.
+- **A tooltip is two or three short lines, never a sentence.** It is drawn ON
+  TOP of the thing it describes and is read every time you point at one, so a
+  paragraph there covers the picture and gets re-read twenty times. Budget
+  ~40 characters a line: what it is, the number, the mechanism. Explanation
+  goes in the `how` block, which is read once. `1.20 ms late · as expected` /
+  `timer set ahead`, not `A timer was set for it in advance. Those land
+  within a few ms.`
+- **Every readout cell must be able to change.** A cell showing a structural
+  constant reads as a measurement and teaches the reader to ignore the row.
+  01's `missed` count was always 1 — the mark due at position 0 can never have
+  a timer — so it became `worst`, which moves. Prefer median AND max over
+  either alone: a median hides the one bad fire that is the reason to look.
+- **A colour scale whose normal reading is a warning has no warning left.**
+  Calibrate against what the mechanism promises, not against an absolute
+  ideal. 01 first painted 18 of 20 marks amber on a loaded machine, against a
+  5 ms threshold — while the lab measures the shipped worker host at p50
+  5.0 ms, so the DOCUMENTED BASELINE was amber. Colour and words must come
+  from one table, so a green bar can never be described in language that
+  sounds like a failure.
+- **One position surface per page.** A page with a strip passes
+  `createTransportBar(…, { scrub: false })`: two horizontal time axes at
+  different scales, stacked, is not a redundancy but a contradiction. The
+  strip already seeks on press AND on drag, which the bar's slider did not.

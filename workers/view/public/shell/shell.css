@@ -35,12 +35,25 @@ body {
 }
 .d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; }
 
+/* how it works — a spec line of real values, then plain language under it */
+.d-how { margin: 10px 0 0; }
+.d-how:empty { display: none; }
+.d-how-spec {
+  font: 500 10.5px/1.6 var(--mono); letter-spacing: .04em;
+  color: var(--dim2); font-variant-numeric: tabular-nums;
+}
+.d-how-note { margin-top: 3px; color: var(--dim); font-size: 13px; max-width: 60ch; }
+
 /* ── readout ──────────────────────────────────────────────────────────── */
 .d-readout {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
 }
+/* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
+   nothing until this existed — the row stayed on screen while the page said it
+   was hidden */
+.d-readout[hidden] { display: none; }
 .d-cell { background: var(--card); padding: 10px 12px; min-width: 0; }
 .d-k {
   font: 500 9.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
@@ -56,11 +69,11 @@ body {
 .d-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 3px; }
 
 /* ── controls ─────────────────────────────────────────────────────────── */
-.d-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.d-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
 button, .d-btn {
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
-  border-radius: 4px; padding: 9px 14px; cursor: pointer;
+  border-radius: 4px; padding: 0 14px; height: 34px; cursor: pointer;
   -webkit-tap-highlight-color: rgba(255,212,0,.12);
 }
 button:hover { border-color: var(--dim2); }
@@ -81,6 +94,21 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
   font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
 
+/* ── hardware (sound + midi) ──────────────────────────────────────────── */
+.d-hw { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+/* the direction label and its picker are one control: same box, same baseline */
+.d-hw-tag {
+  font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--dim2); align-self: center;
+}
+.d-hw-pick {
+  font: 500 12px/1 var(--mono); color: var(--fg);
+  background: var(--card2); border: 1px solid var(--line2);
+  border-radius: 4px; padding: 0 10px; max-width: 100%;
+  /* match the buttons beside it exactly, so the row shares one baseline */
+  height: 34px; align-self: center;
+}
+
 /* ── log ──────────────────────────────────────────────────────────────── */
 .d-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
@@ -93,8 +121,14 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .d-log i { color: var(--bad); font-style: normal; }
 
 /* ── transport bar ────────────────────────────────────────────────────── */
+/* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
+   and by 164 px at 320 — and body{overflow-x:hidden} CLIPPED 2x and 4x off the
+   right edge rather than showing a scrollbar, so on a phone half the rate
+   lattice did not exist. The scrub was the only flexible child, so it collapsed
+   to its 40 px minimum: a seek control you cannot seek with. Wrapping needs no
+   media query — the scrub's flex-basis decides when there is no longer room. */
 .tbar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
   border-radius: 4px; padding: 8px 10px; margin: 0 0 8px;
 }
@@ -105,9 +139,11 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .tbar-toggle::before { content: "▶"; }
 .tbar-toggle[data-state="playing"]::before { content: "❚❚"; font-size: 10px; }
 .tbar-toggle[data-state="buffering"]::before { content: "◌"; }
+/* parked at the end: the button restarts, so it must not look like plain play */
+.tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }
 
 .tbar-scrub {
-  flex: 1 1 auto; min-width: 40px; height: 38px; position: relative;
+  flex: 1 1 200px; min-width: 200px; height: 38px; position: relative;
   cursor: pointer; touch-action: none;
 }
 .tbar-scrub::before {
@@ -122,7 +158,10 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
   position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
   background: var(--hi); border-radius: 50%; left: 0;
 }
-.tbar[data-seekable="0"] .tbar-scrub { display: none; }
+.tbar[data-seekable="0"] .tbar-scrub,
+.tbar[data-scrub="0"] .tbar-scrub { display: none; }
+/* with no slider the clock takes the slack, so the rates stay on the right */
+.tbar[data-scrub="0"] .tbar-time { margin-right: auto; }
 
 .tbar-time {
   flex: none; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums;
@@ -140,10 +179,12 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .tbar-badge:empty { display: none; }
 
 /* ── strip ────────────────────────────────────────────────────────────── */
-.d-strip { display: block; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+.d-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
+/* seed only — createStrip sets the real height from its lanes every frame */
+.strip-auto { height: 44px; }
 
 /* ── index ────────────────────────────────────────────────────────────── */
 .d-acts { list-style: none; margin: 0; padding: 0; }

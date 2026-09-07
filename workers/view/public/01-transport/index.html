@@ -19,40 +19,139 @@
   const d = mount({
     n: '01',
     name: 'transport',
-    what: 'One clock. Play, pause, rate, seek — and what it costs in drift.',
-    readout: { drift: 'ms', fires: '', rate: '×', pos: 'ms' },
-    controls: [{ id: 'check', label: 'Check drift', primary: true }],
+    what: 'Twenty things are set to happen, one a second. Press play and see how close they land.',
+    readout: { typical: 'ms', worst: 'ms', fires: '', pos: 'ms' },
+    controls: [],
   });
   guard(d);
+
+  // Handed to createDeck below AND printed in the HOW line, from these same
+  // constants — so the page cannot describe a setting it does not use.
+  const TICK = 25, HORIZON = 100, GRACE = 150;
 
   const { fired, adapter } = markAdapter();
   const deck = createDeck({
     items: marks(20, DURATION),
     adapters: { mark: adapter },
     range: [0, DURATION],
-    onDrift: (x) => d.set('drift', typeof x === 'number' ? x : x?.ms ?? 0),
+    tickMs: TICK, horizonMs: HORIZON, lateGraceMs: GRACE,
+    // onDrift hands us (newRows, allRows). It is an ARRAY of per-event rows —
+    // reading it as a scalar is how this readout used to print a confident 0
+    // while holding twenty real measurements.
+    onDrift: (_rows, all) => report(all),
   });
 
-  createTransportBar(d.el, deck);
-  createStripView(d.el, deck, { size: 'default', lanes: [{ id: 'mark', kind: 'mark', height: 40 }] });
+  // id -> its measured row, so the strip can colour each mark by how late it
+  // actually was and say so on hover.
+  const measured = new Map();
+
+  // LATE AGAINST WHAT? The first version of this scale used one absolute
+  // threshold (5 ms) and painted eighteen of twenty marks amber on a busy
+  // machine, which says "this is going badly" about a run that was working —
+  // and the project's own lab measures the shipped worker host at p50 5.0 ms,
+  // so an absolute 5 ms scale paints the DOCUMENTED BASELINE amber. A scale
+  // whose normal reading is a warning has no warning left to give.
+  //
+  // So each mark is judged against what its own way of firing promises: a
+  // committed timer is aiming at the instant and lands within a few ms; a mark
+  // the sweep caught was never given a timer at all and can be anywhere inside
+  // the check interval — being in there is the mechanism WORKING.
+  const budgetFor = (m) => (m.origin === 'tick-late' ? TICK : 5);
+  const BANDS = [
+    [1, '#8fd6a8', 'as expected'],
+    [2, '#ffd400', 'over'],
+    [4, '#e0b060', 'well over'],
+    [Infinity, '#e0908a', 'far over'],
+  ];
+  const bandFor = (m) => {
+    const over = Math.abs(m.deltaMs) / budgetFor(m);
+    return BANDS.find(([lim]) => over < lim);
+  };
+
+  /** `typical` is the median (half the marks came in under it) and `worst` is
+   *  the largest, because a typical value alone
+   *  hides the one bad fire that is the whole reason to look. The count of
+   *  marks the sweep caught used to sit here and was dropped: it is
+   *  structurally 1 — the mark due at position 0 cannot have a timer, since
+   *  play had not been pressed when the timers were set — so it read as a
+   *  measurement while being a constant. It is in the strip instead, as the
+   *  thicker bar. Both live; nothing here is behind a button. */
+  function report(rows) {
+    for (const r of rows) measured.set(r.id, r);
+    const xs = rows.map((r) => r.deltaMs).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!xs.length) return;
+    d.set('typical', xs[xs.length >> 1]);
+    d.set('worst', xs[xs.length - 1]);
+    // Assert on the FIRST row, not a comfortable sample: verify.mjs plays for
+    // 500 ms, which is one mark. A threshold of 5 read as "asserted nothing".
+    if (!asserted && xs.length >= 1) {
+      asserted = true;
+      d.assert('every mark reports a real lateness', xs.every(Number.isFinite), `n=${xs.length} typical=${xs[xs.length >> 1]}`);
+      d.assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
+    }
+  }
+  let asserted = false;
+
+  d.how(
+    `looks ${HORIZON} ms ahead · re-checks every ${TICK} ms · off the main thread`,
+    `Instead of twenty timers at once, the clock sets only the next few — and ` +
+    `can still cancel them, which is why pause really stops and dragging ` +
+    `really skips. Green landed as expected; amber to red, late. Hover for the ` +
+    `number.`,
+  );
+
+  // No slider: the strip below IS the position surface. Click or drag it.
+  createTransportBar(d.el, deck, { scrub: false });
+  // Grey until the playhead reaches it, yellow after — `latch` recolours from
+  // the position every frame, so rewinding un-fires them. Without a colour the
+  // lane falls back to a hash of the kind name, which lands wherever it lands
+  // and here landed somewhere you cannot see.
+  createStripView(d.el, deck, {
+    size: 'auto',
+    // follow:false — the strip auto-scrolls to keep the playhead at 82% of the
+    // width, which slides its axis out from under the bar above it and leaves
+    // the two disagreeing about where a second is. A bounded piece has nowhere
+    // to run to, so it holds the whole range instead.
+    follow: false,
+    // armWall:false — the wall-clock cursor measures how far the piece has
+    // fallen behind real time since it first played. That is the number to
+    // watch on a live feed and noise on a 20 s fixture, where after the end it
+    // just counts how long ago you finished.
+    armWall: false,
+    lanes: [{
+      id: 'mark', kind: 'mark', height: 72, width: 2, latch: true,
+      color: '#6a7280',
+      terse: true,        // no id/kind/attested lines: nothing here is restored
+      colorOfRow: (r, fired) => {
+        if (!fired) return null;                       // grey: not played yet
+        const m = measured.get(r.id);
+        return m ? bandFor(m)[1] : '#8fd6a8';
+      },
+      // Two short lines. A tooltip sits ON TOP of the thing it describes and is
+      // read every time you point at one; the sentences belong in the `how`
+      // block above, which is read once.
+      describeRow: (r) => {
+        const m = measured.get(r.id);
+        if (!m) return 'not played yet';
+        const [, , verdict] = bandFor(m);
+        return [
+          `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${verdict}`,
+          m.origin === 'tick-late' ? `no timer · ${TICK} ms check caught it` : 'timer set ahead',
+        ];
+      },
+      // Second channel, same lane: a mark the clock never got to set a timer
+      // for is drawn thicker. It is an annotation on these marks, not a
+      // separate subject, so it does not get a row of its own.
+      widthOfRow: (r) => (measured.get(r.id)?.origin === 'tick-late' ? 5 : 2),
+    }],
+  });
 
   setInterval(() => {
     d.set('pos', deck.position());
-    d.set('rate', deck.rate());
     d.set('fires', fired.length);
   }, 100);
 
-  // drift is the number this demo exists for: scheduled vs actual fire time
-  d.on('check', () => {
-    const s = deck.stats?.() ?? {};
-    const dr = deck.drift?.();
-    d.set('drift', typeof dr === 'number' ? dr : dr?.p50 ?? dr?.ms ?? 0);
-    d.assert('deck reports drift', dr !== undefined && dr !== null, JSON.stringify(dr));
-    d.assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
-    d.log(`stats ${JSON.stringify(s).slice(0, 160)}`);
-  });
-
-  d.log(`${DURATION / 1000}s, 20 marks, lattice ${JSON.stringify(adapter.caps.rates)}`);
+  d.log(`${DURATION / 1000}s, 20 marks, speeds ${adapter.caps.rates.join('/')}x`);
   d.ready();
 </script>
 </html>

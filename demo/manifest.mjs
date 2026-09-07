@@ -21,7 +21,7 @@ export const ACTS = new Map([
 
 export const DEMOS = [
   { n: '01', name: 'transport', act: 0, built: true,
-    one: 'play, pause, rate and seek on one clock; reports its drift',
+    one: 'twenty things happen a second apart — how close to on time each one lands',
     tags: ['timeline'] },
   { n: '02', name: 'lanes', act: 0, built: true,
     one: 'an audio lane and a data lane on one transport',

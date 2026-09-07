@@ -2763,6 +2763,122 @@ export function createAudioLane(transport, ctx, {
   };
 }
 
+/**
+ * MIDI out is an AUDIO-SHAPED lane, not a timer-shaped one.
+ *
+ * `MIDIOutput.send(data, when)` takes a future DOMHighResTimeStamp and the port
+ * delivers it there, so — exactly like the audio lane — nothing happens "at the
+ * moment" and the accuracy is owned below JS. This is why the library needed a
+ * third lane type rather than a `midi` adapter on the wall scheduler: an
+ * adapter would fire at the moment and hand MIDI its worst case.
+ *
+ * Two differences from createAudioLane, both worth knowing:
+ *
+ *   · IT STILL NEEDS A DOMAIN CONVERSION, and the first version of this file
+ *     got it wrong in the most silent way available. `MIDIOutput.send()` takes
+ *     a `DOMHighResTimeStamp` — `performance.now()`'s domain — while the
+ *     transport's default `wallClock()` is `performance.timeOrigin +
+ *     performance.now()`, i.e. EPOCH ms. Handing `transport.timeAt()` straight
+ *     to `send()` therefore scheduled every note about fifty-six years out.
+ *     Nothing threw, nothing logged, and the lane's own `scheduled()` counter
+ *     went up exactly as if it had worked — the counter counts what we QUEUED,
+ *     not what the port accepted. The conversion below is a delta rather than
+ *     `- performance.timeOrigin`, so it holds for any ClockSource, including
+ *     the audio clock and the virtual runtime.
+ *     The audio lane re-anchors best-of-five every tick because
+ *     `AudioContext.currentTime` also DRIFTS against wall time; this one does
+ *     not drift, both being the same underlying clock, so a fresh pair of
+ *     readings per commit is enough.
+ *   · CANCELLATION IS ALL-OR-NOTHING. There is no per-message cancel;
+ *     `clear()` drops every pending message on the port. That is fine for a
+ *     note whose note-on has not sounded yet, and leaves a HUNG NOTE for one
+ *     that has — so cancelling also sends all-notes-off. The looper learned
+ *     the same lesson from the other end: no-stuck-notes is a property of the
+ *     cancel path, never of the callback that was supposed to run.
+ *
+ * UNVERIFIED ON HARDWARE. No MIDI device has ever been attached to this
+ * project (HANDOFF: the macOS IAC toggle is still open), and headless Chrome
+ * needs `Browser.grantPermissions` for midi before it can even enumerate a
+ * port — so `verify.mjs` cannot reach this code. Treat the timing claim above
+ * as the spec's, not as measured.
+ */
+export function createMidiLane(transport, output, {
+  tickMs = 25,
+  horizonMs = 100,
+  host = null,
+  channel = 0,
+  velocity = 100,
+  durationMs = 120,
+} = {}) {
+  const clock = transport.clock;
+  const events = [];
+  let seq = 0, running = false;
+  const scheduledLog = [];
+  const h = host || workerTickHost();
+  const ch = channel & 0x0f;
+  const NOTE_ON = 0x90 | ch, NOTE_OFF = 0x80 | ch, CC = 0xb0 | ch;
+
+  /** transport clock ms -> the performance.now() domain send() speaks. */
+  function toPerf(wallMs) { return performance.now() + (wallMs - clock.now()); }
+
+  function commit(ev) {
+    const wallT = transport.timeAt(ev.at);
+    if (wallT === null || wallT === undefined || wallT < clock.now()) { ev.status = 'passed'; return; }
+    const dur = ev.durMs ?? durationMs;
+    const sendAt = toPerf(wallT);
+    // on and off go out together, so a clear() between them cannot strand one
+    output.send([NOTE_ON, ev.note, ev.vel ?? velocity], sendAt);
+    output.send([NOTE_OFF, ev.note, 0], sendAt + dur);
+    ev.status = 'committed';
+    // BOTH domains are recorded: `intendedUs` to compare against other lanes,
+    // `sentAtPerf` to compare against a MIDIMessageEvent.timeStamp coming back
+    // off a loopback, which is the only way this lane can be measured at all.
+    scheduledLog.push({ id: ev.id, at: ev.at, intendedUs: Math.round(wallT * 1000), sentAtPerf: sendAt });
+  }
+
+  function cancelCommitted() {
+    let any = false;
+    for (const ev of events) if (ev.status === 'committed') { ev.status = 'pending'; any = true; }
+    if (!any) return;
+    try { output.clear && output.clear(); } catch { /* port went away */ }
+    try { output.send([CC, 123, 0]); } catch { /* ditto */ }
+  }
+
+  function tick() {
+    if (!running || transport.rate <= 0) return;
+    const pos = transport.position();
+    const horizonPos = pos + horizonMs * transport.rate;
+    for (const ev of events) {
+      if (ev.status !== 'pending' || ev.at > horizonPos) continue;
+      if (ev.at <= pos) { ev.status = 'passed'; continue; }  // never burst the past into a port
+      commit(ev);
+    }
+  }
+
+  const unsub = transport.onState((st) => {
+    cancelCommitted();
+    if (st.reason === 'seek') for (const ev of events) if (ev.at > st.p0 && ev.status === 'passed') ev.status = 'pending';
+  });
+
+  return {
+    output,
+    schedule({ at, note = 60, vel, durMs, id }) {
+      const ev = { at, note, vel, durMs, id: id ?? `m${seq}`, seq: seq++, status: 'pending' };
+      events.push(ev); events.sort((a, b) => a.at - b.at || a.seq - b.seq);
+      return ev.id;
+    },
+    start() { running = true; h.start(tick, tickMs); },
+    stop() { running = false; h.stop(); cancelCommitted(); },
+    scheduled() { return scheduledLog.slice(); },
+    stats() {
+      const c = {};
+      for (const ev of events) c[ev.status] = (c[ev.status] || 0) + 1;
+      return c;
+    },
+    dispose() { this.stop(); unsub(); h.terminate && h.terminate(); },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Virtual runtime — a deterministic ClockSource + TickHost pair for CI. Time
 // advances only through advanceTo(); due timers and ticks fire in exact time

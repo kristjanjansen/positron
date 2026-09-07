@@ -12,7 +12,7 @@
 import { createStrip } from '/timeline/strip.mjs';
 import { el } from './shell.mjs';
 
-export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep' };
+export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep', auto: 'strip-auto' };
 
 export function createStripView(host, deck, { size = 'default', lanes = [], ...opts } = {}) {
   const cls = SIZES[size] || SIZES.default;
@@ -22,6 +22,9 @@ export function createStripView(host, deck, { size = 'default', lanes = [], ...o
   // gutter narrows with the sanctioned sizes; mini has no room for labels
   const strip = createStrip(canvas, deck, {
     gutter: size === 'mini' ? 0 : undefined,
+    // 'auto' means the canvas takes exactly the height its lanes need, and
+    // follows them when a lane is added or removed at runtime
+    autoHeight: size === 'auto' || undefined,
     ...opts,
   });
   if (lanes.length) strip.setLanes(lanes);

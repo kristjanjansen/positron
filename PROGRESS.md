@@ -1,4 +1,786 @@
-# Progress log — 2026-08-25 → 09-05  (newest first)
+# Progress log — 2026-08-25 → 09-07  (newest first)
+
+## Session 11 (2026-09-07) — a UI/UX review that turned into a jargon audit (user: "lets do ui/ux review of demos one by one" → "save progress to md's")
+
+Reviewed `01 transport` and `02 lanes` against a reader who does not work here.
+Every question the reader asked — *what is drift · green but late? · what
+alarm?? · what is attested? · where is the missed one? · why do I need the
+slider?* — turned out to name a real defect, not a wording preference. Eight of
+them were bugs in behaviour, not in copy.
+
+**127/127 green** across the eight strip demos (`01 02 03 05 14 15 16 19`), with
+per-demo counts unchanged: `01` 14, `02` 15 — the same 15 it had before its
+rewrite.
+
+### The demo that could not display its own headline number
+
+`01 transport` exists to report drift and was printing **`0`**. `deck.drift()`
+returns an ARRAY of per-event rows; the page read
+`typeof dr === 'number' ? dr : dr?.p50 ?? dr?.ms ?? 0`, so every branch missed
+and it fell through to the literal zero. The rows were there the whole time:
+
+```
+{id: "m3", at: 3000, intendedUs: …622418300, firedUs: …622419900,
+ deltaMs: 1.6, origin: "commit"}
+n=20  min 0.1  p50 1.0  p95 1.7  max 1.7  mean 0.99 ms
+origin: commit x19, tick-late x1
+```
+
+Worse, the assert PASSED on it: `deck reports drift — []` was green, because
+the check was `dr !== undefined && dr !== null` and `[]` satisfies that. A demo
+can hold twenty real measurements, display a confident zero, and read green.
+The assert now requires rows.
+
+### A boundary in the paint loop is not a boundary — the fourth instance
+
+`transport-bar.mjs` stopped a bounded deck at `range[1]` from inside `paint()`,
+which `observePosition` drives off **requestAnimationFrame**. Measured in a
+hidden tab:
+
+```
+visibilityState hidden · rafFramesIn1s 0
+bar clock frozen "0:00.000 / 0:20.000"
+deck position 91,001 ms · playing true · range [0, 20000]
+```
+
+The scheduler kept perfect time throughout; the only broken thing was asking
+the renderer to enforce a rule. Now a committed one-shot armed from
+`transport.onState`, re-armed on every play/pause/rate/seek. **Honest caveat,
+recorded in the source:** it is a main-thread `setTimeout`, so a hidden tab
+clamps it to ~1 Hz and the stop can be a second late — a bounded error instead
+of an unbounded one. The exact fix is arming it on the scheduler's worker host,
+which `createDeck` does not expose.
+
+At the end the play button now becomes **↺ and restarts**, which is what a
+sequencer does: stop at the end, leave the playhead there, send it back on the
+next play. Restarting is better defined here than for a media element — a
+backward seek replays each event exactly once, by the library's own property
+test.
+
+### The transport bar did not fit a phone, and clipped rather than scrolled
+
+| viewport | scrub width | overflow |
+|---|---|---|
+| 720 | 265 px | fits |
+| 390 | **40 px** (its min) | **+94 px** |
+| 358 | 40 px | +126 px |
+| 320 | 40 px | +164 px |
+
+`.tbar` had no `flex-wrap` and the scrub was its only flexible child, so the
+scrub collapsed to its 40 px minimum while five rate buttons held 195 px — and
+`body { overflow-x: hidden }` **clipped `2x` and `4x` off the right edge**
+rather than showing a scrollbar. On a phone half the rate lattice did not
+exist. Fixed with `flex-wrap` plus a 200 px flex-basis on the scrub, so
+wrapping needs no media query. After: fits at 320/358/390 with the scrub
+keeping 218–288 px.
+
+### Two position surfaces is a contradiction, not a redundancy
+
+The reader asked why the slider and the strip did not relate. They did not:
+the strip had `follow` on, auto-scrolling to keep the playhead at 82 % of the
+width, so its axis slid out from under the bar and drew out to 30 s on a 20 s
+piece. Worse, the bar's slider **only seeked on `pointerup`** —
+`seekFromEvent()` repainted the bar's own fill and nothing else, so during a
+drag the strip, the readout and every lane sat still.
+
+The strip has always been the better scrubber, and nobody had noticed:
+`pointerdown` seeks, `pointermove` seeks continuously, shift-drag pans, wheel
+zooms. Measured on a synthetic drag: `2392 → 4793 → 8395 → 11996 → 15598 ms`,
+monotonic. So `createTransportBar(…, { scrub: false })` — where a strip exists
+the bar keeps play/pause, the clock, the rates and the badge, and gives up the
+slider. The bar's own scrub now seeks live during a drag anyway, coalesced to
+one seek per frame, with `pointercancel` ending the drag (it used to leave
+`dragging` true forever).
+
+### The strip's "offset" was measuring how long ago you finished
+
+The dual cursor arms a wall-clock line on first play and labels the gap to the
+playhead — accumulated pause and slow-rate time, the right number on a live
+feed. On a bounded 20 s fixture that has stopped, it grows at 1 s per second
+forever. `armWall: false` on both demos.
+
+### A colour scale whose normal reading is a warning
+
+The first lateness scale used one absolute threshold (5 ms green) and painted
+**18 of 20 marks amber** on a loaded machine — while `timeline/lab/NOTES.md`
+measures the shipped worker host at **p50 5.0 ms**, so the documented baseline
+was amber. Now each mark is judged against what its own way of firing promises:
+a committed timer against ~5 ms, a mark the 25 ms sweep caught against 25 ms —
+being inside the sweep window is the mechanism WORKING. Colour and words come
+from one table, so a green bar can never be described in language that sounds
+like a failure.
+
+Same run, before and after: 18 amber → 18 green, 2 yellow.
+
+### A readout cell that cannot change
+
+`MISSED` counted marks the sweep found already due. It is **structurally 1**:
+the mark due at position 0 cannot have a timer, because play had not been
+pressed when the timers were set. A constant dressed as a measurement teaches
+the reader to ignore the row. Replaced with `WORST` (the maximum), which moves;
+the missed one is now the thicker bar in the strip, via a new per-row width
+channel.
+
+### 02 lanes: three lanes, and one that could not be heard
+
+- **Audible at last.** `createAudioLane`'s default source is a ONE-SAMPLE
+  impulse — right for the lab, where threshold detection finds its exact
+  sample, and **20 µs at 48 kHz**, which is nothing on a speaker. The demo
+  appeared to do nothing when you turned sound on. It now passes `makeNode`
+  for a 1320 Hz blip with a 2 ms attack; same scheduled instant.
+- **`await ctx.resume()` removed.** It does not reject when refused, it never
+  settles — the trap that cost `26` and `28` a session, sitting in `02` the
+  whole time.
+- **The lookahead was drawn unfairly.** The sound row went green as soon as its
+  click was handed over, up to 100 ms ahead of the playhead, which reads as the
+  worker lagging. The wall scheduler commits ahead by the same 100 ms. All rows
+  now grey until the playhead passes and re-grey on rewind; colour says WHICH
+  LANE and nothing else.
+- **"Measure skew" deleted.** It wrote two numbers and a log line, so pressing
+  it looked like nothing happened. Skew is the demo; it is live. Live p50 runs
+  0.1–5.9 ms depending on machine load.
+- **Renamed** `timer` → `bg worker` at the reader's suggestion; the library's
+  internal "wall lane" names the clock domain rather than the difference.
+
+### `createMidiLane` — written, and honestly unexercised
+
+MIDI out is an **audio-shaped lane, not a timer-shaped one**:
+`MIDIOutput.send(data, when)` takes a future `DOMHighResTimeStamp`, so nothing
+happens at the moment and the accuracy is owned below JS. That is why it needed
+a third lane type rather than a `midi` adapter on the wall scheduler — an
+adapter would fire at the moment and hand MIDI its worst case.
+
+Two differences from `createAudioLane`, both in the source header:
+
+- **No anchor.** `AudioContext.currentTime` is a separate drifting domain, which
+  is why the audio lane re-anchors best-of-five every tick. MIDI timestamps are
+  in `performance.now()`'s domain — the transport's own — so `transport.timeAt()`
+  is usable directly.
+- **Cancellation is all-or-nothing.** There is no per-message cancel; `clear()`
+  drops everything pending. Fine for a note-on that has not sounded, a HUNG NOTE
+  for one that has, so cancelling also sends all-notes-off.
+
+**IT DID NOT SEND ANYTHING, and finding that out was the useful part.** The
+user brought the macOS IAC driver online mid-session (**Audio MIDI Setup →
+Window → Show MIDI Studio → IAC Driver → "Device is online"**, which publishes
+`IAC Driver Bus 1` as both an input and an output), `02` found the port, and
+its counters looked exactly right:
+
+```
+picker: IAC Driver Bus 1
+worker 32 · sound 31 · midi out 31 · skew 1.40 ms
+0 errors, 0 failures, __demo.failed null
+```
+
+I reported that as "the first MIDI this project has ever sent". It was not.
+`MIDIOutput.send()` takes a `DOMHighResTimeStamp` — `performance.now()`'s
+domain — while the transport's default `wallClock()` is
+`performance.timeOrigin + performance.now()`, i.e. EPOCH ms. Handing
+`transport.timeAt()` straight to `send()` scheduled every note **about
+fifty-six years out**. Nothing threw, nothing logged, and `midi out: 31` went
+up exactly as if it had worked — **because that counter counts what we QUEUED,
+not what the port accepted.**
+
+What exposed it was the loopback reading empty: `MIDI BACK —` on a page whose
+log said `listening back on IAC Driver Bus 1`. A screenshot of a dash. Two
+separate things had the same root cause, which is what made it findable:
+`intendedUs` (epoch) never paired with `MIDIMessageEvent.timeStamp`
+(performance), so nothing arrived AND nothing had been sent.
+
+Fixed with a delta conversion, `performance.now() + (wallMs - clock.now())`,
+which holds for any ClockSource rather than only the wall one — and
+`scheduledLog` now records BOTH domains, so a loopback arrival has something in
+its own units to pair against.
+
+**The lesson is #15 again, one layer out**: a counter that counts intent reads
+identically to a counter that counts delivery, and only one of them is
+evidence.
+
+### Measured, at last — and the obvious metric was worthless
+
+The first instinct was to compare `MIDIMessageEvent.timeStamp` on the way back
+against the instant we sent. Five sends at known instants:
+
+```
+e.timeStamp - scheduled   0.000  0.000  0.000  0.000  0.000 ms
+```
+
+**Exactly zero, five times out of five.** CoreMIDI carries the timestamp in the
+packet and Chrome hands it back unchanged, so the arrival stamp IS the send
+stamp — a number compared against itself, reading as a flawless result. Same
+family as the two entries already in this file: *a codec is not testable against
+itself*, and *comparing two peers' own timestamps CANCELS the skew under test*.
+
+`performance.now()` sampled IN THE HANDLER does not cancel, because it is taken
+on this side after the trip. Same five sends: 0.7, 0.4, 0.3, 0.3, 0.3 ms.
+
+Then a full 16 s pass through `IAC Driver Bus 1`, **n=31**:
+
+| | ms |
+|---|---|
+| min | 0.2 |
+| p50 | **0.4** |
+| p95 | 0.6 |
+| max | 3.7 |
+| mean | 0.5 |
+
+with `spread` — the per-beat gap between the bg-worker lane and the MIDI-in
+lane, as a median — at **1.60 ms** over 32 beats.
+
+**What that is NOT:** it is not send → a synth on a cable. No hardware has ever
+been on the other end of this. It is send → CoreMIDI loopback → Chrome's MIDI
+thread → our JS handler, so it includes the main-thread event loop and is an
+UPPER BOUND on delivery. It is also the only observable available without
+external hardware, and it is the first MIDI measurement this project has.
+
+### MIDI in, as its own lane
+
+The IAC loopback returns everything written to it, so `02` gained a fourth row
+fed by an explicitly chosen **MIDI input** (its own picker beside the output
+one, tagged `OUT ▸` and `◂ IN`, because "MIDI" alone cannot say which device
+you are choosing). It shows a row **only where a note actually arrived** — the
+other three lanes are schedules and exist whether or not anything happened;
+this one is a record, and drawing a row for a note that never came back would
+be inventing evidence. Arrivals print to the page log
+(`◀ note 65 vel 100 · +0.42 ms`), because macOS ships no MIDI monitor and an
+external one cannot see the instant we asked for, only the instant the note
+arrived.
+
+### Skew stopped being definable, so it was replaced
+
+With two rows there is one gap. With four there are six pairs, two of which
+cannot be measured at all, and a single `SKEW` cell had to mean "the gap
+between the first row and the second".
+
+Per-lane numbers now live in their own table (`demo/shell/lane-stats.mjs`),
+each row carrying the swatch that matches its marks in the strip. Every number
+is **that lane's error against the beat it was given**, not against another
+lane — the quantity a lane can answer for on its own, with every pairwise gap
+one subtraction away. Every lane gets a row INCLUDING the ones with nothing to
+say, and they say it in words rather than showing a `0`.
+
+The one page-wide number left is `spread`: per beat, the widest gap between the
+lanes that CAN report, as a median. Lanes with no feedback are excluded rather
+than counted as zero — **a lane that cannot answer must not be able to improve
+the score.**
+
+### One meaning for colour, across every demo
+
+`01` used mark colour for lateness; `02` used it for lane identity. The same
+ink meant two things one page apart. Now, everywhere: grey = not played, slate
+= played and this lane cannot say how well, green = inside what its way of
+firing promises, amber/red = later than that. Lane identity moved to the three
+channels that already carried it — the row, the label, and the swatch.
+
+"Played, unmeasured" earns its own colour rather than borrowing green: the
+sound card gives no per-note feedback, so colouring it as if it had landed well
+would be an assertion nothing checked.
+
+### A unified tooltip
+
+A page about the relationship between lanes was answering with the lane your
+pointer happened to touch, so comparing meant three hovers and holding two
+numbers in your head. `describeHit` on the strip replaces the whole block and
+is handed the default lines, so a client extends rather than replaces:
+
+```
+beat at 7.000 s
+bg worker    +1.20 ms
+sound card   played · no feedback
+midi out     played · no feedback
+midi in      +0.44 ms
+```
+
+### Autofit lanes
+
+`layout()` already knew the exact height its lanes needed, so a fixed canvas
+height was either dead space or a clipped lane. Both happened: `01` ran a 72 px
+lane in a 120 px box, and `02` grew a fourth lane when a MIDI device appeared
+and pushed it out of view. `size: 'auto'` sets the canvas height from the lanes
+every frame.
+
+### `demo/shell/hardware.mjs` — new, the one way to ask for hardware
+
+Sound and MIDI are the two things a page cannot simply have. One gesture buys
+both; `resume()` is never awaited; the capability is reported rather than the
+error ("no such API", "you said no" and "granted, nothing plugged in" are three
+different answers); the device list is a `<select>` that appears as soon as
+access is granted, even empty, because a hidden control is indistinguishable
+from a page that never asked.
+
+**It also has to live in `.d-controls`.** Mounted anywhere else, `verify.mjs`
+never presses it — which read as `page asserted something — 0` and looked like
+a broken demo rather than an unpressed button.
+
+### Library additions, all opt-in
+
+`timeline/strip.mjs` gained three hooks, each mirroring something that already
+existed, and all falsy-safe so no existing lane changes:
+
+| hook | mirrors | why |
+|---|---|---|
+| `colorOfRow(row, fired)` | `colorOf` on the spans renderer | ticks had one colour for the whole latched half, so it could not say WHICH mark went wrong |
+| `widthOfRow(row, fired)` | the lane-level `width` | a second per-row channel: colour for the value, width for a property of the row |
+| `terse` on a lane | — | drops the `id/kind` and `attested` lines. On a lane with no restorations they are noise that reads as a claim: a green bar labelled `attested` invites the conclusion that the colour means attested |
+
+`describeRow(row)` was also added to `describe()`: what a row MEASURED is not in
+the row, and this lets a lane say it without drift leaking into the strip.
+
+`demo/shell/shell.mjs` gained `d.how(spec, note)` — a spec line of real values
+and one plain sentence, published on `__demo.how`. Its numbers come from the
+same constants the page hands the library, never typed twice.
+
+### The jargon audit, which is the actual finding
+
+Six reader questions, six defects:
+
+| question | what it exposed |
+|---|---|
+| "what is drift… is it about how much I am behind?" | the page never defined its own headline number, and it was fabricated |
+| "green but late???" | a scale calibrated against an absolute ideal instead of the mechanism |
+| "what alarm??" | a metaphor introduced in one paragraph, then used in a tooltip read on its own |
+| "what is attested?" | a provenance line leaking into a demo with no restorations |
+| "where is the missed one?" | a readout counting something invisible |
+| "why do I need the slider?" | two position surfaces, one of which scrubbed better |
+
+`CLAUDE.md`'s conventions were rewritten as a result. The old rule — *"No
+explanatory prose in demo pages; one line saying what the demo does, and a
+readout of real numbers"* — is what produced pages only their author could
+read. Terse and understandable are not in tension.
+
+### Also
+
+Favicon: 6 px corner radius, glyph shrunk and inset so the whole `e` sits inside
+the field instead of running off the bottom-right corner. **Both copies** — the
+SVG in `demo/shell/shell.mjs` and the pixel plotter in `workers/view/build.mjs`
+that generates `favicon.ico` — with a comment on each to keep them in sync.
+
+### Open
+
+- The end-stop timer should be armed on the scheduler's worker host rather than
+  a main-thread `setTimeout`; `createDeck` does not expose the host.
+- `createMidiLane` has run once by hand on IAC loopback; the `midi back`
+  round-trip number has not been read yet, and no HARDWARE synth has ever been
+  on the other end.
+- The remaining 22 built demos have not had the plain-language pass. `01` and
+  `02` are the worked examples.
+- Nothing is deployed. All of this is in the working tree.
+
+## Session 10 (2026-09-06) — the demo spine finished: one grid, a show that archives its own wire, ERR's rights wall, Icecast, and a compiled score (user: "Etv2 errors")
+
+**332/332 green when the session closed** (commit `5407031`; re-verified
+2026-09-07 at 301/313 from a sandbox with no UDP egress — see the last section).
+24 of 28 demos built. Four new demos (`25 show`, `26 shout`, `27 tracks`,
+`28 vclick`), one demo simplified out of a branch (`11 grid`), and one bug class
+— `canPlayType` — that had left three demos green while never once playing a
+frame.
+
+The assert count walked 274 → 276 → 291 → 305 → 318 → 332 across six commits;
+each step is a demo, and the one place it did NOT move is the interesting one.
+
+### 11 grid — one tier, because the tier was never the cost
+
+Removed the featured/live/wall tiering: no featured tile, no capped live row,
+no cheap wall painted at a lower rate. One grid, one 160×90 backing store per
+participant, a paint on every 40 ms tick. The `Rotate the featured` and
+`All same quality` controls went with it, and so did the branch in the checks.
+
+Paint at 54 uniform tiles reads **0.27 ms** — but these are synthetic canvases,
+so that is a floor, not a verdict. The cost the tiering existed to avoid is an
+SFU delivering and a device decoding N streams at full rate, and `plan-m2m`
+already measured that leg: N=54 = 106 tracks on one PeerConnection, SFU p50
+flat **122–137 ms**. The SFU held; the client tier was the lever. The page says
+so in a comment, because the number on screen cannot.
+
+**Suite 276/276, `11 grid` 12/12 → 14/14** (6 → 8 page asserts).
+
+The count rule earned a sharper data point on the way out. At HEAD the page
+**declared** 8 asserts and the suite only ever ran **6**: `verify.mjs` presses
+every control, so the uniform toggle was ON at check time and the two tiered
+asserts sat behind an early return. Not a dropped assert — a declared assert
+that the harness's own behaviour guaranteed would never fire.
+
+### 25 show — the archive is the bytes that came off the wire
+
+Three legs existed in three demos and had never met: `10 room` does peers (from
+a canvas, not a camera), `24 capture` records a LOCAL source, `14`/`15` replay
+what R2 already holds. None showed the thing worth showing — that what you
+archive can be the received stream.
+
+`25 show` runs the chain in one page. The peer is a second
+`RTCPeerConnection`: a real hop (offer/answer, ICE, encode, packetize, decode),
+and the only shape one browser can assert on deterministically. `MediaRecorder`
+is pointed at the RECEIVED stream, so the segments carry the decode rather than
+a second clean copy of the source. Playback is those segments on a deck with the
+shell's transport bar.
+
+`?room=NAME` also offers the show to the tokenless relay. It now both offers
+**and** answers — the first cut only offered, so two copies of the page each
+sent an offer into the room and neither ever replied. Verified by hand with two
+tabs on the real relay: both sides connect, each gets a peer tile, glare
+resolved by id order. Logged, never asserted; an assert needing a second browser
+is an assert that varies the suite total.
+
+**15/15 for the demo, 9 page asserts. Whole suite 289/291** — the two reds are
+`19 flipper`, below.
+
+Three things it cost, all now rules in `CLAUDE.md`:
+
+- **`verify.mjs` stops collecting 400 ms after the LAST assert**, not after a
+  fixed budget. Its stabiliser waits only while the count is still growing, so a
+  check that waits out a recording before its FIRST assert reports "asserted
+  nothing" and a working page reads as broken. Slow work belongs behind control
+  0, the only control that gets `settleMs`.
+- **A remote `MediaStream` carries the SENDER's msid.** `remote.id ===
+  srcStream.id` and the track ids match too, so the first version of "the
+  recording is of the received stream" compared ids and failed — correctly,
+  because that comparison can never distinguish them in either direction. Object
+  identity against `pc.getReceivers()[i].track` can.
+- **`media-master`'s L1 (the picture is never nudged) binds the HELPER, not the
+  page.** Without someone applying a scrub to the element, the transport bar
+  moves a vector the video ignores and L2 snaps it back a tick later. The page
+  wraps `deck.seek()` once and the check asserts the PICTURE moved.
+
+**`timeline/transport.mjs` no longer holds literal NUL bytes** — the composite
+cache-key separator is written as the `\u0000` escape. Same string at runtime,
+but BSD grep calls a file holding a NUL binary and prints **nothing**, so every
+search of the timeline core answered "not there", including for `createDeck`,
+exported ~40 lines from where the search claimed nothing was. `prop-test` still
+green: 30 basic + 15 gymnastics seeds, every seam suite, including the
+series-cursor path that key belongs to.
+
+### 19 flipper — ERR blocks its own segments by PROGRAMME, and three demos had never played HLS
+
+"Etv2 errors" was two unrelated bugs stacked on each other.
+
+**The rights wall.** The playlists are open (200 + `access-control-allow-origin:
+*`); the segments under `/live/hls/` can be **403 with NO ACAO**, which reaches
+a browser as a CORS failure, so hls.js holds an empty buffer and the cell stays
+black with nothing a viewer can read. Swept at 13 points across each 2 h window
+(`.` = 200, `#` = 403, oldest left, edge right):
+
+```
+etv       ........#####     the newest ~45 min refused
+etv2      #########....     the OLDEST ~78 min refused, the edge fine
+etvpluss  .............     everything served
+```
+
+It moves with the schedule and it is not always at the edge, so there is no
+offset to hard-code. A served segment honours Range, so a **2-byte GET** asks
+"will you serve this one?": the demo sweeps back from the edge, starts where ERR
+will serve, and puts the refused minutes in the readout. Measured headless after
+the fix: **blocked 70 min, state playing, 1920×1080, 138 s buffered.**
+
+Two rounds to get that right, and both wrong versions are the interesting part.
+Starting three segments before the boundary gave six seconds of picture and then
+walked into the wall, where **hls.js retried blocked fragments 1794 times in one
+run**; it now starts 90 s back and stops after three CONSECUTIVE failures — a
+counter that never resets turns three unlucky blips into a false wall. The first
+wall handler also called `pause()`, throwing away **113 s of picture already
+buffered**; it now stops loading and plays out what ERR gave. "Jump to live
+edge" re-probes instead of jumping into the blackout and killing a picture that
+was playing.
+
+**The `canPlayType` trap, in three demos.** `14 replay`, `15 seek` and
+`19 flipper` all gated native HLS on
+`canPlayType('application/vnd.apple.mpegurl')`, which answers `"maybe"` in
+Chrome as well as Safari. So desktop Chrome ran `video.src = <m3u8>` and sat at
+`readyState 0` forever. **Headless Chrome answers `"maybe"` too** — measured —
+so the suite ran the same dead path and stayed green, because those demos'
+asserts are about decks and cue folds, not about frames. All three now gate on
+`ManagedMediaSource`, the rule `src/low-latency-player.js` already followed;
+verified in real Chrome that all three take the MSE path (`blob:` src).
+
+The suite cannot see that fix, which is exactly the point: it was **291 green
+asserts over three pages that had never once played HLS.**
+
+Flipping the engine then turned two demos red on a URL that is CORS-clean: a
+media element's native load had cached a **no-cors (opaque)** entry for the
+archive manifest, and hls.js's XHR for the same url was served from it and
+rejected — while the page's own `fetch` of it returned 200 in the same run.
+`verify.mjs` now deletes its profile's Cache before every run, and classifies
+ERR's rights-403s the way it already classifies LL-HLS live-edge 404s: counted,
+printed, capped at 40. `19 flipper` went from **1794 refused requests to 18**.
+
+**Suite 291/291, `19 flipper` 18/18 with 24 refusals classified.**
+
+### 26 shout — an Icecast stream through Cloudflare, and what the hop costs
+
+SHOUTcast/Icecast is one HTTP response that never ends — no manifest, no
+segments, no seek — so none of the LL-HLS questions apply. Two facts about the
+origin (`icecast.err.ee`, Icecast 2.4.4, HTTP/1.0, 128 kbps MP3, five public
+stations) decided the design:
+
+- **No `access-control-allow-origin`, on any response.** A browser may put the
+  mount in an `<audio>` element and do nothing else with it: no `fetch`, no byte
+  counting, no `icy-name`, and — because a media element without CORS may not
+  join a WebAudio graph — no analyser, no level, no spectrum. Handing the same
+  bytes back with CORS on them is the relay's entire product, and every number
+  on the demo page exists only because of it.
+- **`HEAD` answers `400 Bad Request`**, on every mount. Any uptime checker that
+  HEADs an Icecast URL reads a healthy station as down. The relay GETs upstream,
+  keeps the headers and cancels the body, so HEAD through it is a 200 with
+  `icy-name` on it.
+
+Measured through the real edge (`shout.positron.studio`), 60 s, both paths
+opened in the same tick, `rig/shout/measure.mjs` — full table in
+`workers/shout/NOTES.md`, raw in `results/shout-edge-2026-09-06.json`:
+
+| | direct origin | through the EDGE |
+|---|---|---|
+| ttfb | 325.7 ms | **279.3 ms** |
+| first byte | 502.5 ms | 455.0 ms |
+| burst in the first 250 ms | 67.0 KiB | 67.0 KiB |
+| bytes / chunks | 993 KiB / 726 | 993 KiB / **1322** |
+| mean rate | 135.7 kbps | 135.6 kbps |
+| chunk gap p50 / p95 / max | 79.2 / 106.1 / 218.0 ms | 41.8 / 104.9 / 216.1 ms |
+| gaps past a 1 s jitter buffer | 0 | 0 |
+| audio held beyond realtime | 3.62 s | 3.56 s |
+
+**Same byte, both paths: −0.8 ms of carry through the edge** (−1.4 ms through
+local `workerd`). The relay hands Cloudflare the upstream `ReadableStream` and
+touches nothing, so bytes leave as they arrive.
+
+**The relay answered 46 ms SOONER than the origin.** Not a trick of the
+measurement: Cloudflare terminates in Tallinn (`cf-ray … -TLL`) and the origin
+is in the same city, so that is an edge in front of a local origin, not
+Cloudflare beating Icecast. From further away the connect saving grows and the
+carry — the number this rig exists to bound — is the one to re-measure.
+
+**The edge re-chunks**: same 993 KiB, 1322 writes instead of 726, so the median
+gap halves (41.8 against 79.2 ms) while p95 and max do not move. Chunk count is
+not a defect signal here.
+
+**Ten minutes on one response**: 9431 KiB in 12806 chunks at **128.77 kbps** —
+exactly nominal once the 3.6 s burst amortises — and the Worker held that single
+streaming response open for the whole 600 s. **One gap of 1684 ms**, the only
+one over a second. Streaming duration is not the limit; the occasional gap is.
+
+Two measurement traps, both of which produced a plausible wrong answer first:
+
+- **TTFB cannot answer "what does the hop cost".** Icecast bursts ~64 KiB —
+  some four seconds of already-encoded audio — at every new listener, so the
+  path that connects later can still be holding more audio. The rig takes a
+  16 KiB needle out of one stream, finds it in the other (no transcode, so the
+  frames are identical) and subtracts the two arrival times of that exact byte.
+  Validated against itself first: origin vs origin reads **−48.7 ms**, which is
+  exactly the two connections' TTFB difference and nothing else.
+- **The mean rate is the burst amortised.** 135.9 kbps over 60 s on a 128 kbps
+  station is not a fast link; over a 7 s window the same stream reads **195**.
+  So the demo asserts on the rate measured AFTER the burst lands (130 kbps) and
+  on the burst separately (3.67 s of audio in hand). The first version of that
+  assert — mean rate within 35 % of nominal — was wrong and failed correctly.
+
+The worker is an **allowlist of five stations, never a URL parameter**: an open
+proxy here would be a bandwidth laundromat on this account's egress. `?bytes=N`
+bounds a probe, because a stream that never ends otherwise leaves every harness
+deciding when to hang up.
+
+`26 shout` shipped `built: false` until `positron-shout` was deployed — the
+page's default base is the edge, and a demo whose dependency is not up would be
+a red in a suite that was 291/291. Verified meanwhile against `wrangler dev`,
+8/8 page asserts.
+
+**Two deploy failures were this repo's own `.env` shadowing machine OAuth**, and
+`env -u` cannot fix it, because wrangler reads `.env` from the **cwd**.
+Deploying from `workers/shout/`, which has no `.env`, is the documented other
+half of that `CLAUDE.md` rule.
+
+Also: `workers/view/verify.mjs` asserted `rows === 23` against a generated list
+that has had 25 and now 26 entries, and checked that links start with `/demo/`
+when `build.mjs` strips exactly that prefix. Both are now derived from the
+manifest — that file has gone stale this way twice.
+
+**Suite 305/305** (291 + 14), and the same 14 pass against the deployed page.
+
+### 27 tracks — is audio-only more performant, or only smaller?
+
+Two answers to one question, on the two transports that could plausibly differ.
+
+**LL-HLS: only smaller.** Cloudflare's audio rendition and every video rendition
+carry identical low-latency packaging — `PART-TARGET=0.5`,
+`PART-HOLD-BACK=1.5`, `TARGETDURATION=3` — and, the giveaway, the same
+INDEPENDENT cadence: **11 of 41 parts on BOTH**, though every AAC frame is
+independently decodable and audio could mark them all. `27 tracks` asserts that
+from the playlists, so the claim needs no stopwatch. Measured beside it, same
+run:
+
+| | latency | bitrate |
+|---|---|---|
+| video + audio | 8.83 s | 16431 kbps |
+| audio only | **3.88 s** | **418 kbps** |
+| video only | 3.82 s | 11786 kbps |
+
+Audio-only and video-only are the SAME latency. What costs the seconds is
+running both renditions at once — the demuxed-intersection problem
+`src/low-latency-player.js` exists to fight. (This leg is raw hls.js, not the
+tuned player, which is why 8.83 s is worse than the tuned 2.4–4.0 s.)
+
+**WHEP: the question has no answer on this provider.** An offer with one
+recvonly transceiver — audio alone or video alone — is **HTTP 400, both ways**,
+while video+audio negotiates in the same second (rtt 16 ms, video jitter buffer
+68 ms). Asserted rather than noted: the day that changes is worth being told
+about.
+
+Two bugs in my own instrumentation, both found by **disbelieving a flattering
+number**: the first `getStats` after an answer has no `inbound-rtp` yet, so
+every jitter-buffer delta came out `null` and printed as a very impressive
+**0 ms**; and `hls.latency` read once at the end is one sample of a number that
+moves, so it now medians the second half of the window. A missing buffer prints
+as absent, never as zero.
+
+### timeline/csound.mjs — a score compiles, and then it can be seeked
+
+The compiler `demo/notes/uuu-positron.md` §3 argued for. **22/22 in
+`timeline/lab/csound-test.mjs`** (re-run 2026-09-07: 22/22 green). `t`
+statements become a beat↔ms map, `i` lines become rows, `m`/`n` become quotation
+values that round-trip through `score.mjs` byte-identically (162 bytes), and the
+`.` carry with the `+` and `^+x` shorthands are handled because real scores use
+them.
+
+**The part a parser would have got wrong**: p2 and p3 are BEATS, and Csound
+interpolates tempo linearly in beat, so the map is the **integral** of
+`60/tempo` — closed-form and logarithmic. On `t 0 120 30 90` the true answer at
+beat 30 is **17.2609 s** and the mean-tempo answer is **17.1429 s**. Reaching
+for the average puts every later note **118 ms early** and nothing in the output
+looks wrong, so the test asserts both numbers and the naive one can never
+quietly return.
+
+And the claim itself — seek-from-anywhere as a guarantee rather than a
+discipline: compile a 16-note score, build a deck, and `reduceAt` is exact at
+**57 probes** and on **both sides of all 16 notes** (48 boundary probes, 0
+wrong). The score file cannot answer "what is in force at bar 47"; the compiled
+rows can.
+
+`verify.mjs`: the probed-refusal counter no longer calls a WHEP 400 an "ERR
+segment refused by rights" — it counts refusals the demos ask for on purpose,
+from either source, and says so.
+
+**Suite 318/318** (305 + 13).
+
+### 28 vclick — the arithmetic on screen
+
+The demo for `timeline/csound.mjs`, and `demo/notes/uuu-positron.md` §3 made
+visible: a Csound score is a fine authoring format and a poor runtime one, and
+both gaps close when it is compiled.
+
+The canvas draws the beat→time map as the integral it is, against the straight
+line you get by averaging the tempo. On the default fragment — 120 bpm easing to
+72 by beat 16 — they are **217 ms apart by the end of five seconds**. That gap
+is the error a mean-tempo compiler ships, and it is invisible in the output
+because every note still lands, just early. Drawn rather than argued.
+
+Below it, the `m`/`n` repeat printed as the quotation VALUE it compiles to — the
+JSON that round-trips through `score.mjs` — and a deck with the shell's
+transport bar. Scrub it: beat and fold come off the tempo map the client already
+holds, which is the third gap in the note (vClick must push bar and beat over
+OSC because its tempo lives in the score, so the network is in the critical path
+of every beat).
+
+**14/14.** The fold is exact either side of all 11 rows, a seek lands
+mid-repeat and folds correctly, and the notes sound — one triangle voice per row
+through the deck's own adapter, so a seek is audible as well as assertable.
+
+Two things it cost:
+
+- **`AudioContext.resume()` never resolves without a user gesture, and never
+  rejects either.** Awaiting it left this page with no compile, no deck and no
+  transport bar while LOOKING fine, because the readout had already been filled
+  by the compile at load. Same shape as `audio.play()` blocking `26 shout`'s
+  measurement earlier the same day. Headless hides both — the harness passes
+  `--autoplay-policy=no-user-gesture-required`, so both resolve there and the
+  page reads green while being dead in a browser. **Sound is allowed to be late;
+  the timeline is not.**
+- The score box is editable, so a typo is a normal thing for a human to cause
+  rather than a page fault. A failed compile keeps the last good one and names
+  the line, instead of `guard()` turning it into a dead page.
+
+`build.mjs` deploys `timeline/csound.mjs`, since this is the first page to
+compile a score in the browser.
+
+**Suite 332/332** (318 + 14).
+
+### The BUILD stamp lags one commit, on purpose
+
+`6e5e459` restamps `shell.mjs`'s `BUILD` for the deploy of `5407031`. The stamp
+names the commit the assets were built FROM, so it always lags one behind
+whatever adds it — committed on its own rather than amended in, because the
+deployed bytes should be identical to a tree someone can check out.
+
+### Method
+
+- **A declared assert is not a run assert.** `11 grid` declared 8 and the suite
+  ran 6, because `verify.mjs` presses every control and the toggle was ON at
+  check time. Same failure shape as session 9's 11 → 10 drop, one layer down.
+- **A green suite over a path that never executed.** 291 asserts across three
+  pages that had never played a frame of HLS in Chrome. The asserts were about
+  decks and cue folds; nothing asked for a picture.
+- **Disbelieve a flattering number.** A 0 ms jitter buffer was a `null` from a
+  `getStats` called too early. A missing measurement must print as absent.
+- **An id comparison that cannot distinguish is not a test.** A remote
+  `MediaStream` carries the sender's msid; the assert passed vacuously in both
+  directions until it compared object identity.
+- **The harness caches across engines.** An opaque entry from `video.src` poisons
+  hls.js's XHR for the same URL. Clear the profile Cache every run.
+- **Never let sound gate the work.** Two demos in one day, both from awaiting a
+  promise that neither resolves nor rejects without a gesture.
+- **`grep` lies about a file holding a NUL byte.** Suspect the file before the
+  symbol.
+- **A hard-coded row count against a generated list goes stale** — `rows === 23`
+  against 26 entries. Derive it from the manifest.
+- **`.env` in the cwd shadows machine OAuth and `env -u` cannot fix it**, because
+  wrangler reads `.env` from the cwd. Deploy from a directory without one.
+
+### Open
+
+- **iOS is still unconfirmed on a real phone** since the native-HLS switch of
+  session 9. Nothing this session touched `src/low-latency-player.js`, so the
+  question is exactly where session 9 left it: open `positron.studio/06-llhls/`
+  and read the `BUILD` on the first log line.
+- **The archival cron still needs a fresh Stream-scoped token.** `.env` holds the
+  known-exposed legacy credential.
+- **`26 shout` has no egress cap.** 128 kbps is ~57.6 MB per listener-hour, all
+  billable and none of it cacheable (the origin sends `no-cache, no-store`, and a
+  cached radio stream is a contradiction). Nothing throttles or counts listeners;
+  a link that goes anywhere public should get a cap first.
+- **Every shout number was taken in Tallinn**, where both the origin and the colo
+  are. The carry figure is the one to re-measure from a distance.
+- **Still unbuilt: 4 of 28.** `20 kurenniemi`, `21 megatimeline`, `22 remixer`
+  (the pages work and are linked, not re-shelled) and `23 studio` (assembly —
+  every panel it consumes exists and is verified).
+- **Nothing has still ever been used by a human.** Unchanged, and now the demo
+  spine is finished around it.
+
+### Re-verified 2026-09-07 — 301/313, and what that number means
+
+`node demo/verify.mjs` re-run while writing this entry, on a sandboxed shell:
+**301/313 green, 12 FAILED**, against the 332/332 the session closed on. The
+gap is the environment, not a regression — **UDP egress is blocked here**,
+confirmed directly (a DNS query to `1.1.1.1:53` gets no reply in 4 s, while TCP
+to `positron.studio`, `ws.positron.studio` and `pub.positron.studio` all answer
+200).
+
+| demo | ok | FAIL | why |
+|---|---|---|---|
+| `07 webrtc` | 9 | 5 | WHEP is WebRTC: `connectionState failed`, no inbound video rtp at all |
+| `08 moq` | 5 | 2 | `ERR_QUIC_PROTOCOL_ERROR … QUIC_NETWORK_IDLE_TIMEOUT` to the draft-14 relay |
+| `09 ladder` | 8 | 2 | its WHEP rung, same cause |
+| `25 show` | 6 | 2 | the local loopback `RTCPeerConnection` never leaves `connecting/connecting` |
+| `17 instrument` | 9 | 1 | `relay open — 0`; a WebSocket, so NOT the UDP cause — unexplained |
+
+Every other demo was green, including all four new ones at their committed
+counts: `11 grid` 14, `19 flipper` 18, `26 shout` 14, `27 tracks` 13,
+`28 vclick` 14.
+
+**313, not 332, is the second half of the story**: 19 asserts never RAN. A page
+that loses a leg stops before the asserts behind it — `25 show` ran 8 of its 15,
+because segments, duration, deck and seek all sit behind a live leg that never
+connected. That is the settle/assert-count rule from the other direction: a
+failure upstream silently shrinks the denominator, so **a falling total is a
+symptom to read, not a number to update**.
+
+Nothing here re-tests the four transports that need UDP. To confirm 332/332,
+run the suite somewhere with UDP egress.
 
 ## Session 9 (2026-09-05) — the iOS stutter, MoQ, Safari, and a tokenless write path (user: "See logs" → "save status to md's")
 

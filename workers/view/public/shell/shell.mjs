@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '5407031-194313';
+export const BUILD = '6e5e459-094920';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -19,6 +19,7 @@ export function mount({
   name = 'demo',
   what = '',
   readout = {},          // key -> unit string ('ms', 's', '' …)
+  showReadout = true,    // false: published on __demo, not drawn — see below
   controls = [],         // [{id, label, primary?}]
   index = '/',
 } = {}) {
@@ -32,9 +33,25 @@ export function mount({
   head.append(title);
   if (what) head.append(el('p', 'd-what', what));
 
+  // HOW — optional, one spec line and one sentence. Filled by d.how() AFTER
+  // construction rather than passed in here, so its numbers can come from the
+  // live object (deck.hostName, the constants actually handed to createDeck)
+  // instead of being typed a second time and drifting away from the config.
+  // Empty by default; `.d-how:empty` hides it, so no page pays for the slot.
+  const howEl = el('div', 'd-how');
+  head.append(howEl);
+
   // readout — every key gets a cell, all pending until set()
+  //
+  // `showReadout: false` publishes the numbers on `__demo` without drawing the
+  // row. It is for a page whose numbers have found a better home — 02 puts each
+  // lane's figures in that lane's own gutter, beside its ink, which leaves the
+  // row on top duplicating them a second time in a place with no context. The
+  // MACHINE contract is unchanged: a CDP script still reads `__demo.readout`,
+  // and `verify.mjs` still asserts the page declares one.
   const cells = new Map();
   const rb = el('div', 'd-readout');
+  if (!showReadout) rb.hidden = true;
   for (const [k, unit] of Object.entries(readout)) {
     const cell = el('div', 'd-cell');
     const v = el('span', 'd-v', '—');
@@ -66,6 +83,7 @@ export function mount({
     ready: false,
     failed: null,
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),
+    how: null,
     logs: [],
     asserts: [],
     transport: null,           // filled by transport-bar when one is attached
@@ -105,6 +123,15 @@ export function mount({
     el: body,
     head,
     set, log, assert,
+    /** how it works: a spec line of real values, then one plain sentence.
+     *  Both are published on __demo.how so a harness can read what the page
+     *  claims about itself. */
+    how(spec, note) {
+      howEl.replaceChildren();
+      if (spec) howEl.append(el('div', 'd-how-spec', spec));
+      if (note) howEl.append(el('div', 'd-how-note', note));
+      api.how = { spec: spec ?? null, note: note ?? null };
+    },
     on: (id, fn) => handlers.set(id, fn),
     button: (id) => cbar.querySelector(`[data-id="${id}"]`),
     ready: () => { api.ready = true; log('ready', 'hi'); },
@@ -124,12 +151,12 @@ function favicon() {
   if (document.querySelector('link[rel="icon"]')) return;
   const BG = '%230b0e14', HI = '%23ffd400';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
-    `<rect width="32" height="32" fill="${BG}"/>` +
-    `<circle cx="12.2" cy="19.6" r="7.45" fill="none" stroke="${HI}" stroke-width="4.3"/>` +
-    `<path d="M12.2 19.6L23.3 24.1L32 32L12.6 32Z" fill="${BG}"/>` +
-    `<rect x="3.6" y="17.7" width="17.2" height="3.2" fill="${HI}"/>` +
-    `<rect x="21" y="7" width="9" height="3" fill="${HI}"/>` +
-    `<rect x="24" y="4" width="3" height="9" fill="${HI}"/></svg>`;
+    `<rect width="32" height="32" rx="6" fill="${BG}"/>` +
+    `<circle cx="12.6" cy="19.4" r="6.7" fill="none" stroke="${HI}" stroke-width="3.8"/>` +
+    `<path d="M12.6 19.4L21.5 23L24 27.6L12.6 27.6Z" fill="${BG}"/>` +
+    `<rect x="5" y="17.7" width="15.2" height="2.9" fill="${HI}"/>` +
+    `<rect x="21.1" y="7.1" width="6.8" height="2.2" fill="${HI}"/>` +
+    `<rect x="23.4" y="4.8" width="2.2" height="6.8" fill="${HI}"/></svg>`;
   document.head.append(el('link', '', null, { rel: 'icon', href: 'data:image/svg+xml,' + svg }));
 }
 
