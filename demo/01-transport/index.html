@@ -94,10 +94,9 @@
 
   d.how(
     `looks ${HORIZON} ms ahead · re-checks every ${TICK} ms · off the main thread`,
-    `Instead of twenty timers at once, the clock sets only the next few — and ` +
-    `can still cancel them, which is why pause really stops and dragging ` +
-    `really skips. Green landed as expected; amber to red, late. Hover for the ` +
-    `number.`,
+    `The clock only sets timers for the next fraction of a second, and can ` +
+    `still cancel them — which is why pause really stops and dragging really ` +
+    `skips. Green landed as expected; amber to red, late.`,
   );
 
   // No slider: the strip below IS the position surface. Click or drag it.
