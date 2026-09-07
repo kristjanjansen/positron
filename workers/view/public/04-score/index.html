@@ -111,7 +111,7 @@
 
   function partAdapter(part) {
     return {
-      caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
+      caps: { rates: [0.25, 0.5, 1, 2], continuous: false, assertOnSeek: true },
       actuate(payload) {
         const key = `${part}#${payload.row}`;
         plays.set(key, (plays.get(key) || 0) + 1);
