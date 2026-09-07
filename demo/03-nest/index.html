@@ -21,7 +21,7 @@
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'One two-second recording, played three ways — nothing is copied. The bottom row is the four marks inside it, each time.',
+    what: 'One two-second recording, placed three times — nothing is copied. Each part holds the same four events.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
@@ -34,10 +34,10 @@
   guard(d);
 
   d.how(
-    `All three uses point at the whole recording, so the same four marks turn ` +
-    `up in each — that is the bottom row. The middle one plays at double ` +
-    `speed, so it is half as wide and its marks are twice as close together. ` +
-    `The last one says "twice".`,
+    `Each part points at the whole recording, so the same four events turn up ` +
+    `inside all of them. The middle part plays at double speed, so it is half ` +
+    `as wide and its events are twice as close together. The last one says ` +
+    `"twice".`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
@@ -143,7 +143,11 @@
       // the strip drew one long bar and the looping — the entire subject of this
       // page — was invisible. `rows` may return MORE rows than it was given, so
       // each pass becomes its own span and the loop reads as [ ][ ][ ].
-      { id: 'deck-span', kind: 'deck-span', label: 'the recording', height: 52, barPad: 8, as: 'spans',
+      { id: 'deck-span', kind: 'deck-span', // Cubase's vocabulary, because it is the one DAW that draws this exact
+        // distinction: a PART is a container placed on the timeline, an EVENT is
+        // a single occurrence inside it. Ableton and Pro Tools say "clip", which
+        // implies a copy — and the whole claim here is that nothing is copied.
+        label: 'parts', height: 52, barPad: 8, as: 'spans',
         // ONE ROW. The stack gives every distinct span key its own slot, which
         // is right for things that overlap and wrong for four that never do:
         // the three passes of a loop are one thing happening three times, and
@@ -198,9 +202,9 @@
       // Slate, not green: these are positions DERIVED from the score, not
       // observations. Colour on this site means how something landed, and
       // nothing here was measured.
-      { id: 'from-source', kind: 'mark', label: "what's in it", height: 44, width: 2,
+      { id: 'from-source', kind: 'mark', label: 'events', height: 44, width: 2,
         as: 'ticks', color: '#6f7d94', terse: true,
-        subLabel: ['the same four marks,', 'every time it plays'],
+        subLabel: ['the same four,', 'inside every part'],
         rows: () => {
           const out = [];
           for (const sp of nest.spans()) {
@@ -259,8 +263,8 @@
     d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/2`);
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
-      L.subLabel = [`played ${nest.spans().length} ways`,
-                    wraps ? `${wraps} wrap${wraps === 1 ? '' : 's'} so far` : 'one source'];
+      L.subLabel = [`${nest.spans().length} of them,`,
+                    wraps ? `1 recording · ${wraps} wrap${wraps === 1 ? '' : 's'}` : '1 recording'];
       view.strip.invalidate();
     }
   }, 200);
