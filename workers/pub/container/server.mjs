@@ -139,6 +139,7 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
+  const NUM = 96;             // one size for both clocks, as on the canvas
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
@@ -152,7 +153,7 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     // shows it.
     text('ABSOLUTE', 230, 34, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, 272, 76, VALUE),
+    text(`%{pts\\:flt\\:${epoch}} s`, 280, NUM, VALUE),
     text('LOCAL', 420, 34, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
@@ -160,7 +161,7 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 462, 104, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 465, NUM, VALUE),
   ].join(',');
 }
 
