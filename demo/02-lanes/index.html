@@ -41,11 +41,9 @@
 
   d.how(
     `each lane works ${AHEAD} ms ahead · one clock`,
-    `The worker wakes up and runs code. The sound card and the MIDI port are ` +
-    `told the instant in advance and act on it themselves, which is why they ` +
-    `are accurate to millionths of a second where code is accurate to about a ` +
-    `millisecond. Only a lane that can hear itself back gets a number; the ` +
-    `rest say so.`,
+    `Code has to wake up and do the work, so it lands within a millisecond or ` +
+    `so. The sound card and the MIDI port are told the instant in advance and ` +
+    `hit it themselves, a thousand times closer.`,
   );
 
   // No slider: the strip below is the position surface.
