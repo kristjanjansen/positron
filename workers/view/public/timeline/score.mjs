@@ -1040,3 +1040,241 @@ function canonical(x) {
   return `{${ks.map((k) => `${JSON.stringify(k)}:${canonical(x[k])}`).join(',')}}`;
 }
 export { canonical as canonicalJSON };
+
+// ---------------------------------------------------------------------------
+// 8. THE SCORE DOCUMENT — one container, several languages (plan-score.md).
+//
+// NORMALIZE THE ENVELOPE, NEVER THE PAYLOAD.
+//
+// A Csound note is `i 1 0.0 2.0 8000 440` — instrument, start, duration, then
+// whatever p-fields that instrument reads. A MIDI note is channel, number,
+// velocity. One of ours is a `kind` and an arbitrary payload. A container that
+// made these one vocabulary would need a lowest common denominator, and that
+// denominator is a lie about all three: p5 is not velocity, velocity is not p5,
+// and "note number" means nothing to an instrument that reads a frequency.
+//
+// So a ROW standardises only what is genuinely common — when, how long, what
+// kind of thing it is, which line it came from — and carries the rest verbatim
+// under `payload`, tagged by the part's `lang`. The test for any proposed
+// envelope field: could a Csound p-field, a MIDI velocity and one of our
+// payloads all answer it without one of them lying?
+//
+// TWO DOMAINS, ON PURPOSE. A document is authored in BEATS (`unit: 'beat'`)
+// with a tempo MAP, because that is what a score is; an arrangement runs in ms.
+// `loadScoreDoc` is the converter, and it takes the beat->ms map as an ARGUMENT
+// rather than importing one — the same inversion `repeatsAsQuotations` uses to
+// avoid depending on this file. A container that imported a language's compiler
+// would be a container with a favourite language.
+//
+// A `unit: 'beat'` document with no tempo means 60 bpm, at which one beat is
+// one second. A MIDI part gets `tempo: [[0, 60]]` and SAYS SO, rather than
+// quietly meaning milliseconds.
+// ---------------------------------------------------------------------------
+
+export const SCORE_DOC_VERSION = 1;
+
+/** The languages a part may declare. Open by design — an unknown lang is a
+ *  warning on load, never a refusal, because the envelope is readable whether
+ *  or not this build knows how to sound the payload. */
+export const SCORE_LANGS = ['csound', 'midi', 'positron'];
+
+function scoreRow(r, where) {
+  if (!r || typeof r !== 'object') throw new Error(`${where}: a row must be an object`);
+  const at = Number(r.at);
+  if (!Number.isFinite(at)) throw new Error(`${where}: \`at\` must be a finite number (in the document's unit)`);
+  const dur = r.dur === undefined || r.dur === null ? undefined : Number(r.dur);
+  if (dur !== undefined && !(Number.isFinite(dur) && dur >= 0))
+    throw new Error(`${where}: \`dur\` must be a finite, non-negative number when present`);
+  return clean({
+    id: r.id == null ? null : String(r.id),     // see quotation(): "null" is not an id
+    at, dur, kind: r.kind === undefined ? 'note' : String(r.kind),
+    line: Number.isFinite(r.line) ? Number(r.line) : undefined,
+    payload: r.payload === undefined ? undefined : r.payload,
+  });
+}
+
+function scorePart(p, name) {
+  const where = `scoreDoc.parts['${name}']`;
+  if (!p || typeof p !== 'object') throw new Error(`${where}: a part must be an object`);
+  if (!Array.isArray(p.rows)) throw new Error(`${where}: \`rows\` must be an array`);
+  const lang = p.lang === undefined ? 'positron' : String(p.lang);
+  return clean({
+    lang,
+    rows: p.rows.map((r, i) => scoreRow(r, `${where}.rows[${i}]`)),
+    // Csound statements that carry no row (`f`, `a`, `v`, `r`, `{`, `}`) are
+    // warnings in the compiler, not silent drops. A score leaning on them
+    // compiles to something quietly shorter than it reads, so the document
+    // carries the warnings and a reader can be told.
+    warnings: Array.isArray(p.warnings) && p.warnings.length ? p.warnings.map(String) : undefined,
+    meta: p.meta ?? undefined,
+  });
+}
+
+/**
+ * A score document: named parts, and uses of them.
+ *
+ * `uses` are QUOTATIONS — the same value `nest.add()` takes — and a use's `ref`
+ * names a PART rather than a deck. That is deliberate reuse rather than a
+ * second vocabulary: one thing that names its source by identity, one
+ * canonicaliser, one equality.
+ *
+ * @param spec {id?, unit?, tempo?, parts, uses, meta?}
+ */
+export function scoreDoc(spec = {}) {
+  if (!spec || typeof spec !== 'object') throw new Error('scoreDoc(spec) needs an object');
+  const unit = spec.unit === undefined ? 'beat' : String(spec.unit);
+  if (unit !== 'beat')
+    throw new Error(`scoreDoc: \`unit\` must be 'beat' (got '${unit}') — a document with no tempo means 60 bpm, ` +
+      'at which one beat is one second. Say that, rather than meaning milliseconds quietly.');
+  const tempo = (spec.tempo || [[0, 60]]).map((pair, i) => {
+    const b = Number(pair && pair[0]), m = Number(pair && pair[1]);
+    if (!Number.isFinite(b) || !(m > 0))
+      throw new Error(`scoreDoc.tempo[${i}]: must be [beat, bpm] with a positive bpm`);
+    return [b, m];
+  });
+  const parts = {};
+  for (const name of Object.keys(spec.parts || {}).sort()) parts[name] = scorePart(spec.parts[name], name);
+  if (!Object.keys(parts).length) throw new Error('scoreDoc: needs at least one part');
+  const uses = (spec.uses || []).map((u, i) => {
+    const q = isQuotation(u) ? u : quotation(u);
+    if (!parts[q.ref])
+      throw new Error(`scoreDoc.uses[${i}]: no part named '${q.ref}' — a use names its part by identity ` +
+        `(parts: ${Object.keys(parts).join(', ')})`);
+    return q;
+  });
+  return deepFreeze(clean({
+    v: SCORE_DOC_VERSION,
+    id: spec.id == null ? null : String(spec.id),
+    unit, tempo, parts, uses,
+    meta: spec.meta ?? null,
+  }));
+}
+
+export function isScoreDoc(x) {
+  return !!x && typeof x === 'object' && x.v === SCORE_DOC_VERSION
+    && !!x.parts && Array.isArray(x.uses) && typeof x.unit === 'string';
+}
+
+/** Canonical (key-sorted) JSON. This is the AUTHORITATIVE spelling: two
+ *  structurally equal documents have one text, and that is what round-trip
+ *  byte-identity is asserted against. */
+export function scoreDocToJSON(doc) { return canonical(doc); }
+
+export function parseScoreDoc(input) {
+  const raw = typeof input === 'string' ? JSON.parse(input) : input;
+  if (!raw || typeof raw !== 'object') throw new Error('parseScoreDoc: not an object');
+  if (raw.v !== SCORE_DOC_VERSION)
+    throw new Error(`parseScoreDoc: unknown document version ${raw.v} (this build reads v${SCORE_DOC_VERSION})`);
+  return scoreDoc(raw);
+}
+
+/**
+ * THE JSONL VIEW — a deterministic projection, never a second source of truth.
+ *
+ * Canonical JSON is authoritative; this is a rendering of it, one record per
+ * line, so a player can light "the line playing now" by index instead of
+ * searching a path. `parseScoreDocJSONL` reads it back, and the demo asserts
+ * the two agree byte for byte — two representations that can disagree is
+ * exactly the defect worth designing out.
+ *
+ * Line order is header, then each part's declaration followed by its rows in
+ * document order, then the uses. Parts are visited in sorted name order because
+ * `scoreDoc` stores them that way.
+ */
+export function scoreDocToJSONL(doc) {
+  const out = [canonical({ t: 'doc', v: doc.v, id: doc.id, unit: doc.unit, tempo: doc.tempo, meta: doc.meta })];
+  for (const [name, p] of Object.entries(doc.parts)) {
+    out.push(canonical(clean({ t: 'part', part: name, lang: p.lang, warnings: p.warnings, meta: p.meta })));
+    for (const r of p.rows) out.push(canonical({ t: 'row', part: name, ...r }));
+  }
+  for (const u of doc.uses) out.push(canonical({ t: 'use', ...u }));
+  return out.join('\n');
+}
+
+export function parseScoreDocJSONL(text) {
+  const lines = String(text).split('\n').filter((l) => l.trim());
+  if (!lines.length) throw new Error('parseScoreDocJSONL: empty');
+  const head = JSON.parse(lines[0]);
+  if (head.t !== 'doc') throw new Error("parseScoreDocJSONL: first line must be the 't':'doc' header");
+  const parts = {}, uses = [];
+  for (let i = 1; i < lines.length; i++) {
+    const rec = JSON.parse(lines[i]);
+    if (rec.t === 'part') {
+      parts[rec.part] = { lang: rec.lang, rows: [], warnings: rec.warnings, meta: rec.meta };
+    } else if (rec.t === 'row') {
+      const p = parts[rec.part];
+      if (!p) throw new Error(`parseScoreDocJSONL: line ${i + 1}: row for unknown part '${rec.part}'`);
+      const { t, part, ...row } = rec;
+      p.rows.push(row);
+    } else if (rec.t === 'use') {
+      const { t, ...q } = rec;
+      uses.push(q);
+    } else throw new Error(`parseScoreDocJSONL: line ${i + 1}: unknown record type '${rec.t}'`);
+  }
+  return scoreDoc({ id: head.id, unit: head.unit, tempo: head.tempo, meta: head.meta, parts, uses });
+}
+
+/**
+ * A part's rows as DECK ITEMS, in milliseconds.
+ *
+ * `tempoMap` is passed in rather than imported: the beat->ms integral lives in
+ * `timeline/csound.mjs` because that is where it was needed first, and a
+ * container that imported a language's compiler would be a container with a
+ * favourite language. Pass `tempoMap` from there.
+ *
+ * Every item carries `payload.row` — the row's id — which is what lets a player
+ * light the score line a firing note came from without a lookup by position.
+ */
+export function partItems(doc, name, { tempoMap, kind } = {}) {
+  const p = doc.parts[name];
+  if (!p) throw new Error(`partItems: no part named '${name}' (parts: ${Object.keys(doc.parts).join(', ')})`);
+  if (typeof tempoMap !== 'function')
+    throw new Error('partItems: pass `tempoMap` (from timeline/csound.mjs) — this container does not own a beat->ms map');
+  const tm = tempoMap(doc.tempo);
+  return p.rows.map((r, i) => {
+    const at = tm.msAt(r.at);
+    const durMs = r.dur === undefined ? undefined : tm.msAt(r.at + r.dur) - at;
+    return {
+      at,
+      kind: kind || r.kind,
+      id: r.id || `${name}#${i + 1}`,
+      payload: clean({ ...(r.payload || {}), row: r.id || `${name}#${i + 1}`, part: name, durMs, line: r.line }),
+    };
+  });
+}
+
+/** The span a part occupies, in ms — what a use with no `in`/`out` quotes. */
+export function partRangeMs(doc, name, { tempoMap } = {}) {
+  const items = partItems(doc, name, { tempoMap });
+  if (!items.length) return [0, 0];
+  const lo = Math.min(...items.map((i) => i.at));
+  const hi = Math.max(...items.map((i) => i.at + (i.payload.durMs || 0)));
+  return [lo, hi];
+}
+
+/**
+ * Instantiate a document as a live arrangement.
+ *
+ * The document is in beats; the arrangement runs in ms, so every use's `at`,
+ * `in` and `out` is converted here. A MARK address passes through untouched —
+ * a mark is resolved against the source's own lane at load, which is the whole
+ * reason it survives a re-cut.
+ *
+ * @param resolve (partName, use) -> deck. The only place a name becomes an
+ *        object, exactly as in `loadScore`.
+ */
+export function loadScoreDoc(doc, resolve, opts = {}) {
+  const dc = isScoreDoc(doc) ? doc : parseScoreDoc(doc);
+  const { tempoMap } = opts;
+  if (typeof tempoMap !== 'function')
+    throw new Error('loadScoreDoc: pass `tempoMap` (from timeline/csound.mjs) — the document is in beats and an arrangement runs in ms');
+  const tm = tempoMap(dc.tempo);
+  const beats = (a) => (a === undefined || isMarkAddress(a) ? a : tm.msAt(Number(a)));
+  const inMs = dc.uses.map((u) => quotation({
+    ...u,
+    at: tm.msAt(u.at),
+    in: beats(u.in),
+    out: beats(u.out),
+  }));
+  return loadScore(score({ id: dc.id, quotations: inMs }), resolve, opts);
+}

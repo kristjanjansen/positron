@@ -21,7 +21,7 @@
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'One recording, used twice — nothing is copied. The bottom row shows where its own marks land each time it is used.',
+    what: 'One recording, used three ways — nothing is copied. The bottom row is where its own marks land each time.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
@@ -34,11 +34,11 @@
   guard(d);
 
   d.how(
-    `Both uses are the same kind of thing: a pointer at the recording by name, ` +
+    `Every use is the same kind of thing: a pointer at the recording by name, ` +
     `with a start and an end — like citing a paragraph instead of retyping it. ` +
-    `The only difference is that the second one also says "three times". Watch ` +
-    `the bottom row: the same little pattern of marks comes back each time, ` +
-    `because there is one recording and these are two ways of pointing at it.`,
+    `What differs is the settings. The second use plays the same three seconds ` +
+    `at double speed, so it is half as wide and its marks are twice as close ` +
+    `together. The third takes a shorter piece and says "three times".`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
@@ -102,8 +102,14 @@
   });
 
   // a plain fragment, then the same source looped three times
-  nest.add(quotation({ id: 'frag', ref: 'kurenniemi-1972', at: 1000, in: 1000, out: 4000 }));
-  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 5500, in: 0, out: 1800,
+  // THREE USES, ONE RECORDING, and each shows a different knob a quotation
+  // carries. Same slice twice at two speeds is what makes "faster" a WIDTH you
+  // can see rather than a word: six marks in three seconds, then the same six
+  // in one and a half.
+  nest.add(quotation({ id: 'plain', ref: 'kurenniemi-1972', at: 500, in: 0, out: 3000 }));
+  nest.add(quotation({ id: 'fast', ref: 'kurenniemi-1972', at: 4200, in: 0, out: 3000,
+                       rate: 2 }));
+  nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 6600, in: 0, out: 1500,
                        repeat: 3 }));
 
   // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
@@ -149,7 +155,7 @@
               if (!Number.isFinite(from) || !(end > from)) continue;
               out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
                          payload: { durMs: end - from, pass: i + 1, of: n, quo: sp.id,
-                                    from: sp.c0, to: sp.c1 } });
+                                    from: sp.c0, to: sp.c1, rate: sp.rate || 1 } });
             }
           }
           return out;
@@ -161,12 +167,17 @@
         // and an end. Only one of them also repeats.
         labelOf: (sp) => {
           const p = sp.row?.payload || {};
-          return `${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s`;
+          // compact: a slice at 2x is half as wide and the label has to fit in
+          // it, so trailing zeros go rather than the speed
+          const n = (ms) => String(+(ms / 1000).toFixed(1));
+          const at = `${n(p.from)}–${n(p.to)}s`;
+          return p.rate && p.rate !== 1 ? `${at} @${p.rate}x` : at;
         },
         describeRow: (r) => {
           const p = r.payload || {};
-          const src = `takes ${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s of the recording`;
-          return p.of > 1 ? [src, `pass ${p.pass} of ${p.of}`] : [src, 'played once'];
+          const src = `takes ${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s of it`;
+          if (p.of > 1) return [src, `pass ${p.pass} of ${p.of}`];
+          return [src, p.rate !== 1 ? `played at ${p.rate}x speed` : 'played once, at normal speed'];
         } },
       // WHERE THE SOURCE'S OWN MARKS LAND. This is the row that makes "one
       // recording, used twice" something you can see rather than something the
@@ -237,7 +248,8 @@
     d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
-      L.subLabel = ['2 uses, 1 source', wraps ? `${wraps} wraps` : 'loop not reached'];
+      L.subLabel = [`${nest.spans().length} uses, 1 source`,
+                    wraps ? `${wraps} wraps` : 'loop not reached'];
       view.strip.invalidate();
     }
   }, 200);
@@ -245,7 +257,7 @@
   /** The five asserts this page has always had — now run on their own. */
   function check() {
     const spans = nest.spans();
-    d.assert('two spans registered', spans.length === 2, spans.map((s) => s.id).join(','));
+    d.assert('three uses registered', spans.length === 3, spans.map((s) => s.id).join(','));
     const loop = spans.find((s) => s.id === 'loop');
     d.assert('loop declares 3 passes', loop && (loop.repeat === 3 || loop.repeat?.times === 3),
       JSON.stringify(loop && loop.repeat));
@@ -258,7 +270,14 @@
     d.assert('the loop boundary is committed, not polled',
       nest.boundary() === 'lookahead', nest.boundary());
     d.assert('quotations round-trip out of the nest',
-      nest.quotationsOf(child).length === 2, String(nest.quotationsOf(child).length));
+      nest.quotationsOf(child).length === 3, String(nest.quotationsOf(child).length));
+    // The one that makes "faster" a claim rather than a picture: the fast use
+    // asked for 2x and the nest AGREED to it. `caps.rates` on the child is
+    // [0.5,1,2], so 4x would have been refused and reported as a degradation
+    // instead of quietly played at 2x — which is the whole point of asking.
+    const fast = spans.find((sp) => sp.id === 'fast');
+    d.assert('the fast use really runs at 2x', fast && fast.rateReport?.chose === 2,
+      JSON.stringify(fast && fast.rateReport));
     // the first wrap is one PASS after the loop starts, not at the loop start —
     // asserting against 12000 called 0 wraps a failure at 12652 ms, when the
     // boundary was still 1.3 s away
@@ -268,7 +287,7 @@
       `${wraps} wraps · pos ${Math.round(parent.position())} · first boundary ${firstWrap}`);
   }
 
-  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s source · used twice`);
+  d.log(`${PARENT / 1000}s long · one ${CHILD / 1000}s recording · used three ways`);
   d.ready();
 </script>
 </html>
