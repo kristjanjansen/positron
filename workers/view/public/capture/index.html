@@ -17,7 +17,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt, createShipper } from '/shell/shell.mjs';
+  import { mount, guard, recorderMime, el, armVideo, playOrPrompt, createShipper } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -153,9 +153,8 @@
     if (useR2 && !session) return;
 
     const stream = camStream ? canvas.captureStream(25) : canvas.captureStream(25);
-    mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-      .find((m) => MediaRecorder.isTypeSupported(m));
-    if (!mime) { d.fail(new Error('no webm MediaRecorder support')); return; }
+    mime = recorderMime(d);
+    if (!mime) return;
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
     rec.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
