@@ -82,6 +82,19 @@ export function bitsFor(ms) {
 export const VIDEO_HUE = 50;
 
 /**
+ * THE FIELD IS NEVER TINTED. Twice now the background was a dark hue —
+ * `hsl(hue 26% 12%)`, then the site's black under a 7% wash — and both were
+ * mud, because that is what a warm hue at low saturation and low lightness IS.
+ * There is no alpha that fixes it; the fix is not to do it.
+ *
+ * So the key colour appears only where it is fully saturated and large: the two
+ * labels, the sweep square, and the strip lane the part draws. Those read as
+ * colour. A tinted background reads as dirt, and it was also the weakest way to
+ * tell two sources apart — the square is visible across a room.
+ */
+export const FIELD = '#0d1017';
+
+/**
  * The band video hues are allowed to occupy: wide enough that two sources are
  * obviously different, narrow enough that everything still reads as one family
  * rather than a bag of random colours. An earlier version spread hues over the
@@ -127,25 +140,36 @@ function zoneLabel(d) {
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 /**
- * Draw a camera (or any image source) to fill w x h WITHOUT DISTORTING IT —
- * scaled to cover, centred, cropped on the long side.
+ * Put a camera behind the pattern: field, then the whole camera frame, then a
+ * scrim so the burned clock stays readable. One function because `take`,
+ * `capture` and `show` all did this and all got it wrong the same way.
  *
- * `drawImage(src, 0, 0, w, h)` stretches, and on a phone that is not a subtle
- * defect: iOS does not honour a 640x360 request, so the track comes back 4:3 or
- * portrait and a face gets squashed sideways into a 16:9 box. Reported from an
- * iPhone against the deployed page. The constraint is a HINT; the drawing has to
- * cope with whatever the device actually hands over.
+ * CONTAIN, not cover, and not stretch. Three attempts, and the arithmetic is
+ * the argument:
  *
- * Returns false if the source has no dimensions yet, so a caller can skip the
- * frame rather than divide by zero.
+ *   `drawImage(src, 0, 0, w, h)`  distorts. iOS does not honour a 640x360
+ *     request — the track comes back PORTRAIT — so a face is squashed sideways.
+ *   cover                          keeps the aspect but, on 720x1280 into
+ *     1280x720, scales 1.78x and shows **32% of the frame**. Zoomed into a
+ *     featureless patch, it reads as "the camera is not working".
+ *   contain                        keeps the aspect and shows all of it, with
+ *     the field either side.
+ *
+ * The bars are the point, not a compromise: a phone held upright IS a tall
+ * picture, and a 16:9 box either lies about that or throws two thirds of it
+ * away. Returns false if the source has no dimensions yet.
  */
-export function drawCover(ctx, src, w, h) {
+export function drawCamera(ctx, src, w, h) {
   const sw = src.videoWidth || src.naturalWidth || src.width || 0;
   const sh = src.videoHeight || src.naturalHeight || src.height || 0;
+  ctx.fillStyle = FIELD;
+  ctx.fillRect(0, 0, w, h);
   if (!sw || !sh) return false;
-  const scale = Math.max(w / sw, h / sh);
+  const scale = Math.min(w / sw, h / sh);
   const dw = sw * scale, dh = sh * scale;
   ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  ctx.fillStyle = 'rgba(13,16,23,0.55)';
+  ctx.fillRect(0, 0, w, h);
   return true;
 }
 
@@ -176,15 +200,7 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // still draws, including the row's black bed, which must stay opaque or the
   // clock stops being readable back.
   if (opts.field !== false) {
-    // The SITE's dark, with the hue as a wash over it — not a hue-tinted field.
-    // `hsl(hue 26% 12%)` sounded reasonable and is muddy in practice: at the
-    // brand hue it lands on dark olive, and any warm hue at low saturation and
-    // middling lightness reads as dirt. The base is the shell's own near-black
-    // so every pattern sits in the site's palette, and the hue does its real
-    // work where it is saturated and large — the labels and the square.
-    ctx.fillStyle = '#0d1017';
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = `hsl(${hue} 70% 50% / 0.07)`;
+    ctx.fillStyle = FIELD;
     ctx.fillRect(0, 0, w, h);
   }
 

@@ -35,7 +35,7 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  import { burn, videoHue, drawCover } from '/shell/pattern.mjs';
+  import { burn, videoHue, drawCamera } from '/shell/pattern.mjs';
 
   const CAP_MS   = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
@@ -136,11 +136,7 @@
 
     // The camera goes UNDER the pattern, scrimmed, so the burned clock stays
     // readable over whatever is in front of the lens.
-    const cam = camStream && live.readyState >= 2;
-    if (cam) {
-      drawCover(g, live, W, H);
-      g.fillStyle = ink(hue, 40, 6, 0.7); g.fillRect(0, 0, W, H);
-    }
+    const cam = camStream && live.readyState >= 2 && drawCamera(g, live, W, H);
 
     // ONE test pattern across this project. Same module the MoQ path burns and
     // the same one `publish.sh` generates its ffmpeg filter from, so a frame
