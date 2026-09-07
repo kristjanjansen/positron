@@ -7,7 +7,12 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .sc { font: 400 11px/1.75 var(--mono); background: var(--card);
+  /* Twelve lines, and it HOLDS at twelve. The longest of the five scores is
+     exactly twelve lines, so the padding alone would have been coincidence —
+     a thirteenth would silently grow the block again and put the reflow back.
+     max-height is 12 lines of this exact font plus the padding. */
+  .sc { max-height: calc(12 * 1.75em + 22px); overflow-y: auto;
+        font: 400 11px/1.75 var(--mono); background: var(--card);
         border: 1px solid var(--line); border-radius: 4px; padding: 10px 0;
         overflow-x: auto; margin: 0 0 8px; }
   /* TWO CHANNELS, TWO FACTS, and they must not fight:
@@ -15,6 +20,8 @@
          the same hue that part's slices and events use in the strip above;
        the TEXT carries whether it has played — dim, then bright, then lit.
      Hue never means "played" and lightness never means "which part". */
+  /* an empty line still occupies one, so the block holds its height */
+  .sc-pad { color: transparent; }
   .sc-l { display: block; white-space: pre; color: var(--dim2);
           border-left: 3px solid transparent; padding: 0 12px 0 9px; }
   .sc-l[data-state="played"] { color: var(--dim); }
@@ -158,6 +165,7 @@
   const boundaryHost = workerTickHost();
 
   let doc = null, decks = {}, nest = null, loaded = null;
+  const SCORE_LINES = 12;          // the block never changes height
   let LINES = [], lineEls = [], lineOfRow = new Map(), lineOfUse = new Map();
   const plays = new Map();              // `${part}#${rowId}` -> times fired
   let playCount = 0;
@@ -327,6 +335,12 @@
       pre.append(row);
       return row;
     });
+    // A FIXED TWELVE LINES, padded when the score is shorter. The five scores
+    // run from one line to eleven, and letting the block grow and shrink moved
+    // the timeline up and down the page under the reader's cursor every time
+    // they picked a different one. Padding rather than scrolling, so a short
+    // score still reads as short — the empty lines are visibly empty.
+    for (let i = LINES.length; i < SCORE_LINES; i++) pre.append(el('span', 'sc-l sc-pad', ' '));
 
     for (const name of Object.keys(doc.parts)) {
       const deck = createDeck({
