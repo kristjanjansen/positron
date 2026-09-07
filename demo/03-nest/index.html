@@ -21,7 +21,7 @@
   const d = mount({
     n: '03',
     name: 'nest',
-    what: 'One short piece, used twice in a longer one: once as a slice, once looping three times.',
+    what: 'One recording, used twice — nothing is copied. The bottom row shows where its own marks land each time it is used.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
@@ -34,25 +34,45 @@
   guard(d);
 
   d.how(
-    `The inner piece exists once. Both places on the timeline point at it by ` +
-    `name — like citing a paragraph instead of retyping it. The first use ` +
-    `takes a slice of it. The second says "three times", so the three slices ` +
-    `you see side by side are one source played over and over, not three ` +
-    `copies of anything.`,
+    `Both uses are the same kind of thing: a pointer at the recording by name, ` +
+    `with a start and an end — like citing a paragraph instead of retyping it. ` +
+    `The only difference is that the second one also says "three times". Watch ` +
+    `the bottom row: the same little pattern of marks comes back each time, ` +
+    `because there is one recording and these are two ways of pointing at it.`,
   );
 
   // ── the child: quoted by identity, never by object ──────────────────────
-  const kidMarks = markAdapter({ rates: [0.5, 1, 2] });
+  //
+  // The recording's marks are logged as they ACTUALLY FIRE. `ev.at` is the
+  // position inside the recording, so the log says where in the source we are
+  // — and because the same source is used twice, the same positions come round
+  // again. That is the claim of this page, made by actuation rather than by
+  // drawing: the bottom lane projects where the marks WOULD land, this is the
+  // recording saying it got there.
+  const kidMarks = markAdapter({
+    rates: [0.5, 1, 2],
+    onFire: (_payload, ev) => {
+      if (!Number.isFinite(ev?.at)) return;   // never invent a position
+      d.log(`recording mark at ${(ev.at / 1000).toFixed(1)}s`);
+    },
+  });
+  const childItems = marks(12, CHILD);      // also projected into the parent below
   const child = createDeck({
-    items: marks(12, CHILD),
+    items: childItems,
     adapters: { mark: kidMarks.adapter },
     range: [0, CHILD],
-    autoStart: false,
+    // NOT `autoStart: false`. That reads as "the nest drives this deck, not
+    // itself", which is true of the TRANSPORT and false of the SCHEDULER:
+    // autoStart is the only thing that starts the tick loop, and the nest never
+    // touches it — it plays, pauses and seeks the child's transport and nothing
+    // else. So the child's scheduler had never run, and the recording's marks
+    // had never fired in this demo at all. The page drew where they would land
+    // and nothing was actuating. Starting it costs nothing: rate is 0 until the
+    // nest plays it.
   });
   refDeck(child, 'kurenniemi-1972');
 
   // ── the parent ──────────────────────────────────────────────────────────
-  const measured = new Map();          // id -> its drift row
   const own = markAdapter({ rates: [0.5, 1, 2] });
   const parent = createDeck({
     items: marks(8, PARENT),
@@ -86,17 +106,11 @@
   nest.add(quotation({ id: 'loop', ref: 'kurenniemi-1972', at: 5500, in: 0, out: 1800,
                        repeat: 3 }));
 
-  // Same bands as 01 and 02: colour says HOW IT LANDED, never which lane.
-  const BANDS = [[5, '#8fd6a8', 'as expected'], [20, '#ffd400', 'over'],
-                 [50, '#e0b060', 'well over'], [Infinity, '#e0908a', 'far over']];
-  const bandFor = (ms) => BANDS.find(([lim]) => Math.abs(ms) < lim);
-
   // A 3-pass loop draws as ONE span carrying repeat:3, so the looping is implied
-  // rather than shown. onWrap is the event that makes it observable.
-  // A WRAP IS A TRANSITION, so logging only wraps starts the story at pass 2 —
-  // the first pass has no wrap in front of it. The log follows the PASS instead,
-  // which is the thing a reader is counting.
-  let wraps = 0, lastPass = null;
+  // rather than shown. `onWrap` is what counts the passes; the log is left to
+  // the recording's own marks, which say where in the source we are and are
+  // therefore the evidence that it is the SAME source coming round again.
+  let wraps = 0;
   nest.onWrap(() => { wraps++; d.set('wraps', wraps); });
 
   // A QUOTATION ARRIVING AND LEAVING IS AN EVENT. The nest counted enters and
@@ -113,19 +127,6 @@
   const view = createStripView(d.el, parent, {
     size: 'auto', follow: false, armWall: false, gutter: 150,
     lanes: [
-      { id: 'mark', kind: 'mark', label: 'marks', height: 52, as: 'ticks', width: 2,
-        color: '#6a7280', terse: true,
-        // no `latch`: colour comes from the measurement, so scrubbing back
-        // cannot un-measure anything
-        colorOfRow: (r) => {
-          const m = measured.get(r.id);
-          return m ? bandFor(m.deltaMs)[1] : '#3b424e';
-        },
-        describeRow: (r) => {
-          const m = measured.get(r.id);
-          if (!m) return 'not played yet';
-          return `${Math.abs(m.deltaMs).toFixed(2)} ms ${m.deltaMs < 0 ? 'early' : 'late'} · ${bandFor(m.deltaMs)[2]}`;
-        } },
       // ONE SLICE PER PASS. A 3-pass loop is a single row carrying repeat:3, so
       // the strip drew one long bar and the looping — the entire subject of this
       // page — was invisible. `rows` may return MORE rows than it was given, so
@@ -147,32 +148,77 @@
               const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.out - sp.in));
               if (!Number.isFinite(from) || !(end > from)) continue;
               out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
-                         payload: { durMs: end - from, pass: i + 1, of: n, quo: sp.id } });
+                         payload: { durMs: end - from, pass: i + 1, of: n, quo: sp.id,
+                                    from: sp.c0, to: sp.c1 } });
             }
           }
           return out;
         },
+        // NAME A SLICE BY WHAT IT TAKES. `frag#1` and `loop#1` named which
+        // quotation a slice came from, which is the one thing a reader cannot
+        // see and does not need — and it made the two look like two KINDS of
+        // thing. They are not: both are a pointer at the recording with a start
+        // and an end. Only one of them also repeats.
+        labelOf: (sp) => {
+          const p = sp.row?.payload || {};
+          return `${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s`;
+        },
         describeRow: (r) => {
           const p = r.payload || {};
-          return p.of > 1 ? `${p.quo} · pass ${p.pass} of ${p.of}` : `${p.quo} · played once`;
+          const src = `takes ${(p.from / 1000).toFixed(1)}–${(p.to / 1000).toFixed(1)}s of the recording`;
+          return p.of > 1 ? [src, `pass ${p.pass} of ${p.of}`] : [src, 'played once'];
         } },
+      // WHERE THE SOURCE'S OWN MARKS LAND. This is the row that makes "one
+      // recording, used twice" something you can see rather than something the
+      // paragraph above claims. The same pattern reappears in every use, and
+      // three times over inside the one that repeats.
+      //
+      // Slate, not green: these are positions DERIVED from the score, not
+      // observations. Colour on this site means how something landed, and
+      // nothing here was measured.
+      { id: 'from-source', kind: 'mark', label: 'the recording', height: 44, width: 2,
+        as: 'ticks', color: '#6f7d94', terse: true,
+        subLabel: ['its own marks,', 'each time it is used'],
+        rows: () => {
+          const out = [];
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const base = nest.iterationAt(sp.id, i);
+              if (!Number.isFinite(base)) continue;
+              for (const m of childItems) {
+                if (m.at < sp.c0 || m.at >= sp.c1) continue;
+                out.push({ at: base + (m.at - sp.c0) / (sp.rate || 1),
+                           id: `${sp.id}#${i}:${m.id}`, kind: 'mark',
+                           payload: { srcAt: m.at } });
+              }
+            }
+          }
+          return out;
+        },
+        colorOfRow: () => '#6f7d94',
+        describeRow: (r) => `${((r.payload?.srcAt ?? 0) / 1000).toFixed(1)}s into the recording` },
     ],
   });
 
-  /** Live, and under the lane it describes. */
+  /**
+   * The parent's own marks still run — they are what drives `onDrift`, and
+   * `onDrift` is what fires every assert on this page. They are simply no
+   * longer DRAWN: this page is about one recording used twice, and a row of the
+   * parent's own metronome was a fourth subject competing with the three that
+   * matter.
+   *
+   * `typical`/`worst` therefore have nowhere honest to be drawn. They measure
+   * the PARENT's marks, and hanging them under `quoted` or `the recording`
+   * would label a lane with evidence it did not produce. They stay in the
+   * readout, which this page publishes for CDP without rendering.
+   */
   let asserted = false;
   function report(rows) {
-    for (const r of rows) measured.set(r.id, r);
     const xs = rows.map((r) => r.deltaMs).filter(Number.isFinite).sort((a, b) => a - b);
     if (!xs.length) return;
-    const typical = xs[xs.length >> 1], worst = xs[xs.length - 1];
-    d.set('typical', typical);
-    d.set('worst', worst);
-    const L = view.strip.lanes().find((l) => l.id === 'mark');
-    if (L) {
-      L.subLabel = [`typical +${typical.toFixed(2)} ms`, `worst +${worst.toFixed(2)} ms`];
-      view.strip.invalidate();
-    }
+    d.set('typical', xs[xs.length >> 1]);
+    d.set('worst', xs[xs.length - 1]);
     if (!asserted) { asserted = true; check(); }
   }
 
@@ -189,10 +235,6 @@
   setInterval(() => {
     const it = inLoop() ? nest.iteration?.('loop') : null;
     d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/3`);
-    if (it !== lastPass) {
-      if (it !== null && it !== undefined) d.log(`pass ${it + 1} of 3`, 'hi');
-      lastPass = it;
-    }
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
       L.subLabel = ['2 uses, 1 source', wraps ? `${wraps} wraps` : 'loop not reached'];
