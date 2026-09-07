@@ -235,8 +235,15 @@ counts against the last known total after any change.
   `window.__demo` — human-openable and CDP-drivable from the same page. Assert on
   `__demo`, never on DOM ids.
 - Shared demo code goes in `demo/shell/`, which `build.mjs` **enumerates**. It
-  also refuses the build when a page imports a file nothing deploys, and when two
-  sources collide on one destination.
+  also refuses the build when an import has no deployed file, and when two
+  sources collide on one destination. **It scans modules, not just pages** — it
+  read HTML only until 2026-09-07, and in that gap `demo/shell/moq.mjs` kept
+  importing `/08-moq/moq-vendor.js` across the slug rename: a 404 that killed
+  the module, so `moq` and `ladder` asserted NOTHING and read red for a reason
+  that was true but not theirs (no relay on this network). **A rename moves
+  URLs that live in modules, harnesses and comments, none of which are
+  type-checked — grep the OLD form everywhere.** The same rename left
+  `verify-native.mjs` pointed at a 404, which is the iPhone path.
 - Transport UI is `demo/shell/transport-bar.mjs` and nothing else. Playhead from
   `observePosition`, seek only via `deck.seek()`, rates from intersected
   `caps.rates`.

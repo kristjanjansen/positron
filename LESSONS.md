@@ -174,6 +174,51 @@ ahead of the playhead — which reads as the other lane lagging. The wall
 scheduler commits ahead by the same 100 ms; only one lane's lookahead was
 visible. Colour now says WHICH LANE and nothing else.
 
+### 29. A true explanation that is not THE explanation is the hardest cover
+
+Renaming the demos to bare slugs left `demo/shell/moq.mjs` importing
+`/08-moq/moq-vendor.js`. The 404 killed the module, so `moq` and `ladder` never
+reached `__demo.ready` and asserted **nothing** — for the whole life of the
+rename.
+
+**The harness said so perfectly.** Reproduced by re-breaking it, the entire
+output for that demo is:
+
+    [moq]
+      FAIL  __demo.ready
+    0/1 green  (1 FAILED)
+
+One line. No relay error, no console noise, nothing about WebTransport. And it
+was still read as "moq and ladder fail — relay/WebRTC in headless", which is a
+thing that is **independently true** of those two pages and had been true for
+weeks. The explanation was supplied from expectation and the output was never
+actually read, because the symptom looked already accounted for.
+
+So the lesson is not "add a check". The check existed, fired, and was as clear as
+a check can be. The lesson is about reading:
+
+- **A demo that never ran and a demo that failed its subject look nothing alike,
+  and the giveaway is the COUNT.** `0/1` means the page did not run — one
+  assert, the harness's own. `13/17` means it ran and its subject failed. Read
+  the denominator before reading any failure text.
+- **An expectation that explains the symptom is the most dangerous thing you can
+  bring to a red test**, because a wrong cause gets caught when its predictions
+  fail, and a right-but-irrelevant one predicts the symptom exactly and never
+  does. When a failure matches something you already believe, that is the moment
+  to open the output, not the moment to skip it.
+
+The prevention, since reading discipline is not a mechanism: **`build.mjs`
+refuses an import with no deployed file — but it read HTML ONLY**, so an import
+inside a MODULE was never checked, which is where the dead one lived. It now
+scans `.mjs` and `.js`, proved by restoring the bad path and watching the build
+refuse it.
+
+The same rename also left `verify-native.mjs` and `verify-safari.mjs` fetching
+`/06-llhls/`, a 404 — **the iPhone code path**, the one harness `verify.mjs`
+cannot reach (#2 again, third instance from one rename). When a rename moves
+URLs, grep the OLD form everywhere, not just in pages: harnesses, modules and
+comments all hold paths and none of them are type-checked.
+
 ---
 
 ## Method
