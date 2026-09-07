@@ -1166,7 +1166,12 @@ export function createStrip(canvas, deck, opts = {}) {
       // "no feedback" for a lane that cannot say.
       const client = L.subLabel === undefined || L.subLabel === null ? []
         : [].concat(L.subLabel).filter(Boolean).map(String);
-      const all = [...(sub.length ? [sub.join(' · ')] : []), ...client];
+      // A lane that says something about itself REPLACES the derived line
+      // rather than queueing behind it. The derived line names the lane's clock
+      // domain, which is worth having when nothing better is on offer and is
+      // noise the moment the client has real numbers — and on a short lane it
+      // was pushing those numbers out of the row entirely.
+      const all = client.length ? client : (sub.length ? [sub.join(' · ')] : []);
       ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
       for (let i = 0; i < all.length; i++) {
         const y = L.y + 24 + i * 11;
