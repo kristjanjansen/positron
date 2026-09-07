@@ -144,19 +144,24 @@ export function mount({
  * Inline favicon — otherwise every demo logs a /favicon.ico 404.
  *
  * e+ : the positron. Same geometry as workers/view/build.mjs plots into
- * favicon.ico — a ring with a lower-right aperture, a crossbar to make it an
- * 'e', and the superscript plus that is the charge and the name.
+ * favicon.ico — KEEP THE TWO IN SYNC.
+ *
+ * A ring with a lower-right aperture, a crossbar to make it an 'e', and the
+ * superscript plus that is the charge and the name. The aperture is a WEDGE
+ * FROM THE CENTRE (~11° to ~59°), not a quadrilateral down to the bottom edge:
+ * the earlier version sliced the whole lower arc away and read as a damaged
+ * circle rather than an 'e' at any size below 64 px. Checked at 16/24/32/64.
  */
 function favicon() {
   if (document.querySelector('link[rel="icon"]')) return;
   const BG = '%230b0e14', HI = '%23ffd400';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     `<rect width="32" height="32" rx="6" fill="${BG}"/>` +
-    `<circle cx="12.6" cy="19.4" r="6.7" fill="none" stroke="${HI}" stroke-width="3.8"/>` +
-    `<path d="M12.6 19.4L21.5 23L24 27.6L12.6 27.6Z" fill="${BG}"/>` +
-    `<rect x="5" y="17.7" width="15.2" height="2.9" fill="${HI}"/>` +
-    `<rect x="21.1" y="7.1" width="6.8" height="2.2" fill="${HI}"/>` +
-    `<rect x="23.4" y="4.8" width="2.2" height="6.8" fill="${HI}"/></svg>`;
+    `<circle cx="13" cy="19.4" r="8.4" fill="none" stroke="${HI}" stroke-width="3.4"/>` +
+    `<path d="M13 19.4L30 22.6L22.5 35Z" fill="${BG}"/>` +
+    `<rect x="4.6" y="17.7" width="16.8" height="3.4" fill="${HI}"/>` +
+    `<rect x="21.4" y="6.4" width="7.2" height="2.4" fill="${HI}"/>` +
+    `<rect x="23.8" y="4" width="2.4" height="7.2" fill="${HI}"/></svg>`;
   document.head.append(el('link', '', null, { rel: 'icon', href: 'data:image/svg+xml,' + svg }));
 }
 

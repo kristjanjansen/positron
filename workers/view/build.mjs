@@ -270,20 +270,20 @@ function favicon() {
   // the 'e': an annulus with the lower-right wedge removed. Smaller than it
   // was, so the whole glyph sits inside the rounded field instead of running
   // off the bottom-right corner.
-  const cx = 12.6, cy = 19.4, R = 8.6, r = 4.8;
+  const cx = 13, cy = 19.4, R = 10.1, r = 6.7;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const d = Math.hypot(x - cx, y - cy);
     if (d > R || d < r) continue;
     const a = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;   // y down: +90 = down
-    if (a > 22 && a < 88) continue;                            // the aperture
+    if (a > 11 && a < 59) continue;                            // the aperture
     put(x, y, HI);
   }
   // the crossbar is what makes a ring an 'e'
-  for (let y = Math.round(cy - 1.9); y <= Math.round(cy + 1.3); y++)
-    for (let x = Math.round(cx - R + 1); x <= Math.round(cx + R - 1); x++) put(x, y, HI);
+  for (let y = Math.round(cy - 1.7); y <= Math.round(cy + 1.7); y++)
+    for (let x = Math.round(cx - R + 1.5); x <= Math.round(cx + R - 1.7); x++) put(x, y, HI);
 
   // the superscript plus — the charge, and the whole name
-  const pxc = 24.5, pyc = 8, arm = 3.4, th = 1.1;
+  const pxc = 25, pyc = 7.6, arm = 3.6, th = 1.2;
   const R2 = (v) => Math.round(v);
   for (let x = R2(pxc - arm); x <= R2(pxc + arm); x++) for (let y = R2(pyc - th); y <= R2(pyc + th); y++) put(x, y, HI);
   for (let y = R2(pyc - arm); y <= R2(pyc + arm); y++) for (let x = R2(pxc - th); x <= R2(pxc + th); x++) put(x, y, HI);

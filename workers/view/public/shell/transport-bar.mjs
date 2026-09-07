@@ -128,7 +128,8 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
     deck.pause();
     deck.seek(range[1]);
     atEnd = true;
-    note('end');
+    // no badge: the toggle already turned into a restart glyph, and a word
+    // saying the same thing beside it is the second copy of one fact
   }
 
   function armEnd() {
