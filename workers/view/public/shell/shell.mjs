@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'd824a69-140640';
+export const BUILD = '10f6b3b-141219';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -252,6 +252,40 @@ export async function playOrPrompt(v, d) {
     v.parentNode?.insertBefore(tap, v.nextSibling);
     return false;
   }
+}
+
+/**
+ * The mime a MediaRecorder will actually accept here, WebKit included.
+ *
+ * Three demos each carried the same WebM-only list and `d.fail()`d when nothing
+ * matched — `record`, `capture` and `show`. **WebKit records MP4/H.264 and
+ * never WebM**, so on a phone all three did not degrade: they stopped. And
+ * `verify.mjs` could not see it, because desktop Chrome matches the first
+ * candidate and never reaches the branch. Exactly the shape of the
+ * `canPlayType` bug that left 291 asserts green across three pages that had
+ * never played a frame.
+ *
+ * WebM first where it exists, because everything downstream was built and
+ * measured against it; MP4 after, so a WebKit browser records something rather
+ * than nothing.
+ *
+ * WHAT THIS DOES NOT PROMISE: that the result plays back through this project's
+ * replay paths on WebKit. MSE's appetite for fragmented MP4 is a separate
+ * question and is unverified here — no iOS device has ever run these pages.
+ * This fixes recording, and claims only that.
+ */
+export function recorderMime(d, kinds = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8',
+  'video/webm', 'video/mp4;codecs=avc1.42E01E', 'video/mp4']) {
+  const MR = window.MediaRecorder;
+  if (!MR || typeof MR.isTypeSupported !== 'function') {
+    d?.log('MediaRecorder is not available in this browser', 'bad');
+    return null;
+  }
+  const mime = kinds.find((m) => MR.isTypeSupported(m)) || null;
+  // report the CAPABILITY, never an error string — the lesson @moq/net taught
+  if (mime) d?.log(`recording as ${mime}`);
+  else d?.log(`no recordable format here — tried ${kinds.join(', ')}`, 'bad');
+  return mime;
 }
 
 /** Surface a thrown error instead of a silently dead page. */

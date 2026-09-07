@@ -23,7 +23,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { mount, guard, recorderMime, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -311,9 +311,8 @@
     await goLive();
     if (!remote) { d.log('no received stream to record', 'bad'); return; }
     segs.length = 0; bytes = 0; assembling = null; duration = null; paintSegs();
-    mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-      .find((m) => MediaRecorder.isTypeSupported(m));
-    if (!mime) { d.fail(new Error('no webm MediaRecorder support')); return; }
+    mime = recorderMime(d);
+    if (!mime) return;
     const rec = new MediaRecorder(remote, { mimeType: mime, videoBitsPerSecond: 800_000 });
     // WHAT is being recorded, kept as the object itself. Not its id: a remote
     // MediaStream carries the SENDER's msid, so `remote.id === srcStream.id`

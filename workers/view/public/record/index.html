@@ -17,7 +17,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, recorderMime, el } from '/shell/shell.mjs';
 
   const SEG_MS = 2000;
 
@@ -81,9 +81,8 @@
   d.on('rec', () => {
     if (rec) return;
     const stream = canvas.captureStream(25);
-    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-      .find((m) => MediaRecorder.isTypeSupported(m));
-    if (!mime) { d.fail(new Error('no webm MediaRecorder support')); return; }
+    const mime = recorderMime(d);
+    if (!mime) return;
     rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 800_000 });
     rec.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
