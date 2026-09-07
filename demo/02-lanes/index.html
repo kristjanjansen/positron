@@ -31,7 +31,7 @@
   });
   guard(d);
 
-  const { fired, adapter } = markAdapter({ rates: [0.5, 1, 2] });
+  const { fired, adapter } = markAdapter({ rates: [0.25, 0.5, 1, 2] });
   const deck = createDeck({
     items: marks(Math.floor(DURATION / BEAT), DURATION),
     adapters: { mark: adapter },

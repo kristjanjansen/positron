@@ -45,7 +45,7 @@
     { at: t0 + 1900 * YEAR, kind: 'era', id: 'e4', payload: { label: 'attested' } },
   ];
 
-  const { adapter } = markAdapter({ rates: [1] });
+  const { adapter } = markAdapter({ rates: [0.25, 0.5, 1, 2] });
   const deck = createDeck({
     items,
     adapters: { era: adapter },
