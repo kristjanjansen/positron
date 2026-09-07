@@ -212,7 +212,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     let i = 0;
     timers.push(setInterval(() => {
       if (closed) return;
-      burn(sctx, w, h, i, { hue: patternHue, label: `moq ${ns}` });
+      burn(sctx, w, h, i, { hue: patternHue });
       // Never queue behind a slow encoder: dropping a frame is cheaper than
       // letting the burned clock drift away from wall time, which would corrupt
       // the measurement rather than just thin it.
