@@ -127,6 +127,29 @@ function zoneLabel(d) {
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 /**
+ * Draw a camera (or any image source) to fill w x h WITHOUT DISTORTING IT —
+ * scaled to cover, centred, cropped on the long side.
+ *
+ * `drawImage(src, 0, 0, w, h)` stretches, and on a phone that is not a subtle
+ * defect: iOS does not honour a 640x360 request, so the track comes back 4:3 or
+ * portrait and a face gets squashed sideways into a 16:9 box. Reported from an
+ * iPhone against the deployed page. The constraint is a HINT; the drawing has to
+ * cope with whatever the device actually hands over.
+ *
+ * Returns false if the source has no dimensions yet, so a caller can skip the
+ * frame rather than divide by zero.
+ */
+export function drawCover(ctx, src, w, h) {
+  const sw = src.videoWidth || src.naturalWidth || src.width || 0;
+  const sh = src.videoHeight || src.naturalHeight || src.height || 0;
+  if (!sw || !sh) return false;
+  const scale = Math.max(w / sw, h / sh);
+  const dw = sw * scale, dh = sh * scale;
+  ctx.drawImage(src, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  return true;
+}
+
+/**
  * Draw one frame of the pattern and return the epoch ms it burned.
  *
  * @param ctx    2d context
@@ -153,7 +176,15 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // still draws, including the row's black bed, which must stay opaque or the
   // clock stops being readable back.
   if (opts.field !== false) {
-    ctx.fillStyle = `hsl(${hue} 26% 12%)`;
+    // The SITE's dark, with the hue as a wash over it — not a hue-tinted field.
+    // `hsl(hue 26% 12%)` sounded reasonable and is muddy in practice: at the
+    // brand hue it lands on dark olive, and any warm hue at low saturation and
+    // middling lightness reads as dirt. The base is the shell's own near-black
+    // so every pattern sits in the site's palette, and the hue does its real
+    // work where it is saturated and large — the labels and the square.
+    ctx.fillStyle = '#0d1017';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = `hsl(${hue} 70% 50% / 0.07)`;
     ctx.fillRect(0, 0, w, h);
   }
 
@@ -176,6 +207,10 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // is to say they were decoration that cost legibility and gave nothing back.
   // A picture whose whole job is to be READ off a small pane has room for two
   // labelled numbers and no more.
+  // ONE SIZE FOR BOTH NUMBERS. They are the same kind of thing — a clock — and
+  // drawing one bigger said one mattered more. 96 is what fits: the epoch is 13
+  // characters, and 13 x 0.6 x 96 is 749 px inside the 1160 the margins leave.
+  const NUM = 96;
   ctx.textBaseline = 'alphabetic';
   const d = new Date(ms);
   const second = Number.isFinite(opts.position)
@@ -193,16 +228,16 @@ export function burn(ctx, w, h, frame, opts = {}) {
   ctx.font = `bold 34px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
   ctx.fillText('ABSOLUTE', PAD, 265);
-  ctx.font = `bold 76px ${MONO}`;
+  ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
   ctx.fillText(String(ms), PAD, 360);
 
   ctx.font = `bold 34px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
   ctx.fillText(second.label, PAD, 450);
-  ctx.font = `bold 104px ${MONO}`;
+  ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, PAD, 568);
+  ctx.fillText(second.text, PAD, 545);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -364,6 +399,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
+  const NUM = 96;             // one size for both clocks, as on the canvas
   const LABEL = '0xFFD400';   // --hi
   const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
@@ -386,7 +422,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, 272, 76, VALUE),
+    text(`%{pts\\:flt\\:${epoch}} s`, 280, NUM, VALUE),
     text('LOCAL', 420, 34, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
@@ -398,7 +434,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 462, 104, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 465, NUM, VALUE),
   ].join(',');
 }
 
