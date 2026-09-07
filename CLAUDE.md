@@ -253,6 +253,17 @@ counts against the last known total after any change.
   identically to delivery — while every note was being scheduled fifty-six
   years out. Ask which side of the wire a counter is counted on before quoting
   it.
+- **A background agent must not commit.** `git add -A` in a shared checkout
+  sweeps another agent's in-flight work into an unrelated commit. It happened
+  twice in one session: `timeline/score.mjs` and `csound.mjs` — the whole score
+  container — landed inside a commit about `03 nest`, and `04-score/index.html`
+  inside one about a plan document. The code was right and the history lied
+  about it, which is worse than either being wrong on its own, because a reader
+  doing archaeology trusts the message. Repaired with `git notes` rather than a
+  rewrite, since one agent still held uncommitted work in a file the rewrite
+  would have touched. **Agents report; the session commits.** And when a commit
+  must be made while an agent is running, stage the paths by name — never
+  `git add -A`.
 - Secrets never reach a log. The publisher redacts at the point of capture, so a
   secret split across two stderr chunks is still caught.
 - **Write for someone who does not work here.** Terse, but understandable —
