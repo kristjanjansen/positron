@@ -26,7 +26,9 @@ import { el } from './shell.mjs';
  * strip, the bar keeps what only it has — play/pause, the clock, the rates, the
  * degraded badge — and gives up the slider.
  */
-export function createTransportBar(host, deck, { absolute = false, scrub: wantScrub = true } = {}) {
+export function createTransportBar(host, deck, {
+  absolute = false, scrub: wantScrub = true, extras = [],
+} = {}) {
   const bar = el('div', 'tbar');
 
   const toggle = el('button', 'tbar-toggle', '', { type: 'button', 'aria-label': 'play/pause' });
@@ -34,10 +36,23 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   const fill = el('div', 'tbar-fill');
   const headDot = el('div', 'tbar-head');
   scrub.append(fill, headDot);
+  // `extras` — page buttons that belong to the TRANSPORT rather than beside it.
+  // Recording is the case that earned this: on `take` it is a transport verb,
+  // not a side control, and putting it in `.d-controls` would have said it was
+  // something you do to the page rather than to the playhead. They sit next to
+  // the toggle and are returned by id so a page can relabel or disable one.
+  const extraEls = new Map();
+  for (const x of extras) {
+    const b = el('button', `tbar-x${x.primary ? ' d-pri' : ''}`, x.label, { type: 'button' });
+    if (x.title) b.title = x.title;
+    b.addEventListener('click', () => x.onClick?.(b));
+    extraEls.set(x.id, b);
+  }
+
   const time = el('output', 'tbar-time', '0:00.000');
   const rates = el('div', 'tbar-rates');
   const badge = el('span', 'tbar-badge');
-  bar.append(toggle, scrub, time, rates, badge);
+  bar.append(toggle, ...extraEls.values(), scrub, time, rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -277,6 +292,8 @@ export function createTransportBar(host, deck, { absolute = false, scrub: wantSc
   return {
     el: bar,
     api,
+    /** an `extras` button by id, so a page can relabel or disable it */
+    extra: (id) => extraEls.get(id) || null,
     note,
     destroy() {
       stop();

@@ -19,7 +19,13 @@
 //
 // Four of the five traps from §7.1 are handled below and marked TRAP n. The
 // fifth (fresh user-data-dir per headless run) belongs to the harness.
-import { Connection, Path, Broadcast, Container } from '/08-moq/moq-vendor.js';
+// `/moq/`, not `/08-moq/`: demos are addressed by SLUG now, and this import was
+// left behind by that rename — a 404 that took the whole module down, so `moq`
+// and `ladder` never reached __demo.ready at all. It escaped the build's own
+// missing-import check because that check reads HTML files only, and this is a
+// .mjs importing a .js.
+import { Connection, Path, Broadcast, Container } from '/moq/moq-vendor.js';
+import { ROW, burn, readBurned, hueFor } from './pattern.mjs';
 
 export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
 
@@ -115,68 +121,12 @@ async function webTransportFor(url, force) {
   return t;
 }
 
-/**
- * Burned-row geometry, byte-identical to rig/whep/publish.html.
- *
- * That identity is the whole point: the same 48-bit millisecond clock plus
- * 8-bit xor checksum is burned by every transport's publisher, so 09 ladder can
- * put MoQ, WHEP and LL-HLS on ONE axis instead of three. Change these numbers
- * and the comparison silently stops meaning anything.
- */
-export const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: 40, Y: 100, H: 80 };
-
-/** Burn the current wall clock into a canvas as blocks a decoder can read back. */
-export function burn(ctx, w, h, frame) {
-  const ms = Math.round(performance.timeOrigin + performance.now());
-  ctx.fillStyle = '#404040';
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(ROW.X - 20, ROW.Y - 20, ROW.NBLOCKS * ROW.BLOCK_W + 40, ROW.H + 40);
-  const bytes = [];
-  let v = ms;
-  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
-  let ck = 0;
-  for (const b of bytes) ck ^= b;
-  const bits = [];
-  for (const b of bytes.concat([ck])) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
-  ctx.fillStyle = '#fff';
-  for (let i = 0; i < ROW.NBLOCKS; i++) {
-    if (bits[i]) ctx.fillRect(ROW.X + i * ROW.BLOCK_W, ROW.Y, ROW.BLOCK_W, ROW.H);
-  }
-  ctx.font = 'bold 64px monospace';
-  ctx.fillText(String(ms), 60, 320);
-  ctx.font = 'bold 44px monospace';
-  ctx.fillText(new Date(ms).toISOString().slice(11, 23), 60, 400);
-  // motion, so the encoder never dedupes a static frame down to nothing
-  ctx.fillStyle = '#0f0';
-  ctx.fillRect((frame * 7) % Math.max(1, w - 80), Math.round(h * 0.83), 80, 80);
-  return ms;
-}
-
-/** Read the burned clock back. Returns null unless the checksum agrees. */
-export function readBurned(ctx) {
-  const img = ctx.getImageData(ROW.X, ROW.Y + ROW.H / 2, ROW.NBLOCKS * ROW.BLOCK_W, 1).data;
-  const levels = [];
-  for (let i = 0; i < ROW.NBLOCKS; i++) {
-    let s = 0;
-    for (let dx = 6; dx < 14; dx++) s += img[(i * ROW.BLOCK_W + dx) * 4 + 1];
-    levels.push(s / 8);
-  }
-  const mn = Math.min(...levels), mx = Math.max(...levels);
-  if (mx - mn < 60) return null;                  // nothing decoded into this row yet
-  const thr = (mn + mx) / 2;
-  const bits = levels.map((l) => (l > thr ? 1 : 0));
-  let ms = 0;
-  for (let i = 0; i < 48; i++) ms = ms * 2 + bits[i];
-  let ck = 0;
-  for (let i = 48; i < 56; i++) ck = ck * 2 + bits[i];
-  const bytes = [];
-  let v = ms;
-  for (let i = 5; i >= 0; i--) { bytes[i] = v % 256; v = Math.floor(v / 256); }
-  let expect = 0;
-  for (const b of bytes) expect ^= b;
-  return expect === ck ? ms : null;
-}
+// The pattern used to be drawn here, in a copy of rig/whep/publish.html's
+// loop. It now lives in ONE place — demo/shell/pattern.mjs — which also carries
+// the ffmpeg rendering of the same spec, so the geometry cannot drift between a
+// canvas publisher and an ffmpeg one. Re-exported because `moq` and `ladder`
+// (and any future reader) know this module's name.
+export { ROW, burn, readBurned, hueFor };
 
 /**
  * Start a MoQ leg.
@@ -186,8 +136,12 @@ export function readBurned(ctx) {
  *               namespace and the second one dies (§6.4).
  * @param role   'loopback' (publish AND subscribe — one device, one clock, so
  *               the latency delta is exact), 'pub', or 'watch'.
+ * @param hue    0..359 for the burned pattern. Defaults to a hash of the
+ *               namespace, so two publishers on two devices come out different
+ *               colours without anyone allocating them.
  */
-export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false }) {
+export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null }) {
+  const patternHue = hue ?? hueFor(ns);
   const gop = fps;                                 // 1 s
   const src = document.createElement('canvas');
   src.width = w; src.height = h;
@@ -258,7 +212,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     let i = 0;
     timers.push(setInterval(() => {
       if (closed) return;
-      burn(sctx, w, h, i);
+      burn(sctx, w, h, i, { hue: patternHue, label: `moq ${ns}` });
       // Never queue behind a slow encoder: dropping a frame is cheaper than
       // letting the burned clock drift away from wall time, which would corrupt
       // the measurement rather than just thin it.
