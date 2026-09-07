@@ -675,6 +675,40 @@ export function createNest(parent, {
   const adapter = {
     caps: {
       kind, domain: 'parent', unit: 'ms',
+      /**
+       * THE PARENT'S PLAYABLE RATES ARE ITS CHILDREN'S, DIVIDED BY THE RATE
+       * EACH QUOTATION ASKS FOR.
+       *
+       * A span plays its child at `parentRate * sp.rate`, and that product has
+       * to be in the child's `caps.rates`. So the parent rates that keep one
+       * span legal are `{a / sp.rate}` over that span's allowed set, and the
+       * parent's lattice is the intersection across every span.
+       *
+       * Worked, because the division is the part that surprises: a quotation at
+       * 2x of a child allowing [0.25, 0.5, 1, 2] can be honoured at parent
+       * rates [0.125, 0.25, 0.5, 1] — NOT at 2, which would ask the child for
+       * 4. Beside a plain 1x quotation of the same child the intersection is
+       * [0.25, 0.5, 1], and the 2x button correctly disappears.
+       *
+       * A GETTER, not a value: `deck.caps(kind)` hands back this object by
+       * reference and spans arrive after the adapter is registered, so a
+       * computed-once array would describe an empty nest forever. `undefined`
+       * while there are no spans, so the transport bar falls back to its honest
+       * static label rather than to an empty lattice.
+       */
+      get rates() {
+        if (!spans.size) return undefined;
+        const key = (x) => Math.round(x * 1e6) / 1e6;
+        let acc = null;
+        for (const [, sp] of spans) {
+          const allowed = Array.isArray(sp.allowed) ? sp.allowed : null;
+          if (!allowed || !allowed.length) continue;
+          const r = sp.rate || 1;
+          const mine = allowed.map((a) => key(a / r)).filter((x) => x > 0 && Number.isFinite(x));
+          acc = acc === null ? mine : acc.filter((x) => mine.includes(x));
+        }
+        return acc === null ? undefined : acc.sort((a, b) => a - b);
+      },
       nested: true, seekable: true, reducible: true,
       clockMaster: false,           // rule 4: never, unless a span opts in
       catchUp: 'reduce',            // a missed span boundary is re-asserted, never burst
