@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  textarea { width: 100%; min-height: 150px; background: #0d1117; color: var(--fg);
+             border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px;
+             font: 500 11.5px/1.65 var(--mono); resize: vertical; margin: 0 0 8px; }
+  /* the compiled document, one record per line — 04's block, scrolled rather
+     than padded, because a typed score has no fixed length */
+  .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
+        font: 400 11px/1.75 var(--mono); background: var(--card);
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0;
+        margin: 0 0 8px; }
+  /* TWO CHANNELS, TWO FACTS: the left border is which part a line belongs to,
+     the text is whether it has played. Hue never means "played". */
+  .sc-l { display: block; white-space: pre; color: var(--dim2);
+          border-left: 3px solid transparent; padding: 0 12px 0 9px; }
+  .sc-l[data-state="played"] { color: var(--dim); }
+  .sc-l[data-state="now"]    { color: var(--fg);
+                               background: color-mix(in oklab, var(--hi) 10%, transparent); }
+  .sc-n { color: var(--dim2); }
+  .sc-l[data-state="now"] .sc-n { color: var(--fg); }
+  .warn { font: 500 10.5px/1.7 var(--mono); color: var(--warn); margin: 0 0 8px; }
+  .warn:empty { display: none; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck, workerTickHost } from '/timeline/transport.mjs';
+  import {
+    scoreDoc, quotation, refDeck, partItems, partRangeMs, loadScoreDoc,
+    scoreDocToJSON, scoreDocToJSONL,
+  } from '/timeline/score.mjs';
+  import { csoundPart, compileCsound, tempoMap } from '/timeline/csound.mjs';
+
+  // A WRITTEN SCORE, MADE SEEKABLE — demo/notes/uuu-positron.md §3, on the
+  // container 04 introduces. vClick conducts an ensemble from a Csound score,
+  // and the format has two gaps that only appear when someone asks to start in
+  // the middle:
+  //
+  //   · The tempo map is the INTEGRAL of 60/tempo, because Csound interpolates
+  //     tempo linearly in BEAT. The lane below draws bpm against time, and the
+  //     check compares the integral against the mean-tempo shortcut — which
+  //     looks fine and puts every later note early by a growing amount.
+  //   · `m`/`n` is a repeat, and a repeat is a REFERENCE. It compiles to a use
+  //     in the document, not to four more lines of notes.
+  //
+  // And the seek is the claim neither 04 nor anything else here makes: a score
+  // file cannot answer "what is in force at bar 9" — it carries events, not
+  // state. `deck.reduceAt(kind, pos)` answers it at any position.
+
+  const DEFAULT_SCORE = [
+    '; a fragment in the shape vClick scores are written in',
+    't 0 120  16 72          ; a real accelerando: 120 bpm easing to 72 by beat 16',
+    '',
+    'm theme',
+    'i 1 0    0.5  8000 440',
+    'i 1 +    .    .    550',
+    'i 1 +    .    .    660',
+    'i 1 +    1.0  .    880',
+    '',
+    'i 2 4    0.25 6000 220',
+    'i 2 +    .    .    .',
+    'i 2 +    .    .    .',
+    'n theme                 ; and again — a reference, not seven more lines',
+  ].join('\n');
+
+  const d = mount({
+    n: '05',
+    name: 'vclick',
+    what: 'A Csound score, compiled as you type. The tempo bends, the repeat stays one line, and you can drop into the middle and still know what is in force.',
+    readout: { rows: '', uses: '', bend: 'ms', beat: '', fold: '', sounded: '' },
+    // the numbers sit under the lane that owns them; this row would repeat them
+    // with less context. Still published for CDP.
+    showReadout: false,
+    controls: [
+      { id: 'sound', label: 'Play with sound', primary: true },
+      { id: 'seek', label: 'Jump into the repeat' },
+    ],
+  });
+  guard(d);
+
+  d.how(
+    `Csound counts in beats, not seconds, and a tempo that changes makes the ` +
+    `two come apart — evenly numbered beats, unevenly spaced in time. The grey ` +
+    `line is the tempo the score asks for. Edit the score and everything below ` +
+    `recompiles; drop the playhead anywhere and the count of what has already ` +
+    `sounded is exact, which a file of notes on its own cannot tell you.`,
+  );
+
+  // ── ink: one hue per part, the same in the strip and in the document ─────
+  const INK = { on: '#ffd400', off: '#6b5a12' };
+  const DERIVED = '#6f7d94';        // 02 and 03's slate: shown, never measured
+
+  const parent = createDeck({ items: [], adapters: {}, range: [0, 1000] });
+  const boundaryHost = workerTickHost();
+
+  let doc = null, part = null, tm = null, compiled = null, structural = null;
+  let child = null, nest = null, loaded = null;
+  let LINES = [], lineEls = [], lineOfRow = new Map(), lineOfUse = new Map();
+  const plays = new Map();
+  let sounded = 0, ctx = null, soundAsserted = false;
+
+  const ta = el('textarea', '', DEFAULT_SCORE, { spellcheck: 'false' });
+  d.el.append(ta);
+  const warnEl = el('div', 'warn');
+  d.el.append(warnEl);
+
+  createTransportBar(d.el, parent, { scrub: false });
+
+  const pre = el('pre', 'sc');
+
+  /** bpm at a beat, interpolated linearly IN BEAT exactly as Csound does */
+  function bpmAtBeat(points, beat) {
+    if (!points.length) return 60;
+    for (let i = 0; i < points.length; i++) {
+      const [b0, m0] = points[i], next = points[i + 1];
+      if (!next) return m0;
+      if (beat <= next[0]) {
+        const span = next[0] - b0;
+        return span <= 0 ? m0 : m0 + ((next[1] - m0) * (beat - b0)) / span;
+      }
+    }
+    return points[points.length - 1][1];
+  }
+
+  /** does the tempo actually go anywhere? a flat line is a constant, not a fact */
+  const tempoVaries = (points) => points.length > 1
+    && points.some(([, m]) => Math.abs(m - points[0][1]) > 1e-9);
+
+  const view = createStripView(d.el, parent, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    lanes: [
+      { id: 'deck-span', kind: 'deck-span', label: 'part', height: 46, barPad: 7,
+        as: 'spans', stack: false, barGap: 3, terse: true, color: INK.on,
+        rows: () => {
+          if (!nest) return [];
+          const out = [];
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const from = nest.iterationAt(sp.id, i);
+              const to = nest.iterationAt(sp.id, i + 1);
+              const end = Number.isFinite(to) ? to : from + (sp.onePassMs ?? (sp.c1 - sp.c0));
+              if (!Number.isFinite(from) || !(end > from)) continue;
+              out.push({ at: from, id: `${sp.id}#${i + 1}`, kind: 'deck-span',
+                         payload: { durMs: end - from, use: sp.id, repeat: !!sp.quotation?.meta?.repeat } });
+            }
+          }
+          return out;
+        },
+        labelOf: (s, { bw } = {}) => {
+          const id = s.row?.payload?.use || '';
+          return bw && bw < 84 ? id.slice(0, 6) : id;
+        },
+        describeRow: (r) => {
+          const p = r.payload || {};
+          const line = lineOfUse.get(p.use);
+          return [String(p.use), line === undefined ? 'a use' : `line ${line}`];
+        } },
+      { id: 'rows', kind: 'note', label: 'event', height: 42, width: 2, as: 'ticks',
+        color: INK.off, terse: true,
+        rows: () => {
+          if (!nest || !doc) return [];
+          const out = [];
+          const items = partItems(doc, 'theme', { tempoMap });
+          for (const sp of nest.spans()) {
+            const n = sp.iterations || 1;
+            for (let i = 0; i < n; i++) {
+              const base = nest.iterationAt(sp.id, i);
+              if (!Number.isFinite(base)) continue;
+              for (const it of items) {
+                if (it.at < sp.c0 || it.at >= sp.c1) continue;
+                out.push({ at: base + (it.at - sp.c0) / (sp.rate || 1),
+                           id: `${sp.id}#${i}:${it.id}`, kind: 'note',
+                           payload: { row: it.payload.row } });
+              }
+            }
+          }
+          return out;
+        },
+        colorOfRow: (r) => (plays.get(r.payload?.row) ? INK.on : INK.off),
+        describeRow: (r) => {
+          const row = r.payload?.row;
+          const line = lineOfRow.get(row);
+          const n = plays.get(row) || 0;
+          return [`line ${line}`, n ? `played ${n}x` : 'not played yet'];
+        } },
+      // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
+      // rows to draw it is deriving a picture, not observing one — so it takes
+      // the slate 02 and 03 use for "shown, never measured" and the gutter says
+      // so. The lane is REMOVED, not flattened, when the tempo does not vary:
+      // a flat line is a constant dressed as a measurement.
+      { id: 'tempo', kind: 'note', label: 'tempo', height: 46, as: 'continuous',
+        color: DERIVED, terse: true, dots: false, show: false,
+        value: (p) => p.bpm,
+        rows: () => {
+          if (!doc || !tm) return [];
+          const pts = doc.tempo;
+          if (!tempoVaries(pts)) return [];
+          const [lo, hi] = parent.range;
+          const out = [];
+          for (let i = 0; i <= 120; i++) {
+            const ms = lo + ((hi - lo) * i) / 120;
+            out.push({ at: ms, id: `t${i}`, kind: 'note',
+                       payload: { bpm: bpmAtBeat(pts, tm.beatAtMs(ms)) } });
+          }
+          return out;
+        },
+        describeRow: (r) => [`${Math.round(r.payload?.bpm ?? 0)} bpm`, 'read off the score'] },
+    ],
+  });
+
+  d.el.append(pre);
+
+  // ── highlighting, from the deck and never from a timer ──────────────────
+  const fading = new Map();
+  const setState = (i, st) => { const l = lineEls[i]; if (l) l.dataset.state = st; };
+
+  function lightRow(rowId) {
+    const i = lineOfRow.get(rowId);
+    if (i === undefined) return;
+    setState(i, 'now');
+    clearTimeout(fading.get(i));
+    fading.set(i, setTimeout(() => { setState(i, 'played'); fading.delete(i); }, 450));
+  }
+
+  /** One short tone per row, so a seek is audible as well as assertable. */
+  function voice(p) {
+    if (!ctx) return;
+    const freq = Number(p[4]);
+    if (!Number.isFinite(freq) || freq <= 0) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.2, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.3);
+    sounded++;
+    d.set('sounded', sounded, 'ok');
+    // Asserted WHEN THE EVIDENCE ARRIVES, not at load: at load nothing has
+    // sounded and the claim would be false, and waiting for it with a tolerant
+    // "sounded > 0 || not started" is how 03 spent its life not looping.
+    if (!soundAsserted) {
+      soundAsserted = true;
+      d.assert('notes actually sounded', sounded > 0, `${sounded} voices`);
+    }
+  }
+
+  const noteAdapter = {
+    caps: { rates: [0.25, 0.5, 1, 2], continuous: false, assertOnSeek: true },
+    actuate(payload) {
+      plays.set(payload.row, (plays.get(payload.row) || 0) + 1);
+      lightRow(payload.row);
+      voice(payload.p);
+      view.strip.invalidate();
+    },
+    // The fold: how many notes have sounded by a position. It is what makes
+    // "start at bar 9" answerable, and the checks probe it either side of
+    // every note.
+    reduce: (rows) => ({ count: rows.length }),
+    assertState: (s) => s,
+  };
+
+  /**
+   * CSOUND'S m/n INTO THE CONTAINER'S `uses`.
+   *
+   * A repeat spans mark → here and LANDS here, so the written material and the
+   * replay never overlap in parent time — which matters, because rule 7g says
+   * one deck has one position and two uses of it may not be present at the same
+   * instant. So the score is partitioned: everything up to the repeat, then the
+   * quoted span again, then whatever follows, each placed end to end.
+   */
+  function usesFor(cp, lastBeat) {
+    const uses = [];
+    let cursor = 0, at = 0, i = 0;
+    for (const r of [...cp.repeats].sort((a, b) => a.atBeat - b.atBeat)) {
+      if (r.atBeat > cursor) {
+        uses.push(quotation({ id: `u${++i}`, ref: 'theme', at, in: cursor, out: r.atBeat }));
+        at += r.atBeat - cursor;
+        cursor = r.atBeat;
+      }
+      const span = r.outBeat - r.inBeat;
+      if (span > 0) {
+        uses.push(quotation({ id: `${r.name}${++i}`, ref: 'theme', at, in: r.inBeat, out: r.outBeat }));
+        at += span;
+      }
+    }
+    if (lastBeat > cursor) uses.push(quotation({ id: `u${++i}`, ref: 'theme', at, in: cursor, out: lastBeat }));
+    return uses;
+  }
+
+  function teardown() {
+    if (nest) { nest.dispose(); nest = null; }
+    if (child) { child.dispose(); child = null; }
+    for (const t of fading.values()) clearTimeout(t);
+    fading.clear();
+    plays.clear();
+  }
+
+  /**
+   * The textarea is editable, so a compile failure is a normal thing for a
+   * human to cause and not a page fault. Keep the last good document, say what
+   * was wrong, and let them fix the line.
+   */
+  function compile() {
+    let cp, exp, str;
+    try {
+      cp = csoundPart(ta.value);
+      exp = compileCsound(ta.value, { expand: true });
+      str = compileCsound(ta.value, { expand: false });
+    } catch (e) {
+      warnEl.textContent = `score did not compile: ${String(e?.message ?? e)}`;
+      d.log(`score did not compile: ${String(e?.message ?? e)}`, 'bad');
+      return false;
+    }
+    if (!cp.part.rows.length) {
+      warnEl.textContent = 'the score compiled to no rows';
+      return false;
+    }
+
+    parent.pause();
+    teardown();
+
+    compiled = exp; structural = str;
+    part = cp.part;
+    const lastBeat = Math.max(...cp.part.rows.map((r) => r.at + Math.max(0, r.dur)), 1);
+    doc = scoreDoc({ id: 'vclick', tempo: cp.tempo.length ? cp.tempo : [[0, 60]],
+      parts: { theme: cp.part }, uses: usesFor(cp, lastBeat) });
+    tm = tempoMap(doc.tempo);
+
+    // the document, one record per line, coloured by the part it belongs to
+    LINES = scoreDocToJSONL(doc).split('\n');
+    lineOfRow = new Map();
+    lineOfUse = new Map();
+    pre.replaceChildren();
+    lineEls = LINES.map((text, i) => {
+      const rec = JSON.parse(text);
+      const row = el('span', 'sc-l');
+      if (rec.t === 'row' || rec.t === 'part' || rec.t === 'use') row.style.borderLeftColor = INK.on;
+      if (rec.t === 'row') lineOfRow.set(rec.id, i);
+      else if (rec.t === 'use' && rec.id) lineOfUse.set(rec.id, i);
+      row.append(el('span', 'sc-n', String(i).padStart(2, ' ') + '  '),
+                 document.createTextNode(text));
+      pre.append(row);
+      return row;
+    });
+
+    child = createDeck({
+      items: partItems(doc, 'theme', { tempoMap }),
+      adapters: { note: noteAdapter },
+      range: partRangeMs(doc, 'theme', { tempoMap }),
+    });
+    refDeck(child, 'theme');
+
+    const endBeat = Math.max(...doc.uses.map((u) => Number(u.at) + (Number(u.out) - Number(u.in))));
+    parent.setRange([0, Math.ceil(tm.msAt(endBeat) + 300)]);
+
+    loaded = loadScoreDoc(doc, () => child, { parent, tempoMap, tickHost: boundaryHost });
+    nest = loaded.nest;
+    nest.onPresence(({ span, present }) => {
+      const line = lineOfUse.get(span);
+      if (line !== undefined) setState(line, present ? 'now' : 'played');
+    });
+
+    // THE BEND, in closed form against the shortcut. Tempo linear in beat gives
+    // dt = (60/k)·ln(m1/m0); averaging the tempo gives a straight line. The
+    // difference is the error a mean-tempo compiler ships — every note lands,
+    // slightly early, and nothing in the output shows it.
+    const pts = doc.tempo;
+    const meanBpm = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+    const bendMs = tm.msAt(lastBeat) - (60000 * lastBeat) / meanBpm;
+
+    // the tempo lane appears only when the tempo goes somewhere
+    const varies = tempoVaries(pts);
+    const tempoLane = view.strip.lanes().find((l) => l.id === 'tempo');
+    if (tempoLane) {
+      tempoLane.show = varies;
+      tempoLane.subLabel = varies
+        ? [`${Math.round(pts[0][1])} → ${Math.round(pts[pts.length - 1][1])} bpm`, 'drawn from the score']
+        : null;
+    }
+    const partLane = view.strip.lanes().find((l) => l.id === 'deck-span');
+    if (partLane) partLane.subLabel = [`${doc.uses.length} of them,`,
+      `${structural.repeats.length} from a repeat`];
+    const eventLane = view.strip.lanes().find((l) => l.id === 'rows');
+    if (eventLane) eventLane.subLabel = [`${part.rows.length} written,`, 'each one a line below'];
+
+    d.set('rows', part.rows.length, 'ok');
+    d.set('uses', doc.uses.length);
+    d.set('bend', Math.round(bendMs));
+    d.set('sounded', sounded);
+    warnEl.textContent = compiled.warnings.length
+      ? compiled.warnings.map((w) => `warning: ${w}`).join('\n') : '';
+
+    view.strip.fit();
+    view.strip.invalidate();
+    return true;
+  }
+
+  // compile as you type, debounced — the document is the output of the editor
+  let typing = null;
+  ta.addEventListener('input', () => {
+    clearTimeout(typing);
+    typing = setTimeout(() => { if (compile()) d.log(`recompiled — ${part.rows.length} rows`); }, 400);
+  });
+
+  setInterval(() => {
+    if (!child || !tm) return;
+    const pos = child.position();
+    d.set('beat', Math.round(tm.beatAtMs(pos) * 100) / 100);
+    const fold = child.reduceAt('note', pos);
+    d.set('fold', fold && Number.isFinite(fold.count) ? fold.count : '—');
+  }, 200);
+
+  d.on('sound', () => {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    // NOT awaited. A context created without a gesture starts suspended and
+    // resume() then neither resolves nor rejects — it waits. Awaiting it left
+    // the deck unbuilt while the page looked fine.
+    ctx.resume().catch(() => {});
+    parent.play();
+    d.log('playing with sound', 'hi');
+  });
+
+  d.on('seek', () => {
+    const rep = structural?.repeats?.[0];
+    if (!rep) { d.log('this score has no m/n repeat to jump into', 'bad'); return; }
+    const use = doc.uses.find((u) => u.id.startsWith(rep.name));
+    if (!use) { d.log('the repeat is not in the document', 'bad'); return; }
+    const mid = tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2);
+    parent.seek(mid);
+    const fold = child.reduceAt('note', child.position());
+    d.log(`jumped to ${(mid / 1000).toFixed(2)}s — inside the repeat, beat `
+      + `${tm.beatAtMs(child.position()).toFixed(2)}, fold ${fold?.count}`, 'hi');
+  });
+
+  compile();
+
+  // ── the checks, carried over from vclick and adapted to the container ────
+  d.assert('the score compiles to rows', part.rows.length > 0, `${part.rows.length} rows`);
+  d.assert('no warnings from a score this simple', compiled.warnings.length === 0,
+    compiled.warnings.join(' | ') || 'none');
+
+  // THE INTEGRAL, and the number this project paid for. Tempo 120 -> 72 over 16
+  // beats integrates in closed form; the mean-tempo shortcut is a straight line
+  // through the same endpoints. The gap is the error that compiler ships, and
+  // it is invisible in the output because every note still lands, just early.
+  const bend = Number(d.api.readout.bend);
+  d.assert('the tempo map bends away from the mean-tempo line', Math.abs(bend) > 20,
+    `${bend} ms by the end`);
+
+  d.assert('the repeat compiled to a use, not to more rows',
+    structural.repeats.length > 0
+      && doc.uses.length === structural.repeats.length + 1
+      && part.rows.length === structural.items.length,
+    `${structural.repeats.length} repeat, ${doc.uses.length} uses, ${part.rows.length} rows written`);
+
+  d.assert('the deck spans the score', parent.range[1] > 0
+    && Math.abs(parent.range[1] - compiled.durationMs) < 1500,
+    `${parent.range[1]} vs ${Math.round(compiled.durationMs)} ms`);
+
+  // THE FOLD, either side of every note — the same probe 15 seek runs against a
+  // recording, run here against a written score.
+  {
+    const items = partItems(doc, 'theme', { tempoMap });
+    let wrong = 0, probes = 0;
+    for (const it of items) {
+      for (const at of [it.at - 1, it.at, it.at + 1]) {
+        if (at < 0) continue;
+        probes++;
+        const want = items.filter((x) => x.at <= at).length;
+        const got = child.reduceAt('note', at);
+        if (!got || got.count !== want) wrong++;
+      }
+    }
+    d.assert('the fold is exact either side of every note', wrong === 0,
+      `${probes} probes, ${wrong} wrong`);
+  }
+
+  // A seek that lands inside the repeat: the position the score cannot describe.
+  {
+    const rep = structural.repeats[0];
+    const use = rep && doc.uses.find((u) => u.id.startsWith(rep.name));
+    const mid = use ? tm.msAt(Number(use.at) + (Number(use.out) - Number(use.in)) / 2) : null;
+    if (mid !== null) parent.seek(mid);
+    const pos = child.position();
+    const items = partItems(doc, 'theme', { tempoMap });
+    const want = items.filter((x) => x.at <= pos).length;
+    const got = child.reduceAt('note', pos);
+    d.assert('a seek into the repeat folds correctly', !!got && got.count === want,
+      `at ${Math.round(pos)} ms, fold ${got && got.count} of ${want}`);
+  }
+
+  d.log('edit the score — t bends the tempo lane, m/n becomes one use');
+  d.ready();
+</script>
+</html>

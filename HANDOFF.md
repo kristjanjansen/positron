@@ -125,6 +125,13 @@ reason: it is named for its subject, not for this repo.
 
 ## Where things stand (session 10)
 
+> **Numbering note, 2026-09-07.** `28 vclick` is now **`05 vclick`** and the old
+> `05 strip` is now **`28 strip`**. The session-10 narrative below and the
+> entries in `PROGRESS.md` and `SUMMARY.md` keep the numbers they were written
+> with, because renumbering a record of what happened makes the record false —
+> the same reason `elektronstudio` and `elektron.art` were left alone in the
+> move to positron.
+
 **332/332 green when the session closed; 24 of 28 built.** `20`–`22` are archive
 pages that work and are linked but not re-shelled, `23 studio` is assembly.
 

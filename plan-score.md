@@ -170,8 +170,8 @@ work already done at load, so **every assert fires twice** — `16/16` is really
 
 ### P4 — what it unlocks, and what it does not
 
-`28 vclick` becomes a client of the container rather than a parallel
-implementation. **Do not assume it collapses into `04`** — vclick's subject is
+`05 vclick` (numbered `28` until 2026-09-07) is now a client of the container
+rather than a parallel implementation — P4 is DONE. **Do not assume it collapses into `04`** — vclick's subject is
 the tempo integral and seeking into a written score, which is a different claim
 from "one container, three languages". Two demos, one substrate.
 
@@ -277,7 +277,7 @@ refused rather than as absent.
   document must carry the warnings so the demo can show them.
 - **Beats are not milliseconds and the bug is silent.** Getting the tempo
   integral wrong lands every note slightly late and only an accelerando shows
-  it. `28 vclick` already measures this — the mean-tempo shortcut puts every
+  it. `05 vclick` already measures this — the mean-tempo shortcut puts every
   later note 118 ms early while looking fine.
 
 ---

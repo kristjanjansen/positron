@@ -156,6 +156,25 @@
     { on: '#c9a0ff', off: '#584a72' },
   ];
   let inkOf = {};                       // part name -> {on, off}
+  const DERIVED = '#6f7d94';            // 02 and 03's slate: shown, never measured
+
+  /** bpm at a beat, interpolated linearly IN BEAT exactly as Csound does */
+  function bpmAtBeat(points, beat) {
+    if (!points.length) return 60;
+    for (let i = 0; i < points.length; i++) {
+      const [b0, m0] = points[i], next = points[i + 1];
+      if (!next) return m0;
+      if (beat <= next[0]) {
+        const span = next[0] - b0;
+        return span <= 0 ? m0 : m0 + ((next[1] - m0) * (beat - b0)) / span;
+      }
+    }
+    return points[points.length - 1][1];
+  }
+
+  /** does the tempo actually go anywhere? a flat line is a constant, not a fact */
+  const tempoVaries = (points) => points.length > 1
+    && points.some(([, m]) => Math.abs(m - points[0][1]) > 1e-9);
 
   // ── one parent, one boundary host, rebuilt contents ─────────────────────
   // The parent deck and the transport bar outlive a score change; only the
@@ -246,6 +265,30 @@
           const n = plays.get(`${p.part}#${p.row}`) || 0;
           return [`line ${line} · ${p.part}`, n ? `played ${n}x` : 'not played yet'];
         } },
+      // THE TEMPO, AND IT IS DERIVED. The map is a function; sampling it into
+      // rows to draw it is deriving a picture, not observing one — so it takes
+      // the slate 02 and 03 use for "shown, never measured" and the gutter says
+      // so. REMOVED, not flattened, when the tempo does not vary: four of these
+      // five scores are flat, and a flat line is a constant dressed as a
+      // measurement — the defect the `missed` readout cell was deleted for.
+      { id: 'tempo', kind: 'note', label: 'tempo', height: 44, as: 'continuous',
+        color: DERIVED, terse: true, dots: false, show: false,
+        value: (p) => p.bpm,
+        rows: () => {
+          if (!doc) return [];
+          const pts = doc.tempo;
+          if (!tempoVaries(pts)) return [];
+          const tm = tempoMap(pts);
+          const [lo, hi] = parent.range;
+          const out = [];
+          for (let i = 0; i <= 120; i++) {
+            const ms = lo + ((hi - lo) * i) / 120;
+            out.push({ at: ms, id: `t${i}`, kind: 'note',
+                       payload: { bpm: bpmAtBeat(pts, tm.beatAtMs(ms)) } });
+          }
+          return out;
+        },
+        describeRow: (r) => [`${Math.round(r.payload?.bpm ?? 0)} bpm`, 'read off the score'] },
     ],
   });
 
@@ -385,6 +428,15 @@
       doc.uses.some((u) => u.repeat) ? 'one of them repeats' : 'none repeat'];
     const eventLane = view.strip.lanes().find((l) => l.id === 'rows');
     if (eventLane) eventLane.subLabel = [`${rowCount} in the document,`, 'each one a line below'];
+    const varies = tempoVaries(doc.tempo);
+    const tempoLane = view.strip.lanes().find((l) => l.id === 'tempo');
+    if (tempoLane) {
+      tempoLane.show = varies;
+      tempoLane.subLabel = varies
+        ? [`${Math.round(doc.tempo[0][1])} → ${Math.round(doc.tempo[doc.tempo.length - 1][1])} bpm`,
+           'drawn from the score']
+        : null;
+    }
     view.strip.fit();
     view.strip.invalidate();
 

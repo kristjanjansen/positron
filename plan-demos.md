@@ -310,7 +310,7 @@ entire vocabulary: `tickLOD`, `TICK_LADDER`, `formatTime`, `aoristic`,
 |---|---|---|
 | `strip-mini` | 44 px | Acts 1–2, where the timeline is context, not the subject |
 | `strip` | 120 px | the default, Acts 0 and 3–4 |
-| `strip-deep` | fills | `05 strip` and `21 megatimeline` only |
+| `strip-deep` | fills | `28 strip` and `21 megatimeline` only |
 
 ## 3 · The machine contract comes free
 
