@@ -15,7 +15,7 @@
 <script src="/proto/remixer/hls.min.js"></script>
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt, BUILD } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt, matchAspect, BUILD } from '/shell/shell.mjs';
   import { llhls, holdPublisher, waitForManifest } from '/shell/live.mjs';
   import { createLowLatencyPlayer } from '/src/low-latency-player.js';
 
@@ -34,7 +34,7 @@
   badge.dataset.on = '0';
   d.head.append(badge);
 
-  const video = el('video', '', null, { playsinline: '', muted: '', controls: '' });
+  const video = matchAspect(el('video', '', null, { playsinline: '', muted: '', controls: '' }));
   video.muted = true;
   d.el.append(video);
 

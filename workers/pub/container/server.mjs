@@ -3,7 +3,7 @@
 // One test pattern with an ABSOLUTE EPOCH BURNED INTO THE PIXELS, pushed to
 // Cloudflare Stream over RTMPS. The burn is the whole point: glass-to-glass
 // latency is then measurable from a screenshot alone, and the SAME burn is
-// comparable across every transport 09 ladder puts side by side.
+// comparable across every transport, which is what lets them share one axis.
 //
 //   POST /start   {key, fps?, bitrate?}   -> begin publishing (idempotent)
 //   POST /stop                            -> kill ffmpeg
@@ -53,7 +53,8 @@ const CHORD = "aevalsrc='(0.06*sin(2*PI*220*t)+0.05*sin(2*PI*330*t)+0.035*sin(2*
 //
 // A COPY of demo/shell/pattern.mjs's ffmpegFilters(), which is where the spec
 // lives — the same file draws the browser-canvas version, so the two publishers
-// cannot drift apart on the geometry that 09 ladder compares. It is duplicated
+// cannot drift apart on the geometry a cross-transport comparison rests on. It
+// is duplicated
 // here ONLY because the image is built from `COPY server.mjs .`, one file, with
 // nothing to import from. src/publish.sh does NOT duplicate it; it generates
 // its filter from pattern.mjs directly. If you change one, change the other.
@@ -226,8 +227,8 @@ function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, row = f
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
-  // processes on two Cloudflare inputs — the page already says so — and 09
-  // ladder shows them side by side, where telling them apart is the point.
+  // processes on two Cloudflare inputs — the page already says so — and any
+  // page showing them side by side needs to tell them apart.
   const draw = drawFilters({ epoch, hue: 150, row });
   return [
     '-hide_banner', '-loglevel', 'warning',

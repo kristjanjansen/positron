@@ -7,17 +7,24 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin: 0 0 10px; }
+  /* 300, not 150: the picture in each tile is drawn on a 1280 grid, and below
+     about 300 px its clocks stop being readable — a tile too small to read is
+     a tile that only proves something arrived. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px; margin: 0 0 10px; }
   .cell { position: relative; aspect-ratio: 16/9; background: #000; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
   .cell.me { border-color: var(--hi); }
   .cell video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .cell .lbl { position: absolute; left: 5px; bottom: 4px; font: 600 10px/1.4 var(--mono);
+  /* TOP, not bottom: the machine-readable row lives along the bottom of every
+     picture, and a label sitting on it covers the one part of the frame a
+     program has to be able to read. */
+  .cell .lbl { position: absolute; left: 5px; top: 4px; font: 600 10px/1.4 var(--mono);
                color: var(--fg); background: #0b0e14aa; border-radius: 3px; padding: 1px 5px; }
   .cell.me .lbl { color: #0b0e14; background: var(--hi); }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { burn, hueFor, drawCamera, readBurned } from '/shell/pattern.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'room-demo';
   const ID = Math.random().toString(36).slice(2, 8);
@@ -25,15 +32,25 @@
 
   const d = mount({
     name: 'room',
-    what: 'Join a room and see the others. Peer to peer; the relay only carries signalling.',
-    readout: { peers: '', connected: '', join: 'ms', room: '' },
+    what: 'Open this page twice and each window shows the other. The picture goes '
+        + 'straight between them; the server only introduces them to each other.',
+    readout: { others: '', joined: '', first: 'ms', size: '', dropped: '' },
     controls: [
-      { id: 'join', label: 'Join the room', primary: true },
-      { id: 'check', label: 'Run the checks' },
+      { id: 'join', label: 'Join', primary: true },
+      { id: 'camera', label: 'Use the camera' },
     ],
   });
   guard(d);
-  d.set('room', ROOM);
+
+  d.how(
+    `Each window makes a picture, then hands it to the other window directly — `
+    + `the server in the middle only passes the two of them each other's address `
+    + `and then has nothing more to do with the video. Every picture carries the `
+    + `same clock the rest of this site burns, so you can see how far behind a `
+    + `far-off window is by reading its number against yours. FIRST is how long `
+    + `it took, from pressing Join, for someone else's picture to appear. Each `
+    + `window gets its own colour.`,
+  );
 
   const grid = el('div', 'grid');
   d.el.append(grid);
@@ -52,31 +69,60 @@
   const pcs = new Map();
 
   /**
-   * A camera is not the point of this demo and asking for one is a permission
-   * prompt in the way. A canvas stream is a real MediaStreamTrack — it
-   * negotiates, encodes and arrives exactly like a webcam — so the peer path is
-   * tested without needing a device at all.
+   * A canvas by default, the camera on request.
+   *
+   * A canvas stream is a real MediaStreamTrack — it negotiates, encodes and
+   * arrives exactly like a webcam — so the peer path is exercised with no
+   * permission prompt in the way, and the suite stays deterministic. The camera
+   * draws INTO the same canvas, so one path serves both and the clock is burned
+   * either way.
+   *
+   * 1280x720 because the shared pattern's machine-readable row is frozen on a
+   * 1280 grid. It is captured at 10 fps: this is a room of several senders and
+   * the point is WHOSE picture arrives and how far behind, not frame rate.
    */
-  function localStream() {
-    const c = el('canvas');
-    c.width = 320; c.height = 180;
-    const g = c.getContext('2d');
-    let f = 0;
-    setInterval(() => {
-      f++;
-      g.fillStyle = '#11151d'; g.fillRect(0, 0, 320, 180);
-      g.fillStyle = '#ffd400';
-      g.font = 'bold 22px ui-monospace, monospace';
-      g.fillText(ID, 16, 40);
-      g.font = '13px ui-monospace, monospace';
-      g.fillStyle = '#8b93a1';
-      g.fillText(new Date().toISOString().slice(11, 23), 16, 66);
-      g.fillRect(16, 90, (f * 3) % 288, 6);
-    }, 100);
-    return c.captureStream(10);
-  }
+  const W = 1280, H = 720;
+  const HUE = hueFor(ID);            // this window's colour, from its own id
+  const canvas = el('canvas');
+  canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  const live = el('video', '', null, { playsinline: '', muted: '' });
+  live.hidden = true;
+  let camStream = null, frame = 0;
+
+  setInterval(() => {
+    frame++;
+    // ONE picture across this project: the same module the recorder burns and
+    // the publisher generates its ffmpeg filter from. So a tile here and a
+    // frame off any other transport are the same picture, and the clock in one
+    // can be read against the clock in another.
+    const cam = camStream && live.readyState >= 2 && drawCamera(g, live, W, H);
+    burn(g, W, H, frame, { hue: HUE, field: !cam });
+  }, 100);
+
+  function localStream() { return canvas.captureStream(10); }
+
+  d.on('camera', async () => {
+    if (camStream) { d.log('camera already on'); return; }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      live.srcObject = camStream;
+      await live.play().catch(() => {});
+      d.log(`camera on: ${camStream.getVideoTracks()[0].label || 'default'}`, 'hi');
+    } catch (e) {
+      camStream = null;
+      d.log(`camera: ${e.name} — staying on the generated picture`, 'bad');
+    }
+  });
 
   const send = (o) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...o, from: ID })); };
+
+  /** The higher id dials; the lower id waits to be dialled. See the note below. */
+  function maybeOffer(peer) {
+    if (ID > peer) return offerTo(peer);
+    if (!pcs.has(peer)) d.log(`${peer}: waiting for them to dial`);
+    return undefined;
+  }
 
   async function offerTo(peer) {
     if (pcs.has(peer)) return;
@@ -96,16 +142,38 @@
     tiles.get(peer).video.srcObject = stream;
     if (firstRemoteMs === null && joinedAt) {
       firstRemoteMs = performance.now() - joinedAt;
-      d.set('join', firstRemoteMs);
+      d.set('first', Math.round(firstRemoteMs));
     }
     paint();
   }
 
   function paint() {
-    const conn = [...pcs.values()].filter((p) => p.connectionState === 'connected').length;
-    d.set('peers', pcs.size);
-    d.set('connected', conn, conn === pcs.size && pcs.size > 0 ? 'ok' : '');
+    const states = [...pcs.values()].map((p) => p.connectionState);
+    const joined = states.filter((x) => x === 'connected').length;
+    const gone = states.filter((x) => x === 'failed' || x === 'disconnected').length;
+    // no `?? 0`: a number this page has not observed is an em dash, and before
+    // anyone joins there is nothing to report rather than a confident zero
+    d.set('others', pcs.size || null);
+    d.set('joined', pcs.size ? joined : null, joined === pcs.size && pcs.size > 0 ? 'ok' : '');
+    d.set('dropped', pcs.size ? gone : null, gone ? 'bad' : '');
+
+    // WHAT ACTUALLY ARRIVED, not what we sent. WebRTC starts a new sender low
+    // and climbs as it learns the link: measured here, 320x180 at 4 s and
+    // 1280x720 at 29 s, in six steps. Worth a cell of its own because it is the
+    // reason a far window's clock cannot be read at first — without it the page
+    // would look broken for half a minute and never say why.
+    let best = 0, label = null;
+    for (const [peer, t] of tiles) {
+      if (peer === ID) continue;
+      const v = t.video;
+      if (v.videoWidth * v.videoHeight > best) {
+        best = v.videoWidth * v.videoHeight;
+        label = `${v.videoWidth}x${v.videoHeight}`;
+      }
+    }
+    d.set('size', label, best >= 1280 * 720 ? 'ok' : '');
   }
+  setInterval(paint, 1000);          // the climb happens with no event to hang on
 
   d.on('join', async () => {
     if (ws) return;
@@ -121,8 +189,14 @@
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;                       // the relay echoes to us too
       if (m.to && m.to !== ID) return;
-      if (m.t === 'hello') { send({ t: 'here' }); offerTo(m.from); return; }
-      if (m.t === 'here') { offerTo(m.from); return; }
+      // ONLY ONE SIDE OFFERS. Both used to: whoever received `hello` replied
+      // `here` AND offered, and whoever received `here` offered as well — so two
+      // offers crossed and one of them died on `Called in wrong state: stable`,
+      // leaving an empty tile with no error a reader could act on. Comparing
+      // ids picks an offerer deterministically and needs no extra round trip;
+      // both sides still DISCOVER each other, exactly one of them dials.
+      if (m.t === 'hello') { send({ t: 'here' }); maybeOffer(m.from); return; }
+      if (m.t === 'here') { maybeOffer(m.from); return; }
       if (m.t === 'offer') {
         const pc = new RTCPeerConnection();
         pcs.set(m.from, pc);
@@ -143,21 +217,36 @@
       if (m.t === 'ice') { try { await pcs.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
     };
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
+    // Give the handshake a moment, then check ourselves. Not on `onopen`: the
+    // interesting failure is the relay NOT opening, and an assert that only
+    // runs on success reports nothing at all when it matters.
+    setTimeout(checks, 1200);
   });
 
-  d.on('check', async () => {
+  // The checks run THEMSELVES, once, after joining. A button labelled "Run the
+  // checks" is machinery from the harness showing through into a page a person
+  // is meant to read — and it made the asserts optional, which is the wrong
+  // default for the only thing on the page that can say it worked.
+  let asserted = false;
+  async function checks() {
+    if (asserted) return;
+    asserted = true;
     // readyState 0 is CONNECTING, not broken — wait for the handshake rather
     // than asserting against a race
     for (let i = 0; i < 30 && ws && ws.readyState === 0; i++) await new Promise((r) => setTimeout(r, 100));
-    d.assert('relay open for signalling', ws?.readyState === 1, String(ws?.readyState));
-    d.assert('a local track exists', !!local && local.getTracks().length > 0,
+    d.assert('the server is there to introduce us', ws?.readyState === 1, String(ws?.readyState));
+    d.assert('this window is sending a picture', !!local && local.getTracks().length > 0,
       `${local?.getTracks().length ?? 0} track(s)`);
-    d.assert('own tile rendered', tiles.has(ID));
-    d.assert('media is peer to peer, not relayed',
-      [...pcs.values()].every((p) => p.connectionState !== 'failed'),
-      `${pcs.size} peer(s)`);
+    d.assert('this window can see itself', tiles.has(ID));
+    // The burn is checkable, not decorative: the picture we send carries a
+    // clock a program can read back out of the pixels, which is what makes a
+    // far-off tile comparable to this one.
+    d.assert('the picture carries a readable clock', readBurned(g) !== null,
+      `${W}x${H}, hue ${HUE}`);
+    d.assert('nobody dropped out', [...pcs.values()].every((p) => p.connectionState !== 'failed'),
+      `${pcs.size} other window(s)`);
     d.log(`open this page again with ?room=${ROOM} to see a second tile`);
-  });
+  }
 
   d.ready();
 </script>

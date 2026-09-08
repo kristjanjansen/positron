@@ -13,9 +13,11 @@
 // ── THE ROW IS FROZEN ───────────────────────────────────────────────────────
 // ROW below is byte-identical to rig/whep/publish.html. That identity is the
 // whole point: the same 48-bit millisecond clock plus 8-bit XOR checksum is
-// burned by every transport's publisher, so `ladder` can put MoQ, WHEP and
-// LL-HLS on ONE axis instead of three. CHANGE THESE NUMBERS AND THE COMPARISON
-// SILENTLY STOPS MEANING ANYTHING.
+// burned by every transport's publisher, so MoQ, WHEP and LL-HLS can be put on
+// ONE axis instead of three. CHANGE THESE NUMBERS AND THE COMPARISON SILENTLY
+// STOPS MEANING ANYTHING. (`ladder`, the demo that showed the three side by
+// side, was removed 2026-09-08; the comparison it existed for is still the
+// reason the geometry is frozen, and any future page doing it needs this.)
 //
 // And readBurned() thresholds on LUMINANCE. The bed stays black, the blocks stay
 // white, and no decoration — hue included — is allowed inside the bed rectangle.

@@ -14,7 +14,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
+  import { mount, guard, el, armVideo, playOrPrompt, matchAspect } from '/shell/shell.mjs';
   import { whep, holdPublisher, waitForWhip } from '/shell/live.mjs';
 
   const d = mount({
@@ -32,7 +32,7 @@
   badge.dataset.on = '0';
   d.head.append(badge);
 
-  const video = el('video', '', null, { playsinline: '', muted: '', autoplay: '', controls: '' });
+  const video = matchAspect(el('video', '', null, { playsinline: '', muted: '', autoplay: '', controls: '' }));
   video.muted = true;
   d.el.append(video);
 

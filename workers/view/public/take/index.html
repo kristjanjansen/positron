@@ -15,15 +15,22 @@
      300 px these panes used to be its clock rendered ~18 px and its smaller
      lines ~5 px — a picture whose whole job is to be READ, too small to read.
      Side by side cost more than it bought. */
-  .stage { display: flex; flex-direction: column; gap: 10px; margin: 0 0 10px; }
-  .stage figure { margin: 0; width: 100%; max-width: 440px; }
+  /* SIDE BY SIDE, and stacked when there is no room. The source and the line
+     are the two things you compare — reading a seek means looking at both — and
+     a column puts one off the screen while you look at the other.
+     `auto-fit` with a 300 px floor is what makes that safe: two columns on a
+     normal card, ONE FULL-WIDTH COLUMN on a phone, rather than two panes
+     squeezed to 160 px where the pattern stops being readable at all. */
+  .stage { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+           gap: 10px; margin: 0 0 10px; align-items: start; }
+  .stage figure { margin: 0; width: 100%; }
   .stage canvas { display: block; width: 100%; background: var(--card);
                   border: 1px solid var(--line); border-radius: 4px; }
   /* ONE VIEWPORT for the whole sequence: every part's element is stacked in the
      same box and only the one under the playhead is shown. Parts laid end to
      end mean exactly one is live at a time, so a gallery of N pictures would
      draw a claim the timeline does not make. */
-  .seq { position: relative; width: 100%; max-width: 440px; aspect-ratio: 16 / 9; }
+  .seq { position: relative; width: 100%; aspect-ratio: 16 / 9; }
   .seq video { position: absolute; inset: 0; width: 100%; height: 100%; }
   .seq video[hidden] { display: none; }
 </style>
