@@ -44,6 +44,9 @@ export function createTransportBar(host, deck, {
   const extraEls = new Map();
   for (const x of extras) {
     const b = el('button', `tbar-x${x.primary ? ' d-pri' : ''}`, x.label, { type: 'button' });
+    // The label is a GLYPH, so it is not a name. `aria` is what a screen reader
+    // reads and what a test looks for; without it the control is "●".
+    b.setAttribute('aria-label', x.aria ?? x.label);
     if (x.title) b.title = x.title;
     b.addEventListener('click', () => x.onClick?.(b));
     extraEls.set(x.id, b);
