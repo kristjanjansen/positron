@@ -7,11 +7,25 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .film { width: 100%; max-width: 560px; aspect-ratio: 16 / 9; background: #000;
-          border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 4px; }
-  .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px; max-width: 62ch; }
-  .picked b { color: var(--fg); font-weight: 600; }
-  .picked a { color: var(--hi); }
+  .film { width: 100%; max-width: 440px; aspect-ratio: 16 / 9; background: #000;
+          border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 6px; }
+  /* EMPTY LOOKS EMPTY. A <video controls> with no source still draws a player —
+     a dead play button and 0:00 — which reads as broken rather than as waiting.
+     The box keeps its size so the line below never moves; only the furniture
+     goes. */
+  .film[data-empty="1"] { background: var(--card); }
+  /* THE DESCRIPTION IS BOUNDED. ERR's leads run from one line to a dozen, and a
+     block that grows with its contents pushes the line down the page by a
+     different amount for every film. Five lines here, more where there is room,
+     and the rest scrolls inside its own box — so the strip below never moves. */
+  .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px;
+            max-width: 62ch; min-height: 62px; }
+  .ptitle { color: var(--fg); font-weight: 600; margin-bottom: 3px; }
+  .ptitle a { color: var(--hi); font-weight: 500; }
+  .plead { max-height: calc(5 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
+  @media (min-width: 760px) { .plead { max-height: calc(8 * 1.6em); } }
+  /* the slot keeps its shape before a film is chosen */
+  video.film[data-empty="1"] { background: var(--card); }
 </style>
 
 <script type="module">
@@ -33,7 +47,10 @@
       + 'ERR at that moment and nothing is stored here. Everything on the page comes '
       + 'from ERRarhiiv and every film links back to it.',
     readout: { films: '', picked: '', length: 'min' },
-    controls: [{ id: 'first', label: 'Play the first film', primary: true }],
+    // NO CONTROLS. The line IS the control — a button that plays "the first
+    // film" is a second way to do the one thing the strip already does, and it
+    // implies an order the year does not have.
+    controls: [],
   });
   guard(d);
 
@@ -46,16 +63,28 @@
   // around here.
   const deck = createDeck({ items: [], adapters: {}, range: [YEAR_FROM, YEAR_TO] });
 
-  const film = el('video', 'film', null, { playsinline: '', controls: '' });
-  film.hidden = true;
-  const picked = el('div', 'picked', 'no film chosen yet');
+  // BOTH SLOTS EXIST FROM THE START, empty. A picture that appears out of
+  // nowhere pushes the line down the page the moment you press a film — so the
+  // thing you just aimed at moves while you are looking at it. The box is the
+  // same size before and after; only its contents change.
+  const film = el('video', 'film', null, { playsinline: '' });
+  film.dataset.empty = '1';
+  const picked = el('div', 'picked');
+  const pickedTitle = el('div', 'ptitle', 'press a film on the line');
+  const pickedLead = el('div', 'plead');
+  picked.append(pickedTitle, pickedLead);
   d.el.append(film, picked);
 
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
-  const laneOf = (i) => (i.series === 'AK filmikroonika 1958-1991' ? 'ak' : 'rest');
 
-  let items = [], byLane = { ak: [], rest: [] }, current = null;
+  // ONE LANE. The other 16 films — 16 mm rushes and a few the catalogue files
+  // under no series — are a different kind of thing recorded for a different
+  // reason, and a lane holding "everything that is not the other lane" is a
+  // leftovers bin rather than a lane. `AK filmikroonika` alone is a series: one
+  // newsreel, weekly, for a year.
+  const SERIES = 'AK filmikroonika 1958-1991';
+  let items = [], current = null;
 
   // A film is a PART on the line — a container placed at a position. It has no
   // measured length until it is played: the catalogue's own duration and the
@@ -68,7 +97,7 @@
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
     colorOf: (sp) => (sp.row?.payload?.slug === current?.slug ? '#ffd400' : '#6f7f9a'),
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
-    rows: () => byLane[id].map((it) => ({
+    rows: () => items.map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
       payload: { durMs: it.playedMs ?? DAY, ...it },
     })),
@@ -90,20 +119,20 @@
     // is 2001-09-09 — every date before that, and every negative one, fails it,
     // so 1965 would print as a duration instead of a date.
     absolute: true,
-    lanes: [laneFor('ak', 'newsreels'), laneFor('rest', 'other films')],
+    lanes: [laneFor('ak', 'newsreels')],
   });
 
   function gutters() {
-    const L = view.strip.lanes();
-    for (const id of ['ak', 'rest']) {
-      const lane = L.find((l) => l.id === id);
-      const list = byLane[id];
-      if (!lane) continue;
+    const lane = view.strip.lanes().find((l) => l.id === 'ak');
+    const list = items;
+    if (lane) {
       // WHAT THIS LANE HAS, and nothing it has not measured. No durations here:
       // only films that have been PLAYED have a measured length, and a range
       // derived from two of them would be a fabricated figure.
       lane.subLabel = list.length
-        ? [`${list.length} films`, `${list[0].date.slice(5)} to ${list[list.length - 1].date.slice(5)}`]
+        ? [`${list.length} newsreels`,
+           `${list[0].date.slice(5)} to ${list[list.length - 1].date.slice(5)}`,
+           'one a week, all year']
         : null;
     }
     view.strip.invalidate();
@@ -118,13 +147,13 @@
   async function play(it) {
     current = it;
     d.set('picked', it.date);
-    picked.replaceChildren();
-    picked.append(el('b', '', it.title), document.createTextNode(` · ${it.date} · `));
-    const a = el('a', '', 'see it at ERRarhiiv');
+    pickedTitle.replaceChildren(document.createTextNode(`${it.title} · ${it.date} · `));
+    const a = el('a', '', 'at ERRarhiiv');
     a.href = `${ARHIIV}/video/vaata/${it.slug}`;
     a.target = '_blank'; a.rel = 'noreferrer';
-    picked.append(a);
-    if (it.lead) picked.append(el('div', '', it.lead));
+    pickedTitle.append(a);
+    pickedLead.textContent = it.lead || '';
+    pickedLead.scrollTop = 0;
     view.strip.invalidate();
 
     let media;
@@ -144,7 +173,8 @@
     // depending on where it runs, which is the kind of difference that is
     // invisible until it is a mixed-content block. Pin it.
     const src = raw.startsWith('//') ? `https:${raw}` : raw;
-    film.hidden = false;
+    delete film.dataset.empty;
+    film.controls = true;
     armVideo(film);
     film.src = src;
     film.play().catch(() => {});
@@ -164,19 +194,26 @@
     if (it) play(it);
   });
 
-  d.on('first', () => items.length && play(items[0]));
-
   // ── load the year ─────────────────────────────────────────────────────────
   (async () => {
     const fx = await (await fetch('/reel/1965.json')).json();
-    items = fx.items;
-    for (const it of items) byLane[laneOf(it)].push(it);
+    items = fx.items.filter((i) => i.series === SERIES);
     d.set('films', items.length);
     gutters();
 
+    // A WEEK, NOT A YEAR. The deck still holds all of 1965 — you can pan and
+    // zoom across the whole thing — but at a year across a screen, 282 films
+    // land four pixels apart and the lane is a fence, not a picture. A week is
+    // the span where a newsreel is a thing you can point at. Opening zoomed in
+    // and letting the reader zoom out is the right way round: the wide view is
+    // discoverable from the narrow one, and the narrow one is where the marks
+    // mean something.
+    const WEEK = 7 * DAY;
+    view.strip.fit(items[0].at - DAY, items[0].at - DAY + WEEK);
+
     d.assert('the line is positioned in 1965, not 1970',
       deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
-    d.assert('the whole year is on it', items.length > 250, `${items.length} films`);
+    d.assert('the whole year is on it', items.length > 250, `${items.length} newsreels`);
     d.assert('every film has a day', items.every((i) => Number.isFinite(i.at)),
       `${items[0].date} to ${items[items.length - 1].date}`);
     d.assert('positions are negative — 1965 is before the epoch',
