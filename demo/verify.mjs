@@ -77,11 +77,14 @@ let errors = [];
 let failedReqs = [];
 let abortedReqs = [];
 let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
-// Upstream refusals a demo asks for ON PURPOSE — ERR's rights-blocked segments
-// (19 flipper sweeps for them) and Cloudflare WHEP's 400 on a single-track
-// offer (27 tracks asserts on it). Counted and capped, never ignored: the
-// label has to name what they are, or the next reader believes a WHEP refusal
-// was a radio station.
+// Upstream refusals a demo asks for ON PURPOSE — today that is ERR's
+// rights-blocked segments, which `flipper` sweeps for. Counted and capped,
+// never ignored: the label has to name what they are, or the next reader
+// believes a refusal was a radio station.
+//
+// The WHEP single-track branch below is kept but has no caller since `tracks`
+// was removed on 2026-09-08. Cloudflare still refuses such an offer, so the
+// allowance stays correct for whatever asks next.
 let probed = [];
 const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
 listeners.push((m) => {
@@ -104,10 +107,10 @@ listeners.push((m) => {
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
       edgeMisses.push(e.url);
     } else if (/webRTC\/play/.test(e.url || '') && /\b400\b/.test(e.text || '')) {
-      // 27 tracks asks Cloudflare WHEP for one track at a time on purpose and
-      // gets a 400 both times. The refusal IS the measurement — the page
-      // asserts on it — so the request is expected. Capped like the others:
-      // more than a handful means something other than the probe is failing.
+      // Cloudflare WHEP refuses a single-track offer with a 400, both ways.
+      // `tracks` used to assert on that refusal; it is gone, so nothing sends
+      // one today. Kept because the fact has not changed and the next page to
+      // probe it should not read as broken. Capped like the others.
       probed.push(e.url);
     } else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
