@@ -32,10 +32,22 @@
      the line below by its own margin. A day that has only one of the two still
      gets both columns, and the empty one says in words which half did not
      survive. */
-  .picked { display: grid; grid-template-columns: 1fr; gap: 12px 22px;
-            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 16px 0 18px; }
-  @media (min-width: 700px) { .picked { grid-template-columns: 1fr 1fr; } }
-  .pcol { min-width: 0; }
+  .picked { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 14px 0 4px; }
+  /* TWO COLUMNS ON A PHONE TOO. Stacked, the second archive reads as a
+     footnote to the first; side by side, the day is one thing with two halves,
+     which is what the page is about. Estonian compounds are long and a narrow
+     column cannot fit them, so words break rather than widening the column
+     past its share — `anywhere` and not `break-word`, which leaves an
+     over-long word to overflow when it is the only thing on the line.
+
+     NOT `hyphens: auto`. The page declares lang="en" and the text is Estonian,
+     so the browser hyphenated it with the wrong dictionary — `Gon-siori`,
+     `he-lidefekt`, `arhitektuur-Tallinnas`. A hyphen is a claim about where a
+     word divides; breaking without one claims nothing. The columns carry
+     lang="et" so a reader's own software knows what language it is looking
+     at, which is also the honest answer for a screen reader. */
+  .pcol { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .pcol[data-empty="1"] { display: none; }
   .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim2); }
   .ptitle { color: var(--dim); font-weight: 600; margin-top: 2px;
@@ -138,6 +150,7 @@
   // as one long string and the title is the part being looked for.
   const column = (key) => {
     const box = el('div', 'pcol');
+    box.lang = 'et';                  // the archive's own language, not the page's
     const parts = { key: el('div', 'pkey', key), title: el('div', 'ptitle', ''),
                     meta: el('div', 'pmeta', ''), lead: el('div', 'plead') };
     box.append(parts.key, parts.title, parts.meta, parts.lead);
@@ -164,7 +177,9 @@
     a.target = '_blank'; a.rel = 'noreferrer';
     col.meta.append(a);
   };
-  d.el.append(film, wireless, picked);
+  d.el.append(film, wireless);
+  // `picked` is appended after the bar and the line — see below. It reads as
+  // the caption to what the line is pointing at, which is where a caption goes.
 
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -313,6 +328,7 @@
     // reason to put them on a line at all.
     lanes: [laneFor('ak', 'newsreels'), laneFor('radio', 'radio')],
   });
+  d.el.append(picked);        // under the line, as its caption
 
   function gutters() {
     const lane = view.strip.lanes().find((l) => l.id === 'ak');
