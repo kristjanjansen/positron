@@ -130,9 +130,16 @@ leg is down burns `tracks`' 125 s cold-container budget twice. The strip ink
 sample now lands after a frame, up to three tries, because it raced a canvas
 resize about one run in ten.
 
-**332/344 green.** The 12 failures are every WebRTC and QUIC leg — no UDP egress
-in this shell. The denominator moved 313 → 344 because `moq` and `ladder` run at
-all now.
+**351/351 green — every demo, no failures, on 2026-09-08.** This is the first
+clean full run since session 10, and it settles the open question below: the
+12 failures seen earlier in the session WERE the shell's missing UDP egress, and
+with it back `webrtc`, `moq` and `show` all connect. `moq` in particular read
+**600 clean rows, 0 unreadable** THROUGH the Cloudflare relay — the burned clock
+surviving encode → QUIC → decode with the row in its new position, which is a
+stronger check on that geometry than any local round-trip.
+
+The denominator moved 313 → 344 → 351: `moq` runs at all now (it had been dead
+behind a 404), `take` and `room` gained asserts, and `ladder` was removed.
 
 ### ⚠ `workers/pub` is NOT deployed
 
@@ -587,10 +594,10 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    sessions stale: the native-HLS switch has never been seen on the device it
    was written for. Open `positron.studio/llhls/` and read the `BUILD` on the
    first log line before believing anything about it.
-4. **Re-run the suite somewhere with UDP egress.** 332/332 is the committed
-   number; the last run available read 301/313 because WebRTC and QUIC could not
-   leave the machine. Until then `07`, `08`, `09` and `25` are unverified, and
-   `17 instrument`'s `relay open — 0` is unexplained by that cause.
+4. ~~**Re-run the suite somewhere with UDP egress.**~~ **DONE 2026-09-08:
+   351/351, every demo, no failures.** `webrtc`, `moq` and `show` all connect,
+   and `instrument`'s `relay open — 0` — the one failure that was NOT explained
+   by missing UDP — is green too, so it was the same cause after all.
 5. **The archival cron** needs a fresh Stream-scoped token — `.env` holds the
    known-exposed legacy one, so mint rather than deploy it. Without the cron,
    storage climbs ~225 min/day under testing toward a hard 1000-minute cap that

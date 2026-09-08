@@ -1,6 +1,6 @@
 # positron
 
-Live at **https://positron.studio**. 24 of 28 demos built, 332/332 green. Read
+Live at **https://positron.studio**. 24 of 28 demos built, 351/351 green. Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when.
 
