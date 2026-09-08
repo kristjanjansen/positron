@@ -50,7 +50,15 @@ export const PAD = 60;
  * deliberately left alone. So "byte-identical everywhere" is no longer true and
  * this comment says so rather than letting the next reader assume it.
  */
-export const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: PAD + 20, Y: PAD + 20, H: 80 };
+export const FRAME_H = 720;
+export const ROW = {
+  NBLOCKS: 56, BLOCK_W: 20, H: 56,
+  X: PAD + 20,
+  // AT THE BOTTOM. The row is the machine's half of the picture and the numbers
+  // are the reader's, so the reader's half gets the top. `Y` is derived so the
+  // bed sits PAD off the bottom edge, the same PAD as every other side.
+  Y: FRAME_H - PAD - 20 - 56,
+};
 
 /** 48 bits of epoch milliseconds, MSB first, then the 8-bit XOR of those bytes. */
 export const CLOCK_BITS = 48;
@@ -224,9 +232,10 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // A picture whose whole job is to be READ off a small pane has room for two
   // labelled numbers and no more.
   // ONE SIZE FOR BOTH NUMBERS. They are the same kind of thing — a clock — and
-  // drawing one bigger said one mattered more. 96 is what fits: the epoch is 13
-  // characters, and 13 x 0.6 x 96 is 749 px inside the 1160 the margins leave.
-  const NUM = 96;
+  // drawing one bigger said one mattered more. 84 leaves the epoch's 13
+  // characters at 13 x 0.6 x 84 = 655 px, well inside the 1160 the margins
+  // leave, and reads at the ~440 px these panes are actually shown at.
+  const NUM = 84, LBL = 32;
   ctx.textBaseline = 'alphabetic';
   const d = new Date(ms);
   const second = Number.isFinite(opts.position)
@@ -241,19 +250,19 @@ export function burn(ctx, w, h, frame, opts = {}) {
           + `.${pad(d.getMilliseconds(), 3)}`,
       };
 
-  ctx.font = `bold 34px ${MONO}`;
+  ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText('ABSOLUTE', PAD, 265);
+  ctx.fillText('ABSOLUTE', PAD, 95);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#fff';
-  ctx.fillText(String(ms), PAD, 360);
+  ctx.fillText(String(ms), PAD, 185);
 
-  ctx.font = `bold 34px ${MONO}`;
+  ctx.font = `bold ${LBL}px ${MONO}`;
   ctx.fillStyle = `hsl(${hue} 55% 70%)`;
-  ctx.fillText(second.label, PAD, 450);
+  ctx.fillText(second.label, PAD, 240);
   ctx.font = `bold ${NUM}px ${MONO}`;
   ctx.fillStyle = '#e9eef7';
-  ctx.fillText(second.text, PAD, 545);
+  ctx.fillText(second.text, PAD, 330);
 
   // ── motion, and it MEANS something ───────────────────────────────────────
   // The block has to move, or a rate-controlled encoder dedupes a near-static
@@ -271,9 +280,11 @@ export function burn(ctx, w, h, frame, opts = {}) {
   // read and no arithmetic. At 30 fps it still advances ~4 px a frame, which is
   // more motion than the row's low bits gave the encoder anyway.
   const SWEEP_MS = 10000;
-  const SQ = 60;                       // square, and the same 60 as PAD
+  const SQ = 52;
+  // BETWEEN the numbers and the row: it belongs with the things a person reads,
+  // not tucked under the machine-readable row where it looked like part of it.
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
-  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), h - PAD - SQ, SQ, SQ);
+  ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), 430, SQ, SQ);
   return ms;
 }
 
@@ -415,7 +426,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
-  const NUM = 96;             // one size for both clocks, as on the canvas
+  const NUM = 84, LBL = 32;   // same sizes as the canvas
   const LABEL = '0xFFD400';   // --hi
   const VALUE = '0xE9EEF7';   // the canvas's own near-white
   return [
@@ -430,7 +441,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // There is no source label any more: the hue says which publisher this is,
     // and a name burned into a picture is a small text that cannot be read at
     // the size a demo shows it.
-    text('ABSOLUTE', 230, 34, LABEL),
+    text('ABSOLUTE', 70, LBL, LABEL),
     // pts-derived, and the same instant the row encodes.
     //
     // In SECONDS, not milliseconds, where the canvas prints ms. Not a choice:
@@ -438,8 +449,8 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of
     // floating-point result to int failed" — measured on ffmpeg@7. The unit is
     // therefore printed beside the number rather than left to be guessed.
-    text(`%{pts\\:flt\\:${epoch}} s`, 280, NUM, VALUE),
-    text('LOCAL', 420, 34, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, 120, NUM, VALUE),
+    text('LOCAL', 215, LBL, LABEL),
     // LEGIBLE — the publisher's own wall clock. %{pts:flt:…} is precise and
     // unreadable; this is the one a person checks against their own watch.
     // The two drifting apart is real information: it is encoder drift.
@@ -450,7 +461,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // one level deeper than the one separating `gmtime` from its argument.
     // Measured against ffmpeg@7: `\\\:` renders 15:31:25, `\:` errors with
     // "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 465, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 265, NUM, VALUE),
   ].join(',');
 }
 
