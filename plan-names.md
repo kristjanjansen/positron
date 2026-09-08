@@ -167,6 +167,114 @@ its objects and public URL are bucket-bound. Permanently out of scope.
 
 ---
 
+## 4b. Two things this opens up, recorded here so they are not re-derived
+
+### The index cannot stay in localStorage
+
+`keep` remembers what it put in R2 in `localStorage`, and that is right for what
+it is — a private, best-effort convenience so a reload does not lose that tab's
+own work, bounded by a 6-hour TTL that caps how stale it can get. It is NOT an
+index, and must not grow into one:
+
+- **per-browser, per-profile, per-origin.** Another device sees nothing.
+- **evictable.** Safari's ITP clears it after seven days without a visit; Chrome
+  evicts under storage pressure. So the POINTER dies while the data lives — the
+  worst failure shape available, because the object is still being paid for.
+- **~5 MB and synchronous.** Fine for pointers, wrong for anything growing.
+- **nothing reconciles it.** If R2 deleted early, or another tab wrote one, it
+  never finds out.
+
+The index belongs where the data is: the worker that wrote the object already
+knows about it, and the browser should be a cache of that knowledge. **The merge
+in §2 supplies exactly the missing concept — a PRINCIPAL** — so `GET /mine`,
+listing the prefix for whoever is asking, is the natural next endpoint. For a
+real archive it is a database with titles and times, not a bucket listing; an
+index living in one browser is precisely what a heritage client cannot use.
+
+### `GET /mine` — the index, where the data is
+
+The browser note in `keep` is a stopgap; this is the real thing. It is small,
+and it is the first endpoint the merge in §2 makes possible.
+
+**What it returns:** the sessions belonging to the caller — session id, public
+url, bytes, when it was made, when it expires — newest first. The `Quota` DO
+already holds a record per session; this is a filtered read of state that exists.
+
+**Who "the caller" is, and this is the whole design problem.**
+
+On the trusted tier it is easy: a token IS an identity, so `/mine` means what it
+says.
+
+On the open tier there is no identity, and the obvious shortcut is wrong.
+Filtering by ADDRESS would be a privacy bug, not a convenience:
+
+- two people behind one NAT — a school, an office, a phone network — share an
+  address, so one would be handed the other's recordings;
+- one person on a train does not, so their own list would vanish and come back
+  as the address changes;
+- and an address is already used for QUOTA, where being coarse is
+  fine — being coarse for quota costs someone a retry, being coarse for
+  retrieval hands over a stranger's video.
+
+**So the open tier gets a CAPABILITY, not an identity.** `POST /open` already
+mints a session id; it also returns a `client` secret, once, the first time a
+caller asks for one. The client keeps it, sends it on `/mine`, and gets back the
+sessions minted with it. No login, no account, no personal data, and it does not
+leak across a NAT because it was never about the address.
+
+That also fixes the eviction problem properly rather than working around it: if
+the browser loses the secret, the recordings become unreachable and expire on
+their own — which is the correct behaviour for an anonymous six-hour locker, and
+is exactly what "we cannot tell it was you" should mean. It is a smaller, harder
+thing to lose than a list of urls, and losing it fails CLOSED.
+
+**Asserts it needs**, because this is the endpoint where a mistake is a leak:
+
+- a caller with no client secret gets an EMPTY list, never "everything from this
+  address";
+- a caller with someone else's session id in hand still cannot list;
+- two clients from ONE address see disjoint lists — the NAT case, asserted
+  directly rather than reasoned about;
+- an expired session is absent from `/mine` before the sweep has run, so the
+  list never advertises a file that is about to 404;
+- the trusted tier lists across addresses, and the open tier never does.
+
+**What it does NOT become.** A listing is not a catalogue. A real archive wants
+titles, times, relations and provenance — a database, and one that outlives a
+bucket. `/mine` is the machine-readable "what did I just put here", which is a
+different and much smaller job. Do not grow it into the other one; that is
+`plan-timeline`'s territory and it has different laws.
+
+### The bucket CAN be renamed after all, and `-test` is why it should be
+
+`HANDOFF.md` says R2 buckets cannot be renamed. True, and it does not follow
+that the name is stuck: **`archive.positron.studio` is a custom domain on the
+bucket**, so public identity is already independent of it. A rename is
+create-copy-repoint-delete, and it is small — measured 2026-09-08:
+**607 objects, 372 MB**.
+
+Do it for the right reason. `elektron-` costs nothing: nobody types a bucket
+name, and the public URL is already correct. **`-test` is the hazard** — 372 MB
+of real show recordings in a bucket named as though it were scratch is one
+confident cleanup away from gone.
+
+Order matters, and one step is not reversible:
+
+1. create `positron-archive`;
+2. **stop writes first** — the three workers that bind `ARCHIVE` (`ingest`,
+   `selfrec`, `instrument`) — or anything written during the copy is lost;
+3. copy all 607 objects and verify the count and total bytes match;
+4. re-point the `archive.positron.studio` custom domain;
+5. update the three bindings and the two `proto/archive` scripts, redeploy;
+6. delete the old bucket **last**, and only after reading from the new one works.
+
+Note what breaks and decide deliberately: the `pub-b8d50fdb….r2.dev` URL is
+bucket-bound and was kept alive on purpose through the 2026-09-04 move. A new
+bucket gets a new one. Nothing in the repo should be relying on it, and that is
+worth grepping rather than assuming.
+
+---
+
 ## 5. Phases
 
 **P1 — merge, behind the existing hostname.** Add tiers to `positron-ingest`,
