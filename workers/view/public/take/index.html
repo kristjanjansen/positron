@@ -443,10 +443,42 @@
     part.url = URL.createObjectURL(new Blob(part.blobs, { type: part.mime }));
 
     const v = el('video', '', null, { playsinline: '', muted: '' });
-    v.muted = true; v.hidden = true; v.src = part.url;
+    v.muted = true; v.hidden = true;
+
+    // ARM BEFORE THE SOURCE, which is the case `armVideo` was written for: with
+    // no `src` its `play()` REJECTS, and the rejection is the point — the user
+    // activation is consumed so a later `play()` is allowed, and nothing starts.
+    //
+    // Arming AFTER `src` was set did start it. Nothing showed, because the
+    // element is hidden and muted, which is what made this hard to see: what
+    // happened instead was that `media-master` saw a rolling master, L1 says the
+    // picture is ground truth and the vector bends to IT, and the PAUSED deck
+    // was handed a moving vector. The playhead then advanced at 1x with every
+    // element paused, and snapped back when `tick` sorted it out. That is the
+    // cursor "moving a bit and then resetting" — reported twice, and it was
+    // never the axis rescale I fixed the first time.
+    armVideo(v);
+    v.autoplay = false;          // and it must not start when the source lands
+    v.src = part.url;
     seq.append(v);
     part.video = v;
-    armVideo(v);
+    // ARMED, NOT RUNNING.
+    //
+    // `armVideo` exists to consume the user activation so a LATER `play()` is
+    // allowed, and its own comment says "the point is to consume the
+    // activation, not to start anything". That holds for an element with no
+    // source. This one has a `src` already, so `play()` genuinely starts it.
+    //
+    // Nothing shows — it is hidden and muted — and that is what made this hard
+    // to see. What happens instead: `tick` hands the picture over to the new
+    // take, `media-master` L1 says a playing element is ground truth and the
+    // vector bends to IT, and so the PAUSED deck gets dragged forward at 1x
+    // behind an element nobody asked to play. `tick` pauses it a few frames
+    // later and the position snaps back. That is the playhead "moving a bit and
+    // then resetting" — reported twice, and it was never the axis rescale I
+    // fixed the first time.
+    v.autoplay = false;
+    v.pause();
     v.addEventListener('seeked', () => onSeeked(part));
 
     part.fileMs = await resolveDuration(v);
