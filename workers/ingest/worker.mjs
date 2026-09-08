@@ -35,7 +35,21 @@ const PREFIX = 'demo/ingest';
 
 /** Every cap in one place, and served at /limits so the page can display them. */
 const LIMITS = {
-  maxSegmentBytes: 2 * 1024 * 1024,      // one segment
+  // ONE OBJECT MAY BE A WHOLE SESSION.
+  //
+  // This was 2 MiB, sized for one 4-second segment, which was right while every
+  // caller sliced. `keep` stores a whole take as a single object — slicing an
+  // eight-second recording buys nothing and costs the dense-sequence fragility
+  // — and against that a 2 MiB per-object cap is not a size limit, it is a
+  // silent limit on how long a take may be (~18 s at 900 kbps), enforced in the
+  // wrong place and reported as "segment too large".
+  //
+  // Raising it to the session cap changes NO abuse bound: an address is still
+  // held to 5 sessions and 64 MiB an hour, and a session to 24 MiB. Those are
+  // the guards; this was a shape.
+  //
+  // R2 itself would take ~5 GiB in one PUT. Nothing here is a platform limit.
+  maxSegmentBytes: 24 * 1024 * 1024,      // one object, up to a whole session
   maxSegments: 45,                        // ~3 min at 4 s segments
   maxSessionBytes: 24 * 1024 * 1024,      // one session
   maxSessionsPerHour: 5,                  // per address
