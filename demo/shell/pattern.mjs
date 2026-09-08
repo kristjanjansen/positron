@@ -52,6 +52,7 @@ export const PAD = 60;
  * deliberately left alone. So "byte-identical everywhere" is no longer true and
  * this comment says so rather than letting the next reader assume it.
  */
+export const FRAME_W = 1280;
 export const FRAME_H = 720;
 export const ROW = {
   NBLOCKS: 56, BLOCK_W: 20, H: 56,
@@ -288,6 +289,42 @@ export function burn(ctx, w, h, frame, opts = {}) {
   ctx.fillStyle = `hsl(${hue} 85% 55%)`;
   ctx.fillRect(((ms % SWEEP_MS) / SWEEP_MS) * (w - SQ), 430, SQ, SQ);
   return ms;
+}
+
+/**
+ * Read the burned clock off a playing or paused <video>.
+ *
+ * `readBurned` samples FIXED coordinates, so the frame has to be drawn at its
+ * NATURAL size — scaling it into 1280x720 reads the row at the wrong pixels and
+ * returns null on every frame, which is indistinguishable from "there is no
+ * row". `moq.mjs` reads a `VideoFrame` through WebCodecs; this is the element
+ * path, and it is the only other way in.
+ *
+ * Returns null if the element has no frame yet, or if the checksum disagrees —
+ * which is the honest answer after an encode, a network and a decode.
+ */
+export function readBurnedFrom(video, scratch) {
+  const w = video.videoWidth, h = video.videoHeight;
+  if (!w || !h) return null;
+  // NORMALISE BACK ONTO THE 1280 GRID. `readBurned` samples fixed coordinates,
+  // and a delivered frame is very often NOT 1280 wide: Cloudflare chooses the
+  // WHEP resolution and ramps it — measured 640x360, then 960x540, then
+  // 1280x720 over the first half-minute of a subscription. At 640 the blocks
+  // are 10 px and every sample lands in the wrong place, so the row reads as
+  // absent when it is merely small (0 clean frames of 85 at 960x540).
+  //
+  // Scaling is safe HERE and only here, because the aspect is unchanged: the
+  // row keeps its relative position, and a block is a solid rectangle whose
+  // centre survives resampling. Scaling a differently-shaped source would not
+  // be safe, which is what the camera path had to learn separately.
+  const c = scratch || document.createElement('canvas');
+  const sameShape = Math.abs(w / h - FRAME_W / FRAME_H) < 0.01;
+  const cw = sameShape ? FRAME_W : w, chh = sameShape ? FRAME_H : h;
+  if (c.width !== cw || c.height !== chh) { c.width = cw; c.height = chh; }
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;      // keep block edges hard
+  ctx.drawImage(video, 0, 0, cw, chh);
+  return readBurned(ctx);
 }
 
 /** Read the burned clock back. Returns null unless the checksum agrees. */

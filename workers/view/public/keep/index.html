@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* side by side, stacked when there is no room: the two pictures are the
+     comparison, and a column puts one off the screen while you look at the other */
+  .stage { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+           gap: 10px; margin: 0 0 10px; align-items: start; }
+  .stage figure { margin: 0; width: 100%; }
+  .stage canvas { display: block; width: 100%; background: var(--card);
+                  border: 1px solid var(--line); border-radius: 4px; }
+  .seq { position: relative; width: 100%; aspect-ratio: 16 / 9; }
+  .seq video { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+
+<script type="module">
+  import { mount, guard, el, armVideo, recorderMime } from '/shell/shell.mjs';
+  import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
+  import { burn, readBurnedFrom, videoHue, FRAME_H } from '/shell/pattern.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  const W = 1280, H = FRAME_H;
+  const CAP_MS = 8000;      // a take is capped, so a forgotten one cannot grow
+  const SLICE_MS = 500;
+  const FPS = 25, FRAME_MS = 1000 / FPS;
+
+  const d = mount({
+    name: 'keep',
+    what: 'The picture you send goes out to a server and comes back, and what you '
+      + 'record is the copy that came back. Press record twice and the takes lie '
+      + 'end to end on one line that plays and scrubs as one. Every frame carries '
+      + 'a clock written into the pixels BEFORE it left, so dragging the line and '
+      + 'watching that clock move by the same amount is proof the seek landed — a '
+      + 'number this page cannot fake, because it was written before the round '
+      + 'trip. LEG is how far the picture travelled to get back.',
+    readout: { leg: 'ms', takes: '', line: 's', clean: '', drift: 'ms' },
+    showReadout: false,
+    controls: [{ id: 'go', label: 'Send and receive', primary: true }],
+  });
+  guard(d);
+
+  const ink = (h, s, l, a = 1) => `hsl(${h} ${s}% ${l}% / ${a})`;
+
+  // ── the source: our own picture, published out ────────────────────────────
+  const stage = el('div', 'stage');
+  const srcFig = el('figure');
+  const canvas = el('canvas');
+  canvas.width = W; canvas.height = H;
+  const g = canvas.getContext('2d');
+  srcFig.append(canvas, el('figcaption', 'd-cap', 'sent'));
+
+  const seqFig = el('figure');
+  const seq = el('div', 'seq');
+  const live = el('video', '', null, { playsinline: '', muted: '' });
+  live.muted = true;
+  seq.append(live);
+  const seqCap = el('figcaption', 'd-cap', 'received');
+  seqFig.append(seq, seqCap);
+  stage.append(srcFig, seqFig);
+  d.el.append(stage);
+
+  let frame = 0;
+  setInterval(() => { burn(g, W, H, frame++, { hue: videoHue(parts.length) }); }, 40);
+
+  // ── the line ──────────────────────────────────────────────────────────────
+  const parts = [];      // { n, hue, mime, blobs[], bytes, lenMs, startMs, video, e0 }
+  let totalMs = 0, recording = null, landing = null, active = null;
+  const deck = createDeck({ items: [], adapters: {}, range: [0, CAP_MS] });
+
+  const inFlight = () => {
+    const r = recording;
+    if (!r) return null;
+    return { ...r.part, lenMs: Math.min(CAP_MS, performance.now() - r.t0) };
+  };
+  const shown = () => { const l = inFlight() || landing; return l ? parts.concat([l]) : parts; };
+  const partAt = (pos) => parts.find((p) => pos >= p.startMs && pos < p.startMs + p.lenMs);
+  const localOf = (p, ms) => Math.max(0, Math.min((p.lenMs ?? 0) - 40, ms - p.startMs)) / 1000;
+
+  // ── the round trip ────────────────────────────────────────────────────────
+  let pub = null, sub = null, legs = [], scratch = document.createElement('canvas');
+
+  d.on('go', async () => {
+    if (pub) { d.log('already sending'); return; }
+    try {
+      pub = await whipPublish(canvas.captureStream(FPS), { log: (m, k) => d.log(m, k) });
+    } catch (e) { d.log(`send failed: ${e.message}`, 'bad'); return; }
+    try {
+      sub = await whepPlay(whep(), live, { log: (m, k) => d.log(m, k) });
+    } catch (e) { d.log(`receive failed: ${e.message}`, 'bad'); return; }
+    armVideo(live);
+    // Wait for a frame to actually arrive rather than for a promise to settle:
+    // a WHEP track exists before it carries anything.
+    for (let i = 0; i < 120 && !live.videoWidth; i++) await new Promise((r) => setTimeout(r, 250));
+    d.log(live.videoWidth ? `receiving ${live.videoWidth}x${live.videoHeight}` : 'no picture arrived', live.videoWidth ? 'hi' : 'bad');
+    legSampler();
+  });
+
+  /**
+   * HOW FAR THE PICTURE TRAVELLED, on one clock.
+   *
+   * The number in the received frame was written by THIS machine before the
+   * picture left, so `now - burned` is the whole round trip — out to Cloudflare
+   * and back — with no cross-machine offset to guess at. That is the one thing
+   * a browser publisher buys that an ffmpeg one cannot: the same clock at both
+   * ends.
+   */
+  function legSampler() {
+    setInterval(() => {
+      if (!live.videoWidth) return;
+      const e = readBurnedFrom(live, scratch);
+      if (e === null) { unreadable++; return; }
+      readable++;
+      const ms = Date.now() - e;
+      if (ms > 0 && ms < 10000) legs.push(ms);
+      if (legs.length > 200) legs = legs.slice(-200);
+      d.set('leg', Math.round(median(legs)));
+      d.set('clean', `${readable}/${readable + unreadable}`);
+    }, 200);
+  }
+  let readable = 0, unreadable = 0;
+  const median = (a) => { if (!a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+
+  // ── recording the RECEIVED picture ────────────────────────────────────────
+  function startRecording() {
+    if (recording || !sub) { if (!sub) d.log('nothing to record yet — press Send and receive', 'bad'); return; }
+    const mime = recorderMime(d);
+    if (!mime) return;
+    // THE RECEIVER'S TRACK, not the source. `sub.inbound` is the stream this
+    // page assembled out of `pc.ontrack`; recording `canvas.captureStream()`
+    // here would archive a picture that never crossed the wire.
+    // VIDEO ONLY, and this is not a preference.
+    //
+    // Cloudflare REFUSES a single-track WHEP offer, so the subscription asks for
+    // audio as well and gets an audio track. Our publisher is a canvas, which
+    // has no audio, so that track is live and forever silent — and a
+    // MediaRecorder handed a track that never produces a sample sits waiting for
+    // it and writes NOTHING. First run of this page recorded 0 bytes in 4 s for
+    // exactly that reason, with no error to show for it.
+    const vTracks = sub.inbound.getVideoTracks();
+    if (!vTracks.length) { d.log('no video track to record', 'bad'); return; }
+    const rec = new MediaRecorder(new MediaStream(vTracks),
+      { mimeType: mime, videoBitsPerSecond: 900_000 });
+    rec.onerror = (ev) => d.log(`recorder: ${ev.error?.name ?? 'error'}`, 'bad');
+    const part = { n: parts.length + 1, hue: videoHue(parts.length), mime,
+                   blobs: [], chunks: [], bytes: 0, startMs: totalMs, lenMs: null, video: null };
+    const t0 = performance.now();
+    let lastAt = 0;
+    rec.ondataavailable = (e) => {
+      if (!e.data || !e.data.size) return;
+      const at = performance.now() - t0;
+      part.chunks.push({ at, size: e.data.size, gapMs: part.chunks.length ? at - lastAt : at });
+      lastAt = at;
+      part.blobs.push(e.data);
+      part.bytes += e.data.size;
+      paint();
+    };
+    rec.onstop = async () => {
+      landing = { ...part, lenMs: Math.round(performance.now() - t0) };
+      recording = null;
+      setRecUI(false);
+      view.strip.state.wallAnchor = null;
+      deck.setRange([0, Math.round(totalMs + landing.lenMs)]);
+      await new Promise((r) => setTimeout(r, 250));
+      await landPart(part);
+      landing = null;
+      runChecks();
+    };
+    recording = { rec, part, t0 };
+    rec.start(SLICE_MS);
+    setRecUI(true);
+    view.strip.armWall(part.startMs);
+    d.log(`take ${part.n}: recording what came back · ${CAP_MS / 1000}s cap`, 'hi');
+    recording.capTimer = setTimeout(() => {
+      if (recording?.rec === rec) { d.log(`take ${part.n}: hit the cap`); stopRecording(); }
+    }, CAP_MS);
+  }
+  function stopRecording() {
+    if (!recording) return;
+    clearTimeout(recording.capTimer);
+    try { recording.rec.stop(); } catch { /* already */ }
+  }
+  function setRecUI(on) {
+    const b = bar.extra('rec');
+    if (!b) return;
+    b.dataset.on = on ? '1' : '';
+    b.textContent = on ? '\u25A0' : '\u25CF';
+    b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+  }
+
+  async function resolveDuration(video) {
+    await new Promise((res) => {
+      video.addEventListener('loadedmetadata', res, { once: true });
+      setTimeout(res, 4000);
+    });
+    if (!Number.isFinite(video.duration)) {
+      video.currentTime = 1e6;
+      await new Promise((res) => {
+        const on = () => { if (Number.isFinite(video.duration)) { video.removeEventListener('timeupdate', on); res(); } };
+        video.addEventListener('timeupdate', on);
+        setTimeout(res, 3000);
+      });
+      video.currentTime = 0;
+    }
+    return Number.isFinite(video.duration) ? video.duration * 1000 : null;
+  }
+
+  async function landPart(part) {
+    if (!part.blobs.length) { d.log(`take ${part.n}: nothing recorded`, 'bad'); return; }
+    part.url = URL.createObjectURL(new Blob(part.blobs, { type: part.mime }));
+    const v = el('video', '', null, { playsinline: '', muted: '' });
+    v.muted = true; v.hidden = true;
+    // armed BEFORE the source: with no src, play() rejects and the activation is
+    // consumed without starting anything. Arming after would start it, and a
+    // rolling element drags the paused deck along behind it (media-master L1).
+    armVideo(v);
+    v.autoplay = false;
+    v.src = part.url;
+    seq.append(v);
+    part.video = v;
+    v.addEventListener('seeked', () => {
+      if (queuedSeek && queuedSeek.p === part) {
+        const q = queuedSeek; queuedSeek = null;
+        part.video.currentTime = q.want;
+      }
+    });
+
+    part.lenMs = Math.round((await resolveDuration(v)) ?? (performance.now()));
+    if (part.startMs !== totalMs) part.startMs = totalMs;
+    totalMs += part.lenMs;
+    parts.push(part);
+    deck.setRange([0, Math.round(totalMs)]);
+    if (!active) handOver(part, 0);
+    if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); tick(); })(); }
+    paint();
+    d.log(`take ${part.n} landed: ${(part.lenMs / 1000).toFixed(2)}s at ${(part.startMs / 1000).toFixed(2)}s`, 'hi');
+  }
+
+  // ── one picture under the playhead at a time ──────────────────────────────
+  // The master is a FUNCTION that says which element is the clock right now.
+  // `autoPlayPause: false` because a take ending here is a handover, not a stop.
+  const mm = mediaMaster(deck, () => {
+    const p = active;
+    if (!p || !p.video) return null;
+    return { el: p.video, pos: p.startMs + p.video.currentTime * 1000, key: `take${p.n}` };
+  }, {
+    autoPlayPause: false,
+    onEvent: (e) => d.log(`clock: ${e.reason}${e.key ? ` \u00b7 ${e.key}` : ''}`),
+  });
+  let rafOn = false, handovers = [];
+  function handOver(p, pos) {
+    const from = active;
+    if (from && from.video) { from.video.pause(); from.video.hidden = true; }
+    active = p;
+    p.video.hidden = false;
+    live.hidden = true;
+    const want = localOf(p, pos);
+    if (Math.abs(p.video.currentTime - want) > 0.08) p.video.currentTime = want;
+    mm.release('handover');          // a clean re-acquire on the new key
+    handovers.push(`${from ? from.n : '\u00b7'}\u2192${p.n}@${Math.round(pos)}`);
+  }
+  // EVERY SEEK IS A COMMAND TO THE ELEMENT. `deck.seek()` alone does nothing
+  // visible with a media master attached: L1 means mediaMaster reads the
+  // picture, sees the vector has wandered and pulls it straight back. Without
+  // this mirror the clock check read the SAME frame twice and reported
+  // "playhead +2161 ms, picture +0 ms" — a page seeking itself and watching
+  // nothing happen. `inServo` keeps L2's own corrective seek from chasing its
+  // tail.
+  let inServo = false, queuedSeek = null;
+  deck.transport.onState((st) => {
+    if (st.reason !== 'seek' || inServo || !parts.length) return;
+    const pos = st.p0;
+    const p = partAt(pos);
+    if (!p) return;
+    if (p !== active) handOver(p, pos);
+    const want = localOf(p, pos);
+    // one seek in flight, latest wins — a drag fires one per pointermove, and
+    // queuing them walks the picture through every position the finger passed
+    if (p.video.seeking) { queuedSeek = { p, want }; return; }
+    queuedSeek = null;
+    p.video.currentTime = want;
+  });
+
+  function tick() {
+    if (!parts.length) return;
+    const playing = deck.playing();
+    let pos = deck.position();
+    if (active && active.video.ended) {
+      const next = parts[parts.indexOf(active) + 1];
+      if (next) pos = next.startMs;
+      else if (playing) { deck.pause(); d.log('the line ran out'); }
+    }
+    const want = partAt(pos);
+    if (want && want !== active) handOver(want, pos);
+    if (active && active.video) {
+      if (playing && active.video.paused && !active.video.ended) active.video.play().catch(() => {});
+      if (!playing && !active.video.paused) active.video.pause();
+    }
+    inServo = true;
+    try { mm.tick(); } finally { inServo = false; }
+  }
+
+  // ── the picture of the line ───────────────────────────────────────────────
+  const takeLane = {
+    id: 'parts', kind: 'part', label: 'takes', height: 52, barPad: 8,
+    as: 'spans', stack: false, barGap: 3, terse: true, alpha: 0.9, spanLine: false,
+    colorOf: (sp) => ink(sp.row?.payload?.hue ?? 210, 62, 68),
+    labelOf: (sp, { bw }) => {
+      const p = sp.row?.payload || {};
+      return bw > 110 ? `take ${p.n} \u00b7 ${(p.lenMs / 1000).toFixed(2)}s` : `${p.n}`;
+    },
+    rows: () => shown().map((p) => ({
+      at: p.startMs, id: `take${p.n}`, kind: 'part',
+      payload: { durMs: p.lenMs, n: p.n, hue: p.hue, lenMs: p.lenMs, kib: Math.round(p.bytes / 1024) },
+    })),
+    describeRow: (r) => [`${r.payload.kib} KiB`, `${(r.payload.lenMs / 1000).toFixed(2)}s of the line`],
+  };
+  const sliceLane = {
+    id: 'chunks', kind: 'chunk', label: 'slices', height: 40, width: 2,
+    as: 'ticks', color: '#8fd6a8', terse: true,
+    rows: () => shown().flatMap((p) => p.chunks.map((c, i) => ({
+      at: p.startMs + c.at, id: `p${p.n}c${i}`, kind: 'chunk', payload: { n: p.n, ...c },
+    }))),
+    describeRow: (r) => {
+      const off = r.payload.gapMs - SLICE_MS;
+      return [`take ${r.payload.n} \u00b7 ${Math.round(r.payload.size / 1024)} KiB`,
+              `${off >= 0 ? '+' : ''}${off.toFixed(0)} ms off the ${SLICE_MS} ms slice`];
+    },
+  };
+
+  const bar = createTransportBar(d.el, deck, {
+    scrub: false,
+    extras: [{ id: 'rec', label: '\u25CF', aria: 'Record', primary: true,
+               title: `stop when you like \u2014 ${CAP_MS / 1000}s cap`,
+               onClick: () => (recording ? stopRecording() : startRecording()) }],
+  });
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, armWall: false, gutter: 150, wallStyle: 'head',
+    lanes: [takeLane, sliceLane],
+  });
+
+  function paint() {
+    d.set('takes', shown().length || null);
+    d.set('line', totalMs ? (totalMs / 1000).toFixed(2) : null);
+    const L = view.strip.lanes();
+    const C = L.find((l) => l.id === 'chunks');
+    const offs = shown().flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
+    if (C) C.subLabel = offs.length
+      ? [`${offs.length + shown().length} slices, ${median(offs).toFixed(0)} ms typ`,
+         `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
+      : null;
+    view.strip.invalidate();
+  }
+  setInterval(() => { if (recording) { paint(); view.strip.invalidate(); } }, 40);
+
+  // ── the checks ────────────────────────────────────────────────────────────
+  let asserted = false, didClock = false;
+  async function runChecks() {
+    if (!asserted) {
+      asserted = true;
+      d.assert('the picture went out and came back', !!pub && !!sub && live.videoWidth > 0,
+        live.videoWidth ? `${live.videoWidth}x${live.videoHeight}` : 'no frame');
+      d.assert('what was recorded is the RECEIVED track, not the source',
+        !!recording || parts.length > 0
+          ? sub.pc.getReceivers().some((r) => r.track && sub.inbound.getTracks().includes(r.track))
+          : false,
+        'by object identity against getReceivers()');
+      d.assert('the round trip is a real number, not a guess', legs.length > 0 && median(legs) > 0,
+        legs.length ? `${Math.round(median(legs))} ms, n=${legs.length}` : 'nothing read');
+      // THE ROW NEEDS FULL RESOLUTION. Cloudflare delivers WHEP at a size it
+      // chooses and RAMPS it up — measured here 640x360, then 960x540, then
+      // 1280x720 over the first half-minute. The row is drawn on a 1280 grid,
+      // so while the picture is smaller its blocks are scaled and unreadable:
+      // 0 clean frames at 640, 66 of 163 once it had climbed. That is a real
+      // property of this path, not a fault, and the count says which state the
+      // page was in rather than hiding it.
+      d.assert('the clock survived the round trip', readable > 0,
+        `${readable} clean of ${readable + unreadable} read, now ${live.videoWidth}x${live.videoHeight}`);
+      d.assert('the format was negotiated, not assumed', !!parts[0]?.mime, parts[0]?.mime || '\u2014');
+      d.assert('the take is seekable \u2014 a finite range, not Infinity',
+        Number.isFinite(deck.durationMs) && deck.durationMs > 0, `${deck.durationMs} ms`);
+    }
+    if (parts.length >= 2 && !didClock) { didClock = true; await clockChecks(); }
+    else if (parts.length < 2) {
+      d.log(`${parts.length} take on the line \u2014 the clock check needs a second one. Press record again.`);
+    }
+  }
+
+  /**
+   * THE CHECK THIS PAGE EXISTS FOR.
+   *
+   * `take` proves a seek landed by burning the position into a picture it draws
+   * itself, which is a page checking its own arithmetic. Here the number was
+   * written BEFORE the picture crossed a real network and two encoders, and the
+   * receiving side cannot fake it. So: seek to two positions, read the clock out
+   * of the pixels at each, and assert it advanced by as much as the playhead did.
+   */
+  async function clockChecks() {
+    d.assert('takes are laid end to end \u2014 no gap, no overlap',
+      parts.every((p, i) => (i === 0 ? p.startMs === 0 : p.startMs === parts[i - 1].startMs + parts[i - 1].lenMs)),
+      parts.map((p) => `${p.n}@${p.startMs}+${p.lenMs}`).join(' '));
+    d.assert('exactly one take is under the playhead',
+      parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
+      `at ${Math.round(deck.position())} ms`);
+
+    const readAt = async (pos) => {
+      deck.seek(pos);
+      await new Promise((r) => setTimeout(r, 700));
+      const p = partAt(pos);
+      return p ? readBurnedFrom(p.video, scratch) : null;
+    };
+    // BOTH PROBES INSIDE ONE TAKE. Across two takes this measures something
+    // else entirely and I had it wrong first: the burned clock is wall time, and
+    // the line BUTTS TAKES TOGETHER — the seconds between pressing stop and
+    // pressing record again are discarded by the line but not by the pixels. The
+    // first run read "playhead +3936 ms, picture +11118 ms": a 7.2 s gap
+    // faithfully recorded and correctly thrown away. Within one take there is no
+    // gap to confuse it with, so the comparison is clean.
+    const long = parts.reduce((a, b) => (b.lenMs > a.lenMs ? b : a));
+    const p1 = Math.round(long.startMs + long.lenMs * 0.2);
+    const p2 = Math.round(long.startMs + long.lenMs * 0.75);
+    const e1 = await readAt(p1), e2 = await readAt(p2);
+    if (e1 === null || e2 === null) {
+      d.assert('the clock in the picture moved with the playhead', false,
+        `could not read the row back at ${e1 === null ? p1 : p2} ms`);
+      return;
+    }
+    const err = (e2 - e1) - (p2 - p1);
+    d.set('drift', Math.round(err));
+    d.assert('the clock in the picture moved with the playhead',
+      Math.abs(err) <= FRAME_MS * 3,
+      `playhead +${p2 - p1} ms, picture +${e2 - e1} ms, ${err >= 0 ? '+' : ''}${Math.round(err)} ms apart`);
+
+    // AND THE GAP THE LINE THREW AWAY IS STILL IN THE PIXELS. Reading the last
+    // frame of one take against the first of the next recovers the wall-clock
+    // pause between them — the thing an end-to-end line cannot show. Reported,
+    // not asserted: it depends on how long a person waited.
+    if (parts.length >= 2) {
+      const endOf1 = await readAt(Math.round(parts[0].startMs + parts[0].lenMs - 200));
+      const startOf2 = await readAt(Math.round(parts[1].startMs + 120));
+      if (endOf1 !== null && startOf2 !== null) {
+        d.log(`the pause between take 1 and take 2 was ${((startOf2 - endOf1) / 1000).toFixed(2)}s `
+          + `— the line does not show it, the pixels still do`, 'hi');
+      }
+    }
+  }
+
+  d.ready();
+</script>
+</html>
