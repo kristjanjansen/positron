@@ -15,6 +15,11 @@
      The box keeps its size so the line below never moves; only the furniture
      goes. */
   .film[data-empty="1"] { background: var(--card); }
+  .wireless { width: 100%; max-width: 440px; display: block; margin: 0 0 6px; }
+  /* `display: block` beats the UA sheet's `[hidden] { display: none }`, so
+     without this the audio player sits under every film showing 0:00 / 0:00.
+     The same trap cost the `video` rule an extra line in shell.css. */
+  .wireless[hidden] { display: none; }
   /* THE DESCRIPTION IS BOUNDED. ERR's leads run from one line to a dozen, and a
      block that grows with its contents pushes the line down the page by a
      different amount for every film. Five lines here, more where there is room,
@@ -92,11 +97,16 @@
   // same size before and after; only its contents change.
   const film = el('video', 'film', null, { playsinline: '' });
   film.dataset.empty = '1';
+  // RADIO GETS ITS OWN PLAYER. An audio-only stream in a <video> is a black
+  // rectangle pretending to be a picture; the honest control for sound is an
+  // <audio>. Only one of the two is ever shown.
+  const wireless = el('audio', 'wireless', null, { controls: '' });
+  wireless.hidden = true;
   const picked = el('div', 'picked');
   const pickedTitle = el('div', 'ptitle', '');
   const pickedLead = el('div', 'plead');
   picked.append(pickedTitle, pickedLead);
-  d.el.append(film, picked);
+  d.el.append(film, wireless, picked);
 
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -107,7 +117,7 @@
   // leftovers bin rather than a lane. `AK filmikroonika` alone is a series: one
   // newsreel, weekly, for a year.
   const SERIES = 'AK filmikroonika 1958-1991';
-  let items = [], current = null, hls = null;
+  let items = [], radio = [], current = null, hls = null;
 
   // A CLIP IS AS WIDE AS IT IS LONG.
   //
@@ -124,7 +134,7 @@
   // Two films have no shot list. They draw at the median rather than at zero —
   // and their tooltip says the length is unknown, because a bar you can see is
   // not a number you can trust.
-  let MEDIAN_MS = 132000;   // replaced once the fixture is in
+  let MEDIAN_MS = 132000, sharedDays = 0;   // replaced once the fixture is in
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
@@ -133,11 +143,13 @@
     // back, so the lane reads as one family and still says which film is up.
     // Nothing here is a quality signal — the archive does not tell us how a
     // 1965 broadcast went — so colour carries identity only, and says so.
-    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug
-      ? '#ffd400'
-      : 'hsl(50 62% 40%)'),
+    // Yellow for both, because both are ours to show — but radio is a colder
+    // yellow so the two lanes read as different KINDS of thing at a glance,
+    // without either becoming a quality signal. Nothing here is measured.
+    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug ? '#ffd400'
+      : id === 'radio' ? 'hsl(38 55% 38%)' : 'hsl(50 62% 40%)'),
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
-    rows: () => items.map((it) => ({
+    rows: () => (id === 'radio' ? radio : items).map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
       payload: { durMs: it.playedMs ?? it.catalogueMs ?? MEDIAN_MS, ...it },
     })),
@@ -145,8 +157,9 @@
       const p = r.payload;
       const len = p.playedMs ? `${(p.playedMs / 60000).toFixed(1)} min, measured`
         : p.catalogueMs ? `${(p.catalogueMs / 60000).toFixed(1)} min, per the shot list`
-        : 'length unknown';
-      return [p.title?.slice(0, 46) ?? '', `${p.date} · ${len}`, 'the hour it went out is not recorded'];
+        : 'length unknown until played';
+      return [p.title?.slice(0, 46) ?? '', `${p.date} · ${len}`,
+              p.kind === 'audio' ? 'radio — this one has sound' : 'silent film'];
     },
   });
 
@@ -156,11 +169,14 @@
   // so they belong on the bar rather than beside the page, which is what
   // `extras` exists for.
   const step = (by) => {
-    if (!items.length) return;
-    const i = current ? items.indexOf(current) : -1;
-    const next = items[Math.max(0, Math.min(items.length - 1, i + by))];
+    // Step within the lane you are in: pressing next while listening to radio
+    // should hand you the next broadcast, not the next silent newsreel.
+    const list = current?.kind === 'audio' ? radio : items;
+    if (!list.length) return;
+    const i = current ? list.indexOf(current) : -1;
+    const next = list[Math.max(0, Math.min(list.length - 1, i + by))];
     if (next && next !== current) play(next);
-    else if (!current) play(items[0]);
+    else if (!current) play(list[0]);
   };
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
@@ -180,7 +196,11 @@
     // is 2001-09-09 — every date before that, and every negative one, fails it,
     // so 1965 would print as a duration instead of a date.
     absolute: true,
-    lanes: [laneFor('ak', 'newsreels')],
+    // TWO LANES, ONE DAY. Both are positioned by the date they went out, so a
+    // newsreel and a radio programme from the same day sit at the same place —
+    // which is the thing neither archive's own interface can show you, and the
+    // reason to put them on a line at all.
+    lanes: [laneFor('ak', 'newsreels'), laneFor('radio', 'radio')],
   });
 
   function gutters() {
@@ -218,7 +238,7 @@
     // Calling `play()` synchronously inside the gesture marks the element as
     // user-activated even though it rejects for having no source yet. That
     // rejection IS the mechanism, not a failure.
-    film.play().catch(() => {});
+    (it.kind === 'audio' ? wireless : film).play().catch(() => {});
 
     current = it;
     d.set('picked', it.date);
@@ -243,9 +263,15 @@
     pickedLead.scrollTop = 0;
     view.strip.invalidate();
 
+    const isRadio = it.kind === 'audio';
+    film.hidden = isRadio;
+    wireless.hidden = !isRadio;
+    if (isRadio) { film.pause(); if (hls) { hls.destroy(); hls = null; } }
+    else wireless.pause();
+
     let media;
     try {
-      const r = await fetch(`${ARHIIV}/api/v1/content/video/${encodeURIComponent(it.slug)}`);
+      const r = await fetch(`${ARHIIV}/api/v1/content/${isRadio ? 'audio' : 'video'}/${encodeURIComponent(it.slug)}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       media = await r.json();
     } catch (e) {
@@ -260,6 +286,27 @@
     // depending on where it runs, which is the kind of difference that is
     // invisible until it is a mixed-content block. Pin it.
     const src = raw.startsWith('//') ? `https:${raw}` : raw;
+    if (isRadio) {
+      // Audio HLS plays natively in far more places than video HLS does, and
+      // hls.js drives an <audio> element just as well where it does not.
+      if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) {
+        wireless.src = src;
+      } else {
+        hls = window.__hls = new window.Hls({ enableWorker: true });
+        hls.loadSource(src);
+        hls.attachMedia(wireless);
+      }
+      wireless.muted = false;
+      try { await wireless.play(); } catch { /* the element has its own control */ }
+      d.log(`playing ${it.slug} — radio, and this one has sound`, 'hi');
+      wireless.addEventListener('loadedmetadata', () => {
+        if (!Number.isFinite(wireless.duration)) return;
+        it.playedMs = Math.round(wireless.duration * 1000);
+        gutters();
+      }, { once: true });
+      return;
+    }
+
     delete film.dataset.empty;
     film.controls = true;
     if (hls) { hls.destroy(); hls = null; }
@@ -352,14 +399,17 @@
   view.strip.canvas.addEventListener('pointerup', () => {
     const h = view.strip.state?.hover;
     const slug = h?.row?.payload?.slug;
-    const it = slug && items.find((x) => x.slug === slug);
+    const it = slug && (items.find((x) => x.slug === slug) || radio.find((x) => x.slug === slug));
     if (it) play(it);
   });
 
   // ── load the year ─────────────────────────────────────────────────────────
   (async () => {
     const fx = await (await fetch('/reel/1965.json')).json();
-    items = fx.items.filter((i) => i.series === SERIES);
+    items = fx.items.filter((i) => i.kind === 'video' && i.series === SERIES);
+    radio = fx.items.filter((i) => i.kind === 'audio');
+    const days = new Set(items.map((i) => i.date));
+    sharedDays = radio.filter((r) => days.has(r.date)).length;
     const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
     if (known.length) MEDIAN_MS = known[known.length >> 1];
     d.set('films', items.length);

@@ -15,7 +15,7 @@
 //
 //   node demo/reel/build-fixture.mjs
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const CACHE = 'proto/megatimeline/search-cache.jsonl';
 const OUT = 'demo/reel/1965.json';
@@ -24,15 +24,22 @@ const rows = [];
 for (const line of readFileSync(CACHE, 'utf8').trim().split('\n')) {
   let rec; try { rec = JSON.parse(line); } catch { continue; }
   const key = JSON.parse(rec.key);
-  if (key.type !== 'video') continue;
+  if (key.type !== 'video' && key.type !== 'audio') continue;
   const list = JSON.parse(rec.value).activeList;
   for (const group of list.data || []) {
-    for (const it of group.data || []) rows.push(it);
+    for (const it of group.data || []) rows.push({ ...it, __kind: key.type });
   }
 }
 
 const seriesOf = (it) =>
   (it.navigationLinks || []).find((n) => n.type === 'series')?.data?.[0]?.name || null;
+
+// KEEP WHAT WAS ALREADY FETCHED. Durations cost one upstream request each and
+// six minutes of them; a rebuild that drops them because it was run with
+// --no-fetch is a rebuild that punishes you for rebuilding.
+const prior = existsSync(OUT)
+  ? new Map(JSON.parse(readFileSync(OUT, 'utf8')).items.map((i) => [i.slug, i]))
+  : new Map();
 
 const seen = new Set();
 const items = [];
@@ -42,10 +49,14 @@ for (const it of rows) {
   seen.add(slug);
   const at = Date.parse(it.date);
   if (!Number.isFinite(at)) continue;
+  // 1965 ONLY. The search window is expressed in seconds and its edges pick up
+  // a day either side, so an item stamped 1966-01-02 arrives in a 1965 search.
+  if (at < Date.UTC(1965, 0, 1) || at >= Date.UTC(1966, 0, 1)) continue;
   // The heading is "SERIES: n | TITLE". The part after the pipe is the film.
   const title = String(it.heading || '').split('|').slice(1).join('|').trim() || it.heading;
   items.push({
     slug,
+    kind: it.__kind,          // 'video' (silent newsreels) or 'audio' (radio, with sound)
     series: seriesOf(it),
     title,
     lead: (it.lead || '').trim() || null,
@@ -56,6 +67,7 @@ for (const it of rows) {
     // midday says "somewhere in this day" by sitting in the middle of it, and
     // it leaves room either side for a clip drawn at its true length.
     at: at + 12 * 3600_000,
+    ...(prior.get(slug)?.catalogueMs ? { catalogueMs: prior.get(slug).catalogueMs } : {}),
   });
 }
 items.sort((a, b) => a.at - b.at || a.slug.localeCompare(b.slug));
@@ -77,6 +89,8 @@ if (!process.argv.includes('--no-fetch')) {
   const UA = 'positron/1.0 (+https://positron.studio; research; contact kristjan.jansen@gmail.com)';
   let got = 0, missing = 0;
   for (const [i, it] of items.entries()) {
+    if (it.kind !== 'video') continue;      // radio has no shot list; see the page
+    if (it.catalogueMs) { got++; continue; }               // already known
     try {
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(it.slug)}`,
         { headers: { 'user-agent': UA } });
@@ -100,11 +114,15 @@ writeFileSync(OUT, JSON.stringify({
   source: 'ERR arhiiv (arhiiv.err.ee) — catalogue metadata only, no media',
   built: new Date().toISOString().slice(0, 10),
   count: items.length,
+  video: items.filter((i) => i.kind === 'video').length,
+  audio: items.filter((i) => i.kind === 'audio').length,
   from: items[0]?.date, to: items[items.length - 1]?.date,
   series: bySeries,
   items,
 }, null, 1) + '\n');
 
-console.log(`${items.length} films, ${items[0]?.date} to ${items[items.length - 1]?.date}`);
+console.log(`${items.length} items — ${items.filter((i) => i.kind === 'video').length} film, `
+  + `${items.filter((i) => i.kind === 'audio').length} radio — `
+  + `${items[0]?.date} to ${items[items.length - 1]?.date}`);
 for (const [s, n] of Object.entries(bySeries).sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(4)}  ${s}`);
 console.log(`wrote ${OUT}`);
