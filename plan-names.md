@@ -118,6 +118,23 @@ the demo shipped today is `positron.studio/keep/`, and a subdomain `keep.`
 meaning something else is a trap); `upload` (describes both tiers, distinguishes
 nothing).
 
+**And `r2.` — asked directly, "can it not be like webrtc.positron.studio?"** The
+family does split two ways, and both are legitimate: `archive` `cues` `pub`
+`jam` `instrument` name the FUNCTION, while `rtc` `ws` `moq` `osc` `shout` name
+the PROTOCOL. `store` sits in the first group, which is where it belongs, for
+two reasons:
+
+- **The read side of the same bucket is already `archive`, not `r2`.** Naming
+  the write side after the vendor while its own pair is named after the job
+  splits one thing across two schemes.
+- **No hostname here names a vendor's product.** `pub` is ffmpeg in a Cloudflare
+  Container and is not called `ffmpeg`; `shout` names the protocol family, not
+  Icecast the server. `r2` would be the first, and it goes stale the day storage
+  moves.
+
+`archive` for reading and `store` for writing also read as a pair. `archive` and
+`r2` do not.
+
 ---
 
 ## 4. `elektron-*`, and which of them can actually go
