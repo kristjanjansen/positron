@@ -8,9 +8,11 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   audio { width: 100%; display: block; margin: 0 0 10px; }
-  .bars { display: flex; align-items: flex-end; gap: 2px; height: 54px; margin: 0 0 10px;
-          border: 1px solid var(--line); border-radius: 3px; padding: 5px; background: #0d1117; }
-  .bars i { flex: 1; background: var(--hi); min-height: 1px; border-radius: 1px; opacity: .85; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 54px; margin: 0 0 10px; }
+  /* NO min-height. A floor of 1 px drew a row of yellow stubs before anything
+     was playing, which is a picture of sound where there is none — the one
+     thing this lane must never do. Silence is now blank. */
+  .bars i { flex: 1; background: var(--hi); border-radius: 1px; opacity: .85; }
   .who { font: 500 10.5px/1.5 var(--mono); color: var(--dim2); margin: 0 0 8px; word-break: break-all; }
 </style>
 
@@ -45,13 +47,12 @@
   const d = mount({
     name: 'shout',
     what: 'An Icecast stream through Cloudflare. The relay adds CORS, which is what makes every number here readable.',
-    readout: { station: '', ttfb: 'ms', kbps: '', ahead: 's', gap95: 'ms', level: '' },
+    readout: { station: '', ttfb: 'ms', kbps: '', ahead: 's', gap95: 'ms', loudness: '' },
     // The measurement is 9 s long, so it lives behind control 0 — the only
     // control the harness gives settleMs to, and the only place a wait does not
     // cost the checks their asserts.
     controls: [
-      { id: 'go', label: 'Play and measure 7 s', primary: true },
-      { id: 'check', label: 'Run the checks' },
+      { id: 'go', label: 'Play and measure', primary: true },
     ],
   });
   guard(d);
@@ -91,10 +92,14 @@
       for (const v of time) { const c = (v - 128) / 128; sum += c * c; }
       const rms = Math.sqrt(sum / time.length);
       rmsPeak = Math.max(rmsPeak, rms);
-      d.set('level', Math.round(rms * 1000) / 1000, rms > 0.001 ? 'ok' : '');
+      // LOUDNESS, not "level": the RMS of the audio samples, 0 when silent and
+      // 1 at full scale. It is here to prove SOUND arrived, not just bytes —
+      // every other number on this page would look identical for a stream of
+      // silence.
+      d.set('loudness', Math.round(rms * 1000) / 1000, rms > 0.001 ? 'ok' : '');
       const step = Math.floor(freq.length / BAR_N) || 1;
       [...bars.children].forEach((b, i) => {
-        b.style.height = `${Math.max(1, (freq[i * step] / 255) * 100)}%`;
+        b.style.height = `${(freq[i * step] / 255) * 100}%`;
       });
     }, 60);
   }
@@ -180,9 +185,15 @@
     // thing past the harness's settle and left the checks asserting on nothing.
     audio.play().catch((e) => d.log(`play refused (${e.name})`, 'bad'));
     await measure();
+    // The checks run themselves, here, because the measurement they read is
+    // finished exactly now. A button labelled "Run the checks" is harness
+    // machinery showing through into a page a person is meant to read, and it
+    // made the asserts optional — the wrong default for the only thing that can
+    // say it worked.
+    checks();
   });
 
-  d.on('check', () => {
+  function checks() {
     d.assert('the relay answered', m?.status === 200, `HTTP ${m?.status ?? '—'}`);
     // The origin sends no ACAO at all, so a body the page could READ is itself
     // the proof that the relay's CORS is doing its job.
@@ -206,7 +217,7 @@
     // Impossible against the origin: a media element without CORS cannot be
     // connected to a WebAudio graph, and reads as digital silence if forced.
     d.assert('WebAudio can see the audio', rmsPeak > 0.0005, `peak rms ${rmsPeak.toFixed(4)}`);
-  });
+  }
 
   d.log(`relay ${BASE} · station ${STATION} — ?base= and ?station= override both`);
   d.ready();

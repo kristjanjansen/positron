@@ -50,9 +50,18 @@
     "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30",
     // "1" burns the 56-block machine-readable clock row into the pattern, the
     // same row demo/shell/pattern.mjs draws on a canvas. Measured +16 % encoder
-    // CPU per leg (worker.mjs #size), which is why it is not on: this is the
-    // one vCPU carrying both encodes. Turn it on for a run, then read EXTINF sd.
-    "PUB_ROW": "0"
+    // CPU (worker.mjs #size) on a box that is one vCPU carrying both encodes.
+    //
+    // ON since 2026-09-08, and it applies to the WHIP LEG ONLY — container/
+    // server.mjs ignores it for RTMPS. So the cost is paid once, on the leg
+    // whose receiver is a program that can decode the row, not twice to use it
+    // once. Nothing reads the LL-HLS picture programmatically.
+    //
+    // It is on to settle plan-session §12.1: whether Cloudflare's WHIP -> WHEP
+    // path preserves the row well enough to read a clock out of it. Watch
+    // EXTINF sd on the RTMPS leg (0.003 s before this) — a starved encoder
+    // wrecks that first, and the two legs share the core.
+    "PUB_ROW": "1"
   },
   "observability": { "enabled": true }
 }
