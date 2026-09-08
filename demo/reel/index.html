@@ -108,20 +108,22 @@
   const SERIES = 'AK filmikroonika 1958-1991';
   let items = [], current = null, hls = null;
 
-  // A film is a PART on the line, and it is ONE DAY WIDE — always, before and
-  // after it has been played.
+  // A CLIP IS AS WIDE AS IT IS LONG.
   //
-  // The bar's width is what the catalogue KNOWS, and what it knows is the day.
-  // Every `at` here is UTC midnight: ERR records the broadcast date and not the
-  // time of day. So drawing a played film at its measured 2.3 minutes was two
-  // mistakes at once — it claimed the film aired at 00:00, which nobody knows,
-  // and on a week-wide axis 137 seconds is a single pixel, so selecting a film
-  // made it VANISH. Reported as "playback loses the bar", and the bar was right
-  // to be lost: it was drawing a precision that does not exist.
+  // It was a day wide until the catalogue could say otherwise, and it could not:
+  // there is no duration field in ERR's item API. What there IS is a SHOT LIST
+  // with real millisecond begin/end times, so the last shot's end is a real
+  // figure — collected for 296 of the 298 films, median 2.2 min, longest 67.
   //
-  // The measured length is a real number and it goes where a real number can be
-  // read — the readout and the tooltip — not into a width that would state a
-  // start time we do not have.
+  // That works only because clips sit at MIDDAY. A bar drawn from midnight at
+  // its true length would claim the film went out at 00:00, which nobody knows;
+  // from midday it says "somewhere in this day, and this long", with room either
+  // side. The two changes are one decision.
+  //
+  // Two films have no shot list. They draw at the median rather than at zero —
+  // and their tooltip says the length is unknown, because a bar you can see is
+  // not a number you can trust.
+  let MEDIAN_MS = 132000;   // replaced once the fixture is in
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
@@ -129,14 +131,15 @@
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
     rows: () => items.map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
-      payload: { durMs: DAY, ...it },
+      payload: { durMs: it.playedMs ?? it.catalogueMs ?? MEDIAN_MS, ...it },
     })),
-    describeRow: (r) => [
-      r.payload.title?.slice(0, 46) ?? '',
-      r.payload.playedMs
-        ? `${r.payload.date} · ${(r.payload.playedMs / 60000).toFixed(1)} min long`
-        : `${r.payload.date} · broadcast that day, time unknown`,
-    ],
+    describeRow: (r) => {
+      const p = r.payload;
+      const len = p.playedMs ? `${(p.playedMs / 60000).toFixed(1)} min, measured`
+        : p.catalogueMs ? `${(p.catalogueMs / 60000).toFixed(1)} min, per the shot list`
+        : 'length unknown';
+      return [p.title?.slice(0, 46) ?? '', `${p.date} · ${len}`, 'the hour it went out is not recorded'];
+    },
   });
 
   // STEP THROUGH THE YEAR. 282 films at a week to a screen means the next one is
@@ -341,6 +344,8 @@
   (async () => {
     const fx = await (await fetch('/reel/1965.json')).json();
     items = fx.items.filter((i) => i.series === SERIES);
+    const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
+    if (known.length) MEDIAN_MS = known[known.length >> 1];
     d.set('films', items.length);
     gutters();
 
