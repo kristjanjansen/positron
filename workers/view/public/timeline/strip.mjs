@@ -1256,6 +1256,26 @@ export function createStrip(canvas, deck, opts = {}) {
         }
       }
     }
+    // HOW WIDE THE VIEW IS, top left. Not decoration: every question about this
+    // component so far — why is a clip one pixel, why do the ticks land on the
+    // 27th, is this a week or a year — is a question about the span on screen,
+    // and answering it meant reading numbers out of the console. `zoom: false`
+    // turns it off.
+    if (opts.zoomReadout !== false) {
+      const span = (plotW() * 1000) / S.view.pxPerSecond;
+      const U = [[31556952e3, 'y'], [2629746e3, 'mo'], [604800e3, 'w'], [86400e3, 'd'],
+                 [3600e3, 'h'], [60e3, 'min'], [1000, 's']];
+      const [div, unit] = U.find(([n]) => span >= n) || [1, 'ms'];
+      const n = span / div;
+      const txt = `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit} across`;
+      ctx.font = '9px ui-monospace, Menlo, monospace';
+      const w = ctx.measureText(txt).width + 8;
+      ctx.globalAlpha = 0.85; ctx.fillStyle = 'rgba(8,10,16,.8)';
+      ctx.fillRect(S.gutterPx + 3, 2, w, 12);
+      ctx.fillStyle = T.dim || '#8b93a1';
+      ctx.fillText(txt, S.gutterPx + 7, 11);
+    }
+
     const px = Math.round(x(S.pos)) + 0.5;
     ctx.globalAlpha = 1; ctx.strokeStyle = T.playhead; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, S.contentH); ctx.stroke();
