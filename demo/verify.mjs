@@ -288,7 +288,12 @@ for (const t of targets) {
   // assert would make the suite total vary run to run, and a shrinking total
   // is exactly how four asserts went missing unnoticed earlier.
   const EDGE_CEILING = 25;
-  const PROBE_CEILING = 40;      // 19 flipper sweeps 8 per probe, twice, + hls.js's own tries
+  // TWO DEMOS ASK ERR FOR SEGMENTS ON PURPOSE, and an unexplained ceiling is
+  // how the next reader mistakes a real outage for expected churn:
+  //   flipper  sweeps 8 points per probe, twice
+  //   now      sweeps 13 points across the window, once, capped at 30 in-page
+  // plus hls.js's own retries on whatever comes back refused.
+  const PROBE_CEILING = 60;
   const edgeOk = edgeMisses.length <= EDGE_CEILING;
   const probedOk = probed.length <= PROBE_CEILING;
   ok('no console errors', errors.length === 0 && edgeOk && probedOk,

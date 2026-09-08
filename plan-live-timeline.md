@@ -237,9 +237,10 @@ back-seeking and returning to live expressed in the component that already
 exists, with no new code.
 
 Opening view: **twelve minutes**, fitted so the present sits about three
-quarters across. `reel` opens on a week of a year for the same reason — the wide
-view is discoverable from the narrow one, and the narrow one is where the marks
-mean anything. Two hours across a phone puts a 25-minute programme in 60 px.
+quarters across. Two hours across a phone puts a 25-minute programme in 60 px,
+and the wide view is discoverable from the narrow one rather than the other way
+round — `reel` went year, then week, then **six hours** for exactly this reason,
+and each step made the marks mean more.
 
 ---
 
@@ -819,9 +820,9 @@ than the segment duration.
 
 ---
 
-## 12. Two existing defects this work exposes
+## 12. Three existing defects this work exposes
 
-Reported, not fixed here, and **both are from reading rather than from
+Reported, not fixed here, and **all three are from reading rather than from
 pressing** — verify before acting.
 
 **`flipper`'s scrubber probably cannot move the picture.** It mounts
@@ -832,12 +833,20 @@ straight back. Its own one-line description says *"the bar scrubs its 2 h
 DVR"* — a claim the page may not be able to keep, and nothing asserts it. This
 is what the `command` hook of §9(b) fixes for both pages at once.
 
+**`reel` carries a tautological assert.** Its `the axis reads in days, not seconds` line is
+`view.strip.report?.().absolute === true || true` — and `report()` does not return
+`absolute` at all, so the expression is `undefined || true` and **passes on every
+run without testing anything**. It is asserting the one property the page exists
+to demonstrate. Exactly LESSONS #27, in the sibling this demo is modelled on;
+this is why M2 above is written against a value the page actually hands the
+library. One line to fix, and worth fixing before copying the page.
+
 **`flipper` is exposed to the stop-at-end trap of §11** for the same reason
 `now` would be. Whether it fires depends on how often its 4 Hz master exceeds
 the 40 ms tolerance, which is precisely the sort of thing that works until it
 does not.
 
-Neither is asserted today, in either direction. **Press the scrubber before
+None of the three is asserted today, in either direction. **Press the scrubber before
 believing this paragraph** — LESSONS #26: a second implementation has to be
 looked at, not reasoned about, and that cuts both ways.
 

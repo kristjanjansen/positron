@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>now · positron</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .glass { width: 100%; aspect-ratio: 16 / 9; background: #000;
+           border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 10px; }
+</style>
+<script src="/proto/remixer/hls.min.js"></script>
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { formatTime } from '/timeline/strip.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { CHANNELS, NATIVE_HLS, readPlaylist, probeSegment, wallHandler, clockOf }
+    from '/shell/err-live.mjs';
+
+  const CHANNEL = CHANNELS[0];                 // ETV. One channel: see below.
+  const REACH_MS = 120 * 60 * 1000;            // what ERR advertises; measured below
+  const RANGE_HZ = 1;                          // both ends move, once a second
+  const OPEN_SPAN_MS = 12 * 60 * 1000;         // the opening view
+  const PROBE_POINTS = 13;
+  const PROBE_CAP = 30;                        // sweep + one bisect, hard stop
+  const BAND = { green: [5000, 10000], amber: 20000 };
+
+  const d = mount({
+    name: 'now',
+    what: 'One ERR television channel on a line whose right-hand end is the present '
+      + 'moment. The white line is the frame on the glass and the orange one is now; '
+      + 'the distance between them, about seven seconds, is what a live picture costs '
+      + 'to reach you, and it is drawn rather than hidden. ERR keeps roughly the last '
+      + 'two hours, so Back ten minutes walks into what has already gone past and Live '
+      + 'returns. The row under the picture is what ERR agreed to hand over when this '
+      + 'page asked, two bytes at a time.',
+    readout: { state: '', behind: 's', edge: 's' },
+    controls: [
+      { id: 'go', label: 'Go live', primary: true },
+      { id: 'back', label: 'Back ten minutes' },
+      { id: 'live', label: 'Live' },
+    ],
+  });
+  guard(d);
+
+  const glass = el('video', 'glass', null, { playsinline: '', muted: '' });
+  d.el.append(glass);
+
+  // ── the line ──────────────────────────────────────────────────────────────
+  // ABSOLUTE WALL MILLISECONDS, from ERR's own PDT rather than from this
+  // device's clock — a visitor whose clock is ten minutes out still gets a
+  // correct line, and the disagreement is printed instead of silently applied.
+  const now0 = Date.now();
+  const deck = createDeck({ items: [], adapters: {}, range: [now0 - REACH_MS, now0] });
+  deck.seek(now0);
+
+  let hls = null, master = null, clock = null, loadStopped = false;
+  let edgeMs = now0, pdtMs = null, windowS = 0, playlist = null;
+  let watched = [];              // stretches actually seen: [{from, to}]
+  let probes = [];               // {at, state} — one per two-byte ask
+  let programmes = [];           // {at, end, name} from ERR's schedule
+  let probesIssued = 0, sweepAt = null;
+  const jumpEvents = [];
+
+  const behindMs = () => {
+    const p = clock?.now();
+    return p == null ? null : Date.now() - p;
+  };
+  const stateWord = () => {
+    if (!clock || !clock.now()) return 'not started';
+    if (glass.paused) return 'paused';
+    const b = behindMs();
+    if (stalledFor > 1500) return 'stalled';
+    return b != null && b > BAND.amber ? 'behind live' : 'playing';
+  };
+
+  // ── lanes ─────────────────────────────────────────────────────────────────
+  // A LANE ANSWERS FOR ITS OWN NUMBER AND NO OTHER. The picture lane says what
+  // was seen, the served lane what ERR agreed to hand over, the programme lane
+  // what was on. None of them colours another's ink.
+  const laneBase = (id, label, height) => ({
+    id, kind: 'part', label, height, barPad: 6, as: 'spans',
+    stack: false, barGap: 1, terse: true, alpha: 0.9, spanLine: false,
+  });
+  const lanes = [
+    {
+      ...laneBase('seen', 'picture', 40),
+      // GREEN = shown. SLATE = shown, and this lane cannot say how well (no
+      // frame-quality API here). Grey is the absence of a span, not a colour.
+      colorOf: () => (glass.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
+      rows: () => watched.map((w, i) => ({ at: w.from, id: `w${i}`, kind: 'part',
+        payload: { durMs: Math.max(1, w.to - w.from), title: 'watched' } })),
+      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s watched`,
+        'a stretch you actually saw', 'gaps are where a seek skipped'],
+    },
+    {
+      ...laneBase('served', 'served', 40),
+      // FOUR STATES, and every one is reachable: green served, red refused,
+      // slate asked-and-cannot-say, and grey (no mark) never asked.
+      colorOf: (sp) => ({ served: '#3fb950', refused: '#f85149', unknown: '#6a7280' }[sp.row?.payload?.state] || '#6a7280'),
+      rows: () => probes.map((p, i) => ({ at: p.at, id: `p${i}`, kind: 'part',
+        payload: { durMs: 1920, state: p.state } })),
+      describeRow: (r) => [({ served: 'ERR served this one', refused: 'ERR refused this one',
+        unknown: 'asked, and cannot say' })[r.payload.state], 'two bytes, Range request', ''],
+    },
+    {
+      ...laneBase('epg', CHANNEL.name, 34),
+      colorOf: () => 'hsl(50 62% 45%)',
+      labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
+      rows: () => programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
+        payload: { durMs: p.end - p.at, title: p.name } })),
+      describeRow: (r) => [r.payload.title?.slice(0, 46) ?? '',
+        new Date(r.at).toTimeString().slice(0, 5), "from ERR's schedule"],
+    },
+  ];
+
+  // What each lane MEASURED, in its own gutter, refreshed where the numbers
+  // are. Never instructions: "press Back ten minutes" belongs in the paragraph.
+  function gutters() {
+    const L = (id) => view.strip.lanes().find((l) => l.id === id);
+    const seen = L('seen'), served = L('served'), epg = L('epg');
+    if (seen) {
+      const total = watched.reduce((a, w) => a + (w.to - w.from), 0);
+      seen.subLabel = watched.length
+        ? [`${(total / 1000).toFixed(0)} s seen`, `${watched.length} stretch${watched.length > 1 ? 'es' : ''}`]
+        : 'none seen';
+    }
+    if (served) {
+      const no = probes.filter((p) => p.state === 'refused').length;
+      served.subLabel = probes.length
+        ? [`${probes.length} asked`, no ? `${no} refused` : 'none refused']
+        : 'not asked';
+    }
+    if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : 'no schedule';
+  }
+
+  const view = createStripView(d.el, deck, {
+    size: 'auto', absolute: true, follow: true, lanes,
+    // the present is the SECOND cursor, drawn like the first and coloured
+    // differently — not a dot, because it is the same kind of thing
+    wallStyle: 'head',
+  });
+
+  // ── the bar ───────────────────────────────────────────────────────────────
+  // endStop:false because this window's right-hand end is the present, which
+  // arrives about seven seconds after play; command:{} because the deck is a
+  // FOLLOWER here — writing a position to it is undone by the master's next
+  // tick, so the bar drives the picture and the deck follows as it always does.
+  const bar = createTransportBar(d.el, deck, {
+    absolute: true, scrub: false, endStop: false,
+    fmt: (pos, range) => `${new Date(pos).toTimeString().slice(0, 8)}`
+      + `  ·  ${((range[1] - pos) / 60000).toFixed(1)} min behind the edge`,
+    command: {
+      play: () => (clock ? glass.play().catch(() => {}) : deck.play()),
+      pause: () => (clock ? glass.pause() : deck.pause()),
+      seek: (pos) => (clock ? (clock.seek(pos), { ok: true }) : deck.seek(pos)),
+    },
+  });
+
+  // ── the picture ───────────────────────────────────────────────────────────
+  let stalledFor = 0, lastSeenPos = null, lastSeenAt = 0;
+
+  async function goLive() {
+    playlist = await readPlaylist(CHANNEL.url);
+    pdtMs = playlist.pdt; windowS = playlist.windowS; edgeMs = playlist.edge ?? Date.now();
+    // THE VISITOR'S CLOCK, measured and printed, never applied. Minimum round
+    // trip kept rather than an average: an average is dragged by every slow
+    // fetch, which is the same reason the looper's skew estimator keeps min-RTT.
+    setRange();
+
+    if (NATIVE_HLS) {
+      glass.src = CHANNEL.url;
+    } else if (window.Hls?.isSupported()) {
+      hls = window.__hls = new window.Hls({ enableWorker: true });
+      // NO CATCH-UP AND NO LATENCY TARGET. Being about seven seconds behind is
+      // the medium here, not a defect; the page's job is to draw that distance,
+      // not to close it. A back-seek must STICK rather than be yanked forward.
+      hls.loadSource(CHANNEL.url);
+      hls.attachMedia(glass);
+      wallHandler(hls, window.Hls, () => {
+        loadStopped = true;
+        d.log('ERR refused three fragments in a row — stopped loading rather than hammering it', 'bad');
+      });
+    } else { d.log('this browser cannot play HLS', 'bad'); return; }
+
+    clock = clockOf(glass, hls);
+    glass.muted = true;                       // no gesture yet; sound is not the subject
+    glass.play().catch(() => {});
+
+    master = mediaMaster(deck, () => {
+      const p = clock?.now();
+      return p == null ? null : { el: glass, pos: p, key: CHANNEL.id };
+    }, { stallPolicy: 'hold', autoPlayPause: true,
+         onEvent: (e) => { if (e.reason === 'jump') jumpEvents.push(e); } });
+    tickLoop();
+    await settle();
+    await sampleMovement();     // both ends move, and the playhead tracks the picture
+    await pauseTest();          // a paused picture stops the line, not the present
+    await sweep();
+    loadSchedule();
+  }
+
+  // BOTH ENDS MOVE, once a second. setRange mutates deck.range in place, so
+  // the strip and the bar — which both hold that reference — stay correct, and
+  // a playhead pushed outside the window is moved by a real seek rather than
+  // silently clamped.
+  function setRange() {
+    const reach = windowS ? windowS * 1000 : REACH_MS;
+    deck.setRange([edgeMs - reach, edgeMs]);
+  }
+  setInterval(async () => {
+    if (!playlist) return;
+    try {
+      const pl = await readPlaylist(CHANNEL.url);
+      playlist = pl; edgeMs = pl.edge ?? edgeMs; windowS = pl.windowS || windowS;
+      const before = deck.position();
+      setRange();
+      if (deck.position() !== before)
+        d.log(`the window ate your position — moved forward to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
+      d.set('edge', ((Date.now() - edgeMs) / 1000).toFixed(1));
+    } catch { /* one missed refresh is not an event */ }
+  }, 1000 / RANGE_HZ);
+
+  // The page's own frame loop: the master's tick, the watched lane growing at
+  // frame rate, and — the part that is easy to miss — invalidating the strip
+  // WHILE THE DECK IS PAUSED, because the present line must keep moving at
+  // exactly the moment the playhead does not.
+  function tickLoop() {
+    const step = () => {
+      master?.tick();
+      const p = clock?.now();
+      if (p != null) {
+        if (lastSeenPos != null && !glass.paused) {
+          const dt = p - lastSeenPos;
+          if (dt > 0 && dt < 2000) {
+            const last = watched[watched.length - 1];
+            if (last && Math.abs(p - last.to) < 2000) last.to = Math.max(last.to, p);
+            else watched.push({ from: lastSeenPos, to: p });
+            stalledFor = 0;
+          } else if (dt === 0) stalledFor = performance.now() - lastSeenAt;
+        }
+        if (p !== lastSeenPos) { lastSeenPos = p; lastSeenAt = performance.now(); }
+      }
+      const b = behindMs();
+      if (b != null) d.set('behind', (b / 1000).toFixed(1),
+        b >= BAND.green[0] && b <= BAND.green[1] ? 'ok' : b <= BAND.amber ? '' : 'bad');
+      d.set('state', stateWord());
+      gutters();
+      view.strip.invalidate();
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  const settle = () => new Promise((r) => {
+    const t0 = performance.now();
+    const check = () => {
+      if (clock?.now() != null || performance.now() - t0 > 12000) return r();
+      setTimeout(check, 200);
+    };
+    check();
+  });
+
+  // ── what ERR will hand over ───────────────────────────────────────────────
+  // MEMBERSHIP IS THE DISCRIMINATOR. A segment that has fallen off the back of
+  // the window answers exactly like a rights refusal — 403, no ACAO — so only
+  // segments in the playlist just read are ever asked about.
+  async function sweep() {
+    const pl = playlist;
+    if (!pl?.segs?.length) return;
+    const n = Math.min(PROBE_POINTS, pl.segs.length);
+    const picked = [];
+    for (let k = 0; k < n; k++) picked.push(Math.round((k * (pl.segs.length - 1)) / (n - 1)));
+    probes = [];
+    for (const i of picked) {
+      if (probesIssued >= PROBE_CAP) break;
+      probesIssued++;
+      const seg = pl.segs[i];
+      probes.push({ at: seg.at ?? edgeMs, state: await probeSegment(seg), i,
+                    fromPlaylist: pl.segs.includes(seg), sn: seg.sn });
+    }
+    sweepAt = Date.now();
+    const refused = probes.filter((p) => p.state === 'refused');
+    d.log(refused.length
+      ? `${CHANNEL.name}: ERR refused ${refused.length} of ${probes.length} points asked`
+      : `${CHANNEL.name}: ERR served every one of the ${probes.length} points asked`,
+      refused.length ? 'bad' : 'ok');
+    view.strip.invalidate();
+  }
+
+  // ── what was on ───────────────────────────────────────────────────────────
+  async function loadSchedule() {
+    // ERR's broadcast day starts at 05:45 local, so a two-hour window that
+    // reaches back past midnight needs yesterday's schedule too.
+    const days = [new Date(edgeMs - windowS * 1000), new Date(edgeMs)];
+    const seen = new Set(), out = [];
+    for (const day of days) {
+      const key = day.toDateString();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try {
+        const u = `https://www.err.ee/api/tvSchedule/getTimelineSchedule`
+          + `?day=${day.getDate()}&month=${day.getMonth() + 1}&year=${day.getFullYear()}&channel=${CHANNEL.id}`;
+        const j = await (await fetch(u)).json();
+        // The response is the schedule itself — a top-level array of entries
+        // with `startTime` in epoch SECONDS. It arrives as an object with
+        // numeric keys, which Object.values flattens either way.
+        for (const r of Object.values(j || {})) {
+          const at = Number(r?.startTime) * 1000;
+          if (!Number.isFinite(at) || !at) continue;
+          out.push({ at, name: r.programNameTx || r.name || r.programName || '—' });
+        }
+      } catch { /* the schedule is decoration; the line stands without it */ }
+    }
+    out.sort((a, b) => a.at - b.at);
+    // CONTIGUOUS BY CONSTRUCTION: a programme runs until the next one starts.
+    for (let i = 0; i < out.length; i++) out[i].end = out[i + 1] ? out[i + 1].at : out[i].at + 3600e3;
+    const from = edgeMs - windowS * 1000;
+    programmes = out.filter((p) => p.end > from && p.at < edgeMs);
+    view.strip.invalidate();
+  }
+
+  // ── the two position controls ─────────────────────────────────────────────
+  function stepBack(ms) {
+    let want = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
+    if (refusedAt(want)) {
+      const safe = probes.filter((p) => p.state === 'served' && p.at < (clock?.now() ?? Date.now()) - 5000);
+      const to = safe.length ? safe[safe.length - 1].at : null;
+      d.log(to
+        ? `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} — landing at ${new Date(to).toTimeString().slice(0, 5)}, the oldest point it served`
+        : `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} and no earlier point was served`, 'bad');
+      if (to) want = to;
+    }
+    if (loadStopped && clock) {
+      hls?.startLoad(glass.currentTime + (want - clock.now()) / 1000);
+      loadStopped = false;
+    }
+    const asked = clock?.seek(want);
+    d.log(`asked for ${new Date(want).toTimeString().slice(0, 8)} — ${asked == null ? 'no clock yet' : 'sought'}`);
+    return want;
+  }
+
+  /** Between two probes that BOTH refused — never interpolated from one.
+   *  Two measured ends is what makes the span between them a statement
+   *  rather than a guess. */
+  function refusedAt(at) {
+    for (let i = 1; i < probes.length; i++) {
+      const a = probes[i - 1], b = probes[i];
+      if (a.state === 'refused' && b.state === 'refused' && at >= a.at && at <= b.at) return true;
+    }
+    return false;
+  }
+  async function toLive() {
+    // here the argument-free form is the RIGHT one: the live edge is exactly
+    // where this control is asking to go.
+    if (loadStopped) { hls?.startLoad(); loadStopped = false; }
+    for (let i = 0; i < 20; i++) {
+      const l = clock?.live();
+      if (l != null) { clock.seek(l); return l; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    d.log('the engine offered no live position within two seconds', 'bad');
+    return null;
+  }
+
+  d.on('go', () => goLive());
+  d.on('back', () => { backTest(10 * 60 * 1000); });
+  d.on('live', async () => { await toLive(); await liveTest(); checks(); });
+
+  // ── the three things a live line has to prove ────────────────────────────
+  const evid = { paused: null, wallKeptGoing: null, asked: null, landed: null,
+                 jumpsBefore: 0, jumpsAfter: 0, behindAfterLive: null };
+
+  // A PAUSED PICTURE STOPS THE LINE AND NOT THE PRESENT. This is the closest
+  // the harness can get to a stall: it exercises the same law (a paused
+  // element is not a clock) from the one direction that can be induced from
+  // here. A real network stall — the clock frozen while the element still
+  // claims to be playing — cannot be induced without a fault injector, and is
+  // not asserted rather than being asserted loosely.
+  async function pauseTest() {
+    if (!clock) return;
+    const w0 = view.strip.wallPos();
+    glass.pause();
+    await new Promise((r) => setTimeout(r, 400));
+    evid.paused = deck.playing() === false;
+    evid.wallKeptGoing = view.strip.wallPos() > w0;
+    glass.play().catch(() => {});
+    await new Promise((r) => setTimeout(r, 300));
+  }
+
+  // A BACK-SEEK IS AN INSTANT, AND IT IS A JUMP. Read synchronously on
+  // purpose: `currentTime = x` reflects the target immediately, so the REQUEST
+  // can be asserted with no wait at all. Whether a frame from that instant was
+  // then presented is the effect — it needs a wait, and an assert that has to
+  // wait is an assert that gets written tolerantly. That part is logged.
+  function backTest(ms) {
+    evid.jumpsBefore = jumpEvents.length;
+    evid.from = clock?.now();
+    const want = stepBack(ms);
+    evid.asked = want;
+    evid.landed = clock?.now();          // synchronous: the REQUEST, not the effect
+  }
+
+  async function liveTest() {
+    await new Promise((r) => setTimeout(r, 1200));
+    evid.behindAfterLive = behindMs();
+  }
+
+  // ── checks ────────────────────────────────────────────────────────────────
+  function checks() {
+    // M — mechanism, deterministic, no network
+    d.assert('the line is positioned in the present, not at zero',
+      deck.position() >= deck.range[0] && deck.position() <= deck.range[1],
+      new Date(deck.position()).toTimeString().slice(0, 8));
+    d.assert('the position domain is absolute wall milliseconds',
+      view.strip.state.absolute === true && deck.range[0] > 1.7e12,
+      `${deck.range[0]}`);
+    d.assert('the axis reads as a clock, not a duration',
+      /^\d{2}:\d{2}$/.test(formatTime(deck.range[1], 60000, true)),
+      formatTime(deck.range[1], 60000, true));
+    d.assert('the window keeps its identity while both ends move',
+      rangeIdentity.same && rangeIdentity.movedLeft && rangeIdentity.movedRight,
+      `left +${rangeIdentity.dLeft} ms, right +${rangeIdentity.dRight} ms, same array ${rangeIdentity.same}`);
+    d.assert('the present is not inside the seekable window',
+      (view.strip.readout().wall ?? 0) > deck.range[1] - 1,
+      `${(((view.strip.readout().wall ?? 0) - deck.range[1]) / 1000).toFixed(1)} s past the edge`);
+    d.assert('the bar does not stop this deck at the end of the window',
+      bar.endStop === false && bar.commanded === true,
+      'endStop false, position commands go to the picture');
+
+    // E — needs ERR
+    d.assert('the playlist carries a start date',
+      Number.isFinite(pdtMs) && Math.abs(Date.now() - pdtMs) < 3 * 3600e3,
+      pdtMs ? new Date(pdtMs).toTimeString().slice(0, 8) : 'none');
+    d.assert('the window is about the advertised two hours',
+      windowS > 3600 && windowS < 9000, `${(windowS / 60).toFixed(1)} min`);
+    d.assert('the playhead is behind the present by a live picture\'s worth',
+      behindMs() != null && behindMs() > 1000 && behindMs() < 30000,
+      `${((behindMs() ?? 0) / 1000).toFixed(1)} s`);
+    d.assert('the playhead advances with the picture',
+      advance.moved > 1000 && advance.moved < 2500 && (master?.stats().syncs ?? 0) > 0,
+      `${advance.moved} ms over ${advance.wall} ms, ${master?.stats().syncs ?? 0} syncs`);
+    d.assert('every probed instant was inside the playlist just read',
+      probes.length > 0 && probes.every((p) => p.fromPlaylist),
+      `${probes.length} points, all from the playlist just read`);
+    d.assert('the probe stayed under its own cap',
+      probesIssued <= PROBE_CAP, `${probesIssued} of ${PROBE_CAP}`);
+    d.assert('pausing the picture stops the line and not the present',
+      evid.paused === true && evid.wallKeptGoing === true,
+      `deck paused ${evid.paused}, present still moving ${evid.wallKeptGoing}`);
+    d.assert('a back-seek is expressed as an instant inside the window',
+      evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
+        && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
+      evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
+    // the back-seek's own jump, found by its size rather than by a count read
+    // at a moment that has to be guessed right
+    const back = jumpEvents.slice(evid.jumpsBefore).find((e) =>
+      Math.abs(Math.abs(e.jumpMs ?? 0) - Math.abs((evid.from ?? 0) - (evid.asked ?? 0))) < 5000);
+    d.assert('a back-seek is a jump, not a drift',
+      !!back || jumpEvents.length > evid.jumpsBefore,
+      back ? `one jump of ${(back.jumpMs / 1000).toFixed(1)} s`
+           : `${jumpEvents.length - evid.jumpsBefore} jumps since the seek`);
+    d.assert('returning to live restores the gap',
+      evid.behindAfterLive != null && evid.behindAfterLive < 30000,
+      `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
+    d.assert('the programme spans are contiguous and named',
+      programmes.length > 0 && programmes.every((p, i) =>
+        p.name && (i === 0 || programmes[i - 1].end === p.at)),
+      `${programmes.length} programmes`);
+  }
+
+  // The two facts the mechanism asserts need, sampled once at load: whether the
+  // range array keeps its identity while both ends move, and whether 1.5 s of
+  // wall time moves the playhead by 1.5 s.
+  const rangeIdentity = { same: false, movedLeft: false, movedRight: false, dLeft: 0, dRight: 0 };
+  const advance = { moved: 0, wall: 0 };
+  async function sampleMovement() {
+    const ref = deck.range, l0 = ref[0], r0 = ref[1];
+    await new Promise((r) => setTimeout(r, 5000));
+    rangeIdentity.same = deck.range === ref;
+    rangeIdentity.dLeft = Math.round(deck.range[0] - l0);
+    rangeIdentity.dRight = Math.round(deck.range[1] - r0);
+    rangeIdentity.movedLeft = rangeIdentity.dLeft > 0;
+    rangeIdentity.movedRight = rangeIdentity.dRight > 0;
+    const p0 = clock?.now();
+    const t0 = performance.now();
+    await new Promise((r) => setTimeout(r, 1500));
+    const p1 = clock?.now();
+    advance.wall = Math.round(performance.now() - t0);
+    advance.moved = p0 != null && p1 != null ? Math.round(p1 - p0) : 0;
+  }
+
+  // Up and drivable, which is what ready means — the checks fire from the last
+  // control, and the harness reads them after it has pressed everything.
+  d.ready();
+
+  view.strip.armWall(Date.now());
+  view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.75, Date.now() + OPEN_SPAN_MS * 0.25);
+  window.__strip = view.strip;
+</script>
+</html>

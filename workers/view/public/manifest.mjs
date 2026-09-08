@@ -112,6 +112,12 @@ export const DEMOS = [
   { name: 'reel', act: 5, built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
     tags: ['ERR', 'archive', 'timeline'] },
+  { name: 'now', act: 5, built: true,
+    one: 'one live ERR channel on a line whose right-hand end is the present moment',
+    tags: ['HLS', 'live', 'timeline', 'DVR'],
+    // master + a 218 KB media playlist + first fragments + first PDT + one EPG
+    // fetch + a 13-point two-byte sweep, all behind control 0
+    settleMs: 26000 },
   { name: 'flipper', act: 5, built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],

@@ -289,6 +289,79 @@ first attempt.
 
 ---
 
+## Session 13 — a live line, and four ways to be wrong about it
+
+Written 2026-09-08, building `now` — one ERR channel on a line whose right-hand
+end is the present. Every entry below cost a red assert whose cause was mine
+rather than the source's.
+
+### 33. `startLoad()` with no argument means the LIVE EDGE
+
+hls.js's `startLoad(startPosition = -1)` reads "auto", and auto on a live stream
+is the edge. It was added one line before a ten-minute back-seek, to recover
+from the wall handler's `stopLoad()` — so the page dutifully returned to live
+and then seeked backwards from there, and the picture snapped forward inside
+900 ms. Three asserts read red naming ERR, hls.js and the media master in turn;
+all three were innocent. **A recovery action has to land somewhere specific:**
+`startLoad(seconds)` when the reader asked for a past instant, argument-free
+only when the control being pressed literally means "the live edge". And it is
+only needed at all when loading was actually stopped — track that, do not call
+it hopefully.
+
+### 34. A control that is not finished at press time collides with the next one
+
+The harness presses controls in order and sleeps 650 ms between them. `Back ten
+minutes` spent 700 ms on a pause test before doing its own work, so `Live` was
+pressed, ran, and completed *before the back-seek had happened*. Both mechanisms
+were correct and both read red, intermittently, which is the worst way to be
+wrong. **Whatever a control asserts, it must have done by the time it returns**
+— and a test that belongs to a different mechanism (here, a paused element is
+not a clock) belongs to the control that mechanism lives in.
+
+### 35. A counter read on a timer is a coin toss; an event carries its magnitude
+
+`master.stats().jumps` read 900 ms after a seek passed under the harness and
+failed under a probe pressing the same buttons 900 ms apart — the same check,
+the same page, two answers. The master reports each jump as it happens with its
+size, so the back-seek is now identified by *being a jump of −600.2 s*, which is
+true whenever it is read. **Prefer the event that carries the quantity over a
+counter sampled at a moment you have to guess right.**
+
+### 36. Nothing in the suite looks at ink
+
+Three lane gutters rendered `() => (prob…` — the literal source of the
+functions I passed, because `subLabel` is a VALUE and the strip does
+`String(...)` to it. 29 asserts passed over it on every run, including the ones
+about those very lanes, because an assert reads state and a gutter is paint.
+A screenshot found it in one look. **A page has a class of defect its own checks
+structurally cannot see; look at it once before shipping it.** The ellipsis is
+the second half of the same lesson: `13 asked · …` means the text is wrong for
+the space, not that the space is wrong.
+
+### 37. Continuity is symmetric, or a back-seek eats the record
+
+The watched-stretch lane extended its last span when `p - last.to < 2000` —
+trivially true after a ten-minute back-seek, where `last.to` sits ten minutes in
+the *future*, so the page reported 9.6 minutes watched after a 26-second run.
+The test is `Math.abs(p - last.to) < 2000`. A one-sided comparison against a
+moving quantity is only a continuity test in the direction you were thinking
+about when you wrote it.
+
+### 38. A browser cannot read a response's `Date` header
+
+The plan for this page said measuring the visitor's clock against ERR's was
+free, "off the `date:` header on a fetch the page already makes". It is not
+available at all: `Date` is not on the CORS-safelisted response header list and
+ERR sends no `Access-Control-Expose-Headers`, so `headers.get('date')` is null
+in JS on a response that plainly carries one — `curl` shows it, the page cannot.
+Every other route to that number (the stream's own start date against
+`Date.now()`) adds packaging and network delay to the skew and cannot separate
+them, so it would print mostly latency under a label saying "clock". The
+readout cell and its assert were removed rather than faked. **A measurement
+being present in the protocol does not mean it is present in the browser.**
+
+---
+
 ## Method
 
 ### 1. Measure the quantity in question, not one adjacent to it

@@ -28,7 +28,24 @@ import { el } from './shell.mjs';
  */
 export function createTransportBar(host, deck, {
   absolute = false, scrub: wantScrub = true, extras = [], fmt = null,
+  // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
+  // fires, pauses the deck and parks the playhead there — right for a
+  // recording, wrong for a window whose right-hand end is the present moment,
+  // where that instant arrives a few seconds after play. Default unchanged.
+  endStop = true,
+  // WHO OWNS POSITION. On a deck driven by a media element the deck is a
+  // FOLLOWER: a control that writes to the follower is undone by the master's
+  // next tick, silently and within a few hundred milliseconds. Such a page
+  // passes { play, pause, seek } that drive the element instead, and the deck
+  // follows as it always does. Defaults to the deck's own methods, so every
+  // existing caller behaves exactly as before.
+  command = null,
 } = {}) {
+  const cmd = {
+    play: () => (command?.play ? command.play() : deck.play()),
+    pause: () => (command?.pause ? command.pause() : deck.pause()),
+    seek: (pos) => (command?.seek ? command.seek(pos) : deck.seek(pos)),
+  };
   const bar = el('div', 'tbar');
 
   const toggle = el('button', 'tbar-toggle', '', { type: 'button', 'aria-label': 'play/pause' });
@@ -167,9 +184,9 @@ export function createTransportBar(host, deck, {
 
   function hitEnd() {
     endTimer = null;
-    if (!deck.playing?.()) return;
-    deck.pause();
-    deck.seek(range[1]);
+    if (!endStop || !deck.playing?.()) return;
+    cmd.pause();
+    cmd.seek(range[1]);
     atEnd = true;
     // no badge: the toggle already turned into a restart glyph, and a word
     // saying the same thing beside it is the second copy of one fact
@@ -177,7 +194,7 @@ export function createTransportBar(host, deck, {
 
   function armEnd() {
     clearEnd();
-    if (!seekable || !(deck.playing?.() ?? false)) return;
+    if (!endStop || !seekable || !(deck.playing?.() ?? false)) return;
     const rate = typeof deck.rate === 'function' ? deck.rate() : deck.rate;
     if (!(rate > 0)) return;                       // paused or reversed: no end to reach
     const t = deck.transport;
@@ -201,11 +218,11 @@ export function createTransportBar(host, deck, {
   // well defined in this library in a way it is not for a media element: a
   // backward seek replays each event exactly once.
   toggle.addEventListener('click', () => {
-    if (deck.playing?.()) return deck.pause();
-    if (atEnd || (seekable && deck.position() >= range[1])) leaveEnd(range[0]);
-    deck.play();
+    if (deck.playing?.()) return cmd.pause();
+    if (endStop && (atEnd || (seekable && deck.position() >= range[1]))) leaveEnd(range[0]);
+    cmd.play();
   });
-  function leaveEnd(to) { atEnd = false; clearNote(); deck.seek(to); }
+  function leaveEnd(to) { atEnd = false; clearNote(); cmd.seek(to); }
 
   function seekFromEvent(e) {
     const r = scrub.getBoundingClientRect();
@@ -257,7 +274,7 @@ export function createTransportBar(host, deck, {
 
   function doSeek(pos) {
     if (atEnd && pos < range[1]) { atEnd = false; clearNote(); }
-    const res = deck.seek(pos);
+    const res = cmd.seek(pos);
     if (res && res.degraded) note(res.reason);
   }
 
@@ -271,7 +288,7 @@ export function createTransportBar(host, deck, {
     const span = b - a;
     const cur = deck.position();
     const step = e.shiftKey ? span * 0.1 : span * 0.02;
-    if (e.key === ' ') { e.preventDefault(); deck.playing?.() ? deck.pause() : deck.play(); }
+    if (e.key === ' ') { e.preventDefault(); deck.playing?.() ? cmd.pause() : cmd.play(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); doSeek(Math.min(b, cur + step)); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); doSeek(Math.max(a, cur - step)); }
     else if (/^[0-9]$/.test(e.key)) { e.preventDefault(); doSeek(fracToPos(Number(e.key) / 10)); }
@@ -299,6 +316,9 @@ export function createTransportBar(host, deck, {
   return {
     el: bar,
     api,
+    /** what this bar was built with — so a page can assert the setting it
+     *  passed rather than an effect that has to be waited for. */
+    endStop, commanded: !!command,
     /** an `extras` button by id, so a page can relabel or disable it */
     extra: (id) => extraEls.get(id) || null,
     note,
