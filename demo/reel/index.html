@@ -20,11 +20,11 @@
      different amount for every film. Five lines here, more where there is room,
      and the rest scrolls inside its own box — so the strip below never moves. */
   .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px;
-            max-width: 72ch; min-height: 62px; }
+            max-width: 72ch; }
   .ptitle { color: var(--fg); font-weight: 600; margin-bottom: 3px; }
-  .ptitle a { color: var(--hi); font-weight: 500; }
-  .plead { max-height: calc(9 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
-  @media (min-width: 760px) { .plead { max-height: calc(14 * 1.6em); } }
+  .ptitle a { color: var(--dim); font-weight: 500; }
+  .plead { max-height: calc(6 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
+  @media (min-width: 760px) { .plead { max-height: calc(9 * 1.6em); } }
   /* the slot keeps its shape before a film is chosen */
   video.film[data-empty="1"] { background: var(--card); }
 </style>
@@ -61,7 +61,8 @@
       + 'in 1965 itself, which is a negative number of milliseconds, so the axis reads '
       + 'in days rather than seconds. Press a film to play it: the video streams from '
       + 'ERR at that moment and nothing is stored here. Everything on the page comes '
-      + 'from ERRarhiiv and every film links back to it.',
+      + 'from ERRarhiiv and every film links back to it, and the newsreels are '
+      + 'silent — they were shot mute.',
     // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
     // the lane's gutter, the date in the film's own title line AND in the
     // transport bar, the length in the tooltip. A second table saying the same
@@ -127,7 +128,14 @@
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
-    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug ? '#ffd400' : '#6f7f9a'),
+    // YELLOW, because these are ours to show and the site's colour is `--hi`.
+    // The one playing is the full brand yellow; the rest are the same hue held
+    // back, so the lane reads as one family and still says which film is up.
+    // Nothing here is a quality signal — the archive does not tell us how a
+    // 1965 broadcast went — so colour carries identity only, and says so.
+    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug
+      ? '#ffd400'
+      : 'hsl(50 62% 40%)'),
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
     rows: () => items.map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
@@ -258,7 +266,7 @@
     if (NATIVE_HLS) {
       film.src = src;                        // WebKit plays HLS, audio group and all
     } else if (window.Hls && window.Hls.isSupported()) {
-      hls = new window.Hls({ enableWorker: true });
+      hls = window.__hls = new window.Hls({ enableWorker: true });
       hls.loadSource(src);
       hls.attachMedia(film);
       hls.on(window.Hls.Events.ERROR, (_e, data) => {
@@ -293,18 +301,26 @@
     // step rather than letting the two disagree about what is happening
     film.addEventListener('play', () => { if (!deck.playing()) deck.play(); });
     film.addEventListener('pause', () => { if (deck.playing()) deck.pause(); });
-    // IS SOUND ACTUALLY ARRIVING? Three reports of silence could not be settled
-    // by looking at the element: it read unmuted, at volume 1, playing. The
-    // useful question is whether audio BYTES are being decoded, and the browser
-    // will say. Reported rather than asserted — a headless browser has no audio
-    // device, so this number is only meaningful where a person is listening.
+    // THE FILMS ARE SILENT, and it took four reports of "no sound" to establish
+    // that nothing was broken.
+    //
+    // Measured: every `AK filmikroonika` audio fragment is exactly 6,766 bytes
+    // per 10 seconds — 5.4 kbps, which is what AAC costs to encode silence. A
+    // 1965 item from outside the series measured 123.8 kbps on the same path,
+    // so the player, the CORS, the audio group and the decoder are all fine.
+    // `filmikroonika` was shot MUTE; sound was added at screening or not at all.
+    //
+    // This still reports, because "silent" and "broken" look identical from the
+    // outside and the difference is the whole point. It just no longer accuses
+    // the player of a fault that belongs to 1965.
     setTimeout(() => {
       const a = film.webkitAudioDecodedByteCount;
       if (a === undefined) return;
-      d.log(a > 50_000
-        ? `sound is arriving — ${Math.round(a / 1024)} KiB decoded`
-        : `NO SOUND ARRIVING — only ${a} bytes of audio decoded. The picture is fine; `
-          + `the audio track is not being taken`, a > 50_000 ? 'hi' : 'bad');
+      const kbps = (a * 8) / 6 / 1000;
+      d.log(kbps > 24
+        ? `sound is arriving — ${Math.round(kbps)} kbps decoded`
+        : `this film is SILENT — its audio track carries ${kbps.toFixed(1)} kbps, which is `
+          + `what silence costs. The newsreels were shot mute.`, 'hi');
     }, 6000);
 
     film.addEventListener('loadedmetadata', () => {
@@ -357,15 +373,18 @@
     // Clips are minutes long and a day apart, so width-in-proportion and
     // several-clips-at-once cannot both be had:
     //
-    //     a week     a 15-minute film is 0.15 % of the view — one pixel
-    //     a day                          1 %   — a visible sliver
-    //     12 hours                       2 %   — a bar with a length
-    //     6 hours                        4 %   — a bar, and little else on screen
+    // A MONTH. That is a view about the YEAR rather than about one film: roughly
+    // twenty-four newsreels on screen at once, which is what makes the shape of
+    // the series visible — weekly, all year, with the gaps where a week was
+    // missed.
     //
-    // Twelve hours keeps the clip readable as a bar while still showing the day
-    // around it, which is what makes the midday anchor legible: you can see the
-    // film sitting in the middle of its day rather than filling it.
-    const SPAN = 12 * 3600_000;
+    // Each clip is a 2 px mark at this span, and that is the floor doing its
+    // job rather than a failure. A 2.2-minute film in a month is 0.005 % of the
+    // view; nothing shows that honestly AND legibly at once. So the width is
+    // proportional wherever there is room for it to be, the floor keeps a clip
+    // from vanishing, and the strip prints its own span so the trade is visible
+    // instead of mysterious. Zoom in and the bars become bars.
+    const SPAN = 30 * DAY;
     view.strip.fit(items[0].at - SPAN / 2, items[0].at + SPAN / 2);
 
     d.assert('the line is positioned in 1965, not 1970',

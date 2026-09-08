@@ -547,7 +547,12 @@ registerRenderer('spans', (ctx, L, C) => {
     // rounded rectangles meeting at a shared edge still read as one long bar.
     // A hairline of lane between them is what makes three things three.
     const gap = L.barGap ?? 0;
-    const bw = Math.max(1.5, xb - xa - gap);
+    // A FLOOR YOU CAN SEE, and no wider. 1.5 px is a hairline that reads as a
+    // scratch; 2 px is a mark. Four was tried and is too much — the floor is
+    // there so a clip does not VANISH, not so it looks bigger than it is, and
+    // every pixel above the minimum is a pixel of lie about the duration.
+    // Above it the width stays strictly proportional.
+    const bw = Math.max(2, xb - xa - gap);
     const soft = s.kind === 'vagueness';
     // EDGE = when.kind, and the two are opposite claims about the world (§7):
     //   ignorance — there IS a boundary, the catalogue lost it. The bound is a
@@ -1267,13 +1272,15 @@ export function createStrip(canvas, deck, opts = {}) {
                  [3600e3, 'h'], [60e3, 'min'], [1000, 's']];
       const [div, unit] = U.find(([n]) => span >= n) || [1, 'ms'];
       const n = span / div;
-      const txt = `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit} across`;
+      const txt = `${n < 10 ? n.toFixed(1) : Math.round(n)} ${unit}`;
+      // IN THE GUTTER, not over the plot. Drawn at the plot's left edge it sat
+      // exactly on top of the marks — and the first thing it was used for was
+      // hunting a clip that turned out to be underneath it. A readout that
+      // hides the thing it is describing is worse than no readout.
       ctx.font = '9px ui-monospace, Menlo, monospace';
-      const w = ctx.measureText(txt).width + 8;
-      ctx.globalAlpha = 0.85; ctx.fillStyle = 'rgba(8,10,16,.8)';
-      ctx.fillRect(S.gutterPx + 3, 2, w, 12);
+      ctx.globalAlpha = 0.75;
       ctx.fillStyle = T.dim || '#8b93a1';
-      ctx.fillText(txt, S.gutterPx + 7, 11);
+      ctx.fillText(txt, 8, 11);
     }
 
     const px = Math.round(x(S.pos)) + 0.5;
