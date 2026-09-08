@@ -169,6 +169,20 @@
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
 
+  // THE VIEW STAYS INSIDE THE YEAR. Centring on a clip near either end pushed
+  // the window past it, so the axis read 1964-12-24 on a page whose whole
+  // subject is 1965 — empty months either side of the material, labelled with
+  // a year that has nothing on this line. The window keeps its width and
+  // slides inward instead of being cropped, so the zoom the reader chose
+  // survives being near an edge.
+  const fitInYear = (from, to) => {
+    const w = Math.min(to - from, YEAR_TO - YEAR_FROM);
+    let a = from, b = a + w;
+    if (a < YEAR_FROM) { a = YEAR_FROM; b = a + w; }
+    if (b > YEAR_TO) { b = YEAR_TO; a = b - w; }
+    view.strip.fit(a, b);
+  };
+
   // ERR'S NEWSREEL TITLES ARE GENUINELY ALL-CAPS — 288 of 298, against 11 of
   // 494 on the radio side. That is the film archive's own record, typed on a
   // card, not a rendering accident, and it is why the two columns look unlike
@@ -253,17 +267,26 @@
   // are transport verbs — they move the playhead and change what is showing —
   // so they belong on the bar rather than beside the page, which is what
   // `extras` exists for.
+  // EVERY BROADCAST, BY DAY. Stepping through one lane skips whole weeks the
+  // other lane is the only witness to, and stepping through both as a flat
+  // list hands you the same afternoon twice — once for its film and once for
+  // its radio — on the 283 days where both survive. So the unit is the DAY:
+  // one press, one broadcast day, and the day brings whichever halves of it
+  // reached us. The film represents a day when there is one, because the film
+  // is what carries the picture.
+  let days = [];
+  const rebuildDays = () => {
+    const byDate = new Map();
+    for (const it of items) byDate.set(it.date, it);
+    for (const r of radio) if (!byDate.has(r.date)) byDate.set(r.date, r);
+    days = [...byDate.values()].sort((a, b) => a.at - b.at);
+  };
   const step = (by) => {
-    // ALWAYS THROUGH THE NEWSREELS. They are the weekly series and the thing
-    // the year is made of; the radio is what happened to survive alongside and
-    // it comes along whenever a date matches. Stepping by broadcast rather
-    // than by index, so landing on a sound-only day and pressing next still
-    // moves to the next film rather than the film after the one before it.
-    if (!items.length) return;
+    if (!days.length) return;
     const at = current ? current.at : deck.position();
     const next = by > 0
-      ? items.find((v) => v.at > at) || items[items.length - 1]
-      : [...items].reverse().find((v) => v.at < at) || items[0];
+      ? days.find((x) => x.at > at)
+      : [...days].reverse().find((x) => x.at < at);
     if (next && next !== current) play(next);
   };
   const bar = createTransportBar(d.el, deck, {
@@ -341,7 +364,7 @@
     const v = view.strip.view();
     const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
     const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
-    if (it.at < left || it.at > left + span) view.strip.fit(it.at - span / 2, it.at + span / 2);
+    if (it.at < left || it.at > left + span) fitInYear(it.at - span / 2, it.at + span / 2);
     // BOTH HALVES OF THE DAY, whichever one was pressed. Picking a newsreel
     // finds that date's radio and picking a radio programme finds that date's
     // newsreel, so the two columns and what actually plays always agree.
@@ -535,8 +558,9 @@
     const fx = await (await fetch('/reel/1965.json')).json();
     items = fx.items.filter((i) => i.kind === 'video' && i.series === SERIES);
     radio = fx.items.filter((i) => i.kind === 'audio');
-    const days = new Set(items.map((i) => i.date));
-    sharedDays = radio.filter((r) => days.has(r.date)).length;
+    const filmDays = new Set(items.map((i) => i.date));
+    sharedDays = radio.filter((r) => filmDays.has(r.date)).length;
+    rebuildDays();
     const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
     if (known.length) MEDIAN_MS = known[known.length >> 1];
     d.set('newsreels', items.length);
@@ -568,7 +592,7 @@
     // day makes the page look like it only has half the material.
     const radioDays = new Set(radio.map((r) => r.date));
     const openOn = items.find((i) => radioDays.has(i.date)) || items[0];
-    view.strip.fit(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
+    fitInYear(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
     firstPick = openOn;
     deck.seek(openOn.at);
     play(openOn, true);        // load it and show its first frame; do not start it
