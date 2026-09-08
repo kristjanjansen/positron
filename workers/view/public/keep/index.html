@@ -39,6 +39,27 @@
   // exactly as `capture` does it.
   const useR2 = new URLSearchParams(location.search).get('r2') === '1';
 
+  // WHAT SURVIVES A RELOAD. The recordings are in R2 for six hours; the line
+  // that arranges them is not — it lives in this tab and dies with it. So a
+  // page called `keep` was losing everything on reload while the files sat
+  // there, which is the page contradicting its own name.
+  //
+  // localStorage holds only what is needed to find them again: the url, the
+  // format, the length and when it expires. Not the video — that is R2's job —
+  // and anything past its six hours is dropped on the way in rather than
+  // fetched and found missing.
+  const REMEMBER = 'keep.takes.v1';
+  const remembered = () => {
+    try {
+      const all = JSON.parse(localStorage.getItem(REMEMBER) || '[]');
+      return all.filter((t) => t.expiresAt && new Date(t.expiresAt) > new Date());
+    } catch { return []; }
+  };
+  const remember = (t) => {
+    try { localStorage.setItem(REMEMBER, JSON.stringify([...remembered(), t])); } catch { /* full or off */ }
+  };
+  const forget = () => { try { localStorage.removeItem(REMEMBER); } catch { /* off */ } };
+
   const d = mount({
     name: 'keep',
     what: 'The picture you send goes out to a server and comes back, and what you '
@@ -113,7 +134,9 @@
     seqCap.textContent = legText();
     asserted = false; didClock = false;
     paint();
-    d.log('takes deleted here — any R2 copies stay until their six hours are up');
+    forget();
+    d.log('takes deleted, and forgotten — the R2 files stay until their six hours '
+      + 'are up, but this page will not pick them up again');
   });
 
   // ── the line ──────────────────────────────────────────────────────────────
@@ -288,7 +311,10 @@
         part.expiresAt = put.expiresAt;
         d.log(`take ${part.n}: ${Math.round(whole.size / 1024)} KiB stored as one file`, 'hi');
         blob = await fetchBack(put.url, part.mime, { log: (m, k) => d.log(m, k) });
-        if (blob) part.blobs.length = 0;               // the local copy is gone
+        if (blob) {
+          part.blobs.length = 0;                       // the local copy is gone
+          remember({ url: put.url, mime: part.mime, expiresAt: put.expiresAt });
+        }
         else d.log(`take ${part.n}: could not fetch it back — keeping the local copy`, 'bad');
       }
     }
@@ -407,21 +433,11 @@
     })),
     describeRow: (r) => [`${r.payload.kib} KiB`, `${(r.payload.lenMs / 1000).toFixed(2)}s of the line`],
   };
-  // Slices are RECORDER chunks — one per 500 ms timeslice — and that is all
-  // they are here. They were briefly one-R2-object-each; see `landPart` for why
-  // a take is stored as a single file instead.
-  const sliceLane = {
-    id: 'chunks', kind: 'chunk', label: 'slices', height: 40, width: 2,
-    as: 'ticks', color: '#8fd6a8', terse: true,
-    rows: () => shown().flatMap((p) => p.chunks.map((c, i) => ({
-      at: p.startMs + c.at, id: `p${p.n}c${i}`, kind: 'chunk', payload: { n: p.n, ...c },
-    }))),
-    describeRow: (r) => {
-      const off = r.payload.gapMs - SLICE_MS;
-      return [`take ${r.payload.n} \u00b7 ${Math.round(r.payload.size / 1024)} KiB`,
-              `${off >= 0 ? '+' : ''}${off.toFixed(0)} ms off the ${SLICE_MS} ms slice`];
-    },
-  };
+  // NO SLICES LANE. `take` has one because MediaRecorder's timeslice behaviour
+  // is part of its subject; here a take is stored as ONE file, so the chunks
+  // have no destination of their own and the lane would be drawing an
+  // implementation detail beside the two things this page is about — where the
+  // picture came from, and whether a seek landed.
 
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
@@ -431,19 +447,12 @@
   });
   const view = createStripView(d.el, deck, {
     size: 'auto', follow: false, armWall: false, gutter: 150, wallStyle: 'head',
-    lanes: [takeLane, sliceLane],
+    lanes: [takeLane],
   });
 
   function paint() {
     d.set('takes', shown().length || null);
     d.set('line', totalMs ? (totalMs / 1000).toFixed(2) : null);
-    const L = view.strip.lanes();
-    const C = L.find((l) => l.id === 'chunks');
-    const offs = shown().flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
-    if (C) C.subLabel = offs.length
-      ? [`${offs.length + shown().length} slices, ${median(offs).toFixed(0)} ms typ`,
-         `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
-      : null;
     view.strip.invalidate();
   }
   setInterval(() => { if (recording) { paint(); view.strip.invalidate(); } }, 40);
@@ -550,6 +559,37 @@
       }
     }
   }
+
+  // ── pick up where the last tab left off ───────────────────────────────────
+  async function restore() {
+    const saved = remembered();
+    if (!saved.length) return;
+    d.log(`${saved.length} recording${saved.length > 1 ? 's' : ''} still in R2 — fetching them back`, 'hi');
+    for (const t of saved) {
+      const blob = await fetchBack(t.url, t.mime, { log: (m, k) => d.log(m, k) });
+      if (!blob) continue;
+      const part = { n: parts.length + 1, hue: videoHue(parts.length), mime: t.mime,
+                     blobs: [], chunks: [], bytes: blob.size, startMs: totalMs,
+                     lenMs: null, video: null, manifest: t.url, expiresAt: t.expiresAt, from: 'r2' };
+      part.url = URL.createObjectURL(blob);
+      const v = el('video', '', null, { playsinline: '', muted: '' });
+      v.muted = true; v.hidden = true;
+      armVideo(v); v.autoplay = false; v.src = part.url;
+      seq.append(v); part.video = v;
+      part.lenMs = Math.round((await resolveDuration(v)) ?? 0);
+      if (!part.lenMs) continue;
+      part.startMs = totalMs; totalMs += part.lenMs;
+      parts.push(part);
+      deck.setRange([0, Math.round(totalMs)]);
+      if (!active) handOver(part, 0);
+      if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); tick(); })(); }
+      const mins = Math.round((new Date(t.expiresAt) - Date.now()) / 60000);
+      d.log(`take ${part.n} back from R2, ${(part.lenMs / 1000).toFixed(2)}s \u00b7 `
+        + `${Math.floor(mins / 60)}h ${mins % 60}m left`, 'hi');
+    }
+    paint();
+  }
+  if (useR2) restore();
 
   d.ready();
 </script>
