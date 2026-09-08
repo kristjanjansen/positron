@@ -182,11 +182,20 @@ function drawFilters({ epoch, hue = 0, row = false }) {
  * first ~20 s. A video-only stream has no audio group at all. If the stutter
  * disappears there, audio is the cause; if it survives, it is not.
  */
+// THE RTMPS LEG NEVER DRAWS THE ROW, whatever PUB_ROW says.
+//
+// The row costs +16 % encoder CPU (measured) and this box is 1 vCPU carrying
+// TWO 720p30 encodes. Nothing reads the LL-HLS picture programmatically — the
+// row exists so a RECEIVER can decode the publisher's clock out of the pixels,
+// and the receiver on that path is a human watching a video. Paying for it
+// twice to use it once is what the flag used to do.
+//
+// `row` is therefore accepted and ignored here; the WHIP leg honours it.
 function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av', row = false }) {
   const gop = fps * 2;
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = drawFilters({ epoch, hue: 0, row });
+  const draw = drawFilters({ epoch, hue: 0, row: false });   // see the note above
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
   return [

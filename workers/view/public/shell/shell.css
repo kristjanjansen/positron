@@ -22,7 +22,10 @@ body {
 :focus-visible { outline: 2px solid var(--hi); outline-offset: 2px; }
 
 /* ── head ─────────────────────────────────────────────────────────────── */
-.d-head { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; }
+/* NO RULE UNDER THE INTRO. The heading, the sentence under it and the space
+   below already separate it from the page; a line as well is a third channel
+   saying what two are saying. Spacing kept, so nothing moves. */
+.d-head { padding-bottom: 12px; margin-bottom: 16px; }
 .d-back {
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); text-decoration: none; display: inline-block; margin-bottom: 10px;
