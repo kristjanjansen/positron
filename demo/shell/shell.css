@@ -192,6 +192,23 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 .tbar-badge:empty { display: none; }
 
 /* ── strip ────────────────────────────────────────────────────────────── */
+/* THE SURFACES YOU DRAG DO NOT TAKE A TEXT SELECTION.
+   On iOS a press-and-drag on a canvas starts a selection and pops the callout
+   menu, so scrubbing the strip selected the page instead of seeking — reported
+   from a phone, with the handles sitting across the strip.
+
+   `pan-y`, not `none`: the strip seeks on a HORIZONTAL drag, and it is a big
+   target near the middle of a long page. `none` would take the gesture and
+   leave no way to scroll past it. This gives horizontal drags to the strip and
+   leaves vertical ones to the page.
+
+   Selection is off HERE ONLY. The prose, the readout and the log stay
+   selectable, because copying a number out of them is a real thing to want. */
+.d-strip, .tbar {
+  touch-action: pan-y;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
 .d-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
