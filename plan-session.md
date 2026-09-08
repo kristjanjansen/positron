@@ -1,8 +1,11 @@
 # plan-session — a show off the wire, laid on one line, kept for six hours
 
-Status: **not started.** §1a is the recommended build and is NOT blocked;
-the Cloudflare variant in §1/§3 is, on a container deploy. Written 2026-09-08
-out of `take`. Proposed slug **`keep`**, Act 3 (*capture and return*), after
+Status: **not started, and no longer blocked.** **§1b is the build** — a
+Worker proxies the WHIP handshake, a browser publishes, and no container is in
+the path. §1a is the fallback; §1/§3 are the original container variant and are
+superseded.
+
+Written 2026-09-08 out of `take`. Proposed slug **`keep`**, Act 3 (*capture and return*), after
 `show`.
 
 Read `plan-take.md` first — this extends it and contradicts it in exactly one
@@ -32,6 +35,71 @@ token-gated, and a public page cannot hold a token. That is why `ingest` exists
 at all, and blurring the two is the thing `CLAUDE.md` explicitly forbids.
 
 And `take`'s central claim does not survive the move. §3 is the whole plan.
+
+---
+
+## 1b. THE ANSWER — a Worker, not a container and not peer-to-peer
+
+Added after §1a, from the follow-up: *"It can be just worker, no?"* Yes, and it
+is better than both the container and §1a. **This is the recommended build; §1a
+is the fallback if it does not stand up.**
+
+The container was never needed to MAKE a live source — a browser publishes WHIP
+today (§1a). It was needed to KEEP A SECRET. But the secret is already in a
+Worker: `workers/pub/worker.mjs` reads `env.STREAM_KEY` and `env.WHIP_URL`. So
+the Worker can hand the browser a live input without ever handing it the key.
+
+**Why this is only signalling, which is what makes it cheap.** WHIP to
+Cloudflare is **single-shot SDP with no trickle** — `rig/whep/publish.html` says
+so in as many words, after paying for the knowledge. So the exchange is one POST
+of an offer and one answer. Media then flows browser ↔ Cloudflare over
+ICE/DTLS/SRTP **directly**; it never crosses the Worker. A Worker cannot carry
+media and does not have to.
+
+    browser  --offer SDP-->  Worker  --offer + KEY-->  Cloudflare
+    browser  <--answer SDP-- Worker  <--answer------   Cloudflare
+    browser  ================= media (direct) =======  Cloudflare
+
+**What it needs to do**, and it is small:
+
+1. `POST /whip` — take the browser's offer, forward it to `env.WHIP_URL`, return
+   the answer. The answer SDP carries ICE candidates and a DTLS fingerprint and
+   **no credential**, so returning it is safe.
+2. **Hide the resource URL.** WHIP returns a `Location` for ICE restart and
+   DELETE, and on Cloudflare that URL is itself credential-bearing. The Worker
+   mints an opaque id, keeps the mapping, and proxies `DELETE /whip/<id>`.
+   Returning the raw `Location` would leak the thing this design exists to hide.
+3. **Rate-limit it.** A tokenless publish proxy lets anyone push video into our
+   Stream input. This is the one new risk the design creates and it is not
+   hypothetical: `ingest` exists in exactly this shape for exactly this reason.
+   Reuse its discipline — per-address caps and a TTL in one Durable Object — and
+   do not invent a second scheme.
+
+**What it buys over §1a:** the REAL Cloudflare path. Ingest, packager, edge, and
+both outputs. §1a's peer-to-peer tests none of that, and "can a live stream be
+recorded and scrubbed afterwards" is a question about that path.
+
+**What it buys over the container:** every blocker. No image rebuild, no
+`PUB_ROW`, no +16 % encoder CPU on one core carrying two encodes — and no
+ffmpeg at all in this demo's path.
+
+**And §3's hard problem is simply gone.** The publisher is a browser running
+`burn()`, so the picture carries the row already and the clock in it is a clock
+we control. `take`'s claim survives intact and is stronger than `take`'s own
+version, because the number is committed to pixels before the picture crosses a
+real ingest, a real packager and a real edge — and the receiving page cannot
+fake a number it did not write.
+
+**What still costs, unchanged and not dodged:** it is a real Stream live input,
+so `recording.mode: automatic` still applies, recording still cannot be turned
+off, and every minute published is storage minutes against the 1000-minute cap.
+§5's arithmetic stands. Publish only while a take is recording rather than for
+the page's lifetime, and say the number on the page.
+
+**Open question, and it decides P1:** whether Cloudflare TRANSCODES a WHIP
+ingest before serving WHEP. If it does, the row must survive that transcode, and
+§12.1 is still the thing to measure first — but it can now be measured with a
+browser and a Worker, in an afternoon, instead of behind a container deploy.
 
 ---
 
