@@ -564,7 +564,12 @@
   async function restore() {
     const saved = remembered();
     if (!saved.length) return;
-    d.log(`${saved.length} recording${saved.length > 1 ? 's' : ''} still in R2 — fetching them back`, 'hi');
+    // WHAT THIS LIST IS, said plainly: a note this browser made to itself. It is
+    // not an index — another device sees nothing, and Safari clears it after a
+    // week without a visit, so the note can die while the file it points at is
+    // still there. The six-hour TTL is what keeps that from mattering here.
+    d.log(`${saved.length} recording${saved.length > 1 ? 's' : ''} still in R2 — fetching them back. `
+      + `This list is a note THIS BROWSER made; another device would see none of them`, 'hi');
     for (const t of saved) {
       const blob = await fetchBack(t.url, t.mime, { log: (m, k) => d.log(m, k) });
       if (!blob) continue;
