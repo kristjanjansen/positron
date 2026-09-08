@@ -29,7 +29,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el, armVideo } from '/shell/shell.mjs';
+  import { mount, guard, el } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -46,7 +46,13 @@
       + 'in days rather than seconds. Press a film to play it: the video streams from '
       + 'ERR at that moment and nothing is stored here. Everything on the page comes '
       + 'from ERRarhiiv and every film links back to it.',
+    // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
+    // the lane's gutter, the date in the film's own title line AND in the
+    // transport bar, the length in the tooltip. A second table saying the same
+    // things is a second place to keep in step and one more thing between the
+    // reader and the year.
     readout: { films: '', picked: '', length: 'min' },
+    showReadout: false,
     // NO CONTROLS. The line IS the control — a button that plays "the first
     // film" is a second way to do the one thing the strip already does, and it
     // implies an order the year does not have.
@@ -86,12 +92,20 @@
   const SERIES = 'AK filmikroonika 1958-1991';
   let items = [], current = null;
 
-  // A film is a PART on the line — a container placed at a position. It has no
-  // measured length until it is played: the catalogue's own duration and the
-  // media's disagree (measured, plan-archive-timeline §3), so a bar drawn from
-  // the catalogue would be drawing a claim as though it were a measurement.
-  // Until a film is played it is one DAY wide, which is the precision the
-  // catalogue actually has.
+  // A film is a PART on the line, and it is ONE DAY WIDE — always, before and
+  // after it has been played.
+  //
+  // The bar's width is what the catalogue KNOWS, and what it knows is the day.
+  // Every `at` here is UTC midnight: ERR records the broadcast date and not the
+  // time of day. So drawing a played film at its measured 2.3 minutes was two
+  // mistakes at once — it claimed the film aired at 00:00, which nobody knows,
+  // and on a week-wide axis 137 seconds is a single pixel, so selecting a film
+  // made it VANISH. Reported as "playback loses the bar", and the bar was right
+  // to be lost: it was drawing a precision that does not exist.
+  //
+  // The measured length is a real number and it goes where a real number can be
+  // read — the readout and the tooltip — not into a width that would state a
+  // start time we do not have.
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
@@ -99,19 +113,39 @@
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
     rows: () => items.map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
-      payload: { durMs: it.playedMs ?? DAY, ...it },
+      payload: { durMs: DAY, ...it },
     })),
     describeRow: (r) => [
       r.payload.title?.slice(0, 46) ?? '',
-      `${r.payload.date}${r.payload.playedMs ? ` · ${(r.payload.playedMs / 60000).toFixed(1)} min` : ''}`,
+      r.payload.playedMs
+        ? `${r.payload.date} · ${(r.payload.playedMs / 60000).toFixed(1)} min long`
+        : `${r.payload.date} · broadcast that day, time unknown`,
     ],
   });
 
+  // STEP THROUGH THE YEAR. 282 films at a week to a screen means the next one is
+  // often off the edge, and hunting for it by dragging is not navigation. These
+  // are transport verbs — they move the playhead and change what is showing —
+  // so they belong on the bar rather than beside the page, which is what
+  // `extras` exists for.
+  const step = (by) => {
+    if (!items.length) return;
+    const i = current ? items.indexOf(current) : -1;
+    const next = items[Math.max(0, Math.min(items.length - 1, i + by))];
+    if (next && next !== current) play(next);
+    else if (!current) play(items[0]);
+  };
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
     // A DATE, not a duration. `0:03.910` is the right answer for a deck of
     // seconds and a meaningless one for a deck of 1965.
     fmt: (pos) => iso(pos),
+    extras: [
+      { id: 'prev', label: '\u23EE', aria: 'Previous film', title: 'the film before this one',
+        onClick: () => step(-1) },
+      { id: 'next', label: '\u23ED', aria: 'Next film', title: 'the film after this one',
+        onClick: () => step(1) },
+    ],
   });
   const view = createStripView(d.el, deck, {
     size: 'auto', follow: false, armWall: false, gutter: 150,
@@ -147,6 +181,15 @@
   async function play(it) {
     current = it;
     d.set('picked', it.date);
+    d.set('length', null);
+    // The playhead goes to the day the film was broadcast, and the view follows
+    // if the film is off the edge — stepping to something you cannot see is not
+    // stepping to it.
+    deck.seek(it.at);
+    const v = view.strip.view();
+    const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
+    const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
+    if (it.at < left || it.at > left + span) view.strip.fit(it.at - DAY, it.at - DAY + 7 * DAY);
     pickedTitle.replaceChildren(document.createTextNode(`${it.title} · ${it.date} · `));
     const a = el('a', '', 'at ERRarhiiv');
     a.href = `${ARHIIV}/video/vaata/${it.slug}`;
@@ -175,9 +218,25 @@
     const src = raw.startsWith('//') ? `https:${raw}` : raw;
     delete film.dataset.empty;
     film.controls = true;
-    armVideo(film);
     film.src = src;
-    film.play().catch(() => {});
+
+    // WITH SOUND. `armVideo` mutes — that is its whole job, buying autoplay on a
+    // page that never got a gesture — and using it here made every newsreel
+    // silent. This play came FROM a gesture (a press on the line), so sound is
+    // allowed and these films have it: AAC in its own group, alongside
+    // renditions up to 1920x1080.
+    //
+    // The fallback is still there and is still needed: a browser may refuse
+    // anyway, and a muted picture beats no picture. But it is the fallback now,
+    // not the default.
+    film.muted = false;
+    try {
+      await film.play();
+    } catch {
+      film.muted = true;
+      await film.play().catch(() => {});
+      d.log('the browser refused sound — playing muted; press play to hear it', 'bad');
+    }
     d.log(`playing ${it.slug} — streamed from ERR, nothing stored here`, 'hi');
     film.addEventListener('loadedmetadata', () => {
       if (!Number.isFinite(film.duration)) return;
@@ -222,7 +281,7 @@
       view.strip.report?.().absolute === true || true, iso(deck.position()));
     d.assert('nothing is stored — no media in the fixture',
       !JSON.stringify(items[0]).match(/https?:|\.m3u8|\.mp4/), 'catalogue metadata only');
-    d.log('press a film on the line to play it, or use the button', 'hi');
+    d.log('press a film on the line, or step through the year with the arrows', 'hi');
     d.ready();
   })().catch((e) => d.fail(e));
 </script>
