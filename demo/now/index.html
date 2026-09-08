@@ -218,10 +218,18 @@
     try {
       const pl = await readPlaylist(CHANNEL.url);
       playlist = pl; edgeMs = pl.edge ?? edgeMs; windowS = pl.windowS || windowS;
-      const before = deck.position();
+      // ASK WHETHER THE POSITION WAS OUTSIDE, do not compare it with itself.
+      // `deck.position()` is derived from the transport vector and the clock,
+      // so while the picture is playing it advances between any two reads —
+      // the old check compared a moving quantity across two statements and
+      // announced that the window had eaten your position roughly once a
+      // second, in red, on a page that was working perfectly.
+      const reach = windowS ? windowS * 1000 : REACH_MS;
+      const pos = deck.position();
+      const outside = pos < edgeMs - reach || pos > edgeMs;
       setRange();
-      if (deck.position() !== before)
-        d.log(`the window ate your position — moved forward to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
+      if (outside)
+        d.log(`the window ate your position — moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
       d.set('edge', ((Date.now() - edgeMs) / 1000).toFixed(1));
     } catch { /* one missed refresh is not an event */ }
   }, 1000 / RANGE_HZ);
