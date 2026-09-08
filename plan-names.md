@@ -105,16 +105,21 @@ merge is worth it; doing it carelessly is not.
 
 | now | proposed |
 |---|---|
-| `ingest.positron.studio` + `selfrec.positron.studio` | **`save.positron.studio`** |
+| `ingest.positron.studio` + `selfrec.positron.studio` | **`upload.positron.studio`** |
 | `archive.positron.studio` | unchanged — where it is READ |
 
-**`save`**, and it was `store` for about an hour until someone read it and asked
+**`upload`**, and it was `store` then `save` for about an hour until someone read it and asked
 "what is store?". That is this plan's own acceptance test failing in one word
 (§8.6): a name you have to ask about has not done its job. `store` is a noun
 before it is a verb — it reads like a shop.
 
-`save` is a verb a child knows, and it pairs into a sentence: **save it, then
-find it in the archive.**
+`upload` is what a person thinks they are doing, and that beats what the system
+thinks is happening. `save` was the second guess and is a better VERB — but it
+is the browser's word for writing a file to disk, so on a page that also records
+locally it is ambiguous about where the thing went. `upload` never is: it means
+away from here.
+
+The pair reads **upload it, then find it in the archive.**
 
 **Why there are two hostnames at all**, since one would be tidier: checked, and
 `archive.positron.studio` is the R2 bucket's OWN custom domain — no Worker in
@@ -302,9 +307,9 @@ and `keep` are green at their committed counts with no page change.
 merged worker with their token. **Done when** they work and `elektron-selfrec`
 has served nothing for a week.
 
-**P3 — the name.** Attach `save.positron.studio` with `wrangler triggers
+**P3 — the name.** Attach `upload.positron.studio` with `wrangler triggers
 deploy` (routes only, no re-upload), move the callers, rename
-`demo/shell/ingest.mjs` → `demo/shell/save.mjs`. Leave the old hostnames
+`demo/shell/ingest.mjs` → `demo/shell/upload.mjs`. Leave the old hostnames
 attached: they cost nothing, and keeping `*.workers.dev` plus the old custom
 domains is why the 2026-09-04 move broke no links. **Done when** nothing in
 `demo/` or `proto/` names the old hosts and `build.mjs` passes — proved once by
@@ -354,7 +359,7 @@ harnesses `verify.mjs` cannot cover, so nothing goes red when they rot.
    response.
 2. Four asserts prove that no header, an empty header, a malformed header and a
    wrong token all resolve to the OPEN tier.
-3. `save.positron.studio` serves; the old hostnames still do.
+3. `upload.positron.studio` serves; the old hostnames still do.
 4. `elektron-selfrec` is deleted, and nothing noticed.
 5. `CLAUDE.md`, `HANDOFF.md` and `SUMMARY.md` describe one path with two tiers,
    by what they do — one forgets in six hours, one does not.
