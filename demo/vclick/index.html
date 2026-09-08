@@ -86,7 +86,11 @@
 
   const d = mount({
     name: 'vclick',
-    what: 'A Csound score, compiled as you type. The tempo bends, the repeat stays one line, and you can drop into the middle and still know what is in force.',
+    what: 'A Csound score, compiled as you type. Csound counts in beats, not seconds, so '
+      + 'a changing tempo pulls the two apart: evenly numbered beats, unevenly spaced '
+      + 'in time. Part 2 is part 1 again, the same seven lines, played slower because '
+      + 'it falls under the slowing tempo. Drop the playhead anywhere and the count of '
+      + 'what has sounded is exact, which a file of notes cannot tell you.',
     readout: { rows: '', uses: '', bend: 'ms', beat: '', fold: '', sounded: '' },
     // the numbers sit under the lane that owns them; this row would repeat them
     // with less context. Still published for CDP.
@@ -97,14 +101,6 @@
   });
   guard(d);
 
-  d.how(
-    `Csound counts in beats, not seconds, and a tempo that changes makes the ` +
-    `two come apart — evenly numbered beats, unevenly spaced in time. Part 2 ` +
-    `is part 1 again, the same seven lines, played slower because it falls ` +
-    `under the slowing tempo: same music, wider on the timeline. Edit the ` +
-    `score and everything recompiles; drop the playhead anywhere and the count ` +
-    `of what has sounded is exact, which a file of notes cannot tell you.`,
-  );
 
   // ── ink: one hue per part, the same in the strip and in the document ─────
   const INK = { on: '#ffd400', off: '#6b5a12' };

@@ -33,7 +33,12 @@
   const d = mount({
     name: 'room',
     what: 'Open this page twice and each window shows the other. The picture goes '
-        + 'straight between them; the server only introduces them to each other.',
+      + 'straight between them — the server only passes the two of them each other\'s '
+      + 'address, then has nothing more to do with the video. Every picture carries '
+      + 'the same clock the rest of this site burns, so a far window\'s number read '
+      + 'against yours is how far behind it is. FIRST is how long someone else\'s '
+      + 'picture took to appear; SIZE is what has arrived so far, and it starts small '
+      + 'and climbs over about half a minute.',
     readout: { others: '', joined: '', first: 'ms', size: '', dropped: '' },
     controls: [
       { id: 'join', label: 'Join', primary: true },
@@ -42,15 +47,6 @@
   });
   guard(d);
 
-  d.how(
-    `Each window makes a picture, then hands it to the other window directly — `
-    + `the server in the middle only passes the two of them each other's address `
-    + `and then has nothing more to do with the video. Every picture carries the `
-    + `same clock the rest of this site burns, so you can see how far behind a `
-    + `far-off window is by reading its number against yours. FIRST is how long `
-    + `it took, from pressing Join, for someone else's picture to appear. Each `
-    + `window gets its own colour.`,
-  );
 
   const grid = el('div', 'grid');
   d.el.append(grid);

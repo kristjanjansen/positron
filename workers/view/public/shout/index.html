@@ -47,7 +47,13 @@
 
   const d = mount({
     name: 'shout',
-    what: 'An Icecast stream through Cloudflare. The relay adds CORS, which is what makes every number here readable.',
+    what: 'An Icecast stream relayed through a worker of ours, which adds the permission '
+      + 'header the station omits — that is the whole product, and the audio is '
+      + 'untouched. Without it a browser can play the stream and nothing else: no '
+      + 'reading it, no measuring it. TTFB is the wait for the first byte, KBPS the '
+      + 'settled rate, BURST the seconds of audio that arrive faster than realtime to '
+      + 'fill your buffer, GAP the worst pause between chunks. LOUDNESS is the sound '
+      + 'itself — every other number would look the same for a stream of silence.',
     // No `station` cell: it is a NAME, it never changes, and a constant in a
     // row of measurements teaches the reader to skim the row. It is in the log
     // line and in the station's own `icy-name`.
@@ -61,19 +67,6 @@
   });
   guard(d);
 
-  d.how(
-    `A radio station's stream is fetched through a worker of ours and handed to `
-    + `the page. The station sends no permission header, so a browser cannot read `
-    + `its bytes directly — putting one in front is the entire product, and `
-    + `nothing about the audio is changed on the way. TTFB is how long the first `
-    + `byte took. KBPS is the rate once it settles, which should be the station's `
-    + `own. BURST is how many seconds of audio arrive FASTER than realtime when `
-    + `you connect: it is what fills a listener's buffer before playback catches `
-    + `up with the wire. GAP is the longest pause between arriving chunks, near `
-    + `the worst of them. LOUDNESS is the sound itself, from 0 to 1 — every other `
-    + `number here would look exactly the same for a stream of silence, so it is `
-    + `the one that says audio arrived rather than bytes.`,
-  );
 
   const who = el('div', 'who', `${BASE}/${STATION}.mp3`);
   d.el.append(who);
