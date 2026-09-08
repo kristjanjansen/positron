@@ -124,8 +124,8 @@ async function webTransportFor(url, force) {
 // The pattern used to be drawn here, in a copy of rig/whep/publish.html's
 // loop. It now lives in ONE place — demo/shell/pattern.mjs — which also carries
 // the ffmpeg rendering of the same spec, so the geometry cannot drift between a
-// canvas publisher and an ffmpeg one. Re-exported because `moq` and `ladder`
-// (and any future reader) know this module's name.
+// canvas publisher and an ffmpeg one. Re-exported because `moq` (and any future
+// reader) knows this module's name.
 export { ROW, burn, readBurned, hueFor };
 
 /**
@@ -258,7 +258,19 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     const decoder = new VideoDecoder({
       output: (vf) => {
         const recv = performance.timeOrigin + performance.now();
-        octx.drawImage(vf, 0, 0, w, h);
+        // MATCH THE SOURCE, do not force it into ours. `drawImage(vf,0,0,w,h)`
+        // scaled every frame into the local 1280x720 whatever the publisher
+        // actually sent — which distorts a picture of any other shape, and is
+        // worse than cosmetic here: `readBurned` samples FIXED coordinates, so
+        // a scaled row is read at the wrong pixels. A remote publisher's size
+        // is its own business; the receiver's job is to show it as it is.
+        const fw = vf.displayWidth || vf.codedWidth, fh = vf.displayHeight || vf.codedHeight;
+        if (fw && fh && (out.width !== fw || out.height !== fh)) {
+          out.width = fw; out.height = fh;                     // this also CLEARS it
+          out.style.aspectRatio = `${fw} / ${fh}`;
+          log(`output sized to the source — ${fw}x${fh}`);
+        }
+        octx.drawImage(vf, 0, 0);
         vf.close();
         st.decoded++;
         if (st.firstFrameMs == null) {

@@ -55,10 +55,6 @@ export const DEMOS = [
   { name: 'moq', act: 1, built: true, settleMs: 20000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
-  { name: 'ladder', act: 1, built: true,
-    one: 'one source, two transports, the same clock burned into both pictures',
-    tags: ['LL-HLS', 'WHEP', 'container'],
-    settleMs: 80000 },
 
   { name: 'room', act: 2, built: true,
     one: 'join a room and see the others; peer to peer, the relay only signals',

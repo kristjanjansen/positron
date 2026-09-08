@@ -274,6 +274,30 @@ export async function playOrPrompt(v, d) {
  * question and is unverified here — no iOS device has ever run these pages.
  * This fixes recording, and claims only that.
  */
+/**
+ * Keep a <video> the shape of what is INSIDE it.
+ *
+ * An element with a width and no height uses the intrinsic ratio — but only
+ * once metadata has arrived. Before that a video is 300x150, so a 16:9 stream
+ * starts life in a 2:1 box and the page jumps when the first frame lands; a
+ * portrait phone stream jumps further. And any page that pins a height gets a
+ * letterbox inside a box that is the wrong shape to begin with.
+ *
+ * So: a stated ratio up front, replaced by the real one as soon as the source
+ * says what it is, and again if it CHANGES — an SFU can switch a sender's
+ * resolution mid-call, and `resize` is the only event that reports it.
+ */
+export function matchAspect(v, fallback = '16 / 9') {
+  const apply = () => {
+    const w = v.videoWidth, h = v.videoHeight;
+    v.style.aspectRatio = w && h ? `${w} / ${h}` : fallback;
+  };
+  apply();
+  v.addEventListener('loadedmetadata', apply);
+  v.addEventListener('resize', apply);          // the sender changed resolution
+  return v;
+}
+
 export function recorderMime(d, kinds = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8',
   'video/webm', 'video/mp4;codecs=avc1.42E01E', 'video/mp4']) {
   const MR = window.MediaRecorder;
