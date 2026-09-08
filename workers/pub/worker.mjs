@@ -18,6 +18,7 @@
 import { Container, getContainer } from '@cloudflare/containers';
 
 const SWEEP_MS = 30_000;   // alarm cadence
+const WHIP_PER_HOUR = 20;  // browser publishes allowed per hour, DO-counted
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
 const NAME = 'p1';
 const LOG_KEEP = 400;          // ring buffer of device reports
@@ -29,6 +30,9 @@ export class Pub extends Container {
   sleepAfter = '10m';
 
   #idleTicks = 0;
+  /** browser WHIP publishes: rate-limit stamps, and id -> resource URL */
+  #whipHits = [];
+  #whipRes = new Map();
   /** Ring buffer of device reports. Diagnostic; dies with the DO. */
   #log = [];
 
@@ -122,6 +126,86 @@ export class Pub extends Container {
     if (url.pathname === '/stop' && request.method === 'POST') {
       await this.#stopPublish();
       return json({ ok: true });
+    }
+
+    // ── a browser publishes, and never sees the key ───────────────────────
+    //
+    // WHY THIS EXISTS. A browser can publish WHIP perfectly well —
+    // `rig/whep/publish.html` has done it from a canvas for months. What it
+    // cannot do is HOLD THE CREDENTIAL: Cloudflare's WHIP publish URL carries
+    // the stream key in its path, and a public page cannot keep a secret. That
+    // is the ONLY reason the ffmpeg container was in this path at all.
+    //
+    // WHIP to Cloudflare is single-shot SDP with no trickle (measured, see
+    // rig/whep/publish.html), so this is one POST of an offer and one answer.
+    // Media then flows browser <-> Cloudflare directly over ICE/DTLS/SRTP and
+    // NEVER crosses this worker. A worker cannot carry media and does not have
+    // to; it carries thirty lines of signalling.
+    if (url.pathname === '/whip' && request.method === 'POST') {
+      const whip = this.env.WHIP_URL;
+      if (!whip) return json({ error: 'no WHIP_URL configured' }, 503);
+
+      // A tokenless publish proxy is an open door to our live input, so it gets
+      // the same discipline `ingest` has: a small per-hour cap, counted here
+      // because a DO is the only place two requests cannot both pass a check.
+      const now = Date.now();
+      this.#whipHits = (this.#whipHits || []).filter((t) => now - t < 3600_000);
+      if (this.#whipHits.length >= WHIP_PER_HOUR) {
+        return json({ error: 'too many publishes this hour', limit: WHIP_PER_HOUR }, 429);
+      }
+
+      // The container publishes to the SAME input. Two publishers is one
+      // publisher and a fight, so hand the input over rather than race for it.
+      if (this.viewers() === 0) await this.#stopPublish();
+
+      const offer = await request.text();
+      let up;
+      try {
+        up = await fetch(whip, {
+          method: 'POST',
+          headers: { 'content-type': 'application/sdp' },
+          body: offer,
+        });
+      } catch (e) {
+        return json({ error: `whip upstream: ${e.message}` }, 502);
+      }
+      if (!up.ok) return json({ error: `whip upstream ${up.status}`, detail: (await up.text()).slice(0, 200) }, 502);
+
+      // THE `Location` IS ITSELF A CREDENTIAL on Cloudflare — it addresses this
+      // session under the same secret path. Handing it back would leak exactly
+      // what this endpoint exists to hide, so it is kept here behind an opaque
+      // id and DELETE is proxied.
+      const loc = up.headers.get('location');
+      const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      this.#whipRes = this.#whipRes || new Map();
+      this.#whipRes.set(id, { url: loc ? new URL(loc, whip).toString() : null, at: now });
+      this.#whipHits.push(now);
+      for (const [k, v] of this.#whipRes) if (now - v.at > 6 * 3600_000) this.#whipRes.delete(k);
+
+      return new Response(await up.text(), {
+        status: 201,
+        headers: {
+          'content-type': 'application/sdp',
+          'access-control-allow-origin': '*',
+          'access-control-expose-headers': 'x-whip-id',
+          'x-whip-id': id,
+        },
+      });
+    }
+    if (url.pathname.startsWith('/whip/') && request.method === 'DELETE') {
+      const id = url.pathname.slice('/whip/'.length);
+      const rec = this.#whipRes?.get(id);
+      if (!rec) return json({ error: 'unknown publish' }, 404);
+      this.#whipRes.delete(id);
+      if (rec.url) { try { await fetch(rec.url, { method: 'DELETE' }); } catch { /* gone */ } }
+      return json({ ok: true }, 200);
+    }
+    if (url.pathname === '/whip' && request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'POST,DELETE,OPTIONS',
+        'access-control-allow-headers': 'content-type',
+      } });
     }
 
     return json({ error: 'use /watch /status /start /stop' }, 404);
