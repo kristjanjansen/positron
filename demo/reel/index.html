@@ -254,14 +254,17 @@
   // so they belong on the bar rather than beside the page, which is what
   // `extras` exists for.
   const step = (by) => {
-    // Step within the lane you are in: pressing next while listening to radio
-    // should hand you the next broadcast, not the next silent newsreel.
-    const list = current?.kind === 'audio' ? radio : items;
-    if (!list.length) return;
-    const i = current ? list.indexOf(current) : -1;
-    const next = list[Math.max(0, Math.min(list.length - 1, i + by))];
+    // ALWAYS THROUGH THE NEWSREELS. They are the weekly series and the thing
+    // the year is made of; the radio is what happened to survive alongside and
+    // it comes along whenever a date matches. Stepping by broadcast rather
+    // than by index, so landing on a sound-only day and pressing next still
+    // moves to the next film rather than the film after the one before it.
+    if (!items.length) return;
+    const at = current ? current.at : deck.position();
+    const next = by > 0
+      ? items.find((v) => v.at > at) || items[items.length - 1]
+      : [...items].reverse().find((v) => v.at < at) || items[0];
     if (next && next !== current) play(next);
-    else if (!current) play(list[0]);
   };
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
@@ -310,7 +313,7 @@
   // media url, then the element is given that URL. The page never holds the
   // bytes: no fetch of segments, no blob URL over them, nothing to R2 or to
   // localStorage. A copy is the one thing this must not make.
-  async function play(it) {
+  async function play(it, armed = false) {
     // BLESS THE ELEMENT NOW, before anything is awaited.
     //
     // A user gesture does NOT survive an `await`. This function fetches the
@@ -323,7 +326,7 @@
     // Calling `play()` synchronously inside the gesture marks the element as
     // user-activated even though it rejects for having no source yet. That
     // rejection IS the mechanism, not a failure.
-    (it.kind === 'audio' ? wireless : film).play().catch(() => {});
+    if (!armed) (it.kind === 'audio' ? wireless : film).play().catch(() => {});
 
     current = it;
     d.set('picked', it.date);
@@ -390,7 +393,7 @@
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = su;
       else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
       wireless.muted = false;
-      wireless.play().catch(() => {});
+      if (!armed) wireless.play().catch(() => {});
       d.log(`paired with the same day's radio — ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
     } else if (picture) {
       d.log('no radio survives from this day — the newsreel plays silent');
@@ -405,7 +408,7 @@
       film.muted = false;
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) film.src = su;
       else { hls = window.__hls = new window.Hls({ enableWorker: true }); hls.loadSource(su); hls.attachMedia(film); }
-      await film.play().catch(() => {});
+      if (!armed) await film.play().catch(() => {});
       d.log(`playing ${sound.slug} — radio, streamed from ERR, nothing stored here`, 'hi');
       return;
     }
@@ -437,6 +440,7 @@
     // anyway, and a muted picture beats no picture. But it is the fallback now,
     // not the default.
     film.muted = false;
+    if (armed) { d.log(`${picture.slug} is loaded — press play`); return; }
     try {
       await film.play();
     } catch {
@@ -566,8 +570,8 @@
     const openOn = items.find((i) => radioDays.has(i.date)) || items[0];
     view.strip.fit(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
     firstPick = openOn;
-    fill(colFilm, openOn, 'video');
-    fill(colRadio, radio.find((r) => r.date === openOn.date) || null, 'audio');
+    deck.seek(openOn.at);
+    play(openOn, true);        // load it and show its first frame; do not start it
     // Reachable from the harness, the way `window.__hls` is: a press on the
     // line is the page's only way in, so a check that cannot find the line
     // cannot test anything the page actually does.
