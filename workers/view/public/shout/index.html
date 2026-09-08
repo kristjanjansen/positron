@@ -14,6 +14,7 @@
      thing this lane must never do. Silence is now blank. */
   .bars i { flex: 1; background: var(--hi); border-radius: 1px; opacity: .85; }
   .who { font: 500 10.5px/1.5 var(--mono); color: var(--dim2); margin: 0 0 8px; word-break: break-all; }
+  .now { font: 600 13px/1.5 var(--mono); color: var(--hi); margin: 0 0 10px; min-height: 20px; }
 </style>
 
 <script type="module">
@@ -77,6 +78,16 @@
   const who = el('div', 'who', `${BASE}/${STATION}.mp3`);
   d.el.append(who);
 
+  // WHAT THE STATION IS SAYING, in band. This is the same one-per-second text
+  // slot a cue would ride in, so showing it is showing the channel exists.
+  const nowEl = el('div', 'now', '');
+  d.el.append(nowEl);
+  let title = null;
+  function onTitle(t) {
+    nowEl.textContent = t;
+    d.log(`in-band title: ${t}`, 'hi');
+  }
+
   // crossOrigin is the whole point: it makes the media load a CORS load, which
   // the origin would refuse and the relay allows — and only a CORS-loaded
   // element may be wired into a WebAudio graph.
@@ -131,15 +142,53 @@
     const t0 = performance.now();
     const ctrl = new AbortController();
     const stop = setTimeout(() => ctrl.abort(), MEASURE_MS);
-    const rec = { ttfb: null, first: null, bytes: 0, chunks: 0, gaps: [], marks: [], headers: {}, status: 0, error: null };
+    const rec = { ttfb: null, first: null, bytes: 0, chunks: 0, gaps: [], marks: [], headers: {}, status: 0, error: null, slots: 0, filled: 0 };
     try {
-      const res = await fetch(`${BASE}/${STATION}.mp3`, { signal: ctrl.signal, cache: 'no-store' });
+      // `Icy-MetaData: 1` opts into the IN-BAND text channel. The relay
+      // forwards the header and exposes `icy-metaint`, so the whole thing works
+      // end to end without it having to parse anything.
+      const res = await fetch(`${BASE}/${STATION}.mp3`,
+        { signal: ctrl.signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' } });
       rec.ttfb = performance.now() - t0;
       rec.status = res.status;
       for (const k of ['icy-name', 'icy-br', 'icy-metaint', 'content-type', 'x-shout-ttfb']) {
         const v = res.headers.get(k);
         if (v) rec.headers[k] = v;
       }
+      // ── the in-band text channel ───────────────────────────────────────
+      // After every `icy-metaint` bytes of audio comes one length byte (x16)
+      // and that many bytes of text — `StreamTitle='…';StreamUrl='…'`. Almost
+      // every slot is EMPTY: the station only writes when something changes.
+      // Measured on Raadio Tallinn: metaint 16000 at 128 kbps, so one slot per
+      // second exactly, and 1 of 29 carried text over 25 s.
+      const metaint = Number(rec.headers['icy-metaint'] || 0);
+      let need = metaint, mode = 'audio', metaLen = 0, spare = new Uint8Array(0);
+      const eat = (chunk) => {
+        if (!metaint) return;
+        let b = spare.length ? concat(spare, chunk) : chunk;
+        for (;;) {
+          if (mode === 'audio') {
+            if (b.length < need) break;
+            b = b.subarray(need); mode = 'len';
+          } else if (mode === 'len') {
+            if (b.length < 1) break;
+            metaLen = b[0] * 16; b = b.subarray(1);
+            rec.slots++;
+            mode = metaLen ? 'meta' : 'audio'; if (!metaLen) need = metaint;
+          } else {
+            if (b.length < metaLen) break;
+            const txt = new TextDecoder('utf-8', { fatal: false })
+              .decode(b.subarray(0, metaLen)).replace(/\0+$/, '');
+            rec.filled++;
+            const t = /StreamTitle='([^']*)'/.exec(txt);
+            if (t && t[1] && t[1] !== title) { title = t[1]; onTitle(title); }
+            b = b.subarray(metaLen); mode = 'audio'; need = metaint;
+          }
+        }
+        spare = b;
+      };
+      const concat = (a, c) => { const o = new Uint8Array(a.length + c.length); o.set(a); o.set(c, a.length); return o; };
+
       const reader = res.body.getReader();
       let last = performance.now();
       for (;;) {
@@ -151,6 +200,7 @@
         rec.bytes += value.byteLength;
         rec.chunks++;
         rec.marks.push([rec.bytes, now - t0]);
+        eat(value);
       }
     } catch (e) {
       if (e.name !== 'AbortError') rec.error = `${e.name}: ${e.message}`;
