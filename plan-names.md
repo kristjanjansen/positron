@@ -1,134 +1,184 @@
-# plan-names — `ingest` and `selfrec` say nothing; what to call them instead
+# plan-names — one write path, tiered by credential, with a name that says what it does
 
-Status: **not started.** Written 2026-09-08, out of "rename ingest selfrec to
-something more understandable".
+Status: **not started.** Written 2026-09-08 out of "rename ingest selfrec to
+something more understandable", then rewritten after the better question:
+*"can they not share code, be one domain just different creds / quotas?"*
 
-Read `HANDOFF.md`'s "Why the Worker SCRIPT names are still `elektron-*`" before
-§2 — this plan is that decision applied a second time, and it is the reason the
-work is small.
+They can, and that is the plan. Renaming was the small half.
 
 ---
 
-## 0. What they are, in plain words
+## 0. What exists today
 
-Two places a recording can be written to R2. They differ in exactly two ways,
-and those two ways are the whole product:
+Two Workers that both write a recording to R2, differing in exactly two ways:
 
 | | `ingest.positron.studio` | `selfrec.positron.studio` |
 |---|---|---|
-| who may write | **anyone with the page open** | anything holding a token |
+| script | `positron-ingest` | `elektron-selfrec` |
+| who may write | **anyone with the page open** | anything holding `SELFREC_TOKEN` |
 | how long it lasts | **6 hours**, cron-enforced | forever |
-| caps | 5 sessions and 64 MiB per address per hour | none |
-| reading it back | `archive.positron.studio` | `archive.positron.studio` |
+| caps | 5 sessions + 64 MiB per address per hour | none |
+| Durable Object | `Quota` (sqlite) + an hourly cron | none |
+| read back at | `archive.positron.studio` | `archive.positron.studio` |
 
-The split exists for one reason that cannot be engineered away: **a public page
-cannot hold a secret.** Everything else follows.
+Same bucket, same read path, same job. **Two implementations of one thing,
+whose only real difference is who is asking.**
 
 ---
 
 ## 1. Why the names are wrong
 
-**`ingest`** is a broadcast-industry word for "getting material into a system".
-It describes the ACT from the system's side, tells a reader nothing about which
-of the two paths this is, and is on `CLAUDE.md`'s banned list in spirit — it is
-a word you have to already know.
+**`ingest`** is a broadcast word for "getting material in". It describes the act
+from the system's side and says nothing about which of the two paths this is.
 
-**`selfrec`** is worse: it is short for "self-recording", which is not what the
-service does. It is named after the technique that first used it — participants
-recording themselves in a grid — and that technique is one caller among several.
-A name that describes its first caller ages into a lie the moment there is a
-second.
+**`selfrec`** is worse: short for "self-recording", which is not what the service
+does. It is named after the technique that first used it — participants
+recording themselves in a grid — and a name that describes its first caller ages
+into a lie the moment there is a second.
 
-Neither name says the thing a reader actually needs: **one of these forgets in
-six hours and the other does not.**
+Neither says the thing a reader needs: **one of these forgets in six hours and
+the other does not.**
 
 ---
 
-## 2. What may be renamed, and what may not
+## 2. The decision: ONE worker, one domain, tiered by credential
 
-**Rename the HOSTNAMES. Do not rename the Worker scripts.**
+The split was never about code. It is about **who is asking**, and that is a
+property of a request, not of a deployment.
 
-Renaming a Worker script does not rename anything — it creates a NEW Worker at a
-new hostname and **abandons the Durable Objects of the old one**. That is not
-theoretical here:
+    POST /open                        -> open tier: 6 h, capped
+    POST /open   Authorization: ...   -> trusted tier: no expiry, no caps
 
-- `positron-ingest` binds a Durable Object `Quota` (sqlite) and runs a cron at
-  `17 * * * *`. The DO holds live sessions and every address's hourly counters.
-  Renaming the script strands them: in-flight uploads 410, and every rate limit
-  silently resets to zero — which on a tokenless write path is the one piece of
-  state that must not be casually discarded.
-- `elektron-selfrec` has **no** Durable Object, so its script could be renamed
-  safely. It still should not be, for consistency with the eight `elektron-*`
-  scripts left alone on 2026-09-04 for exactly this reason. A custom domain
-  already decouples public identity from script name, and nobody types a script
-  name.
+One Worker, one hostname, one implementation of the R2 write path. The tier
+becomes a row in a table:
 
-**The R2 bucket cannot be renamed at all** (`elektron-archive-test`), and its
-objects and public URL are bucket-bound. Out of scope, permanently.
+```js
+const TIERS = {
+  open:    { ttlHours: 6,    maxSessionsPerHour: 5,  maxBytesPerHour: 64 * MiB, ... },
+  trusted: { ttlHours: null, maxSessionsPerHour: null, maxBytesPerHour: null,   ... },
+};
+```
 
-So this is a DNS-and-strings change, not a migration.
+The `Quota` DO already keys by address; it keys by PRINCIPAL instead — the
+address for an anonymous caller, the token's id for a trusted one. Everything
+else it does is unchanged, including the cron, which simply skips sessions with
+no expiry.
 
----
+### What this buys
 
-## 3. The names
+- **One implementation.** Today a fix to the R2 write path has to be made twice,
+  and `capture`'s un-awaited upload bug (which the shared client fixed on the
+  way) is the kind of thing that only gets fixed in the copy someone is looking
+  at.
+- **The difference becomes data.** "Who may write what, for how long" is a table
+  a reader can look at, not a difference between two directories.
+- **It deletes `elektron-selfrec`** — see §4, where that matters more than it
+  looks.
+- **The caps get a shape that fits.** `maxSegmentBytes` was already raised today
+  because it was sized for a 4-second segment and had become a silent limit on
+  take length. Per-tier caps make that kind of drift visible.
 
-| now | proposed | why |
-|---|---|---|
-| `ingest.positron.studio` | **`drop.positron.studio`** | you drop something off and collect it later; it is not kept |
-| `selfrec.positron.studio` | **`store.positron.studio`** | it is stored, and stays stored |
-| `archive.positron.studio` | unchanged | where both are READ; already the clearest of the three |
+### The honest cost, and it is real
 
-Read together they say the shape: **drop** is temporary and open, **store** is
-permanent and trusted, **archive** is where you read.
+**Two workers are two blast radii.** Today a bug in `ingest` cannot expose the
+untimed path, because the untimed path is a different script with a different
+secret. Merged, a mistake in tier selection — a truthy check on a header that is
+absent, say — hands an anonymous caller the trusted tier.
 
-**Runners-up, and why not:**
+That risk is manageable and must be managed explicitly:
 
-- `hold` for `drop` — accurate ("we hold it six hours") and arguably safer,
-  because `drop` can be misread as *discard*. It is the fallback if anyone
-  actually trips on that. `drop` wins on the verb a person performs: you drop a
-  file off; you do not "hold" one.
-- `keep` for `selfrec` — the best word for "kept forever", and **taken**: the
-  demo shipped today is `positron.studio/keep/`. A subdomain `keep.` beside a
-  path `/keep/` that mean different things is a trap, not a name.
-- `upload` for either — describes what BOTH do, so it distinguishes nothing.
-- `vault`, `locker`, `stash` — flavour rather than meaning.
+- tier resolution in ONE function, returning `open` unless a token VALIDATES,
+  never "not open" by elimination;
+- the open tier is the default value of the variable, not an else-branch;
+- an assert in the worker's own tests that a request with no header, an empty
+  header, a malformed header and a WRONG token all resolve to `open` — four
+  cases, because "no token" and "bad token" are different bugs;
+- the tier is echoed in the `/open` response, so a caller can see which one it
+  got and a test can assert on it.
 
----
-
-## 4. The migration, additive and reversible
-
-Every step is additive until the last, so nothing breaks mid-flight and any step
-can be abandoned without a rollback.
-
-1. **Attach the new custom domains** to the existing scripts —
-   `drop.positron.studio` to `positron-ingest`, `store.positron.studio` to
-   `elektron-selfrec` — with `wrangler triggers deploy`. Routes only, no code
-   re-upload. Both hostnames now serve the same Worker, so the old one keeps
-   working and there is no flag day.
-2. **Move the callers**, three of them for `drop`: `demo/shell/ingest.mjs`'s
-   `INGEST` constant, `demo/capture/index.html`, and whatever `keep` inherits
-   from the shell module. Then six for `store`, all under `proto/selfrec/`.
-3. **Rename the shell module** `demo/shell/ingest.mjs` → `demo/shell/drop.mjs`
-   and its exports' prose. `build.mjs` enumerates `demo/shell/` and refuses an
-   import with no deployed file — and since 2026-09-07 it scans `.mjs`/`.js` as
-   well as HTML, so a missed import is caught at build rather than as a 404 on
-   the live site. **Prove that once by breaking it on purpose.**
-4. **Update the docs**: `CLAUDE.md`'s "the only tokenless write path" bullet,
-   `HANDOFF.md`'s hostname table and worker table, `SUMMARY.md`.
-5. **Leave the old hostnames attached** for now. They cost nothing, and
-   `workers_dev: true` plus the old custom domains are why the 2026-09-04 move
-   broke no links.
-6. **Retire the old hostnames later**, in their own commit, once nothing has
-   referenced them for a while. Not in the same change as the rename — that is
-   what turns a reversible edit into a flag day.
+If that discipline is not wanted, keep two workers and do only the rename. The
+merge is worth it; doing it carelessly is not.
 
 ---
 
-## 5. What to grep, because a rename here has form
+## 3. The name
 
-The slug rename left **three dead paths**, and one of them pointed the iPhone
-harness at a 404 for weeks (LESSONS #29). URLs live in places no type checker
-looks:
+| now | proposed |
+|---|---|
+| `ingest.positron.studio` + `selfrec.positron.studio` | **`store.positron.studio`** |
+| `archive.positron.studio` | unchanged — where it is READ |
+
+**`store`** because that is the verb: you store a recording there. The tier
+decides how long it stays, and the tier is a credential, not a hostname — which
+is the whole point of §2. Two hostnames would keep implying two services.
+
+Runners-up: `drop` (good for the open tier alone, wrong once one hostname serves
+both — you do not "drop off" something you keep forever); `keep` (**taken** —
+the demo shipped today is `positron.studio/keep/`, and a subdomain `keep.`
+meaning something else is a trap); `upload` (describes both tiers, distinguishes
+nothing).
+
+---
+
+## 4. `elektron-*`, and which of them can actually go
+
+Asked alongside this: remove the `elektron` references. There are **three kinds**
+and only one is safely removable.
+
+**(a) Worker SCRIPT names — 8 of them, and renaming is not free.** Renaming a
+Worker script does not rename anything: it creates a NEW Worker and **abandons
+the Durable Objects of the old one**. `elektron-view` holds `Gate` (the durable
+ERR cache), `elektron-rtc` holds `RtcRoom`, `elektron-jam` holds `JamRoom`,
+`elektron-instrument` holds `Hub`, `elektron-cues` holds `Sessions` and
+`BeaconStore`. A custom domain already decouples public identity from script
+name, and nobody types one.
+
+**`elektron-selfrec` is the exception, and this plan removes it** — it has NO
+Durable Object, and after §2 it has no code either. One of the eight goes away
+as a consequence of the merge rather than as a risky rename. That is the right
+way to lose a name.
+
+**(b) Prior-art citations — these must NOT change.** `elektronstudio`,
+`elektron.art`, `elektron 2020` and the Estonian genitive `elektron.arti` name
+the real predecessor project, which exists under that name. Rewriting them makes
+the notes false — and this is not hypothetical: a rename swept two of them up
+and `SUMMARY.md` claimed a lineage "since positron 2020", a project that did not
+exist until 2026-09-04. Fixed on 2026-09-08. Do not do it again.
+
+**(c) The R2 bucket `elektron-archive-test` — cannot be renamed at all**, and
+its objects and public URL are bucket-bound. Permanently out of scope.
+
+---
+
+## 5. Phases
+
+**P1 — merge, behind the existing hostname.** Add tiers to `positron-ingest`,
+resolve the principal in one function, keep `ingest.positron.studio` serving
+exactly as now. The open tier must behave identically: same caps, same TTL, same
+responses. **Done when** the four tier-resolution cases assert, and `capture`
+and `keep` are green at their committed counts with no page change.
+
+**P2 — move the trusted callers.** Point `proto/selfrec/`'s six files at the
+merged worker with their token. **Done when** they work and `elektron-selfrec`
+has served nothing for a week.
+
+**P3 — the name.** Attach `store.positron.studio` with `wrangler triggers
+deploy` (routes only, no re-upload), move the callers, rename
+`demo/shell/ingest.mjs` → `demo/shell/store.mjs`. Leave the old hostnames
+attached: they cost nothing, and keeping `*.workers.dev` plus the old custom
+domains is why the 2026-09-04 move broke no links. **Done when** nothing in
+`demo/` or `proto/` names the old hosts and `build.mjs` passes — proved once by
+breaking an import on purpose, since it scans `.mjs`/`.js` as well as HTML.
+
+**P4 — retire.** Delete `elektron-selfrec`, and detach the old hostnames, in
+their own commit and not before something has gone a while without them.
+
+---
+
+## 6. What to grep, because a rename here has form
+
+The slug rename left **three dead paths**, one of which pointed the iPhone
+harness at a 404 for weeks (LESSONS #29). URLs live where no type checker looks:
 
 ```sh
 grep -rn "ingest\.positron\.studio\|selfrec\.positron\.studio" . \
@@ -136,42 +186,38 @@ grep -rn "ingest\.positron\.studio\|selfrec\.positron\.studio" . \
   --include='*.jsonc' --include='*.json' --include='*.md'
 ```
 
-and then, separately, the bare words as identifiers — `INGEST`, `SELFREC_TOKEN`,
-`selfrec/`, `demo/ingest/` — because the R2 KEY PREFIX is `demo/ingest/…` and is
-**not** part of this rename: changing it would orphan every object already
-written under it. The prefix is data, not a name.
+Then the bare identifiers separately — `INGEST`, `SELFREC_TOKEN`, `selfrec/` —
+and note that the R2 KEY PREFIX `demo/ingest/…` is **not** part of this: changing
+it orphans every object already written under it. The prefix is data, not a name.
 
 Check `verify-native.mjs` and `verify-safari.mjs` by hand. They are the two
 harnesses `verify.mjs` cannot cover, so nothing goes red when they rot.
 
 ---
 
-## 6. What is NOT renamed
+## 7. What is NOT renamed
 
-- **The Worker scripts** (§2).
-- **The R2 bucket** `elektron-archive-test`, which cannot be.
-- **The R2 key prefix** `demo/ingest/…`, which is data.
-- **`proto/selfrec/`'s directory and filenames.** They are named for the
-  TECHNIQUE — participants recording themselves — which is a real thing that
-  still has that name. The service they call gets renamed; the technique does
-  not. Same reasoning that kept `research/elektron-participation-2026-08.md`.
-- **`SELFREC_TOKEN`**, the secret's name. Renaming a secret means re-minting it
-  in a session where it can be read, and it is on the rotation list already
-  (`SECRETS-ROTATION.md`). Do it there, once, not twice.
+- The seven remaining `elektron-*` scripts (§4a).
+- The R2 bucket, which cannot be (§4c).
+- The R2 key prefix `demo/ingest/…`, which is data.
+- `proto/selfrec/`'s directory and filenames — named for the TECHNIQUE, which
+  still has that name. The service is renamed; the technique is not. Same
+  reasoning that kept `research/elektron-participation-2026-08.md`.
+- `SELFREC_TOKEN`. Renaming a secret means re-minting it, and it is on
+  `SECRETS-ROTATION.md` already. Do it there, once.
 
 ---
 
-## 7. Done when
+## 8. Done when
 
-1. `drop.positron.studio` and `store.positron.studio` serve, and the old
-   hostnames still do.
-2. Nothing in `demo/` or `proto/` names the old hosts; `build.mjs` passes and
-   has been shown to refuse a missing import.
-3. `CLAUDE.md`, `HANDOFF.md` and `SUMMARY.md` describe the two paths by what
-   they do — one forgets in six hours, one does not — rather than by the words
-   `ingest` and `selfrec`.
-4. The full suite is green at its committed count, and `capture` and `keep`
-   still store and fetch back.
-5. A reader who has never seen this repo can say which of the two a public page
-   is allowed to use, from the names alone. That is the whole point of the
-   change and the only test that matters.
+1. One Worker serves both tiers, and which tier a request got is in its own
+   response.
+2. Four asserts prove that no header, an empty header, a malformed header and a
+   wrong token all resolve to the OPEN tier.
+3. `store.positron.studio` serves; the old hostnames still do.
+4. `elektron-selfrec` is deleted, and nothing noticed.
+5. `CLAUDE.md`, `HANDOFF.md` and `SUMMARY.md` describe one path with two tiers,
+   by what they do — one forgets in six hours, one does not.
+6. A reader who has never seen this repo can say, from the names alone, which
+   tier a public page is allowed to use. That is the point, and the only test
+   that matters.
