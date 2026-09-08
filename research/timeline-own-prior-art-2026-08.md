@@ -10,7 +10,7 @@ itself.
 
 ## 0. Corrections to the record
 
-- **The lineage is longer than "four generations".** positron 2020's `store:
+- **The lineage is longer than "four generations".** elektron 2020's `store:
   true` → Redis history → `CHAT_SYNC` replay was the FIRST record/replay
   implementation; and `~/personal/visualia/plans/lineage.md` (559 lines,
   2026-06) already traces a 16-thread, nine-year idea history including a
