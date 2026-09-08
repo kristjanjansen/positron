@@ -146,7 +146,13 @@
     // scrub can be checked against the picture with no arithmetic.
     burn(g, W, H, frame, { hue, position: line / 1000, field: !cam });
   }
-  setInterval(drawFrame, 40);
+  setInterval(() => {
+    drawFrame();
+    // While recording, the strip is animating — repaint it with the picture.
+    // `paint()` otherwise runs once per blob (every 500 ms), which draws the
+    // take in visible steps rather than growing.
+    if (recording) paint();
+  }, 40);
   drawFrame();
 
   // the camera preview never reaches the timeline; it is a texture for the burn
@@ -313,6 +319,13 @@
 
     recording = { rec, part, t0 };
     rec.start(SLICE_MS);
+    // GIVE THE TAKE A RUNWAY. The strip has to show a bar getting longer, and a
+    // range that grows WITH the bar cannot: the right edge stays pinned to the
+    // end of the axis and the bar looks stationary while the numbers change.
+    // So the axis opens to the full cap at the start and the take grows into
+    // it; `finishRecording` snaps it back to the real total. What you see is
+    // also the honest thing — that space is how much take is still allowed.
+    deck.setRange([0, Math.round(totalMs + capMs)]);
     setRecUI(true);
     d.log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like — ${capMs / 1000}s cap`, 'hi');
     // The cap is a BACKSTOP and it is said before it bites, not after. It exists
@@ -400,6 +413,20 @@
     return a[a.length >> 1];
   };
 
+  // THE TAKE IN FLIGHT IS ALREADY ON THE LINE — it just has not stopped growing.
+  // `parts` holds landed takes and nothing else, because every assert on this
+  // page reads it and a half-recorded take would make them lie. This is a VIEW
+  // for the strip only: the same part, with the length it has reached so far.
+  //
+  // Its chunks need no such treatment; `part.chunks` is appended as each blob
+  // arrives, so the event lane draws them the moment they land.
+  const inFlight = () => {
+    const r = recording;
+    if (!r) return null;
+    return { ...r.part, lenMs: Math.min(r.part.capMs, performance.now() - r.t0), live: true };
+  };
+  const shown = () => { const l = inFlight(); return l ? parts.concat([l]) : parts; };
+
   // ONE LANE OF PARTS, in recording order. Cubase's vocabulary, the same as
   // `loops`: a PART is a container placed on the timeline. The seed's colour is
   // what lets two slices tell each other apart at a glance — and it is the same
@@ -413,7 +440,7 @@
       return bw > 128 ? `take ${p.n} · #${String(p.seed).padStart(4, '0')} · ${(p.lenMs / 1000).toFixed(2)}s`
         : bw > 66 ? `take ${p.n} · ${(p.lenMs / 1000).toFixed(1)}s` : `${p.n}`;
     },
-    rows: () => parts.map((p) => ({
+    rows: () => shown().map((p) => ({
       at: p.startMs, id: `take${p.n}`, kind: 'part',
       payload: { durMs: p.lenMs, n: p.n, seed: p.seed, hue: p.hue, lenMs: p.lenMs,
                  kib: Math.round(p.bytes / 1024) },
@@ -430,7 +457,7 @@
     as: 'ticks', color: NOT_YET, terse: true,
     // colour means HOW IT LANDED against the timeslice we asked for, never
     // which take it came from — that is the part lane's job and its colour.
-    rows: () => parts.flatMap((p) => p.chunks.map((c, i) => ({
+    rows: () => shown().flatMap((p) => p.chunks.map((c, i) => ({
       at: p.startMs + c.at, id: `p${p.n}c${i}`, kind: 'chunk', payload: { n: p.n, ...c },
     }))),
     colorOfRow: (r) => bandFor(r.payload.gapMs - SLICE_MS),
@@ -485,17 +512,20 @@
     // The budget is real: ~21 characters at this gutter width, and three lines
     // on a 52 px lane, two on a 40 px one. Written to fit, not trimmed to fit.
     const L = view.strip.lanes();
+    // The gutter counts what the lane DRAWS, in-flight take included — showing
+    // "1 part" beside two bars would be the readout arguing with the picture.
+    const sh = shown();
     const P = L.find((l) => l.id === 'parts');
-    if (P) P.subLabel = parts.length
-      ? [`${parts.length} part${parts.length > 1 ? 's' : ''} · ${(totalMs / 1000).toFixed(2)}s`,
-         `shortest ${(Math.min(...parts.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
-         `longest ${(Math.max(...parts.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
+    if (P) P.subLabel = sh.length
+      ? [`${sh.length} part${sh.length > 1 ? 's' : ''} · ${(sh.reduce((a, p) => a + p.lenMs, 0) / 1000).toFixed(2)}s`,
+         `shortest ${(Math.min(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
+         recording ? 'recording now' : `longest ${(Math.max(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
       : ['no parts', 'nothing recorded yet'];
 
     const C = L.find((l) => l.id === 'chunks');
-    const offs = parts.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
+    const offs = sh.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
     if (C) C.subLabel = offs.length
-      ? [`${offs.length + parts.length} blobs, ${median(offs).toFixed(0)} ms typ`,
+      ? [`${offs.length + sh.length} blobs, ${median(offs).toFixed(0)} ms typ`,
          `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
       : ['no blobs', 'nothing recorded yet'];
 
