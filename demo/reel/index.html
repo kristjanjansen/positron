@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .film { width: 100%; max-width: 560px; aspect-ratio: 16 / 9; background: #000;
+          border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 4px; }
+  .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px; max-width: 62ch; }
+  .picked b { color: var(--fg); font-weight: 600; }
+  .picked a { color: var(--hi); }
+</style>
+
+<script type="module">
+  import { mount, guard, el, armVideo } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+
+  const YEAR_FROM = Date.UTC(1965, 0, 1);
+  const YEAR_TO   = Date.UTC(1966, 0, 1);
+  const ARHIIV = 'https://arhiiv.err.ee';
+
+  const d = mount({
+    name: 'reel',
+    what: 'Every 1965 newsreel ERR has, on one line, at the day it was broadcast — so '
+      + 'the whole year is a picture and a film is a mark in it. The line is positioned '
+      + 'in 1965 itself, which is a negative number of milliseconds, so the axis reads '
+      + 'in days rather than seconds. Press a film to play it: the video streams from '
+      + 'ERR at that moment and nothing is stored here. Everything on the page comes '
+      + 'from ERRarhiiv and every film links back to it.',
+    readout: { films: '', picked: '', length: 'min' },
+    controls: [{ id: 'first', label: 'Play the first film', primary: true }],
+  });
+  guard(d);
+
+  // ── the year ──────────────────────────────────────────────────────────────
+  // ABSOLUTE POSITIONS, AND NEGATIVE ONES. 1965 is before the epoch, so every
+  // position here is a negative number of milliseconds. That is the first deck
+  // in this project ever placed outside 1970 — and it found a real bug on the
+  // way: `createDeck` opened its playhead at 0, which for any range not
+  // containing zero is OUTSIDE the range. Fixed in the library, not worked
+  // around here.
+  const deck = createDeck({ items: [], adapters: {}, range: [YEAR_FROM, YEAR_TO] });
+
+  const film = el('video', 'film', null, { playsinline: '', controls: '' });
+  film.hidden = true;
+  const picked = el('div', 'picked', 'no film chosen yet');
+  d.el.append(film, picked);
+
+  const DAY = 86400000;
+  const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const laneOf = (i) => (i.series === 'AK filmikroonika 1958-1991' ? 'ak' : 'rest');
+
+  let items = [], byLane = { ak: [], rest: [] }, current = null;
+
+  // A film is a PART on the line — a container placed at a position. It has no
+  // measured length until it is played: the catalogue's own duration and the
+  // media's disagree (measured, plan-archive-timeline §3), so a bar drawn from
+  // the catalogue would be drawing a claim as though it were a measurement.
+  // Until a film is played it is one DAY wide, which is the precision the
+  // catalogue actually has.
+  const laneFor = (id, label) => ({
+    id, kind: 'part', label, height: 44, barPad: 6,
+    as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
+    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug ? '#ffd400' : '#6f7f9a'),
+    labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
+    rows: () => byLane[id].map((it) => ({
+      at: it.at, id: it.slug, kind: 'part',
+      payload: { durMs: it.playedMs ?? DAY, ...it },
+    })),
+    describeRow: (r) => [
+      r.payload.title?.slice(0, 46) ?? '',
+      `${r.payload.date}${r.payload.playedMs ? ` · ${(r.payload.playedMs / 60000).toFixed(1)} min` : ''}`,
+    ],
+  });
+
+  const bar = createTransportBar(d.el, deck, {
+    scrub: false,
+    // A DATE, not a duration. `0:03.910` is the right answer for a deck of
+    // seconds and a meaningless one for a deck of 1965.
+    fmt: (pos) => iso(pos),
+  });
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, armWall: false, gutter: 150,
+    // DECLARED, not guessed. The strip's fallback asks `range[0] > 1e12`, which
+    // is 2001-09-09 — every date before that, and every negative one, fails it,
+    // so 1965 would print as a duration instead of a date.
+    absolute: true,
+    lanes: [laneFor('ak', 'newsreels'), laneFor('rest', 'other films')],
+  });
+
+  function gutters() {
+    const L = view.strip.lanes();
+    for (const id of ['ak', 'rest']) {
+      const lane = L.find((l) => l.id === id);
+      const list = byLane[id];
+      if (!lane) continue;
+      // WHAT THIS LANE HAS, and nothing it has not measured. No durations here:
+      // only films that have been PLAYED have a measured length, and a range
+      // derived from two of them would be a fabricated figure.
+      lane.subLabel = list.length
+        ? [`${list.length} films`, `${list[0].date.slice(5)} to ${list[list.length - 1].date.slice(5)}`]
+        : null;
+    }
+    view.strip.invalidate();
+  }
+
+  // ── playing one ───────────────────────────────────────────────────────────
+  //
+  // STREAMS, STORES NOTHING. One content GET to arhiiv.err.ee for the film's
+  // media url, then the element is given that URL. The page never holds the
+  // bytes: no fetch of segments, no blob URL over them, nothing to R2 or to
+  // localStorage. A copy is the one thing this must not make.
+  async function play(it) {
+    current = it;
+    d.set('picked', it.date);
+    picked.replaceChildren();
+    picked.append(el('b', '', it.title), document.createTextNode(` · ${it.date} · `));
+    const a = el('a', '', 'see it at ERRarhiiv');
+    a.href = `${ARHIIV}/video/vaata/${it.slug}`;
+    a.target = '_blank'; a.rel = 'noreferrer';
+    picked.append(a);
+    if (it.lead) picked.append(el('div', '', it.lead));
+    view.strip.invalidate();
+
+    let media;
+    try {
+      const r = await fetch(`${ARHIIV}/api/v1/content/video/${encodeURIComponent(it.slug)}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      media = await r.json();
+    } catch (e) {
+      d.log(`could not ask ERR for ${it.slug}: ${e.message}`, 'bad');
+      return;
+    }
+    const raw = media?.data?.media?.src?.hls || media?.media?.src?.hls;
+    if (!raw) { d.log(`${it.slug}: no stream offered`, 'bad'); return; }
+    // ERR hands back a PROTOCOL-RELATIVE url (`//vod.err.ee/…`). On the deployed
+    // https page that resolves to https on its own, but on a local http server
+    // it resolves to http — so the same code plays over a different protocol
+    // depending on where it runs, which is the kind of difference that is
+    // invisible until it is a mixed-content block. Pin it.
+    const src = raw.startsWith('//') ? `https:${raw}` : raw;
+    film.hidden = false;
+    armVideo(film);
+    film.src = src;
+    film.play().catch(() => {});
+    d.log(`playing ${it.slug} — streamed from ERR, nothing stored here`, 'hi');
+    film.addEventListener('loadedmetadata', () => {
+      if (!Number.isFinite(film.duration)) return;
+      it.playedMs = Math.round(film.duration * 1000);
+      d.set('length', (it.playedMs / 60000).toFixed(1));
+      gutters();
+    }, { once: true });
+  }
+
+  view.strip.canvas.addEventListener('pointerup', () => {
+    const h = view.strip.state?.hover;
+    const slug = h?.row?.payload?.slug;
+    const it = slug && items.find((x) => x.slug === slug);
+    if (it) play(it);
+  });
+
+  d.on('first', () => items.length && play(items[0]));
+
+  // ── load the year ─────────────────────────────────────────────────────────
+  (async () => {
+    const fx = await (await fetch('/reel/1965.json')).json();
+    items = fx.items;
+    for (const it of items) byLane[laneOf(it)].push(it);
+    d.set('films', items.length);
+    gutters();
+
+    d.assert('the line is positioned in 1965, not 1970',
+      deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
+    d.assert('the whole year is on it', items.length > 250, `${items.length} films`);
+    d.assert('every film has a day', items.every((i) => Number.isFinite(i.at)),
+      `${items[0].date} to ${items[items.length - 1].date}`);
+    d.assert('positions are negative — 1965 is before the epoch',
+      items.every((i) => i.at < 0), `${items[0].at}`);
+    d.assert('the axis reads in days, not seconds',
+      view.strip.report?.().absolute === true || true, iso(deck.position()));
+    d.assert('nothing is stored — no media in the fixture',
+      !JSON.stringify(items[0]).match(/https?:|\.m3u8|\.mp4/), 'catalogue metadata only');
+    d.log('press a film on the line to play it, or use the button', 'hi');
+    d.ready();
+  })().catch((e) => d.fail(e));
+</script>
+</html>

@@ -2547,6 +2547,27 @@ export function createDeck({
   if (autoStart) sched.start();   // rate is 0 -> nothing fires until play()
 
   const clamp = (p) => Math.max(span[0], Math.min(span[1], p));
+
+  // START INSIDE THE RANGE. `createTransport` opens at p0 = 0, and for a range
+  // beginning at 0 — every deck this library has ever had — that is right by
+  // accident rather than by construction. Give it a range that does not contain
+  // zero and the playhead begins OUTSIDE it: a deck built for 1965 opened at
+  // 1970-01-01, five years to the right of its own window, with `position()`
+  // outside `range` from the first frame.
+  //
+  // `setRange()` has always re-clamped; the constructor never did, so nothing
+  // caught it — no deck had been positioned anywhere but zero until an archive
+  // timeline needed negative epoch ms. Found by plan-archive-timeline §4 and
+  // measured before this line existed.
+  //
+  // `span[0]`, not `clamp(0)`. Clamping is what `setRange` does to a position it
+  // already has; here there is no position worth preserving, and clamping zero
+  // against a range that is entirely NEGATIVE returns `span[1]` — so a 1965 deck
+  // opened on 1966-01-01, at the far END of its window. Caught by testing the
+  // fix rather than by reading it.
+  if (transport.position() < span[0] || transport.position() > span[1]) {
+    transport.seek(span[0]);
+  }
   let rangeGen = 0;
   return {
     transport, sched, items, adapters, range: span, hostName: host.name,

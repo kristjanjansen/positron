@@ -27,7 +27,7 @@ import { el } from './shell.mjs';
  * degraded badge — and gives up the slider.
  */
 export function createTransportBar(host, deck, {
-  absolute = false, scrub: wantScrub = true, extras = [],
+  absolute = false, scrub: wantScrub = true, extras = [], fmt = null,
 } = {}) {
   const bar = el('div', 'tbar');
 
@@ -138,7 +138,11 @@ export function createTransportBar(host, deck, {
       fill.style.width = `${f * 100}%`;
       headDot.style.left = `${f * 100}%`;
     }
-    time.textContent = seekable
+    // `fmt` — a page may say how a position READS. `0:03.910` is the right
+    // answer for a deck of seconds and a meaningless one for a deck of 1965,
+    // where the position is a date. Default unchanged; a page that needs
+    // calendar time supplies a formatter rather than the bar guessing.
+    time.textContent = fmt ? fmt(pos, range) : seekable
       ? `${clock(pos, absolute)} / ${clock(range[1] - range[0], false)}`
       : clock(pos, absolute);
     const playing = deck.playing?.() ?? false;
