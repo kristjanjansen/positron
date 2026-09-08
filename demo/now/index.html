@@ -407,6 +407,16 @@
   }
 
   async function liveTest() {
+    // WAIT FOR THE JUMP RATHER THAN RACING IT. The back-seek sets currentTime
+    // synchronously, but `hls.playingDate` keeps reporting the old instant
+    // until fragments for the new one arrive — so the master sees no error and
+    // reports no jump until then. On a warm local server that is a few frames;
+    // on a cold edge it was long enough to fail one run in four. A bounded
+    // wait turns the race into a check: if no jump has arrived in three
+    // seconds, that is worth reading as a failure.
+    const t0 = performance.now();
+    while (jumpEvents.length <= evid.jumpsBefore && performance.now() - t0 < 3000)
+      await new Promise((r) => setTimeout(r, 100));
     await new Promise((r) => setTimeout(r, 1200));
     evid.behindAfterLive = behindMs();
   }
