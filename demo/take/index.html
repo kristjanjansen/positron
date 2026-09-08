@@ -52,7 +52,14 @@
   const d = mount({
     name: 'take',
     what: 'Record, then record again. Each take is laid on the line after the one before it, and the whole thing plays and scrubs as one.',
+    // PUBLISHED, NOT DRAWN. Every one of these was already on the page: the
+    // take count and the line length in the lane's gutter, the size in a
+    // tooltip, the codec and the handovers in the log. A second table saying
+    // the same things is a second place to keep in step and one more thing
+    // between the reader and the picture. `showReadout: false` keeps them on
+    // `__demo`, where the suite reads them.
     readout: { takes: '', line: 's', mime: '', kib: 'KiB', handovers: '' },
+    showReadout: false,
     controls: [{ id: 'camera', label: 'Use the camera' }],
   });
   guard(d);
@@ -109,6 +116,13 @@
   const parts = [];   // { n, hue, mime, chunks[], blobs[], bytes, recordedMs,
                       //   fileMs, startMs, lenMs, video }
   let recording = null;
+  // A take that has STOPPED but not yet landed. Between the two there is a
+  // real gap — the last chunk has to arrive and the file has to be asked its
+  // duration, up to four seconds — and for that whole time `recording` was
+  // already null, so the bar vanished off the strip and came back. Reported as
+  // "the newly added bar disappears and reappears". This holds it at its final
+  // length until the real part replaces it.
+  let landing = null;
   let totalMs = 0;    // where the line currently ends — the next take's start
   let camStream = null;
   const ink = (h, s, l, a = 1) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
@@ -247,14 +261,28 @@
     if (!p) return;
     if (p !== active) handOver(p, pos, 'seek');
     pendingSeek = pos;
-    p.video.currentTime = localOf(p, pos);
+    // ONE SEEK IN FLIGHT, LATEST WINS. A drag fires a seek per pointermove, and
+    // writing `currentTime` while the element is still seeking queues them: the
+    // picture then walks through every position the finger passed instead of
+    // following it. Reported as "playback video updates are slow when I scrub".
+    // Hold the newest target and apply it when the element comes free.
+    const want = localOf(p, pos);
+    if (p.video.seeking) { queuedSeek = { p, want }; return; }
+    queuedSeek = null;
+    p.video.currentTime = want;
   });
+  let queuedSeek = null;
 
   function onSeeked(p) {
     if (pendingSeek === null || p !== active) return;
     const got = p.startMs + p.video.currentTime * 1000;
     seeks.push({ asked: pendingSeek, got, offMs: got - pendingSeek, part: p.n });
     pendingSeek = null;
+    // the finger moved on while this one was decoding — go where it is NOW
+    if (queuedSeek && queuedSeek.p === p) {
+      const q = queuedSeek; queuedSeek = null;
+      p.video.currentTime = q.want;
+    }
     paint();
   }
 
@@ -317,12 +345,21 @@
     rec.onerror = (ev) => d.log(`recorder: ${ev.error?.name ?? 'error'}`, 'bad');
     rec.onstop = async () => {
       part.recordedMs = performance.now() - t0;
+      landing = { ...part, lenMs: Math.round(part.recordedMs) };
       recording = null;
+      // SHRINK THE AXIS ONCE, here, not when the part lands. The runway is
+      // `totalMs + capMs`; collapsing a 10 s runway seconds later moved every
+      // mark on the strip including the playhead, which read as the cursor
+      // jumping on its own. The length is known now, and `landPart` only
+      // adjusts it by the file-vs-recorded difference — tens of ms, not ten
+      // seconds.
+      deck.setRange([0, Math.round(totalMs + landing.lenMs)]);
       previewT0 = performance.now();
       setRecUI(false);
       for (const t of stream.getTracks()) t.stop();
       await new Promise((r) => setTimeout(r, 250));      // let the last chunk land
       await landPart(part);
+      landing = null;
       await runChecks();
     };
 
@@ -455,7 +492,7 @@
     if (!r) return null;
     return { ...r.part, lenMs: Math.min(r.part.capMs, performance.now() - r.t0), live: true };
   };
-  const shown = () => { const l = inFlight(); return l ? parts.concat([l]) : parts; };
+  const shown = () => { const l = inFlight() || landing; return l ? parts.concat([l]) : parts; };
 
   // ONE LANE OF PARTS, in recording order. Cubase's vocabulary, the same as
   // `loops`: a PART is a container placed on the timeline. Each part's COLOUR is
@@ -470,6 +507,8 @@
   // actually guarantees neighbours differ.
   const partLane = {
     id: 'parts', kind: 'part', label: 'takes', height: 52, barPad: 8,
+    // each bar is already labelled with its own name and length
+    spanLine: false,
     as: 'spans', stack: false, barGap: 3, terse: true, alpha: 0.9,
     colorOf: (s) => ink(s.row?.payload?.hue ?? 210, 62, 68),
     labelOf: (s, { bw }) => {
@@ -505,25 +544,12 @@
     },
   };
 
-  const seekLane = {
-    id: 'seeks', kind: 'seek', label: 'seeks', height: 38, width: 2,
-    as: 'ticks', color: NOT_YET, terse: true,
-    rows: () => seeks.map((s, i) => ({ at: s.asked, id: `s${i}`, kind: 'seek', payload: { i, ...s } })),
-    // CALIBRATED AGAINST WHAT A SEEK CAN DO, not against zero. A video lands on
-    // a FRAME, so at 25 fps the best possible answer is already up to 40 ms out
-    // — and the old threshold was `< 40`, which put a perfect result exactly on
-    // the boundary and painted half of them amber. A scale whose normal reading
-    // is a warning has no warning left. Green now means "within a frame, which
-    // is as good as this can be"; amber means it missed by more than that.
-    colorOfRow: (r) => (Math.abs(r.payload.offMs) <= FRAME_MS * 1.5 ? '#8fd6a8'
-      : Math.abs(r.payload.offMs) < 250 ? '#ffd400' : '#e0908a'),
-    describeRow: (r) => {
-      const p = r.payload;
-      const within = Math.abs(p.offMs) <= FRAME_MS * 1.5;
-      return [`asked ${(p.asked / 1000).toFixed(2)}s, got ${(p.got / 1000).toFixed(2)}s`,
-              `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms · ${within ? 'within a frame' : 'more than a frame'}`];
-    },
-  };
+  // THE SEEKS LANE IS GONE. It drew one mark per drag of the cursor, which
+  // made it a record of what the READER did rather than of what the page
+  // measured — the lane filled up by being used. The measurement it rested on
+  // stays: `seeks` still collects asked-vs-got on every `seeked`, and the
+  // check below still asserts that a seek reports what it actually got. That
+  // is evidence, and evidence does not need a lane to be true.
 
   const bar = createTransportBar(d.el, deck, {
     scrub: false,          // the strip is the only position surface on this page
@@ -534,8 +560,8 @@
   });
 
   const view = createStripView(d.el, deck, {
-    size: 'auto', follow: false, armWall: false, gutter: 150,
-    lanes: [partLane, chunkLane, seekLane],
+    size: 'auto', follow: false, armWall: false, gutter: 150, wallStyle: 'head',
+    lanes: [partLane, chunkLane],
   });
 
   const shortMime = (m) => {
@@ -574,13 +600,9 @@
     // The gutter counts what the lane DRAWS, in-flight take included — showing
     // "1 part" beside two bars would be the readout arguing with the picture.
     const sh = shown();
-    const P = L.find((l) => l.id === 'parts');
-    if (P) P.subLabel = sh.length
-      ? [`${sh.length} take${sh.length > 1 ? 's' : ''} · ${(sh.reduce((a, p) => a + p.lenMs, 0) / 1000).toFixed(2)}s`,
-         `shortest ${(Math.min(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
-         recording ? 'recording now' : `longest ${(Math.max(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
-      : null;
-
+    // The takes lane carries NO gutter: each bar is already labelled with its
+    // own name and length, so a summary beside them repeats what the picture
+    // says, in the one place a lane has for something the picture cannot say.
     const C = L.find((l) => l.id === 'chunks');
     const offs = sh.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
     if (C) C.subLabel = offs.length

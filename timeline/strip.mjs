@@ -1213,7 +1213,21 @@ export function createStrip(canvas, deck, opts = {}) {
     const w = plotW();
     ctx.save();
     const wp = wallPos();
-    if (wp !== null) {
+    if (wp !== null && opts.wallStyle === 'head') {
+      // A SECOND PLAYHEAD, in the wall colour. `take` arms this line as a
+      // RECORDING head, and a recording head is a position like any other — so
+      // it gets the playhead's shape (solid, 1.5 px, a triangle on top) rather
+      // than the dashes and the gap band below, which belong to the drift
+      // reading and would be measuring nothing here.
+      const wx = Math.round(x(wp)) + 0.5;
+      if (wx >= -1 && wx <= w + 1) {
+        ctx.globalAlpha = 1; ctx.strokeStyle = T.wall; ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(wx, 0); ctx.lineTo(wx, S.contentH); ctx.stroke();
+        ctx.fillStyle = T.wall;
+        ctx.beginPath(); ctx.moveTo(wx - 4, 0); ctx.lineTo(wx + 4, 0); ctx.lineTo(wx, 6); ctx.closePath(); ctx.fill();
+      }
+    } else if (wp !== null) {
       const wx = x(wp);
       if (wx >= -1 && wx <= w + 1) {
         ctx.strokeStyle = T.wall; ctx.globalAlpha = 0.85; ctx.lineWidth = 1;
@@ -1452,7 +1466,12 @@ export function createStrip(canvas, deck, opts = {}) {
     if (hit.span) {
       const s = hit.span;
       const M = tickLOD(S.view.pxPerSecond).major;
-      out.push(`span ${formatTime(s.from, M, S.absolute)} → ${Number.isFinite(s.to) ? formatTime(s.to, M, S.absolute) : '(open)'}`);
+      // `spanLine: false` — for a lane whose bars are already labelled with
+      // their own extent. Repeating it in the tooltip spends the reader's
+      // attention on something the picture has already said.
+      if (L.spanLine !== false) {
+        out.push(`span ${formatTime(s.from, M, S.absolute)} → ${Number.isFinite(s.to) ? formatTime(s.to, M, S.absolute) : '(open)'}`);
+      }
       // the hover says WHICH OF THE THREE ANSWERS this row gives to "certainly
       // in view", in words, because the mark alone cannot carry the reason.
       const st = whenState(s, tAt(0), tAt(plotW()));
@@ -1581,7 +1600,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // this branch is only reachable from a touch pointer.
     touchGesture = Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
     S.dragX = px;
-    if (touchGesture === 'scrub') { S.dragging = true; disengage(); }
+    if (touchGesture === 'scrub') { S.dragging = true; disengage(); holdForScrub(); }
   }
 
   function onTouchMove(e) {
@@ -1620,8 +1639,32 @@ export function createStrip(canvas, deck, opts = {}) {
       const moved = Math.max(Math.abs(p.x - p.x0), Math.abs(p.y - p.y0));
       if (dt <= TOUCH.tapMs && moved < TOUCH.tapPx && p.x >= 0) { seek(tAt(p.x)); tapInspect(p.x, p.y); }
     }
-    if (touches.size === 0) { touchGesture = null; S.dragging = false; }
+    if (touches.size === 0) { touchGesture = null; S.dragging = false; releaseAfterScrub(); }
     invalidate();
+  }
+
+  // SCRUBBING PAUSES THE TRANSPORT, and puts it back on release.
+  //
+  // Dragging the head while the deck is running is two authorities writing one
+  // position: the drag sets it, the transport advances it, and the head fights
+  // the finger. Every editor pauses for the duration of a scrub for this
+  // reason. `resumeAfterScrub` remembers only that WE paused, so a drag that
+  // starts on a paused deck leaves it paused.
+  let resumeAfterScrub = false;
+  function holdForScrub() {
+    // DECIDED FRESH ON EVERY DRAG, never accumulated. If a previous drag ended
+    // in a way that skipped `onUp` — a cancelled pointer, a lost capture — a
+    // sticky `true` would make the NEXT release start playback on a deck the
+    // reader had deliberately paused. Reported as "it starts playing sometimes
+    // when I move the cursor". Assigning rather than OR-ing is the whole fix.
+    const playing = typeof deck.playing === 'function' ? deck.playing() : false;
+    resumeAfterScrub = playing;
+    if (playing && typeof deck.pause === 'function') deck.pause();
+  }
+  function releaseAfterScrub() {
+    if (!resumeAfterScrub) return;
+    resumeAfterScrub = false;
+    if (typeof deck.play === 'function') deck.play();
   }
 
   let dragMode = null;
@@ -1635,7 +1678,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // that had one.
     dragMode = e.shiftKey || e.button === 1 ? 'pan' : 'seek';
     S.dragging = true;
-    if (dragMode === 'seek') seek(tAt(px)); else disengage();
+    if (dragMode === 'seek') { holdForScrub(); seek(tAt(px)); } else disengage();
     S.dragX = px;
     invalidate();
   }
@@ -1657,6 +1700,7 @@ export function createStrip(canvas, deck, opts = {}) {
   function onUp(e) {
     if (isTouch(e)) return onTouchUp(e);
     S.dragging = false; dragMode = null;
+    releaseAfterScrub();
     canvas.releasePointerCapture && e.pointerId !== undefined && canvas.releasePointerCapture(e.pointerId);
   }
   function onWheel(e) {
@@ -1682,6 +1726,9 @@ export function createStrip(canvas, deck, opts = {}) {
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
     canvas.addEventListener('pointerup', onUp);
+    // a cancel is a release that never arrives as one: without this the deck
+    // stays paused and the next drag resumes something it did not stop
+    canvas.addEventListener('pointercancel', onUp);
     canvas.addEventListener('pointercancel', onUp);
     canvas.addEventListener('pointerleave', onLeave);
     canvas.addEventListener('gesturestart', onGesture);
@@ -1808,6 +1855,7 @@ export function createStrip(canvas, deck, opts = {}) {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
+      canvas.removeEventListener('pointercancel', onUp);
       canvas.removeEventListener('pointercancel', onUp);
       canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('gesturestart', onGesture);
