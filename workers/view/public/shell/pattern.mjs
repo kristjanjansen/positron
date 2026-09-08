@@ -345,61 +345,17 @@ export const FFMPEG_FONT = '/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf';
  */
 const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
 
-/** epoch milliseconds as an ffmpeg expression over the frame timestamp `t` */
-const MS_EXPR = (epoch) => `floor((t+${epoch})*1000)`;
-/** bit n (0 = LSB) of that value */
-const BIT_EXPR = (epoch, n) => `mod(floor(${MS_EXPR(epoch)}/${2 ** n}),2)`;
-
-/**
- * The 56 `enable` expressions, in the same order bitsFor() produces bits.
- *
- * The checksum bits cannot be XORed directly in the expression language, but
- * XOR of one bit position across six bytes is just the parity of their sum,
- * which it can do.
- */
-export function rowBitExprs(epoch) {
-  const out = [];
-  for (let i = 0; i < CLOCK_BITS; i++) out.push(BIT_EXPR(epoch, CLOCK_BITS - 1 - i));
-  for (let i = CLOCK_BITS; i < ROW.NBLOCKS; i++) {
-    const k = ROW.NBLOCKS - 1 - i;                 // bit position inside the xor byte
-    const terms = [0, 1, 2, 3, 4, 5].map((m) => BIT_EXPR(epoch, 8 * m + k));
-    out.push(`mod(${terms.join('+')},2)`);
-  }
-  return out;
-}
-
-/**
- * The same 56-block row, as 57 drawboxes.
- *
- * MEASURED 2026-09-07 with ffmpeg@7, 1280x720@30 through the production x264
- * settings, then decoded back out with readBurned()'s own algorithm:
- *   · 150 of 150 frames checksum-clean, worst error 0 ms
- *   · +16 % encoder-process CPU (utime 3.095 s -> 3.598 s per 20 s of video)
- *   · and the reader is not vacuous: flipping ONE block of one frame on
- *     purpose is rejected, at bit 51.
- *   · it also survives a TRANSCODE LADDER, which was the open question: scaled
- *     to 480p/360p/240p, re-encoded, then normalised back onto this 1280-wide
- *     grid the way a browser drawing <video> into a canvas would, every rung
- *     read 90/90 clean — down to 6.7 px blocks at 240p. So a lower Cloudflare
- *     rendition does not cost the row.
- *
- * So it works and it is not expensive in absolute terms — but the publisher
- * container is 1 vCPU running TWO 720p30 encodes, and half a vCPU already
- * stalled that pair once (wrangler.jsonc). +16 % on each leg is a real bite out
- * of a budget nobody has re-measured on the actual instance. Hence OFF by
- * default: switch it on for one measured run, then decide.
- */
-export function rowFilters(epoch) {
-  const f = [
-    `drawbox=x=${ROW.X - 20}:y=${ROW.Y - 20}:w=${ROW.NBLOCKS * ROW.BLOCK_W + 40}`
-      + `:h=${ROW.H + 40}:color=black:t=fill`,
-  ];
-  rowBitExprs(epoch).forEach((e, i) => {
-    f.push(`drawbox=x=${ROW.X + i * ROW.BLOCK_W}:y=${ROW.Y}:w=${ROW.BLOCK_W}:h=${ROW.H}`
-      + `:color=white:t=fill:enable='${e}'`);
-  });
-  return f;
-}
+// THE ROW IS A CANVAS THING ONLY. `rowFilters()`, `MS_EXPR` and `BIT_EXPR`
+// lived here — 57 drawboxes with `enable` expressions, so ffmpeg could burn the
+// same machine-readable clock. It worked (150/150 frames checksum-clean through
+// the production x264 settings, and it survived a transcode ladder down to
+// 6.7 px blocks) and NOTHING EVER READ IT. Every reader in this repo is fed by
+// a browser canvas: `moq.mjs`'s own publisher, `room`, `rig/whep/play.html` off
+// `publish.html`, `rig/obs-docker` off `clock.html`. It cost a measured +16 %
+// encoder CPU on a box with one core and two encodes, to be decoded by nobody.
+//
+// Removed 2026-09-08. It is in the history with its measurements if an
+// ffmpeg-drawn row is ever wanted; do not re-derive it from scratch.
 
 /**
  * The whole video filter chain for a generated ffmpeg source.
@@ -409,9 +365,8 @@ export function rowFilters(epoch) {
  *                absolute hue: testsrc2 has no single hue to set. Two publishers
  *                with different values look different, which is the requirement.
  * @param font    fontfile path — REQUIRED, see the trap above
- * @param row     draw the 56-block row too (default false; see rowFilters)
  */
-export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false } = {}) {
+export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT } = {}) {
   if (!epoch) throw new Error('ffmpegFilters: epoch required');
   if (!font) throw new Error('ffmpegFilters: fontfile required — drawtext without one fails silently');
   // SAME TYPOGRAPHY AS THE CANVAS: a small brand-yellow word over a big light
@@ -435,7 +390,6 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
     // hue FIRST: rotating chroma after the overlays would tint the white boxes
     // and, with row=1, the row itself.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
-    ...(row ? rowFilters(epoch) : []),
     // FOUR draws, mirroring burn()'s layout: a small word, then a big number,
     // twice. It used to be two lines with the word and the number sharing one
     // box, which is not what the canvas does — and the two have to LOOK the
@@ -467,7 +421,7 @@ export function ffmpegFilters({ epoch, hue = 0, font = FFMPEG_FONT, row = false 
   ].join(',');
 }
 
-// CLI: `node demo/shell/pattern.mjs --epoch=… [--hue=…] [--font=…] [--row]`
+// CLI: `node demo/shell/pattern.mjs --epoch=… [--hue=…] [--font=…]`
 // which is how src/publish.sh gets its filter — one spec, two renderings.
 //
 // The guard is an EXACT url match, demo/server.mjs's idiom, not
@@ -483,6 +437,5 @@ if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv
     epoch: arg('epoch'),
     hue: Number(arg('hue', 0)),
     font: arg('font', FFMPEG_FONT),
-    row: process.argv.includes('--row'),
   }));
 }

@@ -132,18 +132,11 @@ export class Pub extends Container {
   /**
    * Source settings, tunable without a redeploy of the IMAGE.
    *
-   * PUB_ROW=1 adds the 56-block machine-readable clock row to the burned
-   * pattern — the same row the browser canvas burns. Measured at +16 % encoder
-   * CPU per leg, on a box that runs two 720p30 encodes on 1 vCPU, so it is off
-   * until somebody switches it on for a run and checks EXTINF sd is still
-   * 0.003 s. A var rather than a constant precisely so that run costs a worker
-   * deploy and not an image rebuild.
    */
   #size() {
     const n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
     return {
       w: n(this.env.PUB_W, 1280), h: n(this.env.PUB_H, 720), fps: n(this.env.PUB_FPS, 30),
-      row: String(this.env.PUB_ROW) === '1',
     };
   }
 

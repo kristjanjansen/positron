@@ -89,43 +89,14 @@ const ROW = {
 /** Single-quote a filtergraph option value; the inner escapes are drawtext's. */
 const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
 
-/**
- * The 56-block row as 57 drawboxes, each gated by an `enable` expression.
- *
- * MEASURED 2026-09-07, ffmpeg@7, 1280x720@30 through these exact x264 settings,
- * decoded back out with readBurned()'s own algorithm: 150 of 150 frames
- * checksum-clean, worst error 0 ms, and a deliberately corrupted block IS
- * rejected. Cost: +16 % encoder-process CPU (utime 3.095 s -> 3.598 s per 20 s
- * of video).
- *
- * OFF BY DEFAULT ANYWAY. This box is 1 vCPU running TWO 720p30 encodes, and
- * half a vCPU already stalled that pair once (wrangler.jsonc). +16 % on each leg
- * is a real bite out of a budget nobody has re-measured on the actual instance,
- * and the only way to find out is to switch it on for one run and watch EXTINF
- * sd — which is 0.003 s today and is what a starved encoder wrecks first.
- * Flip PUB_ROW=1 in the worker's vars; no image rebuild needed.
- */
-function rowFilters(epoch) {
-  const ms = `floor((t+${epoch})*1000)`;
-  const bit = (n) => `mod(floor(${ms}/${2 ** n}),2)`;
-  const exprs = [];
-  for (let i = 0; i < 48; i++) exprs.push(bit(47 - i));
-  for (let i = 48; i < ROW.NBLOCKS; i++) {
-    // XOR of one bit position across six bytes is the parity of their sum,
-    // which the expression language CAN do — it has no xor.
-    const k = ROW.NBLOCKS - 1 - i;
-    exprs.push(`mod(${[0, 1, 2, 3, 4, 5].map((m) => bit(8 * m + k)).join('+')},2)`);
-  }
-  return [
-    `drawbox=x=${ROW.X - 20}:y=${ROW.Y - 20}:w=${ROW.NBLOCKS * ROW.BLOCK_W + 40}`
-      + `:h=${ROW.H + 40}:color=black:t=fill`,
-    ...exprs.map((e, i) => `drawbox=x=${ROW.X + i * ROW.BLOCK_W}:y=${ROW.Y}`
-      + `:w=${ROW.BLOCK_W}:h=${ROW.H}:color=white:t=fill:enable='${e}'`),
-  ];
-}
+// The 56-block machine-readable row used to be drawn here too. NOTHING EVER
+// READ IT — every reader in the repo is fed by a browser canvas — and it cost a
+// measured +16 % encoder CPU on this box, which is one vCPU carrying two
+// encodes. Removed 2026-09-08 along with demo/shell/pattern.mjs's generator and
+// the PUB_ROW var. See that file's note.
 
 /**
- * The whole -vf chain: hue, optional row, and TWO LABELLED CLOCKS.
+ * The whole -vf chain: a hue rotation and TWO LABELLED CLOCKS.
  *
  * `hue` is a ROTATION of the source's colours, not an absolute hue — testsrc2
  * has no single hue to set. It exists so two publishers are distinguishable at
@@ -136,7 +107,7 @@ function rowFilters(epoch) {
  * (1.79e12) prints as 2147483647 and ffmpeg says "Conversion of floating-point
  * result to int failed" — measured. Hence the unit printed beside the number.
  */
-function drawFilters({ epoch, hue = 0, row = false }) {
+function drawFilters({ epoch, hue = 0 }) {
   // Same typography as the browser canvas: a small brand-yellow word over a big
   // light number, on a dark scrim rather than a white slab. Not hue-rotated —
   // `hue=` is applied to the source first and drawtext paints after it, so
@@ -153,7 +124,6 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     // hue FIRST: rotating chroma afterwards would tint the white boxes and,
     // with the row on, the row itself — which readBurned thresholds on.
     ...(hue ? [`hue=h=${((hue % 360) + 360) % 360}`] : []),
-    ...(row ? rowFilters(epoch) : []),
     // FOUR draws, mirroring burn()'s layout: a small word, then a big number,
     // twice. No source label — the hue says which publisher this is, and a name
     // burned into a picture is a small text nobody can read at the size a demo
@@ -182,20 +152,11 @@ function drawFilters({ epoch, hue = 0, row = false }) {
  * first ~20 s. A video-only stream has no audio group at all. If the stutter
  * disappears there, audio is the cause; if it survives, it is not.
  */
-// THE RTMPS LEG NEVER DRAWS THE ROW, whatever PUB_ROW says.
-//
-// The row costs +16 % encoder CPU (measured) and this box is 1 vCPU carrying
-// TWO 720p30 encodes. Nothing reads the LL-HLS picture programmatically — the
-// row exists so a RECEIVER can decode the publisher's clock out of the pixels,
-// and the receiver on that path is a human watching a video. Paying for it
-// twice to use it once is what the flag used to do.
-//
-// `row` is therefore accepted and ignored here; the WHIP leg honours it.
-function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av', row = false }) {
+function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'av' }) {
   const gop = fps * 2;
   // %{pts:flt:OFFSET} — `basetime` does NOT work here (measured, publish.sh).
   const epoch = (Date.now() / 1000).toFixed(6);
-  const draw = drawFilters({ epoch, hue: 0, row: false });   // see the note above
+  const draw = drawFilters({ epoch, hue: 0 });   // see the note above
   const wantV = tracks !== 'a';
   const wantA = tracks !== 'v';
   return [
@@ -232,13 +193,13 @@ function args({ key, fps = 30, bitrate = '2500k', w = 1280, h = 720, tracks = 'a
  *    negotiation gate (run 1 of those notes proved it first try)
  *  · -bf 0 for the same reason as the RTMPS leg
  */
-function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720, row = false }) {
+function whipArgs({ url, fps = 30, bitrate = '2000k', w = 1280, h = 720 }) {
   const gop = fps * 2;
   const epoch = (Date.now() / 1000).toFixed(6);
   // A DIFFERENT hue from the RTMPS leg, deliberately. They are two ffmpeg
   // processes on two Cloudflare inputs — the page already says so — and any
   // page showing them side by side needs to tell them apart.
-  const draw = drawFilters({ epoch, hue: 150, row });
+  const draw = drawFilters({ epoch, hue: 150 });
   return [
     '-hide_banner', '-loglevel', 'warning',
     '-re', '-f', 'lavfi', '-i', `testsrc2=size=${w}x${h}:rate=${fps}`,
