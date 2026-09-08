@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'bfe4be9-091420';
+export const BUILD = 'cf265b0-091802';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -150,9 +150,17 @@ export function mount({
  *
  * A ring with a lower-right aperture, a crossbar to make it an 'e', and the
  * superscript plus that is the charge and the name. The aperture is a WEDGE
- * FROM THE CENTRE (~11° to ~59°), not a quadrilateral down to the bottom edge:
- * the earlier version sliced the whole lower arc away and read as a damaged
- * circle rather than an 'e' at any size below 64 px.
+ * FROM THE CENTRE, **11° to 38°**.
+ *
+ * It was 5° to 62°, and that is 57 degrees of missing bowl: it cut the arc away
+ * from just under the crossbar right past five o'clock, took the terminal with
+ * it, and clipped the RIGHT END OF THE CROSSBAR on the way — so bar and ring
+ * ended in one straight diagonal and the letter read as a bitten circle. It was
+ * reported as "I still do not see a full e".
+ *
+ * 11° clears the crossbar's underside (y 20.4 at the bar's right end); 38° is
+ * where a real 'e' terminates. Chosen by rendering four apertures at 150 px and
+ * at 16 px side by side and looking, which is what the note below says to do.
  *
  * The .ico is a SEPARATE IMPLEMENTATION — a pixel loop, not a rasteriser — so
  * matching parameters do not guarantee a matching picture, and it has to be
@@ -167,7 +175,7 @@ function favicon() {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
     `<rect width="32" height="32" rx="6" fill="${BG}"/>` +
     `<circle cx="13.5" cy="19.3" r="7" fill="none" stroke="${HI}" stroke-width="3.2"/>` +
-    `<path d="M13.5 19.3L28.9 20.7L20.8 33Z" fill="${BG}"/>` +
+    `<path d="M13.5 19.3L35.1 23.5L30.8 32.8Z" fill="${BG}"/>` +
     `<rect x="5.6" y="17.9" width="15.4" height="2.5" fill="${HI}"/>` +
     `<rect x="21.3" y="6.9" width="6.4" height="2.2" fill="${HI}"/>` +
     `<rect x="23.4" y="4.8" width="2.2" height="6.4" fill="${HI}"/></svg>`;
