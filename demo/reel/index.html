@@ -49,7 +49,9 @@
      at, which is also the honest answer for a screen reader. */
   .pcol { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .pcol[data-empty="1"] { display: none; }
-  .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim2); }
+  /* the key carries the lane's colour — set from the INK table in the script,
+     never typed here, so the label and the marks can never disagree */
+  .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
   .ptitle { color: var(--dim); font-weight: 600; margin-top: 2px;
             height: calc(2 * 1.6em); overflow: hidden;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -148,17 +150,26 @@
   // One column per medium. Each carries its own name, then the date and the
   // link to ERR on their OWN line — a title that runs into its metadata reads
   // as one long string and the title is the part being looked for.
-  const column = (key) => {
+  // ONE TABLE FOR THE TWO ARCHIVES' INK, read by the lane that draws the marks
+  // AND by the key above the column, so the two cannot drift apart. Typing the
+  // same yellow twice is how a legend starts being needed.
+  const INK = {
+    video: { on: '#ffd400', off: 'hsl(50 62% 40%)' },
+    audio: { on: 'hsl(185 80% 62%)', off: 'hsl(185 45% 34%)' },
+  };
+
+  const column = (key, medium) => {
     const box = el('div', 'pcol');
     box.lang = 'et';                  // the archive's own language, not the page's
     const parts = { key: el('div', 'pkey', key), title: el('div', 'ptitle', ''),
                     meta: el('div', 'pmeta', ''), lead: el('div', 'plead') };
+    parts.key.style.color = INK[medium].on;   // the same ink as this lane's marks
     box.append(parts.key, parts.title, parts.meta, parts.lead);
     box.dataset.empty = '1';          // nothing is picked yet
     return Object.assign(parts, { box });
   };
-  const colFilm = column('newsreel');
-  const colRadio = column('radio');
+  const colFilm = column('newsreel', 'video');
+  const colRadio = column('radio', 'audio');
   picked.append(colFilm.box, colRadio.box);
 
   // A column with nothing in it is REMOVED, not filled with a sentence saying
@@ -258,9 +269,8 @@
     // same hue at full brightness rather than a different colour.
     colorOf: (sp) => {
       const on = sp.row?.payload?.slug === current?.slug;
-      return id === 'radio'
-        ? (on ? 'hsl(185 80% 62%)' : 'hsl(185 45% 34%)')
-        : (on ? '#ffd400' : 'hsl(50 62% 40%)');
+      const ink = INK[id === 'radio' ? 'audio' : 'video'];
+      return on ? ink.on : ink.off;
     },
     labelOf: (sp, { bw }) => (bw > 90 ? sentenceCase(sp.row?.payload?.title).slice(0, 40) : ''),
     rows: () => (id === 'radio' ? radio : items).map((it) => ({
