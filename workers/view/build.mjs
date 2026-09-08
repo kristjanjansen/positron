@@ -282,12 +282,16 @@ function favicon() {
   // the 'e': an annulus with the lower-right wedge removed. Smaller than it
   // was, so the whole glyph sits inside the rounded field instead of running
   // off the bottom-right corner.
+  //
+  // The aperture is 11°-38° and shell.mjs's SVG must agree. It was 5°-62°,
+  // which removed the terminal and clipped the crossbar, and the letter read as
+  // a bitten circle rather than an 'e'.
   const cx = 13.5, cy = 19.3, R = 8.6, r = 5.4;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const d = Math.hypot(x - cx, y - cy);
     if (d > R || d < r) continue;
     const a = (Math.atan2(y - cy, x - cx) * 180) / Math.PI;   // y down: +90 = down
-    if (a > 5 && a < 62) continue;                             // the aperture
+    if (a > 11 && a < 38) continue;                            // the aperture — KEEP IN SYNC with shell.mjs
     put(x, y, HI);
   }
   // the crossbar is what makes a ring an 'e'
