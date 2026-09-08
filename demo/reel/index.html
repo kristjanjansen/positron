@@ -19,11 +19,11 @@
      different amount for every film. Five lines here, more where there is room,
      and the rest scrolls inside its own box — so the strip below never moves. */
   .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px;
-            max-width: 62ch; min-height: 62px; }
+            max-width: 72ch; min-height: 62px; }
   .ptitle { color: var(--fg); font-weight: 600; margin-bottom: 3px; }
   .ptitle a { color: var(--hi); font-weight: 500; }
-  .plead { max-height: calc(5 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
-  @media (min-width: 760px) { .plead { max-height: calc(8 * 1.6em); } }
+  .plead { max-height: calc(9 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
+  @media (min-width: 760px) { .plead { max-height: calc(14 * 1.6em); } }
   /* the slot keeps its shape before a film is chosen */
   video.film[data-empty="1"] { background: var(--card); }
 </style>
@@ -76,7 +76,7 @@
   const film = el('video', 'film', null, { playsinline: '' });
   film.dataset.empty = '1';
   const picked = el('div', 'picked');
-  const pickedTitle = el('div', 'ptitle', 'press a film on the line');
+  const pickedTitle = el('div', 'ptitle', '');
   const pickedLead = el('div', 'plead');
   picked.append(pickedTitle, pickedLead);
   d.el.append(film, picked);
@@ -179,6 +179,20 @@
   // bytes: no fetch of segments, no blob URL over them, nothing to R2 or to
   // localStorage. A copy is the one thing this must not make.
   async function play(it) {
+    // BLESS THE ELEMENT NOW, before anything is awaited.
+    //
+    // A user gesture does NOT survive an `await`. This function fetches the
+    // media url first and calls `play()` after, by which time the gesture is
+    // spent — so the unmuted play was refused and the fallback muted it. Every
+    // newsreel came out silent, twice reported, and my headless check missed it
+    // because `--autoplay-policy=no-user-gesture-required` is exactly the flag
+    // that hides this.
+    //
+    // Calling `play()` synchronously inside the gesture marks the element as
+    // user-activated even though it rejects for having no source yet. That
+    // rejection IS the mechanism, not a failure.
+    film.play().catch(() => {});
+
     current = it;
     d.set('picked', it.date);
     d.set('length', null);
@@ -186,10 +200,13 @@
     // if the film is off the edge — stepping to something you cannot see is not
     // stepping to it.
     deck.seek(it.at);
+    // KEEP THE READER'S ZOOM. Stepping re-centres on the new clip at whatever
+    // span is currently shown — it does not snap back to the opening view,
+    // because someone who zoomed out to see the month meant it.
     const v = view.strip.view();
     const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
     const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
-    if (it.at < left || it.at > left + span) view.strip.fit(it.at - DAY, it.at - DAY + 7 * DAY);
+    if (it.at < left || it.at > left + span) view.strip.fit(it.at - span / 2, it.at + span / 2);
     pickedTitle.replaceChildren(document.createTextNode(`${it.title} · ${it.date} · `));
     const a = el('a', '', 'at ERRarhiiv');
     a.href = `${ARHIIV}/video/vaata/${it.slug}`;
@@ -233,11 +250,17 @@
     try {
       await film.play();
     } catch {
+      // Kept, because a browser may still refuse and a muted picture beats no
+      // picture — but it should now be rare rather than every single time.
       film.muted = true;
       await film.play().catch(() => {});
-      d.log('the browser refused sound — playing muted; press play to hear it', 'bad');
+      d.log('the browser refused sound — press play on the picture to hear it', 'bad');
     }
     d.log(`playing ${it.slug} — streamed from ERR, nothing stored here`, 'hi');
+    // the element's own controls are a second play button; keep the bar's in
+    // step rather than letting the two disagree about what is happening
+    film.addEventListener('play', () => { if (!deck.playing()) deck.play(); });
+    film.addEventListener('pause', () => { if (deck.playing()) deck.pause(); });
     film.addEventListener('loadedmetadata', () => {
       if (!Number.isFinite(film.duration)) return;
       it.playedMs = Math.round(film.duration * 1000);
@@ -245,6 +268,24 @@
       gutters();
     }, { once: true });
   }
+
+  // PLAY MEANS PLAY A FILM. The toggle drives the deck, and a deck of 1965 with
+  // nothing chosen just creeps the playhead across days with no picture — a
+  // control that appears to do nothing. So the two are joined: pressing play
+  // with nothing chosen starts the first film, and after that play and pause
+  // are the film's.
+  //
+  // The playhead still advances underneath, at one second of 1965 per second of
+  // now, which at a week to a screen is about a pixel an hour. Invisible, and
+  // truthful: the line really is moving through the year.
+  deck.transport.onState((st) => {
+    if (st.reason === 'play') {
+      if (!current) { if (items.length) play(items[0]); return; }
+      if (film.paused) film.play().catch(() => {});
+    } else if (st.reason === 'pause') {
+      if (current && !film.paused) film.pause();
+    }
+  });
 
   view.strip.canvas.addEventListener('pointerup', () => {
     const h = view.strip.state?.hover;
@@ -260,15 +301,18 @@
     d.set('films', items.length);
     gutters();
 
-    // A WEEK, NOT A YEAR. The deck still holds all of 1965 — you can pan and
-    // zoom across the whole thing — but at a year across a screen, 282 films
-    // land four pixels apart and the lane is a fence, not a picture. A week is
-    // the span where a newsreel is a thing you can point at. Opening zoomed in
-    // and letting the reader zoom out is the right way round: the wide view is
-    // discoverable from the narrow one, and the narrow one is where the marks
-    // mean something.
-    const WEEK = 7 * DAY;
-    view.strip.fit(items[0].at - DAY, items[0].at - DAY + WEEK);
+    // SIX HOURS, not a week and certainly not a year. The deck still holds all
+    // of 1965 and pans and zooms across it — but the opening view has to be one
+    // where a CLIP IS A BAR rather than a tick.
+    //
+    // The arithmetic decides it. Clips are minutes long and a day apart, so
+    // width-in-proportion and several-clips-at-once cannot both be had: at a
+    // week a fifteen-minute film is 0.15 % of the view, about one pixel. At six
+    // hours it is 4 %, a bar you can see the length of. So the opening view
+    // shows ONE film properly and the arrows walk the year — and zooming out is
+    // right there when the year is what you want.
+    const SPAN = 6 * 3600_000;
+    view.strip.fit(items[0].at - SPAN / 2, items[0].at + SPAN / 2);
 
     d.assert('the line is positioned in 1965, not 1970',
       deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
