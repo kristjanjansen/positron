@@ -1,6 +1,7 @@
 # plan-session — a show off the wire, laid on one line, kept for six hours
 
-Status: **not started, and blocked on a container deploy.** Written 2026-09-08
+Status: **not started.** §1a is the recommended build and is NOT blocked;
+the Cloudflare variant in §1/§3 is, on a container deploy. Written 2026-09-08
 out of `take`. Proposed slug **`keep`**, Act 3 (*capture and return*), after
 `show`.
 
@@ -31,6 +32,59 @@ token-gated, and a public page cannot hold a token. That is why `ingest` exists
 at all, and blurring the two is the thing `CLAUDE.md` explicitly forbids.
 
 And `take`'s central claim does not survive the move. §3 is the whole plan.
+
+---
+
+## 1a. AMENDMENT — the container is not needed, and the plan below over-assumed it
+
+Added after review, from one question: *"when we do whip why ffmpeg/container?"*
+
+**A browser can publish WHIP itself.** `rig/whep/publish.html` already does —
+canvas 1280x720@30 straight to Cloudflare Stream, with the frozen row in the
+picture. So ffmpeg is not what makes a live source; it is what keeps a SECRET.
+That file says so in its own comment: *"WHIP publish URL is a credential (path
+segment = stream key) — never hardcode it"*, read from a gitignored file via
+`?whip=`. A public page cannot hold that, which is the container's whole reason
+for existing on this path.
+
+**So do not use Cloudflare Stream for this demo at all.** Use the peer relay
+`room` already uses: `wss://ws.positron.studio/room/<id>/ws`, **tokenless**, no
+key, no container, no Stream input. One browser draws the shared pattern and
+sends it; another receives it, records it, and lays the takes on the line.
+
+What that changes, item by item:
+
+| §3's blocker | with a browser publisher |
+|---|---|
+| `PUB_ROW: "0"` — no row in the live pixels | the publisher is `burn()`, which draws the row already |
+| +16 % encoder CPU on 1 vCPU for two encodes | none: the publishing browser encodes one stream |
+| the container image is stale and undeployed | not in the path |
+| the burned clock is the PUBLISHER's, offset unknown | it is a browser's clock, and both ends can share one |
+| ~2-4 Stream storage-minutes per suite run | zero: no Stream input is touched |
+| P0 gates everything | there is no P0 |
+
+**And §3's hard problem mostly dissolves — without weakening the claim.** The
+publisher burns POSITION into the pixels BEFORE the picture crosses the wire. It
+is then encoded, sent over a real peer connection, decoded, re-encoded by
+`MediaRecorder`, stored, played back and read. The number cannot be faked by the
+receiving page, because the receiving page did not write it. So `take`'s claim —
+*a seek checks itself* — survives INTACT and is strictly stronger than `take`'s
+own version, where the frame never left the tab.
+
+**What is lost, said plainly.** This is peer-to-peer, not a broadcast stream, so
+it does not test Cloudflare's ingest, its packager, or its edge. Two tabs on one
+machine share a clock and a CPU; two DEVICES do not, and that is the run worth
+reporting. If the question is specifically *"does a Cloudflare live stream
+survive being recorded and scrubbed"*, this does not answer it and §1 below
+does.
+
+**Reuse gets better too:** `room` already has the relay, the offer/answer, the
+one-dialler rule, and the shared pattern on a canvas — so the source side is a
+demo that exists rather than a container that has to be rebuilt.
+
+Sections 1 and 3-5 below were written before this and assume the container.
+Read them as the CLOUDFLARE variant, which is still the right answer if the
+subject is Cloudflare. Section 1a is the recommended build.
 
 ---
 
