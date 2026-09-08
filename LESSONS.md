@@ -219,6 +219,74 @@ cannot reach (#2 again, third instance from one rename). When a rename moves
 URLs, grep the OLD form everywhere, not just in pages: harnesses, modules and
 comments all hold paths and none of them are type-checked.
 
+### 30. A shared module nobody can see is a claim, not a unification
+
+`demo/shell/pattern.mjs` was written to be the ONE test pattern, and it was
+imported only by `moq.mjs` — so the only two pages that drew it both need a
+relay that does not connect from here. Meanwhile four other demos each drew
+their own picture with a hand-rolled clock. The work was real, the file was
+good, and the thing it existed to achieve had not happened.
+
+Nobody noticed because the module was *correct*: it had tests, it round-tripped,
+its geometry was documented. What it did not have was a reader. The user found
+it in one sentence — "can not see unified test screen rendering" — because they
+went looking for the RESULT rather than the change.
+
+**Ask where a shared thing is visible before calling it shared.** `grep -l` for
+the importers takes ten seconds and answers it. If the answer is "one caller,
+and that caller is offline", the extraction is staged, not done.
+
+The same shape produced #29 one commit earlier: a module whose import 404'd
+killed two pages for weeks. Both are the same question — *who actually reaches
+this?* — asked too late.
+
+### 31. When a fix draws a new complaint, do the arithmetic on what it cost
+
+Three attempts at ~30 lines of camera drawing, each fixing the last one's
+damage:
+
+    drawImage(src, 0, 0, w, h)  distorts — iOS ignores a 640x360 request and
+                                returns PORTRAIT, so a face is squashed
+    cover                       aspect correct, but on 720x1280 into 1280x720
+                                scales 1.78x and shows 32% OF THE FRAME
+    contain                     aspect correct, whole frame, field either side
+
+Cover was a real fix for a real bug and it produced "no video" — zoomed so far
+into the middle of the picture that it read as a broken camera. I had verified
+the thing I changed (a square stays square: ratio 1.000) and not the thing I had
+not thought about (how much of the source survives). One line of arithmetic —
+`h / (sh * scale)` — would have said 32% before it shipped.
+
+The field colour was the same story twice: `hsl(hue 26% 12%)` was mud, and the
+"fix", the site's black under a 7% hue wash, was mud again. **A warm hue at low
+saturation and low lightness IS mud; there is no alpha that fixes it.** The
+answer was to stop tinting the field and let the colour live where it is
+saturated and large.
+
+So: when a change lands and the next report is a NEW complaint about the same
+element, do not reach for the next variant. Write down what the fix costs in the
+units of the thing you are drawing, and check that number against the complaint.
+
+### 32. A scale that grows with the thing cannot show it growing
+
+`take` had to draw a take getting longer while it records. The obvious
+implementation — extend the deck's range as the take extends — produces a bar
+whose right edge is pinned to the end of the axis. It does not animate. Nothing
+is broken, no assert fails, and the numbers under it are all correct.
+
+Growth is only visible against something that is NOT growing. The axis now opens
+to the full cap when recording starts and the take grows into it, which is also
+the honest picture: the empty space is how much take is still allowed.
+
+Second half of the same fix: `paint()` ran once per blob — every 500 ms — so
+even with the runway the bar advanced in steps. **A thing that is supposed to
+look continuous needs a frame rate, not an event.**
+
+And measure it rather than watching it: lit pixels across the lane, sampled
+every 700 ms, `60 → 94 → 129 → 152 → 190 → 229`, monotonic. Watching an
+animation and believing it is smooth is how the 500 ms stepping survived the
+first attempt.
+
 ---
 
 ## Method

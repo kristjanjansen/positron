@@ -1,4 +1,106 @@
-# Progress log — 2026-08-25 → 09-07  (newest first)
+# Progress log — 2026-08-25 → 09-08  (newest first)
+
+## Session 12 (2026-09-07 → 09-08) — one test pattern, and finding out it was a claim rather than a fact
+
+Started as "finish the two background agents", became a rework of the picture
+every demo records. Nine commits, all deployed except the container.
+
+### `take` — a local video timeline
+
+Record moved INTO the transport bar (`createTransportBar` grew an `extras`
+list, defaulting to empty; no other demo passes one), because on this page it
+is a transport verb rather than something you do to the page.
+
+Takes lie end to end, so **exactly one part is ever under the playhead** — which
+is why `media-master` L1 holds unchanged: the part being played IS the master.
+Driven by hand with two takes, **14 page asserts green**, including the boundary
+handover (2549 ms → take 1, 3349 ms → take 2), which element drives the clock,
+local-vs-line time, and asked-vs-got on a seek. The suite presses each control
+once, makes ONE take, and so **8 of those cannot run**; the page logs which are
+outstanding rather than reading green over the gap.
+
+Later: the take is **drawn while it records**, part and events both. Two things
+that were not obvious — it needs a RUNWAY (a range that grows with the bar
+cannot show growth; the right edge stays pinned and the bar looks stationary),
+and it needs FRAMES (`paint()` ran once per blob, every 500 ms, which draws the
+take in steps). Measured, not eyeballed:
+
+    parts lane   60 → 94 → 129 → 152 → 190 → 229 lit px   monotonic
+    events lane  11 → 12 →  14 →  15 →  16 →  18 ticks    monotonic
+
+### The pattern was shared by exactly nobody
+
+`demo/shell/pattern.mjs` existed and was reachable ONLY through `moq.mjs` — so
+only `moq` and `ladder` drew it, and both need a relay that does not connect
+here. Meanwhile `take`, `record`, `capture` and `show` each drew their own
+picture with a hand-rolled ISO clock. **Four renderers, one of them invisible.**
+Reported by the user as "can not see unified test screen rendering", which is
+exactly what it was.
+
+All four call `burn()` now. `take` passes `position`, so its second clock reads
+POSITION ON THE LINE — the same figure the transport bar shows, which is what
+makes a scrub checkable by eye. The others have no deck, so theirs read LOCAL.
+
+### Then five rounds of the user looking at it
+
+Each one a real defect, and each fix measured:
+
+| what was wrong | why | fix |
+|---|---|---|
+| header, caption, second-hand, footer | 3–8 px at the size a demo shows it | removed; row + two clocks only |
+| the sweep meant nothing | `frame * 7` px satisfies the encoder and says nothing | crosses once per 10 s OF THE BURNED CLOCK, so two pictures of one instant agree |
+| three different margins (20 / 80 / 100) | reads as a mistake because it is one | one `PAD = 60`, bed centred |
+| hues over the whole circle | `record` magenta, `capture` green — neither of them ours | a 100° band on `--hi`, hue 50 |
+| **field was mud, twice** | `hsl(hue 26% 12%)`, then black under a 7% wash | **the field is never tinted at any alpha** |
+| iOS stretched the camera | iOS ignores a 640x360 request and returns PORTRAIT | `drawCamera()` |
+| then "no video" | cover shows **32% of a portrait frame** | contain |
+| numbers unequal, wrong end | one bigger said one mattered more | both 84 px, at the top; row at the bottom |
+| iOS selected the page | press-drag on a canvas starts a text selection | `pan-y` + no selection on `.d-strip`/`.tbar` |
+
+Verification that each geometry move kept the pixels readable: **burn →
+readBurned, 600 exact, 0 wrong, worst 0 ms**, re-run after every move of `ROW`.
+And a square drawn in four source aspects — 720x1280, 640x480, 1280x720,
+1920x1080 — measured back out of the destination pixels at **ratio 1.000**.
+
+### The rename had left three dead paths
+
+Found while verifying the agents' work, and the most important thing in the
+session. `demo/shell/moq.mjs` still imported `/08-moq/moq-vendor.js`; the 404
+killed the module, so **`moq` and `ladder` asserted NOTHING** for the whole life
+of the slug rename. `verify-native.mjs` and `verify-safari.mjs` both fetched
+`/06-llhls/` — **the iPhone code path**.
+
+The harness had been saying so perfectly the whole time (`FAIL __demo.ready`,
+`0/1 green`, one line, no relay error) and it was read as "relay/WebRTC in
+headless", which is independently true of that page. See LESSONS #29 and #30.
+`build.mjs` read HTML only, so a dead import inside a MODULE was never checked;
+it now scans `.mjs`/`.js`, proved by restoring the bad path and watching the
+build refuse.
+
+### Harness
+
+- `.tbar-x` joins the control selector — a control the harness cannot press is
+  a subject the suite cannot reach.
+- The assert stabiliser waited only while the count was CHANGING, and **zero
+  never changes**, so a page whose first assert sits behind a wait read as
+  "asserted nothing". Capped at 30 s, not `settleMs`, or a page whose live leg
+  is down burns a 125 s cold-container budget twice.
+- The strip ink sample raced a canvas resize (~1 run in 10 read `0 lit samples`
+  on a working page). Samples after a frame now, up to three times — a retry,
+  not a tolerance, proved by wiping the strip every 8 ms and watching it fail.
+
+### Numbers
+
+**332/344 green** on the full suite; the 12 failures are every WebRTC and QUIC
+leg (no UDP egress in this shell). The denominator moved 313 → 344 because
+`moq` and `ladder` now run at all.
+
+### Not done
+
+**`workers/pub` is not deployed.** Three rounds of pattern changes — typography,
+hue, the row's move to the bottom — are queued behind a container image rebuild.
+Until that happens the live streaming demos draw the OLD picture, and the two
+halves of "one spec, two renderings" disagree in what they actually serve.
 
 ## Session 11 (2026-09-07) — a UI/UX review that turned into a jargon audit (user: "lets do ui/ux review of demos one by one" → "save progress to md's")
 

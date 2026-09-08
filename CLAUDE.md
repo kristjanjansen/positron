@@ -244,6 +244,18 @@ counts against the last known total after any change.
   URLs that live in modules, harnesses and comments, none of which are
   type-checked — grep the OLD form everywhere.** The same rename left
   `verify-native.mjs` pointed at a 404, which is the iPhone path.
+- **The generated test picture is `demo/shell/pattern.mjs` and nothing else.**
+  Six demos draw it and `src/publish.sh` generates its ffmpeg filter by calling
+  it; `workers/pub/container/server.mjs` holds a marked copy because that image
+  is one `COPY` with nothing to import — change one, change the other, and diff
+  the y/size/colour table afterwards. **After ANY move of `ROW`, re-run burn →
+  `readBurned`** (600/600 exact through three moves); it is the only thing
+  between a layout tweak and a stream nothing can read. The field is NEVER
+  tinted — a warm hue at low saturation and low lightness is mud at any alpha —
+  so colour lives in the labels, the sweep square and the strip lane, inside a
+  100° band on `--hi`. One `PAD` off every edge. A camera is CONTAINED, never
+  covered or stretched: iOS ignores a resolution request and returns portrait,
+  where stretching squashes a face and cover shows 32% of the frame.
 - Transport UI is `demo/shell/transport-bar.mjs` and nothing else. Playhead from
   `observePosition`, seek only via `deck.seek()`, rates from intersected
   `caps.rates`.
