@@ -134,11 +134,6 @@ export const DEMOS = [
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
     tags: ['Icecast', 'Workers', 'WebAudio'] },
 
-  // settleMs covers a cold container AND three measured modes behind control 0:
-  // ~80 s for the publisher, then 3 x 8 s of measurement plus negotiation.
-  { name: 'tracks', act: 1, built: true, settleMs: 125000,
-    one: 'the same input as video, audio or both — what drops is the bytes, not the latency',
-    tags: ['LL-HLS', 'WHEP', 'Stream'] },
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
