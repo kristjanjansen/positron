@@ -91,9 +91,19 @@ build refuse.
 
 ### Numbers
 
-**332/344 green** on the full suite; the 12 failures are every WebRTC and QUIC
-leg (no UDP egress in this shell). The denominator moved 313 → 344 because
-`moq` and `ladder` now run at all.
+**351/351 green — every demo, no failures** (2026-09-08), the first clean full
+run since session 10. Mid-session it read 332/344; the 12 were the shell's
+missing UDP egress and cleared with it, which also settles HANDOFF's open item
+4 and explains `instrument`'s `relay open — 0` as the same cause.
+
+`moq` is the one worth quoting: **600 clean rows, 0 unreadable, THROUGH the
+Cloudflare relay** — the burned clock surviving encode → QUIC → decode with the
+row in its new position. A stronger check on that geometry than any local
+round-trip, and it only became possible once the 404 that had killed the module
+was fixed.
+
+The denominator moved 313 → 344 → 351: `moq` runs at all now, `take` and `room`
+gained asserts, `ladder` was removed.
 
 ### Not done
 

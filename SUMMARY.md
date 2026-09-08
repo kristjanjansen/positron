@@ -76,8 +76,9 @@ with an operator studio app as its first build and cultural-heritage archives
   **three dead paths the slug rename left**, one of which had `moq` and `ladder`
   asserting NOTHING for weeks behind a plausible-but-wrong explanation (#29),
   and one pointing the IPHONE harness at a 404. `ladder` was removed on 09-08.
-  ⚠ **332/344**; the 12 are every WebRTC and QUIC leg, no UDP egress in that
-  shell.
+  **351/351 on 09-08** — every demo, no failures, the first clean full run since
+  session 10. Earlier in the session it read 332/344; the 12 were the shell's
+  missing UDP egress and they cleared with it.
 
 ## The stack, with its numbers
 
