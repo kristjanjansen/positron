@@ -20,17 +20,24 @@
 
 <script type="module">
   import { mount, guard, el, armVideo, recorderMime } from '/shell/shell.mjs';
+  import { openSession, putWhole, fetchBack } from '/shell/ingest.mjs';
   import { whipPublish, whepPlay, whep } from '/shell/live.mjs';
-  import { burn, readBurnedFrom, videoHue, FRAME_H } from '/shell/pattern.mjs';
+  import { burn, readBurnedFrom, drawCamera, videoHue, FRAME_H } from '/shell/pattern.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
   const W = 1280, H = FRAME_H;
-  const CAP_MS = 8000;      // a take is capped, so a forgotten one cannot grow
+  const CAP_MS = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;
   const FPS = 25, FRAME_MS = 1000 / FPS;
+
+  // R2 IS OPT-IN, by `?r2=1`. The caps are real — five sessions per address per
+  // hour — and the harness presses every control on every run, so three runs in
+  // an hour would hit a 429 and a working page would read red. Off by default,
+  // exactly as `capture` does it.
+  const useR2 = new URLSearchParams(location.search).get('r2') === '1';
 
   const d = mount({
     name: 'keep',
@@ -43,7 +50,11 @@
       + 'trip. LEG is how far the picture travelled to get back.',
     readout: { leg: 'ms', takes: '', line: 's', clean: '', drift: 'ms' },
     showReadout: false,
-    controls: [{ id: 'go', label: 'Send and receive', primary: true }],
+    controls: [
+      { id: 'go', label: 'Send and receive', primary: true },
+      { id: 'camera', label: 'Use the camera' },
+      { id: 'clear', label: 'Delete takes', end: true },
+    ],
   });
   guard(d);
 
@@ -62,13 +73,48 @@
   const live = el('video', '', null, { playsinline: '', muted: '' });
   live.muted = true;
   seq.append(live);
+  // THE NUMBER SITS ON THE PICTURE IT DESCRIBES. How far the copy travelled is
+  // a property of THIS pane, so it goes in its caption rather than in a row of
+  // figures somewhere else that the reader has to join up.
   const seqCap = el('figcaption', 'd-cap', 'received');
+  const legText = () => (legs.length ? `received  +${Math.round(median(legs))} ms` : 'received');
   seqFig.append(seq, seqCap);
   stage.append(srcFig, seqFig);
   d.el.append(stage);
 
-  let frame = 0;
-  setInterval(() => { burn(g, W, H, frame++, { hue: videoHue(parts.length) }); }, 40);
+  const cam = el('video', '', null, { playsinline: '', muted: '' });
+  cam.hidden = true;
+  let camStream = null, frame = 0;
+  setInterval(() => {
+    const on = camStream && cam.readyState >= 2 && drawCamera(g, cam, W, H);
+    burn(g, W, H, frame++, { hue: videoHue(parts.length), field: !on });
+  }, 40);
+
+  d.on('camera', async () => {
+    if (camStream) { d.log('camera already on'); return; }
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      cam.srcObject = camStream;
+      await cam.play().catch(() => {});
+      d.log(`camera on: ${camStream.getVideoTracks()[0].label || 'default'}`, 'hi');
+    } catch (e) {
+      camStream = null;
+      d.log(`camera: ${e.name} — staying on the generated picture`, 'bad');
+    }
+  });
+
+  d.on('clear', () => {
+    if (recording) { d.log('stop recording first'); return; }
+    for (const p of parts) { try { p.video.remove(); URL.revokeObjectURL(p.url); } catch { /* gone */ } }
+    parts.length = 0; totalMs = 0; active = null; handovers = [];
+    deck.setRange([0, CAP_MS]);
+    deck.seek(0);
+    live.hidden = false;
+    seqCap.textContent = legText();
+    asserted = false; didClock = false;
+    paint();
+    d.log('takes deleted here — any R2 copies stay until their six hours are up');
+  });
 
   // ── the line ──────────────────────────────────────────────────────────────
   const parts = [];      // { n, hue, mime, blobs[], bytes, lenMs, startMs, video, e0 }
@@ -122,6 +168,7 @@
       if (ms > 0 && ms < 10000) legs.push(ms);
       if (legs.length > 200) legs = legs.slice(-200);
       d.set('leg', Math.round(median(legs)));
+      if (!active) seqCap.textContent = legText();
       d.set('clean', `${readable}/${readable + unreadable}`);
     }, 200);
   }
@@ -214,7 +261,39 @@
 
   async function landPart(part) {
     if (!part.blobs.length) { d.log(`take ${part.n}: nothing recorded`, 'bad'); return; }
-    part.url = URL.createObjectURL(new Blob(part.blobs, { type: part.mime }));
+
+    // WHERE THE PICTURE COMES BACK FROM decides what this page is claiming. In
+    // R2 mode the local copies are DROPPED and playback is fetched back from
+    // archive.positron.studio — otherwise the page would say "kept" while
+    // replaying memory, which is the same page reading green over nothing.
+    // ONE FILE PER TAKE, not one per slice.
+    //
+    // The ingest API is segment-shaped because `record` proved the disk
+    // economics of ship-then-delete: for a SHOW you never hold the whole thing,
+    // and the high-water stays at two segments however long it runs. None of
+    // that applies to an eight-second take — at 900 kbps it is about 900 KB,
+    // well under the 2 MiB an object may be — and slicing it buys nothing while
+    // costing real fragility: the worker requires a DENSE sequence, so one
+    // refused piece poisons every later one, and a WebM assembled from
+    // timeslice chunks is only playable if its header chunk arrives first.
+    //
+    // So: record locally, PUT the finished take as a single object, and the
+    // stored file is a complete, directly playable WebM.
+    let blob = null;
+    if (useR2) {
+      const whole = new Blob(part.blobs, { type: part.mime });
+      const put = await putWhole(whole, { log: (m, k) => d.log(m, k) });
+      if (put) {
+        part.manifest = put.url;
+        part.expiresAt = put.expiresAt;
+        d.log(`take ${part.n}: ${Math.round(whole.size / 1024)} KiB stored as one file`, 'hi');
+        blob = await fetchBack(put.url, part.mime, { log: (m, k) => d.log(m, k) });
+        if (blob) part.blobs.length = 0;               // the local copy is gone
+        else d.log(`take ${part.n}: could not fetch it back — keeping the local copy`, 'bad');
+      }
+    }
+    part.from = blob ? 'r2' : 'local';
+    part.url = URL.createObjectURL(blob || new Blob(part.blobs, { type: part.mime }));
     const v = el('video', '', null, { playsinline: '', muted: '' });
     v.muted = true; v.hidden = true;
     // armed BEFORE the source: with no src, play() rejects and the activation is
@@ -240,7 +319,13 @@
     if (!active) handOver(part, 0);
     if (!rafOn) { rafOn = true; (function loop() { requestAnimationFrame(loop); tick(); })(); }
     paint();
-    d.log(`take ${part.n} landed: ${(part.lenMs / 1000).toFixed(2)}s at ${(part.startMs / 1000).toFixed(2)}s`, 'hi');
+    d.log(`take ${part.n} landed: ${(part.lenMs / 1000).toFixed(2)}s at `
+      + `${(part.startMs / 1000).toFixed(2)}s, playing from ${part.from === 'r2' ? 'R2' : 'memory'}`, 'hi');
+    if (part.expiresAt) {
+      const mins = Math.round((new Date(part.expiresAt) - Date.now()) / 60000);
+      d.log(`this recording is deleted in ${Math.floor(mins / 60)}h ${mins % 60}m — six hours is the cap, `
+        + `and a cron enforces it`, 'hi');
+    }
   }
 
   // ── one picture under the playhead at a time ──────────────────────────────
@@ -322,6 +407,9 @@
     })),
     describeRow: (r) => [`${r.payload.kib} KiB`, `${(r.payload.lenMs / 1000).toFixed(2)}s of the line`],
   };
+  // Slices are RECORDER chunks — one per 500 ms timeslice — and that is all
+  // they are here. They were briefly one-R2-object-each; see `landPart` for why
+  // a take is stored as a single file instead.
   const sliceLane = {
     id: 'chunks', kind: 'chunk', label: 'slices', height: 40, width: 2,
     as: 'ticks', color: '#8fd6a8', terse: true,
@@ -386,6 +474,17 @@
       d.assert('the format was negotiated, not assumed', !!parts[0]?.mime, parts[0]?.mime || '\u2014');
       d.assert('the take is seekable \u2014 a finite range, not Infinity',
         Number.isFinite(deck.durationMs) && deck.durationMs > 0, `${deck.durationMs} ms`);
+      // TWO SLOTS, ALWAYS. `capture` puts its R2 asserts inside `if (useR2)`, so
+      // its count changes with the mode — the shape CLAUDE.md bans, and stable
+      // only because the suite never sets the flag. These run either way and
+      // say which mode they are reporting on.
+      const p0 = parts[0];
+      d.assert('the upload leg did what the mode asked',
+        useR2 ? !!p0?.manifest : !p0?.manifest,
+        useR2 ? `R2: ${p0?.manifest ? 'stored' : 'NOT stored'}` : 'off (add ?r2=1)');
+      d.assert('playback comes from where the mode says',
+        useR2 ? (p0?.from === 'r2' && p0.blobs.length === 0) : p0?.from === 'local',
+        `${p0?.from ?? '\u2014'}${useR2 ? `, ${p0?.blobs.length ?? '?'} local copies kept` : ''}`);
     }
     if (parts.length >= 2 && !didClock) { didClock = true; await clockChecks(); }
     else if (parts.length < 2) {

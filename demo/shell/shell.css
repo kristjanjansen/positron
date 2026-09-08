@@ -6,6 +6,7 @@
   --fg: #e6e6e6; --dim: #8b93a1; --dim2: #6a7280;
   --hi: #ffd400;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
+  --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
 }
@@ -84,6 +85,39 @@ button:active { background: var(--card); }
 button[disabled] { opacity: .4; cursor: default; }
 button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600; }
 
+/* A CONTROL AT WORK. Set by the shell whenever a control's handler returns a
+   promise, cleared when it settles. Paint only: no spinner, no label change, no
+   padding change — anything that resizes the button reflows the row and moves
+   the next control out from under the pointer.
+
+   The sweep is a highlight travelling across the face, and it is drawn with a
+   layered background so it does not disturb the button's own colours. Reduced
+   motion gets a steady dimming instead, because a page that respects that
+   setting still has to say the thing is busy. */
+/* pushed to the far right of the control row — see `end` in shell.mjs */
+button[data-end="1"] { margin-left: auto; }
+
+button[data-busy="1"] {
+  cursor: progress;
+  background-image: linear-gradient(100deg,
+    transparent 0%, transparent 35%,
+    color-mix(in oklab, var(--fg) 22%, transparent) 50%,
+    transparent 65%, transparent 100%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: d-sweep 1.1s linear infinite;
+}
+button.d-pri[data-busy="1"] {
+  background-image: linear-gradient(100deg,
+    transparent 0%, transparent 35%,
+    rgba(11, 14, 20, .28) 50%,
+    transparent 65%, transparent 100%);
+}
+@keyframes d-sweep { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  button[data-busy="1"] { animation: none; opacity: .62; }
+}
+
 /* ── slot: whatever the demo itself draws ─────────────────────────────── */
 .d-body { margin: 0 0 14px; }
 .d-body:empty { display: none; }
@@ -154,8 +188,16 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
   flex: none; width: 38px; height: 38px; padding: 0;
   display: grid; place-items: center; font-size: 15px; line-height: 1;
 }
-.tbar-x[data-on="1"] { color: var(--bad); border-color: var(--bad);
-  background: color-mix(in oklab, var(--bad) 16%, var(--card2)); }
+/* RECORD IS RED, and armed rather than shouting: a filled red dot on a dark
+   face. It is the one control on the bar that starts WRITING something, and the
+   play button beside it is the site's yellow — two primaries in one colour
+   would make them the same kind of thing. */
+.tbar-x.d-pri { color: var(--rec); background: color-mix(in oklab, var(--rec) 14%, var(--card2));
+  border-color: color-mix(in oklab, var(--rec) 55%, var(--line)); font-size: 17px; }
+.tbar-x.d-pri:hover { background: color-mix(in oklab, var(--rec) 24%, var(--card2)); }
+/* recording: solid, because it is now a state and not an offer */
+.tbar-x[data-on="1"], .tbar-x.d-pri[data-on="1"] {
+  color: #fff; background: var(--rec); border-color: var(--rec); font-size: 15px; }
 
 .tbar-scrub {
   flex: 1 1 200px; min-width: 200px; height: 38px; position: relative;

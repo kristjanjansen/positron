@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '33d114c-101053';
+export const BUILD = 'c8f0751-103155';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -60,7 +60,35 @@ export function mount({
     const b = el('button', c.primary ? 'd-pri' : '', c.label);
     b.type = 'button';
     b.dataset.id = c.id;
-    b.addEventListener('click', () => handlers.get(c.id)?.(b));
+    // `end: true` pushes a control to the far right of the row. It is for the
+    // destructive one — deleting what you just made should not sit shoulder to
+    // shoulder with the button that makes it, where a mis-aimed click lands on
+    // the wrong one.
+    if (c.end) b.dataset.end = '1';
+    // A CONTROL THAT IS WORKING SAYS SO, and the shell does it rather than every
+    // page inventing its own. If a handler returns a promise the button goes
+    // busy until it settles: disabled, so a second press cannot start a second
+    // run, and swept by a moving highlight so there is something to watch.
+    //
+    // No spinner and no label change ON PURPOSE — both resize the button, the
+    // row reflows, and the thing you were about to click moves out from under
+    // the pointer. The sweep is paint only.
+    b.addEventListener('click', async () => {
+      const fn = handlers.get(c.id);
+      if (!fn || b.disabled) return;
+      let out;
+      try { out = fn(b); } catch (e) { log(String(e?.message || e), 'bad'); return; }
+      if (!out || typeof out.then !== 'function') return;
+      b.dataset.busy = '1';
+      b.disabled = true;
+      b.setAttribute('aria-busy', 'true');
+      try { await out; } catch (e) { log(String(e?.message || e), 'bad'); }
+      finally {
+        delete b.dataset.busy;
+        b.disabled = false;
+        b.removeAttribute('aria-busy');
+      }
+    });
     cbar.append(b);
   }
 
