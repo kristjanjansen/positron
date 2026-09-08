@@ -50,10 +50,48 @@ for (const it of rows) {
     title,
     lead: (it.lead || '').trim() || null,
     date: it.date.slice(0, 10),
-    at,                       // epoch ms, UTC midnight of the air date — NEGATIVE for 1965
+    // MIDDAY, NOT MIDNIGHT. The catalogue records the DAY a film went out and
+    // never the hour, so any time of day we choose is a convention. Midnight
+    // pretends to be a real time and puts the clip against the day boundary;
+    // midday says "somewhere in this day" by sitting in the middle of it, and
+    // it leaves room either side for a clip drawn at its true length.
+    at: at + 12 * 3600_000,
   });
 }
 items.sort((a, b) => a.at - b.at || a.slug.localeCompare(b.slug));
+
+// ── how long each film runs ────────────────────────────────────────────────
+//
+// The catalogue does NOT publish a duration in this API — checked; there is no
+// `Kestus` anywhere in the item response. What it does publish is a SHOT LIST
+// with real millisecond `beginTime`/`endTime`, so the last shot's end is the
+// best figure available without fetching media.
+//
+// It is a CLAIM, not a measurement, and the two are known to disagree: on one
+// film the shot list runs 6,880 ms past the last frame. So the page redraws a
+// clip at its measured length once it has been played, and until then this is
+// what the catalogue says.
+//
+// One request per film, spaced. Skipped entirely with --no-fetch.
+if (!process.argv.includes('--no-fetch')) {
+  const UA = 'positron/1.0 (+https://positron.studio; research; contact kristjan.jansen@gmail.com)';
+  let got = 0, missing = 0;
+  for (const [i, it] of items.entries()) {
+    try {
+      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(it.slug)}`,
+        { headers: { 'user-agent': UA } });
+      if (r.ok) {
+        const j = await r.json();
+        const shots = (j?.data?.description?.data) || (j?.description?.data) || [];
+        const end = shots.length ? Math.max(...shots.map((sh) => Number(sh.endTime) || 0)) : 0;
+        if (end > 0) { it.catalogueMs = end; got++; } else missing++;
+      } else missing++;
+    } catch { missing++; }
+    if (i % 25 === 0) process.stderr.write(`  ${i}/${items.length}\n`);
+    await new Promise((res) => setTimeout(res, 1200));
+  }
+  console.error(`durations: ${got} from the shot list, ${missing} without one`);
+}
 
 const bySeries = {};
 for (const i of items) bySeries[i.series || '(none)'] = (bySeries[i.series || '(none)'] || 0) + 1;
