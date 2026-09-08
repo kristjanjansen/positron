@@ -8,13 +8,13 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <script src="/proto/remixer/hls.min.js"></script>
 <style>
-  .film { width: 100%; max-width: 440px; aspect-ratio: 16 / 9; background: #000;
+  .film { width: 100%; aspect-ratio: 16 / 9; background: #000;
           border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 6px; }
   /* EMPTY LOOKS EMPTY. A <video controls> with no source still draws a player —
      a dead play button and 0:00 — which reads as broken rather than as waiting.
      The box keeps its size so the line below never moves; only the furniture
      goes. */
-  .film[data-empty="1"] { background: var(--card); }
+  .film[data-empty="1"] { background: #000; }
   .wireless { width: 100%; max-width: 440px; display: block; margin: 0 0 6px; }
   /* `display: block` beats the UA sheet's `[hidden] { display: none }`, so
      without this the audio player sits under every film showing 0:00 / 0:00.
@@ -25,22 +25,29 @@
      block that grows with its contents pushes the line down the page by a
      different amount for every film. Five lines here, more where there is room,
      and the rest scrolls inside its own box — so the strip below never moves. */
-  /* TWO COLUMNS: what it is on the left, what is in it on the right. The left
-     edge is coloured by the archive it came from — the same yellow and teal the
-     two lanes use — so the block and the mark on the line are visibly the same
-     thing. */
-  .picked { display: grid; grid-template-columns: 1fr; gap: 10px;
-            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px; }
-  @media (min-width: 700px) { .picked { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); } }
-  .ptitle, .plead { border-left: 2px solid var(--line2); padding-left: 9px; }
-  .picked[data-kind="video"] .ptitle, .picked[data-kind="video"] .plead { border-left-color: hsl(50 62% 45%); }
-  .picked[data-kind="audio"] .ptitle, .picked[data-kind="audio"] .plead { border-left-color: hsl(185 55% 42%); }
-  .ptitle { color: var(--fg); font-weight: 600; }
-  .ptitle a { color: var(--dim); font-weight: 500; }
-  .plead { max-height: calc(6 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
-  @media (min-width: 760px) { .plead { max-height: calc(9 * 1.6em); } }
-  /* the slot keeps its shape before a film is chosen */
-  video.film[data-empty="1"] { background: var(--card); }
+  /* ONE COLUMN PER MEDIUM: the newsreel on the left, the radio on the right. No
+     colour here — the line below carries the colour, and repeating it on a
+     block of prose competes with the marks for the same meaning. This block is
+     reference text, so it is quiet: dim, and set off from the picture above and
+     the line below by its own margin. A day that has only one of the two still
+     gets both columns, and the empty one says in words which half did not
+     survive. */
+  .picked { display: grid; grid-template-columns: 1fr; gap: 12px 22px;
+            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 16px 0 18px; }
+  @media (min-width: 700px) { .picked { grid-template-columns: 1fr 1fr; } }
+  .pcol { min-width: 0; }
+  .pcol[data-empty="1"] { display: none; }
+  .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim2); }
+  .ptitle { color: var(--dim); font-weight: 600; margin-top: 2px;
+            height: calc(2 * 1.6em); overflow: hidden;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .pmeta { color: var(--dim2); }
+  .pmeta a { color: var(--dim2); text-decoration: underline; text-underline-offset: 2px; }
+  /* ONE HEIGHT, not a maximum. A box that shrinks to its contents moves the
+     line below it by a different amount for every clip; fixed, nothing under
+     it ever moves and a long lead scrolls inside its own box. */
+  .plead { color: var(--dim2); margin-top: 6px; height: calc(6 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
+  @media (min-width: 760px) { .plead { height: calc(9 * 1.6em); } }
 </style>
 
 <script type="module">
@@ -48,6 +55,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
+  import { formatTime } from '/timeline/strip.mjs';
 
   const YEAR_FROM = Date.UTC(1965, 0, 1);
   const YEAR_TO   = Date.UTC(1966, 0, 1);
@@ -71,20 +79,20 @@
   const d = mount({
     name: 'reel',
     what: 'Every 1965 newsreel ERR has, on one line, at the day it was broadcast — so '
-      + 'the whole year is a picture and a film is a mark in it. The line is positioned '
-      + 'in 1965 itself, which is a negative number of milliseconds, so the axis reads '
-      + 'in days rather than seconds. Press a film to play it: the video streams from '
-      + 'ERR at that moment and nothing is stored here. Everything on the page comes '
-      + 'from ERRarhiiv and every film links back to it. The newsreels were shot '
-      + 'MUTE and the radio survives separately, so when both exist for the same '
-      + 'day the page plays them together — picture from one archive, sound from '
-      + 'the other, put back on the same afternoon.',
+      + 'the whole year is a picture and a newsreel is a mark in it. The line is '
+      + 'positioned in 1965 itself, which is a negative number of milliseconds, so the '
+      + 'axis reads in days rather than seconds. Press a mark to play it: it streams '
+      + 'from ERR at that moment and nothing is stored here, and every title links '
+      + 'back to ERRarhiiv. The newsreels were shot MUTE and the radio survives '
+      + 'separately, so when both exist for the same day the page plays them together '
+      + '— picture from one archive, sound from the other, put back on the same '
+      + 'afternoon.',
     // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
     // the lane's gutter, the date in the film's own title line AND in the
     // transport bar, the length in the tooltip. A second table saying the same
     // things is a second place to keep in step and one more thing between the
     // reader and the year.
-    readout: { films: '', picked: '', length: 'min' },
+    readout: { newsreels: '', picked: '', length: 'min' },
     showReadout: false,
     // NO CONTROLS. The line IS the control — a button that plays "the first
     // film" is a second way to do the one thing the strip already does, and it
@@ -123,14 +131,64 @@
   // controls vanish is a page that has broken.
   const wireless = el('audio', 'wireless');
   wireless.hidden = true;
+  const hasSound = () => !!(wireless.getAttribute('src') || aHls);
   const picked = el('div', 'picked');
-  const pickedTitle = el('div', 'ptitle', '');
-  const pickedLead = el('div', 'plead');
-  picked.append(pickedTitle, pickedLead);
+  // One column per medium. Each carries its own name, then the date and the
+  // link to ERR on their OWN line — a title that runs into its metadata reads
+  // as one long string and the title is the part being looked for.
+  const column = (key) => {
+    const box = el('div', 'pcol');
+    const parts = { key: el('div', 'pkey', key), title: el('div', 'ptitle', ''),
+                    meta: el('div', 'pmeta', ''), lead: el('div', 'plead') };
+    box.append(parts.key, parts.title, parts.meta, parts.lead);
+    box.dataset.empty = '1';          // nothing is picked yet
+    return Object.assign(parts, { box });
+  };
+  const colFilm = column('newsreel');
+  const colRadio = column('radio');
+  picked.append(colFilm.box, colRadio.box);
+
+  // A column with nothing in it is REMOVED, not filled with a sentence saying
+  // it is empty. Half of 1965 reaches us as picture only or sound only, so on
+  // those days the surviving half simply gets the width.
+  const fill = (col, item, kind) => {
+    col.box.dataset.empty = item ? '0' : '1';
+    col.title.textContent = item ? sentenceCase(item.title) : '';
+    col.meta.replaceChildren();
+    col.lead.textContent = item?.lead || '';
+    col.lead.scrollTop = 0;
+    if (!item) return;
+    col.meta.append(document.createTextNode(`${item.date} · `));
+    const a = el('a', '', 'at ERRarhiiv');
+    a.href = `${ARHIIV}/${kind}/vaata/${item.slug}`;
+    a.target = '_blank'; a.rel = 'noreferrer';
+    col.meta.append(a);
+  };
   d.el.append(film, wireless, picked);
 
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+  // ERR'S NEWSREEL TITLES ARE GENUINELY ALL-CAPS — 288 of 298, against 11 of
+  // 494 on the radio side. That is the film archive's own record, typed on a
+  // card, not a rendering accident, and it is why the two columns look unlike
+  // each other. Shouting is hard to read next to a lowercase lead, so this
+  // page sentence-cases them FOR DISPLAY ONLY: the fixture, the link and the
+  // slug keep exactly what ERR holds.
+  //
+  // The limit, stated rather than hidden: with no name list there is no way to
+  // tell a proper noun from a common one inside a shouted line, so a personal
+  // or place name that is not the first word comes back lowercase. A title
+  // that is already mixed-case is left untouched, which is what keeps the
+  // radio side — where capitals mean something — exact.
+  const sentenceCase = (t) => {
+    if (!t || t !== t.toUpperCase()) return t || '';
+    // NOT after a full stop. In Estonian a period is also the ordinal marker —
+    // `1965. aasta` is "the year 1965" and the next word is lowercase — and in
+    // a catalogue of short titles ordinals outnumber sentence ends, so
+    // capitalising after every `.` gets "1965. Aasta esimesed abiellujad".
+    return t.toLowerCase().replace(/(^|[!?]\s+)(\p{Ll})/gu, (_m, lead, ch) => lead + ch.toUpperCase());
+  };
 
   // ONE LANE. The other 16 films — 16 mm rushes and a few the catalogue files
   // under no series — are a different kind of thing recorded for a different
@@ -175,7 +233,7 @@
         ? (on ? 'hsl(185 80% 62%)' : 'hsl(185 45% 34%)')
         : (on ? '#ffd400' : 'hsl(50 62% 40%)');
     },
-    labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
+    labelOf: (sp, { bw }) => (bw > 90 ? sentenceCase(sp.row?.payload?.title).slice(0, 40) : ''),
     rows: () => (id === 'radio' ? radio : items).map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
       payload: { durMs: it.playedMs ?? it.catalogueMs ?? MEDIAN_MS, ...it },
@@ -185,8 +243,8 @@
       const len = p.playedMs ? `${(p.playedMs / 60000).toFixed(1)} min, measured`
         : p.catalogueMs ? `${(p.catalogueMs / 60000).toFixed(1)} min, per the shot list`
         : 'length unknown until played';
-      return [p.title?.slice(0, 46) ?? '', `${p.date} · ${len}`,
-              p.kind === 'audio' ? 'radio — this one has sound' : 'silent film'];
+      return [sentenceCase(p.title).slice(0, 46), `${p.date} · ${len}`,
+              p.kind === 'audio' ? 'radio — this one has sound' : 'silent newsreel'];
     },
   });
 
@@ -211,9 +269,9 @@
     // seconds and a meaningless one for a deck of 1965.
     fmt: (pos) => iso(pos),
     extras: [
-      { id: 'prev', label: '\u23EE', aria: 'Previous film', title: 'the film before this one',
+      { id: 'prev', label: '\u23EE', aria: 'Previous newsreel', title: 'the newsreel before this one',
         onClick: () => step(-1) },
-      { id: 'next', label: '\u23ED', aria: 'Next film', title: 'the film after this one',
+      { id: 'next', label: '\u23ED', aria: 'Next newsreel', title: 'the newsreel after this one',
         onClick: () => step(1) },
     ],
   });
@@ -281,69 +339,74 @@
     const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
     const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
     if (it.at < left || it.at > left + span) view.strip.fit(it.at - span / 2, it.at + span / 2);
-    pickedTitle.replaceChildren(document.createTextNode(`${it.title} · ${it.date} · `));
-    const a = el('a', '', 'at ERRarhiiv');
-    a.href = `${ARHIIV}/video/vaata/${it.slug}`;
-    a.target = '_blank'; a.rel = 'noreferrer';
-    pickedTitle.append(a);
-    picked.dataset.kind = it.kind;
-    pickedLead.textContent = it.lead || '';
-    pickedLead.scrollTop = 0;
+    // BOTH HALVES OF THE DAY, whichever one was pressed. Picking a newsreel
+    // finds that date's radio and picking a radio programme finds that date's
+    // newsreel, so the two columns and what actually plays always agree.
+    const picture = it.kind === 'video' ? it : items.find((v) => v.date === it.date) || null;
+    const sound   = it.kind === 'audio' ? it : radio.find((r) => r.date === it.date) || null;
+    fill(colFilm, picture, 'video');
+    fill(colRadio, sound, 'audio');
     view.strip.invalidate();
 
-    const isRadio = it.kind === 'audio';
-    // THE DAY'S SOUND, if there is any. A newsreel gets the first radio
-    // programme from the same date; a radio item gets itself. Either way one
-    // sound source is loaded, and the picture drives it.
-    const sound = isRadio ? it : radio.find((r) => r.date === it.date) || null;
     film.pause(); wireless.pause();
     if (hls) { hls.destroy(); hls = null; }
     if (aHls) { aHls.destroy(); aHls = null; }
+    // AND EMPTY IT. Destroying the hls instance leaves the element un-paused
+    // with a source that no longer exists — inaudible today, and exactly the
+    // state that becomes a phantom second sound the next time something calls
+    // play() on everything.
+    wireless.removeAttribute('src'); wireless.load();
 
-    let media;
-    try {
-      const r = await fetch(`${ARHIIV}/api/v1/content/${isRadio ? 'audio' : 'video'}/${encodeURIComponent(it.slug)}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      media = await r.json();
-    } catch (e) {
-      d.log(`could not ask ERR for ${it.slug}: ${e.message}`, 'bad');
-      return;
-    }
-    const raw = media?.data?.media?.src?.hls || media?.media?.src?.hls;
-    if (!raw) { d.log(`${it.slug}: no stream offered`, 'bad'); return; }
     // ERR hands back a PROTOCOL-RELATIVE url (`//vod.err.ee/…`). On the deployed
     // https page that resolves to https on its own, but on a local http server
     // it resolves to http — so the same code plays over a different protocol
     // depending on where it runs, which is the kind of difference that is
     // invisible until it is a mixed-content block. Pin it.
-    const src = raw.startsWith('//') ? `https:${raw}` : raw;
-    // ── the sound, loaded but not presented ──────────────────────────────
-    if (sound) {
-      const sr = await fetch(`${ARHIIV}/api/v1/content/audio/${encodeURIComponent(sound.slug)}`)
-        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
-      const raws = (sr?.data?.media || sr?.media)?.src?.hls;
-      if (raws) {
-        const su = raws.startsWith('//') ? `https:${raws}` : raws;
-        if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = su;
-        else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
-        wireless.muted = false;
-        wireless.play().catch(() => {});
-        d.log(sound === it
-          ? `sound: ${sound.slug}`
-          : `paired with the same day's radio — ${sound.title?.slice(0, 40)}`, 'hi');
+    const streamOf = async (item, kind) => {
+      try {
+        const r = await fetch(`${ARHIIV}/api/v1/content/${kind}/${encodeURIComponent(item.slug)}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const raw = (j?.data?.media || j?.media)?.src?.hls;
+        if (!raw) { d.log(`${item.slug}: no stream offered`, 'bad'); return null; }
+        return raw.startsWith('//') ? `https:${raw}` : raw;
+      } catch (e) {
+        d.log(`could not ask ERR for ${item.slug}: ${e.message}`, 'bad');
+        return null;
       }
-    } else if (!isRadio) {
-      d.log('no radio survives from this day — the picture plays silent');
+    };
+    const src = picture ? await streamOf(picture, 'video') : null;
+    if (picture && !src) return;
+    // ── the sound ────────────────────────────────────────────────────────
+    // WHERE IT GOES DEPENDS ON WHETHER THERE IS A PICTURE. With a newsreel to
+    // pair against, the radio loads into the hidden element and the picture
+    // drives it. With no newsreel, the radio goes into the VIDEO element
+    // itself — a <video> plays an audio-only HLS stream perfectly well, shows
+    // a black frame, and its controls are then real controls driving real
+    // media. That is how a sound-only day gets the same transport as every
+    // other day without a second set of buttons appearing under the picture.
+    const su = sound ? await streamOf(sound, 'audio') : null;
+    if (su && picture) {
+      if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = su;
+      else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
+      wireless.muted = false;
+      wireless.play().catch(() => {});
+      d.log(`paired with the same day's radio — ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
+    } else if (picture) {
+      d.log('no radio survives from this day — the newsreel plays silent');
     }
 
-    if (isRadio) {
-      // A broadcast with no film: the picture stays, black, because it is the
-      // transport. Controls come off, since there is nothing for them to drive.
-      film.removeAttribute('src');
-      film.load();
-      film.controls = false;
+    if (!picture) {
+      // Sound only: black picture, real controls, nothing in the hidden
+      // element — there is no second stream to keep alongside.
+      if (!su) { film.removeAttribute('src'); film.load(); film.controls = false; d.set('length', null); return; }
       film.dataset.empty = '1';
-      d.set('length', null);
+      film.controls = true;
+      film.muted = false;
+      if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) film.src = su;
+      else { hls = window.__hls = new window.Hls({ enableWorker: true }); hls.loadSource(su); hls.attachMedia(film); }
+      await film.play().catch(() => {});
+      d.log(`playing ${sound.slug} — radio, streamed from ERR, nothing stored here`, 'hi');
       return;
     }
 
@@ -383,7 +446,7 @@
       await film.play().catch(() => {});
       d.log('the browser refused sound — press play on the picture to hear it', 'bad');
     }
-    d.log(`playing ${it.slug} — streamed from ERR, nothing stored here`, 'hi');
+    d.log(`playing ${picture.slug} — streamed from ERR, nothing stored here`, 'hi');
     // THE PICTURE DRIVES THE SOUND. Not a servo and not a sync loop — the two
     // are different recordings of different lengths that merely share a day, so
     // pretending to hold them in lockstep would be inventing a relationship the
@@ -391,7 +454,7 @@
     // the picture takes the sound to the same offset. Where the radio is longer
     // than the film, which is usual, it simply keeps its own place.
     const follow = () => {
-      if (!wireless.src && !aHls) return;
+      if (!hasSound()) return;
       if (film.paused) wireless.pause();
       else wireless.play().catch(() => {});
     };
@@ -421,7 +484,7 @@
       const kbps = (a * 8) / 6 / 1000;
       d.log(kbps > 24
         ? `sound is arriving — ${Math.round(kbps)} kbps decoded`
-        : `this film is SILENT — its audio track carries ${kbps.toFixed(1)} kbps, which is `
+        : `this newsreel is SILENT — its audio track carries ${kbps.toFixed(1)} kbps, which is `
           + `what silence costs. The newsreels were shot mute.`, 'hi');
     }, 6000);
 
@@ -446,10 +509,13 @@
     if (st.reason === 'play') {
       if (!current) { if (firstPick) play(firstPick); return; }
       if (film.paused) film.play().catch(() => {});
-      if (wireless.paused) wireless.play().catch(() => {});
+      // ONLY IF IT HOLDS SOMETHING. play() on a source-less element does not
+      // throw and does not make a sound; it just leaves the element reading as
+      // playing, which is a lie the next reader has to chase down.
+      if (hasSound() && wireless.paused) wireless.play().catch(() => {});
     } else if (st.reason === 'pause') {
       if (current && !film.paused) film.pause();
-      if (!wireless.paused) wireless.pause();
+      if (hasSound() && !wireless.paused) wireless.pause();
     }
   });
 
@@ -469,7 +535,7 @@
     sharedDays = radio.filter((r) => days.has(r.date)).length;
     const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
     if (known.length) MEDIAN_MS = known[known.length >> 1];
-    d.set('films', items.length);
+    d.set('newsreels', items.length);
     gutters();
 
     // SIX HOURS, not a week and certainly not a year. The deck still holds all
@@ -500,19 +566,30 @@
     const openOn = items.find((i) => radioDays.has(i.date)) || items[0];
     view.strip.fit(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
     firstPick = openOn;
+    fill(colFilm, openOn, 'video');
+    fill(colRadio, radio.find((r) => r.date === openOn.date) || null, 'audio');
+    // Reachable from the harness, the way `window.__hls` is: a press on the
+    // line is the page's only way in, so a check that cannot find the line
+    // cannot test anything the page actually does.
+    window.__strip = view.strip;
 
     d.assert('the line is positioned in 1965, not 1970',
       deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
     d.assert('the whole year is on it', items.length > 250, `${items.length} newsreels`);
-    d.assert('every film has a day', items.every((i) => Number.isFinite(i.at)),
+    d.assert('every newsreel has a day', items.every((i) => Number.isFinite(i.at)),
       `${items[0].date} to ${items[items.length - 1].date}`);
     d.assert('positions are negative — 1965 is before the epoch',
       items.every((i) => i.at < 0), `${items[0].at}`);
-    d.assert('the axis reads in days, not seconds',
-      view.strip.report?.().absolute === true || true, iso(deck.position()));
+    // WHY THIS IS ASSERTED AT ALL: the strip auto-detects an absolute domain by
+    // magnitude (`range[0] > 1e12`), and 1965 is NEGATIVE — so the detection
+    // says "relative" and the axis would read `-1822d` instead of `1965-01-04`.
+    // The page's `absolute: true` is what fixes that, and dropping it fails here.
+    d.assert('the axis reads as dates, not as a count of days from 1970',
+      view.strip.state.absolute === true
+        && /^\d{4}-\d{2}-\d{2}$/.test(formatTime(deck.position(), 86400000, view.strip.state.absolute)),
+      formatTime(deck.position(), 86400000, view.strip.state.absolute));
     d.assert('nothing is stored — no media in the fixture',
       !JSON.stringify(items[0]).match(/https?:|\.m3u8|\.mp4/), 'catalogue metadata only');
-    d.log('press a film on the line, or step through the year with the arrows', 'hi');
     d.ready();
   })().catch((e) => d.fail(e));
 </script>
