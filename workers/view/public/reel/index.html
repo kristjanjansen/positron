@@ -19,14 +19,23 @@
   /* `display: block` beats the UA sheet's `[hidden] { display: none }`, so
      without this the audio player sits under every film showing 0:00 / 0:00.
      The same trap cost the `video` rule an extra line in shell.css. */
-  .wireless[hidden] { display: none; }
+  /* the empty slot keeps its height so the line never moves under you */
+  .wireless { min-height: 40px; }
   /* THE DESCRIPTION IS BOUNDED. ERR's leads run from one line to a dozen, and a
      block that grows with its contents pushes the line down the page by a
      different amount for every film. Five lines here, more where there is room,
      and the rest scrolls inside its own box — so the strip below never moves. */
-  .picked { font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px;
-            max-width: 72ch; }
-  .ptitle { color: var(--fg); font-weight: 600; margin-bottom: 3px; }
+  /* TWO COLUMNS: what it is on the left, what is in it on the right. The left
+     edge is coloured by the archive it came from — the same yellow and teal the
+     two lanes use — so the block and the mark on the line are visibly the same
+     thing. */
+  .picked { display: grid; grid-template-columns: 1fr; gap: 10px;
+            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 10px; }
+  @media (min-width: 700px) { .picked { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); } }
+  .ptitle, .plead { border-left: 2px solid var(--line2); padding-left: 9px; }
+  .picked[data-kind="video"] .ptitle, .picked[data-kind="video"] .plead { border-left-color: hsl(50 62% 45%); }
+  .picked[data-kind="audio"] .ptitle, .picked[data-kind="audio"] .plead { border-left-color: hsl(185 55% 42%); }
+  .ptitle { color: var(--fg); font-weight: 600; }
   .ptitle a { color: var(--dim); font-weight: 500; }
   .plead { max-height: calc(6 * 1.6em); overflow-y: auto; overscroll-behavior: contain; }
   @media (min-width: 760px) { .plead { max-height: calc(9 * 1.6em); } }
@@ -66,8 +75,10 @@
       + 'in 1965 itself, which is a negative number of milliseconds, so the axis reads '
       + 'in days rather than seconds. Press a film to play it: the video streams from '
       + 'ERR at that moment and nothing is stored here. Everything on the page comes '
-      + 'from ERRarhiiv and every film links back to it, and the newsreels are '
-      + 'silent — they were shot mute.',
+      + 'from ERRarhiiv and every film links back to it. The newsreels were shot '
+      + 'MUTE and the radio survives separately, so when both exist for the same '
+      + 'day the page plays them together — picture from one archive, sound from '
+      + 'the other, put back on the same afternoon.',
     // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
     // the lane's gutter, the date in the film's own title line AND in the
     // transport bar, the length in the tooltip. A second table saying the same
@@ -97,10 +108,20 @@
   // same size before and after; only its contents change.
   const film = el('video', 'film', null, { playsinline: '' });
   film.dataset.empty = '1';
-  // RADIO GETS ITS OWN PLAYER. An audio-only stream in a <video> is a black
-  // rectangle pretending to be a picture; the honest control for sound is an
-  // <audio>. Only one of the two is ever shown.
-  const wireless = el('audio', 'wireless', null, { controls: '' });
+  // ONE PLAYER, TWO SOURCES.
+  //
+  // 1965 handed picture and sound out separately — the newsreels were shot mute
+  // and the radio is sound-only — and they have been apart ever since, in two
+  // archives with two interfaces. On a line positioned by the day they went
+  // out, putting them back together is one line of arithmetic: same date, play
+  // both.
+  //
+  // So the audio element is HIDDEN and driven, never presented. The picture is
+  // the player; it carries the controls, and the sound follows it. When a
+  // broadcast has no film to go with it the picture stays black rather than
+  // disappearing, because the transport is the picture and a page whose
+  // controls vanish is a page that has broken.
+  const wireless = el('audio', 'wireless');
   wireless.hidden = true;
   const picked = el('div', 'picked');
   const pickedTitle = el('div', 'ptitle', '');
@@ -117,7 +138,7 @@
   // leftovers bin rather than a lane. `AK filmikroonika` alone is a series: one
   // newsreel, weekly, for a year.
   const SERIES = 'AK filmikroonika 1958-1991';
-  let items = [], radio = [], current = null, hls = null;
+  let items = [], radio = [], current = null, hls = null, aHls = null;
 
   // A CLIP IS AS WIDE AS IT IS LONG.
   //
@@ -134,7 +155,7 @@
   // Two films have no shot list. They draw at the median rather than at zero —
   // and their tooltip says the length is unknown, because a bar you can see is
   // not a number you can trust.
-  let MEDIAN_MS = 132000, sharedDays = 0;   // replaced once the fixture is in
+  let MEDIAN_MS = 132000, sharedDays = 0, firstPick = null;   // replaced once the fixture is in
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
@@ -143,11 +164,17 @@
     // back, so the lane reads as one family and still says which film is up.
     // Nothing here is a quality signal — the archive does not tell us how a
     // 1965 broadcast went — so colour carries identity only, and says so.
-    // Yellow for both, because both are ours to show — but radio is a colder
-    // yellow so the two lanes read as different KINDS of thing at a glance,
-    // without either becoming a quality signal. Nothing here is measured.
-    colorOf: (sp) => (sp.row?.payload?.slug === current?.slug ? '#ffd400'
-      : id === 'radio' ? 'hsl(38 55% 38%)' : 'hsl(50 62% 40%)'),
+    // TWO HUES, because they are two archives. Yellow is the site's own and the
+    // films are ours to show; radio gets teal, far enough round the circle to be
+    // told apart at a two-pixel mark. Neither is a quality signal — nothing here
+    // is measured — so colour carries identity only, and the playing one is the
+    // same hue at full brightness rather than a different colour.
+    colorOf: (sp) => {
+      const on = sp.row?.payload?.slug === current?.slug;
+      return id === 'radio'
+        ? (on ? 'hsl(185 80% 62%)' : 'hsl(185 45% 34%)')
+        : (on ? '#ffd400' : 'hsl(50 62% 40%)');
+    },
     labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
     rows: () => (id === 'radio' ? radio : items).map((it) => ({
       at: it.at, id: it.slug, kind: 'part',
@@ -259,15 +286,19 @@
     a.href = `${ARHIIV}/video/vaata/${it.slug}`;
     a.target = '_blank'; a.rel = 'noreferrer';
     pickedTitle.append(a);
+    picked.dataset.kind = it.kind;
     pickedLead.textContent = it.lead || '';
     pickedLead.scrollTop = 0;
     view.strip.invalidate();
 
     const isRadio = it.kind === 'audio';
-    film.hidden = isRadio;
-    wireless.hidden = !isRadio;
-    if (isRadio) { film.pause(); if (hls) { hls.destroy(); hls = null; } }
-    else wireless.pause();
+    // THE DAY'S SOUND, if there is any. A newsreel gets the first radio
+    // programme from the same date; a radio item gets itself. Either way one
+    // sound source is loaded, and the picture drives it.
+    const sound = isRadio ? it : radio.find((r) => r.date === it.date) || null;
+    film.pause(); wireless.pause();
+    if (hls) { hls.destroy(); hls = null; }
+    if (aHls) { aHls.destroy(); aHls = null; }
 
     let media;
     try {
@@ -286,24 +317,33 @@
     // depending on where it runs, which is the kind of difference that is
     // invisible until it is a mixed-content block. Pin it.
     const src = raw.startsWith('//') ? `https:${raw}` : raw;
-    if (isRadio) {
-      // Audio HLS plays natively in far more places than video HLS does, and
-      // hls.js drives an <audio> element just as well where it does not.
-      if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) {
-        wireless.src = src;
-      } else {
-        hls = window.__hls = new window.Hls({ enableWorker: true });
-        hls.loadSource(src);
-        hls.attachMedia(wireless);
+    // ── the sound, loaded but not presented ──────────────────────────────
+    if (sound) {
+      const sr = await fetch(`${ARHIIV}/api/v1/content/audio/${encodeURIComponent(sound.slug)}`)
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const raws = (sr?.data?.media || sr?.media)?.src?.hls;
+      if (raws) {
+        const su = raws.startsWith('//') ? `https:${raws}` : raws;
+        if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = su;
+        else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
+        wireless.muted = false;
+        wireless.play().catch(() => {});
+        d.log(sound === it
+          ? `sound: ${sound.slug}`
+          : `paired with the same day's radio — ${sound.title?.slice(0, 40)}`, 'hi');
       }
-      wireless.muted = false;
-      try { await wireless.play(); } catch { /* the element has its own control */ }
-      d.log(`playing ${it.slug} — radio, and this one has sound`, 'hi');
-      wireless.addEventListener('loadedmetadata', () => {
-        if (!Number.isFinite(wireless.duration)) return;
-        it.playedMs = Math.round(wireless.duration * 1000);
-        gutters();
-      }, { once: true });
+    } else if (!isRadio) {
+      d.log('no radio survives from this day — the picture plays silent');
+    }
+
+    if (isRadio) {
+      // A broadcast with no film: the picture stays, black, because it is the
+      // transport. Controls come off, since there is nothing for them to drive.
+      film.removeAttribute('src');
+      film.load();
+      film.controls = false;
+      film.dataset.empty = '1';
+      d.set('length', null);
       return;
     }
 
@@ -344,10 +384,25 @@
       d.log('the browser refused sound — press play on the picture to hear it', 'bad');
     }
     d.log(`playing ${it.slug} — streamed from ERR, nothing stored here`, 'hi');
-    // the element's own controls are a second play button; keep the bar's in
-    // step rather than letting the two disagree about what is happening
-    film.addEventListener('play', () => { if (!deck.playing()) deck.play(); });
-    film.addEventListener('pause', () => { if (deck.playing()) deck.pause(); });
+    // THE PICTURE DRIVES THE SOUND. Not a servo and not a sync loop — the two
+    // are different recordings of different lengths that merely share a day, so
+    // pretending to hold them in lockstep would be inventing a relationship the
+    // archive does not have. They start together, stop together, and a scrub of
+    // the picture takes the sound to the same offset. Where the radio is longer
+    // than the film, which is usual, it simply keeps its own place.
+    const follow = () => {
+      if (!wireless.src && !aHls) return;
+      if (film.paused) wireless.pause();
+      else wireless.play().catch(() => {});
+    };
+    film.addEventListener('play', () => { if (!deck.playing()) deck.play(); follow(); });
+    film.addEventListener('pause', () => { if (deck.playing()) deck.pause(); follow(); });
+    film.addEventListener('seeked', () => {
+      if (!wireless.src && !aHls) return;
+      const t = film.currentTime;
+      if (Number.isFinite(wireless.duration) && t <= wireless.duration
+          && Math.abs(wireless.currentTime - t) > 0.25) wireless.currentTime = t;
+    });
     // THE FILMS ARE SILENT, and it took four reports of "no sound" to establish
     // that nothing was broken.
     //
@@ -389,10 +444,12 @@
   // truthful: the line really is moving through the year.
   deck.transport.onState((st) => {
     if (st.reason === 'play') {
-      if (!current) { if (items.length) play(items[0]); return; }
+      if (!current) { if (firstPick) play(firstPick); return; }
       if (film.paused) film.play().catch(() => {});
+      if (wireless.paused) wireless.play().catch(() => {});
     } else if (st.reason === 'pause') {
       if (current && !film.paused) film.pause();
+      if (!wireless.paused) wireless.pause();
     }
   });
 
@@ -435,7 +492,14 @@
     // from vanishing, and the strip prints its own span so the trade is visible
     // instead of mysterious. Zoom in and the bars become bars.
     const SPAN = 30 * DAY;
-    view.strip.fit(items[0].at - SPAN / 2, items[0].at + SPAN / 2);
+    // Open on a day where BOTH survive, so the thing this page does is visible
+    // before anyone presses anything. Most days pair — 283 of them — but the
+    // first newsreel of the year is not one of them, and opening on a silent
+    // day makes the page look like it only has half the material.
+    const radioDays = new Set(radio.map((r) => r.date));
+    const openOn = items.find((i) => radioDays.has(i.date)) || items[0];
+    view.strip.fit(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
+    firstPick = openOn;
 
     d.assert('the line is positioned in 1965, not 1970',
       deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
