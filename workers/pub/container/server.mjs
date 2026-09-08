@@ -77,7 +77,13 @@ const FONT = '/usr/share/fonts/dejavu/DejaVuSansMono-Bold.ttf';
 // a reader that agree with each other, so they keep working — but "byte-
 // identical everywhere" is no longer true and this comment no longer says it.
 const PAD = 60;
-const ROW = { NBLOCKS: 56, BLOCK_W: 20, X: PAD + 20, Y: PAD + 20, H: 80 };
+const FRAME_H = 720;
+const ROW = {
+  NBLOCKS: 56, BLOCK_W: 20, H: 56,
+  X: PAD + 20,
+  // at the BOTTOM: the machine's half of the picture, PAD off the bottom edge
+  Y: FRAME_H - PAD - 20 - 56,
+};
 
 /** Single-quote a filtergraph option value; the inner escapes are drawtext's. */
 const q = (s) => `'${String(s).replace(/'/g, "\\'")}'`;
@@ -139,7 +145,7 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     `x=${PAD}`, `y=${y}`, `fontsize=${size}`, `fontcolor=${colour}`,
     'box=1', 'boxcolor=black@0.55', 'boxborderw=14',
   ].join(':');
-  const NUM = 96;             // one size for both clocks, as on the canvas
+  const NUM = 84, LBL = 32;   // same sizes as the canvas
   const LABEL = '0xFFD400';
   const VALUE = '0xE9EEF7';
   return [
@@ -151,17 +157,17 @@ function drawFilters({ epoch, hue = 0, row = false }) {
     // twice. No source label — the hue says which publisher this is, and a name
     // burned into a picture is a small text nobody can read at the size a demo
     // shows it.
-    text('ABSOLUTE', 230, 34, LABEL),
+    text('ABSOLUTE', 70, LBL, LABEL),
     // pts-derived, the same instant the row encodes.
-    text(`%{pts\\:flt\\:${epoch}} s`, 280, NUM, VALUE),
-    text('LOCAL', 420, 34, LABEL),
+    text(`%{pts\\:flt\\:${epoch}} s`, 120, NUM, VALUE),
+    text('LOCAL', 215, LBL, LABEL),
     // LEGIBLE — this box's own wall clock, for a human with a watch. The two
     // drifting apart is real information: it is encoder drift.
     // The triple backslash is not a typo: gmtime's strftime argument has to
     // survive drawtext's expansion parser, which splits `%{name:args}` on a
     // bare colon. Measured on ffmpeg@7 — `\\\:` renders 15:31:25, `\:` errors
     // with "%{gmtime} requires at most 1 arguments".
-    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 465, NUM, VALUE),
+    text('%{gmtime\\:%H\\\\\\:%M\\\\\\:%S}', 265, NUM, VALUE),
   ].join(',');
 }
 
