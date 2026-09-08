@@ -80,6 +80,12 @@ export const DEMOS = [
   { name: 'take', act: 3, built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['MediaRecorder', 'timeline', 'local only'] },
+  // The round trip a browser can make on its own: publish out through a worker
+  // that holds the key, subscribe back, and record the copy that came back.
+  // settleMs covers the WHIP handshake, the WHEP handshake and one take.
+  { name: 'keep', act: 3, built: true, settleMs: 30000,
+    one: 'send a picture out, record the copy that comes back, and scrub it',
+    tags: ['WHIP', 'WHEP', 'timeline'] },
   { name: 'record', act: 3, built: true,
     one: 'record in segments and ship each one, so disk stays flat',
     tags: ['MediaRecorder', 'R2'] },
