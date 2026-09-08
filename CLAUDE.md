@@ -297,9 +297,11 @@ counts against the last known total after any change.
 - **Write for someone who does not work here.** Terse, but understandable —
   those are not in tension, and the old rule ("no explanatory prose, one line
   and a readout") produced pages that only their author could read. A demo page
-  carries three things: one line saying what happens in plain words, a `d.how()`
-  block saying how it is done and what the number means, and a readout of real
-  numbers.
+  carries two things: **ONE paragraph of three or four sentences** saying what
+  happens, how it is done and what the numbers mean — and a readout of real
+  numbers. It was a lead line plus a second `d.how()` paragraph until
+  2026-09-08; two blocks meant the lead said too little and the mechanism went
+  unread. `d.how()` is gone; put it all in `what`.
 - **No jargon in anything a visitor sees.** Not in `what`, not in `how`, not in
   a readout key, not in `manifest.mjs`'s `one` line. Banned unless the page
   defines it on the spot: lookahead, horizon, one-shot, tick, host, commit,

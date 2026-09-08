@@ -129,7 +129,12 @@
 
   const d = mount({
     name: 'score',
-    what: 'One document format for scores written in different languages. Pick one and press play — the line that is sounding lights up.',
+    what: 'One document format for scores written in different languages: pick one and '
+      + 'press play, and the line that is sounding lights up. A score in one language '
+      + 'cannot hold one written in another, so the document agrees only on when a '
+      + 'thing happens and how long it lasts, and carries the rest exactly as '
+      + 'written. Repeats stay repeats — a loop is one line saying how many times, '
+      + 'never the same line copied out.',
     readout: { bytes: 'B', lines: '', rows: '', plays: '' },
     // the numbers sit under the lane that owns them; this row would repeat them
     // with less context. Still published for CDP.
@@ -138,12 +143,6 @@
   });
   guard(d);
 
-  d.how(
-    `A score written in one language cannot hold one written in another, so ` +
-    `this document agrees only on when a thing happens and how long it lasts, ` +
-    `and carries the rest exactly as written. Repeats stay repeats: a loop is ` +
-    `one line saying how many times, never the same line copied out.`,
-  );
 
   // ── ink: one hue per part, used in three places so no legend is needed ───
   // The strip's slices, the strip's events, and the score lines below all take

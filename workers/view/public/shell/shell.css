@@ -46,9 +46,6 @@ body {
 .d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
 
 /* how it works — one plain paragraph */
-.d-how { margin: 8px 0 0; }
-.d-how:empty { display: none; }
-.d-how-note { color: var(--dim); font-size: 13px; max-width: 62ch; }
 
 /* ── readout ──────────────────────────────────────────────────────────── */
 .d-readout {

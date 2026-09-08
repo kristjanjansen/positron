@@ -20,7 +20,10 @@
 
   const d = mount({
     name: 'loops',
-    what: 'One two-second recording, placed three times — nothing is copied. Each part holds the same four events.',
+    what: 'One two-second recording, placed three times — nothing is copied. Each part '
+      + 'points at the whole recording, so the same four events turn up inside all of '
+      + 'them. The middle part plays at double speed, so it is half as wide and its '
+      + 'events are twice as close together.',
     readout: { typical: 'ms', worst: 'ms', pass: '', wraps: '' },
     // the numbers live under the lane they describe; this row would repeat them
     // somewhere with less context. Still published for CDP.
@@ -32,12 +35,6 @@
   });
   guard(d);
 
-  d.how(
-    `Each part points at the whole recording, so the same four events turn up ` +
-    `inside all of them. The middle part plays at double speed, so it is half ` +
-    `as wide and its events are twice as close together. The last one says ` +
-    `"twice".`,
-  );
 
   // ── the child: quoted by identity, never by object ──────────────────────
   //

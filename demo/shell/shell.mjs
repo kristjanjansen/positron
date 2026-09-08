@@ -32,11 +32,6 @@ export function mount({
   head.append(title);
   if (what) head.append(el('p', 'd-what', what));
 
-  // HOW — optional, one plain paragraph. Filled by d.how() after construction
-  // so it can quote the live object rather than a second copy of its numbers.
-  // Empty by default; `.d-how:empty` hides it, so no page pays for the slot.
-  const howEl = el('div', 'd-how');
-  head.append(howEl);
 
   // readout — every key gets a cell, all pending until set()
   //
@@ -120,20 +115,9 @@ export function mount({
     el: body,
     head,
     set, log, assert,
-    /** How it works, in plain words. Published on __demo.how so a harness can
-     *  read what the page claims about itself.
-     *
-     *  This used to take a SPEC LINE too — `looks 100 ms ahead · re-checks
-     *  every 25 ms` — on the theory that real constants beat prose. They do,
-     *  when someone is looking for them; above a paragraph they are a second
-     *  thing to parse before reaching the sentence that says what is going on.
-     *  The constants still belong on the page, in the lane whose behaviour they
-     *  describe, not in a header. */
-    how(note) {
-      howEl.replaceChildren();
-      if (note) howEl.append(el('div', 'd-how-note', note));
-      api.how = { note: note ?? null };
-    },
+    // `how()` is gone. A demo's intro is now ONE paragraph of three or four
+    // sentences in `what`, not a lead line plus a second paragraph of mechanism:
+    // two blocks meant the mechanism went unread and the lead said too little.
     on: (id, fn) => handlers.set(id, fn),
     button: (id) => cbar.querySelector(`[data-id="${id}"]`),
     ready: () => { api.ready = true; log('ready', 'hi'); },

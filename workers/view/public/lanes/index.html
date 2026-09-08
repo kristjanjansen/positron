@@ -21,7 +21,10 @@
 
   const d = mount({
     name: 'lanes',
-    what: 'One beat, sent several ways at once. Each row shows how close it landed.',
+    what: 'One beat, sent several ways at once, with each row showing how close it '
+      + 'landed. Code has to wake up and do the work, so it lands within a '
+      + 'millisecond or so. The sound card and the MIDI port are told the instant in '
+      + 'advance and hit it themselves, a thousand times closer.',
     readout: { worst: 'ms', measured: '' },
     // every number now lives in its own lane's gutter; this row would repeat
     // them with less context. Still published for CDP.
@@ -38,11 +41,6 @@
     onDrift: (_rows, all) => { for (const r of all) driftOf.set(r.at, r.deltaMs); },
   });
 
-  d.how(
-    `Code has to wake up and do the work, so it lands within a millisecond or ` +
-    `so. The sound card and the MIDI port are told the instant in advance and ` +
-    `hit it themselves, a thousand times closer.`,
-  );
 
   // No slider: the strip below is the position surface.
   createTransportBar(d.el, deck, { scrub: false });
