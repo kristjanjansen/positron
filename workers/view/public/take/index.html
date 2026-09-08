@@ -46,6 +46,8 @@
 
   const CAP_MS   = 10_000;   // a backstop, not the mechanism — stop is manual
   const SLICE_MS = 500;      // the timeslice we ask MediaRecorder for
+  const FPS      = 25;       // what we capture at, so one frame is 1000/FPS ms
+  const FRAME_MS = 1000 / FPS;
 
   const d = mount({
     name: 'take',
@@ -159,7 +161,7 @@
     // While recording, the strip is animating — repaint it with the picture.
     // `paint()` otherwise runs once per blob (every 500 ms), which draws the
     // take in visible steps rather than growing.
-    if (recording) paint();
+    if (recording) { paint(); view.strip.invalidate(); }
   }, 40);
   drawFrame();
 
@@ -290,7 +292,7 @@
     if (recording) { d.log('already recording'); return; }
     const mime = recorderMime(d);
     if (!mime) return;
-    const stream = canvas.captureStream(25);
+    const stream = canvas.captureStream(FPS);
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 });
     const part = {
       n: parts.length + 1, hue: hueOf(parts.length), mime,
@@ -333,6 +335,17 @@
     // it; `finishRecording` snaps it back to the real total. What you see is
     // also the honest thing — that space is how much take is still allowed.
     deck.setRange([0, Math.round(totalMs + capMs)]);
+    // A HEAD THAT MOVES WITH THE RECORDING. The bar grows to the right and the
+    // playhead used to sit still, which reads as the page disagreeing with
+    // itself about where "now" is.
+    //
+    // It is NOT the playhead, deliberately. The deck is not at the recording
+    // head — nothing is playing — and seeking it there every frame would drive
+    // the previous take's element and land in the seeks lane, corrupting the
+    // one measurement this page makes about seeking. The strip's wall cursor is
+    // exactly the right instrument: anchored at the take's start, advancing in
+    // real time, which is what a recording head IS.
+    view.strip.armWall(part.startMs);
     setRecUI(true);
     d.log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like — ${capMs / 1000}s cap`, 'hi');
     // The cap is a BACKSTOP and it is said before it bites, not after. It exists
@@ -345,13 +358,23 @@
 
   function stopRecording() {
     if (!recording) return;
+    // the head belongs to a recording; without one there is nothing for it to
+    // mean, and a line still creeping rightward would be inventing one
+    view.strip.state.wallAnchor = null;
+    view.strip.invalidate();
     clearTimeout(recording.capTimer);
     try { recording.rec.stop(); } catch { /* already stopped */ }
   }
 
   function setRecUI(on) {
     const b = bar.extra('rec');
-    if (b) { b.dataset.on = on ? '1' : ''; b.textContent = on ? 'Stop' : 'Record'; }
+    // ● to start, ■ to stop — the two glyphs every recorder has used for fifty
+    // years, on the same square as the play button beside them.
+    if (b) {
+      b.dataset.on = on ? '1' : '';
+      b.textContent = on ? '\u25A0' : '\u25CF';
+      b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+    }
   }
 
   async function resolveDuration(video) {
@@ -446,7 +469,7 @@
   // Removed. The hue comes from the take's INDEX, which is the property that
   // actually guarantees neighbours differ.
   const partLane = {
-    id: 'parts', kind: 'part', label: 'parts', height: 52, barPad: 8,
+    id: 'parts', kind: 'part', label: 'takes', height: 52, barPad: 8,
     as: 'spans', stack: false, barGap: 3, terse: true, alpha: 0.9,
     colorOf: (s) => ink(s.row?.payload?.hue ?? 210, 62, 68),
     labelOf: (s, { bw }) => {
@@ -467,7 +490,7 @@
   };
 
   const chunkLane = {
-    id: 'chunks', kind: 'chunk', label: 'events', height: 40, width: 2,
+    id: 'chunks', kind: 'chunk', label: 'slices', height: 40, width: 2,
     as: 'ticks', color: NOT_YET, terse: true,
     // colour means HOW IT LANDED against the timeslice we asked for, never
     // which take it came from — that is the part lane's job and its colour.
@@ -486,19 +509,26 @@
     id: 'seeks', kind: 'seek', label: 'seeks', height: 38, width: 2,
     as: 'ticks', color: NOT_YET, terse: true,
     rows: () => seeks.map((s, i) => ({ at: s.asked, id: `s${i}`, kind: 'seek', payload: { i, ...s } })),
-    colorOfRow: (r) => (Math.abs(r.payload.offMs) < 40 ? '#8fd6a8'
+    // CALIBRATED AGAINST WHAT A SEEK CAN DO, not against zero. A video lands on
+    // a FRAME, so at 25 fps the best possible answer is already up to 40 ms out
+    // — and the old threshold was `< 40`, which put a perfect result exactly on
+    // the boundary and painted half of them amber. A scale whose normal reading
+    // is a warning has no warning left. Green now means "within a frame, which
+    // is as good as this can be"; amber means it missed by more than that.
+    colorOfRow: (r) => (Math.abs(r.payload.offMs) <= FRAME_MS * 1.5 ? '#8fd6a8'
       : Math.abs(r.payload.offMs) < 250 ? '#ffd400' : '#e0908a'),
     describeRow: (r) => {
       const p = r.payload;
+      const within = Math.abs(p.offMs) <= FRAME_MS * 1.5;
       return [`asked ${(p.asked / 1000).toFixed(2)}s, got ${(p.got / 1000).toFixed(2)}s`,
-              `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms apart · landed in take ${p.part}`];
+              `${p.offMs >= 0 ? '+' : ''}${p.offMs.toFixed(0)} ms · ${within ? 'within a frame' : 'more than a frame'}`];
     },
   };
 
   const bar = createTransportBar(d.el, deck, {
     scrub: false,          // the strip is the only position surface on this page
     // recording is a TRANSPORT verb here, not a side action beside the page
-    extras: [{ id: 'rec', label: 'Record', primary: true,
+    extras: [{ id: 'rec', label: '\u25CF', aria: 'Record', primary: true,
                title: `stop when you like — ${CAP_MS / 1000}s cap`,
                onClick: () => (recording ? stopRecording() : startRecording(CAP_MS)) }],
   });
@@ -546,7 +576,7 @@
     const sh = shown();
     const P = L.find((l) => l.id === 'parts');
     if (P) P.subLabel = sh.length
-      ? [`${sh.length} part${sh.length > 1 ? 's' : ''} · ${(sh.reduce((a, p) => a + p.lenMs, 0) / 1000).toFixed(2)}s`,
+      ? [`${sh.length} take${sh.length > 1 ? 's' : ''} · ${(sh.reduce((a, p) => a + p.lenMs, 0) / 1000).toFixed(2)}s`,
          `shortest ${(Math.min(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
          recording ? 'recording now' : `longest ${(Math.max(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
       : null;
@@ -554,7 +584,7 @@
     const C = L.find((l) => l.id === 'chunks');
     const offs = sh.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
     if (C) C.subLabel = offs.length
-      ? [`${offs.length + sh.length} blobs, ${median(offs).toFixed(0)} ms typ`,
+      ? [`${offs.length + sh.length} slices, ${median(offs).toFixed(0)} ms typ`,
          `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
       : null;
 

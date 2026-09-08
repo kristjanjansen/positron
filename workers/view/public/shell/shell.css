@@ -145,8 +145,15 @@ button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); f
 /* parked at the end: the button restarts, so it must not look like plain play */
 .tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }
 
-/* a page button that belongs to the transport — sits with the toggle */
-.tbar-x { flex: none; height: 34px; padding: 0 12px; font-size: 12px; }
+/* a page button that belongs to the transport — sits with the toggle, and is
+   the SAME SQUARE as it. These are transport verbs, so they are glyphs on a
+   38 px square like ▶ and ❚❚, not words in a pill: a row that mixes the two
+   reads as a toolbar with a stray form control in it. The label a page passes
+   is the glyph; `aria` carries the word for anyone who cannot see it. */
+.tbar-x {
+  flex: none; width: 38px; height: 38px; padding: 0;
+  display: grid; place-items: center; font-size: 15px; line-height: 1;
+}
 .tbar-x[data-on="1"] { color: var(--bad); border-color: var(--bad);
   background: color-mix(in oklab, var(--bad) 16%, var(--card2)); }
 
