@@ -1,4 +1,4 @@
-# positron — compact summary (start → 2026-09-06)
+# positron — compact summary (start → 2026-09-08)
 
 One paragraph: a measured live-streaming + performance platform on Cloudflare
 (LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
@@ -55,6 +55,30 @@ with an operator studio app as its first build and cultural-heritage archives
   apart. ⚠ A re-run on 09-07 read 301/313, from a shell with no UDP egress;
   332/332 needs re-confirming somewhere WebRTC and QUIC can leave the machine.
 
+- **09-07, session 11** — a UI/UX review of the demos, one at a time, which
+  turned into a jargon audit. Every reader question — *what is drift · green but
+  late? · what alarm?? · why do I need the slider?* — named a real defect rather
+  than a wording preference. `01 transport` was **printing a fabricated `0` for
+  the one number it exists to report**, and its assert passed on the empty array
+  that caused it. Also: the demos lost their number prefixes and are addressed
+  by SLUG; `04 score` became a normalized JSON score container; `05` became the
+  Csound demo beside it. CLAUDE.md's writing conventions were rewritten — the
+  old "no explanatory prose" rule is what produced pages only their author could
+  read.
+
+- **09-07/08, session 12** — **one generated test picture**, `demo/shell/
+  pattern.mjs`, drawn by six demos and generated as an ffmpeg filter by both
+  publishers. It already existed and was imported by a single caller that cannot
+  connect, while four demos each drew their own — **a shared module nobody can
+  see is a claim, not a unification** (LESSONS #30). New `take`: a local video
+  timeline, no network, where a take is drawn as it records and the burned
+  number is POSITION ON THE LINE, so a scrub checks itself. The same look found
+  **three dead paths the slug rename left**, one of which had `moq` and `ladder`
+  asserting NOTHING for weeks behind a plausible-but-wrong explanation (#29),
+  and one pointing the IPHONE harness at a 404. `ladder` was removed on 09-08.
+  ⚠ **332/344**; the 12 are every WebRTC and QUIC leg, no UDP egress in that
+  shell.
+
 ## The stack, with its numbers
 
 | Layer | Verdict |
@@ -98,7 +122,7 @@ polling lies about edge lag (+2.3 s); ThreatLocker kills unapproved binaries
   vector. Artistic canon deep (Zenph, Marclay, Morrison, Hsieh…), shared
   infrastructure EMPTY — that gap is the project.
 - **Own prior art** (research/timeline-own-prior-art-2026-08.md): lineage is
-  5+ generations since positron 2020 (map: visualia/plans/lineage.md). Steal
+  5+ generations since elektron 2020 (map: visualia/plans/lineage.md). Steal
   list: pre-roll ring buffer, command-sourcing + undoable commands (cheap
   backward seek), per-kind quantization, ACT/DISPLAY split, drift channel,
   gate() recognizer, loopback ordering, wall-clock-in-frame test pattern.

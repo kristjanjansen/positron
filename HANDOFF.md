@@ -1,4 +1,4 @@
-# Handoff — 2026-09-07 (end of session 11)
+# Handoff — 2026-09-08 (end of session 12)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
@@ -7,9 +7,18 @@ newest and wins over §7–§8.
 
 ## One line
 
-Live on **positron.studio**. Session 11 was a **UI/UX review of the demos, one
-at a time**, and it found that a reader's every "I don't understand this"
-named a real defect rather than a wording preference. `01 transport` was
+Live on **positron.studio**. Session 12 made `demo/shell/pattern.mjs` the ONE
+generated test picture — six demos and both ffmpeg publishers draw it — and
+found, on the way, that it had been imported by a single caller that cannot
+connect, while four demos each drew their own. **A shared module nobody can see
+is a claim, not a unification** (LESSONS #30). The same look also found three
+dead paths the slug rename left behind, including one that had `moq` and
+`ladder` asserting NOTHING for weeks and one pointing the IPHONE harness at a
+404. `take` is new: a local video timeline where a take is drawn as it records.
+**332/344 green**, and `workers/pub` is NOT deployed — see the warning below.
+
+Session 11 before it was a **UI/UX review of the demos, one at a time**, and it
+found that a reader's every "I don't understand this" named a real defect rather than a wording preference. `01 transport` was
 **printing a fabricated `0` for the one number it exists to report** — and its
 assert passed on the empty array that caused it. The stop-at-end lived in the
 render loop, so a hidden tab let a 20 s deck reach **91,001 ms** while still
@@ -330,7 +339,7 @@ candidate-pair RTT, not media latency.
 - **iOS is UNCONFIRMED since the native switch.** "Seems to work" was reported on
   v12; then a TDZ of mine broke the page entirely, and v13/v14 added native
   recovery plus three native-path fixes. No phone has been tested since. Open
-  `positron.studio/06-llhls/` and read the first log line for the build id.
+  `positron.studio/llhls/` and read the first log line for the build id.
 - **The archival cron.** Copying Stream recordings to R2 is PROVEN (105.8 MB MP4,
   byte-exact, publicly served). The worker needs a Stream-scoped token; `.env`
   holds the known-exposed legacy one — mint a fresh token rather than deploying
@@ -385,7 +394,7 @@ candidate-pair RTT, not media latency.
   deploy: latency **3.33 s** against target **4.0** (hls.js adds
   `liveSyncOnStallIncrease` per internal stall, capped at one targetduration),
   rate **1.0**, **0 resyncs**, 1 level switch. Cost: ~0.5 s more latency.
-  **Still to do:** open `/06-llhls/` on the iPhone and read `switches`. The
+  **Still to do:** open `/llhls/` on the iPhone and read `switches`. The
   arithmetic is device-independent, but the jank was reported on iOS and only
   that device can confirm it. iPhone does take the hls.js path — bundled hls.js
   is 1.7.1 and its `getMediaSource` returns `ManagedMediaSource` when
@@ -450,8 +459,8 @@ stripping the `demo/` prefix let two sources collide on `index.html`.
 
 ## Nothing is in flight. Everything below is committed and green.
 
-*(Except these notes: the session-10 entries in `PROGRESS.md`, `HANDOFF.md` and
-`SUMMARY.md` are written but not yet committed.)*
+*(Working tree clean at the end of session 12. The one thing NOT shipped is
+`workers/pub`'s container image — see the warning above.)*
 
 ## What exists
 
@@ -576,7 +585,7 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    would teach more than any module.
 3. **Confirm iOS on a real phone.** Unchanged since session 9 and now two
    sessions stale: the native-HLS switch has never been seen on the device it
-   was written for. Open `positron.studio/06-llhls/` and read the `BUILD` on the
+   was written for. Open `positron.studio/llhls/` and read the `BUILD` on the
    first log line before believing anything about it.
 4. **Re-run the suite somewhere with UDP egress.** 332/332 is the committed
    number; the last run available read 301/313 because WebRTC and QUIC could not
