@@ -183,9 +183,13 @@ to recover.
   low-latency guidance for MMS — native HLS is the documented low-latency path
   on WebKit, which is why the player prefers it there.
 
-- **Stream recording cannot be turned off.** `mode: off` also disables HLS
-  playback of a live input, and `preferLowLatency` requires `automatic`, so 06
-  and 09 depend on it. Storage is bounded by DELETING recordings; the account
+- **Stream recording cannot be turned off — ON THE RTMPS PATH.** `mode: off`
+  also disables HLS playback of a live input, and `preferLowLatency` requires
+  `automatic`, so 06 and 09 depend on it. **WHIP ingest is the opposite and the
+  unqualified rule has already misled a plan once: WHIP RECORDS NOTHING** —
+  direct-tested, 183 s against a recording-ENABLED input, 26 polls, zero assets.
+  Stream-WebRTC is delivery-only, so a WHIP source costs no storage minutes and
+  cannot be archived server-side either; whatever records it must do so itself. Storage is bounded by DELETING recordings; the account
   cap is 1000 storage-minutes and testing adds ~225/day.
   `deleteRecordingAfterDays` minimum is 30 — too coarse to help.
 - **`ingest.positron.studio` is the only tokenless write path.** Server-minted

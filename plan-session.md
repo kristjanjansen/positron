@@ -90,11 +90,28 @@ version, because the number is committed to pixels before the picture crosses a
 real ingest, a real packager and a real edge — and the receiving page cannot
 fake a number it did not write.
 
-**What still costs, unchanged and not dodged:** it is a real Stream live input,
-so `recording.mode: automatic` still applies, recording still cannot be turned
-off, and every minute published is storage minutes against the 1000-minute cap.
-§5's arithmetic stands. Publish only while a take is recording rather than for
-the page's lifetime, and say the number on the page.
+**And it costs NO STORAGE MINUTES. This was wrong in the first draft.**
+
+**WHIP ingest records NOTHING** — direct-tested in this repo: 183 s against a
+**recording-enabled** input produced **zero assets**, across 26 polls, with
+`recording.mode: automatic` set. Stream-WebRTC is delivery-only and creates no
+video assets, ever (`PROGRESS.md`, `plan-m2m.md` §5, `proto/m2m/NOTES.md`
+Route A).
+
+So `CLAUDE.md`'s "Stream recording cannot be turned off" is about the **RTMPS**
+path — where it is true and where `06` and `09` depend on it — and it does not
+apply here. §5's arithmetic below is about the container's RTMPS leg and should
+be read that way; this demo touches it not at all.
+
+**The corollary is the demo's own subject.** Because the platform records
+nothing on this path, the page's own recording is the ONLY archive there is.
+§2's decision — a take is a `MediaRecorder` session over the received track —
+stops being a preference and becomes the only option. That is a better reason
+than the one §2 gives.
+
+The remaining cost is delivery, not storage, and there is **no number for it in
+this repo**: whether a WHEP subscriber bills as Stream delivered minutes is
+unrecorded and is not being guessed at (§12.5).
 
 **Open question, and it decides P1:** whether Cloudflare TRANSCODES a WHIP
 ingest before serving WHEP. If it does, the row must survive that transcode, and
@@ -387,6 +404,10 @@ durations, so if a duration resolves differently elsewhere, the line differs.
 ---
 
 ## 5. What this costs
+
+> **Read §1b first.** This section was written for the container variant and is
+> about the **RTMPS** leg. WHIP ingest records nothing (direct-tested), so the
+> recommended build incurs none of the storage below.
 
 **Stream storage.** Holding `pub.positron.studio/watch` starts the container,
 which publishes to two live inputs, both `recording.mode: automatic` because
