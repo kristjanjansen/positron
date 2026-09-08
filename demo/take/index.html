@@ -83,33 +83,28 @@
 
   const stage = el('div', 'stage');
   const srcFig = el('figure');
-  srcFig.append(canvas, el('figcaption', 'd-cap', 'source · recorded as you see it'));
+  srcFig.append(canvas, el('figcaption', 'd-cap', 'source'));
   const seqFig = el('figure');
   const seq = el('div', 'seq');
-  const seqCap = el('figcaption', 'd-cap', 'the line — nothing on it yet');
+  const seqCap = el('figcaption', 'd-cap', 'playback');
   seqFig.append(seq, seqCap);
   stage.append(srcFig, seqFig);
   d.el.append(stage);
 
-  // A SEED PER TAKE, drawn ONCE when the take starts — never per frame, or the
-  // recording would flicker and the same take would not look like itself twice.
-  const randSeed = () => Math.floor(Math.random() * 10000);
-  let nextSeed = randSeed();
-
-  // …but the HUE comes from the take's INDEX, not from the seed. Two random
-  // hues can land five degrees apart, and then two parts on the line are
-  // indistinguishable — the exact failure the seed exists to prevent. So the
-  // index picks a colour guaranteed far from its neighbours'. `videoHue` keeps
-  // it inside the shared video band, so a take is recognisably the same family
-  // as everything else this project generates, and the strip paints its lane
-  // from the same number.
+  // A COLOUR PER TAKE, from the take's INDEX — not from anything random. Two
+  // random hues can land five degrees apart, and then two parts on the line are
+  // indistinguishable, which is the whole failure the colour exists to prevent.
+  // An index picks one guaranteed far from its neighbours'. `videoHue` keeps it
+  // inside the shared video band, so a take is recognisably the same family as
+  // everything else this project generates, and the strip paints its lane from
+  // the same number the frames are burned with.
   const hueOf = (i) => videoHue(i);
 
   // Declared HERE, above `drawFrame`, because the first frame is painted
   // during module evaluation and a `let` further down is in its temporal dead
   // zone at that moment — which surfaces as `__demo.ready false`, not as a
   // drawing bug. That exact mistake cost six pages once already.
-  const parts = [];   // { n, seed, hue, mime, chunks[], blobs[], bytes, recordedMs,
+  const parts = [];   // { n, hue, mime, chunks[], blobs[], bytes, recordedMs,
                       //   fileMs, startMs, lenMs, video }
   let recording = null;
   let totalMs = 0;    // where the line currently ends — the next take's start
@@ -151,7 +146,13 @@
     // the point: they get compared. `position` swaps the second clock from wall
     // time to POSITION ON THE LINE, the quantity the transport bar shows, so a
     // scrub can be checked against the picture with no arithmetic.
-    burn(g, W, H, frame, { hue, position: line / 1000, field: !cam });
+    // POSITION ONLY WHILE RECORDING. Before that this picture is not on the
+    // line at all, and a free-running rehearsal counter said otherwise — it
+    // read `00:08.619` beside a transport bar reading `0:05.099` total, which
+    // is the page contradicting itself in two places a reader is meant to
+    // compare. Not recording, the frame shows the wall clock, which is the
+    // honest answer to "where is this?": nowhere yet.
+    burn(g, W, H, frame, { hue, field: !cam, ...(rec ? { position: line / 1000 } : {}) });
   }
   setInterval(() => {
     drawFrame();
@@ -220,11 +221,11 @@
     const from = active;
     if (from && from.video) { from.video.pause(); from.video.hidden = true; }
     active = p;
-    if (!p) { seqCap.textContent = 'the line — nothing on it'; return; }
+    if (!p) { seqCap.textContent = 'playback'; return; }
     p.video.hidden = false;
     const want = localOf(p, pos);
     if (Math.abs(p.video.currentTime - want) > 0.08) p.video.currentTime = want;
-    seqCap.textContent = `take ${p.n} · seed #${String(p.seed).padStart(4, '0')} · the clock`;
+    seqCap.textContent = `playback · take ${p.n}`;
     if (from !== p) handovers.push({ at: pos, from: from ? from.n : null, to: p.n, why });
     mm.release('handover');          // a clean re-acquire on the new key
   }
@@ -292,7 +293,7 @@
     const stream = canvas.captureStream(25);
     const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 });
     const part = {
-      n: parts.length + 1, seed: nextSeed, hue: hueOf(parts.length), mime,
+      n: parts.length + 1, hue: hueOf(parts.length), mime,
       chunks: [], blobs: [], bytes: 0, recordedMs: null, fileMs: null,
       // KNOWN NOW, not when it lands: a take is appended, so it starts where
       // the line currently ends — and only one recording runs at a time, so
@@ -300,7 +301,6 @@
       // their own position on the line rather than their offset into the take.
       startMs: totalMs, lenMs: null, video: null, capMs,
     };
-    nextSeed = randSeed();
     const t0 = performance.now();
     let lastAt = 0;
     rec.ondataavailable = (e) => {
@@ -435,26 +435,33 @@
   const shown = () => { const l = inFlight(); return l ? parts.concat([l]) : parts; };
 
   // ONE LANE OF PARTS, in recording order. Cubase's vocabulary, the same as
-  // `loops`: a PART is a container placed on the timeline. The seed's colour is
-  // what lets two slices tell each other apart at a glance — and it is the same
-  // colour that is burned into the frames inside them.
+  // `loops`: a PART is a container placed on the timeline. Each part's COLOUR is
+  // what lets two of them tell each other apart at a glance, and it is the same
+  // colour burned into the frames inside them.
+  //
+  // There used to be a random `seed` here as well, printed in the caption, the
+  // label and the tooltip. It stopped doing anything the moment the page moved
+  // to the shared pattern — `burn()` never saw it — so three places advertised a
+  // number with no effect, and this comment claimed the colour came from it.
+  // Removed. The hue comes from the take's INDEX, which is the property that
+  // actually guarantees neighbours differ.
   const partLane = {
     id: 'parts', kind: 'part', label: 'parts', height: 52, barPad: 8,
     as: 'spans', stack: false, barGap: 3, terse: true, alpha: 0.9,
     colorOf: (s) => ink(s.row?.payload?.hue ?? 210, 62, 68),
     labelOf: (s, { bw }) => {
       const p = s.row?.payload || {};
-      return bw > 128 ? `take ${p.n} · #${String(p.seed).padStart(4, '0')} · ${(p.lenMs / 1000).toFixed(2)}s`
+      return bw > 128 ? `take ${p.n} · ${(p.lenMs / 1000).toFixed(2)}s`
         : bw > 66 ? `take ${p.n} · ${(p.lenMs / 1000).toFixed(1)}s` : `${p.n}`;
     },
     rows: () => shown().map((p) => ({
       at: p.startMs, id: `take${p.n}`, kind: 'part',
-      payload: { durMs: p.lenMs, n: p.n, seed: p.seed, hue: p.hue, lenMs: p.lenMs,
+      payload: { durMs: p.lenMs, n: p.n, hue: p.hue, lenMs: p.lenMs,
                  kib: Math.round(p.bytes / 1024) },
     })),
     describeRow: (r) => {
       const p = r.payload;
-      return [`seed #${String(p.seed).padStart(4, '0')} · ${p.kib} KiB`,
+      return [`${p.kib} KiB`,
               `${(p.lenMs / 1000).toFixed(2)}s of the line`];
     },
   };
@@ -501,10 +508,20 @@
     lanes: [partLane, chunkLane, seekLane],
   });
 
+  const shortMime = (m) => {
+    const container = (m.split(';')[0] || '').replace('video/', '');
+    const codec = (m.match(/codecs=([^;,"']+)/)?.[1] || '').split('.')[0];
+    return codec ? `${container} ${codec}` : container;
+  };
+
   function paint() {
     d.set('takes', parts.length || null);
     d.set('line', totalMs ? (totalMs / 1000).toFixed(2) : null);
-    d.set('mime', parts[0] ? parts[0].mime.replace('video/', '') : null);
+    // CONTAINER AND CODEC, not the raw type string. `video/webm;codecs=vp9`
+    // rendered as `webm;cod…` — an ellipsis, which says the content is wrong
+    // for the slot rather than the slot being too small. Safari's
+    // `video/mp4;codecs=avc1.42E01E` loses its profile suffix the same way.
+    d.set('mime', parts[0] ? shortMime(parts[0].mime) : null);
     const kib = parts.reduce((a, p) => a + p.bytes, 0);
     d.set('kib', kib ? Math.round(kib / 1024) : null);
     // no `?? 0` anywhere: a number this page has not observed is an em dash
@@ -518,6 +535,11 @@
     // out the figures the slot exists for, and it TRUNCATED, which is the tell.
     // The budget is real: ~21 characters at this gutter width, and three lines
     // on a 52 px lane, two on a 40 px one. Written to fit, not trimmed to fit.
+    //
+    // And with nothing measured yet it carries NOTHING. "no parts / nothing
+    // recorded yet" is the lane narrating its own emptiness beside an empty
+    // strip that already shows it — two channels saying one thing, and the one
+    // that costs three lines of gutter is the one that goes.
     const L = view.strip.lanes();
     // The gutter counts what the lane DRAWS, in-flight take included — showing
     // "1 part" beside two bars would be the readout arguing with the picture.
@@ -527,21 +549,21 @@
       ? [`${sh.length} part${sh.length > 1 ? 's' : ''} · ${(sh.reduce((a, p) => a + p.lenMs, 0) / 1000).toFixed(2)}s`,
          `shortest ${(Math.min(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`,
          recording ? 'recording now' : `longest ${(Math.max(...sh.map((p) => p.lenMs)) / 1000).toFixed(2)}s`]
-      : ['no parts', 'nothing recorded yet'];
+      : null;
 
     const C = L.find((l) => l.id === 'chunks');
     const offs = sh.flatMap((p) => p.chunks.slice(1).map((x) => Math.abs(x.gapMs - SLICE_MS)));
     if (C) C.subLabel = offs.length
       ? [`${offs.length + sh.length} blobs, ${median(offs).toFixed(0)} ms typ`,
          `worst ${Math.max(...offs).toFixed(0)} ms off ${SLICE_MS}`]
-      : ['no blobs', 'nothing recorded yet'];
+      : null;
 
     const S = L.find((l) => l.id === 'seeks');
     const so = seeks.map((x) => Math.abs(x.offMs));
     if (S) S.subLabel = so.length
       ? [`${seeks.length} asked, ${median(so).toFixed(0)} ms typ`,
          `worst ${Math.max(...so).toFixed(0)} ms off`]
-      : ['no seeks yet', 'asked-vs-got needs one'];
+      : null;
     view.strip.invalidate();
   }
   setInterval(paint, 250);
