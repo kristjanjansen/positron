@@ -106,6 +106,12 @@ export const DEMOS = [
     one: 'two browsers on one pulse, on a peer-corrected clock',
     tags: ['WS', 'relay', 'WebAudio'] },
 
+  // The archival horizon and the timeline library, meeting for the first time:
+  // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
+  // committed; the media streams from ERR and nothing is stored here.
+  { name: 'reel', act: 5, built: true,
+    one: 'every 1965 newsreel on one line, at the day it was broadcast',
+    tags: ['ERR', 'archive', 'timeline'] },
   { name: 'flipper', act: 5, built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
