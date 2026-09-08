@@ -52,10 +52,8 @@ else
   #   ROW=1         also burn the 56-block machine-readable clock row
   EPOCH=$(python3 -c 'import time;print(f"{time.time():.6f}")')
   # An `[ … ] && x` here would be a `set -e` landmine, not a shortcut.
-  ROWFLAG=()
-  if [ "${ROW:-0}" = "1" ]; then ROWFLAG=(--row); fi
   node ../demo/shell/pattern.mjs \
-    --epoch="$EPOCH" --hue="${HUE:-280}" --font="$FONT" "${ROWFLAG[@]}" \
+    --epoch="$EPOCH" --hue="${HUE:-280}" --font="$FONT" \
     > /tmp/ll-filt.txt
   [ -s /tmp/ll-filt.txt ] || { echo "publish.sh: pattern.mjs produced no filter" >&2; exit 1; }
   INPUT=(-re -f lavfi -i "testsrc2=size=1280x720:rate=$FPS" -re -f lavfi -i "sine=frequency=1000:sample_rate=48000" -filter_script:v /tmp/ll-filt.txt)
