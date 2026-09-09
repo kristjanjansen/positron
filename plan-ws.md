@@ -108,6 +108,76 @@ how many DISTINCT rooms one client opens.
 
 ---
 
+## 1b. What elektron already settled — v1 and v3, read 2026-09-09
+
+The prior art is ours. `elektronstudio/v1` (`src/lib/websocket.js`) and
+`elektronstudio/v3` (`src/utils/message.ts`) carry the same envelope, five years
+apart:
+
+```js
+// v1                                    // v3
+{ id: randomId(),                        { id: randomString(16),
+  datetime: new Date().toISOString(),      datetime: new Date().toISOString(),
+  userId, userName,                        channel: "",
+  type: "", channel: "", value: "",        type: "", value: "",
+  ...message }                             ...message }
+```
+
+Beside positron's, which three demos invented independently:
+
+| elektron | positron | the difference that matters |
+|---|---|---|
+| `type` | `t` | the same field, shorter |
+| `channel` **in the message** | the room **in the URL** | see below |
+| `value` | fields spread at top level | elektron nests, we do not |
+| `id`, random 16 chars | — (`seq` proposed) | **dedupe** vs **gap detection** |
+| `datetime`, ISO string | `at`, epoch ms | readable vs arithmetic |
+| `userId` / `userName` | `from` | same job |
+
+**Four things it teaches, each of which changes this plan:**
+
+1. **`channel` in the message is a different architecture, not a different
+   name.** One socket carries every channel and the client filters, against our
+   socket-per-room with the DO fanning out. Theirs costs one connection and
+   every message to everyone; ours costs a connection per room and delivers only
+   what a room sent. §5's "the filter is applied by the receiver" is elektron's
+   model arriving by the back door — worth choosing on purpose rather than
+   drifting into.
+
+2. **`id` and `seq` answer different questions and we may want both.** A random
+   id lets two lists be merged without duplicates — which is exactly what v3's
+   history code does, `uniqueCollection([...loaded, ...messages], "id")`. It
+   cannot see a gap. A per-sender counter sees the gap and cannot dedupe an
+   overlap. **The moment history is merged into a live list, the random id stops
+   being optional**, and that is the case §3 is proposing.
+
+3. **History over HTTP existed here already, and is commented out.** v3 has a
+   `config.messagesUrl` fetch that loads past messages and merges them by `id`
+   into the live list — the whole of §3's read path, written and disabled. Worth
+   finding out why before rebuilding it: if it was turned off because the
+   backlog grew without bound, that is §3's retention question answered from
+   experience.
+
+4. **Never omit a key some client might read.** v3 fills `channel`, `type` and
+   `value` with empty strings and says why: *"Some clients just check for the
+   value in the message, not whenever the key exists."* That is a scar, and the
+   cheap way to avoid re-earning it is to send the full shape always.
+
+**And one thing they have that we do not**: both versions use
+`reconnecting-websocket`, v1 vendored into `src/deps/`. Every positron demo uses
+a raw `new WebSocket` with no reconnect at all — `cues` logs "relay closed" and
+stops. On a phone that changes network, our pages simply stop working and say
+so quietly. ⚠️ Not measured yet; it is a reading of the code, and the fix is a
+shell module rather than a per-demo patch.
+
+The remaining unknown: **the server is not in the org.** `WebSocketServer`,
+`socket.io` and `new WebSocket` return nothing across `elektronstudio/*`, so
+whatever answered `VITE_WS_URL` lived elsewhere. If it is the Strapi host
+(`elektronstudio/strapi4`, `data.elektron.art`), that is the comparison §0's
+second fragment was probably asking for.
+
+---
+
 ## 2. The envelope
 
 ```
