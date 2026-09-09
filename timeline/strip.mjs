@@ -1255,7 +1255,7 @@ export function createStrip(canvas, deck, opts = {}) {
         // the tick labels it is measuring against
         if (gap > 34) {
           ctx.font = '9px ui-monospace, Menlo, monospace';
-          const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s offset`;
+          const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s`;
           const w = ctx.measureText(lbl).width + 6;
           const lx = Math.min(Math.max(0, Math.min(px, wx) + gap / 2 - w / 2), Math.max(0, S.width - S.gutterPx - w));
           ctx.globalAlpha = 0.92; ctx.fillStyle = 'rgba(8,10,16,.85)';
