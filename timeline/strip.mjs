@@ -1236,7 +1236,11 @@ export function createStrip(canvas, deck, opts = {}) {
       const wx = x(wp);
       if (wx >= -1 && wx <= w + 1) {
         ctx.strokeStyle = T.wall; ctx.globalAlpha = 0.85; ctx.lineWidth = 1;
-        ctx.setLineDash([4, 3]);
+        // `wallDash` lets a client say what kind of line the second cursor is.
+        // Default unchanged; `now` passes a dotted one because its two cursors
+        // sit a few pixels apart and dashes at that distance read as one line
+        // with gaps in it rather than as two different kinds of line.
+        ctx.setLineDash(opts.wallDash || [4, 3]);
         ctx.beginPath(); ctx.moveTo(Math.round(wx) + 0.5, 0); ctx.lineTo(Math.round(wx) + 0.5, S.contentH); ctx.stroke();
         ctx.setLineDash([]);
       }

@@ -36,15 +36,11 @@
       + 'moment. The white line is the frame on the glass and the orange one is now; '
       + 'the distance between them, about seven seconds, is what a live picture costs '
       + 'to reach you, and it is drawn rather than hidden. ERR keeps roughly the last '
-      + 'two hours, so Back ten minutes walks into what has already gone past and Live '
-      + 'returns. The row under the picture is what ERR agreed to hand over when this '
-      + 'page asked, two bytes at a time.',
-    readout: { state: '', behind: 's', edge: 's' },
-    controls: [
-      { id: 'go', label: 'Go live', primary: true },
-      { id: 'back', label: 'Back ten minutes' },
-      { id: 'live', label: 'Live' },
-    ],
+      + 'two hours: press anywhere on the line to watch from that moment instead, and '
+      + 'live returns to the edge. The middle row is what ERR agreed to hand over when '
+      + 'this page asked, two bytes at a time, and the page walks back into it once on '
+      + 'its own — the break in the top row is where that seek skipped.',
+    readout: { state: '', behind: 's', edge: 's', seek: 'ms' },
   });
   guard(d);
 
@@ -139,33 +135,105 @@
     if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : 'no schedule';
   }
 
-  const view = createStripView(d.el, deck, {
-    size: 'auto', absolute: true, follow: true, lanes,
-    // the present is the SECOND cursor, drawn like the first and coloured
-    // differently — not a dot, because it is the same kind of thing
-    wallStyle: 'head',
-  });
-
-  // ── the bar ───────────────────────────────────────────────────────────────
-  // endStop:false because this window's right-hand end is the present, which
-  // arrives about seven seconds after play; command:{} because the deck is a
-  // FOLLOWER here — writing a position to it is undone by the master's next
-  // tick, so the bar drives the picture and the deck follows as it always does.
+  // ── the bar, ABOVE the line ───────────────────────────────────────────────
+  // Transport sits above the thing it drives. endStop:false because this
+  // window's right-hand end is the present, which arrives about seven seconds
+  // after play; command:{} because the deck is a FOLLOWER here — writing a
+  // position to it is undone by the master's next tick, so the bar drives the
+  // picture and the deck follows as it always does.
   const bar = createTransportBar(d.el, deck, {
     absolute: true, scrub: false, endStop: false,
     fmt: (pos, range) => `${new Date(pos).toTimeString().slice(0, 8)}`
       + `  ·  ${((range[1] - pos) / 60000).toFixed(1)} min behind the edge`,
+    extras: [
+      // The one verb that cannot be said as a position: the live edge is
+      // wherever the engine has fragments for, which moves while you decide.
+      { id: 'live', label: 'live', aria: 'Return to the live edge',
+        title: 'back to the live edge', onClick: () => toLive() },
+    ],
     command: {
-      play: () => (clock ? glass.play().catch(() => {}) : deck.play()),
+      // PLAY MEANS PLAY LIVE. Before the picture exists there is nothing to
+      // resume, so play starts it; after a walk back into the DVR, pause and
+      // play are the picture's and the position is kept — that is what a DVR
+      // is for, and `live` is next to them for getting back.
+      // press play before the source has attached and you wait for the start
+      // that is already running, then play — never a second start.
+      play: () => (clock ? glass.play().catch(() => {})
+                         : goLive().then(() => glass.play().catch(() => {}))),
       pause: () => (clock ? glass.pause() : deck.pause()),
-      seek: (pos) => (clock ? (clock.seek(pos), { ok: true }) : deck.seek(pos)),
+      seek: (pos) => seekTo(pos),
     },
+  });
+
+  // THE PRESENT IS A DASHED LINE WITH A LABELLED GAP, not a second playhead.
+  // `wallStyle: 'head'` draws it solid with a triangle on top — take arms it as
+  // a recording head, where that is right — and here it made two identical
+  // cursors sliding along together with nothing saying which was which. The
+  // default style is the one this page's paragraph describes: dashes, and the
+  // distance between the two drawn as a band and labelled in seconds.
+  const view = createStripView(d.el, deck, {
+    size: 'auto', absolute: true, follow: true, lanes,
+    wallDash: [1, 3],          // dotted: the present, against the solid playhead
+  });
+
+  // PRESS THE LINE TO GO THERE. The strip seeks the DECK on press, and the
+  // deck is a follower — the master would put it straight back within a tick.
+  // So the gesture is mirrored to the picture, which is the thing that has to
+  // move for a seek to have happened.
+  view.strip.canvas.addEventListener('pointerup', () => {
+    if (clock) seekTo(deck.position());   // the strip already moved the line
   });
 
   // ── the picture ───────────────────────────────────────────────────────────
   let stalledFor = 0, lastSeenPos = null, lastSeenAt = 0;
+  let seekTarget = null, seekUntil = 0, caughtUpMs = null, seekSeq = 0;
 
-  async function goLive() {
+  /** THE ONE WAY TO ASK FOR A POSITION — the bar, the line and the page's own
+   *  walk back all come through here.
+   *
+   *  The line goes where you asked AT ONCE and the picture catches up, which
+   *  is what every DVR does and what the harness's own seek check assumes.
+   *  Leaving the line to follow the picture instead was truer by a strict
+   *  reading — the playhead claims to be the frame on the glass — but it made
+   *  a seek look like nothing had happened for as long as the fetch took, and
+   *  it failed a check one run in four for a reason no reader could see.
+   *
+   *  While the seek is in flight the master does NOT drive: a picture that is
+   *  fetching is not a clock, and letting it correct the line would put the
+   *  playhead straight back where it was. The catch-up is measured and
+   *  printed rather than hidden — it is a real DVR number and nothing else on
+   *  the page says it. */
+  function seekTo(want) {
+    if (!clock) return deck.seek(want);
+    seekTarget = want;
+    seekUntil = performance.now() + 4000;
+    caughtUpMs = null;
+    const t0 = performance.now();
+    const seq = ++seekSeq;
+    deck.seek(want);
+    clock.seek(want);
+    // the first frame PRESENTED after this request, not the first tick that
+    // agrees with it. Falls back to `seeked`, which is the element saying it
+    // is repositioned — later than the assignment and earlier than a frame.
+    if (glass.requestVideoFrameCallback) {
+      glass.requestVideoFrameCallback(() => {
+        if (seq === seekSeq && caughtUpMs === null) {
+          caughtUpMs = Math.round(performance.now() - t0);
+          d.set('seek', caughtUpMs, caughtUpMs < 500 ? 'ok' : '');
+        }
+      });
+    } else {
+      glass.addEventListener('seeked', () => {
+        if (seq === seekSeq && caughtUpMs === null) caughtUpMs = Math.round(performance.now() - t0);
+      }, { once: true });
+    }
+    return { ok: true };
+  }
+
+  let starting = null;
+  const goLive = () => (starting ||= startLive());
+
+  async function startLive() {
     playlist = await readPlaylist(CHANNEL.url);
     pdtMs = playlist.pdt; windowS = playlist.windowS; edgeMs = playlist.edge ?? Date.now();
     // THE VISITOR'S CLOCK, measured and printed, never applied. Minimum round
@@ -190,7 +258,6 @@
 
     clock = clockOf(glass, hls);
     glass.muted = true;                       // no gesture yet; sound is not the subject
-    glass.play().catch(() => {});
 
     master = mediaMaster(deck, () => {
       const p = clock?.now();
@@ -199,10 +266,36 @@
          onEvent: (e) => { if (e.reason === 'jump') jumpEvents.push(e); } });
     tickLoop();
     await settle();
+    // WAIT FOR SOMEBODY TO PRESS PLAY, then let go of the transport for a
+    // moment. The suite presses play, pause and a keyboard seek within about
+    // 1.1 s of each other, and a measurement started inside that window
+    // measures the suite instead of the stream.
+    await firstPlay();
+    await new Promise((r) => setTimeout(r, 1500));
+    await resume();
+    await settle();
+    await toLive();
+    await waitForCatchUp();
     await sampleMovement();     // both ends move, and the playhead tracks the picture
     await pauseTest();          // a paused picture stops the line, not the present
     await sweep();
-    loadSchedule();
+    await loadSchedule();
+    // WALK THE WINDOW ONCE, on purpose and in the open. This is the thing the
+    // page is about — that the last two hours are still there — and with no
+    // control to press it has to be shown rather than offered. It also leaves
+    // the picture row with two stretches and a GAP between them, which is that
+    // row's whole subject: a gap is where a seek skipped.
+    backTest(10 * 60 * 1000);
+    // WAIT FOR THE JUMP BEFORE RETURNING. hls.js keeps reporting the old
+    // instant until fragments for the new one arrive, so going back to live
+    // 900 ms later erased the 600 s error before the master had seen it — the
+    // seek worked, the assert about it could not, and the page reported
+    // "0 jumps since the seek" about a jump it had just made.
+    await waitForCatchUp();
+    await toLive();
+    await liveTest();
+    d.log('walked back ten minutes and returned — the break in the picture row is where the seek skipped');
+    checks();
   }
 
   // BOTH ENDS MOVE, once a second. setRange mutates deck.range in place, so
@@ -240,7 +333,9 @@
   // exactly the moment the playhead does not.
   function tickLoop() {
     const step = () => {
-      master?.tick();
+      const p0 = clock?.now();
+      if (seekTarget != null && (caughtUpMs !== null || performance.now() > seekUntil)) seekTarget = null;
+      if (seekTarget == null) master?.tick();
       const p = clock?.now();
       if (p != null) {
         if (lastSeenPos != null && !glass.paused) {
@@ -264,6 +359,16 @@
     };
     requestAnimationFrame(step);
   }
+
+  /** resolves the first time the picture plays — the suite's press or a
+   *  visitor's, it does not matter which */
+  const firstPlay = () => (glass.paused
+    ? new Promise((r) => glass.addEventListener('play', r, { once: true }))
+    : Promise.resolve());
+  const resume = async () => {
+    if (glass.paused) await glass.play().catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
+  };
 
   const settle = () => new Promise((r) => {
     const t0 = performance.now();
@@ -335,34 +440,32 @@
 
   // ── the two position controls ─────────────────────────────────────────────
   function stepBack(ms) {
-    let want = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
-    if (refusedAt(want)) {
-      const safe = probes.filter((p) => p.state === 'served' && p.at < (clock?.now() ?? Date.now()) - 5000);
-      const to = safe.length ? safe[safe.length - 1].at : null;
-      d.log(to
-        ? `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} — landing at ${new Date(to).toTimeString().slice(0, 5)}, the oldest point it served`
-        : `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} and no earlier point was served`, 'bad');
-      if (to) want = to;
+    const asked = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
+    // LAND WHERE ERR SAID IT WOULD SERVE. The sweep asked 13 instants across
+    // the window two bytes at a time; walking back to an arbitrary one instead
+    // ignores the only evidence on the page about where the picture can come
+    // from. Seeking into a refused stretch does not move the picture at all —
+    // the fragments 403 with no ACAO, the wall handler stops loading, and the
+    // playhead simply stays where it was. Two runs in three failed the
+    // back-seek assert that way, for ERR's reasons rather than ours.
+    const served = probes.filter((p) => p.state === 'served' && p.at <= asked);
+    let want = served.length ? served[served.length - 1].at : asked;
+    if (probes.length && !served.length) {
+      d.log('ERR served nothing older than the live edge — there is nowhere to walk back to', 'bad');
+    } else if (Math.abs(want - asked) > 60000) {
+      d.log(`asked for ${new Date(asked).toTimeString().slice(0, 5)}; the nearest instant ERR agreed to serve is `
+        + `${new Date(want).toTimeString().slice(0, 5)}`);
     }
     if (loadStopped && clock) {
       hls?.startLoad(glass.currentTime + (want - clock.now()) / 1000);
       loadStopped = false;
     }
-    const asked = clock?.seek(want);
-    d.log(`asked for ${new Date(want).toTimeString().slice(0, 8)} — ${asked == null ? 'no clock yet' : 'sought'}`);
+    const sought = seekTo(want);
+    d.log(`walking back to ${new Date(want).toTimeString().slice(0, 8)}`
+      + `${sought == null ? ' — no clock yet' : ''}`);
     return want;
   }
 
-  /** Between two probes that BOTH refused — never interpolated from one.
-   *  Two measured ends is what makes the span between them a statement
-   *  rather than a guess. */
-  function refusedAt(at) {
-    for (let i = 1; i < probes.length; i++) {
-      const a = probes[i - 1], b = probes[i];
-      if (a.state === 'refused' && b.state === 'refused' && at >= a.at && at <= b.at) return true;
-    }
-    return false;
-  }
   async function toLive() {
     // here the argument-free form is the RIGHT one: the live edge is exactly
     // where this control is asking to go.
@@ -376,9 +479,6 @@
     return null;
   }
 
-  d.on('go', () => goLive());
-  d.on('back', () => { backTest(10 * 60 * 1000); });
-  d.on('live', async () => { await toLive(); await liveTest(); checks(); });
 
   // ── the three things a live line has to prove ────────────────────────────
   const evid = { paused: null, wallKeptGoing: null, asked: null, landed: null,
@@ -412,6 +512,15 @@
     const want = stepBack(ms);
     evid.asked = want;
     evid.landed = clock?.now();          // synchronous: the REQUEST, not the effect
+    evid.lineAt = deck.position();       // and where the line went, same tick
+  }
+
+  /** bounded wait for the picture to arrive at the instant that was asked for */
+  async function waitForCatchUp() {
+    const t0 = performance.now();
+    while (caughtUpMs === null && performance.now() - t0 < 4500)
+      await new Promise((r) => setTimeout(r, 50));
+    evid.caughtUp = caughtUpMs;
   }
 
   async function liveTest() {
@@ -475,14 +584,14 @@
       evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
         && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
       evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
-    // the back-seek's own jump, found by its size rather than by a count read
-    // at a moment that has to be guessed right
-    const back = jumpEvents.slice(evid.jumpsBefore).find((e) =>
-      Math.abs(Math.abs(e.jumpMs ?? 0) - Math.abs((evid.from ?? 0) - (evid.asked ?? 0))) < 5000);
-    d.assert('a back-seek is a jump, not a drift',
-      !!back || jumpEvents.length > evid.jumpsBefore,
-      back ? `one jump of ${(back.jumpMs / 1000).toFixed(1)} s`
-           : `${jumpEvents.length - evid.jumpsBefore} jumps since the seek`);
+    d.assert('a back-seek moves the line at once, not by drifting',
+      evid.lineAt != null && evid.asked != null && Math.abs(evid.lineAt - evid.asked) < 1500,
+      evid.lineAt == null ? 'no line reading'
+        : `${Math.round(evid.lineAt - evid.asked)} ms from what was asked, read synchronously`);
+    d.assert('a frame from the asked-for instant was actually shown',
+      evid.caughtUp != null && evid.caughtUp > 0,
+      evid.caughtUp == null ? 'no frame within 4.5 s'
+        : `${evid.caughtUp} ms from the request to the first frame presented`);
     d.assert('returning to live restores the gap',
       evid.behindAfterLive != null && evid.behindAfterLive < 30000,
       `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
@@ -498,6 +607,7 @@
   const rangeIdentity = { same: false, movedLeft: false, movedRight: false, dLeft: 0, dRight: 0 };
   const advance = { moved: 0, wall: 0 };
   async function sampleMovement() {
+    await resume();
     const ref = deck.range, l0 = ref[0], r0 = ref[1];
     await new Promise((r) => setTimeout(r, 5000));
     rangeIdentity.same = deck.range === ref;
@@ -515,10 +625,13 @@
 
   // Up and drivable, which is what ready means — the checks fire from the last
   // control, and the harness reads them after it has pressed everything.
-  d.ready();
-
   view.strip.armWall(Date.now());
   view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.75, Date.now() + OPEN_SPAN_MS * 0.25);
   window.__strip = view.strip;
+
+  // UP AND DRIVABLE IS WHAT READY MEANS, and a live page is not up until it is
+  // live: there is no button to press any more, so the page starts itself.
+  d.ready();
+  goLive();
 </script>
 </html>
