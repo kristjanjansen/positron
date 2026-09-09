@@ -158,8 +158,11 @@
       // is for, and `live` is next to them for getting back.
       // press play before the source has attached and you wait for the start
       // that is already running, then play — never a second start.
-      play: () => (clock ? glass.play().catch(() => {})
-                         : goLive().then(() => glass.play().catch(() => {}))),
+      play: () => {
+        if (clock) return glass.play().catch(() => {});
+        deck.play();
+        return goLive().then(() => glass.play().catch(() => {}));
+      },
       pause: () => (clock ? glass.pause() : deck.pause()),
       seek: (pos) => seekTo(pos),
     },
@@ -389,14 +392,12 @@
     const n = Math.min(PROBE_POINTS, pl.segs.length);
     const picked = [];
     for (let k = 0; k < n; k++) picked.push(Math.round((k * (pl.segs.length - 1)) / (n - 1)));
-    probes = [];
-    for (const i of picked) {
-      if (probesIssued >= PROBE_CAP) break;
-      probesIssued++;
+    const asking = picked.filter(() => probesIssued++ < PROBE_CAP).map((i) => {
       const seg = pl.segs[i];
-      probes.push({ at: seg.at ?? edgeMs, state: await probeSegment(seg), i,
-                    fromPlaylist: pl.segs.includes(seg), sn: seg.sn });
-    }
+      return probeSegment(seg).then((state) => ({ at: seg.at ?? edgeMs, state, i,
+        fromPlaylist: pl.segs.includes(seg), sn: seg.sn }));
+    });
+    probes = (await Promise.all(asking)).sort((a, b) => a.at - b.at);
     sweepAt = Date.now();
     const refused = probes.filter((p) => p.state === 'refused');
     d.log(refused.length
@@ -411,11 +412,14 @@
     // ERR's broadcast day starts at 05:45 local, so a two-hour window that
     // reaches back past midnight needs yesterday's schedule too.
     const days = [new Date(edgeMs - windowS * 1000), new Date(edgeMs)];
-    const seen = new Set(), out = [];
-    for (const day of days) {
+    const seen = new Set();
+    const wanted = days.filter((day) => {
       const key = day.toDateString();
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    const out = (await Promise.all(wanted.map(async (day) => {
+      const rows = [];
       try {
         const u = `https://www.err.ee/api/tvSchedule/getTimelineSchedule`
           + `?day=${day.getDate()}&month=${day.getMonth() + 1}&year=${day.getFullYear()}&channel=${CHANNEL.id}`;
@@ -426,10 +430,11 @@
         for (const r of Object.values(j || {})) {
           const at = Number(r?.startTime) * 1000;
           if (!Number.isFinite(at) || !at) continue;
-          out.push({ at, name: r.programNameTx || r.name || r.programName || '—' });
+          rows.push({ at, name: r.programNameTx || r.name || r.programName || '—' });
         }
       } catch { /* the schedule is decoration; the line stands without it */ }
-    }
+      return rows;
+    }))).flat();
     out.sort((a, b) => a.at - b.at);
     // CONTIGUOUS BY CONSTRUCTION: a programme runs until the next one starts.
     for (let i = 0; i < out.length; i++) out[i].end = out[i + 1] ? out[i + 1].at : out[i].at + 3600e3;
