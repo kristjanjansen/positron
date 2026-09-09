@@ -35,12 +35,12 @@
     what: 'One ERR television channel on a line whose right-hand end is the present '
       + 'moment. The white line is the frame on the glass and the orange one is now; '
       + 'the distance between them, about seven seconds, is what a live picture costs '
-      + 'to reach you, and it is drawn rather than hidden. ERR keeps roughly the last '
-      + 'two hours: press anywhere on the line to watch from that moment instead, and '
-      + 'live returns to the edge. The middle row is what ERR agreed to hand over when '
-      + 'this page asked, two bytes at a time, and the page walks back into it once on '
-      + 'its own — the break in the top row is where that seek skipped.',
-    readout: { state: '', behind: 's', edge: 's', seek: 'ms' },
+      + 'to reach you: behind is that distance, and newest is how old the freshest '
+      + 'moment ERR offers is. ERR keeps roughly the last two hours, so press anywhere '
+      + 'on the line to watch from that moment instead — first frame is how long that '
+      + 'took to arrive — and LIVE returns to the edge. The middle row is what ERR '
+      + 'agreed to hand over when this page asked, two bytes at a time.',
+    readout: { state: '', behind: 's', newest: 's', 'first frame': 'ms' },
   });
   guard(d);
 
@@ -62,6 +62,15 @@
   let programmes = [];           // {at, end, name} from ERR's schedule
   let probesIssued = 0, sweepAt = null;
   const jumpEvents = [];
+
+  /** mm:ss, or hh:mm:ss once there is an hour of it — the shape a video
+   *  position is read in, rather than a decimal count of minutes. */
+  const hms = (ms) => {
+    const t = Math.max(0, Math.round(ms / 1000));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    const mm = String(h ? m : m).padStart(2, '0'), ss = String(sec).padStart(2, '0');
+    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  };
 
   const behindMs = () => {
     const p = clock?.now();
@@ -85,33 +94,37 @@
   });
   const lanes = [
     {
-      ...laneBase('seen', 'picture', 40),
+      ...laneBase('seen', 'you watched', 40),
       // GREEN = shown. SLATE = shown, and this lane cannot say how well (no
       // frame-quality API here). Grey is the absence of a span, not a colour.
       colorOf: () => (glass.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
+      labelOf: () => '',
       rows: () => watched.map((w, i) => ({ at: w.from, id: `w${i}`, kind: 'part',
         payload: { durMs: Math.max(1, w.to - w.from), title: 'watched' } })),
-      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s watched`,
-        'a stretch you actually saw', 'gaps are where a seek skipped'],
+      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s`,
+        'you watched this stretch', 'a gap is where a seek skipped'],
     },
     {
-      ...laneBase('served', 'served', 40),
+      ...laneBase('served', 'asked ERR', 40),
       // FOUR STATES, and every one is reachable: green served, red refused,
       // slate asked-and-cannot-say, and grey (no mark) never asked.
       colorOf: (sp) => ({ served: '#3fb950', refused: '#f85149', unknown: '#6a7280' }[sp.row?.payload?.state] || '#6a7280'),
+      labelOf: () => '',
       rows: () => probes.map((p, i) => ({ at: p.at, id: `p${i}`, kind: 'part',
         payload: { durMs: 1920, state: p.state } })),
-      describeRow: (r) => [({ served: 'ERR served this one', refused: 'ERR refused this one',
-        unknown: 'asked, and cannot say' })[r.payload.state], 'two bytes, Range request', ''],
+      describeRow: (r) => [({ served: 'ERR served this', refused: 'ERR refused this',
+        unknown: 'asked, cannot say' })[r.payload.state],
+        new Date(r.at).toTimeString().slice(0, 5), 'asked for two bytes'],
     },
     {
       ...laneBase('epg', CHANNEL.name, 34),
       colorOf: () => 'hsl(50 62% 45%)',
       labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
       rows: () => programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
-        payload: { durMs: p.end - p.at, title: p.name } })),
+        payload: { durMs: p.end - p.at, title: p.name, repeat: p.repeat } })),
       describeRow: (r) => [r.payload.title?.slice(0, 46) ?? '',
-        new Date(r.at).toTimeString().slice(0, 5), "from ERR's schedule"],
+        new Date(r.at).toTimeString().slice(0, 5) + (r.payload.repeat ? ' · repeat' : ''),
+        "from ERR's schedule"],
     },
   ];
 
@@ -129,7 +142,8 @@
     if (served) {
       const no = probes.filter((p) => p.state === 'refused').length;
       served.subLabel = probes.length
-        ? [`${probes.length} asked`, no ? `${no} refused` : 'none refused']
+        ? [`${probes.length} asked`, `over ${(windowS / 3600).toFixed(0)} h`,
+           no ? `${no} refused` : 'none refused']
         : 'not asked';
     }
     if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : 'no schedule';
@@ -144,11 +158,11 @@
   const bar = createTransportBar(d.el, deck, {
     absolute: true, scrub: false, endStop: false,
     fmt: (pos, range) => `${new Date(pos).toTimeString().slice(0, 8)}`
-      + `  ·  ${((range[1] - pos) / 60000).toFixed(1)} min behind the edge`,
+      + `\u00a0\u00a0\u00a0\u00a0${hms(range[1] - pos)} behind the edge`,
     extras: [
       // The one verb that cannot be said as a position: the live edge is
       // wherever the engine has fragments for, which moves while you decide.
-      { id: 'live', label: 'live', aria: 'Return to the live edge',
+      { id: 'live', label: 'live', word: true, aria: 'Return to the live edge',
         title: 'back to the live edge', onClick: () => toLive() },
     ],
     command: {
@@ -159,8 +173,8 @@
       // press play before the source has attached and you wait for the start
       // that is already running, then play — never a second start.
       play: () => {
-        if (clock) return glass.play().catch(() => {});
         deck.play();
+        if (clock) return glass.play().catch(() => {});
         return goLive().then(() => glass.play().catch(() => {}));
       },
       pause: () => (clock ? glass.pause() : deck.pause()),
@@ -219,12 +233,18 @@
     // agrees with it. Falls back to `seeked`, which is the element saying it
     // is repositioned — later than the assignment and earlier than a frame.
     if (glass.requestVideoFrameCallback) {
-      glass.requestVideoFrameCallback(() => {
-        if (seq === seekSeq && caughtUpMs === null) {
-          caughtUpMs = Math.round(performance.now() - t0);
-          d.set('seek', caughtUpMs, caughtUpMs < 500 ? 'ok' : '');
+      const wantMedia = glass.currentTime;        // where the seek just put it
+      const onFrame = (_now, meta) => {
+        if (seq !== seekSeq || caughtUpMs !== null) return;
+        // a frame from before the seek still carries the old timestamp
+        if (Math.abs((meta?.mediaTime ?? wantMedia) - wantMedia) > 1) {
+          if (performance.now() - t0 < 4000) glass.requestVideoFrameCallback(onFrame);
+          return;
         }
-      });
+        caughtUpMs = Math.round(performance.now() - t0);
+        d.set('first frame', caughtUpMs, caughtUpMs < 500 ? 'ok' : '');
+      };
+      glass.requestVideoFrameCallback(onFrame);
     } else {
       glass.addEventListener('seeked', () => {
         if (seq === seekSeq && caughtUpMs === null) caughtUpMs = Math.round(performance.now() - t0);
@@ -297,7 +317,8 @@
     await waitForCatchUp();
     await toLive();
     await liveTest();
-    d.log('walked back ten minutes and returned — the break in the picture row is where the seek skipped');
+    d.log('walked back into the window and returned — the break in the top row is where that seek skipped');
+    view.strip.fit(deck.position() - OPEN_SPAN_MS * 0.10, deck.position() + OPEN_SPAN_MS * 0.90);
     checks();
   }
 
@@ -326,7 +347,7 @@
       setRange();
       if (outside)
         d.log(`the window ate your position — moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
-      d.set('edge', ((Date.now() - edgeMs) / 1000).toFixed(1));
+      d.set('newest', ((Date.now() - edgeMs) / 1000).toFixed(1));
     } catch { /* one missed refresh is not an event */ }
   }, 1000 / RANGE_HZ);
 
@@ -430,7 +451,8 @@
         for (const r of Object.values(j || {})) {
           const at = Number(r?.startTime) * 1000;
           if (!Number.isFinite(at) || !at) continue;
-          rows.push({ at, name: r.programNameTx || r.name || r.programName || '—' });
+          const clean = (r.programName || r.programNameTx || r.name || '—').replace(/\*\s*$/, '').trim();
+          rows.push({ at, name: clean || '—', repeat: r.automaticReplay === 'Y' });
         }
       } catch { /* the schedule is decoration; the line stands without it */ }
       return rows;
@@ -475,6 +497,7 @@
     // here the argument-free form is the RIGHT one: the live edge is exactly
     // where this control is asking to go.
     if (loadStopped) { hls?.startLoad(); loadStopped = false; }
+    if (glass.paused) await glass.play().catch(() => {});
     for (let i = 0; i < 20; i++) {
       const l = clock?.live();
       if (l != null) { clock.seek(l); return l; }
@@ -594,9 +617,9 @@
       evid.lineAt == null ? 'no line reading'
         : `${Math.round(evid.lineAt - evid.asked)} ms from what was asked, read synchronously`);
     d.assert('a frame from the asked-for instant was actually shown',
-      evid.caughtUp != null && evid.caughtUp > 0,
-      evid.caughtUp == null ? 'no frame within 4.5 s'
-        : `${evid.caughtUp} ms from the request to the first frame presented`);
+      evid.caughtUp != null && evid.caughtUp < 4000,
+      evid.caughtUp == null ? 'no frame from there within 4.5 s'
+        : `${evid.caughtUp} ms from the request to a frame carrying that timestamp`);
     d.assert('returning to live restores the gap',
       evid.behindAfterLive != null && evid.behindAfterLive < 30000,
       `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
@@ -631,7 +654,7 @@
   // Up and drivable, which is what ready means — the checks fire from the last
   // control, and the harness reads them after it has pressed everything.
   view.strip.armWall(Date.now());
-  view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.75, Date.now() + OPEN_SPAN_MS * 0.25);
+  view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.10, Date.now() + OPEN_SPAN_MS * 0.90);
   window.__strip = view.strip;
 
   // UP AND DRIVABLE IS WHAT READY MEANS, and a live page is not up until it is
