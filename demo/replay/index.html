@@ -23,7 +23,8 @@
 
   const d = mount({
     name: 'replay',
-    what: 'A recorded show off R2 with the eight cues it was recorded with. desync is deck vs picture.',
+    what: 'A recorded show off R2 with the eight cues it was recorded with. '
+      + 'desync is how far apart the timeline and the picture are.',
     readout: { fired: '', lateBy: 'ms', desync: 'ms', media: 's' },
     controls: [
       { id: 'load', label: 'Load + play', primary: true },

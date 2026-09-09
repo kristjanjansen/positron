@@ -47,13 +47,12 @@
 
   const d = mount({
     name: 'shout',
-    what: 'An Icecast stream relayed through a worker of ours, which adds the permission '
-      + 'header the station omits — that is the whole product, and the audio is '
-      + 'untouched. Without it a browser can play the stream and nothing else: no '
-      + 'reading it, no measuring it. TTFB is the wait for the first byte, KBPS the '
-      + 'settled rate, BURST the seconds of audio that arrive faster than realtime to '
-      + 'fill your buffer, GAP the worst pause between chunks. LOUDNESS is the sound '
-      + 'itself — every other number would look the same for a stream of silence.',
+    what: 'An Icecast stream relayed through a worker of ours, which adds the '
+      + 'permission header the station omits; the audio is untouched, and '
+      + 'without it a browser can play the stream but not measure it. TTFB is '
+      + 'the wait for the first byte, KBPS the settled rate, BURST the seconds '
+      + 'that arrive faster than realtime, GAP the worst pause, and LOUDNESS '
+      + 'the sound itself.',
     // No `station` cell: it is a NAME, it never changes, and a constant in a
     // row of measurements teaches the reader to skim the row. It is in the log
     // line and in the station's own `icy-name`.
