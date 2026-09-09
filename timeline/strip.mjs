@@ -1253,7 +1253,11 @@ export function createStrip(canvas, deck, opts = {}) {
         ctx.fillRect(Math.min(px, wx), 0, gap, S.axisH);
         // the label sits BELOW the axis, on its own backing, so it never fights
         // the tick labels it is measuring against
-        if (gap > 34) {
+        // `wallLabel: false` for a client that already prints the gap somewhere
+        // a reader is looking — `now` carries it in the live row's margin, and
+        // the same number twice, one of them floating over the axis, is one
+        // more thing to reconcile rather than one more thing known.
+        if (gap > 34 && opts.wallLabel !== false) {
           ctx.font = '9px ui-monospace, Menlo, monospace';
           const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s`;
           const w = ctx.measureText(lbl).width + 6;

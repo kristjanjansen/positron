@@ -209,6 +209,7 @@
   const view = createStripView(d.el, deck, {
     size: 'auto', absolute: true, follow: true, lanes,
     wallDash: [1, 3],          // dotted: the present, against the solid playhead
+    wallLabel: false,          // the gap is already a line in the live row's margin
   });
 
   // PRESS THE LINE TO GO THERE. The strip seeks the DECK on press, and the
@@ -541,7 +542,19 @@
     if (glass.paused) await glass.play().catch(() => {});
     for (let i = 0; i < 20; i++) {
       const l = clock?.live();
-      if (l != null) { clock.seek(l); return l; }
+      if (l != null) {
+        // THROUGH THE ONE SEEK PATH, so the line moves at once here too, and
+        // then BRING THE VIEW BACK. Returning the picture to the live edge
+        // while the view is still parked ten minutes ago puts the playhead off
+        // the left of the screen: the control did exactly what it said and the
+        // page looked like it had stopped. Scrolling or dragging disengages
+        // the strip's follow, which is the behaviour that stops it fighting
+        // you; this control is the thing that re-engages it.
+        seekTo(l);
+        openView(l);
+        view.strip.setFollow(true);
+        return l;
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
     d.log('the engine offered no live position within two seconds', 'bad');
