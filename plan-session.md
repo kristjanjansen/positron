@@ -203,10 +203,19 @@ to within a frame or two. At 3.3 s it is false by 80-odd frames, and whether the
 last 3.3 s is in the file at all depends on where hls.js's buffer sits — a
 quantity this page would have to measure before it could say anything.
 
-**3. Cost is a wash, and must not be argued as a WHEP advantage.** Both legs are
-Cloudflare Stream live inputs, both are `recording.mode: automatic` because
-`mode: off` also disables HLS playback and `preferLowLatency` requires
-`automatic`. Recording cannot be turned off on either. See §5.
+**3. Cost is NOT a wash — corrected 2026-09-09, and it favours WHEP.** This
+line used to read "cost is a wash, and must not be argued as a WHEP advantage",
+on the grounds that both legs are `recording.mode: automatic`. That is the
+unqualified recording rule CLAUDE.md now warns about by name, and this
+paragraph is the plan it misled: **the rule holds on the RTMPS path only.**
+WHIP ingest records nothing — direct-tested here, 183 s against a
+recording-ENABLED input, 26 polls, zero assets — and 📄 Cloudflare's pricing
+page agrees in as many words: *"WebRTC broadcasts cannot currently be recorded,
+thus no storage is consumed."*
+
+So the two legs differ on the dimension that actually bites, and the difference
+is not the dollar amount. See §5 for the arithmetic and for what changes on
+**15 October 2026**, when WebRTC delivery starts billing.
 
 **Where LL-HLS genuinely wins, said plainly:** its segments are already the
 durable artefact. Cloudflare has stored them; a "keep the show" demo on that
@@ -427,7 +436,67 @@ RTMPS leg it costs +16 % CPU for nothing — **WHIP leg only**.
 **R2.** Bounded and trivial: ≤ 24 MiB per session, ≤ 5 sessions/hour/address,
 gone in 6 hours. Egress is free.
 
-**WHEP delivery billing is unknown from this repo** and is not being guessed at.
+### WHEP delivery billing — answered 2026-09-09, no longer a guess
+
+This line used to read *"unknown from this repo and not being guessed at"*. It
+is now known, from the GA notice mailed on 2026-09-08 and from 📄
+`developers.cloudflare.com/stream/pricing`:
+
+**WebRTC delivery starts billing 15 October 2026 at $1 per 1,000 minutes
+delivered — the same rate as HLS, "regardless of protocol".** This account
+delivered an estimated **246 WebRTC minutes in the preceding 30 days**, so the
+headline change is worth **about $0.25 a month**. That number is not the
+consideration. These are:
+
+**a. Same price, so WHEP's latency is now free rather than discounted.** Before
+the change one could argue WHEP was cheap *because* it was in beta. It is not
+cheaper any more; it is the same price. Measured here, same method, burned
+pixels: WHEP **p50 67.0 ms** against LL-HLS **~3.3 s**. At an identical rate per
+delivered minute, two orders of magnitude of latency now cost nothing extra.
+
+**b. The two protocols METER differently, and LL-HLS meters worse for short
+views.** 📄 "Delivery is counted by HTTP requests for video segments", so
+"client-side preloading and buffering **is** counted as billable delivery", and
+minutes are "rounded to the *segment* length", which for a live broadcast is
+"determined by the keyframe interval or GOP size" — **2.0 s on Cloudflare**, a
+number this repo already measured for a different reason. hls.js's bundled
+`liveSyncDurationCount` is **3** (read out of `proto/remixer/hls.min.js`, not
+assumed), so a player fetches roughly three segments before it shows a frame.
+⚠️ Arithmetic, not a bill: **a visitor who opens a demo page and closes it two
+seconds later is billed for ~6 s of delivery on LL-HLS and for ~2 s on WHEP.**
+For pages that are opened briefly — every demo on this site, and the verify
+suite three times a session — the prefetch is the dominant term, not the
+watching.
+
+**c. An idle broadcast is free on WHIP and not free on RTMPS.** 📄 *"A live
+broadcast with no viewers will cost $0 for minutes delivered, but the recording
+of the broadcast will count toward minutes of video stored."* Recording cannot
+be turned off on the RTMPS path — `mode: off` also disables HLS playback and
+`preferLowLatency` requires `automatic` — so **the publisher costs money while
+nobody is watching, and only on that path.** This is the reverse of how the GA
+notice reads.
+
+**d. And the cap is an availability problem, not a bill.** Storage is prepaid
+capacity, $5 per 1,000 minutes per month, and 📄 *"if you run out of storage,
+you will not be able to upload new videos or start new live streams"*. At the
+~225 storage-minutes/day this rig accrues under testing, a 1,000-minute cap
+fills in **4.4 days** — and what breaks then is broadcasting, not billing.
+WHIP accrues zero. **That, and not the $0.25, is the reason the recommended
+build is the WHIP one.**
+
+**e. Minutes, not bytes — so the audio-only saving is worth nothing here.**
+Stream bills duration "regardless of file size". `tracks` measured audio-only
+at 418 kbps against video-only at 11.8 Mbps, a **28×** reduction in bytes, for
+the same 3.8 s of latency. On this provider that saving is worth **$0.00**: it
+is an argument for the viewer's connection and never for the account's bill.
+
+**f. What is announced but not shipped.** The notice promises "recording and
+HLS interoperability for WebRTC broadcasts... in the coming months", and 📄 the
+WebRTC page still lists both as unsupported today, along with "WHIP and WHEP
+must be used together" and no simulcast. If WHIP gains recording, (c) and (d)
+evaporate and CLAUDE.md's direct-tested "WHIP RECORDS NOTHING" expires. **Re-test
+before relying on it in either direction** — this section exists because an
+unqualified recording rule was believed once already.
 
 ---
 

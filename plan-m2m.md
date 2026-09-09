@@ -412,6 +412,15 @@ Readings:
   a cost feature, not just a UX feature.
 - Stage stream bills separately on Stream 📄 ($1/1000 delivered min): 225 viewers × 120 min = $27
   per big show; storage $5/1000 min recorded.
+- **Two different Cloudflare products, two different meters — do not mix them.** This table is
+  Realtime/SFU, billed by **egress GB**. Stream WHIP/WHEP is billed by **minutes delivered**, and
+  from **15 Oct 2026** WebRTC delivery bills at the same $1/1000 min as HLS (GA notice
+  2026-09-08; 📄 `stream/pricing`). So a stage feed carried on Stream-WebRTC costs the same per
+  viewer-minute as the same feed on LL-HLS, and the choice between them is decided by latency,
+  by recording and by the storage cap — never by the delivery rate. See `plan-session.md` §5.
+  ⚠️ A per-minute meter and a per-GB meter rank options differently: on Stream, a quarter-quality
+  tile costs exactly what a full-quality one costs, so simulcast is a UX and bandwidth feature
+  there and a **cost** feature only on the SFU. The $33-vs-$91 reading above does not carry over.
 - Cross-checks: RealtimeKit ⚠️ (📄 $0.002/min/video participant,
   https://developers.cloudflare.com/realtime/realtimekit/pricing/): $2.40 / $9.60 / $54 per event —
   same order of magnitude, no free tier, but recording exists ($1.20 per 2 h composite).

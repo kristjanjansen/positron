@@ -192,6 +192,22 @@ to recover.
   cannot be archived server-side either; whatever records it must do so itself. Storage is bounded by DELETING recordings; the account
   cap is 1000 storage-minutes and testing adds ~225/day.
   `deleteRecordingAfterDays` minimum is 30 — too coarse to help.
+- **Stream bills MINUTES, not bytes, and from 2026-10-15 WebRTC bills too.**
+  $1 per 1,000 minutes delivered on both protocols — "regardless of protocol"
+  (GA notice 2026-09-08; this account delivered 246 WebRTC minutes in 30 days,
+  ≈$0.25). Three consequences that are not the price. **Buffering is billable**
+  and HLS minutes round up to the segment, which is the GOP — 2.0 s here — so a
+  visitor who leaves after two seconds is billed for the ~3 segments hls.js
+  prefetched (`liveSyncDurationCount: 3`, read from the bundled build) and for
+  ~2 s on WHEP. **An idle broadcast costs nothing on WHIP and storage on
+  RTMPS**, because recording cannot be turned off there. And **the 1000-minute
+  cap blocks new live streams when it fills** — at ~225 min/day that is 4.4
+  days, so the RTMPS path's real cost is an outage, not a bill. Because the
+  meter is duration, `tracks`' 28x byte saving (418 kbps against 11.8 Mbps) is
+  worth exactly $0 on this provider: audio-only is an argument for the viewer's
+  connection, never for the account. Recording and HLS interop for WHIP are
+  announced "in the coming months" and are NOT shipped — re-test before
+  planning either way.
 - **`ingest.positron.studio` is the only tokenless write path.** Server-minted
   session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
   with a cron sweep. `selfrec` stays token-gated; keep the two separate.
