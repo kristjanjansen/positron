@@ -60,7 +60,12 @@ export function createTransportBar(host, deck, {
   // the toggle and are returned by id so a page can relabel or disable one.
   const extraEls = new Map();
   for (const x of extras) {
-    const b = el('button', `tbar-x${x.primary ? ' d-pri' : ''}`, x.label, { type: 'button' });
+    // `word: true` says the label is a WORD, not a glyph — it gets width from
+    // its text instead of the 38px square, and the uppercase treatment the
+    // rest of the furniture uses. A square sized for one glyph either clips a
+    // word or is padded around it, and both read as a mistake.
+    const b = el('button', `tbar-x${x.primary ? ' d-pri' : ''}${x.word ? ' tbar-word' : ''}`,
+      x.label, { type: 'button' });
     // The label is a GLYPH, so it is not a name. `aria` is what a screen reader
     // reads and what a test looks for; without it the control is "●".
     b.setAttribute('aria-label', x.aria ?? x.label);

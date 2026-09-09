@@ -1236,7 +1236,11 @@ export function createStrip(canvas, deck, opts = {}) {
       const wx = x(wp);
       if (wx >= -1 && wx <= w + 1) {
         ctx.strokeStyle = T.wall; ctx.globalAlpha = 0.85; ctx.lineWidth = 1;
-        ctx.setLineDash([4, 3]);
+        // `wallDash` lets a client say what kind of line the second cursor is.
+        // Default unchanged; `now` passes a dotted one because its two cursors
+        // sit a few pixels apart and dashes at that distance read as one line
+        // with gaps in it rather than as two different kinds of line.
+        ctx.setLineDash(opts.wallDash || [4, 3]);
         ctx.beginPath(); ctx.moveTo(Math.round(wx) + 0.5, 0); ctx.lineTo(Math.round(wx) + 0.5, S.contentH); ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -1249,9 +1253,13 @@ export function createStrip(canvas, deck, opts = {}) {
         ctx.fillRect(Math.min(px, wx), 0, gap, S.axisH);
         // the label sits BELOW the axis, on its own backing, so it never fights
         // the tick labels it is measuring against
-        if (gap > 34) {
+        // `wallLabel: false` for a client that already prints the gap somewhere
+        // a reader is looking — `now` carries it in the live row's margin, and
+        // the same number twice, one of them floating over the axis, is one
+        // more thing to reconcile rather than one more thing known.
+        if (gap > 34 && opts.wallLabel !== false) {
           ctx.font = '9px ui-monospace, Menlo, monospace';
-          const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s offset`;
+          const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s`;
           const w = ctx.measureText(lbl).width + 6;
           const lx = Math.min(Math.max(0, Math.min(px, wx) + gap / 2 - w / 2), Math.max(0, S.width - S.gutterPx - w));
           ctx.globalAlpha = 0.92; ctx.fillStyle = 'rgba(8,10,16,.85)';

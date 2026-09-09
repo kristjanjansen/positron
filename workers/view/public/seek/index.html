@@ -28,7 +28,9 @@
 
   const d = mount({
     name: 'seek',
-    what: 'Seek inside the recording. The fold at the new position must be exact — no retroactive burst, no skipped cue.',
+    what: 'Seek inside the recording. At the new position, exactly the cues that '
+      + 'should already have fired have fired — nothing arrives late in a rush, '
+      + 'nothing is skipped.',
     readout: { jumps: '', asked: '', wrong: '', lateBurst: '' },
     controls: [
       { id: 'load', label: 'Load the recording', primary: true },

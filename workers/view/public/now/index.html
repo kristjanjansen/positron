@@ -35,16 +35,18 @@
     what: 'One ERR television channel on a line whose right-hand end is the present '
       + 'moment. The white line is the frame on the glass and the orange one is now; '
       + 'the distance between them, about seven seconds, is what a live picture costs '
-      + 'to reach you, and it is drawn rather than hidden. ERR keeps roughly the last '
-      + 'two hours, so Back ten minutes walks into what has already gone past and Live '
-      + 'returns. The row under the picture is what ERR agreed to hand over when this '
-      + 'page asked, two bytes at a time.',
-    readout: { state: '', behind: 's', edge: 's' },
-    controls: [
-      { id: 'go', label: 'Go live', primary: true },
-      { id: 'back', label: 'Back ten minutes' },
-      { id: 'live', label: 'Live' },
-    ],
+      + 'to reach you, and the row underneath counts it in its own margin. ERR keeps '
+      + 'roughly the last two hours, so press anywhere on the line to watch from that '
+      + 'moment instead, and LIVE returns to the edge. That row also says how many '
+      + 'instants across the window ERR agreed to hand over when the page asked, two '
+      + 'bytes at a time, and how many it refused. The grey row under it is what ERR '
+      + 'says was on.',
+    // NO READOUT. Four cells above the picture repeated what the rows already
+    // say and put the page's headline number — how far behind the picture is —
+    // as far from the line that draws it as the layout allows. The distance is in
+    // the live row's gutter now, beside the marks it is about.
+    readout: { state: '', behind: 's', newest: 's', 'first frame': 'ms' },
+    showReadout: false,
   });
   guard(d);
 
@@ -66,6 +68,15 @@
   let programmes = [];           // {at, end, name} from ERR's schedule
   let probesIssued = 0, sweepAt = null;
   const jumpEvents = [];
+
+  /** mm:ss, or hh:mm:ss once there is an hour of it — the shape a video
+   *  position is read in, rather than a decimal count of minutes. */
+  const hms = (ms) => {
+    const t = Math.max(0, Math.round(ms / 1000));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    const mm = String(h ? m : m).padStart(2, '0'), ss = String(sec).padStart(2, '0');
+    return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  };
 
   const behindMs = () => {
     const p = clock?.now();
@@ -89,33 +100,37 @@
   });
   const lanes = [
     {
-      ...laneBase('seen', 'picture', 40),
-      // GREEN = shown. SLATE = shown, and this lane cannot say how well (no
+      // ONE ROW FOR THE LIVE CHANNEL. It was two — what you watched, and what
+      // ERR agreed to hand over — and they were reported as two questions
+      // because they are two questions. But they are two questions about the
+      // SAME channel at the same instants, and a reader looking at two rows of
+      // small marks under one picture has to work out which is which before
+      // either says anything. The probing still happens and still asserts; its
+      // answer is a number in this row's gutter, where a number that has no
+      // shape of its own belongs.
+      ...laneBase('seen', `${CHANNEL.name} live`, 56),
+      // GREEN = shown. SLATE = shown, and this row cannot say how well (no
       // frame-quality API here). Grey is the absence of a span, not a colour.
       colorOf: () => (glass.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
+      labelOf: () => '',
       rows: () => watched.map((w, i) => ({ at: w.from, id: `w${i}`, kind: 'part',
         payload: { durMs: Math.max(1, w.to - w.from), title: 'watched' } })),
-      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s watched`,
-        'a stretch you actually saw', 'gaps are where a seek skipped'],
+      describeRow: (r) => [`${((r.payload.durMs) / 1000).toFixed(1)} s`,
+        'you watched this stretch', 'a gap is where a seek skipped'],
     },
     {
-      ...laneBase('served', 'served', 40),
-      // FOUR STATES, and every one is reachable: green served, red refused,
-      // slate asked-and-cannot-say, and grey (no mark) never asked.
-      colorOf: (sp) => ({ served: '#3fb950', refused: '#f85149', unknown: '#6a7280' }[sp.row?.payload?.state] || '#6a7280'),
-      rows: () => probes.map((p, i) => ({ at: p.at, id: `p${i}`, kind: 'part',
-        payload: { durMs: 1920, state: p.state } })),
-      describeRow: (r) => [({ served: 'ERR served this one', refused: 'ERR refused this one',
-        unknown: 'asked, and cannot say' })[r.payload.state], 'two bytes, Range request', ''],
-    },
-    {
-      ...laneBase('epg', CHANNEL.name, 34),
-      colorOf: () => 'hsl(50 62% 45%)',
+      // GREY, because it is not a measurement. Every other mark on this page
+      // is something that was watched or something that was asked for and
+      // answered; the schedule is ERR telling us what was on, which nothing
+      // here checked. Colour is spent on what was measured.
+      ...laneBase('epg', `${CHANNEL.name} schedule`, 34),
+      colorOf: () => '#5a6474',
       labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
       rows: () => programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
-        payload: { durMs: p.end - p.at, title: p.name } })),
+        payload: { durMs: p.end - p.at, title: p.name, repeat: p.repeat } })),
       describeRow: (r) => [r.payload.title?.slice(0, 46) ?? '',
-        new Date(r.at).toTimeString().slice(0, 5), "from ERR's schedule"],
+        new Date(r.at).toTimeString().slice(0, 5) + (r.payload.repeat ? ' · repeat' : ''),
+        "from ERR's schedule"],
     },
   ];
 
@@ -123,55 +138,174 @@
   // are. Never instructions: "press Back ten minutes" belongs in the paragraph.
   function gutters() {
     const L = (id) => view.strip.lanes().find((l) => l.id === id);
-    const seen = L('seen'), served = L('served'), epg = L('epg');
+    const seen = L('seen'), epg = L('epg');
     if (seen) {
       const total = watched.reduce((a, w) => a + (w.to - w.from), 0);
-      seen.subLabel = watched.length
-        ? [`${(total / 1000).toFixed(0)} s seen`, `${watched.length} stretch${watched.length > 1 ? 'es' : ''}`]
-        : 'none seen';
-    }
-    if (served) {
+      const b = behindMs();
       const no = probes.filter((p) => p.state === 'refused').length;
-      served.subLabel = probes.length
-        ? [`${probes.length} asked`, no ? `${no} refused` : 'none refused']
-        : 'not asked';
+      seen.subLabel = [
+        b == null ? 'not started' : `${(b / 1000).toFixed(1)} s behind`,
+        watched.length ? `${(total / 1000).toFixed(0)} s seen` : 'none seen yet',
+        // WHETHER ANY WERE REFUSED is the answer; how many were asked is the
+        // method, and the method fits in the log rather than in eleven
+        // characters of margin.
+        probes.length ? (no ? `${no} refused` : 'none refused') : '',
+      ].filter(Boolean);
     }
-    if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : 'no schedule';
+    if (epg) {
+      // "on air" read as "two things are broadcasting at once", which is
+      // nonsense — it is how many programmes OVERLAP the seekable window, and
+      // that is what it now says. The second line is the one that moves: when
+      // the programme under the playhead gives way to the next one.
+      const now = deck.position();
+      const next = programmes.find((p) => p.at > now) || null;
+      epg.subLabel = programmes.length
+        ? [`${programmes.length} over ${(windowS / 3600).toFixed(0)} h`,
+           next ? `next ${new Date(next.at).toTimeString().slice(0, 5)}` : '']
+          .filter(Boolean)
+        : '';
+    }
   }
 
-  const view = createStripView(d.el, deck, {
-    size: 'auto', absolute: true, follow: true, lanes,
-    // the present is the SECOND cursor, drawn like the first and coloured
-    // differently — not a dot, because it is the same kind of thing
-    wallStyle: 'head',
-  });
-
-  // ── the bar ───────────────────────────────────────────────────────────────
-  // endStop:false because this window's right-hand end is the present, which
-  // arrives about seven seconds after play; command:{} because the deck is a
-  // FOLLOWER here — writing a position to it is undone by the master's next
-  // tick, so the bar drives the picture and the deck follows as it always does.
+  // ── the bar, ABOVE the line ───────────────────────────────────────────────
+  // Transport sits above the thing it drives. endStop:false because this
+  // window's right-hand end is the present, which arrives about seven seconds
+  // after play; command:{} because the deck is a FOLLOWER here — writing a
+  // position to it is undone by the master's next tick, so the bar drives the
+  // picture and the deck follows as it always does.
   const bar = createTransportBar(d.el, deck, {
     absolute: true, scrub: false, endStop: false,
     fmt: (pos, range) => `${new Date(pos).toTimeString().slice(0, 8)}`
-      + `  ·  ${((range[1] - pos) / 60000).toFixed(1)} min behind the edge`,
+      + `\u00a0\u00a0\u00a0\u00a0${hms(range[1] - pos)} behind the edge`,
+    extras: [
+      // The one verb that cannot be said as a position: the live edge is
+      // wherever the engine has fragments for, which moves while you decide.
+      { id: 'live', label: 'live', word: true, aria: 'Return to the live edge',
+        title: 'back to the live edge', onClick: () => toLive() },
+    ],
     command: {
-      play: () => (clock ? glass.play().catch(() => {}) : deck.play()),
+      // PLAY MEANS PLAY LIVE. Before the picture exists there is nothing to
+      // resume, so play starts it; after a walk back into the DVR, pause and
+      // play are the picture's and the position is kept — that is what a DVR
+      // is for, and `live` is next to them for getting back.
+      // press play before the source has attached and you wait for the start
+      // that is already running, then play — never a second start.
+      play: () => {
+        deck.play();
+        if (clock) return glass.play().catch(() => {});
+        return goLive().then(() => glass.play().catch(() => {}));
+      },
       pause: () => (clock ? glass.pause() : deck.pause()),
-      seek: (pos) => (clock ? (clock.seek(pos), { ok: true }) : deck.seek(pos)),
+      seek: (pos) => seekTo(pos),
     },
+  });
+
+  // THE PRESENT IS A DASHED LINE WITH A LABELLED GAP, not a second playhead.
+  // `wallStyle: 'head'` draws it solid with a triangle on top — take arms it as
+  // a recording head, where that is right — and here it made two identical
+  // cursors sliding along together with nothing saying which was which. The
+  // default style is the one this page's paragraph describes: dashes, and the
+  // distance between the two drawn as a band and labelled in seconds.
+  const view = createStripView(d.el, deck, {
+    size: 'auto', absolute: true, follow: true, lanes,
+    wallDash: [1, 3],          // dotted: the present, against the solid playhead
+    wallLabel: false,          // the gap is already a line in the live row's margin
+  });
+
+  // PRESS THE LINE TO GO THERE. The strip seeks the DECK on press, and the
+  // deck is a follower — the master would put it straight back within a tick.
+  // So the gesture is mirrored to the picture, which is the thing that has to
+  // move for a seek to have happened.
+  // READ THE POINTER, NOT THE DECK. This used to take `deck.position()` on
+  // pointerup, on the assumption that the strip's own press-to-seek had just
+  // put it there. On a media-mastered deck it has not: the master's next tick
+  // is ~16 ms away, it sees the picture disagreeing with the line by minutes
+  // and puts the line straight back — so by the time pointerup ran, the value
+  // read was the picture's own position and the seek was a no-op. Clicking
+  // into the past did nothing at all, at any distance. This is the trap the
+  // plan flagged for `flipper`, arrived at from the other side.
+  //
+  // The strip converts a pixel to an instant itself (`xToTime`), in the plot's
+  // own coordinates — which is why the gutter has to come off the x first,
+  // exactly as its internal `localX` does.
+  const instantAt = (clientX) => {
+    const r = view.strip.canvas.getBoundingClientRect();
+    const st = view.strip.state;
+    const px = (clientX - r.left) * (st.width / r.width) - st.gutterPx;
+    return px < 0 ? null : view.strip.xToTime(px);
+  };
+  view.strip.canvas.addEventListener('pointerup', (e) => {
+    if (!clock) return;
+    const at = instantAt(e.clientX);
+    if (at == null) return;                       // the gutter is not the line
+    const want = Math.min(deck.range[1], Math.max(deck.range[0], at));
+    seekTo(want);
+    d.log(`watching from ${new Date(want).toTimeString().slice(0, 8)}`);
   });
 
   // ── the picture ───────────────────────────────────────────────────────────
   let stalledFor = 0, lastSeenPos = null, lastSeenAt = 0;
+  let seekTarget = null, seekUntil = 0, caughtUpMs = null, seekSeq = 0;
 
-  async function goLive() {
+  /** THE ONE WAY TO ASK FOR A POSITION — the bar, the line and the page's own
+   *  walk back all come through here.
+   *
+   *  The line goes where you asked AT ONCE and the picture catches up, which
+   *  is what every DVR does and what the harness's own seek check assumes.
+   *  Leaving the line to follow the picture instead was truer by a strict
+   *  reading — the playhead claims to be the frame on the glass — but it made
+   *  a seek look like nothing had happened for as long as the fetch took, and
+   *  it failed a check one run in four for a reason no reader could see.
+   *
+   *  While the seek is in flight the master does NOT drive: a picture that is
+   *  fetching is not a clock, and letting it correct the line would put the
+   *  playhead straight back where it was. The catch-up is measured and
+   *  printed rather than hidden — it is a real DVR number and nothing else on
+   *  the page says it. */
+  function seekTo(want) {
+    if (!clock) return deck.seek(want);
+    seekTarget = want;
+    seekUntil = performance.now() + 4000;
+    caughtUpMs = null;
+    const t0 = performance.now();
+    const seq = ++seekSeq;
+    deck.seek(want);
+    clock.seek(want);
+    // the first frame PRESENTED after this request, not the first tick that
+    // agrees with it. Falls back to `seeked`, which is the element saying it
+    // is repositioned — later than the assignment and earlier than a frame.
+    if (glass.requestVideoFrameCallback) {
+      const wantMedia = glass.currentTime;        // where the seek just put it
+      const onFrame = (_now, meta) => {
+        if (seq !== seekSeq || caughtUpMs !== null) return;
+        // a frame from before the seek still carries the old timestamp
+        if (Math.abs((meta?.mediaTime ?? wantMedia) - wantMedia) > 1) {
+          if (performance.now() - t0 < 4000) glass.requestVideoFrameCallback(onFrame);
+          return;
+        }
+        caughtUpMs = Math.round(performance.now() - t0);
+        d.set('first frame', caughtUpMs, caughtUpMs < 500 ? 'ok' : '');
+      };
+      glass.requestVideoFrameCallback(onFrame);
+    } else {
+      glass.addEventListener('seeked', () => {
+        if (seq === seekSeq && caughtUpMs === null) caughtUpMs = Math.round(performance.now() - t0);
+      }, { once: true });
+    }
+    return { ok: true };
+  }
+
+  let starting = null;
+  const goLive = () => (starting ||= startLive());
+
+  async function startLive() {
     playlist = await readPlaylist(CHANNEL.url);
     pdtMs = playlist.pdt; windowS = playlist.windowS; edgeMs = playlist.edge ?? Date.now();
     // THE VISITOR'S CLOCK, measured and printed, never applied. Minimum round
     // trip kept rather than an average: an average is dragged by every slow
     // fetch, which is the same reason the looper's skew estimator keeps min-RTT.
     setRange();
+    loadSchedule();             // fires as soon as the window is known
 
     if (NATIVE_HLS) {
       glass.src = CHANNEL.url;
@@ -190,7 +324,6 @@
 
     clock = clockOf(glass, hls);
     glass.muted = true;                       // no gesture yet; sound is not the subject
-    glass.play().catch(() => {});
 
     master = mediaMaster(deck, () => {
       const p = clock?.now();
@@ -199,10 +332,36 @@
          onEvent: (e) => { if (e.reason === 'jump') jumpEvents.push(e); } });
     tickLoop();
     await settle();
+    // WAIT FOR SOMEBODY TO PRESS PLAY, then let go of the transport for a
+    // moment. The suite presses play, pause and a keyboard seek within about
+    // 1.1 s of each other, and a measurement started inside that window
+    // measures the suite instead of the stream.
+    await firstPlay();
+    await new Promise((r) => setTimeout(r, 1500));
+    await resume();
+    await settle();
+    await toLive();
+    await waitForCatchUp();
     await sampleMovement();     // both ends move, and the playhead tracks the picture
     await pauseTest();          // a paused picture stops the line, not the present
     await sweep();
-    loadSchedule();
+    // WALK THE WINDOW ONCE, on purpose and in the open. This is the thing the
+    // page is about — that the last two hours are still there — and with no
+    // control to press it has to be shown rather than offered. It also leaves
+    // the picture row with two stretches and a GAP between them, which is that
+    // row's whole subject: a gap is where a seek skipped.
+    backTest(10 * 60 * 1000);
+    // WAIT FOR THE JUMP BEFORE RETURNING. hls.js keeps reporting the old
+    // instant until fragments for the new one arrive, so going back to live
+    // 900 ms later erased the 600 s error before the master had seen it — the
+    // seek worked, the assert about it could not, and the page reported
+    // "0 jumps since the seek" about a jump it had just made.
+    await waitForCatchUp();
+    await toLive();
+    await liveTest();
+    d.log('walked back into the window and returned — the break in the top row is where that seek skipped');
+    openView(deck.position());
+    checks();
   }
 
   // BOTH ENDS MOVE, once a second. setRange mutates deck.range in place, so
@@ -218,11 +377,19 @@
     try {
       const pl = await readPlaylist(CHANNEL.url);
       playlist = pl; edgeMs = pl.edge ?? edgeMs; windowS = pl.windowS || windowS;
-      const before = deck.position();
+      // ASK WHETHER THE POSITION WAS OUTSIDE, do not compare it with itself.
+      // `deck.position()` is derived from the transport vector and the clock,
+      // so while the picture is playing it advances between any two reads —
+      // the old check compared a moving quantity across two statements and
+      // announced that the window had eaten your position roughly once a
+      // second, in red, on a page that was working perfectly.
+      const reach = windowS ? windowS * 1000 : REACH_MS;
+      const pos = deck.position();
+      const outside = pos < edgeMs - reach || pos > edgeMs;
       setRange();
-      if (deck.position() !== before)
-        d.log(`the window ate your position — moved forward to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
-      d.set('edge', ((Date.now() - edgeMs) / 1000).toFixed(1));
+      if (outside)
+        d.log(`the window ate your position — moved to ${new Date(deck.position()).toTimeString().slice(0, 8)}`, 'bad');
+      d.set('newest', ((Date.now() - edgeMs) / 1000).toFixed(1));
     } catch { /* one missed refresh is not an event */ }
   }, 1000 / RANGE_HZ);
 
@@ -232,7 +399,9 @@
   // exactly the moment the playhead does not.
   function tickLoop() {
     const step = () => {
-      master?.tick();
+      const p0 = clock?.now();
+      if (seekTarget != null && (caughtUpMs !== null || performance.now() > seekUntil)) seekTarget = null;
+      if (seekTarget == null) master?.tick();
       const p = clock?.now();
       if (p != null) {
         if (lastSeenPos != null && !glass.paused) {
@@ -257,6 +426,16 @@
     requestAnimationFrame(step);
   }
 
+  /** resolves the first time the picture plays — the suite's press or a
+   *  visitor's, it does not matter which */
+  const firstPlay = () => (glass.paused
+    ? new Promise((r) => glass.addEventListener('play', r, { once: true }))
+    : Promise.resolve());
+  const resume = async () => {
+    if (glass.paused) await glass.play().catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
+  };
+
   const settle = () => new Promise((r) => {
     const t0 = performance.now();
     const check = () => {
@@ -276,14 +455,12 @@
     const n = Math.min(PROBE_POINTS, pl.segs.length);
     const picked = [];
     for (let k = 0; k < n; k++) picked.push(Math.round((k * (pl.segs.length - 1)) / (n - 1)));
-    probes = [];
-    for (const i of picked) {
-      if (probesIssued >= PROBE_CAP) break;
-      probesIssued++;
+    const asking = picked.filter(() => probesIssued++ < PROBE_CAP).map((i) => {
       const seg = pl.segs[i];
-      probes.push({ at: seg.at ?? edgeMs, state: await probeSegment(seg), i,
-                    fromPlaylist: pl.segs.includes(seg), sn: seg.sn });
-    }
+      return probeSegment(seg).then((state) => ({ at: seg.at ?? edgeMs, state, i,
+        fromPlaylist: pl.segs.includes(seg), sn: seg.sn }));
+    });
+    probes = (await Promise.all(asking)).sort((a, b) => a.at - b.at);
     sweepAt = Date.now();
     const refused = probes.filter((p) => p.state === 'refused');
     d.log(refused.length
@@ -298,11 +475,14 @@
     // ERR's broadcast day starts at 05:45 local, so a two-hour window that
     // reaches back past midnight needs yesterday's schedule too.
     const days = [new Date(edgeMs - windowS * 1000), new Date(edgeMs)];
-    const seen = new Set(), out = [];
-    for (const day of days) {
+    const seen = new Set();
+    const wanted = days.filter((day) => {
       const key = day.toDateString();
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    const out = (await Promise.all(wanted.map(async (day) => {
+      const rows = [];
       try {
         const u = `https://www.err.ee/api/tvSchedule/getTimelineSchedule`
           + `?day=${day.getDate()}&month=${day.getMonth() + 1}&year=${day.getFullYear()}&channel=${CHANNEL.id}`;
@@ -313,10 +493,12 @@
         for (const r of Object.values(j || {})) {
           const at = Number(r?.startTime) * 1000;
           if (!Number.isFinite(at) || !at) continue;
-          out.push({ at, name: r.programNameTx || r.name || r.programName || '—' });
+          const clean = (r.programName || r.programNameTx || r.name || '—').replace(/\*\s*$/, '').trim();
+          rows.push({ at, name: clean || '—', repeat: r.automaticReplay === 'Y' });
         }
       } catch { /* the schedule is decoration; the line stands without it */ }
-    }
+      return rows;
+    }))).flat();
     out.sort((a, b) => a.at - b.at);
     // CONTIGUOUS BY CONSTRUCTION: a programme runs until the next one starts.
     for (let i = 0; i < out.length; i++) out[i].end = out[i + 1] ? out[i + 1].at : out[i].at + 3600e3;
@@ -327,50 +509,58 @@
 
   // ── the two position controls ─────────────────────────────────────────────
   function stepBack(ms) {
-    let want = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
-    if (refusedAt(want)) {
-      const safe = probes.filter((p) => p.state === 'served' && p.at < (clock?.now() ?? Date.now()) - 5000);
-      const to = safe.length ? safe[safe.length - 1].at : null;
-      d.log(to
-        ? `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} — landing at ${new Date(to).toTimeString().slice(0, 5)}, the oldest point it served`
-        : `ERR refuses ${new Date(want).toTimeString().slice(0, 5)} and no earlier point was served`, 'bad');
-      if (to) want = to;
+    const asked = Math.max(deck.range[0] + 5000, (clock?.now() ?? Date.now()) - ms);
+    // LAND WHERE ERR SAID IT WOULD SERVE. The sweep asked 13 instants across
+    // the window two bytes at a time; walking back to an arbitrary one instead
+    // ignores the only evidence on the page about where the picture can come
+    // from. Seeking into a refused stretch does not move the picture at all —
+    // the fragments 403 with no ACAO, the wall handler stops loading, and the
+    // playhead simply stays where it was. Two runs in three failed the
+    // back-seek assert that way, for ERR's reasons rather than ours.
+    const served = probes.filter((p) => p.state === 'served' && p.at <= asked);
+    let want = served.length ? served[served.length - 1].at : asked;
+    if (probes.length && !served.length) {
+      d.log('ERR served nothing older than the live edge — there is nowhere to walk back to', 'bad');
+    } else if (Math.abs(want - asked) > 60000) {
+      d.log(`asked for ${new Date(asked).toTimeString().slice(0, 5)}; the nearest instant ERR agreed to serve is `
+        + `${new Date(want).toTimeString().slice(0, 5)}`);
     }
     if (loadStopped && clock) {
       hls?.startLoad(glass.currentTime + (want - clock.now()) / 1000);
       loadStopped = false;
     }
-    const asked = clock?.seek(want);
-    d.log(`asked for ${new Date(want).toTimeString().slice(0, 8)} — ${asked == null ? 'no clock yet' : 'sought'}`);
+    const sought = seekTo(want);
+    d.log(`walking back to ${new Date(want).toTimeString().slice(0, 8)}`
+      + `${sought == null ? ' — no clock yet' : ''}`);
     return want;
   }
 
-  /** Between two probes that BOTH refused — never interpolated from one.
-   *  Two measured ends is what makes the span between them a statement
-   *  rather than a guess. */
-  function refusedAt(at) {
-    for (let i = 1; i < probes.length; i++) {
-      const a = probes[i - 1], b = probes[i];
-      if (a.state === 'refused' && b.state === 'refused' && at >= a.at && at <= b.at) return true;
-    }
-    return false;
-  }
   async function toLive() {
     // here the argument-free form is the RIGHT one: the live edge is exactly
     // where this control is asking to go.
     if (loadStopped) { hls?.startLoad(); loadStopped = false; }
+    if (glass.paused) await glass.play().catch(() => {});
     for (let i = 0; i < 20; i++) {
       const l = clock?.live();
-      if (l != null) { clock.seek(l); return l; }
+      if (l != null) {
+        // THROUGH THE ONE SEEK PATH, so the line moves at once here too, and
+        // then BRING THE VIEW BACK. Returning the picture to the live edge
+        // while the view is still parked ten minutes ago puts the playhead off
+        // the left of the screen: the control did exactly what it said and the
+        // page looked like it had stopped. Scrolling or dragging disengages
+        // the strip's follow, which is the behaviour that stops it fighting
+        // you; this control is the thing that re-engages it.
+        seekTo(l);
+        openView(l);
+        view.strip.setFollow(true);
+        return l;
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
     d.log('the engine offered no live position within two seconds', 'bad');
     return null;
   }
 
-  d.on('go', () => goLive());
-  d.on('back', () => { backTest(10 * 60 * 1000); });
-  d.on('live', async () => { await toLive(); await liveTest(); checks(); });
 
   // ── the three things a live line has to prove ────────────────────────────
   const evid = { paused: null, wallKeptGoing: null, asked: null, landed: null,
@@ -404,9 +594,28 @@
     const want = stepBack(ms);
     evid.asked = want;
     evid.landed = clock?.now();          // synchronous: the REQUEST, not the effect
+    evid.lineAt = deck.position();       // and where the line went, same tick
+  }
+
+  /** bounded wait for the picture to arrive at the instant that was asked for */
+  async function waitForCatchUp() {
+    const t0 = performance.now();
+    while (caughtUpMs === null && performance.now() - t0 < 4500)
+      await new Promise((r) => setTimeout(r, 50));
+    evid.caughtUp = caughtUpMs;
   }
 
   async function liveTest() {
+    // WAIT FOR THE JUMP RATHER THAN RACING IT. The back-seek sets currentTime
+    // synchronously, but `hls.playingDate` keeps reporting the old instant
+    // until fragments for the new one arrive — so the master sees no error and
+    // reports no jump until then. On a warm local server that is a few frames;
+    // on a cold edge it was long enough to fail one run in four. A bounded
+    // wait turns the race into a check: if no jump has arrived in three
+    // seconds, that is worth reading as a failure.
+    const t0 = performance.now();
+    while (jumpEvents.length <= evid.jumpsBefore && performance.now() - t0 < 3000)
+      await new Promise((r) => setTimeout(r, 100));
     await new Promise((r) => setTimeout(r, 1200));
     evid.behindAfterLive = behindMs();
   }
@@ -457,14 +666,14 @@
       evid.asked != null && evid.asked >= deck.range[0] && evid.asked <= deck.range[1]
         && Math.abs((evid.landed ?? 0) - evid.asked) < 1500,
       evid.asked ? `asked ${new Date(evid.asked).toTimeString().slice(0, 8)}, clock read ${new Date(evid.landed).toTimeString().slice(0, 8)}` : 'not asked');
-    // the back-seek's own jump, found by its size rather than by a count read
-    // at a moment that has to be guessed right
-    const back = jumpEvents.slice(evid.jumpsBefore).find((e) =>
-      Math.abs(Math.abs(e.jumpMs ?? 0) - Math.abs((evid.from ?? 0) - (evid.asked ?? 0))) < 5000);
-    d.assert('a back-seek is a jump, not a drift',
-      !!back || jumpEvents.length > evid.jumpsBefore,
-      back ? `one jump of ${(back.jumpMs / 1000).toFixed(1)} s`
-           : `${jumpEvents.length - evid.jumpsBefore} jumps since the seek`);
+    d.assert('a back-seek moves the line at once, not by drifting',
+      evid.lineAt != null && evid.asked != null && Math.abs(evid.lineAt - evid.asked) < 1500,
+      evid.lineAt == null ? 'no line reading'
+        : `${Math.round(evid.lineAt - evid.asked)} ms from what was asked, read synchronously`);
+    d.assert('a frame from the asked-for instant was actually shown',
+      evid.caughtUp != null && evid.caughtUp < 4000,
+      evid.caughtUp == null ? 'no frame from there within 4.5 s'
+        : `${evid.caughtUp} ms from the request to a frame carrying that timestamp`);
     d.assert('returning to live restores the gap',
       evid.behindAfterLive != null && evid.behindAfterLive < 30000,
       `${((evid.behindAfterLive ?? 0) / 1000).toFixed(1)} s behind`);
@@ -480,6 +689,13 @@
   const rangeIdentity = { same: false, movedLeft: false, movedRight: false, dLeft: 0, dRight: 0 };
   const advance = { moved: 0, wall: 0 };
   async function sampleMovement() {
+    await resume();
+    // and never measure across a seek still in flight — the master stands
+    // down while one is, so the playhead legitimately does not advance and
+    // the sample would read "0 ms over 1500 ms" about a page that is fine.
+    const waitFrom = performance.now();
+    while (seekTarget != null && performance.now() - waitFrom < 4500)
+      await new Promise((r) => setTimeout(r, 100));
     const ref = deck.range, l0 = ref[0], r0 = ref[1];
     await new Promise((r) => setTimeout(r, 5000));
     rangeIdentity.same = deck.range === ref;
@@ -497,10 +713,26 @@
 
   // Up and drivable, which is what ready means — the checks fire from the last
   // control, and the harness reads them after it has pressed everything.
-  d.ready();
-
   view.strip.armWall(Date.now());
-  view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.75, Date.now() + OPEN_SPAN_MS * 0.25);
+  // THE PAST FILLS THE VIEW. Opening with the playhead a tenth from the left
+  // put nine tenths of the line in the FUTURE, which is empty by definition —
+  // so a press anywhere but the first inch landed after the live edge, was
+  // clamped to it, and "clicking on the past" did nothing at any distance.
+  // Measured: a press a third of the way across asked for 10:19:42 while the
+  // newest instant on offer was 10:17:12.
+  //
+  // At 70% the playhead keeps room to travel — which is what putting it near
+  // the left was for, and it still crosses the follow threshold at 82% about a
+  // minute and a half later — while eight of the twelve minutes on screen are
+  // material you can actually watch.
+  const openView = (at = Date.now()) =>
+    view.strip.fit(at - OPEN_SPAN_MS * 0.70, at + OPEN_SPAN_MS * 0.30);
+  openView();
   window.__strip = view.strip;
+
+  // UP AND DRIVABLE IS WHAT READY MEANS, and a live page is not up until it is
+  // live: there is no button to press any more, so the page starts itself.
+  d.ready();
+  goLive();
 </script>
 </html>
