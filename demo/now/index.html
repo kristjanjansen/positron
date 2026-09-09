@@ -35,12 +35,18 @@
     what: 'One ERR television channel on a line whose right-hand end is the present '
       + 'moment. The white line is the frame on the glass and the orange one is now; '
       + 'the distance between them, about seven seconds, is what a live picture costs '
-      + 'to reach you: behind is that distance, and newest is how old the freshest '
-      + 'moment ERR offers is. ERR keeps roughly the last two hours, so press anywhere '
-      + 'on the line to watch from that moment instead — first frame is how long that '
-      + 'took to arrive — and LIVE returns to the edge. The middle row is what ERR '
-      + 'agreed to hand over when this page asked, two bytes at a time.',
+      + 'to reach you, and the row underneath counts it in its own margin. ERR keeps '
+      + 'roughly the last two hours, so press anywhere on the line to watch from that '
+      + 'moment instead, and LIVE returns to the edge. That row also says how many '
+      + 'instants across the window ERR agreed to hand over when the page asked, two '
+      + 'bytes at a time, and how many it refused. The grey row under it is what ERR '
+      + 'says was on.',
+    // NO READOUT. Four cells above the picture repeated what the rows already
+    // say and put the page's headline number — how far behind the picture is —
+    // as far from the line that draws it as the layout allows. The distance is in
+    // the live row's gutter now, beside the marks it is about.
     readout: { state: '', behind: 's', newest: 's', 'first frame': 'ms' },
+    showReadout: false,
   });
   guard(d);
 
@@ -94,8 +100,16 @@
   });
   const lanes = [
     {
-      ...laneBase('seen', 'you watched', 40),
-      // GREEN = shown. SLATE = shown, and this lane cannot say how well (no
+      // ONE ROW FOR THE LIVE CHANNEL. It was two — what you watched, and what
+      // ERR agreed to hand over — and they were reported as two questions
+      // because they are two questions. But they are two questions about the
+      // SAME channel at the same instants, and a reader looking at two rows of
+      // small marks under one picture has to work out which is which before
+      // either says anything. The probing still happens and still asserts; its
+      // answer is a number in this row's gutter, where a number that has no
+      // shape of its own belongs.
+      ...laneBase('seen', `${CHANNEL.name} live`, 56),
+      // GREEN = shown. SLATE = shown, and this row cannot say how well (no
       // frame-quality API here). Grey is the absence of a span, not a colour.
       colorOf: () => (glass.getVideoPlaybackQuality ? '#3fb950' : '#6a7280'),
       labelOf: () => '',
@@ -105,20 +119,12 @@
         'you watched this stretch', 'a gap is where a seek skipped'],
     },
     {
-      ...laneBase('served', 'asked ERR', 40),
-      // FOUR STATES, and every one is reachable: green served, red refused,
-      // slate asked-and-cannot-say, and grey (no mark) never asked.
-      colorOf: (sp) => ({ served: '#3fb950', refused: '#f85149', unknown: '#6a7280' }[sp.row?.payload?.state] || '#6a7280'),
-      labelOf: () => '',
-      rows: () => probes.map((p, i) => ({ at: p.at, id: `p${i}`, kind: 'part',
-        payload: { durMs: 1920, state: p.state } })),
-      describeRow: (r) => [({ served: 'ERR served this', refused: 'ERR refused this',
-        unknown: 'asked, cannot say' })[r.payload.state],
-        new Date(r.at).toTimeString().slice(0, 5), 'asked for two bytes'],
-    },
-    {
-      ...laneBase('epg', CHANNEL.name, 34),
-      colorOf: () => 'hsl(50 62% 45%)',
+      // GREY, because it is not a measurement. Every other mark on this page
+      // is something that was watched or something that was asked for and
+      // answered; the schedule is ERR telling us what was on, which nothing
+      // here checked. Colour is spent on what was measured.
+      ...laneBase('epg', `${CHANNEL.name} schedule`, 34),
+      colorOf: () => '#5a6474',
       labelOf: (sp, { bw }) => (bw > 90 ? sp.row?.payload?.title?.slice(0, 40) ?? '' : ''),
       rows: () => programmes.map((p, i) => ({ at: p.at, id: `e${i}`, kind: 'part',
         payload: { durMs: p.end - p.at, title: p.name, repeat: p.repeat } })),
@@ -132,21 +138,21 @@
   // are. Never instructions: "press Back ten minutes" belongs in the paragraph.
   function gutters() {
     const L = (id) => view.strip.lanes().find((l) => l.id === id);
-    const seen = L('seen'), served = L('served'), epg = L('epg');
+    const seen = L('seen'), epg = L('epg');
     if (seen) {
       const total = watched.reduce((a, w) => a + (w.to - w.from), 0);
-      seen.subLabel = watched.length
-        ? [`${(total / 1000).toFixed(0)} s seen`, `${watched.length} stretch${watched.length > 1 ? 'es' : ''}`]
-        : 'none seen';
-    }
-    if (served) {
+      const b = behindMs();
       const no = probes.filter((p) => p.state === 'refused').length;
-      served.subLabel = probes.length
-        ? [`${probes.length} asked`, `over ${(windowS / 3600).toFixed(0)} h`,
-           no ? `${no} refused` : 'none refused']
-        : 'not asked';
+      seen.subLabel = [
+        b == null ? 'not started' : `${(b / 1000).toFixed(1)} s behind`,
+        watched.length ? `${(total / 1000).toFixed(0)} s seen` : 'none seen yet',
+        // WHETHER ANY WERE REFUSED is the answer; how many were asked is the
+        // method, and the method fits in the log rather than in eleven
+        // characters of margin.
+        probes.length ? (no ? `${no} refused` : 'none refused') : '',
+      ].filter(Boolean);
     }
-    if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : 'no schedule';
+    if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : '';
   }
 
   // ── the bar, ABOVE the line ───────────────────────────────────────────────
@@ -263,6 +269,7 @@
     // trip kept rather than an average: an average is dragged by every slow
     // fetch, which is the same reason the looper's skew estimator keeps min-RTT.
     setRange();
+    loadSchedule();             // fires as soon as the window is known
 
     if (NATIVE_HLS) {
       glass.src = CHANNEL.url;
@@ -302,7 +309,6 @@
     await sampleMovement();     // both ends move, and the playhead tracks the picture
     await pauseTest();          // a paused picture stops the line, not the present
     await sweep();
-    await loadSchedule();
     // WALK THE WINDOW ONCE, on purpose and in the open. This is the thing the
     // page is about — that the last two hours are still there — and with no
     // control to press it has to be shown rather than offered. It also leaves
@@ -636,6 +642,12 @@
   const advance = { moved: 0, wall: 0 };
   async function sampleMovement() {
     await resume();
+    // and never measure across a seek still in flight — the master stands
+    // down while one is, so the playhead legitimately does not advance and
+    // the sample would read "0 ms over 1500 ms" about a page that is fine.
+    const waitFrom = performance.now();
+    while (seekTarget != null && performance.now() - waitFrom < 4500)
+      await new Promise((r) => setTimeout(r, 100));
     const ref = deck.range, l0 = ref[0], r0 = ref[1];
     await new Promise((r) => setTimeout(r, 5000));
     rangeIdentity.same = deck.range === ref;
