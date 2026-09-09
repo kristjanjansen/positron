@@ -18,10 +18,10 @@
 
   const d = mount({
     name: 'transport',
-    what: 'Twenty things are set to happen, one a second. The clock only sets timers '
-      + 'for the next fraction of a second and can still cancel them, which is why '
-      + 'pause really stops and dragging really skips. Press play and watch how close '
-      + 'each one lands: green arrived as expected, amber to red is late.',
+    what: 'Twenty things are set to happen, one a second. Timers are set only a '
+      + 'fraction of a second ahead and can still be cancelled, so pause really '
+      + 'stops and dragging really skips; green arrived as expected, amber to '
+      + 'red is late.',
     readout: { typical: 'ms', worst: 'ms', fires: '', pos: 'ms' },
     // the numbers live under the lane they describe, in the strip's gutter;
     // this row would repeat them somewhere with less context. Still published

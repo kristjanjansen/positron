@@ -32,12 +32,26 @@
      the line below by its own margin. A day that has only one of the two still
      gets both columns, and the empty one says in words which half did not
      survive. */
-  .picked { display: grid; grid-template-columns: 1fr; gap: 12px 22px;
-            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 16px 0 18px; }
-  @media (min-width: 700px) { .picked { grid-template-columns: 1fr 1fr; } }
-  .pcol { min-width: 0; }
+  .picked { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+            font: 500 12px/1.6 var(--mono); color: var(--dim); margin: 14px 0 4px; }
+  /* TWO COLUMNS ON A PHONE TOO. Stacked, the second archive reads as a
+     footnote to the first; side by side, the day is one thing with two halves,
+     which is what the page is about. Estonian compounds are long and a narrow
+     column cannot fit them, so words break rather than widening the column
+     past its share — `anywhere` and not `break-word`, which leaves an
+     over-long word to overflow when it is the only thing on the line.
+
+     NOT `hyphens: auto`. The page declares lang="en" and the text is Estonian,
+     so the browser hyphenated it with the wrong dictionary — `Gon-siori`,
+     `he-lidefekt`, `arhitektuur-Tallinnas`. A hyphen is a claim about where a
+     word divides; breaking without one claims nothing. The columns carry
+     lang="et" so a reader's own software knows what language it is looking
+     at, which is also the honest answer for a screen reader. */
+  .pcol { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .pcol[data-empty="1"] { display: none; }
-  .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim2); }
+  /* the key carries the lane's colour — set from the INK table in the script,
+     never typed here, so the label and the marks can never disagree */
+  .pkey { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
   .ptitle { color: var(--dim); font-weight: 600; margin-top: 2px;
             height: calc(2 * 1.6em); overflow: hidden;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -78,15 +92,10 @@
 
   const d = mount({
     name: 'reel',
-    what: 'Every 1965 newsreel ERR has, on one line, at the day it was broadcast — so '
-      + 'the whole year is a picture and a newsreel is a mark in it. The line is '
-      + 'positioned in 1965 itself, which is a negative number of milliseconds, so the '
-      + 'axis reads in days rather than seconds. Press a mark to play it: it streams '
-      + 'from ERR at that moment and nothing is stored here, and every title links '
-      + 'back to ERRarhiiv. The newsreels were shot MUTE and the radio survives '
-      + 'separately, so when both exist for the same day the page plays them together '
-      + '— picture from one archive, sound from the other, put back on the same '
-      + 'afternoon.',
+    what: 'Every 1965 newsreel ERR has, on one line at the day it was broadcast, '
+      + 'so the whole year is a picture. Press a mark to play it — it streams '
+      + 'from ERR and nothing is stored here — and where a mute newsreel has '
+      + 'surviving radio from the same day, the two play together.',
     // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
     // the lane's gutter, the date in the film's own title line AND in the
     // transport bar, the length in the tooltip. A second table saying the same
@@ -136,16 +145,26 @@
   // One column per medium. Each carries its own name, then the date and the
   // link to ERR on their OWN line — a title that runs into its metadata reads
   // as one long string and the title is the part being looked for.
-  const column = (key) => {
+  // ONE TABLE FOR THE TWO ARCHIVES' INK, read by the lane that draws the marks
+  // AND by the key above the column, so the two cannot drift apart. Typing the
+  // same yellow twice is how a legend starts being needed.
+  const INK = {
+    video: { on: '#ffd400', off: 'hsl(50 62% 40%)' },
+    audio: { on: 'hsl(185 80% 62%)', off: 'hsl(185 45% 34%)' },
+  };
+
+  const column = (key, medium) => {
     const box = el('div', 'pcol');
+    box.lang = 'et';                  // the archive's own language, not the page's
     const parts = { key: el('div', 'pkey', key), title: el('div', 'ptitle', ''),
                     meta: el('div', 'pmeta', ''), lead: el('div', 'plead') };
+    parts.key.style.color = INK[medium].on;   // the same ink as this lane's marks
     box.append(parts.key, parts.title, parts.meta, parts.lead);
     box.dataset.empty = '1';          // nothing is picked yet
     return Object.assign(parts, { box });
   };
-  const colFilm = column('newsreel');
-  const colRadio = column('radio');
+  const colFilm = column('newsreel', 'video');
+  const colRadio = column('radio', 'audio');
   picked.append(colFilm.box, colRadio.box);
 
   // A column with nothing in it is REMOVED, not filled with a sentence saying
@@ -164,10 +183,26 @@
     a.target = '_blank'; a.rel = 'noreferrer';
     col.meta.append(a);
   };
-  d.el.append(film, wireless, picked);
+  d.el.append(film, wireless);
+  // `picked` is appended after the bar and the line — see below. It reads as
+  // the caption to what the line is pointing at, which is where a caption goes.
 
   const DAY = 86400000;
   const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+  // THE VIEW STAYS INSIDE THE YEAR. Centring on a clip near either end pushed
+  // the window past it, so the axis read 1964-12-24 on a page whose whole
+  // subject is 1965 — empty months either side of the material, labelled with
+  // a year that has nothing on this line. The window keeps its width and
+  // slides inward instead of being cropped, so the zoom the reader chose
+  // survives being near an edge.
+  const fitInYear = (from, to) => {
+    const w = Math.min(to - from, YEAR_TO - YEAR_FROM);
+    let a = from, b = a + w;
+    if (a < YEAR_FROM) { a = YEAR_FROM; b = a + w; }
+    if (b > YEAR_TO) { b = YEAR_TO; a = b - w; }
+    view.strip.fit(a, b);
+  };
 
   // ERR'S NEWSREEL TITLES ARE GENUINELY ALL-CAPS — 288 of 298, against 11 of
   // 494 on the radio side. That is the film archive's own record, typed on a
@@ -229,9 +264,8 @@
     // same hue at full brightness rather than a different colour.
     colorOf: (sp) => {
       const on = sp.row?.payload?.slug === current?.slug;
-      return id === 'radio'
-        ? (on ? 'hsl(185 80% 62%)' : 'hsl(185 45% 34%)')
-        : (on ? '#ffd400' : 'hsl(50 62% 40%)');
+      const ink = INK[id === 'radio' ? 'audio' : 'video'];
+      return on ? ink.on : ink.off;
     },
     labelOf: (sp, { bw }) => (bw > 90 ? sentenceCase(sp.row?.payload?.title).slice(0, 40) : ''),
     rows: () => (id === 'radio' ? radio : items).map((it) => ({
@@ -253,15 +287,27 @@
   // are transport verbs — they move the playhead and change what is showing —
   // so they belong on the bar rather than beside the page, which is what
   // `extras` exists for.
+  // EVERY BROADCAST, BY DAY. Stepping through one lane skips whole weeks the
+  // other lane is the only witness to, and stepping through both as a flat
+  // list hands you the same afternoon twice — once for its film and once for
+  // its radio — on the 283 days where both survive. So the unit is the DAY:
+  // one press, one broadcast day, and the day brings whichever halves of it
+  // reached us. The film represents a day when there is one, because the film
+  // is what carries the picture.
+  let days = [];
+  const rebuildDays = () => {
+    const byDate = new Map();
+    for (const it of items) byDate.set(it.date, it);
+    for (const r of radio) if (!byDate.has(r.date)) byDate.set(r.date, r);
+    days = [...byDate.values()].sort((a, b) => a.at - b.at);
+  };
   const step = (by) => {
-    // Step within the lane you are in: pressing next while listening to radio
-    // should hand you the next broadcast, not the next silent newsreel.
-    const list = current?.kind === 'audio' ? radio : items;
-    if (!list.length) return;
-    const i = current ? list.indexOf(current) : -1;
-    const next = list[Math.max(0, Math.min(list.length - 1, i + by))];
+    if (!days.length) return;
+    const at = current ? current.at : deck.position();
+    const next = by > 0
+      ? days.find((x) => x.at > at)
+      : [...days].reverse().find((x) => x.at < at);
     if (next && next !== current) play(next);
-    else if (!current) play(list[0]);
   };
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
@@ -287,6 +333,7 @@
     // reason to put them on a line at all.
     lanes: [laneFor('ak', 'newsreels'), laneFor('radio', 'radio')],
   });
+  d.el.append(picked);        // under the line, as its caption
 
   function gutters() {
     const lane = view.strip.lanes().find((l) => l.id === 'ak');
@@ -310,7 +357,7 @@
   // media url, then the element is given that URL. The page never holds the
   // bytes: no fetch of segments, no blob URL over them, nothing to R2 or to
   // localStorage. A copy is the one thing this must not make.
-  async function play(it) {
+  async function play(it, armed = false) {
     // BLESS THE ELEMENT NOW, before anything is awaited.
     //
     // A user gesture does NOT survive an `await`. This function fetches the
@@ -323,7 +370,7 @@
     // Calling `play()` synchronously inside the gesture marks the element as
     // user-activated even though it rejects for having no source yet. That
     // rejection IS the mechanism, not a failure.
-    (it.kind === 'audio' ? wireless : film).play().catch(() => {});
+    if (!armed) (it.kind === 'audio' ? wireless : film).play().catch(() => {});
 
     current = it;
     d.set('picked', it.date);
@@ -338,7 +385,7 @@
     const v = view.strip.view();
     const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
     const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
-    if (it.at < left || it.at > left + span) view.strip.fit(it.at - span / 2, it.at + span / 2);
+    if (it.at < left || it.at > left + span) fitInYear(it.at - span / 2, it.at + span / 2);
     // BOTH HALVES OF THE DAY, whichever one was pressed. Picking a newsreel
     // finds that date's radio and picking a radio programme finds that date's
     // newsreel, so the two columns and what actually plays always agree.
@@ -390,7 +437,7 @@
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = su;
       else { aHls = new window.Hls({ enableWorker: true }); aHls.loadSource(su); aHls.attachMedia(wireless); }
       wireless.muted = false;
-      wireless.play().catch(() => {});
+      if (!armed) wireless.play().catch(() => {});
       d.log(`paired with the same day's radio — ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
     } else if (picture) {
       d.log('no radio survives from this day — the newsreel plays silent');
@@ -405,7 +452,7 @@
       film.muted = false;
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) film.src = su;
       else { hls = window.__hls = new window.Hls({ enableWorker: true }); hls.loadSource(su); hls.attachMedia(film); }
-      await film.play().catch(() => {});
+      if (!armed) await film.play().catch(() => {});
       d.log(`playing ${sound.slug} — radio, streamed from ERR, nothing stored here`, 'hi');
       return;
     }
@@ -437,6 +484,7 @@
     // anyway, and a muted picture beats no picture. But it is the fallback now,
     // not the default.
     film.muted = false;
+    if (armed) { d.log(`${picture.slug} is loaded — press play`); return; }
     try {
       await film.play();
     } catch {
@@ -531,8 +579,9 @@
     const fx = await (await fetch('/reel/1965.json')).json();
     items = fx.items.filter((i) => i.kind === 'video' && i.series === SERIES);
     radio = fx.items.filter((i) => i.kind === 'audio');
-    const days = new Set(items.map((i) => i.date));
-    sharedDays = radio.filter((r) => days.has(r.date)).length;
+    const filmDays = new Set(items.map((i) => i.date));
+    sharedDays = radio.filter((r) => filmDays.has(r.date)).length;
+    rebuildDays();
     const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
     if (known.length) MEDIAN_MS = known[known.length >> 1];
     d.set('newsreels', items.length);
@@ -564,10 +613,10 @@
     // day makes the page look like it only has half the material.
     const radioDays = new Set(radio.map((r) => r.date));
     const openOn = items.find((i) => radioDays.has(i.date)) || items[0];
-    view.strip.fit(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
+    fitInYear(openOn.at - SPAN / 2, openOn.at + SPAN / 2);
     firstPick = openOn;
-    fill(colFilm, openOn, 'video');
-    fill(colRadio, radio.find((r) => r.date === openOn.date) || null, 'audio');
+    deck.seek(openOn.at);
+    play(openOn, true);        // load it and show its first frame; do not start it
     // Reachable from the harness, the way `window.__hls` is: a press on the
     // line is the page's only way in, so a check that cannot find the line
     // cannot test anything the page actually does.
