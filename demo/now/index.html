@@ -152,7 +152,19 @@
         probes.length ? (no ? `${no} refused` : 'none refused') : '',
       ].filter(Boolean);
     }
-    if (epg) epg.subLabel = programmes.length ? `${programmes.length} on air` : '';
+    if (epg) {
+      // "on air" read as "two things are broadcasting at once", which is
+      // nonsense — it is how many programmes OVERLAP the seekable window, and
+      // that is what it now says. The second line is the one that moves: when
+      // the programme under the playhead gives way to the next one.
+      const now = deck.position();
+      const next = programmes.find((p) => p.at > now) || null;
+      epg.subLabel = programmes.length
+        ? [`${programmes.length} over ${(windowS / 3600).toFixed(0)} h`,
+           next ? `next ${new Date(next.at).toTimeString().slice(0, 5)}` : '']
+          .filter(Boolean)
+        : '';
+    }
   }
 
   // ── the bar, ABOVE the line ───────────────────────────────────────────────
@@ -203,8 +215,31 @@
   // deck is a follower — the master would put it straight back within a tick.
   // So the gesture is mirrored to the picture, which is the thing that has to
   // move for a seek to have happened.
-  view.strip.canvas.addEventListener('pointerup', () => {
-    if (clock) seekTo(deck.position());   // the strip already moved the line
+  // READ THE POINTER, NOT THE DECK. This used to take `deck.position()` on
+  // pointerup, on the assumption that the strip's own press-to-seek had just
+  // put it there. On a media-mastered deck it has not: the master's next tick
+  // is ~16 ms away, it sees the picture disagreeing with the line by minutes
+  // and puts the line straight back — so by the time pointerup ran, the value
+  // read was the picture's own position and the seek was a no-op. Clicking
+  // into the past did nothing at all, at any distance. This is the trap the
+  // plan flagged for `flipper`, arrived at from the other side.
+  //
+  // The strip converts a pixel to an instant itself (`xToTime`), in the plot's
+  // own coordinates — which is why the gutter has to come off the x first,
+  // exactly as its internal `localX` does.
+  const instantAt = (clientX) => {
+    const r = view.strip.canvas.getBoundingClientRect();
+    const st = view.strip.state;
+    const px = (clientX - r.left) * (st.width / r.width) - st.gutterPx;
+    return px < 0 ? null : view.strip.xToTime(px);
+  };
+  view.strip.canvas.addEventListener('pointerup', (e) => {
+    if (!clock) return;
+    const at = instantAt(e.clientX);
+    if (at == null) return;                       // the gutter is not the line
+    const want = Math.min(deck.range[1], Math.max(deck.range[0], at));
+    seekTo(want);
+    d.log(`watching from ${new Date(want).toTimeString().slice(0, 8)}`);
   });
 
   // ── the picture ───────────────────────────────────────────────────────────
@@ -324,7 +359,7 @@
     await toLive();
     await liveTest();
     d.log('walked back into the window and returned — the break in the top row is where that seek skipped');
-    view.strip.fit(deck.position() - OPEN_SPAN_MS * 0.10, deck.position() + OPEN_SPAN_MS * 0.90);
+    openView(deck.position());
     checks();
   }
 
@@ -666,7 +701,20 @@
   // Up and drivable, which is what ready means — the checks fire from the last
   // control, and the harness reads them after it has pressed everything.
   view.strip.armWall(Date.now());
-  view.strip.fit(Date.now() - OPEN_SPAN_MS * 0.10, Date.now() + OPEN_SPAN_MS * 0.90);
+  // THE PAST FILLS THE VIEW. Opening with the playhead a tenth from the left
+  // put nine tenths of the line in the FUTURE, which is empty by definition —
+  // so a press anywhere but the first inch landed after the live edge, was
+  // clamped to it, and "clicking on the past" did nothing at any distance.
+  // Measured: a press a third of the way across asked for 10:19:42 while the
+  // newest instant on offer was 10:17:12.
+  //
+  // At 70% the playhead keeps room to travel — which is what putting it near
+  // the left was for, and it still crosses the follow threshold at 82% about a
+  // minute and a half later — while eight of the twelve minutes on screen are
+  // material you can actually watch.
+  const openView = (at = Date.now()) =>
+    view.strip.fit(at - OPEN_SPAN_MS * 0.70, at + OPEN_SPAN_MS * 0.30);
+  openView();
   window.__strip = view.strip;
 
   // UP AND DRIVABLE IS WHAT READY MEANS, and a live page is not up until it is
