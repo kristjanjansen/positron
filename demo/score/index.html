@@ -129,12 +129,10 @@
 
   const d = mount({
     name: 'score',
-    what: 'One document format for scores written in different languages: pick one and '
-      + 'press play, and the line that is sounding lights up. A score in one language '
-      + 'cannot hold one written in another, so the document agrees only on when a '
-      + 'thing happens and how long it lasts, and carries the rest exactly as '
-      + 'written. Repeats stay repeats — a loop is one line saying how many times, '
-      + 'never the same line copied out.',
+    what: 'One file format for scores written in different languages; the line '
+      + 'that is sounding lights up. It agrees only on when a thing happens and '
+      + 'how long it lasts, carries the rest exactly as written, and writes a '
+      + 'repeat as one line rather than copying it out.',
     readout: { bytes: 'B', lines: '', rows: '', plays: '' },
     // the numbers sit under the lane that owns them; this row would repeat them
     // with less context. Still published for CDP.

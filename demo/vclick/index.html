@@ -86,11 +86,10 @@
 
   const d = mount({
     name: 'vclick',
-    what: 'A Csound score, compiled as you type. Csound counts in beats, not seconds, so '
-      + 'a changing tempo pulls the two apart: evenly numbered beats, unevenly spaced '
-      + 'in time. Part 2 is part 1 again, the same seven lines, played slower because '
-      + 'it falls under the slowing tempo. Drop the playhead anywhere and the count of '
-      + 'what has sounded is exact, which a file of notes cannot tell you.',
+    what: 'A Csound score, compiled as you type. Csound counts in beats, not '
+      + 'seconds, so a slowing tempo spaces evenly numbered beats unevenly in '
+      + 'time; part 2 is part 1 again played slower, and dropping the playhead '
+      + 'anywhere still gives an exact count of what has sounded.',
     readout: { rows: '', uses: '', bend: 'ms', beat: '', fold: '', sounded: '' },
     // the numbers sit under the lane that owns them; this row would repeat them
     // with less context. Still published for CDP.

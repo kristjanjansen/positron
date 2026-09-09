@@ -32,13 +32,11 @@
 
   const d = mount({
     name: 'room',
-    what: 'Open this page twice and each window shows the other. The picture goes '
-      + 'straight between them — the server only passes the two of them each other\'s '
-      + 'address, then has nothing more to do with the video. Every picture carries '
-      + 'the same clock the rest of this site burns, so a far window\'s number read '
-      + 'against yours is how far behind it is. FIRST is how long someone else\'s '
-      + 'picture took to appear; SIZE is what has arrived so far, and it starts small '
-      + 'and climbs over about half a minute.',
+    what: 'Open this page twice and each window shows the other; the picture goes '
+      + 'straight between them and the server only introduces the two. Every '
+      + 'frame carries the same burned-in clock, so a far window read against '
+      + 'yours is how far behind it is, and FIRST is how long it took to '
+      + 'appear.',
     readout: { others: '', joined: '', first: 'ms', size: '', dropped: '' },
     controls: [
       { id: 'join', label: 'Join', primary: true },
