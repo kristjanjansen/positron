@@ -16,18 +16,24 @@
 // the AudioContext stays suspended and NEVER REJECTS -- it just silently never
 // makes a sound, which is the trap CLAUDE.md calls "never let sound gate the
 // work".
-const ROOM = new URLSearchParams(location.search).get('room') || 'proinst';
+const Q = new URLSearchParams(location.search);
+const ROOM = Q.get('room') || 'proinst';
+const MOQ_NS = Q.get('ns') || `proinst-${ROOM}`;
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[synth]', m); };
 
 const ac = new AudioContext({ latencyHint: 'interactive' });
 await ac.resume().catch(() => {});
 const dest = ac.createMediaStreamDestination();
+// One bus everything plays into, so the WebRTC track and the MoQ publisher are
+// fed by the SAME sound rather than two graphs that could differ.
+const bus = ac.createGain();
+bus.connect(dest);
 // A tiny gain floor keeps the track from being latched silent: Chrome hands an
 // AudioWorklet an EMPTY input array when it decides a bus is silent, and a
 // WebRTC sender can likewise treat a dead track as nothing to send.
 const keepAlive = ac.createConstantSource();
 const kg = ac.createGain(); kg.gain.value = 0.0001;
-keepAlive.connect(kg).connect(dest); keepAlive.start();
+keepAlive.connect(kg).connect(bus); keepAlive.start();
 log(`audio ${ac.state} @ ${ac.sampleRate} Hz, baseLatency ${(ac.baseLatency*1000).toFixed(1)} ms`);
 
 function play(note, vel = 100) {
@@ -40,7 +46,7 @@ function play(note, vel = 100) {
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(Math.max(vel, 1) / 127 * 0.3, t + 0.005);
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-  o.connect(g).connect(dest);
+  o.connect(g).connect(bus);
   o.start(t); o.stop(t + 0.5);
 }
 
@@ -65,6 +71,16 @@ function accept() {
   };
   return pc;
 }
+
+// The MoQ arm, published continuously beside the WebRTC one so a listener can
+// switch between them and hear the SAME instrument two ways.
+import('./moq-audio.mjs').then(async ({ publishSynth }) => {
+  try {
+    const pub = await publishSynth({ ac, bus, msDest: dest, ns: MOQ_NS, log });
+    setInterval(() => { const st = pub.stats(); log(`moq: ${st.published} frames, ${(st.bytes/1024).toFixed(0)} KiB`); }, 15000);
+    window.__synth.moq = pub;
+  } catch (e) { log('moq publish FAILED: ' + e.message); }
+});
 
 const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
 const send = (o) => ws.send(JSON.stringify({ from: 'synth', at: Date.now(), ...o }));

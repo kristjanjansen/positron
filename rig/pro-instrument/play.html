@@ -38,31 +38,32 @@ The cushion is reported below; it cannot be switched off.</p>
 <tr><td>handshake channel</td><td id="r">—</td></tr>
 <tr><td>direct link for notes</td><td id="d">—</td></tr>
 <tr><td>sound coming back</td><td id="a">—</td></tr>
-<tr><td>the browser’s audio cushion</td><td id="jb">—</td></tr>
-<tr><td><b>key press → sound in your ears</b></td><td id="ear">—</td></tr>
 </table>
-<p class="note"><b>These two are different journeys and only one of them is what
-you hear.</b> The table below times a <i>message</i> — key press out, acknowledgement
-straight back — and no sound is involved in it. The row above times the actual
-note arriving: out to the Pro, synthesised, encoded, sent back, and held in the
-cushion before it plays. That is why the message can be 6 ms while the sound
-takes about eighty.</p>
 
-<h4>How long a MESSAGE takes to reach the Pro and come back</h4>
-<p class="note">What comes back here is a <b>receipt</b>, not the note. No audio
-is involved in this table at all — it is the cost of <i>telling</i> the Pro to
-play, and it is about 7% of the time before you hear anything. The row above is
-the one that says how late the sound is.</p>
 <table class="t">
-<tr><th>path</th><th>typical</th><th>worst 1 in 20</th><th>slowest</th><th>presses</th></tr>
-<tr><td>direct link</td><td id="dc50">—</td><td id="dc95">—</td><td id="dcmx">—</td><td id="dcn">—</td></tr>
-<tr><td>via the relay</td><td id="ws50" colspan="4">not tried yet</td></tr>
+<tr>
+  <th rowspan="2">path</th><th rowspan="2">carries</th>
+  <th colspan="2">receipt — telling the Pro to play</th>
+  <th colspan="2">sound — the note in your ears</th>
+  <th rowspan="2">cushion</th><th rowspan="2">notes</th>
+</tr>
+<tr><th>typical</th><th>worst 1 in 20</th><th>typical</th><th>worst 1 in 20</th></tr>
+<tr><td>direct link</td><td>the notes</td>
+    <td id="dc50">—</td><td id="dc95">—</td>
+    <td id="dcE50">—</td><td id="dcE95">—</td>
+    <td id="dcJB">—</td><td id="dcn">—</td></tr>
+<tr><td>via the relay</td><td>the notes</td>
+    <td id="ws50">—</td><td id="ws95">—</td>
+    <td id="wsE50">—</td><td id="wsE95">—</td>
+    <td id="wsJB">—</td><td id="wsn">—</td></tr>
+<tr><td>MoQ</td><td>the sound back</td>
+    <td>—</td><td>—</td>
+    <td id="mqE50">—</td><td id="mqE95">—</td>
+    <td id="mqJB">—</td><td id="mqn">—</td></tr>
 </table>
-<p class="note"><b>Typical</b> is the middle press — half were quicker than this.
-<b>Worst 1 in 20</b> is the level 19 presses out of 20 came in under; it is the
-one that says whether the slow ones are rare or common. <b>Slowest</b> is the
-single worst press of the run. A median on its own hides the one bad press,
-which is usually the reason to look.</p>
+<p class="note">A <b>receipt</b> carries no audio — it is only the cost of telling
+the Pro to play. <b>Typical</b> is the middle press; <b>worst 1 in 20</b> is what
+19 in 20 came in under, and it is there because a median hides the one bad press.</p>
 <audio id="out" autoplay></audio>
 <script type="module">
 const ROOM = new URLSearchParams(location.search).get('room') || 'proinst';
@@ -81,8 +82,7 @@ pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
 // THAT from the key press. An AudioWorklet reports the first sample over
 // threshold, which is sample-accurate -- polling an AnalyserNode in rAF would
 // quantise the answer to a frame and this number is ~80 ms, not ~800.
-let earPending = null;   // {t0} of the most recent press, whichever path
-const ears = [];
+let earPending = null;   // {t0, via} of the most recent press
 pc.ontrack = async (e) => {
   document.getElementById('out').srcObject = e.streams[0];
   set('a', `${e.track.kind} live`);
@@ -106,10 +106,9 @@ pc.ontrack = async (e) => {
   src.connect(w); w.connect(mute).connect(ac.destination);
   w.port.onmessage = () => {
     if (!earPending) return;
-    ears.push(performance.now() - earPending.t0);
+    ears[earPending.via].push(performance.now() - earPending.t0);
     earPending = null;
-    const q = (p) => { const a = [...ears].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p / 100 * a.length))]; };
-    set('ear', `${q(50).toFixed(0)} ms typical · ${q(95).toFixed(0)} ms worst 1 in 20 · ${ears.length} notes`);
+    report();
   };
 };
 
@@ -118,27 +117,18 @@ const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
 // timed on this machine, so no clock agreement is needed and none of the number
 // is skew -- which is the only reason these two are comparable at all.
 let seq = 0; const sent = new Map(); const rtts = { dc: [], ws: [] };
+const ears = { dc: [], ws: [], mq: [] };
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
+const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
+const ms = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
+const msi = (v) => Number.isFinite(v) ? v.toFixed(0) + ' ms' : '—';
 function report() {
-  // The relay row starts as one wide "not tried yet" cell, because a row of
-  // dashes reads as a broken measurement rather than an untaken one. The first
-  // relayed press splits it back into real columns.
-  const wr = document.getElementById('ws50');
-  if (rtts.ws.length && wr.hasAttribute('colspan')) {
-    wr.removeAttribute('colspan');
-    for (const id of ['ws95', 'wsmx', 'wsn']) {
-      const td = document.createElement('td'); td.id = id; td.textContent = '—';
-      wr.parentNode.append(td);
-    }
-  }
-  for (const k of ['dc', 'ws']) {
-    const a = rtts[k], pre = k === 'dc' ? 'dc' : 'ws';
-    if (!a.length) continue;
-    const f = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
-    set(pre + '50', f(pct(a, 50)));
-    set(pre + '95', f(pct(a, 95)));
-    set(pre + 'mx', a.length ? f(Math.max(...a)) : '—');
-    set(pre + 'n', a.length || '—');
+  for (const k of ['dc', 'ws', 'mq']) {
+    const r = rtts[k] || [], e = ears[k] || [];
+    if (rtts[k]) { set(k + '50', ms(q(r, 50))); set(k + '95', ms(q(r, 95))); }
+    set(k + 'E50', msi(q(e, 50)));
+    set(k + 'E95', msi(q(e, 95)));
+    set(k + 'n', (rtts[k] ? r.length : e.length) || '—');
   }
 }
 dc.onopen = () => set('d', 'open');
@@ -157,12 +147,12 @@ const note = (n, via = 'dc') => {
     // silently dropped the note and looked like a broken key.
     if (dc.readyState !== 'open') { set('d', `not open yet (${dc.readyState}) — that press went nowhere`); return; }
     const t0 = performance.now();
-    sent.set(id, { t0, via }); earPending = { t0 };
+    sent.set(id, { t0, via }); earPending = { t0, via: earVia() };
     dc.send(JSON.stringify(body));
   } else {
     if (ws.readyState !== 1) { set('r', 'not open — that press went nowhere'); return; }
     const t0 = performance.now();
-    sent.set(id, { t0, via }); earPending = { t0 };
+    sent.set(id, { t0, via }); earPending = { t0, via: earVia() };
     send(body);
   }
 };
@@ -215,7 +205,8 @@ setInterval(async () => {
   const st = await pc.getStats();
   st.forEach((r) => {
     if (r.type === 'inbound-rtp' && r.kind === 'audio' && r.jitterBufferDelay != null && r.jitterBufferEmittedCount) {
-      set('jb', `${(1000 * r.jitterBufferDelay / r.jitterBufferEmittedCount).toFixed(1)} ms · ${r.packetsLost ?? 0} lost`);
+      const v = `${(1000 * r.jitterBufferDelay / r.jitterBufferEmittedCount).toFixed(1)} ms`;
+      set('dcJB', v); set('wsJB', v);
     }
   });
 }, 1000);
