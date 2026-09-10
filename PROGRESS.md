@@ -7,6 +7,58 @@ and MoQ from the SAME source, driven entirely over obs-websocket from this Mac.
 Two background agents closed **0aa** (Csound's section-local `t`) and **0a**
 (the `t` → `type` sweep) in parallel.
 
+### Ableton Live played remotely, and all four return paths
+
+Press a key on the dev Mac, Drift sounds in Live on the other machine, hear it
+back. 14 of 14 notes in every case; the receipt (the message telling Live to
+play) stayed 6.6–8.8 ms throughout, so the control leg is never the story.
+
+| sound comes back over | typical | worst 1 in 20 | gaps | result |
+|---|---|---|---|---|
+| **MoQ, relay on the LAN** | **58 ms** | 69 ms | 31 | clean |
+| WebRTC peer to peer | 111–128 ms | 114–236 ms | — | clean |
+| MoQ via Cloudflare | 136 ms | 271 ms | **1133** | **garbled** |
+
+⚠️ **The Cloudflare relay is LOSSY for this publisher, not merely slower** —
+about a third of frames missing, heard as garbling at the receiving end BEFORE
+the counter was read, then confirmed by it. That is `seq` earning its place
+exactly as plan-ws argued: the receiver sees the counter skip and nothing else on
+the path reports anything. Stated carefully, because the same relay carried the
+built-in synth cleanly: this is this publisher's cadence (5 ms Opus frames
+grouped every 50 ms) over that path on that day. Group policy, frame duration and
+the wide-area path are NOT separated.
+
+**Ableton costs ~29 ms over the built-in synth** on the best path (29 → 58 ms),
+about what Live reports for itself: 512 samples at 48 kHz is 10.7 ms plus its
+stated 13.7 ms output latency.
+
+**The chain, with every link measured**: key press → 7.5 ms → the Pro → Web MIDI
+→ IAC Bus 1 → Live/Drift (track meter 0.807) → Multi-Output → BlackHole → MoQ →
+58 ms at the ear.
+
+**What actually cost the hours was a permission grant.** A
+`Browser.grantPermissions` grant lives only while the CDP client stays
+CONNECTED. The launcher exited after printing its log, permission fell back to
+"prompt", labels hid, and the capture the page had already opened went on
+reporting a **live, unmuted, enabled** track carrying **digital silence** —
+0.00010 against 0.38763 for a freshly granted capture of the SAME device in the
+same second. BlackHole was never broken, the Multi-Output was never
+misconfigured, Live was never misrouted; all three were checked on that evidence.
+
+**Three "BlackHole is silent" readings were three deaf instruments**: `afplay`
+over ssh has no audio session, headless Chrome has no audio input at all, and a
+GUI app SPAWNED from ssh runs outside the user's session and gets none either
+(`open -na` hands it to launchd, which does). The control that ends it in one
+step is the built-in microphone — it cannot be digitally silent in a room, so a
+reading of 0.00000 there means the browser is deaf, not the device. Measured
+side by side once it was finally run: mic 0.22437, BlackHole 0.38763.
+
+**A detector tuned to one instrument is not tuned to instruments.** The onset
+detector fires above 0.02 and re-arms below 0.004. The built-in triangle decays
+to 0.0001 in 450 ms so it re-armed between notes; Drift sustains and does not, so
+at 420 ms spacing exactly ONE note of thirty was counted. At 1300 ms it is 14 of
+14.
+
 ### The Pro as an instrument, and Ableton behind it
 
 `rig/pro-instrument/` — a page on the Pro is the instrument, a page here plays
