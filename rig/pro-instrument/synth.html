@@ -44,17 +44,27 @@ function play(note, vel = 100) {
   o.start(t); o.stop(t + 0.5);
 }
 
-const pc = new RTCPeerConnection({ iceServers: [] });   // LAN: host candidates only
-for (const track of dest.stream.getAudioTracks()) pc.addTrack(track, dest.stream);
-pc.oniceconnectionstatechange = () => log(`ice ${pc.iceConnectionState}`);
-pc.ondatachannel = (e) => {
-  const dc = e.channel;
-  dc.onopen = () => log(`datachannel "${dc.label}" open`);
-  dc.onmessage = (m) => {
-    const msg = JSON.parse(m.data);
-    if (msg.type === 'note') { play(msg.note, msg.vel); dc.send(JSON.stringify({ type: 'ack', seq: msg.seq, at: msg.at })); }
+// A FRESH CONNECTION PER OFFER. Holding one for the page's life meant that once
+// a player went away the connection stayed bound to a dead peer, and the next
+// player could never establish -- which looks exactly like "the synth is down"
+// while the synth is fine and still in the room. Only the FIRST client of a
+// given synth process ever worked.
+let pc = null;
+function accept() {
+  if (pc) { try { pc.close(); } catch { /* already */ } }
+  pc = new RTCPeerConnection({ iceServers: [] });        // LAN: host candidates only
+  for (const track of dest.stream.getAudioTracks()) pc.addTrack(track, dest.stream);
+  pc.oniceconnectionstatechange = () => log(`ice ${pc.iceConnectionState}`);
+  pc.ondatachannel = (e) => {
+    const dc = e.channel;
+    dc.onopen = () => log(`datachannel "${dc.label}" open`);
+    dc.onmessage = (m) => {
+      const msg = JSON.parse(m.data);
+      if (msg.type === 'note') { play(msg.note, msg.vel); dc.send(JSON.stringify({ type: 'ack', seq: msg.seq, at: msg.at })); }
+    };
   };
-};
+  return pc;
+}
 
 const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
 const send = (o) => ws.send(JSON.stringify({ from: 'synth', at: Date.now(), ...o }));
@@ -68,11 +78,12 @@ ws.onmessage = async (e) => {
     return;
   }
   if (m.type === 'offer') {
-    await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
-    const a = await pc.createAnswer(); await pc.setLocalDescription(a);
-    await new Promise((r) => pc.iceGatheringState === 'complete' ? r()
-      : pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()));
-    send({ type: 'answer', sdp: pc.localDescription.sdp });
+    const c = accept();
+    await c.setRemoteDescription({ type: 'offer', sdp: m.sdp });
+    const a = await c.createAnswer(); await c.setLocalDescription(a);
+    await new Promise((r) => c.iceGatheringState === 'complete' ? r()
+      : c.addEventListener('icegatheringstatechange', () => c.iceGatheringState === 'complete' && r()));
+    send({ type: 'answer', sdp: c.localDescription.sdp });
     log('answered');
   }
 };
