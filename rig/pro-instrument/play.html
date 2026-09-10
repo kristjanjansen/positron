@@ -48,11 +48,15 @@ note arriving: out to the Pro, synthesised, encoded, sent back, and held in the
 cushion before it plays. That is why the message can be 6 ms while the sound
 takes about eighty.</p>
 
-<h4>How long a key press takes to reach the Pro and come back</h4>
+<h4>How long a MESSAGE takes to reach the Pro and come back</h4>
+<p class="note">What comes back here is a <b>receipt</b>, not the note. No audio
+is involved in this table at all — it is the cost of <i>telling</i> the Pro to
+play, and it is about 7% of the time before you hear anything. The row above is
+the one that says how late the sound is.</p>
 <table class="t">
 <tr><th>path</th><th>typical</th><th>worst 1 in 20</th><th>slowest</th><th>presses</th></tr>
 <tr><td>direct link</td><td id="dc50">—</td><td id="dc95">—</td><td id="dcmx">—</td><td id="dcn">—</td></tr>
-<tr><td>via the relay</td><td id="ws50">—</td><td id="ws95">—</td><td id="wsmx">—</td><td id="wsn">—</td></tr>
+<tr><td>via the relay</td><td id="ws50" colspan="4">not tried yet</td></tr>
 </table>
 <p class="note"><b>Typical</b> is the middle press — half were quicker than this.
 <b>Worst 1 in 20</b> is the level 19 presses out of 20 came in under; it is the
@@ -116,8 +120,20 @@ const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
 let seq = 0; const sent = new Map(); const rtts = { dc: [], ws: [] };
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
 function report() {
+  // The relay row starts as one wide "not tried yet" cell, because a row of
+  // dashes reads as a broken measurement rather than an untaken one. The first
+  // relayed press splits it back into real columns.
+  const wr = document.getElementById('ws50');
+  if (rtts.ws.length && wr.hasAttribute('colspan')) {
+    wr.removeAttribute('colspan');
+    for (const id of ['ws95', 'wsmx', 'wsn']) {
+      const td = document.createElement('td'); td.id = id; td.textContent = '—';
+      wr.parentNode.append(td);
+    }
+  }
   for (const k of ['dc', 'ws']) {
     const a = rtts[k], pre = k === 'dc' ? 'dc' : 'ws';
+    if (!a.length) continue;
     const f = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
     set(pre + '50', f(pct(a, 50)));
     set(pre + '95', f(pct(a, 95)));
