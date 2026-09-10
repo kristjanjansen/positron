@@ -61,6 +61,14 @@ export function ask(addr, args = [], tries = 4) {
   });
 }
 
+// ONLY act as a CLI when RUN, not when IMPORTED. live-setup.mjs imports ask()
+// from here, and this block used to execute on import -- status report, then
+// process.exit(0), so the importer's own code never ran at all and its output
+// looked like this file's.
+const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
+if (!isMain) { /* imported: expose ask() and do nothing else */ }
+else {
+
 const [cmd, ...rest] = process.argv.slice(2);
 if (cmd === 'get') {
   console.log(JSON.stringify(await ask(rest[0], rest.slice(1).map((x) => (/^-?\d+$/.test(x) ? +x : x)))));
@@ -84,3 +92,4 @@ console.log(types.some((t) => String(t).includes('IAC'))
   ? 'IAC IS visible to Live'
   : 'IAC is NOT visible to Live — enable it in Preferences > Link/Tempo/MIDI > MIDI Ports (Track = On)');
 process.exit(0);
+}
