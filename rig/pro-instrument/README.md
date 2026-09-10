@@ -230,3 +230,57 @@ is still the unmeasured quantity everything multi-device rests on.
 - **A real instrument.** The synth here is a triangle wave with an envelope. The
   Pro has Ableton Live 11 and BlackHole 2ch, so the next step is to capture
   BlackHole instead of synthesising, and to drive Live over MIDI or OSC.
+
+## Ableton Live as the instrument — wired, waiting on four clicks
+
+`?instrument=ableton` turns the synth page into a BRIDGE: notes go out a MIDI
+port into Live, and Live's audio comes back through a loopback device onto the
+same bus the internal oscillator used — so the WebRTC track and the MoQ
+publisher are fed by one source either way. The oscillator stays the default, so
+nothing here breaks without Live.
+
+### Done, and done without a GUI
+
+**The IAC MIDI driver is enabled from the command line.** It was HANDOFF's
+"Yours alone" item and it is a plist flag, not a click: `devices:0:offline` in
+`~/Library/Audio/MIDI Configurations/Default.mcfg`, flipped with PlistBuddy and
+followed by `killall MIDIServer`. Chrome went from **zero MIDI ports to
+`IAC Driver Bus 1`, in and out**, with no Audio MIDI Setup involved.
+
+Two traps on the way, both already in this repo's notes: `grep` printed nothing
+for "IAC" in the config because it holds NUL bytes (`grep -a`), and `plutil`'s
+XML has raw control characters that Python's expat refuses — PlistBuddy reads
+the binary form directly and is the right tool.
+
+`launch-synth.mjs` grants `midi` and `audioCapture` over CDP **before**
+navigating. A flag will not do it: `--use-fake-ui-for-media-devices` is
+insufficient under `headless=new`, and navigating first means
+`requestMIDIAccess` has already been refused.
+
+**`abletonosc-ext/browser.py`** adds what AbletonOSC lacks and a remote
+instrument needs: Live's browser. `/live/browser/instruments`, `/live/browser/
+find <text>`, `/live/browser/load <track> <name>`. A track with no device makes
+no sound however well the MIDI arrives, and nothing else in the OSC surface can
+load one.
+
+### The four clicks that remain
+
+1. **Restart Live.** `/live/api/reload` logs "Reloaded code" but does NOT rebuild
+   the handler list, so the new browser handler is still `Unknown OSC address`.
+   AppleScript `quit` timed out, which means a dialog is up.
+2. **Preferences → Link/Tempo/MIDI → MIDI Ports → IAC Driver Bus 1 → Track: On.**
+   Live enumerates MIDI ports at startup and its input routing list currently
+   reads `All Ins | Computer Keyboard | 2-MIDI | No Input` — no IAC. A restart
+   may fix this by itself.
+3. **Preferences → Audio → Output Device: BlackHole 2ch**, so the page can
+   capture what Live plays. macOS has no loopback without a virtual device.
+4. **An instrument on a MIDI track** — which step 1 makes scriptable:
+   `node live-osc.mjs get /live/browser/load 0 "Grand Piano"`.
+
+### Why not ableton-mcp
+
+`ahujasid/ableton-mcp` exists and does expose browser loading. It was not used
+because AbletonOSC is already installed, enabled and MEASURED on this machine
+(0.063% worst clock error across four tempos), so the missing capability is
+forty lines rather than a second Remote Script plus an MCP server duplicating a
+working control path. Worth revisiting if the browser handler proves fragile.
