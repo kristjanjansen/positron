@@ -263,6 +263,51 @@ find <text>`, `/live/browser/load <track> <name>`. A track with no device makes
 no sound however well the MIDI arrives, and nothing else in the OSC surface can
 load one.
 
+## STATE, PAUSED 2026-09-10
+
+Everything below the MIDI line works. The audio return from Live does not yet.
+
+| link in the chain | state |
+|---|---|
+| key press → the Pro (direct link) | ✅ 6.10 ms typical |
+| Web MIDI → `IAC Driver Bus 1` | ✅ `midi out: IAC Driver Bus 1` |
+| Live: Drift, input IAC, armed, monitoring In | ✅ set over OSC, one command |
+| Live → Multi-Output → BlackHole | ✅ set by hand (Live's UI has no API) |
+| **BlackHole → `getUserMedia` → the bus** | ❌ **unresolved — see below** |
+| the bus → MoQ (LAN relay) → back | ✅ publishing, 2988 frames |
+
+**The one open thread**: in `?instrument=ableton` the capture branch logged
+**neither** `audio in:` **nor** `audio in denied:`. Both are `.then`/`.catch` on
+one `getUserMedia`, so the promise is still PENDING rather than refused — which
+is a different failure from a permission problem and should be diagnosed as
+such. `audioCapture` IS granted for the origin (`launch-synth.mjs` does it over
+CDP before navigating, and `midi` from the same grant worked). Suspect headless
+Chrome's audio input enumeration rather than the grant.
+
+Next step when picking this up: check whether headless Chrome resolves
+`getUserMedia({audio:true})` at all on that machine, before touching the device
+selection. A pending promise that never rejects is the same shape as
+`audio.play()` and `AudioContext.resume()` — CLAUDE.md's "never let sound gate
+the work" — so the capture should be armed and NOT awaited by anything else.
+
+### How to bring it all back up
+
+    # on the Pro
+    cd ~/positron && git pull
+    node demo/server.mjs &
+    MOQ_IP=192.168.1.241 ~/lan-relay.sh run &          # fingerprint is printed
+    node rig/pro-instrument/launch-synth.mjs --ableton \
+      --relay https://127.0.0.1:4443 \
+      --relay-for https://192.168.1.241:4443 \
+      --cert <fingerprint>
+
+    # from the dev Mac
+    LIVE_HOST=192.168.1.241 node rig/pro-instrument/live-setup.mjs Drift 0
+    node demo/server.mjs        # then open /rig/pro-instrument/play.html?room=proinst
+
+`IAC` survives reboots (it is a plist flag). Live's audio output device survives
+reboots. Live's SET does not — `live-setup.mjs` rebuilds it.
+
 ### Three of the four "clicks" were not clicks
 
 **1. The Live restart is not needed.** `/live/api/reload` DOES rebuild the
