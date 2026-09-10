@@ -46,7 +46,7 @@ The cushion is reported below; it cannot be switched off.</p>
   <th rowspan="2">path</th><th rowspan="2">carries</th>
   <th colspan="2">receipt — telling the Pro to play</th>
   <th colspan="2">sound — the note in your ears</th>
-  <th rowspan="2">cushion</th><th rowspan="2">notes</th>
+  <th rowspan="2">audio cushion</th><th rowspan="2">notes</th>
 </tr>
 <tr><th>typical</th><th>worst 1 in 20</th><th>typical</th><th>worst 1 in 20</th></tr>
 <tr><td>direct link</td><td>the notes</td>
@@ -228,7 +228,7 @@ const setReturn = async (v) => {
       });
       window.__moq = moq;                          // so a probe can read decode/underrun counts
       await attachOnset(ac2, moq.node);            // same detector, other path
-      setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
+      setInterval(() => { const st = moq.stats(); set('mqJB', `${st.floorMs} ms · ours, fixed`); set('mqn', st.frames || '—'); }, 1000);
     } catch (e) {
       console.warn('MoQ subscribe failed:', e.message);
       window.__return = 'rtc'; markCase();
@@ -255,7 +255,7 @@ setInterval(async () => {
   const st = await pc.getStats();
   st.forEach((r) => {
     if (r.type === 'inbound-rtp' && r.kind === 'audio' && r.jitterBufferDelay != null && r.jitterBufferEmittedCount) {
-      const v = `${(1000 * r.jitterBufferDelay / r.jitterBufferEmittedCount).toFixed(1)} ms`;
+      const v = `${(1000 * r.jitterBufferDelay / r.jitterBufferEmittedCount).toFixed(1)} ms · the browser's`;
       set('dcJB', v); set('wsJB', v);
     }
   });
