@@ -77,93 +77,44 @@ const NOTES = [60, 62, 64, 65, 67, 69, 71, 72], KEYS = 'asdfghjk';
 // LAN ONLY, on purpose: no iceServers means host candidates only. That is the
 // right shape for a machine in the same room and it will NOT traverse a NAT --
 // an internet instrument needs STUN, and a symmetric NAT needs TURN.
-const pc = new RTCPeerConnection({ iceServers: [] });
-pc.addTransceiver('audio', { direction: 'recvonly' });
-pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
-// KEY -> EAR. The control round trip is a MESSAGE number and says nothing about
-// when a sound arrives; these are different paths and only one of them has a
-// jitter buffer in it. So watch the returned audio for the note's onset and time
-// THAT from the key press. An AudioWorklet reports the first sample over
-// threshold, which is sample-accurate -- polling an AnalyserNode in rAF would
-// quantise the answer to a frame and this number is ~80 ms, not ~800.
-let earPending = null;   // {t0, via} of the most recent press
-// The onset detector, usable on either return path.
-async function attachOnset(actx, sourceNode) {
-  const code = `class O extends AudioWorkletProcessor{
-    constructor(){super();this.q=true;}
-    process(inputs){const c=inputs[0]&&inputs[0][0];if(!c)return true;
-      let pk=0;for(let i=0;i<c.length;i++){const a=c[i]<0?-c[i]:c[i];if(a>pk)pk=a;}
-      if(this.q&&pk>0.02){this.q=false;this.port.postMessage(currentTime);}
-      else if(!this.q&&pk<0.004){this.q=true;}
-      return true;}}
-    registerProcessor('onset2',O);`;
-  await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
-  const w = new AudioWorkletNode(actx, 'onset2');
-  const mute = actx.createGain(); mute.gain.value = 0;
-  sourceNode.connect(w); w.connect(mute).connect(actx.destination);
-  w.port.onmessage = () => {
-    if (!earPending) return;
-    ears[earPending.via].push(performance.now() - earPending.t0);
-    earPending = null; report();
-  };
-}
-
-pc.ontrack = async (e) => {
-  document.getElementById('out').srcObject = e.streams[0];
-  set('a', `${e.track.kind} live`);
-  if (e.track.kind !== 'audio' || window.__earUp) return;
-  window.__earUp = true;
-  const ac = new AudioContext();
-  await ac.resume().catch(() => {});
-  const src = ac.createMediaStreamSource(e.streams[0]);
-  const code = `class O extends AudioWorkletProcessor{
-    constructor(){super();this.q=true;}
-    process(inputs){const c=inputs[0]&&inputs[0][0];if(!c)return true;
-      let pk=0;for(let i=0;i<c.length;i++){const a=c[i]<0?-c[i]:c[i];if(a>pk)pk=a;}
-      if(this.q&&pk>0.02){this.q=false;this.port.postMessage(currentTime);}
-      else if(!this.q&&pk<0.004){this.q=true;}
-      return true;}}
-    registerProcessor('onset',O);`;
-  await ac.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
-  const w = new AudioWorkletNode(ac, 'onset');
-  // The stream must reach a destination or Chrome latches the graph silent.
-  const mute = ac.createGain(); mute.gain.value = 0;
-  src.connect(w); w.connect(mute).connect(ac.destination);
-  w.port.onmessage = () => {
-    if (!earPending) return;
-    ears[earPending.via].push(performance.now() - earPending.t0);
-    earPending = null;
-    report();
-  };
-};
-
-const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
-// ONE payload, TWO paths, measured on ONE clock. Both legs are round trips
-// timed on this machine, so no clock agreement is needed and none of the number
-// is skew -- which is the only reason these two are comparable at all.
+//
+// ONE OFFER PER ANNOUNCED SYNTH. Offering on ws.onopen AND again on 'here' made
+// the synth accept twice, and its second accept() closed the connection the
+// first was still completing -- which is why a fresh page worked and a restart
+// did not. The synth announces itself; we answer that announcement exactly once,
+// and re-offer only when the announcement changes (i.e. the synth restarted).
+let pc = null, dc = null;
 let seq = 0; const sent = new Map(); const rtts = { dc: [], ws: [] };
 const ears = { dc: [], ws: [], mq: [] };
-const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
-const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
-const ms = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
-const msi = (v) => Number.isFinite(v) ? v.toFixed(0) + ' ms' : '—';
-function report() {
-  for (const k of ['dc', 'ws', 'mq']) {
-    const r = rtts[k] || [], e = ears[k] || [];
-    if (rtts[k]) { set(k + '50', ms(q(r, 50))); set(k + '95', ms(q(r, 95))); }
-    set(k + 'E50', msi(q(e, 50)));
-    set(k + 'E95', msi(q(e, 95)));
-    set(k + 'n', (rtts[k] ? r.length : e.length) || '—');
-  }
+
+function makePeer() {
+  if (pc) { try { pc.close(); } catch { /* already */ } }
+  pc = new RTCPeerConnection({ iceServers: [] });
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+  pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
+  pc.ontrack = onTrack;
+  dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
+  dc.onopen = () => set('d', 'open');
+  dc.onclose = () => set('d', 'closed');
+  dc.onmessage = (m) => {
+    const msg = JSON.parse(m.data);
+    if (msg.type !== 'ack') return;
+    const rec = sent.get(msg.seq); if (!rec) return;
+    sent.delete(msg.seq); rtts[rec.via].push(performance.now() - rec.t0);
+    report();
+  };
+  return pc;
 }
-dc.onopen = () => set('d', 'open');
-dc.onmessage = (m) => {
-  const msg = JSON.parse(m.data);
-  if (msg.type !== 'ack') return;
-  const rec = sent.get(msg.seq); if (!rec) return;
-  sent.delete(msg.seq); rtts[rec.via].push(performance.now() - rec.t0);
-  report();
-};
+
+async function offer() {
+  const c = makePeer();
+  const o = await c.createOffer(); await c.setLocalDescription(o);
+  await new Promise((r) => c.iceGatheringState === 'complete' ? r()
+    : c.addEventListener('icegatheringstatechange', () => c.iceGatheringState === 'complete' && r()));
+  send({ type: 'offer', sdp: c.localDescription.sdp });
+  set('r', 'offered');
+}
+
 const note = (n, via = 'dc') => {
   const id = ++seq;
   const body = { type: 'note', note: n, vel: 100, seq: id, at: Date.now() };
@@ -213,6 +164,7 @@ let moqNs = null, moqRelay = null, moqCert = null;
 const rRtc = document.getElementById('r-rtc'), rMq = document.getElementById('r-mq');
 const out = document.getElementById('out');
 let moq = null;
+const setPathUI = () => { rRtc.classList.toggle('on', window.__return === 'rtc'); rMq.classList.toggle('on', window.__return === 'mq'); };
 const setReturn = async (v) => {
   window.__return = v;
   rRtc.classList.toggle('on', v === 'rtc');
@@ -283,29 +235,35 @@ const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
 const send = (o) => ws.send(JSON.stringify({ from: 'play', at: Date.now(), ...o }));
 ws.onopen = async () => {
   set('r', `open (${ROOM})`);
-  const o = await pc.createOffer(); await pc.setLocalDescription(o);
-  await new Promise((r) => pc.iceGatheringState === 'complete' ? r()
-    : pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()));
-  send({ type: 'hello' });                       // ask the synth for its MoQ name
-  send({ type: 'offer', sdp: pc.localDescription.sdp });
+  send({ type: 'hello' });                       // ask the synth to announce itself
 };
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
-  if (m.from === 'play') return;
+  if (m.from === 'play') return;                       // the relay echoes to sender
+
+  // The synth announces itself with the MoQ name it minted this run. A NEW name
+  // means a new synth process, so the old peer connection is dead and we offer
+  // again -- exactly once per announcement, which is the whole fix.
   if (m.ns && m.ns !== moqNs) {
     moqNs = m.ns; moqRelay = m.moqRelay || null; moqCert = m.moqCert || null;
     rMq.textContent = moqRelay ? 'sound back over MoQ (LAN relay)' : 'sound back over MoQ';
     set('mqn', 'ready');
+    if (moq) { try { moq.close(); } catch { /* gone */ } moq = null; window.__return = 'rtc'; setPathUI(); }
+    await offer();
+    return;
   }
+
   if (m.type === 'ack') {
     const rec = sent.get(m.seq);
     if (rec) { sent.delete(m.seq); rtts[rec.via].push(performance.now() - rec.t0); report(); }
     return;
   }
-  if (m.type === 'answer') { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); set('r', 'answered'); }
-  if (m.type === 'here' && pc.localDescription) send({ type: 'offer', sdp: pc.localDescription.sdp });
+  if (m.type === 'answer' && pc) {
+    if (pc.signalingState !== 'have-local-offer') return;   // a stale answer is not ours
+    await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+    set('r', 'answered');
+  }
 };
-// the relay arm must be acked over the relay too
-const _onmsg = ws.onmessage;
+
 window.__play = { note, rtts, sweep, report, ears };
 </script>
