@@ -35,7 +35,7 @@ async function pickOpus(preferUs = 5000) {
  * pacer note below; without it a HEADLESS context free-runs in bursts and the
  * subscriber starves through every retry while everything reports healthy.
  */
-export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, log = () => {} }) {
+export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, log = () => {} }) {
   await import('/proto/jam/moq/www/moq-synth.js');
   await ac.audioWorklet.addModule(WORKLET);
 
@@ -50,8 +50,13 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
   pacer.muted = true;
   pacer.play().catch((e) => log('pacer play failed: ' + e.message));
 
-  const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false });
-  log(`moq publishing "${ns}" (relay version ${pub.version ?? '?'})`);
+  // latencyMax is the window the relay RETAINS, and the wrapper's default is
+  // 2000 ms. Left at that, a subscriber joining mid-stream is served the whole
+  // two seconds and spends the run draining it -- measured: transit starting at
+  // 2030 ms and counting down, decode perfect, underruns zero. Everything looks
+  // healthy and every sound is two seconds old.
+  const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false, latencyMax });
+  log(`moq publishing "${ns}" (relay ${pub.version ?? '?'}, retains ${latencyMax} ms)`);
 
   const cfg = await pickOpus();
   const st = { seq: 0, published: 0, bytes: 0, errors: 0, frameUs: cfg.opus?.frameDuration ?? 20000 };
