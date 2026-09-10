@@ -528,6 +528,33 @@ nothing else. It stays tight: Opus at 48 kHz is ~85% of one core by a
 third-party benchmark, so the second core carries the synth and there is no third
 core for surprises.
 
+### MEASURED 2026-09-10: raw PCM goes through, and Opus is unnecessary here
+
+`rig/pro-instrument/ws-audio-probe.mjs`, through the deployed relay, echo timed
+on one clock so no offset is in it:
+
+| configuration | kbit/s | msg/s | delivered | loss | round trip p50/p95 |
+|---|---|---|---|---|---|
+| **PCM 48k, 20 ms frames** | 768 | 50 | **400/400** | **0.0%** | 36 / 45 ms |
+| **PCM 48k, 40 ms frames** | 768 | 25 | **200/200** | **0.0%** | 39 / 51 ms |
+| PCM 24k, 40 ms | 384 | 25 | 200/200 | 0.0% | 40 / 56 ms |
+| Opus 64k, 20 ms | 64 | 50 | 400/400 | 0.0% | 33 / 37 ms |
+| PCM 48k, 10 ms | 768 | **100** | 646/800 | **19.3%** | 31 / 39 ms |
+
+**So the codec is not needed on this path.** Opus exists to save bandwidth and
+bandwidth is the abundant thing here — 768 kbit/s is 19% of one socket's budget.
+Dropping it removes the 85%-of-a-core encode, the encoder's own frame delay, and
+a library from the firmware. It bought only **3 ms** of round trip for all that
+CPU, which is the whole argument in one number.
+
+**And the cap bites exactly where the relay says it does.** 100 msg/s lost 19.3%
+with no error, no close and no backpressure — the token bucket, visible only
+because the receiver could count. Stay at or under 50 msg/s; 20 ms frames give
+that with room.
+
+This test cost nothing and needed no hardware. It is the cheapest thing that
+could have killed the ESP32 path, so it is the thing to run first.
+
 ### What this does NOT change
 
 The Pi is still the first box, for the reason it always was: it changes exactly
