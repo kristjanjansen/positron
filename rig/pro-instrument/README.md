@@ -21,8 +21,20 @@ the two are comparable.
 
 | control path | typical | worst 1 in 20 | slowest | quickest | presses |
 |---|---|---|---|---|---|
-| direct peer-to-peer link | **6.50 ms** | 10.70 ms | 12.50 ms | 4.50 ms | 60 |
-| via the Cloudflare relay | **72.70 ms** | 96.90 ms | 149.80 ms | 63.20 ms | 60 |
+| direct peer-to-peer link | **6.00 ms** | 8.20 ms | 31.10 ms | 4.50 ms | 100 |
+| via the Cloudflare relay | **68.90 ms** | 94.80 ms | 120.90 ms | 59.30 ms | 100 |
+
+**The relay costs 11.5x at typical**, and the number that decides playability is
+the last row of the run rather than the median: **presses over 100 ms — direct
+0 of 100, relay 4 of 100.** Anything past ~100 ms reads as sluggish under the
+fingers, so the relay crosses that line four times in a hundred and the direct
+link never approaches it.
+
+⚠️ **Discard a warm-up.** A first attempt read 1781 ms at worst-1-in-20 on BOTH
+arms — a single ~2 s stall in the first seconds of the page, which at only 30
+samples per arm made the 95th percentile almost the maximum. A page that has
+just started is not the thing being measured. These figures follow 24 discarded
+presses.
 
 **Typical** is the middle press — half were quicker. **Worst 1 in 20** is the
 level 19 presses out of 20 came in under, which is what says whether the slow

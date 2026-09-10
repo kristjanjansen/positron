@@ -58,12 +58,12 @@ up a direct peer-to-peer link, synthesised there, sound back on the same
 connection; the relay carries only the handshake. The control-path A/B, same
 payload, alternating note by note, 60 each:
 
-| control path | typical | worst 1 in 20 | slowest |
-|---|---|---|---|
-| direct peer-to-peer link | **6.50 ms** | 10.70 ms | 12.50 ms |
-| via the Cloudflare relay | **72.70 ms** | 96.90 ms | 149.80 ms |
+| control path | typical | worst 1 in 20 | slowest | over 100 ms |
+|---|---|---|---|---|
+| direct peer-to-peer link | **6.00 ms** | 8.20 ms | 31.10 ms | **0 of 100** |
+| via the Cloudflare relay | **68.90 ms** | 94.80 ms | 120.90 ms | **4 of 100** |
 
-**The relay costs 11.2x**, because a machine three metres away is reached by
+**The relay costs 11.5x**, because a machine three metres away is reached by
 going out to the edge and back, twice. So anything in the timing path takes the
 direct link — which is what `proto/jam`'s 0.56 ms MIDI leg already implied and
 this now measures between two real machines. The sound's own delay is the
