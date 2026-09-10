@@ -33,7 +33,11 @@ const NAME = arg('name', process.env.BOX_NAME || 'positron-box');
 const DRY = flag('dry');
 const ONCE = flag('once');
 const AUDIO_DEV = arg('audio', process.env.BOX_AUDIO || 'default');
-const URL_ = `${RELAY_BASE}/room/${ROOM}/ws`;
+// Which relay is a PARAMETER, not a constant. A hop over the LAN and a hop
+// over the internet are the same protocol, and cost 6 ms against 69 ms
+// (measured, this repo). Choosing per hop is the point.
+const RELAY = arg('relay', RELAY_BASE);
+const URL_ = `${RELAY}/room/${ROOM}/ws`;
 
 const FROM = `box-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();

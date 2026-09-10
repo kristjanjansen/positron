@@ -14,7 +14,8 @@ const FROM = `ft-${randomId(6)}`;
 let seq = 0, pass = 0, fail = 0;
 const ok = (n, c, d = '') => { c ? pass++ : fail++; console.log(`  ${c ? 'ok  ' : 'FAIL'} ${n}${d ? `  ${d}` : ''}`); };
 
-const ws = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
+const RELAY = arg('relay', RELAY_BASE);
+const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
 const send = (m) => ws.send(format(m, { from: FROM, seq: seq++ }));
 

@@ -18,7 +18,8 @@ const BODY = rest[1];
 
 const FROM = `ask-${randomId(6)}`;
 let seq = 0, bytes = 0, frames = 0;
-const ws = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
+const RELAY = arg('relay', RELAY_BASE);
+const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
 
 const timeout = setTimeout(() => {
