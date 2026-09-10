@@ -39,7 +39,14 @@ The cushion is reported below; it cannot be switched off.</p>
 <tr><td>direct link for notes</td><td id="d">—</td></tr>
 <tr><td>sound coming back</td><td id="a">—</td></tr>
 <tr><td>the browser’s audio cushion</td><td id="jb">—</td></tr>
+<tr><td><b>key press → sound in your ears</b></td><td id="ear">—</td></tr>
 </table>
+<p class="note"><b>These two are different journeys and only one of them is what
+you hear.</b> The table below times a <i>message</i> — key press out, acknowledgement
+straight back — and no sound is involved in it. The row above times the actual
+note arriving: out to the Pro, synthesised, encoded, sent back, and held in the
+cushion before it plays. That is why the message can be 6 ms while the sound
+takes about eighty.</p>
 
 <h4>How long a key press takes to reach the Pro and come back</h4>
 <table class="t">
@@ -64,7 +71,43 @@ const NOTES = [60, 62, 64, 65, 67, 69, 71, 72], KEYS = 'asdfghjk';
 const pc = new RTCPeerConnection({ iceServers: [] });
 pc.addTransceiver('audio', { direction: 'recvonly' });
 pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
-pc.ontrack = (e) => { document.getElementById('out').srcObject = e.streams[0]; set('a', `${e.track.kind} live`); };
+// KEY -> EAR. The control round trip is a MESSAGE number and says nothing about
+// when a sound arrives; these are different paths and only one of them has a
+// jitter buffer in it. So watch the returned audio for the note's onset and time
+// THAT from the key press. An AudioWorklet reports the first sample over
+// threshold, which is sample-accurate -- polling an AnalyserNode in rAF would
+// quantise the answer to a frame and this number is ~80 ms, not ~800.
+let earPending = null;   // {t0} of the most recent press, whichever path
+const ears = [];
+pc.ontrack = async (e) => {
+  document.getElementById('out').srcObject = e.streams[0];
+  set('a', `${e.track.kind} live`);
+  if (e.track.kind !== 'audio' || window.__earUp) return;
+  window.__earUp = true;
+  const ac = new AudioContext();
+  await ac.resume().catch(() => {});
+  const src = ac.createMediaStreamSource(e.streams[0]);
+  const code = `class O extends AudioWorkletProcessor{
+    constructor(){super();this.q=true;}
+    process(inputs){const c=inputs[0]&&inputs[0][0];if(!c)return true;
+      let pk=0;for(let i=0;i<c.length;i++){const a=c[i]<0?-c[i]:c[i];if(a>pk)pk=a;}
+      if(this.q&&pk>0.02){this.q=false;this.port.postMessage(currentTime);}
+      else if(!this.q&&pk<0.004){this.q=true;}
+      return true;}}
+    registerProcessor('onset',O);`;
+  await ac.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  const w = new AudioWorkletNode(ac, 'onset');
+  // The stream must reach a destination or Chrome latches the graph silent.
+  const mute = ac.createGain(); mute.gain.value = 0;
+  src.connect(w); w.connect(mute).connect(ac.destination);
+  w.port.onmessage = () => {
+    if (!earPending) return;
+    ears.push(performance.now() - earPending.t0);
+    earPending = null;
+    const q = (p) => { const a = [...ears].sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p / 100 * a.length))]; };
+    set('ear', `${q(50).toFixed(0)} ms typical · ${q(95).toFixed(0)} ms worst 1 in 20 · ${ears.length} notes`);
+  };
+};
 
 const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
 // ONE payload, TWO paths, measured on ONE clock. Both legs are round trips
@@ -97,11 +140,13 @@ const note = (n, via = 'dc') => {
     // A press that goes nowhere must say so. Before the direct link is up this
     // silently dropped the note and looked like a broken key.
     if (dc.readyState !== 'open') { set('d', `not open yet (${dc.readyState}) — that press went nowhere`); return; }
-    sent.set(id, { t0: performance.now(), via });
+    const t0 = performance.now();
+    sent.set(id, { t0, via }); earPending = { t0 };
     dc.send(JSON.stringify(body));
   } else {
     if (ws.readyState !== 1) { set('r', 'not open — that press went nowhere'); return; }
-    sent.set(id, { t0: performance.now(), via });
+    const t0 = performance.now();
+    sent.set(id, { t0, via }); earPending = { t0 };
     send(body);
   }
 };
@@ -181,5 +226,5 @@ ws.onmessage = async (e) => {
 };
 // the relay arm must be acked over the relay too
 const _onmsg = ws.onmessage;
-window.__play = { note, rtts, sweep, report };
+window.__play = { note, rtts, sweep, report, ears };
 </script>
