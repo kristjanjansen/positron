@@ -132,6 +132,36 @@ in for the notes: Live's transport is clocked by its audio engine, and
 `is_playing` reports intent rather than delivery (a `current_song_time` that
 does not move is the only proof the clock stopped).
 
+## The MoQ return: transport proven, key→ear NOT yet captured
+
+`moq-audio.mjs` publishes the synth bus as Opus over MoQ beside the WebRTC track
+(same bus, so it is one instrument heard two ways) and subscribes with our own
+playout ring. **What is measured:** the subscription goes live, decode is clean
+(4417 of 4417, then 2156 of 2156), underruns 0, and **transit settled at
+37–40 ms typical**.
+
+**What is NOT measured: key→ear over MoQ.** Do not quote a number for it; there
+isn't one. The blocker is not MoQ — it is that after many rapid restarts of the
+headless synth the WebRTC pairing that carries the NOTES stops completing, so no
+note is played and nothing sounds on either return. A fresh page meeting a fresh
+synth works (6.00 ms receipts, 84 ms key→ear, measured repeatedly).
+
+Two real defects were found and fixed on the way, both of which reported perfect
+health while being wrong:
+
+- **`latencyMax` defaults to 2000 ms** in the wrapper, which is the window the
+  relay RETAINS. A subscriber joining mid-stream was served the whole two seconds
+  and spent the run draining it: **transit started at 2030 ms and counted
+  steadily down** while decode was 4417 of 4417 and underruns were 0. Every
+  indicator healthy, every sound two seconds old. Now 100 ms. The consumer was
+  already at `latency: 0`, so this was never the consumer.
+- **A same-name rejoin bricks a draft-14 namespace** (RUNBOOK 13.4). Restarting
+  the synth five times under one fixed name gave every subscriber
+  `SUBSCRIBE code=4 Track not found` while the publisher sent 1851 frames with
+  zero errors. The name is now minted per run and announced over the relay,
+  because a player that guesses the name is a player that subscribes to a
+  bricked one.
+
 ## What is NOT measured here
 
 - **Off-LAN.** `iceServers` is empty on purpose — host candidates only, right for
