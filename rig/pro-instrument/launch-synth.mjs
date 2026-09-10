@@ -34,18 +34,26 @@ const url = `http://127.0.0.1:8890/rig/pro-instrument/synth.html?${q}`;
 
 spawn('pkill', ['-f', UDD]);
 await sleep(1500);
-// HEADFUL, and this is not a preference. Headless Chrome on macOS has NO
-// working audio input: a getUserMedia track comes back live/unmuted/enabled and
-// reads EXACTLY 0.00000 -- including from the built-in microphone, which cannot
-// be digitally silent in a room. Measured side by side: headful mic 0.00575 at
-// rest and 0.16897 with sound in the room, headless 0.00000 for both. Every
-// "BlackHole is silent" reading was the instrument, not the signal.
-const ch = spawn(CHROME, [`--user-data-dir=${UDD}`, '--no-first-run',
+// HEADFUL, AND LAUNCHED WITH `open`. Neither is a preference; both were
+// measured, and each one alone still gives digital silence.
+//
+//  · Headless Chrome on macOS has NO working audio input. The track comes back
+//    live/unmuted/enabled and reads EXACTLY 0.00000 -- including from the
+//    built-in microphone, which cannot be silent in a room.
+//  · A GUI app SPAWNED from an ssh session is a child of sshd and runs outside
+//    the user's GUI session, so it gets no audio devices either -- the same
+//    0.00000, from a headful browser. `open -na` hands the launch to launchd,
+//    which puts it in the GUI session where the audio devices live.
+//
+// Measured on one machine, same page, same flags: mic 0.16897 with sound in the
+// room when opened with `open`, 0.00000 when spawned. Every "BlackHole is
+// silent" reading before this was the instrument rather than the signal.
+spawn('open', ['-na', 'Google Chrome', '--args',
+  `--user-data-dir=${UDD}`, '--no-first-run',
   '--autoplay-policy=no-user-gesture-required',
   '--auto-accept-camera-and-microphone-capture',
   `--remote-debugging-port=${PORT}`,
-  'about:blank'], { stdio: 'ignore', detached: true });
-ch.unref();
+  'about:blank'], { stdio: 'ignore' });
 await sleep(4000);
 
 // The BROWSER target — /json/version, not a page from /json/list.
