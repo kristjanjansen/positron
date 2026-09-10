@@ -115,6 +115,63 @@ async function offer() {
   set('r', 'offered');
 }
 
+// ---- hearing the note, on whichever path the sound came back ------------
+// A press stamps `earPending`; the first onset after it is that note arriving.
+// Which ROW it lands in is decided by the return path in force, not by how the
+// note travelled up -- those are different journeys.
+let earPending = null;
+const earVia = () => (window.__return === 'mq' ? 'mq' : 'dc');
+
+async function attachOnset(actx, sourceNode) {
+  // An AudioWorklet reports the first sample over threshold, so the onset is
+  // sample-accurate. Polling an analyser in rAF would quantise an ~80 ms answer
+  // to a frame.
+  const code = `class O extends AudioWorkletProcessor{
+    constructor(){super();this.q=true;}
+    process(inputs){const c=inputs[0]&&inputs[0][0];if(!c)return true;
+      let pk=0;for(let i=0;i<c.length;i++){const a=c[i]<0?-c[i]:c[i];if(a>pk)pk=a;}
+      if(this.q&&pk>0.02){this.q=false;this.port.postMessage(currentTime);}
+      else if(!this.q&&pk<0.004){this.q=true;}
+      return true;}}
+    registerProcessor('onset',O);`;
+  await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  const w = new AudioWorkletNode(actx, 'onset');
+  // The graph must reach a destination or Chrome latches it silent.
+  const mute = actx.createGain(); mute.gain.value = 0;
+  sourceNode.connect(w); w.connect(mute).connect(actx.destination);
+  w.port.onmessage = () => {
+    if (!earPending) return;
+    ears[earPending.via].push(performance.now() - earPending.t0);
+    earPending = null;
+    report();
+  };
+}
+
+async function onTrack(e) {
+  document.getElementById('out').srcObject = e.streams[0];
+  set('a', `${e.track.kind} live`);
+  if (e.track.kind !== 'audio' || window.__earUp) return;
+  window.__earUp = true;
+  const actx = new AudioContext();
+  await actx.resume().catch(() => {});
+  await attachOnset(actx, actx.createMediaStreamSource(e.streams[0]));
+}
+
+// ---- the readout -------------------------------------------------------
+const q = (a, p) => { const t = [...a].sort((x, y) => x - y); return t.length ? t[Math.min(t.length - 1, Math.floor(p / 100 * t.length))] : NaN; };
+const ms = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
+const msi = (v) => Number.isFinite(v) ? v.toFixed(0) + ' ms' : '—';
+function report() {
+  for (const k of ['dc', 'ws', 'mq']) {
+    const r = rtts[k] || [], e = ears[k] || [];
+    if (rtts[k] && r.length) { set(k + '50', ms(q(r, 50))); set(k + '95', ms(q(r, 95))); }
+    set(k + 'E50', msi(q(e, 50)));
+    set(k + 'E95', msi(q(e, 95)));
+    const n = (rtts[k] ? r.length : e.length);
+    if (n) set(k + 'n', n);
+  }
+}
+
 const note = (n, via = 'dc') => {
   const id = ++seq;
   const body = { type: 'note', note: n, vel: 100, seq: id, at: Date.now() };
