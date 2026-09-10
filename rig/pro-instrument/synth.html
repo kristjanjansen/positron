@@ -62,6 +62,11 @@ ws.onopen = () => { log(`relay open (${ROOM})`); send({ type: 'here' }); };
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
   if (m.from === 'synth') return;                       // the relay echoes to sender
+  if (m.type === 'note') {                              // the RELAY arm of the A/B
+    play(m.note, m.vel);
+    send({ type: 'ack', seq: m.seq, via: 'ws' });
+    return;
+  }
   if (m.type === 'offer') {
     await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
     const a = await pc.createAnswer(); await pc.setLocalDescription(a);

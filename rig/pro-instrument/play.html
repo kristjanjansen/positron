@@ -23,6 +23,7 @@ The cushion is reported below; it cannot be switched off.</p>
 <tr><td>direct link</td><td id="d">—</td></tr>
 <tr><td>sound coming back</td><td id="a">—</td></tr>
 <tr><td>key press → the Pro and back</td><td id="rtt">—</td></tr>
+<tr><td> </td><td id="rly">—</td></tr>
 <tr><td>the browser’s audio cushion</td><td id="jb">—</td></tr>
 </table>
 <audio id="out" autoplay></audio>
@@ -40,21 +41,49 @@ pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
 pc.ontrack = (e) => { document.getElementById('out').srcObject = e.streams[0]; set('a', `${e.track.kind} live`); };
 
 const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
-let seq = 0; const sent = new Map(); const rtts = [];
+// ONE payload, TWO paths, measured on ONE clock. Both legs are round trips
+// timed on this machine, so no clock agreement is needed and none of the number
+// is skew -- which is the only reason these two are comparable at all.
+let seq = 0; const sent = new Map(); const rtts = { dc: [], ws: [] };
+const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
+function report() {
+  const row = (k) => rtts[k].length
+    ? `${pct(rtts[k],50).toFixed(2)} / ${pct(rtts[k],95).toFixed(2)} / ${Math.max(...rtts[k]).toFixed(2)} ms  n=${rtts[k].length}`
+    : '—';
+  set('rtt', `direct ${row('dc')}`);
+  set('rly', `relay  ${row('ws')}`);
+}
 dc.onopen = () => set('d', 'open');
 dc.onmessage = (m) => {
   const msg = JSON.parse(m.data);
   if (msg.type !== 'ack') return;
-  const t0 = sent.get(msg.seq); if (t0 == null) return;
-  sent.delete(msg.seq); rtts.push(performance.now() - t0);
-  const s = [...rtts].sort((a, b) => a - b);
-  set('rtt', `${s[Math.floor(s.length/2)].toFixed(2)} ms p50 · ${s.at(-1).toFixed(2)} max · n=${s.length}`);
+  const rec = sent.get(msg.seq); if (!rec) return;
+  sent.delete(msg.seq); rtts[rec.via].push(performance.now() - rec.t0);
+  report();
 };
-const note = (n) => {
-  if (dc.readyState !== 'open') return;
-  const id = ++seq; sent.set(id, performance.now());
-  dc.send(JSON.stringify({ type: 'note', note: n, vel: 100, seq: id, at: Date.now() }));
+const note = (n, via = 'dc') => {
+  const id = ++seq;
+  const body = { type: 'note', note: n, vel: 100, seq: id, at: Date.now() };
+  if (via === 'dc') {
+    if (dc.readyState !== 'open') return;
+    sent.set(id, { t0: performance.now(), via });
+    dc.send(JSON.stringify(body));
+  } else {
+    if (ws.readyState !== 1) return;
+    sent.set(id, { t0: performance.now(), via });
+    send(body);
+  }
 };
+// Alternate the two paths note-by-note so any drift in the link is shared
+// between them rather than landing on whichever ran second.
+async function sweep(n = 60, gapMs = 120) {
+  const scale = [60, 62, 64, 65, 67, 69, 71, 72];
+  for (let i = 0; i < n; i++) {
+    note(scale[i % scale.length], i % 2 ? 'ws' : 'dc');
+    await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return { dc: rtts.dc.length, ws: rtts.ws.length };
+}
 
 NOTES.forEach((n, i) => {
   const b = document.createElement('button');
@@ -85,8 +114,15 @@ ws.onopen = async () => {
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
   if (m.from === 'play') return;
+  if (m.type === 'ack') {
+    const rec = sent.get(m.seq);
+    if (rec) { sent.delete(m.seq); rtts[rec.via].push(performance.now() - rec.t0); report(); }
+    return;
+  }
   if (m.type === 'answer') { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); set('r', 'answered'); }
   if (m.type === 'here' && pc.localDescription) send({ type: 'offer', sdp: pc.localDescription.sdp });
 };
-window.__play = { note, rtts };
+// the relay arm must be acked over the relay too
+const _onmsg = ws.onmessage;
+window.__play = { note, rtts, sweep, report };
 </script>
