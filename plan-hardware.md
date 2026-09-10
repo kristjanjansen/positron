@@ -562,3 +562,186 @@ ONE variable. The ESP32 path needs a new transport, a new synth and new hardware
 at once, and would produce one number with no way to say what caused it. Build
 the Pi, get a baseline, then let the ESP32 try to beat it with everything else
 held still.
+
+---
+
+## 8. The real use case, which reframes all of it (2026-09-10)
+
+Everything above was written against an abstract box. Here is the actual one,
+and it is better because it is smaller.
+
+**A Novation Circuit lives in another studio, in another city, and its owner is
+not there.** Three wants, which turn out to be one box:
+
+| when you are | the box is |
+|---|---|
+| in that studio | a MIDI patchbay you re-patch by voice |
+| in another city | the same patchbay, with audio coming back |
+| either | something that has to survive being alone |
+
+### 8.1 A Circuit is LOOP-SHAPED, and that dissolves the latency problem
+
+The sequencer runs ON the Circuit, in the room where it is. Nothing is scheduled
+remotely and nothing has to agree about time. What crosses the wire is
+*steering* — change pattern, mute a track, turn a macro, nudge tempo — and none
+of that is latency-critical. A mute landing 100 ms late lands on the next step.
+A filter sweep at 100 ms delay feels like a filter sweep.
+
+So the two things measured as hard this month simply do not arise:
+
+- **no clock problem.** The Circuit is its own clock, so the ~57 ms
+  machine-to-machine offset and the ~3 ms residual after estimation are not in
+  this path at all.
+- **no note-timing problem.** There are no remote notes to schedule.
+
+What is left is audio coming back at ~100 ms, and you are LISTENING to that, not
+playing on it. **What you lose is finger drumming**, and no board fixes that.
+Say so plainly rather than letting somebody discover it after buying.
+
+### 8.2 The patchbay is what justifies the box
+
+A box that only works when you are away is hard to justify; a box that is your
+patchbay every day and is also reachable from another city is easy. Build the
+second thing.
+
+**Linux already IS the patchbay.** The ALSA sequencer gives every MIDI port a
+number and a name, and `aconnect 20:0 24:0` wires any output to any input, live.
+A Pi with a USB hub is the hardware: the Circuit is class-compliant USB MIDI, so
+it is a cable, not a DIN socket and two resistors.
+
+What is missing is only the FACE — and because that face talks over the relay it
+is identical from the next room and the next country.
+
+### 8.3 Voice belongs in the browser, not in the box
+
+Put speech where the microphone and the CPU already are:
+
+    phone or laptop -> browser speech-to-text -> "connect circuit to microfreak"
+      -> the relay -> the box runs the patch
+
+The box never runs a model, needs no microphone, and the voice half is testable
+on a laptop today with no hardware at all.
+
+### 8.4 A patch is a VALUE, not a sequence of commands
+
+The tempting shape is voice -> `aconnect 20:0 24:0`. The failure mode forbids it:
+**a wrong MIDI patch is SILENT.** Nothing errors, nothing lights up, notes just
+do not arrive — and you are in another city. Generated commands that might work
+are the wrong shape for something that fails quietly.
+
+A document can be checked before it is applied:
+
+```jsonc
+{ "v": 1, "name": "circuit drives everything",
+  "links": [
+    { "from": "circuit", "to": "microfreak", "carry": ["note", "cc"] },
+    { "from": "circuit", "to": "digitakt",   "carry": ["clock", "transport"] }
+  ] }
+```
+
+Every name resolves against the ports ALSA actually reports, or is named as
+unresolvable. The model's job becomes **intent -> document**, which is
+verifiable, rather than **intent -> commands**, which can only be run and hoped
+for. That is `plan-score.md`'s rule one level up: normalise the envelope, carry
+the payload verbatim, and never let a generated thing be authoritative over a
+thing you can check.
+
+Three consequences:
+
+- **The naming layer is the product.** ALSA says `20:0` and `Circuit MIDI 1`;
+  nobody says that out loud. The map from "the circuit" to a port is what a human
+  wants, and once it exists, voice is easy and so is typing.
+- **Patches diff and recall.** "What did I have patched last Tuesday" is a real
+  question in a dawless rig, and a document answers it where a command history
+  does not.
+- **A re-patch is an event with a timestamp**, which puts it in this project's
+  own substrate: a session's patching history is a timeline you could replay.
+
+⚠️ **`carry` matters more than `from`/`to`.** Most dawless pain is clock and
+transport arriving somewhere they should not, and a patch that says only "A -> B"
+hides exactly that. Making the message classes explicit is what makes this better
+than cables rather than a metaphor for them.
+
+⚠️ **Do not let the box become the timing path.** Route clock as directly as the
+rig allows and measure the jitter `aconnect` adds against a direct cable before
+trusting it. Same rule this project already applies to OSC and to the servo.
+
+### 8.5 Unattended is now the binding requirement
+
+Nobody is in that room. Every failure this month needed a human standing at the
+machine:
+
+- Live blocked twenty minutes on a crash-recovery dialog, having written **zero**
+  log lines;
+- audio capture died because a permission grant expires when its client
+  disconnects, leaving a live, unmuted track carrying digital silence;
+- the machine went to sleep mid-measurement;
+- `sshd` wedged and needed Remote Login toggled.
+
+So the box must boot into its job with no login and no dialog, come back after a
+power cut, hold its permissions across restarts, and **say that it is alive
+before you need it** — which this project already has, in the device log sink and
+the BUILD stamp that attributes a report to a build.
+
+**This makes one unknown critical**: can a Chrome policy file on Linux grant
+microphone access permanently? If yes, the measured 58 ms browser path runs
+unattended and the box is a Pi with a systemd service. If no, something must hold
+that grant forever, and that is the argument for a native client. One evening on
+one Pi settles it.
+
+### 8.6 What can be simulated, and what cannot
+
+**Not a Cloudflare Container.** Containers are the wrong instrument here: the
+patchbay needs ALSA's sequencer, which is a KERNEL facility, and a container
+shares the host's kernel with no `/dev/snd` and no `snd-seq`. It also cannot
+answer anything about ARM, and the whole browser question is "does Chrome for
+arm64 Linux do this". A container would answer the questions we are not asking.
+
+**Docker on the M1 is better and free.** `--platform linux/arm64` on an Apple
+Silicon machine is NATIVE arm64 Linux, not emulation, so it answers the
+software-only half properly: does Chrome for arm64 Linux exist and run, does
+`AudioEncoder.isConfigSupported` accept 5 ms `lowdelay` Opus, does WebTransport
+reach the relay from arm64 Linux.
+
+**What no simulation answers**: real MIDI ports, real audio devices, unattended
+boot, and how a Pi behaves after a power cut. Those need the board, and they are
+precisely the things that broke this month.
+
+### 8.7 Where the audio goes, and where a model does not
+
+The audio goes to **your ears and nowhere else**:
+
+    Circuit -> the Pi captures -> the relay -> your browser -> your speakers
+
+**Cloudflare is a dumb pipe here, deliberately.** The relay's whole value is that
+it does not parse, which is why the Durable Object hop costs 0.18 ms. Nothing
+stores the audio and no model touches it — the moment the relay understands
+audio, every message becomes a parse and the hop stops being free.
+
+A model belongs in exactly one place: **the words, not the sound.**
+
+| | |
+|---|---|
+| the browser's own `SpeechRecognition` | free, no round trip, Chrome-only, ships audio to Google anyway |
+| **Workers AI (Whisper)** | consistent, any browser, infrastructure already in use, costs a little |
+
+Voice commands are not latency-critical — a few hundred milliseconds to hear
+"connect circuit to microfreak" is invisible — so the round trip is free in the
+only sense that matters. **Not a local model on the Pi**: a speech model on the
+box is exactly the kind of weight that makes an unattended machine fragile.
+
+The second place a model earns its keep is **intent -> patch document** — turning
+"make the circuit drive everything but keep the digitakt on its own clock" into
+the `links` array of 8.4. Under 8.4's rule: it produces a DOCUMENT that is
+validated against the ports ALSA reports, never commands that are run.
+
+Which divides the work cleanly, and keeps the part nobody can walk over to as
+boring as possible:
+
+- **the Pi**: ports, patching, capture. No models, no speech, nothing clever.
+- **Cloudflare**: a dumb pipe for audio, and optionally a model for words.
+- **the browser**: the face, the microphone and the speakers.
+
+The order that follows: prototype the naming layer and the patch document with
+`aconnect -l` output and no hardware; test the browser capabilities in arm64
+Docker; buy one Pi only for the questions that are left.
