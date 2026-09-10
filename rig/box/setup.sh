@@ -56,9 +56,26 @@ echo "== install to $DEST"
 install -d "$DEST" "$DEST/fixtures" "$DEST/demo/shell"
 install -m 644 "$SRC"/*.mjs "$DEST/"
 install -m 644 "$SRC"/fixtures/* "$DEST/fixtures/"
-# The envelope is imported from the deployed module, not copied — one shape,
-# both ends. It has to come along, at the path box.mjs expects.
-install -m 644 "$SRC"/../../demo/shell/wire.mjs "$DEST/demo/shell/wire.mjs"
+# Shared modules are IMPORTED from demo/shell rather than copied into rig/box —
+# one envelope, one Rhodes, one Moog, both ends. They must come along at the
+# exact paths box.mjs expects.
+#
+# Do not hand-maintain this list. It was wire.mjs alone until 2026-09-10, by
+# which time synth.mjs also imported rhodes.mjs and moog.mjs — so the service
+# would have installed cleanly and died on its first import, on a board in
+# another room. Read the imports out of the source, and REFUSE the install when
+# one has no file: the rule build.mjs already applies to the deployed site.
+MISSING=0
+for rel in $(grep -ho "from '\.\./\.\./[^']*'" "$SRC"/*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u); do
+  if [ -f "$SRC/../../$rel" ]; then
+    install -d "$DEST/$(dirname "$rel")"
+    install -m 644 "$SRC/../../$rel" "$DEST/$rel"
+    echo "   + $rel"
+  else
+    echo "   MISSING: $rel"; MISSING=1
+  fi
+done
+[ "$MISSING" = 0 ] || { echo "refusing to install with an unresolved import"; exit 1; }
 chown -R "$BOXUSER":"$BOXUSER" "$DEST"
 
 echo "== config"

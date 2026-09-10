@@ -29,9 +29,14 @@ const timeout = setTimeout(() => {
 
 ws.onopen = () => {
   if (VERB === 'listen') { console.error(`listening on ${ROOM} for ${BODY ?? 5}s ...`); return; }
-  let patch;
-  if (BODY) { try { patch = JSON.parse(BODY); } catch (e) { console.error('patch is not JSON:', e.message); process.exit(1); } }
-  ws.send(format({ type: VERB, ...(patch ? { patch } : {}) }, { from: FROM, seq: seq++ }));
+  let body;
+  if (BODY) { try { body = JSON.parse(BODY); } catch (e) { console.error('body is not JSON:', e.message); process.exit(1); } }
+  // A patch verb takes a DOCUMENT and everything else takes FIELDS. Nesting
+  // both under `patch` meant `audio.start {"source":"fluidsynth"}` arrived with
+  // no source at all and fell back to the built-in synth — reporting ok:true
+  // for an instrument nobody asked for, which is the worst kind of wrong.
+  const wrap = body ? (VERB.startsWith('patch.') ? { patch: body } : body) : {};
+  ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++ }));
 };
 
 ws.onmessage = (e) => {

@@ -1,0 +1,219 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>listen to the box</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b0e14; --fg:#c9d1d9; --dim:#7d8590; --hi:#7ee787; --line:#21262d; }
+  body { background:var(--bg); color:var(--fg); font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; margin:0; padding:24px; }
+  h1 { font-size:15px; font-weight:600; margin:0 0 4px; }
+  p  { color:var(--dim); margin:0 0 18px; max-width:44rem; }
+  button { background:#161b22; color:var(--fg); border:1px solid var(--line); border-radius:6px;
+           padding:7px 12px; font:inherit; cursor:pointer; margin:0 6px 6px 0; }
+  button:hover { border-color:var(--hi); }
+  button.on { background:var(--hi); color:#0b0e14; border-color:var(--hi); }
+  .row { margin:0 0 14px; }
+  .lab { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.08em; margin:0 0 6px; }
+  #keys { display:flex; gap:3px; margin:10px 0 18px; flex-wrap:wrap; }
+  #keys button { width:46px; height:64px; margin:0; }
+  #keys button.black { background:#0d1117; color:var(--dim); }
+  #keys button.lit { background:var(--hi); color:#0b0e14; }
+  table { border-collapse:collapse; font-size:13px; }
+  td { padding:2px 18px 2px 0; }
+  td.k { color:var(--dim); }
+  #log { color:var(--dim); font-size:12px; white-space:pre-wrap; margin-top:16px; max-height:9em; overflow:auto; }
+</style>
+<h1>listen to the box</h1>
+<p>The instrument is a process somewhere else — a container here, a Raspberry Pi later. It makes the
+sound and sends raw samples over a socket; this page only plays what arrives and sends key presses back.
+Nothing is synthesised here. Play with the <b>a w s e d f t g y h u j k</b> row, or click the keys;
+<b>z</b> and <b>x</b> shift the octave.</p>
+
+<div class="row">
+  <div class="lab">audio</div>
+  <button id="go">Start listening</button>
+  <button id="stop">Stop</button>
+</div>
+<div class="row">
+  <div class="lab">instrument</div>
+  <span id="sfs"></span>
+</div>
+<div class="row">
+  <div class="lab">voice (fluidsynth only)</div>
+  <span id="voices"></span>
+</div>
+<div class="row">
+  <div class="lab">filter — the moog's whole gesture, and the thing a sample cannot do</div>
+  <label>cutoff <input id="cut" type="range" min="0" max="127" value="60"></label>
+  <label style="margin-left:18px">resonance <input id="res" type="range" min="0" max="127" value="80"></label>
+  <span id="fval" style="margin-left:14px;color:var(--dim)"></span>
+</div>
+<div id="keys"></div>
+<table>
+  <tr><td class="k">source</td><td id="src">—</td><td class="k">frames</td><td id="frames">0</td></tr>
+  <tr><td class="k">dropped</td><td id="lost">0</td><td class="k">level</td><td id="rms">—</td></tr>
+</table>
+<div id="log"></div>
+
+<script type="module">
+const q = new URLSearchParams(location.search);
+const ROOM = q.get('room') || 'box-listen';
+const RELAY = q.get('relay') || 'wss://ws.positron.studio';
+const ID = 'web-' + Math.random().toString(36).slice(2, 8);
+
+const $ = (id) => document.getElementById(id);
+const log = (s) => { $('log').textContent = (s + '\n' + $('log').textContent).slice(0, 1200); };
+
+let ctx = null, playout = null, ws = null, seq = 0, frames = 0, lost = 0, last = -1;
+
+const send = (m) => ws?.readyState === 1 &&
+  ws.send(JSON.stringify({ id: Math.random().toString(36).slice(2), type: '', ...m, from: ID, at: Date.now(), seq: seq++ }));
+
+// The relay is verbatim and echoes to everyone including the sender, so a page
+// must ignore its own traffic or it answers itself.
+function connect() {
+  ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => { log(`joined ${ROOM}`); send({ type: 'sf.list' }); };
+  // The relay's Durable Object hibernates and drops every socket. Without this
+  // the page keeps its buttons and answers nobody, which looks like the box
+  // died. Re-ask for the soundfonts on the way back in.
+  ws.onclose = () => { log('socket closed — reconnecting'); setTimeout(connect, 1000); };
+  ws.onerror = () => {};
+  ws.onmessage = (e) => {
+    if (typeof e.data !== 'string') {
+      const s = new DataView(e.data).getUint32(0, true);
+      if (last >= 0 && s !== last + 1) lost += s - last - 1;
+      last = s; frames++;
+      const pcm = new Int16Array(e.data, 12);
+      const f32 = new Float32Array(pcm.length);
+      let sum = 0;
+      for (let i = 0; i < pcm.length; i++) { f32[i] = pcm[i] / 32768; sum += f32[i] * f32[i]; }
+      if (frames % 10 === 0) {
+        $('frames').textContent = frames; $('lost').textContent = lost;
+        $('rms').textContent = Math.sqrt(sum / pcm.length).toFixed(3);
+      }
+      playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
+      return;
+    }
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.from === ID) return;
+    if (m.type === 'sf.listed') drawSoundfonts(m.soundfonts);
+    if (m.type === 'audio.started') { $('src').textContent = m.ok ? (m.soundfont ?? m.source) : ('failed: ' + m.reason); log(JSON.stringify(m).slice(0, 160)); }
+    if (m.type === 'box.hello') log('box joined: ' + JSON.stringify(m.instruments ?? {}));
+  };
+}
+
+async function startAudio() {
+  if (ctx) return;
+  ctx = new AudioContext({ latencyHint: 'interactive' });
+  await ctx.resume();
+  await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
+  playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+  playout.connect(ctx.destination);
+  playout.port.postMessage({ cmd: 'floor', ms: 60, adaptive: false });
+  log('audio running — the cushion is ours, 60 ms');
+}
+
+$('go').onclick = async () => { await startAudio(); send({ type: 'audio.start', source: 'synth' }); };
+$('stop').onclick = () => send({ type: 'audio.stop' });
+
+function drawSoundfonts(list) {
+  const host = $('sfs'); host.textContent = '';
+  const mk = (label, msg) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = async () => {
+      await startAudio();
+      send({ type: 'audio.stop' });
+      setTimeout(() => send(msg), 350);       // let the old instrument go before the new one starts
+      [...host.children].forEach((c) => c.classList.remove('on'));
+      b.classList.add('on');
+    };
+    host.append(b);
+  };
+  mk('our FM rhodes', { type: 'audio.start', source: 'synth' });
+  mk('our moog (modelled)', { type: 'audio.start', source: 'moog', patch: 'bass' });
+  for (const sf of list) mk(`${sf.name} (${sf.mb} MB)`, { type: 'audio.start', source: 'fluidsynth', soundfont: sf.path });
+}
+
+const VOICES = ['rhodes', 'piano', 'vibes', 'pad', 'strings', 'bass', 'organ', 'clav'];
+for (const v of VOICES) {
+  const b = document.createElement('button');
+  b.textContent = v;
+  b.onclick = () => send({ type: 'voice.select', channel: 0, voice: v });
+  $('voices').append(b);
+}
+for (const p of ['bass', 'lead', 'pad', 'pluck', 'squelch']) {
+  const b = document.createElement('button');
+  b.textContent = 'moog:' + p;
+  b.onclick = () => send({ type: 'moog.patch', patch: p });
+  $('voices').append(b);
+}
+
+const BLACK = { 1:1, 3:1, 6:1, 8:1, 10:1 };
+const NAME = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// The typing row, chromatic: the same mapping demo/shell/keyboard.mjs uses, so
+// a key means the same note on every page in this project.
+const QWERTY = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12 };
+let base = 60;
+const buttons = new Map();          // semitone offset -> button
+
+// A key is lit by the NOTE, never by the press that caused it — so a note from
+// the typing row, a pointer, or anywhere else lights the same key.
+function light(off, on) { buttons.get(off)?.classList.toggle('lit', on); }
+async function noteOn(off, vel = 100) {
+  await startAudio();
+  light(off, true);
+  send({ type: 'note.on', note: base + off, vel, channel: 0 });
+}
+function noteOff(off) {
+  light(off, false);
+  send({ type: 'note.off', note: base + off, channel: 0 });
+}
+
+const LABEL = Object.fromEntries(Object.entries(QWERTY).map(([k, v]) => [v, k]));
+for (let off = 0; off <= 12; off++) {
+  const b = document.createElement('button');
+  b.innerHTML = `${NAME[(base + off) % 12]}<br><span style="opacity:.5">${LABEL[off] ?? ''}</span>`;
+  if (BLACK[off % 12]) b.classList.add('black');
+  b.addEventListener('pointerdown', () => noteOn(off));
+  b.addEventListener('pointerup', () => noteOff(off));
+  b.addEventListener('pointerleave', () => noteOff(off));
+  buttons.set(off, b);
+  $('keys').append(b);
+}
+
+const held = new Set();
+addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' || k === 'x') { base += k === 'z' ? -12 : 12; base = Math.max(24, Math.min(96, base)); redraw(); return; }
+  const off = QWERTY[k];
+  // repeat fires while a key is held; without this every note retriggers ~30x a
+  // second and the box hears a machine gun rather than a held key.
+  if (off === undefined || e.repeat || held.has(off)) return;
+  held.add(off); e.preventDefault(); noteOn(off);
+});
+addEventListener('keyup', (e) => {
+  const off = QWERTY[e.key.toLowerCase()];
+  if (off === undefined) return;
+  held.delete(off); noteOff(off);
+});
+// Losing focus with a key down would leave a note sounding forever.
+addEventListener('blur', () => { for (const o of held) noteOff(o); held.clear(); });
+
+function redraw() {
+  for (const [off, b] of buttons) b.innerHTML = `${NAME[(base + off) % 12]}<br><span style="opacity:.5">${LABEL[off] ?? ''}</span>`;
+  log(`octave: base note ${base}`);
+}
+
+// A patch knob takes effect on the NEXT note, as on a real one — so sweep it
+// while playing repeated notes rather than expecting a held note to move.
+for (const [id, ctrl, name] of [['cut', 74, 'cutoff'], ['res', 71, 'resonance']]) {
+  $(id).addEventListener('input', () => {
+    send({ type: 'cc', ctrl, value: +$(id).value, channel: 0 });
+    $('fval').textContent = `cutoff ${$('cut').value} · resonance ${$('res').value}`;
+  });
+}
+
+connect();
+</script>

@@ -24,6 +24,10 @@ export const RATE = 48000;
 export const FRAME = 960;                    // 20 ms -> 50 messages a second
 
 // Debian and Pi OS put the GM soundfont here (package: fluid-soundfont-gm).
+// 141 MB on disk and 141 MB in RAM — fluidsynth has NO mmap and no disk
+// streaming anywhere in fluid_defsfont.c / fluid_samplecache.c, so a soundfont
+// is loaded whole or not at all. That is the ceiling on this box: a library
+// bigger than RAM cannot be used, however much card you put in it.
 export const DEFAULT_SF = '/usr/share/sounds/sf2/FluidR3_GM.sf2';
 
 /** General MIDI program numbers worth naming, so a client need not know GM. */
@@ -52,11 +56,18 @@ export function startFluid({ soundfont = DEFAULT_SF, gain = 0.6, polyphony = 64,
     '-n',                                    // no MIDI driver: notes come on stdin
     '-a', 'file',
     '-o', `audio.file.name=${fifo}`,
+    // raw, never wav: libsndfile cannot backfill a WAV header on a pipe, so a
+    // wav-typed stream is a file whose length field is never written.
     '-o', 'audio.file.type=raw',
     '-o', 'audio.file.format=s16',
     '-o', `synth.sample-rate=${RATE}`,
     '-o', `synth.gain=${gain}`,
     '-o', `synth.polyphony=${polyphony}`,
+    // ⚠️ synth.lock-memory DEFAULTS TO 1: fluidsynth mlock()s the whole sample
+    // set, so a 141 MB soundfont is 141 MB of RAM that can never be paged out.
+    // On a 2 GB board that is a tenth of everything, held hostage to make
+    // worst-case latency slightly better — a trade worth refusing here.
+    '-o', 'synth.lock-memory=0',
     soundfont,
   ];
   const p = spawn('fluidsynth', args, { stdio: ['pipe', 'pipe', 'pipe'] });
