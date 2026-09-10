@@ -98,11 +98,20 @@ AbletonOSC lacks** — Live's browser — registered from `view.py` because
 restart is needed. With it, `live-setup.mjs` loads Drift, routes `IAC Driver
 (Bus 1)`, arms and sets monitoring In in one command, from the other machine.
 
-⚠️ **PAUSED with one link open**: the BlackHole capture in the bridge page logs
-neither success nor failure, so `getUserMedia` is PENDING rather than refused —
-a different bug from a permission one, and the same shape as the never-resolving
-`audio.play()`. Everything either side of it works. Full state, and the exact
-commands to bring it all back, in `rig/pro-instrument/README.md`.
+✅ **DONE — Ableton Live is playable remotely at 58 ms key→ear** (MoQ over the
+LAN relay; 128 ms over WebRTC), 14 of 14 notes, receipt 7.50 ms, 0 underruns.
+Live costs ~29 ms over the built-in synth, about what it reports for itself
+(512 samples at 48 kHz plus 13.7 ms output latency).
+
+**Two lessons, both expensive.** A `Browser.grantPermissions` grant lives only
+while the CDP client stays CONNECTED — the launcher exited, permission fell back
+to "prompt", and the capture already open went on reporting a live, unmuted,
+enabled track carrying digital silence (0.00010 against 0.38763 for a freshly
+granted capture of the same device, in the same second). And **verify the
+instrument before believing the signal**: three tests said "BlackHole is silent"
+and all three were deaf instruments — `afplay` over ssh, headless Chrome, and a
+GUI app SPAWNED from ssh rather than opened. The microphone is the control: it
+cannot be digitally silent in a room.
 
 **Two platform facts worth keeping.** Accessibility (`sshd-keygen-wrapper` in
 Privacy & Security) makes system modals scriptable — which matters because
