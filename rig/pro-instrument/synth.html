@@ -18,7 +18,12 @@
 // work".
 const Q = new URLSearchParams(location.search);
 const ROOM = Q.get('room') || 'proinst';
-const MOQ_NS = Q.get('ns') || `proinst-${ROOM}`;
+// FRESH NAMESPACE EVERY START. On draft-14 a same-name rejoin before the relay
+// has GC'd the old one BRICKS the name -- the publisher looks healthy and every
+// subscriber gets "SUBSCRIBE code=4 Track not found" forever. Restarting this
+// page five times under one fixed name is exactly how that was re-earned.
+// The name is therefore minted here and TOLD to players over the relay.
+const MOQ_NS = Q.get('ns') || `proinst-${Date.now().toString(36)}`;
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[synth]', m); };
 
 const ac = new AudioContext({ latencyHint: 'interactive' });
@@ -84,7 +89,7 @@ import('./moq-audio.mjs').then(async ({ publishSynth }) => {
 
 const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
 const send = (o) => ws.send(JSON.stringify({ from: 'synth', at: Date.now(), ...o }));
-ws.onopen = () => { log(`relay open (${ROOM})`); send({ type: 'here' }); };
+ws.onopen = () => { log(`relay open (${ROOM})`); send({ type: 'here', ns: MOQ_NS }); };
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
   if (m.from === 'synth') return;                       // the relay echoes to sender
@@ -93,13 +98,14 @@ ws.onmessage = async (e) => {
     send({ type: 'ack', seq: m.seq, via: 'ws' });
     return;
   }
+  if (m.type === 'hello') { send({ type: 'here', ns: MOQ_NS }); return; }
   if (m.type === 'offer') {
     const c = accept();
     await c.setRemoteDescription({ type: 'offer', sdp: m.sdp });
     const a = await c.createAnswer(); await c.setLocalDescription(a);
     await new Promise((r) => c.iceGatheringState === 'complete' ? r()
       : c.addEventListener('icegatheringstatechange', () => c.iceGatheringState === 'complete' && r()));
-    send({ type: 'answer', sdp: c.localDescription.sdp });
+    send({ type: 'answer', sdp: c.localDescription.sdp, ns: MOQ_NS });
     log('answered');
   }
 };
