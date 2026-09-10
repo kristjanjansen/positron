@@ -22,11 +22,12 @@
 
   const d = mount({
     name: 'instrument',
-    what: 'Play an instrument in another browser. Note numbers cross the relay; raw MIDI never leaves this page.',
-    readout: { midi: '', sent: '', received: '', latency: 'ms' },
+    what: 'Play an instrument that is somewhere else. What crosses the relay is a note NUMBER, so it carries music rather than a device protocol and cannot tell a keyboard from a tapped screen. With nobody else here the sound is made in this page; when another machine offers to make it, the sound comes back as live audio and the page times how late it is.',
+    readout: { midi: '', sent: '', received: '', latency: 'ms', sound: '', heard: 'ms' },
     controls: [
       { id: 'start', label: 'Start audio and join', primary: true },
       { id: 'midi', label: 'Ask for MIDI' },
+      { id: 'remote', label: 'Hear the other machine' },
       { id: 'check', label: 'Run the checks' },
     ],
   });
@@ -45,6 +46,16 @@
 
   let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not asked';
   const lat = [];
+
+  // --- where the sound is made -------------------------------------------
+  // 'here' until another machine says it will make it. The fallback is not a
+  // degraded mode: with one machine this page IS the instrument, and it says so
+  // rather than showing an empty readout somebody has to interpret.
+  let source = 'here';
+  let synth = null;                 // {from, ns, moqRelay, moqCert} once announced
+  let pc = null, remoteAudio = null;
+  const ears = [];                  // key press -> sound arriving, one clock
+  let earPending = null;
   const send = (o) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...o, from: ID })); };
 
   /**
@@ -55,14 +66,17 @@
    */
   function press(note, how = 'key') {
     kb.lightNote(note, true);
-    play(note, 100);
+    // Only make the sound here if nothing else is making it, or the note plays
+    // twice -- once locally and once from the far end, a few tens of ms apart.
+    if (source === 'here') play(note, 100);
+    else earPending = { t0: performance.now() };
     send({ type: 'on', note, vel: 100, at: Date.now(), src: how === 'midi' ? 'midi' : 'touch' });
     sent++;
     d.set('sent', sent);
   }
   function release(note) {
     kb.lightNote(note, false);
-    stop(note);
+    if (source === 'here') stop(note);
     send({ type: 'off', note, at: Date.now() });
   }
 
@@ -89,6 +103,16 @@
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;                    // the relay echoes to us too
+      if (m.type === 'here' && m.ns) {           // a machine offering to be the synth
+        synth = { from: m.from, ns: m.ns, moqRelay: m.moqRelay || null, moqCert: m.moqCert || null };
+        d.set('sound', `offered by ${m.from}`);
+        d.log(`a synth is here: ${m.from}`, 'hi');
+        return;
+      }
+      if (m.type === 'answer' && pc && pc.signalingState === 'have-local-offer') {
+        pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
+        return;
+      }
       if (m.type === 'on') {
         received++;
         if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('latency', lat[lat.length - 1]); }
@@ -103,6 +127,61 @@
     };
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
   });
+
+  /**
+   * HEAR THE OTHER MACHINE. With nobody offering, this says so in words rather
+   * than failing — a demo whose subject needs a second machine must still be
+   * true on one, or it reads as broken and the suite asserts nothing on the leg
+   * that matters.
+   */
+  d.on('remote', async () => {
+    if (!ws || ws.readyState !== 1) { d.set('sound', 'join first', 'bad'); return; }
+    if (!synth) {
+      source = 'here';
+      d.set('sound', 'nobody else here — this page is the instrument');
+      d.log('no synth in this room; open rig/pro-instrument/synth.html on another machine');
+      return;
+    }
+    pc = new RTCPeerConnection({ iceServers: [] });   // same room: host candidates
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    pc.ontrack = (e) => {
+      remoteAudio = remoteAudio || Object.assign(new Audio(), { autoplay: true });
+      remoteAudio.srcObject = e.streams[0];
+      source = 'remote';
+      d.set('sound', `made by ${synth.from}`, 'ok');
+      listenForOnsets(e.streams[0]);
+    };
+    const o = await pc.createOffer(); await pc.setLocalDescription(o);
+    await new Promise((r) => pc.iceGatheringState === 'complete' ? r()
+      : pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()));
+    send({ type: 'offer', sdp: pc.localDescription.sdp });
+    d.log('asked the other machine for its sound');
+  });
+
+  /**
+   * How late the sound is, timed as a ROUND TRIP ON ONE CLOCK — pressed here,
+   * heard here. A one-way stamp difference across two machines carries their
+   * clock offset, which was measured at ~57 ms between two Macs that both run
+   * network time, and is how a transit reading once came back NEGATIVE.
+   */
+  async function listenForOnsets(stream) {
+    const code = `class O extends AudioWorkletProcessor{constructor(){super();this.q=true;}
+      process(i){const c=i[0]&&i[0][0];if(!c)return true;let p=0;
+      for(let n=0;n<c.length;n++){const a=c[n]<0?-c[n]:c[n];if(a>p)p=a;}
+      if(this.q&&p>0.02){this.q=false;this.port.postMessage(0);}else if(!this.q&&p<0.004){this.q=true;}
+      return true;}}registerProcessor('onset',O);`;
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+    const w = new AudioWorkletNode(ctx, 'onset');
+    const mute = ctx.createGain(); mute.gain.value = 0;
+    ctx.createMediaStreamSource(stream).connect(w); w.connect(mute).connect(ctx.destination);
+    w.port.onmessage = () => {
+      if (!earPending) return;
+      ears.push(performance.now() - earPending.t0);
+      earPending = null;
+      const s = [...ears].sort((a, b) => a - b);
+      d.set('heard', Math.round(s[Math.floor(s.length / 2)]));
+    };
+  }
 
   // MIDI is optional and its absence is REPORTED, not hidden: most browsers
   // and every headless run have no device, and the demo must still be true.
@@ -132,10 +211,16 @@
     d.assert('midi state reported honestly', d.api.readout.midi !== null, String(d.api.readout.midi));
     // the claim in the title: no raw MIDI on the wire
     d.assert('the wire carries note numbers, not MIDI bytes', true, '{type, note, vel, at}');
+    // The fallback is the claim being tested on one machine: with nobody else
+    // here the page must SAY where the sound is made, not leave the cell blank.
+    d.assert('says where the sound is made', !!d.api.readout.sound, String(d.api.readout.sound));
+    d.assert('sound source matches what is connected', (source === 'remote') === !!(pc && remoteAudio),
+      `${source}, peer ${pc ? 'yes' : 'no'}`);
     d.log(`open again with ?room=${ROOM} to play into another browser`);
   });
 
   d.set('midi', midiState);
+  d.set('sound', 'here (nobody else yet)');
   d.ready();
 </script>
 </html>
