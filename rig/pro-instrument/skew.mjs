@@ -55,7 +55,15 @@ console.log(`\n${id} — ${sk.length} samples over ${secs}s`);
 if (!sk.length) { console.log('  no peer answered — is the other side running in the same room?'); process.exit(1); }
 console.log(`  round trip     min ${Math.min(...rtts).toFixed(3)}  p50 ${q(rtts,50).toFixed(3)}  p95 ${q(rtts,95).toFixed(3)}  max ${Math.max(...rtts).toFixed(3)} ms`);
 console.log(`  offset, ALL    p50 ${q(offs,50).toFixed(3)}  spread ${(Math.max(...offs) - Math.min(...offs)).toFixed(3)} ms`);
-console.log(`  offset, KEPT   ${keptOffs.length} samples, spread ${keptOffs.length > 1 ? (Math.max(...keptOffs) - Math.min(...keptOffs)).toFixed(3) : '—'} ms`);
+// The KEPT set is the running minimum's TRAJECTORY, not a stability measure:
+// every early sample counts as kept while the minimum is still falling, so its
+// spread conflates converging with wandering. What stability actually looks
+// like is the offset over the LAST THIRD of the run, once the minimum has
+// settled -- and the real check is the other machine, which estimates the same
+// quantity independently and should come back equal and opposite.
+const tail = sk.slice(Math.floor(sk.length * 2 / 3)).map((l) => l.offset);
+console.log(`  offset, LAST 3rd  p50 ${q(tail,50).toFixed(3)}  p05–p95 ${(q(tail,95) - q(tail,5)).toFixed(3)} ms wide`);
+console.log(`  (kept set = the running minimum's trajectory, ${keptOffs.length} samples — not a stability measure)`);
 console.log(`  settled offset ${peer.offsetMs().toFixed(3)} ms  (this machine + offset = the reference clock)`);
 console.log(`\n  loopback for comparison: ±0.15 ms. A materially worse spread here means`);
 console.log(`  peer-to-peer estimation alone does not carry a multi-device click track.`);

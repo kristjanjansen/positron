@@ -834,7 +834,41 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    reproduces on demand. Costs nothing (WHIP records nothing), takes minutes.
    If it returns in the wild, capture the response body and request URL first.
 
-0. **Measure min-RTT clock skew over a REAL LINK.** Twenty minutes, one phone on
+0. ~~**Measure min-RTT clock skew over a REAL LINK.**~~ **DONE 2026-09-10.**
+   Two real machines, 455 samples each over 180 s, through the deployed relay
+   (`rig/pro-instrument/skew.mjs`, which runs in node because `peer.mjs` needs
+   only WebSocket and performance).
+
+   | | dev Mac | the Pro |
+   |---|---|---|
+   | min round trip | 64.011 ms | 61.937 ms |
+   | p50 / p95 | 80.96 / 107.26 | 83.02 / 107.00 |
+   | offset p50 | **−55.911 ms** | **+58.605 ms** |
+   | settled offset | 0 (elected reference) | +58.872 ms |
+
+   **The two machines estimated each other INDEPENDENTLY and agree to ~3 ms** —
+   −55.9 against +58.9, equal and opposite. That agreement, not either number
+   alone, is the precision of the method on a real link, and it is **20x worse
+   than the ±0.15 ms loopback figure**. The suspicion recorded here — that the
+   loopback number was loopback-shaped — was right.
+
+   **Is 3 ms fatal? No.** A flam becomes audible around 10–20 ms, and 3 ms is
+   0.15% of a 2 s loop. So peer-to-peer estimation DOES carry a multi-device
+   click track, with an order of magnitude less headroom than the loopback
+   number implied. Quote 3 ms, never 0.15.
+
+   **And the clocks really do differ by ~57 ms**, which is what made a MoQ
+   transit reading come back at −14.2 ms earlier the same day. A cross-machine
+   stamp difference is not a latency, and now there is a number for how much it
+   is not.
+
+   ⚠️ **This is a WAN path, not a LAN one.** Both peers dial
+   `ws.positron.studio`, so every ping goes out to a Cloudflare edge and back —
+   min RTT ~62 ms, consistent with the two-edge-round-trip arithmetic measured
+   elsewhere today. Skew over a LAN relay is a different measurement and is NOT
+   done; `moq-relay` on the LAN exists but carries no signalling.
+
+0z. **Superseded note, kept for the argument:** Twenty minutes, one phone on
    cellular, and it settles the last unmeasured number in the whole timing
    story — the one every multi-device claim rests on.
 
