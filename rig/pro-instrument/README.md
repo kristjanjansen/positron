@@ -49,6 +49,37 @@ So anything in the timing path takes the direct link. The relay is for the
 handshake, which is not in the timing path, and for reaching machines that
 cannot see each other directly.
 
+## Key press to sound: 84 ms — and the control path is 7% of it
+
+The two numbers on the page are DIFFERENT JOURNEYS and only one is what you hear.
+The control figure times a *message* — press out, acknowledgement straight back —
+and carries no audio and no buffer. Measured together, 40 notes:
+
+| | typical | worst 1 in 20 | spread |
+|---|---|---|---|
+| **key press → sound** | **84 ms** | 86 ms | every sample 77–86 ms |
+| message round trip (direct link) | 6.10 ms | — | — |
+| the browser's audio cushion | 37.9 ms | — | 0 packets lost |
+
+Roughly 3 ms of one-way control, ~38 ms of cushion, ~20 ms of Opus framing, and
+the rest synthesis, encode and decode. **So making the control path faster buys
+almost nothing** — it is already 7% of the total — and the sound path is the
+whole game. That is the argument for MoQ audio return (35.8 ms key→ear measured
+in `proto/jam`) over any amount of tuning here.
+
+It lands in the same band as `proto/jam`'s 77.7 ms, which is a useful check: that
+figure came from two headless Chromes on ONE machine, this one from two real
+machines in a room.
+
+**What this number does NOT include: your output device.** The onset is detected
+on the DECODED audio, before it reaches a speaker; physical ears add the output
+latency on top (`proto/jam` used +32 ms). State it as decoded-audio latency and
+it is a floor worth having rather than a claim.
+
+**How it is measured**: an AudioWorklet on the returned stream reports the first
+sample over threshold, so the onset is sample-accurate. Polling an analyser in
+rAF would quantise an 84 ms answer to a frame.
+
 **The sound's own delay is not the network.** The browser holds a cushion of
 audio so that unevenly-arriving packets still play smoothly; it read **30–44 ms**
 across runs here with zero packets lost, and it adapts — a clean LAN gives it
