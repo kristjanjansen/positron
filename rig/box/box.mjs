@@ -20,8 +20,9 @@ import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wi
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
-import { startJackSynth, jackSynthAvailable, JACK_SYNTHS } from './jacksynth.mjs';
-import { spawn } from 'node:child_process';
+import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
+         pappusFx, pappusAvailable, pappusRandomise, stopPappus } from './jacksynth.mjs';
+import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
 
 const arg = (k, dflt) => {
@@ -49,6 +50,7 @@ let synth = null, stopSynth = null, midiIn = null, fluid = null, jsyn = null;
 // saw 'nothing running' and started FluidSynth alongside it. Two instruments,
 // interleaved samples, 100 msg/s into a 60 msg/s relay. Measured twice.
 let starting = null;
+let fxOn = false;          // pappus inserted between the instrument and the capture
 let lastHeard = Date.now();
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
@@ -116,7 +118,10 @@ async function startAudio(source = 'synth', msg = null) {
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
     jsyn = r;
     log(`${source} up · port ${r.port} · midi ${r.midi ? 'in' : 'NONE'}`);
-    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec };
+    // An instrument change re-patches the graph, so a switched-on insert has to
+    // be put back or it silently drops out from under the new instrument.
+    if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
+    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec, fx: fxOn ? 'pappus' : null };
   }
 
 
@@ -309,6 +314,34 @@ async function handle(msg) {
       }
       return reply('sf.listed', { soundfonts: out });
     }
+    // What is sounding RIGHT NOW. A page that joins mid-session has clicked
+    // nothing, so without this it shows no selection while the box plays on —
+    // a readout that contradicts the thing it is describing.
+    // Roll the granular parameters. A program change means nothing to Pappus —
+    // it has no patches, it has 106 knobs — so "random" has to mean something
+    // different here, and this is it.
+    // Pappus is an INSERT, not an instrument: it wraps whatever is playing.
+    // It only reaches JACK instruments — fluidsynth writes to a pipe and never
+    // appears on the JACK graph at all, which is worth saying rather than
+    // failing quietly.
+    case 'fx.pappus': {
+      const want = msg.on !== false;
+      if (want && !jsyn) return reply('fx.pappus', { ok: false, reason: 'pappus can only wrap hexter or yoshimi — fluidsynth does not go through JACK' });
+      const r = await pappusFx(want, { instrumentPort: jsyn?.port, onLog: (l) => log('pappus:', l) });
+      if (r.ok) fxOn = want;
+      return reply('fx.pappus', { ...r, instrument: jsyn?.source ?? null });
+    }
+    case 'params.random':
+      if (!fxOn) return reply('params.rolled', { ok: false, reason: 'pappus is not switched on' });
+      return reply('params.rolled', { ok: true, on: 'pappus', params: pappusRandomise() });
+    case 'params.set':
+      return reply('params.set', { ok: fxOn });
+    case 'audio.status':
+      return reply('audio.started', jsyn ? { ok: true, source: jsyn.source, fx: fxOn ? 'pappus' : null }
+        : fluid ? { ok: true, source: 'fluidsynth', soundfont: fluid.soundfont ?? null }
+        : stopSynth ? { ok: true, source: 'synth' }
+        : audio ? { ok: true, source: 'capture' }
+        : { ok: false, reason: 'nothing playing' });
     case 'box.ping':    return reply('box.pong', { at: Date.now() });
     default: return false;      // another client's traffic; the relay is verbatim
   }
@@ -332,7 +365,7 @@ function connect() {
     log(`joined ${ROOM} · backend ${s.backend} · ${s.ports.length} ports${DRY ? ' · DRY' : ''}`);
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
     send({ type: 'box.hello', name: NAME, backend: s.backend, ports: s.ports.length, dry: DRY, since,
-                 instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt(),
+                 instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt(), pappusFx: pappusAvailable(),
                                 ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) },
                  ...(s.error ? { error: s.error, hint: s.hint } : {}) });
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
@@ -384,6 +417,25 @@ function connect() {
 // Alive before you need it: a heartbeat means "the box is fine, the question is
 // elsewhere" can be answered without going to the room.
 setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames }), 5000).unref?.();
+
+/**
+ * ⚠️ Sweep orphans at startup. Audio children (jackd, a synth, an ffmpeg
+ * capture) outlive a restarted service — systemd replaces the node process but
+ * nothing reaps what it spawned. They then collide with the new chain: a stale
+ * scsynth holding 33% of a core, two jack-dssi-hosts, and a capture whose jackd
+ * somebody else killed, which presents as a box that answers pings and makes no
+ * sound. Measured on the board twice.
+ *
+ * pkill -x, NEVER -f: the -f pattern would match this process's own command
+ * line and kill the service being started.
+ */
+function sweepOrphans() {
+  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'ffmpeg', 'jackd']) {
+    try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
+    catch { /* nothing of that name, which is the normal case */ }
+  }
+}
+if (backend() === 'alsa') sweepOrphans();
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

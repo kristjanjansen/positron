@@ -25,12 +25,18 @@ RestartSec=2
 StandardOutput=journal
 StandardError=journal
 
-# It reads two ALSA tools and one socket. Nothing else needs to be reachable.
+# ⚠️ THE HARDENING IS OFF, DELIBERATELY, AND HERE IS THE BILL.
+# This box's job is to run audio servers, and every one of these fought it:
+#   PrivateTmp=true        gave the service its own /tmp, so its jackd socket
+#                          was invisible to its own children after a restart
+#   ProtectSystem=strict   made /tmp read-only once PrivateTmp was off, so
+#                          jackd could not create that socket at all
+#   ProtectHome=read-only  blocked jackd's and SuperCollider's config writes
+# Each presented three processes downstream as "scsynth could not initialize
+# audio", which is a long way from the cause. JACK is a shared-socket system
+# with a per-user namespace; sandboxing it needs more care than it is worth on
+# a single-purpose board that runs one service.
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/opt/positron-box
 
 [Install]
 WantedBy=multi-user.target

@@ -70,6 +70,18 @@ export function createKeyboard(host, {
 
   return {
     el, noteOf, keyOf, press, release,
+    get base() { return base; },
+    /**
+     * Move the whole keyboard by octaves. Any note still held is released
+     * FIRST and at its old pitch — shifting under a held key would send a
+     * note-off for a note that was never started, and leave the real one
+     * sounding forever.
+     */
+    shiftOctave(delta, { min = 24, max = 96 } = {}) {
+      for (const k of [...held]) release(k, 'key');
+      base = Math.max(min, Math.min(max, base + (delta * 12)));
+      return base;
+    },
     /** paint a key. `who` is 'self' or 'remote'; they are different colours. */
     lightNote(note, on, who = 'self') {
       const k = keyOf(note);
