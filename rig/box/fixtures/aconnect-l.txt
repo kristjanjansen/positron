@@ -1,0 +1,17 @@
+client 0: 'System' [type=kernel]
+    0 'Timer           '
+    1 'Announce        '
+client 14: 'Midi Through' [type=kernel]
+    0 'Midi Through Port-0'
+client 20: 'Circuit' [type=kernel,card=1]
+    0 'Circuit MIDI 1  '
+	Connecting To: 24:0
+client 24: 'MicroFreak' [type=kernel,card=2]
+    0 'MicroFreak MIDI 1'
+	Connected From: 20:0
+client 28: 'Digitakt' [type=kernel,card=3]
+    0 'Digitakt MIDI 1 '
+client 32: 'Virtual Raw MIDI 1-0' [type=kernel,card=4]
+    0 'VirMIDI 1-0     '
+client 33: 'Virtual Raw MIDI 1-1' [type=kernel,card=4]
+    0 'VirMIDI 1-1     '

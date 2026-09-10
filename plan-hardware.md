@@ -662,6 +662,17 @@ transport arriving somewhere they should not, and a patch that says only "A -> B
 hides exactly that. Making the message classes explicit is what makes this better
 than cables rather than a metaphor for them.
 
+**Narrowed 2026-09-10, building `rig/box`: `carry` is not expressible in
+`aconnect`.** An ALSA subscription is unfiltered — it carries every message class
+the source emits, there is no per-class flag on the connection, and the
+sequencer's event filter is per *client*, governing what a client receives rather
+than what a subscription between two other ports carries. So the box **refuses** a
+subset rather than connecting everything, because over-connecting would leak
+clock and transport silently, which is the exact failure the document exists to
+prevent. Filtering needs a process in the middle that reads and re-emits — which
+makes the box the timing path, the thing the next paragraph warns against. Read
+from the tools rather than measured; **first thing to check on the board.**
+
 ⚠️ **Do not let the box become the timing path.** Route clock as directly as the
 rig allows and measure the jitter `aconnect` adds against a direct cable before
 trusting it. Same rule this project already applies to OSC and to the servo.
@@ -696,6 +707,38 @@ patchbay needs ALSA's sequencer, which is a KERNEL facility, and a container
 shares the host's kernel with no `/dev/snd` and no `snd-seq`. It also cannot
 answer anything about ARM, and the whole browser question is "does Chrome for
 arm64 Linux do this". A container would answer the questions we are not asking.
+
+⚠️ **HALF WRONG, corrected 2026-09-10.** This generalised from the patchbay to
+the whole box, and the instrument does not need a kernel at all. FluidSynth's
+`file` audio driver is **realtime-paced** and writes to a pipe, so sound is made
+with no `/dev/snd`, no ALSA, no audio server and no mixer. Measured in an arm64
+container: 4.14 s of wall clock produced 3.92 s of audio, six programs on six
+channels, and the whole of `rig/box` ran there against the live relay —
+**13/13 green, streaming, in Docker, with no sound hardware in existence.**
+
+The line falls between two things this plan treated as one:
+
+| | needs a kernel | runs in a container |
+|---|---|---|
+| making sound | no | **yes** |
+| a MIDI keyboard plugged in | yes | no |
+| capturing a real audio device | yes | no |
+| the patchbay | yes | no |
+
+Three consequences, none small:
+
+- **A cloud instrument is real.** Notes over the relay, audio back, no hardware
+  anywhere — a complete product for anyone without a box.
+- **It is how the box gets tested.** Everything except real ports and real
+  capture is now exercisable in CI, which this plan listed under "needs the
+  board".
+- **A container can hold a sample library the Pi cannot.** 2 GB of RAM rules out
+  any serious SFZ or SoundFont set, which makes the cloud the *better* home for
+  big libraries rather than a fallback.
+
+`box.mjs` needs no change to run there — it dials OUT, the one thing a
+Cloudflare Container can do, and this repo already ships one in
+`workers/pub/container/`.
 
 **Docker on the M1 is better and free.** `--platform linux/arm64` on an Apple
 Silicon machine is NATIVE arm64 Linux, not emulation, so it answers the
@@ -799,6 +842,38 @@ Which divides the work, and keeps the part nobody can walk over to boring:
 facility, and a container shares the host kernel with no `/dev/snd` and no
 `snd-seq`. It cannot answer anything about ARM either. It would answer questions
 nobody is asking.
+
+⚠️ **HALF WRONG, corrected 2026-09-10.** This generalised from the patchbay to
+the whole box, and the instrument does not need a kernel at all. FluidSynth's
+`file` audio driver is **realtime-paced** and writes to a pipe, so sound is made
+with no `/dev/snd`, no ALSA, no audio server and no mixer. Measured in an arm64
+container: 4.14 s of wall clock produced 3.92 s of audio, six programs on six
+channels, and the whole of `rig/box` ran there against the live relay —
+**13/13 green, streaming, in Docker, with no sound hardware in existence.**
+
+The line falls between two things this plan treated as one:
+
+| | needs a kernel | runs in a container |
+|---|---|---|
+| making sound | no | **yes** |
+| a MIDI keyboard plugged in | yes | no |
+| capturing a real audio device | yes | no |
+| the patchbay | yes | no |
+
+Three consequences, none small:
+
+- **A cloud instrument is real.** Notes over the relay, audio back, no hardware
+  anywhere — a complete product for anyone without a box.
+- **It is how the box gets tested.** Everything except real ports and real
+  capture is now exercisable in CI, which this plan listed under "needs the
+  board".
+- **A container can hold a sample library the Pi cannot.** 2 GB of RAM rules out
+  any serious SFZ or SoundFont set, which makes the cloud the *better* home for
+  big libraries rather than a fallback.
+
+`box.mjs` needs no change to run there — it dials OUT, the one thing a
+Cloudflare Container can do, and this repo already ships one in
+`workers/pub/container/`.
 
 **Docker on an M1 is better and free.** `--platform linux/arm64` on Apple Silicon
 is NATIVE arm64 Linux, so it answers the software half properly.

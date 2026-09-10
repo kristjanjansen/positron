@@ -1,0 +1,34 @@
+[Unit]
+Description=positron box — the instrument, as a service
+Documentation=https://positron.studio/notes/hardware-box
+# The relay is reached over the network, so wait for it to be up rather than
+# merely configured. Restart=always covers the case where it is not.
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=positron
+EnvironmentFile=/etc/default/positron-box
+WorkingDirectory=/opt/positron-box
+ExecStart=/usr/bin/node /opt/positron-box/box.mjs --room ${ROOM}
+
+# Nobody is in that room. Every failure this month needed a human standing at
+# the machine, so: come back from anything, forever, without rate-limiting
+# itself into a permanent stop.
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=0
+
+StandardOutput=journal
+StandardError=journal
+
+# It reads two ALSA tools and one socket. Nothing else needs to be reachable.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/positron-box
+
+[Install]
+WantedBy=multi-user.target
