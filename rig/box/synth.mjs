@@ -15,6 +15,7 @@
 // complete instrument. No Circuit, no audio interface, no soundcard — notes
 // arrive over the relay, sound leaves over the relay.
 import { rhodesVoice, mixVoices } from '../../demo/shell/rhodes.mjs';
+import { moogVoice, PATCHES } from '../../demo/shell/moog.mjs';
 
 export const RATE = 48000;
 export const FRAME = 960;                 // 20 ms -> 50 messages a second
@@ -122,3 +123,70 @@ export function alsaNotes(spawn, onNote, { port } = {}) {
   });
   return p;
 }
+
+
+/**
+ * A subtractive instrument, same clock, different voice.
+ *
+ * It is a separate factory rather than a parameter on createSynth because the
+ * two voices are shaped differently and always will be: a Rhodes voice is a
+ * pure function of time since onset, while this one carries filter state and
+ * must be stepped in order. Pretending they are the same thing behind a flag
+ * would be two components in a trenchcoat.
+ */
+export function createMoogSynth({ maxVoices = 8, patch = 'bass' } = {}) {
+  let voices = [];
+  let n = 0;
+  let opts = { ...PATCHES[patch] ?? PATCHES.bass };
+  const now = () => n / RATE;
+
+  return {
+    get voices() { return voices.length; },
+    get patch() { return opts; },
+    setPatch(name) { if (PATCHES[name]) opts = { ...PATCHES[name] }; return !!PATCHES[name]; },
+    // The two controls that ARE the instrument, live. MIDI CC 74 and 71 by
+    // convention, so a hardware knob maps to them without translation.
+    set(k, value) {
+      if (k === 'cutoff') opts.cutoff = 60 + 5000 * Math.pow(value / 127, 2);
+      else if (k === 'resonance') opts.resonance = 0.98 * (value / 127);
+      else if (k === 'envAmount') opts.envAmount = 4000 * (value / 127);
+      else return false;
+      return true;                    // takes effect on the NEXT note, like a real patch knob
+    },
+    noteOn(note, vel = 100) {
+      const freq = 440 * Math.pow(2, (note - 69) / 12);
+      for (const x of voices) if (x.note === note && !x.rel) { x.v.release(now() - x.t0); x.rel = true; }
+      voices.push({ v: moogVoice(freq, vel, { rate: RATE, ...opts }), t0: now(), note, rel: false });
+      if (voices.length > maxVoices) voices.shift();
+    },
+    noteOff(note) {
+      for (const x of voices) if (x.note === note && !x.rel) { x.v.release(now() - x.t0); x.rel = true; }
+    },
+    allOff() { for (const x of voices) if (!x.rel) { x.v.release(now() - x.t0); x.rel = true; } },
+    render(frames = FRAME) {
+      const out = new Int16Array(frames);
+      for (let i = 0; i < frames; i++) {
+        let s = 0;
+        for (const x of voices) s += x.v.sample();     // stateful: stepped in order
+        s = Math.tanh(s * 0.9);
+        out[i] = Math.max(-32768, Math.min(32767, s * 32767));
+      }
+      n += frames;
+      const t = now();
+      voices = voices.filter((x) => !x.v.done(t - x.t0));
+      return out;
+    },
+    startRealtime(onFrame, { tickMs = 10 } = {}) {
+      const t0 = performance.now();
+      const timer = setInterval(() => {
+        const want = Math.floor(((performance.now() - t0) / 1000) * RATE);
+        let guard = 0;
+        while (n + FRAME <= want && guard++ < 25) onFrame(this.render(FRAME));
+        if (guard >= 25) n = want;
+      }, tickMs);
+      return () => clearInterval(timer);
+    },
+  };
+}
+
+export { PATCHES as MOOG_PATCHES };

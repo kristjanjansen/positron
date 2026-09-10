@@ -18,9 +18,10 @@
 // file the pages use, so a change to the shape cannot reach only one end.
 import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wire.mjs';
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
-import { createSynth, alsaNotes, FRAME, RATE } from './synth.mjs';
+import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
 import { spawn } from 'node:child_process';
+import { readdirSync, statSync } from 'node:fs';
 
 const arg = (k, dflt) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -42,6 +43,7 @@ const URL_ = `${RELAY}/room/${ROOM}/ws`;
 const FROM = `box-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();
 let synth = null, stopSynth = null, midiIn = null, fluid = null;
+let lastHeard = Date.now();
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
@@ -78,7 +80,7 @@ function sendPcm(int16) {
   sentFrames++;
 }
 
-function startAudio(source = 'synth') {
+function startAudio(source = 'synth', msg = null) {
   if (audio || stopSynth || fluid) return { ok: true, already: true, source: fluid ? 'fluidsynth' : stopSynth ? 'synth' : 'capture' };
 
   // A real multitimbral instrument: 16 channels, 16 GM programs, one process.
@@ -86,7 +88,10 @@ function startAudio(source = 'synth') {
   // no soundcard, no ALSA, nothing to mix.
   if (source === 'fluidsynth') {
     if (!fluidAvailable()) return { ok: false, reason: 'fluidsynth is not installed (apt: fluidsynth fluid-soundfont-gm)' };
-    const sf = soundfontAt(arg('soundfont', DEFAULT_SF));
+    // A client may name the soundfont, so instruments can be A/B'd live rather
+    // than by restarting the box. Resolved against the filesystem either way —
+    // a missing soundfont is the silent failure here.
+    const sf = soundfontAt(msg?.soundfont ?? arg('soundfont', DEFAULT_SF));
     // A missing soundfont is the silent failure here: fluidsynth starts happily
     // and plays nothing at all, which reads as a broken stream.
     if (!sf) return { ok: false, reason: `no soundfont at ${DEFAULT_SF} (apt: fluid-soundfont-gm)` };
@@ -95,6 +100,17 @@ function startAudio(source = 'synth') {
     log(`fluidsynth up · ${sf} · 16 channels`);
     return { ok: true, source: 'fluidsynth', soundfont: sf, channels: 16,
              rate: RATE, msgPerSec: RATE / FRAME, voices: Object.keys(VOICES) };
+  }
+
+  // Subtractive, and modelled rather than sampled for a measured reason: driving
+  // FluidSynth's GM Synth Bass across the whole CC 74 range moved the spectral
+  // centroid 169 -> 154 Hz. The filter is the gesture and a sample freezes it.
+  if (source === 'moog') {
+    synth = createMoogSynth({ patch: msg?.patch ?? 'bass' });
+    stopSynth = synth.startRealtime(sendPcm);
+    log(`moog up · patch ${msg?.patch ?? 'bass'}`);
+    return { ok: true, source: 'moog', patch: msg?.patch ?? 'bass', patches: Object.keys(MOOG_PATCHES),
+             rate: RATE, msgPerSec: RATE / FRAME, needs: 'nothing plugged in' };
   }
 
   if (source === 'synth') {
@@ -169,7 +185,7 @@ function handle(msg) {
     case 'patch.clear':
       log('clearing every subscription');
       return reply('patch.cleared', clearAll({ dry: DRY }));
-    case 'audio.start': return reply('audio.started', startAudio(msg.source ?? 'synth'));
+    case 'audio.start': return reply('audio.started', startAudio(msg.source ?? 'synth', msg));
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The box does
     // not care which, and does not need one to exist.
     case 'note.on':
@@ -196,10 +212,30 @@ function handle(msg) {
       fluid.select(msg.channel ?? 0, prog);
       return reply('voice.selected', { ok: true, channel: msg.channel ?? 0, voice: msg.voice ?? null, program: prog });
     }
-    case 'cc':
-      if (fluid) fluid.cc(msg.channel ?? 0, msg.ctrl, msg.value);
-      return reply('cc.ack', { ok: !!fluid });
+    case 'cc': {
+      if (fluid) { fluid.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: 'fluidsynth' }); }
+      // 74 and 71 are the conventional cutoff and resonance, so a hardware knob
+      // maps onto them with no translation anywhere.
+      const k = msg.ctrl === 74 ? 'cutoff' : msg.ctrl === 71 ? 'resonance' : msg.ctrl === 79 ? 'envAmount' : null;
+      const ok = !!(k && synth?.set?.(k, msg.value));
+      return reply('cc.ack', { ok, on: ok ? 'moog' : null, control: k, value: msg.value, patch: ok ? synth.patch : null });
+    }
+    case 'moog.patch':
+      return reply('moog.patched', { ok: !!synth?.setPatch?.(msg.patch), patch: msg.patch, patches: Object.keys(MOOG_PATCHES) });
     case 'audio.stop':  return reply('audio.stopped', stopAudio());
+    case 'sf.list': {
+      const dirs = (process.env.BOX_SF_DIRS || '/sf:/usr/share/sounds/sf2').split(':');
+      const out = [];
+      for (const d of dirs) {
+        try {
+          for (const f of readdirSync(d)) if (/\.sf[23]$/i.test(f)) {
+            const p = `${d}/${f}`;
+            out.push({ path: p, name: f.replace(/\.sf[23]$/i, ''), mb: +(statSync(p).size / 1048576).toFixed(1) });
+          }
+        } catch { /* a directory that is not there is not an error, it is empty */ }
+      }
+      return reply('sf.listed', { soundfonts: out });
+    }
     case 'box.ping':    return reply('box.pong', { at: Date.now() });
     default: return false;      // another client's traffic; the relay is verbatim
   }
@@ -218,6 +254,7 @@ function connect() {
 
   ws.onopen = () => {
     backoff = 500;
+    lastHeard = Date.now();
     const s = state();
     log(`joined ${ROOM} · backend ${s.backend} · ${s.ports.length} ports${DRY ? ' · DRY' : ''}`);
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
@@ -227,6 +264,7 @@ function connect() {
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
   ws.onmessage = (e) => {
+    lastHeard = Date.now();                               // ANY frame proves the socket lives
     if (typeof e.data !== 'string') return;               // audio is ours, outbound only
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;      // never answer yourself
@@ -234,6 +272,7 @@ function connect() {
     catch (err) { log('handler threw:', err.message); send({ type: 'box.error', re: msg.id, error: err.message }); }
   };
   ws.onclose = (e) => {
+    clearInterval(ws.__watchdog);
     log(`closed ${e.code} — retrying in ${backoff} ms`);
     stopAudio();
     if (!ONCE) setTimeout(connect, backoff);
@@ -242,6 +281,26 @@ function connect() {
   // A close always follows an error here, so retrying on both would double the
   // reconnects and halve the backoff.
   ws.onerror = () => {};
+
+  /**
+   * A DEAD SOCKET DOES NOT ALWAYS CLOSE. Measured 2026-09-10: the Durable
+   * Object hibernated, the relay reported `sockets: 0`, and this process
+   * carried on with `readyState === 1` sending into nothing. No error, no
+   * close, no reconnect -- the box looked healthy and answered nobody, which
+   * is the exact failure mode a service in another room cannot afford.
+   *
+   * The fix uses a property the relay documents: it echoes every message back
+   * to the SENDER too. So the 5 s heartbeat is self-addressed proof of life --
+   * if it has not come back for three beats the socket is gone whatever it
+   * claims, and we reconnect rather than believe it.
+   */
+  ws.__watchdog = setInterval(() => {
+    if (ws.readyState !== 1) return;
+    if (Date.now() - lastHeard < 16000) return;
+    log('no echo in 16 s -- socket dead but not closed. reconnecting.');
+    try { ws.close(); } catch { /* already gone, which is the point */ }
+  }, 4000);
+  ws.__watchdog.unref?.();
 }
 
 // Alive before you need it: a heartbeat means "the box is fine, the question is
