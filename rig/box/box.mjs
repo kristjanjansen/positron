@@ -21,7 +21,7 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
-         pappusFx, pappusAvailable, pappusRandomise, stopPappus } from './jacksynth.mjs';
+         pappusFx, pappusAvailable, pappusRandomise, pappusPanic, stopPappus } from './jacksynth.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
 
@@ -113,7 +113,7 @@ async function startAudio(source = 'synth', msg = null) {
     starting = source;
     log(`starting ${source} (jack chain) ...`);
     let r;
-    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l) }); }
+    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont }); }
     finally { starting = null; }
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
     jsyn = r;
@@ -260,7 +260,11 @@ async function handle(msg) {
       if (jsyn) jsyn.panic();
       if (fluid) fluid.panic();
       if (synth) synth.allOff();
-      return reply('note.ack', { panic: true });
+      // An insert keeps sounding after every note has stopped — a captured
+      // ring buffer, eight delay taps and a reverb tail. Silence it too, or
+      // "all notes off" is only true of the instrument.
+      if (fxOn) pappusPanic();
+      return reply('note.ack', { panic: true, fx: fxOn ? 'pappus cleared' : null });
     // The multitimbral surface: one call per channel, then sixteen channels are
     // sixteen instruments. Names so a client need not memorise GM numbers.
     case 'voice.select': {
@@ -326,9 +330,21 @@ async function handle(msg) {
     // failing quietly.
     case 'fx.pappus': {
       const want = msg.on !== false;
-      if (want && !jsyn) return reply('fx.pappus', { ok: false, reason: 'pappus can only wrap hexter or yoshimi — fluidsynth does not go through JACK' });
+      // ⚠️ An insert can only reach what is ON THE JACK GRAPH. FluidSynth
+      // normally writes to a FIFO and never appears there, so pappus cannot
+      // wrap it. A `fluidjack` variant exists in jacksynth.mjs and swapping to
+      // it was tried — it works in principle and was flaky in practice, so the
+      // honest thing is to say no rather than half-swap under the user. The
+      // page disables the switch on fluidsynth for the same reason.
+      if (want && !jsyn) return reply('fx.pappus', {
+        ok: false,
+        reason: fluid ? 'fluidsynth writes to a pipe, not to JACK — pappus can wrap hexter or yoshimi'
+                      : 'nothing is playing for an insert to wrap',
+      });
       const r = await pappusFx(want, { instrumentPort: jsyn?.port, onLog: (l) => log('pappus:', l) });
       if (r.ok) fxOn = want;
+      // Switching off returns the sampler to its cheap path: one process, no
+      // jackd, no capture.
       return reply('fx.pappus', { ...r, instrument: jsyn?.source ?? null });
     }
     case 'params.random':

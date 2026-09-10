@@ -8,6 +8,38 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .pick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+  .pick .fx, .d-controls .fx { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+  .d-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
+                         text-transform: uppercase; margin: 0 2px 0 0; }
+  .d-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
+  .d-controls button.die:disabled, .d-controls .fx button:disabled {
+    opacity: .35; cursor: default; border-color: var(--line); }
+  .d-controls .fx button[aria-pressed="true"] {
+    color: var(--hi); border-color: var(--hi);
+    background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
+  /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
+     `:focus-visible { outline: 2px solid var(--hi) }` — the same green the
+     armed state uses — so a focused-but-OFF switch was indistinguishable from
+     an armed one, and read as "pappus is on" while the log said bypassed.
+     Focus goes grey; green means armed and nothing else. */
+  .d-controls .fx button:focus:not(:focus-visible),
+  .pick button:focus:not(:focus-visible) { outline: none; }
+  .d-controls .fx button:focus-visible,
+  .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+  /* and the switch says which it is in words, so nobody has to read a colour */
+  .d-controls .fx button[aria-pressed="false"]::after { content: ' off'; opacity: .5; }
+  .d-controls .fx button[aria-pressed="true"]::after { content: ' on'; opacity: .7; }
+  .pick .fx .lab { margin: 0 2px 0 0; }
+  .pick button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
+  .pick button.die:disabled { opacity: .35; cursor: default; border-color: var(--line); }
+  .pick button:disabled { opacity: .35; cursor: default; border-color: var(--line); }
+  /* ⚠️ A FOCUS RING IS NOT A SELECTION. After clicking, the effect switch kept
+     a yellow outline that read as "armed" while it was in fact bypassed —
+     sitting one row from a genuinely armed instrument wearing the same colour.
+     Pointer clicks lose the ring; keyboard focus keeps it, which is who needs
+     it. */
+  .pick button:focus:not(:focus-visible) { outline: none; }
+  .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   .pick .lab { flex: none; color: var(--dim2); font: 500 11px/1 var(--mono);
                letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
   /* the armed instrument gets the same treatment the transport bar gives its
@@ -46,15 +78,12 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own: it sends your key presses to the board and plays back the samples the board sends in return. The box dials out to the server rather than listening for connections, so it answers from any network without anything being opened to the internet — and the round trip you hear is the real one, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave.',
-    readout: { playing: '', patch: '', frames: '', dropped: '', level: '' },
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave.',
+    readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s' },
     controls: [
-      { id: 'prev', label: '◀' },
-      { id: 'rand', label: 'random' },
-      { id: 'next', label: '▶' },
-      { id: 'oct-', label: 'oct −' },
-      { id: 'oct+', label: 'oct +' },
-      { id: 'panic', label: 'all notes off' },
+      { id: 'oct-', label: '−' },
+      { id: 'oct+', label: '+' },
+      { id: 'panic', label: 'notes off' },
     ],
   });
   guard(d);
@@ -67,30 +96,56 @@
   const controls = document.querySelector('.d-controls');
   if (controls) controls.parentNode.insertBefore(picks, controls);
   else d.el.append(picks);
+  // Pinned right on the instrument row: a patch belongs to the instrument, and
+  // choosing one is the next thing you do after choosing the other.
+  // drawInstruments() inserts new instrument buttons before this block.
+  const fxWrap = el('span', 'fx');
+  const patchPrev = el('button', '', '◀', { type: 'button', title: 'previous patch' });
+  const patchDie  = el('button', 'die', '🎲', { type: 'button', title: 'random patch' });
+  const patchNext = el('button', '', '▶', { type: 'button', title: 'next patch' });
+  // ◀ ▶ then the die: stepping and rolling are different gestures, and the two
+  // arrows read as a pair when nothing sits between them.
+  fxWrap.append(patchPrev, patchNext, patchDie);
+  patchPrev.onclick = () => { idx = (idx - 1 + span()) % span(); showPatch(); sendPatch(); };
+  patchNext.onclick = () => { idx = (idx + 1) % span(); showPatch(); sendPatch(); };
+  patchDie.onclick  = () => { idx = Math.floor(Math.random() * span()); showPatch(); sendPatch(); };
 
   const patchLine = el('p', 'patch', '—');
   d.el.append(patchLine);
 
   // Pappus is an effect, so it is a switch beside the instruments rather than
   // one of them: it wraps whatever is playing, and can go on and off underneath.
-  const fxRow = el('div', 'pick');
+  // The effect lives on the SAME line as the instruments, pushed right: it is
+  // not a fourth instrument, it wraps whichever one is chosen, and the gap says
+  // so better than a second row would.
+  const fxRow = el('span', 'fx');
   fxRow.append(el('span', 'lab', 'effect'));
-  const fxBtn = el('button', '', 'pappus — granular', { type: 'button', 'aria-pressed': 'false' });
+  const fxBtn = el('button', '', 'pappus', { type: 'button', 'aria-pressed': 'false' });
+  // Its own die, because a granular parameter roll and a patch change are
+  // different actions on different things — one surface has 106 knobs and no
+  // patches, the other has patches and no knobs.
+  const fxDie = el('button', 'die', '🎲', { type: 'button', title: 'roll the granular parameters' });
+  fxDie.disabled = true;
   let fxOn = false;
   fxBtn.onclick = () => {
     fxOn = !fxOn;
     fxBtn.setAttribute('aria-pressed', String(fxOn));
-    // The engine compiles a 2,030-line class library on first switch-on, which
-    // is about forty seconds; after that a toggle is just a re-patch.
+    // The engine compiles a 2,030-line class library on first switch-on, about
+    // forty seconds; after that a toggle is just a re-patch.
     if (fxOn) fxBtn.dataset.busy = '1';
     send({ type: 'fx.pappus', on: fxOn });
   };
-  fxRow.append(fxBtn);
-  const cIdx = document.querySelector('.d-controls');
-  if (cIdx) cIdx.parentNode.insertBefore(fxRow, cIdx); else d.el.append(fxRow);
+  fxDie.onclick = () => { send({ type: 'params.random' }); d.log('rolled the granular parameters', 'hi'); };
+  fxRow.append(fxBtn, fxDie);
+  picks.append(fxWrap);
+  // On the same row as the octave and panic buttons, pinned right: it is a
+  // per-performance switch like they are, not a per-instrument choice.
+  if (controls) { controls.style.display = 'flex'; controls.style.alignItems = 'center'; controls.append(fxRow); }
+  else d.el.append(fxRow);
 
   let ctx = null, playout = null, ws = null, seq = 0;
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
+  let bytes = 0, firstFrame = 0, pingAt = 0, autoStarted = false;
   let soundfonts = [];
 
   const send = (m) => ws?.readyState === 1 && ws.send(JSON.stringify(
@@ -126,7 +181,9 @@
    + 'VIBE 1,MARIMBA,KOTO,FLUTE 1,ORCH-CHIME,TUB BELLS,STEEL DRUM,TIMPANI,REFS WHISL,VOICE 1,TRAIN,TAKE OFF').split(',');
 
   const bankOf = (i) => (i >> 7) & 63, progOf = (i) => i & 127;
-  const span = () => (current === 'hexter' ? 128 : 2048);
+  // hexter is flat (128 DX7 voices). Yoshimi reports 1822 instruments in 48
+  // banks, so the walk covers all of them.
+  const span = () => (current === 'hexter' ? 128 : 48 * 128);
   const patchName = (i) => {
     const p = progOf(i);
     if (current === 'hexter') return DX7[p] ?? `voice ${p + 1}`;
@@ -134,12 +191,16 @@
     return `program ${p}`;               // yoshimi: the banks are the user's own
   };
   function showPatch() {
-    d.set('patch', progOf(idx));
     patchLine.innerHTML = `<b>${patchName(idx)}</b>${bankOf(idx) ? ` · bank ${bankOf(idx)}` : ''}`;
   }
+  // ⚠️ BANK SELECT IS CC 32 HERE, NOT CC 0. Read from Yoshimi's own config:
+  //     MIDI Root CC 0        MIDI Bank CC 32        MIDI Program Change on
+  // Sending banks on CC 0 was moving its ROOT DIRECTORY instead, pointing it at
+  // roots that do not exist — so every program change after that landed
+  // nowhere and patch changing looked broken. CC 0 is left alone entirely.
   function sendPatch() {
     const b = bankOf(idx), changed = b !== lastBank;
-    if (changed) { send({ type: 'cc', channel: 0, ctrl: 0, value: b }); lastBank = b; }
+    if (changed) { send({ type: 'cc', channel: 0, ctrl: 32, value: b }); lastBank = b; }
     setTimeout(() => send({ type: 'voice.select', channel: 0, program: progOf(idx) }), changed ? 120 : 0);
   }
 
@@ -166,7 +227,11 @@
       b.setAttribute('aria-pressed', String(b.dataset.src === name));
   };
   function drawInstruments() {
-    for (const b of [...picks.querySelectorAll('button')]) b.remove();
+    // ⚠️ Only the INSTRUMENT buttons. Clearing every button in this row also
+    // removed the effect switch and its die, and appending the new ones then
+    // put them after the effect block — which is the layout falling apart in
+    // two ways from one line. Instrument buttons are the ones with data-src.
+    for (const b of [...picks.querySelectorAll('button[data-src]')]) b.remove();
     const mk = (label, src, msg, slow) => {
       const b = el('button', '', label, { type: 'button', 'aria-pressed': 'false' });
       b.dataset.src = src;
@@ -177,7 +242,8 @@
         send({ type: 'audio.stop' });
         setTimeout(() => send(msg), 400);
       };
-      picks.append(b);
+      // before the effect block, which is pinned right with margin-left:auto
+      picks.insertBefore(b, fxWrap);
     };
     if (soundfonts.length) for (const sf of soundfonts) mk(sf.name, sf.name, { type: 'audio.start', source: 'fluidsynth', soundfont: sf.path });
     else mk('sampled', 'fluidsynth', { type: 'audio.start', source: 'fluidsynth' });
@@ -211,26 +277,38 @@
         const s = new DataView(e.data).getUint32(0, true);
         if (last >= 0 && s > last + 1) lost += s - last - 1;
         last = s; frames++;
+        if (!firstFrame) firstFrame = performance.now();
         const pcm = new Int16Array(e.data, 12);
         const f32 = new Float32Array(pcm.length);
         let sum = 0;
         for (let i = 0; i < pcm.length; i++) { f32[i] = pcm[i] / 32768; sum += f32[i] * f32[i]; }
+        bytes += e.data.byteLength;
         if (frames % 10 === 0) {
+          const secs = (performance.now() - firstFrame) / 1000;
           d.set('frames', frames);
           d.set('dropped', lost, lost ? 'bad' : 'ok');
-          d.set('level', Math.sqrt(sum / pcm.length).toFixed(3));
+          // 50/s is one clean source. Anything above it is TWO instruments
+          // streaming into one socket, which is what a garbled stream sounds
+          // like — so this cell is a fault detector, not decoration.
+          const fps = frames / Math.max(0.001, secs);
+          d.set('rate', fps.toFixed(1), Math.abs(fps - 50) < 6 ? 'ok' : 'bad');
+          d.set('bitrate', Math.round(bytes * 8 / 1000 / Math.max(0.001, secs)));
         }
         playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
         return;
       }
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;
+      // ONE CLOCK, both stamps: the box's performance.now() and ours share no
+      // origin, so this is timed entirely here and contains no clock offset.
+      if (m.type === 'box.pong' && pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
       if (m.type === 'fx.pappus') {
         fxOn = !!m.on;
         delete fxBtn.dataset.busy;
         fxBtn.setAttribute('aria-pressed', String(fxOn));
+        fxDie.disabled = !fxOn;
         d.log(m.ok ? (fxOn ? 'pappus inserted' : 'pappus bypassed') : `pappus: ${m.reason}`, m.ok ? 'hi' : 'bad');
       }
       if (m.type === 'params.rolled' && m.ok) {
@@ -239,6 +317,15 @@
       }
       if (m.type === 'audio.started') {
         for (const c of picks.querySelectorAll('button')) delete c.dataset.busy;
+        // Nothing playing on arrival: start the cheap instrument rather than
+        // present a page where every control does nothing until you guess that
+        // one of the buttons is a prerequisite.
+        if (!m.ok && m.reason === 'nothing playing' && !autoStarted) {
+          autoStarted = true;
+          d.log('nothing was playing — starting the sampled instrument', 'hi');
+          send({ type: 'audio.start', source: 'fluidsynth' });
+          return;
+        }
         if (m.ok) {
           current = m.source; lastBank = -1;
           // Arm by what the BOX reports, not by what was clicked — the box is
@@ -246,25 +333,24 @@
           // joins mid-session has clicked nothing.
           armed = m.soundfont ? m.soundfont.replace(/.*\//, '').replace(/\.sf[23]$/i, '') : m.source;
           arm(armed);
-          d.set('playing', m.source);
+
+          // An insert can only reach a JACK instrument. FluidSynth writes to a
+          // pipe, so the switch is disabled rather than offered and refused.
+          const wrappable = m.source === 'hexter' || m.source === 'yoshimi';
+          fxBtn.disabled = !wrappable;
+          fxBtn.title = wrappable ? 'granular insert' : 'fluidsynth writes to a pipe, not to JACK';
+          if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; }
           showPatch();
-          if (m.fx) { fxOn = true; fxBtn.setAttribute('aria-pressed', 'true'); fxBtn.textContent = 'pappus — on'; }
+          if (m.fx) { fxOn = true; fxBtn.setAttribute('aria-pressed', 'true'); fxDie.disabled = false; }
           d.log(`playing ${m.source}`, 'hi');
         }
         else { d.set('playing', 'failed'); d.log(`failed: ${m.reason}`, 'bad'); }
       }
     };
   }
-
-  d.on('prev', () => { idx = (idx - 1 + span()) % span(); showPatch(); sendPatch(); });
-  d.on('next', () => { idx = (idx + 1) % span(); showPatch(); sendPatch(); });
   // "random" means a different thing per instrument. Pappus has no patches at
   // all — it has 106 parameters — so rolling a program number there does
   // nothing audible, which is exactly how it sounded.
-  d.on('rand', () => {
-    if (fxOn) { send({ type: 'params.random' }); d.log('rolled the granular parameters', 'hi'); return; }
-    idx = Math.floor(Math.random() * span()); showPatch(); sendPatch();
-  });
   const octave = () => d.log(`octave: base note ${kb.base} (${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][kb.base % 12]}${Math.floor(kb.base / 12) - 1})`);
   d.on('oct-', () => { kb.shiftOctave(-1); octave(); });
   d.on('oct+', () => { kb.shiftOctave(1); octave(); });
@@ -275,6 +361,10 @@
     if (k === 'z' || k === 'x') { kb.shiftOctave(k === 'z' ? -1 : 1); octave(); }
   });
   d.on('panic', () => send({ type: 'note.panic' }));
+
+  // Steering round trip, every few seconds. This is the CONTROL plane, not the
+  // audio: what a key press costs to reach the board, before anything is made.
+  setInterval(() => { if (ws?.readyState === 1 && !pingAt) { pingAt = performance.now(); send({ type: 'box.ping' }); } }, 4000);
 
   showPatch();
   connect();

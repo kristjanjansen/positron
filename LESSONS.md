@@ -789,3 +789,65 @@ audio stream controller starting behind the main one). The rest:
 A seek is not free. A watchdog that fires on the wrong signal is worse than no
 watchdog. Rate-limit every recovery action, require it to have somewhere to land,
 and make it yield rather than retry forever.
+
+## 39. `pkill -f <pattern>` matches its own command line (session 17)
+
+`ssh host 'pkill -9 -f "fluidsynth|yoshimi|jack-dssi-host"'` kills **its own
+shell**, because `-f` matches the full command line and the pattern text is in
+the command being run. Several deploys silently did nothing and their output
+vanished before this was spotted; the failure looks like ssh dropping the
+connection. **Use `pkill -x`**, which matches the process name exactly.
+
+## 40. `custom.toml` needs Imager's hook, and says nothing without it (session 17)
+
+Raspberry Pi OS reads `custom.toml` from a firstrun script that **Raspberry Pi
+Imager injects**, together with a `systemd.run=` entry in `cmdline.txt`. Write
+the image with `dd` and there is no hook, so the file is never read: the card
+boots as `raspberrypi` with no user and no sshd, the file is still sitting there
+afterwards, and nothing in any log mentions it. `userconf.txt` and an empty
+`ssh` file are handled by services **inside the image** and work on a plain
+write. An hour went into placing a file nothing was ever going to look at.
+
+## 41. Two audio sources in one socket is what "garbled" sounds like (session 17)
+
+`startAudio` returned `{already:true}` when anything was running, so choosing a
+second instrument left the first one ALSO streaming — interleaved samples from
+two instruments at 100 msg/s against the relay's 60 msg/s cap. Measured **60
+frames/s arriving and 5,495 dropped at the relay**. It sounds exactly like
+corruption and it is two instruments talking over each other. The same bug then
+arrived through a second door: raising a JACK chain takes ~13 s, and a `note.on`
+during that window saw "nothing running" and started a second instrument.
+**Frame rate is now a readout cell**, because 50/s is one clean source and
+anything above it is this.
+
+## 42. Sandboxing fights JACK, three processes upstream of the symptom (session 17)
+
+`PrivateTmp=true` gave a service its own /tmp, so its jackd socket was invisible
+to its own children after a restart. Turning it off made `ProtectSystem=strict`
+bite instead — /tmp is not exempt once PrivateTmp is gone, so jackd could not
+create the socket at all. `ProtectHome=read-only` then blocked jackd's and
+SuperCollider's config writes. **Every one presented as "scsynth could not
+initialize audio"**, which is three processes from the cause. Related: ask
+`jack_lsp`, never `pgrep -x jackd` — the process table reports a server this
+process may not be able to REACH, and skipping the start on that basis leaves
+every client unable to connect. And jackd must not be in a teardown list: it is
+a shared server, and killing it on an instrument switch kills the one the next
+instrument needs.
+
+## 43. A focus ring wearing the armed colour reads as armed (session 17)
+
+`shell.css` has `:focus-visible { outline: 2px solid var(--hi) }`, and the box
+page used the same `--hi` for its armed toggle. A focused-but-OFF switch was
+indistinguishable from an armed one — the page said the effect was on while its
+own log said bypassed. Focus is grey there now. **One colour, one meaning**, the
+rule this project already applies to marks in a strip.
+
+## 44. The M1/M2 Pro SD reader is a documented fault, and IOKit shows the split
+
+It reads once and then reports `Link Width: Off` until a reboot. Underneath,
+`ioreg -c AppleSDXCSlot` said **`Card Present = Yes`** while the PCIe link was
+down: the mechanical detect switch fires, the pins do not make contact, the
+driver attaches and publishes no media. `system_profiler` also returns **stale**
+card details from a previous insertion, which is worth knowing before believing
+it twice. Hours went into treating a hardware fault as a software one — the tell
+was that it worked once and then never again, which is a contact, not a bug.

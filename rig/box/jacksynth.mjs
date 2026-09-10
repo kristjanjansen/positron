@@ -105,6 +105,26 @@ export const JACK_SYNTHS = {
     oscCmd: true,                  // driven by parameters, not by notes
     osc: false,
   },
+  // FluidSynth again, but as a JACK CLIENT rather than writing to a FIFO.
+  // The FIFO path is cheaper — one process, no jackd — and is what plays
+  // normally. This variant exists so the sampler can be wrapped by an insert:
+  // an effect can only reach what is on the JACK graph, and the FIFO never is.
+  // The box swaps between the two transparently when the effect is toggled.
+  fluidjack: {
+    needs: ['fluidsynth', 'jackd', 'ffmpeg'],
+    spawn: (opt = {}) => spawn('fluidsynth', [
+      '-a', 'jack', '-m', 'alsa_seq', '-i',
+      '-o', 'audio.jack.id=fluidsynth',
+      '-o', 'audio.jack.autoconnect=0',
+      '-o', 'synth.lock-memory=0',
+      '-o', `synth.sample-rate=${RATE}`,
+      '-o', 'synth.gain=0.6',
+      opt.soundfont || '/usr/share/sounds/sf2/FluidR3_GM.sf2',
+    ], { stdio: ['ignore', 'pipe', 'pipe'] }),
+    portMatch: /^fluidsynth:/i,
+    alsaMatch: /fluid/i,
+    osc: false,
+  },
   yoshimi: {
     needs: ['yoshimi', 'jackd', 'ffmpeg'],
     // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
@@ -176,18 +196,123 @@ export function pappusOsc(cmdName, ...args) {
   return true;
 }
 
+const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(3);
+const rndInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+const arr = (n, lo, hi) => Array.from({ length: n }, () => rnd(lo, hi));
+
+/**
+ * Roll the whole instrument, not just the granulators.
+ *
+ * Pappus's chain is GRAINSWARM 1 and 2 in parallel -> RESONATOR -> DELAY ->
+ * COLOUR -> REVERB, and every stage takes a settable amount of each granulator.
+ * Rolling only the grain rate moved the least interesting third of it, which is
+ * why it sounded like a pass-through.
+ *
+ * Ranges are chosen to stay musical rather than maximal: wet levels are kept
+ * off the ceiling, feedback short of runaway, and the resonator is tuned to a
+ * scale rather than to noise — a randomiser that mostly produces mush is one
+ * nobody presses twice.
+ */
 export function pappusRandomise() {
   const out = {};
+  const set = (name, ...v) => { pappusOsc(name, ...v); out[name] = v.length === 1 ? v[0] : `[${v.length}]`; };
+
+  // ── the two granulators ────────────────────────────────────────────────
   for (const pre of ['m', 'n']) {
-    for (const [name, lo, hi] of PAPPUS_RANDOM) {
-      const v = +(lo + Math.random() * (hi - lo)).toFixed(3);
-      pappusOsc(pre + name, v); out[pre + name] = v;
-    }
-    pappusOsc(pre + 'contour', 1 + Math.floor(Math.random() * 8));
-    pappusOsc(pre + 'scanmode', Math.floor(Math.random() * 3));
+    for (const [name, lo, hi] of PAPPUS_RANDOM) set(pre + name, rnd(lo, hi));
+    set(pre + 'contour', rndInt(1, 8));
+    set(pre + 'scanmode', rndInt(0, 2));
+    set(pre + 'spraymode', rndInt(0, 2));
+    set(pre + 'swarmmode', rndInt(0, 2));
+    set(pre + 'lock', rndInt(0, 1));
+    set(pre + 'buflen', rnd(1, 12));
+    set(pre + 'winstart', rnd(0, 0.4));
+    set(pre + 'winend', rnd(0.6, 1));
+    set(pre + 'elen', rnd(0.2, 1));
   }
-  pappusOsc('loss', +(Math.random() * 0.5).toFixed(3));
+
+  // ── the eight voices per granulator: pitches, gates, probabilities ──────
+  // A scale rather than free intervals, or it is atonal by construction.
+  const SCALE = [0, 2, 3, 5, 7, 8, 10, 12, -5, -12];
+  const pitches = () => Array.from({ length: 8 }, () => SCALE[rndInt(0, SCALE.length - 1)]);
+  set('pitches', ...pitches());
+  set('pitches2', ...pitches());
+  set('gates', ...Array.from({ length: 8 }, () => (Math.random() < 0.55 ? 1 : 0)));
+  set('gates2', ...Array.from({ length: 8 }, () => (Math.random() < 0.45 ? 1 : 0)));
+  set('probs', ...arr(8, 0.4, 1));
+  set('probs2', ...arr(8, 0.4, 1));
+  set('epattern', ...Array.from({ length: 16 }, () => (Math.random() < 0.5 ? 1 : 0)));
+  set('epattern2', ...Array.from({ length: 16 }, () => (Math.random() < 0.4 ? 1 : 0)));
+
+  // ── RESONATOR: 48 of them, tuned to a chord ────────────────────────────
+  const root = 60 + rndInt(-12, 7);
+  const chord = [0, 3, 7, 10, 14, 17][Math.random() < 0.5 ? 0 : 1] !== undefined ? [0, 3, 7, 10, 14, 17] : [0, 4, 7, 11];
+  const frq = Array.from({ length: 48 }, (_, i) =>
+    +(440 * Math.pow(2, ((root + chord[i % chord.length] + 12 * Math.floor(i / chord.length / 2)) - 69) / 12)).toFixed(2));
+  set('pfrq', ...frq);
+  set('pamp', ...Array.from({ length: 48 }, (_, i) => +(Math.random() * Math.exp(-i / 22)).toFixed(3)));
+  set('pdamp', rnd(0.1, 0.9));
+  set('pbright', rnd(0, 1));
+  set('pstruct', rnd(0, 1));
+  set('ppos', rnd(0, 1));
+  set('pmodel', rndInt(0, 2));
+  set('pgrain', rnd(0, 0.7));
+  set('pgraintype', rndInt(0, 2));
+  set('pwet', rnd(0.15, 0.85));
+
+  // ── DELAY: eight taps ──────────────────────────────────────────────────
+  set('taptimes', ...arr(8, 0.02, 1.2));
+  set('taplevels', ...arr(8, 0, 0.8));
+  set('tappans', ...arr(8, -1, 1));
+  set('tappitch', ...arr(8, -7, 7));
+  set('sfb', rnd(0, 0.6));               // short of runaway
+  set('stilt', rnd(-1, 1));
+  set('stiltxover', rnd(200, 4000));
+  set('sdiffuse', rnd(0, 0.9));
+  set('swet', rnd(0.1, 0.7));
+  set('scycle', rnd(0.1, 2));
+
+  // ── COLOUR: drive, crush, loss, noise ──────────────────────────────────
+  set('drive', rnd(0, 0.6));
+  set('crush', rnd(0, 0.5));
+  set('crushmode', rndInt(0, 2));
+  set('loss', rnd(0, 0.5));
+  set('noise', rnd(0, 0.3));
+  set('noisetype', rndInt(0, 2));
+  set('noisedecay', rnd(0.05, 1));
+  set('noisetone', rnd(0, 1));
+  set('kwow', rnd(0, 0.4));
+
+  // ── REVERB ─────────────────────────────────────────────────────────────
+  set('rverb', rnd(0.1, 0.7));
+  set('rtime', rnd(0.5, 6));
+  set('rshimmer', rnd(0, 0.5));
+  set('rshimmersemi', rndInt(-12, 12));
+
+  // ── ROUTING: how much of each granulator reaches each stage ────────────
+  // This is SIGNAL, the thing that decides whether either granulator skips a
+  // part of the chain — and it changes the character more than any single knob.
+  for (const k of ['pin1', 'pin2', 'sin1', 'sin2', 'kin1', 'kin2', 'oin1', 'oin2']) set(k, rnd(0, 1));
+
   return out;
+}
+
+/**
+ * Silence the insert as well as the instrument.
+ *
+ * A MIDI all-notes-off reaches the synth and nothing else — but Pappus holds a
+ * ring buffer of captured audio, eight delay taps and a reverb tail, all of
+ * which keep sounding after every note has stopped. `bufclear` and `delayclear`
+ * are its own commands for exactly this.
+ */
+export function pappusPanic() {
+  pappusOsc('bufclear', 1);
+  pappusOsc('delayclear', 1);
+  // The reverb has no clear, so collapse its time and let it fall silent, then
+  // restore it — dropping `amp` instead would mute the instrument as well.
+  pappusOsc('rtime', 0.2);
+  setTimeout(() => pappusOsc('rtime', 2.5), 900);
+  return true;
 }
 
 export function stopPappus() {
@@ -211,7 +336,7 @@ function findVirmidi() {
   return existsSync(dev) ? { client: m[1], dev } : null;
 }
 
-export async function startJackSynth(name, { onFrame, onLog } = {}) {
+export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   const def = JACK_SYNTHS[name];
   if (!def) return { ok: false, reason: `unknown jack synth ${name}` };
   const missing = def.needs.filter((b) => !have(b));
@@ -259,7 +384,7 @@ export async function startJackSynth(name, { onFrame, onLog } = {}) {
   }
 
   // 3. the instrument
-  const synth = def.spawn();
+  const synth = def.spawn(opts);
   procs.push(synth);
   let log = '';
   // ⚠️ FORWARD STDOUT TOO. sclang reports through `postln`, which is stdout —

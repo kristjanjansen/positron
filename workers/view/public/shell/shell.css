@@ -334,8 +334,14 @@ video[hidden] { display: none; }
    playing, `remote` is one somebody else is. */
 .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
 .k { flex: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
-     border: 1px solid var(--line2); display: grid; place-items: end center; padding-bottom: 6px;
+     border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto;
+     justify-items: center; padding: 6px 0;
      font: 500 10px/1 var(--mono); color: var(--dim2); user-select: none; cursor: pointer; }
+/* the pitch on top, the keystroke underneath: the pitch is what moves when the
+   octave shifts, and it is what a player is looking for */
+.k .kn { grid-row: 1; color: var(--dim); font-weight: 500; }
+.k .kk { grid-row: 3; opacity: .65; }
+.k.down .kn, .k.down .kk, .k.remote .kn, .k.remote .kk { color: inherit; opacity: 1; }
 .k.sharp { background: #0e1219; }
 .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
 .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
