@@ -19,6 +19,19 @@ play) stayed 6.6–8.8 ms throughout, so the control leg is never the story.
 | WebRTC peer to peer | 111–128 ms | 114–236 ms | — | clean |
 | MoQ via Cloudflare | 136 ms | 271 ms | **1133** | **garbled** |
 
+⚠️ **CORRECTED — the 31% loss did NOT reproduce.** Two later runs at the
+identical config gave **3.9%** (185 gaps of 4796) and **2.4%** (114 of 4808),
+with key→ear 72 and 73 ms. So Cloudflare is **~14 ms slower than the LAN relay
+and loses a few percent**, not a third. The single 1133-gap run stands as an
+outlier nobody has explained, and the claim built on it — that the cadence is at
+fault — was one run's worth of evidence dressed as a finding. Reproducing it was
+the first thing to do about it, and it was not there.
+
+(A 300 ms retention arm decoded only **29 frames** and is not a sample; it is
+recorded so nobody reads its 51.7% as a result. The knobs are now exposed —
+`--latencyMax --groupMs --frameUs` — so this can be swept properly when someone
+wants the answer rather than an anecdote.)
+
 ⚠️ **The Cloudflare relay is LOSSY for this publisher, not merely slower** —
 about a third of frames missing, heard as garbling at the receiving end BEFORE
 the counter was read, then confirmed by it. That is `seq` earning its place
