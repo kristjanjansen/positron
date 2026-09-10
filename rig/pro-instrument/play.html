@@ -4,12 +4,13 @@
 <style>
 body{font:14px ui-monospace,monospace;background:#0d1017;color:#c9d1d9;padding:2rem;max-width:44rem}
 b{color:#ffd400} kbd{background:#161b22;padding:.1rem .4rem;border-radius:3px}
-#path{display:flex;gap:6px;margin:1rem 0 .5rem}
-#path button{padding:.45rem .9rem;background:#161b22;color:#8b949e;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
-#path button.on{background:#ffd400;color:#0d1017;border-color:#ffd400}
-#cmp{padding:.45rem .9rem;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
-#cmp:disabled{opacity:.5;cursor:default}
-#prog{color:#8b949e;margin-left:.8rem}
+#cases{display:flex;align-items:center;margin:1rem 0 .5rem}
+#cases button{padding:.4rem .8rem;background:#161b22;color:#8b949e;border:1px solid #30363d;font:inherit;cursor:pointer;white-space:nowrap}
+#cases button:not(:first-of-type){border-left:none}
+#cases button:first-of-type{border-radius:4px 0 0 4px}
+#cases button:last-of-type{border-radius:0 4px 4px 0}
+#cases button.on{background:#ffd400;color:#0d1017;border-color:#ffd400}
+#cases button.on + button{border-left-color:#ffd400}
 #keys{display:flex;gap:4px;margin:1rem 0}
 #keys button{flex:1;height:88px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
 #keys button:active{background:#ffd400;color:#0d1017}
@@ -26,17 +27,13 @@ Pro over a direct link; the sound is made there and comes back as live audio.
 arriving unevenly still plays smoothly — measured at 98.6% of the round trip,
 which is why a machine in the same room sounds much like one across the country.
 The cushion is reported below; it cannot be switched off.</p>
-<div id="path">
-  <button id="p-dc" class="on">notes go direct</button>
-  <button id="p-ws">notes go via the relay</button>
-</div>
-<div id="path">
-  <button id="r-rtc" class="on">sound back over WebRTC</button>
-  <button id="r-mq">sound back over MoQ</button>
+<div id="cases">
+  <button data-n="dc" data-s="rtc" class="on">direct → WebRTC</button>
+  <button data-n="dc" data-s="mq">direct → MoQ</button>
+  <button data-n="ws" data-s="rtc">relay → WebRTC</button>
+  <button data-n="ws" data-s="mq">relay → MoQ</button>
 </div>
 <div id="keys"></div>
-<button id="cmp">Compare both — 100 presses each</button>
-<span id="prog"></span>
 <table>
 <tr><td>connection to the Pro</td><td id="i">—</td></tr>
 <tr><td>handshake channel</td><td id="r">—</td></tr>
@@ -65,9 +62,7 @@ The cushion is reported below; it cannot be switched off.</p>
     <td id="mqE50">—</td><td id="mqE95">—</td>
     <td id="mqJB">—</td><td id="mqn">—</td></tr>
 </table>
-<p class="note">A <b>receipt</b> carries no audio — it is only the cost of telling
-the Pro to play. <b>Typical</b> is the middle press; <b>worst 1 in 20</b> is what
-19 in 20 came in under, and it is there because a median hides the one bad press.</p>
+
 <audio id="out" autoplay></audio>
 <script type="module">
 const ROOM = new URLSearchParams(location.search).get('room') || 'proinst';
@@ -200,55 +195,49 @@ async function sweep(n = 60, gapMs = 120) {
   return { dc: rtts.dc.length, ws: rtts.ws.length };
 }
 
-// WHICH PATH THE KEYS USE. The comparison table below is the measurement; this
-// switch is so you can hear the difference, which is the part a number cannot
-// give you -- 6 ms and 69 ms feel nothing alike under the fingers.
+// FOUR CASES, ONE SELECTION. The two axes -- how the notes go up, how the sound
+// comes back -- are independent, but a reader picks a CASE, not two switches.
+// One segmented row says which of the four you are hearing, and the table below
+// keeps a row per transport so the numbers do not move when you switch.
 let via = 'dc';
-const pDc = document.getElementById('p-dc'), pWs = document.getElementById('p-ws');
-const setPath = (v) => { via = v; pDc.classList.toggle('on', v === 'dc'); pWs.classList.toggle('on', v === 'ws'); };
-pDc.onclick = () => setPath('dc');
-pWs.onclick = () => setPath('ws');
-
-// WHICH WAY THE SOUND COMES BACK. WebRTC's cushion is the browser's and cannot
-// be hinted; MoQ's floor is ours, so latency becomes a number we choose. The
-// catch on a LAN is that MoQ routes through Cloudflare, so its transit is ~34 ms
-// where the direct WebRTC path's is ~0 -- it wins anyway only because the
-// cushion is bigger than the detour.
 window.__return = 'rtc';
 // The synth mints its own MoQ namespace per run (fresh-name discipline) and
 // tells us over the relay. Guessing it is how you subscribe to a bricked name.
 let moqNs = null, moqRelay = null, moqCert = null;
-const rRtc = document.getElementById('r-rtc'), rMq = document.getElementById('r-mq');
 const out = document.getElementById('out');
+const caseBtns = [...document.querySelectorAll('#cases button')];
 let moq = null;
-const setPathUI = () => { rRtc.classList.toggle('on', window.__return === 'rtc'); rMq.classList.toggle('on', window.__return === 'mq'); };
+
+const markCase = () => caseBtns.forEach((b) =>
+  b.classList.toggle('on', b.dataset.n === via && b.dataset.s === window.__return));
+const setPathUI = markCase;
+
 const setReturn = async (v) => {
   window.__return = v;
-  rRtc.classList.toggle('on', v === 'rtc');
-  rMq.classList.toggle('on', v === 'mq');
-  out.muted = v !== 'rtc';
+  out.muted = v !== 'rtc';                       // the MoQ ring plays through its own graph
+  markCase();
   if (v === 'mq' && !moq) {
-    rMq.textContent = 'connecting to MoQ …';
     try {
-      const { subscribeSynth } = await import('./moq-audio.mjs');
+      const mod = await import('./moq-audio.mjs');
       const ac2 = new AudioContext(); await ac2.resume().catch(() => {});
       if (!moqNs) throw new Error('the synth has not announced a MoQ name yet');
-      const mod = await import('./moq-audio.mjs');
-      moq = await subscribeSynth({
+      moq = await mod.subscribeSynth({
         ac: ac2, ns: moqNs, floorMs: 10, log: (m) => console.log('[moq]', m),
         ...(moqRelay ? { relay: moqRelay } : {}),
         ...(moqCert ? { connect: mod.pinned(moqCert) } : {}),
       });
-      window.__moq = moq;                            // so a probe can read decode/underrun counts
-      await attachOnset(ac2, moq.node);              // same detector, other path
+      window.__moq = moq;                          // so a probe can read decode/underrun counts
+      await attachOnset(ac2, moq.node);            // same detector, other path
       setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
-      rMq.textContent = 'sound back over MoQ';
-    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc'; }
+    } catch (e) {
+      console.warn('MoQ subscribe failed:', e.message);
+      window.__return = 'rtc'; markCase();
+    }
   }
-  if (moq) moq.node.gain != null && 0;              // playout runs regardless; muting is on the element
 };
-rRtc.onclick = () => setReturn('rtc');
-rMq.onclick = () => setReturn('mq');
+
+caseBtns.forEach((b) => { b.onclick = async () => { via = b.dataset.n; await setReturn(b.dataset.s); }; });
+
 
 NOTES.forEach((n, i) => {
   const b = document.createElement('button');
@@ -260,19 +249,6 @@ addEventListener('keydown', (e) => { if (e.repeat) return; const i = KEYS.indexO
 // The measurement, as a control rather than a console incantation. It discards a
 // warm-up because a page that has just started is not the thing being measured:
 // one 2 s stall in the first seconds once made worst-1-in-20 almost the maximum.
-const cmp = document.getElementById('cmp'), prog = document.getElementById('prog');
-cmp.onclick = async () => {
-  cmp.disabled = true;
-  prog.textContent = 'warming up (discarded) …';
-  await sweep(24, 90);
-  rtts.dc.length = 0; rtts.ws.length = 0; report();
-  for (let done = 0; done < 200; done += 20) {
-    prog.textContent = `measuring … ${done} of 200`;
-    await sweep(20, 90);
-  }
-  prog.textContent = `done — ${rtts.dc.length} direct, ${rtts.ws.length} relayed`;
-  cmp.disabled = false;
-};
 
 // The buffer is the story, so report it rather than leaving it implied.
 setInterval(async () => {
@@ -300,7 +276,6 @@ ws.onmessage = async (e) => {
   // again -- exactly once per announcement, which is the whole fix.
   if (m.ns && m.ns !== moqNs) {
     moqNs = m.ns; moqRelay = m.moqRelay || null; moqCert = m.moqCert || null;
-    rMq.textContent = moqRelay ? 'sound back over MoQ (LAN relay)' : 'sound back over MoQ';
     set('mqn', 'ready');
     if (moq) { try { moq.close(); } catch { /* gone */ } moq = null; window.__return = 'rtc'; setPathUI(); }
     await offer();
