@@ -231,6 +231,28 @@ export default {
       return json(await s.text(), 200, { 'cache-control': 'no-store' });
     }
 
+    // ── GET /notes/<slug> — a real path for a note ─────────────────────────
+    // Assets are tried before this Worker runs, so `/notes/index.html` and
+    // `/notes/<slug>.md` are already served and never reach here. What reaches
+    // here is the READABLE form, which has no file behind it.
+    //
+    // The dot is not in the character class on purpose, so `<slug>.md` cannot
+    // match this and shadow the asset it is named after.
+    //
+    // NO FALLBACK: the note must EXIST before the viewer is served. Serving the
+    // viewer for any slug-shaped path gives a soft 404 — the reader sees "could
+    // not load", while a crawler, a link checker and every automated caller see
+    // 200 and success. A page that says it is broken is not the same as a site
+    // that says so, and only one of them is true to anything but a human eye.
+    const note = p.match(/^\/notes\/([a-z0-9-]+)\/?$/);
+    if (note && request.method === 'GET') {
+      const md = await env.ASSETS.fetch(new URL(`/notes/${note[1]}.md`, url.origin));
+      if (!md.ok) {
+        return new Response('no such note', { status: 404, headers: { 'content-type': 'text/plain' } });
+      }
+      return env.ASSETS.fetch(new URL('/notes/index.html', url.origin));
+    }
+
     // Anything else that reached the Worker is a path with no static asset.
     return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } });
   },

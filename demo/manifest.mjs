@@ -206,7 +206,7 @@ export function rowHTML(d, i) {
 
 /** and the note row, for the same reason */
 export function noteHTML(n) {
-  return '<li class="d-row"><a href="/notes/?doc=' + n.doc + '">'
+  return '<li class="d-row"><a href="/notes/' + n.doc + '">'
     + '<span class="n">·</span>'
     + '<span class="nm">' + n.title + '</span>'
     + '<span class="d-one">' + n.one + '</span>'
