@@ -394,10 +394,10 @@
     const endBeat = Math.max(...doc.uses.map((u) => Number(u.at) + (Number(u.out) - Number(u.in))));
     parent.setRange([0, Math.ceil(tm.msAt(endBeat) + 300)]);
 
-    // THE BEND, in closed form against the shortcut. Tempo linear in beat gives
-    // dt = (60/k)·ln(m1/m0); averaging the tempo gives a straight line. The
-    // difference is the error a mean-tempo compiler ships — every note lands,
-    // slightly early, and nothing in the output shows it.
+    // THE BEND, against the shortcut. Seconds-per-beat is linear in beat, so
+    // the true curve is the trapezoid of 60/tempo; averaging the tempo gives a
+    // straight line. The difference is the error a mean-tempo compiler ships —
+    // every note lands, slightly early, and nothing in the output shows it.
     const pts = doc.tempo;
     const meanBpm = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     const bendMs = tm.msAt(lastBeat) - (60000 * lastBeat) / meanBpm;
@@ -469,9 +469,13 @@
     compiled.warnings.join(' | ') || 'none');
 
   // THE INTEGRAL, and the number this project paid for. Tempo 120 -> 72 over 16
-  // beats integrates in closed form; the mean-tempo shortcut is a straight line
-  // through the same endpoints. The gap is the error that compiler ships, and
-  // it is invisible in the output because every note still lands, just early.
+  // beats is the TRAPEZOID of seconds-per-beat (Csound interpolates 60/tempo
+  // linearly in beat, verified against csound 6.18); the mean-tempo shortcut is
+  // a straight line through the same endpoints. The gap is the error that
+  // compiler ships, and it is invisible in the output because every note still
+  // lands, just early. Until 2026-09-09 this said "closed form" and meant a
+  // logarithmic integral of a linearly-interpolated TEMPO — which was a third,
+  // also-wrong answer. See timeline/lab/csound-oracle.mjs.
   const bend = Number(d.api.readout.bend);
   d.assert('the tempo map bends away from the mean-tempo line', Math.abs(bend) > 20,
     `${bend} ms by the end`);
