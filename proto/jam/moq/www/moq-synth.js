@@ -21792,8 +21792,8 @@ function mergeBufferedRanges(a, b) {
 
 // src/moq-synth.js
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function publisher(relay, ns, { withVideo = false, latencyMax = 2e3 } = {}) {
-  const conn = await connection_exports.connect(new URL(relay), { websocket: { enabled: false } });
+async function publisher(relay, ns, { withVideo = false, latencyMax = 2e3, connect: connect2 = null } = {}) {
+  const conn = await connection_exports.connect(new URL(relay), { websocket: { enabled: false }, ...connect2 || {} });
   const bc = new broadcast_exports.Producer();
   conn.publish(path_exports.from(ns), bc);
   const aTrack = bc.createTrack("audio", trackInfo({ latencyMax }));
@@ -21888,8 +21888,8 @@ async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts, slot, tri
   return false;
 }
 async function subscriber(relay, ns, { onAudio, onVideo, log = () => {
-}, subOpts = null } = {}) {
-  const conn = await connection_exports.connect(new URL(relay), { websocket: { enabled: false } });
+}, subOpts = null, connect: connect2 = null } = {}) {
+  const conn = await connection_exports.connect(new URL(relay), { websocket: { enabled: false }, ...connect2 || {} });
   const bc = conn.consume(path_exports.from(ns));
   const stopped = { v: false, closers: [] };
   const slots = { audio: { cb: onAudio, closer: null }, video: { cb: onVideo, closer: null } };

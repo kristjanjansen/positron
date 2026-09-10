@@ -209,7 +209,7 @@ pWs.onclick = () => setPath('ws');
 window.__return = 'rtc';
 // The synth mints its own MoQ namespace per run (fresh-name discipline) and
 // tells us over the relay. Guessing it is how you subscribe to a bricked name.
-let moqNs = null;
+let moqNs = null, moqRelay = null, moqCert = null;
 const rRtc = document.getElementById('r-rtc'), rMq = document.getElementById('r-mq');
 const out = document.getElementById('out');
 let moq = null;
@@ -224,7 +224,12 @@ const setReturn = async (v) => {
       const { subscribeSynth } = await import('./moq-audio.mjs');
       const ac2 = new AudioContext(); await ac2.resume().catch(() => {});
       if (!moqNs) throw new Error('the synth has not announced a MoQ name yet');
-      moq = await subscribeSynth({ ac: ac2, ns: moqNs, floorMs: 10, log: (m) => console.log('[moq]', m) });
+      const mod = await import('./moq-audio.mjs');
+      moq = await subscribeSynth({
+        ac: ac2, ns: moqNs, floorMs: 10, log: (m) => console.log('[moq]', m),
+        ...(moqRelay ? { relay: moqRelay } : {}),
+        ...(moqCert ? { connect: mod.pinned(moqCert) } : {}),
+      });
       window.__moq = moq;                            // so a probe can read decode/underrun counts
       await attachOnset(ac2, moq.node);              // same detector, other path
       setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
@@ -232,7 +237,7 @@ const setReturn = async (v) => {
     } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc';
 // The synth mints its own MoQ namespace per run (fresh-name discipline) and
 // tells us over the relay. Guessing it is how you subscribe to a bricked name.
-let moqNs = null; }
+let moqNs = null, moqRelay = null, moqCert = null; }
   }
   if (moq) moq.node.gain != null && 0;              // playout runs regardless; muting is on the element
 };
@@ -287,7 +292,11 @@ ws.onopen = async () => {
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
   if (m.from === 'play') return;
-  if (m.ns && m.ns !== moqNs) { moqNs = m.ns; set('mqn', 'ready'); }
+  if (m.ns && m.ns !== moqNs) {
+    moqNs = m.ns; moqRelay = m.moqRelay || null; moqCert = m.moqCert || null;
+    rMq.textContent = moqRelay ? 'sound back over MoQ (LAN relay)' : 'sound back over MoQ';
+    set('mqn', 'ready');
+  }
   if (m.type === 'ack') {
     const rec = sent.get(m.seq);
     if (rec) { sent.delete(m.seq); rtts[rec.via].push(performance.now() - rec.t0); report(); }

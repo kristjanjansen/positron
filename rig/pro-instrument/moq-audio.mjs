@@ -11,6 +11,18 @@
 // ring with an underrun-counting floor).
 
 export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
+
+/**
+ * Connection options for a relay on the LAN. A browser will accept a
+ * self-signed certificate for WebTransport if the page PINS it -- but Chrome
+ * requires ECDSA P-256 and validity <= 14 DAYS, which is why the repo's old
+ * ten-year auto.crt was refused with an error that never mentions validity.
+ * `rig/pro-instrument/lan-relay.sh cert` mints a 10-day one and prints this hash.
+ */
+export function pinned(sha256hex) {
+  const value = Uint8Array.from(sha256hex.match(/../g).map((h) => parseInt(h, 16)));
+  return { webtransport: { serverCertificateHashes: [{ algorithm: 'sha-256', value }] } };
+}
 const WORKLET = '/proto/jam/playout-worklet.js';
 const nowUs = () => (performance.timeOrigin + performance.now()) * 1000;
 
@@ -35,7 +47,7 @@ async function pickOpus(preferUs = 5000) {
  * pacer note below; without it a HEADLESS context free-runs in bursts and the
  * subscriber starves through every retry while everything reports healthy.
  */
-export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, log = () => {} }) {
+export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, connect = null, log = () => {} }) {
   await import('/proto/jam/moq/www/moq-synth.js');
   await ac.audioWorklet.addModule(WORKLET);
 
@@ -55,7 +67,7 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
   // two seconds and spends the run draining it -- measured: transit starting at
   // 2030 ms and counting down, decode perfect, underruns zero. Everything looks
   // healthy and every sound is two seconds old.
-  const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false, latencyMax });
+  const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false, latencyMax, connect });
   log(`moq publishing "${ns}" (relay ${pub.version ?? '?'}, retains ${latencyMax} ms)`);
 
   const cfg = await pickOpus();
@@ -119,7 +131,7 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
  * `node` is the playout worklet, already connected to the destination, so a
  * caller can tap it for onset detection.
  */
-export async function subscribeSynth({ ac, ns, relay = MOQ_RELAY, floorMs = 10, log = () => {} }) {
+export async function subscribeSynth({ ac, ns, relay = MOQ_RELAY, floorMs = 10, connect = null, log = () => {} }) {
   await import('/proto/jam/moq/www/moq-synth.js');
   await ac.audioWorklet.addModule(WORKLET);
 
@@ -150,7 +162,7 @@ export async function subscribeSynth({ ac, ns, relay = MOQ_RELAY, floorMs = 10, 
   out.port.onmessage = (e) => { if (e.data?.underruns != null) st.underruns = e.data.underruns; };
 
   const sub = await window.MoqSynth.subscriber(relay, ns, {
-    log,
+    log, connect,
     onAudio: ({ payload, tsUs }) => {
       if (!payload || payload.byteLength <= 12) return;
       const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);

@@ -16,8 +16,8 @@ import * as Container from "@moq/hang/container";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function publisher(relay, ns, { withVideo = false, latencyMax = 2000 } = {}) {
-  const conn = await Connection.connect(new URL(relay), { websocket: { enabled: false } });
+export async function publisher(relay, ns, { withVideo = false, latencyMax = 2000, connect = null } = {}) {
+  const conn = await Connection.connect(new URL(relay), { websocket: { enabled: false }, ...(connect || {}) });
   const bc = new Broadcast.Producer();
   conn.publish(Path.from(ns), bc);
   const aTrack = bc.createTrack("audio", Container.trackInfo({ latencyMax }));
@@ -86,8 +86,8 @@ async function subscribeLoop(bc, name, onFrame, log, stopped, subOpts, slot, tri
   return false;
 }
 
-export async function subscriber(relay, ns, { onAudio, onVideo, log = () => {}, subOpts = null } = {}) {
-  const conn = await Connection.connect(new URL(relay), { websocket: { enabled: false } });
+export async function subscriber(relay, ns, { onAudio, onVideo, log = () => {}, subOpts = null, connect = null } = {}) {
+  const conn = await Connection.connect(new URL(relay), { websocket: { enabled: false }, ...(connect || {}) });
   const bc = conn.consume(Path.from(ns));
   const stopped = { v: false, closers: [] };
   const slots = { audio: { cb: onAudio, closer: null }, video: { cb: onVideo, closer: null } };
