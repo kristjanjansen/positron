@@ -111,9 +111,15 @@ export function startFluid({ soundfont = DEFAULT_SF, gain = 0.6, polyphony = 64,
     panic: () => { for (let c = 0; c < 16; c++) cmd(`cc ${c} 123 0`); },
     stop: () => {
       try { cmd('quit'); } catch { /* already gone */ }
+      // Detach the reader FIRST, so no more frames can be emitted from a
+      // synth that is on its way out — a source that keeps delivering after
+      // stop() is what lets two instruments stream at once.
+      try { audioIn.destroy(); } catch { /* already closed */ }
       setTimeout(() => {
-        p.kill('SIGTERM');
-        try { audioIn.destroy(); } catch { /* already closed */ }
+        try { p.kill('SIGTERM'); } catch { /* gone */ }
+        // and make sure. `quit` plus SIGTERM left a fluidsynth alive for two
+        // minutes once; SIGKILL after a grace period is the guarantee.
+        setTimeout(() => { try { p.kill('SIGKILL'); } catch { /* gone */ } }, 700);
         try { unlinkSync(fifo); } catch { /* already gone */ }
       }, 150);
     },

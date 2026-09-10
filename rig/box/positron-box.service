@@ -5,20 +5,22 @@ Documentation=https://positron.studio/notes/hardware-box
 # merely configured. Restart=always covers the case where it is not.
 After=network-online.target sound.target
 Wants=network-online.target
+# Never give up restarting. In [Unit], not [Service] — systemd ignores it there
+# with only a warning, so the backstop silently would not apply.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
 User=positron
 EnvironmentFile=/etc/default/positron-box
-WorkingDirectory=/opt/positron-box
-ExecStart=/usr/bin/node /opt/positron-box/box.mjs --room ${ROOM}
+WorkingDirectory=/opt/positron-box/rig/box
+ExecStart=/usr/bin/node /opt/positron-box/rig/box/box.mjs --room ${ROOM}
 
 # Nobody is in that room. Every failure this month needed a human standing at
 # the machine, so: come back from anything, forever, without rate-limiting
 # itself into a permanent stop.
 Restart=always
 RestartSec=2
-StartLimitIntervalSec=0
 
 StandardOutput=journal
 StandardError=journal

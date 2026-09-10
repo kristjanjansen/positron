@@ -118,6 +118,54 @@ instrument.** Making sound needs no kernel. It means a cloud instrument with no
 hardware is real, and that everything except real ports and real capture is
 testable in CI.
 
+## The two we wrote, and removed
+
+`demo/shell/rhodes.mjs` (FM electric piano) and `demo/shell/moog.mjs`
+(subtractive) were written to answer one question: **what can a box do with
+nothing but arithmetic?** Both are gone from the instrument list. What they
+found is worth more than either of them.
+
+**They lost to things already packaged.** `hexter` plays the *actual DX7
+factory cartridges* — ROM1A/1B/2A/2B, E.PIANO 1 included, shipped in Debian
+main — which is the patch `rhodes.mjs` was imitating from memory. SuperCollider's
+`MoogFF` is a correct ladder filter. Neither took an afternoon to write.
+
+**The Rhodes was diagnosed rather than merely disliked.** The first listener's
+verdict was "super metally and has no warmth", and the measurement agreed:
+spectral centroid of a 220 Hz note, **251 Hz soft against 621 Hz hard**, a
+2.48x range — a soft note at a centroid of 251 Hz on a 220 Hz fundamental *is*
+a sine, which is exactly what "thin" means. The cause is that a real Rhodes'
+only nonlinearity is the **electromagnetic pickup** (Falaize & Hélie,
+*J. Sound Vib.* 390, 2017: "this transduction mechanism is the only one that is
+responsible for the characteristic Rhodes piano tones"), and this model has
+none. Adding it is seven flops and **zero state**:
+
+    const u = L2 - q * SWING + OFF;      // q = summed tine displacement
+    out = (-2 * q / (u * u)) * qdot * g; // Phi'(q) * qdot
+
+Verified against the documented prediction: with the pickup dead centre the
+fundamental and every odd harmonic vanish to **-315 dB** and the note jumps an
+octave, exactly as Modartt's manual and the Rhodes service manual describe.
+`qdot` must come analytically from the same phasor — differencing `q` adds a
++6 dB/octave tilt.
+
+**The Moog's resonance was measurably broken**, and is left that way on purpose
+rather than quietly patched. Four cascaded one-poles give loop gain `k*g^4`,
+and `g^4` collapses at low cutoff: **0.001 at fc 900 Hz, 0.011 at 2000**.
+Resonance moves the peak 6% across its entire range. A real ladder compensates
+the feedback for cutoff (Stilson & Smith, Huovilainen). It is a starting point
+for anyone porting one, not a working filter.
+
+**What they are still for.** They are pure per-sample arithmetic with no audio
+library, so the same maths runs in a browser AudioWorklet (`/carry/`), in node
+on the box, and in C on a microcontroller. **No plugin ports there** — not
+hexter, not Yoshimi, not a sampler. If the box ever becomes a chip rather than
+a Pi, this is the only code in this directory that comes along. Measured on the
+Pi 4's A72: 8 voices at **6.8x realtime, 15% of one core**.
+
+Reachable by explicit name (`audio.start {"source":"moog"}`) so the numbers
+above can be reproduced. Not listed, not offered, not the default.
+
 ## Using a different synth instead
 
 Everything below is apt-installable on Pi OS and headless by design. Each one
