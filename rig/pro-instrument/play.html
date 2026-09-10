@@ -225,7 +225,8 @@ const setReturn = async (v) => {
       const ac2 = new AudioContext(); await ac2.resume().catch(() => {});
       if (!moqNs) throw new Error('the synth has not announced a MoQ name yet');
       moq = await subscribeSynth({ ac: ac2, ns: moqNs, floorMs: 10, log: (m) => console.log('[moq]', m) });
-      attachOnset(ac2, moq.node);                    // same detector, other path
+      window.__moq = moq;                            // so a probe can read decode/underrun counts
+      await attachOnset(ac2, moq.node);              // same detector, other path
       setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
       rMq.textContent = 'sound back over MoQ';
     } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc';
