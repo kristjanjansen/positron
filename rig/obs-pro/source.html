@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>positron OBS source</title>
+<style>html,body{margin:0;background:#0d1017;overflow:hidden}canvas{display:block}</style>
+<canvas id="cv"></canvas>
+<script type="module">
+// The OBS encoder's picture, drawn by THE one test pattern — imported live from
+// the repo, never copied. A second copy of pattern.mjs is how the container's
+// image drifted a whole session behind; this file must never grow its own
+// drawing code.
+//
+// ?w=&h= renders the SAME 1280x720 drawing scaled up, so a 4K frame is a real
+// 4K render of the pattern rather than an upscale of a 720p bitmap: at 3840 the
+// row's blocks are 60 px instead of 20. Safe because readBurnedFrom() scales a
+// same-aspect frame back onto the 1280 grid before sampling — and only because
+// the aspect is unchanged, which is why w/h are forced to 16:9 here.
+import { burn, FRAME_W, FRAME_H } from './pattern.mjs';
+
+const q = new URLSearchParams(location.search);
+const w = Number(q.get('w') || FRAME_W);
+const h = Math.round(w * FRAME_H / FRAME_W);          // 16:9, never taken from a param
+const hue = Number(q.get('hue') ?? 205);
+
+const cv = document.getElementById('cv');
+cv.width = w; cv.height = h;
+const ctx = cv.getContext('2d');
+ctx.scale(w / FRAME_W, h / FRAME_H);
+ctx.imageSmoothingEnabled = false;                    // keep the row's block edges hard
+
+let frame = 0;
+(function paint() {
+  burn(ctx, FRAME_W, FRAME_H, frame++, { hue });
+  requestAnimationFrame(paint);
+})();
+</script>
