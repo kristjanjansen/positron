@@ -86,7 +86,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
     for (let i = 0; i < pingBurst; i++) {
       const s = ++seq;
       pending.set(s, now());
-      send({ t: 'ping', seq: s, t0: now() });
+      send({ type: 'ping', seq: s, t0: now() });
     }
   }
 
@@ -105,7 +105,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
     if (!p) { p = { id: m.from, offsetMs: 0, rttMs: Infinity, samples: 0, lastSeen: 0 }; peers.set(m.from, p); }
     p.samples++; p.lastSeen = now();
     if (rtt < p.rttMs) { p.rttMs = rtt; p.offsetMs = offset; }
-    log.push({ t: 'skew', peer: m.from, rtt: +rtt.toFixed(3), offset: +offset.toFixed(3), kept: rtt <= p.rttMs });
+    log.push({ type: 'skew', peer: m.from, rtt: +rtt.toFixed(3), offset: +offset.toFixed(3), kept: rtt <= p.rttMs });
     recomputeOffset();
   }
 
@@ -121,7 +121,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
     const next = ref === id ? 0 : (peers.get(ref) ? peers.get(ref).offsetMs : offsetMs);
     if (next !== offsetMs) {
       const was = offsetMs; offsetMs = next;
-      log.push({ t: 'offset', from: +was.toFixed(3), to: +next.toFixed(3), ref });
+      log.push({ type: 'offset', from: +was.toFixed(3), to: +next.toFixed(3), ref });
     }
   }
 
@@ -135,8 +135,8 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
   function setGrid(loopMs, origin = null) {
     const o = origin ?? Math.ceil(sharedNow() / loopMs) * loopMs;
     grid = { loopMs, origin: o, by: id };
-    send({ t: 'grid', loopMs, origin: o });
-    log.push({ t: 'grid-set', loopMs, origin: o });
+    send({ type: 'grid', loopMs, origin: o });
+    log.push({ type: 'grid-set', loopMs, origin: o });
     return grid;
   }
 
@@ -148,7 +148,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
       // SO — a silently re-timed recording is worse than a refused one.
       const mineFirst = grid.origin < m.origin || (grid.origin === m.origin && id < m.from);
       if (mineFirst) return;
-      log.push({ t: 'grid-yield', to: m.from, was: grid, now: { loopMs: m.loopMs, origin: m.origin } });
+      log.push({ type: 'grid-yield', to: m.from, was: grid, now: { loopMs: m.loopMs, origin: m.origin } });
     }
     grid = { loopMs: m.loopMs, origin: m.origin, by: m.from };
     onGrid && onGrid(grid);
@@ -158,14 +158,14 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
   /** LOOP PLANE. One committed layer, as a value. Latency-indifferent. */
   function publishLayer(session, meta = {}) {
     const bytes = JSON.stringify(session).length;
-    send({ t: 'layer', session, meta, sentAt: sharedNow(), bytes });
-    log.push({ t: 'layer-sent', bytes, at: sharedNow() });
+    send({ type: 'layer', session, meta, sentAt: sharedNow(), bytes });
+    log.push({ type: 'layer-sent', bytes, at: sharedNow() });
     return bytes;
   }
 
   /** LIVE PLANE. Fire and forget; a lost note is a note nobody hears once. */
   function publishLive(row) {
-    send({ t: 'live', row: { type: row.type, note: row.note, vel: row.vel, at: row.at } });
+    send({ type: 'live', row: { type: row.type, note: row.note, vel: row.vel, at: row.at } });
   }
 
   function onMessage(m) {
@@ -175,12 +175,12 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
       p = { id: m.from, offsetMs: 0, rttMs: Infinity, samples: 0, lastSeen: now() };
       peers.set(m.from, p); onPeer && onPeer(p);
       recomputeOffset();
-      send({ t: 'hello' });                       // so a late joiner is seen too
+      send({ type: 'hello' });                       // so a late joiner is seen too
       ping();
     }
     p.lastSeen = now();
-    switch (m.t) {
-      case 'ping': send({ t: 'pong', seq: m.seq, t0: m.t0, t1: now() }); break;
+    switch (m.type) {
+      case 'ping': send({ type: 'pong', seq: m.seq, t0: m.t0, t1: now() }); break;
       case 'pong': onPong(m); break;
       case 'grid': onGridMsg(m); break;
       case 'hello': break;
@@ -189,7 +189,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
         const rec = { from: m.from, session: m.session, meta: m.meta, bytes: m.bytes,
                       sentAt: m.sentAt, arrivedAt, deliveryMs: +(arrivedAt - m.sentAt).toFixed(3) };
         rxLayers.push(rec);
-        log.push({ t: 'layer-recv', from: m.from, bytes: m.bytes, deliveryMs: rec.deliveryMs });
+        log.push({ type: 'layer-recv', from: m.from, bytes: m.bytes, deliveryMs: rec.deliveryMs });
         onLayer && onLayer(rec);
         break;
       }
@@ -199,7 +199,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
   }
 
   transport.onMessage(onMessage);
-  send({ t: 'hello' });
+  send({ type: 'hello' });
   ping();
   if (pingEveryMs > 0 && typeof setInterval === 'function') pingTimer = setInterval(ping, pingEveryMs);
 

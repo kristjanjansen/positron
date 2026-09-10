@@ -123,12 +123,12 @@
     const pc = new RTCPeerConnection();
     pcs.set(peer, pc);
     for (const t of local.getTracks()) pc.addTrack(t, local);
-    pc.onicecandidate = (e) => { if (e.candidate) send({ t: 'ice', to: peer, c: e.candidate }); };
+    pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'ice', to: peer, c: e.candidate }); };
     pc.ontrack = (e) => attach(peer, e.streams[0]);
     pc.onconnectionstatechange = () => { d.log(`${peer}: ${pc.connectionState}`); paint(); };
     const o = await pc.createOffer();
     await pc.setLocalDescription(o);
-    send({ t: 'offer', to: peer, sdp: o.sdp });
+    send({ type: 'offer', to: peer, sdp: o.sdp });
   }
 
   function attach(peer, stream) {
@@ -178,7 +178,7 @@
     joinedAt = performance.now();
 
     ws = new WebSocket(RELAY);
-    ws.onopen = () => { d.log(`joined ${ROOM} as ${ID}`, 'hi'); send({ t: 'hello' }); };
+    ws.onopen = () => { d.log(`joined ${ROOM} as ${ID}`, 'hi'); send({ type: 'hello' }); };
     ws.onmessage = async (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;                       // the relay echoes to us too
@@ -189,26 +189,26 @@
       // leaving an empty tile with no error a reader could act on. Comparing
       // ids picks an offerer deterministically and needs no extra round trip;
       // both sides still DISCOVER each other, exactly one of them dials.
-      if (m.t === 'hello') { send({ t: 'here' }); maybeOffer(m.from); return; }
-      if (m.t === 'here') { maybeOffer(m.from); return; }
-      if (m.t === 'offer') {
+      if (m.type === 'hello') { send({ type: 'here' }); maybeOffer(m.from); return; }
+      if (m.type === 'here') { maybeOffer(m.from); return; }
+      if (m.type === 'offer') {
         const pc = new RTCPeerConnection();
         pcs.set(m.from, pc);
         for (const t of local.getTracks()) pc.addTrack(t, local);
-        pc.onicecandidate = (ev) => { if (ev.candidate) send({ t: 'ice', to: m.from, c: ev.candidate }); };
+        pc.onicecandidate = (ev) => { if (ev.candidate) send({ type: 'ice', to: m.from, c: ev.candidate }); };
         pc.ontrack = (ev) => attach(m.from, ev.streams[0]);
         pc.onconnectionstatechange = () => paint();
         await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
         const a = await pc.createAnswer();
         await pc.setLocalDescription(a);
-        send({ t: 'answer', to: m.from, sdp: a.sdp });
+        send({ type: 'answer', to: m.from, sdp: a.sdp });
         return;
       }
-      if (m.t === 'answer') {
+      if (m.type === 'answer') {
         await pcs.get(m.from)?.setRemoteDescription({ type: 'answer', sdp: m.sdp });
         return;
       }
-      if (m.t === 'ice') { try { await pcs.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
+      if (m.type === 'ice') { try { await pcs.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
     };
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
     // Give the handshake a moment, then check ourselves. Not on `onopen`: the

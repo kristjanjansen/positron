@@ -487,15 +487,19 @@
     Array.isArray(two.parts.verse.warnings) && two.parts.verse.warnings.length === 1,
     two.parts.verse.warnings[0]);
 
-  // THE RAMP, in closed form. Tempo falling 120 -> 60 over 8 beats is the
-  // logarithmic integral csound.mjs exists for:
-  //   dt = (60/k)*ln(m1/m0),  k = (60-120)/8 = -7.5  ->  5.545177 s
-  // A mean-tempo shortcut would say 8 beats at 90 bpm = 5.333 s, which looks
-  // fine and puts every later note 212 ms early.
+  // THE RAMP, measured against csound 6.18 rather than derived. Tempo falling
+  // 120 -> 60 over 8 beats: Csound interpolates SECONDS PER BEAT linearly in
+  // beat, so the elapsed time is the trapezoid of 60/tempo — 8*(0.5+1.0)/2 =
+  // 6.000 s, confirmed on the reference implementation. Two plausible wrong
+  // answers sit either side and this assert separates all three: averaging the
+  // tempo says 8 beats at 90 bpm = 5.333 s, and interpolating the TEMPO
+  // linearly (the logarithmic integral, which this project shipped until
+  // 2026-09-09) says 5.545 s.
   const ramp = tempoMap(DOCS[2].tempo);
   const rampMs = ramp.msAt(8);
-  d.assert('the tempo ramp integrates in closed form, not by averaging',
-    Math.abs(rampMs - 5545.18) < 1, `beat 8 at ${rampMs.toFixed(2)} ms (mean-tempo would say 5333)`);
+  d.assert('the tempo ramp matches Csound, not an average and not a log',
+    Math.abs(rampMs - 6000) < 1,
+    `beat 8 at ${rampMs.toFixed(2)} ms (mean-tempo 5333, linear-in-tempo 5545)`);
 
   d.assert('every use in every score resolves to a part it names',
     DOCS.every((doc0) => doc0.uses.every((u) => !!doc0.parts[u.ref])),

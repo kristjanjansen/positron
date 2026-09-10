@@ -65,15 +65,15 @@
 
   function connect() {
     ws = new WebSocket(RELAY);
-    ws.onopen = () => { d.log(`joined ${ROOM} as ${ID}`, 'hi'); send({ t: 'hello' }); };
+    ws.onopen = () => { d.log(`joined ${ROOM} as ${ID}`, 'hi'); send({ type: 'hello' }); };
     ws.onclose = () => d.log('relay closed', 'bad');
     ws.onerror = () => d.log('relay error', 'bad');
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from && m.from !== ID) peers.add(m.from);
-      if (m.t === 'hello') { send({ t: 'here' }); render(); return; }
-      if (m.t === 'here') { render(); return; }
-      if (m.t === 'cue') {
+      if (m.type === 'hello') { send({ type: 'here' }); render(); return; }
+      if (m.type === 'here') { render(); return; }
+      if (m.type === 'cue') {
         // THE SENDER STAMPS; the relay never re-stamps. So delivery time is
         // honest even though the relay has no idea what time it is.
         const deliveryMs = Date.now() - m.at;
@@ -93,7 +93,7 @@
 
   // The echo is the point: the relay sends every message back to the sender
   // too, so everyone — including whoever fired — sees the same order.
-  const fire = () => send({ t: 'cue', id: `CUE-${String(++seq).padStart(2, '0')}-${ID}`, at: Date.now() });
+  const fire = () => send({ type: 'cue', id: `CUE-${String(++seq).padStart(2, '0')}-${ID}`, at: Date.now() });
 
   d.on('fire', () => { fired++; fire(); });
   d.on('burst', () => { for (let i = 0; i < 10; i++) setTimeout(() => { fired++; fire(); }, i * 120); });
