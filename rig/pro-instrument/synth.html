@@ -128,6 +128,22 @@ if (INSTRUMENT === 'ableton') {
     });
     ac.createMediaStreamSource(st).connect(bus);
     log(`audio in: ${dev.label}`);
+    // A LEVEL METER ON THE BUS. Without it, "the capture is connected" and "Live
+    // is making a sound" are indistinguishable -- both look like silence at the
+    // far end, and only one of them is our problem.
+    const an = ac.createAnalyser(); an.fftSize = 2048;
+    bus.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    window.__synth.level = (ms = 1000) => new Promise((res) => {
+      let peak = 0;
+      const t0 = performance.now();
+      const tick = () => {
+        an.getFloatTimeDomainData(buf);
+        for (const v of buf) { const a = v < 0 ? -v : v; if (a > peak) peak = a; }
+        if (performance.now() - t0 < ms) requestAnimationFrame(tick); else res(peak);
+      };
+      tick();
+    });
   }).catch((e) => log('audio in denied: ' + e.message));
 }
 
@@ -168,5 +184,5 @@ ws.onmessage = async (e) => {
     log('answered');
   }
 };
-window.__synth = { ready: true, played: 0 };
+window.__synth = { ready: true, played: 0, play: (n = 60, v = 100) => play(n, v) };
 </script>
