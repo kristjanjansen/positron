@@ -162,6 +162,43 @@ health while being wrong:
   because a player that guesses the name is a player that subscribes to a
   bricked one.
 
+## A MoQ relay on the LAN — built, and it works
+
+`moq-relay-ietf` from `rig/moq/moq-rs-draft14`, built with Rust 1.98 on the
+instrument machine (90 seconds), listening on `[::]:4443`, with a 10-day ECDSA
+P-256 certificate the page PINS via `serverCertificateHashes`. Chrome connected
+first try: **2974 frames, 2974 decoded, 0 underruns**, and the relay logged
+`serving announce: namespace=/proinst-…`.
+
+`lan-relay.sh cert|run|print` does the setup. The synth publishes over loopback
+and ANNOUNCES the address and fingerprint a player should use — neither is
+derivable, and a guessed fingerprint is not a thing.
+
+### The transit number, and why it is negative
+
+| relay | transit as measured | |
+|---|---|---|
+| Cloudflare draft-14 | 39.6 ms | |
+| **this LAN relay** | **−14.2 ms** | ← impossible |
+
+**A negative latency is the measurement telling you what it really contains.**
+The send stamp is written by the instrument machine's clock and read by the
+player's, so this figure is *transit plus the offset between two clocks* — and
+here the offset is larger than the transit, so the sum goes negative. It is the
+same trap as comparing two peers' own timestamps, which cancels the skew under
+test.
+
+What IS valid is the **difference**, because both runs involve the same two
+clocks and the offset subtracts out: **the LAN relay saves ~53.8 ms of transit**
+against going to a Cloudflare edge and back. That is larger than the 34.19 ms
+edge round trip alone, so some of it is the relay's own handling as well as the
+distance.
+
+**For an absolute number, measure a ROUND trip on one clock** — press here, hear
+here — which is what the key→ear row does and why it needs no clock agreement.
+That is HANDOFF item 0 showing up in practice: min-RTT skew between two machines
+is still the unmeasured quantity everything multi-device rests on.
+
 ## What is NOT measured here
 
 - **Off-LAN.** `iceServers` is empty on purpose — host candidates only, right for
