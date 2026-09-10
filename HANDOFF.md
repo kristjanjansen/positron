@@ -53,6 +53,29 @@ of this staleness class after the container image and `rig/obs-docker/clock.html
 `GetStreamServiceSettings`. Rotate `positron-demo`'s RTMPS key; see
 `SECRETS-ROTATION.md`.
 
+**And the Pro became an instrument you can play.** `rig/pro-instrument/` — notes
+up a direct peer-to-peer link, synthesised there, sound back on the same
+connection; the relay carries only the handshake. The control-path A/B, same
+payload, alternating note by note, 60 each:
+
+| control path | p50 | p95 | max |
+|---|---|---|---|
+| direct peer-to-peer link | **6.50 ms** | 10.70 | 12.50 |
+| via the Cloudflare relay | **72.70 ms** | 96.90 | 149.80 |
+
+**The relay costs 11.2x**, because a machine three metres away is reached by
+going out to the edge and back, twice. So anything in the timing path takes the
+direct link — which is what `proto/jam`'s 0.56 ms MIDI leg already implied and
+this now measures between two real machines. The sound's own delay is the
+browser's audio cushion (**30–44 ms**, adapting, 0 lost), not the network; MoQ
+audio return measured 35.8 ms against WebRTC's 77.7 and is the upgrade path.
+
+⚠️ Both pages shipped broken first: the heredocs that wrote them ended one line
+early, so neither had a closing `</script>` and neither module ever ran, with
+**nothing thrown** — an unterminated module is a parse failure, not a runtime
+one, and the only console line was a favicon 404. I read "page returns 200 with
+the right URL" as "page works". `window.__play === undefined` is the check.
+
 **Both parallel agents landed.** `csound.mjs` is section-local (0aa closed,
 42/42 self-test, 23/23 oracle against real Csound 6.18), and the `t` → `type`
 sweep is done (0a closed, 413/413, no shim). The sweep's negative control is
