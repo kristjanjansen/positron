@@ -34,7 +34,13 @@ const url = `http://127.0.0.1:8890/rig/pro-instrument/synth.html?${q}`;
 
 spawn('pkill', ['-f', UDD]);
 await sleep(1500);
-const ch = spawn(CHROME, ['--headless=new', `--user-data-dir=${UDD}`, '--no-first-run',
+// HEADFUL, and this is not a preference. Headless Chrome on macOS has NO
+// working audio input: a getUserMedia track comes back live/unmuted/enabled and
+// reads EXACTLY 0.00000 -- including from the built-in microphone, which cannot
+// be digitally silent in a room. Measured side by side: headful mic 0.00575 at
+// rest and 0.16897 with sound in the room, headless 0.00000 for both. Every
+// "BlackHole is silent" reading was the instrument, not the signal.
+const ch = spawn(CHROME, [`--user-data-dir=${UDD}`, '--no-first-run',
   '--autoplay-policy=no-user-gesture-required',
   '--auto-accept-camera-and-microphone-capture',
   `--remote-debugging-port=${PORT}`,
