@@ -207,6 +207,9 @@ pWs.onclick = () => setPath('ws');
 // where the direct WebRTC path's is ~0 -- it wins anyway only because the
 // cushion is bigger than the detour.
 window.__return = 'rtc';
+// The synth mints its own MoQ namespace per run (fresh-name discipline) and
+// tells us over the relay. Guessing it is how you subscribe to a bricked name.
+let moqNs = null;
 const rRtc = document.getElementById('r-rtc'), rMq = document.getElementById('r-mq');
 const out = document.getElementById('out');
 let moq = null;
@@ -220,11 +223,15 @@ const setReturn = async (v) => {
     try {
       const { subscribeSynth } = await import('./moq-audio.mjs');
       const ac2 = new AudioContext(); await ac2.resume().catch(() => {});
-      moq = await subscribeSynth({ ac: ac2, ns: `proinst-${ROOM}`, floorMs: 10, log: (m) => console.log('[moq]', m) });
+      if (!moqNs) throw new Error('the synth has not announced a MoQ name yet');
+      moq = await subscribeSynth({ ac: ac2, ns: moqNs, floorMs: 10, log: (m) => console.log('[moq]', m) });
       attachOnset(ac2, moq.node);                    // same detector, other path
       setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
       rMq.textContent = 'sound back over MoQ';
-    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc'; }
+    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc';
+// The synth mints its own MoQ namespace per run (fresh-name discipline) and
+// tells us over the relay. Guessing it is how you subscribe to a bricked name.
+let moqNs = null; }
   }
   if (moq) moq.node.gain != null && 0;              // playout runs regardless; muting is on the element
 };
@@ -273,11 +280,13 @@ ws.onopen = async () => {
   const o = await pc.createOffer(); await pc.setLocalDescription(o);
   await new Promise((r) => pc.iceGatheringState === 'complete' ? r()
     : pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()));
+  send({ type: 'hello' });                       // ask the synth for its MoQ name
   send({ type: 'offer', sdp: pc.localDescription.sdp });
 };
 ws.onmessage = async (e) => {
   const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
   if (m.from === 'play') return;
+  if (m.ns && m.ns !== moqNs) { moqNs = m.ns; set('mqn', 'ready'); }
   if (m.type === 'ack') {
     const rec = sent.get(m.seq);
     if (rec) { sent.delete(m.seq); rtts[rec.via].push(performance.now() - rec.t0); report(); }
