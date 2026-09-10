@@ -102,6 +102,12 @@ const FILES = [
   ['demo/notes/index.html', 'notes/index.html'],
   ['demo/notes/uuu-positron.md', 'notes/uuu-positron.md'],
   ['demo/notes/hardware-box.md', 'notes/hardware-box.md'],
+
+  // The box listener: play a Raspberry Pi in another building from a phone.
+  // It needs nothing else deployed — proto/jam/playout-worklet.js is already
+  // listed above for the MoQ return path, and the page talks only to
+  // ws.positron.studio. Served at /box/.
+  ['rig/box/listen.html', 'box/index.html'],
   ...demoFiles(),
 ];
 

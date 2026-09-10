@@ -20,8 +20,9 @@ import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wi
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
+import { startJackSynth, jackSynthAvailable, JACK_SYNTHS } from './jacksynth.mjs';
 import { spawn } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync, realpathSync } from 'node:fs';
 
 const arg = (k, dflt) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -42,7 +43,12 @@ const URL_ = `${RELAY}/room/${ROOM}/ws`;
 
 const FROM = `box-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();
-let synth = null, stopSynth = null, midiIn = null, fluid = null;
+let synth = null, stopSynth = null, midiIn = null, fluid = null, jsyn = null;
+// ⚠️ Set BEFORE any await in startAudio. Raising a JACK chain takes ~13 s,
+// and during that window jsyn is still null — so a note.on arriving mid-start
+// saw 'nothing running' and started FluidSynth alongside it. Two instruments,
+// interleaved samples, 100 msg/s into a 60 msg/s relay. Measured twice.
+let starting = null;
 let lastHeard = Date.now();
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
@@ -80,8 +86,39 @@ function sendPcm(int16) {
   sentFrames++;
 }
 
-function startAudio(source = 'synth', msg = null) {
-  if (audio || stopSynth || fluid) return { ok: true, already: true, source: fluid ? 'fluidsynth' : stopSynth ? 'synth' : 'capture' };
+async function startAudio(source = 'synth', msg = null) {
+  // ⚠️ REPLACE, do not refuse. This used to return {already:true} when
+  // anything was running, so picking a second instrument left the first one
+  // ALSO streaming: two sources into one socket at 50 msg/s each, interleaved
+  // samples, and 100 msg/s against the relay's 60 — measured 60 frames/s
+  // arriving and 5,495 dropped at the relay. It sounds like corruption and it
+  // is two instruments talking over each other.
+  if (starting) return { ok: false, reason: `already starting ${starting}`, starting };
+  const running = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  if (running) {
+    if (running === source && source !== 'fluidsynth') return { ok: true, already: true, source: running };
+    log(`switching ${running} -> ${source}`);
+    stopAudio();
+    await new Promise((r) => setTimeout(r, 600));   // let the old one actually die
+  }
+
+  // JACK-client instruments: hexter (the real DX7, factory cartridges) and
+  // yoshimi. They cannot write to a pipe, so jacksynth.mjs raises jackd, the
+  // synth and an ffmpeg capture, and plays them by writing raw MIDI bytes to
+  // a snd-virmidi device that aconnect routes to their sequencer port.
+  if (JACK_SYNTHS[source]) {
+    if (!jackSynthAvailable(source)) return { ok: false, reason: `${source} is not installed on this box` };
+    starting = source;
+    log(`starting ${source} (jack chain) ...`);
+    let r;
+    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l) }); }
+    finally { starting = null; }
+    if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
+    jsyn = r;
+    log(`${source} up · port ${r.port} · midi ${r.midi ? 'in' : 'NONE'}`);
+    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec };
+  }
+
 
   // A real multitimbral instrument: 16 channels, 16 GM programs, one process.
   // Its `file` audio driver is realtime-paced, so its stdout IS the stream —
@@ -102,9 +139,15 @@ function startAudio(source = 'synth', msg = null) {
              rate: RATE, msgPerSec: RATE / FRAME, voices: Object.keys(VOICES) };
   }
 
-  // Subtractive, and modelled rather than sampled for a measured reason: driving
-  // FluidSynth's GM Synth Bass across the whole CC 74 range moved the spectral
-  // centroid 169 -> 154 Hz. The filter is the gesture and a sample freezes it.
+  // ⚠️ 'synth' (the FM Rhodes) and 'moog' are NO LONGER OFFERED as instruments.
+  // Both were written to find out what a box can do with plain arithmetic, and
+  // both were beaten by things already packaged: hexter plays the real DX7
+  // factory cartridges, and SuperCollider's MoogFF is a correct ladder where
+  // this one's resonance measurably does nothing (loop gain 0.001 at fc 900).
+  // The code stays in demo/shell for /carry/ and for the microcontroller path
+  // where no plugin can follow — see README, "the two we wrote and removed".
+  // Kept reachable with an explicit source name so the measurements can be
+  // reproduced; not listed, not the default, not on the page.
   if (source === 'moog') {
     synth = createMoogSynth({ patch: msg?.patch ?? 'bass' });
     stopSynth = synth.startRealtime(sendPcm);
@@ -150,7 +193,9 @@ function startAudio(source = 'synth', msg = null) {
 }
 
 function stopAudio() {
-  const was = fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  const was = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  aseq = 0;                       // a new source restarts the sequence
+  if (jsyn) { jsyn.stop(); jsyn = null; }
   if (fluid) { fluid.stop(); fluid = null; }
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
   if (midiIn) { midiIn.kill('SIGTERM'); midiIn = null; }
@@ -163,7 +208,7 @@ function stopAudio() {
 // Every verb that changes the rig has a PLAN twin that changes nothing, so a
 // client can always ask "what would this do" first. A wrong MIDI patch is
 // silent; a plan is not.
-function handle(msg) {
+async function handle(msg) {
   const reply = (type, body) => send({ type, re: msg.id, ...body });
   switch (msg.type) {
     case 'ports.get': {
@@ -185,34 +230,56 @@ function handle(msg) {
     case 'patch.clear':
       log('clearing every subscription');
       return reply('patch.cleared', clearAll({ dry: DRY }));
-    case 'audio.start': return reply('audio.started', startAudio(msg.source ?? 'synth', msg));
+    case 'audio.start':
+      startAudio(msg.source ?? 'fluidsynth', msg).then((r) => reply('audio.started', r));
+      return true;
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The box does
     // not care which, and does not need one to exist.
     case 'note.on':
-      // Whichever instrument is running takes the note. Nothing running starts
-      // the built-in one, so a client never has to sequence two calls.
-      if (!synth && !fluid) startAudio('synth');
-      if (fluid) fluid.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
-      else synth.noteOn(msg.note, msg.vel ?? 100);
-      return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0, on: fluid ? 'fluidsynth' : 'synth', voices: synth?.voices ?? null });
+      // Whichever instrument is running takes the note.
+      // If something is mid-start, do NOT start a second instrument — drop the
+      // note. One missed note is nothing; two instruments is a broken stream.
+      if (starting) return reply('note.ack', { note: msg.note, dropped: true, starting });
+      if (!synth && !fluid && !jsyn) await startAudio('fluidsynth', {});
+      if (jsyn) jsyn.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
+      else if (fluid) fluid.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
+      else synth?.noteOn(msg.note, msg.vel ?? 100);
+      return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
+        on: jsyn ? jsyn.source : fluid ? 'fluidsynth' : 'synth' });
     case 'note.off':
-      if (fluid) fluid.noteOff(msg.channel ?? 0, msg.note);
+      if (jsyn) jsyn.noteOff(msg.channel ?? 0, msg.note);
+      else if (fluid) fluid.noteOff(msg.channel ?? 0, msg.note);
       else if (synth) synth.noteOff(msg.note);
-      return reply('note.ack', { note: msg.note, voices: synth?.voices ?? null });
+      return reply('note.ack', { note: msg.note });
     case 'note.panic':
+      if (jsyn) jsyn.panic();
       if (fluid) fluid.panic();
       if (synth) synth.allOff();
-      return reply('note.ack', { panic: true, voices: synth?.voices ?? 0 });
+      return reply('note.ack', { panic: true });
     // The multitimbral surface: one call per channel, then sixteen channels are
     // sixteen instruments. Names so a client need not memorise GM numbers.
     case 'voice.select': {
-      if (!fluid) return reply('voice.selected', { ok: false, reason: 'voice.select needs the fluidsynth source' });
+      // Every instrument here answers program change; only the MEANING of the
+      // number differs. FluidSynth's are General MIDI, hexter's index the
+      // loaded DX7 cartridge, Yoshimi's index its current bank — so a client
+      // sends either a GM name (fluidsynth) or a program number (anything).
+      if (jsyn) {
+        const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
+        if (prog === undefined) return reply('voice.selected', { ok: false, reason: 'send {program:<0-127>} to this instrument', on: jsyn.source });
+        jsyn.program(msg.channel ?? 0, prog);
+        return reply('voice.selected', { ok: true, on: jsyn.source, channel: msg.channel ?? 0, program: prog, name: msg.name ?? null });
+      }
+      if (!fluid) return reply('voice.selected', { ok: false, reason: 'no instrument running' });
       const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
       if (prog === undefined) return reply('voice.selected', { ok: false, reason: `unknown voice ${JSON.stringify(msg.voice)}`, known: Object.keys(VOICES) });
       fluid.select(msg.channel ?? 0, prog);
       return reply('voice.selected', { ok: true, channel: msg.channel ?? 0, voice: msg.voice ?? null, program: prog });
     }
     case 'cc': {
+      // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real; hexter has
+      // no filter at all but takes CC 16/17/18/19/80/81 as operator coarse
+      // frequency, effective on notes ALREADY SOUNDING.
+      if (jsyn) { jsyn.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: jsyn.source }); }
       if (fluid) { fluid.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: 'fluidsynth' }); }
       // 74 and 71 are the conventional cutoff and resonance, so a hardware knob
       // maps onto them with no translation anywhere.
@@ -225,12 +292,18 @@ function handle(msg) {
     case 'audio.stop':  return reply('audio.stopped', stopAudio());
     case 'sf.list': {
       const dirs = (process.env.BOX_SF_DIRS || '/sf:/usr/share/sounds/sf2').split(':');
-      const out = [];
+      const out = [], seen = new Set();
       for (const d of dirs) {
         try {
           for (const f of readdirSync(d)) if (/\.sf[23]$/i.test(f)) {
             const p = `${d}/${f}`;
-            out.push({ path: p, name: f.replace(/\.sf[23]$/i, ''), mb: +(statSync(p).size / 1048576).toFixed(1) });
+            // Debian ships default-GM.sf2 as an ALTERNATIVES SYMLINK to
+            // FluidR3_GM.sf2, so a naive listing offers one 141 MB file twice
+            // under two names. Dedupe on the resolved path.
+            let real; try { real = realpathSync(p); } catch { continue; }
+            if (seen.has(real)) continue;
+            seen.add(real);
+            out.push({ path: real, name: f.replace(/\.sf[23]$/i, ''), mb: +(statSync(real).size / 1048576).toFixed(1) });
           }
         } catch { /* a directory that is not there is not an error, it is empty */ }
       }
@@ -259,7 +332,8 @@ function connect() {
     log(`joined ${ROOM} · backend ${s.backend} · ${s.ports.length} ports${DRY ? ' · DRY' : ''}`);
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
     send({ type: 'box.hello', name: NAME, backend: s.backend, ports: s.ports.length, dry: DRY, since,
-                 instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt() },
+                 instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt(),
+                                ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) },
                  ...(s.error ? { error: s.error, hint: s.hint } : {}) });
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
@@ -268,8 +342,12 @@ function connect() {
     if (typeof e.data !== 'string') return;               // audio is ours, outbound only
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;      // never answer yourself
-    try { handle(msg); }
-    catch (err) { log('handler threw:', err.message); send({ type: 'box.error', re: msg.id, error: err.message }); }
+    // handle() is async now (raising a JACK chain takes seconds), so a throw
+    // arrives as a rejection — an unhandled one would take the service down.
+    Promise.resolve().then(() => handle(msg)).catch((err) => {
+      log('handler threw:', err.message);
+      send({ type: 'box.error', re: msg.id, error: err.message });
+    });
   };
   ws.onclose = (e) => {
     clearInterval(ws.__watchdog);

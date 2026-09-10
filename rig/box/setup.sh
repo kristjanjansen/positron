@@ -53,9 +53,15 @@ echo "== audio group"
 usermod -aG audio "$BOXUSER" || true
 
 echo "== install to $DEST"
-install -d "$DEST" "$DEST/fixtures" "$DEST/demo/shell"
-install -m 644 "$SRC"/*.mjs "$DEST/"
-install -m 644 "$SRC"/fixtures/* "$DEST/fixtures/"
+# ⚠️ PRESERVE THE DEPTH. box.mjs imports '../../demo/shell/wire.mjs', so it must
+# sit two levels below $DEST or that resolves off the filesystem root —
+# ERR_MODULE_NOT_FOUND file:///demo/shell/wire.mjs, which is what a flattened
+# install produced. Checking the files exist at the SOURCE was not enough: what
+# matters is whether the import resolves from where it will actually run.
+BOXDIR="$DEST/rig/box"
+install -d "$BOXDIR" "$BOXDIR/fixtures" "$DEST/demo/shell"
+install -m 644 "$SRC"/*.mjs "$BOXDIR/"
+install -m 644 "$SRC"/fixtures/* "$BOXDIR/fixtures/"
 # Shared modules are IMPORTED from demo/shell rather than copied into rig/box —
 # one envelope, one Rhodes, one Moog, both ends. They must come along at the
 # exact paths box.mjs expects.
@@ -92,6 +98,18 @@ CFG
 echo "== service"
 install -m 644 "$SRC/positron-box.service" /etc/systemd/system/positron-box.service
 sed -i "s/^User=.*/User=$BOXUSER/" /etc/systemd/system/positron-box.service
+# Prove every import RESOLVES from the installed location, not merely that the
+# files were copied. `node --input-type=module -e "import(...)"` is the only
+# check that answers the question the service will ask at 3am.
+echo "== checking the install actually loads"
+if sudo -u "$BOXUSER" node --input-type=module -e "
+  import('file://$BOXDIR/synth.mjs').then(()=>console.log('   synth.mjs and its imports resolve'))
+    .catch(e=>{console.error('   FAILED:', e.message.split('\n')[0]); process.exit(1)})" ; then
+  :
+else
+  echo "refusing to enable a service that cannot load"; exit 1
+fi
+
 systemctl daemon-reload
 systemctl enable --now positron-box
 
