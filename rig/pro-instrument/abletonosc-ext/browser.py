@@ -11,16 +11,18 @@
 #   /live/browser/load <track_index> <name>   -> select track, load first match
 #
 # Installed to Live's Remote Scripts and picked up by /live/api/reload.
+# REGISTERED FROM view.py, NOT FROM manager.py. /live/api/reload does rebuild the
+# handler list -- it calls clear_api() then init_api() -- but it reloads only the
+# abletonosc/* modules, and NOT manager.py. So a handler added to manager's list
+# needs a Live restart, while one registered from inside an already-reloaded
+# module does not. Live refuses AppleScript quit, so "no restart" is the whole
+# point.
 from typing import Optional, Tuple
-from .handler import AbletonOSCHandler
 
 
-class BrowserHandler(AbletonOSCHandler):
-    def __init__(self, manager):
-        super().__init__(manager)
-        self.class_identifier = "browser"
-
-    def init_api(self):
+def register(self):
+    """`self` is any AbletonOSCHandler — we borrow its .song/.osc_server/.manager."""
+    if True:
         def browser():
             return self.manager.application.browser
 
