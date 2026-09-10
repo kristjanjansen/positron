@@ -707,16 +707,70 @@ reach the relay from arm64 Linux.
 boot, and how a Pi behaves after a power cut. Those need the board, and they are
 precisely the things that broke this month.
 
-### 8.7 Where the audio goes, and where a model does not
+### 8.7 The box is a SERVICE, not a peer
 
-The audio goes to **your ears and nowhere else**:
+An earlier draft of this section made the browser load-bearing. That was wrong,
+and the correction is the important part of the plan.
 
-    Circuit -> the Pi captures -> the relay -> your browser -> your speakers
+**The Pi connects out to Cloudflare and does its thing, whether or not anyone is
+watching.** It holds a socket to the relay and reconnects forever; it reports
+what MIDI ports exist; it accepts a patch document, validates it and applies it;
+it streams audio when asked; and it keeps its own state, so the truth about the
+studio lives IN the studio.
+
+Nothing in that list mentions a browser. The box behaves the same at 3 a.m. with
+nobody connected as it does when a page is open.
+
+The draft that coupled the box's behaviour to a session on the other end
+reproduced the exact fault §8.5 complains about: a studio that exists only while
+somebody is looking at it is a SESSION, and the whole point of a box is that it
+is an OBJECT.
+
+**So the interface is the message shape, not the page.** `plan-ws.md` already
+settled the envelope — `type`, `from`, `at`, `seq`, carried verbatim — so the box
+speaks what everything else here speaks, and then:
+
+- a browser is a client;
+- `curl` and a node script are clients;
+- a phone is a client;
+- another box could be a client.
+
+Two consequences worth having:
+
+**It is testable without a browser**, which matters because driving Chrome over
+CDP is what made this month's debugging slow. `node something.mjs` can list
+ports, apply a patch and read state back.
+
+**The browser gets to be genuinely good**, because it is no longer carrying
+reliability: draw the patch graph, light the ports as MIDI flows, scrub the
+audio, show what changed and when. Rich, disposable, and if it crashes the studio
+does not notice.
+
+Audio still has to LAND somewhere, and a browser is the most convenient renderer
+— no install, works on a phone. But that is a choice of listener, not a
+dependency: `ffplay` would do, and so would a second box with speakers.
+
+### 8.8 Where the audio goes, and where a model does not
+
+The audio goes to **whoever asked for it, and nowhere else**:
+
+    Circuit -> the box captures -> the relay -> a listener
 
 **Cloudflare is a dumb pipe here, deliberately.** The relay's whole value is that
 it does not parse, which is why the Durable Object hop costs 0.18 ms. Nothing
-stores the audio and no model touches it — the moment the relay understands
-audio, every message becomes a parse and the hop stops being free.
+stores the audio and no model touches it.
+
+⚠️ **Do not transcode in the Worker.** It is the tempting place and it is the
+wrong one: it makes every message a parse, it spends Worker CPU per listener, it
+adds encode and decode to the latency, and it solves a problem that does not
+exist — raw PCM measured **zero loss at 768 kbit/s**, which is 19% of one
+socket's budget. `shout` already showed a Worker carries continuous audio as a
+PIPE at −0.8 ms of carry. **Compress at the source or not at all**, and if a
+listener on mobile data needs Opus, encode it on the box, which has the CPU the
+ESP32 did not.
+
+**No container either.** A container adds a hop, a cold start and a bill to solve
+a problem nobody has.
 
 A model belongs in exactly one place: **the words, not the sound.**
 
@@ -725,23 +779,36 @@ A model belongs in exactly one place: **the words, not the sound.**
 | the browser's own `SpeechRecognition` | free, no round trip, Chrome-only, ships audio to Google anyway |
 | **Workers AI (Whisper)** | consistent, any browser, infrastructure already in use, costs a little |
 
-Voice commands are not latency-critical — a few hundred milliseconds to hear
-"connect circuit to microfreak" is invisible — so the round trip is free in the
-only sense that matters. **Not a local model on the Pi**: a speech model on the
-box is exactly the kind of weight that makes an unattended machine fragile.
+Voice commands are not latency-critical, so the round trip is free in the only
+sense that matters. **Not a local model on the box**: a speech model is exactly
+the weight that makes an unattended machine fragile.
 
-The second place a model earns its keep is **intent -> patch document** — turning
-"make the circuit drive everything but keep the digitakt on its own clock" into
-the `links` array of 8.4. Under 8.4's rule: it produces a DOCUMENT that is
-validated against the ports ALSA reports, never commands that are run.
+The second place a model earns its keep is **intent -> patch document**, under
+8.4's rule: it produces a DOCUMENT validated against the ports ALSA reports,
+never commands that are run.
 
-Which divides the work cleanly, and keeps the part nobody can walk over to as
-boring as possible:
+Which divides the work, and keeps the part nobody can walk over to boring:
 
-- **the Pi**: ports, patching, capture. No models, no speech, nothing clever.
-- **Cloudflare**: a dumb pipe for audio, and optionally a model for words.
-- **the browser**: the face, the microphone and the speakers.
+- **the box**: ports, patching, capture, a socket. No models, no browser.
+- **Cloudflare**: a dumb pipe, and optionally a model for words.
+- **the listener**: the face, the microphone and the speakers.
 
-The order that follows: prototype the naming layer and the patch document with
-`aconnect -l` output and no hardware; test the browser capabilities in arm64
-Docker; buy one Pi only for the questions that are left.
+### 8.9 What can be simulated, and what cannot
+
+**Not a Cloudflare Container.** The patchbay needs ALSA's sequencer, a KERNEL
+facility, and a container shares the host kernel with no `/dev/snd` and no
+`snd-seq`. It cannot answer anything about ARM either. It would answer questions
+nobody is asking.
+
+**Docker on an M1 is better and free.** `--platform linux/arm64` on Apple Silicon
+is NATIVE arm64 Linux, so it answers the software half properly.
+
+**What no simulation answers**: real MIDI ports, real audio devices, unattended
+boot, and how a board behaves after a power cut. Those need the board, and they
+are precisely what broke this month.
+
+The order that follows: prototype the naming layer and the patch document against
+`aconnect -l` output with no hardware; test what is left in arm64 Docker; buy one
+board only for the questions that remain. And with no browser on the box, that
+board is the **1 GB Pi 5 at 65 EUR** rather than the 4 GB at 159 — the RAM crisis
+turned "browser or native" into a 94 EUR question, and native wins it twice.
