@@ -1,3 +1,141 @@
+# Handoff — 2026-09-11 (end of session 17)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 17 — the board arrived, and it plays
+
+**A Raspberry Pi 4 runs three instruments and answers from anywhere.**
+`https://positron.studio/box/?room=studio-1` plays it from any network. The
+board boots into the job, dials OUT to `ws.positron.studio`, survives reboots,
+and needs neither laptop. Note to ear over the internet: **98.7 ms median**.
+
+| | | |
+|---|---|---|
+| **FluidSynth** | FluidR3_GM, 16 channels | writes realtime PCM to a FIFO — **one process, no jackd** |
+| **hexter** | the real DX7, **factory cartridges ROM1A/1B/2A/2B** in Debian main | DSSI, needs a host |
+| **Yoshimi** | AddSynth/SubSynth/PadSynth, 1822 instruments in 24 banks | JACK client |
+| **Pappus** | a norns granular engine, as a **toggleable insert** | 2,030 lines, 106 commands, FULL graph on a Pi 4 |
+
+**Measured on the A72, replacing an estimate that stood all day**: our own FM
+voice runs 8 voices at **6.8x realtime, 15% of one core** — I had guessed 3–4x.
+Yoshimi costs 4.8% CPU and **317 MB**. Pappus + hexter together: **57.6% of
+400%, zero xruns, 49.6 °C**.
+
+**`rig/box/` is the service.** `alsa.mjs` (patchbay), `fluid.mjs`, `synth.mjs`,
+`jacksynth.mjs` (JACK-client instruments), `norns/` (run norns engines without
+norns), `provision.sh` (find the board and set it up), `listen.html` (deployed
+at `/box/`). 38 unit tests, 13 live, all against the real relay.
+
+### What is BROKEN and diagnosed, not guessed
+
+**Yoshimi patch stepping and random do nothing.** Its instruments are numbered
+**from 0001 and SPARSELY** — the Rhodes bank holds 26 instruments spread across
+0001–0068 — so walking 0…127 mostly lands on empty slots and program 0 never
+exists at all. The fix is to enumerate `/usr/share/yoshimi/banks/*/NNNN-*.xiz`
+on the box and walk only what is there, which also yields real names. Not a
+patch; do it in one pass.
+
+⚠️ Also read from Yoshimi's own config, after a wrong guess cost an hour:
+**`MIDI Root CC 0`, `MIDI Bank CC 32`, `MIDI Program Change on`.** Bank select
+is **CC 32**. Sending banks on CC 0 moves its ROOT DIRECTORY instead, at which
+point every program change lands nowhere.
+
+### Things that cost real time, in the order they bit
+
+**`pkill -f "fluidsynth|yoshimi|jack-dssi-host"` MATCHES ITS OWN SSH COMMAND
+LINE**, because the pattern text is in the command being run. It killed its own
+shell mid-script — several deploys silently did nothing and their output
+vanished. **Use `pkill -x`.**
+
+**`custom.toml` does nothing on a `dd`-written card.** It is read by a firstrun
+script that **Raspberry Pi Imager injects**, along with a `systemd.run=` hook in
+`cmdline.txt`. A raw image has no hook, so the file sits there unread — the card
+boots as `raspberrypi` with no user and no sshd, and nothing anywhere says why.
+`userconf.txt` and an empty `ssh` file are handled by services **baked into the
+image** and work on a plain write. Use Imager, or use those two.
+
+**The M1/M2 Pro built-in SD reader is a documented fault.** Reads once, then
+`Link Width: Off` until a reboot. IOKit's `AppleSDXCSlot` said `Card Present =
+Yes` while the electrical link was down — the mechanical detect switch fires,
+the pins do not make contact, the driver publishes no media. Hours went into
+this. A USB reader is the fix.
+
+**Systemd hardening fights JACK.** `PrivateTmp=true` gave the service its own
+/tmp so its jackd socket was invisible to its own children; `ProtectSystem=
+strict` then made /tmp read-only so jackd could not create that socket at all;
+`ProtectHome=read-only` blocked jackd's and SuperCollider's config writes. Each
+presented three processes downstream as **"scsynth could not initialize
+audio"**. All three are off, with the bill recorded in the unit file.
+
+**Ask JACK, not the process table.** `pgrep -x jackd` reports a server this
+process may not be able to REACH — different namespace, different user — and
+skipping the start on that basis leaves every client unable to connect.
+`jack_lsp` answers the question actually being asked. And **jackd must not be
+in the teardown list**: it is a shared server, and killing it on every
+instrument switch kills the one the next instrument needs.
+
+**Two audio sources into one socket is what "garbled" sounds like.**
+`startAudio` returned `{already:true}` when anything was running, so choosing a
+second instrument left the first ALSO streaming: interleaved samples at 100
+msg/s against the relay's 60. Measured **60 frames/s arriving and 5,495 dropped
+at the relay**. The same thing then arrived through a second door — raising a
+JACK chain takes ~13 s, and a `note.on` during that window saw "nothing
+running" and started FluidSynth alongside. **Rate is now a readout cell,
+because 50/s is one clean source and anything above it is this bug.**
+
+**A focus ring is not a selection.** The shell's `:focus-visible` outline uses
+`var(--hi)` — the same green as the armed state — so a focused-but-off switch
+read as armed. Focus is grey here now.
+
+### Norns engines without norns — `rig/box/norns/`
+
+A norns engine is an ordinary SuperCollider class; the Lua layer, the grid and
+softcut are not involved in making sound. `CroneEngine.sc` is a **65-line**
+stand-in for the one base class, and Pappus loads and allocates on plain
+`scsynth`. Three things it needs, none discoverable:
+
+- `QT_QPA_PLATFORM=offscreen` — Debian's `sclang` links the Qt GUI classes
+- `QTWEBENGINE_DISABLE_SANDBOX=1` — it embeds QtWebEngine, whose Chromium
+  zygote refuses to run as root
+- **jackd must run as the same user** — its control socket is per-user
+
+⚠️ **The context members are not the same shape**, and neither error says so:
+`context.in_b[0].index` but `context.out_b.index` — an ARRAY and a SINGLE bus.
+Read `Engine_Pappus.sc:1757` rather than guessing symmetry. And `addCommand`
+handlers are given an **array whose first argument is `msg[1]`**, not the
+arguments directly.
+
+### Cloudflare containers CAN run the instrument
+
+`plan-hardware.md` §8.6 said otherwise and is corrected in both copies. Making
+sound needs no kernel: FluidSynth's `file` driver is **realtime-paced** and
+writes to a pipe, so the whole of `rig/box` ran in an arm64 container against
+the live relay — **13/13 green, streaming, with no sound hardware in
+existence**. A container can also hold a sample library a 2 GB Pi cannot.
+
+### The two synths we wrote, and removed
+
+`demo/shell/rhodes.mjs` and `moog.mjs` are no longer offered as instruments and
+are written up in `rig/box/README.md`. The Rhodes was diagnosed rather than
+merely disliked — spectral centroid **251 Hz soft against 621 Hz hard**, and a
+soft note at 251 Hz on a 220 Hz fundamental *is* a sine, which is what "thin"
+means. The cause is the missing **pickup nonlinearity**, seven flops and zero
+state, verified against the documented octave-jump prediction at **−315 dB**.
+The Moog's resonance is **measurably broken and left that way on purpose**:
+four cascaded one-poles give loop gain `k·g⁴`, which collapses to **0.001 at
+fc 900 Hz**. They stay because they are the only code here that ports to a
+microcontroller, where no plugin can follow.
+
+### Still open
+
+- Yoshimi patch enumeration (above) — the one known-broken thing
+- `keep`'s 409 (§0b below), untouched
+- `positron-demo`'s RTMPS stream key is still exposed and unrotated
+- `workers/pub`'s container image is still pre-session-12
+
+---
+
 # Handoff — 2026-09-10 (end of session 16)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`

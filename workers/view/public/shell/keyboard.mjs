@@ -28,6 +28,18 @@ export function createKeyboard(host, {
 } = {}) {
   const keys = keyOpts || Object.keys(map);
   const noteOf = (k) => base + map[k];
+  // A key carries two names: the note it plays and the letter that plays it.
+  // The note goes on TOP because it is the one that changes — an octave shift
+  // moves every note name and no letter — and because a player reading a
+  // keyboard is looking for a pitch, not for a keystroke.
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const noteName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
+  const label = (b, k) => {
+    b.textContent = '';
+    const nn = document.createElement('span'); nn.className = 'kn'; nn.textContent = noteName(noteOf(k));
+    const kk = document.createElement('span'); kk.className = 'kk'; kk.textContent = k;
+    b.append(nn, kk);
+  };
   const keyOf = (note) => keys.find((k) => noteOf(k) === note) ?? null;
 
   const el = document.createElement('div');
@@ -36,7 +48,7 @@ export function createKeyboard(host, {
   for (const k of keys) {
     const b = document.createElement('div');
     b.className = `k${sharps.has(k) ? ' sharp' : ''}`;
-    b.textContent = k;
+    label(b, k);
     // pointerdown/up rather than click, so a HELD finger is a held note; capture
     // so that sliding off the key still releases it.
     b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); press(k, 'pointer'); });
@@ -80,6 +92,7 @@ export function createKeyboard(host, {
     shiftOctave(delta, { min = 24, max = 96 } = {}) {
       for (const k of [...held]) release(k, 'key');
       base = Math.max(min, Math.min(max, base + (delta * 12)));
+      for (const k of keys) label(els.get(k), k);      // every note name moved
       return base;
     },
     /** paint a key. `who` is 'self' or 'remote'; they are different colours. */
