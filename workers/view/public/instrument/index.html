@@ -7,13 +7,6 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
-  .k { flex: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
-       border: 1px solid var(--line2); display: grid; place-items: end center; padding-bottom: 6px;
-       font: 500 10px/1 var(--mono); color: var(--dim2); user-select: none; cursor: pointer; }
-  .k.sharp { background: #0e1219; }
-  .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
-  .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
   .src { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
   .src b { color: var(--fg); font-weight: 500; }
 </style>
@@ -21,13 +14,11 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createVoices } from '/proto/looper/synth.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'instrument-demo';
   const ID = Math.random().toString(36).slice(2, 8);
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
-  const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
-  const SHARP = new Set(['w', 'e', 't', 'y', 'u']);
-  const BASE = 60;
 
   const d = mount({
     name: 'instrument',
@@ -41,24 +32,19 @@
   });
   guard(d);
 
-  const kb = el('div', 'keys');
-  const keyEls = new Map();
-  for (const k of Object.keys(KEYMAP)) {
-    const b = el('div', `k${SHARP.has(k) ? ' sharp' : ''}`, k);
-    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); press(k); });
-    b.addEventListener('pointerup', () => release(k));
-    b.addEventListener('pointercancel', () => release(k));
-    keyEls.set(k, b);
-    kb.append(b);
-  }
-  d.el.append(kb);
+  // The keyboard is a shared component now (shell/keyboard.mjs). It REPORTS
+  // presses; what lights a key is a note event, which is why a note arriving
+  // from the other player lights the same key without a second code path.
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (note, how) => press(note, how),
+    onUp: (note) => release(note),
+  });
   const srcEl = el('p', 'src', 'no source yet');
   d.el.append(srcEl);
 
   let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not asked';
   const lat = [];
-  const down = new Set();
-  const noteOf = (k) => BASE + KEYMAP[k];
   const send = (o) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...o, from: ID })); };
 
   /**
@@ -67,21 +53,17 @@
    * relay carries music rather than a device protocol, and it cannot tell a MIDI
    * keyboard from a tapped screen.
    */
-  function press(k, fromMidi = false) {
-    if (down.has(k)) return;
-    down.add(k);
-    keyEls.get(k)?.classList.add('down');
-    play(noteOf(k), 100);
-    send({ type: 'on', note: noteOf(k), vel: 100, at: Date.now(), src: fromMidi ? 'midi' : 'touch' });
+  function press(note, how = 'key') {
+    kb.lightNote(note, true);
+    play(note, 100);
+    send({ type: 'on', note, vel: 100, at: Date.now(), src: how === 'midi' ? 'midi' : 'touch' });
     sent++;
     d.set('sent', sent);
   }
-  function release(k) {
-    if (!down.has(k)) return;
-    down.delete(k);
-    keyEls.get(k)?.classList.remove('down');
-    stop(noteOf(k));
-    send({ type: 'off', note: noteOf(k), at: Date.now() });
+  function release(note) {
+    kb.lightNote(note, false);
+    stop(note);
+    send({ type: 'off', note, at: Date.now() });
   }
 
   const live = new Map();
@@ -107,17 +89,16 @@
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;                    // the relay echoes to us too
-      const key = Object.keys(KEYMAP).find((k) => noteOf(k) === m.note);
       if (m.type === 'on') {
         received++;
         if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('latency', lat[lat.length - 1]); }
         d.set('received', received);
         play(m.note, m.vel ?? 100);
-        if (key) keyEls.get(key)?.classList.add('remote');
+        kb.lightNote(m.note, true, 'remote');
         srcEl.innerHTML = `<b>${m.from}</b> played note ${m.note} (${m.src ?? '?'})`;
       } else if (m.type === 'off') {
         stop(m.note);
-        if (key) keyEls.get(key)?.classList.remove('remote');
+        kb.lightNote(m.note, false, 'remote');
       }
     };
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
@@ -136,22 +117,14 @@
         input.onmidimessage = ({ data }) => {
           const [status, n, v] = data;
           const cmd = status & 0xf0;
-          const k = Object.keys(KEYMAP).find((x) => noteOf(x) === n);
-          if (!k) return;
-          if (cmd === 0x90 && v > 0) press(k, true);
-          else if (cmd === 0x80 || (cmd === 0x90 && v === 0)) release(k);
+          if (!kb.keyOf(n)) return;                 // outside this keyboard's range
+          if (cmd === 0x90 && v > 0) press(n, 'midi');
+          else if (cmd === 0x80 || (cmd === 0x90 && v === 0)) release(n);
         };
       }
       d.log(`midi: ${midiState}`);
     } catch (e) { midiState = `denied (${e.name})`; d.set('midi', midiState, 'bad'); }
   });
-
-  addEventListener('keydown', (e) => {
-    if (e.repeat) return;
-    const k = e.key.toLowerCase();
-    if (k in KEYMAP) { e.preventDefault(); press(k); }
-  });
-  addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); if (k in KEYMAP) release(k); });
 
   d.on('check', () => {
     d.assert('audio running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
