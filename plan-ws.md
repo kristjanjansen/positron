@@ -1,8 +1,18 @@
 # plan-ws — one message shape, and a backlog that is ours to write
 
-Status: **not started.** Written 2026-09-09 from a spoken request; §0 records what
-I think was asked and what I could not make out, because acting on a wrong
-reading of a dictated brief is expensive.
+Status: **P1–P3 BUILT AND DEPLOYED 2026-09-09** — `demo/shell/wire.mjs`,
+`workers/backlog` on `backlog.positron.studio`, and `wire` at
+`positron.studio/wire/` (17/17 green). Two things are outstanding: the
+`t` → `type` sweep across the other six files (§2, P1's second half — only
+`wire` speaks `type` today), and §7's P4 comparison, which still waits on §0.
+Written 2026-09-09 from a spoken request; §0 records what I think was asked and
+what I could not make out, because acting on a wrong reading of a dictated brief
+is expensive.
+
+**Three decisions taken since, each argued where it lands**: the room stays in
+the URL and `channel` is not added (§5); the verb field is `type`, not `t`
+(§2); and the backlog is filled by a recorder that joins the room as an ordinary
+socket, so the relay still never parses (§3).
 
 ---
 
@@ -86,8 +96,9 @@ which is the shape §4 argues for.
 | `instrument` | `{t:'on', note, vel, at, src}` `{t:'off', note, at}` |
 | `looper` (`proto/looper/peer.mjs`) | `{t:'hello'}` `{t:'grid', loopMs, origin}` `{t:'grid-set'}` `{t:'grid-yield'}` `{t:'layer-recv', from, bytes, deliveryMs}` |
 
-Three authors, one convention, never written down: **`t` is the verb**, the
-relay adds nothing, and `from` is stamped by the sender. Two more shared rules
+Three authors, one convention, never written down: **`t` is the verb** — which
+§2 renames to `type` — the relay adds nothing, and `from` is stamped by the
+sender. Two more shared rules
 are in the code as comments rather than as a spec:
 
 - **the sender stamps `at`, the relay never re-stamps** (`cues`) — which is why
@@ -105,6 +116,60 @@ autoresponse, so an RTT probe never wakes the DO and measures pure network.
 
 ⚠️ Residual risk the relay's own header states rather than hides: nothing caps
 how many DISTINCT rooms one client opens.
+
+### What it costs and how it scales — measured 2026-09-09
+
+Against the DEPLOYED relay from one Mac, three runs; the backlog numbers are
+`wrangler dev` on this machine and are NOT edge numbers. Method and script:
+`demo/perf-wire.mjs`, 200 samples per round-trip figure.
+
+| | run A | run B | run C |
+|---|---|---|---|
+| `ping`→`pong`, answered by the runtime, DO never woken | p50 26.0 / p95 32.6 ms | p50 36.4 / p95 46.2 ms | p50 37.5 / p95 49.5 ms |
+| echo, through the room's Durable Object | p50 27.0 / p95 40.4 ms | p50 38.0 / p95 51.2 ms | p50 38.3 / p95 50.5 ms |
+| **what the DO hop costs** | **+1.0 p50 / +7.8 p95** | **+1.6 p50 / +5.0 p95** | **+0.8 p50 / +1.1 p95** |
+
+The absolute numbers are this link and moved 11 ms across three runs; the
+DIFFERENCE is the relay, and it is **one to two milliseconds at the median**. Quoting the
+autoresponse RTT as "the relay's latency" would be quoting the network.
+
+**Fan-out is nearly free.** One sender at 20 msg/s, N receivers, 60 messages
+each time, delivery measured at the sender's own echo:
+
+    N= 1   p50 40 ms    60/60 delivered, 0 lost
+    N= 2   p50 42 ms   120/120
+    N= 4   p50 42 ms   240/240
+    N= 8   p50 45 ms   480/480
+    N=15   p50 48 ms   900/900 delivered, 0 lost
+
+A full room costs the sender **8 ms at p50** over an empty one, and nothing is
+lost at the ceiling of 16 sockets. So the per-room limit is the cap, not the
+machine.
+
+**Size**: 1 KiB p50 47 ms · 8 KiB 70 · 64 KiB 81 · 200 KiB 116 · 256 KiB 125,
+one sender to one receiver, paced to stay under the byte budget. A message at
+the roof costs ~78 ms more than a small one — worth knowing before putting a
+committed loop layer on the hot path.
+
+**And the caps bite exactly where the relay says they do, counted by `seq`:**
+
+    30 msg/s   delivered  90/90    dropped   0   (0.0%)
+    60 msg/s   delivered 180/180   dropped   0   (0.0%)
+   120 msg/s   delivered 298/360   dropped  62  (17.2%)
+   300 msg/s   delivered 298/900   dropped 599  (66.6%)
+
+Both overloads delivered **298 in three seconds**, and a third run repeated it
+to the message (298 again, 61 and 601 dropped), which is the token bucket
+read back out of the wire: `MSG_BURST` 120 plus 3 s at `MSG_PER_SEC` 60 is a
+300-message allowance, and 298 arrived. **The sender was told nothing in either
+case** — no error, no close, no backpressure — and the only reason those 599
+losses have a number at all is that the receiver could see the counter skip.
+That is `seq` earning its place against a real mechanism rather than a
+hypothetical one (§2).
+
+**The backlog** (local dev, so treat as a floor rather than a number): kept 300
+of 300 at a 60 msg/s send, and history reads of 8, 50 and 200 rows all returned
+in **5–8 ms**, flat in the row count.
 
 ---
 
@@ -127,7 +192,7 @@ Beside positron's, which three demos invented independently:
 
 | elektron | positron | the difference that matters |
 |---|---|---|
-| `type` | `t` | the same field, shorter |
+| `type` | `t` | **their name wins** — §2 |
 | `channel` **in the message** | the room **in the URL** | see below |
 | `value` | fields spread at top level | elektron nests, we do not |
 | `id`, random 16 chars | — (`seq` proposed) | **dedupe** vs **gap detection** |
@@ -144,10 +209,16 @@ Beside positron's, which three demos invented independently:
    model arriving by the back door — worth choosing on purpose rather than
    drifting into.
 
+   **And they did not get the one connection.** `useChat()` calls
+   `useMessage()`, and `useMessage()` opens its own `ReconnectingWebsocket` — so
+   a page with two chats holds two sockets AND filters every channel on both.
+   The multiplexing advantage was never realised, which makes the argument for
+   room-in-the-URL theirs rather than mine. §5 records the decision.
+
 2. **`id` and `seq` answer different questions and we may want both.** A random
    id lets two lists be merged without duplicates — which is exactly what v3's
    history code does, `uniqueCollection([...loaded, ...messages], "id")`. It
-   cannot see a gap. A per-sender counter sees the gap and cannot dedupe an
+   cannot see a gap. A per-connection counter sees the gap and cannot dedupe an
    overlap. **The moment history is merged into a live list, the random id stops
    being optional**, and that is the case §3 is proposing.
 
@@ -178,21 +249,127 @@ second fragment was probably asking for.
 
 ---
 
+## 1c. What an elektron client has to change
+
+Read from source 2026-09-09: `v1/src/lib/websocket.js`, `v3/src/utils/message.ts`,
+`v3/src/utils/chat.ts`, `v3/src/components/Chat.vue`.
+
+Before, as v3 stands:
+
+```ts
+const ws = new ReconnectingWebsocket(config.wsUrl)          // one URL, everything
+
+formatMessage = (m) => JSON.stringify({
+  id: randomString(16),
+  datetime: new Date().toISOString(),
+  channel: "", type: "", value: "",     // never omit a key a client might read
+  ...m })
+
+sendMessage({ userId, userName, type: "CHAT", channel, value, store: true })
+
+chatMessages = messages.filter(
+  (m) => m.type === receiveMessageType && m.channel === channel)
+```
+
+After:
+
+```js
+const ws = new ReconnectingWebSocket(`wss://ws.positron.studio/room/${channel}/ws`)
+
+format = (m) => JSON.stringify({
+  id: randomString(16),
+  type: "", value: "",                  // the same scar, kept
+  from: connectionId, at: Date.now(), seq: seq++,
+  ...m })
+
+send({ from: connectionId, userId, userName, type: "CHAT", value })
+
+chatMessages = messages.filter((m) => m.type === receiveMessageType)
+```
+
+| field | change | why |
+|---|---|---|
+| `id` | unchanged | the only thing that dedupes history merged into a live list |
+| `type` | unchanged | §2 |
+| `value` | unchanged | past the four envelope keys it is carried verbatim — their nesting is not ours to have an opinion about |
+| `userId` / `userName` | **unchanged, and still theirs** | app data that rides along; `from` does not replace it, because they are not the same thing — see below |
+| `channel` | **removed**, becomes a URL path segment | the room is the channel |
+| `datetime` ISO | → `at`, epoch ms | `now` subtracts stamps; nothing should parse a string to do arithmetic |
+| — | **`from` added**, minted per socket | a CONNECTION id, which is what `seq` counts |
+| — | **`seq` added** | §2 |
+| `store: true` | **kept, and §3 has to honour it** | below |
+
+**`from` is not `userId` renamed.** A user id is a person and persists across
+tabs and reloads; `from` identifies one socket, because that is the only scope in
+which a counter means anything (§2). Two tabs are two senders on the wire and one
+person in the app, and the envelope should not pretend those are one fact.
+
+The filter loses one clause because the URL does that half. `safeJsonParse` stays
+exactly as written — v3's comment (*"payload can also contain binary data so we
+try to be on safe side"*) is right, and now literally so.
+
+**`store: true` is theirs and we should take it.** v3 marks the messages worth
+keeping at the point of sending, where the sender knows; §3 as first written
+assumed the backlog keeps everything, which in a room carrying cues at 60/s fills
+a 1,000-message cap in seventeen seconds and buries the chat somebody actually
+wants to read back. The cost is that the backlog stops being a faithful record of
+the wire, so the page must print KEPT against SENT rather than letting one imply
+the other.
+
+---
+
 ## 2. The envelope
 
 ```
-{ "t": "<verb>", "from": "<sender id>", "at": <epoch ms, sender's clock>,
-  "seq": <per-sender counter>, ... }
+{ "type": "<verb>", "from": "<connection id>", "at": <epoch ms, sender's clock>,
+  "seq": <per-connection counter>, ... }
 ```
 
 One line of JSON per message, `\n`-delimited when several are batched or
 written to the backlog — the same NDJSON the Csound and media work uses, so a
 backlog file is `jq`-able and a `curl` of a room is readable without a tool.
 
-`t`, `from`, `at` are the existing three, promoted from convention to contract.
-`seq` is the one addition, and it earns its place: **without a per-sender
-counter you cannot tell "the message never arrived" from "the message arrived
-out of order"**, and a demo about a socket has to be able to tell.
+**`type`, not `t`** — decided 2026-09-09, against three demos that already say
+`t`. It costs three bytes a message, which at the relay's own 60 msg/s ceiling
+is 180 B/s against a 512 KiB/s budget. What it buys: `t` sits beside `at` in one
+object while everywhere else in this project `t` is TIME (`reduce(events ≤ t)`,
+`t0`, the strip's row `t`), so a key meaning *verb* and a key meaning *when* end
+up one letter apart with nothing to catch a misread; `wire`'s whole subject is
+printing the raw line to a reader, and CLAUDE.md bans jargon in anything a
+visitor sees, which a single-letter key is; and it is the name five years of
+elektron already used, so §1c's migration is one line shorter. Counted rather
+than estimated: **6 source files, ~46 send-side literals** — `room` 8, `show` 6,
+`instrument` 5, `cues` 5, `proto/looper/peer.mjs` 13,
+`workers/instrument/src/index.js` 9 — with `workers/view/public/*` following as
+build output, and each demo's assert count the check on its own move.
+
+`type`, `from`, `at` are the existing three, promoted from convention to
+contract. `seq` is the one addition, and **the reason first written here was
+wrong**: on one socket the order is already guaranteed. A WebSocket rides TCP,
+so a single sender's messages cannot arrive out of order, and nothing goes
+missing without the connection dying. Any check written to catch reordering is
+checking something that cannot happen and will pass forever.
+
+What `seq` actually sees is the two ways this relay loses a message anyway, both
+of them deliberate design, neither of them reported to the sender:
+
+- **the caps bite.** 256 KiB, 512 KiB/s, 60 msg/s, 20 strikes — the relay drops
+  and counts, and that counter lives in `/stats` where it cannot be attributed
+  to a message. The looper publishes a committed layer at ~52 KB, so this is not
+  hypothetical.
+- **a reconnect gaps.** The socket goes and comes back; `seq` says how many went
+  missing, which is how you know whether the history fetch that filled the hole
+  filled all of it. `id` merges the overlap and cannot see the hole.
+
+⚠️ **`seq` counts a CONNECTION, not a person**, which is why `from` is minted
+per socket and elektron's `userId` rides beside it rather than replacing it
+(§1c). Two tabs under one persisted id interleave two counters and manufacture
+gaps that never happened; a reconnect that keeps the id but restarts the count
+reads as a duplicate range.
+
+It is also the only counter available. A server-assigned per-room sequence would
+be strictly better — one number, every sender, authoritative — and the relay
+cannot mint one without parsing, which §3 is the whole argument against.
 
 **Anything beyond those four is the sender's own business** and is carried
 verbatim. This is the rule `plan-score` already settled for p-fields: a
@@ -209,6 +386,15 @@ measurement stops being pure network. So:
 
 > **A second Durable Object, `Backlog`, sits beside the relay — never inside it.**
 
+**How it fills, which the first draft left unsaid**: the recorder **joins the
+room as an ordinary socket**. It costs one of the sixteen slots, it sees exactly
+the order every other member sees — the echo is the ordering point — and it is
+allowed to parse because it is not the relay. That is also the one place
+`store: true` can be honoured, which is why the flag belongs in the envelope
+rather than in a query string. The cost is stated rather than hidden: a recorded
+room is a DO kept awake, so recording is a thing you turn on for a room, not a
+property every room has.
+
 Sketch, following `instrument`'s schema because it is proven:
 
 ```sql
@@ -221,17 +407,29 @@ Reads are **plain HTTP against the same hostname**, which is the "accessed with
 regular connections" part of the request:
 
 ```
-GET /room/<room>/history?last=200
-GET /room/<room>/history?since=<epoch ms>
-GET /room/<room>/history?from=<ms>&to=<ms>
+GET  /room/<room>/history?last=200
+GET  /room/<room>/history?since=<epoch ms>
+GET  /room/<room>/history?from=<ms>&to=<ms>&type=<verb>
                       → NDJSON, oldest first, one message per line
+POST /room/<room>/clear        one room
+POST /clear-all                every room the index knows of
 ```
+
+**`clear-all` needs a list of rooms and a DO namespace cannot be enumerated**,
+so one reserved instance — `__index`, unreachable from outside because the room
+route refuses any name starting `__` — keeps the names as they start recording.
+⚠️ It therefore knows only what was recorded SINCE it existed; rooms from before
+are unreachable by name and hold up to `cap` rows until something writes to them
+again, because the prune runs on write. At demo scale that is a handful of rows.
+If it matters, prune on the idle-stop alarm.
 
 **Retention has to be a decision, not a default.** `SELECT` over a table nobody
 prunes is a demo that works for a week. Proposal, to be argued: **the newer of
 1,000 messages or 24 hours per room**, pruned on write, with the room's own
 count and oldest instant returned in a `X-Backlog` header so the page can print
-what it is looking at rather than implying completeness.
+what it is looking at rather than implying completeness. The cap counts KEPT
+messages, so a room full of unstored live traffic cannot evict the handful
+somebody asked to keep.
 
 ---
 
@@ -254,42 +452,96 @@ socket should print.
 
 ---
 
-## 5. Subscriptions
+## 5. Subscriptions — room, not channel
 
-The smallest thing that is not a lie: **a room is the subscription**, and
-within a room a socket may declare `{t:'sub', verbs:['cue','note']}`. The relay
-cannot honour that without parsing — so **the filter is applied by the
+**Decided 2026-09-09: the room stays in the URL and `channel` is not added.**
+The relay is the argument. Put the channel in the message and there are exactly
+two ways to route it — the relay parses every message, which ends the verbatim
+contract, makes every message a parse, and puts the hibernation `ping`/`pong`
+measurement behind a DO wake; or the receiver filters, in which case the wire
+carried every channel to every socket and full fan-out was paid for messages
+nobody wanted. Room-in-the-URL is the only shape where the relay routes
+correctly while knowing nothing about the payload.
+
+The budget makes it concrete: **the caps are per SOCKET**, so multiplexing four
+channels onto one puts them in a single 512 KiB/s, 60 msg/s bucket, where a
+chatty channel starves a sparse one and the strikes close the socket carrying
+both. Separate rooms get separate budgets and separate 16-socket ceilings. And
+§1b settles it from their side — v3 opened a socket per chat anyway, so it paid
+N sockets AND full fan-out.
+
+What it costs, stated rather than hidden:
+
+- **A connection per room, not per client.** Cheap here, since an idle room
+  hibernates and costs nothing, but the client pays N handshakes and N
+  reconnects — and today we have no reconnect at all (§1b).
+- **No order across rooms.** The echo is the ordering point and it is per-DO, so
+  two kinds of message that must interleave in a known order have to share a
+  room. That is the test for when to split: same order, same room.
+- **The uncapped-distinct-rooms risk gets heavier**, since more rooms per client
+  leans harder on the one limit that does not exist (§1).
+
+So elektron's `channel` is our room and their `type` is our `type`: the mapping
+is exact and nothing is lost. **Do not add a `channel` field** — that is two
+overlapping filters at two levels for one job.
+
+Within a room a socket may declare `{type:'sub', verbs:['cue','note']}`. The
+relay cannot honour that without parsing — so **the filter is applied by the
 receiver, not the relay**, and the page says so. A server-side filter belongs to
 the `Backlog` DO, which already parses, and applies to history queries only:
-`?t=cue`.
+`?type=cue`.
 
-Anything more (wildcards, per-topic fan-out) is a different product. Recorded as
-a decision, not an omission.
+The case that would reverse this: a client that routinely needs many SPARSE
+streams at once and one order across them. Then multiplexing wins, the relay
+still must not parse, and the receiver filters everything — elektron's
+architecture, adopted deliberately, with the shared-budget consequence printed on
+the page. Anything more (wildcards, per-topic fan-out) is a different product.
+Recorded as a decision, not an omission.
 
 ---
 
 ## 6. The demo
 
-Slug `wire`. One page, three things on it:
+Slug `wire`, **built 2026-09-09**. One page, three things on it:
 
-1. **A composer.** Pick a verb, type a body, send. A checkbox sends the same
-   payload as **binary** instead, so the two paths are one press apart.
+1. **A composer, with the two acts under it as two buttons** — *Send it* and
+   *Send and keep it*. Not a send button plus a "keep" checkbox: keeping is a
+   different ACT, not a setting on this one, and a checkbox makes you read a
+   tick back before you press. One primary, because two yellow buttons side by
+   side say neither is the main path.
 2. **What actually travelled**, both directions, as bytes: the exact line that
    went out, its size, and the same for what came back — including the echo of
-   your own message, which is how the ordering point shows itself.
-3. **The backlog**, fetched over plain HTTP, with the room's count and oldest
-   instant printed beside it.
+   your own message, which is how the ordering point shows itself. Every line
+   WRAPS: a message is 110-odd bytes and a phone is ~45 characters wide, so an
+   ellipsis hid the one thing the page exists to show.
+3. **The history, already on the page when you arrive** — not behind a press.
+   That is why the room is SHARED (`wire`) rather than one per tab: a fresh room
+   has no past, so loading it on arrival would have shown an empty box every
+   time. `?room=NAME` still splits one off. Beside it, **Clear history**, which
+   clears THIS room: a two-word button must not be wired to a wider blast radius
+   than it names. The worker's `/clear-all` still exists for the rooms this page
+   left behind when it kept one per tab, and it has done that job.
 
-**What it measures** (all four cells move): round trip via the hibernation
-autoresponse; delivery time from the sender's own stamp; bytes out against
-bytes stored; and messages held against the retention cap.
+**Three visible controls** — *Send it*, *Send and keep it*, *Clear history*.
+The three that exercise
+mechanism (binary, the roof, the retention cap) are **hidden, not removed**:
+the harness presses `.d-controls button`, and a control it cannot reach is a
+subject the suite silently stops testing. `?checks=1` shows them.
+
+**What it measures** (every cell moves): round trip via the hibernation
+autoresponse; delivery time from the sender's own stamp; bytes out against bytes
+stored; messages KEPT against messages SENT, because `store` makes those two
+different numbers; and messages held against the retention cap.
 
 **Asserts, mechanism not effect:**
 
 - the echo returns the sender's own message, byte-identical
-- `seq` arrives contiguous per sender — a gap is a loss, and it is named as one
+- `seq` arrives contiguous per CONNECTION — a gap is a loss and is named as one.
+  Prove the guard fires: send one message over the 256 KiB roof and watch the
+  next `seq` skip, which is the relay's own cap becoming visible
 - a binary frame round-trips with its bytes unchanged (not its base64)
 - history over HTTP returns the same messages the socket delivered, same order
+- a message sent without `store` reaches every socket and is NOT in the history
 - the retention cap holds: writing cap+1 leaves cap, and the oldest is the one
   that went
 - a message over 256 KiB is refused by the relay rather than truncated
@@ -299,8 +551,11 @@ bytes stored; and messages held against the retention cap.
 ## 7. Phases
 
 **P1 — the envelope, written down and adopted.** `demo/shell/wire.mjs`: build,
-parse, validate, and the `seq` counter. `cues` moves onto it first, because it
-is the smallest existing caller and its assert count is a check on the move.
+parse, validate, the per-connection `from`, the `seq` counter, and the reconnect
+every positron page currently lacks (§1b). `cues` moves onto it first, because it
+is the smallest existing caller and its assert count is a check on the move; then
+the `t` → `type` sweep across the other five files, diffing per-demo assert counts
+after each.
 
 **P2 — the `Backlog` DO.** Schema, write path, the three history queries, the
 retention prune. Lab test against the cap before any page uses it.
@@ -325,3 +580,9 @@ RTT, delivery, and what each costs to keep a room alive with nobody in it.
 - **The `at` stamp is the sender's clock.** Across devices it carries their
   clock error, and `now` has already established that a browser cannot read
   ERR's `Date` header to correct one. Print it as what it is.
+- **`seq` counts a connection, not a person.** Two tabs under one persisted user
+  id manufacture gaps that never happened. §2.
+- **On one socket, order is not the risk — loss is.** TCP already orders a
+  sender's messages, so a reordering check passes forever and measures nothing.
+- **A shim that reads `m.type ?? m.t` is how two names become permanent.** If the
+  migration needs one, it ships with the condition for removing it.

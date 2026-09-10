@@ -1,6 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. 24 of 28 demos built, 351/351 green. Read
+Live at **https://positron.studio**. 26 of 30 demos built, **413/413 green**
+(2026-09-09, every demo, no failures). Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when.
 
@@ -91,6 +92,25 @@ Fire them and move on; sound is allowed to be late, the timeline is not.
 
 **Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
 reports `tail`'s exit status, not `cmd`'s.
+
+**When you implement somebody else's format, only their implementation can
+grade you.** `timeline/csound.mjs` was 22/22 green for months with two real
+defects, because the test compared it against a number derived from the SAME
+formula the compiler implements — which catches a typo and can never catch a
+misreading. Real Csound found both in an hour: the tempo ramp was 239 ms out at
+beat 30 (Csound interpolates seconds-per-beat linearly in beat, not tempo), and
+`^+x` resolved against the wrong note. The warning comment in that file was
+worse than useless — its confident "118 ms early" was the distance between two
+WRONG answers. `timeline/lab/csound-oracle.mjs`; it skips cleanly where the
+reference is not installed, because a check nobody can run is a check nobody
+runs.
+
+**A partial result that is too tidy is a broken collector, not a finding.**
+Exactly 4 of 5 events, exactly 0 across every case, exactly nothing on the
+network scan. In one session: csound writes ANSI escapes so `grep '^EVT'` lost
+most lines; `execFileSync` returns only stdout while csound's `prints` go to
+stderr; and `.local` names do not resolve at all from this sandbox because mDNS
+is multicast UDP. Check the instrument before believing the pattern.
 
 **Long measurements: no pipes, no dangling promises.** `node x.mjs | tail` buffers
 until exit and looks hung — write to a file. An un-awaited `fetch` keeps the
@@ -208,6 +228,27 @@ to recover.
   connection, never for the account. Recording and HLS interop for WHIP are
   announced "in the coming months" and are NOT shipped — re-test before
   planning either way.
+- **A Durable Object's OUTBOUND client WebSocket hands binary over as a
+  `Blob`**, not an `ArrayBuffer` — measured `Blob`, `size` 9, `byteLength`
+  undefined — and a `Uint8Array` binds to a SQLite `BLOB` column as an EMPTY
+  one, silently. So a recorder can look like it stored a frame while the row
+  reads back at 0 bytes with its hex head blank. `await data.arrayBuffer()`
+  first, and bind the ArrayBuffer. A BLOB also comes back OUT as an
+  ArrayBuffer, which has no useful `.slice()` and no iterator — wrap it before
+  reading it. (`workers/backlog`, 2026-09-09.)
+- **A DO's input gate does NOT cover a non-storage await.** Events are held back
+  across a `storage.get`, so handlers cannot interleave there — but
+  `blob.arrayBuffer()` is not storage, and two frames a millisecond apart will
+  race each other into a table in the wrong order. Where order IS the product,
+  serialise the handler through one promise chain.
+- **The relay's own token bucket is readable off the wire**, and it is exact:
+  at both 120 and 300 msg/s, three runs delivered **298 messages in three
+  seconds** — `MSG_BURST` 120 plus 3 s at `MSG_PER_SEC` 60. The sender is told
+  NOTHING when this bites: no error, no close, no backpressure. Only a
+  per-connection counter in the payload can see it. The Durable Object hop
+  itself costs **1–2 ms at p50** over the runtime's `ping`/`pong` autoresponse,
+  and a full 16-socket room costs the sender **8 ms at p50** over an empty one
+  with zero loss (`demo/perf-wire.mjs`).
 - **`ingest.positron.studio` is the only tokenless write path.** Server-minted
   session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
   with a cron sweep. `selfrec` stays token-gated; keep the two separate.

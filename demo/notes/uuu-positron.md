@@ -226,12 +226,17 @@ fold is exact at 57 probes and either side of all 16 notes. The `.` carry, `+`
 and `^+x` shorthands are handled, because real scores use them.
 
 One thing the compiler had to get right that a parser would not have: **p2 and
-p3 are BEATS, and Csound interpolates tempo linearly in beat**, so the beat→time
-map is the integral of 60/tempo — closed-form and logarithmic. On `t 0 120
-30 90` the true answer is 17.2609 s at beat 30 and the mean-tempo answer is
-17.1429 s. A compiler that reached for the average would put every later note
-118 ms early, and nothing in its output would look wrong. The test asserts both
-numbers so the naive answer can never quietly return.
+p3 are BEATS**, so beat→time needs the tempo map rather than a multiplication.
+
+⚠️ **Corrected 2026-09-09.** This paragraph said Csound interpolates *tempo*
+linearly in beat, making the map "the integral of 60/tempo — closed-form and
+logarithmic", 17.2609 s at beat 30 of `t 0 120 30 90`, with a mean-tempo
+shortcut 118 ms early. Measured against csound 6.18, Csound interpolates
+**seconds per beat** linearly in beat, so the map is a TRAPEZOID and beat 30 is
+**17.500 s**. Neither number here was Csound's, so the 118 ms was the distance
+between two wrong answers and the real error was 239 ms. The compiler is fixed
+and `timeline/lab/csound-oracle.mjs` now checks it against the reference
+implementation rather than against its own arithmetic.
 ### 4. Borrow their LAN, which positron does not have
 
 Their in-room Host/Guest with UDP discovery is genuinely missing here. positron
