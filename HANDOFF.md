@@ -58,10 +58,10 @@ up a direct peer-to-peer link, synthesised there, sound back on the same
 connection; the relay carries only the handshake. The control-path A/B, same
 payload, alternating note by note, 60 each:
 
-| control path | p50 | p95 | max |
+| control path | typical | worst 1 in 20 | slowest |
 |---|---|---|---|
-| direct peer-to-peer link | **6.50 ms** | 10.70 | 12.50 |
-| via the Cloudflare relay | **72.70 ms** | 96.90 | 149.80 |
+| direct peer-to-peer link | **6.50 ms** | 10.70 ms | 12.50 ms |
+| via the Cloudflare relay | **72.70 ms** | 96.90 ms | 149.80 ms |
 
 **The relay costs 11.2x**, because a machine three metres away is reached by
 going out to the edge and back, twice. So anything in the timing path takes the

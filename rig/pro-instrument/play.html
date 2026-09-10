@@ -7,7 +7,11 @@ b{color:#ffd400} kbd{background:#161b22;padding:.1rem .4rem;border-radius:3px}
 #keys{display:flex;gap:4px;margin:1rem 0}
 #keys button{flex:1;height:88px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
 #keys button:active{background:#ffd400;color:#0d1017}
-table{border-collapse:collapse;margin-top:1rem}td{padding:.15rem .8rem .15rem 0}
+table{border-collapse:collapse;margin-top:.6rem}td,th{padding:.2rem 1.1rem .2rem 0;text-align:left}
+th{color:#8b949e;font-weight:400;border-bottom:1px solid #30363d}
+table.t td:not(:first-child){font-variant-numeric:tabular-nums}
+h4{margin:1.6rem 0 0;font-weight:400;color:#8b949e}
+.note{color:#8b949e;font-size:13px;line-height:1.5;max-width:38rem}
 </style>
 <h3>play it — the Pro is the instrument</h3>
 <p>Press <kbd>a s d f g h j k</kbd> or click. The key press goes straight to the
@@ -18,14 +22,24 @@ which is why a machine in the same room sounds much like one across the country.
 The cushion is reported below; it cannot be switched off.</p>
 <div id="keys"></div>
 <table>
-<tr><td>relay</td><td id="r">—</td></tr>
-<tr><td>ice</td><td id="i">—</td></tr>
-<tr><td>direct link</td><td id="d">—</td></tr>
+<tr><td>connection to the Pro</td><td id="i">—</td></tr>
+<tr><td>handshake channel</td><td id="r">—</td></tr>
+<tr><td>direct link for notes</td><td id="d">—</td></tr>
 <tr><td>sound coming back</td><td id="a">—</td></tr>
-<tr><td>key press → the Pro and back</td><td id="rtt">—</td></tr>
-<tr><td> </td><td id="rly">—</td></tr>
 <tr><td>the browser’s audio cushion</td><td id="jb">—</td></tr>
 </table>
+
+<h4>How long a key press takes to reach the Pro and come back</h4>
+<table class="t">
+<tr><th>path</th><th>typical</th><th>worst 1 in 20</th><th>slowest</th><th>presses</th></tr>
+<tr><td>direct link</td><td id="dc50">—</td><td id="dc95">—</td><td id="dcmx">—</td><td id="dcn">—</td></tr>
+<tr><td>via the relay</td><td id="ws50">—</td><td id="ws95">—</td><td id="wsmx">—</td><td id="wsn">—</td></tr>
+</table>
+<p class="note"><b>Typical</b> is the middle press — half were quicker than this.
+<b>Worst 1 in 20</b> is the level 19 presses out of 20 came in under; it is the
+one that says whether the slow ones are rare or common. <b>Slowest</b> is the
+single worst press of the run. A median on its own hides the one bad press,
+which is usually the reason to look.</p>
 <audio id="out" autoplay></audio>
 <script type="module">
 const ROOM = new URLSearchParams(location.search).get('room') || 'proinst';
@@ -47,11 +61,14 @@ const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
 let seq = 0; const sent = new Map(); const rtts = { dc: [], ws: [] };
 const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))] : NaN; };
 function report() {
-  const row = (k) => rtts[k].length
-    ? `${pct(rtts[k],50).toFixed(2)} / ${pct(rtts[k],95).toFixed(2)} / ${Math.max(...rtts[k]).toFixed(2)} ms  n=${rtts[k].length}`
-    : '—';
-  set('rtt', `direct ${row('dc')}`);
-  set('rly', `relay  ${row('ws')}`);
+  for (const k of ['dc', 'ws']) {
+    const a = rtts[k], pre = k === 'dc' ? 'dc' : 'ws';
+    const f = (v) => Number.isFinite(v) ? v.toFixed(2) + ' ms' : '—';
+    set(pre + '50', f(pct(a, 50)));
+    set(pre + '95', f(pct(a, 95)));
+    set(pre + 'mx', a.length ? f(Math.max(...a)) : '—');
+    set(pre + 'n', a.length || '—');
+  }
 }
 dc.onopen = () => set('d', 'open');
 dc.onmessage = (m) => {
