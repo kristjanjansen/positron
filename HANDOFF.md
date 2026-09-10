@@ -1,11 +1,130 @@
-# Handoff — 2026-09-08 (end of session 12)
+# Handoff — 2026-09-10 (end of session 16)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching. `plan-timeline.md` §7–§9 is the
 current state of the library and OVERRIDES §§1–6 where they disagree; §9 is
 newest and wins over §7–§8.
 
-## One line
+⚠️ **Session 13 was never written into this file.** It built `reel`, `now` and
+`keep`, landed plan-names P1, and removed `tracks` and `grid`; its record is
+`LESSONS.md` §33–38 and the git log, and the demo table further down predates
+it. Do not read the older sections below as current.
+
+## Session 16 — one real encoder, three transports, and a picture read back at the far end
+
+**HANDOFF 0ad is discharged.** OBS on the Pro publishes to LL-HLS, WHEP and MoQ
+from the SAME source, driven over obs-websocket from the dev Mac. `rig/obs-pro/`
+holds the rig: `stream.mjs hls|whip|moq|off` is the one driver, `shot.mjs` reads
+the burned clock out of OBS's own composited frame, `read-hls.mjs` reads it back
+off the live edge, `clear-recordings.mjs` is the storage lever.
+
+| transport | connect | frames | skipped | far end |
+|---|---|---|---|---|
+| HLS (RTMPS) | 1.8 s | 1038 | **0** | **25/25 frames readable off the edge** |
+| WebRTC (WHIP) | 3.6 s | 876 | **0** | storage unchanged → records nothing |
+| MoQ 720p | 113 ms | — | **0** | 30 fps, 712 decoded, 0 decode errors |
+| **MoQ 4K30** | 137 ms | 2451 | **0 (0.00%)** | 30 fps, 1358 decoded, 0 errors |
+
+**4K30 held on SOFTWARE x264 at 6.2 Mbps with zero drops** on the M1 Pro; the
+hardware encoder was never needed. **WHIP records nothing — reconfirmed from a
+real encoder** (512.54 min before an 876-frame publish, 512.54 after), where the
+rule was previously known only from the container.
+
+**The rig found a real defect in its first hour.** OBS Simple mode leaves x264 at
+`keyint=250` — 8.33 s at 30 fps — so the manifest carried **4 INDEPENDENT parts
+of 63** against the publisher's documented 10-of-38, pinning the LL-HLS floor
+near 8 s. `keyint=60` gives **11 of 43**. Note OBS parses custom encoder settings
+**space-separated**; the x264 CLI colon form logs `x264 param … failed` and
+half-applies.
+
+**Two blockers that do not announce themselves.** macOS **Local Network Privacy
+is per APP** — `curl` on the Pro got 200 where Chrome and OBS got
+`ERR_ADDRESS_UNREACHABLE`, a black frame with nothing in any log; and
+**`BrowserHWAccel=true` renders every browser source black** on a Mac with no
+attached display. Both were separated from "my page is broken" by a
+`color_source_v3`, which read back solid red and put the fault in CEF.
+
+⚠️ **`moq.positron.studio` still samples the PRE-session-12 row**, so its
+`g2g_p50` came back as −40198856720202 ms (≈ −1274 years). Transport is verified;
+**glass-to-glass is NOT measured** until that player is rebuilt. Third instance
+of this staleness class after the container image and `rig/obs-docker/clock.html`.
+
+⚠️ **A stream key reached a session transcript** via a raw
+`GetStreamServiceSettings`. Rotate `positron-demo`'s RTMPS key; see
+`SECRETS-ROTATION.md`.
+
+**Both parallel agents landed.** `csound.mjs` is section-local (0aa closed,
+42/42 self-test, 23/23 oracle against real Csound 6.18), and the `t` → `type`
+sweep is done (0a closed, 413/413, no shim). The sweep's negative control is
+worth keeping: **a half-swept room reads GREEN**, because "nobody dropped out"
+passes vacuously when there are no peers.
+
+## Session 14 — one message shape, and a history the relay refuses to keep
+
+`plan-ws.md` was written and then built. **`wire` is live at
+`positron.studio/wire/`** (21/21) — a demo ABOUT the socket: compose a message,
+watch the exact bytes go out and come back, and find the history already on the
+page when you arrive, over an ordinary web request. The room is SHARED (`wire`)
+for that reason; three visible controls — *Send it*, *Send and keep it*,
+*Clear history* — with the three mechanism checks hidden rather than removed so
+the harness still reaches them (`?checks=1` shows them). Clear scopes to this
+room; the worker's `/clear-all` sweeps every room its index knows of, which is
+only what was recorded since the index existed. New worker **`positron-backlog`** on **`backlog.positron.studio`**, in
+which **the recorder joins the room as an ordinary socket** — which is the whole
+trick, because it is what lets the relay go on parsing nothing.
+
+**374/389 green, and every one of the 15 failures is attributed**: eleven are
+this shell's missing UDP egress (reproduced — a DNS query to `1.1.1.1:53`
+returned nothing while TCP answered 200 in 0.16 s), four are ERR refusing
+`etv`'s live edge to `now`, proven with a 2-byte Range GET (newest three
+segments **403 with no ACAO**, one ~3,700 back **206 with ACAO `*`**). One
+signal is NOT explained: `keep` logged a **409**, which is HTTP and cannot be
+the UDP story.
+
+> ⚠️ **Superseded the same day — re-run at 413/413, 26 demos, ZERO failures.**
+> The missing UDP was **the VPN on this machine**, settled by test: with it
+> disconnected a DNS query to `1.1.1.1:53` answers, and `webrtc` (14), `moq`
+> (16), `show` (15) and `keep` (20) all run their full sets. The denominator
+> moved 389 → 413 because a page that loses a leg stops before the asserts
+> behind it, so restoring the leg ADDS asserts rather than only flipping them.
+>
+> **Two of the three clearances are weather, not fixes.** `now`'s four cleared
+> because ERR happened to be serving `etv`'s edge on this run, which the notes
+> already say moves with the schedule and cannot be hard-coded — it will read
+> red again. And **`keep`'s 409 did not reproduce; it is not explained** (§0b).
+> A 409 is HTTP and no mechanism connects UDP egress to it. Absent is not
+> understood, which is the whole of #29.
+
+**Four decisions, each argued where it lands in `plan-ws.md`:**
+
+- **Room, not channel.** A channel in the payload forces either a parsing relay
+  or full fan-out to every socket. The caps are per SOCKET, so multiplexing puts
+  every channel in one 512 KiB/s bucket. elektron settles it from their side:
+  `useChat()` opens its OWN socket, so v3 paid N sockets AND full fan-out.
+- **`type`, not `t`.** `t` means TIME everywhere else here, and it would sit one
+  letter from `at`. Cost: 3 bytes a message. **The sweep is NOT done** — 6 files,
+  ~46 literals, and only `wire` speaks `type` today.
+- **`from` is not `userId` renamed** — a socket, not a person, because that is
+  the only scope in which a counter means anything.
+- **`seq` stays, on a corrected argument.** TCP already orders one sender's
+  messages, so a reordering check would pass forever. What it sees is the relay
+  dropping under its caps, silently — and the perf run made that concrete.
+
+### The relay's numbers, measured (`demo/perf-wire.mjs`, three runs)
+
+| | measured |
+|---|---|
+| the Durable Object hop, over the runtime's `ping`/`pong` | **+0.8 to +1.6 ms at p50** |
+| a full 16-socket room, at the sender's own echo | **+8 ms at p50, 900/900 delivered** |
+| 256 KiB message against 1 KiB | 125 ms against 47 ms p50 |
+| the rate cap | **298 delivered in 3 s at BOTH 120 and 300 msg/s** |
+
+That last one is the token bucket read back off the wire — `MSG_BURST` 120 plus
+3 s at 60/s — and the sender is told nothing when it bites. Only a
+per-connection counter in the payload sees it. Not measured: where a single DO
+bends. The run reached 300 sends/s, 2% of what the caps permit.
+
+## One line (session 12, kept for context)
 
 Live on **positron.studio**. Session 12 made `demo/shell/pattern.mjs` the ONE
 generated test picture — six demos and both ffmpeg publishers draw it — and
@@ -249,6 +368,7 @@ had never once played a frame of HLS in Chrome.** All three now gate on
 |---|---|---|
 | `elektron-view` | `positron.studio` | the index, the demos, the archive pages |
 | `positron-ws` | `ws.positron.studio` | tokenless verbatim relay |
+| **`positron-backlog`** | **`backlog.positron.studio`** | **the history the relay refuses to keep (session 14) — a recorder joins the room as a socket; SQLite in the DO, NDJSON over plain HTTP** |
 | `positron-pub` | `pub.positron.studio` | publisher container + device log sink (`/logs?format=text`) |
 | `positron-ingest` | `ingest.positron.studio` | the one tokenless WRITE path to R2, capped |
 | **`positron-shout`** | **`shout.positron.studio`** | **the Icecast relay — its own worker because it holds one connection open for a whole listen** |
@@ -443,11 +563,17 @@ being per-input, MoQ relays being impossible in a Container).
 The blunt version: our own recovery layer caused more of the iOS stutter than
 hls.js did.
 
-**`LESSONS.md` stops at session 9** — nothing in it is from session 10. That
-session's method lessons went into `CLAUDE.md`'s rules (the 400 ms settle
-window, the NUL-byte grep, the cross-engine cache, never letting sound gate the
-work) and into `PROGRESS.md`'s session-10 entry. Fold them back here when
-`LESSONS.md` is next revised.
+**It no longer stops at session 9.** The file now runs #1–13 (method, session
+9), #14–32 (session 11's reader review), #33–38 (session 13's live line) and
+**#39–42 (session 14)**: a counter that cannot be wrong is not a check ·
+`map(fn)` passes the INDEX, and a defaulted second parameter takes it · hide a
+control the harness needs rather than removing it · a control's blast radius
+must not exceed its label.
+
+**Session 10 is still the gap.** Its method lessons went into `CLAUDE.md`'s
+rules (the 400 ms settle window, the NUL-byte grep, the cross-engine cache,
+never letting sound gate the work) and into `PROGRESS.md`'s session-10 entry.
+Fold them back here when `LESSONS.md` is next revised.
 
 ## How to run and check things
 
@@ -530,6 +656,86 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 `studio/NOTES.md`. Do not quote an old content-anchor number as exact.
 
 ## Next, in order
+
+0sec. ⚠️ **Rotate `positron-demo`'s RTMPS stream key — it reached a session
+   transcript on 2026-09-10** via a bare `GetStreamServiceSettings`, which
+   returns the key in clear. Every purpose-built script here redacts; the ad-hoc
+   call did not. Same lesson `src/publish.sh` already paid for: **redaction has
+   to live at the point of capture**, because any convenience call around it
+   prints the raw object. `rig/obs-pro/stream.mjs` carries a comment forbidding
+   such a call. Add to `SECRETS-ROTATION.md`, which is now five items.
+
+0aa. ~~**`csound.mjs`'s tempo map is SECTION-LOCAL in Csound and global in ours.**~~
+   **DONE 2026-09-10.** Graded against real Csound 6.18 over ssh
+   (`timeline/lab/csound-ssh.mjs` stands in for the binary). Six rules, each from
+   a probe where the competing models are seconds apart — the decisive
+   instrument was `csound --keep-sorted-score`, which prints per-section warp
+   lines with no performance involved. **A section starts at the previous one's
+   END TIME in seconds**, ends at the furthest of every note's p2+p3, every `f`'s
+   p2 and the `s` argument, and resets to 60 bpm unless it declares its own `t`.
+   Separately fixed: **a `t` whose first pair is not beat 0 is discarded whole**
+   by Csound, where ours held it back to beat 0. `csound-test` 27 → **42/42**,
+   oracle 10 → **23/23**, verify counts unchanged.
+   **Three new KNOWN OPENs, labelled in the oracle rather than omitted** — the
+   biggest being that **Csound's `n` is a SOURCE REWIND, not an in-place replay**:
+   it re-reads statements from the mark and only fires at a section boundary.
+   Matching it would mean giving up the quotation, which is why this compiler
+   exists. That is a decision to take, and it is bigger than 0aa was.
+
+0ac. **`workers/pub`'s container image is still stale, and the Pro now makes it
+   easy.** It draws the pre-session-12 test pattern, so a browser frame and a
+   container frame are two different pictures and any comparison between them is
+   void. The Pro has `ffmpeg@7` with `drawtext`/libfreetype CONFIRMED, which is
+   what `src/publish.sh` pins the version for. `positron-pub-pub` is the ONLY
+   container on the account (verified 2026-09-10) — the three rig workers
+   `positron-obscloud`, `positron-obscloud-quic` and `positron-cnt-test` do not
+   exist on it at all, so there is no CF OBS container to tear down.
+
+0ad. ~~**OBS on the Pro is ready and obs-moq is loaded.**~~ **DONE 2026-09-10 —
+   see the session 16 section above.** All three transports run from one encoder
+   off one source, `rig/obs-pro/stream.mjs hls|whip|moq`. What is NOT done is the
+   comparison itself: **`moq.positron.studio` samples the pre-session-12 row**, so
+   glass-to-glass is unmeasurable until that player is rebuilt. Rebuilding it is
+   the next step, and it is the same job as 0ac.
+
+0ab. **Ableton is drivable and measured** — AbletonOSC on Live 11 Standard,
+   beat clock within 0.063% across four tempos. Two facts to build on:
+   the transport does NOT advance with the audio engine off while `is_playing`
+   still says true, and OSC is UDP so a reply can go missing. OSC arms and
+   reads; never put it in the timing path.
+
+0a. ~~**Finish the `t` → `type` sweep.**~~ **DONE 2026-09-10.** 47 literals across
+   six files, **413/413, every per-demo count unchanged, no shim.** Two
+   corrections to the plan's own estimate: `workers/instrument/src/index.js` had
+   **zero** (it already said `type`, and `demo/instrument/` does not talk to it —
+   it uses the tokenless relay), so the deploy-coupling hazard did not exist; and
+   `proto/looper/remote-verify.mjs` was an unlisted reader that would have broken
+   assert P3 silently. One `t` is left on the wire ON PURPOSE:
+   `workers/pub/worker.mjs`'s `{t:'hello', viewers}`, which nothing reads.
+   **Keep the negative control it produced**: a room swept on one side only goes
+   completely dead and **still reports every assert passing**, because "nobody
+   dropped out" is vacuous with no peers. `verify.mjs` is single-tab and
+   structurally cannot see it.
+
+0b. **Chase `keep`'s 409 — STILL OPEN, but there is now a named suspect.**
+   Its two failures were filed under this shell's missing UDP egress and one of
+   them does not fit: a 409 is HTTP. It did NOT reproduce on the 413/413 run and
+   that is not a fix — a symptom that stopped is exactly the condition #29 was
+   earned under.
+
+   **The suspect, found 2026-09-10 while reading `demo/shell/live.mjs`.**
+   `keep` calls `whipPublish()`, which POSTs to `pub.positron.studio/whip` and
+   throws `publish ${res.status}` on any non-ok — so a 409 stops the page before
+   a single assert, which matches "asserted 0" exactly. And **Cloudflare answers
+   409 when a live input already has a publisher.** The pub container publishes
+   the same burned pattern to the SAME `whep-rig` input whenever anything holds
+   `/watch`, so two publishers on one input is an ordinary occurrence and would
+   be intermittent in precisely this way. It also has nothing to do with UDP.
+
+   **Not confirmed — this is a hypothesis with a cheap decisive test**: hold
+   `/watch` to bring the container up, then run `keep`, and see whether the 409
+   reproduces on demand. Costs nothing (WHIP records nothing), takes minutes.
+   If it returns in the wild, capture the response body and request URL first.
 
 0. **Measure min-RTT clock skew over a REAL LINK.** Twenty minutes, one phone on
    cellular, and it settles the last unmeasured number in the whole timing

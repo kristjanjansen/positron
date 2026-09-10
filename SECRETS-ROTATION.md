@@ -53,3 +53,38 @@ rotation — but delete it from `.env` and from any Worker secret store),
 `ROOM_TOKEN`, `OPERATOR_TOKEN` (elektron-rtc/cues — CUES_TOKEN already rotated
 once after a log echo). Rotate with:
 `wrangler secret put <NAME> --name <worker>` from a no-.env dir.
+
+## 2026-09-10 — ROOM_TOKEN rotated; RTMPS key still owed
+
+**`ROOM_TOKEN` — ROTATED, and verified dead.** It was found sitting in a
+COMMITTED log at HEAD (`proto/m2m/logs/p3b-server-a.log`, as
+`token=dae4e3d4…`), discovered while auditing the repo before publishing it to
+GitHub. New secret put on `elektron-rtc`; proved by effect rather than by the
+CLI's "Success" line — the old value now answers **403** and the new one **200**
+on `rtc.positron.studio`. The committed string is therefore a dead literal and
+needed no history rewrite. Only `studio/engine.mjs` and `studio/verify.mjs`
+consume it, both from `.env`, so nothing deployed broke.
+
+⚠️ **`positron-demo`'s RTMPS stream key is exposed and NOT yet rotated.** It
+reached a session transcript on 2026-09-10 via a bare
+`GetStreamServiceSettings`, which returns the key in clear. Anyone holding it
+can PUBLISH to the input the live demos play, so the risk is vandalism of
+positron.studio rather than data loss.
+
+**There is no rotate-key API for a Cloudflare live input** — the key is bound to
+the input, so rotating means DELETE AND RECREATE, which mints a new UID and
+ripples into `demo/shell/live.mjs`, `workers/pub`'s container, and every demo
+that plays it. Deliberately not done in the same breath as finding it; it is a
+scoped change, not a one-liner.
+
+**Also audited, and found harmless:** the RTMPS stream keys, SRT passphrases and
+WHIP publish URL committed under `proto/m2m/artifacts/`, `proto/m2m/logs/`,
+`proto/replay/` and `studio/artifacts/` all name live inputs that **404 today**,
+so those credentials are dead. `.env` has never been committed (`.gitignore`
+covers it from the first commit).
+
+**The standing lesson, now earned twice.** `src/publish.sh` already learned that
+redaction must live at the point of capture; this time every purpose-built
+script redacted correctly (`key set, not printed`) and an ad-hoc convenience
+call printed the raw object anyway. `rig/obs-pro/stream.mjs` carries a comment
+forbidding any call that dumps service settings.

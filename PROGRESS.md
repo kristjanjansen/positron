@@ -1,4 +1,553 @@
-# Progress log — 2026-08-25 → 09-08  (newest first)
+# Progress log — 2026-08-25 → 09-10  (newest first)
+
+## Session 16 (2026-09-10) — one real encoder, three transports, and a picture proved readable at the far end (user: "read md's" → "can you run simple obs hls/webrtc/moq stream tests?" → "clean up")
+
+HANDOFF item **0ad** discharged: OBS on the Pro now publishes to LL-HLS, WHEP
+and MoQ from the SAME source, driven entirely over obs-websocket from this Mac.
+Two background agents closed **0aa** (Csound's section-local `t`) and **0a**
+(the `t` → `type` sweep) in parallel.
+
+### The rig
+
+`rig/obs-pro/` — `source.html` (the OBS picture), `serve.mjs` (serves it over
+the LAN), `pro-proxy.mjs` (runs ON the Pro), `shot.mjs`, `read-hls.mjs`,
+`stream.mjs` (one driver, three transports), `clear-recordings.mjs`.
+
+**The source is `demo/shell/pattern.mjs` itself, fetched at request time — never
+copied.** A second copy is exactly how `workers/pub`'s container image drifted a
+whole session behind, and `rig/obs-docker/clock.html` is a third copy carrying
+the pre-session-12 geometry to this day. `source.html` holds no drawing code and
+must not grow any.
+
+### Measured, all four legs
+
+| transport | connect | frames | skipped | verified at the far end |
+|---|---|---|---|---|
+| HLS (RTMPS) | 1.8 s | 1038 | **0** | **25/25 frames readable off the edge** |
+| WebRTC (WHIP) | 3.6 s | 876 | **0** | storage unchanged → records nothing |
+| MoQ 720p | 113 ms | — | **0** | player live 30 fps, 712 decoded, 0 errors |
+| **MoQ 4K30** | 137 ms | 2451 | **0 (0.00%)** | player live 30 fps, 1358 decoded, 0 errors |
+
+**4K30 held on SOFTWARE x264 at 6.2 Mbps with zero dropped frames** on an M1
+Pro; the hardware encoder was never needed. The pattern renders natively at
+3840 (`?w=3840` scales the 1280x720 drawing, so the row's blocks are 60 px
+rather than an upscaled 20) and `readBurnedFrom` normalises it back onto the
+1280 grid, which is why the clock still decodes.
+
+**WHIP RECORDS NOTHING, reconfirmed from a real encoder.** Storage read 512.54
+before an 876-frame publish and 512.54 after. The rule was previously known only
+from the container.
+
+### The defect the rig found in its first hour
+
+**OBS Simple mode leaves x264 at its default `keyint=250`** — 8.33 s at 30 fps.
+The manifest showed **4 INDEPENDENT parts of 63** (~1 per 7.9 s) against the
+documented publisher baseline of 10-of-38. Since a latency target inside one
+keyframe interval is unreachable, that pinned the LL-HLS floor near 8 s. Set to
+`keyint=60`: **11 of 43**, ~1 per 2.0 s, matching `src/publish.sh`.
+
+⚠️ The first attempt wrote `keyint=60:min-keyint=60:scenecut=0` — x264 CLI
+colon syntax — and OBS logged `x264 param: … failed`. **OBS parses custom
+encoder settings SPACE-separated.** The GOP still changed because `keyint` alone
+was consumed; `min-keyint` and `scenecut` were not. A setting that half-applies
+while logging a failure is worse than one that refuses.
+
+### Two blockers, neither of which announces itself
+
+- **macOS Local Network Privacy is granted PER APP.** `curl` on the Pro fetched
+  the LAN URL 200; Chrome and OBS on the same machine got
+  `ERR_ADDRESS_UNREACHABLE` — a pure black frame with nothing in any OBS log.
+  Terminal processes inherit the grant; `.app` bundles do not. Solved by
+  proxying through 127.0.0.1 on the Pro rather than asking for a GUI click,
+  which also keeps `pattern.mjs` un-forked.
+- **`BrowserHWAccel=true` renders EVERY browser source black** on a Mac with no
+  attached display. Separated from "my page is broken" by pointing the source at
+  `example.com`, which was black too. Off → the burned clock decodes 3/3.
+
+The discriminating step in both cases was a source with no browser in it: a
+`color_source_v3` read back solid red, which proved the screenshot path worked
+and put the fault squarely in CEF.
+
+### A number that must not be quoted
+
+`moq.positron.studio` reported `g2g_p50 = -40198856720202 ms` — about −1274
+years. **The deployed player still samples the PRE-session-12 row position**, so
+it decodes noise as a timestamp. Transport is verified (fps, decoded count, zero
+decode errors); **glass-to-glass is NOT measured** and cannot be until that
+player is rebuilt. Third instance of the same staleness class: the container
+image, `rig/obs-docker/clock.html`, and now this player.
+
+### ⚠️ A stream key reached the transcript
+
+A raw `GetStreamServiceSettings` call printed `positron-demo`'s RTMPS key. The
+purpose-built driver redacts (`key set, not printed`); the ad-hoc call did not.
+**Treat it as exposed and rotate it** — added to `SECRETS-ROTATION.md`. The
+lesson is the one `src/publish.sh` already learned: redaction has to live at the
+point of capture, because any convenience call around it will print the raw
+object.
+
+### Storage, and why it is an outage rather than a bill
+
+Found at **509 of the 1000-minute cap** — back to where session 9 cleared it
+from, because the archival cron (item 5) was never built. 59 recordings, three
+of them accidental long runs (101 + 118 + 109 min = 64% of the total). Verified
+that none is referenced anywhere in the repo and that `replay`/`seek` play from
+R2, not Stream, so clearing costs no demo. `rig/obs-pro/clear-recordings.mjs`
+does it; the delete is deliberately opt-in behind `--delete`.
+
+### OBS state worth knowing
+
+**OBS refuses `osascript quit` (`-128`)** and System Events has no assistive
+access, so it could not be restarted to pick up a written config. Consequence:
+`basic.ini` on disk carries a 4K / `apple_h264` / 20000 kbps profile that the
+running instance will clobber on its eventual exit. The live instance is back at
+1280x720 / x264 / 6000 with the clock decoding. Session 15's rule stands and was
+re-earned: **quit → write → launch, and verify the process actually exited** —
+`open -a OBS` on a running app merely focuses it, so a "relaunched" that never
+relaunched is easy to print.
+
+## Session 15 (2026-09-09) — a second Mac on the LAN, and the suite clean at 413/413
+
+A MacBook Pro on the local network was set up as a test and integration box
+(Ableton Live 11 Standard, Logic, Max, BlackHole 2ch, FaceTime camera), and the
+suite was re-run once the VPN came off.
+
+### 413/413 green, 26 demos, zero failures
+
+The best full run this project has had, and it supersedes session 14's 374/389.
+
+    transport 14  lanes 15  loops 19  score 20  vclick 21  llhls 12
+    webrtc 14  moq 16  room 11  cues 10  wire 21  take 18  keep 20
+    record 11  replay 16  seek 18  looper 9  instrument 10  jam 11
+    reel 18  now 30  flipper 18  capture 12  show 15  shout 14  strip 20
+
+**The missing UDP egress was the VPN**, settled by test rather than inferred: a
+DNS query to `1.1.1.1:53` returns nothing with it connected and answers without
+it, while TCP is unaffected either way. With it off, `webrtc`, `moq`, `show` and
+`keep` all run their full sets.
+
+**The denominator moved 389 → 413, and that is the interesting half.** A page
+that loses a leg stops before the asserts behind it, so restoring the leg ADDS
+asserts rather than only flipping red ones to green — `keep` contributed 0 page
+asserts before and 20 now, `show` 2 of 15 and now 15. A falling total is a
+symptom to read; a rising one is too.
+
+### ⚠️ Two of the three clearances are weather, not fixes
+
+- **`keep`'s 409 did not reproduce, and is NOT explained.** A 409 is HTTP and
+  no mechanism connects UDP egress to an HTTP conflict. The symptom stopped;
+  the cause is unestablished and it can recur. This is exactly the condition
+  #29 was earned under — a true-but-irrelevant explanation predicts the symptom
+  perfectly and never gets caught. HANDOFF §0b stays OPEN. If it returns,
+  capture the response body and request URL first.
+- **`now`'s four cleared because ERR served `etv`'s edge on this run.** The
+  notes already say the refusal moves with the schedule and has no offset to
+  hard-code, so this will read red again on some future run without anything
+  having changed.
+
+### The second machine, and two facts about this shell
+
+`Kristjan's MacBook Pro (2)` — MacBookPro18,3, M1 Pro, 10 cores, 16 GB, macOS
+26.6.2, at **192.168.1.241**, reachable as `ssh mbp` with key auth. It stays
+reachable **with the lid closed** on AC (`SleepDisabled 1`), and its GUI session
+is reachable from SSH (`WindowServer`, Finder and `launchctl gui/501` all
+answer) — so GUI apps can be launched and driven remotely.
+
+- **mDNS does not resolve from the agent sandbox — at all.** `dns-sd`,
+  `dscacheutil` and `getaddrinfo` are silent even for this Mac's OWN `.local`
+  name, because multicast is blocked here independently of the VPN. Address LAN
+  machines by IP; a `.local` name that works in a human's Terminal will not work
+  in a tool call, and the failure is a resolution error rather than a timeout.
+- **One dead Command Line Tools install blocked four unrelated things.**
+  `/Library/Developer/CommandLineTools` held an empty `usr/` and a 2022
+  `MacOSX12.3.sdk`, with no `pkgutil` receipt — so `xcode-select -p` succeeded
+  while `xcrun` was absent. That broke `git`, which broke `brew update`, which
+  left Homebrew too old both to install any formula ("No developer tools
+  installed") and to parse current casks ("Unexpected method 'command_wrapper'").
+  Four symptoms, one cause, and the OS upgrade removed the ghost directory by
+  itself. **A tool that reports its own path successfully has not told you the
+  tool is there.**
+
+Installed on it: node **24.20.0** (the active LTS — v26 is not LTS until
+2026-10-28, and the machine's previous v20.7.0 was EOL), **ffmpeg 7.1.5** with
+`drawtext`/`enable-libfreetype` CONFIRMED present rather than assumed (that
+filter is the entire reason `src/publish.sh` pins the version), **csound 6.18**
+for the tempo-map oracle, git 2.50.1, and **OBS 32.2.2**. AbletonOSC is cloned
+into Live's Remote Scripts; enabling it is one GUI click.
+
+### The Csound oracle — two real defects, found in the first hour
+
+The second Mac's first job was to run real Csound against `timeline/csound.mjs`,
+which had been 22/22 green for months. It was wrong in two places, and the test
+could not have seen either, because it compared the compiler against a number
+derived from the same formula the compiler implements.
+
+**1. The tempo ramp integral.** We interpolated TEMPO linearly in beat, making
+time the logarithmic integral. **Csound interpolates SECONDS PER BEAT linearly
+in beat**, making time a trapezoid. Confirmed on two-, and four-point maps — 15
+onsets and 15 durations, all exact to nine decimal places on the trapezoid model
+and none on ours:
+
+| score | beat | Csound | ours (old) | error |
+|---|---|---|---|---|
+| `t 0 120 30 90` | 30 | 17.500000000 | 17.260924347 | **−239 ms** |
+| `t 0 60 20 180` | 20 | 13.333333333 | 10.986122887 | **−2347 ms** |
+| `t 0 120 8 60` | 8 | 6.000000000 | 5.545177444 | −455 ms |
+
+**And the documented number was the gap between two wrong answers.** The file
+warned that a mean-tempo shortcut lands notes "118 ms early" — which is
+`17.2609 − 17.1429`, our wrong answer minus the naive one. Csound was in neither.
+That 118 ms was quoted in `SUMMARY.md`, `plan-score.md`, `plan-uuu-local.md`,
+`demo/notes/uuu-positron.md` and two source comments; all now corrected, with
+the session-10 PROGRESS entry MARKED rather than rewritten.
+
+**2. `^+x` resolved against the wrong note.** We used the previous note of the
+same instrument; Csound uses the **immediately preceding statement**, whatever
+instrument. Discriminated with `i 1 0 2 / i 2 5 2 / i 1 ^+0.5 .` — Csound
+answers 5.5, we answered 0.5. And the asymmetry is the point: `+` and `.` really
+ARE per-instrument, proved with cases where the two rules give different answers
+(the original test's score could not tell them apart, because there the
+same-instrument note *was* the preceding statement).
+
+**Fixed, and now checkable.** `timeline/lab/csound-oracle.mjs` runs both against
+whatever `csound` is on PATH and skips cleanly where there is none — 10/10 green
+on csound 6.18. `csound-test.mjs` is 27/27 and now asserts measured values.
+**413/413 on the full suite.**
+
+⚠️ **KNOWN OPEN: Csound's `t` is SECTION-LOCAL.** After `s` the tempo resets to
+60 bpm unless the section declares its own; ours carries one global map, so a
+multi-section score with a tempo is 2 s out in the oracle's case. The oracle
+reports it as OPEN rather than omitting it. Fixing it needs a per-section tempo
+map and a section start TIME, which touches `sections`, `marks`, `repeats` and
+the quotation round-trip — deliberately not rushed.
+
+**On WASM.** There is no drop-in Node oracle: `@csound/browser` (7.0.0-beta33)
+will not import outside a browser, and `csound-wasm` (6.15.0-5) crashes on
+`window` at module load. Both are browser-targeted, so the native binary is the
+practical path and the oracle uses it.
+
+### Ableton Live, driven and measured over OSC
+
+AbletonOSC cloned into Live's Remote Scripts and enabled. **It works on Live 11
+Standard** — it is a Remote Script, not a Max for Live device, so Suite is not
+required, which is what makes this machine usable at all (it has standalone
+Max.app but no M4L).
+
+**Live's beat clock, read over OSC with the audio engine ON**, least-squares
+slope of `current_song_time` against wall seconds, ~6 s per tempo:
+
+| tempo | measured | expected | error |
+|---|---|---|---|
+| 120 | 2.0000 beats/s | 2.0000 | −0.002% |
+| 60 | 0.9996 | 1.0000 | −0.043% |
+| 174 | 2.8982 | 2.9000 | −0.063% |
+| 90.5 | 1.5076 | 1.5083 | −0.048% |
+
+**Worst 0.063%**, so Live's transport is a usable reference. ⚠️ Every error is
+NEGATIVE, ~0.05%, which is 3 ms per minute. That is either Live's audio-device
+crystal against the system clock — the transport is clocked by the audio engine,
+so they are genuinely different oscillators — or a bias in sampling the reply.
+**Not separated**, and it needs a better rig than an OSC poll to separate: quote
+0.063% as an upper bound on the pair, not as Live's clock error.
+
+**⚠️ THE TRANSPORT DOES NOT ADVANCE WITH THE AUDIO ENGINE OFF, AND
+`is_playing` SAYS `true` ANYWAY.** Measured before the engine was switched on:
+`start_playing` flipped `is_playing` to true while `current_song_time` stayed at
+0 across every probe, then `stop_playing` flipped it back. Live's transport is
+clocked by the audio engine, so with the engine off there is no clock — and the
+flag reports INTENT while the time reports DELIVERY, which is #22 exactly.
+**A moving `current_song_time` is the only evidence the transport is running.**
+
+**OSC is UDP and a reply can simply not arrive.** One `current_song_time` query
+went unanswered and killed a run; a second run lost 0 of 111. It did not
+reproduce, so this is not a rate — but a single-shot request/response over UDP
+has no delivery guarantee, so the client retries rather than failing. Do not
+build a measurement on one unacknowledged ask.
+
+**Not in the timing path, by rule.** OSC arms and reads; the numbers come from
+audio. AbletonOSC's own docs state nothing about latency or precision, which is
+reason enough — and plan-uuu-local's first trap says never put anything back in
+the per-beat path.
+
+### OBS on the Pro, and the MoQ plugin that was always there
+
+**OBS 32.2.2** (brew cask) with **obs-websocket 5.7.4 on 4455**, auth on,
+reachable from the other Mac over the LAN — `GetVersion` answers in ~7.5 ms with
+the full request set. `rig/obs-docker/control.mjs` drives it unchanged; it needed
+only `OBS_WS_URL`.
+
+**Two GUI walls, both modal, neither scriptable:**
+
+- **The first-run auto-configuration wizard refuses `quit`.** `osascript -e 'quit
+  app "OBS"'` returned `User cancelled (-128)` while the wizard was up.
+  Force-killing would be worse — an unclean exit makes OBS show a crash-recovery
+  dialog on the next launch, i.e. a second modal on top of the first.
+- **TCC permissions block startup outright, and the log says so in five lines.**
+  A healthy OBS start writes ~123; ours sat at 5, ending in `Permission for
+  screen capture denied`, and re-logged the same line a minute later. Once
+  screen/camera/input were granted the log ran to 123 and obs-websocket loaded.
+  **The line count was the tell** — same shape as reading the denominator (#29).
+
+**Config written rather than clicked, and the ordering matters.** OBS rewrites
+`plugin_config/obs-websocket/config.json` on shutdown, so a config written while
+it runs can be clobbered — the hazard already recorded from the Docker work. The
+sequence that works is: quit → write → launch. Written this way it survived a
+full OBS rewrite with its values intact.
+
+Password **generated on the target and never echoed** (`~/.obs-ws-password`,
+chmod 600), after an earlier one was printed into the session transcript — which
+is the standing rule broken and then repaired, the same accumulate-then-redact
+discipline the publisher uses. `EnableAutoUpdates=false` in `global.ini`, so brew
+owns upgrades rather than OBS's own updater.
+
+**obs-moq 0.5.13 (aarch64-apple-darwin) is installed and loads.** SHA-256 checked
+against the published `SHA256SUMS` before unpacking; Mach-O arm64, adhoc-signed;
+the only complaint in the log is `Failed to load 'en-US' text for module:
+'obs-moq'` — **the exact cosmetic locale warning session 6 recorded for the Linux
+build**, which is a pleasing cross-check that it is the same plugin.
+
+⚠️ **The inversion worth remembering.** `rig/obs-docker/NOTES.md` says releases
+"ship macOS-arm64/Windows only → Linux build from source", and that is why
+session 6 spent ~7 minutes of emulated Docker and a pinned rustup building a
+48 MB `.so`. **This machine is macOS-arm64**, so the thing that cost a build
+back then is a 6 MB download now. The `.so` kept in `rig/obs-cloud/obs/plugin/`
+is `ELF 64-bit x86-64` and is useless here — keep it for the container, never
+reach for it on the Mac.
+
+### There is no Cloudflare OBS container, and there never was
+
+Checked against the account rather than against the note. All three rig workers
+answer **`This Worker does not exist on your account [code 10007]`**:
+`positron-obscloud`, `positron-obscloud-quic`, `positron-cnt-test`. The
+OBS-in-a-container work was real and measured but lived entirely in local
+Docker; the Cloudflare side was written up and never shipped. That is also why
+those three were the only scripts safe to RENAME in the positron move — nothing
+to abandon.
+
+**`wrangler containers list` returns exactly one: `positron-pub-pub`**, 1/1
+instances, v18, updated 2026-09-08 — the ffmpeg publisher, not OBS. Worth
+keeping: it is what lets a visitor to positron.studio trigger a live stream with
+no laptop involved, it is alive only while `/watch` is held, and a MacBook that
+may be closed or elsewhere cannot be a public origin. Its real problem is
+unchanged and is a REBUILD rather than a teardown — the image still draws the
+pre-session-12 test pattern, so any browser-frame-against-container-frame
+comparison is comparing two different pictures.
+
+### What it unblocks
+
+plan-uuu-local **P3** (two devices, one LAN, a measured number rather than a
+loopback one), HANDOFF **item 0** (min-RTT skew over a real link), a **Csound
+oracle** for `timeline/csound.mjs`'s tempo integral — which is currently checked
+only against a number derived from the same formula, so it can catch a typo but
+not a misreading — and a **key→ear** rig whose 35.8 / 77.7 ms figures are
+documented as two headless Chromes on ONE machine with a synthetic voice and an
+ESTIMATED +32 ms to the ear.
+
+## Session 14 (2026-09-09) — one message shape, a history the relay refuses to keep, and what the relay actually costs (user: "read md's" → "implement demo" → "can you do perf tests?" → "save results to md's")
+
+Started from `plan-ws.md`, written that morning from a dictated brief. Four
+questions were settled by argument, one by measurement, and then the plan was
+built.
+
+### The decisions, and what each turned on
+
+**Room, not channel.** elektron puts `channel` IN the message and filters at the
+receiver; we put the room in the URL and let the DO fan out. The relay decides
+it: a channel in the payload leaves exactly two options — parse every message,
+which ends the verbatim contract and puts the hibernation `ping`/`pong` behind a
+DO wake, or filter at the receiver, in which case every channel reached every
+socket and full fan-out was paid for messages nobody wanted. The budget seals
+it, because **the caps are per SOCKET**: multiplexing four channels onto one
+puts them in a single 512 KiB/s, 60 msg/s bucket where a chatty one starves a
+sparse one. And elektron's own code settles it from their side — `useChat()`
+calls `useMessage()`, which opens its OWN socket, so v3 paid N sockets AND full
+fan-out and never collected the multiplexing benefit it was designed for.
+
+**`type`, not `t`**, against three demos that already say `t`. Three bytes a
+message — 180 B/s at the relay's own 60 msg/s ceiling. What it buys: `t` means
+TIME everywhere else here (`reduce(events ≤ t)`, `t0`, the strip's row `t`), so
+a key meaning *verb* would sit one letter from a key meaning *when*; `wire`
+prints the raw line to a reader and CLAUDE.md bans jargon in what a visitor
+sees; and it is the name elektron has used for five years, which shortens the
+migration. Counted, not estimated: 6 source files, ~46 send-side literals. **The
+sweep is NOT done** — only `wire` speaks `type` today.
+
+**`from` is not `userId` renamed.** A user id is a person and persists across
+tabs; `from` identifies one socket, because that is the only scope in which a
+counter means anything. Two tabs are two senders on the wire and one person in
+the app.
+
+**Is `seq` necessary?** The reason first written in the plan was WRONG: a
+WebSocket rides TCP, so one sender's messages cannot arrive out of order, and a
+reordering check would pass forever. It survives on a different argument, and
+the perf run turned that argument into a measurement — see below.
+
+### Built
+
+- **`demo/shell/wire.mjs`** — the envelope written down: `type`/`from`/`at`/`seq`,
+  a per-connection id, gap detection, UTF-8 sizing, binary, `ping()`, and the
+  reconnect **every positron page lacks** (elektron carried
+  `reconnecting-websocket` in v1 and v3; `cues` logs "relay closed" and stops).
+- **`workers/backlog`** → new worker, new DO, `backlog.positron.studio`.
+  **The recorder joins the room as an ordinary socket**, which is what lets the
+  relay go on parsing nothing. SQLite, one row per kept message, NDJSON history
+  over plain HTTP with `last`/`since`/`from`+`to`/`type`, retention pruned on
+  write, `store: true` honoured, recording stopped when the room goes idle.
+- **`demo/wire/`** — composer, the exact bytes both ways, the history panel.
+  **17/17 green.**
+- **`demo/perf-wire.mjs`** — the perf harness, in the repo rather than a scratch dir.
+
+Deviation from the plan, recorded in the wrangler config: §3 wanted history on
+the same hostname as the relay. `ws.positron.studio` is `positron-ws`'s custom
+domain and owns the whole hostname, so the backlog took its own subdomain rather
+than a path-route fight with a custom domain.
+
+### Two platform traps, both silent
+
+**A DO's OUTBOUND client WebSocket hands binary over as a `Blob`** — measured
+`Blob`, `size` 9, `byteLength` undefined — and a `Uint8Array` binds to a SQLite
+`BLOB` column as an EMPTY one without complaining. The row read back at 0 bytes
+with a blank hex head while looking recorded. `await data.arrayBuffer()` first;
+and a BLOB comes back OUT as an ArrayBuffer, which has no useful `.slice()` and
+no iterator.
+
+**A DO's input gate does not cover a non-storage await.** Events are held back
+across `storage.get`, so handlers cannot interleave there — but
+`blob.arrayBuffer()` is not storage, and two frames a millisecond apart would
+race into the table in the wrong order on a page whose product IS the order.
+Handling is serialised through one promise chain.
+
+### What the relay costs — three runs, deployed, `demo/perf-wire.mjs`
+
+| | run A | run B | run C |
+|---|---|---|---|
+| `ping`→`pong` (runtime autoresponse, DO never woken) | p50 26.0 | 36.4 | 37.5 ms |
+| echo through the room's DO | p50 27.0 | 38.0 | 38.3 ms |
+| **the DO hop** | **+1.0** | **+1.6** | **+0.8 ms** |
+
+The absolute number moved 11 ms across runs and is this link; the DIFFERENCE is
+the relay, and it is 1–2 ms. Quoting the autoresponse RTT as "the relay's
+latency" would be quoting the network — the same error as `candidate-pair` RTT.
+
+**Fan-out is nearly free**: one sender at 20 msg/s, delivery at its own echo —
+N=1 p50 40 ms, N=2 42, N=4 42, N=8 45, **N=15 48 ms, 900/900 delivered, 0 lost**.
+A full room costs the sender 8 ms at p50 over an empty one.
+
+**Size**: 1 KiB p50 47 ms · 8 KiB 70 · 64 KiB 81 · 200 KiB 116 · 256 KiB 125.
+
+**The caps bite exactly where the source says**, and this is `seq` earning its
+place:
+
+    30 msg/s   delivered  90/90    dropped   0
+    60 msg/s   delivered 180/180   dropped   0
+   120 msg/s   delivered 298/360   dropped  62  (17.2%)
+   300 msg/s   delivered 298/900   dropped 599  (66.6%)
+
+Both overloads delivered **298 in three seconds**, and a third run repeated it to
+the message: `MSG_BURST` 120 plus 3 s at `MSG_PER_SEC` 60 is a 300-message
+allowance. **The sender is told nothing** — no error, no close, no backpressure —
+so those 599 losses have a number only because the receiver saw the counter
+skip. That is the argument for `seq`, measured rather than imagined.
+
+**Scale, and what was NOT measured**: per room the caps permit 16 × 60 = 960
+msg/s in, fanned to 16 sockets ≈ 15k sends/s. The run reached 300 sends/s, 2% of
+that, so what is established is that the CAPS bind long before the machine at
+demo scale — not where a single DO bends. Rooms are independent DOs, so the
+horizontal direction is free; distinct-room creation is still uncapped.
+
+**The backlog** (local `wrangler dev`, a floor rather than an edge number): kept
+300 of 300 at a 60 msg/s send; reads of 8, 50 and 200 rows all in 5–8 ms, flat
+in the row count.
+
+### The suite: 374/389, and all 15 failures attributed
+
+**Eleven are this shell's missing UDP egress** — the documented test reproduced
+it: a DNS query to `1.1.1.1:53` returned nothing while TCP to `positron.studio`
+answered 200 in 0.16 s. `webrtc` 5, `moq` 2 (`QUIC_NETWORK_IDLE_TIMEOUT`),
+`show` 2 (`connecting/connecting`), `keep` 2.
+
+**Four are `now`, and they are ERR's rights wall, not our code** — checked
+rather than assumed, because a true-but-irrelevant explanation is the hardest
+cover (#29). The master playlist answers 200 and a 2-byte Range GET separates
+the rest: the newest three segments of `etv` return **403 with no ACAO**, while
+one ~3,700 segments back returns **206 with `access-control-allow-origin: *`**.
+`now` sits at the live edge by definition, so when ERR refuses the edge the page
+cannot show a frame.
+
+⚠️ **One thing is NOT explained**: `keep` also logged a **409** from a resource
+load, and a 409 is HTTP, not UDP. Its `page asserted something — 0` says the page
+never ran (read the denominator, #29), which the missing UDP would explain — but
+the 409 is a second signal and has not been chased.
+
+**389, not 351.** The old total predates session 13's `reel`, `now` and `keep`
+and its removal of `tracks` and `grid`; `wire` adds 21. A page that loses a leg
+stops before the asserts behind it, so the denominator falls with the failures —
+`keep` contributed 0 page asserts here and `show` 2 of its usual 15.
+
+### And then it was LOOKED AT, which found a bug 11 asserts could not
+
+Session 13's lesson #36 is that a page has a class of defect its own checks
+structurally cannot see. Second instance, one screenshot of the DEPLOYED page:
+
+- **The history pane rendered a STAIRCASE OF ELLIPSES** — `…`, `{…`, `{"…`,
+  `{"i…`, one character longer per row. `rows.map(short)` hands the callback
+  `(value, INDEX, array)`, so `short`'s `n = 96` default was overridden by the
+  row number and row *i* truncated at *i* characters. Every assert passed
+  throughout, because they compare the ROWS, and the rows were right — only the
+  paint was wrong.
+- **The `kept` cell read `8 of …`** — a readout cell that truncates is in the
+  wrong place (CLAUDE.md). It is a number now, and the pair it was trying to
+  show (`8 held of 13 seen`) lives in the history pane's own gutter, beside the
+  ink it describes.
+- The intro ran to eight lines on a 430 px phone; trimmed to three sentences.
+
+17/17 green again afterwards, on the deploy and locally.
+
+### Then a second round, from reading the page rather than the asserts
+
+- **The history loads on arrival**, and the read-it-back button is gone. Which
+  forced a second change: the room was one per TAB, and a fresh room has no
+  past, so loading on arrival would have shown an empty box every time. The
+  default room is now the shared `wire`. That in turn made the order assert
+  wrong — another visitor's messages are interleaved — so it checks that OUR
+  lines appear in the order we sent them rather than that the history is only
+  ours.
+- **Two visible controls**, *Send it* and *Clear*. The three that exercise
+  mechanism are HIDDEN, not removed, because the harness presses
+  `.d-controls button` and a control it cannot reach is a subject the suite
+  silently stops testing (#19). `?checks=1` shows them.
+- **Clear covers every room the index knows of.** A DO namespace cannot be
+  enumerated, so a reserved `__index` instance keeps room names as they start
+  recording, and the room route refuses any name beginning `__`. ⚠️ It knows
+  only what was recorded since it existed — rooms from before are unreachable
+  by name, and hold up to `cap` rows until something writes to them again,
+  because the prune runs on write. The assert says "every room it knows of",
+  which is the true claim rather than the flattering one.
+- **Everything wraps.** `.d-log` already did; the two panes this page adds did
+  not, and at 390 px a 110-byte line showed about 40 characters of itself. The
+  direction label wrapped onto two lines in a 58 px column until it became one
+  word (`out`/`echo`/`in`/`bytes in`).
+
+Then a third pass, all of it from looking rather than from a failing assert:
+the composer moved ABOVE the control bar so Send sits under the thing it sends
+(moving the BUTTON instead would have taken it out of `.d-controls`, the only
+place the harness looks, and reordered every press, since it walks them in
+document order); the **keep checkbox became a second button**, because keeping
+is a different act rather than a setting on this one; and **Clear history** lost
+its "— every room" tail AND the matching blast radius — it clears this room,
+since a two-word button must not be wired to more than it names. `/clear-all`
+stays in the worker for the rooms the per-tab default left behind.
+
+**21/21 green**, deployed and local.
+
+### Not done
+
+- **The `t` → `type` sweep** across `room`, `show`, `instrument`, `cues`,
+  `proto/looper/peer.mjs` and `workers/instrument/src/index.js` (~46 literals).
+  P1's second half; `cues` first, diffing assert counts per demo.
+- **§4's comparison** — our DO against a plain site with its own WS server —
+  still waits on which site the dictated brief meant.
+- `workers/pub`'s container image is still not deployed (since session 12).
 
 ## Session 12 (2026-09-07 → 09-08) — one test pattern, and finding out it was a claim rather than a fact
 
@@ -870,6 +1419,14 @@ beat 30 is **17.2609 s** and the mean-tempo answer is **17.1429 s**. Reaching
 for the average puts every later note **118 ms early** and nothing in the output
 looks wrong, so the test asserts both numbers and the naive one can never
 quietly return.
+
+> ⚠️ **WRONG, and left standing as the record of what was believed.** Corrected
+> in session 15 (2026-09-09) against real csound: Csound interpolates SECONDS
+> PER BEAT linearly in beat, not tempo, so beat 30 is **17.500 s** and 17.2609
+> was never Csound's answer. That makes the "118 ms" above the gap between two
+> WRONG answers; the real error was 239 ms. The paragraph is not edited because
+> a journal that is rewritten stops being evidence — see the demo-renumbering
+> note for the same rule.
 
 And the claim itself — seek-from-anywhere as a guarantee rather than a
 discipline: compile a 16-note score, build a deck, and `reduceAt` is exact at

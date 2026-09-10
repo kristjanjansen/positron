@@ -68,10 +68,11 @@ in the payload, not the envelope.
 ```
 
 - **`tempo` is a map and never a number.** `csound.mjs` already computes the
-  beat→ms integral, including the closed-form logarithmic case for a ramp
-  (`Δt = (60/k)·ln(m1/m0)`). The map is what lets a client derive "where are we
-  now" without asking a server — one of the three failures the Csound compiler
-  was written to fix.
+  beat→ms integral: Csound interpolates SECONDS PER BEAT linearly in beat, so a
+  ramp is the trapezoid of `60/tempo` (verified against csound 6.18 — this line
+  claimed a closed-form logarithmic integral until 2026-09-09, which was wrong).
+  The map is what lets a client derive "where are we now" without asking a
+  server — one of the three failures the Csound compiler was written to fix.
 - **`unit: "beat"` is mandatory even for languages that have no tempo.** A MIDI
   score gets `tempo: [[0, 60]]`, at which one beat is one second, and it SAYS SO
   rather than quietly meaning milliseconds. Csound's own default is 60 bpm for
@@ -276,9 +277,10 @@ refused rather than as absent.
   leans on them compiles to something quietly shorter than it reads, and the
   document must carry the warnings so the demo can show them.
 - **Beats are not milliseconds and the bug is silent.** Getting the tempo
-  integral wrong lands every note slightly late and only an accelerando shows
-  it. `05 vclick` already measures this — the mean-tempo shortcut puts every
-  later note 118 ms early while looking fine.
+  integral wrong lands every note slightly off and only an accelerando shows it.
+  This project shipped a wrong one for months and its own test agreed with it,
+  because the test recomputed the same formula. Check against the reference
+  implementation: `timeline/lab/csound-oracle.mjs`.
 
 ---
 

@@ -1,4 +1,4 @@
-# positron — compact summary (start → 2026-09-08)
+# positron — compact summary (start → 2026-09-09)
 
 One paragraph: a measured live-streaming + performance platform on Cloudflare
 (LL-HLS stage, WebRTC SFU grid, MoQ fast tier, DO cue relay, R2 archive),
@@ -46,8 +46,11 @@ with an operator studio app as its first build and cultural-heritage archives
   against video-only's 3.82 s, asserted from the playlists rather than a
   stopwatch; and Cloudflare WHEP refuses a single-track offer outright),
   `28 vclick` + `timeline/csound.mjs` (a Csound score compiled into rows you can
-  seek into; the tempo map is the INTEGRAL of `60/tempo`, and the mean-tempo
-  shortcut puts every later note 118 ms early while looking fine). `11 grid`
+  seek into; the tempo map is the trapezoid of `60/tempo` — ⚠️ this said "the
+  INTEGRAL … mean-tempo puts every later note 118 ms early" until 2026-09-09,
+  when a real-Csound oracle showed the compiler AND that claim were both wrong:
+  the 118 ms was the gap between two wrong answers and the true error was
+  239 ms, see PROGRESS session 15). `11 grid`
   lost its tiering. And the session's real lesson, one layer down from session
   9's: **291 asserts were green across three pages that had never once played a
   frame of HLS in Chrome**, because `canPlayType('…mpegurl')` answers `"maybe"`
@@ -79,6 +82,40 @@ with an operator studio app as its first build and cultural-heritage archives
   **351/351 on 09-08** — every demo, no failures, the first clean full run since
   session 10. Earlier in the session it read 332/344; the 12 were the shell's
   missing UDP egress and they cleared with it.
+
+- **09-08, session 13** — ⚠️ **not written up while it happened**; this line is
+  reconstructed from the git log and `LESSONS.md` §33–38, which are its only
+  record. It built `reel` (1965 newsreels and radio on one line, from ERR's own
+  shot list), `now` (one live ERR channel on a line whose right-hand end is the
+  present) and `keep` (a picture out to a server and back onto the line, R2, one
+  file per take), landed plan-names P1 (one write path tiered by credential),
+  and removed `tracks` and `grid`. Its six lessons are worth reading before
+  touching any live page: `startLoad()` with no argument means the LIVE EDGE; a
+  control that is not finished at press time collides with the next one; prefer
+  the event carrying the magnitude over a counter sampled at a guessed moment;
+  **nothing in the suite looks at ink**; continuity must be symmetric or a
+  back-seek eats the record; and **a browser cannot read a response's `Date`
+  header**.
+
+- **09-09, session 14** — **one message shape, written down**, and the history
+  the relay refuses to keep. `plan-ws.md` was built: `demo/shell/wire.mjs` (the
+  envelope — `type`/`from`/`at`/`seq` — plus the reconnect every positron page
+  lacked), `workers/backlog` on `backlog.positron.studio` where **a recorder
+  joins the room as an ordinary socket**, so the relay still parses nothing, and
+  `wire` at `positron.studio/wire/`, a demo ABOUT the socket. Decisions:
+  **room, not channel** (a channel in the payload forces either a parsing relay
+  or full fan-out — and elektron's own `useChat()` opened a socket per chat, so
+  v3 paid both); **`type`, not `t`** (`t` means time everywhere else here, and
+  the sweep of the other six files is NOT done); **`from` is a socket, not a
+  person**. And `seq` survived on a corrected argument — TCP already orders one
+  sender's messages, so what a counter sees is the relay dropping under its own
+  caps, silently. Measured: **the DO hop costs 1–2 ms**, a full 16-socket room
+  costs the sender 8 ms with zero loss, and at both 120 and 300 msg/s exactly
+  **298 messages arrive in three seconds** — the token bucket (`MSG_BURST` 120 +
+  3 s × 60/s) read back off the wire, with the sender told nothing. **374/389**,
+  every failure attributed: 11 to this shell's missing UDP, 4 to ERR refusing
+  `now` the live edge (403 no-ACAO at the edge, 206 with ACAO 3,700 segments
+  back), 1 unexplained 409 in `keep`.
 
 ## The stack, with its numbers
 

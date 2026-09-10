@@ -105,18 +105,29 @@ The mapping, from the note's own table and confirmed against the code:
 
 | Csound | positron | in the code |
 |---|---|---|
-| `t` statements | the beat↔ms map | `tempoMap(pairs)`, integral of 60/tempo |
+| `t` statements | the beat↔ms map | `tempoMap(pairs)`, trapezoid on seconds-per-beat |
 | `i` lines | deck rows | `p2`→`at`, `p3`→duration, `p1`→kind, rest→payload |
 | `m` / `n` repeats | a **quotation**, not duplicated lines | `repeatsAsQuotations()` |
 | bar/beat readout | a derived lane off the map | not pushed over OSC |
 
 **The one thing a parser would have got wrong**, and the reason this is a
-compiler: `p2` and `p3` are BEATS and Csound interpolates tempo linearly in
-beat, so beat→time is the integral of `60/tempo` — closed form and logarithmic,
-`Δt = (60/k)·ln(m1/m0)`. On `t 0 120  30 90` the true answer is **17.2609 s** at
-beat 30 and the mean-tempo answer is **17.1429 s**. Reaching for the average
-puts every later note **118 ms early and nothing in the output looks wrong**.
-The test asserts both numbers so the naive answer can never quietly return.
+compiler: `p2` and `p3` are BEATS. What Csound interpolates linearly in beat is
+**seconds per beat**, NOT tempo — so beat→time is the trapezoid of `60/tempo`.
+On `t 0 120  30 90` the answer is **17.500 s** at beat 30.
+
+⚠️ **Corrected 2026-09-09, and the correction is the lesson.** This paragraph
+used to say the map was the *logarithmic* integral of a linearly-interpolated
+TEMPO, `Δt = (60/k)·ln(m1/m0)` = 17.2609 s, and warned that the mean-tempo
+shortcut (17.1429 s) lands notes "118 ms early". Both the code and this text
+were wrong: **17.2609 is not Csound's answer either**, so that 118 ms was the
+distance between two wrong answers. Measured against csound 6.18, the real error
+was **239 ms** at beat 30, and **2.35 s** by beat 20 on `t 0 60 20 180`.
+
+It survived because `csound-test.mjs` checked the compiler against a number
+derived from the same formula the compiler implemented — which catches a typo
+and can never catch a misreading. `timeline/lab/csound-oracle.mjs` now runs both
+against the reference implementation (10/10 green), and skips cleanly where
+`csound` is not installed.
 
 ### Where it does NOT fit, stated rather than smoothed over
 
@@ -247,9 +258,17 @@ positron does not address. This is a borrowing, not a build.
 
 - **Do not put anything back in the per-beat path.** §1. It is the whole point,
   and every convenience will pull that way.
-- **The mean-tempo shortcut.** 118 ms early by beat 30 on a gentle ramp, and
-  nothing in the output looks wrong. Already guarded by a test that asserts both
-  numbers; keep it that way.
+- **The tempo integral, and TWO ways to get it wrong.** Averaging the tempo is
+  the obvious mistake. The subtle one, which this project actually shipped until
+  2026-09-09, is interpolating the TEMPO linearly rather than SECONDS PER BEAT —
+  it looks more rigorous, it is closed-form and logarithmic, and it is 239 ms out
+  at beat 30 of a gentle ramp. **Do not check an implementation of somebody
+  else's format against your own reading of it**; run
+  `timeline/lab/csound-oracle.mjs`.
+- **Csound's `t` is SECTION-LOCAL — KNOWN OPEN.** After `s` the tempo resets to
+  60 bpm unless the new section declares its own; ours carries one global map, so
+  a multi-section score with a tempo is wrong by 2 s in the oracle's case. The
+  oracle reports it rather than omitting it.
 - **A repeat under a changing tempo is not the same material in time.** Found
   and fixed in `demo/vclick/` this session: the document keeps the repeat as one
   line (authoring) while the deck is built from the expanded compile (trace),

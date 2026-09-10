@@ -362,6 +362,207 @@ being present in the protocol does not mean it is present in the browser.**
 
 ---
 
+## Session 14 — a demo about the wire, and four ways a page lies quietly
+
+Written 2026-09-09, building `wire` and the backlog beside the relay. Two of
+these are silent platform behaviour; two are about what a page says when nobody
+reads it.
+
+### 39. A counter that cannot be wrong is not a check
+
+`seq` went into the envelope to tell "never arrived" from "arrived out of
+order". That reason was **wrong**: a WebSocket rides TCP, so one sender's
+messages cannot arrive out of order and nothing goes missing without the
+connection dying. A reordering assert would have passed forever — the same
+vacuous shape as #27, arrived at from the opposite direction, by reasoning
+about a mechanism instead of waiting on an effect.
+
+It survived on a different argument, and the perf run turned that argument into
+a number. The relay drops under its own caps and **tells the sender nothing** —
+no error, no close, no backpressure. At 120 and 300 msg/s, three runs each
+delivered exactly **298 messages in three seconds**: `MSG_BURST` 120 plus 3 s at
+`MSG_PER_SEC` 60, the token bucket read straight off the wire. Those 599 losses
+have a number only because the receiver could see the counter skip.
+
+So: before keeping a field, name the failure it makes visible, then check that
+failure can actually happen. And a first assert on it — `'seq' in bytes` —
+was itself unfalsifiable and had to be replaced by one that could fail (the
+counter did NOT advance across a binary frame).
+
+### 40. `map(fn)` passes the INDEX, and a defaulted second parameter will take it
+
+`rows.map(short)` where `short = (s, n = 96) => …` renders row *i* truncated to
+*i* characters: a staircase of ellipses down the pane. **Eleven asserts passed
+throughout**, because they compare the rows and the rows were right — only the
+paint was wrong. One screenshot found it; nothing in the suite could.
+
+Second instance of #36 in two sessions, so the rule is worth stating as
+mechanism rather than as advice: **a page has a class of defect its own checks
+structurally cannot see, and the cost of looking is one screenshot.** The
+specific trap generalises past this bug — never pass a function with optional
+parameters straight to `map`, `forEach` or `filter`.
+
+### 41. Hide a control the harness needs; do not remove it
+
+Asked to drop the debugging buttons, the obvious move is to delete them. But
+`verify.mjs` presses `.d-controls button`, so a removed control is a subject the
+suite silently stops testing (#19, from the other side). They are `hidden` and
+still in the DOM, `?checks=1` shows them, and the assert count is unchanged.
+
+The same shape decided where the compose box went. "Move send below the box"
+reads as *move the button* — which would take it out of `.d-controls` entirely,
+and reorder every press besides, since the harness walks them in document
+order. Moving the BOX above the bar puts the same pixels on screen at no cost.
+**When a layout request would move an element out of the harness's reach, move
+the other element.**
+
+### 42. A control's blast radius must not exceed its label
+
+`Clear the history — every room` was honest about being blunt. Shortened to
+`Clear history`, the same wiring became a two-word button that silently emptied
+every room the worker knew of. The fix was not to restore the long label but to
+**cut the behaviour to the name**: it clears this room, and the all-rooms sweep
+stays in the worker where it is asked for by URL rather than by a button
+somebody might press expecting less.
+
+Related, on the wording of the assert: the sweep can only reach rooms recorded
+since the index existed, because **a Durable Object namespace cannot be
+enumerated**. So the assert says "every room it knows of", not "every room" —
+the true claim rather than the flattering one.
+
+---
+
+## Session 15 — the oracle, and what a self-referential test cannot see
+
+Written 2026-09-09, after running `timeline/csound.mjs` against real Csound for
+the first time. It had been green at 22/22 for months and was wrong in two
+places.
+
+### 43. A test that recomputes the formula is not a test of the formula
+
+`csound-test.mjs`'s ramp check compared `t.secondsAt(30)` against `closed`, a
+number the test computed **from the same expression the compiler implements**.
+It passes whenever the two agree, which is whenever nobody has made a typo. It
+cannot see a misreading of the format, and there was one:
+
+- We interpolated **tempo** linearly in beat, making time the logarithmic
+  integral `Δt = (60/k)·ln(m1/m0)`. Csound interpolates **seconds per beat**
+  linearly in beat, making time a plain trapezoid. On `t 0 120 30 90` that is
+  17.500 s against our 17.261 — **239 ms** — and on `t 0 60 20 180` it is
+  **2.35 s** by beat 20.
+- `^+x` resolved against the previous note of the same instrument. Csound
+  resolves it against the **immediately preceding statement**, any instrument.
+  `+` and `.` really *are* per-instrument, so the three shorthands do not share
+  a reference note — an asymmetry nobody would guess and a reading of the manual
+  would not settle.
+
+**The sharpest part is the documentation.** The file warned in a comment that a
+mean-tempo shortcut "puts every later note 118 ms early". That 118 ms was
+`17.2609 − 17.1429` — the distance between **two wrong answers**. A confident,
+specific, load-bearing number, quoted in `SUMMARY.md`, `plan-score.md`,
+`plan-uuu-local.md` and `demo/notes/`, measuring nothing.
+
+So: **when you implement somebody else's format, the reference implementation is
+the only thing that can grade you.** `brew install csound` and
+`timeline/lab/csound-oracle.mjs` — which skips cleanly where csound is absent,
+because a check nobody can run is a check nobody runs.
+
+Same family as #26 (a second implementation has to be LOOKED AT, not reasoned
+about) and #29 (an explanation supplied from expectation). The new part is that
+here the *test* was the thing supplying the expectation.
+
+### 44. Build the case that separates all the candidates, not one that fails
+
+The first ramp showed a disagreement but not what the right rule was: 17.500
+measured, 17.261 ours, 17.143 mean-tempo. Three numbers, and "not ours" is not
+an answer. `t 0 60 20 180` was chosen because the three models predict **13.333
+/ 10.986 / 10.000** — far apart, and only one can be right. Csound answered
+13.333333333, which named the mechanism rather than merely refuting one.
+
+Then a four-point map confirmed it at seven onsets, because a rule fitted to two
+points is how the *next* wrong formula ships. Same rule as the ADV/EDGE pair in
+#5: build the measurement that discriminates, then stop guessing.
+
+### 45. A filter that drops most of the evidence looks like a finding
+
+`csound … | grep '^EVT'` returned 4 of 5 events, and the missing one was the
+note at beat 0 — which reads as a meaningful pattern about how Csound handles
+time zero. It was an anchor. **Csound writes ANSI escapes**, so most lines begin
+`\x1b[m`, and `^EVT` matched only the ones that happened to follow a newline
+cleanly.
+
+The same shape twice more in one session: `execFileSync` returns only stdout, so
+capturing csound's `prints` — which go to **stderr** — read back as "csound
+produced 0 events" across every case at once. And the sweep for the other Mac
+came back empty because mDNS is silent in this sandbox, not because the machine
+was absent.
+
+The tell in all three: **a partial result that is too tidy.** Exactly 4 of 5,
+exactly 0 of everything, exactly nothing found. Before believing a pattern in
+missing data, check the thing that did the collecting.
+
+### 46. A flag that reports intent is not a transport running
+
+Ableton Live's `is_playing` returned `true` after `start_playing` while
+`current_song_time` stayed at 0 across every probe — because the audio engine
+was off, and Live's transport is clocked by the audio engine. No error, no
+warning, and a rig built on `is_playing` would have recorded a session of
+nothing while looking correct.
+
+Third instance of one shape in this project: `createMidiLane`'s counter climbed
+while every note was scheduled fifty-six years out (#22); `wire`'s `seq`
+survived only once it was pointed at a loss that could actually happen (#39).
+**Ask what the indicator is downstream of.** `is_playing` is downstream of a
+request; `current_song_time` is downstream of the clock. Only the second one can
+report that the clock stopped.
+
+With the engine on, the same reading is worth having: 0.063% worst rate error
+across four tempos — but every error was NEGATIVE at about 0.05%, and that could
+be Live's audio crystal against the system clock or a bias in how the reply was
+sampled. Two candidates, one number, not separated: so it is quoted as an upper
+bound on the PAIR rather than as Live's clock error (#1).
+
+### 47. A log's LINE COUNT says whether a program started
+
+OBS wrote five lines and stopped, the last being `Permission for screen capture
+denied`. Nothing said "blocked"; there was no error, no exit, and the process was
+alive the whole time. A healthy start writes about 123 lines. **The count was the
+whole diagnosis** — and once the macOS permissions were granted the same binary
+went straight to 123 and loaded its plugins.
+
+Third instance of one rule: read the SIZE of the output before reading its
+content. #29 was the denominator (`0/1` means the page never ran, `13/17` means
+it ran and failed); #45 was a filter that returned exactly 4 of 5 events. Here
+it is a log that is too short. **A program blocked on a modal dialog looks
+exactly like a program that is running**, from every angle except how much it
+has said.
+
+Also worth keeping: **an unclean kill is not a way past a modal.** OBS refused
+`quit` while its first-run wizard was up (`User cancelled -128`), and force-
+killing would have added a crash-recovery dialog on the next launch — a second
+modal stacked on the first. Some walls are the user's to click, and the right
+move is to say exactly which button.
+
+### 48. The build you could not avoid may have become a download
+
+`rig/obs-docker/NOTES.md` records, correctly, that obs-moq releases "ship
+macOS-arm64/Windows only → Linux build from source" — and session 6 duly spent
+~7 minutes of emulated Docker plus a pinned rustup to produce a 48 MB `.so`.
+That was the right call for a Linux container.
+
+On a macOS-arm64 laptop the same plugin is a **6 MB signed download**, and it
+loads with the identical cosmetic locale warning the Linux build produced. The
+note was never wrong; the machine changed underneath it. **When a note explains
+why something was hard, check whether its premise still holds before repeating
+the work** — the premise here was the target platform, and it was stated right
+there in the sentence.
+
+The negative half matters too: the `.so` kept in `rig/obs-cloud/obs/plugin/` is
+`ELF 64-bit x86-64`. It is the right artifact for the container and useless on
+the Mac, and `file` answers that in a second.
+
+---
+
 ## Method
 
 ### 1. Measure the quantity in question, not one adjacent to it
