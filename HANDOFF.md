@@ -98,7 +98,23 @@ AbletonOSC lacks** — Live's browser — registered from `view.py` because
 restart is needed. With it, `live-setup.mjs` loads Drift, routes `IAC Driver
 (Bus 1)`, arms and sets monitoring In in one command, from the other machine.
 
-✅ **DONE — Ableton Live is playable remotely at 58 ms key→ear** (MoQ over the
+✅ **DONE — Ableton Live is playable remotely.** All four cases measured, 14 of
+14 notes each, receipt 6.6–8.8 ms throughout:
+
+| sound comes back over | typical | worst 1 in 20 | gaps | result |
+|---|---|---|---|---|
+| **MoQ, LAN relay** | **58 ms** | 69 ms | 31 | clean |
+| WebRTC peer to peer | 111–128 ms | 114–236 ms | — | clean |
+| MoQ via Cloudflare | 136 ms | 271 ms | **1133** | **garbled** |
+
+⚠️ **The Cloudflare relay is LOSSY for this publisher**, not merely slower —
+about a third of frames missing, audible as garbling and confirmed by ear. The
+same relay carried the built-in synth cleanly, so it is this cadence (5 ms Opus
+frames grouped every 50 ms) over that path, not a broken relay. NOT separated:
+group policy, frame duration, or the wide-area path. `seq` is the only thing that
+sees it — nothing else on the path reports a thing.
+
+✅ **58 ms key→ear on the LAN relay** (MoQ over the
 LAN relay; 128 ms over WebRTC), 14 of 14 notes, receipt 7.50 ms, 0 underruns.
 Live costs ~29 ms over the built-in synth, about what it reports for itself
 (512 samples at 48 kHz plus 13.7 ms output latency).
