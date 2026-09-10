@@ -30,6 +30,10 @@ The cushion is reported below; it cannot be switched off.</p>
   <button id="p-dc" class="on">notes go direct</button>
   <button id="p-ws">notes go via the relay</button>
 </div>
+<div id="path">
+  <button id="r-rtc" class="on">sound back over WebRTC</button>
+  <button id="r-mq">sound back over MoQ</button>
+</div>
 <div id="keys"></div>
 <button id="cmp">Compare both — 100 presses each</button>
 <span id="prog"></span>
@@ -83,6 +87,27 @@ pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
 // threshold, which is sample-accurate -- polling an AnalyserNode in rAF would
 // quantise the answer to a frame and this number is ~80 ms, not ~800.
 let earPending = null;   // {t0, via} of the most recent press
+// The onset detector, usable on either return path.
+async function attachOnset(actx, sourceNode) {
+  const code = `class O extends AudioWorkletProcessor{
+    constructor(){super();this.q=true;}
+    process(inputs){const c=inputs[0]&&inputs[0][0];if(!c)return true;
+      let pk=0;for(let i=0;i<c.length;i++){const a=c[i]<0?-c[i]:c[i];if(a>pk)pk=a;}
+      if(this.q&&pk>0.02){this.q=false;this.port.postMessage(currentTime);}
+      else if(!this.q&&pk<0.004){this.q=true;}
+      return true;}}
+    registerProcessor('onset2',O);`;
+  await actx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+  const w = new AudioWorkletNode(actx, 'onset2');
+  const mute = actx.createGain(); mute.gain.value = 0;
+  sourceNode.connect(w); w.connect(mute).connect(actx.destination);
+  w.port.onmessage = () => {
+    if (!earPending) return;
+    ears[earPending.via].push(performance.now() - earPending.t0);
+    earPending = null; report();
+  };
+}
+
 pc.ontrack = async (e) => {
   document.getElementById('out').srcObject = e.streams[0];
   set('a', `${e.track.kind} live`);
@@ -175,6 +200,36 @@ const pDc = document.getElementById('p-dc'), pWs = document.getElementById('p-ws
 const setPath = (v) => { via = v; pDc.classList.toggle('on', v === 'dc'); pWs.classList.toggle('on', v === 'ws'); };
 pDc.onclick = () => setPath('dc');
 pWs.onclick = () => setPath('ws');
+
+// WHICH WAY THE SOUND COMES BACK. WebRTC's cushion is the browser's and cannot
+// be hinted; MoQ's floor is ours, so latency becomes a number we choose. The
+// catch on a LAN is that MoQ routes through Cloudflare, so its transit is ~34 ms
+// where the direct WebRTC path's is ~0 -- it wins anyway only because the
+// cushion is bigger than the detour.
+window.__return = 'rtc';
+const rRtc = document.getElementById('r-rtc'), rMq = document.getElementById('r-mq');
+const out = document.getElementById('out');
+let moq = null;
+const setReturn = async (v) => {
+  window.__return = v;
+  rRtc.classList.toggle('on', v === 'rtc');
+  rMq.classList.toggle('on', v === 'mq');
+  out.muted = v !== 'rtc';
+  if (v === 'mq' && !moq) {
+    rMq.textContent = 'connecting to MoQ …';
+    try {
+      const { subscribeSynth } = await import('./moq-audio.mjs');
+      const ac2 = new AudioContext(); await ac2.resume().catch(() => {});
+      moq = await subscribeSynth({ ac: ac2, ns: `proinst-${ROOM}`, floorMs: 10, log: (m) => console.log('[moq]', m) });
+      attachOnset(ac2, moq.node);                    // same detector, other path
+      setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
+      rMq.textContent = 'sound back over MoQ';
+    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc'; }
+  }
+  if (moq) moq.node.gain != null && 0;              // playout runs regardless; muting is on the element
+};
+rRtc.onclick = () => setReturn('rtc');
+rMq.onclick = () => setReturn('mq');
 
 NOTES.forEach((n, i) => {
   const b = document.createElement('button');
