@@ -80,6 +80,33 @@ it is a floor worth having rather than a claim.
 sample over threshold, so the onset is sample-accurate. Polling an analyser in
 rAF would quantise an 84 ms answer to a frame.
 
+## Why the relay costs 71 ms — it is geography, not the Durable Object
+
+The obvious suspicion is that the relay's compute is the cost. It is not, and
+`edge-rtt.mjs` separates the two: `ping`→`pong` is answered by the Worker
+RUNTIME's hibernation autoresponse and never wakes the Durable Object, so it is
+pure network; an echo makes the identical trip THROUGH the object.
+
+| | typical | worst 1 in 20 | n |
+|---|---|---|---|
+| this Mac → Cloudflare edge → back | **34.19 ms** | 37.93 ms | 60 |
+| the same trip through the Durable Object | **34.37 ms** | 38.99 ms | 60 |
+| **the Durable Object itself** | **0.18 ms** | | |
+
+**0.18 ms of 71 is a quarter of one percent.** A note to the Pro is TWO of those
+trips — out to the edge and down to the Pro, then the receipt back up and down
+to me — so the prediction is 2 x 34.37 = **68.7 ms** against **71.00 ms**
+observed, the ~2 ms gap being the synth's own handling.
+
+So a machine three metres away is 71 ms away because every message goes to a
+Cloudflare edge and back, twice. The relay is not slow; the route is long. Which
+is also why no amount of tuning the relay would help, and why the direct link
+exists.
+
+(Session 14 measured the same hop at 0.8–1.6 ms against a busier room; 0.18 ms
+here is one warm object with one other socket in it. Either way it is noise
+beside the trip.)
+
 **The sound's own delay is not the network.** The browser holds a cushion of
 audio so that unevenly-arriving packets still play smoothly; it read **30–44 ms**
 across runs here with zero packets lost, and it adapts — a clean LAN gives it
