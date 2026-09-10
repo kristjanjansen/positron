@@ -50,13 +50,20 @@ CroneEngine {
 
 	// Not part of norns' interface — this is how a caller without Lua invokes
 	// a registered command.
+	//
+	// ⚠️ The handler is given an ARRAY, and its first argument is msg[1], not
+	// msg[0] — norns passes the OSC message with the command name still in
+	// slot 0. Engines are written against that: Pappus does
+	//     addCommand("amp", "f", { arg msg; synth.set(\amp, msg[1]) })
+	// so passing the arguments directly gets `Message 'at' not understood` on
+	// an Integer. Rebuild the shape norns would have sent.
 	cmd { arg name ... args;
 		var f = commands[name.asSymbol];
 		if(f.isNil, {
 			("CroneEngine: no command '" ++ name ++ "'").postln;
 			^nil;
 		});
-		^f.valueArray(args);
+		^f.value([name.asString] ++ args);
 	}
 
 	listCommands {

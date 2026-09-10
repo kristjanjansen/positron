@@ -101,6 +101,7 @@ export function startFluid({ soundfont = DEFAULT_SF, gain = 0.6, polyphony = 64,
 
   return {
     proc: p,
+    soundfont,
     // `select <chan> <sfont> <bank> <prog>` — sfont 1 is the first one loaded.
     // This is the whole multitimbral surface: one call per channel, and the
     // sixteen channels are then sixteen instruments.
