@@ -263,7 +263,37 @@ find <text>`, `/live/browser/load <track> <name>`. A track with no device makes
 no sound however well the MIDI arrives, and nothing else in the OSC surface can
 load one.
 
-### The four clicks that remain
+### Three of the four "clicks" were not clicks
+
+**1. The Live restart is not needed.** `/live/api/reload` DOES rebuild the
+handler list — it calls `clear_api()` then `init_api()`. What it reloads is
+`abletonosc/*` and **not `manager.py`**, so a handler added to manager's list
+needs a restart while one registered from inside an already-reloaded module does
+not. `install-hook.py` appends the registration to `ViewHandler.init_api`, which
+is re-run on every reload. Live never restarted, and it refuses AppleScript
+`quit` anyway (AppleEvent timeout — a dialog it will not describe).
+
+**2. IAC became visible to Live by itself** once the port existed and the API
+reloaded. Its input routing list went from
+`All Ins | Computer Keyboard | 2-MIDI | No Input` to including
+`IAC Driver (Bus 1)`.
+
+**3. The instrument loads over OSC.** `/live/browser/load 0 Drift` →
+`[0,"Drift","loaded"]`, and the track renamed itself `1-Drift`. Live's browser
+reports `Drift, Drum Rack, Drum Synth, External Instrument, Impulse, Instrument
+Rack, Simpler`.
+
+### What is genuinely left
+
+- **Track routing**: input → `IAC Driver (Bus 1)`, arm, monitor In. All three are
+  OSC-able (`/live/track/set/{input_routing_type,arm,current_monitoring_state}`)
+  — the commands were in flight when the machine dropped off the network.
+- **Live's audio output device → BlackHole 2ch.** This one looks genuinely
+  manual: Live's Object Model has no audio-device API, so neither AbletonOSC nor
+  an extension can reach it. Live's `Preferences.cfg` is an undocumented binary
+  and not somewhere to guess.
+
+### The four clicks, as originally written
 
 1. **Restart Live.** `/live/api/reload` logs "Reloaded code" but does NOT rebuild
    the handler list, so the new browser handler is still `Unknown OSC address`.
