@@ -89,3 +89,4 @@ ws.onmessage = async (e) => {
   if (m.type === 'here' && pc.localDescription) send({ type: 'offer', sdp: pc.localDescription.sdp });
 };
 window.__play = { note, rtts };
+</script>
