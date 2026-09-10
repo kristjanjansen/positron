@@ -33,6 +33,11 @@ function decode(buf) {
     if (t === 'i') { out.push(buf.readInt32BE(o)); o += 4; }
     else if (t === 'f') { out.push(buf.readFloatBE(o)); o += 4; }
     else if (t === 's') out.push(rs());
+    // T/F/N carry NO payload -- the tag IS the value. Skipping them silently is
+    // how `arm` read back as an empty answer while being perfectly set.
+    else if (t === 'T') out.push(true);
+    else if (t === 'F') out.push(false);
+    else if (t === 'N') out.push(null);
   }
   return { addr, args: out };
 }
