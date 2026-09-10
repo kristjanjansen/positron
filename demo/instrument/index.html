@@ -72,7 +72,7 @@
     down.add(k);
     keyEls.get(k)?.classList.add('down');
     play(noteOf(k), 100);
-    send({ t: 'on', note: noteOf(k), vel: 100, at: Date.now(), src: fromMidi ? 'midi' : 'touch' });
+    send({ type: 'on', note: noteOf(k), vel: 100, at: Date.now(), src: fromMidi ? 'midi' : 'touch' });
     sent++;
     d.set('sent', sent);
   }
@@ -81,7 +81,7 @@
     down.delete(k);
     keyEls.get(k)?.classList.remove('down');
     stop(noteOf(k));
-    send({ t: 'off', note: noteOf(k), at: Date.now() });
+    send({ type: 'off', note: noteOf(k), at: Date.now() });
   }
 
   const live = new Map();
@@ -108,14 +108,14 @@
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID) return;                    // the relay echoes to us too
       const key = Object.keys(KEYMAP).find((k) => noteOf(k) === m.note);
-      if (m.t === 'on') {
+      if (m.type === 'on') {
         received++;
         if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('latency', lat[lat.length - 1]); }
         d.set('received', received);
         play(m.note, m.vel ?? 100);
         if (key) keyEls.get(key)?.classList.add('remote');
         srcEl.innerHTML = `<b>${m.from}</b> played note ${m.note} (${m.src ?? '?'})`;
-      } else if (m.t === 'off') {
+      } else if (m.type === 'off') {
         stop(m.note);
         if (key) keyEls.get(key)?.classList.remove('remote');
       }
@@ -158,7 +158,7 @@
     d.assert('relay open', ws?.readyState === 1, String(ws?.readyState));
     d.assert('midi state reported honestly', d.api.readout.midi !== null, String(d.api.readout.midi));
     // the claim in the title: no raw MIDI on the wire
-    d.assert('the wire carries note numbers, not MIDI bytes', true, '{t, note, vel, at}');
+    d.assert('the wire carries note numbers, not MIDI bytes', true, '{type, note, vel, at}');
     d.log(`open again with ?room=${ROOM} to play into another browser`);
   });
 

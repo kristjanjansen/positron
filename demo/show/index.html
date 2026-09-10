@@ -235,7 +235,7 @@
     const send = (o) => ws.readyState === 1 && ws.send(JSON.stringify({ ...o, from: ID }));
     const wire = (peer, pc) => {
       peers.set(peer, pc);
-      pc.onicecandidate = (e) => e.candidate && send({ t: 'ice', to: peer, c: e.candidate });
+      pc.onicecandidate = (e) => e.candidate && send({ type: 'ice', to: peer, c: e.candidate });
       pc.onconnectionstatechange = () => d.log(`peer ${peer}: ${pc.connectionState}`);
       pc.ontrack = (e) => peerTile(peer).srcObject = e.streams[0];
       for (const t of srcStream.getTracks()) pc.addTrack(t, srcStream);
@@ -246,15 +246,15 @@
       wire(peer, pc);
       const o = await pc.createOffer();
       await pc.setLocalDescription(o);
-      send({ t: 'offer', to: peer, sdp: o.sdp });
+      send({ type: 'offer', to: peer, sdp: o.sdp });
     };
-    ws.onopen = () => { d.log(`offering this show to room ${ROOM} as ${ID}`); send({ t: 'hello' }); };
+    ws.onopen = () => { d.log(`offering this show to room ${ROOM} as ${ID}`); send({ type: 'hello' }); };
     ws.onmessage = async (e) => {
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m.from === ID || (m.to && m.to !== ID)) return;
-      if (m.t === 'hello') { send({ t: 'here' }); offerTo(m.from); return; }
-      if (m.t === 'here') { offerTo(m.from); return; }
-      if (m.t === 'offer') {
+      if (m.type === 'hello') { send({ type: 'here' }); offerTo(m.from); return; }
+      if (m.type === 'here') { offerTo(m.from); return; }
+      if (m.type === 'offer') {
         // Glare: both sides offer on hello/here. Whoever's id sorts lower keeps
         // its own offer; the other drops it and answers, so exactly one
         // negotiation survives instead of two half-built ones.
@@ -265,15 +265,15 @@
         await pc.setRemoteDescription({ type: 'offer', sdp: m.sdp });
         const a = await pc.createAnswer();
         await pc.setLocalDescription(a);
-        send({ t: 'answer', to: m.from, sdp: a.sdp });
+        send({ type: 'answer', to: m.from, sdp: a.sdp });
         return;
       }
-      if (m.t === 'answer') {
+      if (m.type === 'answer') {
         const pc = peers.get(m.from);
         if (pc?.signalingState === 'have-local-offer') await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp });
         return;
       }
-      if (m.t === 'ice') { try { await peers.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
+      if (m.type === 'ice') { try { await peers.get(m.from)?.addIceCandidate(m.c); } catch { /* late */ } }
     };
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
   }

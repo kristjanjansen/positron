@@ -128,7 +128,7 @@ await A.key('keyDown', ' '); await A.key('keyUp', ' ');       // pedal: commit +
 await sleep(1200);
 
 const aState = await A.evalJs(`(() => { const L = window.__L;
-  return { ...L.looper.stats(), sent: L.peer.log.filter(x => x.t === 'layer-sent') }; })()`);
+  return { ...L.looper.stats(), sent: L.peer.log.filter(x => x.type === 'layer-sent') }; })()`);
 ok('P3', aState.layers === 1 && aState.sent.length === 1,
   `alice committed a layer of ${aState.notes} notes and published it ONCE — ${aState.sent[0].bytes} B on the wire, for a ${f(aState.loopMs, 0)} ms loop`);
 
