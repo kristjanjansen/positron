@@ -168,6 +168,8 @@ export const DEMOS = [
 export const NOTES = [
   { doc: 'uuu-positron', title: 'positron and U:',
     one: 'two answers to one problem, where they already agree, and six ways to cowork' },
+  { doc: 'hardware-box', title: 'an instrument in a box',
+    one: 'what the smallest machine is that can be the instrument at the far end' },
 ];
 
 export const bySlug = (name) => DEMOS.find((d) => d.name === name);
