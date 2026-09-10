@@ -10,19 +10,20 @@ b{color:#ffd400} kbd{background:#161b22;padding:.1rem .4rem;border-radius:3px}
 table{border-collapse:collapse;margin-top:1rem}td{padding:.15rem .8rem .15rem 0}
 </style>
 <h3>play it — the Pro is the instrument</h3>
-<p>Press <kbd>a s d f g h j k</kbd> or click. Notes go over a <b>DataChannel</b>
-(measured 0.56 ms on the jam rig); the sound comes back as a WebRTC audio track.
-<b>The round trip you hear is mostly NetEQ's jitter buffer</b> — measured at
-98.6% of it — not the network, which is why a LAN sounds much like the internet
-here.</p>
+<p>Press <kbd>a s d f g h j k</kbd> or click. The key press goes straight to the
+Pro over a direct link; the sound is made there and comes back as live audio.
+<b>Most of the delay you hear is the cushion the browser keeps</b> so that audio
+arriving unevenly still plays smoothly — measured at 98.6% of the round trip,
+which is why a machine in the same room sounds much like one across the country.
+The cushion is reported below; it cannot be switched off.</p>
 <div id="keys"></div>
 <table>
 <tr><td>relay</td><td id="r">—</td></tr>
 <tr><td>ice</td><td id="i">—</td></tr>
-<tr><td>datachannel</td><td id="d">—</td></tr>
-<tr><td>audio track</td><td id="a">—</td></tr>
-<tr><td>note → ack (control leg)</td><td id="rtt">—</td></tr>
-<tr><td>jitter buffer</td><td id="jb">—</td></tr>
+<tr><td>direct link</td><td id="d">—</td></tr>
+<tr><td>sound coming back</td><td id="a">—</td></tr>
+<tr><td>key press → the Pro and back</td><td id="rtt">—</td></tr>
+<tr><td>the browser’s audio cushion</td><td id="jb">—</td></tr>
 </table>
 <audio id="out" autoplay></audio>
 <script type="module">
