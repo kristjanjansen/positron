@@ -58,6 +58,22 @@ destabilised an SFU run from 116 to 235 ms). This is why a machine in the same
 room sounds much like one across the country: the cushion, not the distance,
 owns the number.
 
+## What makes the sound
+
+A **triangle-wave oscillator with a 5 ms attack and a 450 ms decay**, built in
+Web Audio inside a headless Chrome on the instrument machine — about fifteen
+lines in `synth.html`. It feeds a `MediaStreamDestination`, and that stream is
+the outgoing WebRTC audio track. A near-silent `ConstantSourceNode` sits on the
+same bus on purpose: Chrome hands a bus it has decided is silent an EMPTY buffer,
+and a sender treats a dead track as nothing to send.
+
+**It is not Ableton.** Live 11 and BlackHole 2ch are installed on that machine
+and untouched here. Capturing BlackHole instead of synthesising — so Live is the
+instrument and this is only the transport — is the next step, and it needs a way
+in for the notes: Live's transport is clocked by its audio engine, and
+`is_playing` reports intent rather than delivery (a `current_song_time` that
+does not move is the only proof the clock stopped).
+
 ## What is NOT measured here
 
 - **Off-LAN.** `iceServers` is empty on purpose — host candidates only, right for

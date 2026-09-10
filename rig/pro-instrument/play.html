@@ -4,6 +4,12 @@
 <style>
 body{font:14px ui-monospace,monospace;background:#0d1017;color:#c9d1d9;padding:2rem;max-width:44rem}
 b{color:#ffd400} kbd{background:#161b22;padding:.1rem .4rem;border-radius:3px}
+#path{display:flex;gap:6px;margin:1rem 0 .5rem}
+#path button{padding:.45rem .9rem;background:#161b22;color:#8b949e;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
+#path button.on{background:#ffd400;color:#0d1017;border-color:#ffd400}
+#cmp{padding:.45rem .9rem;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
+#cmp:disabled{opacity:.5;cursor:default}
+#prog{color:#8b949e;margin-left:.8rem}
 #keys{display:flex;gap:4px;margin:1rem 0}
 #keys button{flex:1;height:88px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
 #keys button:active{background:#ffd400;color:#0d1017}
@@ -20,7 +26,13 @@ Pro over a direct link; the sound is made there and comes back as live audio.
 arriving unevenly still plays smoothly — measured at 98.6% of the round trip,
 which is why a machine in the same room sounds much like one across the country.
 The cushion is reported below; it cannot be switched off.</p>
+<div id="path">
+  <button id="p-dc" class="on">notes go direct</button>
+  <button id="p-ws">notes go via the relay</button>
+</div>
 <div id="keys"></div>
+<button id="cmp">Compare both — 100 presses each</button>
+<span id="prog"></span>
 <table>
 <tr><td>connection to the Pro</td><td id="i">—</td></tr>
 <tr><td>handshake channel</td><td id="r">—</td></tr>
@@ -82,11 +94,13 @@ const note = (n, via = 'dc') => {
   const id = ++seq;
   const body = { type: 'note', note: n, vel: 100, seq: id, at: Date.now() };
   if (via === 'dc') {
-    if (dc.readyState !== 'open') return;
+    // A press that goes nowhere must say so. Before the direct link is up this
+    // silently dropped the note and looked like a broken key.
+    if (dc.readyState !== 'open') { set('d', `not open yet (${dc.readyState}) — that press went nowhere`); return; }
     sent.set(id, { t0: performance.now(), via });
     dc.send(JSON.stringify(body));
   } else {
-    if (ws.readyState !== 1) return;
+    if (ws.readyState !== 1) { set('r', 'not open — that press went nowhere'); return; }
     sent.set(id, { t0: performance.now(), via });
     send(body);
   }
@@ -102,12 +116,38 @@ async function sweep(n = 60, gapMs = 120) {
   return { dc: rtts.dc.length, ws: rtts.ws.length };
 }
 
+// WHICH PATH THE KEYS USE. The comparison table below is the measurement; this
+// switch is so you can hear the difference, which is the part a number cannot
+// give you -- 6 ms and 69 ms feel nothing alike under the fingers.
+let via = 'dc';
+const pDc = document.getElementById('p-dc'), pWs = document.getElementById('p-ws');
+const setPath = (v) => { via = v; pDc.classList.toggle('on', v === 'dc'); pWs.classList.toggle('on', v === 'ws'); };
+pDc.onclick = () => setPath('dc');
+pWs.onclick = () => setPath('ws');
+
 NOTES.forEach((n, i) => {
   const b = document.createElement('button');
-  b.textContent = KEYS[i]; b.onclick = () => note(n);
+  b.textContent = KEYS[i]; b.onclick = () => note(n, via);
   document.getElementById('keys').append(b);
 });
-addEventListener('keydown', (e) => { if (e.repeat) return; const i = KEYS.indexOf(e.key); if (i >= 0) note(NOTES[i]); });
+addEventListener('keydown', (e) => { if (e.repeat) return; const i = KEYS.indexOf(e.key); if (i >= 0) note(NOTES[i], via); });
+
+// The measurement, as a control rather than a console incantation. It discards a
+// warm-up because a page that has just started is not the thing being measured:
+// one 2 s stall in the first seconds once made worst-1-in-20 almost the maximum.
+const cmp = document.getElementById('cmp'), prog = document.getElementById('prog');
+cmp.onclick = async () => {
+  cmp.disabled = true;
+  prog.textContent = 'warming up (discarded) …';
+  await sweep(24, 90);
+  rtts.dc.length = 0; rtts.ws.length = 0; report();
+  for (let done = 0; done < 200; done += 20) {
+    prog.textContent = `measuring … ${done} of 200`;
+    await sweep(20, 90);
+  }
+  prog.textContent = `done — ${rtts.dc.length} direct, ${rtts.ws.length} relayed`;
+  cmp.disabled = false;
+};
 
 // The buffer is the story, so report it rather than leaving it implied.
 setInterval(async () => {
