@@ -47,7 +47,12 @@ async function pickOpus(preferUs = 5000) {
  * pacer note below; without it a HEADLESS context free-runs in bursts and the
  * subscriber starves through every retry while everything reports healthy.
  */
-export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, frameUs = 5000, connect = null, log = () => {} }) {
+// groupMs 200 IS THE MEASURED DEFAULT, not a guess. One MoQ group is one QUIC
+// uni-stream, so 50 ms groups opened 20 streams a second and 200 ms opens 5.
+// Swept across both relays, twice each: 50 ms lost 0.8% on the LAN and 2.2% over
+// Cloudflare, 200 ms lost 0.0% on BOTH -- and was also the FASTEST Cloudflare
+// config (73 ms against 76), so it costs nothing to take.
+export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 200, latencyMax = 100, frameUs = 5000, connect = null, log = () => {} }) {
   await import('/proto/jam/moq/www/moq-synth.js');
   await ac.audioWorklet.addModule(WORKLET);
 

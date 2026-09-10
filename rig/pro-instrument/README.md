@@ -275,6 +275,41 @@ throughout, so the control leg is never the story.
 | WebRTC (peer to peer) | 111–128 ms | 114–236 ms | — | clean |
 | MoQ, via Cloudflare | 136 ms | 271 ms | **1133** | **garbled** |
 
+## The loss was the GROUP POLICY, and it costs nothing to fix
+
+Swept both relays, five configs, twice each (`sweep.mjs`), varying one knob at a
+time with the LAN relay as the control on every row:
+
+| relay | config | loss median [spread] | key→ear median [spread] | runs |
+|---|---|---|---|---|
+| lan | baseline (group 50) | 0.8% [0.4–0.8] | 60 ms [60–60] | 2 |
+| lan | retain 300 | 0.7% [0.5–0.7] | 63 ms [60–63] | 2 |
+| lan | **group 200** | **0.0%** | **60 ms** | 1 |
+| lan | frame 10 ms | 0.0% | 63 ms | 2 |
+| lan | frame 20 ms | 0.0% | 64 ms | 1 |
+| cf | baseline (group 50) | 2.2% [1.8–2.2] | 76 ms [73–76] | 2 |
+| cf | retain 300 | **no valid run** | | 0 |
+| cf | **group 200** | **0.0%** | **73 ms** [71–73] | 2 |
+| cf | frame 10 ms | 3.8% [2.3–3.8] | 118 ms | 2 |
+| cf | frame 20 ms | 1.5% [0.7–1.5] | 83 ms | 2 |
+
+**`groupMs: 200` is zero-loss on BOTH relays and simultaneously the fastest
+Cloudflare config.** There is no trade to weigh — it is now the default. One MoQ
+group is one QUIC uni-stream, so 50 ms opened twenty streams a second where
+200 ms opens five.
+
+Two results worth keeping because they are counter-intuitive:
+
+- **A longer Opus frame is not simply safer.** 10 ms frames were WORSE over
+  Cloudflare than 5 ms (3.8% against 2.2%) and cost 42 ms of latency (118 ms
+  against 76). Only on the LAN did bigger frames help. Frame size and group size
+  are not the same lever.
+- **`retain 300` produced no valid run over Cloudflare at all** — both attempts
+  decoded too few frames to be a sample, while every other config on the same
+  relay worked twice. Two consecutive failures at one setting is a signal, not a
+  gap in the table; a longer retention window may be actively breaking the
+  subscription. NOT explained.
+
 ⚠️ **CORRECTED — the 31% loss did NOT reproduce.** Two later runs at the
 identical config gave **3.9%** (185 gaps of 4796) and **2.4%** (114 of 4808),
 with key→ear 72 and 73 ms. So Cloudflare is **~14 ms slower than the LAN relay
