@@ -78,6 +78,13 @@ const FILES = [
   ['proto/looper/peer.mjs', 'proto/looper/peer.mjs'],
   ['proto/looper/onset-worklet.js', 'proto/looper/onset-worklet.js'],
 
+  // MoQ audio return (shell/moq-audio.mjs). The wrapper and the PCM worklets
+  // live under proto/jam because that is where they were measured (session 6i,
+  // 35.8 ms key->ear); the shell module is the only consumer and the build
+  // refuses it if these are missing, which is how they got listed at all.
+  ['proto/jam/moq/www/moq-synth.js', 'proto/jam/moq/www/moq-synth.js'],
+  ['proto/jam/playout-worklet.js', 'proto/jam/playout-worklet.js'],
+
   // ── the demo sequence (plan-demos.md) ─────────────────────────────────────
   // strip.mjs is REQUIRED here: every Act 0 demo imports it, and
   // proto/megatimeline/index.html has imported /timeline/strip.mjs since

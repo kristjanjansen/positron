@@ -156,9 +156,9 @@ if (INSTRUMENT === 'ableton') {
 
 // The MoQ arm, published continuously beside the WebRTC one so a listener can
 // switch between them and hear the SAME instrument two ways.
-import('./moq-audio.mjs').then(async ({ publishSynth }) => {
+import('/shell/moq-audio.mjs').then(async ({ publishSynth }) => {
   try {
-    const { pinned } = await import('./moq-audio.mjs');
+    const { pinned } = await import('/shell/moq-audio.mjs');
     const pub = await publishSynth({
       ac, bus, msDest: dest, ns: MOQ_NS, log,
       latencyMax: LATENCY_MAX, groupMs: GROUP_MS, frameUs: FRAME_US,
