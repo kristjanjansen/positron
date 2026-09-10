@@ -47,7 +47,7 @@ async function pickOpus(preferUs = 5000) {
  * pacer note below; without it a HEADLESS context free-runs in bursts and the
  * subscriber starves through every retry while everything reports healthy.
  */
-export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, connect = null, log = () => {} }) {
+export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 50, latencyMax = 100, frameUs = 5000, connect = null, log = () => {} }) {
   await import('/proto/jam/moq/www/moq-synth.js');
   await ac.audioWorklet.addModule(WORKLET);
 
@@ -70,7 +70,7 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
   const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false, latencyMax, connect });
   log(`moq publishing "${ns}" (relay ${pub.version ?? '?'}, retains ${latencyMax} ms)`);
 
-  const cfg = await pickOpus();
+  const cfg = await pickOpus(frameUs);
   const st = { seq: 0, published: 0, bytes: 0, errors: 0, frameUs: cfg.opus?.frameDuration ?? 20000 };
   let groupStart = null;
 

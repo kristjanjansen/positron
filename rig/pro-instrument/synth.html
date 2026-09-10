@@ -38,6 +38,13 @@ const MOQ_CERT = Q.get('moqCert') || null;                // sha-256 hex of the 
 const INSTRUMENT = Q.get('instrument') || 'internal';
 const MIDI_PORT = Q.get('midiPort') || 'IAC Driver Bus 1';
 const AUDIO_IN = Q.get('audioIn') || 'BlackHole';
+// The three knobs that separate WHY a relay loses frames. latencyMax is the
+// window the relay RETAINS; groupMs is how often a new MoQ group (and so a new
+// QUIC uni-stream) starts; frameUs is the Opus frame duration, which sets how
+// many frames a second there are to lose.
+const LATENCY_MAX = Number(Q.get('latencyMax') || 100);
+const GROUP_MS = Number(Q.get('groupMs') || 50);
+const FRAME_US = Number(Q.get('frameUs') || 5000);
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[synth]', m); };
 
 const ac = new AudioContext({ latencyHint: 'interactive' });
@@ -154,9 +161,11 @@ import('./moq-audio.mjs').then(async ({ publishSynth }) => {
     const { pinned } = await import('./moq-audio.mjs');
     const pub = await publishSynth({
       ac, bus, msDest: dest, ns: MOQ_NS, log,
+      latencyMax: LATENCY_MAX, groupMs: GROUP_MS, frameUs: FRAME_US,
       ...(MOQ_RELAY_PUB ? { relay: MOQ_RELAY_PUB } : {}),
       ...(MOQ_CERT ? { connect: pinned(MOQ_CERT) } : {}),
     });
+    log(`moq config: retains ${LATENCY_MAX} ms · group ${GROUP_MS} ms · frame ${FRAME_US / 1000} ms`);
     setInterval(() => { const st = pub.stats(); log(`moq: ${st.published} frames, ${(st.bytes/1024).toFixed(0)} KiB`); }, 15000);
     window.__synth.moq = pub;
   } catch (e) { log('moq publish FAILED: ' + e.message); }
