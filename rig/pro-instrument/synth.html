@@ -31,6 +31,13 @@ const MOQ_NS = Q.get('ns') || `proinst-${Date.now().toString(36)}`;
 const MOQ_RELAY_PUB = Q.get('moqRelay') || null;          // e.g. https://127.0.0.1:4443
 const MOQ_RELAY_SUB = Q.get('moqRelayFor') || MOQ_RELAY_PUB;   // what players dial
 const MOQ_CERT = Q.get('moqCert') || null;                // sha-256 hex of the DER
+// ?instrument=ableton makes this page a BRIDGE rather than a synth: notes go out
+// of a MIDI port into Live, and Live's audio comes back in through a loopback
+// device. The internal oscillator stays the default so the rig works with no
+// Live, no MIDI port and no audio device configured.
+const INSTRUMENT = Q.get('instrument') || 'internal';
+const MIDI_PORT = Q.get('midiPort') || 'IAC Driver Bus 1';
+const AUDIO_IN = Q.get('audioIn') || 'BlackHole';
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[synth]', m); };
 
 const ac = new AudioContext({ latencyHint: 'interactive' });
@@ -48,7 +55,21 @@ const kg = ac.createGain(); kg.gain.value = 0.0001;
 keepAlive.connect(kg).connect(bus); keepAlive.start();
 log(`audio ${ac.state} @ ${ac.sampleRate} Hz, baseLatency ${(ac.baseLatency*1000).toFixed(1)} ms`);
 
+let midiOut = null;
+function playMidi(note, vel) {
+  // Note-off is SCHEDULED, not hoped for: a dropped note-off is a stuck note,
+  // and the reducer lesson from the looper says the release must not depend on
+  // a later message arriving.
+  midiOut.send([0x90, note, Math.max(1, Math.min(127, vel))]);
+  midiOut.send([0x80, note, 0], performance.now() + 450);
+}
+
 function play(note, vel = 100) {
+  if (INSTRUMENT === 'ableton') {
+    if (!midiOut) { log('no MIDI port yet — note dropped'); return; }
+    playMidi(note, vel);
+    return;
+  }
   const f = 440 * Math.pow(2, (note - 69) / 12);
   const t = ac.currentTime;
   const o = ac.createOscillator(); o.type = 'triangle'; o.frequency.value = f;
@@ -82,6 +103,32 @@ function accept() {
     };
   };
   return pc;
+}
+
+if (INSTRUMENT === 'ableton') {
+  // OUT: notes to Live over a MIDI port.
+  navigator.requestMIDIAccess({ sysex: false }).then((a) => {
+    const ports = [...a.outputs.values()];
+    midiOut = ports.find((o) => o.name.includes(MIDI_PORT)) || null;
+    log(midiOut ? `midi out: ${midiOut.name}` : `midi out: NO PORT matching "${MIDI_PORT}" (ports: ${ports.map((o) => o.name).join(', ') || 'none'})`);
+  }).catch((e) => log('midi denied: ' + e.message));
+
+  // IN: Live's audio, through a loopback device, onto the SAME bus the internal
+  // synth would have used -- so the WebRTC track and the MoQ publisher are fed
+  // by one source either way and nothing downstream has to know which.
+  navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+  }).then(async (probe) => {
+    probe.getTracks().forEach((t) => t.stop());            // permission first, then labels
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const dev = devs.find((d) => d.kind === 'audioinput' && d.label.includes(AUDIO_IN));
+    if (!dev) { log(`audio in: NO DEVICE matching "${AUDIO_IN}" (${devs.filter((d) => d.kind === 'audioinput').map((d) => d.label).join(', ') || 'none'})`); return; }
+    const st = await navigator.mediaDevices.getUserMedia({
+      audio: { deviceId: { exact: dev.deviceId }, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+    ac.createMediaStreamSource(st).connect(bus);
+    log(`audio in: ${dev.label}`);
+  }).catch((e) => log('audio in denied: ' + e.message));
 }
 
 // The MoQ arm, published continuously beside the WebRTC one so a listener can
