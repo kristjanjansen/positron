@@ -19,10 +19,15 @@ better half of the link. Both are ROUND TRIPS timed on one machine, so no clock
 agreement is involved and none of the number is skew — which is the only reason
 the two are comparable.
 
-| control path | p50 | p95 | max | min | n |
+| control path | typical | worst 1 in 20 | slowest | quickest | presses |
 |---|---|---|---|---|---|
-| direct peer-to-peer link | **6.50 ms** | 10.70 | 12.50 | 4.50 | 60 |
-| via the Cloudflare relay | **72.70 ms** | 96.90 | 149.80 | 63.20 | 60 |
+| direct peer-to-peer link | **6.50 ms** | 10.70 ms | 12.50 ms | 4.50 ms | 60 |
+| via the Cloudflare relay | **72.70 ms** | 96.90 ms | 149.80 ms | 63.20 ms | 60 |
+
+**Typical** is the middle press — half were quicker. **Worst 1 in 20** is the
+level 19 presses out of 20 came in under, which is what says whether the slow
+ones are rare or routine. A median alone hides the one bad press, and that press
+is usually the reason to look.
 
 **The relay costs 11.2x the direct link**, and the shape says why: a machine
 three metres away is reached by going out to Cloudflare's edge and back down,
