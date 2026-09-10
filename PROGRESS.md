@@ -7,6 +7,60 @@ and MoQ from the SAME source, driven entirely over obs-websocket from this Mac.
 Two background agents closed **0aa** (Csound's section-local `t`) and **0a**
 (the `t` → `type` sweep) in parallel.
 
+### The Pro as an instrument, and Ableton behind it
+
+`rig/pro-instrument/` — a page on the Pro is the instrument, a page here plays
+it. Notes go up a direct peer-to-peer DataChannel; the sound comes back on the
+same connection or over MoQ.
+
+| control path | typical | worst 1 in 20 | over 100 ms |
+|---|---|---|---|
+| direct link | **6.00 ms** | 8.20 ms | **0 of 100** |
+| via the Cloudflare relay | **68.90 ms** | 94.80 ms | **4 of 100** |
+
+**The relay's cost is geography, not compute.** `ping`→`pong` is answered by the
+worker runtime and never wakes the Durable Object: 34.19 ms, against 34.37 ms
+for the same trip THROUGH it. **The object costs 0.18 ms** — a quarter of one
+percent. A note is two such trips, predicting 68.7 against 71.00 measured.
+
+| sound comes back over | typical | worst 1 in 20 |
+|---|---|---|
+| WebRTC | **86 ms** | 91 ms |
+| **MoQ, relay on the LAN** | **29 ms** | 34 ms |
+
+Round trips on ONE clock, so no skew is in them. **Three times faster, and the
+cushion is why** — WebRTC's 86 ms is mostly a buffer the browser will not let
+you set; 29 ms is a floor we chose plus a relay in the same room.
+
+**A negative latency, and what it meant.** MoQ transit read **−14.2 ms**. The
+send stamp is the instrument machine's clock and the read is the player's, so
+the figure is transit PLUS the offset between two clocks, and the offset was the
+larger term. Only the DIFFERENCE is valid (LAN saves ~53.8 ms against
+Cloudflare). HANDOFF item 0 arriving in practice.
+
+**Defects found, each reporting perfect health while wrong**: `latencyMax`
+defaults to 2000 ms so a joining subscriber drains a two-second backlog (transit
+started at 2030 ms and counted down, decode 4417/4417, underruns 0); a same-name
+rejoin **bricks a draft-14 namespace** (RUNBOOK 13.4 — 1851 frames published,
+every subscriber `code=4 Track not found`); and the notes leg was a **duplicate
+offer**, the second `accept()` closing the connection the first was completing.
+
+**Ableton, almost entirely without clicking.** The **IAC driver enabled from the
+CLI** (`devices:0:offline`, PlistBuddy, `killall MIDIServer`) — zero MIDI ports
+to `IAC Driver Bus 1`, surviving reboots. **`browser.py` adds Live's browser to
+AbletonOSC**, registered from `view.py` because `/live/api/reload` reloads
+`abletonosc/*` and NOT `manager.py` — so no Live restart. `live-setup.mjs` then
+loads Drift, routes IAC, arms and monitors In from the other machine.
+
+⚠️ **Paused with the BlackHole capture unresolved** — it logs neither success
+nor failure, so `getUserMedia` is PENDING, not refused.
+
+**Two traps re-earned.** `grep` printed nothing for "IAC" in the MIDI config
+because it holds NUL bytes. And **Live blocked 20 minutes on a crash-recovery
+dialog**, diagnosed by LESSONS #47's tell — its log had written **zero** lines.
+Accessibility now makes system modals scriptable, but **Live's own UI is opaque
+to it**, so its audio device stays a one-time manual setting.
+
 ### The rig
 
 `rig/obs-pro/` — `source.html` (the OBS picture), `serve.mjs` (serves it over

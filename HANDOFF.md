@@ -76,6 +76,42 @@ early, so neither had a closing `</script>` and neither module ever ran, with
 one, and the only console line was a favicon 404. I read "page returns 200 with
 the right URL" as "page works". `window.__play === undefined` is the check.
 
+**The Pro became a playable instrument, and then an Ableton bridge.**
+`rig/pro-instrument/` — notes up a direct peer link, sound back on the same
+connection. **86 ms → 29 ms key→ear** once a **self-hosted MoQ relay** went on
+the LAN (`moq-relay-ietf`, built there in 90 s; 10-day ECDSA cert pinned by the
+page via `serverCertificateHashes`, because Chrome refuses anything over 14
+days). The control leg is 6.10 ms and is **7% of what you hear** — the cushion
+is the whole cost, which is why MoQ and not tuning.
+
+**The relay's 71 ms is geography, not the Durable Object**: `ping`→`pong` (the
+runtime's autoresponse, never wakes the object) 34.19 ms against 34.37 ms
+through it — **the DO costs 0.18 ms**. A note is two such trips, predicting
+68.7 ms against 71.00 observed.
+
+**Ableton Live is wired in, and almost none of it needed clicking.** The **IAC
+MIDI driver is enabled from the command line** — `devices:0:offline` in
+`Default.mcfg` via PlistBuddy plus `killall MIDIServer`, which closes the "Yours
+alone" MIDI item and survives reboots. **`abletonosc-ext/browser.py` adds what
+AbletonOSC lacks** — Live's browser — registered from `view.py` because
+`/live/api/reload` reloads `abletonosc/*` but NOT `manager.py`, so no Live
+restart is needed. With it, `live-setup.mjs` loads Drift, routes `IAC Driver
+(Bus 1)`, arms and sets monitoring In in one command, from the other machine.
+
+⚠️ **PAUSED with one link open**: the BlackHole capture in the bridge page logs
+neither success nor failure, so `getUserMedia` is PENDING rather than refused —
+a different bug from a permission one, and the same shape as the never-resolving
+`audio.play()`. Everything either side of it works. Full state, and the exact
+commands to bring it all back, in `rig/pro-instrument/README.md`.
+
+**Two platform facts worth keeping.** Accessibility (`sshd-keygen-wrapper` in
+Privacy & Security) makes system modals scriptable — which matters because
+**Live blocked for 20 minutes on a crash-recovery dialog** after a hard restart
+and the tell was LESSONS #47 again: its log had written **zero** lines. But
+**Live's own UI is opaque to the Accessibility API** — its Preferences window
+exposes only close/zoom/minimise — so Live's audio device is genuinely a
+one-time manual setting, and no amount of permission changes that.
+
 **Both parallel agents landed.** `csound.mjs` is section-local (0aa closed,
 42/42 self-test, 23/23 oracle against real Csound 6.18), and the `t` → `type`
 sweep is done (0a closed, 413/413, no shim). The sweep's negative control is
