@@ -126,7 +126,11 @@
     return out.join('\n');
   }
 
-  const doc = new URLSearchParams(location.search).get('doc') || 'uuu-positron';
+  // The path IS the address — /notes/hardware-box — and there is no query
+  // fallback. Two ways to name one thing is two things to keep working, and the
+  // one nobody links to is the one that quietly rots.
+  const fromPath = location.pathname.match(/^\/notes\/([a-z0-9-]+)\/?$/);
+  const doc = (fromPath && fromPath[1]) || 'uuu-positron';
   const safe = /^[a-z0-9-]+$/.test(doc) ? doc : 'uuu-positron';
   try {
     const r = await fetch(`/notes/${safe}.md`, { cache: 'no-store' });
