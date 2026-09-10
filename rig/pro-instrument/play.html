@@ -243,10 +243,7 @@ const setReturn = async (v) => {
       await attachOnset(ac2, moq.node);              // same detector, other path
       setInterval(() => { const st = moq.stats(); set('mqJB', `floor ${st.floorMs} ms`); set('mqn', st.frames || '—'); }, 1000);
       rMq.textContent = 'sound back over MoQ';
-    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc';
-// The synth mints its own MoQ namespace per run (fresh-name discipline) and
-// tells us over the relay. Guessing it is how you subscribe to a bricked name.
-let moqNs = null, moqRelay = null, moqCert = null; }
+    } catch (e) { rMq.textContent = 'MoQ failed: ' + e.message; window.__return = 'rtc'; }
   }
   if (moq) moq.node.gain != null && 0;              // playout runs regardless; muting is on the element
 };
