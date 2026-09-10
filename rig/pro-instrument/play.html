@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>pro-instrument — play it</title>
+<style>
+body{font:14px ui-monospace,monospace;background:#0d1017;color:#c9d1d9;padding:2rem;max-width:44rem}
+b{color:#ffd400} kbd{background:#161b22;padding:.1rem .4rem;border-radius:3px}
+#keys{display:flex;gap:4px;margin:1rem 0}
+#keys button{flex:1;height:88px;background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;font:inherit;cursor:pointer}
+#keys button:active{background:#ffd400;color:#0d1017}
+table{border-collapse:collapse;margin-top:1rem}td{padding:.15rem .8rem .15rem 0}
+</style>
+<h3>play it — the Pro is the instrument</h3>
+<p>Press <kbd>a s d f g h j k</kbd> or click. Notes go over a <b>DataChannel</b>
+(measured 0.56 ms on the jam rig); the sound comes back as a WebRTC audio track.
+<b>The round trip you hear is mostly NetEQ's jitter buffer</b> — measured at
+98.6% of it — not the network, which is why a LAN sounds much like the internet
+here.</p>
+<div id="keys"></div>
+<table>
+<tr><td>relay</td><td id="r">—</td></tr>
+<tr><td>ice</td><td id="i">—</td></tr>
+<tr><td>datachannel</td><td id="d">—</td></tr>
+<tr><td>audio track</td><td id="a">—</td></tr>
+<tr><td>note → ack (control leg)</td><td id="rtt">—</td></tr>
+<tr><td>jitter buffer</td><td id="jb">—</td></tr>
+</table>
+<audio id="out" autoplay></audio>
+<script type="module">
+const ROOM = new URLSearchParams(location.search).get('room') || 'proinst';
+const set = (id, v) => document.getElementById(id).textContent = v;
+const NOTES = [60, 62, 64, 65, 67, 69, 71, 72], KEYS = 'asdfghjk';
+
+// LAN ONLY, on purpose: no iceServers means host candidates only. That is the
+// right shape for a machine in the same room and it will NOT traverse a NAT --
+// an internet instrument needs STUN, and a symmetric NAT needs TURN.
+const pc = new RTCPeerConnection({ iceServers: [] });
+pc.addTransceiver('audio', { direction: 'recvonly' });
+pc.oniceconnectionstatechange = () => set('i', pc.iceConnectionState);
+pc.ontrack = (e) => { document.getElementById('out').srcObject = e.streams[0]; set('a', `${e.track.kind} live`); };
+
+const dc = pc.createDataChannel('notes', { ordered: true, maxRetransmits: 0 });
+let seq = 0; const sent = new Map(); const rtts = [];
+dc.onopen = () => set('d', 'open');
+dc.onmessage = (m) => {
+  const msg = JSON.parse(m.data);
+  if (msg.type !== 'ack') return;
+  const t0 = sent.get(msg.seq); if (t0 == null) return;
+  sent.delete(msg.seq); rtts.push(performance.now() - t0);
+  const s = [...rtts].sort((a, b) => a - b);
+  set('rtt', `${s[Math.floor(s.length/2)].toFixed(2)} ms p50 · ${s.at(-1).toFixed(2)} max · n=${s.length}`);
+};
+const note = (n) => {
+  if (dc.readyState !== 'open') return;
+  const id = ++seq; sent.set(id, performance.now());
+  dc.send(JSON.stringify({ type: 'note', note: n, vel: 100, seq: id, at: Date.now() }));
+};
+
+NOTES.forEach((n, i) => {
+  const b = document.createElement('button');
+  b.textContent = KEYS[i]; b.onclick = () => note(n);
+  document.getElementById('keys').append(b);
+});
+addEventListener('keydown', (e) => { if (e.repeat) return; const i = KEYS.indexOf(e.key); if (i >= 0) note(NOTES[i]); });
+
+// The buffer is the story, so report it rather than leaving it implied.
+setInterval(async () => {
+  const st = await pc.getStats();
+  st.forEach((r) => {
+    if (r.type === 'inbound-rtp' && r.kind === 'audio' && r.jitterBufferDelay != null && r.jitterBufferEmittedCount) {
+      set('jb', `${(1000 * r.jitterBufferDelay / r.jitterBufferEmittedCount).toFixed(1)} ms · ${r.packetsLost ?? 0} lost`);
+    }
+  });
+}, 1000);
+
+const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
+const send = (o) => ws.send(JSON.stringify({ from: 'play', at: Date.now(), ...o }));
+ws.onopen = async () => {
+  set('r', `open (${ROOM})`);
+  const o = await pc.createOffer(); await pc.setLocalDescription(o);
+  await new Promise((r) => pc.iceGatheringState === 'complete' ? r()
+    : pc.addEventListener('icegatheringstatechange', () => pc.iceGatheringState === 'complete' && r()));
+  send({ type: 'offer', sdp: pc.localDescription.sdp });
+};
+ws.onmessage = async (e) => {
+  const m = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
+  if (m.from === 'play') return;
+  if (m.type === 'answer') { await pc.setRemoteDescription({ type: 'answer', sdp: m.sdp }); set('r', 'answered'); }
+  if (m.type === 'here' && pc.localDescription) send({ type: 'offer', sdp: pc.localDescription.sdp });
+};
+window.__play = { note, rtts };
