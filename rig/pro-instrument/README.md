@@ -132,7 +132,26 @@ in for the notes: Live's transport is clocked by its audio engine, and
 `is_playing` reports intent rather than delivery (a `current_song_time` that
 does not move is the only proof the clock stopped).
 
-## The MoQ return: transport proven, key→ear NOT yet captured
+## The result: 86 ms → 29 ms, measured
+
+Same instrument, same notes, two ways back. 30 notes each, and these are ROUND
+TRIPS ON ONE CLOCK — pressed here, heard here — so unlike the transit figures
+there is no clock offset anywhere in them.
+
+| sound comes back over | typical | worst 1 in 20 | notes |
+|---|---|---|---|
+| WebRTC | **86 ms** | 91 ms | 30 |
+| **MoQ, relay on the LAN** | **29 ms** | 34 ms | 30 |
+
+with the receipt (the message telling the Pro to play) at **6.10 ms**, and MoQ
+decoding 3713 frames with **0 underruns**.
+
+**Three times faster, and the reason is the cushion, not the wire.** WebRTC's
+86 ms is mostly a buffer the browser owns and will not let you set; MoQ's 29 ms
+is a floor we chose (10 ms) plus a relay in the same room. It also beats
+`proto/jam`'s 35.8 ms, which was the same idea routed through Cloudflare.
+
+## How the MoQ return is built
 
 `moq-audio.mjs` publishes the synth bus as Opus over MoQ beside the WebRTC track
 (same bus, so it is one instrument heard two ways) and subscribes with our own
@@ -140,13 +159,14 @@ playout ring. **What is measured:** the subscription goes live, decode is clean
 (4417 of 4417, then 2156 of 2156), underruns 0, and **transit settled at
 37–40 ms typical**.
 
-**What is NOT measured: key→ear over MoQ.** Do not quote a number for it; there
-isn't one. The blocker is not MoQ — it is that after many rapid restarts of the
-headless synth the WebRTC pairing that carries the NOTES stops completing, so no
-note is played and nothing sounds on either return. A fresh page meeting a fresh
-synth works (6.00 ms receipts, 84 ms key→ear, measured repeatedly).
+**The notes leg was a duplicate-offer race**, now fixed: the player offered on
+socket-open AND again on the synth's announcement, so the synth accepted twice
+and its second accept closed the connection the first was still completing. A
+fresh page survived it on timing; a restart did not. The handshake is now
+hello → here → exactly one offer, and a NEW announced name is what triggers
+re-offering, so either side can restart.
 
-Two real defects were found and fixed on the way, both of which reported perfect
+Two more defects were found and fixed on the way, both of which reported perfect
 health while being wrong:
 
 - **`latencyMax` defaults to 2000 ms** in the wrapper, which is the window the
