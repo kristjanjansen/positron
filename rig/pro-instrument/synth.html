@@ -43,7 +43,7 @@ const AUDIO_IN = Q.get('audioIn') || 'BlackHole';
 // QUIC uni-stream) starts; frameUs is the Opus frame duration, which sets how
 // many frames a second there are to lose.
 const LATENCY_MAX = Number(Q.get('latencyMax') || 100);
-const GROUP_MS = Number(Q.get('groupMs') || 50);
+const GROUP_MS = Number(Q.get('groupMs') || 200);   // measured; see moq-audio.mjs
 const FRAME_US = Number(Q.get('frameUs') || 5000);
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[synth]', m); };
 
