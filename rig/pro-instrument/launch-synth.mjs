@@ -83,4 +83,13 @@ await sleep(7000);
 const r = await cmd('Runtime.evaluate', { expression: 'document.querySelector("pre").textContent', returnByValue: true });
 console.log('--- page log ---');
 console.log(r?.result?.value ?? '(no log)');
-process.exit(0);
+
+// STAY ALIVE. A Browser.grantPermissions grant lives only as long as the CDP
+// client holds the connection: exit here and permission drops back to "prompt",
+// device labels hide again, and -- the part that cost hours -- the capture the
+// page opened during the grant keeps reporting a live, unmuted, enabled track
+// that carries DIGITAL SILENCE. A freshly granted capture of the same device
+// reads 0.38763 in the same second. So the grant is not a setup step, it is a
+// thing to hold.
+console.log('\nholding the permission grant open — Ctrl-C to stop the bridge');
+process.stdin.resume();
