@@ -62,6 +62,13 @@ export const DEMOS = [
   { name: 'cues', act: 2, built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
+  // The demo ABOUT the socket, rather than one that happens to use it: the
+  // message shape written down, the exact bytes shown both ways, and the
+  // history the relay refuses to keep. settleMs covers asking the recorder to
+  // join the room before anything is sent — every assert here sits behind that.
+  { name: 'wire', act: 2, built: true, settleMs: 6000,
+    one: 'compose a message, watch the exact bytes go and come back, and read the history',
+    tags: ['WS', 'DO', 'SQLite'] },
 
   // The only network-free row in Act 3, and the act's simplest complete
   // instance: make a recording yourself, then scrub it. Everything after this

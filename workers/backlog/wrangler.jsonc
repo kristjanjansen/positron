@@ -1,0 +1,27 @@
+{
+  "name": "positron-backlog",
+  // The history the relay refuses to keep — plan-ws §3.
+  //
+  // A SEPARATE SCRIPT on purpose. The Backlog DO could have lived beside Relay
+  // in positron-ws, but the relay is the one component whose whole value is
+  // that it does not parse, and the cheapest way to keep that true is to give
+  // the thing that DOES parse its own script, its own deploy and its own
+  // failure. Nothing here can wake a relay room or slow a fan-out.
+  "main": "src/index.js",
+  // backlog.positron.studio, attached with `wrangler triggers deploy` (routes
+  // only, no code re-upload). NOT a path under ws.positron.studio: that
+  // hostname is positron-ws's custom domain and owns all of it, and the plan's
+  // "same hostname" wish is not worth a path-route fight with a custom domain.
+  "routes": [{ "pattern": "backlog.positron.studio", "custom_domain": true }],
+  // kept on: the *.workers.dev name still serves, so the move is additive
+  "workers_dev": true,
+  "compatibility_date": "2026-08-01",
+  "durable_objects": {
+    "bindings": [{ "name": "BACKLOG", "class_name": "Backlog" }]
+  },
+  // SQLite-backed because this one actually stores: one row per kept message,
+  // indexed by time, following instrument's Sessions schema because that shape
+  // is already proven in this project.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Backlog"] }],
+  "observability": { "enabled": true }
+}

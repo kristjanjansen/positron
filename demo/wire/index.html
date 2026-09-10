@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .compose {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    padding: 10px; margin: 0 0 10px;
+  }
+  .compose label { font: 400 11px/1 var(--mono); color: var(--dim); }
+  .compose input[type=text] {
+    font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: #0b0e14;
+    border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; min-width: 0;
+  }
+  .compose .verb { width: 92px; }
+  .compose .body { flex: 1 1 140px; }
+  .compose .keep { display: flex; align-items: center; gap: 5px; }
+  /* Everything here WRAPS. A line of JSON is 110-odd bytes and a phone is
+     about 45 characters wide, so `nowrap` plus an ellipsis hid most of the one
+     thing this page exists to show — and an ellipsis is the signal that
+     something is in the wrong place, not a styling choice to live with. */
+  .lines { font: 400 11px/1.55 var(--mono); margin: 0 0 10px; }
+  .lines .row { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #ffffff08; }
+  .lines .dir { width: 58px; flex: none; color: var(--dim2); }
+  .lines .dir.out { color: var(--hi); }
+  .lines .dir.echo { color: var(--ok, #6ee7a8); }
+  .lines .sz { width: 46px; flex: none; color: var(--dim); text-align: right; }
+  .lines .txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lines .txt b { color: var(--fg); font-weight: 500; }
+  .pane { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 10px; margin: 0 0 10px; }
+  .pane h2 { font: 500 11px/1 var(--mono); color: var(--dim2); margin: 0 0 7px; letter-spacing: .04em; text-transform: uppercase; }
+  .pane .gut { font: 400 11px/1.5 var(--mono); color: var(--dim); margin: 7px 0 0; }
+  .pane pre {
+    font: 400 10.5px/1.55 var(--mono); color: var(--dim); margin: 0;
+    max-height: 190px; overflow-y: auto;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { openWire, LIMITS } from '/shell/wire.mjs';
+
+  const q = new URLSearchParams(location.search);
+  // ONE shared room by default. It used to be a room per tab, which made
+  // loading the history on arrival meaningless — a fresh room has no past.
+  // Sharing it means what you find on load is what other people left.
+  const ROOM = q.get('room') || 'wire';
+  const BACKLOG = q.get('backlog') || 'https://backlog.positron.studio';
+  // Small on purpose: the retention rule is 1,000 messages or 24 hours, and a
+  // page cannot show a cap it would take seventeen seconds to reach.
+  const CAP = 8;
+  // The three checks below are mechanism, not something a visitor came to
+  // press. They stay in the DOM — HIDDEN, not removed — because the harness
+  // presses `.d-controls button`, and a control it cannot reach is a subject
+  // the suite silently stops testing. `?checks=1` shows them.
+  const SHOW_CHECKS = q.has('checks');
+
+  const d = mount({
+    name: 'wire',
+    what: `Compose a message and watch the exact bytes travel — out, and back again, because the relay returns
+           your own message to you and that echo is what gives everyone one order. Every message carries a kind, a
+           sender, a time and a counter, and the counter is how a loss becomes visible: the relay drops anything
+           over ${(LIMITS.maxBytes / 1024) | 0} KiB or past its rate limit without telling the sender. Messages
+           you send and keep also go to a small history, read back over an ordinary web request and already on
+           the page when you arrive.`,
+    readout: { 'round trip': 'ms', delivery: 'ms', sent: '', kept: '', missing: '' },
+    controls: [
+      { id: 'send', label: 'Send it', primary: true },
+      // ONE primary. Two yellow buttons side by side say neither is the main
+      // path, and the base act is sending — keeping is the variant.
+      { id: 'store', label: 'Send and keep it' },
+      { id: 'bytes', label: 'Send the same as bytes' },
+      { id: 'toobig', label: 'Try one that is too big' },
+      { id: 'overfill', label: 'Overfill the history' },
+      { id: 'clear', label: 'Clear history' },
+    ],
+  });
+  guard(d);
+  if (!SHOW_CHECKS) for (const id of ['bytes', 'toobig', 'overfill']) d.button(id).hidden = true;
+
+  // ── the composer ────────────────────────────────────────────────────────
+  const compose = el('div', 'compose');
+  const verb = el('input', 'verb', null, { type: 'text', value: 'note', 'aria-label': 'kind of message' });
+  const body = el('input', 'body', null, { type: 'text', value: 'hello', 'aria-label': 'what it says' });
+  // No checkbox: keeping is a different ACT, not a setting on this one, so it
+  // is a second button under the box rather than a state you have to read back
+  // off a tick before you press send.
+  compose.append(el('label', null, 'kind'), verb, el('label', null, 'says'), body);
+  // The composer goes ABOVE the control bar, so Send sits under the thing it
+  // sends. Moving the BUTTON instead would take it out of `.d-controls`, which
+  // is the only place the harness looks — a control it cannot reach is a
+  // subject the suite silently stops testing (#19), and it would also reorder
+  // the presses, since the harness walks them in document order.
+  const cbar = d.button('send').parentElement;
+  cbar.parentNode.insertBefore(compose, cbar);
+
+  const lines = el('div', 'lines');
+  d.el.append(lines);
+
+  const histPane = el('div', 'pane');
+  const histOut = el('pre', null, 'reading…');
+  const histGut = el('div', 'gut', `room ${ROOM} · keeps the newest ${CAP} · only what was marked keep`);
+  histPane.append(el('h2', null, 'the history, over an ordinary web request'), histOut, histGut);
+  d.el.append(histPane);
+
+  // ── state ───────────────────────────────────────────────────────────────
+  const shown = [];
+  const stored = [];            // the exact lines we asked to be kept, in order
+  const deliveries = [];
+  let recording = false, recordNote = 'not asked yet';
+
+  const short = (s, n = 260) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+  function show(dir, bytes, text, hi) {
+    shown.push({ dir, bytes, text });
+    const row = el('div', 'row');
+    row.append(
+      el('span', `dir ${dir === 'out' ? 'out' : hi ? 'echo' : ''}`, dir),
+      el('span', 'sz', `${bytes} B`),
+    );
+    const t = el('span', 'txt');
+    t.innerHTML = hi ? `<b>${escape(short(text))}</b>` : escape(short(text));
+    row.append(t);
+    lines.prepend(row);
+    while (lines.children.length > 4) lines.lastChild.remove();
+  }
+  const escape = (s) => s.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
+
+  function render() {
+    const s = wire.stats();
+    d.set('sent', s.sent);
+    d.set('missing', s.missing);
+    if (deliveries.length) {
+      const sorted = deliveries.slice().sort((a, b) => a - b);
+      d.set('delivery', sorted[Math.floor(sorted.length / 2)]);
+    }
+  }
+
+  // ── the wire ────────────────────────────────────────────────────────────
+  const wire = openWire(ROOM, {
+    onOpen: (from) => d.log(`joined ${ROOM} as ${from}`, 'hi'),
+    onClose: () => d.log('relay closed', 'bad'),
+    onMessage: (got) => {
+      if (got.kind === 'binary') { show('bytes in', got.bytes, hex(got.data)); lastBinaryIn = got.data; return; }
+      if (got.kind === 'unreadable') { show('in', got.bytes, got.data); return; }
+      const mine = got.msg.from === wire.stats().from;
+      // The sender stamps `at` and the relay never re-stamps, which is why this
+      // number is honest even though the relay has no idea what time it is.
+      if (mine) deliveries.push(Date.now() - got.msg.at);
+      show(mine ? 'echo' : 'in', got.bytes, got.data, mine);
+      render();
+    },
+  });
+  let lastBinaryIn = null;
+  const hex = (buf) => Array.from(new Uint8Array(buf).slice(0, 12), (b) => b.toString(16).padStart(2, '0')).join(' ');
+
+  /** Wait for a specific line to come back rather than sleeping and hoping:
+   *  whatever a control asserts, it must have done by the time it returns. */
+  function echoOf(line, ms = 2500) {
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const timer = setInterval(() => {
+        if (shown.some((r) => r.dir === 'echo' && r.text === line)) { clearInterval(timer); resolve(performance.now() - t0); }
+        else if (performance.now() - t0 > ms) { clearInterval(timer); resolve(null); }
+      }, 15);
+    });
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function put(msg) {
+    const out = wire.send(msg);
+    if (out) show('out', out.bytes, out.sent ? out.line : `refused here — ${out.bytes} B is over the ${LIMITS.maxBytes} B roof`);
+    if (out?.sent && msg.store) stored.push(out.line);
+    render();
+    return out;
+  }
+
+  // ── the recorder, asked for before anything is sent ──────────────────────
+  // It joins the room as an ordinary socket, so the relay still parses nothing.
+  // Never awaited without a ceiling: a page that cannot reach the history must
+  // say so, not hang.
+  async function startRecording() {
+    try {
+      const res = await fetch(`${BACKLOG}/room/${ROOM}/record`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cap: CAP }),
+        signal: AbortSignal.timeout(4000),
+      });
+      const j = await res.json();
+      recording = !!j.recording;
+      recordNote = recording ? `recording, keeps ${j.cap}` : 'the recorder could not join';
+    } catch (e) {
+      recording = false;
+      recordNote = `no history here — ${String(e.name || e)}`;
+    }
+    d.log(recordNote, recording ? 'info' : 'bad');
+  }
+
+  async function readHistory(query = `last=${CAP * 4}`) {
+    const res = await fetch(`${BACKLOG}/room/${ROOM}/history?${query}`, { signal: AbortSignal.timeout(4000) });
+    const text = await res.text();
+    const header = res.headers.get('X-Backlog') || '';
+    const num = (k) => Number(new RegExp(`${k}=(\\d+)`).exec(header)?.[1] ?? 0);
+    const held = num('kept'); const seen = num('seen'); const oldest = num('oldest');
+    const rows = text.split('\n').filter(Boolean);
+    d.set('kept', held);
+    histOut.textContent = rows.length ? rows.map((r) => short(r)).join('\n') : '(nothing kept yet)';
+    histGut.textContent = `room ${ROOM} · ${held} held of ${seen} seen · cap ${CAP} · `
+      + `oldest ${oldest ? new Date(oldest).toISOString().slice(11, 19) : '—'} · ${recordNote}`;
+    return { rows, held, seen, oldest };
+  }
+
+  /** Our own lines, in the order we sent them — allowing for other people's
+   *  messages in a shared room, and for the cap having eaten the front. */
+  const oursInOrder = (rows) => {
+    const ours = rows.filter((r) => stored.includes(r));
+    const at = ours.map((r) => stored.indexOf(r));
+    return { count: ours.length, ok: at.every((p, i) => i === 0 || p > at[i - 1]) };
+  };
+
+  // ── controls ────────────────────────────────────────────────────────────
+  d.on('send', async () => {
+    const rtt = await wire.ping();
+    if (rtt !== null) d.set('round trip', rtt);
+    const out = put({ type: verb.value || 'note', value: body.value, store: false });
+    const back = out?.sent ? await echoOf(out.line) : null;
+    render();
+    d.assert('relay open', wire.state() === 1, String(wire.state()));
+    d.assert('the message comes back byte for byte', back !== null && out?.sent === true,
+      out ? `${out.bytes} B, back in ${back === null ? 'never' : `${back.toFixed(0)} ms`}` : 'not sent');
+    d.assert('round trip answered without waking the room', rtt !== null && rtt < 2000,
+      rtt === null ? 'no pong' : `${rtt.toFixed(1)} ms`);
+    await readHistory().catch(() => {});
+  });
+
+  d.on('store', async () => {
+    // The same message, kept. Two acts, one press apart — which is also the
+    // pair the history's held-of-seen counts are made of.
+    const out = put({ type: verb.value || 'note', value: body.value, store: true });
+    const back = out?.sent ? await echoOf(out.line) : null;
+    let h = { rows: [], held: 0, seen: 0 };
+    let reached = true;
+    try { h = await readHistory(); } catch { reached = false; }
+    d.assert('a kept message comes back AND lands in the history',
+      back !== null && reached && h.rows.includes(out.line),
+      out ? `${out.bytes} B · ${h.held} held of ${h.seen} seen` : 'not sent');
+    d.assert('the one sent without keeping is not in there',
+      reached && !h.rows.some((r) => r.includes('"store":false')),
+      `${h.rows.length} rows, none of them unkept`);
+    render();
+  });
+
+  d.on('bytes', async () => {
+    // The same payload, as bytes: the two paths are one press apart, and the
+    // relay's contract says it carries them unchanged.
+    const payload = new TextEncoder().encode(`${verb.value}:${body.value}`);
+    lastBinaryIn = null;
+    const seqBefore = wire.stats().seq;
+    const out = wire.sendBinary(payload.buffer);
+    if (out) show('bytes out', out.bytes, hex(payload.buffer));
+    for (let i = 0; i < 100 && !lastBinaryIn; i++) await sleep(5);
+    const got = lastBinaryIn ? new Uint8Array(lastBinaryIn) : null;
+    const same = !!got && got.length === payload.length && got.every((b, i) => b === payload[i]);
+    d.assert('bytes come back unchanged, not base64', same,
+      got ? `${got.length} B in / ${payload.length} B out` : 'nothing came back');
+    // Not `!('seq' in bytes)` — that cannot fail and would pass forever. The
+    // real fact is that the counter did NOT advance: there is nowhere in a
+    // binary frame to put one, so this message is invisible to the loss check.
+    d.assert('a binary frame carries no counter', out?.sent === true && wire.stats().seq === seqBefore,
+      `counter still at ${seqBefore} — the bytes had nowhere to carry it`);
+    render();
+  });
+
+  d.on('toobig', async () => {
+    // Prove the guard fires. The roof refuses this one, the counter still
+    // advances, and the NEXT message therefore arrives with a hole in front of
+    // it — which is the only way a receiver can know anything went missing.
+    const before = wire.stats().missing;
+    const refused = put({ type: 'toobig', value: 'x'.repeat(LIMITS.maxBytes + 1024) });
+    const after = put({ type: verb.value || 'note', value: 'the one after the hole', store: true });
+    if (after?.sent) await echoOf(after.line);
+    const s = wire.stats();
+    d.assert('one over the roof is refused, not truncated', refused?.sent === false,
+      `${refused?.bytes ?? 0} B against a ${LIMITS.maxBytes} B roof`);
+    d.assert('the loss shows up as a hole in the count', s.missing > before,
+      `${s.missing - before} missing, seen by the receiver`);
+    render();
+  });
+
+  d.on('overfill', async () => {
+    // Retention is a decision, not a default. One that is delivered and NOT
+    // kept, then one more than the room holds.
+    const passing = put({ type: 'chatter', value: 'delivered, not kept', store: false });
+    if (passing?.sent) await echoOf(passing.line);
+    for (let i = 1; i <= CAP + 1; i++) put({ type: 'fill', value: `fill ${i}`, store: true });
+    await sleep(400);
+    let h = { rows: [], held: 0, seen: 0 };
+    let reached = true;
+    try { h = await readHistory(); } catch { reached = false; }
+    const order = oursInOrder(h.rows);
+    d.assert('the history answers over an ordinary web request', reached && recording, recordNote);
+    d.assert('it hands back our own lines in the order the socket delivered them',
+      order.count > 0 && order.ok, `${order.count} of ours among ${h.rows.length}`);
+    d.assert('what was not marked keep is delivered but not kept',
+      passing?.sent === true && !h.rows.some((r) => r.includes('delivered, not kept')),
+      `${h.held} held of ${h.seen} seen`);
+    d.assert('the cap holds: one more in, the oldest out', h.held === CAP,
+      `${h.held} held against a cap of ${CAP}`);
+    render();
+  });
+
+  d.on('clear', async () => {
+    // THIS ROOM, which is what the label says. The worker also has a
+    // `/clear-all` that sweeps every room its index knows of — that existed to
+    // mop up the rooms this page left behind when it kept one per tab, and it
+    // has done that job. A two-word button must not be wired to a wider blast
+    // radius than it names.
+    let wiped = null;
+    try {
+      const res = await fetch(`${BACKLOG}/room/${ROOM}/clear`, { method: 'POST', signal: AbortSignal.timeout(8000) });
+      wiped = await res.json();
+    } catch (e) { d.log(`clear failed — ${String(e.name || e)}`, 'bad'); }
+    stored.length = 0;
+    let after = { rows: [], held: 0 };
+    try { after = await readHistory(); } catch { /* asserted below */ }
+    d.log(wiped ? `cleared ${ROOM}` : 'clear did not answer', wiped ? 'hi' : 'bad');
+    d.assert('clearing empties this room and leaves the counts saying so',
+      wiped?.cleared === true && after.held === 0, `${after.held} held after · room ${ROOM}`);
+  });
+
+  // ── go ──────────────────────────────────────────────────────────────────
+  await startRecording();
+  for (let i = 0; i < 200 && wire.state() !== 1; i++) await sleep(10);
+  // ON LOAD, not behind a press: what somebody else left is the interesting
+  // part, and a button to fetch it left the page looking empty until you asked.
+  let opening = { rows: [], held: 0 };
+  let openOk = true;
+  try { opening = await readHistory(); } catch { openOk = false; histOut.textContent = '(the history did not answer)'; }
+  d.assert('the history is on the page before anything is sent', openOk && recording,
+    openOk ? `${opening.held} held on arrival · ${recordNote}` : recordNote);
+  d.log(`room ${ROOM} · open a second copy to see both sides · ?checks=1 shows the checks`, 'hi');
+  d.ready();
+</script>
+</html>
