@@ -263,6 +263,36 @@ find <text>`, `/live/browser/load <track> <name>`. A track with no device makes
 no sound however well the MIDI arrives, and nothing else in the OSC surface can
 load one.
 
+## All four cases, with Ableton Live as the instrument
+
+Press a key here, Drift sounds in Live on the other machine, hear it back.
+14 of 14 notes in every case; receipt (the message telling Live to play) 6.6–8.8 ms
+throughout, so the control leg is never the story.
+
+| sound comes back over | typical | worst 1 in 20 | gaps | audible result |
+|---|---|---|---|---|
+| **MoQ, relay on the LAN** | **58 ms** | 69 ms | **31** | clean |
+| WebRTC (peer to peer) | 111–128 ms | 114–236 ms | — | clean |
+| MoQ, via Cloudflare | 136 ms | 271 ms | **1133** | **garbled** |
+
+**The Cloudflare relay is not just slower here, it is lossy** — 1133 gaps against
+31 for the same publisher over the LAN, about a third of frames missing, and it
+is audible as garbling rather than as delay. `seq` earns its place exactly here:
+the receiver can see the counter skip, and nothing else on the path reports a
+thing.
+
+Worth being careful about what that does and does not say. The same Cloudflare
+relay carried the built-in synth cleanly earlier, so this is not "Cloudflare is
+broken" — it is this publisher, at 5 ms Opus frames grouped every 50 ms, over
+that path, on this day. What changed with Live in the chain is the frame
+cadence, not the bitrate. Not yet separated: whether the loss is the group
+policy, the frame duration, or the wide-area path itself.
+
+**Ableton costs about 29 ms over the built-in synth** on the best path
+(29 → 58 ms), which is roughly what Live reports for itself: a 512-sample buffer
+at 48 kHz is 10.7 ms, plus its stated 13.7 ms output latency, plus the loopback
+hop.
+
 ## IT WORKS — Ableton Live played remotely, 58 ms key to ear
 
 Press a key here, Drift sounds in Live on the other machine, and you hear it
