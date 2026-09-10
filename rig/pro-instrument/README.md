@@ -263,6 +263,54 @@ find <text>`, `/live/browser/load <track> <name>`. A track with no device makes
 no sound however well the MIDI arrives, and nothing else in the OSC surface can
 load one.
 
+## IT WORKS — Ableton Live played remotely, 58 ms key to ear
+
+Press a key here, Drift sounds in Live on the other machine, and you hear it
+back. 14 of 14 notes on both return paths.
+
+| sound comes back over | typical | worst 1 in 20 | notes |
+|---|---|---|---|
+| WebRTC | 128 ms | 236 ms | 14 |
+| **MoQ, relay on the LAN** | **58 ms** | 69 ms | 14 |
+
+with the receipt at **7.50 ms** and MoQ decoding 4813 frames, **0 underruns**.
+
+    key press -> 7.5 ms -> the Pro -> Web MIDI -> IAC Bus 1
+      -> Live / Drift -> Multi-Output -> BlackHole
+      -> MoQ (LAN relay) -> 58 ms total
+
+**Ableton costs about 29 ms over the built-in synth** (29 -> 58 ms), which is
+roughly what Live reports for itself: 512-sample buffer at 48 kHz is 10.7 ms,
+plus its stated 13.7 ms output latency, plus the loopback hop.
+
+### Two things that made this hard, both mine
+
+**A permission grant is a thing to HOLD, not a step to perform.** A
+`Browser.grantPermissions` grant lives only while the CDP client stays
+connected. The launcher exited after printing the page log, so permission fell
+back to "prompt", labels hid, and the capture the page had already opened went
+on reporting a **live, unmuted, enabled** track carrying **digital silence**.
+Measured in one second on one machine: the page's own capture 0.00010 (its
+keep-alive only) against a freshly granted capture of the SAME device at
+0.38763, with the microphone at 0.22437 as the control. BlackHole was never
+broken, the Multi-Output was never misconfigured, Live was never misrouted.
+
+**Verify the instrument before believing the signal.** Three separate tests said
+"BlackHole is silent" and all three were the instrument: `afplay` over ssh has no
+audio session, headless Chrome has no audio input, and a GUI app SPAWNED from
+ssh runs outside the user's session and gets none either. The control that ends
+it in one step is to capture something known to carry signal — the built-in
+microphone cannot be digitally silent in a room, and when it reads 0.00000 the
+browser is deaf, not the device.
+
+### Drift sustains, and the detector re-arms on silence
+
+The onset detector fires above 0.02 and re-arms below 0.004. The built-in
+triangle decays to 0.0001 in 450 ms, so it re-armed between notes; **Drift does
+not**, so at 420 ms spacing only the FIRST note of thirty was ever counted. At
+1300 ms spacing it is 14 of 14. A detector tuned to one instrument is not tuned
+to instruments.
+
 ## STATE, PAUSED 2026-09-10
 
 Everything below the MIDI line works. The audio return from Live does not yet.
