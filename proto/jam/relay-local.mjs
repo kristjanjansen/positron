@@ -10,7 +10,14 @@ const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 const rooms = new Map();
 
 wss.on('connection', (ws, req) => {
-  const room = new URL(req.url, 'http://x').searchParams.get('room') || 'default';
+  // TWO URL SHAPES, one contract. `?room=` is what arm f has always used; the
+  // path form is what ws.positron.studio uses, and accepting both is what lets
+  // the SAME client code point at either relay with only the base URL changed.
+  // That is the whole of "mix and match LAN and internet": the protocol above
+  // the socket never learns which one it got.
+  const u = new URL(req.url, 'http://x');
+  const path = u.pathname.match(/^\/room\/([A-Za-z0-9._-]{1,64})\/ws$/);
+  const room = path ? path[1] : (u.searchParams.get('room') || 'default');
   if (!rooms.has(room)) rooms.set(room, new Set());
   const set = rooms.get(room);
   set.add(ws);

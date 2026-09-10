@@ -18,7 +18,8 @@ let seq = 0, pass = 0, fail = 0;
 const is = (n, got, want) => { const o = got === want; o ? pass++ : fail++; console.log(`  ${o ? 'ok  ' : 'FAIL'} ${n}${o ? '' : `  got ${got}, want ${want}`}`); };
 const ok = (n, cond, detail = '') => { cond ? pass++ : fail++; console.log(`  ${cond ? 'ok  ' : 'FAIL'} ${n}${detail ? `  ${detail}` : ''}`); };
 
-const ws = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
+const RELAY = arg('relay', RELAY_BASE);
+const ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
 ws.binaryType = 'arraybuffer';
 const send = (m) => ws.send(format(m, { from: FROM, seq: seq++ }));
 
