@@ -862,6 +862,38 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    stamp difference is not a latency, and now there is a number for how much it
    is not.
 
+
+   **Confirmed independently, and it changes what to DO about it.** Each machine
+   against Apple's time server: dev **+66.6 ms**, the Pro **+121.7 ms**, a
+   difference of **55.1 ms** against the 57 ms the peer-to-peer estimator
+   measured. Two unrelated methods agreeing to ~2 ms. (The per-sample ± is ~25 ms,
+   so that is corroboration, not a second decimal place.)
+
+   **Both machines run network time and are still 66 and 122 ms off true.**
+   macOS's `timed` does not discipline a clock anywhere near the millisecond, so
+   **an absolute wall clock is not usable across machines at this scale, and no
+   amount of NTP makes it so.** That is not a fault to fix — it is the reason the
+   peer-to-peer estimator exists, and this measurement is the first real
+   vindication of that design choice rather than an assumption about it.
+
+   **What to do, in order:**
+
+   1. **Never quote a cross-machine one-way stamp difference as a latency.** It
+      carries the offset, and the offset here is 57 ms — bigger than most of the
+      numbers we care about. This already produced a −14.2 ms "transit". Prefer a
+      ROUND TRIP on ONE clock, which is why key→ear is trustworthy and transit is
+      not.
+   2. **Quote 3 ms as the estimator's precision, never 0.15.** The loopback
+      figure is loopback-shaped, as suspected here for months.
+   3. **Do not set a servo dead band below the estimation error.** HANDOFF
+      records tightening it from 5 ms to 1 ms and moving cross-peer p50 from
+      −8.24 to −5.77 ms. With ~3 ms of clock-agreement error, a 1 ms dead band is
+      BELOW THE NOISE FLOOR and is chasing estimation noise rather than real
+      position error. 3–5 ms is the honest floor.
+   4. **It is not a problem for a click track.** A flam is audible around
+      10–20 ms; 3 ms is 0.15% of a 2 s loop. Multi-device click tracks survive —
+      with an order of magnitude less headroom than the old number implied.
+
    ⚠️ **This is a WAN path, not a LAN one.** Both peers dial
    `ws.positron.studio`, so every ping goes out to a Cloudflare edge and back —
    min RTT ~62 ms, consistent with the two-edge-round-trip arithmetic measured
