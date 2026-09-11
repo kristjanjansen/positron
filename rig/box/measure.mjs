@@ -71,3 +71,59 @@ export const distance = (a, b) => ({
   env: Math.abs(a.ratio - b.ratio),
   oct: a.centroid > 0 && b.centroid > 0 ? Math.abs(Math.log2(a.centroid / b.centroid)) : 0,
 });
+
+const med = (xs) => { const s = [...xs].sort((x, y) => x - y); return s[s.length >> 1]; };
+
+/**
+ * ⚠️ ONE TAKE OF A STOCHASTIC INSTRUMENT IS NOT A MEASUREMENT.
+ *
+ * Pappus fires grains against a per-voice probability and a euclidean gate, so
+ * two captures of the IDENTICAL setting differ — and by how much is not a
+ * constant. `pappus-live.mjs` read 14, 16 and 16 of 17 across three consecutive
+ * runs with DIFFERENT checks failing each time, and its own same-seed noise
+ * floor moved between 0.045 and 0.126 envelope across those runs. Every
+ * threshold in it was therefore being compared against a number that was itself
+ * a die roll.
+ *
+ * The fix is not a wider threshold — that only makes the test unable to fail.
+ * It is to measure the spread instead of assuming it: repeat each condition,
+ * take the MEDIAN as the condition's value, and take the spread WITHIN a
+ * condition as the floor that any between-condition difference has to clear.
+ *
+ * Returns the median take plus `spread`, the median distance from that median —
+ * how far this instrument moves when nothing changed at all.
+ */
+export function summarise(takes) {
+  const good = takes.filter((t) => t && t.n > 0);
+  if (!good.length) return null;
+  const mid = {
+    peak: med(good.map((t) => t.peak)),
+    ratio: med(good.map((t) => t.ratio)),
+    centroid: med(good.map((t) => t.centroid)),
+    n: good.length,
+  };
+  const ds = good.map((t) => distance(t, mid));
+  return {
+    ...mid,
+    takes: good.length,
+    spread: { env: med(ds.map((d) => d.env)), oct: med(ds.map((d) => d.oct)) },
+  };
+}
+
+/**
+ * Is B different from A by more than either of them moves on its own?
+ *
+ * The floor is the LARGER of the two spreads, times a margin — comparing
+ * against one condition's spread alone would call a difference real whenever
+ * the quieter of the two happened to be steady. An axis with no spread
+ * measured cannot vote, because a floor of zero makes everything significant.
+ */
+export function separated(a, b, margin = 2) {
+  const d = distance(a, b);
+  const axes = {};
+  for (const k of ['env', 'oct']) {
+    const floor = Math.max(a.spread?.[k] ?? 0, b.spread?.[k] ?? 0);
+    axes[k] = { d: d[k], floor, clears: floor > 0 && d[k] > floor * margin };
+  }
+  return { ...axes, any: axes.env.clears || axes.oct.clears };
+}
