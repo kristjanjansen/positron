@@ -150,7 +150,13 @@ const ok = (label, cond, detail) => {
 for (const t of targets) {
   console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
-  await S('Page.navigate', { url: `${BASE}/${t.name}/` });
+  // DEMO_QUERY appends to every page, so a BRANCH can be verified rather than
+  // only the default. Added when moq's publisher started PROBING for a codec:
+  // the probe picks AV1, every recorded MoQ number was taken on VP8, and a
+  // fallback the harness cannot select is a fallback nobody has run.
+  //   DEMO_QUERY='codec=vp8' node demo/verify.mjs moq
+  const query = process.env.DEMO_QUERY ? `?${process.env.DEMO_QUERY}` : '';
+  await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
 
   // ready, with a bounded wait — never a bare sleep

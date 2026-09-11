@@ -22,6 +22,13 @@
   // the whole path and both ends share one clock — the delta is exact, not an
   // estimate. pub/watch split the same leg across two devices.
   const role = q.get('role') || 'loopback';
+  // ?codec=vp8 pins the publisher. The MoQ numbers already recorded in HANDOFF
+  // (p50 20 ms, 4K30 at zero drops) were taken on VP8, and the publisher now
+  // probes for AV1 first — so without a way to ask for the old one, those
+  // numbers could never be reproduced and a later run would quietly be
+  // comparing two different codecs. A fallback nothing can select is not a
+  // fallback.
+  const codec = q.get('codec') || null;
   const ns = q.get('ns') || `positron-08-${Math.random().toString(36).slice(2, 8)}`;
 
   const d = mount({
@@ -62,7 +69,7 @@
       return;
     }
     d.log(`relay ${new URL(MOQ_RELAY).host} — role ${role}, namespace ${ns}`);
-    leg = await startMoq({ out, ns, role, forceTransport, log: (m, k) => d.log(m, k) });
+    leg = await startMoq({ out, ns, role, forceTransport, codec, log: (m, k) => d.log(m, k) });
     pill.dataset.on = '1';
     pill.textContent = `relay: ${leg.version}`;
     d.set('version', leg.version);
@@ -92,6 +99,12 @@
     d.assert('negotiated an IETF MoQT version', /moq-transport-1\d/.test(String(leg.version)), String(leg.version));
     if (role !== 'watch') {
       d.assert('broadcast published', s.published);
+      // ⚠️ WHICH CODEC RAN, because the publisher now PROBES for one rather
+      // than declaring `vp8`, and a branch the suite cannot see is a branch
+      // nobody asserts. It also names the thing the far end has to decode: VP8
+      // is not hardware-decoded on a Quest 3 or 3S, which is why the probe
+      // exists at all.
+      d.assert('names the codec it is publishing', !!s.codec, s.codec ?? 'none');
       d.assert('no encoder errors', s.encErrs === 0, String(s.encErrs));
     }
     if (role !== 'pub') {

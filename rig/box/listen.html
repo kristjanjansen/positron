@@ -270,8 +270,29 @@
   // ── audio ────────────────────────────────────────────────────────────────
   async function startAudio() {
     if (ctx) return;
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
-    await ctx.resume();
+    // ⚠️ ASK FOR 48 kHz, BECAUSE NOTHING IN THIS CHAIN RESAMPLES.
+    // The box fixes `RATE = 48000` (rig/box/synth.mjs) and the worklet writes
+    // those samples straight into a ring drained at the context's own rate. On
+    // an output running at 44.1 kHz the pitch is wrong by the ratio AND the
+    // ring fills faster than it drains, so the latency guard trims the oldest
+    // samples back to the floor several times a second — periodic clicking.
+    //
+    // And the readout would stay green throughout: its fault cell is frames per
+    // second, which is unaffected. That is this project's oldest shape of
+    // failure — a stream that looks identical to a working one from every angle
+    // except the samples.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
+    // A REQUEST, not a guarantee: a browser may hand back its device rate
+    // anyway. No readout cell for it — a cell that reads `48000` forever is a
+    // constant wearing a measurement's clothes, and it teaches the reader to
+    // skip the row. It only speaks when it has something to say.
+    if (ctx.sampleRate !== 48000) {
+      d.log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends 48000 — pitch will be off by ${(48000 / ctx.sampleRate).toFixed(3)}x and you will hear clicks`, 'bad');
+    }
+    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
+    // and NEVER REJECTS, so awaiting it here is a hang rather than an error —
+    // it would stop the worklet ever loading and the page would look fine.
+    ctx.resume().catch(() => { /* a suspended context is allowed; sound is late, not broken */ });
     await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
     playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
     playout.connect(ctx.destination);
