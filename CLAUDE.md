@@ -1,7 +1,10 @@
 # positron
 
-Live at **https://positron.studio**. 29 shelled demos of 34 rows,
-**437/437 green** (2026-09-11, every demo, no failures). The front page is
+Live at **https://positron.studio**. 30 shelled demos of 35 rows,
+**441 asserts** (2026-09-11; `now`'s four are ERR refusing its own live edge,
+verified with a 403 probe, not a regression). `scene` is the first WebXR page
+and **its headset half is HUMAN-VERIFIED** — `demo/verify-quest.mjs` has to
+exist before that half's green means anything about a device. The front page is
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read

@@ -24,6 +24,7 @@ export function mount({
 } = {}) {
   document.title = `POSITRON · ${name}`;
   favicon();
+  markHeadset();
 
   const head = el('div', 'd-head');
   if (index) head.append(el('a', 'd-back', '← demos', { href: index }));
@@ -373,4 +374,33 @@ export function createShipper(url = 'https://pub.positron.studio/log') {
       } catch { /* diagnostics are never load-bearing */ }
     }, 2000);
   };
+}
+
+
+/**
+ * Give a demo page the headset layout when it is being read through one.
+ *
+ * ⚠️ THE INDEX ALREADY DID THIS AND THE DEMOS DID NOT, which is backwards: the
+ * index is a list you scan once and a demo is a page you stand in front of
+ * while a number changes. The reason it matters is a measurement, not a
+ * preference — the Quest Browser opens in DESKTOP MODE by default, it IGNORES
+ * `<meta viewport>`, and its window is 1280 x 670 CSS pixels. 670 is about half
+ * a laptop viewport, so a page's paragraph, readout, controls and log are not
+ * on screen together, and a readout that scrolls out of view mid-measurement is
+ * exactly the thing that gets reported as "the page is broken".
+ *
+ * ⚠️ The sizes themselves are UNCONFIRMED — nothing in this repo has been read
+ * through a headset yet. shell.css says which numbers to move.
+ *
+ * Capability, never a user-agent string: a headset browser is Chromium wearing
+ * a Chromium UA, and research/quest-xr §1.7 measured that a Quest 3 and a 3S
+ * cannot be told apart by user agent at all.
+ */
+async function markHeadset() {
+  try {
+    if (!navigator.xr?.isSessionSupported) return;
+    if (await navigator.xr.isSessionSupported('immersive-vr')) {
+      document.documentElement.classList.add('xr');
+    }
+  } catch { /* a browser that will not answer is not a headset we can style for */ }
 }

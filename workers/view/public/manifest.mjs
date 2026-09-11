@@ -87,6 +87,23 @@ export const DEMOS = [
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
+  // A room from one 32-bit number, and the first WebXR page here. `gl: true`
+  // for the same reason `mirror` has it — demo/verify.mjs runs Chrome with
+  // --disable-gpu, where getContext('webgl2') is null and every assert on this
+  // page would be unreachable.
+  //
+  // ⚠️ TWO OF ITS ASSERTS CANNOT BE REACHED BY ANY DESKTOP BROWSER — that an
+  // immersive session started, and that a floor-relative space resolved. They
+  // are the Quest-only branch, and they are why demo/verify-quest.mjs has to
+  // exist before this page's green means anything about a headset. Until it
+  // does, the headset half is HUMAN-VERIFIED and the page says so on its face.
+  // The Immersive Web Emulator satisfies both on a laptop, which makes it
+  // useful for writing the page and worthless as evidence about a device —
+  // research/quest-xr calls that "the iPhone mistake in a new accent".
+  { name: 'scene', act: 0, created: '2026-09-11', built: true, gl: true, settleMs: 6000,
+    one: 'a room built from one number — roll it, and the same number rebuilds it exactly',
+    tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
+
   { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000,
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },

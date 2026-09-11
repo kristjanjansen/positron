@@ -402,6 +402,20 @@ video[hidden] { display: none; }
 /* A ray drifts, so a row must not need a steady hand to stay lit. */
 .xr .d-row a:hover { background: var(--card); }
 
+/* And a DEMO page, which is the harder case: 670 px of height has to hold a
+   paragraph, a readout, the controls and a log. So the prose gets smaller
+   rather than larger — it is read once — while the readout and the controls,
+   which are read WHILE something is changing, get bigger. Everything else
+   gives up its margins. */
+.xr .d-what { font-size: 14px; line-height: 1.55; max-height: 8.5em; overflow-y: auto; }
+.xr .d-readout { gap: 10px 20px; }
+.xr .d-v { font-size: 22px; }
+.xr .d-k { font-size: 11px; }
+.xr .d-controls { gap: 10px; margin-bottom: 10px; }
+.xr button, .xr .d-btn { height: 44px; font-size: 15px; padding: 0 18px; }
+.xr .d-head { margin-bottom: 10px; }
+.xr .d-log { font-size: 12.5px; max-height: 9em; }
+
 /* ── filling the screen without a Fullscreen API ──────────────────────────
    demo/shell/fullscreen.mjs sets `.d-full` on BOTH paths and adds `.d-faux`
    when it had to do the work itself — which on an iPhone is always, because
