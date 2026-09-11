@@ -199,23 +199,27 @@ export const DEMOS = [
     one: 'play a Raspberry Pi in another building — its instruments, 1965 radio, and a granulator over both',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
-  // rig/pro-instrument/play.html — Ableton Live and Arturia's Rhodes on the
-  // studio Mac, played from a browser over a direct peer link.
+  // A CHECKUP, not a player — and that is what makes it shippable. The playing
+  // page (rig/pro-instrument/play.html) needs a peer with Ableton open, so it
+  // is a dead link for a visitor; asking whether the rig is set up is a real
+  // answer in BOTH states, and the interesting one is usually "it is not".
   //
-  // ⚠️ NOT DEPLOYED, and the row says so rather than linking a page that
-  // cannot work for a visitor. Two separate reasons, both real: the page is
-  // not shelled (its own CSS, no mount(), so no harness can grade it), and it
-  // dynamically imports ./moq-audio.mjs, which does not exist beside it — so
-  // build.mjs's import check would refuse the deploy, correctly.
+  // MEASURED 2026-09-11, the whole chain end to end: the studio's own output
+  // recorded at -91.0 dB with nothing sent and 0.0 dB peak with a chord held —
+  // 91 dB apart, so the separation is not ambient noise. That run also found
+  // the output clipping at full scale, which nothing else had noticed.
   //
-  // MEASURED 2026-09-10, two Macs on one LAN, 100 presses alternating:
-  // direct peer link 6.00 ms typical, the relay 68.90 ms — 11.5x — and the
-  // number that decides playability is presses over 100 ms: direct 0 of 100,
-  // relay 4 of 100.
-  { name: 'rack', act: 4, created: '2026-09-10', built: false,
-    one: 'play the studio Mac\'s own Rhodes from a browser — a real desk instrument, 6 ms away',
-    tags: ['Ableton Live', 'Arturia', 'WebRTC', 'CoreMIDI'],
-    why: 'the page is not shelled, and it needs the studio Mac awake' },
+  // For the record, from 2026-09-10 and not what this page shows: playing it
+  // costs 6.00 ms typical over a direct peer link against 68.90 ms via the
+  // relay, and presses over 100 ms go 0 of 100 against 4 of 100.
+  // ⚠️ ITS ASSERT COUNT IS SUPPOSED TO MOVE, which is the one demo here where
+  // that is true. Studio silent: 10/10 with 4 page asserts. Studio answering:
+  // 12/12 with 6. Both branches are real and both are asserted when they occur
+  // — the page cannot force the studio Mac to be off, so it cannot run both in
+  // one pass. Diff the count against the branch, not against the last run.
+  { name: 'rack', act: 4, created: '2026-09-10', built: true, settleMs: 5000,
+    one: 'ask a studio Mac whether its Ableton Live rig is really set up, link by link',
+    tags: ['Ableton Live', 'CoreMIDI', 'WS', 'relay'] },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */

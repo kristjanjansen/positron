@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .chain { margin: 0 0 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); overflow: hidden; }
+  .link { display: grid; grid-template-columns: 1.6em 1fr; gap: 2px 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  .link:last-child { border-bottom: 0; }
+  .link .mk { font: 700 12px/1.5 var(--mono); }
+  .link.y .mk { color: var(--ok); }
+  .link.n .mk { color: var(--bad); }
+  .link .nm { font: 500 13px/1.4 var(--mono); color: var(--fg); }
+  .link .dt { grid-column: 2; font: 400 11.5px/1.6 var(--mono); color: var(--dim); word-break: break-word; }
+  .link .fx { grid-column: 2; font: 500 11.5px/1.6 var(--mono); color: var(--warn); margin-top: 3px; }
+  .none { padding: 22px 14px; text-align: center; font: 500 13px/1.7 var(--mono); color: var(--dim2); }
+  .none b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 6px; font-weight: 600; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+
+  // The studio machine's own room, separate from the board's. Two instruments
+  // in two buildings should not share a room just because both are "the rig".
+  const ROOM = new URLSearchParams(location.search).get('room') || 'pro-1';
+  const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
+  const ID = Math.random().toString(36).slice(2, 8);
+
+  const d = mount({
+    name: 'rack',
+    what: 'A Mac in a studio is running Ableton Live with an electric piano loaded, and this page asks it whether it is actually set up — not whether it is switched on, but whether every link holds: the software is up, it answers remote control, the track has an instrument, it is armed and unmuted, and a note sent to it comes back as real sound. That last one is the only check that crosses the whole chain, and it works by holding a chord while recording the machine’s own output and comparing it against silence recorded seconds earlier. If nobody answers, this page says so rather than showing you an empty list that looks like a pass.',
+    readout: { studio: '', links: '', checked: '', answer: 'ms', room: '' },
+    controls: [
+      { id: 'ask', label: 'Ask the studio', primary: true },
+      { id: 'again', label: 'Check it again' },
+    ],
+  });
+  guard(d);
+  d.set('room', ROOM);
+
+  const chain = el('div', 'chain');
+  const none = el('div', 'none');
+  none.append(el('b', '', 'Waiting…'), el('span', '', 'nothing has answered in this room yet'));
+  chain.append(none);
+  d.el.append(chain);
+
+  let ws = null, seq = 0, asked = 0, state = null, answered = false, rtt = null;
+
+  const send = (msg) => {
+    if (ws?.readyState !== 1) return false;
+    ws.send(JSON.stringify({ ...msg, from: `page-${ID}`, at: Date.now(), seq: seq++ }));
+    return true;
+  };
+
+  function render() {
+    chain.replaceChildren();
+    if (!state?.results) {
+      const b = el('div', 'none');
+      // ⚠️ NEVER AN EMPTY LIST. A blank chain and a passing chain look the same
+      // at a glance, and this page exists to tell them apart — the same reason
+      // every lane in this project gets a row even when it has nothing to say.
+      b.append(el('b', '', answered ? 'Nothing checked yet' : 'Nobody is answering'),
+        el('span', '', answered
+          ? 'the studio answered, but has not run a check — press "Check it again"'
+          : 'the studio machine is not in this room. It has to be switched on, with Ableton Live open and the rack agent running in a terminal — it cannot be woken from here.'));
+      chain.append(b);
+      d.set('studio', answered ? 'answering' : 'not answering', answered ? 'ok' : 'bad');
+      d.set('links', '—');
+      return;
+    }
+    for (const r of state.results) {
+      const row = el('div', `link ${r.ok ? 'y' : 'n'}`);
+      row.append(el('span', 'mk', r.ok ? '✓' : '✗'), el('span', 'nm', r.name));
+      if (r.detail) row.append(el('span', 'dt', r.detail));
+      if (!r.ok && r.fix) row.append(el('span', 'fx', `→ ${r.fix}`));
+      chain.append(row);
+    }
+    const all = state.pass === state.total;
+    d.set('studio', 'answering', 'ok');
+    d.set('links', `${state.pass}/${state.total}`, all ? 'ok' : 'warn');
+    d.set('checked', state.ageSec === null ? 'never'
+      : state.ageSec < 90 ? `${state.ageSec} s ago` : `${Math.round(state.ageSec / 60)} min ago`);
+  }
+  render();
+
+  function open() {
+    return new Promise((done) => {
+      ws = new WebSocket(RELAY);
+      ws.onopen = () => { d.log(`joined ${ROOM}`); done(true); };
+      ws.onerror = () => done(false);
+      ws.onmessage = (e) => {
+        if (typeof e.data !== 'string') return;
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.from === `page-${ID}`) return;
+        if (m.type !== 'rack.state' && m.type !== 'rack.up') return;
+        if (!answered) { rtt = Date.now() - asked; d.set('answer', rtt); }
+        answered = true;
+        state = m;
+        render();
+        d.log(m.checking ? 'the studio is running a fresh check…'
+          : `${m.pass}/${m.total} links${m.ageSec === null ? '' : `, checked ${m.ageSec} s ago`}`);
+      };
+      setTimeout(() => done(ws.readyState === 1), 2500);
+    });
+  }
+
+  d.on('ask', async () => {
+    if (ws?.readyState !== 1) await open();
+    asked = Date.now();
+    const sent = send({ type: 'rack.status' });
+    d.log(sent ? 'asked the studio for its state' : 'could not reach the relay');
+    // ⚠️ A WINDOW, NOT A RACE. Nobody answering is the answer this page exists
+    // to be able to give, so it waits a fixed time and then reports silence —
+    // rather than waiting forever and looking like it is still loading.
+    await new Promise((r) => setTimeout(r, 3000));
+    if (!answered) d.log('nobody answered in 3 s — the studio machine is not in this room', 'warn');
+    render();
+
+    d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
+    d.assert('the ask went out', sent);
+    // BOTH outcomes are asserted, because both are real. A page that only
+    // asserts the happy path has no coverage on the day the studio is off,
+    // which is most days.
+    d.assert('it says which of the two states it is in',
+      (answered && !!state) || (!answered && !!chain.querySelector('.none b')),
+      answered ? 'the studio answered' : 'the studio is silent, and the page says so');
+    if (answered && state?.results) {
+      d.assert('every link is named and marked', chain.querySelectorAll('.link').length === state.results.length,
+        `${chain.querySelectorAll('.link').length} of ${state.results.length} drawn`);
+      d.assert('a failing link carries what to do about it',
+        state.results.every((r) => r.ok || !!r.fix),
+        `${state.results.filter((r) => !r.ok).length} failing, all with a fix`);
+      d.assert('the reading is dated, not presented as live',
+        state.ageSec === null || Number.isFinite(state.ageSec), `${state.ageSec} s old`);
+    } else {
+      d.assert('silence is reported as silence, not as a pass',
+        chain.textContent.includes('Nobody is answering'), 'the page says nobody answered');
+    }
+  });
+
+  d.on('again', async () => {
+    if (ws?.readyState !== 1) await open();
+    asked = Date.now();
+    send({ type: 'rack.check' });
+    d.log('asked for a fresh check — it takes about 25 s, because two of its arms are real recordings');
+  });
+
+  d.ready();
+</script>
+</html>
