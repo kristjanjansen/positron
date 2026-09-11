@@ -4,6 +4,7 @@
 //   ./v3dpipe W H FRAMES [PASSES] > /dev/null      (or | ffmpeg ...)
 // Reports to STDERR: wall clock, achieved fps, and its own CPU time split.
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -25,20 +26,21 @@ static const char *FS_KAL =
   "#version 310 es\n"
   "precision highp float;\n"
   "uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;\n"
+  "uniform float uSeg; uniform float uFb;\n"
   "out vec4 o;\n"
   "float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\n"
   "float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);\n"
   "  return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }\n"
   "void main(){\n"
   "  vec2 uv=(gl_FragCoord.xy-0.5*uRes)/uRes.y;\n"
-  "  float a=atan(uv.y,uv.x), r=length(uv), seg=6.2831853/8.0;\n"
+  "  float a=atan(uv.y,uv.x), r=length(uv), seg=6.2831853/uSeg;\n"
   "  a=abs(mod(a+0.5*seg,seg)-0.5*seg);\n"
   "  vec2 k=vec2(cos(a),sin(a))*r;\n"
   "  float w=n(k*4.0+uT*0.3)+0.5*n(k*8.0-uT*0.2)+0.25*n(k*16.0+uT*0.5);\n"
   "  vec2 dd=k+0.08*vec2(cos(w*6.2831),sin(w*6.2831));\n"
   "  vec3 c=0.5+0.5*cos(6.2831*(w+vec3(0.0,0.33,0.67))+uT);\n"
   "  vec3 fb=texture(uPrev,dd*0.9+0.5).rgb;\n"
-  "  o=vec4(mix(c,fb,0.62),1.0); }\n";
+  "  o=vec4(mix(c,fb,uFb),1.0); }\n";
 static const char *FS_BLUR =
   "#version 310 es\n"
   "precision highp float;\n"
@@ -71,9 +73,33 @@ static void mktarget(int w,int h,GLuint*t,GLuint*f){
   glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,*t,0);
 }
 
+// ⚠️ THE CONTROL CHANNEL IS STDIN, WHICH WAS FREE. stdout carries the pixels
+// and stderr carries the timings, so parameters had nowhere to arrive — and the
+// alternative, restarting the process with new argv, costs seconds and cycles
+// the exclusive hardware encoder, which is the thing that wedged the board
+// once already. One line per change: `seg 16\n`, `fb 0.85\n`.
+//
+// NON-BLOCKING, because this is read in the render loop: a blocking read with
+// nobody typing would stop the picture dead.
+static float g_seg = 8.0f, g_fb = 0.62f;
+static void drain_stdin(void){
+  static char line[256]; static int len = 0;
+  char c;
+  while(read(0, &c, 1) == 1){
+    if(c != '\n'){ if(len < (int)sizeof(line)-1) line[len++] = c; continue; }
+    line[len] = 0; len = 0;
+    char k[32]; float v;
+    if(sscanf(line, "%31s %f", k, &v) == 2){
+      if(!strcmp(k,"seg")) g_seg = v < 2.0f ? 2.0f : (v > 64.0f ? 64.0f : v);
+      else if(!strcmp(k,"fb")) g_fb = v < 0.0f ? 0.0f : (v > 0.95f ? 0.95f : v);
+    }
+  }
+}
+
 int main(int argc,char**argv){
   int W=argc>1?atoi(argv[1]):1280, H=argc>2?atoi(argv[2]):720;
   int N=argc>3?atoi(argv[3]):150, PASSES=argc>4?atoi(argv[4]):1;
+  fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
   int fd=open("/dev/dri/renderD128",O_RDWR|O_CLOEXEC);
   struct gbm_device*g=gbm_create_device(fd);
   PFNEGLGETPLATFORMDISPLAYEXTPROC gpd=(PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
@@ -101,6 +127,7 @@ int main(int argc,char**argv){
   long done_frames=0;
   GLuint src=tA,srct=tB,dst=fB,dst2=fA;
   for(long i=0; forever || i<N; i++){
+    drain_stdin();
     double a0=now_ms();
     for(int p=0;p<PASSES;p++){
       GLuint prog=p?pB:pK;
@@ -108,6 +135,8 @@ int main(int argc,char**argv){
       GLint l;
       if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,(float)(i/30.0));
       if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
+      if((l=glGetUniformLocation(prog,"uSeg"))>=0) glUniform1f(l,g_seg);
+      if((l=glGetUniformLocation(prog,"uFb"))>=0) glUniform1f(l,g_fb);
       if((l=glGetUniformLocation(prog,"uPrev"))>=0){
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
       glDrawArrays(GL_TRIANGLES,0,3);

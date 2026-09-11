@@ -173,8 +173,13 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   // "render none and exit" until 2026-09-11, which left ffmpeg waiting on a
   // pipe nothing would ever come down while every status said the picture was
   // up.
+  // ⚠️ stdin IS A PIPE, not 'ignore': it is the renderer's control channel.
+  // stdout carries the pixels and stderr the timings, so a parameter has
+  // nowhere else to arrive — and the alternative, restarting with new argv,
+  // costs seconds and cycles the exclusive hardware encoder that wedged this
+  // board once already.
   const render = spawn(V3DPIPE, [String(w), String(h), '0', String(passes)],
-    { stdio: ['ignore', 'pipe', 'pipe'] });
+    { stdio: ['pipe', 'pipe', 'pipe'] });
   const enc = spawn('ffmpeg', [
     '-hide_banner', '-loglevel', 'error',
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', String(fps), '-i', '-',
@@ -221,8 +226,21 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     });
   }
 
+  // What the picture is set to right now. Kept here rather than asked of the
+  // renderer, because it has no way to answer — a one-way channel means this
+  // end owns the truth, and a client reading it back is reading what was SENT.
+  const params = { seg: 8, fb: 0.62 };
+
   return {
     ok: true, w, h, fps, bitrate, gop, passes,
+    params: () => ({ ...params }),
+    /** One parameter down the control channel. Clamped at the far end too. */
+    set: (key, value) => {
+      if (!['seg', 'fb'].includes(key) || !Number.isFinite(value)) return false;
+      params[key] = value;
+      try { render.stdin.write(`${key} ${value}\n`); return true; }
+      catch { return false; }
+    },
     stats: () => ({ frames, bytes, keys, biggestFrame: biggest, renderer,
                     meanFrameBytes: frames ? Math.round(bytes / frames) : 0 }),
     stop: () => {

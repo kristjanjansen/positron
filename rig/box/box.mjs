@@ -98,6 +98,7 @@ function videoShape() {
   return {
     w: video?.w, h: video?.h, fps: video?.fps, bitrate: video?.bitrate, gop: video?.gop,
     codec: 'avc1.42E01E',        // baseline 3.0 — what h264_v4l2m2m emits here
+    mirrors: video?.params().seg, feedback: video?.params().fb,
     // What actually drew it, read off the renderer rather than declared here.
     renderer: st.renderer ?? null,
     // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
@@ -784,6 +785,19 @@ async function handle(msg) {
       video = r; vseq = 0; vsent = 0;
       log(`video up · ${r.w}x${r.h} @${r.fps} · ${(r.bitrate / 1e6).toFixed(1)} Mbit/s · room ${VIDEO_ROOM}`);
       return reply('video.started', { ok: true, room: VIDEO_ROOM, ...videoShape() });
+    }
+    // The two knobs the picture has. Named rather than numbered, because a
+    // client should not have to know that the mirror count is a uniform.
+    case 'video.params': {
+      if (!video) return reply('video.params', { ok: false, reason: 'no picture running' });
+      let n = 0;
+      if (Number.isFinite(msg.mirrors)) n += video.set('seg', Math.max(2, Math.min(64, msg.mirrors))) ? 1 : 0;
+      if (Number.isFinite(msg.feedback)) n += video.set('fb', Math.max(0, Math.min(0.95, msg.feedback))) ? 1 : 0;
+      const p = video.params();
+      log(`video params: ${p.seg} mirrors · feedback ${p.fb}`);
+      // ⚠️ REPORTED AS SENT, NOT AS APPLIED. The control channel is one-way —
+      // the renderer has no way to answer — so this is what went down the pipe.
+      return reply('video.params', { ok: n > 0, sent: n, mirrors: p.seg, feedback: p.fb });
     }
     case 'video.stop': {
       if (!video) return reply('video.stopped', { ok: true, was: null });
