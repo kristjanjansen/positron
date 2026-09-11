@@ -93,10 +93,24 @@
   /* ⚠️ The knob row lives ABOVE both panes, which means it is not inside the
      element that goes fullscreen — so it simply vanishes, and the picture you
      went fullscreen to look at becomes the one you cannot change. It is moved
-     into the fullscreen pane's own bar instead, centred between the numbers and
-     the button. */
-  .bar .knobs { margin: 0 auto; gap: 18px; }
+     into the fullscreen pane's own bar instead.
+
+     ⚠️ AND A THREE-COLUMN GRID, NOT `margin: 0 auto`. Auto margins centre a
+     thing in what is LEFT OVER, and the numbers on the left are much wider than
+     the button on the right — so the knobs sat visibly right of centre on a
+     screen where the middle is the one place the eye expects them. `1fr auto
+     1fr` puts the middle column at the centre of the bar regardless of what
+     flanks it. */
+  .bar .knobs { margin: 0; gap: 18px; }
   .bar .knob button { padding: 4px 9px; }
+  .pane:fullscreen .bar {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+  }
+  /* The flex spacer has no job in a grid, and an empty cell would shift the
+     columns by one. */
+  .pane:fullscreen .bar .sp { display: none; }
+  .pane:fullscreen .bar .knobs { justify-self: center; }
+  .pane:fullscreen .bar button.ico { justify-self: end; }
 </style>
 
 <script type="module">
