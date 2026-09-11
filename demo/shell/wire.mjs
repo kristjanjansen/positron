@@ -123,19 +123,61 @@ export function openWire(room, {
   const stats = {
     from: null, seq: 0, sent: 0, received: 0, echoed: 0,
     bytesOut: 0, bytesIn: 0, gaps: 0, missing: 0, reconnects: 0, refused: 0,
+    // Why the last upgrade failed, when it can be known. Null means either
+    // "nothing has failed" or "it failed for an ordinary network reason" — the
+    // two are distinguished by `reconnects`.
+    refusal: null, roomSockets: null,
   };
   let ws = null, closed = false, backoff = 300;
+
+  /**
+   * Why the upgrade was refused, asked of the only thing that can answer.
+   *
+   * Best-effort and never awaited by the reconnect: the point is to put a
+   * reason in front of a person, not to gate a retry on a second request that
+   * may fail the same way. `refusal` is null until something is known.
+   */
+  async function diagnose() {
+    try {
+      const r = await fetch(`${base.replace(/^ws/, 'http')}/room/${room}/stats`, { cache: 'no-store' });
+      if (!r.ok) { stats.refusal = `the relay answered ${r.status} when asked about the room`; return; }
+      const s2 = await r.json();
+      const max = s2.limits?.maxSockets;
+      stats.roomSockets = s2.sockets;
+      stats.refusal = (max && s2.sockets >= max)
+        ? `the room is full — ${s2.sockets} of ${max} sockets, and the relay refuses the next one rather than dropping it`
+        : null;                       // reachable and not full: an ordinary network failure
+    } catch (e) {
+      stats.refusal = `the relay is unreachable (${e.message})`;
+    }
+  }
 
   function connect() {
     stats.from = randomId(6);           // per CONNECTION, never per person
     stats.seq = 0;
+    let opened = false;
     ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => { backoff = 300; onOpen(stats.from); };
+    ws.onopen = () => { opened = true; backoff = 300; onOpen(stats.from); };
     ws.onclose = () => {
       onClose();
       if (closed || !reconnect) return;
       stats.reconnects++;
+      // ⚠️ A CLOSE THAT NEVER OPENED IS A REFUSAL, AND THE ROOM BEING FULL IS
+      // THE LIKELY ONE. The relay caps a room at MAX_SOCKETS and answers the
+      // seventeenth upgrade `503 room full (16)` rather than accepting and
+      // dropping — deliberately, because "a client that is told no can retry".
+      // But this loop could not hear it: **a browser cannot read the HTTP
+      // status of a failed WebSocket upgrade**, by design, the same way it
+      // cannot read a response's `Date` header (LESSONS #38). So a full room
+      // and a dead relay produced the identical `error` then `close`, and the
+      // seventeenth headset in a room would back off to 5 s and retry forever
+      // with nothing anywhere saying why.
+      //
+      // `/stats` is an ordinary CORS-clear GET on the same host (verified:
+      // `access-control-allow-origin: *`), and it reports `sockets` against
+      // `limits.maxSockets`. So ASK, rather than infer from a silence.
+      if (!opened) diagnose();
       setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 5000);
     };
