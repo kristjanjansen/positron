@@ -15,10 +15,8 @@
 // startup subtracted out: 0.088 s of CPU per second of audio with 24 notes
 // sounding across six parts — about 9% of one core. The Pi 4 figure needs the
 // board; `bench.mjs` there.
-import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, openSync, createReadStream, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 export const RATE = 48000;
 export const FRAME = 960;                    // 20 ms -> 50 messages a second
@@ -37,115 +35,30 @@ export const VOICES = {
   flute: 73, square: 80, saw: 81, pad: 89, bells: 98, kalimba: 108,
 };
 
-export function startFluid({ soundfont = DEFAULT_SF, gain = 0.6, polyphony = 64, onFrame, onLog } = {}) {
-  // ⚠️ A FIFO, not /dev/stdout. fluidsynth's file driver writes fine to a shell
-  // pipe, but under `spawn` it cannot re-open the inherited descriptor:
-  //   Failed to open audio file '/dev/stdout' for writing
-  // and /dev/fd/1 fails identically. Both measured on arm64 Linux 2026-09-10.
-  // A named pipe has none of that ambiguity — it is opened by PATH, by both
-  // ends, like any file.
-  const fifo = join(tmpdir(), `fluid-${process.pid}-${Date.now() % 100000}.raw`);
-  try { unlinkSync(fifo); } catch { /* not there, which is the normal case */ }
-  execFileSync('mkfifo', [fifo]);
-  // O_RDWR ('r+'), NOT read-only: opening a FIFO for reading BLOCKS until a
-  // writer attaches, and fluidsynth has not started yet. That deadlock cost a
-  // whole container run before it was understood.
-  const rfd = openSync(fifo, 'r+');
+/**
+ * ⚠️ `startFluid` WAS HERE AND IS GONE, 2026-09-11.
+ *
+ * It ran FluidSynth with the `file` audio driver writing realtime PCM into a
+ * FIFO — one process, no jackd — and it was kept for two reasons that both
+ * turned out to be wrong when measured:
+ *
+ *   EFFICIENCY. It is not cheaper. 12.8% of 400 against the JACK path's 12.3%,
+ *   and 84 ms to the ear against 74 ms. The FIFO's buffering costs more than
+ *   jackd's period does.
+ *
+ *   NO KERNEL NEEDED. True, and not exclusive. In an arm64 container with no
+ *   /dev/snd and no realtime privileges, `jackd -r -d dummy` came up and the
+ *   graph carried 144,021 samples at peak 0.1096 in three seconds. jackd's
+ *   dummy driver is software timing for the same reason the `file` driver was.
+ *
+ * What the pipe cost was the thing that mattered: the granular insert is a JACK
+ * insert, so General MIDI could not be granulated at all. `git show 0ca0d67^`.
+ *
+ * What stays below is the part that was never about the transport — the General
+ * MIDI name table, the default soundfont, and the two checks that answer
+ * whether this board can play sampled instruments at all.
+ */
 
-  const args = [
-    '-n',                                    // no MIDI driver: notes come on stdin
-    '-a', 'file',
-    '-o', `audio.file.name=${fifo}`,
-    // raw, never wav: libsndfile cannot backfill a WAV header on a pipe, so a
-    // wav-typed stream is a file whose length field is never written.
-    '-o', 'audio.file.type=raw',
-    '-o', 'audio.file.format=s16',
-    '-o', `synth.sample-rate=${RATE}`,
-    '-o', `synth.gain=${gain}`,
-    '-o', `synth.polyphony=${polyphony}`,
-    // ⚠️ synth.lock-memory DEFAULTS TO 1: fluidsynth mlock()s the whole sample
-    // set, so a 141 MB soundfont is 141 MB of RAM that can never be paged out.
-    // On a 2 GB board that is a tenth of everything, held hostage to make
-    // worst-case latency slightly better — a trade worth refusing here.
-    '-o', 'synth.lock-memory=0',
-    soundfont,
-  ];
-  const p = spawn('fluidsynth', args, { stdio: ['pipe', 'pipe', 'pipe'] });
-
-  // fluidsynth writes INTERLEAVED STEREO. The relay framing is mono, matching
-  // demo/carry, so the two channels are averaged rather than one being taken:
-  // dropping a channel loses half of anything panned.
-  const STEREO_BYTES = FRAME * 2 * 2;        // 960 frames x 2 ch x 2 bytes
-  let carry = Buffer.alloc(0);
-  const audioIn = createReadStream(null, { fd: rfd, autoClose: false });
-  audioIn.on('data', (chunk) => {
-    carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
-    while (carry.length >= STEREO_BYTES) {
-      const mono = new Int16Array(FRAME);
-      for (let i = 0; i < FRAME; i++) {
-        mono[i] = (carry.readInt16LE(i * 4) + carry.readInt16LE(i * 4 + 2)) >> 1;
-      }
-      carry = carry.subarray(STEREO_BYTES);
-      onFrame?.(mono);
-    }
-  });
-
-  // Its complaints are the only clue when a soundfont path is wrong, and a
-  // missing soundfont is silent otherwise — it starts, and plays nothing.
-  p.stderr.on('data', (d) => {
-    const s = String(d).trim();
-    if (s && !/^>/.test(s)) onLog?.(s);
-  });
-
-  const cmd = (line) => { if (!p.killed && p.stdin.writable) p.stdin.write(line + '\n'); };
-
-  return {
-    proc: p,
-    soundfont,
-    // ⚠️ THE SAME SHAPE AS `startJackSynth`. box.mjs used to hold two variables,
-    // `fluid` and `jsyn`, and branch on which was set at fourteen sites — every
-    // one of them a place where a new source has to be remembered and a
-    // reviewer has to check both halves. They are two IMPLEMENTATIONS of one
-    // thing, so they return one interface and the caller holds one variable.
-    // `jack: false` is the only honest difference and it is the one thing that
-    // genuinely matters downstream: pappus is a JACK insert, so it cannot wrap
-    // a synth that writes to a pipe.
-    source: 'fluidpipe',
-    jack: false,
-    port: null,
-    channels: 1,
-    rate: RATE,
-    msgPerSec: RATE / FRAME,
-    midi: false,
-    // jsyn calls this `program`; fluidsynth's shell calls it `select`. One name
-    // reaches the caller.
-    program: (channel, prog) => cmd(`select ${channel} 1 0 ${prog}`),
-    // `select <chan> <sfont> <bank> <prog>` — sfont 1 is the first one loaded.
-    // This is the whole multitimbral surface: one call per channel, and the
-    // sixteen channels are then sixteen instruments.
-    select: (channel, program) => cmd(`select ${channel} 1 0 ${program}`),
-    noteOn: (channel, note, vel = 100) => cmd(`noteon ${channel} ${note} ${vel}`),
-    noteOff: (channel, note) => cmd(`noteoff ${channel} ${note}`),
-    cc: (channel, ctrl, val) => cmd(`cc ${channel} ${ctrl} ${val}`),
-    panic: () => { for (let c = 0; c < 16; c++) cmd(`cc ${c} 123 0`); },
-    stop: () => {
-      try { cmd('quit'); } catch { /* already gone */ }
-      // Detach the reader FIRST, so no more frames can be emitted from a
-      // synth that is on its way out — a source that keeps delivering after
-      // stop() is what lets two instruments stream at once.
-      try { audioIn.destroy(); } catch { /* already closed */ }
-      setTimeout(() => {
-        try { p.kill('SIGTERM'); } catch { /* gone */ }
-        // and make sure. `quit` plus SIGTERM left a fluidsynth alive for two
-        // minutes once; SIGKILL after a grace period is the guarantee.
-        setTimeout(() => { try { p.kill('SIGKILL'); } catch { /* gone */ } }, 700);
-        try { unlinkSync(fifo); } catch { /* already gone */ }
-      }, 150);
-    },
-  };
-}
-
-/** Is it installed? A clear answer beats a spawn that fails asynchronously. */
 export function fluidAvailable() {
   try { execFileSync('which', ['fluidsynth'], { stdio: 'pipe' }); return true; }
   catch { return false; }
