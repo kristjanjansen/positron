@@ -129,6 +129,61 @@ async function webTransportFor(url, force) {
 export { ROW, burn, readBurned, hueFor };
 
 /**
+ * WHICH CODEC, AND WHY IT IS NO LONGER `vp8`.
+ *
+ * ⚠️ VP8 IS NOT HARDWARE-DECODED ON QUEST 3 OR QUEST 3S. Meta's own codec table
+ * says so in as many words, while listing AV1 as decoded there — so a headset
+ * software-decodes every frame inside a 13.9 ms budget on a six-core part.
+ * (developers.meta.com/horizon/documentation/web/browser-video/)
+ *
+ * The old `'vp8'` was not a careless choice: it came out of a correct
+ * measurement — Safari's WebCodecs does VP8 720p at 370 fps, which settled that
+ * the encoder was not the bottleneck. But that was measured on a LAPTOP, and a
+ * codec picked for one device's encoder is a claim about every device's
+ * decoder. This project's own rule: being right about a mechanism says nothing
+ * about whether it dominates somewhere else.
+ *
+ * So the publisher PROBES rather than declares, in preference order, and says
+ * which one it got. The subscriber already read the codec out of the catalog —
+ * that end needed no change.
+ *
+ * ⚠️ The MoQ numbers already in HANDOFF (p50 20 ms, 4K30 at zero drops) were
+ * taken on VP8. Pass `codec: 'vp8'` to reproduce them; a run that changes the
+ * codec and compares against them is comparing two different things.
+ */
+export const CODEC_PREFERENCE = [
+  // AV1 first. Hardware-decoded on Quest 3/3S, and what NVIDIA's shipping
+  // CloudXR.js picks for exactly these headsets. Two levels because an encoder
+  // may refuse the higher one: 4.0 covers 1080p30, 3.1 covers 720p30.
+  'av01.0.08M.08',
+  'av01.0.05M.08',
+  // VP9 next: hardware-decoded everywhere that matters and no worse than VP8.
+  'vp09.00.10.08',
+  // VP8 last, and it stays in the list because it is the one with a measurement
+  // behind it. A fallback that has never run is not a fallback.
+  'vp8',
+];
+
+/**
+ * The first candidate this browser will actually encode.
+ *
+ * Asks `isConfigSupported` rather than guessing from a user agent — an error
+ * string cannot tell "codec absent" from "codec refused at this size", and
+ * neither can a UA.
+ */
+async function pickCodec({ want, width, height, framerate, bitrate, log }) {
+  const list = want ? [want] : CODEC_PREFERENCE;
+  for (const codec of list) {
+    const cfg = { codec, width, height, framerate, bitrate, latencyMode: 'realtime' };
+    let sup = null;
+    try { sup = await VideoEncoder.isConfigSupported(cfg); } catch { /* a bad string throws; try the next */ }
+    if (sup?.supported) return { codec, cfg: sup.config ?? cfg };
+    log(`${codec}: this browser will not encode it here`);
+  }
+  return null;
+}
+
+/**
  * Start a MoQ leg.
  *
  * @param out    canvas decoded frames are drawn into
@@ -140,7 +195,7 @@ export { ROW, burn, readBurned, hueFor };
  *               namespace, so two publishers on two devices come out different
  *               colours without anyone allocating them.
  */
-export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null }) {
+export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null, codec = null }) {
   const patternHue = hue ?? hueFor(ns);
   const gop = fps;                                 // 1 s
   const src = document.createElement('canvas');
@@ -152,6 +207,9 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
   const st = {
     version: null, published: false, catalog: null, firstFrameMs: null,
     decoded: 0, wireFrames: 0, badRows: 0, decErrs: 0, encErrs: 0, encoded: 0,
+    // WHICH codec actually ran. The publisher probes, so this is a branch, and
+    // a branch a harness cannot see is a branch nobody asserts.
+    codec: null,
   };
   const samples = [];
   const timers = [];
@@ -175,11 +233,19 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     conn.publish(Path.from(ns), bc);
     st.published = true;
 
+    // Decide the codec BEFORE the catalog, because the catalog is what tells the
+    // far end what to configure. Publishing `vp8` and then encoding something
+    // else is a decoder rejecting a stream that is perfectly fine.
+    const pick = await pickCodec({ want: codec, width: w, height: h, framerate: fps, bitrate: 2_000_000, log });
+    if (!pick) { log('no codec in the preference list can be encoded here', 'bad'); return api(); }
+    st.codec = pick.codec;
+    log(`encoding ${pick.codec}${codec ? ' (asked for)' : ''}`, 'hi');
+
     const catalog = {
       video: {
         renditions: {
           video: {
-            codec: 'vp8', container: { kind: 'legacy' },
+            codec: pick.codec, container: { kind: 'legacy' },
             codedWidth: w, codedHeight: h, framerate: fps, optimizeForLatency: true,
           },
         },
@@ -198,16 +264,26 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     const prod = new Container.Legacy.Producer(vTrack);
 
     const encoder = new VideoEncoder({
-      output: (chunk) => {
+      output: (chunk, metadata) => {
+        // ⚠️ CARRY THE DECODER DESCRIPTION WHEN THERE IS ONE. VP8 needs none, so
+        // this was never missed; AV1 and H.264 hand their parameter sets out
+        // here, exactly once, on the first chunk. Without it the far end
+        // configures a decoder that cannot parse the stream — and the symptom
+        // is decode errors on a publisher that looks perfectly healthy.
+        const desc = metadata?.decoderConfig?.description;
+        if (desc && !catalog.video.renditions.video.description) {
+          const b = desc instanceof ArrayBuffer ? new Uint8Array(desc) : new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
+          let bin = ''; for (const v of b) bin += String.fromCharCode(v);
+          catalog.video.renditions.video.description = btoa(bin);
+          catTrack.writeJson(catalog);            // republish at once, not in 2 s
+          log(`catalog carries a ${b.length}-byte decoder description`);
+        }
         try { prod.encode(chunk, chunk.timestamp, chunk.type === 'key'); st.encoded++; }
         catch (e) { st.encErrs++; log(`producer error ${String(e?.message ?? e).slice(0, 70)}`, 'bad'); }
       },
       error: (e) => { st.encErrs++; log(`encoder error ${String(e?.message ?? e).slice(0, 70)}`, 'bad'); },
     });
-    const cfg = { codec: 'vp8', width: w, height: h, framerate: fps, bitrate: 2_000_000, latencyMode: 'realtime' };
-    const sup = await VideoEncoder.isConfigSupported(cfg);
-    if (!sup.supported) { log('vp8 encode unsupported here', 'bad'); return api(); }
-    encoder.configure(cfg);
+    encoder.configure(pick.cfg);
 
     let i = 0;
     timers.push(setInterval(() => {
