@@ -174,6 +174,7 @@ export async function markIndex(root = document) {
   // A headset gets a different LAYOUT, not a different list — the list is
   // decided by the probes below, which are true or false on a laptop too.
   root.documentElement?.classList.toggle('xr', caps.xr === true);
+  if (caps.xr === true) offerHeadset(root);
 
   for (const row of root.querySelectorAll('.d-row[data-needs]')) {
     const needs = row.dataset.needs.split(' ').filter(Boolean);
@@ -202,4 +203,32 @@ function addWhy(row, text, kind) {
   el.className = kind === 'soft' ? 'd-why soft' : 'd-why';
   el.textContent = text;
   meta.append(el);
+}
+
+
+/**
+ * In a headset, hand over the page that is worth being in rather than making
+ * someone find it.
+ *
+ * ⚠️ THE REASON IS TYPING. A URL with a query string on a virtual keyboard, in
+ * a headset, is enough friction that a measurement does not get taken — and
+ * scrolling a 35-row list with a hand-ray to find one slug is not much better.
+ * The list still has every row in it and nothing is hidden; this is one link
+ * placed above it, and it only exists where it is useful.
+ *
+ * One copy, here, because the deployed index is baked by build.mjs and the
+ * local one renders itself — two copies of a thing both index pages need is
+ * precisely how `rowHTML` printed `undefined` over every demo name for an
+ * afternoon.
+ */
+function offerHeadset(root) {
+  const head = root.querySelector('.d-title');
+  if (!head || root.querySelector('.d-xr-offer')) return;
+  head.insertAdjacentHTML('afterend', `
+    <a class="d-xr-offer" href="/scene/">
+      <span class="k">you are in a headset</span>
+      <span class="n">scene</span>
+      <span class="o">a room built from one number — roll it, and the same number rebuilds it exactly</span>
+      <span class="g">open it, then press “Put it on your face”</span>
+    </a>`);
 }
