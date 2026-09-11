@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. 28 shelled demos of 34 rows,
-**429/429 green** (2026-09-11, every demo, no failures). The front page is
+Live at **https://positron.studio**. 29 shelled demos of 34 rows,
+**437/437 green** (2026-09-11, every demo, no failures). The front page is
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read
@@ -197,6 +197,14 @@ to recover.
 
 ## Platform facts
 
+- **An avfoundation device INDEX is a shared mutable global, exactly like a
+  fixed port.** `ffmpeg -f avfoundation -i ":0"` meant the microphone when
+  `rig/pro-instrument/README.md` was written and means **BlackHole** today —
+  and both read **-91.0 dB**, where one reading proves "this capture is deaf"
+  and the other proves "nothing is playing", which are opposite conclusions
+  from an identical number. The README's own deafness control had been
+  measuring the wrong device. Resolve by NAME from
+  `-list_devices true` every time; `rig/pro-instrument/live-check.mjs` does.
 - **iPhone Safari has NO element Fullscreen API.** Not `requestFullscreen`,
   not `webkitRequestFullscreen` — the only thing that fills an iPhone screen is
   a `<video>`, via the non-standard `HTMLVideoElement.webkitEnterFullscreen()`.
