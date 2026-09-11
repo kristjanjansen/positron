@@ -381,6 +381,29 @@ it in one step is to capture something known to carry signal — the built-in
 microphone cannot be digitally silent in a room, and when it reads 0.00000 the
 browser is deaf, not the device.
 
+### PARKED 2026-09-11: what is done, and the one piece left
+
+**Done and verified:** the browser extension finds and loads plugins from every
+root (`plugins/Stage-73 V2` loads and its meter reads 0.787); the capture
+problem is solved (below); a jazz turnaround written over OSC plays and was
+captured off BlackHole at -10.5 dB with the microphone at -8.9 as its control.
+
+**`midisend.c` is the missing link and is HALF verified.** It builds on the Pro
+with the Command Line Tools, finds `IAC Driver Bus 1` and reports ready — but
+nothing has yet confirmed a note reaching Live through it, because that needs
+the track armed with monitoring In, which is `live-box.mjs`'s job. **Do not
+record it as working until a note moves Live's meter.**
+
+**Left to build — `live-box.mjs`:** join a relay room, turn `note.on`/`note.off`
+into lines on `midisend`'s stdin, and stream BlackHole back as 20 ms frames. Then
+`/box/?room=pro-1` plays Live with no page changes, because the box page does not
+know what a Raspberry Pi is.
+
+⚠️ **It cannot dial out unattended the way the Pi does.** A capture started over
+ssh is deaf, so this service has to live in the user's login session — a
+LaunchAgent or a command in a terminal. That is a real difference from the box
+and it belongs in the README rather than in somebody's surprise.
+
 ### ✅ RESOLVED 2026-09-11: how to capture in the user's session from ssh
 
 The lesson above says a capture started over ssh is deaf. It does not say what
