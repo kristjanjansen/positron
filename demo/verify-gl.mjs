@@ -228,6 +228,15 @@ for (const t of targets) {
     await evalIn(`document.querySelectorAll('.d-controls button')[${i}].click()`);
     await sleep(i === 0 ? (t.settleMs ?? 4000) : 1200);
   }
+  // ⚠️ AND A PAGE WITH NO CONTROLS MUST STILL BE WAITED FOR. `mirror` starts
+  // itself and runs its own checks, so there is nothing to press — pressing
+  // zero buttons and reading immediately would report "asserted nothing" about
+  // a page that was mid-check. Wait for `ready`, bounded, then read whatever is
+  // there and let the count speak.
+  for (let i = 0; i < 60; i++) {
+    if (await evalIn(`!!window.__demo?.ready`)) break;
+    await sleep(500);
+  }
   const asserts = await evalIn(`JSON.stringify(window.__demo?.asserts ?? [])`);
   const list = JSON.parse(asserts || '[]');
   ok('the page asserted something', list.length > 0, `${list.length}`);

@@ -98,6 +98,8 @@ function videoShape() {
   return {
     w: video?.w, h: video?.h, fps: video?.fps, bitrate: video?.bitrate, gop: video?.gop,
     codec: 'avc1.42E01E',        // baseline 3.0 — what h264_v4l2m2m emits here
+    // What actually drew it, read off the renderer rather than declared here.
+    renderer: st.renderer ?? null,
     // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
     // drops silently, so a client MUST compare it against the counter in the
     // payload. A number counted here is not evidence about the far end.

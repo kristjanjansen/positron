@@ -189,6 +189,13 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   render.stdout.pipe(enc.stdin);
 
   let frames = 0, bytes = 0, keys = 0, biggest = 0;
+  // ⚠️ WHICH GPU DREW IT, CAPTURED FROM THE RENDERER'S OWN FIRST LINE. The page
+  // names the chip under its own picture; the streamed picture deserves the
+  // same, or one pane is attributed and the other is anonymous. And it must be
+  // READ rather than declared here: `v3dpipe` prints what EGL actually gave it,
+  // which is the difference between the real v3d driver and a software
+  // rasteriser that would quietly be twenty times slower.
+  let renderer = null;
   const split = createAnnexBSplitter((unit, key) => {
     if (unit === null) { onLog?.('the encoder produced no frame boundary in 4 MB — stopping rather than buffering'); return; }
     frames++; bytes += unit.byteLength; if (key) keys++;
@@ -198,7 +205,13 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   enc.stdout.on('data', split);
   // ⚠️ v3dpipe reports its own timing on STDERR, which is the only place the
   // render rate is visible — its stdout is the pixels.
-  render.stderr?.on('data', (d) => { const t = String(d).trim(); if (t) onLog?.(`render: ${t}`); });
+  render.stderr?.on('data', (d) => {
+    const t = String(d).trim();
+    if (!t) return;
+    const m = t.match(/^renderer\s+(.+?)\s\s/);
+    if (m && !renderer) renderer = m[1].trim();
+    onLog?.(`render: ${t}`);
+  });
   enc.stderr?.on('data', (d) => { const t = String(d).trim(); if (t) onLog?.(`ffmpeg: ${t}`); });
   let stopping = false;
   for (const [name, p] of [['renderer', render], ['encoder', enc]]) {
@@ -210,7 +223,7 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
 
   return {
     ok: true, w, h, fps, bitrate, gop, passes,
-    stats: () => ({ frames, bytes, keys, biggestFrame: biggest,
+    stats: () => ({ frames, bytes, keys, biggestFrame: biggest, renderer,
                     meanFrameBytes: frames ? Math.round(bytes / frames) : 0 }),
     stop: () => {
       stopping = true;
