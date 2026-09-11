@@ -27,7 +27,16 @@ cd workers/view && node build.mjs && npx wrangler deploy    # ALWAYS build first
 `.env` in the cwd shadows machine OAuth. Deploy from a directory without one, or
 `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN npx wrangler deploy`.
 
-Device logs from any phone: `https://pub.positron.studio/logs?format=text`.
+Device logs from any phone or headset:
+`https://pub.positron.studio/logs?format=text`. 🔴 **Those reports used to
+evaporate in under a minute** — the ring buffer was an in-memory array on a
+Durable Object, so an eviction took it with it. MEASURED 2026-09-12: posted at
+02:07:46, read back fine, **gone by 02:08:32**. The failure mode is the worst
+shape there is — the device ships correctly, the reader sees
+`(nothing reported)`, and the obvious conclusion is that the device never sent
+anything, so somebody debugs the device. Persisted to DO storage now and
+re-checked at 120 s. **Any "the phone reported nothing" conclusion drawn before
+2026-09-12 is worthless.**
 Every 06 log opens with `BUILD <sha>-<hhmmss>`, so a report can be attributed.
 Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold start
 — that is expected, not a hang.
