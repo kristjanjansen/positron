@@ -102,6 +102,24 @@ export function startFluid({ soundfont = DEFAULT_SF, gain = 0.6, polyphony = 64,
   return {
     proc: p,
     soundfont,
+    // ⚠️ THE SAME SHAPE AS `startJackSynth`. box.mjs used to hold two variables,
+    // `fluid` and `jsyn`, and branch on which was set at fourteen sites — every
+    // one of them a place where a new source has to be remembered and a
+    // reviewer has to check both halves. They are two IMPLEMENTATIONS of one
+    // thing, so they return one interface and the caller holds one variable.
+    // `jack: false` is the only honest difference and it is the one thing that
+    // genuinely matters downstream: pappus is a JACK insert, so it cannot wrap
+    // a synth that writes to a pipe.
+    source: 'fluidpipe',
+    jack: false,
+    port: null,
+    channels: 1,
+    rate: RATE,
+    msgPerSec: RATE / FRAME,
+    midi: false,
+    // jsyn calls this `program`; fluidsynth's shell calls it `select`. One name
+    // reaches the caller.
+    program: (channel, prog) => cmd(`select ${channel} 1 0 ${prog}`),
     // `select <chan> <sfont> <bank> <prog>` — sfont 1 is the first one loaded.
     // This is the whole multitimbral surface: one call per channel, and the
     // sixteen channels are then sixteen instruments.
