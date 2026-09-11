@@ -78,7 +78,7 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave, and the arrows and the die move through the patches the board actually has — it reads its own instrument library and sends back the names, so every one of them makes a sound.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave, and the arrows and the die move through the patches the board actually has — it reads its own instrument library and sends back the names, so every one of them makes a sound. 1965 is an instrument too: the board plays a random hour of Estonian radio from that year straight off the national archive, and the granular switch beside it chews up whatever is playing, radio or synth alike.',
     readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s' },
     controls: [
       { id: 'oct-', label: '−' },
@@ -148,7 +148,14 @@
   //
   // ⚠️ The AUDIO archive. The 298 video items from 1965 are silent 16 mm film
   // negatives, so the obvious half of the archive granulates nothing.
-  const fx1965 = el('button', '', '1965', { type: 'button', title: 'load a minute of Estonian radio from 1965 into the grains' });
+  // ⚠️ NOT LABELLED 1965 ANY MORE. There is a `1965` on the instrument row now
+  // and it means something else: that one PLAYS the broadcast, live, as the
+  // thing the insert is wrapping. This one FREEZES a minute of it into the
+  // grain buffers, after which the keys play that minute and the instrument
+  // underneath goes quiet. The engine's own comment calls the two "genuinely
+  // different instruments", and two buttons wearing one word is the kind of
+  // thing this project has already paid for twice.
+  const fx1965 = el('button', '', 'load', { type: 'button', title: 'freeze a minute of 1965 into the grain buffers, so the keys play it' });
   fx1965.disabled = true;
   fx1965.onclick = () => {
     fx1965.dataset.busy = '1';
@@ -335,6 +342,15 @@
       if (avail && avail[k] === false) continue;
       mk(k, k, { type: 'audio.start', source: k }, true);
     }
+    // 1965 IS A SOURCE, NOT A FEATURE OF THE GRANULATOR. It belongs on this row
+    // because that is what it is: something making sound into the board's audio
+    // graph, the same as the synths beside it. The granular insert then works
+    // on it exactly as it works on them — switch the insert off and you hear
+    // the broadcast raw, switch it on and you hear it granulated — and nothing
+    // downstream needs a special case for it.
+    if (!avail || avail.archive !== false) {
+      mk('1965', 'archive', { type: 'audio.start', source: 'archive' }, true);
+    }
     arm(armed);
   }
   let armed = null;
@@ -463,6 +479,17 @@
           d.log(`loaded in ${m.tookMs} ms — the keys now play this`, 'hi');
         } else d.log(`1965: ${m.reason}`, 'warn');
       }
+      // What the archive is playing. It goes on `sourceLine` — the line that
+      // already names what is IN the sound rather than what is making it —
+      // because that is the same question whether the material is in the grain
+      // buffers or coming down the wire live.
+      if (m.type === 'audio.started' && m.ok) {
+        if (m.archive) {
+          sourceLine.textContent = '';
+          sourceLine.append(el('b', '', m.archive.title || m.archive.slug),
+                            ` · ${m.archive.date} · ERR archive, from ${m.archive.atSec} s in`);
+        } else if (m.source !== 'archive') sourceLine.textContent = '';
+      }
       if (m.type === 'audio.started') {
         for (const c of picks.querySelectorAll('button')) delete c.dataset.busy;
         // Nothing playing on arrival: start the cheap instrument rather than
@@ -484,7 +511,9 @@
 
           // An insert can only reach a JACK instrument. FluidSynth writes to a
           // pipe, so the switch is disabled rather than offered and refused.
-          const wrappable = m.source === 'hexter' || m.source === 'yoshimi';
+          // Anything on the JACK graph can be wrapped, and the archive is on it.
+          // fluidsynth is the exception and always was: it writes to a pipe.
+          const wrappable = m.source === 'hexter' || m.source === 'yoshimi' || m.source === 'archive';
           fxBtn.disabled = !wrappable;
           fxBtn.title = wrappable ? 'granular insert' : 'fluidsynth writes to a pipe, not to JACK';
           if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; fx1965.disabled = true; }

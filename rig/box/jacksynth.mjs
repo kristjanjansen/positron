@@ -117,6 +117,62 @@ export const JACK_SYNTHS = {
     alsaMatch: /yoshimi/i,
     osc: false,
   },
+
+  /**
+   * 1965, AS A SOURCE RATHER THAN AS A FEATURE OF THE GRANULATOR.
+   *
+   * It sits beside the synths because that is what it is: something that makes
+   * sound into the JACK graph. Pappus is an INSERT over whatever is playing, so
+   * with pappus off you hear the broadcast raw, and with pappus on you hear it
+   * granulated — and neither case needs a line of its own anywhere downstream.
+   * That is the whole reason to do it this way instead of as a second kind of
+   * thing.
+   *
+   * ⚠️ TWO PROCESSES, BECAUSE FFMPEG HAS NO JACK MUXER. `ffmpeg -devices` lists
+   * jack as `D` — a demuxer only — so it can READ the graph (that is how the
+   * capture works) and cannot write to it. The way across is the loopback card
+   * `snd-aloop`, which `setup.sh` already loads for exactly this class of
+   * problem: ffmpeg plays into its playback side, `alsa_in` reads its capture
+   * side and registers an ordinary JACK client.
+   *
+   * The cost is one resampling between two unsynchronised clocks, inside
+   * `alsa_in`. A granulator could not care less; for raw playback it is a
+   * correction every few minutes, and the honest alternative — a player with a
+   * native JACK output — is not installed on this board (no mpv, no sox).
+   *
+   * ⚠️ `-re` IS A PER-INPUT OPTION and there is one input, so it belongs where
+   * it is. Without it ffmpeg pulls the whole broadcast as fast as the network
+   * allows and the loopback card's buffer is the only thing pacing it.
+   */
+  archive: {
+    needs: ['jackd', 'ffmpeg', 'alsa_in'],
+    // ffmpeg has to open the network stream, and alsa_in has to see a running
+    // playback side before it reports a sane rate. Four seconds covers both on
+    // this board; the port check below is what actually decides.
+    warmup: 5000,
+    portMatch: /^err1965:capture_1$/,
+    spawnAll: ({ hls, atSec = 0 } = {}) => [
+      // ⚠️ `-stream_loop -1`, BECAUSE A BROADCAST ENDS. Measured: the source
+      // went silent about six minutes in and everything downstream looked
+      // healthy — ffmpeg had simply reached the end of a fifteen-minute sports
+      // diary and exited normally. `alsa_in` keeps its JACK port either way, so
+      // the graph still had `err1965:capture_1` on it, streaming silence. The
+      // box is an OBJECT rather than a SESSION (plan-hardware §8.7): it is
+      // supposed to still be playing at three in the morning.
+      spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error',
+                       '-stream_loop', '-1',
+                       '-re', '-ss', String(atSec), '-i', String(hls),
+                       '-ac', '2', '-ar', String(RATE),
+                       '-f', 'alsa', 'plughw:Loopback,0'],
+            { stdio: ['ignore', 'pipe', 'pipe'] }),
+      // `-j` names the JACK client, which is what portMatch above looks for.
+      // Device 1 is the other end of device 0 on snd-aloop: what is written to
+      // one is readable on the other.
+      spawn('alsa_in', ['-j', 'err1965', '-d', 'plughw:Loopback,1',
+                        '-r', String(RATE), '-c', '2'],
+            { stdio: ['ignore', 'pipe', 'pipe'] }),
+    ],
+  },
 };
 
 /**
@@ -275,6 +331,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   if (missing.length) return { ok: false, reason: `not installed: ${missing.join(', ')}` };
 
   const procs = [];
+  let stopping = false;               // so an orderly teardown is not reported as a death
   // 1. a clock with no hardware
   // Ask JACK, not the process table. `pgrep -x jackd` reports a server this
   // process may not be able to REACH — a different mount namespace, a different
@@ -316,8 +373,17 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   }
 
   // 3. the instrument
-  const synth = def.spawn(opts);
-  procs.push(synth);
+  //
+  // `spawnAll` rather than `spawn` for a source that is more than one process.
+  // The archive needs two — ffmpeg decoding into the loopback card, and
+  // `alsa_in` bridging that card into JACK — because ffmpeg has NO JACK MUXER
+  // (`ffmpeg -devices` lists jack as `D`, a demuxer, only), so the loopback hop
+  // is not avoidable. Everything downstream is unchanged: whichever of them
+  // registers the JACK port `portMatch` finds is the thing that gets patched,
+  // exactly like a synth's output.
+  const spawned = def.spawnAll ? def.spawnAll(opts) : [def.spawn(opts)];
+  procs.push(...spawned);
+  const synth = spawned[spawned.length - 1];
   let log = '';
   // ⚠️ FORWARD STDOUT TOO. sclang reports through `postln`, which is stdout —
   // so "PAPPUS READY" and every engine error were being collected into a
@@ -336,8 +402,20 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     if (!t || /^@ \w+/.test(t) || /^(sc3>|->)/.test(t)) return;
     onLog?.(t);
   };
-  synth.stdout?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
-  synth.stderr?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
+  for (const pr of spawned) {
+    pr.stdout?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
+    pr.stderr?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
+    // ⚠️ SAY WHEN ONE OF THEM DIES. A source is more than one process now, and
+    // the one that makes the sound is not the one that holds the JACK port:
+    // `alsa_in` keeps `err1965:capture_1` registered whether or not anything is
+    // being written to the loopback card, so a dead feeder presents as a
+    // perfectly healthy graph carrying digital silence. That is this project's
+    // oldest failure shape and the only defence is to report the fact.
+    pr.on('exit', (code, sig) => {
+      if (stopping) return;               // an orderly teardown is not news
+      onLog?.(`⚠ ${pr.spawnfile} exited (${sig ?? code}) — this source is no longer making sound`);
+    });
+  }
   await wait(def.warmup ?? (name === 'yoshimi' ? 13000 : 6000));
 
   // 3. capture — raw s16 on stdout, read straight into the frame pump
@@ -365,7 +443,11 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
 
   // 5. MIDI in, through virmidi
   const vm = findVirmidi();
-  const alsa = sh('aconnect -l').split('\n').find((l) => /^client \d+:/.test(l) && def.alsaMatch.test(l));
+  // A source need not have MIDI at all — the archive is a recording, not an
+  // instrument — so `alsaMatch` is optional rather than assumed.
+  const alsa = def.alsaMatch
+    ? sh('aconnect -l').split('\n').find((l) => /^client \d+:/.test(l) && def.alsaMatch.test(l))
+    : null;
   const alsaClient = alsa?.match(/client (\d+):/)?.[1];
   let midiFd = null;
   if (vm && alsaClient) {
@@ -416,6 +498,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     panic: () => { for (let c = 0; c < 16; c++) midi([0xb0 | c, 123, 0]); },
     osc,
     stop: () => {
+      stopping = true;                // an orderly teardown is not a death
       try { udp?.close(); } catch { /* already closed */ }
       if (midiFd !== null) { try { closeSync(midiFd); } catch {} }
       for (const p of procs) { try { p.kill('SIGTERM'); } catch {} }
