@@ -111,6 +111,10 @@
   .pane:fullscreen .bar .sp { display: none; }
   .pane:fullscreen .bar .knobs { justify-self: center; }
   .pane:fullscreen .bar button.ico { justify-self: end; }
+  .bar .left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  /* In the bar the label is not a floating caption any more, so it drops the
+     plate it needed to stay readable over a picture. */
+  .lab.inbar { position: static; background: none; padding: 0; }
 </style>
 
 <script type="module">
@@ -150,7 +154,12 @@
     // The bar under each picture: that picture's numbers, and the one control
     // that belongs to a picture rather than to the page.
     const bar = el('div', 'bar');
+    // A group, so the label and the numbers occupy ONE cell when the bar
+    // becomes a three-column grid in fullscreen — otherwise the label takes a
+    // column of its own and the knobs stop being in the middle.
+    const left = el('span', 'left');
     const nums = el('span', 'stat', '—');
+    left.append(nums);
     // ⛶ U+26F6 SQUARE FOUR CORNERS — the conventional fullscreen glyph, and it
     // renders as text rather than as an emoji, so it takes the bar's colour and
     // sits on its baseline instead of arriving as a coloured picture at a size
@@ -164,16 +173,36 @@
       if (document.fullscreenElement === p) document.exitFullscreen();
       else p.requestFullscreen?.().catch((e) => d.log(`fullscreen refused — ${e.message}`, 'warn'));
     };
-    bar.append(nums, el('span', 'sp'), full);
+    bar.append(left, el('span', 'sp'), full);
     p.append(c, lab);
     const wrap = el('div', 'pane');
     wrap.style.position = 'static';
     panes.append(p);
     p.append(bar);
-    return { p, c, lab, nums, full };
+    return { p, c, lab, nums, full, left };
   };
-  const local = mk('<b>here</b> — your browser');
-  const far = mk('<b>the box</b> — a Raspberry Pi, over the internet');
+  // ⚠️ THE LABEL NAMES THE THING THAT DREW THE PICTURE, not the side of the
+  // screen it is on. "here" and "the box" say where to look; the chip says what
+  // you are looking at, which is the comparison the page exists to make. Until
+  // each end reports, it says what it can.
+  const WHERE = { here: 'in your browser', box: 'on a Raspberry Pi, over the internet' };
+  const chip = { here: null, box: null };
+  // ⚠️ DECLARED HERE BECAUSE `relabel` READS IT, and `relabel` is called while
+  // the panes are being built. A `let` further down is in the temporal dead
+  // zone until its line runs, so the first call threw at module scope — a blank
+  // page, no asserts, and a harness reporting "the page reports no renderer".
+  // Second time in this file; the first was `knobRow`.
+  let lockedFrame = null, lockedAt = 0;
+  function relabel(which) {
+    const pane = which === 'here' ? local : far;
+    const name = chip[which] ?? (which === 'here' ? 'your browser' : 'a Raspberry Pi');
+    const lock = which === 'here' && lockedFrame !== null ? ' · locked' : '';
+    pane.lab.innerHTML = '';
+    pane.lab.append(el('b', '', name), document.createTextNode(` — ${WHERE[which]}${lock}`));
+  }
+  const local = mk('');
+  const far = mk('');
+  relabel('here'); relabel('box');
   const farNone = el('div', 'none', 'Waiting…');
   far.p.append(farNone);
   d.el.prepend(panes);
@@ -198,7 +227,7 @@
   // this repo measured.
   const KNOBS = {
     // 2 is a single fold — almost a mirror down the middle. 24 is a doily.
-    mirrors: { label: 'mirrors', steps: [['2', 2], ['16', 16], ['24', 24]], at: 1 },
+    mirrors: { label: 'mirrors', steps: [['2', 2], ['8', 8], ['24', 24]], at: 1 },
     // The noise frequency, which decides whether the shapes are continents or
     // filigree. An eightfold span, because a doubling is not visible here.
     grain:   { label: 'grain',   steps: [['coarse', 1.2], ['mid', 4], ['fine', 16]], at: 1 },
@@ -208,7 +237,16 @@
     // palette in one number: near zero the three channels move together and the
     // picture is a duotone sweep; at 1 it is the rainbow; past 1 the offsets
     // wrap and the hues come back round in a different order.
-    hue:     { label: 'hue',     steps: [['close', 0.12], ['mid', 1], ['wide', 2.2]], at: 1 },
+    // ⚠️ 2.2 WAS NOT "WIDER", IT WAS THE SAME RAINBOW RESHUFFLED, and it looked
+    // it. Three phases a third of a turn apart is the MAXIMUM colour separation
+    // there is — anything past that wraps and lands somewhere else on the
+    // circle with no more spread than before, which is why `mid` and `wide`
+    // were hard to tell apart. 1.5 is the interesting place instead: the green
+    // channel goes half a turn while red and blue come back to nearly the same
+    // phase, so the picture splits into two opposed colours — magenta against
+    // green — rather than running through all of them. Checked by sweeping
+    // 0.12/0.45/1.0/1.5/1.8/2.2 and looking at the six.
+    hue:     { label: 'hue',     steps: [['close', 0.12], ['full', 1], ['split', 1.5]], at: 1 },
   };
   const knobRow = el('div', 'knobs');
   for (const [key, k] of Object.entries(KNOBS)) {
@@ -242,8 +280,22 @@
   document.addEventListener('fullscreenchange', () => {
     const fs = document.fullscreenElement;
     const pane = [local, far].find((p) => p.p === fs);
-    if (pane) pane.p.querySelector('.bar').insertBefore(knobRow, pane.full);
-    else d.el.insertBefore(knobRow, panes);
+    if (pane) {
+      pane.p.querySelector('.bar').insertBefore(knobRow, pane.full);
+      // ⚠️ AND THE LABEL COMES DOWN TOO. It is drawn ON TOP of the picture,
+      // which is fine in a 340-pixel pane and wrong across a whole screen —
+      // a caption floating over the middle of the thing you went fullscreen to
+      // look at. In the bar it sits beside the numbers, which is where the rest
+      // of what this pane has to say already is.
+      pane.lab.classList.add('inbar');
+      pane.left.insertBefore(pane.lab, pane.nums);
+    } else {
+      for (const q of [local, far]) {
+        q.lab.classList.remove('inbar');
+        q.p.insertBefore(q.lab, q.c.nextSibling);
+      }
+      d.el.insertBefore(knobRow, panes);
+    }
   });
 
   function choose(key, idx) {
@@ -277,10 +329,13 @@
   // second of text moving for no reason the reader can see. A dash holds the
   // place instead, which is also honest: it says "not yet", where an absent
   // field says nothing at all.
+  // ⚠️ NO `note` FIELD ANY MORE. The renderer's name moved to the label, where
+  // it belongs: the bar is measurements, and a name sitting among them read as
+  // one. What is left here can all change.
   const FIELDS = {
-    here: [['fps', 'fps', (v) => v.toFixed(1)], ['note', '', (v) => v]],
+    here: [['fps', 'fps', (v) => v.toFixed(1)]],
     box: [['fps', 'fps', (v) => v.toFixed(1)], ['kbit', 'kbit/s', (v) => v.toFixed(0)],
-          ['lost', 'lost', (v) => String(v)], ['note', '', (v) => v]],
+          ['lost', 'lost', (v) => String(v)]],
   };
   function stat(which, fields) {
     const pane = which === 'here' ? local : far;
@@ -289,7 +344,6 @@
     pane.nums.innerHTML = FIELDS[which].map(([key, unit, fmt]) => {
       // `note` is the only field with nothing to hold a place for — it is a
       // name, not a measurement, and an empty one should take no room.
-      if (key === 'note') return v.note ? `<span class="dim">${v.note}</span>` : '';
       const shown = v[key] == null ? '—' : fmt(v[key]);
       return `<span class="n">${shown}</span>${unit ? ' ' + unit : ''}`;
     }).filter(Boolean).join(' · ');
@@ -340,7 +394,8 @@
   // driving `uT` from it puts both panes on the same instant. Then anything
   // still visibly different between them is the PIPELINE, which is the thing
   // worth looking at.
-  let lockedFrame = null, lockedAt = 0;
+  // (`lockedFrame` and `lockedAt` are declared with `chip`, above, because
+  // `relabel` reads them while the panes are still being built.)
 
   function compile(type, src) {
     const s = gl.createShader(type);
@@ -363,7 +418,8 @@
   if (!gl) {
     local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
     d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
-    stat('here', { note: 'no WebGL2 here' });
+    chip.here = 'no WebGL2';
+    relabel('here');
   } else {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
@@ -382,7 +438,8 @@
     // The part worth printing is what follows "Renderer:".
     const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
       ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
-    stat('here', { note: short.trim().slice(0, 32) });
+    chip.here = short.trim().slice(0, 32);
+    relabel('here');
 
     const prog = gl.createProgram();
     gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
@@ -422,9 +479,9 @@
       if (lockedFrame !== null && performance.now() - lockedAt > 1000) {
         lockedFrame = null;
         i = Math.max(i, 1);
-        local.lab.innerHTML = '<b>here</b> — your browser';
+        relabel('here');
         d.log('the box stopped sending — this pane is free-running again', 'warn');
-        stat('box', { fps: null, kbit: null, note: 'not arriving' });
+        stat('box', { fps: null, kbit: null });
       }
       gl.uniform1f(uT, (lockedFrame ?? i) / 30);
       gl.uniform2f(uRes, W, H);
@@ -473,14 +530,14 @@
         // fault — it is the cue to ask. Anything else is worth a line.
         if (/no picture running/.test(msg.reason || '')) { askForPicture(); return; }
         d.log(`the box is not drawing — ${msg.reason}`, msg.available === false ? 'bad' : 'warn');
-        stat('box', { note: 'unavailable' });
+
         return;
       }
       d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} — ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
       // The box names its GPU the same way this page names yours. It arrives on
       // the second status at the latest, because the renderer prints it on its
       // own first line and the reply may be composed before that lands.
-      if (msg.renderer) stat('box', { note: msg.renderer });
+      if (msg.renderer) { chip.box = msg.renderer; relabel('box'); }
       // ⚠️ TELL THE BOX WHAT THIS PAGE IS SET TO. The knobs only sent on a
       // press, so at load the page rendered its own defaults and the box
       // rendered ITS defaults — and the two agreed only because the numbers
@@ -534,8 +591,13 @@
     // Back to free-running, and SAY SO. A pane that silently stopped being
     // locked would be two different claims wearing one label.
     lockedFrame = null;
-    local.lab.innerHTML = '<b>here</b> — your browser';
-    stat('box', { fps: null, kbit: null, note: 'not arriving' });
+    relabel('here');
+    // ⚠️ NO `note` HERE EITHER. The bar stopped rendering it when the renderer
+    // name moved to the label, but the write stayed — so `__demo.panes.box`
+    // carried "not arriving" beside a live 27.7 fps. Nothing on screen showed
+    // it, which is worse: the machine surface and the picture disagreed and
+    // only a harness would ever have noticed.
+    stat('box', { fps: null, kbit: null });
     // ⚠️ "Waiting…" HAS TO BE TRUE. Saying it and then doing nothing is the
     // worst of both: a reader waits for something nobody is asking for. The
     // page re-asks, and the word is a promise it keeps.
@@ -559,10 +621,7 @@
         vf.close();
         farDecoded++;
         farNone.remove();
-        // ⚠️ CLEAR THE STALE NOTE. "not arriving" was left behind by an earlier
-        // close and sat next to a live frame rate — a bar saying both at once
-        // is worse than one saying neither.
-        if (window.__demo.panes.box.note) stat('box', { note: null });
+
       },
       error: (e) => d.log(`decode error — ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
     });
@@ -584,8 +643,9 @@
       // The board's sequence number is its frame counter — see the comment at
       // `lockedFrame`. Taken here, before the decode, because a frame the
       // decoder refuses is still a frame the board drew.
-      if (lockedFrame === null) local.lab.innerHTML = '<b>here</b> — your browser, locked to the box';
+      const wasFree = lockedFrame === null;
       lockedFrame = s; lockedAt = performance.now();
+      if (wasFree) relabel('here');
       farBytes += e.data.byteLength;
       // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
       // is an error it reports once and then stays broken through, so a joiner
