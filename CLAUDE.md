@@ -1,7 +1,10 @@
 # positron
 
-Live at **https://positron.studio**. 26 of 30 demos built, **413/413 green**
-(2026-09-09, every demo, no failures). Read
+Live at **https://positron.studio**. 28 shelled demos of 34 rows,
+**429/429 green** (2026-09-11, every demo, no failures). The front page is
+ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
+it, because the index answers "what is new here?" and the sequence answers
+"where do I start?". Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when.
 
@@ -312,6 +315,13 @@ to recover.
 - **MediaRecorder output reports `duration: Infinity`**, which leaves a
   transport bar with no range to scrub. Seek far past the end, let the browser
   resolve the duration, then come back.
+- **The same suite read 425/429 and then 429/429, forty minutes apart, with no
+  code between them.** All four failures were `now`, all downstream of frames
+  never arriving, and a single two-byte range GET on the live edge segment
+  answered **403 with no ACAO** while the playlists beside it were fine. So
+  before treating a red `now`/`flipper` as a regression, ASK ERR — one range
+  request separates "our code broke" from "the schedule moved", and they look
+  identical from the harness.
 - **ERR blocks live segments by PROGRAMME, not by age.** The playlists are open
   (200 + `access-control-allow-origin: *`), the segments under `/live/hls/` can
   be 403 with NO ACAO — which reaches a browser as a CORS failure, so hls.js
@@ -362,6 +372,19 @@ counts against the last known total after any change.
   URLs that live in modules, harnesses and comments, none of which are
   type-checked — grep the OLD form everywhere.** The same rename left
   `verify-native.mjs` pointed at a 404, which is the iPhone path.
+- **What a demo REQUIRES is read off its `tags`, never listed twice.**
+  `demo/shell/caps.mjs` maps a tag to a capability (`WebGL2` -> `webgl2`,
+  `getUserMedia` -> `camera`), probes this browser once, and un-links rows the
+  browser cannot run **with the reason in words** — a vanished row says the
+  demo does not exist, which is a different and false statement. Three rules
+  the file exists to hold: it is a **capability test, never a user-agent
+  check** (a headset browser is Chromium, and research/quest-xr §1.7 measured
+  that a Quest 3 and a 3S are indistinguishable by UA); a probe that could not
+  answer returns **`unknown`, which never blocks**, because "we did not look"
+  must not read as "it is missing"; and `midi` is deliberately soft, since
+  `instrument` keeps playing from its on-screen keys. Proved by breaking it:
+  the same page under `--disable-gpu` un-links `mirror` with *"this browser
+  draws no 3-D"* and links it with the GPU on.
 - **The generated test picture is `demo/shell/pattern.mjs` and nothing else.**
   Six demos draw it and `src/publish.sh` generates its ffmpeg filter by calling
   it; `workers/pub/container/server.mjs` holds a marked copy because that image
