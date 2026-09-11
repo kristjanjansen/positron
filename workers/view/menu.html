@@ -25,10 +25,8 @@
   // why in words. demo/index.html calls the same function on rows it rendered
   // itself, so there is one copy of the rule.
   import { markIndex } from '/shell/caps.mjs';
-  const caps = await markIndex(document);
-  if (caps.xr === true) {
-    document.querySelector('.d-title').insertAdjacentHTML('beforeend',
-      '<p class="d-sub">bigger type and taller rows, because you are in a headset</p>');
-  }
+  // markIndex also puts the headset offer at the top when there is one —
+  // one copy, in caps.mjs, because both index pages need it.
+  await markIndex(document);
 </script>
 </html>

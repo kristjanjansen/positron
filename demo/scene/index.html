@@ -39,7 +39,18 @@
   // them from a laptop. So a headset with no cable can still report, and the one
   // claim it cannot make on its own is the one about its own hardware — which is
   // why the report says so in its own header rather than leaving it out.
-  const REPORT = new URLSearchParams(location.search).has('report');
+  // ⚠️ ON BY DEFAULT WHEN THERE IS A HEADSET, AND ONLY THEN. Typing
+  // `?report=1` on a virtual keyboard, in a headset, is exactly the kind of
+  // friction that means a measurement never gets taken — and it was the only
+  // way to turn this on. But defaulting it on for EVERYONE would POST a log
+  // from every desktop visitor, which is somebody else's traffic in our
+  // diagnostics and nobody's idea of consent.
+  //
+  // So it is capability-gated like everything else here: a browser that reports
+  // `immersive-vr` is a browser someone is wearing, and that is the only case
+  // where these lines are wanted. `?report=1` forces it on anywhere (the laptop,
+  // for checking the shipper itself), `?report=0` forces it off.
+  const REPORT_PARAM = new URLSearchParams(location.search).get('report');
   let ship = null;
 
   /** Is `navigator.xr` the browser's, or something installed over it? */
@@ -503,7 +514,10 @@
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
   publishXR();
-  if (REPORT) {
+  async function maybeReport() {
+    if (REPORT_PARAM === '0') return;
+    const headset = await navigator.xr?.isSessionSupported('immersive-vr').catch(() => false);
+    if (REPORT_PARAM !== '1' && !headset) return;
     ship = createShipper();
     const nx = nativeXR();
     // ⚠️ EVERY REPORT OPENS WITH A BUILD STAMP, so "still broken" and "the fix
@@ -515,12 +529,16 @@
     ship(`renderer ${rendererName}`);
     ship(`window ${innerWidth}x${innerHeight} css · dpr ${devicePixelRatio}`);
     ship(`⚠️ SELF-REPORTED. This page cannot read its own hardware; only adb getprop can.`);
-    navigator.xr?.isSessionSupported('immersive-vr').then(
-      (v) => ship(`immersive-vr supported: ${v}`), () => ship('immersive-vr: the browser would not answer'));
+    ship(`immersive-vr supported: ${headset}${REPORT_PARAM === '1' && !headset ? ' (forced on with ?report=1)' : ''}`);
+    // ⚠️ WRAP `d.assert` RATHER THAN COPYING THE LIST. Every assert this page
+    // makes ships, including ones added later by someone who never reads this
+    // block — a second list of "things worth reporting" would go stale the
+    // first time an assert was added, and go stale silently.
     const origAssert = d.assert;
     d.assert = (label, pass, detail) => { ship(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`); return origAssert(label, pass, detail); };
     d.log('reporting to pub.positron.studio — read it with /logs?format=text');
   }
+  maybeReport();
   d.set('view', 'window');
   d.set('refused', 0);
   // A room to stand in before anything is pressed, so the stage is never empty.
