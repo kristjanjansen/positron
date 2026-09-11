@@ -117,6 +117,16 @@ transport bar — while looking fine, because the readout had been filled at loa
 Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.
 Fire them and move on; sound is allowed to be late, the timeline is not.
 
+**A second browser of your own is a harness that reads broken.** A full run
+went 429/429, then 420/429 with nine failures, then 429/429 again with no code
+between them — and all nine were in the three demos that depend on something
+outside the machine (`carry`'s relay socket opened 0 times, `shout` read
+`peak rms 0.0000`, `now` showed no frames). The cause was two probe Chromes of
+mine still holding relay sockets and bandwidth while the suite ran. Re-running
+just those three gave 57/57. So **before calling a red run a regression, run the
+failing demos ALONE** — it costs a minute and it separates "my change broke it"
+from "I was competing with myself", which look identical in the output.
+
 **A harness and a dev server that share a port is a harness that reads broken.**
 `node demo/verify.mjs` died with an unhandled `EADDRINUSE` three separate times
 in one session because `node demo/server.mjs` was still holding 8890 — each
@@ -187,6 +197,29 @@ to recover.
 
 ## Platform facts
 
+- **iPhone Safari has NO element Fullscreen API.** Not `requestFullscreen`,
+  not `webkitRequestFullscreen` — the only thing that fills an iPhone screen is
+  a `<video>`, via the non-standard `HTMLVideoElement.webkitEnterFullscreen()`.
+  iPad is different (iPadOS carries the prefixed element API), so **"iOS" is the
+  wrong unit** and the capability has to be asked, not branched on by platform.
+  `mirror`'s ⛶ did nothing at all on an iPhone because `p.requestFullscreen?.()`
+  **optional-chains straight past a missing method**: no throw, no `catch`, no
+  log line, no picture — optional chaining is an excellent way to build a
+  control that looks live and is inert. `demo/shell/fullscreen.mjs` tries the
+  real API, falls back to a `position:fixed` cover that needs no API, and says
+  which ran. ⚠️ **Style it with a CLASS, never `:fullscreen`** — a browser that
+  does not know that pseudo-class discards the entire selector list it appears
+  in, so `.pane:fullscreen, .pane.d-full { … }` would delete the fallback on
+  precisely the browsers that need it. And the utility needs (0,2,0): MEASURED,
+  a bare `.d-faux` lost to a page's own `.pane { position: relative }` on source
+  order and the cover stayed 338px wide inside its grid.
+- **A long press on a control raises the iOS text LOUPE, and `user-select:
+  none` does not stop it.** `-webkit-touch-callout: none` is the one that does.
+  Photographed on `/box/` and `/mirror/`: the magnifier over the piano keys and
+  selection handles dragged across a readout. Controls and keys now carry it
+  along with `touch-action: manipulation`, which also drops the 300 ms
+  double-tap wait so a key sounds when it is pressed. Prose, readouts and the
+  log stay selectable — copying a number out of those is a real thing to want.
 - **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()` is now TRUE on
   iPhone. Any fallback written `if (!Hls.isSupported() && canPlayType(...))`
   silently stopped firing.
