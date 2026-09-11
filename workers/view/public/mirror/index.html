@@ -36,6 +36,25 @@
   }
   .bar button:hover { color: var(--fg); border-color: var(--dim); }
   .bar button.ico { font-size: 14px; line-height: 1; padding: 3px 8px; }
+  /* One row, two groups. They sit ABOVE both pictures because they change both
+     — a control that belongs to one pane goes in that pane's bar, and these do
+     not. */
+  .knobs { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 14px 0 0; }
+  .knob { display: flex; align-items: center; gap: 6px; font: 400 11px/1.5 var(--mono); color: var(--dim); }
+  .knob .seg { display: flex; gap: -1px; }
+  .knob button {
+    font: 400 11px/1 var(--mono); color: var(--dim);
+    background: transparent; border: 1px solid var(--line);
+    padding: 5px 10px; cursor: pointer;
+  }
+  .knob button:first-of-type { border-radius: 4px 0 0 4px; }
+  .knob button:last-of-type { border-radius: 0 4px 4px 0; }
+  .knob button + button { border-left: none; }
+  .knob button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+  /* ⚠️ Focus is GREY here. shell.css focuses with `var(--hi)`, the same colour
+     as the chosen state, so a focused-but-unchosen button read as chosen — the
+     exact trap the box page already paid for. */
+  .knob button:focus-visible { outline: 2px solid var(--dim); outline-offset: 1px; }
   /* ⚠️ In fullscreen the PANE is the fullscreen element, so the canvas has to be
      told to fill it — a canvas keeps its attribute size otherwise and sits in
      the middle of a black screen at 640x360. `contain`, never `cover`: this is a
@@ -122,6 +141,56 @@
   d.el.prepend(panes);
 
   /**
+   * ⚠️ TWO KNOBS, AND THEY DRIVE BOTH PANES. A control that moved only the
+   * local picture would break the one claim this page makes — that the two
+   * sides are the same shader — and would do it invisibly, because the panes
+   * would simply stop matching and look like a bug. So each press sets the
+   * local uniform AND sends `video.params` to the box.
+   *
+   * They are the two things the paragraph already names: the kaleidoscope fold
+   * and the feedback. Three steps each rather than a slider, because a slider
+   * here is a hundred values nobody wants and a number nobody can repeat.
+   */
+  const KNOBS = {
+    mirrors:  { label: 'mirrors',  steps: [['4', 4], ['8', 8], ['16', 16]], at: 1 },
+    feedback: { label: 'feedback', steps: [['low', 0.25], ['mid', 0.62], ['high', 0.88]], at: 1 },
+  };
+  const knobRow = el('div', 'knobs');
+  for (const [key, k] of Object.entries(KNOBS)) {
+    const wrap = el('div', 'knob');
+    wrap.append(el('span', '', k.label));
+    const seg = el('div', 'seg');
+    k.buttons = k.steps.map(([text, value], idx) => {
+      const b = el('button', '', text, { type: 'button', 'aria-pressed': String(idx === k.at) });
+      b.onclick = () => choose(key, idx);
+      seg.append(b);
+      return b;
+    });
+    wrap.append(seg);
+    knobRow.append(wrap);
+  }
+
+  // ⚠️ AFTER the row is built. `const knobRow` is in the temporal dead zone
+  // until its declaration runs, so inserting it earlier throws before anything
+  // is drawn — and a page that throws at module scope shows a blank frame with
+  // no log line to say why.
+  d.el.insertBefore(knobRow, panes);
+
+  function choose(key, idx) {
+    const k = KNOBS[key];
+    k.at = idx;
+    k.buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === idx)));
+    const value = k.steps[idx][1];
+    // The local picture changes on the next frame; the box changes when the
+    // message lands, which is a hop away. They converge, and the panes being
+    // briefly different IS the latency — the same thing the lock makes visible.
+    if (key === 'mirrors') localSeg = value; else localFb = value;
+    send({ type: 'video.params', [key]: value });
+    d.log(`${k.label} ${k.steps[idx][0]}`, 'hi');
+  }
+  let localSeg = 8, localFb = 0.62;
+
+  /**
    * Each pane's own numbers, under it.
    *
    * ⚠️ AND `__demo.panes` IS THE MACHINE COPY, written from the same values in
@@ -160,20 +229,21 @@
   const FS = `#version 300 es
     precision highp float;
     uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
+    uniform float uSeg; uniform float uFb;
     out vec4 o;
     float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
       return mix(mix(h(i), h(i + vec2(1,0)), f.x), mix(h(i + vec2(0,1)), h(i + vec2(1,1)), f.x), f.y); }
     void main(){
       vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-      float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / 8.0;
+      float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / uSeg;
       a = abs(mod(a + 0.5 * seg, seg) - 0.5 * seg);
       vec2 k = vec2(cos(a), sin(a)) * r;
       float w = n(k * 4.0 + uT * 0.3) + 0.5 * n(k * 8.0 - uT * 0.2) + 0.25 * n(k * 16.0 + uT * 0.5);
       vec2 dd = k + 0.08 * vec2(cos(w * 6.2831), sin(w * 6.2831));
       vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67)) + uT);
       vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
-      o = vec4(mix(c, fb, 0.62), 1.0); }`;
+      o = vec4(mix(c, fb, uFb), 1.0); }`;
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
@@ -238,6 +308,8 @@
     const uT = gl.getUniformLocation(prog, 'uT');
     const uRes = gl.getUniformLocation(prog, 'uRes');
     const uPrev = gl.getUniformLocation(prog, 'uPrev');
+    const uSeg = gl.getUniformLocation(prog, 'uSeg');
+    const uFb = gl.getUniformLocation(prog, 'uFb');
     gl.bindVertexArray(gl.createVertexArray());
     // The feedback tap needs the same ping-pong the C does: two targets, swapped
     // every frame, with the previous one bound as the texture.
@@ -268,6 +340,8 @@
       }
       gl.uniform1f(uT, (lockedFrame ?? i) / 30);
       gl.uniform2f(uRes, W, H);
+      gl.uniform1f(uSeg, localSeg);
+      gl.uniform1f(uFb, localFb);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, A.t);
       gl.uniform1i(uPrev, 0);
