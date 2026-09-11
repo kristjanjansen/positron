@@ -52,10 +52,26 @@ echo "== shipping to $IP:$DEST"
 # rig/box plus every module it imports from outside itself, at the paths the
 # imports expect. tar over ssh rather than rsync, which a fresh Pi OS Lite does
 # not have.
+# ⚠️ rig/vis GOES TOO. The renderer is a C program that has to be COMPILED on
+# the board, and it lived in /tmp there until 2026-09-11 — one reboot from
+# taking every number in plan-visuals §3 with it.
 ( cd "$SRC/../.." && tar cf - \
-    rig/box \
+    rig/box rig/vis \
     $(cd rig/box && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
+
+echo "== building the renderer, if its source changed"
+# Cheap and idempotent: gcc is fast on two small files, and a binary older than
+# its source is the failure this avoids — it would run the PREVIOUS shader and
+# report the new one's name.
+ssh "$USER_@$IP" 'cd /opt/positron-box/rig/vis 2>/dev/null && {
+  for t in v3dbench v3dpipe; do
+    if [ ! -x "$t" ] || [ "$t.c" -nt "$t" ]; then
+      gcc -O2 -o "$t" "$t.c" -lEGL -lGLESv2 -lgbm 2>&1 | head -5 && echo "   built $t" || echo "   FAILED to build $t"
+    fi
+  done
+  ls -la v3dpipe 2>/dev/null || echo "   no v3dpipe — visuals will report unavailable"
+}'
 
 echo "== what landed, against what was sent"
 # Not "ok" — the md5 of the file that will actually execute. Printing a success

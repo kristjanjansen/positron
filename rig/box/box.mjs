@@ -24,6 +24,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
+import { startVideo, videoAvailable, V3DPIPE } from './video.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
 
@@ -75,6 +76,64 @@ let grainSource = null;
 // starts — a title left behind by a source that stopped is a page lying about
 // what you are hearing.
 let archiveNow = null;
+
+// ── the picture, on its own socket ───────────────────────────────────────────
+//
+// ⚠️ A SECOND SOCKET, AND IT IS FORCED BY A MEASUREMENT RATHER THAN CHOSEN. The
+// relay allows 60 messages a second PER SOCKET and the audio stream is already
+// 50 of them. Thirty video frames on the same socket is 80 against a cap of 60,
+// and the bucket drops the excess silently — no error, no close, no
+// backpressure. A picture sharing the audio socket would quietly cost a quarter
+// of both. It also keeps the binary framing unambiguous: every page here treats
+// an incoming binary frame as PCM.
+//
+// Room `<room>-video`, so a page that wants the picture opens a second socket
+// to a name it can derive, and a page that does not is unaffected.
+let video = null, vws = null, vseq = 0, vsent = 0;
+const VIDEO_ROOM = `${ROOM}-video`;
+
+/** What a client needs to render it, plus what only this end can count. */
+function videoShape() {
+  const st = video?.stats() ?? {};
+  return {
+    w: video?.w, h: video?.h, fps: video?.fps, bitrate: video?.bitrate, gop: video?.gop,
+    codec: 'avc1.42E01E',        // baseline 3.0 — what h264_v4l2m2m emits here
+    // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
+    // drops silently, so a client MUST compare it against the counter in the
+    // payload. A number counted here is not evidence about the far end.
+    sent: vsent, ...st,
+  };
+}
+
+function videoConnect() {
+  if (vws && (vws.readyState === 0 || vws.readyState === 1)) return;
+  vws = new WebSocket(`${RELAY}/room/${VIDEO_ROOM}/ws`);
+  vws.binaryType = 'arraybuffer';
+  vws.onopen = () => log(`video socket joined ${VIDEO_ROOM}`);
+  vws.onclose = () => { log('video socket closed'); vws = null; if (video) setTimeout(videoConnect, 1000); };
+  vws.onerror = () => { /* close follows; one report is enough */ };
+}
+
+/**
+ * One frame out.
+ *
+ * ⚠️ THE SEQUENCE NUMBER GOES IN THE PAYLOAD. A binary frame carries no
+ * envelope, so `wire.mjs`'s `seq` cannot ride along — and the relay's caps drop
+ * frames with no error at all, which is exactly what a counter exists to see.
+ * MEASURED: at 8 Mbit/s the relay lost 101 of 361 frames and NOTHING else on
+ * the path reported it. 8 bytes: a uint32 counter and a uint32 flag word whose
+ * low bit says this frame is a keyframe, so a joiner knows what to wait for
+ * without parsing NAL types.
+ */
+function sendFrame(unit, key) {
+  if (vws?.readyState !== 1) return;
+  const out = Buffer.allocUnsafe(8 + unit.byteLength);
+  out.writeUInt32LE(vseq++, 0);
+  out.writeUInt32LE(key ? 1 : 0, 4);
+  Buffer.from(unit.buffer, unit.byteOffset, unit.byteLength).copy(out, 8);
+  vws.send(out);
+  vsent++;
+}
 
 /**
  * ⚠️ AN INFINITE LOOP AGAINST SOMEBODY ELSE'S CDN IS NOT A FEATURE.
@@ -703,6 +762,41 @@ async function handle(msg) {
       if (pap) { pap.send('mlock', 0); pap.send('nlock', 0); pap.send('msrc', 2); pap.send('nsrc', 2); pap.notes.panic(); }
       grainSource = null;
       return reply('source.cleared', { ok: true, recording: 'stereo' });
+    // ── the picture ──────────────────────────────────────────────────────
+    case 'video.start': {
+      if (video) return reply('video.started', { ok: true, already: true, room: VIDEO_ROOM, ...videoShape() });
+      videoConnect();
+      const r = startVideo({
+        w: Math.min(msg.w ?? 1280, 1920), h: Math.min(msg.h ?? 720, 1080),
+        fps: Math.min(msg.fps ?? 30, 60),
+        // ⚠️ CAPPED AT 4 Mbit/s, MEASURED. 2 and 4 arrive byte-identical
+        // through the relay; 8 loses 28% of frames silently. Letting a client
+        // ask for 8 would hand it a stream that looks like it is working.
+        bitrate: Math.min(msg.bitrate ?? 2_000_000, 4_000_000),
+        gop: Math.min(msg.gop ?? 30, 120),
+        passes: Math.min(msg.passes ?? 1, 4),
+        onFrame: sendFrame,
+        onLog: (l) => log('video:', l),
+      });
+      if (!r.ok) return reply('video.started', { ok: false, reason: r.reason });
+      video = r; vseq = 0; vsent = 0;
+      log(`video up · ${r.w}x${r.h} @${r.fps} · ${(r.bitrate / 1e6).toFixed(1)} Mbit/s · room ${VIDEO_ROOM}`);
+      return reply('video.started', { ok: true, room: VIDEO_ROOM, ...videoShape() });
+    }
+    case 'video.stop': {
+      if (!video) return reply('video.stopped', { ok: true, was: null });
+      const st = video.stats();
+      video.stop(); video = null;
+      try { vws?.close(); } catch { /* already */ }
+      vws = null;
+      log(`video stopped after ${st.frames} frames`);
+      return reply('video.stopped', { ok: true, ...st });
+    }
+    case 'video.status':
+      return reply('video.started', video
+        ? { ok: true, room: VIDEO_ROOM, ...videoShape() }
+        : { ok: false, reason: 'no picture running', available: videoAvailable(), renderer: V3DPIPE });
+
     case 'audio.status':
       return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, fx: fxOn ? 'pappus' : null,
                                             soundfont: inst.soundfont ?? null,

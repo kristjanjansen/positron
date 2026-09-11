@@ -1,0 +1,342 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>mirror — positron</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
+  .pane { position: relative; background: var(--card2); border-radius: 8px; overflow: hidden; }
+  .pane canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+  .pane .lab {
+    position: absolute; left: 8px; top: 8px; z-index: 2;
+    font: 400 11px/1.5 var(--mono); color: var(--dim);
+    background: color-mix(in oklab, var(--card2) 80%, transparent);
+    padding: 2px 7px; border-radius: 4px;
+  }
+  .pane .lab b { color: var(--hi); font-weight: 400; }
+  .pane .none {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    font: 400 12px/1.7 var(--mono); color: var(--dim); padding: 18px;
+  }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const W = 640, H = 360;
+
+  const d = mount({
+    name: 'mirror',
+    what: 'The same picture is drawn twice: on the left your own machine draws it, and on the right a Raspberry Pi in another building draws it and sends the result over as video. It is the same forty lines of shader code either way — a kaleidoscope fold over drifting noise, fed back into itself — because a picture like this is a short document rather than a large thing, so it can simply be sent and run anywhere. Which is the point: the left pane costs nothing to send to a thousand people, and the right pane is what you have to do instead when a picture depends on something only that machine has.',
+    readout: {
+      'here': 'fps',
+      'the board': 'fps',
+      'bitrate': 'kbit/s',
+      'frames lost': '',
+      'your renderer': '',
+    },
+    controls: [
+      // ⚠️ THE CHECKS ARE A CONTROL, because that is this project's contract:
+      // verify.mjs presses every button in `.d-controls` in order, and a
+      // control the harness cannot press is a subject the suite cannot reach.
+      // Ordered so the board has been asked before the checks run.
+      { id: 'ask', label: 'ask the board to draw' },
+      { id: 'check', label: 'run the checks' },
+      { id: 'stop', label: 'stop the board' },
+    ],
+  });
+  guard(d);
+
+  const panes = el('div', 'panes');
+  const mk = (title) => {
+    const p = el('div', 'pane');
+    const c = el('canvas');
+    c.width = W; c.height = H;
+    const lab = el('div', 'lab');
+    lab.innerHTML = title;
+    p.append(c, lab);
+    panes.append(p);
+    return { p, c, lab };
+  };
+  const local = mk('<b>here</b> — your browser');
+  const far = mk('<b>the board</b> — a Raspberry Pi, over the internet');
+  const farNone = el('div', 'none', 'nothing arriving yet — press “ask the board to draw”');
+  far.p.append(farNone);
+  d.el.insertBefore(panes, d.el.querySelector('.d-readout') ?? null);
+
+  // ── the picture, here ────────────────────────────────────────────────────
+  //
+  // ⚠️ THIS IS THE SAME SHADER AS rig/vis/v3dpipe.c, PORTED RATHER THAN
+  // REWRITTEN — and the port is three lines of difference, which is itself the
+  // argument the page is making. The board runs `#version 310 es` because it
+  // has GLES 3.1; WebGL2 is GLSL ES 3.00, and nothing in the fragment shader
+  // needs 3.10. Everything else — gl_VertexID, `out vec4`, texture(), highp —
+  // is unchanged.
+  //
+  // ⚠️ AND `uT` IS A FRAME COUNTER, NOT A CLOCK. The C drives it as i/30.0. If
+  // this drove it from wall time the two panes would be the same shader making
+  // visibly different motion, and the page's whole claim would read as false
+  // while both halves were working.
+  const VS = `#version 300 es
+    void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+      gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+  const FS = `#version 300 es
+    precision highp float;
+    uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
+    out vec4 o;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h(i), h(i + vec2(1,0)), f.x), mix(h(i + vec2(0,1)), h(i + vec2(1,1)), f.x), f.y); }
+    void main(){
+      vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+      float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / 8.0;
+      a = abs(mod(a + 0.5 * seg, seg) - 0.5 * seg);
+      vec2 k = vec2(cos(a), sin(a)) * r;
+      float w = n(k * 4.0 + uT * 0.3) + 0.5 * n(k * 8.0 - uT * 0.2) + 0.25 * n(k * 16.0 + uT * 0.5);
+      vec2 dd = k + 0.08 * vec2(cos(w * 6.2831), sin(w * 6.2831));
+      vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67)) + uT);
+      vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
+      o = vec4(mix(c, fb, 0.62), 1.0); }`;
+
+  const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
+  let rendererName = null, localFps = 0, drewAny = 0;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function target() {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.LINEAR);
+    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    return { t, f };
+  }
+
+  if (!gl) {
+    local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
+    d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
+    d.set('your renderer', 'none');
+  } else {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
+    // real visitor, and a page that is quietly slow teaches nothing. It is also
+    // what demo/verify-gl.mjs checks its own answer against.
+    d.set('your renderer', String(rendererName).replace(/^ANGLE \(|\)$/g, '').slice(0, 42));
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    const uT = gl.getUniformLocation(prog, 'uT');
+    const uRes = gl.getUniformLocation(prog, 'uRes');
+    const uPrev = gl.getUniformLocation(prog, 'uPrev');
+    gl.bindVertexArray(gl.createVertexArray());
+    // The feedback tap needs the same ping-pong the C does: two targets, swapped
+    // every frame, with the previous one bound as the texture.
+    let A = target(), B = target();
+    let i = 0, tick = 0, lastAt = performance.now();
+    // ⚠️ WHICH FRAMEBUFFER HOLDS THE FRAME THAT WAS JUST DRAWN. Reading pixels
+    // without binding one reads whatever happens to be current, and with
+    // `preserveDrawingBuffer: false` the default framebuffer is not readable
+    // after the frame ends at all — so a check would sample an undefined
+    // surface and report a flat field on a picture that is fine.
+    window.__lastFbo = null;
+
+    const frame = () => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
+      gl.viewport(0, 0, W, H);
+      gl.uniform1f(uT, i / 30);
+      gl.uniform2f(uRes, W, H);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, A.t);
+      gl.uniform1i(uPrev, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      // Blit to the canvas so it is visible, then swap.
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, B.f);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+      gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      window.__lastFbo = B.f;          // before the swap: B is what was just drawn
+      [A, B] = [B, A];
+      i++; tick++; drewAny++;
+      const now = performance.now();
+      if (now - lastAt >= 1000) { localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now; d.set('here', localFps.toFixed(1)); }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
+  // ── the picture, from the board ──────────────────────────────────────────
+  //
+  // ⚠️ A SECOND SOCKET, TO `<room>-video`. The relay allows 60 messages a
+  // second per socket and the box's audio is already 50 of them; thirty video
+  // frames on the same socket would be 80 against a cap of 60 and the bucket
+  // drops the excess with no error at all. It also keeps the binary framing
+  // unambiguous — every other page here reads a binary frame as PCM.
+  const FROM = `mir-${randomId(6)}`;
+  let seq = 0;
+  const ctl = new WebSocket(`${RELAY_BASE}/room/${ROOM}/ws`);
+  const send = (m) => { const id = randomId(); ctl.send(format(m, { from: FROM, seq: seq++, id })); return id; };
+  ctl.onopen = () => { d.log(`asking ${ROOM} what it can draw`); send({ type: 'video.status' }); };
+  ctl.onmessage = (e) => {
+    if (typeof e.data !== 'string') return;
+    const { kind, msg } = parse(e.data);
+    if (kind !== 'json' || msg.from === FROM) return;
+    if (msg.type === 'video.started') {
+      if (!msg.ok) { d.log(`the board is not drawing — ${msg.reason}`, msg.available === false ? 'bad' : 'warn'); return; }
+      d.log(`the board is drawing ${msg.w}x${msg.h} at ${msg.fps} — ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
+      openVideo(msg.room, msg);
+    }
+    if (msg.type === 'video.stopped') { d.log(`the board stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
+  };
+  d.on('ask', () => { d.log('asking the board to draw…', 'hi'); send({ type: 'video.start', w: 1280, h: 720, fps: 30 }); });
+  d.on('stop', () => send({ type: 'video.stop' }));
+
+  let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
+  const fctx = far.c.getContext('2d');
+
+  function closeVideo() {
+    try { vws?.close(); } catch { /* already */ }
+    try { decoder?.close(); } catch { /* already */ }
+    vws = null; decoder = null;
+  }
+
+  function openVideo(room, info) {
+    closeVideo();
+    if (typeof VideoDecoder !== 'function') {
+      farNone.textContent = 'this browser has no WebCodecs, so the board’s picture cannot be decoded here';
+      d.log('no WebCodecs — the right pane is unavailable on this browser', 'bad');
+      return;
+    }
+    waitingForKey = true; farDecoded = 0; farGaps = 0; farBytes = 0;
+    decoder = new VideoDecoder({
+      output: (vf) => {
+        if (far.c.width !== vf.displayWidth) { far.c.width = vf.displayWidth; far.c.height = vf.displayHeight; }
+        fctx.drawImage(vf, 0, 0);
+        vf.close();
+        farDecoded++;
+        farNone.remove();
+      },
+      error: (e) => d.log(`decode error — ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
+    });
+    decoder.configure({ codec: info.codec ?? 'avc1.42E01E', optimizeForLatency: true });
+
+    vws = new WebSocket(`${RELAY_BASE}/room/${room}/ws`);
+    vws.binaryType = 'arraybuffer';
+    let last = -1, tick = 0, at = performance.now();
+    vws.onmessage = (e) => {
+      if (typeof e.data === 'string') return;
+      const dv = new DataView(e.data);
+      const s = dv.getUint32(0, true), key = (dv.getUint32(4, true) & 1) === 1;
+      // ⚠️ THE COUNTER IS IN THE PAYLOAD BECAUSE A BINARY FRAME HAS NO
+      // ENVELOPE, and the relay drops frames with no error, no close and no
+      // backpressure. Measured: at 8 Mbit/s it lost 101 of 361 frames and
+      // nothing else on the path said so. This cell is the only witness.
+      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; d.set('frames lost', String(farGaps)); }
+      last = s;
+      farBytes += e.data.byteLength;
+      // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
+      // is an error it reports once and then stays broken through, so a joiner
+      // waits — up to one second at this GOP, which is a GOP choice and not a
+      // fault.
+      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe — the board’s picture starts here'); }
+      try {
+        decoder.decode(new EncodedVideoChunk({
+          type: key ? 'key' : 'delta',
+          timestamp: s * 1e6 / (info.fps ?? 30),
+          data: new Uint8Array(e.data, 8),
+        }));
+      } catch (err) { d.log(`chunk refused — ${String(err.message ?? err).slice(0, 70)}`, 'bad'); }
+      tick++;
+      const now = performance.now();
+      if (now - at >= 1000) {
+        farFps = tick * 1000 / (now - at);
+        d.set('the board', farFps.toFixed(1));
+        d.set('bitrate', (farBytes * 8 / (now - at)).toFixed(0));
+        tick = 0; at = now; farBytes = 0;
+      }
+    };
+    vws.onclose = () => d.log('the board’s video socket closed');
+  }
+
+  // ── what a harness can check ─────────────────────────────────────────────
+  // The renderer goes on `__demo` directly, because demo/verify-gl.mjs asserts
+  // the page's own answer against what it found itself — two ends disagreeing
+  // about which context they are looking at is worth catching.
+  window.__demo.gl = { renderer: rendererName, ok: !!gl };
+  d.on('check', async () => {
+      // ⚠️ THE LOCAL PANE IS ASSERTED WITHOUT THE BOARD, ON PURPOSE. It is a
+      // pure function of (parameters, clock) and needs no network at all —
+      // which is the claim the page exists to make. Tying its asserts to a
+      // Raspberry Pi being switched on would make the page read red for a
+      // reason that is not about the page.
+      d.assert('a real WebGL2 context, not a fallback', !!gl, rendererName ?? 'none');
+      d.assert('the shader compiled and linked', drewAny > 0, `${drewAny} frames drawn`);
+      await new Promise((r) => setTimeout(r, 1200));
+      d.assert('it keeps drawing', drewAny > 30, `${drewAny} frames`);
+      d.assert('and it reports a real frame rate', localFps > 5, `${localFps.toFixed(1)} fps`);
+      // ⚠️ THE PICTURE IS NOT A FLAT FIELD. A shader that compiles, links and
+      // draws can still be producing one colour — "it rendered" and "there is
+      // something in it" are different claims and only the second is the one
+      // anybody cares about.
+      //
+      // ⚠️ AND IT IS READ OVER THE WHOLE FRAME, NOT AT FOUR POINTS. Four points
+      // read `5 of 765` on a picture whose true range is 26..254 — because this
+      // image is EIGHT-FOLD SYMMETRIC and radial, so any two samples at similar
+      // radius are similar BY CONSTRUCTION. The assert was measuring the
+      // symmetry of the thing it was checking, and it failed a working page.
+      // A whole frame at this size is 900 KB and reads in a millisecond.
+      let spread = 0;
+      if (gl && window.__lastFbo) {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, window.__lastFbo);
+        const px = new Uint8Array(W * H * 4);
+        gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        // ⚠️ PER CHANNEL, NOT THE SUM — AND THE SUM IS THE ONE STATISTIC THAT
+        // CANNOT SEE THIS PICTURE. The colour is
+        // `0.5 + 0.5*cos(2pi*(w + vec3(0, 0.33, 0.67)) + uT)`: three cosines
+        // about 120 degrees apart, and three cosines 120 degrees apart SUM TO A
+        // CONSTANT. So the image varies almost entirely in HUE at near-constant
+        // total luminance — measured, R+G+B spans 377..386 of 765 while red
+        // alone spans 26..254. A luminance check reported a flat field on a
+        // vivid kaleidoscope and failed a page that was perfectly fine, twice.
+        const lo = [255, 255, 255], hi = [0, 0, 0];
+        for (let i = 0; i < px.length; i += 4) {
+          for (let k = 0; k < 3; k++) {
+            const v = px[i + k];
+            if (v < lo[k]) lo[k] = v;
+            if (v > hi[k]) hi[k] = v;
+          }
+        }
+        spread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+      }
+      // ⚠️ NOT A PIXEL COMPARISON AGAINST A GOLDEN IMAGE. The same shader with
+      // identical inputs summed 48,147,330 of red on ANGLE Metal and 68,001,881
+      // on SwiftShader — 41% apart — because the standard GLSL hash amplifies
+      // last-bit float differences into unrelated noise. Structure is portable;
+      // exact pixels are not.
+      d.assert('there is a picture in it, not a flat field', spread > 60,
+               `the widest colour channel spans ${spread} of 255`);
+      // The far pane, only if the board answered. A lane with nothing to say
+      // says so in words rather than counting as a failure.
+      if (farDecoded > 0) {
+        d.assert('the board’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
+        d.assert('and arrived without the relay dropping any', farGaps === 0, `${farGaps} lost`);
+      } else {
+        d.log('the board is not sending — the right pane has nothing to report', 'warn');
+      }
+      d.ready();
+    });
+</script>

@@ -1,0 +1,156 @@
+// rig/box/video.mjs — the board draws a picture and sends it, as H.264.
+//
+// `rig/vis/v3dpipe` renders a generative shader headless on the VideoCore VI
+// (EGL surfaceless over GBM — see rig/vis/README.md for why that is the only
+// way in on a machine with no screen) and writes raw RGBA to stdout. ffmpeg's
+// `h264_v4l2m2m` encoder — the board's HARDWARE encoder on /dev/video11 — turns
+// that into an Annex-B byte stream, and this cuts the stream into one message
+// per frame.
+//
+// MEASURED, 30 s, alongside the running instruments: 29.6 fps at 1280x720 for
+// 18.6% user + 14.0% sys of 400%, 79 MB, zero audio dropouts, throttled=0x0.
+//
+// ⚠️ VIDEO GETS ITS OWN SOCKET, AND THAT IS FORCED BY A MEASUREMENT.
+// The relay's per-socket budget is `MSG_PER_SEC` 60 (workers/relay/src/index.js)
+// and the audio stream is already 50 a second — 48000/960. Thirty video frames
+// on the same socket would be 80 against a cap of 60, and the token bucket drops
+// the excess SILENTLY: no error, no close, no backpressure, counted only in the
+// relay's own /stats. So a picture sharing the audio socket would quietly cost a
+// quarter of both. A second socket has its own bucket and its own 512 KiB/s.
+//
+// ⚠️ AND IT KEEPS THE AUDIO FRAMING UNAMBIGUOUS. Every page in this project
+// treats an incoming binary frame as PCM. Putting H.264 on the same socket would
+// need a type byte in a header that is already deployed on both ends, or a magic
+// number that a 32-bit sequence counter can eventually collide with. A separate
+// room needs neither.
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+export const V3DPIPE = '/opt/positron-box/rig/vis/v3dpipe';
+
+/** Is there a renderer and a hardware encoder on this box? */
+export function videoAvailable() {
+  return existsSync(V3DPIPE) && existsSync('/dev/video11') && existsSync('/dev/dri/renderD128');
+}
+
+/**
+ * Cut an Annex-B byte stream into one access unit per frame.
+ *
+ * ⚠️ THIS ENCODER PUTS SPS AND PPS BEFORE EVERY SINGLE FRAME, which is more
+ * than "inline headers" and exactly what a lossy fan-out wants — a viewer who
+ * joins mid-stream has the parameter sets the moment the next IDR arrives.
+ * MEASURED on this board's stack (ffmpeg 7.1.5, kernel 6.18.34) over 150 frames
+ * at -g 30: 150 SPS, 150 PPS, 5 IDR, pattern `7,8,5, 7,8,1, 7,8,1, …`. libx264
+ * on the same input emits 5 and 5. There is an open upstream report that
+ * `h264_v4l2m2m` omits inline parameter sets and is therefore unusable for live
+ * streaming; it does not reproduce here, and that was checked because it would
+ * have killed this file outright.
+ *
+ * So a new frame begins at each SPS. That is a property of this encoder rather
+ * than of H.264, so the splitter falls back to cutting at any slice NAL when no
+ * SPS has been seen — otherwise a stack that does NOT emit them would buffer the
+ * entire stream into one enormous message and look like a hang.
+ */
+export function createAnnexBSplitter(onUnit) {
+  let buf = Buffer.alloc(0);
+  let sawSps = false;
+  return (chunk) => {
+    buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
+    // Find every start code, then decide which of them begin a frame.
+    const starts = [];
+    for (let i = 0; i + 3 < buf.length; i++) {
+      if (buf[i] === 0 && buf[i + 1] === 0) {
+        if (buf[i + 2] === 1) { starts.push({ at: i, len: 3 }); i += 2; }
+        else if (buf[i + 2] === 0 && buf[i + 3] === 1) { starts.push({ at: i, len: 4 }); i += 3; }
+      }
+    }
+    if (starts.length < 2) return;
+    const cuts = [];
+    for (const s of starts) {
+      const type = buf[s.at + s.len] & 0x1f;
+      if (type === 7) sawSps = true;
+      const begins = type === 7 || (!sawSps && (type === 1 || type === 5));
+      if (begins) cuts.push(s.at);
+    }
+    // Emit every COMPLETE unit — everything between one cut and the next. The
+    // tail after the last cut is incomplete by definition and stays buffered.
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const unit = buf.subarray(cuts[i], cuts[i + 1]);
+      let key = false;
+      for (const s of starts) {
+        if (s.at < cuts[i] || s.at >= cuts[i + 1]) continue;
+        if ((buf[s.at + s.len] & 0x1f) === 5) key = true;
+      }
+      onUnit(Uint8Array.prototype.slice.call(unit), key);
+    }
+    if (cuts.length) buf = buf.subarray(cuts[cuts.length - 1]);
+    // A stream with no cut at all would grow without bound and present as a
+    // hang rather than as an error, so say so instead.
+    else if (buf.length > 4 << 20) { onUnit(null, false); buf = Buffer.alloc(0); }
+  };
+}
+
+/**
+ * Start rendering and encoding. `onFrame(bytes, key)` gets one access unit per
+ * frame; `stop()` kills both processes.
+ *
+ * The bitrate default is 2 Mbit/s, which is not a taste: MEASURED Pi →
+ * Cloudflare → laptop, 2 and 4 Mbit/s arrive byte-identical with zero gaps,
+ * 5 passes despite nominally exceeding the cap, and 8 loses 28% of frames
+ * silently. Design to 4 and measure; ship 2, which is 48% of one socket's byte
+ * budget and leaves room for the keyframes to be six times the mean.
+ */
+export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
+                             gop = 30, passes = 1, onFrame, onLog } = {}) {
+  if (!videoAvailable()) {
+    return { ok: false, reason: `no renderer at ${V3DPIPE} or no hardware encoder at /dev/video11` };
+  }
+  // 0 frames means FOREVER — see the comment in rig/vis/v3dpipe.c. It meant
+  // "render none and exit" until 2026-09-11, which left ffmpeg waiting on a
+  // pipe nothing would ever come down while every status said the picture was
+  // up.
+  const render = spawn(V3DPIPE, [String(w), String(h), '0', String(passes)],
+    { stdio: ['ignore', 'pipe', 'pipe'] });
+  const enc = spawn('ffmpeg', [
+    '-hide_banner', '-loglevel', 'error',
+    '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', String(fps), '-i', '-',
+    '-pix_fmt', 'yuv420p', '-c:v', 'h264_v4l2m2m',
+    '-b:v', String(bitrate),
+    // ⚠️ A JOINER WAITS FOR AN IDR, and that is a GOP choice rather than a bug.
+    // At -g 30 and 30 fps that is up to one second of black for someone who has
+    // just opened the page. Shorter GOPs cost bitrate; this is the knob.
+    '-g', String(gop),
+    '-f', 'h264', '-',
+  ], { stdio: ['pipe', 'pipe', 'pipe'] });
+  render.stdout.pipe(enc.stdin);
+
+  let frames = 0, bytes = 0, keys = 0, biggest = 0;
+  const split = createAnnexBSplitter((unit, key) => {
+    if (unit === null) { onLog?.('the encoder produced no frame boundary in 4 MB — stopping rather than buffering'); return; }
+    frames++; bytes += unit.byteLength; if (key) keys++;
+    if (unit.byteLength > biggest) biggest = unit.byteLength;
+    onFrame?.(unit, key);
+  });
+  enc.stdout.on('data', split);
+  // ⚠️ v3dpipe reports its own timing on STDERR, which is the only place the
+  // render rate is visible — its stdout is the pixels.
+  render.stderr?.on('data', (d) => { const t = String(d).trim(); if (t) onLog?.(`render: ${t}`); });
+  enc.stderr?.on('data', (d) => { const t = String(d).trim(); if (t) onLog?.(`ffmpeg: ${t}`); });
+  let stopping = false;
+  for (const [name, p] of [['renderer', render], ['encoder', enc]]) {
+    p.on('exit', (code, sig) => {
+      if (stopping) return;
+      onLog?.(`⚠ the ${name} exited (${sig ?? code}) — the picture has stopped`);
+    });
+  }
+
+  return {
+    ok: true, w, h, fps, bitrate, gop, passes,
+    stats: () => ({ frames, bytes, keys, biggestFrame: biggest,
+                    meanFrameBytes: frames ? Math.round(bytes / frames) : 0 }),
+    stop: () => {
+      stopping = true;
+      for (const p of [render, enc]) { try { p.kill('SIGTERM'); } catch { /* gone */ } }
+    },
+  };
+}

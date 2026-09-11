@@ -114,6 +114,39 @@ transport bar — while looking fine, because the readout had been filled at loa
 Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.
 Fire them and move on; sound is allowed to be late, the timeline is not.
 
+**A harness and a dev server that share a port is a harness that reads broken.**
+`node demo/verify.mjs` died with an unhandled `EADDRINUSE` three separate times
+in one session because `node demo/server.mjs` was still holding 8890 — each
+time looking like a broken suite rather than a busy port. `serve()` now takes
+the next free port and says so, and the harnesses read `server.address().port`
+rather than the one they asked for. The general form: **a fixed port is a
+shared mutable global.** The same bug in a second costume is a fixed CDP port —
+`verify-gl.mjs` attached to a Chrome left over from the previous run and
+reported that run's flags, which is how a SwiftShader test reported ANGLE
+Metal. Let the OS choose and read back what you got.
+
+**A wedged hardware encoder cannot be killed, and looks like broken code.**
+`/dev/video11` is a single exclusive V4L2 device, and when it wedges, ffmpeg
+sits in uninterruptible sleep: `SIGTERM` does nothing, `SIGKILL` does nothing,
+`timeout` does nothing, and `modprobe -r bcm2835_codec` answers "Module is in
+use". Three ffmpegs stacked up behind it, each one reading from the outside as
+"the encoder produces no bytes". Recovery is a reboot. **Check `pgrep -cx
+ffmpeg` before concluding anything about an encode** — and `-x`, never `-f`,
+because `pgrep -f h264_v4l2m2m` matches its own ssh command line and answers
+"still held" about itself. That is LESSONS #39 in a new costume and it cost
+twenty minutes twice.
+
+**Ask the picture the right question.** `mirror`'s "there is a picture in it,
+not a flat field" assert failed twice on a vivid kaleidoscope. First it sampled
+four points — on an EIGHT-FOLD SYMMETRIC radial image, where any two samples at
+similar radius are similar by construction, so it was measuring the symmetry of
+the thing it was checking. Then it summed R+G+B over the whole frame and read
+`9 of 765`, because the shader's colour is three cosines 120° apart and **three
+cosines 120° apart sum to a constant**: the image varies almost entirely in HUE
+at near-constant luminance. Per channel, red alone spans 26..254. A statistic
+that is constant by construction over your subject is not a weak measurement,
+it is a blind one.
+
 **Prove a guard fires.** Break the thing on purpose once. And note `cmd | tail`
 reports `tail`'s exit status, not `cmd`'s.
 
