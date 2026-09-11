@@ -6,7 +6,11 @@
 // README rather than faked here, because a fake that passes is worse than a
 // gap that is written down.
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
-import { readFileSync } from 'node:fs';
+import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 let pass = 0, fail = 0;
 const is = (name, got, want) => {
@@ -91,6 +95,104 @@ if (live.backend === 'alsa' && live.error) {
 } else {
   ok('live backend did not throw', true, live.error ? live.error : `${live.clients.length} clients`);
 }
+
+// ---------------------------------------------------------------- yoshimi
+//
+// ⚠️ WHAT THIS SECTION CANNOT DO. It checks that the reader agrees with a
+// fixture, and the fixture was written by the same hand as the reader — so it
+// catches a typo and can never catch a misreading of Yoshimi's format. The
+// thing that GRADED this code is Yoshimi itself: a throwaway instance was sent
+// real MIDI bytes and asked what it had loaded (2026-09-11), and it answered
+//
+//   program 0 -> loaded 0001-DX Rhodes 1     program 5 -> FAILED, no instrument at 6
+//   program 1 -> loaded 0002-DX Rhodes 2     program 6 -> loaded 0007-Dig Rhodes
+//
+// which is the `program === NNNN - 1` rule these checks pin down. `yoshimi-test.mjs`
+// is the other half: it grades the whole path by the SOUND changing, on the board.
+console.log('\nyoshimi: reading the bank map');
+const yBanksSrc = readFileSync(new URL('./fixtures/yoshimi-banks.xml', import.meta.url), 'utf8');
+const yInstSrc = readFileSync(new URL('./fixtures/yoshimi-instance.xml', import.meta.url), 'utf8');
+
+const tmp = mkdtempSync(join(tmpdir(), 'positron-yoshimi-'));
+const cfg = join(tmp, 'config'), rootA = join(tmp, 'found'), rootB = join(tmp, 'installed');
+mkdirSync(cfg);
+// Real directories with real files, because the reader cross-checks the bank
+// map against the disk and a cross-check against nothing always passes.
+const LAID = { Arpeggios: 2, Rhodes: 6, Drums: 2 };
+for (const root of [rootA, rootB]) for (const [dir, n] of Object.entries(LAID)) {
+  mkdirSync(join(root, dir), { recursive: true });
+  for (let i = 1; i <= n; i++) writeFileSync(join(root, dir, `${String(i).padStart(4, '0')}-fixture.xiz`), '');
+  // The same slot, saved in Yoshimi's other format. Real banks are full of
+  // these — Strings holds 54 files in 47 slots — and counting files rather
+  // than slots made a healthy board report a stale bank map.
+  writeFileSync(join(root, dir, '0001-fixture.xiy'), '');
+}
+const banksXml = yBanksSrc.replaceAll('__ROOT_A__', rootA).replaceAll('__ROOT_B__', rootB);
+writeFileSync(join(cfg, 'yoshimi.banks'), banksXml);
+writeFileSync(join(cfg, 'yoshimi-0.instance'), yInstSrc);
+
+const parsedBanks = parseBanks(banksXml);
+is('both bank roots are read', parsedBanks.roots.map((r) => r.root), [5, 10]);
+is('banks are numbered in fives, not from zero', parsedBanks.roots[1].banks.map((b) => b.bank), [5, 30, 80]);
+// THE fact this module exists for. The filename counts from 1, the MIDI
+// program counts from 0, and every entry must obey the same offset.
+const everyPatch = parsedBanks.roots.flatMap((r) => r.banks.flatMap((b) => b.patches));
+ok('a program number is the filename NNNN minus one, every time',
+  everyPatch.every((p) => Number(p.file.slice(0, 4)) === p.program + 1), `${everyPatch.length} patches`);
+is('slots are sparse, not a run', parsedBanks.roots[1].banks.find((b) => b.bank === 80).patches.map((p) => p.program),
+  [0, 1, 4, 6, 67, 130]);
+is('a slot Yoshimi marks unused is dropped', parsedBanks.roots[1].banks.find((b) => b.bank === 30).patches.length, 2);
+is('an escaped name is decoded', parsedBanks.roots[1].banks.find((b) => b.bank === 30).patches[1].name, 'Bell & Hammer');
+
+console.log('yoshimi: the three settings that decide whether a patch lands');
+const inst = parseInstance(yInstSrc);
+// The one that cost an hour. Banks go on 32; CC 0 moves the ROOT DIRECTORY.
+is('bank select is CC 32', inst.bankCC, 32);
+is('and CC 0 is the root control, left alone', inst.rootCC, 0);
+is('program change is obeyed', inst.programChange, true);
+is('the extended program control is switched off', inst.upperVoiceCC, 128);
+// root_current_ID 0 matches no root, and Yoshimi falls back rather than fails.
+is('a current root that does not exist falls back', chooseRoot(parsedBanks.roots, inst.rootCurrent).root, 10);
+is('and a real one is honoured', chooseRoot(parsedBanks.roots, 5).root, 5);
+
+console.log('yoshimi: the list the box sends');
+const list = yoshimiPatches({ dir: cfg });
+is('it reads', list.ok, true);
+is('the chosen root is the one Yoshimi would use', list.root, 10);
+is('both roots hold the same instruments', list.rootsAgree, true);
+// 2 + 2 + 5: the slot at 130 is past the end of a seven-bit program change.
+is('only reachable slots are offered', list.count, 9);
+is('and the unreachable one is counted, not hidden', list.hidden, 1);
+ok('nothing offered is past the last program number',
+  flatten(list).every((p) => p.program <= MAX_PROGRAM));
+is('the walk is bank order, then slot order', flatten(list).map((p) => `${p.bank}/${p.program}`),
+  ['5/0', '5/1', '30/1', '30/11', '80/0', '80/1', '80/4', '80/6', '80/67']);
+is('the bank map agrees with the files on disk', list.stale, false);
+is('a slot saved in both of Yoshimi\'s formats counts once', list.banks.find((b) => b.bank === 30).disk, 2);
+
+console.log('yoshimi: and when it does not');
+// gzip is the normal case on a board — Yoshimi writes zlib whenever
+// gzip_compression is non-zero, under the same filename.
+writeFileSync(join(cfg, 'yoshimi.banks'), gzipSync(Buffer.from(banksXml)));
+is('a gzipped bank map reads the same', yoshimiPatches({ dir: cfg }).count, 9);
+// One extra file on the board and the map is out of date. Saying so is the
+// difference between a list that is quietly wrong and one that is right.
+writeFileSync(join(rootB, 'Drums', '0099-added-later.xiz'), '');
+is('a bank map older than the disk is reported', yoshimiPatches({ dir: cfg }).stale, true);
+is('no bank map at all is an answer, not a throw', yoshimiPatches({ dir: join(tmp, 'nowhere') }).ok, false);
+ok('and it says where it looked', /nowhere/.test(yoshimiPatches({ dir: join(tmp, 'nowhere') }).reason ?? ''));
+// The file it was read from is `file`, never `source` — box.mjs spreads this
+// object beside a `source` that names the instrument, and a collision there
+// left every client waiting for a reply that had already arrived.
+ok('the file it read is not called `source`', list.source === undefined && /yoshimi\.banks$/.test(list.file ?? ''));
+// Two roots that disagree is a rig somebody edited; it must not read as fine.
+is('roots that disagree are noticed', parseBanks(banksXml.replace('DX Rhodes 2', 'Something Else')).roots.length, 2);
+ok('and rootsAgree goes false', (() => {
+  const x = banksXml.replace('<string name="listname">Dig Rhodes</string>', '<string name="listname">Edited</string>');
+  writeFileSync(join(cfg, 'yoshimi.banks'), x);
+  return yoshimiPatches({ dir: cfg }).rootsAgree === false;
+})());
+rmSync(tmp, { recursive: true, force: true });
 
 console.log(`\n${pass}/${pass + fail} green`);
 process.exit(fail ? 1 : 0);

@@ -1,0 +1,73 @@
+#!/bin/bash
+# rig/box/push.sh — put THIS checkout on the board and restart the service.
+#
+#   ./push.sh                 find the board, ship, restart, show the log
+#   ./push.sh 192.168.1.213   skip the search
+#   ./push.sh --no-restart    ship only (a running instrument keeps playing)
+#
+# `provision.sh` is the first-run path: it installs packages, kernel modules and
+# the unit file. This is the loop you use fifty times after that, and it exists
+# because doing it by hand got the destination wrong.
+#
+# ⚠️ THE SERVICE RUNS FROM /opt/positron-box, NOT FROM ~/positron.
+# `provision.sh` unpacks into ~/positron and `setup.sh` copies that to /opt.
+# A file edited in ~/positron changes nothing, and the copy already on the board
+# there is stale — it has no pappus.mjs at all. So this writes to /opt directly
+# and prints the md5 of what landed, because "it deployed" and "it says it
+# deployed" have been different things here before.
+set -uo pipefail
+SRC="$(cd "$(dirname "$0")" && pwd)"
+USER_=${BOX_USER:-positron}
+DEST=/opt/positron-box
+RESTART=1
+IP=""
+for a in "$@"; do
+  case "$a" in
+    --no-restart) RESTART=0 ;;
+    -*) echo "unknown flag $a" >&2; exit 2 ;;
+    *) IP="$a" ;;
+  esac
+done
+
+# ── find it ──────────────────────────────────────────────────────────────────
+# Port 22, not mDNS and not ARP. `positron-box.local` does not resolve from this
+# sandbox (mDNS is multicast UDP) and guessing Raspberry Pi MAC prefixes in the
+# ARP cache missed the board entirely while it was sitting on the subnet.
+if [ -z "$IP" ]; then
+  base=$(ipconfig getifaddr en0 2>/dev/null | sed 's/\.[0-9]*$//')
+  [ -n "$base" ] || { echo "no IPv4 on en0 — pass the address" >&2; exit 1; }
+  echo "looking for a host that answers on ssh in ${base}.0/24 ..." >&2
+  for i in $(seq 1 254); do (nc -z -G 1 -w 1 "${base}.$i" 22 2>/dev/null && echo "${base}.$i" >> /tmp/positron-ssh.$$) & done
+  wait
+  for cand in $(sort -u /tmp/positron-ssh.$$ 2>/dev/null); do
+    if ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=4 \
+           "$USER_@$cand" 'test -d /opt/positron-box' 2>/dev/null; then IP=$cand; break; fi
+  done
+  rm -f /tmp/positron-ssh.$$
+  [ -n "$IP" ] || { echo "nothing on this subnet answers as the box" >&2; exit 1; }
+  echo "   found it at $IP" >&2
+fi
+
+echo "== shipping to $IP:$DEST"
+# rig/box plus every module it imports from outside itself, at the paths the
+# imports expect. tar over ssh rather than rsync, which a fresh Pi OS Lite does
+# not have.
+( cd "$SRC/../.." && tar cf - \
+    rig/box \
+    $(cd rig/box && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
+) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
+
+echo "== what landed, against what was sent"
+# Not "ok" — the md5 of the file that will actually execute. Printing a success
+# line is not evidence that a copy happened (CLAUDE.md).
+ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/pappus.mjs 2>/dev/null"
+md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" 2>/dev/null || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs"
+
+if [ "$RESTART" = 1 ]; then
+  echo "== restarting"
+  ssh "$USER_@$IP" 'sudo systemctl restart positron-box && sleep 2 && systemctl is-active positron-box'
+  echo "== the first lines it says"
+  ssh "$USER_@$IP" 'journalctl -u positron-box -n 12 --no-pager -o cat'
+else
+  echo "== not restarting (--no-restart); the running box still has the old code"
+fi

@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Yoshimi-data>
+<!-- A small, faithful copy of ~/.config/yoshimi/yoshimi.banks, for tests.
+
+     Faithful in the four ways that matter and were all got wrong at least once:
+       - TWO bank roots, with the same banks in both. Yoshimi copies the
+         installed library into ~/.local/share/yoshimi/found on first run, so
+         its splash counts everything twice — "1822 instruments in 48 banks" is
+         911 in 24, seen double.
+       - banks are numbered 5, 10, 15 … not 0, 1, 2.
+       - instrument slots are SPARSE, and `instrument_id` is the MIDI program
+         number, which is the filename's NNNN minus one.
+       - a slot above 127 exists and cannot be reached by a plain program
+         change (Yoshimi keeps 32 extra per bank behind an extended control).
+
+     The two bank_root values are placeholders that test.mjs fills in, because
+     a bank root is an absolute path and a fixture cannot know one. (They are
+     not named here: the first version of this comment SPELLED them, and a
+     String.replace hit the comment instead of the data.) -->
+<Yoshimi-data Yoshimi-author="Alan Ernest Calvert" Yoshimi-major="2"
+Yoshimi-minor="3" Yoshimi-revision="3">
+<INFORMATION>
+<string name="XMLtype">Roots and Banks</string>
+<par name="Banks_Version" value="11" />
+</INFORMATION>
+<BANKLIST>
+<BANKROOT id="5">
+<string name="bank_root">__ROOT_A__</string>
+<bank_id id="5">
+<string name="dirname">Arpeggios</string>
+<instrument_id id="0">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Arpeggio1</string>
+<string name="filename">0001-Arpeggio1.xiz</string>
+</instrument_id>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Arpeggio2</string>
+<string name="filename">0002-Arpeggio2.xiz</string>
+</instrument_id>
+</bank_id>
+<bank_id id="80">
+<string name="dirname">Rhodes</string>
+<instrument_id id="0">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 1</string>
+<string name="filename">0001-DX Rhodes 1.xiz</string>
+</instrument_id>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 2</string>
+<string name="filename">0002-DX Rhodes 2.xiz</string>
+</instrument_id>
+<instrument_id id="4">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 5</string>
+<string name="filename">0005-DX Rhodes 5.xiz</string>
+</instrument_id>
+<instrument_id id="6">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Dig Rhodes</string>
+<string name="filename">0007-Dig Rhodes.xiz</string>
+</instrument_id>
+<instrument_id id="67">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">RhodesPad2</string>
+<string name="filename">0068-RhodesPad2.xiz</string>
+</instrument_id>
+<instrument_id id="130">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Out of reach</string>
+<string name="filename">0131-Out of reach.xiz</string>
+</instrument_id>
+</bank_id>
+<bank_id id="30">
+<string name="dirname">Drums</string>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">subliminal-kit</string>
+<string name="filename">0002-subliminal-kit.xiy</string>
+</instrument_id>
+<instrument_id id="9">
+<par_bool name="isUsed" value="no" />
+<string name="listname">a slot Yoshimi knows is empty</string>
+<string name="filename"></string>
+</instrument_id>
+<instrument_id id="11">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Bell &amp; Hammer</string>
+<string name="filename">0012-Bell &amp; Hammer.xiz</string>
+</instrument_id>
+</bank_id>
+</BANKROOT>
+<BANKROOT id="10">
+<string name="bank_root">__ROOT_B__</string>
+<bank_id id="5">
+<string name="dirname">Arpeggios</string>
+<instrument_id id="0">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Arpeggio1</string>
+<string name="filename">0001-Arpeggio1.xiz</string>
+</instrument_id>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Arpeggio2</string>
+<string name="filename">0002-Arpeggio2.xiz</string>
+</instrument_id>
+</bank_id>
+<bank_id id="80">
+<string name="dirname">Rhodes</string>
+<instrument_id id="0">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 1</string>
+<string name="filename">0001-DX Rhodes 1.xiz</string>
+</instrument_id>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 2</string>
+<string name="filename">0002-DX Rhodes 2.xiz</string>
+</instrument_id>
+<instrument_id id="4">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">DX Rhodes 5</string>
+<string name="filename">0005-DX Rhodes 5.xiz</string>
+</instrument_id>
+<instrument_id id="6">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Dig Rhodes</string>
+<string name="filename">0007-Dig Rhodes.xiz</string>
+</instrument_id>
+<instrument_id id="67">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">RhodesPad2</string>
+<string name="filename">0068-RhodesPad2.xiz</string>
+</instrument_id>
+<instrument_id id="130">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Out of reach</string>
+<string name="filename">0131-Out of reach.xiz</string>
+</instrument_id>
+</bank_id>
+<bank_id id="30">
+<string name="dirname">Drums</string>
+<instrument_id id="1">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">subliminal-kit</string>
+<string name="filename">0002-subliminal-kit.xiy</string>
+</instrument_id>
+<instrument_id id="9">
+<par_bool name="isUsed" value="no" />
+<string name="listname">a slot Yoshimi knows is empty</string>
+<string name="filename"></string>
+</instrument_id>
+<instrument_id id="11">
+<par_bool name="isUsed" value="yes" />
+<string name="listname">Bell &amp; Hammer</string>
+<string name="filename">0012-Bell &amp; Hammer.xiz</string>
+</instrument_id>
+</bank_id>
+</BANKROOT>
+</BANKLIST>
+</Yoshimi-data>

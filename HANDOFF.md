@@ -1,3 +1,129 @@
+# Handoff — 2026-09-11 (end of session 18)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 18 — the granular insert was mostly switched off, and nobody could tell
+
+**Four defects between the die and the sound, all measured, all fixed.** The
+board plays 1965 through the granulator and holds it. `pappus-test.mjs` went
+**19/19 → 26/26** and `test.mjs` is 66/66, both deterministic.
+
+⚠️ **`pappus-live.mjs` reads 14–16 of 17 and the failures MOVE between runs** —
+three consecutive runs gave 16, 14 and 16, with different checks failing each
+time. That is not a fifth defect: it is this file grading a STOCHASTIC
+granulator (per-grain `TRand`, per-voice `probs`, a euclidean gate) from ONE
+take per condition. The same-seed noise floor itself moves — 0.045, 0.099 and
+0.126 envelope across those runs — so any threshold calibrated against it is
+calibrated against a die roll. **Do not read a single run of this file as a
+verdict, and do not tune a threshold to make one pass.** The fix is to average
+N takes per condition and assert on the spread, which is the next piece of work
+on it.
+
+| | what it did | evidence |
+|---|---|---|
+| **`at` collided with the wire envelope** | `format()` writes `from`/`at`/`seq` AFTER spreading the message, so `source.load`'s excerpt offset became `Date.now()` — ffmpeg was asked to seek to second **1,789,103,743,118** and returned sixty seconds of real audio anyway | renamed `atSec`; `format()` now **throws** on the collision |
+| **`src 1` erased the buffer it was documented to hold** | record gain zero AND retain gain zero, so `BufWr` writes `0·new + 0·old` — a loaded minute wiped within one window pass, 1–12 s | 0.1061 → **0.0000** after a load; with `mlock 1`, **still sounding at 90 s** |
+| **the die switched the instrument off** | `melen` is a STEP COUNT, rolled as a 0.2–1.0 fraction → `% 1` = index 0 forever | **30.5% of rolls killed both granulators, 49.6% killed one**; now 0.0% |
+| **`fx.pappus` answered ok ~7 s early** | it waited on the JACK port, not on the engine; everything sent in the gap vanished | board log: inserted 05:38:59.8, loaded 05:39:03.5, `PAPPUS READY` 05:39:06.0 |
+
+⚠️ **Every reading of the 1965 feature had been wrong in the same direction.** A
+take started a second after the load caught material on its way out, so it "made
+a sound" and "sounded unlike the synth" — both true, both about something being
+erased. A single take cannot tell *loaded* from *loaded and already being
+erased*. The live test now listens again 25 s on.
+
+**The pitch question was a measurement failure, not an engine failure.** "A
+higher key pitches the grains up" read FAILED for a day because it was measured
+through 48 fixed-pitch resonators and delay taps that cannot follow a key, on
+speech that has no pitch to measure. On steady material with the chain muted:
+**225 · 271 · 350 · 1102 · 2100 Hz**. Brightness still cannot resolve DOWNWARD
+pitch — grain-envelope splatter floors the spectrum — so the test asserts the
+upward rungs and says the rest in words. See LESSONS #48.
+
+**New: `params.set`**, a bounded passthrough to the engine's 106 commands. It is
+the MEASUREMENT surface — it is what let a harness sweep one parameter and grade
+the sound without a redeploy per question, and three of the four fixes above
+needed it.
+
+### ⚠️ We got blocked by ERR, and have fixed our side
+
+`arhiiv.err.ee` answered **nothing** from the board — refused, `curl` `000` —
+while Cloudflare answered 200 from the same machine in 14 ms. Earned: the search
+was re-asked for a year that ended sixty years ago, the excerpt was re-pulled
+every time (**`errExcerpt` runs ffmpeg against their HLS, so one "load" is a
+stream of segment fetches and there is no `fetch` on that line to notice**), and
+a refusal was answered with another request. Now: one at a time, 2 s floor, disk
+caches with no TTL for a closed year, 30 s → 15 min backoff honouring
+`Retry-After`, and a refusal that reaches the page in words. They are answering
+the board again (200 in 128 ms). **It is a public broadcaster's archive, not a
+service we pay for — keep it that way.**
+
+### Finding the board, which cost real time
+
+`positron-box.local` does not resolve here (mDNS is multicast UDP) and ARP
+prefix-guessing missed it. `nc -z <ip> 22` across the /24 found it in a minute:
+**192.168.1.213**. It also answers over the relay from any network, so **"I
+cannot ssh to it" is not "it is down"** — ask the relay first. And **the service
+runs from `/opt/positron-box/`, not `~/positron/`**, whose copy is stale and has
+no `pappus.mjs`. New `rig/box/push.sh` ships to `/opt`, restarts, and prints the
+md5 of what landed. Both written into `CLAUDE.md`.
+
+`node demo/server.mjs` now serves the box page at **`/box/`**, the same URL as
+the deploy (it 404'd before; `build.mjs` maps `rig/box/listen.html` there).
+
+### Quest 3S research — `research/quest-xr-2026-09.md`, 1588 lines
+
+**Recommendation: buy the 3S, and wait the twelve days to Meta Connect (23–24
+Sept).** rde.ee is genuine — 368.70 €, in stock, two-year warranty — against
+Meta's EU list 359.99 € and a Quest 3 at 616.97 €. The brief's premise was
+wrong: **the passthrough cameras are identical** (4 MP, 18 px/deg, same API).
+What you give up is display pixels, lens quality and 14° of field of view. **No
+Unity**: colocation, camera pixels and Meta's own AI tooling are all on the web
+path now. Our CDP harness can reach the headset over `adb` — four precedents,
+one in this repo's style — and ⚠️ **`verify-quest.mjs` must exist before any
+WebXR demo is called green**, because this project's most expensive recurring
+failure is a green suite over a path the suite cannot reach.
+
+⚠️ **Two instrument warnings from that report, worth more than the verdict.**
+MDN/caniuse Quest data is ~90% fabricated: BCD's `oculus` key ships pre-resolved
+values that are mostly the literal token `"mirror"` (copy Chrome for Android),
+so its confident answers about WebTransport, WebCodecs, WebGPU, MSE and WebRTC
+are not evidence. And **a doff does not stop anything** — per Meta's own
+engineer the browser reports the experience visible when it is not,
+`visibilitychange` fires ~10 s later at sleep, and the 3S has no proximity
+sensor at all: an empty headset on a table is a billable Stream viewer.
+
+**Three defects in code we already ship, found without a headset. NOT YET
+FIXED:**
+
+- 🔴 **`demo/shell/moq.mjs` hard-codes `vp8`** on publish (`:207`) and accepts it
+  on subscribe (`:182`), and Meta states VP8 is **not hardware-decoded on Quest
+  3 or 3S** — software decode inside a 13.9 ms frame budget. The codec was
+  chosen from a correct measurement on Safari, a laptop. AV1 is the right
+  default there.
+- 🟠 **`rig/box/listen.html:273` requests no `sampleRate`** and nothing in the
+  chain resamples the box's 48 kHz PCM. On a 44.1 kHz output this pitches wrong
+  AND trims samples several times a second while the page's own fault cell stays
+  green. Live today, on any Mac.
+- 🟡 **`openWire()` cannot tell a full room from a dead relay** — the 17th client
+  meets `503 room full (16)` and reconnect-loops forever, silently.
+
+### Still open
+
+- **`pappus-live.mjs` is not yet a reliable instrument** (above): single takes
+  against a stochastic engine. Average N per condition, report the spread.
+- the three defects above
+- `errItem`'s memo is 10 minutes because the media URLs are signed and expire —
+  if a load ever fails with a dead link, that is the number to look at
+- `fluid-test.mjs` reads 12/13 — a start-up timing assumption, not a defect
+  (see session 17)
+- a user-level `fluidsynth.service` the box's orphan sweep keeps killing
+- `keep`'s 409, `positron-demo`'s unrotated RTMPS key, `workers/pub`'s
+  pre-session-12 container image
+
+---
+
 # Handoff — 2026-09-11 (end of session 17)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
@@ -14,7 +140,7 @@ and needs neither laptop. Note to ear over the internet: **98.7 ms median**.
 |---|---|---|
 | **FluidSynth** | FluidR3_GM, 16 channels | writes realtime PCM to a FIFO — **one process, no jackd** |
 | **hexter** | the real DX7, **factory cartridges ROM1A/1B/2A/2B** in Debian main | DSSI, needs a host |
-| **Yoshimi** | AddSynth/SubSynth/PadSynth, 1822 instruments in 24 banks | JACK client |
+| **Yoshimi** | AddSynth/SubSynth/PadSynth, **911 instruments in 24 banks**, 878 of them reachable | JACK client |
 | **Pappus** | a norns granular engine, as a **toggleable insert** | 2,030 lines, 106 commands, FULL graph on a Pi 4 |
 
 **Measured on the A72, replacing an estimate that stood all day**: our own FM
@@ -23,23 +149,43 @@ Yoshimi costs 4.8% CPU and **317 MB**. Pappus + hexter together: **57.6% of
 400%, zero xruns, 49.6 °C**.
 
 **`rig/box/` is the service.** `alsa.mjs` (patchbay), `fluid.mjs`, `synth.mjs`,
-`jacksynth.mjs` (JACK-client instruments), `norns/` (run norns engines without
-norns), `provision.sh` (find the board and set it up), `listen.html` (deployed
-at `/box/`). 38 unit tests, 13 live, all against the real relay.
+`jacksynth.mjs` (JACK-client instruments), `yoshimi.mjs` (reads Yoshimi's own
+bank map), `norns/` (run norns engines without norns), `provision.sh` (find the
+board and set it up), `listen.html` (deployed at `/box/`). 66 unit tests, 13
+live, 25 in `yoshimi-test.mjs`, all against the real relay.
 
-### What is BROKEN and diagnosed, not guessed
+### Yoshimi patch stepping — FIXED 2026-09-11, and the diagnosis was half wrong
 
-**Yoshimi patch stepping and random do nothing.** Its instruments are numbered
-**from 0001 and SPARSELY** — the Rhodes bank holds 26 instruments spread across
-0001–0068 — so walking 0…127 mostly lands on empty slots and program 0 never
-exists at all. The fix is to enumerate `/usr/share/yoshimi/banks/*/NNNN-*.xiz`
-on the box and walk only what is there, which also yields real names. Not a
-patch; do it in one pass.
+The sparseness was right: the Rhodes bank holds 26 instruments spread across
+slots 0001–0068, so walking 0…127 lands on an empty slot most of the time, and
+Yoshimi's answer to an empty slot is to **carry on playing what it had** — no
+error, no silence, nothing on the wire. That is why a green suite and a
+message counter both read fine while the buttons did nothing.
 
-⚠️ Also read from Yoshimi's own config, after a wrong guess cost an hour:
+⚠️ **"program 0 never exists at all" was WRONG.** Settled by asking Yoshimi:
+a throwaway instance was sent real MIDI bytes and it reported what it loaded —
+`program 0 -> loaded 0001-DX Rhodes 1`, `program 6 -> loaded 0007-Dig Rhodes`,
+`program 5 -> load FAILED No instrument at 6 in this bank`. **The wire value is
+the filename's NNNN minus one.** Program 0 is slot 0001 and exists in almost
+every bank.
+
+⚠️ **A bank DIRECTORY's MIDI number is not derivable from the directory.** It
+is in `~/.config/yoshimi/yoshimi.banks` — gzipped XML, so `grep` on it returns
+nothing — as `<BANKROOT id>` / `<bank_id id>` / `<instrument_id id>`. The banks
+are numbered **5, 10, 15 … 120**. `rig/box/yoshimi.mjs` reads it; the box
+answers `voices.list` with the whole library and the page walks that.
+
+⚠️ **Yoshimi's splash lies about the size by exactly 2x.** "Found 1822
+instruments in 48 banks" counts BOTH bank roots, and `~/.local/share/yoshimi/
+found/…` is a copy Yoshimi makes of `/usr/share/yoshimi/banks` on first run.
+911 instruments, 24 banks, **878 reachable** — 33 sit above slot 128 and need
+the extended program-change control, which is off (`midi_upper_voice_C` 128).
+
+⚠️ And still true, after a wrong guess cost an hour:
 **`MIDI Root CC 0`, `MIDI Bank CC 32`, `MIDI Program Change on`.** Bank select
-is **CC 32**. Sending banks on CC 0 moves its ROOT DIRECTORY instead, at which
-point every program change lands nowhere.
+is **CC 32** — now READ from `yoshimi-0.instance` rather than typed. Sending
+banks on CC 0 moves its ROOT DIRECTORY instead, at which point every program
+change lands nowhere.
 
 ### Things that cost real time, in the order they bit
 
@@ -129,7 +275,19 @@ microcontroller, where no plugin can follow.
 
 ### Still open
 
-- Yoshimi patch enumeration (above) — the one known-broken thing
+- a **user-level `fluidsynth.service`** runs on the board as `positron` and
+  `box.mjs`'s orphan sweep kills it on every restart, after which systemd
+  restarts it. Harmless so far — it is on ALSA, not on the JACK graph — but
+  `pkill -9 -x fluidsynth` is reaching past the box's own children.
+- `fluid-test.mjs` reads **12/13**, and did so on the committed code too
+  (A/B'd 2026-09-11): its "frames are flowing" check wants >18 frames in the
+  600 ms after `audio.started` and fluidsynth's stream takes ~350 ms to open.
+  A start-up timing assumption, not a defect in the instrument.
+- seen ONCE and not reproduced: `/dev/shm` empty while `jackd` was alive, so a
+  fresh Yoshimi "registered no JACK port". logind's `RemoveIPC` defaults to
+  yes on this image and would do exactly that when the last login session
+  ends — but 75 s with no ssh session did not reproduce it. Written down
+  rather than fixed, because the fix would be to a cause nobody has shown.
 - `keep`'s 409 (§0b below), untouched
 - `positron-demo`'s RTMPS stream key is still exposed and unrotated
 - `workers/pub`'s container image is still pre-session-12

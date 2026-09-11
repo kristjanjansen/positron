@@ -26,6 +26,30 @@ Every 06 log opens with `BUILD <sha>-<hhmmss>`, so a report can be attributed.
 Clear with `POST /logs/clear`. `GET /status` blocks on the container's cold start
 — that is expected, not a hang.
 
+## Finding the box, and where its code actually lives
+
+**Ask port 22, not ARP and not mDNS.** `positron-box.local` does not resolve
+from this sandbox (mDNS is multicast UDP), a ping sweep answers nothing useful,
+and guessing Raspberry Pi MAC prefixes in `arp -an` missed it outright — the
+board was there the whole time. One line finds it in about a minute:
+
+```sh
+for i in $(seq 1 254); do (nc -z -G 1 -w 1 192.168.1.$i 22 2>/dev/null && echo 192.168.1.$i) & done; wait
+ssh positron@<ip> hostname -s            # it answers `raspberrypi`
+```
+
+It also answers over the relay from any network — `node rig/box/ask.mjs --room
+studio-1 audio.status` — so **"I cannot ssh to it" is never the same as "it is
+down"**, and saying the second because of the first is wrong. Ask the relay
+first; it needs no LAN.
+
+⚠️ **The service runs from `/opt/positron-box/`, NOT from `~/positron/`.**
+`provision.sh` unpacks into `~/positron` and `setup.sh` copies that to
+`/opt/positron-box`, which is what `positron-box.service` executes. The copy in
+`~/positron` on the board is stale — it has no `pappus.mjs` at all — so editing
+or checking it tells you nothing about what is running. Compare `md5sum` against
+`/opt/positron-box/rig/box/` before believing a deploy landed.
+
 ## Rules that cost real time to learn
 
 **Measure the quantity in question, not one adjacent to it.** An A/B where both

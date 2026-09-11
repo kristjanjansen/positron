@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Yoshimi-data>
+<!-- ~/.config/yoshimi/yoshimi-0.instance, trimmed to the lines that decide
+     whether a patch change lands at all. Values are the board's real ones.
+
+     `root_current_ID` is 0 and there IS no root 0 — Yoshimi prints "No match
+     for root ID 0" at startup and then reports "Root 10" when a bank arrives,
+     so a reader has to reproduce that fallback rather than trust the number. -->
+<Yoshimi-data Yoshimi-author="Alan Ernest Calvert" Yoshimi-major="2"
+Yoshimi-minor="3" Yoshimi-revision="3">
+<INFORMATION>
+<string name="XMLtype">Config Instance</string>
+</INFORMATION>
+<CONFIGURATION>
+<par name="sample_rate" value="48000" />
+<par name="midi_bank_root" value="0" />
+<par name="midi_bank_C" value="32" />
+<par name="midi_upper_voice_C" value="128" />
+<par name="ignore_program_change" value="0" />
+<par name="root_current_ID" value="0" />
+<par name="bank_current_ID" value="0" />
+</CONFIGURATION>
+</Yoshimi-data>
