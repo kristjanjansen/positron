@@ -381,6 +381,56 @@ it in one step is to capture something known to carry signal — the built-in
 microphone cannot be digitally silent in a room, and when it reads 0.00000 the
 browser is deaf, not the device.
 
+### ✅ RESOLVED 2026-09-11: how to capture in the user's session from ssh
+
+The lesson above says a capture started over ssh is deaf. It does not say what
+to do instead, so the rig sat paused on it. The answer is to stop trying to
+START something in the session and instead ASK SOMETHING ALREADY IN IT:
+
+    ssh mbp 'osascript -e '"'"'tell application "iTerm2" to tell current window \
+      to tell current session to write text "ffmpeg -f avfoundation -i \":0\" ..."'"'"''
+
+That is not a GUI app spawned from ssh — it is an AppleEvent to a process the
+user already has running, so the work happens inside their audio session.
+
+MEASURED, the same device, the same ffmpeg, the same minute, only the route
+differing — and this A/B is the whole proof:
+
+| route | built-in microphone |
+|---|---|
+| plain ssh | **-91.0 dB** (digital silence) |
+| via iTerm2 in the live session | **-29.3 dB** (a real room) |
+
+⚠️ **Always capture the microphone first.** It cannot be digitally silent in a
+room, so it separates "the device is quiet" from "this process is deaf" in one
+command — and a capture spawned over ssh reports exactly the same -91.0 dB for
+both. On 2026-09-11 that mistake was made again, from inside this file, three
+commands after reading the paragraph above it.
+
+`launchctl asuser` is the documented way and needs root; there is no passwordless
+sudo on this machine, so it is not the route here.
+
+**End to end, through that route: Live -> Multi-Output -> BlackHole -> ffmpeg
+reads -12.7 dB.** The capture problem is solved.
+
+### ⚠️ Arturia plugins load, report themselves, and make no sound unlicensed
+
+`abletonosc-ext/browser.py` now searches every browser root, so
+`plugins/Analog Lab V` and `plugins/Stage-73 V2` are findable and loadable —
+`/live/browser/load [0, "Stage-73 V2"]` answers
+`[0, "Stage-73 V2", "plugins", "loaded"]` and the track's device list confirms
+it. **And it produces silence.**
+
+The A/B that says so: Drift on track 1 and Stage-73 on track 0, the same clip
+mechanism, the same instant — Drift's output meter reads **0.72-0.76** while
+Stage-73 reads **0**. So the OSC, the clip, the notes, the meter and the audio
+device are all fine and the plugin is not. Arturia Software Center is installed
+and its agent is running, but `~/Library/Arturia` is empty and there is no
+`/Library/Application Support/Arturia`, so it is almost certainly unactivated.
+
+**A plugin that loads and names itself is not a plugin that sounds.** Check the
+meter, not the device list.
+
 ### Drift sustains, and the detector re-arms on silence
 
 The onset detector fires above 0.02 and re-arms below 0.004. The built-in
