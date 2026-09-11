@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px; }
   @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
   .pane { position: relative; background: var(--card2); border-radius: 8px; overflow: hidden; }
   .pane canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
@@ -39,8 +39,16 @@
   /* One row, two groups. They sit ABOVE both pictures because they change both
      — a control that belongs to one pane goes in that pane's bar, and these do
      not. */
-  .knobs { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 14px 0 0; }
-  .knob { display: flex; align-items: center; gap: 6px; font: 400 11px/1.5 var(--mono); color: var(--dim); }
+  .knobs { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin: 18px 0 16px; }
+  .knob { display: flex; align-items: center; gap: 8px; }
+  /* ⚠️ THE SAME KEY STYLE AS THE READOUT, copied from shell.css's `.d-k` rather
+     than invented: these name a value the way every other label on every other
+     page here names one, and a second convention for the same job is how a set
+     of pages stops looking like one thing. */
+  .knob > span {
+    font: 500 9.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--dim2);
+  }
   .knob .seg { display: flex; gap: -1px; }
   .knob button {
     font: 400 11px/1 var(--mono); color: var(--dim);
