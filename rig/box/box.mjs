@@ -19,7 +19,7 @@
 import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wire.mjs';
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
-import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
+import { VOICES, DEFAULT_SF, fluidAvailable, soundfontAt } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
@@ -265,28 +265,23 @@ async function startAudio(source = 'synth', msg = null) {
   // A real multitimbral instrument: 16 channels, 16 GM programs, one process.
   // Its `file` audio driver is realtime-paced, so its stdout IS the stream —
   // no soundcard, no ALSA, nothing to mix.
-  // ⚠️ `fluidpipe`, NOT `fluidsynth`. `fluidsynth` is the JACK one now and is
-  // handled above by the JACK_SYNTHS branch. This path stays because it is what
-  // let the whole of rig/box run in an arm64 container with no sound hardware
-  // in existence — FluidSynth's `file` driver is realtime-paced, so its stdout
-  // IS the stream. jackd runs `-d dummy` here and probably works there too, but
-  // that is untested, and a platform fact in CLAUDE.md should not be deleted on
-  // a guess.
-  if (source === 'fluidpipe') {
-    if (!fluidAvailable()) return { ok: false, reason: 'fluidsynth is not installed (apt: fluidsynth fluid-soundfont-gm)' };
-    // A client may name the soundfont, so instruments can be A/B'd live rather
-    // than by restarting the box. Resolved against the filesystem either way —
-    // a missing soundfont is the silent failure here.
-    const sf = soundfontAt(msg?.soundfont ?? arg('soundfont', DEFAULT_SF));
-    // A missing soundfont is the silent failure here: fluidsynth starts happily
-    // and plays nothing at all, which reads as a broken stream.
-    if (!sf) return { ok: false, reason: `no soundfont at ${DEFAULT_SF} (apt: fluid-soundfont-gm)` };
-    inst = startFluid({ soundfont: sf, onFrame: sendPcm, onLog: (l) => log('fluidpipe:', l) });
-    inst.proc.on('exit', (code) => { log(`fluidpipe exited ${code}`); inst = null; });
-    log(`fluidpipe up · ${sf} · 16 channels`);
-    return { ok: true, source: 'fluidpipe', jack: false, soundfont: sf, channels: 16,
-             rate: RATE, msgPerSec: RATE / FRAME, voices: Object.keys(VOICES) };
-  }
+  // ⚠️ `fluidpipe` WAS HERE AND IS GONE, 2026-09-11, on a measurement.
+  //
+  // It wrote realtime PCM to a FIFO — one process, no jackd — and the one thing
+  // keeping it alive was a platform fact: the whole of rig/box once ran in an
+  // arm64 container with no sound hardware in existence, BECAUSE FluidSynth's
+  // `file` driver needs no kernel. That argument is transferable and nobody had
+  // checked. Now checked: in a `debian:trixie` arm64 container with no /dev/snd
+  // at all and `ulimit -r` 0, `jackd -r -d dummy` came up, fluidsynth
+  // registered left and right, the ffmpeg capture client attached, and three
+  // seconds of the graph came back as 144,021 samples at peak 0.1096 — real
+  // audio, not silence. jackd's dummy driver is pure software timing, which is
+  // the same reason the `file` driver worked.
+  //
+  // So the pipe path bought nothing the JACK path does not, and cost the one
+  // thing that mattered: pappus is a JACK insert, so on a pipe the 128 General
+  // MIDI instruments could not be granulated at all. `git show 0ca0d67^` has it
+  // if it is ever wanted back.
 
   // ⚠️ 'synth' (the FM Rhodes) and 'moog' are NO LONGER OFFERED as instruments.
   // Both were written to find out what a box can do with plain arithmetic, and
@@ -322,6 +317,17 @@ async function startAudio(source = 'synth', msg = null) {
              midi: !!midiIn, needs: 'nothing plugged in' };
   }
 
+  // ⚠️ CAPTURE IS ASKED FOR BY NAME, NOT FALLEN INTO. Everything that did not
+  // match above used to arrive here and become a MICROPHONE — so a typo, or a
+  // source removed from the table, started `arecord` and answered
+  // `{ok: true, source: 'capture'}`. It even made sound, because a capture
+  // device usually has something on it. Measured after `fluidpipe` was deleted:
+  // asking for it still "worked", peak 0.0391, which is the deletion silently
+  // not taking effect. A name nobody recognises is an error, not a default.
+  if (source !== 'capture') {
+    return { ok: false, reason: `unknown source ${JSON.stringify(source)}`,
+             known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture'] };
+  }
   if (backend() !== 'alsa') return { ok: false, reason: 'no arecord here — capture needs the board' };
   const p = spawn('arecord', ['-D', AUDIO_DEV, '-f', 'S16_LE', '-r', String(RATE), '-c', '1', '-t', 'raw', '-q'],
     { stdio: ['ignore', 'pipe', 'pipe'] });
