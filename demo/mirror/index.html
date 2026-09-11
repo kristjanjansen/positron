@@ -19,6 +19,41 @@
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
     font: 400 12px/1.7 var(--mono); color: var(--dim); padding: 18px;
   }
+  /* The bar belongs to its pane, so the numbers sit with the ink they describe
+     rather than in a table somewhere else — which is what makes a legend
+     necessary. */
+  .bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 9px; background: var(--card2); border-top: 1px solid var(--line);
+    font: 400 11px/1.5 var(--mono); color: var(--dim);
+  }
+  .bar .n { color: var(--fg); }
+  .bar .sp { margin-left: auto; }
+  .bar button {
+    font: 400 11px/1 var(--mono); color: var(--dim);
+    background: transparent; border: 1px solid var(--line); border-radius: 4px;
+    padding: 4px 8px; cursor: pointer;
+  }
+  .bar button:hover { color: var(--fg); border-color: var(--dim); }
+  .bar button.ico { font-size: 14px; line-height: 1; padding: 3px 8px; }
+  /* ⚠️ In fullscreen the PANE is the fullscreen element, so the canvas has to be
+     told to fill it — a canvas keeps its attribute size otherwise and sits in
+     the middle of a black screen at 640x360. `contain`, never `cover`: this is a
+     picture with a centre and cropping it is not a style choice.
+
+     ⚠️ AND THE GRID SIZES THE ROWS, NOT A GUESSED NUMBER. This said
+     `height: calc(100vh - 34px)` as well as `grid-template-rows: 1fr auto`,
+     which counts the bar TWICE: the grid reserves its real height and the
+     canvas then also reserves 34px of it, pushing the bar off the bottom of the
+     screen. The numbers were clipped away in fullscreen — the half that says
+     whether what you are looking at is arriving properly. `1fr` plus
+     `min-height: 0` lets the row be exactly what is left. */
+  .pane:fullscreen { background: #000; display: grid; grid-template-rows: 1fr auto; }
+  .pane:fullscreen canvas {
+    width: 100%; height: 100%; min-height: 0;
+    object-fit: contain; aspect-ratio: auto;
+  }
+  .pane:fullscreen .bar { padding: 10px 14px; font-size: 12px; }
 </style>
 
 <script type="module">
@@ -31,23 +66,20 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture is drawn twice: on the left your own machine draws it, and on the right a Raspberry Pi in another building draws it and sends the result over as video. It is the same forty lines of shader code either way — a kaleidoscope fold over drifting noise, fed back into itself — because a picture like this is a short document rather than a large thing, so it can simply be sent and run anywhere. Which is the point: the left pane costs nothing to send to a thousand people, and the right pane is what you have to do instead when a picture depends on something only that machine has.',
-    readout: {
-      'here': 'fps',
-      'the board': 'fps',
-      'bitrate': 'kbit/s',
-      'frames lost': '',
-      'your renderer': '',
-    },
-    controls: [
-      // ⚠️ THE CHECKS ARE A CONTROL, because that is this project's contract:
-      // verify.mjs presses every button in `.d-controls` in order, and a
-      // control the harness cannot press is a subject the suite cannot reach.
-      // Ordered so the board has been asked before the checks run.
-      { id: 'ask', label: 'ask the board to draw' },
-      { id: 'check', label: 'run the checks' },
-      { id: 'stop', label: 'stop the board' },
-    ],
+    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere.',
+    // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
+    // so it goes in that picture's own bar rather than in a row above both —
+    // joining a figure to its ink across two elements is exactly what makes a
+    // legend necessary, and a single row under two panes cannot say which pane
+    // it means without repeating the word every time. The machine surface is
+    // `__demo.panes`, set below.
+    readout: {},
+    // ⚠️ NO CONTROLS. The board is asked to draw on connect and the checks run
+    // themselves — see `runChecks` — because a page whose first act is asking
+    // you to press something is a page that shows you nothing. That removes
+    // this project's usual harness hook, so demo/verify-gl.mjs waits for
+    // `__demo.ready` and reads the asserts rather than pressing buttons.
+    controls: [],
   });
   guard(d);
 
@@ -58,15 +90,56 @@
     c.width = W; c.height = H;
     const lab = el('div', 'lab');
     lab.innerHTML = title;
+    // The bar under each picture: that picture's numbers, and the one control
+    // that belongs to a picture rather than to the page.
+    const bar = el('div', 'bar');
+    const nums = el('span', 'stat', '—');
+    // ⛶ U+26F6 SQUARE FOUR CORNERS — the conventional fullscreen glyph, and it
+    // renders as text rather than as an emoji, so it takes the bar's colour and
+    // sits on its baseline instead of arriving as a coloured picture at a size
+    // of its own. `title` and `aria-label` carry the meaning for anyone the
+    // glyph does not reach.
+    const full = el('button', 'ico', '⛶', { type: 'button', title: 'fullscreen', 'aria-label': 'fullscreen' });
+    // ⚠️ FULLSCREEN THE PANE, NOT THE CANVAS. A fullscreen canvas takes the bar
+    // with it or loses it entirely, and the numbers are the half that says
+    // whether what you are looking at is arriving properly.
+    full.onclick = () => {
+      if (document.fullscreenElement === p) document.exitFullscreen();
+      else p.requestFullscreen?.().catch((e) => d.log(`fullscreen refused — ${e.message}`, 'warn'));
+    };
+    bar.append(nums, el('span', 'sp'), full);
     p.append(c, lab);
+    const wrap = el('div', 'pane');
+    wrap.style.position = 'static';
     panes.append(p);
-    return { p, c, lab };
+    p.append(bar);
+    return { p, c, lab, nums, full };
   };
   const local = mk('<b>here</b> — your browser');
-  const far = mk('<b>the board</b> — a Raspberry Pi, over the internet');
-  const farNone = el('div', 'none', 'nothing arriving yet — press “ask the board to draw”');
+  const far = mk('<b>the box</b> — a Raspberry Pi, over the internet');
+  const farNone = el('div', 'none', 'waiting for the box…');
   far.p.append(farNone);
-  d.el.insertBefore(panes, d.el.querySelector('.d-readout') ?? null);
+  d.el.prepend(panes);
+
+  /**
+   * Each pane's own numbers, under it.
+   *
+   * ⚠️ AND `__demo.panes` IS THE MACHINE COPY, written from the same values in
+   * the same call — two places that can disagree is how a readout ends up
+   * describing something the page is not doing.
+   */
+  window.__demo.panes = { here: {}, box: {} };
+  function stat(which, fields) {
+    const pane = which === 'here' ? local : far;
+    Object.assign(window.__demo.panes[which], fields);
+    const v = window.__demo.panes[which];
+    const bits = [];
+    if (v.fps != null) bits.push(`<span class="n">${v.fps.toFixed(1)}</span> fps`);
+    if (v.kbit != null) bits.push(`<span class="n">${v.kbit.toFixed(0)}</span> kbit/s`);
+    if (v.lost != null) bits.push(`<span class="n">${v.lost}</span> lost`);
+    if (v.note) bits.push(v.note);
+    pane.nums.innerHTML = bits.join(' · ') || '—';
+  }
 
   // ── the picture, here ────────────────────────────────────────────────────
   //
@@ -112,7 +185,7 @@
   // driving `uT` from it puts both panes on the same instant. Then anything
   // still visibly different between them is the PIPELINE, which is the thing
   // worth looking at.
-  let lockedFrame = null;
+  let lockedFrame = null, lockedAt = 0;
 
   function compile(type, src) {
     const s = gl.createShader(type);
@@ -135,14 +208,26 @@
   if (!gl) {
     local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
     d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
-    d.set('your renderer', 'none');
+    stat('here', { note: 'no WebGL2 here' });
   } else {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
     // real visitor, and a page that is quietly slow teaches nothing. It is also
     // what demo/verify-gl.mjs checks its own answer against.
-    d.set('your renderer', String(rendererName).replace(/^ANGLE \(|\)$/g, '').slice(0, 42));
+    // ⚠️ THE RENDERER, ALWAYS, UNDER THE PICTURE IT DREW. A visitor on a
+    // software rasteriser is a real visitor and a page that is quietly slow
+    // teaches nothing; it is also what demo/verify-gl.mjs checks its own answer
+    // against. It goes in the `here` bar because it is a fact about THAT pane —
+    // the right-hand picture was drawn by a Raspberry Pi and this says nothing
+    // about it.
+    // ⚠️ NAME THE CHIP, NOT THE FIRST COMMA. Splitting
+    // "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)"
+    // on its first comma leaves the word "Apple", which says nothing at all.
+    // The part worth printing is what follows "Renderer:".
+    const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
+      ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
+    stat('here', { note: short.trim().slice(0, 32) });
 
     const prog = gl.createProgram();
     gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
@@ -168,7 +253,19 @@
     const frame = () => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
       gl.viewport(0, 0, W, H);
-      // Locked to the board when it is sending, free-running otherwise.
+      // ⚠️ A LOCK WITH NO TIMEOUT FREEZES THE THING IT LOCKED. When the box
+      // stops sending — it died, the stream ended, the socket dropped without a
+      // `video.stopped` — the counter stops advancing and this pane stops with
+      // it. Both pictures then appear dead and only one of them actually is,
+      // which is the page failing at the exact moment it should be showing that
+      // the local one needs nobody. Unlock after a second of silence.
+      if (lockedFrame !== null && performance.now() - lockedAt > 1000) {
+        lockedFrame = null;
+        i = Math.max(i, 1);
+        local.lab.innerHTML = '<b>here</b> — your browser';
+        d.log('the box stopped sending — this pane is free-running again', 'warn');
+        stat('box', { fps: null, kbit: null, note: 'not arriving' });
+      }
       gl.uniform1f(uT, (lockedFrame ?? i) / 30);
       gl.uniform2f(uRes, W, H);
       gl.activeTexture(gl.TEXTURE0);
@@ -183,7 +280,7 @@
       [A, B] = [B, A];
       i++; tick++; drewAny++;
       const now = performance.now();
-      if (now - lastAt >= 1000) { localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now; d.set('here', localFps.toFixed(1)); }
+      if (now - lastAt >= 1000) { localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now; stat('here', { fps: localFps }); }
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
@@ -206,14 +303,34 @@
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;
     if (msg.type === 'video.started') {
-      if (!msg.ok) { d.log(`the board is not drawing — ${msg.reason}`, msg.available === false ? 'bad' : 'warn'); return; }
-      d.log(`the board is drawing ${msg.w}x${msg.h} at ${msg.fps} — ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
-      openVideo(msg.room, msg);
+      if (!msg.ok) {
+        // `video.status` answers this when nothing is running, which is not a
+        // fault — it is the cue to ask. Anything else is worth a line.
+        if (/no picture running/.test(msg.reason || '')) { askForPicture(); return; }
+        d.log(`the box is not drawing — ${msg.reason}`, msg.available === false ? 'bad' : 'warn');
+        stat('box', { note: 'unavailable' });
+        return;
+      }
+      d.log(`the box is drawing ${msg.w}x${msg.h} at ${msg.fps} — ${(msg.bitrate / 1000).toFixed(0)} kbit/s`, 'hi');
+      // The box names its GPU the same way this page names yours. It arrives on
+      // the second status at the latest, because the renderer prints it on its
+      // own first line and the reply may be composed before that lands.
+      if (msg.renderer) stat('box', { note: msg.renderer });
+      // ⚠️ DO NOT REOPEN A STREAM THAT IS ALREADY OPEN. Every client's
+      // `video.status` is answered to the whole room, so a second visitor's
+      // question tore this one's decoder down and built it again — which showed
+      // up as a bar reading "not arriving" next to a live frame rate.
+      if (!vws) openVideo(msg.room, msg);
     }
-    if (msg.type === 'video.stopped') { d.log(`the board stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
+    if (msg.type === 'video.stopped') { d.log(`the box stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
   };
-  d.on('ask', () => { d.log('asking the board to draw…', 'hi'); send({ type: 'video.start', w: 1280, h: 720, fps: 30 }); });
-  d.on('stop', () => send({ type: 'video.stop' }));
+  // ⚠️ ASK ON CONNECT, NOT ON A PRESS. A page whose first act is asking you to
+  // press something shows you nothing; and the box stops on its own when the
+  // room empties, so nobody has to remember to switch it off.
+  function askForPicture() {
+    d.log('asking the box to draw…', 'hi');
+    send({ type: 'video.start', w: 1280, h: 720, fps: 30 });
+  }
 
   let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
   const fctx = far.c.getContext('2d');
@@ -226,14 +343,15 @@
     // locked would be two different claims wearing one label.
     lockedFrame = null;
     local.lab.innerHTML = '<b>here</b> — your browser';
-    farNone.textContent = 'nothing arriving — press “ask the board to draw”';
+    stat('box', { fps: null, kbit: null, note: 'not arriving' });
+    farNone.textContent = 'the box is not sending';
     far.p.append(farNone);
   }
 
   function openVideo(room, info) {
     closeVideo();
     if (typeof VideoDecoder !== 'function') {
-      farNone.textContent = 'this browser has no WebCodecs, so the board’s picture cannot be decoded here';
+      farNone.textContent = 'this browser has no WebCodecs, so the box’s picture cannot be decoded here';
       d.log('no WebCodecs — the right pane is unavailable on this browser', 'bad');
       return;
     }
@@ -245,6 +363,10 @@
         vf.close();
         farDecoded++;
         farNone.remove();
+        // ⚠️ CLEAR THE STALE NOTE. "not arriving" was left behind by an earlier
+        // close and sat next to a live frame rate — a bar saying both at once
+        // is worse than one saying neither.
+        if (window.__demo.panes.box.note) stat('box', { note: null });
       },
       error: (e) => d.log(`decode error — ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
     });
@@ -261,19 +383,19 @@
       // ENVELOPE, and the relay drops frames with no error, no close and no
       // backpressure. Measured: at 8 Mbit/s it lost 101 of 361 frames and
       // nothing else on the path said so. This cell is the only witness.
-      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; d.set('frames lost', String(farGaps)); }
+      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; stat('box', { lost: farGaps }); }
       last = s;
       // The board's sequence number is its frame counter — see the comment at
       // `lockedFrame`. Taken here, before the decode, because a frame the
       // decoder refuses is still a frame the board drew.
-      if (lockedFrame === null) local.lab.innerHTML = '<b>here</b> — your browser, locked to the board';
-      lockedFrame = s;
+      if (lockedFrame === null) local.lab.innerHTML = '<b>here</b> — your browser, locked to the box';
+      lockedFrame = s; lockedAt = performance.now();
       farBytes += e.data.byteLength;
       // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
       // is an error it reports once and then stays broken through, so a joiner
       // waits — up to one second at this GOP, which is a GOP choice and not a
       // fault.
-      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe — the board’s picture starts here'); }
+      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('keyframe — the box’s picture starts here'); }
       try {
         decoder.decode(new EncodedVideoChunk({
           type: key ? 'key' : 'delta',
@@ -285,12 +407,11 @@
       const now = performance.now();
       if (now - at >= 1000) {
         farFps = tick * 1000 / (now - at);
-        d.set('the board', farFps.toFixed(1));
-        d.set('bitrate', (farBytes * 8 / (now - at)).toFixed(0));
+        stat('box', { fps: farFps, kbit: farBytes * 8 / (now - at), lost: farGaps });
         tick = 0; at = now; farBytes = 0;
       }
     };
-    vws.onclose = () => d.log('the board’s video socket closed');
+    vws.onclose = () => d.log('the box’s video socket closed');
   }
 
   // ── what a harness can check ─────────────────────────────────────────────
@@ -298,7 +419,19 @@
   // the page's own answer against what it found itself — two ends disagreeing
   // about which context they are looking at is worth catching.
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
-  d.on('check', async () => {
+  /**
+   * ⚠️ THE CHECKS RUN THEMSELVES, because the controls are gone.
+   *
+   * This project's usual hook is a button the harness presses — "a control the
+   * harness cannot press is a subject the suite cannot reach". With no controls
+   * the same rule points the other way: the page must reach its own checks, and
+   * demo/verify-gl.mjs waits for `__demo.ready` instead of pressing anything.
+   *
+   * It waits for the box before running, but only for a bounded time: a page
+   * whose asserts never fire because a Raspberry Pi is switched off reads as
+   * broken, and the left-hand pane is a claim that stands on its own.
+   */
+  async function runChecks() {
       // ⚠️ THE LOCAL PANE IS ASSERTED WITHOUT THE BOARD, ON PURPOSE. It is a
       // pure function of (parameters, clock) and needs no network at all —
       // which is the claim the page exists to make. Tying its asserts to a
@@ -353,11 +486,16 @@
       // The far pane, only if the board answered. A lane with nothing to say
       // says so in words rather than counting as a failure.
       if (farDecoded > 0) {
-        d.assert('the board’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
+        d.assert('the box’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
         d.assert('and arrived without the relay dropping any', farGaps === 0, `${farGaps} lost`);
       } else {
-        d.log('the board is not sending — the right pane has nothing to report', 'warn');
+        d.log('the box is not sending — the right pane has nothing to report', 'warn');
       }
       d.ready();
-    });
+  }
+  (async () => {
+    for (let i = 0; i < 30 && farDecoded === 0; i++) await new Promise((r) => setTimeout(r, 400));
+    if (farDecoded === 0) d.log('the box did not send in 12 s — checking the left pane only', 'warn');
+    runChecks();
+  })();
 </script>
