@@ -44,22 +44,6 @@ export function oscMessage(address, args = []) {
   return Buffer.concat(parts);
 }
 
-/**
- * The granular parameters worth moving, with honest ranges. Pappus exposes 106
- * commands; most are structure. These are the ones that change what you HEAR,
- * and both granulators get the same surface one letter apart (m… and n…).
- */
-export const PAPPUS_RANDOM = [
-  ['rate', 0.5, 24],      // grains per second
-  ['size', 0.02, 0.4],    // grain length, seconds
-  ['scan', 0, 1],         // where in the buffer the playhead sits
-  ['spray', 0, 0.6],      // scatter around it
-  ['swarm', 0, 0.9],      // duplicate grains, detuned
-  ['tilt', -1, 1],        // spectral tilt
-  ['delay', 0, 0.8],
-  ['sos', 0, 0.7],        // sound-on-sound feedback
-  ['strum', 0, 0.5],
-];
 
 const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }); } catch { return ''; } };
 const have = (bin) => { try { execFileSync('which', [bin], { stdio: 'pipe' }); return true; } catch { return false; } };
@@ -146,6 +130,21 @@ export const JACK_SYNTHS = {
  * two presses of a button. Bypassing is a re-patch, which is instant.
  */
 let pappusProc = null;
+/**
+ * ⚠️ A JACK PORT IS NOT A READY ENGINE, AND THE GAP IS SEVEN SECONDS.
+ *
+ * `SuperCollider:out_1` appears as soon as scsynth boots; the 2,030-line engine
+ * class is compiled and its 106 commands registered several seconds LATER, and
+ * sclang answers an unknown command with nothing at all. So waiting on the port
+ * returned ok while every command sent afterwards fell into a void — measured
+ * from the board's own log: `pappus inserted` at 05:38:59.8, a minute of 1965
+ * loaded at 05:39:03.5, and `PAPPUS READY` only at 05:39:06.0. The load, the
+ * buffer lock and the gates were all sent 2.6 s before anything could receive
+ * them, with no error anywhere, and the page said the material was loaded.
+ *
+ * The engine prints `PAPPUS READY` when it means it. That is the signal.
+ */
+let pappusReady = false;
 
 export function pappusAvailable() {
   return ['sclang', 'jackd'].every(have) && existsSync('/opt/positron-box/rig/box/norns/run-pappus.scd');
@@ -171,11 +170,31 @@ export async function pappusFx(on, { instrumentPort, onLog } = {}) {
       env: { ...process.env, XDG_RUNTIME_DIR: rt, QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_DISABLE_SANDBOX: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    pappusProc.stdout?.on('data', (d) => { for (const l of String(d).split('\n')) { const t = l.trim(); if (t && !/^(sc3>|->)/.test(t)) onLog?.(t); } });
+    pappusReady = false;
+    pappusProc.stdout?.on('data', (d) => {
+      for (const l of String(d).split('\n')) {
+        const t = l.trim();
+        if (!t || /^(sc3>|->)/.test(t)) continue;
+        // Guard on the exact line the engine prints, not on a substring of it.
+        if (/^PAPPUS READY\b/.test(t)) pappusReady = true;
+        onLog?.(t);
+      }
+    });
     pappusProc.stderr?.on('data', (d) => onLog?.(String(d).trim()));
     let up = false;
     for (let i = 0; i < 80 && !up; i++) { await wait(500); up = sh('jack_lsp 2>/dev/null').includes('SuperCollider:out_1'); }
     if (!up) { pappusProc?.kill(); pappusProc = null; return { ok: false, reason: 'the pappus engine did not come up' }; }
+    // ...and now wait for the engine itself. 60 s: a Pi 4 takes about seven
+    // from the port appearing, and the cost of waiting too long is a slow
+    // switch while the cost of not waiting is a silent one.
+    for (let i = 0; i < 120 && !pappusReady; i++) await wait(500);
+    if (!pappusReady) { stopPappus(); return { ok: false, reason: 'the engine came up but never reported READY' }; }
+  } else {
+    // Somebody else's sclang, or one this process started before a restart:
+    // its stdout is not ours to read, and it has been up long enough to have
+    // finished compiling. Treat that as ready rather than waiting forever for
+    // a line that will never arrive on this pipe.
+    pappusReady = true;
   }
 
   // Insert it: the instrument stops feeding the capture directly and feeds
@@ -186,7 +205,7 @@ export async function pappusFx(on, { instrumentPort, onLog } = {}) {
   }
   sh(`jack_connect ${SCOUT} ${CAP} 2>/dev/null`);
   onLog?.(instrumentPort ? 'pappus inserted' : 'pappus running, nothing feeding it');
-  return { ok: true, on: true, fed: !!instrumentPort };
+  return { ok: true, on: true, fed: !!instrumentPort, ready: pappusReady };
 }
 
 export function pappusOsc(cmdName, ...args) {
@@ -196,106 +215,18 @@ export function pappusOsc(cmdName, ...args) {
   return true;
 }
 
-const rnd = (lo, hi) => +(lo + Math.random() * (hi - lo)).toFixed(3);
-const rndInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-const arr = (n, lo, hi) => Array.from({ length: n }, () => rnd(lo, hi));
 
 /**
- * Roll the whole instrument, not just the granulators.
+ * The granular roll and the drift moved to `pappus.mjs` — one implementation,
+ * seeded, in named characters, and with four mode ranges corrected against the
+ * engine. The version that lived here rolled `scanmode`, `spraymode` and
+ * `swarmmode` 0..2 where the engine indexes `mode - 1` over four-element
+ * arrays, so mode 4 was unreachable on all three; `contour` 1..8 of 17; and its
+ * chord selector was always-true, so the major chord was dead code.
  *
- * Pappus's chain is GRAINSWARM 1 and 2 in parallel -> RESONATOR -> DELAY ->
- * COLOUR -> REVERB, and every stage takes a settable amount of each granulator.
- * Rolling only the grain rate moved the least interesting third of it, which is
- * why it sounded like a pass-through.
- *
- * Ranges are chosen to stay musical rather than maximal: wet levels are kept
- * off the ceiling, feedback short of runaway, and the resonator is tuned to a
- * scale rather than to noise — a randomiser that mostly produces mush is one
- * nobody presses twice.
+ * `pappusOsc` below stays: it is the panic path, which has nothing to do with
+ * rolling anything.
  */
-export function pappusRandomise() {
-  const out = {};
-  const set = (name, ...v) => { pappusOsc(name, ...v); out[name] = v.length === 1 ? v[0] : `[${v.length}]`; };
-
-  // ── the two granulators ────────────────────────────────────────────────
-  for (const pre of ['m', 'n']) {
-    for (const [name, lo, hi] of PAPPUS_RANDOM) set(pre + name, rnd(lo, hi));
-    set(pre + 'contour', rndInt(1, 8));
-    set(pre + 'scanmode', rndInt(0, 2));
-    set(pre + 'spraymode', rndInt(0, 2));
-    set(pre + 'swarmmode', rndInt(0, 2));
-    set(pre + 'lock', rndInt(0, 1));
-    set(pre + 'buflen', rnd(1, 12));
-    set(pre + 'winstart', rnd(0, 0.4));
-    set(pre + 'winend', rnd(0.6, 1));
-    set(pre + 'elen', rnd(0.2, 1));
-  }
-
-  // ── the eight voices per granulator: pitches, gates, probabilities ──────
-  // A scale rather than free intervals, or it is atonal by construction.
-  const SCALE = [0, 2, 3, 5, 7, 8, 10, 12, -5, -12];
-  const pitches = () => Array.from({ length: 8 }, () => SCALE[rndInt(0, SCALE.length - 1)]);
-  set('pitches', ...pitches());
-  set('pitches2', ...pitches());
-  set('gates', ...Array.from({ length: 8 }, () => (Math.random() < 0.55 ? 1 : 0)));
-  set('gates2', ...Array.from({ length: 8 }, () => (Math.random() < 0.45 ? 1 : 0)));
-  set('probs', ...arr(8, 0.4, 1));
-  set('probs2', ...arr(8, 0.4, 1));
-  set('epattern', ...Array.from({ length: 16 }, () => (Math.random() < 0.5 ? 1 : 0)));
-  set('epattern2', ...Array.from({ length: 16 }, () => (Math.random() < 0.4 ? 1 : 0)));
-
-  // ── RESONATOR: 48 of them, tuned to a chord ────────────────────────────
-  const root = 60 + rndInt(-12, 7);
-  const chord = [0, 3, 7, 10, 14, 17][Math.random() < 0.5 ? 0 : 1] !== undefined ? [0, 3, 7, 10, 14, 17] : [0, 4, 7, 11];
-  const frq = Array.from({ length: 48 }, (_, i) =>
-    +(440 * Math.pow(2, ((root + chord[i % chord.length] + 12 * Math.floor(i / chord.length / 2)) - 69) / 12)).toFixed(2));
-  set('pfrq', ...frq);
-  set('pamp', ...Array.from({ length: 48 }, (_, i) => +(Math.random() * Math.exp(-i / 22)).toFixed(3)));
-  set('pdamp', rnd(0.1, 0.9));
-  set('pbright', rnd(0, 1));
-  set('pstruct', rnd(0, 1));
-  set('ppos', rnd(0, 1));
-  set('pmodel', rndInt(0, 2));
-  set('pgrain', rnd(0, 0.7));
-  set('pgraintype', rndInt(0, 2));
-  set('pwet', rnd(0.15, 0.85));
-
-  // ── DELAY: eight taps ──────────────────────────────────────────────────
-  set('taptimes', ...arr(8, 0.02, 1.2));
-  set('taplevels', ...arr(8, 0, 0.8));
-  set('tappans', ...arr(8, -1, 1));
-  set('tappitch', ...arr(8, -7, 7));
-  set('sfb', rnd(0, 0.6));               // short of runaway
-  set('stilt', rnd(-1, 1));
-  set('stiltxover', rnd(200, 4000));
-  set('sdiffuse', rnd(0, 0.9));
-  set('swet', rnd(0.1, 0.7));
-  set('scycle', rnd(0.1, 2));
-
-  // ── COLOUR: drive, crush, loss, noise ──────────────────────────────────
-  set('drive', rnd(0, 0.6));
-  set('crush', rnd(0, 0.5));
-  set('crushmode', rndInt(0, 2));
-  set('loss', rnd(0, 0.5));
-  set('noise', rnd(0, 0.3));
-  set('noisetype', rndInt(0, 2));
-  set('noisedecay', rnd(0.05, 1));
-  set('noisetone', rnd(0, 1));
-  set('kwow', rnd(0, 0.4));
-
-  // ── REVERB ─────────────────────────────────────────────────────────────
-  set('rverb', rnd(0.1, 0.7));
-  set('rtime', rnd(0.5, 6));
-  set('rshimmer', rnd(0, 0.5));
-  set('rshimmersemi', rndInt(-12, 12));
-
-  // ── ROUTING: how much of each granulator reaches each stage ────────────
-  // This is SIGNAL, the thing that decides whether either granulator skips a
-  // part of the chain — and it changes the character more than any single knob.
-  for (const k of ['pin1', 'pin2', 'sin1', 'sin2', 'kin1', 'kin2', 'oin1', 'oin2']) set(k, rnd(0, 1));
-
-  return out;
-}
 
 /**
  * Silence the insert as well as the instrument.
@@ -316,6 +247,7 @@ export function pappusPanic() {
 }
 
 export function stopPappus() {
+  pappusReady = false;
   if (pappusProc) { try { pappusProc.kill('SIGTERM'); } catch { /* gone */ } pappusProc = null; }
   sh('pkill -9 -x scsynth 2>/dev/null'); sh('pkill -9 -x sclang 2>/dev/null');
 }
@@ -391,20 +323,21 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // so "PAPPUS READY" and every engine error were being collected into a
   // variable nobody read, and the box looked like it had started something
   // that silently did nothing.
-  synth.stdout?.on('data', (d) => {
-    log += d;
-    for (const line of String(d).split('\n')) {
-      const t = line.trim();
-      if (t && !/^(sc3>|->|\s*$)/.test(t) && !/^(yoshimi>\s*)?@ \w+$/.test(t)) onLog?.(t);
-    }
-  });
-  // Yoshimi's CLI prints its prompt continuously; forwarding it floods the
-  // journal with thousands of "@ Top" lines and buries anything real.
-  synth.stderr?.on('data', (d) => {
-    log += d;
-    const t = String(d).trim();
-    if (t && !/^(yoshimi>\s*)?@ \w+$/.test(t)) onLog?.(t);
-  });
+  // ⚠️ STRIP THE PROMPT, DO NOT MATCH ON IT. Yoshimi's CLI writes `yoshimi> `
+  // continuously and PREFIXES its real output with it, so a filter that only
+  // dropped `@ Top` left thousands of bare prompts in the journal — and the
+  // lines worth having were hiding behind one:
+  //     yoshimi> Main Part 1 loaded 0001-DX Rhodes 1
+  //     yoshimi> Main Part 1 load FAILED No instrument at 6 in this bank
+  // which is Yoshimi saying exactly whether a patch change landed. Peel the
+  // prompts off, then drop what is left only if it is empty or a context line.
+  const say = (raw) => {
+    const t = String(raw).replace(/^(?:yoshimi>\s*)+/, '').trim();
+    if (!t || /^@ \w+/.test(t) || /^(sc3>|->)/.test(t)) return;
+    onLog?.(t);
+  };
+  synth.stdout?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
+  synth.stderr?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
   await wait(def.warmup ?? (name === 'yoshimi' ? 13000 : 6000));
 
   // 3. capture — raw s16 on stdout, read straight into the frame pump
@@ -482,22 +415,6 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     program: (ch, p) => midi([0xc0 | (ch & 15), p & 127]),
     panic: () => { for (let c = 0; c < 16; c++) midi([0xb0 | c, 123, 0]); },
     osc,
-    /** Roll every audible granular parameter, on both granulators. */
-    randomise: () => {
-      if (!udp) return null;
-      const out = {};
-      for (const pre of ['m', 'n']) {
-        for (const [name, lo, hi] of PAPPUS_RANDOM) {
-          const v = +(lo + Math.random() * (hi - lo)).toFixed(3);
-          osc(pre + name, v);
-          out[pre + name] = v;
-        }
-        osc(pre + 'contour', 1 + Math.floor(Math.random() * 8));
-        osc(pre + 'scanmode', Math.floor(Math.random() * 3));
-      }
-      osc('loss', +(Math.random() * 0.5).toFixed(3));
-      return out;
-    },
     stop: () => {
       try { udp?.close(); } catch { /* already closed */ }
       if (midiFd !== null) { try { closeSync(midiFd); } catch {} }

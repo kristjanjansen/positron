@@ -851,3 +851,146 @@ driver attaches and publishes no media. `system_profiler` also returns **stale**
 card details from a previous insertion, which is worth knowing before believing
 it twice. Hours went into treating a hardware fault as a software one — the tell
 was that it worked once and then never again, which is a contact, not a bug.
+
+## 45. An envelope field eats a payload field of the same name, silently (session 18)
+
+`wire.mjs`'s `format()` builds `{ id, type: '', ...msg, from, at, seq }` — the
+envelope is written AFTER the message is spread, so any payload field called
+`from`, `at` or `seq` is replaced without a word. `source.load` carried the
+excerpt's start offset as `at`, so every send overwrote it with `Date.now()` and
+the box asked ffmpeg to seek to **second 1,789,103,743,118** of a forty-five
+minute broadcast.
+
+The reason it survived is the reason it is worth an entry: **ffmpeg answered
+with sixty seconds of real audio anyway**, from wherever it decided that was. So
+the feature made sound, the suite stayed green, and the only control the feature
+had did nothing. This is the second time the same spread ate a field in the same
+file — `voices.listed`'s `source` was the first, and its fix was a comment.
+
+`format()` now THROWS on the collision. There is no correct silent behaviour for
+a programming error whose alternative is a timestamp in a seek argument, and it
+fires on the first send rather than in the field.
+
+## 46. "Off" that erases: `src 1` wiped the buffer it was documented to hold
+
+Pappus's own comment calls `msrc 1` *"OFF (hold what the buffer already has)"*,
+and the record gain does go to zero. But the write head does not stop, and the
+RETAIN gain is zero too unless `lock` is set:
+
+    sosret = (sos * 1.05).clip(0, 1)            sos = msos.max(mlock) = 0
+    sosin  = ((1 - sos) * 4).clip(0,1) * run * (ssel > 1.5) = 0
+    BufWr.ar((cap * sosin) + (old * sosret), …) = 0 * new + 0 * old
+
+So "stop recording" wrote **silence** over the live window at real time — one to
+twelve seconds, depending on the roll. A loaded minute of 1965 was gone before
+anyone could listen to it twice.
+
+⚠️ **And every reading of the feature was wrong in the same direction.** A take
+started a second after the load still caught material on its way out, so it
+"made a sound" and "sounded unlike the synth" — both true, both about something
+being erased. **A single take cannot tell "loaded" from "loaded and already
+being erased".** Only a second take, later, can. The live test now listens again
+25 s on, which is the assertion that would have caught it on day one.
+
+## 47. A die that rolls a step count as a fraction turns the instrument off
+
+The euclidean gate reads `epattern[(estep + mephase*i).floor % melen.max(1)]`
+and advances it with `Stepper.ar(trig, 0, 0, (melen - 1).max(0), 1)` — so
+`melen` is a NUMBER OF STEPS. The roll drew it `f(0.2, 1)`. Any value at or
+below 1 makes the modulo `% 1`, which is 0 for every voice at every step: the
+pattern is read at index 0 forever, and if that bit is a 0 the granulator never
+fires a grain.
+
+Measured over 20,000 rolls of the shipped code: **30.5% of rolls gated BOTH
+granulators off and 49.6% gated exactly one.** About a fifth of presses left the
+instrument running. Nothing reported an error — the die simply produced silence
+most of the time, and that read as "granular is subtle". Now 0.0%.
+
+This is the fourth range bug in one file (`scanmode`, `contour`, `pmodel`,
+`pgraintype` were the others), and the pattern behind all four is the same: **a
+number whose UNITS were guessed from its name.** The engine is on the board and
+`grep` answers in a second.
+
+## 48. A proxy measurement cannot answer in the direction it has a floor in
+
+"Does a key pitch the grains?" read FAILED for a day against an engine that was
+working, for two reasons that are both about the instrument and not the subject:
+
+- **the chain** — 48 resonators tuned to a fixed chord, eight delay taps and a
+  reverb sit between the grains and the capture, and not one follows a key.
+  Through a resonator-heavy roll, four octaves of key moved the measured
+  brightness by **−0.05 octaves**. Through a roll that goes straight out, the
+  same four octaves moved it **1.77**.
+- **the material** — a two-second spectral centroid of grains scattered over a
+  minute of SPEECH is dominated by which words they landed on. The same sweep
+  gave −1.92 octaves at −12 semitones (right) and +0.34 at −12 on the next take.
+
+On steady material with the chain muted the ladder is unambiguous: **225 · 271 ·
+350 · 1102 · 2100 Hz**. But brightness still cannot answer DOWNWARD — a grain
+clock at 12/s with a 0.2 s envelope puts a broadband floor under everything, and
+partials moving down into that floor stop moving the centroid. So the test
+asserts the upward rungs and **says the rest in words**, rather than going amber
+on a working engine every third run.
+
+## 49. A green reply can precede the thing it reports by seven seconds
+
+`fx.pappus` waited for `SuperCollider:out_1` to appear in `jack_lsp` and then
+answered `ok`. That port is scsynth booting; the 2,030-line engine class is
+compiled and its 106 commands registered **several seconds later**, and sclang
+answers an unknown command with nothing at all. From the board's own log:
+`pappus inserted` at 05:38:59.8, a minute of 1965 loaded at 05:39:03.5,
+`PAPPUS READY` at 05:39:06.0. The load, the buffer lock and the gates all went
+into a void, with no error anywhere, and the page said the material was loaded.
+
+**Wait for the thing that means what you are claiming.** The engine prints
+`PAPPUS READY` when it means it. Guard on the exact line, not a substring.
+
+## 50. We got blocked by ERR, and the heavy request had no `fetch` in it
+
+After a day of testing, `arhiiv.err.ee` answered **nothing at all** from the
+board — connection refused, `curl` code `000` — while Cloudflare answered 200
+from the same machine in 14 ms and the same host answered 200 from a laptop on a
+different address. That is a block, and it was earned.
+
+Three causes, and the biggest one did not look like traffic:
+
+1. **`errExcerpt` runs ffmpeg against their HLS playlist**, so one "load" is a
+   stream of segment fetches. There is no `fetch` on that line, so it read as
+   local work. Four button presses pulled four minutes of their bandwidth for
+   the same four minutes of audio.
+2. **The search was repeated for a year that ended sixty years ago** — 543
+   immutable rows, re-asked on every press and every test run.
+3. **A refusal was answered with another request.** No backoff at all, so the
+   moment they started saying no, we asked faster.
+
+⚠️ And **the refusal reached nobody**: the fetch threw, the box replied
+`box.error`, and no client was listening for that type — so the page spun and
+the harness sat out its full 30 s timeout reporting *"no box in this room"*
+about a box that was answering fine. A blocked dependency and a dead service
+looked identical.
+
+It is a public broadcaster's archive, not a service we pay for. One request at a
+time, a 2 s floor between any two, disk caches with no TTL for a closed year,
+and 30 s → 15 min of backoff that honours `Retry-After`. The tests count
+REQUESTS on a stubbed `fetch`, because "it seemed faster" is not evidence about
+traffic.
+
+## 51. Asking the wrong instrument where the board is
+
+`positron-box.local` does not resolve from this sandbox (mDNS is multicast UDP),
+a ping sweep answered nothing useful, and grepping `arp -an` for Raspberry Pi
+MAC prefixes missed a board that was sitting on the subnet the whole time. One
+line found it in a minute: `nc -z <ip> 22` across the /24, then `ssh` and ask
+its hostname.
+
+⚠️ And it answers over the RELAY from any network at all, so **"I cannot ssh to
+it" is never the same as "it is down"** — a thing said out loud today before
+checking. Ask the relay first; it needs no LAN.
+
+Second trap in the same hour: **the service runs from `/opt/positron-box/`, not
+`~/positron/`**. `provision.sh` unpacks into the home directory and `setup.sh`
+copies that to `/opt`, which is what the unit file executes — so the copy in
+`~/positron` is stale, has no `pappus.mjs` at all, and reading it says nothing
+about what is running. `push.sh` now writes to `/opt` and prints the md5 of what
+landed, because "it deployed" and "it says it deployed" have been different
+things here before.

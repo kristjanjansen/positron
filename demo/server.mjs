@@ -34,6 +34,13 @@ export function serve(port = PORT) {
     // LOCAL == DEPLOYED. On the worker, demo/<x> is served at /<x>, so a page
     // asking for /shell/shell.css or /llhls/ must resolve here too — try the
     // repo root first, then inside demo/.
+    //
+    // One page is not under either root: workers/view/build.mjs copies
+    // rig/box/listen.html to box/index.html, so /box/ is a 404 here while it
+    // works on the deploy. Mapped rather than served out of
+    // workers/view/public/, which is BUILD OUTPUT — serving that would test a
+    // copy and read green on a page the build had not refreshed.
+    if (rel === 'box/index.html') rel = 'rig/box/listen.html';
     let file = join(ROOT, rel);
     try {
       let body;

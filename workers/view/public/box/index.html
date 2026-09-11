@@ -78,7 +78,7 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave, and the arrows and the die move through the patches the board actually has — it reads its own instrument library and sends back the names, so every one of them makes a sound.',
     readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s' },
     controls: [
       { id: 'oct-', label: '−' },
@@ -106,12 +106,17 @@
   // ◀ ▶ then the die: stepping and rolling are different gestures, and the two
   // arrows read as a pair when nothing sits between them.
   fxWrap.append(patchPrev, patchNext, patchDie);
-  patchPrev.onclick = () => { idx = (idx - 1 + span()) % span(); showPatch(); sendPatch(); };
-  patchNext.onclick = () => { idx = (idx + 1) % span(); showPatch(); sendPatch(); };
-  patchDie.onclick  = () => { idx = Math.floor(Math.random() * span()); showPatch(); sendPatch(); };
+  // A press is what makes the patch line true — see showPatch().
+  patchPrev.onclick = () => { idx = (idx - 1 + span()) % span(); chosen = true; showPatch(); sendPatch(); };
+  patchNext.onclick = () => { idx = (idx + 1) % span(); chosen = true; showPatch(); sendPatch(); };
+  patchDie.onclick  = () => { idx = Math.floor(Math.random() * span()); chosen = true; showPatch(); sendPatch(); };
 
   const patchLine = el('p', 'patch', '—');
-  d.el.append(patchLine);
+  // What is IN the grain buffers, when something was put there deliberately.
+  // Its own line rather than a second clause on the patch line: one names the
+  // sound, the other names the material, and they change for different reasons.
+  const sourceLine = el('p', 'patch', '');
+  d.el.append(patchLine, sourceLine);
 
   // Pappus is an effect, so it is a switch beside the instruments rather than
   // one of them: it wraps whatever is playing, and can go on and off underneath.
@@ -136,7 +141,21 @@
     send({ type: 'fx.pappus', on: fxOn });
   };
   fxDie.onclick = () => { send({ type: 'params.random' }); d.log('rolled the granular parameters', 'hi'); };
-  fxRow.append(fxBtn, fxDie);
+  // 1965, as grain material. ERR's audio archive holds 543 items from that
+  // year; this asks the box for one at random and loads sixty seconds of it
+  // into the grain buffers, after which the keys play THAT rather than the
+  // instrument. One button, because choosing among 543 is a different page.
+  //
+  // ⚠️ The AUDIO archive. The 298 video items from 1965 are silent 16 mm film
+  // negatives, so the obvious half of the archive granulates nothing.
+  const fx1965 = el('button', '', '1965', { type: 'button', title: 'load a minute of Estonian radio from 1965 into the grains' });
+  fx1965.disabled = true;
+  fx1965.onclick = () => {
+    fx1965.dataset.busy = '1';
+    send({ type: 'source.search', limit: 100 });
+    d.log('asking ERR for 1965…', 'hi');
+  };
+  fxRow.append(fxBtn, fxDie, fx1965);
   picks.append(fxWrap);
   // On the same row as the octave and panic buttons, pinned right: it is a
   // per-performance switch like they are, not a per-instrument choice.
@@ -152,11 +171,24 @@
     { id: Math.random().toString(36).slice(2), type: '', ...m, from: ID, at: Date.now(), seq: seq++ }));
 
   // ── patch names ──────────────────────────────────────────────────────────
-  // One continuous number rather than a bank control and a program control:
-  // hexter is flat (128 voices, no banks) and FluidR3 has only bank 0 plus 128
-  // for drums, so separate banks were clutter for two instruments out of three.
-  // Walking past 127 rolls into the next bank, which is how Yoshimi's 393
-  // instruments are reached with the same two buttons.
+  // Two kinds of instrument, and they need different walks.
+  //
+  // hexter and the sampled instruments carry a FIXED TABLE — 128 DX7 voices in
+  // one flat cartridge, 128 General MIDI programs — which is the same on every
+  // board, so it lives here. One continuous number is the whole story: hexter
+  // has no banks at all and the GM soundfont has only bank 0 plus 128 for
+  // drums, so a separate bank control would be clutter for two instruments out
+  // of three.
+  //
+  // Yoshimi is not like that, and pretending it was is what made its patch
+  // buttons do nothing. Its library on this board is 911 instruments in 24
+  // banks; the banks are numbered 5, 10, 15 … 120 rather than 0, 1, 2, and the
+  // slots inside them are sparse — the Rhodes bank holds 26 patches spread
+  // across slots 1…68. Walking 0…127 lands on an empty slot most of the time,
+  // and Yoshimi's answer to an empty slot is to carry on playing what it had.
+  // So the BOX enumerates, because it is the only end that can see the files,
+  // and this page steps through the list it is sent: `voices.list` ->
+  // `voices.listed`, and then one entry per press.
   const GM = ('Grand Piano,Bright Piano,Electric Grand,Honky-tonk,Electric Piano 1,Electric Piano 2,Harpsichord,Clavi,'
    + 'Celesta,Glockenspiel,Music Box,Vibraphone,Marimba,Xylophone,Tubular Bells,Dulcimer,'
    + 'Drawbar Organ,Percussive Organ,Rock Organ,Church Organ,Reed Organ,Accordion,Harmonica,Tango Accordion,'
@@ -180,17 +212,36 @@
    + 'E.PIANO 1,GUITAR 1,GUITAR 2,SYN-LEAD 1,BASS 1,BASS 2,E.ORGAN 1,PIPES 1,HARPSICH 1,CLAV 1,'
    + 'VIBE 1,MARIMBA,KOTO,FLUTE 1,ORCH-CHIME,TUB BELLS,STEEL DRUM,TIMPANI,REFS WHISL,VOICE 1,TRAIN,TAKE OFF').split(',');
 
+  // The box's own list, when the instrument has one. Empty means "walk the
+  // fixed table above".
+  let patches = [], banksInList = 0, chosen = false;
+  const listed = () => patches.length > 0;
+
   const bankOf = (i) => (i >> 7) & 63, progOf = (i) => i & 127;
-  // hexter is flat (128 DX7 voices). Yoshimi reports 1822 instruments in 48
-  // banks, so the walk covers all of them.
-  const span = () => (current === 'hexter' ? 128 : 48 * 128);
+  const span = () => (listed() ? patches.length : current === 'hexter' ? 128 : 48 * 128);
   const patchName = (i) => {
+    if (listed()) return patches[i]?.name ?? '—';
     const p = progOf(i);
     if (current === 'hexter') return DX7[p] ?? `voice ${p + 1}`;
     if (current?.startsWith('fluid')) return GM[p] ?? `program ${p}`;
-    return `program ${p}`;               // yoshimi: the banks are the user's own
+    return `program ${p}`;
   };
   function showPatch() {
+    if (listed()) {
+      // ⚠️ DO NOT NAME A PATCH NOBODY CHOSE. Arriving at a board that is
+      // already playing, this page has picked nothing and the instrument holds
+      // whatever it loaded on startup — so printing the first entry of the list
+      // would be a readout contradicting the thing it describes. It says how
+      // many there are until somebody steps, and then it says which one.
+      patchLine.textContent = '';
+      if (!chosen) { patchLine.append(el('b', '', '—'), ` · ${patches.length} patches in ${banksInList} banks`); return; }
+      // Built as elements rather than as a string: these names come off another
+      // machine's filesystem, and one with an ampersand in it would be a broken
+      // line at best.
+      const e = patches[idx];
+      patchLine.append(el('b', '', e?.name ?? '—'), ` · ${e?.bankName ?? ''} · ${idx + 1} of ${patches.length}`);
+      return;
+    }
     patchLine.innerHTML = `<b>${patchName(idx)}</b>${bankOf(idx) ? ` · bank ${bankOf(idx)}` : ''}`;
   }
   // ⚠️ BANK SELECT IS CC 32 HERE, NOT CC 0. Read from Yoshimi's own config:
@@ -198,7 +249,19 @@
   // Sending banks on CC 0 was moving its ROOT DIRECTORY instead, pointing it at
   // roots that do not exist — so every program change after that landed
   // nowhere and patch changing looked broken. CC 0 is left alone entirely.
+  //
+  // For a listed instrument the bank rides ALONG WITH the program in one
+  // message, and the box puts both on the same MIDI byte stream back to back —
+  // which is a stronger guarantee than the 120 ms this page used to leave
+  // between two separate messages.
   function sendPatch() {
+    if (listed()) {
+      const e = patches[idx];
+      if (!e) return;
+      lastBank = e.bank;
+      send({ type: 'voice.select', channel: 0, bank: e.bank, program: e.program, name: e.name });
+      return;
+    }
     const b = bankOf(idx), changed = b !== lastBank;
     if (changed) { send({ type: 'cc', channel: 0, ctrl: 32, value: b }); lastBank = b; }
     setTimeout(() => send({ type: 'voice.select', channel: 0, program: progOf(idx) }), changed ? 120 : 0);
@@ -309,11 +372,75 @@
         delete fxBtn.dataset.busy;
         fxBtn.setAttribute('aria-pressed', String(fxOn));
         fxDie.disabled = !fxOn;
+        fx1965.disabled = !fxOn;
         d.log(m.ok ? (fxOn ? 'pappus inserted' : 'pappus bypassed') : `pappus: ${m.reason}`, m.ok ? 'hi' : 'bad');
       }
+      // The box's own library. It arrives once per instrument change and is
+      // ~34 KB for Yoshimi, well inside the relay's 256 KiB per message.
+      if (m.type === 'voices.listed') {
+        if (m.source !== current) { /* an answer about an instrument we left */ }
+        else if (m.ok && m.banks?.length) {
+          patches = [];
+          for (const b of m.banks) for (const p of b.patches)
+            patches.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
+          banksInList = m.bankCount ?? m.banks.length;
+          idx = 0; lastBank = -1;
+          showPatch();
+          d.log(`${m.source}: ${patches.length} patches in ${m.bankCount} banks`, 'hi');
+          // The board checked its own bank map against its own files. Saying
+          // nothing here would leave a list that is quietly wrong looking
+          // exactly like one that is right.
+          if (m.stale) d.log('the board\'s bank list disagrees with the files on its disk', 'bad');
+        }
+        // `fixed` means the instrument simply has no library to read and this
+        // page's own table is the right answer — not a failure worth a line.
+        else if (m.reason && !m.fixed) d.log(`patches: ${m.reason}`, 'bad');
+      }
+      // Somebody chose a patch — this page, or another listener in the same
+      // room. Following it is what keeps two people looking at one instrument.
+      if (m.type === 'voice.selected' && m.ok && listed()) {
+        const at = patches.findIndex((p) => p.bank === m.bank && p.program === m.program);
+        if (at >= 0) { idx = at; chosen = true; showPatch(); }
+      }
+      // The roll names itself. The two characters are what it actually did;
+      // the seed is how to get this exact sound back, which is the difference
+      // between a die you can play and one you can only press.
       if (m.type === 'params.rolled' && m.ok) {
-        const p = m.params;
-        patchLine.innerHTML = `<b>granular</b> · rate ${p.mrate} · size ${p.msize} · swarm ${p.mswarm} · spray ${p.mspray}`;
+        patchLine.innerHTML = `<b>${m.character.m} / ${m.character.n}</b> · ${m.m.rate} and ${m.n.rate} grains per second`
+          + ` · <span class="dim">seed ${m.seed}</span>`;
+        d.log(`${m.character.m}/${m.character.n} · seed ${m.seed}`, 'hi');
+      }
+      // The box picks; the page only says which. A list of 543 in a browser is
+      // a different page, and the box is the thing that can reach the archive
+      // at all — the search cannot be called from a browser, because its JSON
+      // content type forces a preflight that answers 204 with no ACAO.
+      // ⚠️ SAY WHY. ERR blocked the board's address after a day of testing, and
+      // the button just sat there spinning — "nothing happened" reads as our
+      // bug when it is the archive asking us to wait. It is somebody else's
+      // public archive, so the honest thing is to name the wait and stop.
+      if (m.type === 'source.found' && !m.ok) {
+        delete fx1965.dataset.busy;
+        d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `1965: ${m.reason}`, 'warn');
+      }
+      if (m.type === 'source.loaded' && !m.ok && m.holdingOff) {
+        delete fx1965.dataset.busy;
+        d.log(`the archive asked us to wait — ${m.reason}`, 'warn');
+      }
+      if (m.type === 'source.found' && m.ok) {
+        const pick = m.items[Math.floor(Math.random() * m.items.length)];
+        // Somewhere past the announcer at the top, and far enough from the end
+        // that a minute of it exists.
+        // ⚠️ `atSec`, not `at` — `at` is the envelope's timestamp and wire.mjs
+        // writes over it, so the one control this button has silently did nothing.
+        send({ type: 'source.load', slug: pick.slug, atSec: 60 + Math.floor(Math.random() * 300), dur: 60 });
+        d.log(`${m.total} items from 1965 · loading ${pick.date} ${pick.title}`, 'hi');
+      }
+      if (m.type === 'source.loaded') {
+        delete fx1965.dataset.busy;
+        if (m.ok) {
+          sourceLine.innerHTML = `<b>${m.title}</b> · ${m.date} · ERR archive`;
+          d.log(`loaded in ${m.tookMs} ms — the keys now play this`, 'hi');
+        } else d.log(`1965: ${m.reason}`, 'warn');
       }
       if (m.type === 'audio.started') {
         for (const c of picks.querySelectorAll('button')) delete c.dataset.busy;
@@ -339,12 +466,20 @@
           const wrappable = m.source === 'hexter' || m.source === 'yoshimi';
           fxBtn.disabled = !wrappable;
           fxBtn.title = wrappable ? 'granular insert' : 'fluidsynth writes to a pipe, not to JACK';
-          if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; }
+          if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; fx1965.disabled = true; }
+          // A new instrument means a new library. Drop the old one FIRST, or
+          // the arrows keep walking the previous instrument's list until the
+          // reply lands — stepping through names that belong to something else.
+          patches = []; idx = 0; banksInList = 0; chosen = false;
           showPatch();
-          if (m.fx) { fxOn = true; fxBtn.setAttribute('aria-pressed', 'true'); fxDie.disabled = false; }
+          send({ type: 'voices.list', source: m.source });
+          if (m.fx) { fxOn = true; fxBtn.setAttribute('aria-pressed', 'true'); fxDie.disabled = false; fx1965.disabled = false; }
           d.log(`playing ${m.source}`, 'hi');
         }
-        else { d.set('playing', 'failed'); d.log(`failed: ${m.reason}`, 'bad'); }
+        // ⚠️ NOT `d.set('playing', ...)`. There is no `playing` cell — the shell
+        // catches it and logs "readout 'playing' was not declared in mount()",
+        // which is what a visitor saw instead of the reason the start failed.
+        else d.log(`failed: ${m.reason}`, 'bad');
       }
     };
   }

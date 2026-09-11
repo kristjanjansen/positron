@@ -21,7 +21,9 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startFluid, fluidAvailable, soundfontAt, VOICES, DEFAULT_SF } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
-         pappusFx, pappusAvailable, pappusRandomise, pappusPanic, stopPappus } from './jacksynth.mjs';
+         pappusFx, pappusAvailable, pappusPanic, stopPappus } from './jacksynth.mjs';
+import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
+import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
 
@@ -52,6 +54,40 @@ let synth = null, stopSynth = null, midiIn = null, fluid = null, jsyn = null;
 let starting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
 let lastHeard = Date.now();
+// The granulator's own surface — the die, the drift and the grain buffers. Its
+// OSC socket is opened once and kept, separately from `pappusFx`'s patching,
+// because the engine keeps running while it is bypassed and a drift that
+// stopped when the insert was switched off would be a drift you could hear stop.
+let pap = null;
+const pappus = () => (pap ||= openPappus({ onLog: (l) => log('pappus:', l) }));
+// What is IN the grain buffers, if anything was put there deliberately. Null
+// means the buffers hold whatever the input recorded, which is the ordinary
+// insert case.
+let grainSource = null;
+
+/**
+ * Yoshimi's bank map, read once and re-read when Yoshimi rewrites it.
+ *
+ * The file is 660 KB of gzipped XML and a patch step asks for the bank number
+ * every time, so re-reading it per keystroke would be silly — but caching it
+ * forever would make an instrument added on the box invisible until a restart.
+ * The mtime is the cheap way to have both.
+ */
+let yoshimiMemo = null, yoshimiMemoAt = 0;
+function yoshimiList() {
+  let mtime = 0;
+  try { mtime = statSync(`${YOSHIMI_DIR}/yoshimi.banks`).mtimeMs; } catch { /* answered below */ }
+  if (!yoshimiMemo || mtime !== yoshimiMemoAt) { yoshimiMemo = yoshimiPatches(); yoshimiMemoAt = mtime; }
+  return yoshimiMemo;
+}
+/**
+ * Which controller selects a bank, for the instrument that is running.
+ *
+ * 32 is the MIDI standard (bank select LSB) and is the right answer for any
+ * synth that has banks at all; Yoshimi's is read from Yoshimi rather than
+ * assumed, because it is settable there and a page cannot see the setting.
+ */
+const bankCC = (source) => (source === 'yoshimi' ? yoshimiList().bankCC ?? 32 : 32);
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
@@ -249,12 +285,20 @@ async function handle(msg) {
       if (jsyn) jsyn.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else if (fluid) fluid.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
+      // With material loaded, the SAME key also pitches a grain voice, so the
+      // granulator is played rather than merely switched on. Eight voices,
+      // oldest stolen. The feeder instrument is still sounding into the insert
+      // and is inaudible, because a loaded buffer has recording switched off —
+      // so one key press is one sound, not two.
+      if (grainSource && fxOn) pappus().notes.on(msg.note, msg.vel ?? 100);
       return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
-        on: jsyn ? jsyn.source : fluid ? 'fluidsynth' : 'synth' });
+        grains: !!(grainSource && fxOn),
+        on: grainSource && fxOn ? 'pappus' : jsyn ? jsyn.source : fluid ? 'fluidsynth' : 'synth' });
     case 'note.off':
       if (jsyn) jsyn.noteOff(msg.channel ?? 0, msg.note);
       else if (fluid) fluid.noteOff(msg.channel ?? 0, msg.note);
       else if (synth) synth.noteOff(msg.note);
+      if (grainSource && fxOn) pappus().notes.off(msg.note);
       return reply('note.ack', { note: msg.note });
     case 'note.panic':
       if (jsyn) jsyn.panic();
@@ -264,7 +308,38 @@ async function handle(msg) {
       // ring buffer, eight delay taps and a reverb tail. Silence it too, or
       // "all notes off" is only true of the instrument.
       if (fxOn) pappusPanic();
+      // ...and close the grain voices, or eight gates stay open and the buffer
+      // keeps sounding through a panic that said it had stopped everything.
+      if (pap) pap.notes.panic();
       return reply('note.ack', { panic: true, fx: fxOn ? 'pappus cleared' : null });
+    // What patches this box HAS, read off the box rather than guessed in a
+    // browser. Which instruments exist is a property of the machine the synth
+    // runs on — a page cannot see /usr/share/yoshimi/banks and should not
+    // pretend to — so the box enumerates and the page renders what it is told.
+    case 'voices.list': {
+      const src = msg.source ?? jsyn?.source ?? (fluid ? 'fluidsynth' : null);
+      if (src === 'yoshimi') {
+        const list = yoshimiList();
+        log(`voices.list: ${list.count} patches in ${list.bankCount} banks, root ${list.root}${list.stale ? ' (STALE — the bank map disagrees with the disk)' : ''}`);
+        // ⚠️ `source` names the INSTRUMENT and must survive the spread. The
+        // list carried its own `source` (the file it was read from) for one
+        // revision, the spread overwrote this one with a path, and every
+        // client waiting for "the yoshimi list" waited forever — with the
+        // reply sitting right there. The file is `file`.
+        return reply('voices.listed', { ...list, source: 'yoshimi' });
+      }
+      // hexter's programs index a cartridge this box loaded and fluidsynth's
+      // are General MIDI: both are fixed tables the page already carries, and
+      // inventing a second copy here is a second thing to keep in step.
+      // `fixed` is the difference between "this instrument has no library to
+      // read" and "something went wrong reading one" — a client that cannot
+      // tell them apart has to log both, and then it logs a non-event every
+      // time an instrument starts.
+      return reply('voices.listed', {
+        source: src, ok: false, fixed: !!src, banks: [], count: 0,
+        reason: src ? `${src}'s programs are a fixed table, not a library on this box` : 'nothing is playing',
+      });
+    }
     // The multitimbral surface: one call per channel, then sixteen channels are
     // sixteen instruments. Names so a client need not memorise GM numbers.
     case 'voice.select': {
@@ -275,8 +350,19 @@ async function handle(msg) {
       if (jsyn) {
         const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
         if (prog === undefined) return reply('voice.selected', { ok: false, reason: 'send {program:<0-127>} to this instrument', on: jsyn.source });
+        // ⚠️ BANK SELECT IS CC 32, AND THE NUMBER IS READ FROM YOSHIMI'S OWN
+        // CONFIG (`midi_bank_C`), never typed here. CC 0 is `midi_bank_root`:
+        // sending a bank on it moves Yoshimi's ROOT DIRECTORY instead, at which
+        // point every program change afterwards lands nowhere. One wrong guess
+        // about this cost an hour.
+        //
+        // Bank and program go out back to back on ONE byte stream, so they
+        // cannot arrive out of order and no delay is needed between them.
+        const bank = Number.isInteger(msg.bank) ? msg.bank : null;
+        if (bank !== null) jsyn.cc(msg.channel ?? 0, bankCC(jsyn.source), bank);
         jsyn.program(msg.channel ?? 0, prog);
-        return reply('voice.selected', { ok: true, on: jsyn.source, channel: msg.channel ?? 0, program: prog, name: msg.name ?? null });
+        return reply('voice.selected', { ok: true, on: jsyn.source, channel: msg.channel ?? 0,
+                                         bank, bankCC: bank === null ? null : bankCC(jsyn.source), program: prog, name: msg.name ?? null });
       }
       if (!fluid) return reply('voice.selected', { ok: false, reason: 'no instrument running' });
       const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
@@ -347,11 +433,155 @@ async function handle(msg) {
       // jackd, no capture.
       return reply('fx.pappus', { ...r, instrument: jsyn?.source ?? null });
     }
-    case 'params.random':
+    // A SEEDED roll, in one of six named characters.
+    //
+    // The old roll drew nine parameters uniformly and independently, which
+    // lands in the middle of all nine nearly every time — one sound wearing
+    // different numbers — and threw the numbers away, so a roll that landed on
+    // something good could not be got back. Both are fixed in `pappus.mjs`:
+    // the character is drawn first and narrows the ranges, and the seed comes
+    // back with the roll so the same roll can be asked for again.
+    case 'params.random': {
       if (!fxOn) return reply('params.rolled', { ok: false, reason: 'pappus is not switched on' });
-      return reply('params.rolled', { ok: true, on: 'pappus', params: pappusRandomise() });
-    case 'params.set':
-      return reply('params.set', { ok: fxOn });
+      // With material loaded the keyboard owns the eight grain voices, so the
+      // roll leaves `pitches`/`gates` alone rather than pulling the instrument
+      // out from under whoever is playing it.
+      const r = pappus().roll(Number.isInteger(msg.seed) ? msg.seed : undefined, { voices: !grainSource });
+      // Movement is on by default once there is something to move. It is not a
+      // control the page offers — see `params.drift` for why it exists at all.
+      pappus().startDrift();
+      log(`rolled ${r.character.m}/${r.character.n} · seed ${r.seed} · ${r.m.rate}/${r.n.rate} grains per second`);
+      return reply('params.rolled', { ok: true, on: 'pappus', ...r, characters: CHARACTER_NAMES, drift: pappus().driftStats() });
+    }
+    // The slow movement, which has no slider on purpose.
+    //
+    // It lives in the box rather than in the page because the box is an OBJECT
+    // and not a SESSION: the sound goes on moving with nobody connected, which
+    // is the whole of plan-hardware §8.7. The page can turn it off; it cannot
+    // steer it, because a steerable drift is just a slider with extra steps.
+    case 'params.drift': {
+      if (!fxOn) return reply('params.drifted', { ok: false, reason: 'pappus is not switched on' });
+      const want = msg.on !== false;
+      const changed = want ? pappus().startDrift(msg.hz) : pappus().stopDrift();
+      return reply('params.drifted', { ok: true, on: want, changed, ...pappus().driftStats() });
+    }
+    case 'params.state':
+      return reply('params.state', {
+        ok: fxOn, roll: pap?.current() ?? null, drift: pap?.driftStats() ?? null, source: grainSource,
+        // Which voice slots are open and at what interval. ⚠️ This is what the
+        // box SENT, not what the engine did with it — a count on this side of
+        // the wire is not evidence about the far side (CLAUDE.md). It is here
+        // so a sweep can tell "the box never sent it" apart from "the engine
+        // took it and made no sound", which are opposite bugs.
+        notes: pap?.notes.state() ?? null,
+      });
+    // One named engine command, forwarded. Pappus has 106 of them and the roll
+    // reaches a chosen subset, so without this the only way to ask the engine a
+    // question is to edit the box and redeploy it — which is how an afternoon
+    // went on a question that takes four seconds to answer.
+    //
+    // This is the MEASUREMENT surface, not a control surface: it is what lets a
+    // harness sweep one parameter and grade the sound, which is the only way to
+    // tell "the engine ignores this" from "the capture cannot see it".
+    //
+    // Same posture as every other verb here: the relay is tokenless, so anyone
+    // in the room can send it. The blast radius is one granulator's parameters
+    // on one board — strictly smaller than `patch.apply` or `audio.start`,
+    // which have been open all along.
+    case 'params.set': {
+      if (!fxOn) return reply('params.set', { ok: false, reason: 'pappus is not switched on' });
+      // A command NAME, not arbitrary text: this becomes an OSC address on a
+      // socket, and the engine takes any string without complaint.
+      const cmd = typeof msg.cmd === 'string' && /^[a-z][a-z0-9_]{0,23}$/.test(msg.cmd) ? msg.cmd : null;
+      if (!cmd) return reply('params.set', { ok: false, reason: 'send {cmd:"<name>", args:[<numbers>]}' });
+      const args = (Array.isArray(msg.args) ? msg.args : [msg.value])
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+      // 48 because the resonator bank takes 48 frequencies in one message, and
+      // nothing here takes more.
+      if (!args.length || args.length > 48) return reply('params.set', { ok: false, reason: 'args must be 1..48 finite numbers' });
+      pappus().send(cmd, ...args);
+      return reply('params.set', { ok: true, cmd, args });
+    }
+
+    // ── 1965, as grain material ──────────────────────────────────────────
+    //
+    // ⚠️ The AUDIO archive, not the video one. ERR's 298 video items from 1965
+    // are `FILM 16mm m/v negatiiv helita` — silent film negatives — so
+    // granulating those granulates nothing, which is a failure this engine has
+    // already had once.
+    case 'source.search': {
+      // ⚠️ A REFUSAL IS AN ANSWER, NOT A CRASH. This used to let the fetch throw
+      // and the box replied `box.error` — which no client was listening for, so
+      // the page and the harness both sat for their full timeout and reported
+      // "no box in this room" about a box that was answering fine. ERR blocked
+      // this board's address on 2026-09-11 and that is exactly what it looked
+      // like from the outside.
+      try {
+        const s = await errSearch({ limit: Math.min(msg.limit ?? 100, 100), page: msg.page ?? 1 });
+        if (s.cached) log(`source.search: ${s.items.length} of ${s.total} from the local list — the archive was not asked`);
+        return reply('source.found', { ok: true, ...s, archive: errStatus() });
+      } catch (e) {
+        log(`source.search: ${e.message}`);
+        return reply('source.found', { ok: false, reason: e.message, holdingOff: !!e.holdingOff, archive: errStatus() });
+      }
+    }
+    // Pull an excerpt and put it in the grain buffers. This is what turns the
+    // insert into an instrument: with material in the buffer and recording
+    // switched OFF, the granulator plays what you loaded rather than whatever
+    // happens to be going into it.
+    case 'source.load': {
+      if (!fxOn) return reply('source.loaded', { ok: false, reason: 'pappus is not switched on' });
+      let item;
+      try { item = await errItem(msg.slug); }
+      catch (e) {
+        log(`source.load: ${e.message}`);
+        return reply('source.loaded', { ok: false, reason: e.message, holdingOff: !!e.holdingOff, archive: errStatus() });
+      }
+      // 60 s because that is exactly the grain buffer's length. Asking for more
+      // is silently truncated by the read, which reads as "the end of my
+      // excerpt is missing" rather than as a limit.
+      const dur = Math.min(msg.dur ?? 60, 60);
+      // ⚠️ The offset and length are part of the NAME. Without them two
+      // different minutes of the same programme are one file, so the cache
+      // would hand back the first excerpt for every later request — a stale
+      // answer that is real audio, which is the kind nobody notices.
+      const atSec = msg.atSec ?? 0;
+      const out = `/tmp/err-${msg.slug.slice(0, 40).replace(/[^a-z0-9-]/gi, '')}-${atSec}-${dur}.wav`;
+      // ⚠️ `atSec`, NOT `at`. `at` IS THE ENVELOPE'S TIMESTAMP: `format()` in
+      // wire.mjs spreads the message FIRST and then writes `from`/`at`/`seq`
+      // over it, so a field called `at` never survives the send. This asked
+      // ffmpeg to seek to second 1,789,103,743,118 of a 45-minute broadcast —
+      // and ffmpeg answered with sixty seconds of real audio anyway, from
+      // wherever it decided that was, so nothing anywhere read as broken while
+      // the one control this feature has did nothing at all. Second time in
+      // this file: `voices.listed`'s `source` was eaten by the same spread.
+      const ex = await errExcerpt({ hls: item.hls, atSec, durSec: dur, out });
+      const r = loadBuffers(pappus(), out);
+      // ⚠️ CLOSE THE ROLLED VOICES. A roll opens about half of the eight grain
+      // voices at pitches of its own, and those keep sounding — so a key press
+      // was adding a NINTH voice to a chord that was already going, and moved
+      // the sound by four hundredths of an octave. Measured, not reasoned:
+      // 515 Hz against 531 Hz for a key an octave apart, which reads as a
+      // keyboard that does nothing.
+      //
+      // Loading material is therefore also the moment the keyboard takes the
+      // voices over, and it has to start from silence to own them.
+      pappus().notes.panic();
+      grainSource = { slug: item.slug, title: item.title, date: item.date, atSec, dur, tookMs: ex.tookMs };
+      log(`loaded ${item.date} · ${item.title} · ${dur} s from ${atSec} s ${ex.cached ? '(from the local copy)' : `in ${ex.tookMs} ms`}`);
+      return reply('source.loaded', { ok: true, ...grainSource, ...r, cached: ex.cached });
+    }
+    // Give the buffers back to the input. Named rather than implied, because
+    // "the granulator is recording again" is not something a listener can hear
+    // until the material has been overwritten.
+    case 'source.clear':
+      // The lock has to come off with the source. Leaving it on holds the
+      // buffer against the very input that is being given back to it, so
+      // recording would read as on and the sound would never change again —
+      // see loadBuffers for what `lock` and `src` each actually do.
+      if (pap) { pap.send('mlock', 0); pap.send('nlock', 0); pap.send('msrc', 2); pap.send('nsrc', 2); pap.notes.panic(); }
+      grainSource = null;
+      return reply('source.cleared', { ok: true, recording: 'stereo' });
     case 'audio.status':
       return reply('audio.started', jsyn ? { ok: true, source: jsyn.source, fx: fxOn ? 'pappus' : null }
         : fluid ? { ok: true, source: 'fluidsynth', soundfont: fluid.soundfont ?? null }

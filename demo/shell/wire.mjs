@@ -58,7 +58,28 @@ export const randomId = (n = 16) => {
  * whether the key exists" — which is a scar, and the cheap way not to re-earn
  * it is to send every envelope key every time.
  */
+/**
+ * ⚠️ `from`, `at` and `seq` BELONG TO THE ENVELOPE and are written AFTER the
+ * message is spread, so a payload field with one of those names is silently
+ * replaced. It has happened for real: `source.load` carried the excerpt's start
+ * offset as `at`, every send overwrote it with `Date.now()`, and the box asked
+ * ffmpeg to seek to second 1,789,103,743,118 of a forty-five minute broadcast.
+ * ffmpeg returned sixty seconds of real audio from wherever it decided that
+ * was, so the feature made sound, the suite stayed green, and the only control
+ * it had did nothing.
+ *
+ * Throwing is the point. This is a programming error with no correct silent
+ * behaviour, it fires on the first send rather than in the field, and the
+ * alternative — the value quietly becoming a timestamp — is the failure that
+ * cost the afternoon. Name the field something else: `atSec`, `sentBy`, `n`.
+ */
+const ENVELOPE = ['from', 'at', 'seq'];
 export function format(msg, { from, seq, at = Date.now(), id = randomId() }) {
+  for (const k of ENVELOPE) {
+    if (Object.hasOwn(msg, k)) {
+      throw new Error(`wire: "${k}" is an envelope field — ${msg.type || 'this message'} would lose it. Rename the payload field (e.g. "${k}Sec", "${k}Value").`);
+    }
+  }
   return JSON.stringify({ id, type: '', ...msg, from, at, seq });
 }
 
