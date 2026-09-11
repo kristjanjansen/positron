@@ -64,6 +64,11 @@ const pappus = () => (pap ||= openPappus({ onLog: (l) => log('pappus:', l) }));
 // means the buffers hold whatever the input recorded, which is the ordinary
 // insert case.
 let grainSource = null;
+// What the archive source is playing, when it is the source. Reported in
+// `audio.started` so the page can name it, and null the moment anything else
+// starts — a title left behind by a source that stopped is a page lying about
+// what you are hearing.
+let archiveNow = null;
 
 /**
  * Yoshimi's bank map, read once and re-read when Yoshimi rewrites it.
@@ -124,6 +129,30 @@ function sendPcm(int16) {
   sentFrames++;
 }
 
+/**
+ * Which broadcast, and where in it.
+ *
+ * A slug if one is named, otherwise one drawn at random from the cached list of
+ * 1965 — which costs the archive NOTHING, because that list is on this box's
+ * disk and a year that ended sixty years ago does not change. Then somewhere
+ * past the announcer at the top, and far enough from the end that there is
+ * something to hear.
+ */
+async function archiveSource(msg) {
+  let slug = msg?.slug;
+  let picked = null;
+  if (!slug) {
+    const list = await errSearch({ limit: 100 });
+    if (!list.items?.length) throw new Error('the archive returned no 1965 audio');
+    picked = list.items[Math.floor(Math.random() * list.items.length)];
+    slug = picked.slug;
+  }
+  const item = await errItem(slug);
+  const atSec = Number.isFinite(msg?.atSec) ? msg.atSec : 60 + Math.floor(Math.random() * 600);
+  archiveNow = { slug: item.slug, title: item.title, date: item.date, atSec };
+  return { hls: item.hls, atSec, ...archiveNow };
+}
+
 async function startAudio(source = 'synth', msg = null) {
   // ⚠️ REPLACE, do not refuse. This used to return {already:true} when
   // anything was running, so picking a second instrument left the first one
@@ -132,9 +161,20 @@ async function startAudio(source = 'synth', msg = null) {
   // arriving and 5,495 dropped at the relay. It sounds like corruption and it
   // is two instruments talking over each other.
   if (starting) return { ok: false, reason: `already starting ${starting}`, starting };
+  // A title left behind by a source that has stopped is a page lying about what
+  // you are hearing, so it goes the moment anything else starts.
+  if (source !== 'archive') archiveNow = null;
   const running = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
   if (running) {
-    if (running === source && source !== 'fluidsynth') return { ok: true, already: true, source: running };
+    // ⚠️ AND SAY WHAT IT IS PLAYING. This early return used to answer
+    // `{ok, already, source}` and nothing else, so a client that asked to start
+    // something already running got a reply with no port and no title — which
+    // reads as "started, and playing nothing". A reply about a running source
+    // must describe it as fully as the reply that started it.
+    if (running === source && source !== 'fluidsynth') {
+      return { ok: true, already: true, source: running, port: jsyn?.port ?? null,
+               fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
+    }
     log(`switching ${running} -> ${source}`);
     stopAudio();
     await new Promise((r) => setTimeout(r, 600));   // let the old one actually die
@@ -146,10 +186,20 @@ async function startAudio(source = 'synth', msg = null) {
   // a snd-virmidi device that aconnect routes to their sequencer port.
   if (JACK_SYNTHS[source]) {
     if (!jackSynthAvailable(source)) return { ok: false, reason: `${source} is not installed on this box` };
+    // The archive is a source like any other, but it needs to be TOLD WHAT TO
+    // PLAY before it can start. Resolving it here rather than inside the synth
+    // table keeps the table a description of processes and keeps the network
+    // in one place — which is also the place that holds off when ERR says no.
+    let extra = {};
+    if (source === 'archive') {
+      try { extra = await archiveSource(msg); }
+      catch (e) { return { ok: false, reason: e.message, holdingOff: !!e.holdingOff }; }
+      log(`archive: ${extra.date} · ${extra.title} · from ${extra.atSec} s`);
+    }
     starting = source;
     log(`starting ${source} (jack chain) ...`);
     let r;
-    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont }); }
+    try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont, ...extra }); }
     finally { starting = null; }
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
     jsyn = r;
@@ -157,7 +207,8 @@ async function startAudio(source = 'synth', msg = null) {
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
     if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
-    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec, fx: fxOn ? 'pappus' : null };
+    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
+             fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
   }
 
 
@@ -583,7 +634,7 @@ async function handle(msg) {
       grainSource = null;
       return reply('source.cleared', { ok: true, recording: 'stereo' });
     case 'audio.status':
-      return reply('audio.started', jsyn ? { ok: true, source: jsyn.source, fx: fxOn ? 'pappus' : null }
+      return reply('audio.started', jsyn ? { ok: true, source: jsyn.source, fx: fxOn ? 'pappus' : null, archive: jsyn.source === 'archive' ? archiveNow : null }
         : fluid ? { ok: true, source: 'fluidsynth', soundfont: fluid.soundfont ?? null }
         : stopSynth ? { ok: true, source: 'synth' }
         : audio ? { ok: true, source: 'capture' }
