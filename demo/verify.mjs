@@ -18,12 +18,27 @@ const PROFILE = '/private/tmp/claude-501/demo-verify-udd';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2);
-const targets = DEMOS.filter((d) => d.built && (!want.length || want.includes(d.name)));
-if (!targets.length) { console.error('nothing to verify'); process.exit(1); }
+// ⚠️ A `gl: true` DEMO IS NOT THIS HARNESS'S SUBJECT, AND FAILING IT HERE WOULD
+// BE A LIE. This file launches Chrome with `--disable-gpu` (see the flags
+// below), where `getContext('webgl2')` returns null — so a visual demo reports
+// `__demo.ready` false and the suite goes red for a page that is perfectly
+// fine. Hand them to demo/verify-gl.mjs and SAY SO, rather than counting a
+// subject this harness cannot reach as a failure.
+const all = DEMOS.filter((d) => d.built && (!want.length || want.includes(d.name)));
+const handedOff = all.filter((d) => d.gl);
+const targets = all.filter((d) => !d.gl);
+if (handedOff.length) {
+  const n = handedOff.length;
+  console.log(`(${handedOff.map((d) => d.name).join(', ')} ${n === 1 ? 'needs' : 'need'} a GPU — this harness runs --disable-gpu; use node demo/verify-gl.mjs)`);
+}
+if (!targets.length) { console.error('nothing for this harness to verify'); process.exit(handedOff.length ? 0 : 1); }
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
-const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${HTTP_PORT}`;
+// The port ACTUALLY bound, which may not be the one asked for — see
+// serve()'s comment about a dev server already holding it.
+const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
+// (`server` is null only when DEMO_BASE is set, and then it is not read.)
 console.log(`base ${BASE}`);
 
 // EMPTY CACHE EVERY RUN. A media element loading `video.src = <m3u8>` stores a

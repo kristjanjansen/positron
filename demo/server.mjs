@@ -25,6 +25,15 @@ const MIME = {
   '.wasm': 'application/wasm',
 };
 
+/**
+ * ⚠️ IF THE PORT IS TAKEN, TAKE THE NEXT ONE.
+ *
+ * A dev server left running on 8890 made every `node demo/verify.mjs` die with
+ * an unhandled EADDRINUSE — three times in one session, each time reading as a
+ * broken harness rather than as a port that was busy. The harness does not care
+ * which port it gets; it only cares that it has one. Callers that need to know
+ * read `server.address().port`, and `serve()` logs when it had to move.
+ */
 export function serve(port = PORT) {
   const s = createServer(async (req, res) => {
     let rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^([/\\])+/, '');
@@ -55,7 +64,18 @@ export function serve(port = PORT) {
       res.writeHead(404, { 'content-type': 'text/plain' }).end(`404 ${rel}`);
     }
   });
-  return new Promise((ok) => s.listen(port, '127.0.0.1', () => ok(s)));
+  return new Promise((ok, bad) => {
+    let tries = 0;
+    s.on('error', (e) => {
+      if (e.code !== 'EADDRINUSE' || ++tries > 20) { bad(e); return; }
+      s.listen(port + tries, '127.0.0.1');
+    });
+    s.listen(port, '127.0.0.1', () => {
+      const got = s.address().port;
+      if (got !== port) console.error(`(port ${port} was busy — serving on ${got})`);
+      ok(s);
+    });
+  });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

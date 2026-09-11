@@ -66,6 +66,14 @@ export const DEMOS = [
   // message shape written down, the exact bytes shown both ways, and the
   // history the relay refuses to keep. settleMs covers asking the recorder to
   // join the room before anything is sent — every assert here sits behind that.
+  // The picture, drawn twice. `gl: true` is what puts it in demo/verify-gl.mjs
+  // rather than demo/verify.mjs — the ordinary harness runs Chrome with
+  // --disable-gpu, where getContext('webgl2') returns null and every assert
+  // here would be unreachable.
+  { name: 'mirror', act: 0, built: true, gl: true, settleMs: 5000,
+    one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
+    tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
+
   { name: 'wire', act: 2, built: true, settleMs: 6000,
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },

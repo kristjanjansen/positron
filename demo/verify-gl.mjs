@@ -62,7 +62,10 @@ const PROFILE = '/tmp/positron-verify-gl';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
-const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${HTTP_PORT}`;
+// The port ACTUALLY bound, which may not be the one asked for — see
+// serve()'s comment about a dev server already holding it.
+const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
+// (`server` is null only when DEMO_BASE is set, and then it is not read.)
 
 // ⚠️ THE TARGET LIST IS CHECKED AFTER THE RENDERER, NOT BEFORE IT. Exiting
 // early on "no visual demos yet" meant this file could not answer the question
@@ -217,14 +220,19 @@ for (const t of targets) {
        said === RENDER.renderer ? said : `page says ${said}, harness saw ${RENDER.renderer}`);
   }
 
-  // Let the page run its own checks, the same contract as verify.mjs.
-  await evalIn(`window.__demo?.run?.()`).catch(() => {});
-  const settle = t.settleMs ?? 4000;
-  await sleep(settle);
+  // Press every control, in order — the same contract as verify.mjs, and for
+  // the same stated reason: a control the harness cannot press is a subject the
+  // suite cannot reach.
+  const n = await evalIn(`document.querySelectorAll('.d-controls button').length`);
+  for (let i = 0; i < n; i++) {
+    await evalIn(`document.querySelectorAll('.d-controls button')[${i}].click()`);
+    await sleep(i === 0 ? (t.settleMs ?? 4000) : 1200);
+  }
   const asserts = await evalIn(`JSON.stringify(window.__demo?.asserts ?? [])`);
   const list = JSON.parse(asserts || '[]');
   ok('the page asserted something', list.length > 0, `${list.length}`);
-  for (const a of list) ok(`page: ${a.name}`, a.ok, a.detail ?? '');
+  // The shell's assert records are {label, pass, detail} — not {name, ok}.
+  for (const a of list) ok(`page: ${a.label}`, a.pass, a.detail ?? '');
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);

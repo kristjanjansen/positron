@@ -90,15 +90,23 @@ int main(int argc,char**argv){
   glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glViewport(0,0,W,H);
   unsigned char*buf=malloc((size_t)W*H*4);
 
+  // N <= 0 MEANS FOREVER, for the streaming case.
+  // Without it `video.start` asked for 0 frames, the renderer rendered none and
+  // exited 0, and everything downstream stayed up: ffmpeg waited on a pipe that
+  // would never carry anything and the socket joined an empty room. The only
+  // thing that said so was the exit watcher. A bench wants a frame count; a
+  // picture that somebody is watching does not have one.
+  int forever = (N<=0);
   double t0=now_ms(), tRender=0, tRead=0, tWrite=0;
+  long done_frames=0;
   GLuint src=tA,srct=tB,dst=fB,dst2=fA;
-  for(int i=0;i<N;i++){
+  for(long i=0; forever || i<N; i++){
     double a0=now_ms();
     for(int p=0;p<PASSES;p++){
       GLuint prog=p?pB:pK;
       glBindFramebuffer(GL_FRAMEBUFFER,dst); glUseProgram(prog);
       GLint l;
-      if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,i/30.0f);
+      if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,(float)(i/30.0));
       if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
       if((l=glGetUniformLocation(prog,"uPrev"))>=0){
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
@@ -114,7 +122,22 @@ int main(int argc,char**argv){
     while(done<want){ ssize_t k=write(1,buf+done,want-done); if(k<=0) break; done+=k; }
     double a3=now_ms();
     tRender+=a1-a0; tRead+=a2-a1; tWrite+=a3-a2;
+    done_frames++;
+    // ⚠️ A SHORT WRITE MEANS THE CONSUMER WENT AWAY. `done<want` above breaks
+    // the inner loop and used to fall straight into the next frame, so a dead
+    // encoder left this spinning at full GPU load with nowhere to put the
+    // pixels. Stop instead, and let the caller's exit watcher report it.
+    if(done<want){ fprintf(stderr,"downstream closed after %ld frames\n",done_frames); break; }
+    // Report periodically when there is no end to report at: a stream nobody
+    // can see the rate of is a stream nobody can tell has slowed down.
+    if(forever && (done_frames % 300)==0){
+      double e=now_ms()-t0;
+      fprintf(stderr,"%ld frames, %.1f fps | render %.2f ms readback %.2f ms write %.2f ms\n",
+              done_frames, done_frames*1000.0/e, tRender/done_frames, tRead/done_frames, tWrite/done_frames);
+    }
   }
+  N = (int)done_frames;
+  if(N<1) N=1;                       // the report below divides by it
   double el=now_ms()-t0;
   struct rusage ru; getrusage(RUSAGE_SELF,&ru);
   double cpu=ru.ru_utime.tv_sec+ru.ru_utime.tv_usec/1e6
