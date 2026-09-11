@@ -159,9 +159,22 @@
    * and the feedback. Three steps each rather than a slider, because a slider
    * here is a hundred values nobody wants and a number nobody can repeat.
    */
+  // ⚠️ WIDE ENOUGH TO SEE FROM ACROSS THE ROOM. The first pair were 4/8/16
+  // mirrors and three feedback amounts, and the three steps of each looked like
+  // the same picture in a slightly different mood — a control whose settings a
+  // viewer cannot tell apart is a control that teaches nothing. These are
+  // ranges chosen so the ends are unmistakable, and the middle of each is the
+  // value the renderer ships with, so "mid mid mid" is the picture the rest of
+  // this repo measured.
   const KNOBS = {
-    mirrors:  { label: 'mirrors',  steps: [['4', 4], ['8', 8], ['16', 16]], at: 1 },
-    feedback: { label: 'feedback', steps: [['low', 0.25], ['mid', 0.62], ['high', 0.88]], at: 1 },
+    // 2 is a single fold — almost a mirror down the middle. 24 is a doily.
+    mirrors: { label: 'mirrors', steps: [['2', 2], ['8', 8], ['24', 24]], at: 1 },
+    // The noise frequency, which decides whether the shapes are continents or
+    // filigree. An eightfold span, because a doubling is not visible here.
+    grain:   { label: 'grain',   steps: [['coarse', 1.2], ['mid', 4], ['fine', 16]], at: 1 },
+    // How far the picture drags itself sideways by its own brightness. At 0 it
+    // is a clean kaleidoscope; at 0.55 it is liquid and barely symmetric.
+    melt:    { label: 'melt',    steps: [['none', 0], ['some', 0.08], ['lots', 0.55]], at: 1 },
   };
   const knobRow = el('div', 'knobs');
   for (const [key, k] of Object.entries(KNOBS)) {
@@ -192,11 +205,14 @@
     // The local picture changes on the next frame; the box changes when the
     // message lands, which is a hop away. They converge, and the panes being
     // briefly different IS the latency — the same thing the lock makes visible.
-    if (key === 'mirrors') localSeg = value; else localFb = value;
+    P[key] = value;
     send({ type: 'video.params', [key]: value });
     d.log(`${k.label} ${k.steps[idx][0]}`, 'hi');
   }
-  let localSeg = 8, localFb = 0.62;
+  // The live values, one place, read by the render loop and sent to the box.
+  const P = Object.fromEntries(Object.entries(KNOBS).map(([k, v]) => [k, v.steps[v.at][1]]));
+  // Exposed so a harness can sweep the ranges without pressing nine buttons.
+  window.__P = P;
 
   /**
    * Each pane's own numbers, under it.
@@ -206,16 +222,28 @@
    * describing something the page is not doing.
    */
   window.__demo.panes = { here: {}, box: {} };
+  // ⚠️ EVERY FIELD IS ALWAYS DRAWN, EVEN BEFORE IT HAS A VALUE. Building the bar
+  // from only the fields that happen to be known means the renderer name starts
+  // at the left edge and JUMPS right the moment the first frame rate lands — a
+  // second of text moving for no reason the reader can see. A dash holds the
+  // place instead, which is also honest: it says "not yet", where an absent
+  // field says nothing at all.
+  const FIELDS = {
+    here: [['fps', 'fps', (v) => v.toFixed(1)], ['note', '', (v) => v]],
+    box: [['fps', 'fps', (v) => v.toFixed(1)], ['kbit', 'kbit/s', (v) => v.toFixed(0)],
+          ['lost', 'lost', (v) => String(v)], ['note', '', (v) => v]],
+  };
   function stat(which, fields) {
     const pane = which === 'here' ? local : far;
     Object.assign(window.__demo.panes[which], fields);
     const v = window.__demo.panes[which];
-    const bits = [];
-    if (v.fps != null) bits.push(`<span class="n">${v.fps.toFixed(1)}</span> fps`);
-    if (v.kbit != null) bits.push(`<span class="n">${v.kbit.toFixed(0)}</span> kbit/s`);
-    if (v.lost != null) bits.push(`<span class="n">${v.lost}</span> lost`);
-    if (v.note) bits.push(v.note);
-    pane.nums.innerHTML = bits.join(' · ') || '—';
+    pane.nums.innerHTML = FIELDS[which].map(([key, unit, fmt]) => {
+      // `note` is the only field with nothing to hold a place for — it is a
+      // name, not a measurement, and an empty one should take no room.
+      if (key === 'note') return v.note ? `<span class="dim">${v.note}</span>` : '';
+      const shown = v[key] == null ? '—' : fmt(v[key]);
+      return `<span class="n">${shown}</span>${unit ? ' ' + unit : ''}`;
+    }).filter(Boolean).join(' · ');
   }
 
   // ── the picture, here ────────────────────────────────────────────────────
@@ -237,7 +265,7 @@
   const FS = `#version 300 es
     precision highp float;
     uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
-    uniform float uSeg; uniform float uFb;
+    uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp;
     out vec4 o;
     float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -247,8 +275,8 @@
       float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / uSeg;
       a = abs(mod(a + 0.5 * seg, seg) - 0.5 * seg);
       vec2 k = vec2(cos(a), sin(a)) * r;
-      float w = n(k * 4.0 + uT * 0.3) + 0.5 * n(k * 8.0 - uT * 0.2) + 0.25 * n(k * 16.0 + uT * 0.5);
-      vec2 dd = k + 0.08 * vec2(cos(w * 6.2831), sin(w * 6.2831));
+      float w = n(k * uScale + uT * 0.3) + 0.5 * n(k * uScale * 2.0 - uT * 0.2) + 0.25 * n(k * uScale * 4.0 + uT * 0.5);
+      vec2 dd = k + uWarp * vec2(cos(w * 6.2831), sin(w * 6.2831));
       vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67)) + uT);
       vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
       o = vec4(mix(c, fb, uFb), 1.0); }`;
@@ -318,6 +346,8 @@
     const uPrev = gl.getUniformLocation(prog, 'uPrev');
     const uSeg = gl.getUniformLocation(prog, 'uSeg');
     const uFb = gl.getUniformLocation(prog, 'uFb');
+    const uScale = gl.getUniformLocation(prog, 'uScale');
+    const uWarp = gl.getUniformLocation(prog, 'uWarp');
     gl.bindVertexArray(gl.createVertexArray());
     // The feedback tap needs the same ping-pong the C does: two targets, swapped
     // every frame, with the previous one bound as the texture.
@@ -348,8 +378,10 @@
       }
       gl.uniform1f(uT, (lockedFrame ?? i) / 30);
       gl.uniform2f(uRes, W, H);
-      gl.uniform1f(uSeg, localSeg);
-      gl.uniform1f(uFb, localFb);
+      gl.uniform1f(uSeg, P.mirrors);
+      gl.uniform1f(uFb, 0.78);
+      gl.uniform1f(uScale, P.grain);
+      gl.uniform1f(uWarp, P.melt);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, A.t);
       gl.uniform1i(uPrev, 0);

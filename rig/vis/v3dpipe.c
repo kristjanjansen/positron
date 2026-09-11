@@ -26,7 +26,7 @@ static const char *FS_KAL =
   "#version 310 es\n"
   "precision highp float;\n"
   "uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;\n"
-  "uniform float uSeg; uniform float uFb;\n"
+  "uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp;\n"
   "out vec4 o;\n"
   "float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }\n"
   "float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);\n"
@@ -36,8 +36,8 @@ static const char *FS_KAL =
   "  float a=atan(uv.y,uv.x), r=length(uv), seg=6.2831853/uSeg;\n"
   "  a=abs(mod(a+0.5*seg,seg)-0.5*seg);\n"
   "  vec2 k=vec2(cos(a),sin(a))*r;\n"
-  "  float w=n(k*4.0+uT*0.3)+0.5*n(k*8.0-uT*0.2)+0.25*n(k*16.0+uT*0.5);\n"
-  "  vec2 dd=k+0.08*vec2(cos(w*6.2831),sin(w*6.2831));\n"
+  "  float w=n(k*uScale+uT*0.3)+0.5*n(k*uScale*2.0-uT*0.2)+0.25*n(k*uScale*4.0+uT*0.5);\n"
+  "  vec2 dd=k+uWarp*vec2(cos(w*6.2831),sin(w*6.2831));\n"
   "  vec3 c=0.5+0.5*cos(6.2831*(w+vec3(0.0,0.33,0.67))+uT);\n"
   "  vec3 fb=texture(uPrev,dd*0.9+0.5).rgb;\n"
   "  o=vec4(mix(c,fb,uFb),1.0); }\n";
@@ -81,7 +81,7 @@ static void mktarget(int w,int h,GLuint*t,GLuint*f){
 //
 // NON-BLOCKING, because this is read in the render loop: a blocking read with
 // nobody typing would stop the picture dead.
-static float g_seg = 8.0f, g_fb = 0.62f;
+static float g_seg = 8.0f, g_fb = 0.78f, g_scale = 4.0f, g_warp = 0.08f;
 static void drain_stdin(void){
   static char line[256]; static int len = 0;
   char c;
@@ -92,6 +92,8 @@ static void drain_stdin(void){
     if(sscanf(line, "%31s %f", k, &v) == 2){
       if(!strcmp(k,"seg")) g_seg = v < 2.0f ? 2.0f : (v > 64.0f ? 64.0f : v);
       else if(!strcmp(k,"fb")) g_fb = v < 0.0f ? 0.0f : (v > 0.95f ? 0.95f : v);
+      else if(!strcmp(k,"scale")) g_scale = v < 0.5f ? 0.5f : (v > 40.0f ? 40.0f : v);
+      else if(!strcmp(k,"warp")) g_warp = v < 0.0f ? 0.0f : (v > 1.2f ? 1.2f : v);
     }
   }
 }
@@ -137,6 +139,8 @@ int main(int argc,char**argv){
       if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
       if((l=glGetUniformLocation(prog,"uSeg"))>=0) glUniform1f(l,g_seg);
       if((l=glGetUniformLocation(prog,"uFb"))>=0) glUniform1f(l,g_fb);
+      if((l=glGetUniformLocation(prog,"uScale"))>=0) glUniform1f(l,g_scale);
+      if((l=glGetUniformLocation(prog,"uWarp"))>=0) glUniform1f(l,g_warp);
       if((l=glGetUniformLocation(prog,"uPrev"))>=0){
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
       glDrawArrays(GL_TRIANGLES,0,3);
