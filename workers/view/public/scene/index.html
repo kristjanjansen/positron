@@ -134,7 +134,12 @@
       // Held down hard: this is a WALL, behind the things you are looking at,
       // and a bright surround in a headset is the difference between a room and
       // a migraine.
-      o = vec4(c * 0.16, 1.0); }`;
+      // ⚠️ 0.16 WAS TOO DARK. It was chosen against a bright laptop panel, where
+      // it reads as a held-back surround; through a headset there is no ambient
+      // light to compare it with and the room reads as black. 0.34 with the
+      // same colour, so the walls are still behind the things and not competing
+      // with them.
+      o = vec4(c * 0.34, 1.0); }`;
 
   const BOX_FS = `#version 300 es
     precision highp float;
@@ -245,11 +250,25 @@
   /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
   const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
 
-  function drawRoom(proj, view, tSec) {
+  function drawRoom(proj, view, tSec, doClear = true) {
     if (!gl || !doc) return;
     gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0.02, 0.03, 0.045, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // 🔴 `gl.clear` IGNORES THE VIEWPORT — it clears the whole framebuffer.
+    // Both eyes render into ONE framebuffer side by side, so clearing on the
+    // second view wiped everything the first had just drawn. The comment in
+    // onXR said "only the first may clear it" and the code then cleared on
+    // both; a headset showed black. A viewport is not a clip region, and
+    // `gl.scissor` is the thing that would make it one.
+    if (doClear) {
+      gl.clearColor(0.02, 0.03, 0.045, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    } else {
+      // Each eye still needs its OWN depth cleared, or the second eye tests
+      // against the first eye's depths and drops most of the room.
+      gl.enable(gl.SCISSOR_TEST);
+      gl.clear(gl.DEPTH_BUFFER_BIT);
+      gl.disable(gl.SCISSOR_TEST);
+    }
     gl.bindVertexArray(cube.vao);
 
     // The walls: one big cube seen from the inside, so the front faces are the
@@ -358,6 +377,9 @@
 
   // ── the headset ─────────────────────────────────────────────────────────
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
+  // Taken once, at load, away from any gesture — see enter().
+  let headsetKnown = null;
+  navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; }, () => { headsetKnown = false; });
 
   /**
    * What demo/verify-quest.mjs reads to turn its compositor line from context
@@ -376,17 +398,32 @@
   };
   async function enter() {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'warn'); return false; }
-    const supported = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
-    if (!supported) { d.log('no headset here — the window above is the same room', 'warn'); return false; }
+    // 🔴 NO AWAIT BEFORE `requestSession`. It needs a TRANSIENT user activation,
+    // and awaiting anything first can spend it — so the support answer is the
+    // one already taken at load (`headsetKnown`), never a fresh await here.
+    // This is the whole reason the first attempt on a real Quest produced no
+    // asserts at all: the handler threw where nothing was reporting.
+    if (headsetKnown === false) { d.log('no headset here — the window above is the same room', 'warn'); return false; }
     try {
       // ⚠️ `local-floor` is REQUIRED, not optional: the room is authored in
       // metres from the floor, and on `local` the origin is wherever the head
       // happened to be, which puts a 0.3 m cube at eye height.
       session = await navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] });
-    } catch (e) { d.log(`the headset refused the session — ${e.message}`, 'bad'); return false; }
-    await gl.makeXRCompatible();
-    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
-    xrSpace = await session.requestReferenceSpace('local-floor');
+      // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
+      // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
+      // the handler entirely — so the session could START and the page then die
+      // with no assert, no log line and no way to tell that from "the button
+      // was never pressed". That is what the first headset run looked like.
+      await gl.makeXRCompatible();
+      session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+      xrSpace = await session.requestReferenceSpace('local-floor');
+    } catch (e) {
+      d.log(`the headset refused the session — ${e.name}: ${e.message}`, 'bad');
+      ship?.(`FAIL session — ${e.name}: ${e.message}`);
+      try { await session?.end(); } catch { /* it may never have started */ }
+      session = null;
+      return false;
+    }
     xrOk = true; publishXR();
     if (ship) {
       ship(`session started · mode immersive-vr · ${session.renderState.baseLayer.framebufferWidth}x${session.renderState.baseLayer.framebufferHeight} per eye`);
@@ -414,11 +451,21 @@
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const tSec = (now - t0) / 1000;
+    let eye = 0;
     for (const view of pose.views) {
       const vp = layer.getViewport(view);
       gl.viewport(vp.x, vp.y, vp.width, vp.height);
-      // Both eyes clear the SHARED framebuffer, so only the first may clear it.
-      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec);
+      gl.scissor(vp.x, vp.y, vp.width, vp.height);
+      // Only the FIRST eye clears the shared framebuffer; the rest clear depth
+      // inside their own scissor. See drawRoom.
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0);
+      eye++;
+    }
+    if (ship && xrFrames === 1) {
+      const err = gl.getError();
+      ship(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err}`);
+      const vp0 = layer.getViewport(pose.views[0]);
+      ship(`eye 0 viewport ${vp0.x},${vp0.y} ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0}`);
     }
     markShown(now);
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
@@ -528,6 +575,7 @@
     ship(`navigator.xr native: ${nx.native} — ${nx.why}`);
     ship(`renderer ${rendererName}`);
     ship(`window ${innerWidth}x${innerHeight} css · dpr ${devicePixelRatio}`);
+    ship(`headset layout applied: ${document.documentElement.classList.contains('xr')}`);
     ship(`⚠️ SELF-REPORTED. This page cannot read its own hardware; only adb getprop can.`);
     ship(`immersive-vr supported: ${headset}${REPORT_PARAM === '1' && !headset ? ' (forced on with ?report=1)' : ''}`);
     // ⚠️ WRAP `d.assert` RATHER THAN COPYING THE LIST. Every assert this page
@@ -539,6 +587,18 @@
     d.log('reporting to pub.positron.studio — read it with /logs?format=text');
   }
   maybeReport();
+
+  // 🔴 A THROWN HANDLER USED TO LEAVE NO TRACE, which made "the button was
+  // never pressed" and "the button threw" the same observation in the report —
+  // and that is exactly what the first run on a real headset looked like.
+  // Every press is logged before it runs, and anything that escapes is logged
+  // with it.
+  addEventListener('error', (e) => ship?.(`FAIL uncaught — ${e.message} @ ${e.filename}:${e.lineno}`));
+  addEventListener('unhandledrejection', (e) => ship?.(`FAIL unhandled rejection — ${e.reason?.message || e.reason}`));
+  for (const id of ['roll', 'again', 'enter', 'bad']) {
+    const b = d.button(id);
+    if (b) b.addEventListener('click', () => ship?.(`pressed "${b.textContent}"`), true);
+  }
   d.set('view', 'window');
   d.set('refused', 0);
   // A room to stand in before anything is pressed, so the stage is never empty.
