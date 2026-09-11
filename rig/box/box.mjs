@@ -154,27 +154,83 @@ function sendFrame(unit, key) {
  * how many sockets are in the room, and the box is one of them.
  */
 const ARCHIVE_IDLE_MS = 5 * 60e3;
+// ⚠️ THE PICTURE NEEDS THIS MORE THAN THE ARCHIVE DID, and it did not have it.
+// The mirror page asks the box to draw AS SOON AS IT LOADS, so one visit leaves
+// the renderer and the hardware encoder running for ever — measured: 25% of the
+// machine and 2 Mbit/s into an empty room, hours after the last viewer closed
+// the tab. The same reasoning was written out in full for ERR's archive this
+// morning and not applied one file over. Shorter here because nobody is
+// listening to a picture nobody is watching, where a broadcast might reasonably
+// play on.
+const VIDEO_IDLE_MS = 2 * 60e3;
 let archiveWatch = null, aloneSince = null;
+let videoWatch = null, videoAloneSince = null;
+
+/** How many sockets are in a room, or null when the relay will not say. */
+async function roomSockets(room) {
+  try {
+    const r = await fetch(`${RELAY.replace(/^ws/, 'http')}/room/${room}/stats`, { cache: 'no-store' });
+    if (!r.ok) return null;
+    return (await r.json()).sockets ?? null;
+  } catch { return null; }
+}
+
 function watchArchiveListeners() {
   if (archiveWatch) return;
   aloneSince = null;
   archiveWatch = setInterval(async () => {
     if (inst?.source !== 'archive') return stopArchiveWatch();
-    try {
-      const r = await fetch(`${RELAY.replace(/^ws/, 'http')}/room/${ROOM}/stats`, { cache: 'no-store' });
-      if (!r.ok) return;                       // cannot tell; do not act on a guess
-      const { sockets } = await r.json();
-      if (sockets > 1) { aloneSince = null; return; }
-      aloneSince ??= Date.now();
-      if (Date.now() - aloneSince < ARCHIVE_IDLE_MS) return;
-      log(`archive: nobody has been in ${ROOM} for ${Math.round(ARCHIVE_IDLE_MS / 60000)} min — stopping rather than streaming ERR to an empty room`);
-      send({ type: 'audio.stopped', source: 'archive', reason: 'nobody listening' });
-      stopAudio();
-    } catch { /* a failed poll is not a reason to stop the music */ }
+    const sockets = await roomSockets(ROOM);
+    if (sockets === null) return;              // cannot tell; do not act on a guess
+    if (sockets > 1) { aloneSince = null; return; }
+    aloneSince ??= Date.now();
+    if (Date.now() - aloneSince < ARCHIVE_IDLE_MS) return;
+    log(`archive: nobody has been in ${ROOM} for ${Math.round(ARCHIVE_IDLE_MS / 60000)} min — stopping rather than streaming ERR to an empty room`);
+    send({ type: 'audio.stopped', source: 'archive', reason: 'nobody listening' });
+    stopAudio();
   }, 60e3);
   archiveWatch.unref?.();
 }
 function stopArchiveWatch() { if (archiveWatch) { clearInterval(archiveWatch); archiveWatch = null; aloneSince = null; } }
+
+/**
+ * ⚠️ A SOCKET IS NOT A VIEWER, AND COUNTING SOCKETS DOES NOT WORK.
+ *
+ * The first version of this asked the relay how many sockets were in the video
+ * room and treated anything above one as somebody watching. MEASURED: the room
+ * reported SEVEN while nothing on earth was watching — stale connections left
+ * by test runs that exited without a clean close. The guard could never fire,
+ * and the renderer ran for 231,300 frames, about two and a quarter hours, for
+ * nobody.
+ *
+ * That is this repo's own rule, ignored one more time: a count is only evidence
+ * on the far side of the boundary. The relay's socket count is a PROXY for a
+ * viewer. The quantity in question is whether anyone is watching, and the only
+ * thing that knows is the page — so it says so, every ten seconds, and a viewer
+ * that has stopped saying it has stopped watching. It also, for free, covers
+ * the case a socket count never could: a tab that is open but hidden.
+ */
+let lastWatchAt = 0;
+
+function watchVideoViewers() {
+  if (videoWatch) return;
+  videoAloneSince = null;
+  lastWatchAt = Date.now();          // grace: nobody has had a chance to say yet
+  videoWatch = setInterval(() => {
+    if (!video) return stopVideoWatch();
+    if (Date.now() - lastWatchAt < VIDEO_IDLE_MS) { videoAloneSince = null; return; }
+    videoAloneSince ??= lastWatchAt;
+    log(`video: nobody has said they are watching for ${Math.round(VIDEO_IDLE_MS / 60000)} min — stopping the renderer`);
+    const st = video.stats();
+    video.stop(); video = null;
+    try { vws?.close(); } catch { /* already */ }
+    vws = null;
+    stopVideoWatch();
+    send({ type: 'video.stopped', ok: true, reason: 'nobody watching', ...st });
+  }, 30e3);
+  videoWatch.unref?.();
+}
+function stopVideoWatch() { if (videoWatch) { clearInterval(videoWatch); videoWatch = null; videoAloneSince = null; } }
 
 /**
  * Yoshimi's bank map, read once and re-read when Yoshimi rewrites it.
@@ -783,6 +839,7 @@ async function handle(msg) {
       });
       if (!r.ok) return reply('video.started', { ok: false, reason: r.reason });
       video = r; vseq = 0; vsent = 0;
+      watchVideoViewers();
       log(`video up · ${r.w}x${r.h} @${r.fps} · ${(r.bitrate / 1e6).toFixed(1)} Mbit/s · room ${VIDEO_ROOM}`);
       return reply('video.started', { ok: true, room: VIDEO_ROOM, ...videoShape() });
     }
@@ -804,10 +861,18 @@ async function handle(msg) {
       // the renderer has no way to answer — so this is what went down the pipe.
       return reply('video.params', { ok: n > 0, sent: n, mirrors: p.seg, grain: p.scale, hue: p.hue });
     }
+    // ⚠️ A VIEWER SAYING IT IS WATCHING. Cheap on purpose: no reply, so a room
+    // of viewers costs the relay one message each per ten seconds and nothing
+    // comes back. Without this the box cannot tell a watched picture from an
+    // abandoned one — see `watchVideoViewers`.
+    case 'video.watching':
+      lastWatchAt = Date.now();
+      return true;
     case 'video.stop': {
       if (!video) return reply('video.stopped', { ok: true, was: null });
       const st = video.stats();
       video.stop(); video = null;
+      stopVideoWatch();
       try { vws?.close(); } catch { /* already */ }
       vws = null;
       log(`video stopped after ${st.frames} frames`);

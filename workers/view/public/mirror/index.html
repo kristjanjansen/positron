@@ -593,6 +593,15 @@
   }
 
   let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
+  // ⚠️ SAY THAT SOMEBODY IS WATCHING, so the box can stop when nobody is. It
+  // cannot tell from its side: the relay reported seven sockets in the video
+  // room while nothing was watching, because a test run that exits without a
+  // clean close leaves one behind. `document.hidden` is checked because a tab
+  // in the background is not a viewer either, and a socket count could never
+  // have seen that.
+  setInterval(() => {
+    if (vws && !document.hidden) send({ type: 'video.watching' });
+  }, 10000);
   const fctx = far.c.getContext('2d');
 
   function closeVideo() {
