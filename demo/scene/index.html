@@ -316,7 +316,23 @@
   if (gl) flat(performance.now());
 
   // ── the headset ─────────────────────────────────────────────────────────
-  let session = null, xrSpace = null, xrOk = false;
+  let session = null, xrSpace = null, xrOk = false, xrFrames = 0;
+
+  /**
+   * What demo/verify-quest.mjs reads to turn its compositor line from context
+   * into a verdict. `frames` is the count THIS PAGE drew; the harness prints it
+   * beside what `adb logcat -s VrApi` says the compositor did.
+   *
+   * ⚠️ THE TWO ARE PRINTED SIDE BY SIDE AND NEVER AVERAGED. They are counted on
+   * opposite sides of the wire — one by the page, one by the system compositor —
+   * and a mean of them would hide exactly the case worth catching, which is the
+   * page believing it drew frames the compositor never presented. That is
+   * createMidiLane's `scheduled()` in a new costume: a count is only evidence
+   * on the far side of the boundary.
+   */
+  const publishXR = () => {
+    window.__demo.xr = { presenting: xrOk, mode: xrOk ? 'immersive-vr' : 'window', frames: xrFrames };
+  };
   async function enter() {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'warn'); return false; }
     const supported = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
@@ -330,12 +346,12 @@
     await gl.makeXRCompatible();
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
     xrSpace = await session.requestReferenceSpace('local-floor');
-    xrOk = true;
+    xrOk = true; publishXR();
     cancelAnimationFrame(raf);
     badge.innerHTML = 'headset · <b>you are in the room</b>';
     d.set('view', 'headset', 'ok');
     session.addEventListener('end', () => {
-      xrOk = false; session = null; badge.innerHTML = 'window · <b>session ended</b>';
+      xrOk = false; session = null; publishXR(); badge.innerHTML = 'window · <b>session ended</b>';
       d.set('view', 'window'); raf = requestAnimationFrame(flat);
     });
     session.requestAnimationFrame(onXR);
@@ -347,6 +363,7 @@
     session.requestAnimationFrame(onXR);
     const pose = frame.getViewerPose(xrSpace);
     if (!pose) return;
+    xrFrames++; publishXR();
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const tSec = (now - t0) / 1000;
@@ -449,6 +466,7 @@
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
+  publishXR();
   d.set('view', 'window');
   d.set('refused', 0);
   // A room to stand in before anything is pressed, so the stage is never empty.

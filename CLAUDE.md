@@ -2,9 +2,9 @@
 
 Live at **https://positron.studio**. 30 shelled demos of 35 rows,
 **441 asserts** (2026-09-11; `now`'s four are ERR refusing its own live edge,
-verified with a 403 probe, not a regression). `scene` is the first WebXR page
-and **its headset half is HUMAN-VERIFIED** — `demo/verify-quest.mjs` has to
-exist before that half's green means anything about a device. The front page is
+verified with a 403 probe, not a regression). `scene` is the first WebXR page;
+`node demo/verify-quest.mjs` drives it on a real Quest over adb, and
+`--self-test` proves its headset guard discriminates with no device attached. The front page is
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read
@@ -119,6 +119,20 @@ suspended context and never compiled, never built its deck, never raised its
 transport bar — while looking fine, because the readout had been filled at load.
 Headless hides it: `--autoplay-policy=no-user-gesture-required` resolves both.
 Fire them and move on; sound is allowed to be late, the timeline is not.
+
+**"Is the XR object real" is not "is there a headset", and desktop Chrome is
+the proof.** MEASURED while building `verify-quest.mjs`: desktop Chrome has a
+genuinely **native `navigator.xr`** — an `XRSystem`, an accessor on
+`Navigator.prototype`, every method `[native code]` — and answers
+`immersive-vr: false`. So a nativeness test alone passes every laptop, and an
+`isSessionSupported` test alone passes a polyfill that claims everything. They
+catch disjoint things and BOTH are needed, plus `adb shell getprop` from
+outside the browser entirely. The Immersive Web Emulator installs a JavaScript
+`XRSystem`, and Meta markets its coverage as "on par with the Meta Quest
+Browser" — which is the iPhone mistake in a new accent. `--self-test` runs all
+three cases against headless Chrome and needs no device; sabotage
+`nativeVerdict` and it goes 3/3 -> 0/3, which is how you know it is not
+decoration.
 
 **A second browser of your own is a harness that reads broken.** A full run
 went 429/429, then 420/429 with nine failures, then 429/429 again with no code
