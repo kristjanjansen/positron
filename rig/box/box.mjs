@@ -24,7 +24,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
-import { startVideo, videoAvailable, V3DPIPE } from './video.mjs';
+import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, statSync, realpathSync } from 'node:fs';
 
@@ -898,6 +898,13 @@ function sweepOrphans() {
   }
 }
 if (backend() === 'alsa') sweepOrphans();
+// ⚠️ AND THE VIDEO ENCODER, WHICH `sweepOrphans` CANNOT SAFELY REACH LATER.
+// It runs `pkill -9 -x ffmpeg`, which at startup is fine because nothing is
+// running — but the box's own audio capture is also an ffmpeg, so the same
+// sweep during operation would silence the instrument. The video encoder is
+// told apart by reading raw frames on stdin. An orphan here holds an exclusive
+// device and makes the picture permanently unavailable.
+sweepStrayEncoders((l) => log('video:', l));
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

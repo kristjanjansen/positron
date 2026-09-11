@@ -26,12 +26,46 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-/** How many ffmpegs are encoding right now. `-x` matches the NAME, never a pattern. */
-function countEncoders() {
+/**
+ * The PIDs of every ffmpeg encoding video right now.
+ *
+ * ⚠️ MATCHED ON `rawvideo`, AND THAT IS DELIBERATE RATHER THAN LAZY. The box's
+ * AUDIO capture is also an ffmpeg — `-f jack -i posbox` — so `pkill -x ffmpeg`
+ * would take the instrument's sound with it. Only the video encoder reads raw
+ * frames on stdin, so that is what tells them apart.
+ *
+ * ⚠️ And read with `ps` rather than `pgrep -f`: a `-f` pattern matches the
+ * command line running the check and answers about ITSELF. LESSONS #39, twice
+ * in one session.
+ */
+export function encoderPids() {
   try {
     const out = execFileSync('ps', ['-eo', 'pid,args', '--no-headers'], { encoding: 'utf8' });
-    return out.split('\n').filter((l) => /\brawvideo\b/.test(l) && /ffmpeg/.test(l)).length;
-  } catch { return 0; }
+    return out.split('\n')
+      .filter((l) => /\brawvideo\b/.test(l) && /ffmpeg/.test(l))
+      .map((l) => +l.trim().split(/\s+/)[0])
+      .filter(Boolean);
+  } catch { return []; }
+}
+
+/**
+ * Kill encoders nobody owns.
+ *
+ * ⚠️ AN ORPHANED ENCODER BRICKS THE FEATURE UNTIL A REBOOT, and it survives a
+ * restart of this service: systemd replaces the node process and nothing reaps
+ * what it spawned, so the device stays held and every later `video.start`
+ * refuses forever. box.mjs already sweeps orphans at startup for exactly this
+ * reason — but only at startup, and an encoder can be orphaned at any time.
+ * The caller decides it is safe: it calls this only when IT is not streaming,
+ * in which case an encoder on this board is by definition garbage.
+ */
+export function sweepStrayEncoders(onLog) {
+  const pids = encoderPids();
+  for (const pid of pids) {
+    try { process.kill(pid, 'SIGKILL'); onLog?.(`swept a stray video encoder (pid ${pid}) that was holding /dev/video11`); }
+    catch { /* already gone */ }
+  }
+  return pids.length;
 }
 
 export const V3DPIPE = '/opt/positron-box/rig/vis/v3dpipe';
@@ -122,9 +156,18 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   // ⚠️ `pgrep -x`, NEVER `-f`: a `-f` pattern matches the very command line
   // running the check, so it always answers "held" — including about itself.
   // That is LESSONS #39, and it cost twenty minutes twice in one session.
-  const held = countEncoders();
-  if (held > 0) {
-    return { ok: false, reason: `${held} encoder process(es) already hold /dev/video11 — a second one would block forever, not fail`, held };
+  // The caller only reaches here when it is NOT already streaming, so anything
+  // holding the device is an orphan — from a killed run, or from a restart of
+  // this service that left its child behind. Clear it rather than refusing
+  // forever: refusing was correct about the danger and wrong about the remedy,
+  // and it left the feature permanently unavailable with an accurate message.
+  const swept = sweepStrayEncoders(onLog);
+  if (swept) {
+    onLog?.(`waiting for the device to come back after sweeping ${swept}`);
+  }
+  const still = encoderPids().length;
+  if (still > 0) {
+    return { ok: false, reason: `${still} encoder process(es) still hold /dev/video11 and would not die — the device needs a reboot`, held: still };
   }
   // 0 frames means FOREVER — see the comment in rig/vis/v3dpipe.c. It meant
   // "render none and exit" until 2026-09-11, which left ffmpeg waiting on a
