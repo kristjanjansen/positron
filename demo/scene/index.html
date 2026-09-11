@@ -17,7 +17,7 @@
 </style>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
   import { world, docOf, validate } from '/shell/seed.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'scene-demo';
@@ -26,6 +26,36 @@
   // The ceiling is a constant and the readout prints it FROM this constant.
   // A description that can disagree with the config is worse than none.
   const TO_FRAME_CEIL_MS = 120;
+
+  // ── reporting from a device that has no cable in it ─────────────────────
+  // 🔴 adb IS FOR GRADING, NOT FOR USING. Opening this page on a headset needs
+  // nothing: positron.studio is HTTPS and the Quest Browser is Chromium. What
+  // adb buys is the two things page script CANNOT see — the hardware, read with
+  // `getprop` from outside the browser, and the compositor's own frame counter
+  // from `logcat -s VrApi` — plus pressing the controls unattended.
+  //
+  // Everything else the device can say about itself, and this is the same route
+  // the iPhone work already uses: POST the lines to pub.positron.studio and read
+  // them from a laptop. So a headset with no cable can still report, and the one
+  // claim it cannot make on its own is the one about its own hardware — which is
+  // why the report says so in its own header rather than leaving it out.
+  const REPORT = new URLSearchParams(location.search).has('report');
+  let ship = null;
+
+  /** Is `navigator.xr` the browser's, or something installed over it? */
+  function nativeXR() {
+    if (!navigator.xr) return { native: false, why: 'no navigator.xr at all' };
+    const proto = Object.getPrototypeOf(navigator.xr);
+    const names = Object.getOwnPropertyNames(proto).filter((n) => n !== 'constructor');
+    const fns = names
+      .map((n) => Object.getOwnPropertyDescriptor(proto, n))
+      .filter((dsc) => typeof dsc?.value === 'function')
+      .map((dsc) => dsc.value);
+    const faked = fns.filter((fn) => !/\{\s*\[native code\]\s*\}/.test(Function.prototype.toString.call(fn)));
+    if (faked.length) return { native: false, why: `${faked.length} method(s) are JavaScript — something is installed over navigator.xr` };
+    if (Object.prototype.hasOwnProperty.call(navigator, 'xr')) return { native: false, why: 'navigator owns `xr` as an own property' };
+    return { native: true, why: `${proto.constructor?.name || 'XRSystem'} · ${fns.length} methods, all [native code]` };
+  }
 
   const d = mount({
     name: 'scene',
@@ -316,7 +346,7 @@
   if (gl) flat(performance.now());
 
   // ── the headset ─────────────────────────────────────────────────────────
-  let session = null, xrSpace = null, xrOk = false, xrFrames = 0;
+  let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
 
   /**
    * What demo/verify-quest.mjs reads to turn its compositor line from context
@@ -347,6 +377,10 @@
     session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
     xrSpace = await session.requestReferenceSpace('local-floor');
     xrOk = true; publishXR();
+    if (ship) {
+      ship(`session started · mode immersive-vr · ${session.renderState.baseLayer.framebufferWidth}x${session.renderState.baseLayer.framebufferHeight} per eye`);
+      ship(`views ${(frameViews || 0)} · refresh ${session.frameRate || 'not reported'}`);
+    }
     cancelAnimationFrame(raf);
     badge.innerHTML = 'headset · <b>you are in the room</b>';
     d.set('view', 'headset', 'ok');
@@ -364,6 +398,8 @@
     const pose = frame.getViewerPose(xrSpace);
     if (!pose) return;
     xrFrames++; publishXR();
+    if (ship && xrFrames % 120 === 0) ship(`${xrFrames} frames drawn in the headset · worst gap ${worst.toFixed(1)} ms`);
+    if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const tSec = (now - t0) / 1000;
@@ -467,6 +503,24 @@
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
   publishXR();
+  if (REPORT) {
+    ship = createShipper();
+    const nx = nativeXR();
+    // ⚠️ EVERY REPORT OPENS WITH A BUILD STAMP, so "still broken" and "the fix
+    // never loaded" stop being the same observation — the rule the 06 device
+    // logs already follow.
+    ship(`BUILD ${BUILD} · scene`);
+    ship(`ua ${navigator.userAgent}`);
+    ship(`navigator.xr native: ${nx.native} — ${nx.why}`);
+    ship(`renderer ${rendererName}`);
+    ship(`window ${innerWidth}x${innerHeight} css · dpr ${devicePixelRatio}`);
+    ship(`⚠️ SELF-REPORTED. This page cannot read its own hardware; only adb getprop can.`);
+    navigator.xr?.isSessionSupported('immersive-vr').then(
+      (v) => ship(`immersive-vr supported: ${v}`), () => ship('immersive-vr: the browser would not answer'));
+    const origAssert = d.assert;
+    d.assert = (label, pass, detail) => { ship(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail ? '  ' + detail : ''}`); return origAssert(label, pass, detail); };
+    d.log('reporting to pub.positron.studio — read it with /logs?format=text');
+  }
   d.set('view', 'window');
   d.set('refused', 0);
   // A room to stand in before anything is pressed, so the stage is never empty.
