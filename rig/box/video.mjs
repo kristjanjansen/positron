@@ -23,8 +23,16 @@
 // need a type byte in a header that is already deployed on both ends, or a magic
 // number that a 32-bit sequence counter can eventually collide with. A separate
 // room needs neither.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+
+/** How many ffmpegs are encoding right now. `-x` matches the NAME, never a pattern. */
+function countEncoders() {
+  try {
+    const out = execFileSync('ps', ['-eo', 'pid,args', '--no-headers'], { encoding: 'utf8' });
+    return out.split('\n').filter((l) => /\brawvideo\b/.test(l) && /ffmpeg/.test(l)).length;
+  } catch { return 0; }
+}
 
 export const V3DPIPE = '/opt/positron-box/rig/vis/v3dpipe';
 
@@ -105,6 +113,19 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   if (!videoAvailable()) {
     return { ok: false, reason: `no renderer at ${V3DPIPE} or no hardware encoder at /dev/video11` };
   }
+  // ⚠️ THE HARDWARE ENCODER IS A SINGLE EXCLUSIVE DEVICE. A second ffmpeg on
+  // /dev/video11 does not fail — it BLOCKS, forever, looking exactly like an
+  // encoder that produces no bytes. Stacking them is what wedged the device
+  // badly enough to need a reboot on 2026-09-11. Refuse instead, and say what
+  // is holding it.
+  //
+  // ⚠️ `pgrep -x`, NEVER `-f`: a `-f` pattern matches the very command line
+  // running the check, so it always answers "held" — including about itself.
+  // That is LESSONS #39, and it cost twenty minutes twice in one session.
+  const held = countEncoders();
+  if (held > 0) {
+    return { ok: false, reason: `${held} encoder process(es) already hold /dev/video11 — a second one would block forever, not fail`, held };
+  }
   // 0 frames means FOREVER — see the comment in rig/vis/v3dpipe.c. It meant
   // "render none and exit" until 2026-09-11, which left ffmpeg waiting on a
   // pipe nothing would ever come down while every status said the picture was
@@ -151,6 +172,17 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     stop: () => {
       stopping = true;
       for (const p of [render, enc]) { try { p.kill('SIGTERM'); } catch { /* gone */ } }
+      // ⚠️ AND MAKE SURE, BECAUSE SIGTERM DID NOT. An ffmpeg holding
+      // /dev/video11 survived SIGTERM and kept the device for minutes, so every
+      // later `video.start` queued behind it and read from the outside as "the
+      // encoder produces no bytes". Six of them stacked up that way and the
+      // device ended up needing a REBOOT. fluid.mjs already recorded this exact
+      // lesson — "`quit` plus SIGTERM left a fluidsynth alive for two minutes
+      // once; SIGKILL after a grace period is the guarantee" — and it was not
+      // applied here.
+      setTimeout(() => {
+        for (const p of [render, enc]) { try { p.kill('SIGKILL'); } catch { /* gone */ } }
+      }, 800).unref?.();
     },
   };
 }
