@@ -98,7 +98,7 @@ function videoShape() {
   return {
     w: video?.w, h: video?.h, fps: video?.fps, bitrate: video?.bitrate, gop: video?.gop,
     codec: 'avc1.42E01E',        // baseline 3.0 — what h264_v4l2m2m emits here
-    mirrors: video?.params().seg, grain: video?.params().scale, melt: video?.params().warp,
+    mirrors: video?.params().seg, grain: video?.params().scale, hue: video?.params().hue,
     // What actually drew it, read off the renderer rather than declared here.
     renderer: st.renderer ?? null,
     // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
@@ -792,17 +792,17 @@ async function handle(msg) {
       if (!video) return reply('video.params', { ok: false, reason: 'no picture running' });
       // The page's names on the left, the renderer's uniforms on the right — a
       // client should not have to know that `grain` is a noise frequency.
-      const MAP = { mirrors: ['seg', 2, 64], grain: ['scale', 0.5, 40], melt: ['warp', 0, 1.2] };
+      const MAP = { mirrors: ['seg', 2, 64], grain: ['scale', 0.5, 40], hue: ['hue', 0, 3] };
       let n = 0;
       for (const [name, [key, lo, hi]] of Object.entries(MAP)) {
         if (!Number.isFinite(msg[name])) continue;
         n += video.set(key, Math.max(lo, Math.min(hi, msg[name]))) ? 1 : 0;
       }
       const p = video.params();
-      log(`video params: ${p.seg} mirrors · grain ${p.scale} · melt ${p.warp}`);
+      log(`video params: ${p.seg} mirrors · grain ${p.scale} · hue ${p.hue}`);
       // ⚠️ REPORTED AS SENT, NOT AS APPLIED. The control channel is one-way —
       // the renderer has no way to answer — so this is what went down the pipe.
-      return reply('video.params', { ok: n > 0, sent: n, mirrors: p.seg, grain: p.scale, melt: p.warp });
+      return reply('video.params', { ok: n > 0, sent: n, mirrors: p.seg, grain: p.scale, hue: p.hue });
     }
     case 'video.stop': {
       if (!video) return reply('video.stopped', { ok: true, was: null });

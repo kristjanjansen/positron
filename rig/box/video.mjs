@@ -229,14 +229,14 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   // What the picture is set to right now. Kept here rather than asked of the
   // renderer, because it has no way to answer — a one-way channel means this
   // end owns the truth, and a client reading it back is reading what was SENT.
-  const params = { seg: 8, fb: 0.78, scale: 4, warp: 0.08 };
+  const params = { seg: 8, fb: 0.78, scale: 4, warp: 0.08, hue: 1 };
 
   return {
     ok: true, w, h, fps, bitrate, gop, passes,
     params: () => ({ ...params }),
     /** One parameter down the control channel. Clamped at the far end too. */
     set: (key, value) => {
-      if (!['seg', 'fb', 'scale', 'warp'].includes(key) || !Number.isFinite(value)) return false;
+      if (!['seg', 'fb', 'scale', 'warp', 'hue'].includes(key) || !Number.isFinite(value)) return false;
       params[key] = value;
       try { render.stdin.write(`${key} ${value}\n`); return true; }
       catch { return false; }

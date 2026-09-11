@@ -57,8 +57,17 @@
   }
   .knob button:first-of-type { border-radius: 4px 0 0 4px; }
   .knob button:last-of-type { border-radius: 0 4px 4px 0; }
-  .knob button + button { border-left: none; }
-  .knob button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+  /* ⚠️ OVERLAP, DO NOT DROP THE BORDER. The segmented look used
+     `border-left: none` on every button after the first, which is fine while
+     the chosen state is a FILL and wrong the moment it is a border: the chosen
+     pill would be missing its left edge and read as half-drawn. A -1px margin
+     puts the two borders on the same pixel, and z-index decides which is on
+     top — which is the chosen one. */
+  .knob button + button { margin-left: -1px; }
+  .knob button[aria-pressed="true"] {
+    color: var(--hi); border-color: var(--hi); background: transparent;
+    position: relative; z-index: 1;
+  }
   /* ⚠️ Focus is GREY here. shell.css focuses with `var(--hi)`, the same colour
      as the chosen state, so a focused-but-unchosen button read as chosen — the
      exact trap the box page already paid for. */
@@ -81,6 +90,13 @@
     object-fit: contain; aspect-ratio: auto;
   }
   .pane:fullscreen .bar { padding: 10px 14px; font-size: 12px; }
+  /* ⚠️ The knob row lives ABOVE both panes, which means it is not inside the
+     element that goes fullscreen — so it simply vanishes, and the picture you
+     went fullscreen to look at becomes the one you cannot change. It is moved
+     into the fullscreen pane's own bar instead, centred between the numbers and
+     the button. */
+  .bar .knobs { margin: 0 auto; gap: 18px; }
+  .bar .knob button { padding: 4px 9px; }
 </style>
 
 <script type="module">
@@ -144,7 +160,7 @@
   };
   const local = mk('<b>here</b> — your browser');
   const far = mk('<b>the box</b> — a Raspberry Pi, over the internet');
-  const farNone = el('div', 'none', 'waiting for the box…');
+  const farNone = el('div', 'none', 'Waiting…');
   far.p.append(farNone);
   d.el.prepend(panes);
 
@@ -168,13 +184,17 @@
   // this repo measured.
   const KNOBS = {
     // 2 is a single fold — almost a mirror down the middle. 24 is a doily.
-    mirrors: { label: 'mirrors', steps: [['2', 2], ['8', 8], ['24', 24]], at: 1 },
+    mirrors: { label: 'mirrors', steps: [['2', 2], ['16', 16], ['24', 24]], at: 1 },
     // The noise frequency, which decides whether the shapes are continents or
     // filigree. An eightfold span, because a doubling is not visible here.
     grain:   { label: 'grain',   steps: [['coarse', 1.2], ['mid', 4], ['fine', 16]], at: 1 },
-    // How far the picture drags itself sideways by its own brightness. At 0 it
-    // is a clean kaleidoscope; at 0.55 it is liquid and barely symmetric.
-    melt:    { label: 'melt',    steps: [['none', 0], ['some', 0.08], ['lots', 0.55]], at: 1 },
+    // HOW FAR APART THE THREE COLOUR CHANNELS ARE. The colour is three cosines
+    // of the same field, offset by vec3(0, 0.33, 0.67) — a third of a turn each,
+    // which is what makes a full rainbow. Scaling those offsets is the whole
+    // palette in one number: near zero the three channels move together and the
+    // picture is a duotone sweep; at 1 it is the rainbow; past 1 the offsets
+    // wrap and the hues come back round in a different order.
+    hue:     { label: 'hue',     steps: [['close', 0.12], ['mid', 1], ['wide', 2.2]], at: 1 },
   };
   const knobRow = el('div', 'knobs');
   for (const [key, k] of Object.entries(KNOBS)) {
@@ -196,6 +216,21 @@
   // is drawn — and a page that throws at module scope shows a blank frame with
   // no log line to say why.
   d.el.insertBefore(knobRow, panes);
+
+  /**
+   * ⚠️ FOLLOW THE PICTURE INTO FULLSCREEN. The knobs sit above both panes,
+   * which is the right place while both are on screen and the wrong place the
+   * moment one of them fills it: the row is not inside the fullscreen element,
+   * so it disappears and the picture you went fullscreen to look at is the one
+   * you can no longer change. It moves into that pane's bar and comes back
+   * afterwards.
+   */
+  document.addEventListener('fullscreenchange', () => {
+    const fs = document.fullscreenElement;
+    const pane = [local, far].find((p) => p.p === fs);
+    if (pane) pane.p.querySelector('.bar').insertBefore(knobRow, pane.full);
+    else d.el.insertBefore(knobRow, panes);
+  });
 
   function choose(key, idx) {
     const k = KNOBS[key];
@@ -265,7 +300,7 @@
   const FS = `#version 300 es
     precision highp float;
     uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
-    uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp;
+    uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp; uniform float uHue;
     out vec4 o;
     float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -277,7 +312,7 @@
       vec2 k = vec2(cos(a), sin(a)) * r;
       float w = n(k * uScale + uT * 0.3) + 0.5 * n(k * uScale * 2.0 - uT * 0.2) + 0.25 * n(k * uScale * 4.0 + uT * 0.5);
       vec2 dd = k + uWarp * vec2(cos(w * 6.2831), sin(w * 6.2831));
-      vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67)) + uT);
+      vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67) * uHue) + uT);
       vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
       o = vec4(mix(c, fb, uFb), 1.0); }`;
 
@@ -348,6 +383,7 @@
     const uFb = gl.getUniformLocation(prog, 'uFb');
     const uScale = gl.getUniformLocation(prog, 'uScale');
     const uWarp = gl.getUniformLocation(prog, 'uWarp');
+    const uHue = gl.getUniformLocation(prog, 'uHue');
     gl.bindVertexArray(gl.createVertexArray());
     // The feedback tap needs the same ping-pong the C does: two targets, swapped
     // every frame, with the previous one bound as the texture.
@@ -381,7 +417,8 @@
       gl.uniform1f(uSeg, P.mirrors);
       gl.uniform1f(uFb, 0.78);
       gl.uniform1f(uScale, P.grain);
-      gl.uniform1f(uWarp, P.melt);
+      gl.uniform1f(uWarp, 0.08);
+      gl.uniform1f(uHue, P.hue);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, A.t);
       gl.uniform1i(uPrev, 0);
@@ -430,6 +467,14 @@
       // the second status at the latest, because the renderer prints it on its
       // own first line and the reply may be composed before that lands.
       if (msg.renderer) stat('box', { note: msg.renderer });
+      // ⚠️ TELL THE BOX WHAT THIS PAGE IS SET TO. The knobs only sent on a
+      // press, so at load the page rendered its own defaults and the box
+      // rendered ITS defaults — and the two agreed only because the numbers
+      // happened to be the same on both sides. Changing one of them anywhere
+      // would have made the panes quietly disagree, which is the one thing this
+      // page must never do. Sent on every start, so a box that restarted comes
+      // back matching whatever is on screen.
+      send({ type: 'video.params', ...P });
       // ⚠️ DO NOT REOPEN A STREAM THAT IS ALREADY OPEN. Every client's
       // `video.status` is answered to the whole room, so a second visitor's
       // question tore this one's decoder down and built it again — which showed
@@ -446,6 +491,25 @@
     send({ type: 'video.start', w: 1280, h: 720, fps: 30 });
   }
 
+  /**
+   * Ask again, slowly, for as long as the page is open.
+   *
+   * ⚠️ Every five seconds and NOT faster: the thing being asked is a Raspberry
+   * Pi with one hardware encoder, and a page that retries hard is a page that
+   * queues work on a device which blocks rather than fails. Five seconds is
+   * slow enough to be polite and quick enough that someone switching the box on
+   * sees the picture without reloading.
+   */
+  let retry = null;
+  function scheduleRetry() {
+    if (retry) return;
+    retry = setInterval(() => {
+      if (vws) { clearInterval(retry); retry = null; return; }
+      send({ type: 'video.status' });
+    }, 5000);
+    retry.unref?.();
+  }
+
   let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
   const fctx = far.c.getContext('2d');
 
@@ -458,7 +522,11 @@
     lockedFrame = null;
     local.lab.innerHTML = '<b>here</b> — your browser';
     stat('box', { fps: null, kbit: null, note: 'not arriving' });
-    farNone.textContent = 'the box is not sending';
+    // ⚠️ "Waiting…" HAS TO BE TRUE. Saying it and then doing nothing is the
+    // worst of both: a reader waits for something nobody is asking for. The
+    // page re-asks, and the word is a promise it keeps.
+    farNone.textContent = 'Waiting…';
+    scheduleRetry();
     far.p.append(farNone);
   }
 
