@@ -104,6 +104,15 @@
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
+  // ⚠️ LOCK THE LOCAL PICTURE TO THE BOARD'S FRAME NUMBER WHEN ONE IS ARRIVING.
+  // Free-running, the two panes are the same shader counting from different
+  // starts — the same family of shape in unrelated colours, which a viewer
+  // reads as "these do not match" and which makes the page argue against
+  // itself. The board's per-frame sequence number IS its frame counter, so
+  // driving `uT` from it puts both panes on the same instant. Then anything
+  // still visibly different between them is the PIPELINE, which is the thing
+  // worth looking at.
+  let lockedFrame = null;
 
   function compile(type, src) {
     const s = gl.createShader(type);
@@ -159,7 +168,8 @@
     const frame = () => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
       gl.viewport(0, 0, W, H);
-      gl.uniform1f(uT, i / 30);
+      // Locked to the board when it is sending, free-running otherwise.
+      gl.uniform1f(uT, (lockedFrame ?? i) / 30);
       gl.uniform2f(uRes, W, H);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, A.t);
@@ -212,6 +222,12 @@
     try { vws?.close(); } catch { /* already */ }
     try { decoder?.close(); } catch { /* already */ }
     vws = null; decoder = null;
+    // Back to free-running, and SAY SO. A pane that silently stopped being
+    // locked would be two different claims wearing one label.
+    lockedFrame = null;
+    local.lab.innerHTML = '<b>here</b> — your browser';
+    farNone.textContent = 'nothing arriving — press “ask the board to draw”';
+    far.p.append(farNone);
   }
 
   function openVideo(room, info) {
@@ -247,6 +263,11 @@
       // nothing else on the path said so. This cell is the only witness.
       if (last >= 0 && s > last + 1) { farGaps += s - last - 1; d.set('frames lost', String(farGaps)); }
       last = s;
+      // The board's sequence number is its frame counter — see the comment at
+      // `lockedFrame`. Taken here, before the decode, because a frame the
+      // decoder refuses is still a frame the board drew.
+      if (lockedFrame === null) local.lab.innerHTML = '<b>here</b> — your browser, locked to the board';
+      lockedFrame = s;
       farBytes += e.data.byteLength;
       // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
       // is an error it reports once and then stays broken through, so a joiner
