@@ -94,7 +94,24 @@ export const JACK_SYNTHS = {
   // normally. This variant exists so the sampler can be wrapped by an insert:
   // an effect can only reach what is on the JACK graph, and the FIFO never is.
   // The box swaps between the two transparently when the effect is toggled.
-  fluidjack: {
+  /**
+   * FluidSynth ON JACK, and this is now what `fluidsynth` means.
+   *
+   * It used to write realtime PCM to a FIFO — one process, no jackd — and that
+   * was kept for efficiency. MEASURED on the board, same binary, same
+   * soundfont, same note: the pipe costs 12.8% of 400 against JACK's 12.3%, and
+   * 84 ms to the ear against 74 ms. The efficiency argument was not a CPU
+   * argument and JACK is the FASTER of the two; the FIFO's buffering costs more
+   * than jackd's period does.
+   *
+   * What it buys is the whole reason to move: the granular insert is a JACK
+   * insert, so on a pipe the 128 General MIDI instruments and the drum bank
+   * could not be granulated at all. The pipe path is still here as `fluidpipe`,
+   * because it is what let the whole of rig/box run in a container with no
+   * sound hardware in existence — a claim that would need re-testing before
+   * anything removed it.
+   */
+  fluidsynth: {
     needs: ['fluidsynth', 'jackd', 'ffmpeg'],
     // ⚠️ `-s` (SERVER), OR IT LOADS THE SOUNDFONT AND EXITS 0. `-i` means "do
     // not read commands from stdin", and without a shell to sit in and no MIDI
@@ -543,7 +560,10 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     return true;
   };
   return {
-    ok: true, source: name, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd,
+    // ⚠️ `jack: true` IS LOAD-BEARING. The caller gates the granular insert on
+    // it, and so does the page. Leaving it to be inferred from which variable
+    // happened to be set is exactly the coupling this refactor removed.
+    ok: true, source: name, jack: true, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd,
     rate: RATE, msgPerSec: RATE / FRAME,
     noteOn: (ch, n, v) => midi([0x90 | (ch & 15), n & 127, v & 127]),
     noteOff: (ch, n) => midi([0x80 | (ch & 15), n & 127, 0]),

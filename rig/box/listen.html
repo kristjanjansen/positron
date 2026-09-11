@@ -511,11 +511,14 @@
 
           // An insert can only reach a JACK instrument. FluidSynth writes to a
           // pipe, so the switch is disabled rather than offered and refused.
-          // Anything on the JACK graph can be wrapped, and the archive is on it.
-          // fluidsynth is the exception and always was: it writes to a pipe.
-          const wrappable = m.source === 'hexter' || m.source === 'yoshimi' || m.source === 'archive';
+          // ⚠️ ASK THE BOX, DO NOT KEEP A LIST. This was a list of instrument
+          // names, so every new source meant remembering to add it here — and
+          // forgetting meant a switch that silently refused to arm, on a page
+          // that could not say why. Whether the insert can wrap something is a
+          // property of the SOURCE, and the box now reports it.
+          const wrappable = m.jack !== false;
           fxBtn.disabled = !wrappable;
-          fxBtn.title = wrappable ? 'granular insert' : 'fluidsynth writes to a pipe, not to JACK';
+          fxBtn.title = wrappable ? 'granular insert' : `${m.source} writes to a pipe, not to the audio graph the insert lives on`;
           if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; fx1965.disabled = true; }
           // A new instrument means a new library. Drop the old one FIRST, or
           // the arrows keep walking the previous instrument's list until the

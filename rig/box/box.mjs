@@ -46,7 +46,13 @@ const URL_ = `${RELAY}/room/${ROOM}/ws`;
 
 const FROM = `box-${randomId(6)}`;   // per SOCKET, per wire.mjs: `seq` counts a connection
 let seq = 0, ws = null, audio = null, since = Date.now();
-let synth = null, stopSynth = null, midiIn = null, fluid = null, jsyn = null;
+// ONE variable for whatever is making sound. There used to be two — `fluid`
+// for the pipe path and `jsyn` for the JACK ones — and fourteen sites branched
+// on which was set, so every new source meant remembering both halves and every
+// reviewer had to check both. They are two implementations of one interface
+// now; `inst.jack` is the only thing anyone downstream actually needs to know,
+// because the granular insert can only wrap what is on the JACK graph.
+let synth = null, stopSynth = null, midiIn = null, inst = null;
 // ⚠️ Set BEFORE any await in startAudio. Raising a JACK chain takes ~13 s,
 // and during that window jsyn is still null — so a note.on arriving mid-start
 // saw 'nothing running' and started FluidSynth alongside it. Two instruments,
@@ -91,7 +97,7 @@ function watchArchiveListeners() {
   if (archiveWatch) return;
   aloneSince = null;
   archiveWatch = setInterval(async () => {
-    if (jsyn?.source !== 'archive') return stopArchiveWatch();
+    if (inst?.source !== 'archive') return stopArchiveWatch();
     try {
       const r = await fetch(`${RELAY.replace(/^ws/, 'http')}/room/${ROOM}/stats`, { cache: 'no-store' });
       if (!r.ok) return;                       // cannot tell; do not act on a guess
@@ -202,7 +208,7 @@ async function startAudio(source = 'synth', msg = null) {
   // A title left behind by a source that has stopped is a page lying about what
   // you are hearing, so it goes the moment anything else starts.
   if (source !== 'archive') archiveNow = null;
-  const running = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  const running = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
   if (running) {
     // ⚠️ AND SAY WHAT IT IS PLAYING. This early return used to answer
     // `{ok, already, source}` and nothing else, so a client that asked to start
@@ -214,7 +220,7 @@ async function startAudio(source = 'synth', msg = null) {
     // button can do is choose. Short-circuiting here made a second press a
     // no-op that reported success, which reads as a broken button.
     if (running === source && source !== 'fluidsynth' && source !== 'archive') {
-      return { ok: true, already: true, source: running, port: jsyn?.port ?? null,
+      return { ok: true, already: true, source: running, jack: !!inst?.jack, port: inst?.port ?? null,
                fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
     }
     log(`switching ${running} -> ${source}`);
@@ -244,14 +250,14 @@ async function startAudio(source = 'synth', msg = null) {
     try { r = await startJackSynth(source, { onFrame: sendPcm, onLog: (l) => log(`${source}:`, l), soundfont: msg?.soundfont, ...extra }); }
     finally { starting = null; }
     if (!r.ok) { log(`${source} failed: ${r.reason}`); return r; }
-    jsyn = r;
+    inst = r;
     log(`${source} up · port ${r.port} · midi ${r.midi ? 'in' : 'NONE'}`);
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
     if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
     if (source === 'archive') watchArchiveListeners();
-    return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
-             fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null,
+    return { ok: true, source, jack: true, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
+             channels: r.channels, fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null,
              idleStopMin: source === 'archive' ? ARCHIVE_IDLE_MS / 60000 : undefined };
   }
 
@@ -259,7 +265,14 @@ async function startAudio(source = 'synth', msg = null) {
   // A real multitimbral instrument: 16 channels, 16 GM programs, one process.
   // Its `file` audio driver is realtime-paced, so its stdout IS the stream —
   // no soundcard, no ALSA, nothing to mix.
-  if (source === 'fluidsynth') {
+  // ⚠️ `fluidpipe`, NOT `fluidsynth`. `fluidsynth` is the JACK one now and is
+  // handled above by the JACK_SYNTHS branch. This path stays because it is what
+  // let the whole of rig/box run in an arm64 container with no sound hardware
+  // in existence — FluidSynth's `file` driver is realtime-paced, so its stdout
+  // IS the stream. jackd runs `-d dummy` here and probably works there too, but
+  // that is untested, and a platform fact in CLAUDE.md should not be deleted on
+  // a guess.
+  if (source === 'fluidpipe') {
     if (!fluidAvailable()) return { ok: false, reason: 'fluidsynth is not installed (apt: fluidsynth fluid-soundfont-gm)' };
     // A client may name the soundfont, so instruments can be A/B'd live rather
     // than by restarting the box. Resolved against the filesystem either way —
@@ -268,10 +281,10 @@ async function startAudio(source = 'synth', msg = null) {
     // A missing soundfont is the silent failure here: fluidsynth starts happily
     // and plays nothing at all, which reads as a broken stream.
     if (!sf) return { ok: false, reason: `no soundfont at ${DEFAULT_SF} (apt: fluid-soundfont-gm)` };
-    fluid = startFluid({ soundfont: sf, onFrame: sendPcm, onLog: (l) => log('fluidsynth:', l) });
-    fluid.proc.on('exit', (code) => { log(`fluidsynth exited ${code}`); fluid = null; });
-    log(`fluidsynth up · ${sf} · 16 channels`);
-    return { ok: true, source: 'fluidsynth', soundfont: sf, channels: 16,
+    inst = startFluid({ soundfont: sf, onFrame: sendPcm, onLog: (l) => log('fluidpipe:', l) });
+    inst.proc.on('exit', (code) => { log(`fluidpipe exited ${code}`); inst = null; });
+    log(`fluidpipe up · ${sf} · 16 channels`);
+    return { ok: true, source: 'fluidpipe', jack: false, soundfont: sf, channels: 16,
              rate: RATE, msgPerSec: RATE / FRAME, voices: Object.keys(VOICES) };
   }
 
@@ -329,12 +342,11 @@ async function startAudio(source = 'synth', msg = null) {
 }
 
 function stopAudio() {
-  const was = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  const was = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
   stopArchiveWatch();             // nothing to watch once nothing is playing
   archiveNow = null;
   aseq = 0;                       // a new source restarts the sequence
-  if (jsyn) { jsyn.stop(); jsyn = null; }
-  if (fluid) { fluid.stop(); fluid = null; }
+  if (inst) { inst.stop(); inst = null; }
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
   if (midiIn) { midiIn.kill('SIGTERM'); midiIn = null; }
   if (audio) { audio.kill('SIGTERM'); audio = null; }
@@ -378,9 +390,8 @@ async function handle(msg) {
       // If something is mid-start, do NOT start a second instrument — drop the
       // note. One missed note is nothing; two instruments is a broken stream.
       if (starting) return reply('note.ack', { note: msg.note, dropped: true, starting });
-      if (!synth && !fluid && !jsyn) await startAudio('fluidsynth', {});
-      if (jsyn) jsyn.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
-      else if (fluid) fluid.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
+      if (!synth && !inst) await startAudio('fluidsynth', {});
+      if (inst) inst.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
       // With material loaded, the SAME key also pitches a grain voice, so the
       // granulator is played rather than merely switched on. Eight voices,
@@ -390,16 +401,14 @@ async function handle(msg) {
       if (grainSource && fxOn) pappus().notes.on(msg.note, msg.vel ?? 100);
       return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
         grains: !!(grainSource && fxOn),
-        on: grainSource && fxOn ? 'pappus' : jsyn ? jsyn.source : fluid ? 'fluidsynth' : 'synth' });
+        on: grainSource && fxOn ? 'pappus' : inst ? inst.source : 'synth' });
     case 'note.off':
-      if (jsyn) jsyn.noteOff(msg.channel ?? 0, msg.note);
-      else if (fluid) fluid.noteOff(msg.channel ?? 0, msg.note);
+      if (inst) inst.noteOff(msg.channel ?? 0, msg.note);
       else if (synth) synth.noteOff(msg.note);
       if (grainSource && fxOn) pappus().notes.off(msg.note);
       return reply('note.ack', { note: msg.note });
     case 'note.panic':
-      if (jsyn) jsyn.panic();
-      if (fluid) fluid.panic();
+      if (inst) inst.panic();
       if (synth) synth.allOff();
       // An insert keeps sounding after every note has stopped — a captured
       // ring buffer, eight delay taps and a reverb tail. Silence it too, or
@@ -414,7 +423,7 @@ async function handle(msg) {
     // runs on — a page cannot see /usr/share/yoshimi/banks and should not
     // pretend to — so the box enumerates and the page renders what it is told.
     case 'voices.list': {
-      const src = msg.source ?? jsyn?.source ?? (fluid ? 'fluidsynth' : null);
+      const src = msg.source ?? inst?.source ?? null;
       if (src === 'yoshimi') {
         const list = yoshimiList();
         log(`voices.list: ${list.count} patches in ${list.bankCount} banks, root ${list.root}${list.stale ? ' (STALE — the bank map disagrees with the disk)' : ''}`);
@@ -444,9 +453,18 @@ async function handle(msg) {
       // number differs. FluidSynth's are General MIDI, hexter's index the
       // loaded DX7 cartridge, Yoshimi's index its current bank — so a client
       // sends either a GM name (fluidsynth) or a program number (anything).
-      if (jsyn) {
+      if (inst) {
         const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
-        if (prog === undefined) return reply('voice.selected', { ok: false, reason: 'send {program:<0-127>} to this instrument', on: jsyn.source });
+        if (prog === undefined) {
+          // Two different mistakes, two different answers. A NAME that is not
+          // in the GM table is worth listing the table for; no name and no
+          // number is worth saying what to send instead. The pipe path used to
+          // give the first and the JACK path the second, which meant the help
+          // you got depended on which transport happened to be running.
+          return reply('voice.selected', typeof msg.voice === 'string'
+            ? { ok: false, reason: `unknown voice ${JSON.stringify(msg.voice)}`, known: Object.keys(VOICES), on: inst.source }
+            : { ok: false, reason: 'send {program:<0-127>} or {voice:"<general midi name>"}', on: inst.source });
+        }
         // ⚠️ BANK SELECT IS CC 32, AND THE NUMBER IS READ FROM YOSHIMI'S OWN
         // CONFIG (`midi_bank_C`), never typed here. CC 0 is `midi_bank_root`:
         // sending a bank on it moves Yoshimi's ROOT DIRECTORY instead, at which
@@ -456,23 +474,18 @@ async function handle(msg) {
         // Bank and program go out back to back on ONE byte stream, so they
         // cannot arrive out of order and no delay is needed between them.
         const bank = Number.isInteger(msg.bank) ? msg.bank : null;
-        if (bank !== null) jsyn.cc(msg.channel ?? 0, bankCC(jsyn.source), bank);
-        jsyn.program(msg.channel ?? 0, prog);
-        return reply('voice.selected', { ok: true, on: jsyn.source, channel: msg.channel ?? 0,
-                                         bank, bankCC: bank === null ? null : bankCC(jsyn.source), program: prog, name: msg.name ?? null });
+        if (bank !== null) inst.cc(msg.channel ?? 0, bankCC(inst.source), bank);
+        inst.program(msg.channel ?? 0, prog);
+        return reply('voice.selected', { ok: true, on: inst.source, channel: msg.channel ?? 0,
+                                         bank, bankCC: bank === null ? null : bankCC(inst.source), program: prog, name: msg.name ?? null });
       }
-      if (!fluid) return reply('voice.selected', { ok: false, reason: 'no instrument running' });
-      const prog = typeof msg.voice === 'string' ? VOICES[msg.voice] : msg.program;
-      if (prog === undefined) return reply('voice.selected', { ok: false, reason: `unknown voice ${JSON.stringify(msg.voice)}`, known: Object.keys(VOICES) });
-      fluid.select(msg.channel ?? 0, prog);
-      return reply('voice.selected', { ok: true, channel: msg.channel ?? 0, voice: msg.voice ?? null, program: prog });
+      return reply('voice.selected', { ok: false, reason: 'no instrument running' });
     }
     case 'cc': {
       // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real; hexter has
       // no filter at all but takes CC 16/17/18/19/80/81 as operator coarse
       // frequency, effective on notes ALREADY SOUNDING.
-      if (jsyn) { jsyn.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: jsyn.source }); }
-      if (fluid) { fluid.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: 'fluidsynth' }); }
+      if (inst) { inst.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: inst.source }); }
       // 74 and 71 are the conventional cutoff and resonance, so a hardware knob
       // maps onto them with no translation anywhere.
       const k = msg.ctrl === 74 ? 'cutoff' : msg.ctrl === 71 ? 'resonance' : msg.ctrl === 79 ? 'envAmount' : null;
@@ -519,16 +532,21 @@ async function handle(msg) {
       // it was tried — it works in principle and was flaky in practice, so the
       // honest thing is to say no rather than half-swap under the user. The
       // page disables the switch on fluidsynth for the same reason.
-      if (want && !jsyn) return reply('fx.pappus', {
+      // ⚠️ THE GATE IS `inst.jack`, NOT AN INSTRUMENT NAME. It used to read
+      // `!jsyn`, which meant "is it one of the JACK ones" by which variable
+      // happened to be set — so adding a source meant remembering this line.
+      // The insert can wrap anything on the JACK graph, and that is a property
+      // the source reports about itself.
+      if (want && !inst?.jack) return reply('fx.pappus', {
         ok: false,
-        reason: fluid ? 'fluidsynth writes to a pipe, not to JACK — pappus can wrap hexter or yoshimi'
+        reason: inst ? `${inst.source} writes to a pipe, not to JACK — the insert can only wrap what is on the JACK graph`
                       : 'nothing is playing for an insert to wrap',
       });
-      const r = await pappusFx(want, { instrumentPort: jsyn?.port, onLog: (l) => log('pappus:', l) });
+      const r = await pappusFx(want, { instrumentPort: inst?.port, onLog: (l) => log('pappus:', l) });
       if (r.ok) fxOn = want;
       // Switching off returns the sampler to its cheap path: one process, no
       // jackd, no capture.
-      return reply('fx.pappus', { ...r, instrument: jsyn?.source ?? null });
+      return reply('fx.pappus', { ...r, instrument: inst?.source ?? null });
     }
     // A SEEDED roll, in one of six named characters.
     //
@@ -680,8 +698,9 @@ async function handle(msg) {
       grainSource = null;
       return reply('source.cleared', { ok: true, recording: 'stereo' });
     case 'audio.status':
-      return reply('audio.started', jsyn ? { ok: true, source: jsyn.source, fx: fxOn ? 'pappus' : null, archive: jsyn.source === 'archive' ? archiveNow : null }
-        : fluid ? { ok: true, source: 'fluidsynth', soundfont: fluid.soundfont ?? null }
+      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, fx: fxOn ? 'pappus' : null,
+                                            soundfont: inst.soundfont ?? null,
+                                            archive: inst.source === 'archive' ? archiveNow : null }
         : stopSynth ? { ok: true, source: 'synth' }
         : audio ? { ok: true, source: 'capture' }
         : { ok: false, reason: 'nothing playing' });
@@ -759,7 +778,7 @@ function connect() {
 
 // Alive before you need it: a heartbeat means "the box is fine, the question is
 // elsewhere" can be answered without going to the room.
-setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames }), 5000).unref?.();
+setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames }), 5000).unref?.();
 
 /**
  * ⚠️ Sweep orphans at startup. Audio children (jackd, a synth, an ffmpeg
