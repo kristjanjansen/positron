@@ -16,11 +16,21 @@
 <ol class="d-acts" id="rows"></ol>
 
 <script type="module">
-  import { DEMOS, NOTES, rowHTML, noteHTML } from '/manifest.mjs';
+  import { NOTES, byNewest, rowHTML, noteHTML } from '/manifest.mjs';
+  import { markIndex } from '/shell/caps.mjs';
+
   // rowHTML lives in the manifest; this page used to carry its own copy and
-  // printed `undefined` for a whole afternoon after the other one was fixed
-  document.getElementById('rows').innerHTML = DEMOS.map(rowHTML).join('');
+  // printed `undefined` for a whole afternoon after the other one was fixed.
+  // NEWEST FIRST — byNewest() copies, so the array is still the story order.
+  document.getElementById('rows').innerHTML = byNewest().map(rowHTML).join('');
   document.body.insertAdjacentHTML('beforeend',
     '<h2 class="d-act-h">notes</h2><ol class="d-acts">' + NOTES.map(noteHTML).join('') + '</ol>');
+
+  // Same call the deployed index makes, on rows this page rendered itself.
+  const caps = await markIndex(document);
+  if (caps.xr === true) {
+    document.querySelector('.d-title').insertAdjacentHTML('beforeend',
+      '<p class="d-sub">bigger type and taller rows, because you are in a headset</p>');
+  }
 </script>
 </html>

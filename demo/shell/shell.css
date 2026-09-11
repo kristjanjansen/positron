@@ -286,7 +286,7 @@ button.d-pri[data-busy="1"] {
 }
 .d-row { border-bottom: 1px solid var(--line); }
 .d-row a {
-  display: grid; grid-template-columns: 1.9em 1fr; gap: 2px 10px;
+  display: grid; grid-template-columns: 3.7em 1fr; gap: 2px 10px;
   padding: 12px 2px; color: inherit; text-decoration: none;
 }
 .d-row .n { grid-row: 1 / span 2; }
@@ -301,7 +301,21 @@ button.d-pri[data-busy="1"] {
   border: 1px dashed color-mix(in oklab, var(--warn) 45%, var(--line)); border-radius: 3px; padding: 0 6px;
 }
 .d-row a:active { background: var(--card); }
-.d-row .n { font: 600 11px/1.4 var(--mono); color: var(--hi); opacity: .8; min-width: 1.6em; font-variant-numeric: tabular-nums; }
+/* The first column is the day the page landed, not a rank: the front page
+   sorts by it, and a rank renumbers itself every time the sort changes. */
+.d-row .n { font: 600 11px/1.4 var(--mono); color: var(--hi); opacity: .8; min-width: 3.4em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The act still says where a row sits in the sequence, now that the ORDER no
+   longer does. Same shape as a tag, dimmer, always first. */
+.d-act {
+  font: 500 9.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  color: var(--hi); opacity: .7; border: 1px solid color-mix(in oklab, var(--hi) 30%, var(--line));
+  border-radius: 999px; padding: 1px 7px;
+}
+/* A capability this browser HAS but a page only wants — said, never enforced.
+   demo/instrument keeps playing from its on-screen keys with no MIDI at all,
+   so striking it off would be the index inventing a failure. */
+.d-why.soft { color: var(--dim2); border-style: dotted; border-color: var(--line); }
+.d-sub { font: 500 11.5px/1.5 var(--mono); color: var(--dim); margin: 4px 0 0; }
 .d-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
 .d-row.todo { opacity: .6; }
 .d-row.todo a { cursor: default; }
@@ -345,3 +359,32 @@ video[hidden] { display: none; }
 .k.sharp { background: #0e1219; }
 .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
 .k.remote { background: var(--ok); color: #0b0e14; border-color: var(--ok); }
+
+
+/* ── in a headset ─────────────────────────────────────────────────────────
+   Turned on by demo/shell/caps.mjs when navigator.xr reports immersive-vr —
+   a capability call, never a user-agent string, because research/quest-xr §1.7
+   measured that you cannot tell a Quest 3 from a 3S by user agent at all.
+
+   ⚠️ UNCONFIRMED, AND SAYING SO IS THE POINT. Nothing in this block has been
+   measured on a headset; research/quest-xr-2026-09.md opens by admitting the
+   same thing about itself. These are the two changes that follow from how the
+   panel is actually used rather than from taste — text is read at roughly two
+   metres through a lens, and the pointer is a ray from the hand rather than a
+   mouse on a desk, so small type and 12px-tall targets are the two things that
+   fail first. If someone opens this in a headset and it is still wrong, the
+   numbers here are what to move.
+
+   It is deliberately NOT a different list of demos. Which pages run is decided
+   by the probes in caps.mjs, which answer true or false on a laptop too. */
+.xr body { font-size: 17px; }
+.xr .d-row a { padding: 20px 6px; gap: 5px 14px; grid-template-columns: 4.6em 1fr; }
+.xr .d-row .nm { font-size: 20px; }
+.xr .d-row .n { font-size: 13px; min-width: 4.3em; opacity: 1; }
+.xr .d-one { font-size: 16px; line-height: 1.5; }
+.xr .d-tag, .xr .d-act, .xr .d-why { font-size: 12px; padding: 3px 10px; }
+.xr .d-meta { gap: 8px; margin-top: 6px; }
+.xr .d-name { font-size: 30px; }
+.xr .d-act-h { font-size: 13px; margin: 34px 0 8px; }
+/* A ray drifts, so a row must not need a steady hand to stay lit. */
+.xr .d-row a:hover { background: var(--card); }

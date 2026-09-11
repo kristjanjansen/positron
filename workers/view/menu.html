@@ -18,4 +18,17 @@
 </ol>
 
 <!--NOTES-->
+
+<script type="module">
+  // The rows above are baked at build time, so anything that needs a live
+  // browser to decide runs here: un-link what this browser cannot do, and say
+  // why in words. demo/index.html calls the same function on rows it rendered
+  // itself, so there is one copy of the rule.
+  import { markIndex } from '/shell/caps.mjs';
+  const caps = await markIndex(document);
+  if (caps.xr === true) {
+    document.querySelector('.d-title').insertAdjacentHTML('beforeend',
+      '<p class="d-sub">bigger type and taller rows, because you are in a headset</p>');
+  }
+</script>
 </html>

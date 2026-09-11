@@ -33,7 +33,7 @@ const OUT = join(HERE, 'public');
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, rowHTML, noteHTML } =
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byNewest, rowHTML, noteHTML } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
@@ -354,7 +354,9 @@ await mkdir(OUT, { recursive: true });
 // GENERATED from demo/manifest.mjs (plan-demos.md step 8) so there is no second
 // place to forget. Number and name only; a row with no target renders greyed.
 {
-  const rows = DEMO_MANIFEST.map((d, i) => '  ' + rowHTML(d, i)).join('\n');
+  // NEWEST FIRST on the front page, story order everywhere else. byNewest()
+  // returns a copy for exactly this reason — the array is still the sequence.
+  const rows = byNewest(DEMO_MANIFEST).map((d, i) => '  ' + rowHTML(d, i)).join('\n');
   const notes = '<h2 class="d-act-h">notes</h2>\n<ol class="d-acts">'
     + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');

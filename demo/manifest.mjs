@@ -12,8 +12,21 @@
 // is renamed and no link changes meaning.
 //   page  — explicit target for a page that exists but is not shelled yet
 //   one   — one line: what it does
-//   tags  — the tech it actually uses
+//   tags  — the tech it actually uses; demo/shell/caps.mjs reads REQUIREMENTS
+//           off these, so there is no second `needs:` list to forget
 //   why   — for a row with no target: why it is not clickable
+//
+//   created — the day the page first landed, and it is WRITTEN DOWN rather
+//           than derived. A creation date is immutable, so a literal here can
+//           never go stale — while `git log` would answer differently the
+//           moment a file is moved, and this repo has already renamed every
+//           demo directory once (`10f6b3b`, slugs replacing numbers), which
+//           flattened sixteen of these dates to the rename's own day.
+
+// The requirement table lives in demo/shell/caps.mjs, beside the probes that
+// test for it — one table, read here at render time, so a row's `data-needs`
+// and the browser's answer can never disagree about what a name means.
+import { needsOf } from './shell/caps.mjs';
 
 export const ACTS = new Map([
   [0, 'the substrate'],
@@ -26,40 +39,40 @@ export const ACTS = new Map([
 ]);
 
 export const DEMOS = [
-  { name: 'transport', act: 0, built: true,
+  { name: 'transport', act: 0, created: '2026-09-04', built: true,
     one: 'twenty things happen a second apart — how close to on time each one lands',
     tags: ['timeline'] },
-  { name: 'lanes', act: 0, built: true,
+  { name: 'lanes', act: 0, created: '2026-09-04', built: true,
     one: 'an audio lane and a data lane on one transport',
     tags: ['timeline', 'WebAudio'] },
-  { name: 'loops', act: 0, built: true,
+  { name: 'loops', act: 0, created: '2026-09-04', built: true,
     one: 'one recording placed three times — a slice, the same slice faster, and a loop',
     tags: ['timeline'] },
-  { name: 'score', act: 0, built: true,
+  { name: 'score', act: 0, created: '2026-09-04', built: true,
     one: 'a score round-trips byte-identically and refuses mutation',
     tags: ['timeline'] },
-  { name: 'vclick', act: 0, built: true,
+  { name: 'vclick', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
 
-  { name: 'llhls', act: 1, built: true,
+  { name: 'llhls', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000 },
-  { name: 'webrtc', act: 1, built: true,
+  { name: 'webrtc', act: 1, created: '2026-09-04', built: true,
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', act: 1, built: true, settleMs: 20000,
+  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 20000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
-  { name: 'room', act: 2, built: true,
+  { name: 'room', act: 2, created: '2026-09-04', built: true,
     one: 'join a room and see the others; peer to peer, the relay only signals',
-    tags: ['WebRTC', 'relay'] },
-  { name: 'cues', act: 2, built: true,
+    tags: ['getUserMedia', 'WebRTC', 'relay'] },
+  { name: 'cues', act: 2, created: '2026-09-04', built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
@@ -70,11 +83,11 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', act: 0, built: true, gl: true, settleMs: 5000,
+  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, settleMs: 5000,
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
-  { name: 'wire', act: 2, built: true, settleMs: 6000,
+  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000,
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -89,90 +102,120 @@ export const DEMOS = [
   // assert, and every assert on this page sits behind a recording that runs to
   // a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
   // page broken.
-  { name: 'take', act: 3, built: true, settleMs: 13000,
+  { name: 'take', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
-    tags: ['MediaRecorder', 'timeline', 'local only'] },
+    tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
-  { name: 'keep', act: 3, built: true, settleMs: 30000,
+  { name: 'keep', act: 3, created: '2026-09-08', built: true, settleMs: 30000,
     one: 'send a picture out, record the copy that comes back, and scrub it',
-    tags: ['WHIP', 'WHEP', 'timeline'] },
-  { name: 'record', act: 3, built: true,
+    tags: ['getUserMedia', 'WHIP', 'WHEP', 'timeline'] },
+  { name: 'record', act: 3, created: '2026-09-04', built: true,
     one: 'record in segments and ship each one, so disk stays flat',
     tags: ['MediaRecorder', 'R2'] },
-  { name: 'replay', act: 3, built: true,
+  { name: 'replay', act: 3, created: '2026-09-04', built: true,
     one: 'a 190 s show off R2, played with the eight cues it was recorded with',
     tags: ['HLS', 'R2', 'timeline'] },
-  { name: 'seek', act: 3, built: true,
+  { name: 'seek', act: 3, created: '2026-09-04', built: true,
     one: 'seek inside that recording; the fold at any position must be exact',
     tags: ['HLS', 'R2', 'timeline'] },
 
-  { name: 'looper', act: 4, built: true,
+  { name: 'looper', act: 4, created: '2026-09-04', built: true,
     one: 'a keyboard into a WebAudio synth, then loop what you played',
     tags: ['WebAudio', 'AudioWorklet'] },
-  { name: 'carry', act: 4, built: true,
+  { name: 'carry', act: 4, created: '2026-09-10', built: true,
     one: 'press a key; the sound you hear has been to a server and back',
     tags: ['WebSocket', 'AudioWorklet', 'PCM'] },
-  { name: 'instrument', act: 4, built: true,
+  { name: 'instrument', act: 4, created: '2026-09-04', built: true,
     one: 'play an instrument that is somewhere else, and hear how late it is',
     tags: ['WebMIDI', 'relay', 'WebAudio', 'WebRTC'] },
-  { name: 'jam', act: 4, built: true,
+  { name: 'jam', act: 4, created: '2026-09-04', built: true,
     one: 'two browsers on one pulse, on a peer-corrected clock',
     tags: ['WS', 'relay', 'WebAudio'] },
 
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', act: 5, built: true,
+  { name: 'reel', act: 5, created: '2026-09-08', built: true,
     one: 'every 1965 newsreel on one line, at the day it was broadcast',
     tags: ['ERR', 'archive', 'timeline'] },
-  { name: 'now', act: 5, built: true,
+  { name: 'now', act: 5, created: '2026-09-08', built: true,
     one: 'one live ERR channel on a line whose right-hand end is the present moment',
     tags: ['HLS', 'live', 'timeline', 'DVR'],
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
     settleMs: 26000 },
-  { name: 'flipper', act: 5, built: true,
+  { name: 'flipper', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
-  { name: 'kurenniemi', act: 5, built: false, page: '/proto/kurenniemi/',
+  { name: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/kurenniemi/',
     one: "Erkki Kurenniemi's corpus, media from archive.org",
     tags: ['timeline', 'not shelled'] },
-  { name: 'megatimeline', act: 5, built: false, page: '/proto/megatimeline/',
+  { name: 'megatimeline', act: 5, created: '2026-08-27', built: false, page: '/proto/megatimeline/',
     one: 'the ERR archive as one zoomable century, 1908 to 2026',
     tags: ['canvas', 'DO cache', 'not shelled'] },
-  { name: 'remixer', act: 5, built: false, page: '/proto/remixer/',
+  { name: 'remixer', act: 5, created: '2026-08-27', built: false, page: '/proto/remixer/',
     one: 'stack archive recordings from any year on one playhead',
     tags: ['HLS', 'timeline', 'not shelled'] },
 
-  { name: 'studio', act: 6, built: false,
+  { name: 'studio', act: 6, created: '2026-08-26', built: false,
     one: 'the operator surface: go live, fire cues, archive the show',
     tags: ['WebRTC', 'DO', 'R2'],
     why: 'consumes 10 through 14' },
-  { name: 'capture', act: 4, built: true, settleMs: 26000,
+  { name: 'capture', act: 4, created: '2026-09-05', built: true, settleMs: 26000,
     one: 'camera in, segments out, played back on the timeline',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
   // FAR END of that hop recorded, and the recording scrubbed on the deck
-  { name: 'show', act: 3, built: true, settleMs: 9000,
+  { name: 'show', act: 3, created: '2026-09-05', built: true, settleMs: 9000,
     one: 'live over WebRTC, recorded off the far end of that hop, replayed on the timeline',
-    tags: ['WebRTC', 'MediaRecorder', 'timeline'] },
+    tags: ['getUserMedia', 'WebRTC', 'MediaRecorder', 'timeline'] },
 
   // 26 is Act 5 with 19: both are ERR's live output, one television and one
   // radio, and both are here because the archive work needs the live end of the
   // same pipe. `built` flips the moment positron-shout answers.
-  { name: 'shout', act: 5, built: true, settleMs: 12000,
+  { name: 'shout', act: 5, created: '2026-09-06', built: true, settleMs: 12000,
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
     tags: ['Icecast', 'Workers', 'WebAudio'] },
 
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.
-  { name: 'strip', act: 0, built: true,
+  { name: 'strip', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
+  // ── pages that are not shelled demos, but are the point of the whole rig ──
+  //
+  // Both live outside demo/, so `built` stays false — it means "a shelled page
+  // under demo/<name>/ that demo/verify.mjs runs", and neither is that. `page`
+  // is what makes a row clickable anyway.
+
+  // rig/box/listen.html, deployed to /box/ by workers/view/build.mjs. The Pi
+  // in the other building, played from here: its own instrument library, a
+  // random hour of 1965 Estonian radio, and pappus chewing either one up.
+  { name: 'box', act: 4, created: '2026-09-10', built: false, page: '/box/',
+    one: 'play a Raspberry Pi in another building — its instruments, 1965 radio, and a granulator over both',
+    tags: ['WS', 'relay', 'PCM', 'live board'] },
+
+  // rig/pro-instrument/play.html — Ableton Live and Arturia's Rhodes on the
+  // studio Mac, played from a browser over a direct peer link.
+  //
+  // ⚠️ NOT DEPLOYED, and the row says so rather than linking a page that
+  // cannot work for a visitor. Two separate reasons, both real: the page is
+  // not shelled (its own CSS, no mount(), so no harness can grade it), and it
+  // dynamically imports ./moq-audio.mjs, which does not exist beside it — so
+  // build.mjs's import check would refuse the deploy, correctly.
+  //
+  // MEASURED 2026-09-10, two Macs on one LAN, 100 presses alternating:
+  // direct peer link 6.00 ms typical, the relay 68.90 ms — 11.5x — and the
+  // number that decides playability is presses over 100 ms: direct 0 of 100,
+  // relay 4 of 100.
+  { name: 'rack', act: 4, created: '2026-09-10', built: false,
+    one: 'play the studio Mac\'s own Rhodes from a browser — a real desk instrument, 6 ms away',
+    tags: ['Ableton Live', 'Arturia', 'WebRTC', 'CoreMIDI'],
+    why: 'the page is not shelled, and it needs the studio Mac awake' },
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */
@@ -189,6 +232,33 @@ export const bySlug = (name) => DEMOS.find((d) => d.name === name);
 export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
 
 /**
+ * Newest first, and the array is left alone.
+ *
+ * ⚠️ THE ARRAY ORDER IS STILL THE STORY ORDER — this returns a COPY. The build
+ * and every other reader keep reading `DEMOS` in acts; only the front page
+ * sorts, because the front page answers a different question ("what is new
+ * here?") from the one the sequence answers ("where do I start?").
+ *
+ * Ties are broken by position in DEMOS rather than by name, so a day that
+ * landed six demos at once still reads in the order they were meant to be
+ * read, and the sort is stable across runs.
+ */
+export function byNewest(list = DEMOS) {
+  return list
+    .map((d, i) => [d, i])
+    .sort((a, b) => (b[0].created || '').localeCompare(a[0].created || '') || a[1] - b[1])
+    .map(([d]) => d);
+}
+
+/** `2026-09-11` -> `11 Sep`. Fixed width in the mono column either side of the month. */
+export function shortDate(iso) {
+  if (!iso) return '';
+  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const [, m, d] = iso.split('-');
+  return `${Number(d)} ${M[Number(m) - 1]}`;
+}
+
+/**
  * ONE renderer for an index row, because there were two.
  *
  * `demo/index.html` and `workers/view/build.mjs` each carried their own copy of
@@ -197,18 +267,32 @@ export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
  * file's own header claims cannot happen ("no second place to forget a row").
  * The header was aspirational; now it is true.
  *
- * `i` is the row's POSITION, and the number shown is display rather than
- * identity: reorder the array and the list renumbers while nothing is renamed.
+ * The first column used to be the row's POSITION. It is now the day the page
+ * landed, because the front page sorts by that: a rank number that renumbers
+ * itself whenever the sort changes is a column that cannot be quoted, while a
+ * date is the same fact wherever the row appears.
+ *
+ * `opt.missing` is a list of capability names this browser answered NO to —
+ * `demo/shell/caps.mjs` produces it. When `opt.blocked` is set the row is drawn
+ * unlinked WITH ITS REASON IN WORDS, never simply dropped: a missing row and a
+ * row that cannot run here are different facts, and hiding one as the other is
+ * the same defect as a blank cell that collapses "we did not look" into "we
+ * looked and it was fine".
  */
-export function rowHTML(d, i) {
-  const href = targetOf(d);
-  const tags = (d.tags || []).map((t) => `<span class="d-tag">${t}</span>`).join('');
+export function rowHTML(d, i, opt = {}) {
+  const href = opt.blocked ? null : targetOf(d);
+  const bits = [];
+  if (ACTS.has(d.act)) bits.push(`<span class="d-act">${ACTS.get(d.act)}</span>`);
+  for (const t of d.tags || []) bits.push(`<span class="d-tag">${t}</span>`);
+  const why = opt.blocked ? opt.says : d.why;
+  if (why) bits.push(`<span class="d-why">${why}</span>`);
   const open = href ? `<a href="${href}">` : '<a>';
-  return `<li class="d-row${href ? '' : ' todo'}">${open}`
-    + `<span class="n">${String(i + 1).padStart(2, '0')}</span>`
+  const needs = needsOf(d);
+  return `<li class="d-row${href ? '' : ' todo'}"${needs.length ? ` data-needs="${needs.join(' ')}"` : ''}>${open}`
+    + `<span class="n">${shortDate(d.created)}</span>`
     + `<span class="nm">${d.name}</span>`
     + `<span class="d-one">${d.one || ''}</span>`
-    + `<span class="d-meta">${tags}</span>`
+    + `<span class="d-meta">${bits.join('')}</span>`
     + '</a></li>';
 }
 
