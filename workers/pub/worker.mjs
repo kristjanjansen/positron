@@ -35,6 +35,36 @@ export class Pub extends Container {
   #whipRes = new Map();
   /** Ring buffer of device reports. Diagnostic; dies with the DO. */
   #log = [];
+  #hydrated = false;
+
+  /**
+   * Read the ring back after an eviction, once.
+   *
+   * ⚠️ LAZY, NOT IN THE CONSTRUCTOR. A DO constructor cannot await, and doing
+   * this in `blockConcurrencyWhile` would make every OTHER route on this
+   * object — the WebSocket upgrade, /status, /start — wait on a storage read
+   * they do not use. The log routes are the only ones that need it.
+   */
+  async #hydrate() {
+    if (this.#hydrated) return;
+    this.#hydrated = true;
+    try { this.#log = (await this.ctx.storage.get('log')) || []; }
+    catch { this.#log = []; }
+  }
+
+  /**
+   * ⚠️ TRIMMED TO FIT, FROM THE FRONT. A DO storage value caps at 128 KiB and
+   * LOG_KEEP x LOG_MAX_BODY is 800 KB in the worst case — so a busy device
+   * could make every write throw, which would look exactly like the eviction
+   * bug this replaced. Drop the OLDEST lines until it fits; the newest report
+   * is the one somebody is waiting to read.
+   */
+  async #persist() {
+    let out = this.#log;
+    while (out.length > 1 && JSON.stringify(out).length > 100000) out = out.slice(Math.ceil(out.length / 8));
+    this.#log = out;
+    try { await this.ctx.storage.put('log', out); } catch { /* diagnostics are never load-bearing */ }
+  }
 
   async fetch(request) {
     const url = new URL(request.url);
@@ -79,7 +109,16 @@ export class Pub extends Container {
     // A phone cannot be attached to a debugger from here, and the numbers that
     // matter (buffer length, hole seeks) are only observable on the device. So
     // the page posts them and this holds a ring buffer. Diagnostic only: no
-    // secrets, capped hard, dropped when the DO goes away.
+    // secrets, capped hard.
+    //
+    // 🔴 IT USED TO SAY "dropped when the DO goes away", AND THAT MADE THE
+    // WHOLE ENDPOINT A TRAP. MEASURED 2026-09-12: a line POSTed at 02:07:46
+    // read back immediately and was GONE by 02:08:32 — the DO had evicted and
+    // an in-memory array went with it. CLAUDE.md advertises this URL as the way
+    // to get a report off a phone or a headset, so the failure mode was: the
+    // device ships correctly, the reader sees "(nothing reported)", and the
+    // obvious conclusion is that the device never sent anything. Somebody then
+    // debugs the device. The ring is persisted now.
     if (url.pathname === '/log' && request.method === 'POST') {
       const body = (await request.text()).slice(0, LOG_MAX_BODY);
       const ua = request.headers.get('user-agent') || '';
@@ -92,12 +131,15 @@ export class Pub extends Container {
         ios: /iPhone|iPad|iPod/.test(ua),
         body,
       };
+      await this.#hydrate();
       this.#log.push(line);
       if (this.#log.length > LOG_KEEP) this.#log.splice(0, this.#log.length - LOG_KEEP);
+      await this.#persist();
       return json({ ok: true, kept: this.#log.length });
     }
 
     if (url.pathname === '/logs') {
+      await this.#hydrate();
       if (url.searchParams.get('format') === 'text') {
         const txt = this.#log
           .map((l) => `${l.at} ${l.ios ? 'iOS' : '   '} ${l.who} ${l.body}`)
@@ -110,8 +152,11 @@ export class Pub extends Container {
     }
 
     if (url.pathname === '/logs/clear' && request.method === 'POST') {
+      await this.#hydrate();
       const had = this.#log.length;
       this.#log = [];
+      await this.ctx.storage.delete('log');
+      this.#hydrated = true;          // emptied on purpose, do not re-read
       return json({ ok: true, cleared: had });
     }
 
