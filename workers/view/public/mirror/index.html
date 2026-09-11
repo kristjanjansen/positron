@@ -111,6 +111,12 @@
   .pane:fullscreen .bar .sp { display: none; }
   .pane:fullscreen .bar .knobs { justify-self: center; }
   .pane:fullscreen .bar button.ico { justify-self: end; }
+  /* ⚠️ THE BAR IS ONE LINE OR IT IS NOT A BAR. Left to itself the flex row
+     wraps, and a footer that becomes two lines in fullscreen pushes the picture
+     up and reads as a layout that has come apart. Nothing in here is long
+     enough to need wrapping — the fix when something IS too long is to shorten
+     the words, which is what happened to the label, not to let it fold. */
+  .bar, .bar .left, .bar .stat, .bar .knobs, .lab { white-space: nowrap; }
   .bar .left { display: flex; align-items: center; gap: 12px; min-width: 0; }
   /* In the bar the label is not a floating caption any more, so it drops the
      plate it needed to stay readable over a picture. */
@@ -185,7 +191,12 @@
   // screen it is on. "here" and "the box" say where to look; the chip says what
   // you are looking at, which is the comparison the page exists to make. Until
   // each end reports, it says what it can.
-  const WHERE = { here: 'in your browser', box: 'on a Raspberry Pi, over the internet' };
+  // ⚠️ SHORT ENOUGH FOR THE PANE IT SITS ON. "on a Raspberry Pi, over the
+  // internet" wrapped onto a second line across a 340-pixel pane, and a caption
+  // that needs two lines to say where a picture came from is covering the
+  // picture to do it. The journey is already in the paragraph above and in the
+  // kbit/s under the pane; the label only has to name the far end.
+  const WHERE = { here: 'your browser', box: 'a Raspberry Pi' };
   const chip = { here: null, box: null };
   // ⚠️ DECLARED HERE BECAUSE `relabel` READS IT, and `relabel` is called while
   // the panes are being built. A `let` further down is in the temporal dead
