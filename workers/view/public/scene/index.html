@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .stage { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden;
+           background: #05070b; margin: 0 0 12px; }
+  .stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+  .badge { position: absolute; left: 10px; top: 10px; font: 500 11px/1.5 var(--mono);
+           color: var(--dim); background: rgba(8,11,17,.72); border: 1px solid var(--line);
+           border-radius: 4px; padding: 3px 8px; pointer-events: none; }
+  .badge b { color: var(--hi); font-weight: 500; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { world, docOf, validate } from '/shell/seed.mjs';
+
+  const ROOM = new URLSearchParams(location.search).get('room') || 'scene-demo';
+  const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
+  const ID = Math.random().toString(36).slice(2, 8);
+  // The ceiling is a constant and the readout prints it FROM this constant.
+  // A description that can disagree with the config is worse than none.
+  const TO_FRAME_CEIL_MS = 120;
+
+  const d = mount({
+    name: 'scene',
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it; without one you are looking through a window at the same room.`,
+    readout: { seed: '', things: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
+    controls: [
+      { id: 'roll', label: 'Roll a room', primary: true },
+      { id: 'again', label: 'Same seed again' },
+      { id: 'enter', label: 'Put it on your face' },
+      { id: 'bad', label: 'Try an impossible room' },
+    ],
+  });
+  guard(d);
+
+  const stage = el('div', 'stage');
+  const canvas = el('canvas', null, null, { width: 960, height: 540 });
+  const badge = el('div', 'badge');
+  badge.innerHTML = 'window · <b>no headset yet</b>';
+  stage.append(canvas, badge);
+  d.el.append(stage);
+
+  // ── the picture ─────────────────────────────────────────────────────────
+  // WebGL2 and nothing else. `OCULUS_multiview` is on by default on Quest and
+  // WebGPU inside an immersive session is behind a chrome://flags switch the
+  // visitor would have to set, which makes it an R&D capability rather than a
+  // deliverable (research/quest-xr §1.3). And no three.js: this repo has no
+  // build step, and a 600 KB renderer to draw boxes would be the first
+  // bundler-shaped dependency in it — the same argument plan-nodes §1.5 made
+  // about importing a node editor.
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, xrCompatible: true });
+  if (!gl) { d.log('no WebGL2 in this browser — there is nothing to draw with', 'bad'); }
+
+  const compile = (t, src) => {
+    const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  };
+  const link = (vs, fs) => {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  };
+
+  // The walls run demo/mirror's shader, unchanged apart from losing the
+  // feedback tap — the same kaleidoscope and domain warp, so the surface of
+  // this room is the picture that page already measures on two GPUs.
+  const SKY_FS = `#version 300 es
+    precision highp float;
+    uniform float uT; uniform float uHue; out vec4 o;
+    in vec3 vP;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+      return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+    void main(){
+      vec3 p = normalize(vP);
+      vec2 uv = vec2(atan(p.z, p.x) / 6.2831853, p.y * 0.5);
+      float a = uv.x * 6.2831853, r = length(vec2(uv.x, uv.y)) + 0.35, seg = 6.2831853 / 8.0;
+      a = abs(mod(a + 0.5*seg, seg) - 0.5*seg);
+      vec2 k = vec2(cos(a), sin(a)) * r;
+      float w = n(k*3.0 + uT*0.06) + 0.5*n(k*6.0 - uT*0.04) + 0.25*n(k*12.0 + uT*0.1);
+      vec3 c = 0.5 + 0.5*cos(6.2831*(w + vec3(0.0,0.33,0.67)) + uHue*6.2831);
+      // Held down hard: this is a WALL, behind the things you are looking at,
+      // and a bright surround in a headset is the difference between a room and
+      // a migraine.
+      o = vec4(c * 0.16, 1.0); }`;
+
+  const BOX_FS = `#version 300 es
+    precision highp float;
+    in vec3 vN; in vec3 vW; uniform vec3 uCol; out vec4 o;
+    void main(){
+      vec3 n = normalize(vN);
+      float l = 0.35 + 0.65 * max(0.0, dot(n, normalize(vec3(0.4, 0.9, 0.25))));
+      o = vec4(uCol * l, 1.0); }`;
+
+  const VS = `#version 300 es
+    in vec3 aPos; in vec3 aNrm;
+    uniform mat4 uProj, uView, uModel;
+    out vec3 vN; out vec3 vW; out vec3 vP;
+    void main(){
+      vP = aPos;
+      vN = mat3(uModel) * aNrm;
+      vec4 w = uModel * vec4(aPos, 1.0); vW = w.xyz;
+      gl_Position = uProj * uView * w; }`;
+
+  let progSky = null, progBox = null, cube = null;
+  try { progSky = link(VS, SKY_FS); progBox = link(VS, BOX_FS); } catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
+
+  function unitCube() {
+    // 6 faces, flat normals. Positions in -0.5..0.5 so `s` is an edge length.
+    const P = [], N = [];
+    const faces = [[[1,0,0],[0,1,0],[0,0,1]], [[-1,0,0],[0,1,0],[0,0,-1]],
+                   [[0,1,0],[0,0,1],[1,0,0]], [[0,-1,0],[0,0,-1],[1,0,0]],
+                   [[0,0,1],[0,1,0],[-1,0,0]], [[0,0,-1],[0,1,0],[1,0,0]]];
+    for (const [nrm, u, v] of faces) {
+      const c = nrm.map((x) => x * 0.5);
+      const q = [[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]];
+      for (const [a, b] of q) {
+        P.push(c[0] + (u[0]*a + v[0]*b)*0.5, c[1] + (u[1]*a + v[1]*b)*0.5, c[2] + (u[2]*a + v[2]*b)*0.5);
+        N.push(...nrm);
+      }
+    }
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    for (const [data, loc] of [[P, 0], [N, 1]]) {
+      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+    }
+    gl.bindVertexArray(null);
+    return { vao, count: P.length / 3 };
+  }
+  if (gl) { gl.bindAttribLocation(progSky, 0, 'aPos'); cube = unitCube(); }
+
+  // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a real
+  // visitor, and a page that is quietly slow teaches nothing. demo/verify-gl.mjs
+  // checks its own answer against this one, so a page that stays silent reads as
+  // a broken harness rather than as a quiet page.
+  let rendererName = null;
+  if (gl) {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    badge.innerHTML = `window · <b>${rendererName}</b>`;
+  }
+
+  // ── the smallest matrix library that does this job ──────────────────────
+  // Column-major, like GL wants. Written out rather than imported because it is
+  // forty lines and the alternative is a dependency.
+  const mul = (a, b) => { const o = new Float32Array(16);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+      let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; }
+    return o; };
+  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const norm = (a) => { const l = Math.hypot(...a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+
+  const modelM = (x, y, z, s, rx, ry) => {
+    const cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
+    // R = Ry * Rx, then uniform scale, then translate.
+    return new Float32Array([
+      s*cy,        0,     s*(-sy),      0,
+      s*(sy*sx),   s*cx,  s*(cy*sx),    0,
+      s*(sy*cx),  -s*sx,  s*(cy*cx),    0,
+      x, y, z, 1]);
+  };
+  const perspective = (fov, asp, n, f) => { const t = 1 / Math.tan(fov / 2);
+    return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]); };
+  const lookAt = (eye, at) => {
+    const z = norm(sub(eye, at)), x = norm(cross([0,1,0], z)), y = cross(z, x);
+    return new Float32Array([
+      x[0], y[0], z[0], 0,  x[1], y[1], z[1], 0,  x[2], y[2], z[2], 0,
+      -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]);
+  };
+
+  // ── the room itself ─────────────────────────────────────────────────────
+  let doc = null;              // the document the room IS
+  let refused = 0, applied = 0;
+  // When the accepted room landed, and whether a frame has shown it yet. `to
+  // frame` is the distance between those two, which is the quantity the page
+  // claims to report.
+  let appliedAt = 0, shown = true, lastToFrame = null;
+  let worst = 0, toFrame = [];
+  const lastDocs = [];         // for the negative control
+  const U = {};                // uniform locations, filled on first draw
+
+  function locs(p) {
+    if (U[p.__i]) return U[p.__i];
+    const g = (n) => gl.getUniformLocation(p, n);
+    return (U[p.__i] = { proj: g('uProj'), view: g('uView'), model: g('uModel'),
+                         t: g('uT'), hue: g('uHue'), col: g('uCol') });
+  }
+  if (gl) { progSky.__i = 'sky'; progBox.__i = 'box'; }
+
+  /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
+  const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
+
+  function drawRoom(proj, view, tSec) {
+    if (!gl || !doc) return;
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0.02, 0.03, 0.045, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.bindVertexArray(cube.vao);
+
+    // The walls: one big cube seen from the inside, so the front faces are the
+    // ones pointing AWAY. Cull the other way round rather than turning culling
+    // off — a room drawn with both faces writes depth from the near wall and
+    // hides everything inside it.
+    gl.useProgram(progSky);
+    let L = locs(progSky);
+    gl.cullFace(gl.FRONT); gl.enable(gl.CULL_FACE);
+    gl.uniformMatrix4fv(L.proj, false, proj);
+    gl.uniformMatrix4fv(L.view, false, view);
+    gl.uniformMatrix4fv(L.model, false, modelM(0, 2, 0, 26, 0, 0));
+    gl.uniform1f(L.t, tSec); gl.uniform1f(L.hue, doc.hue);
+    gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+
+    gl.cullFace(gl.BACK);
+    gl.useProgram(progBox);
+    L = locs(progBox);
+    gl.uniformMatrix4fv(L.proj, false, proj);
+    gl.uniformMatrix4fv(L.view, false, view);
+    for (const t of doc.things) {
+      gl.uniformMatrix4fv(L.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
+      gl.uniform3fv(L.col, hueRGB(t.c));
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+    }
+    gl.bindVertexArray(null);
+  }
+
+  // ── applying a room, which is the only way the room ever changes ────────
+  /**
+   * ⚠️ NOTHING CALLS THIS EXCEPT THE SOCKET. A roll is a request that goes out
+   * and comes back; the room changes on the echo. That is what makes the
+   * `round trip` number the real distance between asking and seeing rather than
+   * the time to draw something we already had — and it is why two headsets in
+   * one room see the same world in the same order.
+   */
+  function apply(next, askedAt) {
+    const why = validate(next);
+    if (why) {
+      refused++;
+      d.set('refused', refused, 'warn');
+      d.log(`refused — ${why}`, 'warn');
+      return false;
+    }
+    doc = next; applied++;
+    appliedAt = performance.now(); shown = false;
+    lastDocs.push(docOf(next));
+    if (askedAt) { const rt = Date.now() - askedAt; d.set('round trip', rt); }
+    d.set('seed', String(next.seed));
+    d.set('things', next.things.length);
+    d.log(`room ${next.seed} — ${next.things.length} things, ${docOf(next).length} bytes`);
+    return true;
+  }
+
+  // ── the socket ──────────────────────────────────────────────────────────
+  let ws = null, seq = 0, echoed = false, asked = 0;
+  const send = (m) => {
+    if (ws?.readyState !== 1) return false;
+    ws.send(JSON.stringify({ ...m, from: `page-${ID}`, at: Date.now(), seq: seq++ }));
+    return true;
+  };
+  function open() {
+    return new Promise((done) => {
+      ws = new WebSocket(RELAY);
+      ws.onopen = () => { d.log(`joined ${ROOM}`); done(true); };
+      ws.onerror = () => done(false);
+      ws.onmessage = (e) => {
+        if (typeof e.data !== 'string') return;
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.type !== 'scene.room') return;
+        if (m.from === `page-${ID}`) echoed = true;      // our own message came back
+        apply(m.doc, m.from === `page-${ID}` ? asked : 0);
+      };
+      setTimeout(() => done(ws.readyState === 1), 2500);
+    });
+  }
+  const roll = async (seed) => {
+    if (ws?.readyState !== 1) await open();
+    asked = Date.now();
+    if (!send({ type: 'scene.room', doc: world(seed) })) {
+      // No relay: still show a room rather than an empty stage, and SAY that
+      // the number is missing rather than printing a zero that looks measured.
+      d.set('round trip', '—');
+      apply(world(seed), 0);
+    }
+    await new Promise((r) => setTimeout(r, 900));
+  };
+
+  // ── the flat window, which is also how the desktop harness sees it ──────
+  let raf = 0, t0 = performance.now(), lastFrame = 0;
+  function flat(now) {
+    raf = requestAnimationFrame(flat);
+    if (!gl || !doc) return;
+    const w = canvas.clientWidth * devicePixelRatio | 0, h = w * 9 / 16 | 0;
+    if (canvas.width !== w) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    const tSec = (now - t0) / 1000;
+    const a = tSec * 0.12;
+    drawRoom(perspective(1.05, canvas.width / canvas.height, 0.1, 60),
+             lookAt([Math.cos(a) * 6.5, 2.4, Math.sin(a) * 6.5], [0, 1.2, 0]), tSec);
+    markShown(now);
+    if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
+    lastFrame = now;
+  }
+  if (gl) flat(performance.now());
+
+  // ── the headset ─────────────────────────────────────────────────────────
+  let session = null, xrSpace = null, xrOk = false;
+  async function enter() {
+    if (!navigator.xr) { d.log('this browser has no WebXR at all', 'warn'); return false; }
+    const supported = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+    if (!supported) { d.log('no headset here — the window above is the same room', 'warn'); return false; }
+    try {
+      // ⚠️ `local-floor` is REQUIRED, not optional: the room is authored in
+      // metres from the floor, and on `local` the origin is wherever the head
+      // happened to be, which puts a 0.3 m cube at eye height.
+      session = await navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] });
+    } catch (e) { d.log(`the headset refused the session — ${e.message}`, 'bad'); return false; }
+    await gl.makeXRCompatible();
+    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+    xrSpace = await session.requestReferenceSpace('local-floor');
+    xrOk = true;
+    cancelAnimationFrame(raf);
+    badge.innerHTML = 'headset · <b>you are in the room</b>';
+    d.set('view', 'headset', 'ok');
+    session.addEventListener('end', () => {
+      xrOk = false; session = null; badge.innerHTML = 'window · <b>session ended</b>';
+      d.set('view', 'window'); raf = requestAnimationFrame(flat);
+    });
+    session.requestAnimationFrame(onXR);
+    return true;
+  }
+
+  function onXR(now, frame) {
+    if (!session) return;
+    session.requestAnimationFrame(onXR);
+    const pose = frame.getViewerPose(xrSpace);
+    if (!pose) return;
+    const layer = session.renderState.baseLayer;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    const tSec = (now - t0) / 1000;
+    for (const view of pose.views) {
+      const vp = layer.getViewport(view);
+      gl.viewport(vp.x, vp.y, vp.width, vp.height);
+      // Both eyes clear the SHARED framebuffer, so only the first may clear it.
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec);
+    }
+    markShown(now);
+    if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
+    lastFrame = now;
+    d.set('worst', worst.toFixed(1));
+  }
+
+  /**
+   * ⚠️ MEASURE THE QUANTITY IN QUESTION. This used to time the whole `roll()`
+   * call, which contains a 900 ms wait of its own — so it reported ~902 ms and
+   * was really measuring that sleep. `to frame` is the distance from the room
+   * being ACCEPTED to the first frame that actually drew it, which is the only
+   * part of the trip a viewer experiences as the room changing.
+   */
+  function markShown(now) {
+    if (shown || !doc) return;
+    shown = true;
+    lastToFrame = now - appliedAt;
+    toFrame.push(lastToFrame);
+    d.set('to frame', lastToFrame.toFixed(1), lastToFrame < TO_FRAME_CEIL_MS ? 'ok' : 'warn');
+  }
+
+  // ── controls ────────────────────────────────────────────────────────────
+  d.on('roll', async () => {
+    const seed = (Math.random() * 0xffffffff) >>> 0;
+    const t = Date.now();
+    await roll(seed);
+    d.set('worst', worst.toFixed(1));
+    d.set('view', xrOk ? 'headset' : 'window');
+
+    d.assert('there is a real WebGL2 context', !!gl && !!gl.getParameter(gl.VERSION), gl?.getParameter(gl.VERSION));
+    d.assert('the room is a document, and it is valid', !!doc && validate(doc) === null,
+      doc ? `${doc.things.length} things, ${docOf(doc).length} bytes` : 'none');
+    d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
+    d.assert('the room changed only when the message came back', echoed || ws?.readyState !== 1,
+      echoed ? 'own message echoed' : 'no relay — drew locally and said so');
+    // The ceiling is read from the same constant the label prints. It was
+    // typed twice once — the label said 120 and the comparison said 1200 — and
+    // the run still read green, which is what a description that can disagree
+    // with its config buys you.
+    d.assert(`an accepted room is on screen inside ${TO_FRAME_CEIL_MS} ms`,
+      lastToFrame !== null && lastToFrame < TO_FRAME_CEIL_MS,
+      lastToFrame === null ? 'no frame drawn' : `${lastToFrame.toFixed(1)} ms`);
+  });
+
+  // 🔴 THE NEGATIVE CONTROL, and the reason the word "generative" means
+  // anything here. pappus asserts the same thing about sound: the same seed is
+  // not distinguishable from itself. If this ever fails, the room is not a
+  // function of the seed and the document is not the product.
+  d.on('again', async () => {
+    const seed = doc?.seed ?? 424242;
+    const before = docOf(world(seed));
+    await roll((Math.random() * 0xffffffff) >>> 0);     // somewhere else entirely
+    const between = doc ? docOf(doc) : '';
+    await roll(seed);                                    // and back
+    const after = doc ? docOf(doc) : '';
+    d.assert('the same seed rebuilds the same room, byte for byte', before === after,
+      `${before.length} bytes, ${before === after ? 'identical' : 'DIFFERENT'}`);
+    d.assert('a different seed makes a different room', between !== after,
+      between === after ? 'two seeds gave one room' : 'they differ');
+    d.set('seed', String(seed));
+  });
+
+  d.on('enter', async () => {
+    const got = await enter();
+    // Both branches are real and both are asserted. A headset is the only place
+    // the first two can pass, which is exactly why demo/verify.mjs cannot grade
+    // this page and verify-quest.mjs has to exist.
+    d.assert('it knows whether there is a headset here',
+      typeof navigator.xr === 'object' || navigator.xr === undefined,
+      navigator.xr ? 'WebXR present' : 'no WebXR in this browser');
+    if (got) {
+      d.assert('an immersive session started', !!session);
+      d.assert('a floor-relative space resolved', !!xrSpace, 'local-floor');
+    } else {
+      d.assert('with no headset it says so and keeps drawing the window',
+        !xrOk && !!doc, 'window path');
+    }
+  });
+
+  // One impossible room per run. It is impossible in a way `validate` can name:
+  // a thing outside the room, which is a real mistake a generator can make and
+  // not a syntax error a parser would catch anyway.
+  d.on('bad', async () => {
+    const was = doc ? doc.things.length : 0;
+    const wasDoc = doc ? docOf(doc) : '';
+    const took = apply({ v: 1, seed: 1, hue: 0.5, things: [{ x: 99, y: 0, z: 0, s: 0.3, rx: 0, ry: 0, spin: 0, c: 0.5 }] }, 0);
+    d.assert('the impossible room was refused', took === false, `refused ${refused} so far`);
+    d.assert('and the room did not change across the refusal',
+      (doc ? docOf(doc) : '') === wasDoc && (doc ? doc.things.length : 0) === was,
+      `${was} things before and after`);
+  });
+
+  window.__demo.gl = { renderer: rendererName, ok: !!gl };
+  d.set('view', 'window');
+  d.set('refused', 0);
+  // A room to stand in before anything is pressed, so the stage is never empty.
+  roll(424242);
+  d.ready();
+</script>
+</html>
