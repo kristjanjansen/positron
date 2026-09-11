@@ -79,6 +79,17 @@ button, .d-btn {
   background: var(--card2); border: 1px solid var(--line2);
   border-radius: 4px; padding: 0 14px; height: 34px; cursor: pointer;
   -webkit-tap-highlight-color: rgba(255,212,0,.12);
+  /* 🔴 A LONG PRESS ON A CONTROL IS ALWAYS A MIS-PRESS, NEVER A COPY.
+     Holding a button on iPhone raised the text loupe and dropped selection
+     handles over the page — photographed on /box/ and /mirror/ — which is the
+     magnifier, not selection, and `user-select: none` does NOT suppress it.
+     `-webkit-touch-callout: none` is the one that does. `touch-action:
+     manipulation` goes with it: it drops the 300 ms double-tap-to-zoom wait, so
+     a key press sounds when it is pressed. Readouts, prose and the log keep
+     their selection — copying a number out of those is a real thing to want,
+     which is the rule already stated at .d-strip below. */
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; touch-action: manipulation;
 }
 button:hover { border-color: var(--dim2); }
 button:active { background: var(--card); }
@@ -346,11 +357,13 @@ video[hidden] { display: none; }
 /* --- the shared on-screen keyboard (demo/shell/keyboard.mjs) --------------
    One meaning for colour, as everywhere else: `down` is a note YOU are
    playing, `remote` is one somebody else is. */
-.keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
+.keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none;
+        -webkit-touch-callout: none; }
 .k { flex: 1; min-width: 0; height: 74px; border-radius: 4px; background: var(--card2);
      border: 1px solid var(--line2); display: grid; grid-template-rows: auto 1fr auto;
      justify-items: center; padding: 6px 0;
-     font: 500 10px/1 var(--mono); color: var(--dim2); user-select: none; cursor: pointer; }
+     font: 500 10px/1 var(--mono); color: var(--dim2); cursor: pointer;
+     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 /* the pitch on top, the keystroke underneath: the pitch is what moves when the
    octave shifts, and it is what a player is looking for */
 .k .kn { grid-row: 1; color: var(--dim); font-weight: 500; }
@@ -388,3 +401,28 @@ video[hidden] { display: none; }
 .xr .d-act-h { font-size: 13px; margin: 34px 0 8px; }
 /* A ray drifts, so a row must not need a steady hand to stay lit. */
 .xr .d-row a:hover { background: var(--card); }
+
+/* ── filling the screen without a Fullscreen API ──────────────────────────
+   demo/shell/fullscreen.mjs sets `.d-full` on BOTH paths and adds `.d-faux`
+   when it had to do the work itself — which on an iPhone is always, because
+   Safari there has no element fullscreen at all (only <video> can take the
+   screen, via webkitEnterFullscreen).
+
+   ⚠️ THESE ARE CLASSES AND NEVER `:fullscreen`. A browser that does not know
+   `:fullscreen` throws away the WHOLE selector list it appears in, so
+   `.pane:fullscreen, .pane.d-full { … }` would delete the fallback on exactly
+   the browsers that depend on it. One hook, set from script, both paths. */
+/* ⚠️ TWO CLASSES, AND THE REASON IS SPECIFICITY, NOT STYLE. A bare `.d-faux`
+   is (0,1,0) and loses to any page's own `.pane { position: relative }` — which
+   is (0,1,0) too, in a <style> block that comes after this file. MEASURED: the
+   cover applied its height and z-index, `.d-faux` was on the element, and the
+   pane stayed 338px wide because it was still a grid item. Scoping it under the
+   host class the same script already sets makes it (0,2,0) and it wins on
+   specificity rather than on where the stylesheet happens to sit. */
+.d-faux-host .d-faux {
+  position: fixed; inset: 0; z-index: 60;
+  width: 100%; height: 100dvh; max-width: none; margin: 0; border-radius: 0;
+}
+/* The page behind must not scroll under a cover that is only position:fixed,
+   and iOS will happily rubber-band it. */
+.d-faux-host, .d-faux-host body { overflow: hidden; overscroll-behavior: none; }
