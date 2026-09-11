@@ -96,8 +96,16 @@ export const JACK_SYNTHS = {
   // The box swaps between the two transparently when the effect is toggled.
   fluidjack: {
     needs: ['fluidsynth', 'jackd', 'ffmpeg'],
+    // ⚠️ `-s` (SERVER), OR IT LOADS THE SOUNDFONT AND EXITS 0. `-i` means "do
+    // not read commands from stdin", and without a shell to sit in and no MIDI
+    // file to play, fluidsynth has nothing left to do and quits — registering
+    // no JACK port, which is what the caller sees and is three steps from the
+    // cause. Measured on the board: with `-s` it registers fluidsynth:left and
+    // fluidsynth:right in under five seconds. The pipe path avoids this a
+    // different way, by keeping its shell open on stdin, which is also how it
+    // receives notes.
     spawn: (opt = {}) => spawn('fluidsynth', [
-      '-a', 'jack', '-m', 'alsa_seq', '-i',
+      '-a', 'jack', '-m', 'alsa_seq', '-i', '-s',
       '-o', 'audio.jack.id=fluidsynth',
       '-o', 'audio.jack.autoconnect=0',
       '-o', 'synth.lock-memory=0',
@@ -105,7 +113,8 @@ export const JACK_SYNTHS = {
       '-o', 'synth.gain=0.6',
       opt.soundfont || '/usr/share/sounds/sf2/FluidR3_GM.sf2',
     ], { stdio: ['ignore', 'pipe', 'pipe'] }),
-    portMatch: /^fluidsynth:/i,
+    portMatch: /^fluidsynth:left/i,
+    portMatch2: /^fluidsynth:right/i,
     alsaMatch: /fluid/i,
     osc: false,
   },
@@ -114,6 +123,10 @@ export const JACK_SYNTHS = {
     // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
     spawn: () => spawn('yoshimi', ['-i', '-a', '-J', '-b=256'], { stdio: ['ignore','pipe','pipe'] }),
     portMatch: /^yoshimi:left/i,
+    portMatch2: /^yoshimi:right/i,
+    // It appears on the graph well before it has read 911 instruments off the
+    // disk, so this is waited AFTER the port is there rather than instead of it.
+    settle: 6000,
     alsaMatch: /yoshimi/i,
     osc: false,
   },
@@ -151,6 +164,7 @@ export const JACK_SYNTHS = {
     // this board; the port check below is what actually decides.
     warmup: 5000,
     portMatch: /^err1965:capture_1$/,
+    portMatch2: /^err1965:capture_2$/,
     spawnAll: ({ hls, atSec = 0 } = {}) => [
       // ⚠️ `-stream_loop -1`, BECAUSE A BROADCAST ENDS. Measured: the source
       // went silent about six minutes in and everything downstream looked
@@ -416,18 +430,58 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
       onLog?.(`⚠ ${pr.spawnfile} exited (${sig ?? code}) — this source is no longer making sound`);
     });
   }
-  await wait(def.warmup ?? (name === 'yoshimi' ? 13000 : 6000));
+  // ⚠️ POLL FOR THE PORT; DO NOT SLEEP A GUESSED AMOUNT. This line used to be
+  // `await wait(def.warmup ?? 6000)` — and twenty lines above, about jackd,
+  // this same file already says why that is wrong: "2.5 s was enough on a warm
+  // board and not on a cold one, which is the worst kind of timing constant."
+  // The lesson was written down and not applied to the line below it.
+  //
+  // It cost nine and a half seconds on every switch to an instrument that was
+  // ready in one. MEASURED: a warm switch to fluidjack took 9540 ms against the
+  // pipe path's 725 ms, and almost all of it was 6000 + 2500 + 600 of sleeping.
+  // The warmup is now a CEILING rather than a duration.
+  //
+  // `settle` is for an instrument that registers its port before it can play —
+  // yoshimi loads 911 instruments across 24 banks after it appears on the graph
+  // — and it is waited only after the port is actually there.
+  const ceiling = def.warmup ?? (name === 'yoshimi' ? 13000 : 6000);
+  const t0port = Date.now();
+  let ready = false;
+  while (!ready && Date.now() - t0port < ceiling) {
+    ready = sh('jack_lsp 2>/dev/null').split('\n').some((p) => def.portMatch.test(p));
+    if (!ready) await wait(250);
+  }
+  onLog?.(ready ? `port up in ${Date.now() - t0port} ms` : `no port after ${ceiling} ms — carrying on so the failure is reported below`);
+  if (ready && def.settle) await wait(def.settle);
 
   // 3. capture — raw s16 on stdout, read straight into the frame pump
   const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', 'posbox',
     '-f', 's16le', '-ar', String(RATE), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
   procs.push(cap);
-  await wait(2500);
+  // Same again for the capture's own client, rather than 2.5 s of hoping.
+  const t0cap = Date.now();
+  while (Date.now() - t0cap < 8000) {
+    if (sh('jack_lsp 2>/dev/null').includes('posbox:input_1')) break;
+    await wait(200);
+  }
 
   // 4. wire the instrument's output into the capture client
   const port = sh('jack_lsp').split('\n').find((p) => def.portMatch.test(p));
   if (!port) { procs.forEach((p) => p.kill()); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
   sh(`jack_connect "${port}" posbox:input_1`);
+  // ⚠️ AND THE RIGHT CHANNEL, WHICH WAS GOING NOWHERE. `portMatch` finds ONE
+  // port, and for a stereo instrument that is the left one — so the capture was
+  // mono-LEFT rather than mono-SUM and everything panned right was silently
+  // absent. Measured on the same note through the same soundfont: the pipe path
+  // (which averages the two channels) read 2029 Hz, the JACK path 1661 Hz, an
+  // apparent 0.29-octave difference that was not the transport at all. Many
+  // ports into one input SUM in JACK, which is what mono-sum means.
+  let portR = null;
+  if (def.portMatch2) {
+    portR = sh('jack_lsp').split('\n').find((p) => def.portMatch2.test(p));
+    if (portR) sh(`jack_connect "${portR}" posbox:input_1`);
+    else onLog?.(`${name}: no right channel found — the capture is one channel of a stereo source`);
+  }
 
   // and patch the feeder into it. Pappus reads In.ar on the HARDWARE inputs,
   // which is what SuperCollider:in_1 is — private busses would have it
@@ -489,7 +543,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     return true;
   };
   return {
-    ok: true, source: name, port, alsaClient, midi: !!midiFd,
+    ok: true, source: name, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd,
     rate: RATE, msgPerSec: RATE / FRAME,
     noteOn: (ch, n, v) => midi([0x90 | (ch & 15), n & 127, v & 127]),
     noteOff: (ch, n) => midi([0x80 | (ch & 15), n & 127, 0]),

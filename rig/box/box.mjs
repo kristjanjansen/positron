@@ -71,6 +71,44 @@ let grainSource = null;
 let archiveNow = null;
 
 /**
+ * ⚠️ AN INFINITE LOOP AGAINST SOMEBODY ELSE'S CDN IS NOT A FEATURE.
+ *
+ * `-stream_loop -1` keeps the broadcast from ending, which is right while a
+ * person is listening — the box is an OBJECT rather than a SESSION and is meant
+ * to still be playing at three in the morning. But an archive source left
+ * running in an empty room pulls ERR's segments forever for nobody: about
+ * 28 MB an hour, continuously, from a public broadcaster we were already
+ * blocked by once today. "Still playing" and "still downloading" are the same
+ * act here, and only one of them is the point.
+ *
+ * So the archive — and ONLY the archive; a synth costs nobody anything — stops
+ * when the room has been empty for a while. The relay's own `/stats` answers
+ * how many sockets are in the room, and the box is one of them.
+ */
+const ARCHIVE_IDLE_MS = 5 * 60e3;
+let archiveWatch = null, aloneSince = null;
+function watchArchiveListeners() {
+  if (archiveWatch) return;
+  aloneSince = null;
+  archiveWatch = setInterval(async () => {
+    if (jsyn?.source !== 'archive') return stopArchiveWatch();
+    try {
+      const r = await fetch(`${RELAY.replace(/^ws/, 'http')}/room/${ROOM}/stats`, { cache: 'no-store' });
+      if (!r.ok) return;                       // cannot tell; do not act on a guess
+      const { sockets } = await r.json();
+      if (sockets > 1) { aloneSince = null; return; }
+      aloneSince ??= Date.now();
+      if (Date.now() - aloneSince < ARCHIVE_IDLE_MS) return;
+      log(`archive: nobody has been in ${ROOM} for ${Math.round(ARCHIVE_IDLE_MS / 60000)} min — stopping rather than streaming ERR to an empty room`);
+      send({ type: 'audio.stopped', source: 'archive', reason: 'nobody listening' });
+      stopAudio();
+    } catch { /* a failed poll is not a reason to stop the music */ }
+  }, 60e3);
+  archiveWatch.unref?.();
+}
+function stopArchiveWatch() { if (archiveWatch) { clearInterval(archiveWatch); archiveWatch = null; aloneSince = null; } }
+
+/**
  * Yoshimi's bank map, read once and re-read when Yoshimi rewrites it.
  *
  * The file is 660 KB of gzipped XML and a patch step asks for the bank number
@@ -171,7 +209,11 @@ async function startAudio(source = 'synth', msg = null) {
     // something already running got a reply with no port and no title — which
     // reads as "started, and playing nothing". A reply about a running source
     // must describe it as fully as the reply that started it.
-    if (running === source && source !== 'fluidsynth') {
+    // ⚠️ THE ARCHIVE IS NEVER "ALREADY RUNNING". Pressing 1965 again means
+    // "play me something else" — there are 543 of them and the one thing the
+    // button can do is choose. Short-circuiting here made a second press a
+    // no-op that reported success, which reads as a broken button.
+    if (running === source && source !== 'fluidsynth' && source !== 'archive') {
       return { ok: true, already: true, source: running, port: jsyn?.port ?? null,
                fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
     }
@@ -207,8 +249,10 @@ async function startAudio(source = 'synth', msg = null) {
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
     if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
+    if (source === 'archive') watchArchiveListeners();
     return { ok: true, source, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
-             fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
+             fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null,
+             idleStopMin: source === 'archive' ? ARCHIVE_IDLE_MS / 60000 : undefined };
   }
 
 
@@ -286,6 +330,8 @@ async function startAudio(source = 'synth', msg = null) {
 
 function stopAudio() {
   const was = jsyn ? jsyn.source : fluid ? 'fluidsynth' : stopSynth ? 'synth' : audio ? 'capture' : null;
+  stopArchiveWatch();             // nothing to watch once nothing is playing
+  archiveNow = null;
   aseq = 0;                       // a new source restarts the sequence
   if (jsyn) { jsyn.stop(); jsyn = null; }
   if (fluid) { fluid.stop(); fluid = null; }
