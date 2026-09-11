@@ -197,6 +197,14 @@ to recover.
 
 ## Platform facts
 
+- **The Ableton rig is PARKED (2026-09-11) and it is parked working — 11/11.**
+  Not broken, too heavy: six things must be true before a note sounds and
+  **four are Preferences clicks with no API**, including Live's audio output
+  device, which the Live Object Model cannot set. A capture started over ssh is
+  deaf, so its relay agent must live in a login session — the box is a service
+  that dials out on boot, this is a performance instrument you wake on purpose.
+  `rig/pro-instrument/README.md` has the measurements, the two traps and the
+  revisit order. `/rack/` stays live and reports silence AS silence.
 - **An avfoundation device INDEX is a shared mutable global, exactly like a
   fixed port.** `ffmpeg -f avfoundation -i ":0"` meant the microphone when
   `rig/pro-instrument/README.md` was written and means **BlackHole** today —

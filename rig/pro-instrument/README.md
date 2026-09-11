@@ -576,3 +576,105 @@ because AbletonOSC is already installed, enabled and MEASURED on this machine
 (0.063% worst clock error across four tempos), so the missing capability is
 forty lines rather than a second Remote Script plus an MCP server duplicating a
 working control path. Worth revisiting if the browser handler proves fragile.
+
+---
+
+# ⏸ PARKED 2026-09-11 — it works, and the setup is too heavy to keep warm
+
+Everything below was measured on the day it was parked. Nothing here is broken;
+the reason to stop is cost, not failure, and that distinction is the whole point
+of writing it down. **11/11 links pass.** `node rig/pro-instrument/live-check.mjs`
+re-runs the lot in about 25 seconds.
+
+## What is proven, so a revisit does not re-derive it
+
+- **The chain is real, end to end.** `midisend` → IAC Driver Bus 1 → Ableton
+  Live 11 → Arturia **Stage-73 V2** → Multi-Output → BlackHole 2ch → ffmpeg.
+  MEASURED: a held C major 7th reads **−29.1 dB peak / −46.8 dB mean** against a
+  **−91.0 dB** silence baseline recorded the same way seconds earlier — 61.9 dB
+  of separation, so it is not ambient noise and not a stuck meter. Before this,
+  `midisend.c` was half-verified: it built, it found the port, and **no note had
+  ever been confirmed reaching Live.** It has now.
+- **The clipping is fixed.** The track fader was at 0.85 (unity) and the same
+  chord peaked at **0.0 dB — full scale**. At **0.52** it peaks at −29.1 dB.
+  ⚠️ That is arguably too much headroom now: −6 to −12 dB is the usual target
+  for something about to be streamed, and −29 will sound thin next to anything
+  else. Somewhere around 0.65 is the thing to measure first on a revisit.
+- **Live needs no clicking to be readied**, except its audio OUTPUT device.
+  `live-setup.mjs` loads the instrument, routes the input, arms and sets
+  monitoring over OSC. The Live Object Model has **no audio-device API**, so
+  Preferences → Audio → Output stays manual. That is a permanent limit, not a
+  gap in the script.
+- **Playing it costs 6.00 ms over a direct peer link and 68.90 ms via the
+  relay** (2026-09-10, 100 alternating presses). Presses over 100 ms: **0 of 100
+  direct, 4 of 100 relayed.** Against `research/music-jamming`'s threshold —
+  under 25 ms one-way is real ensemble playing — the direct link is inside and
+  the relay is outside. **Relay for asking, direct link for playing.**
+
+## 🔴 Two traps this cost, both already paid for
+
+- **An avfoundation device index is a shared mutable global, exactly like a
+  fixed port.** `-i ":0"` meant the microphone when the section above was
+  written and means **BlackHole** today. Both read **−91.0 dB** — one reading
+  proves *"this capture is deaf"*, the other proves *"nothing is playing"*, and
+  they are opposite conclusions from an identical number. **This document's own
+  deafness control had been measuring the wrong device.** Resolve by NAME from
+  `-list_devices true`, every run; `live-check.mjs` does.
+- **`ssh localhost` is not "local".** The first run of `rack-agent.mjs` reported
+  *"the studio machine answers: no ssh to localhost"* — about the machine it was
+  running on. `PRO_SSH=local` runs commands directly, which also drops the
+  iTerm2 AppleEvent dependency entirely: the difference between *needs a
+  terminal window open* and *needs to be started once from one*.
+
+## ⚠️ Why it is parked: the setup is heavy, and here is exactly how heavy
+
+Six things must ALL be true before a single note sounds, and **four of them
+cannot be restored from this repo**:
+
+| what | restorable from the repo? |
+|---|---|
+| the Mac awake and not asleep | no — physical |
+| Ableton Live 11 open, with this set loaded | no |
+| AbletonOSC selected as a **Control Surface** (installed is not enough) | no — a Preferences click |
+| **Preferences → Audio → Output = BlackHole / Multi-Output** | no — no OSC API exists |
+| IAC Driver Bus 1 enabled for Track input | no — a Preferences click |
+| the instrument, routing, arm, monitoring | **yes** — `live-setup.mjs` |
+| `midisend` built | **yes** — `live-check.mjs` builds it |
+| the relay agent running in a login session | yes, but must be STARTED by hand |
+
+Compare the box: it is a service, it dials out on boot, and it survives a power
+cut unattended. This rig cannot — **a capture started over ssh is deaf**, so the
+agent has to live in somebody's login session. That is a real and permanent
+difference between the two instruments and it is the reason to park rather than
+to automate harder.
+
+**The honest summary: it is a performance instrument, not an always-on one.**
+Wake it deliberately for a session; do not expect `/rack/` to be green on a
+random Tuesday. The page is built for that — it reports silence AS silence.
+
+## To wake it again
+
+```sh
+# on the studio Mac, in a terminal window (NOT over ssh)
+cd ~/positron-rack && PRO_SSH=local node rack-agent.mjs --room pro-1
+
+# from anywhere
+node rig/pro-instrument/live-check.mjs          # LIVE_HOST=<ip> if remote
+open https://positron.studio/rack/
+```
+
+To stop it: `pkill -f rack-agent.mjs` on the Mac, or close the terminal window.
+`/rack/` then shows *"Nobody is answering"*, which is correct and is asserted.
+
+## If it is revisited, do these in this order
+
+1. **Re-measure the fader.** −29.1 dB is over-corrected; try 0.65 and read the
+   peak rather than computing it — Live's 0..1 volume is not linear in dB.
+2. **Shell `play.html`.** It is the actual instrument and it is still ungraded:
+   its own CSS, no `mount()`, and a dynamic `import('./moq-audio.mjs')` of a
+   file that does not exist beside it — which `build.mjs`'s import check would
+   refuse, correctly.
+3. **Decide the audio path before writing any more of it.** Direct peer link,
+   measured, not the relay. §"Playing it costs" above.
+4. **Leave the Preferences items alone.** Three of the six blockers are clicks
+   with no API. Automating around them is where this would get expensive.
