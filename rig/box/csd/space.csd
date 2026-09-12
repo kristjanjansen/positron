@@ -21,9 +21,20 @@
 ; where a SynthDef is compiled bytes. MEASURED: installing it pulled six
 ; packages and NO GUI toolkit, while SC's own sclang needs Qt offscreen.
 <CsOptions>
--+rtaudio=jack -+jack_client=positron-space -+jack_inportname=in -+jack_outportname=out
--i adc -o dac -B 512 -b 128 --sample-rate=48000 --nodisplays -d
+-+rtaudio=jack -+jack_client=positron-space -+jack_inportname=in_ -+jack_outportname=out_
+-i adc -o dac -B 2048 -b 128 --sample-rate=48000 --nodisplays -d
 </CsOptions>
+; ⚠️ `-B 2048`, AND IT IS NOT A TASTE. This said 512 and Csound REFUSED TO
+; START against the box's JACK server — `*** rtjack: buffer size (-B) is too
+; small`, then exit, with the orchestra compiling perfectly on the way past.
+; jackd is raised here with `-p 1024` and rtjack wants -B at least twice the
+; server's period. Measured on the board, same file, same server: -B 512 and
+; -B 1024 both refuse and register no port; -B 2048 registers all four in one
+; second. A file that compiles is not a file that runs.
+;
+; `jacksynth.mjs` re-computes this from `jack_bufsize` at spawn time and passes
+; it on the command line, where it wins over this line — so the number here is
+; the floor for the server we ship, not a constant anyone has to keep in step.
 <CsInstruments>
 sr      = 48000
 ksmps   = 64
@@ -36,10 +47,39 @@ nchnls  = 2
 ; re-patching JACK is what made `fx.pappus` answer `ok` seven seconds before
 ; anything could be heard.
 instr 1
+  ; Defaults at init, because a channel nobody has set yet reads 0 — and
+  ; `damp` 0 is a reverb with its top end shut, not a quiet one. The box sends
+  ; all four the moment it has proof the engine is listening, so these govern
+  ; only the first few milliseconds.
+  chnset    0.35, "mix"
+  chnset    0.5,  "room"
+  chnset    5000, "damp"
+  chnset    0,    "chorus"
+
   kmix    chnget "mix"        ; 0 dry .. 1 drenched
   kroom   chnget "room"       ; 0 small .. 1 cavernous
   kdamp   chnget "damp"       ; high-frequency loss in the tail, Hz
   kchorus chnget "chorus"     ; 0 off .. 1 wide
+
+  ; ⚠️ CLAMPED AT THE FAR END, which is here. The box clamps too, but the UDP
+  ; control port takes a number from anything on this machine, and `room` above
+  ; 1 puts the feedback over 0.95 — a tail that never decays, which is the drone
+  ; this whole file exists to get rid of. `damp` at 0 is a reverb with its top
+  ; end shut rather than a quiet one.
+  kmix    limit   kmix, 0, 1
+  kroom   limit   kroom, 0, 1
+  kdamp   limit   kdamp, 1000, 12000
+  kchorus limit   kchorus, 0, 1
+
+  ; ⚠️ THE PROOF THAT A KNOB REACHED A RUNNING ENGINE, not merely a socket.
+  ; The box writes a fresh number to `echo` and waits to read it back here.
+  ; This line runs in the performance loop, so the line only appears if the
+  ; orchestra is actually being performed — which is the exact thing a JACK
+  ; port cannot tell you, and the exact gap that made `fx.pappus` answer ok
+  ; seven seconds early.
+  kecho   chnget "echo"
+  kchg    changed kecho
+  printf  "SPACE ECHO %d\n", kchg, kecho
 
   al, ar  ins
 
@@ -60,6 +100,18 @@ instr 1
   awl, awr reverbsc apl, apr, kfb, kdamp
 
   outs    apl + (awl * kmix), apr + (awr * kmix)
+endin
+
+; The fallback probe: a short quiet burst, fired by the box over the same UDP
+; port the knobs use (`$i2 0 0.25`) and listened for on out_1. It proves the
+; engine is producing sound, and NOT that the input reaches the output — which
+; is why the box prefers to push a tone through in_1 with `jack_metro` and only
+; falls back to this where that tool is missing. Whichever it used is named in
+; the reply, so nobody has to guess which claim was made.
+instr 2
+  aenv    linseg  0, 0.01, 0.2, p3 - 0.02, 0.2, 0.01, 0
+  a1      oscili  aenv, 440
+  outs    a1, a1
 endin
 </CsInstruments>
 <CsScore>
