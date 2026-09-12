@@ -530,3 +530,110 @@ an afternoon, and it does not commit the project to shipping anything.
   CLAUDE.md's "measure the quantity in question, not one adjacent to it" —
   the v1 test could not have detected a v2 parsing failure, which is the only
   failure that mattered. Hence the converter.
+
+---
+
+## 8 · The oracle was run, and it is blocked on ONE thing (2026-09-13)
+
+§5 proposed a differential oracle: compile `SynthDef(\pappus)` on the board,
+`/d_recv` it into a browser, drive `mrate 0.5` against `24`. It was built and
+run. **The rig works and the def will not load.**
+
+**The board side is completely solved.** `sclang` on the Pi compiled the def the
+board actually runs — ✅ `LITE=false`, **2,780 UGens**, **118,597 bytes**,
+`SCgf` v2 — and the buffer table and buffer CONTENTS were dumped with it,
+because the compiled def hard-codes bufnums (`gbufl.bufnum` is a literal in the
+graph, not an argument):
+
+| | |
+|---|---|
+| buffers | 29, numbered 0–28 |
+| 0–3 | 2,880,000 frames, 1 ch — the grain rings |
+| 4 | 528,000 — the delay |
+| 5–9 | the shipped loops, 2 ch |
+| 10–26 | 17 × 256 — the grain WINDOWS |
+| 27–28 | 16 — the euclidean GATE |
+
+🔴 **Two hypotheses died here, and they are worth recording so nobody re-runs
+them.** ✅ `patbuf` reads **all 1s**, so the gate is fully OPEN and `melen = 1`
+reads index 0 and passes — **LESSONS #47 does not apply to this board.** And the
+envelope buffers are real raised cosines (254 of 256 non-zero, 0..1), so grains
+are not being multiplied by a zero window.
+
+**The browser side runs, with controls that prove it.**
+
+```
+init 687 ms · ctx 48000 Hz · state running
+29 buffers allocated   (b_alloc done 29, no failures)
+19 buffers filled with the board's own window and gate data
+CONTROL: the source, direct      rms 0.0568  peak -14.4 dBFS
+CONTROL: scsynth makes a sound   rms 0.0798  peak  -8.2 dBFS
+```
+
+Neither control is optional: without them "silence at every rate" and "this
+harness is deaf" are the same reading, which is the mistake that produced three
+"BlackHole is silent" readings in this project.
+
+🔴 **`/d_recv` of a large SynthDef does not register, and fails SILENTLY.**
+
+| def | bytes | result |
+|---|---|---|
+| the shipped v1→v2 converted one (§2.1) | 2,370 | ✅ `/done /d_recv`, plays |
+| `sonic-pi-beep` via `loadSynthDef` | small | ✅ `/supersonic/synthdef/loaded` |
+| **pappus LITE** (1,706 UGens) | **73,297** | ❌ nothing |
+| **pappus FULL** (2,780 UGens) | **118,597** | ❌ nothing |
+
+There is **no `/fail` on `/d_recv`** — no reply at all. The first thing the
+server says is `/fail "/s_new", "SynthDef not found"`, and then every parameter
+message answers `/fail "/n_set", "Node 1001 not found"`. Raising
+`scsynthOptions` (`realTimeMemorySize` 262144, `maxWireBufs` 2048,
+`maxGraphDefs` 2048) changed nothing, and all 29 buffers allocate cleanly, so it
+is not memory and not buffer count.
+
+⚠️ **And `loadSynthDef()` returns a SUCCESS OBJECT for a def the server never
+received** — `{"name":"pappus","size":118597}` — with no `synthdef/loaded`
+reply behind it. A green reply that is not evidence, the same shape as
+`fx.pappus` answering ok seven seconds before the engine existed. Do not trust
+its return value; watch for `/supersonic/synthdef/loaded`.
+
+### 8.1 The limit is in scsynth, not in the transport — measured both ways
+
+Bracketed with the package's own shipped defs, then repeated on the OTHER
+transport:
+
+| def | bytes | postMessage | SAB |
+|---|---|---|---|
+| `sonic-pi-fx_eq` | 8,584 | ✅ LOADED | ✅ LOADED |
+| `sonic-pi-stereo_player` | 11,296 | ✅ LOADED | ✅ LOADED |
+| `sonic-pi-fx_vowel` | 12,984 | ✅ LOADED | ✅ LOADED |
+| **pappus LITE** | **73,297** | ❌ no reply | ❌ no reply |
+| **pappus FULL** | **118,597** | ❌ no reply | ❌ no reply |
+
+🔴 **Identical on both transports, so it is NOT SuperSonic's message plumbing —
+it is the wasm scsynth's own OSC receive path.** Nothing on our side of the
+wire can raise it.
+
+⚠️ Getting to the SAB transport at all took two undocumented steps, both worth
+keeping: **`mode: 'sab'` has to be ASKED FOR** — with `crossOriginIsolated`
+true and `SharedArrayBuffer` present, SuperSonic still chose `postMessage` — and
+**`workerBaseURL` points at `supersonic-scsynth/dist/workers/`, not at
+`supersonic-scsynth-core/workers/`**, which holds only the audio worklet.
+Pointing it at core gives `OSC IN worker initialization timeout`, which is a
+loud failure and the good kind.
+
+**So the limit is between 12,984 B and 73,297 B** — 65,536 is the obvious
+constant — **and pappus LITE is only ~12% over it.**
+
+**What this closes and what it does not.** The oracle as designed cannot run on
+SuperSonic 0.81.0: the def does not fit, in either transport, and no option
+exposed by the package changes that. It is not a configuration mistake and it
+is not worth further guessing. What remains open is the same thing as before —
+whether the board's fault is in the SynthDef or in `pappus.mjs` → sclang — and
+it now needs a different instrument. The three that are left, cheapest first:
+a smaller graph compiled from a cut-down engine (breaks "the SynthDef is the
+asset", but would answer it); `scsynth` on the DEV MAC driven by the same
+`/n_set` values, which has no size limit at all and is the obvious next move;
+or reading the OSC buffer constant out of the wasm build and filing it upstream.
+
+**Superseded: the limit is no longer UNMEASURED inside that range.**
+
