@@ -604,6 +604,29 @@ counts against the last known total after any change.
   `git add -A`.
 - Secrets never reach a log. The publisher redacts at the point of capture, so a
   secret split across two stderr chunks is still caught.
+- 🔴 **THREE SENTENCES. A DESCRIPTION IS NOT AN ESSAY.** The rule below says
+  three or four and it kept being broken — `grains` shipped a `what` of FIVE
+  long sentences that explained the granulator, defended why it has its own
+  page, described the dice, and finished with what the board does unattended.
+  Nobody read it, and the page it described was called *"mambo jumbo"* by the
+  person it was written for. A visitor wants: what this is, what to press, what
+  the numbers mean. Say it and stop. **No history, no justification for a design
+  decision, no account of what it used to be** — that belongs in a comment, in
+  LESSONS.md, or in a commit message, all of which are read by somebody who
+  asked. If a sentence exists to defend the page rather than to use it, delete
+  it.
+- 🔴 **BUILD FROM `/kit/`, AND SAY SO WHEN YOU CANNOT.** Before writing any new
+  interface, look at what `demo/shell/` already has — slider, slider group,
+  stepper, choice, keyboard, MIDI, transport bar, logger — and use it. Hand-
+  rolling a control that exists is how three pages ended up with three different
+  radio rows and two different slider stacks, and the cost is not only the
+  duplication: `choice.mjs` and the slider group BOTH shipped emitting class
+  names no stylesheet matched, which is a bug that only happens to a control
+  nobody else uses. **If the thing you need is not in the kit, stop and ask** —
+  whether to add it as a component, or to lift something a page already has and
+  has not been componentised yet. Do not quietly build a fourth copy. A control
+  that exists in one page and nowhere else is a component that has not been
+  noticed yet, not a special case.
 - **Write for someone who does not work here.** Terse, but understandable —
   those are not in tension, and the old rule ("no explanatory prose, one line
   and a readout") produced pages that only their author could read. A demo page
