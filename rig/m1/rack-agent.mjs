@@ -2,7 +2,7 @@
 // a browser anywhere can ask without ssh, without OSC and without being on the
 // LAN.
 //
-//   node rig/pro-instrument/rack-agent.mjs --room pro-1
+//   node rig/m1/rack-agent.mjs --room pro-1
 //
 // ⚠️ RUN IT FROM A TERMINAL ON THE STUDIO MAC, not over ssh. live-check.mjs's
 // last two arms capture audio, and a capture started over ssh is deaf — the

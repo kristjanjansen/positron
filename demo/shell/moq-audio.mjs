@@ -17,7 +17,7 @@ export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
  * self-signed certificate for WebTransport if the page PINS it -- but Chrome
  * requires ECDSA P-256 and validity <= 14 DAYS, which is why the repo's old
  * ten-year auto.crt was refused with an error that never mentions validity.
- * `rig/pro-instrument/lan-relay.sh cert` mints a 10-day one and prints this hash.
+ * `rig/m1/lan-relay.sh cert` mints a 10-day one and prints this hash.
  */
 export function pinned(sha256hex) {
   const value = Uint8Array.from(sha256hex.match(/../g).map((h) => parseInt(h, 16)));

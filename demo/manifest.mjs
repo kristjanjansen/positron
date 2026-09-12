@@ -244,7 +244,7 @@ export const DEMOS = [
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing
-  // page (rig/pro-instrument/play.html) needs a peer with Ableton open, so it
+  // page (rig/m1/play.html) needs a peer with Ableton open, so it
   // is a dead link for a visitor; asking whether the rig is set up is a real
   // answer in BOTH states, and the interesting one is usually "it is not".
   //

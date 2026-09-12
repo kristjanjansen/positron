@@ -1,4 +1,4 @@
-# pro-instrument — play a machine in the next room
+# m1 — play a machine in the next room
 
 `synth.html` runs on the instrument machine; `play.html` runs on yours. Notes go
 up a direct peer-to-peer link, the sound is synthesised there and comes back on
@@ -6,11 +6,11 @@ the same connection. The Cloudflare relay carries ONLY the initial handshake.
 
     # on the instrument machine
     node demo/server.mjs
-    open http://127.0.0.1:8890/rig/pro-instrument/synth.html?room=proinst
+    open http://127.0.0.1:8890/rig/m1/synth.html?room=proinst
 
     # on yours
     node demo/server.mjs
-    open http://127.0.0.1:8890/rig/pro-instrument/play.html?room=proinst
+    open http://127.0.0.1:8890/rig/m1/play.html?room=proinst
 
 ## Measured, 2026-09-10, two Macs on one LAN
 
@@ -93,8 +93,8 @@ pure network; an echo makes the identical trip THROUGH the object.
 | the same trip through the Durable Object | **34.37 ms** | 38.99 ms | 60 |
 | **the Durable Object itself** | **0.18 ms** | | |
 
-**0.18 ms of 71 is a quarter of one percent.** A note to the Pro is TWO of those
-trips — out to the edge and down to the Pro, then the receipt back up and down
+**0.18 ms of 71 is a quarter of one percent.** A note to the M1 is TWO of those
+trips — out to the edge and down to the M1, then the receipt back up and down
 to me — so the prediction is 2 x 34.37 = **68.7 ms** against **71.00 ms**
 observed, the ~2 ms gap being the synth's own handling.
 
@@ -143,7 +143,7 @@ there is no clock offset anywhere in them.
 | WebRTC | **86 ms** | 91 ms | 30 |
 | **MoQ, relay on the LAN** | **29 ms** | 34 ms | 30 |
 
-with the receipt (the message telling the Pro to play) at **6.10 ms**, and MoQ
+with the receipt (the message telling the M1 to play) at **6.10 ms**, and MoQ
 decoding 3713 frames with **0 underruns**.
 
 **Three times faster, and the reason is the cushion, not the wire.** WebRTC's
@@ -353,7 +353,7 @@ back. 14 of 14 notes on both return paths.
 
 with the receipt at **7.50 ms** and MoQ decoding 4813 frames, **0 underruns**.
 
-    key press -> 7.5 ms -> the Pro -> Web MIDI -> IAC Bus 1
+    key press -> 7.5 ms -> the M1 -> Web MIDI -> IAC Bus 1
       -> Live / Drift -> Multi-Output -> BlackHole
       -> MoQ (LAN relay) -> 58 ms total
 
@@ -388,7 +388,7 @@ root (`plugins/Stage-73 V2` loads and its meter reads 0.787); the capture
 problem is solved (below); a jazz turnaround written over OSC plays and was
 captured off BlackHole at -10.5 dB with the microphone at -8.9 as its control.
 
-**`midisend.c` is the missing link and is HALF verified.** It builds on the Pro
+**`midisend.c` is the missing link and is HALF verified.** It builds on the M1
 with the Command Line Tools, finds `IAC Driver Bus 1` and reports ready — but
 nothing has yet confirmed a note reaching Live through it, because that needs
 the track armed with monitoring In, which is `live-box.mjs`'s job. **Do not
@@ -486,7 +486,7 @@ Everything below the MIDI line works. The audio return from Live does not yet.
 
 | link in the chain | state |
 |---|---|
-| key press → the Pro (direct link) | ✅ 6.10 ms typical |
+| key press → the M1 (direct link) | ✅ 6.10 ms typical |
 | Web MIDI → `IAC Driver Bus 1` | ✅ `midi out: IAC Driver Bus 1` |
 | Live: Drift, input IAC, armed, monitoring In | ✅ set over OSC, one command |
 | Live → Multi-Output → BlackHole | ✅ set by hand (Live's UI has no API) |
@@ -509,18 +509,18 @@ the work" — so the capture should be armed and NOT awaited by anything else.
 
 ### How to bring it all back up
 
-    # on the Pro
+    # on the M1
     cd ~/positron && git pull
     node demo/server.mjs &
     MOQ_IP=192.168.1.241 ~/lan-relay.sh run &          # fingerprint is printed
-    node rig/pro-instrument/launch-synth.mjs --ableton \
+    node rig/m1/launch-synth.mjs --ableton \
       --relay https://127.0.0.1:4443 \
       --relay-for https://192.168.1.241:4443 \
       --cert <fingerprint>
 
     # from the dev Mac
-    LIVE_HOST=192.168.1.241 node rig/pro-instrument/live-setup.mjs Drift 0
-    node demo/server.mjs        # then open /rig/pro-instrument/play.html?room=proinst
+    LIVE_HOST=192.168.1.241 node rig/m1/live-setup.mjs Drift 0
+    node demo/server.mjs        # then open /rig/m1/play.html?room=proinst
 
 `IAC` survives reboots (it is a plist flag). Live's audio output device survives
 reboots. Live's SET does not — `live-setup.mjs` rebuilds it.
@@ -583,7 +583,7 @@ working control path. Worth revisiting if the browser handler proves fragile.
 
 Everything below was measured on the day it was parked. Nothing here is broken;
 the reason to stop is cost, not failure, and that distinction is the whole point
-of writing it down. **11/11 links pass.** `node rig/pro-instrument/live-check.mjs`
+of writing it down. **11/11 links pass.** `node rig/m1/live-check.mjs`
 re-runs the lot in about 25 seconds.
 
 ## What is proven, so a revisit does not re-derive it
@@ -622,7 +622,7 @@ re-runs the lot in about 25 seconds.
   `-list_devices true`, every run; `live-check.mjs` does.
 - **`ssh localhost` is not "local".** The first run of `rack-agent.mjs` reported
   *"the studio machine answers: no ssh to localhost"* — about the machine it was
-  running on. `PRO_SSH=local` runs commands directly, which also drops the
+  running on. `M1_SSH=local` runs commands directly, which also drops the
   iTerm2 AppleEvent dependency entirely: the difference between *needs a
   terminal window open* and *needs to be started once from one*.
 
@@ -656,10 +656,10 @@ random Tuesday. The page is built for that — it reports silence AS silence.
 
 ```sh
 # on the studio Mac, in a terminal window (NOT over ssh)
-cd ~/positron-rack && PRO_SSH=local node rack-agent.mjs --room pro-1
+cd ~/positron-rack && M1_SSH=local node rack-agent.mjs --room pro-1
 
 # from anywhere
-node rig/pro-instrument/live-check.mjs          # LIVE_HOST=<ip> if remote
+node rig/m1/live-check.mjs          # LIVE_HOST=<ip> if remote
 open https://positron.studio/rack/
 ```
 

@@ -1,4 +1,4 @@
-// One driver for the Pro's OBS across all three transports.
+// One driver for the M1's OBS across all three transports.
 //
 //   node stream.mjs hls  [secs]    RTMPS -> Cloudflare live input -> LL-HLS
 //   node stream.mjs whip [secs]    WHIP  -> Cloudflare live input -> WHEP

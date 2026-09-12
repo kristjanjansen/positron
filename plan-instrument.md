@@ -1,6 +1,6 @@
 # plan-instrument — one instrument, two ends, shared parts
 
-Status: **not started.** Written 2026-09-10, out of building `rig/pro-instrument`
+Status: **not started.** Written 2026-09-10, out of building `rig/m1`
 beside the existing `instrument` demo and finding they share a subject and almost
 no code.
 
@@ -13,7 +13,7 @@ the one about shared modules.
 
 There are now **two instruments in this repo that do not know about each other**:
 `demo/instrument/` (play here, hear it in another browser) and
-`rig/pro-instrument/` (play here, a machine in the next room makes the sound and
+`rig/m1/` (play here, a machine in the next room makes the sound and
 sends it back). They duplicate the key mapping and the note plumbing, disagree
 about which keys are which notes, and only one of them can be played with a
 mouse or a finger.
@@ -25,7 +25,7 @@ because they are different claims and collapsing them would lose both.
 
 ## 1. What is actually duplicated, counted rather than assumed
 
-| piece | `demo/instrument` | `rig/pro-instrument` | verdict |
+| piece | `demo/instrument` | `rig/m1` | verdict |
 |---|---|---|---|
 | MIDI in/out | `shell/hardware.mjs` | its own `requestMIDIAccess` | **the shell already owns this** |
 | synth voices | `proto/looper/synth.mjs` (3 callers) | a hand-rolled triangle | shared already, wrong address |
@@ -36,12 +36,12 @@ because they are different claims and collapsing them would lose both.
 
 Two things stand out. **`hardware.mjs` already exists and already does the hard
 part** — one gesture buys sound and MIDI, and the capability is reported rather
-than thrown. `pro-instrument` re-implemented a worse version of it because it was
+than thrown. `m1` re-implemented a worse version of it because it was
 written as a rig, outside `demo/`, where the shell was not in reach.
 
 And **neither page has a reusable keyboard**. `instrument` has no on-screen keys
 at all, so it cannot be played on a phone or by a visitor who does not know the
-mapping; `pro-instrument` grew eight buttons in a `<div>` because it needed
+mapping; `m1` grew eight buttons in a `<div>` because it needed
 something to press. That is the component to build, and it is the one the user
 asked for.
 
@@ -56,7 +56,7 @@ The two pages answer different questions and both are worth having:
 - `instrument` asks *what crosses the wire when two people play together* — and
   its answer is that **note numbers cross, raw MIDI never leaves the page**, so
   the relay carries music rather than a device protocol.
-- `pro-instrument` asks *how late is the sound when the instrument is somewhere
+- `m1` asks *how late is the sound when the instrument is somewhere
   else* — and its answer is a table of four transports, 58 ms at best.
 
 Merging them into one page would force one paragraph to make both claims, and
@@ -86,7 +86,7 @@ createKeyboard(host, {
 
 Rules it has to obey, each from something already paid for:
 
-- **Black and white keys, drawn as a keyboard.** `pro-instrument`'s eight equal
+- **Black and white keys, drawn as a keyboard.** `m1`'s eight equal
   grey buttons cannot show that `w` is a black key, which is why its mapping
   drifted diatonic — the picture could not represent the chromatic one. Shape
   first, then the mapping can be the real one.
@@ -113,7 +113,7 @@ one caller is the same mistake with a different file name.
 
 ## 4. The other three moves, in order of how much they buy
 
-### P1 — `pro-instrument` uses `hardware.mjs` for MIDI
+### P1 — `m1` uses `hardware.mjs` for MIDI
 
 It re-implements `requestMIDIAccess` and picks a port by substring. `hardware.mjs`
 already does that, reports the capability rather than throwing, and is the thing
@@ -127,7 +127,7 @@ port it found.
 `createVoices` has three callers (`demo/instrument`, `demo/looper`,
 `proto/looper`) and lives in `proto/looper/`, which is a prototype directory.
 `build.mjs` enumerates `demo/shell/` and refuses an import with no deployed file;
-a shared synth belongs where that guard can see it. `pro-instrument` becomes the
+a shared synth belongs where that guard can see it. `m1` becomes the
 fourth caller and loses its hand-rolled oscillator — which matters beyond tidiness,
 because that oscillator's 450 ms decay is what let the onset detector re-arm, and
 Drift's sustain silently broke the measurement until the spacing was widened.
@@ -137,11 +137,11 @@ re-export, or is gone.
 
 ### P3 — one readout, `d.readout`
 
-`pro-instrument` hand-rolls its table because it is not a demo. If P4 happens it
+`m1` hand-rolls its table because it is not a demo. If P4 happens it
 gets `d.readout` for free; if it does not, it should at least use `shell.css`
 rather than a private copy of the same greys.
 
-### P4 — does `pro-instrument` become a demo?
+### P4 — does `m1` become a demo?
 
 **Argued, not assumed.** For:
 
@@ -184,7 +184,7 @@ Do not ship it as a demo that is dead without a second Mac.
   silently-dropped branch is how four asserts went missing while the suite read
   green (#13).
 - **Two key mappings will fight.** Pick the chromatic one — it is the one a
-  keyboard picture can show — and change `pro-instrument`'s eight buttons rather
+  keyboard picture can show — and change `m1`'s eight buttons rather
   than flattening `instrument` to a scale.
 - **Do not let the on-screen keyboard become a second source of truth for what
   is playing.** Lit keys come from note events, never from the press that caused
@@ -197,7 +197,7 @@ Do not ship it as a demo that is dead without a second Mac.
 
 1. One `shell/keyboard.mjs`, imported by both pages, playable with a mouse, a
    finger, the typing keys and a MIDI keyboard, with the same mapping on both.
-2. `pro-instrument` has no MIDI code and no synth code of its own.
+2. `m1` has no MIDI code and no synth code of its own.
 3. `createVoices` has one home, in `demo/shell/`, with four callers.
 4. Per-demo assert counts unchanged, or changed on purpose and diffed.
 5. Whatever ships as a demo is honest with one machine, and says in words what a

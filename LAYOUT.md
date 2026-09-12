@@ -16,7 +16,7 @@ measured price of "fixing" them, so nobody re-litigates it from scratch.
 | | runs on | holds |
 |---|---|---|
 | `demo/` | **a browser** | the demo pages, the shared browser library (`shell/`), the harnesses that drive them, and the dev server |
-| `rig/` | **hardware we own** | the Raspberry Pi (`box/`), its renderer (`vis/`), the studio Mac (`pro-instrument/`), tools that talk to them |
+| `rig/` | **hardware we own** | the Raspberry Pi (`box/`), its renderer (`vis/`), the studio Mac (`m1/`), tools that talk to them |
 | `workers/` | **Cloudflare** | `relay`, `view`, `pub`, `backlog`, `ingest` — one directory each |
 | `timeline/` | **anywhere** | the library: decks, scores, the strip. Imported by pages and by node |
 | `src/` | **a shell** | the publisher and its stream tooling |

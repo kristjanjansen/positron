@@ -31,5 +31,5 @@ show('armed', await ask('/live/track/get/arm', [TRACK]));
 show('monitoring', await ask('/live/track/get/current_monitoring_state', [TRACK]));
 show('devices', await ask('/live/track/get/devices/name', [TRACK]));
 console.log('\nStill manual: Live > Preferences > Audio > Output Device = BlackHole 2ch');
-console.log('(or a Multi-Output Device, if you also want to hear it on the Pro)');
+console.log('(or a Multi-Output Device, if you also want to hear it on the M1)');
 process.exit(0);

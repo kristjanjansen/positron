@@ -68,9 +68,13 @@ export const MACHINES = {
     ],
   },
 
-  pro: {
-    what: 'the MacBook that runs Ableton Live — PARKED, see rig/pro-instrument/README.md',
-    ssh: process.env.PRO_SSH_HOST || 'mbp',
+  m1: {
+    what: 'the M1 Pro MacBook that runs Ableton Live — PARKED, see rig/m1/README.md',
+    ssh: process.env.M1_SSH || 'mbp',
+    // ⚠️ `m1`, NOT `pro`. BOTH Macs here are "Pro" — MEASURED: the studio one is
+    // an Apple M1 Pro (MacBookPro18,3) and the machine this repo is edited on is
+    // an Apple M2 Pro. "the Pro" named neither of them unambiguously and was
+    // used for both.
     mac: true,
     // ⚠️ NOT RESTORABLE FROM THIS REPO, and that is the point of listing them.
     // Four of these are Preferences clicks with no API at all, which is why
@@ -87,7 +91,7 @@ export const MACHINES = {
     files: [
       ['~/positron-rack/live-check.mjs', 'the checkup; copied by hand, not deployed by anything'],
       ['~/positron-rack/rack-agent.mjs', 'answers rack.status over the relay. ⚠️ must be started from a terminal IN the login session — a capture started over ssh is deaf'],
-      ['/tmp/midisend',            'CoreMIDI sender, built from rig/pro-instrument/midisend.c. ⚠️ IN /tmp, so it does NOT survive a reboot — live-check.mjs rebuilds it'],
+      ['/tmp/midisend',            'CoreMIDI sender, built from rig/m1/midisend.c. ⚠️ IN /tmp, so it does NOT survive a reboot — live-check.mjs rebuilds it'],
     ],
   },
 };

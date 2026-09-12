@@ -304,7 +304,7 @@ Android, and Quest is on ~150 — but it is an inference.
 network access restrictions for WebTransport**
 ([chromestatus 5126430912544768](https://chromestatus.com/feature/5126430912544768)).
 A Quest on ~150 dialling a **LAN relay** meets a permission gate that did not
-exist when `rig/pro-instrument/lan-relay.sh` was written. Cloudflare's public
+exist when `rig/m1/lan-relay.sh` was written. Cloudflare's public
 relay is unaffected; a laptop on the same Wi-Fi is not.
 
 What matters more than any of this is that the project already built the probe.

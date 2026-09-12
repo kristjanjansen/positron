@@ -1,6 +1,6 @@
 // Serves the OBS source page and the test pattern to OBS's CEF.
 //
-// RUNS ON THE PRO, out of the Pro's own checkout of this repo, bound to
+// RUNS ON THE PRO, out of the M1's own checkout of this repo, bound to
 // 127.0.0.1. Two reasons it is local rather than fetched from the dev Mac:
 //
 //   · macOS Local Network Privacy is granted PER APP. A terminal process

@@ -308,7 +308,7 @@ it. Do not read the older sections below as current.
 
 ## Session 16 — one real encoder, three transports, and a picture read back at the far end
 
-**HANDOFF 0ad is discharged.** OBS on the Pro publishes to LL-HLS, WHEP and MoQ
+**HANDOFF 0ad is discharged.** OBS on the M1 publishes to LL-HLS, WHEP and MoQ
 from the SAME source, driven over obs-websocket from the dev Mac. `rig/obs-pro/`
 holds the rig: `stream.mjs hls|whip|moq|off` is the one driver, `shot.mjs` reads
 the burned clock out of OBS's own composited frame, `read-hls.mjs` reads it back
@@ -334,7 +334,7 @@ near 8 s. `keyint=60` gives **11 of 43**. Note OBS parses custom encoder setting
 half-applies.
 
 **Two blockers that do not announce themselves.** macOS **Local Network Privacy
-is per APP** — `curl` on the Pro got 200 where Chrome and OBS got
+is per APP** — `curl` on the M1 got 200 where Chrome and OBS got
 `ERR_ADDRESS_UNREACHABLE`, a black frame with nothing in any log; and
 **`BrowserHWAccel=true` renders every browser source black** on a Mac with no
 attached display. Both were separated from "my page is broken" by a
@@ -349,7 +349,7 @@ of this staleness class after the container image and `rig/obs-docker/clock.html
 `GetStreamServiceSettings`. Rotate `positron-demo`'s RTMPS key; see
 `SECRETS-ROTATION.md`.
 
-**And the Pro became an instrument you can play.** `rig/pro-instrument/` — notes
+**And the M1 became an instrument you can play.** `rig/m1/` — notes
 up a direct peer-to-peer link, synthesised there, sound back on the same
 connection; the relay carries only the handshake. The control-path A/B, same
 payload, alternating note by note, 60 each:
@@ -373,7 +373,7 @@ one, and the only console line was a favicon 404. I read "page returns 200 with
 the right URL" as "page works". `window.__play === undefined` is the check.
 
 **The Pro became a playable instrument, and then an Ableton bridge.**
-`rig/pro-instrument/` — notes up a direct peer link, sound back on the same
+`rig/m1/` — notes up a direct peer link, sound back on the same
 connection. **86 ms → 29 ms key→ear** once a **self-hosted MoQ relay** went on
 the LAN (`moq-relay-ietf`, built there in 90 s; 10-day ECDSA cert pinned by the
 page via `serverCertificateHashes`, because Chrome refuses anything over 14
@@ -1075,7 +1075,7 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    Matching it would mean giving up the quotation, which is why this compiler
    exists. That is a decision to take, and it is bigger than 0aa was.
 
-0ac. **`workers/pub`'s container image is still stale, and the Pro now makes it
+0ac. **`workers/pub`'s container image is still stale, and the M1 now makes it
    easy.** It draws the pre-session-12 test pattern, so a browser frame and a
    container frame are two different pictures and any comparison between them is
    void. The Pro has `ffmpeg@7` with `drawtext`/libfreetype CONFIRMED, which is
@@ -1084,7 +1084,7 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    `positron-obscloud`, `positron-obscloud-quic` and `positron-cnt-test` do not
    exist on it at all, so there is no CF OBS container to tear down.
 
-0ad. ~~**OBS on the Pro is ready and obs-moq is loaded.**~~ **DONE 2026-09-10 —
+0ad. ~~**OBS on the M1 is ready and obs-moq is loaded.**~~ **DONE 2026-09-10 —
    see the session 16 section above.** All three transports run from one encoder
    off one source, `rig/obs-pro/stream.mjs hls|whip|moq`. What is NOT done is the
    comparison itself: **`moq.positron.studio` samples the pre-session-12 row**, so
@@ -1132,10 +1132,10 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 0. ~~**Measure min-RTT clock skew over a REAL LINK.**~~ **DONE 2026-09-10.**
    Two real machines, 455 samples each over 180 s, through the deployed relay
-   (`rig/pro-instrument/skew.mjs`, which runs in node because `peer.mjs` needs
+   (`rig/m1/skew.mjs`, which runs in node because `peer.mjs` needs
    only WebSocket and performance).
 
-   | | dev Mac | the Pro |
+   | | dev Mac | the M1 |
    |---|---|---|
    | min round trip | 64.011 ms | 61.937 ms |
    | p50 / p95 | 80.96 / 107.26 | 83.02 / 107.00 |
@@ -1160,7 +1160,7 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
 
 
    **Confirmed independently, and it changes what to DO about it.** Each machine
-   against Apple's time server: dev **+66.6 ms**, the Pro **+121.7 ms**, a
+   against Apple's time server: dev **+66.6 ms**, the M1 **+121.7 ms**, a
    difference of **55.1 ms** against the 57 ms the peer-to-peer estimator
    measured. Two unrelated methods agreeing to ~2 ms. (The per-sample ± is ~25 ms,
    so that is corroboration, not a second decimal place.)

@@ -13,7 +13,7 @@
 // about the ENCODING, one that helps only over distance is about the PATH.
 import { spawn, execFileSync } from 'node:child_process';
 
-const HOST = process.env.PRO_HOST || 'mbp';
+const HOST = process.env.M1_HOST || 'mbp';
 const LAN_RELAY = 'https://192.168.1.241:4443';
 const LAN_PUB = 'https://127.0.0.1:4443';
 const CERT = process.env.MOQ_CERT || '816dec73811a251e2ab4eae785c1641f5c319e2b31e51f44e2c284b6f297f5cd';
@@ -33,7 +33,7 @@ function launch(cfg, relay) {
   if (relay === 'lan') args.push('--relay', LAN_PUB, '--relay-for', LAN_RELAY, '--cert', CERT);
   const remote = `export PATH=/opt/homebrew/bin:$PATH; cd ~/positron
     pkill -f 'pro-synth-udd' 2>/dev/null; pkill -f launch-synth 2>/dev/null; sleep 2
-    nohup node rig/pro-instrument/launch-synth.mjs ${args.join(' ')} > /tmp/bridge.log 2>&1 &
+    nohup node rig/m1/launch-synth.mjs ${args.join(' ')} > /tmp/bridge.log 2>&1 &
     sleep 14; grep -cE 'audio in:' /tmp/bridge.log`;
   const out = execFileSync('ssh', ['-o', 'BatchMode=yes', HOST, remote], { encoding: 'utf8' }).trim();
   return out.endsWith('1');           // the capture line is the readiness signal
@@ -44,7 +44,7 @@ async function measure(notes = 12, gap = 1300) {
   const udd = `/private/tmp/sweep-udd-${port}`;
   const ch = spawn(CHROME, ['--headless=new', `--user-data-dir=${udd}`, '--no-first-run',
     '--autoplay-policy=no-user-gesture-required', `--remote-debugging-port=${port}`,
-    'http://127.0.0.1:8890/rig/pro-instrument/play.html?room=proinst'], { stdio: 'ignore' });
+    'http://127.0.0.1:8890/rig/m1/play.html?room=proinst'], { stdio: 'ignore' });
   const p = port++;
   await sleep(8000);
   let ws;
