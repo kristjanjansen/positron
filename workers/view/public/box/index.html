@@ -112,6 +112,13 @@
   // ◀ ▶ then the die: stepping and rolling are different gestures, and the two
   // arrows read as a pair when nothing sits between them.
   fxWrap.append(step.el);
+  // ⚠️ ATTACHED HERE. The line that put `fxWrap` into the row lived inside the
+  // granulator block that was removed, so `picks.insertBefore(b, fxWrap)` threw
+  // — "the node before which the new node is to be inserted is not a child of
+  // this node" — at module scope, before a single instrument button was drawn.
+  // A page with a readout of dashes and one error line, which is what a cut
+  // that takes a neighbour's setup line with it looks like.
+  picks.append(fxWrap);
   // A press is what makes the patch line true — see showPatch().
 
   const patchLine = el('p', 'patch', '—');

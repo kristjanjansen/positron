@@ -70,7 +70,7 @@ body {
 .d-v[data-state="pending"] { color: var(--dim2); }
 .d-v[data-state="ok"]   { color: var(--ok); }
 .d-v[data-state="bad"]  { color: var(--bad); }
-.d-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 3px; }
+.d-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 1.5px; }
 
 /* ── controls ─────────────────────────────────────────────────────────── */
 .d-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
@@ -158,15 +158,24 @@ button.d-pri[data-busy="1"] {
 }
 
 /* ── log ──────────────────────────────────────────────────────────────── */
+/* ⚠️ A GRID, SO A LONG LINE WRAPS INSIDE ITS OWN COLUMN. As one padded string
+   a message longer than the box wrapped back to column zero — the continuation
+   sat under the TIMESTAMP and read as a new entry that had lost its time.
+   `auto 1fr` keeps every continuation under the message it belongs to. */
 .d-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   padding: 10px 12px; max-height: 150px; overflow-y: auto; margin: 0;
-  white-space: pre-wrap; word-break: break-word;
+  display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-content: start;
 }
 .d-log:empty { display: none; }
-.d-log b { color: var(--fg); font-weight: 500; }
-.d-log i { color: var(--bad); font-style: normal; }
+.d-line { display: contents; }
+.d-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.d-m { min-width: 0; overflow-wrap: anywhere; }
+.d-line.hi .d-m, .d-log b { color: var(--fg); font-weight: 500; }
+.d-line.bad .d-m, .d-log i { color: var(--bad); font-style: normal; }
+.d-line.warn .d-m { color: var(--warn); }
+.d-line.ok .d-m { color: var(--ok); }
 
 /* ── transport bar ────────────────────────────────────────────────────── */
 /* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
@@ -489,7 +498,10 @@ video[hidden] { display: none; }
 .sld-lane[aria-disabled] { opacity: .4; cursor: default; }
 .sld-v {
   font: 500 12px/1 var(--mono); color: var(--fg);
-  font-variant-numeric: tabular-nums; min-width: 4.2em; white-space: nowrap;
+  /* `min-width` is set per slider from its own widest possible value — see
+     slider.mjs. `tabular-nums` is what makes that width exact: without it a 1
+     is narrower than a 0 and the number still shifts inside its reserved box. */
+  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;
 }
 
 /* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────

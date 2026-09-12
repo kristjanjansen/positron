@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'f858fff-130139';
+export const BUILD = '9cf423b-142429';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -127,9 +127,14 @@ export function mount({
     const line = { t: performance.now(), msg: String(msg), kind: kind || 'info' };
     api.logs.push(line);
     if (api.logs.length > LOG_CAP) api.logs.shift();
-    const tag = kind === 'bad' ? 'i' : kind === 'hi' ? 'b' : 'span';
-    const row = document.createElement(tag);
-    row.textContent = `${(line.t / 1000).toFixed(2).padStart(7)}  ${line.msg}\n`;
+    // ⚠️ THREE CELLS, NOT ONE PADDED STRING. A line was time + text in one
+    // node, so a message longer than the box wrapped back to COLUMN ZERO — the
+    // continuation started under the timestamp and read as a new entry with no
+    // time. Photographed on `mirror`: "…spans 157" then "of 255" hanging off
+    // the left margin. A grid gives the message its own column to wrap inside.
+    const row = el('span', `d-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
+    row.append(el('span', 'd-t', (line.t / 1000).toFixed(2)));
+    row.append(el('span', 'd-m', line.msg));
     logEl.append(row);
     logEl.scrollTop = logEl.scrollHeight;
   }
