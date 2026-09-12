@@ -574,6 +574,85 @@ video[hidden] { display: none; }
 .pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
 .pos-choice button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
 
+/* ── message list ─────────────────────────────────────────────────────────
+   demo/shell/messages.mjs. One renderer for live traffic and for a history of
+   the same messages — they used to be a gutter row and a <pre> of raw lines,
+   so one message looked like two unrelated things depending on the pane.
+
+   ⚠️ FIXED GUTTERS, FLUID TEXT, AND EVERYTHING WRAPS. An ellipsis here would
+   hide the one thing the page exists to show. */
+.pos-msgs { font: 400 11px/1.55 var(--mono); }
+.pos-msgs-row {
+  display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #ffffff08;
+}
+.pos-msgs-row:last-child { border-bottom: 0; }
+.pos-msgs-dir { width: 44px; flex: none; color: var(--dim2); }
+.pos-msgs-dir.out  { color: var(--hi); }
+.pos-msgs-dir.echo { color: var(--ok); }
+/* Rows that were already in the history when this tab arrived — they have no
+   direction, because nobody here sent them. */
+.pos-msgs-dir.stored { color: var(--dim2); }
+.pos-msgs-sz { width: 46px; flex: none; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
+/* Always the same width whether or not it says anything, so the eye reads a
+   column instead of hunting for marks. */
+.pos-msgs-store { width: 46px; flex: none; color: var(--dim2); }
+.pos-msgs-store.yes { color: var(--ok); }
+.pos-msgs-txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pos-msgs-txt[data-hi] { color: var(--fg); }
+.pos-msgs-empty { color: var(--dim2); padding: 3px 0; }
+
+/* ── picker: step, or jump straight to one by name ────────────────────────
+   demo/shell/picker.mjs. ‹ | Brass 1 ▾ | ›   ⚅
+
+   ⚠️ THE `<select>` IS INVISIBLE, NOT ABSENT. It lies over the name cell at
+   opacity 0 and full size, so a press opens the PLATFORM's list — which
+   scrolls, type-aheads, keyboards and becomes a proper sheet on a phone — while
+   the closed state is drawn by us in the row's own mono face. A native select
+   left visible brings a macOS bevel and an iOS sheet button into a row of flat
+   mono buttons, which is the whole reason this is not just a `<select>`.
+
+   ⚠️ FIXED WIDTH. `--pick-w`, and long names ellipsize. A cell that sizes to
+   its text moves the arrows and the die every time you step, so the control you
+   are about to press again is not where it was. */
+.pos-pick { display: inline-flex; align-items: center; gap: 8px; height: 34px; --pick-w: 13ch; }
+.pos-pick-l {
+  font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--dim2); flex: none;
+}
+.pos-pick-cell {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  width: var(--pick-w); height: 34px; padding: 0 10px; box-sizing: border-box;
+  font: 500 13px/1 var(--mono); color: var(--fg);
+  background: var(--card2); border: 1px solid var(--line2);
+  border-radius: 0; margin-left: -1px; cursor: pointer;
+  -webkit-touch-callout: none; touch-action: manipulation;
+}
+.pos-pick-n {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.pos-pick-caret { color: var(--dim2); font-size: 10px; flex: none; }
+/* Nothing to choose between: the caret would promise a list that is not there. */
+.pos-pick-cell[data-flat="1"] { cursor: default; }
+.pos-pick-cell[data-flat="1"] .pos-pick-caret { display: none; }
+/* The real control, over the whole cell and invisible. `appearance: none` keeps
+   Safari from drawing its own box THROUGH the zero opacity on some versions. */
+.pos-pick-sel {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; appearance: none; -webkit-appearance: none;
+  border: 0; padding: 0; margin: 0; font: inherit;
+}
+.pos-pick-sel:disabled { cursor: default; }
+/* Focus lands on the select, so the ring has to be drawn on the cell around it.
+   Grey, never `--hi` — green means armed here and nothing else. */
+.pos-pick-cell:has(.pos-pick-sel:focus-visible) { outline: 2px solid var(--dim2); outline-offset: 2px; z-index: 1; }
+.pos-pick-cell:hover { position: relative; z-index: 1; border-color: var(--line2); }
+/* ⚠️ A GAP, SO IT IS NOT A FOURTH STEP. The die is a different kind of move
+   from ‹ and ›, and joining it to them says it is the same kind. */
+.pos-pick-die { margin-left: 4px; border-radius: 4px; }
+/* The pips are SVG, so there is no font to fall back from — see picker.mjs. */
+.pos-pick-die { display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.pos-pick-die svg { display: block; }
+
 .step { display: inline-flex; align-items: center; height: 34px; }
 .step button { border-radius: 0; margin-left: -1px; }
 .step button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
