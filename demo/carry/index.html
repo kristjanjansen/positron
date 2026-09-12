@@ -13,6 +13,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'carry-demo';
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
@@ -23,7 +24,7 @@
   const d = mount({
     name: 'carry',
     what: 'Press a key and the sound you hear has been to a server and back. This page makes no sound of its own: it synthesises an electric piano, sends the raw samples out over a socket, and plays only what the server returns — so the delay is the trip, and you are listening to it rather than reading it. Raw samples, not a compressed stream, because the socket has bandwidth to spare and compressing costs more than it saves.',
-    readout: { out: '', back: '', lost: '', rate: 'kbit/s', trip: 'ms' },
+    readout: { out: '', back: '', lost: '', rate: 'kbit/s', trip: 'ms', midi: '' },
     controls: [
       { id: 'start', label: 'Start and connect', primary: true },
       { id: 'phrase', label: 'Play a phrase' },
@@ -49,6 +50,23 @@
       synth.port.postMessage({ on: note, vel: 100 });
     },
     onUp: (note) => kb.lightNote(note, false),
+  });
+
+  // A real keyboard plays this the same way the screen does — one path, so the
+  // round trip being measured is the same round trip either way. The component
+  // carries the velocity-0-is-a-note-off rule, which is the thing a first MIDI
+  // implementation always gets wrong.
+  const midi = createMidi({
+    onDown: (note, vel) => {
+      if (!kb.keyOf(note)) return;              // outside the drawn range
+      kb.lightNote(note, true);
+      if (!synth) { noteLine.textContent = 'press "Start and connect" first'; return; }
+      pending = { t0: performance.now() };
+      synth.port.postMessage({ on: note, vel });
+    },
+    onUp: (note) => kb.lightNote(note, false),
+    log: (line, kind) => d.log(line, kind),
+    onPorts: (n) => d.set('midi', n || midi?.state?.() || 'none'),
   });
 
   /**

@@ -39,6 +39,7 @@
   /* One row, two groups. They sit ABOVE both pictures because they change both
      — a control that belongs to one pane goes in that pane's bar, and these do
      not. */
+  .lookname { font: 500 11px/1.5 var(--mono); color: var(--hi); margin-left: 9px; }
   .knobs { display: flex; flex-wrap: wrap; gap: 22px; align-items: center; margin: 18px 0 16px; }
   .knob { display: flex; align-items: center; gap: 8px; }
   /* ⚠️ THE SAME KEY STYLE AS THE READOUT, copied from shell.css's `.d-k` rather
@@ -130,6 +131,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
   import { toggle as toggleFull, watch as watchFull, support as fullSupport } from '/shell/fullscreen.mjs';
   import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
 
@@ -152,11 +154,7 @@
     // you to press something is a page that shows you nothing. That removes
     // this project's usual harness hook, so demo/verify-gl.mjs waits for
     // `__demo.ready` and reads the asserts rather than pressing buttons.
-    // ⚠️ ONE CONTROL, AND IT IS THE ARGUMENT OF THE PAGE. The knobs change
-    // numbers a shader reads; this replaces the shader itself, on both machines,
-    // from one text — which is the thing this demo exists to show and was until
-    // now only reachable by sending a message by hand.
-    controls: [{ id: 'look', label: 'Next look' }],
+    controls: [],
   });
   guard(d);
 
@@ -293,6 +291,56 @@
     knobRow.append(wrap);
   }
 
+  // 🔴 IN `.d-controls`, AND THAT IS NOT A LAYOUT PREFERENCE. It sat in the
+  // knob row for one revision and the assert count went 9 -> 7 while the page
+  // read GREEN: `verify.mjs` presses `.d-controls button, .tbar-x` and nothing
+  // else, so a control anywhere else is never exercised and its asserts never
+  // run. That is this project's oldest failure — a green suite over a path the
+  // suite cannot reach — committed by moving a button.
+  //
+  // It is a STEPPER rather than a "next" because a list you can only walk
+  // forwards through is one you have to go all the way round to revisit.
+  {
+    const wrap = el('span', 'knob');
+    wrap.append(el('span', '', 'LOOK'));
+    const jump = (to) => {
+      lookAt_ = (to + LOOKS.length) % LOOKS.length;
+      const { name, body } = LOOKS[lookAt_];
+      lookName.textContent = name;
+      const okHere = window.__applyShader(body);
+      d.log(`“${name}” — ${okHere ? 'fading in here' : 'refused here'}`);
+      const open = ctl?.readyState === 1;
+      let sent = false;
+      if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
+      d.assert('the new look compiled in this browser', okHere, name);
+      d.assert('and the same body went to the box, when there is one',
+        sent || !open, open ? (sent ? 'sent' : 'the socket refused it') : 'no board in the room, so nothing to send');
+    };
+    const step = createStepper({
+      what: 'look',
+      prev: () => jump(lookAt_ - 1),
+      next: () => jump(lookAt_ + 1),
+      random: () => jump(Math.floor(Math.random() * LOOKS.length)),
+    });
+    // ⚠️ EMPTY HERE, FILLED WHERE `LOOKS` EXISTS. The shader sources are
+    // declared BELOW this row, so reading `LOOKS[0].name` at build time is a
+    // temporal dead zone — `Cannot access 'LOOKS' before initialization`, at
+    // module scope, which means a blank page with no asserts and no log line
+    // saying why. This file's own comments already record two of these; this
+    // is the third.
+    //
+    // A stepper with no readout is three buttons and a guess about which of
+    // four you are looking at, so the label still has to exist — it is just
+    // named a few lines later.
+    var lookName = el('span', 'lookname', '');
+    const seg2 = el('div', 'seg');
+    seg2.append(step.el);
+    wrap.append(seg2, lookName);
+    const row = document.querySelector('.d-controls');
+    if (row) { row.style.display = 'flex'; row.style.alignItems = 'center'; row.append(wrap); }
+    else knobRow.append(wrap);
+  }
+
   // ⚠️ AFTER the row is built. `const knobRow` is in the temporal dead zone
   // until its declaration runs, so inserting it earlier throws before anything
   // is drawn — and a page that throws at module scope shows a blank frame with
@@ -344,23 +392,6 @@
    * somebody typed a semicolon wrong, on a demo whose entire job is to be
    * looked at.
    */
-  d.on('look', async () => {
-    lookAt_ = (lookAt_ + 1) % LOOKS.length;
-    const { name, body } = LOOKS[lookAt_];
-    const okHere = window.__applyShader(body);
-    d.log(`“${name}” — ${okHere ? 'fading in here' : 'refused here'}`);
-    // The SAME body to the board, which compiles it as 310 es.
-    // ⚠️ `send` throws on a closed socket rather than returning false, and a
-    // page with no board in the room is the ordinary case — so the state is
-    // read before the attempt rather than inferred from whether it blew up.
-    const open = ctl?.readyState === 1;
-    let sent = false;
-    if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
-    d.assert('the new look compiled in this browser', okHere, name);
-    d.assert('and the same body went to the box, when there is one',
-      sent || !open, open ? (sent ? 'sent' : 'the socket refused it') : 'no board in the room, so nothing to send');
-  });
-
   function choose(key, idx) {
     const k = KNOBS[key];
     k.at = idx;
@@ -506,6 +537,8 @@
         o = vec4(mix(c*0.8, fb, min(0.93, uFb+0.12)), 1.0); }` },
   ];
   let lookAt_ = 0;
+  // Now that LOOKS exists, say which one is running. See the note by lookName.
+  if (typeof lookName !== 'undefined' && lookName) lookName.textContent = LOOKS[0].name;
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
