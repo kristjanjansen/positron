@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+
+  const d = mount({
+    name: 'cloud',
+    what: 'This page holds the last few seconds of sound and replays them as hundreds of short overlapping fragments, all of it made here rather than fetched. The picture underneath is every one of those fragments: across is when it played, up is where in the held seconds it read from, and each mark is filled because the thing that started it said so rather than being guessed from the sound. Density is how much the fragments overlap — under one they leave gaps you hear as stuttering, around three they fuse into a cloud.',
+    // Six cells, all of which move. `overlap` is the one to steer by: it is
+    // density x length, and it is the difference between a stutter and a cloud.
+    readout: { overlap: '', grains: '/s', 'at once': '', held: 's', measured: '', late: 'ms' },
+    controls: [
+      { id: 'check', label: 'Check it', primary: true },
+      { id: 'freeze', label: 'Freeze what it is holding' },
+    ],
+  });
+  guard(d);
+
+  const RATE = 48000;
+  let ctx = null, node = null, src = null, gain = null, osc = [], scope = null;
+  let stats = { live: 0, fired: 0, heldSec: 0, overlap: 0 }, firedAt = [], lateMs = 0;
+
+  // ── the sound going in ───────────────────────────────────────────────────
+  // 🔴 THE PAGE MAKES ITS OWN, and that is deliberate. `grains` needs a
+  // Raspberry Pi, a relay and an instrument to be up before it can show
+  // anything, and when one of those is wrong the page cannot tell you which.
+  // A granulator with nothing to chew is not a granulator, so this one carries
+  // its own material and works with the network unplugged.
+  const CHORD = [48, 55, 60, 64, 67, 72];
+  const SOURCES = [
+    ['a held chord', 'chord'],
+    ['the microphone', 'mic'],
+  ];
+  let source = 'chord';
+
+  async function startAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on — `resume()` waits on a gesture and NEVER rejects, so
+    // awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => {});
+    await ctx.audioWorklet.addModule('/shell/granular-worklet.js');
+    node = new AudioWorkletNode(ctx, 'granular', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      processorOptions: { bufferSeconds: 8 },
+    });
+    node.port.onmessage = (e) => {
+      const m = e.data || {};
+      if (m.stats) stats = m.stats;
+      // ⚠️ EVERY GRAIN, FROM THE THING THAT STARTED IT. This is the whole
+      // argument for doing it here: the board can only ever send audio, and a
+      // grain inferred from audio might be a note, a delay tap or a reverb
+      // swell. These are not inferred.
+      if (m.grains?.length) { scope.marks(m.grains); firedAt.push({ t: performance.now(), n: m.grains.length }); }
+      if (firedAt.length > 200) firedAt.splice(0, firedAt.length - 200);
+    };
+    gain = ctx.createGain(); gain.gain.value = 0.9;
+    node.connect(gain).connect(ctx.destination);
+    await pickSource(source);
+    apply();
+  }
+
+  /** Whatever is being chewed is just a node into the worklet's input. */
+  async function pickSource(which) {
+    source = which;
+    for (const o of osc) { try { o.stop(); } catch {} }
+    osc = [];
+    if (src) { try { src.disconnect(); } catch {} src = null; }
+    if (which === 'mic') {
+      try {
+        const ms = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+        src = ctx.createMediaStreamSource(ms);
+        src.connect(node);
+        d.log('granulating the microphone — the held seconds are whatever it heard', 'hi');
+      } catch (e) {
+        d.log(`no microphone (${e.name}) — staying on the chord`, 'warn');
+        source = 'chord'; srcPick.set(0, true); return pickSource('chord');
+      }
+      return;
+    }
+    // A chord rather than one note: a granulator reading one sine is a
+    // granulator you cannot hear working.
+    const mix = ctx.createGain(); mix.gain.value = 0.16;
+    for (const n of CHORD) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 440 * Math.pow(2, (n - 69) / 12);
+      const g = ctx.createGain(); g.gain.value = 1 / CHORD.length;
+      o.connect(g).connect(mix); o.start(); osc.push(o);
+    }
+    mix.connect(node);
+    src = mix;
+  }
+
+  // ── the controls ─────────────────────────────────────────────────────────
+  // 🔴 DENSITY AND LENGTH, NOT RATE AND SIZE. Overlap is rate x length, and it
+  // is the parameter a listener actually hears: under 1 there are gaps between
+  // grains, 2-4 is a smooth cloud, over 8 is mush. Exposing rate and size as
+  // two free sliders means most of the rectangle you can drag to is one of the
+  // two bad regions — which is LESSONS #59 one level down, where nine sliders
+  // turned out to describe one surface that mostly sounded the same. Here you
+  // steer the thing you can hear and the page does the arithmetic.
+  const P = { overlap: 3, sizeMs: 120, scan: 0.5, spray: 0.06, pitch: 0, pan: 0.8 };
+
+  function apply() {
+    const rate = Math.max(0.2, P.overlap / (P.sizeMs / 1000));
+    node?.port.postMessage({
+      cmd: 'set', rate, sizeMs: P.sizeMs, scan: P.scan, spray: P.spray,
+      pitch: Math.pow(2, P.pitch / 12), pan: P.pan, level: 0.7, follow: 1,
+    });
+    // What the settings IMPLY, drawn as an outline so it can never be mistaken
+    // for what happened.
+    scope?.expect({ rate, sizeMs: P.sizeMs, scan: P.scan, spray: P.spray });
+    d.set('overlap', P.overlap.toFixed(2), P.overlap < 1 ? 'warn' : 'ok');
+    d.set('grains', Math.round(rate));
+  }
+
+  const srcPick = createChoice({
+    label: 'chewing', options: SOURCES,
+    onPick: async (v) => { await startAudio(); await pickSource(v); },
+  });
+  const pickRow = el('div', 'pos-controls');
+  pickRow.append(srcPick.el);
+  d.el.append(pickRow);
+
+  scope = createGrainScope(d.el, { seconds: 4, height: 160 });
+  scope.source('the granulator in this page reports every grain it starts');
+
+  const KNOBS = [
+    ['density', 0.2, 8,   0.1,  '',   'how much the fragments overlap — under one you hear gaps', (v) => { P.overlap = v; }],
+    ['length',  10,  400, 5,    'ms', 'how long each fragment lasts',                             (v) => { P.sizeMs = v; }],
+    ['where',   0,   1,   0.01, '',   'how far back in the held seconds they read from',          (v) => { P.scan = v; }],
+    ['scatter', 0,   0.5, 0.01, '',   'how far they wander from that point',                      (v) => { P.spray = v; }],
+    ['pitch',  -24,  24,  1,    'st', 'how far each fragment is transposed',                      (v) => { P.pitch = v; }],
+  ];
+  const group = createSliderGroup();
+  const sliders = new Map();
+  for (const [label, min, max, step, unit, why, set] of KNOBS) {
+    const s = createSlider({
+      label, min, max, step, unit,
+      value: label === 'density' ? P.overlap : label === 'length' ? P.sizeMs
+           : label === 'where' ? P.scan : label === 'scatter' ? P.spray : P.pitch,
+      // ⚠️ ON EVERY MOVE, not on release. There is no relay here and no rate
+      // cap — the whole argument for doing this in the page is that a parameter
+      // change is audible in one render quantum, and waiting for the hand to
+      // stop would throw that away.
+      onInput: (v) => { set(v); apply(); },
+      onChange: (v) => { set(v); apply(); d.log(`${label} ${v}${unit ? ' ' + unit : ''} — ${why}`); },
+    });
+    sliders.set(label, s);
+    group.add(s);
+  }
+  d.el.append(group.el);
+
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (n) => { kb.lightNote(n, true); startAudio().then(() => addNote(n)); },
+    onUp: (n) => { kb.lightNote(n, false); dropNote(n); },
+  });
+  const playing = new Map();
+  function addNote(n) {
+    if (!ctx || source !== 'chord' || playing.has(n)) return;
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.value = 440 * Math.pow(2, (n - 69) / 12);
+    const g = ctx.createGain(); g.gain.value = 0.12;
+    o.connect(g).connect(src); o.start(); playing.set(n, { o, g });
+  }
+  function dropNote(n) {
+    const v = playing.get(n); if (!v) return;
+    playing.delete(n);
+    try { v.g.gain.setTargetAtTime(0, ctx.currentTime, 0.05); v.o.stop(ctx.currentTime + 0.4); } catch {}
+  }
+
+  let frozen = false;
+  d.on('freeze', async () => {
+    await startAudio();
+    frozen = !frozen;
+    node.port.postMessage({ cmd: 'freeze', on: frozen });
+    d.log(frozen ? 'holding what it had — the fragments keep coming from it' : 'listening again', 'hi');
+  });
+
+  setInterval(() => {
+    d.set('at once', stats.live);
+    d.set('held', stats.heldSec ? stats.heldSec.toFixed(1) : 0);
+    d.set('measured', stats.fired);
+    // How late a grain is against the quantum it was scheduled in. It is a
+    // local number and it should be tiny; a page that cannot keep up says so.
+    d.set('late', lateMs.toFixed(1), lateMs > 8 ? 'warn' : 'ok');
+  }, 500);
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  d.on('check', async () => {
+    await startAudio();
+    await sleep(1200);
+
+    d.assert('the granulator is running in this page, not somewhere else',
+      !!node && !!ctx, `an AudioWorklet at ${ctx?.sampleRate} Hz, no network in the path`);
+    d.assert('it is holding sound to chew', stats.heldSec > 0.5, `${stats.heldSec?.toFixed(1)} s held`);
+
+    // 🔴 THE ASSERT THIS PAGE EXISTS FOR. The board's granulator could not be
+    // shown to respond to ANY of its parameters — MEASURED 2026-09-12, `mrate`
+    // 0.5 against 24 gave rms 0.2636 against 0.2550 and the envelope never
+    // dropped below a quarter of its median at either. So the one thing worth
+    // checking here is that a parameter change reaches the grains, and the way
+    // to check it is to COUNT THEM, which is only possible because the engine
+    // reports each one.
+    const count = async (ms) => { const a = stats.fired; await sleep(ms); return stats.fired - a; };
+    P.overlap = 1; P.sizeMs = 100; apply(); await sleep(400);
+    const slow = await count(1500);
+    P.overlap = 4; apply(); await sleep(400);
+    const fast = await count(1500);
+    d.assert('turning the density up fires more grains, and it can be counted',
+      fast > slow * 2, `${slow} grains in 1.5 s at density 1, ${fast} at density 4`);
+
+    d.assert('overlap is density times length, and the page steers by it',
+      Math.abs(stats.overlap - P.overlap) < 0.35, `${stats.overlap?.toFixed(2)} against the ${P.overlap} asked for`);
+
+    // Freeze is the one control whose effect is about what it STOPS doing.
+    const heldBefore = stats.heldSec;
+    node.port.postMessage({ cmd: 'freeze', on: true });
+    await sleep(900);
+    d.assert('freezing stops it taking anything new in', Math.abs(stats.heldSec - heldBefore) < 0.35,
+      `held ${heldBefore.toFixed(1)} s, still ${stats.heldSec.toFixed(1)} s after 0.9 s`);
+    node.port.postMessage({ cmd: 'freeze', on: false });
+
+    // ⚠️ AND THE PICTURE IS MEASURED, NOT DRAWN FROM THE SETTINGS. A scope fed
+    // parameters would look identical and mean nothing.
+    const sc = scope.stats();
+    d.assert('every mark in the picture was reported by the thing that fired it',
+      sc.measured > 0 && sc.inferred === 0, `${sc.measured} measured, ${sc.inferred} inferred`);
+
+    P.overlap = 3; P.sizeMs = 120; apply();
+    sliders.get('density').set(3, true); sliders.get('length').set(120, true);
+  });
+
+  apply();
+  d.ready();
+</script>
+</html>

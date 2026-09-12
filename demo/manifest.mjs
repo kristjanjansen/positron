@@ -225,6 +225,16 @@ export const DEMOS = [
   // you heard them. The patch selector and the die both stopped doing anything
   // audible. The engine is not at fault; wrapping an instrument in it was.
   // Here, being droney is the point rather than a defect.
+  // The same subject as `grains`, on this machine instead of on the Pi — and it
+  // exists because the board's granulator could not be shown to respond to any
+  // of its own parameters, while this one reports every grain it fires.
+  // ⚠️ `settleMs`, because the density check COUNTS GRAINS OVER TIME — two
+  // 1.5 s windows at different densities — and `verify.mjs` stops collecting
+  // 400 ms after the last assert. Without it the page reports 2 asserts and
+  // reads as broken while working perfectly.
+  { name: 'cloud', act: 4, created: '2026-09-12', built: true, settleMs: 14000,
+    one: 'a grain cloud made in the page, with every grain drawn as it fires',
+    tags: ['AudioWorklet', 'WebAudio'] },
   { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
     one: 'a granular engine on a Raspberry Pi, rolled from a seed you can get back',
     tags: ['SuperCollider', 'relay', 'PCM', 'live board'] },

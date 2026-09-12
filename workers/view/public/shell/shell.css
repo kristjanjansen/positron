@@ -574,6 +574,18 @@ video[hidden] { display: none; }
 .pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
 .pos-choice button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
 
+/* ── grain scope ──────────────────────────────────────────────────────────
+   demo/shell/grain-scope.mjs. Time across, position-in-the-held-seconds up,
+   and the colour says HOW a mark landed: filled green was reported by the thing
+   that started it, hollow slate was inferred from audio alone, outline is what
+   the settings merely imply. */
+.pos-scope { margin: 0 0 12px; }
+.pos-scope-c {
+  display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--card);
+}
+.pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
+
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
    the same messages — they used to be a gutter row and a <pre> of raw lines,
