@@ -9,7 +9,9 @@ ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copie
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read
 `HANDOFF.md` for current state, `LESSONS.md` for why the rules below exist,
-`PROGRESS.md` for what was measured when.
+`PROGRESS.md` for what was measured when, and **`LAYOUT.md` for where a new file
+goes** — including the two renames that were priced and rejected, so they are
+not re-litigated.
 
 ## Run and check
 
