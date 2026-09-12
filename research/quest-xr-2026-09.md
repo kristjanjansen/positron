@@ -1,5 +1,15 @@
 # Meta Quest 3S, for this project (2026-09-11)
 
+> 🔴 **SUPERSEDED IN PART, 2026-09-12.** A headset arrived. `plan-xr.md` carries
+> what was MEASURED on it and it settles several things this document could only
+> tag UNCONFIRMED — the framebuffer (3360×1760, two views), the frame rate
+> (89.8 fps VR, 90.0 passthrough on an Adreno 740), the 1280×670 window, that
+> `immersive-ar` really composites (`alpha-blend`), and that a real Quest
+> Browser's `navigator.xr` passes a nativeness gate. It also confirms §1.7
+> empirically: **the user agent says "Quest 3" on a 3S.**
+>
+> Where the two disagree, `plan-xr.md` wins — it was taken from the device.
+
 A buying question — a Quest 3S 128 GB from an Estonian retailer — asked against
 a stack that is all web, all measured, and all on Cloudflare. The intended use
 is generative code (three.js / WebXR scenes partly written by a model at run
