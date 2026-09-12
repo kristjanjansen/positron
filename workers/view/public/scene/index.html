@@ -90,8 +90,8 @@
 
   const d = mount({
     name: 'scene',
-    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it; without one you are looking through a window at the same room.`,
-    readout: { seed: '', things: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up and carries it, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second.`,
+    readout: { seed: '', things: '', moved: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
       { id: 'again', label: 'Same seed again' },
@@ -368,6 +368,38 @@
     return true;
   }
 
+  // ── moving a thing ──────────────────────────────────────────────────────
+  let held = null;          // { i, dist } while a trigger is down
+  let moved = 0;
+
+  /**
+   * Put one thing somewhere else, IN THE DOCUMENT.
+   *
+   * ⚠️ A MOVE IS AN EDIT, AND THE ROOM STOPS BEING A PURE FUNCTION OF ITS SEED
+   * THE MOMENT YOU MAKE ONE. That is not a bug to hide: the seed is where a
+   * room STARTS, the document is what it IS, and `plan-nodes` §4 is the same
+   * argument one level up — the document is the product. Rolling again
+   * regenerates from the seed and the negative control still holds, because it
+   * compares two fresh rolls rather than the live room.
+   *
+   * Rounded like the generator rounds, so an edited document stays canonical
+   * and a byte comparison keeps meaning what it says.
+   */
+  function moveThing(i, x, y, z) {
+    const t = doc?.things?.[i];
+    if (!t) return false;
+    const r4 = (v) => Math.round(v * 10000) / 10000;
+    const next = { ...t, x: r4(x), y: r4(y), z: r4(z) };
+    const trial = { ...doc, things: doc.things.map((o, k) => (k === i ? next : o)) };
+    // ⚠️ THE SAME `validate` THE RELAY PATH USES. A hand can drag a thing
+    // through a wall as easily as a generator can put one there, and a rule
+    // that only applies to what arrives over the wire is not a rule about the
+    // document.
+    if (validate(trial)) return false;
+    doc = trial;
+    return true;
+  }
+
   // ── the socket ──────────────────────────────────────────────────────────
   let ws = null, seq = 0, echoed = false, asked = 0;
   const send = (m) => {
@@ -422,6 +454,25 @@
 
   // ── the headset ─────────────────────────────────────────────────────────
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
+  let rayNow = null;
+
+  /** Nearest thing the ray passes through, or null. Spheres, because a cube of
+   *  edge s is well enough approximated by a ball of radius s*0.87 for aiming,
+   *  and an exact box test would be twenty lines nobody can check by eye. */
+  function pick(o, dir) {
+    let best = null;
+    doc?.things?.forEach((t, i) => {
+      const r = t.s * 0.87;
+      const ox = o[0] - t.x, oy = o[1] - t.y, oz = o[2] - t.z;
+      const b = ox * dir[0] + oy * dir[1] + oz * dir[2];
+      const c = ox * ox + oy * oy + oz * oz - r * r;
+      const disc = b * b - c;
+      if (disc < 0) return;
+      const dist = -b - Math.sqrt(disc);
+      if (dist > 0.05 && (!best || dist < best.dist)) best = { i, dist };
+    });
+    return best;
+  }
   // Taken once, at load, away from any gesture — see enter().
   let headsetKnown = null, arKnown = null, arMode = false;
   navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; }, () => { headsetKnown = false; });
@@ -523,9 +574,29 @@
     // cannot draw, with no way out except the system menu, is worse than a page
     // that never entered — and "press the Meta button" is not an answer a page
     // gets to give about its own bug.
-    for (const ev of ['select', 'squeeze']) {
-      session.addEventListener(ev, () => { shipNow(`${ev} — leaving`); session?.end().catch(() => {}); });
-    }
+    // ⚠️ THE TRIGGER USED TO BE THE EXIT, AND NOW IT GRABS — so the exit moved
+    // to the grip rather than disappearing. A page that can strand somebody in
+    // a room must keep a way out that belongs to the page: grip leaves, and the
+    // dead-man's switch below still fires if nothing ever draws.
+    session.addEventListener('selectstart', () => {
+      if (!rayNow) return;
+      held = pick(rayNow.o, rayNow.dir);
+      shipNow(held ? `grabbed thing ${held.i} at ${held.dist.toFixed(2)} m` : 'trigger — nothing under the pointer');
+    });
+    session.addEventListener('selectend', () => {
+      if (held) {
+        moved++;
+        d.set('moved', moved);
+        // ⚠️ ONE MESSAGE ON DROP, NEVER ONE PER FRAME. At 90 fps a dragged
+        // thing would be 90 msg/s into a relay whose measured ceiling is 60,
+        // and the relay tells a sender NOTHING when that bites — it simply
+        // drops. The room everyone else sees converges when you let go.
+        shipNow(`dropped thing ${held.i} — document now ${docOf(doc).length} bytes`);
+        send({ type: 'scene.room', doc });
+      }
+      held = null;
+    });
+    session.addEventListener('squeeze', () => { shipNow('grip — leaving'); session?.end().catch(() => {}); });
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
     // rather than leaving somebody standing in it. MEASURED: two runs ended
@@ -553,6 +624,26 @@
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const tSec = (now - t0) / 1000;
+    // A ray per hand, in room coordinates. `targetRaySpace` is the pointer the
+    // runtime draws; using it rather than the grip means what you aim at is
+    // what you get.
+    for (const src of session.inputSources) {
+      if (!src.targetRaySpace) continue;
+      const rp = frame.getPose(src.targetRaySpace, xrSpace);
+      if (!rp) continue;
+      const m = rp.transform.matrix;
+      const o = [m[12], m[13], m[14]];
+      const dir = [-m[8], -m[9], -m[10]];        // -Z of the ray's own frame
+      if (held) {
+        // Carry it at the distance it was grabbed from, so a thing does not
+        // rush at your face the moment you pick it up.
+        moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
+      } else {
+        rayNow = { o, dir };
+      }
+      break;                                      // one pointer is enough here
+    }
+
     let eye = 0;
     for (const view of pose.views) {
       const vp = layer.getViewport(view);
@@ -700,6 +791,24 @@
     d.assert('and the room did not change across the refusal',
       (doc ? docOf(doc) : '') === wasDoc && (doc ? doc.things.length : 0) === was,
       `${was} things before and after`);
+
+    // ⚠️ THE MOVE IS GRADED HERE, NOT ONLY IN A HEADSET. A controller ray needs
+    // hands, but everything behind it — that a move edits the document, that an
+    // impossible move is refused by the same rule the wire is held to, and that
+    // the document stays canonical — is ordinary code and can be checked on a
+    // laptop. Leaving all of it to the device would mean the only test of the
+    // interesting half runs where nothing is watching.
+    const before = docOf(doc);
+    const t0i = doc.things[0];
+    const okMove = moveThing(0, t0i.x + 0.25, t0i.y + 0.1, t0i.z);
+    d.assert('a thing can be moved, and the move edits the document',
+      okMove && docOf(doc) !== before, okMove ? `${before.length} -> ${docOf(doc).length} bytes` : 'refused');
+    d.assert('...and the moved document is still a valid room',
+      validate(doc) === null, validate(doc) || 'valid');
+    const midway = docOf(doc);
+    const far = moveThing(0, 40, 0.5, 40);      // through the wall, deliberately
+    d.assert('a thing cannot be dragged out of the room',
+      far === false && docOf(doc) === midway, far ? 'it went through the wall' : 'refused, document unchanged');
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
@@ -748,6 +857,7 @@
   }
   d.set('view', 'window');
   d.set('refused', 0);
+  d.set('moved', 0);
   // A room to stand in before anything is pressed, so the stage is never empty.
   roll(424242);
   d.ready();
