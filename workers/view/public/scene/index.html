@@ -461,10 +461,20 @@
       return false;
     }
     xrOk = true; publishXR();
-    if (ship) {
-      ship(`session started · mode immersive-vr · ${session.renderState.baseLayer.framebufferWidth}x${session.renderState.baseLayer.framebufferHeight} per eye`);
-      ship(`views ${(frameViews || 0)} · refresh ${session.frameRate || 'not reported'}`);
-    }
+    // 🔴 `session.renderState.baseLayer` IS NULL HERE, AND READING IT IS WHAT
+    // MADE THE ROOM BLACK. `updateRenderState()` does not apply immediately —
+    // the spec queues it and it takes effect at the NEXT animation frame — so
+    // `baseLayer.framebufferWidth` threw a TypeError one line after the session
+    // was successfully created. The throw escaped the handler, so
+    // `requestAnimationFrame(onXR)` was never reached, the dead-man's switch
+    // below was never registered, and the user stood in an empty room with no
+    // way out and no line explaining it.
+    //
+    // The framebuffer's size is reported from the first frame instead, where
+    // the layer genuinely exists. MEASURED: every step of entry logged `ok`
+    // and the very next statement was the one that killed it — which is why
+    // the instrumentation had to go in before the cause could be guessed at.
+    shipNow(`session created · refresh ${session.frameRate || 'not reported'}`);
     cancelAnimationFrame(raf);
     badge.innerHTML = 'headset · <b>you are in the room</b>';
     d.set('view', 'headset', 'ok');
@@ -584,7 +594,18 @@
   });
 
   d.on('enter', async () => {
-    const got = await enter();
+    // ⚠️ A LAST NET. Every individual await inside enter() is guarded now, but
+    // the bug that cost two runs was a plain synchronous statement BETWEEN the
+    // guarded parts. A handler whose failure mode is silence is not one to
+    // trust to its own internal care.
+    let got = false;
+    try { got = await enter(); }
+    catch (e) {
+      shipNow(`FAIL enter() — ${e.name}: ${e.message}`);
+      d.log(`entering failed — ${e.name}: ${e.message}`, 'bad');
+      try { await session?.end(); } catch { /* may not exist */ }
+      session = null; xrOk = false;
+    }
     // Both branches are real and both are asserted. A headset is the only place
     // the first two can pass, which is exactly why demo/verify.mjs cannot grade
     // this page and verify-quest.mjs has to exist.
@@ -647,8 +668,12 @@
   // and that is exactly what the first run on a real headset looked like.
   // Every press is logged before it runs, and anything that escapes is logged
   // with it.
-  addEventListener('error', (e) => ship?.(`FAIL uncaught — ${e.message} @ ${e.filename}:${e.lineno}`));
-  addEventListener('unhandledrejection', (e) => ship?.(`FAIL unhandled rejection — ${e.reason?.message || e.reason}`));
+  // ⚠️ THESE MUST USE THE BEACON TOO. They were on the batched shipper, which
+  // is why a TypeError thrown while entering an immersive session produced no
+  // line at all — the net that was supposed to catch a silent failure was
+  // itself waiting on a timer that had stopped being generous.
+  addEventListener('error', (e) => shipNow(`FAIL uncaught — ${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`));
+  addEventListener('unhandledrejection', (e) => shipNow(`FAIL unhandled rejection — ${e.reason?.message || e.reason}`));
   for (const id of ['roll', 'again', 'enter', 'bad']) {
     const b = d.button(id);
     if (b) b.addEventListener('click', () => ship?.(`pressed "${b.textContent}"`), true);
