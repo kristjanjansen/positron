@@ -18,7 +18,12 @@
 
 <script type="module">
   import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
-  import { world, docOf, validate } from '/shell/seed.mjs';
+  import { world as world0, docOf, validate as validate0 } from '/shell/seed.mjs';
+
+  // ⚠️ ALIASED, NOT USED DIRECTLY. An imported binding cannot be reassigned, and
+  // tier 3 of the update story replaces the generator while a session is live.
+  // Every call below goes through these.
+  let world = world0, validate = validate0;
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'scene-demo';
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
@@ -195,8 +200,19 @@
       vec4 w = uModel * vec4(aPos, 1.0); vW = w.xyz;
       gl_Position = uProj * uView * w; }`;
 
-  let progSky = null, progBox = null, cube = null;
-  try { progSky = link(VS, SKY_FS); progBox = link(VS, BOX_FS); } catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
+  const PANEL_VS = `#version 300 es
+    in vec3 aPos; in vec3 aNrm;
+    uniform mat4 uProj, uView, uModel; out vec2 vUv;
+    void main(){ vUv = vec2(aPos.x + 0.5, 0.5 - aPos.y);
+      gl_Position = uProj * uView * uModel * vec4(aPos, 1.0); }`;
+  const PANEL_FS = `#version 300 es
+    precision highp float;
+    in vec2 vUv; uniform sampler2D uTex; uniform float uFade; out vec4 o;
+    void main(){ vec4 t = texture(uTex, vUv); o = vec4(t.rgb, t.a * uFade); }`;
+
+  let progSky = null, progBox = null, progPanel = null, cube = null, quad = null;
+  try { progSky = link(VS, SKY_FS); progBox = link(VS, BOX_FS); progPanel = link(PANEL_VS, PANEL_FS); }
+  catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
 
   function unitCube() {
     // 6 faces, flat normals. Positions in -0.5..0.5 so `s` is an edge length.
@@ -221,7 +237,49 @@
     gl.bindVertexArray(null);
     return { vao, count: P.length / 3 };
   }
-  if (gl) cube = unitCube();
+  function unitQuad() {
+    const P = [-0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0];
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    return { vao, count: 6 };
+  }
+  if (gl) { cube = unitCube(); quad = unitQuad(); }
+
+  // ── the status panel: text drawn to a canvas, uploaded as a texture ─────
+  // 🔴 THE 2D PAGE IS INVISIBLE INSIDE AN IMMERSIVE SESSION. `d.log` and the
+  // readout are behind your face, so anything you need to READ while wearing
+  // the headset has to be drawn in the scene. That is the whole reason this
+  // exists, and it is why the update story needed it first.
+  const panelCv = document.createElement('canvas');
+  panelCv.width = 768; panelCv.height = 192;
+  const pctx = panelCv.getContext('2d');
+  let panelTex = null, panelText = '', panelUntil = 0;
+
+  function setPanel(text, holdMs = 9000) {
+    panelText = text; panelUntil = performance.now() + holdMs;
+    pctx.clearRect(0, 0, 768, 192);
+    pctx.fillStyle = 'rgba(8,11,17,.88)';
+    pctx.roundRect?.(0, 0, 768, 192, 18); pctx.fill();
+    pctx.strokeStyle = '#ffd400'; pctx.lineWidth = 3;
+    pctx.beginPath(); pctx.moveTo(3, 18); pctx.lineTo(3, 174); pctx.stroke();
+    pctx.fillStyle = '#e8edf5';
+    pctx.font = '600 40px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const lines = String(text).split('\n').slice(0, 3);
+    lines.forEach((l, i) => pctx.fillText(l.slice(0, 34), 34, 62 + i * 52));
+    if (!panelTex) {
+      panelTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, panelTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, panelTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, panelCv);
+  }
 
   // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a real
   // visitor, and a page that is quietly slow teaches nothing. demo/verify-gl.mjs
@@ -279,14 +337,15 @@
     if (U[p.__i]) return U[p.__i];
     const g = (n) => gl.getUniformLocation(p, n);
     return (U[p.__i] = { proj: g('uProj'), view: g('uView'), model: g('uModel'),
-                         t: g('uT'), hue: g('uHue'), col: g('uCol') });
+                         t: g('uT'), hue: g('uHue'), col: g('uCol'),
+                         tex: g('uTex'), fade: g('uFade') });
   }
-  if (gl) { progSky.__i = 'sky'; progBox.__i = 'box'; }
+  if (gl) { progSky.__i = 'sky'; progBox.__i = 'box'; progPanel.__i = 'panel'; }
 
   /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
   const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
 
-  function drawRoom(proj, view, tSec, doClear = true) {
+  function drawRoom(proj, view, tSec, doClear = true, pose = null) {
     if (!gl || !doc) return;
     gl.enable(gl.DEPTH_TEST);
     // 🔴 `gl.clear` IGNORES THE VIEWPORT — it clears the whole framebuffer.
@@ -334,9 +393,32 @@
     L = locs(progBox);
     gl.uniformMatrix4fv(L.proj, false, proj);
     gl.uniformMatrix4fv(L.view, false, view);
-    for (const t of doc.things) {
+    doc.things.forEach((t, i) => {
       gl.uniformMatrix4fv(L.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
-      gl.uniform3fv(L.col, hueRGB(t.c));
+      // The thing under the pointer, and the thing in your hand, are lit
+      // differently — colour says WHAT IS HAPPENING to it, which is the same
+      // rule every other page here follows about colour.
+      const c = hueRGB(t.c);
+      const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
+      gl.uniform3fv(L.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+    });
+
+    // ⚠️ THE POINTER HAS TO BE VISIBLE OR THE ROOM IS UNUSABLE. Dragging worked
+    // before this and still felt like guessing, because nothing showed where
+    // you were aiming — reported from the headset, and it is the difference
+    // between a control and a coincidence. A beam down the ray, and a marker
+    // at the point it stops.
+    if (rayNow && xrOk) {
+      const len = held ? held.dist : (aimedDist || 2.4);
+      gl.uniformMatrix4fv(L.model, false, beamM(rayNow.m, len));
+      gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      const hx = rayNow.o[0] + rayNow.dir[0] * len,
+            hy = rayNow.o[1] + rayNow.dir[1] * len,
+            hz = rayNow.o[2] + rayNow.dir[2] * len;
+      gl.uniformMatrix4fv(L.model, false, modelM(hx, hy, hz, aimed !== null || held ? 0.045 : 0.022, 0, tSec));
+      gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.55, 0.92, 0.9]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     }
     gl.bindVertexArray(null);
@@ -415,6 +497,7 @@
       ws.onmessage = (e) => {
         if (typeof e.data !== 'string') return;
         let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.type?.startsWith('dev.')) { onDev(m); return; }
         if (m.type !== 'scene.room') return;
         if (m.from === `page-${ID}`) echoed = true;      // our own message came back
         apply(m.doc, m.from === `page-${ID}` ? asked : 0);
@@ -433,6 +516,80 @@
     }
     await new Promise((r) => setTimeout(r, 900));
   };
+
+  /**
+   * Updates from whoever is writing this page, while you are wearing it.
+   *
+   * 🔴 A RELOAD ENDS A WEBXR SESSION AND THERE IS NO WAY AROUND THAT. So the
+   * tiers exist to keep as much work as possible on THIS side of a reload:
+   *
+   *   dev.status   a line to read          — nothing changes
+   *   dev.shader   new GLSL                — recompiled in place, session lives
+   *   dev.module   a new generator         — re-imported, session lives
+   *   dev.reload   everything else         — the session must end, so YOU pick when
+   *
+   * ⚠️ The first three apply themselves. The fourth never does: it puts a line
+   * up and waits, because a session ending under somebody without warning is
+   * the disruptive refresh this whole arrangement exists to avoid.
+   */
+  let reloadOffered = null;
+  async function onDev(m) {
+    if (m.type === 'dev.status') {
+      setPanel(m.text || '', m.holdMs || 9000);
+      d.log(`dev: ${m.text}`);
+      return;
+    }
+    if (m.type === 'dev.shader') {
+      try {
+        const next = link(VS, m.sky || SKY_FS);
+        const nextBox = link(VS, m.box || BOX_FS);
+        progSky = next; progBox = nextBox;
+        progSky.__i = `sky${Date.now()}`; progBox.__i = `box${Date.now()}`;   // fresh uniform cache
+        setPanel('✓ new look, applied\nthe session kept going');
+        shipNow('dev.shader applied live');
+      } catch (e) {
+        // A shader that will not compile must not take the picture with it.
+        setPanel(`✗ new look refused\n${String(e.message).slice(0, 30)}`);
+        shipNow(`FAIL dev.shader — ${e.message}`);
+      }
+      return;
+    }
+    if (m.type === 'dev.module') {
+      try {
+        // A cache-busted URL is a NEW module, which is the only way to get a
+        // second copy of one the browser has already evaluated.
+        const mod = await import(`/shell/seed.mjs?v=${encodeURIComponent(m.v || Date.now())}`);
+        world = mod.world; validate = mod.validate;
+        setPanel('✓ new generator, applied\nroll to see it');
+        shipNow(`dev.module applied live — v${m.v}`);
+      } catch (e) {
+        setPanel(`✗ new generator refused\n${String(e.message).slice(0, 30)}`);
+        shipNow(`FAIL dev.module — ${e.message}`);
+      }
+      return;
+    }
+    if (m.type === 'dev.reload') {
+      reloadOffered = m.build || 'a new build';
+      setPanel(`● update ready — ${reloadOffered}\nsqueeze BOTH grips to take it`, 60000);
+      d.log(`an update is ready (${reloadOffered}) — reload when you want it`);
+      shipNow(`dev.reload offered — ${reloadOffered}`);
+    }
+  }
+
+  /**
+   * Taking a tier-4 update, as gently as it can be taken.
+   *
+   * ⚠️ IT CANNOT RE-ENTER BY ITSELF AFTERWARDS. `requestSession` needs a
+   * transient user activation and a freshly loaded page has none, so the
+   * honest design is one press on the other side rather than a promise of
+   * none. The flag makes that press a single obvious button instead of finding
+   * the card and the control again.
+   */
+  function takeReload() {
+    try { sessionStorage.setItem('scene-resume', '1'); } catch { /* private mode */ }
+    shipNow('taking the reload');
+    location.reload();
+  }
 
   // ── the flat window, which is also how the desktop harness sees it ──────
   let raf = 0, t0 = performance.now(), lastFrame = 0;
@@ -454,7 +611,25 @@
 
   // ── the headset ─────────────────────────────────────────────────────────
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
-  let rayNow = null;
+  let rayNow = null, aimed = null, aimedDist = 0;
+
+  /**
+   * A long thin box lying along a controller's ray.
+   *
+   * `modelM` cannot do this: it scales uniformly and only rotates about two
+   * axes, while a beam needs the controller's OWN orientation and a different
+   * scale down each axis. Taking the rotation straight out of the pose matrix
+   * is both shorter and exact.
+   */
+  function beamM(m, len) {
+    const sx = 0.004, sy = 0.004;
+    return new Float32Array([
+      m[0] * sx, m[1] * sx, m[2] * sx, 0,
+      m[4] * sy, m[5] * sy, m[6] * sy, 0,
+      m[8] * len, m[9] * len, m[10] * len, 0,
+      // -Z is forward, so the box's centre sits half a length down the ray
+      m[12] - m[8] * len * 0.5, m[13] - m[9] * len * 0.5, m[14] - m[10] * len * 0.5, 1]);
+  }
 
   /** Nearest thing the ray passes through, or null. Spheres, because a cube of
    *  edge s is well enough approximated by a ball of radius s*0.87 for aiming,
@@ -596,7 +771,13 @@
       }
       held = null;
     });
-    session.addEventListener('squeeze', () => { shipNow('grip — leaving'); session?.end().catch(() => {}); });
+    session.addEventListener('squeeze', () => {
+      // Both grips at once is the only two-handed gesture here, which is why it
+      // carries the one action you cannot undo.
+      const gripping = [...session.inputSources].filter((i) => i.gamepad?.buttons?.[1]?.pressed).length;
+      if (reloadOffered && gripping >= 2) { takeReload(); return; }
+      shipNow('grip — leaving'); session?.end().catch(() => {});
+    });
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
     // rather than leaving somebody standing in it. MEASURED: two runs ended
@@ -638,8 +819,12 @@
         // Carry it at the distance it was grabbed from, so a thing does not
         // rush at your face the moment you pick it up.
         moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
-      } else {
-        rayNow = { o, dir };
+      }
+      rayNow = { o, dir, m };
+      if (!held) {
+        const hit = pick(o, dir);
+        aimed = hit ? hit.i : null;
+        aimedDist = hit ? hit.dist : 0;
       }
       break;                                      // one pointer is enough here
     }
@@ -651,9 +836,38 @@
       gl.scissor(vp.x, vp.y, vp.width, vp.height);
       // Only the FIRST eye clears the shared framebuffer; the rest clear depth
       // inside their own scissor. See drawRoom.
-      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0);
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0, pose);
       eye++;
     }
+    // The panel, head-locked and low-left, drawn after everything so nothing
+    // occludes it. It fades out on its own — a status line that stays up
+    // forever is furniture in your field of view.
+    if (pose && panelTex && performance.now() < panelUntil + 900) {
+      const fade = Math.max(0, Math.min(1, (panelUntil + 900 - performance.now()) / 900));
+      const hm = pose.transform.matrix;
+      const M = new Float32Array([
+        hm[0] * 0.44, hm[1] * 0.44, hm[2] * 0.44, 0,
+        hm[4] * 0.11, hm[5] * 0.11, hm[6] * 0.11, 0,
+        hm[8], hm[9], hm[10], 0,
+        hm[12] - hm[8] * 1.25 - hm[4] * 0.30 - hm[0] * 0.16,
+        hm[13] - hm[9] * 1.25 - hm[5] * 0.30 - hm[1] * 0.16,
+        hm[14] - hm[10] * 1.25 - hm[6] * 0.30 - hm[2] * 0.16, 1]);
+      gl.useProgram(progPanel);
+      const PL = locs(progPanel);
+      gl.uniformMatrix4fv(PL.proj, false, proj);
+      gl.uniformMatrix4fv(PL.view, false, view);
+      gl.uniformMatrix4fv(PL.model, false, M);
+      gl.uniform1f(PL.fade, fade);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, panelTex);
+      gl.uniform1i(PL.tex, 0);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.DEPTH_TEST);
+      gl.bindVertexArray(quad.vao);
+      gl.drawArrays(gl.TRIANGLES, 0, quad.count);
+      gl.bindVertexArray(null);
+      gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    }
+
     if (xrFrames === 1) {
       const err = gl.getError();
       const vp0 = layer.getViewport(pose.views[0]);
@@ -858,6 +1072,14 @@
   d.set('view', 'window');
   d.set('refused', 0);
   d.set('moved', 0);
+  try {
+    if (sessionStorage.getItem('scene-resume')) {
+      sessionStorage.removeItem('scene-resume');
+      d.log('updated — press "Put it in your room" to go back in', 'ok');
+      const b = d.button('ar') || d.button('enter');
+      if (b) { b.classList.add('d-pri'); b.textContent = '↩ Back in — update taken'; }
+    }
+  } catch { /* private mode */ }
   // A room to stand in before anything is pressed, so the stage is never empty.
   roll(424242);
   d.ready();
