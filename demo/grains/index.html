@@ -64,7 +64,7 @@
 
   const d = mount({
     name: 'grains',
-    what: 'A Raspberry Pi holds the last sixty seconds of sound and replays it as thousands of short overlapping fragments. The sound going in is Yoshimi; the granulator chewing it is Pappus, a norns engine running on plain SuperCollider. Pick a patch and it starts the instrument, holds a chord and chews it — the sliders move the cloud from there.',
+    what: 'A Raspberry Pi holds the last sixty seconds of sound and replays it as thousands of short overlapping fragments. The sound going in is Yoshimi; the granulator chewing it is Pappus, a norns engine running on plain SuperCollider. Press Hold and the board stops listening — the fragments then come only from the minute it already has, which is when the sliders start to do something you can hear.',
     // ⚠️ FIVE CELLS, MEASURED RATHER THAN GUESSED. It was eight, and five of
     // those ellipsised — `answe…`, `fluid…`, `shatt…`. A readout cell here is
     // 90 px of text whatever the window does (the page's own measure caps it,
@@ -82,7 +82,18 @@
     // `.pos-controls button` and every assert on this page hangs off this
     // handler, so deleting it stops the page being tested while looking tidier.
     // `?checks=1` brings it back.
-    controls: [{ id: 'on', label: 'Switch it on', primary: true }],
+    controls: [
+      // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
+      // real scsynth 2026-09-13: with the instrument still playing IN, the
+      // grains read at the write head and come out as a copy of what is going
+      // in — `mrate` 0.5 against 24 measured rms 0.0575 against 0.0580, which
+      // is the same. Take the input away and freeze the buffer and the same
+      // sweep reads flutter 0.377 against 0.692 and 0.0 against 4.6 gaps a
+      // second. It was never a broken engine; a granulator reading the present
+      // sounds like the present, however you set it.
+      { id: 'hold', label: 'Hold what it has', primary: true },
+      { id: 'on', label: 'Switch it on' },
+    ],
   });
   guard(d);
   if (!new URLSearchParams(location.search).has('checks')) d.button('on').hidden = true;
@@ -699,6 +710,24 @@
   // ── the material row's actions ───────────────────────────────────────────
 
   // ── the controls ─────────────────────────────────────────────────────────
+  // HOLD is two commands and both are needed: `lock` keeps the material (it
+  // makes the retain gain 1, so the write becomes a rewrite of what is already
+  // there) and `src 1` stops the live input being mixed into it. ⚠️ `src 1`
+  // ALONE ERASES — retain zero and record zero writes `0*new + 0*old` over the
+  // window at real time, which is LESSONS #46 and cost a day once.
+  let held = false;
+  d.on('hold', async () => {
+    held = !held;
+    for (const h of ['m', 'n']) {
+      send({ type: 'params.set', cmd: `${h}lock`, args: [held ? 1 : 0] });
+      send({ type: 'params.set', cmd: `${h}src`, args: [held ? 1 : 2] });
+    }
+    d.button('hold').textContent = held ? 'Listen again' : 'Hold what it has';
+    d.log(held
+      ? 'holding the last minute — the grains are now the only thing you hear'
+      : 'listening again — the grains follow the instrument, so they sound like it', 'hi');
+  });
+
   d.on('on', async () => {
     startAudio();
     // ⚠️ A WINDOW, NOT A RACE. Nobody answering is a real answer here, so this
