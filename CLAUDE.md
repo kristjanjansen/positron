@@ -239,6 +239,41 @@ to recover.
   from an identical number. The README's own deafness control had been
   measuring the wrong device. Resolve by NAME from
   `-list_devices true` every time; `rig/pro-instrument/live-check.mjs` does.
+- **WebXR, MEASURED on a Quest 3 (Browser 150.1 / Chromium 150, Adreno 740),
+  2026-09-12.** The framebuffer is **3360x1760, two views, 1680x1760 per eye**,
+  and `scene` holds **89.8 fps** in it — full rate. The 2D window really is
+  **1280x670 CSS at dpr 1**. `session.frameRate` is **not reported**. The user
+  agent says **"Quest 3" on a 3S**, which is the empirical form of the claim
+  that the two cannot be told apart.
+- 🔴 **`session.renderState.baseLayer` is NULL until the next animation frame.**
+  `updateRenderState()` queues; it does not apply. Reading
+  `baseLayer.framebufferWidth` one line after creating a session throws a
+  TypeError — which cost three headset runs, because the throw escaped the
+  handler and so the render loop, the exit-on-any-button and the bail-out timer
+  were ALL never registered. Session live, nothing drawing, no way out, no log
+  line. Read the layer inside `requestAnimationFrame`, where it exists.
+- **Instrument the entry path BEFORE guessing at it.** Those three runs were
+  indistinguishable from outside; what separated them was a line shipped before
+  and after every await, with a deadline turning a hang into a named failure.
+  ⚠️ And the lines that say where something hung **cannot be on a batched
+  shipper** — `createShipper` holds for 2 s, and entering an immersive session
+  is exactly when timers stop being generous. `navigator.sendBeacon` survives
+  it. The uncaught-error handler has to use it too, or the net meant to catch a
+  silent failure is itself waiting on the timer that stopped.
+- **Anything immersive needs a way out that the PAGE owns.** Any controller
+  button ends the session, plus a dead-man's switch that ends it if nothing has
+  been drawn after 4 s. "Press the Meta button" is not an answer a page gets to
+  give about its own bug.
+- **`gl.clear` ignores the viewport.** Both eyes share one framebuffer, so a
+  clear on the second view wipes what the first drew — black. Only the first
+  eye clears; the rest clear DEPTH inside a `gl.scissor`, or the second eye
+  tests against the first eye's depths. A viewport is not a clip region.
+- **`bindAttribLocation` only takes effect at the NEXT link.** Called after
+  `linkProgram` it is a no-op that reads like a fix; the Quest reported
+  `GL_INVALID_OPERATION` (1282) on its first frame and **drew correctly
+  anyway**, because the linker happened to choose the same slots. A page will
+  render a right-looking picture with an error pending, so assert on
+  `gl.getError()`.
 - **iPhone Safari has NO element Fullscreen API.** Not `requestFullscreen`,
   not `webkitRequestFullscreen` — the only thing that fills an iPhone screen is
   a `<video>`, via the non-standard `HTMLVideoElement.webkitEnterFullscreen()`.
