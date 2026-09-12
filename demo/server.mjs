@@ -34,6 +34,9 @@ const MIME = {
  * which port it gets; it only cares that it has one. Callers that need to know
  * read `server.address().port`, and `serve()` logs when it had to move.
  */
+/** Pages the deploy copies in from outside demo/, by their served path. */
+const EXTRA = new Map((await import('./manifest.mjs')).extraPages().map(([src, dst]) => [dst, src]));
+
 export function serve(port = PORT) {
   const s = createServer(async (req, res) => {
     let rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^([/\\])+/, '');
@@ -44,12 +47,15 @@ export function serve(port = PORT) {
     // asking for /shell/shell.css or /llhls/ must resolve here too — try the
     // repo root first, then inside demo/.
     //
-    // One page is not under either root: workers/view/build.mjs copies
-    // rig/box/listen.html to box/index.html, so /box/ is a 404 here while it
-    // works on the deploy. Mapped rather than served out of
-    // workers/view/public/, which is BUILD OUTPUT — serving that would test a
-    // copy and read green on a page the build had not refreshed.
-    if (rel === 'box/index.html') rel = 'rig/box/listen.html';
+    // Some pages are under neither root: the build copies them in from
+    // elsewhere (the box's listener from rig/, the component sandbox). They
+    // declare their own `src` in demo/manifest.mjs and BOTH ends read it, so
+    // this rewrite and the build's copy list cannot disagree.
+    //
+    // ⚠️ Mapped rather than served out of workers/view/public/, which is BUILD
+    // OUTPUT — serving that would test a copy and read green on a page the
+    // build had not refreshed.
+    if (EXTRA.has(rel)) rel = EXTRA.get(rel);
     let file = join(ROOT, rel);
     try {
       let body;

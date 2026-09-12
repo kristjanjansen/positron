@@ -33,7 +33,7 @@ const OUT = join(HERE, 'public');
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byNewest, rowHTML, noteHTML } =
+const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byNewest, rowHTML, noteHTML, extraPages } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
@@ -107,13 +107,12 @@ const FILES = [
   // It needs nothing else deployed — proto/jam/playout-worklet.js is already
   // listed above for the MoQ return path, and the page talks only to
   // ws.positron.studio. Served at /box/.
-  ['rig/box/listen.html', 'box/index.html'],
-
-  // The component sandbox. ⚠️ EXPLICIT, because `demoFiles()` enumerates BUILT
-  // demos and `kit` is not one — it publishes no `__demo` and asserts nothing,
-  // so `built: false` is right and the copy has to be named here or /kit/ is a
-  // 404 with a row on the index pointing at it.
-  ['demo/kit/index.html', 'kit/index.html'],
+  // ⚠️ FROM THE MANIFEST, NOT LISTED HERE. `demoFiles()` enumerates BUILT demos;
+  // a page that is not one — the box's listener in rig/, the component sandbox —
+  // used to need a hand-written line here AND a matching rewrite in
+  // demo/server.mjs. Two pages, four edits, in two files, with nothing to notice
+  // if only one of the pair was made. Each declares its own `src` now.
+  ...extraPages(),
   ...demoFiles(),
 ];
 

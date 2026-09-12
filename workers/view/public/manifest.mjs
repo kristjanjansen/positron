@@ -11,6 +11,12 @@
 // four too many. Moving a demo now means moving a line in this array; nothing
 // is renamed and no link changes meaning.
 //   page  — explicit target for a page that exists but is not shelled yet
+//   src   — for a `page` row, WHERE THAT FILE LIVES. Both the deploy and the
+//           dev server read it, so a page outside demo/ is declared once here
+//           rather than hand-written into build.mjs's copy list AND
+//           demo/server.mjs's rewrite. There were two such pages and four such
+//           edits; the third would have been another two, in two files, with
+//           nothing to notice if only one was made.
 //   one   — one line: what it does
 //   tags  — the tech it actually uses; demo/shell/caps.mjs reads REQUIREMENTS
 //           off these, so there is no second `needs:` list to forget
@@ -208,6 +214,7 @@ export const DEMOS = [
   // a relay or a stream. `built: false` because it publishes no `__demo` and
   // asserts nothing: it is a mirror for the components, not a claim about them.
   { name: 'kit', act: 0, created: '2026-09-12', built: false, page: '/kit/',
+    src: 'demo/kit/index.html',
     one: 'every reusable control on one page, wired to nothing',
     tags: ['shell', 'no network'] },
 
@@ -221,6 +228,7 @@ export const DEMOS = [
   // in the other building, played from here: its own instrument library, a
   // random hour of 1965 Estonian radio, and pappus chewing either one up.
   { name: 'box', act: 4, created: '2026-09-10', built: false, page: '/box/',
+    src: 'rig/box/listen.html',
     one: 'play a Raspberry Pi in another building — its instruments, 1965 radio, and a granulator over both',
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
@@ -256,6 +264,17 @@ export const NOTES = [
 ];
 
 export const bySlug = (name) => DEMOS.find((d) => d.name === name);
+
+/**
+ * Pages that live outside demo/ and are copied in: [source, destination].
+ *
+ * ⚠️ `built: true` demos are ENUMERATED by build.mjs from the directory and are
+ * not in here. This is only the exceptions — the box's listener, which lives in
+ * rig/, and the component sandbox, which is not a demo.
+ */
+export const extraPages = () =>
+  DEMOS.filter((d) => !d.built && d.src && d.page)
+       .map((d) => [d.src, `${d.page.replace(/^\/|\/$/g, '')}/index.html`]);
 
 /** the link target for a row, or null when it has none */
 export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
