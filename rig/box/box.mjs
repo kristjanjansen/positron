@@ -850,7 +850,7 @@ async function handle(msg) {
     // two compilers, rather than two copies kept in step by hand.
     case 'video.shader': {
       if (!video) return reply('video.shader.applied', { ok: false, reason: 'no picture running' });
-      const r = video.shader(msg.body);
+      const r = await video.shader(msg.body);
       log(r.ok ? `new shader sent to the renderer — ${r.bytes} bytes` : `shader refused — ${r.reason}`);
       return reply('video.shader.applied', r);
     }
