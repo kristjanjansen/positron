@@ -93,7 +93,7 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey. Delay is half the trip to the board plus the sound this page is holding in hand, which makes it a floor rather than the whole figure — it cannot see the board’s own capture or this browser’s output. Play the a-to-k row, the drawn keys, or a MIDI keyboard; z and x move the octave. Reverb and chorus are made on the board — this page only sends the numbers.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Buffer is how much sound this page is holding in hand before playing it, and a dropout is a moment that ran out or had to be cut — one click each. Play the a-to-k row, the drawn keys, or a MIDI keyboard; z and x move the octave. Reverb and chorus are made on the board — this page only sends the numbers.',
 
     // ⚠️ `frames`, `rate` and `midi` ALL WENT, and two of the three deserve a
     // word. `frames` was an odometer. `midi` sat at `1` forever, which is the
@@ -110,7 +110,13 @@
     // `delay`, `buffer` and `dropouts` are new. /box/ carried the same cushion
     // as `rack` with NO number on it at all — which is how `rack` sounded wrong
     // for an hour while six measurements said it was fine (LESSONS #52).
-    readout: { delay: 'ms', 'round trip': 'ms', buffer: 'ms', dropouts: '', bitrate: 'Mb/s', dropped: '' },
+    // ⚠️ `delay` AND `round trip` BOTH WENT, and the reason is not that they
+    // were wrong. Half a round trip plus the cushion is an honest floor, and
+    // the ping does answer — but neither is a number you can DO anything with
+    // while playing, and this row is read by somebody pressing keys, not
+    // somebody tuning a network. `buffer` and `dropouts` stay because they are
+    // the two that say whether what you are hearing is intact.
+    readout: { buffer: 'ms', dropouts: '', bitrate: 'Mb/s', dropped: '' },
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
     // which put all three at the TOP of the page, a hand's width above the keys
     // they act on. They are the keyboard's own controls and the keyboard draws
@@ -173,26 +179,7 @@
   let ctx = null, playout = null, ws = null, seq = 0;
   let rtt = null, cushionMs = 0, breaks = -1, rateWarned = false;
 
-  /**
-   * How late the sound is, as far as this page can honestly account for it:
-   * half the round trip to the board and back, plus the cushion it is holding.
-   *
-   * ⚠️ IT IS A FLOOR, NOT THE FIGURE. What it does NOT contain: the board's own
-   * capture and encode, this browser's output latency (tens of ms and not
-   * readable from here), and the speaker. So it can only ever be an
-   * under-estimate — which is the honest direction for a number somebody will
-   * quote, and the paragraph above says so in words.
-   *
-   * ⚠️ AND HALF A ROUND TRIP IS AN ASSUMPTION. The path out and the path back
-   * are not required to cost the same, and this project has measured them not
-   * to: a Worker `/time` endpoint came back ±50 ms of BIAS rather than jitter.
-   * Halving is the best a page with one clock can do, and saying so is the
-   * difference between a measurement and a claim.
-   */
-  function showDelay() {
-    if (rtt == null) return;
-    d.set('delay', Math.round(rtt / 2 + cushionMs));
-  }
+
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
   let bytes = 0, firstFrame = 0, pingAt = 0, autoStarted = false;
   let soundfonts = [];
@@ -357,7 +344,6 @@
       const st = e.data?.stats; if (!st) return;
       cushionMs = st.bufferedMs;
       d.set('buffer', Math.round(st.bufferedMs));
-      showDelay();
       const b = st.underruns + st.trimEvents;
       if (b !== breaks) {
         const first = breaks < 0;
@@ -596,7 +582,9 @@
       if (m.from === ID) return;
       // ONE CLOCK, both stamps: the box's performance.now() and ours share no
       // origin, so this is timed entirely here and contains no clock offset.
-      if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); d.set('round trip', rtt); showDelay(); pingAt = 0; }
+      // The ping still runs — it is how this page knows the board is answering
+      // at all — it just has no cell of its own any more.
+      if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); pingAt = 0; }
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
       // The box's own library. It arrives once per instrument change and is
