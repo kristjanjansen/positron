@@ -57,7 +57,7 @@
   const CAP = 8;
   // The three checks below are mechanism, not something a visitor came to
   // press. They stay in the DOM — HIDDEN, not removed — because the harness
-  // presses `.d-controls button`, and a control it cannot reach is a subject
+  // presses `.pos-controls button`, and a control it cannot reach is a subject
   // the suite silently stops testing. `?checks=1` shows them.
   const SHOW_CHECKS = q.has('checks');
 
@@ -93,7 +93,7 @@
   // off a tick before you press send.
   compose.append(el('label', null, 'kind'), verb, el('label', null, 'says'), body);
   // The composer goes ABOVE the control bar, so Send sits under the thing it
-  // sends. Moving the BUTTON instead would take it out of `.d-controls`, which
+  // sends. Moving the BUTTON instead would take it out of `.pos-controls`, which
   // is the only place the harness looks — a control it cannot reach is a
   // subject the suite silently stops testing (#19), and it would also reorder
   // the presses, since the harness walks them in document order.

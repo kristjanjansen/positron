@@ -28,8 +28,8 @@
   .kit-out { font: 500 12px/1.6 var(--mono); color: var(--hi); min-height: 1.6em; }
 </style>
 
-<div class="d-head">
-  <div class="d-title"><h1 class="d-name">kit</h1></div>
+<div class="pos-head">
+  <div class="pos-title"><h1 class="pos-name">kit</h1></div>
 </div>
 
 <p class="kit-n" style="margin-top:10px">
@@ -58,12 +58,12 @@
   }
 
   // ── buttons ─────────────────────────────────────────────────────────────
-  section('buttons', 'The baseline everything else matches: 34 px tall, 4 px corner. `d-pri` is the one primary per page — two primaries side by side say neither is the main path.',
+  section('buttons', 'The baseline everything else matches: 34 px tall, 4 px corner. `pos-pri` is the one primary per page — two primaries side by side say neither is the main path.',
     `el('button', '', 'ordinary', { type: 'button' })
-el('button', 'd-pri', 'the primary one', { type: 'button' })`,
+el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
     (box) => {
       box.append(el('button', '', 'ordinary', { type: 'button' }));
-      const p = el('button', 'd-pri', 'the primary one', { type: 'button' }); box.append(p);
+      const p = el('button', 'pos-pri', 'the primary one', { type: 'button' }); box.append(p);
       const dis = el('button', '', 'disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
       const busy = el('button', '', 'working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
     });
@@ -121,8 +121,8 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── keyboard ────────────────────────────────────────────────────────────
   section('keyboard — shell/keyboard.mjs',
-    'Two octaves, a-to-k on a real keyboard, pointer or touch on the drawn one. It REPORTS a note number and knows nothing about what makes the sound — which is why the same component serves a synth in the page and a Raspberry Pi in another building.',
-    `createKeyboard(parent, { base: 60, onDown, onUp })`,
+    'Two octaves, a-to-k on a real keyboard, pointer or touch on the drawn one. It REPORTS a note number and knows nothing about what makes the sound — which is why the same component serves a synth in the page and a Raspberry Pi in another building. The small row underneath comes with it and cannot be switched off: those three are the keyboard’s own controls, and every page that draws a keyboard wanted all three. 26 px rather than the standard 34, because it acts on the keys above it and must not read as the page’s own row of buttons moved down. Push the octave to either end and the button that has nowhere left to go goes dim.',
+    `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })`,
     (box) => {
       const o = out('—');
       const holder = el('div', '', null); holder.style.width = '100%';
@@ -131,6 +131,11 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
         base: 60,
         onDown: (n) => { kb.lightNote(n, true); o.textContent = `note ${n} down`; },
         onUp: (n) => { kb.lightNote(n, false); o.textContent = `note ${n} up`; },
+        onOctave: (n) => { o.textContent = `octave moved — leftmost note is now ${n}`; },
+        // The keyboard has already released every key it was holding by the
+        // time this runs. It is here for a page whose sound is made somewhere
+        // the component cannot reach — on /box/ it is a message to the board.
+        onPanic: () => { o.textContent = 'notes off'; },
       });
       box.append(o);
     });
@@ -140,18 +145,18 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
     'Every cell must be able to change. A cell showing a structural constant reads as a measurement and teaches the reader to skip the row — which is why 01’s always-1 `missed` became `worst`.',
     `d.set('latency', 26.2);  d.set('holes', 0, 'warn')`,
     (box) => {
-      const r = el('div', 'd-readout');
+      const r = el('div', 'pos-readout');
       for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'], ['lost', '0', '', ''], ['state', 'live', '', 'ok']]) {
-        const c = el('div', 'd-cell');
-        c.append(el('div', 'd-k', k));
+        const c = el('div', 'pos-cell');
+        c.append(el('div', 'pos-k', k));
         // ⚠️ THE UNIT GOES INSIDE THE VALUE, which is what shell.mjs does —
-        // `.d-v` is display:block, so a unit next to it as a SIBLING drops to a
+        // `.pos-v` is display:block, so a unit next to it as a SIBLING drops to a
         // line of its own with the value's whole line-height between them. The
         // sandbox existing to catch drift and then drifting itself is the joke
         // that writes itself; it is nested now, like the real one.
-        const val = el('span', 'd-v', v);
+        const val = el('span', 'pos-v', v);
         if (state) val.dataset.state = state;
-        if (u) val.append(el('span', 'd-u', u));
+        if (u) val.append(el('span', 'pos-u', u));
         c.append(val); r.append(c);
       }
       box.style.display = 'block'; box.append(r);

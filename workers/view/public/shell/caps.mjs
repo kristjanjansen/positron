@@ -176,7 +176,7 @@ export async function markIndex(root = document) {
   root.documentElement?.classList.toggle('xr', caps.xr === true);
   if (caps.xr === true) offerHeadset(root);
 
-  for (const row of root.querySelectorAll('.d-row[data-needs]')) {
+  for (const row of root.querySelectorAll('.pos-row[data-needs]')) {
     const needs = row.dataset.needs.split(' ').filter(Boolean);
     const missing = needs.filter((c) => caps[c] === false);
     if (!missing.some((c) => HARD.has(c))) {
@@ -197,10 +197,10 @@ export async function markIndex(root = document) {
 }
 
 function addWhy(row, text, kind) {
-  const meta = row.querySelector('.d-meta');
+  const meta = row.querySelector('.pos-meta');
   if (!meta || !text) return;
   const el = document.createElement('span');
-  el.className = kind === 'soft' ? 'd-why soft' : 'd-why';
+  el.className = kind === 'soft' ? 'pos-why soft' : 'pos-why';
   el.textContent = text;
   meta.append(el);
 }
@@ -222,10 +222,10 @@ function addWhy(row, text, kind) {
  * afternoon.
  */
 function offerHeadset(root) {
-  const head = root.querySelector('.d-title');
-  if (!head || root.querySelector('.d-xr-offer')) return;
+  const head = root.querySelector('.pos-title');
+  if (!head || root.querySelector('.pos-xr-offer')) return;
   head.insertAdjacentHTML('afterend', `
-    <a class="d-xr-offer" href="/scene/">
+    <a class="pos-xr-offer" href="/scene/">
       <span class="k">you are in a headset</span>
       <span class="n">scene</span>
       <span class="o">a room built from one number — roll it, and the same number rebuilds it exactly</span>

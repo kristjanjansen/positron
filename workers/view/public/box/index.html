@@ -8,13 +8,13 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .pick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
-  .pick .fx, .d-controls .fx { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
-  .d-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
+  .pick .fx, .pos-controls .fx { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+  .pos-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
                          text-transform: uppercase; margin: 0 2px 0 0; }
-  .d-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
-  .d-controls button.die:disabled, .d-controls .fx button:disabled {
+  .pos-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
+  .pos-controls button.die:disabled, .pos-controls .fx button:disabled {
     opacity: .35; cursor: default; border-color: var(--line); }
-  .d-controls .fx button[aria-pressed="true"] {
+  .pos-controls .fx button[aria-pressed="true"] {
     color: var(--hi); border-color: var(--hi);
     background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
   /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
@@ -22,13 +22,13 @@
      armed state uses — so a focused-but-OFF switch was indistinguishable from
      an armed one, and read as "pappus is on" while the log said bypassed.
      Focus goes grey; green means armed and nothing else. */
-  .d-controls .fx button:focus:not(:focus-visible),
+  .pos-controls .fx button:focus:not(:focus-visible),
   .pick button:focus:not(:focus-visible) { outline: none; }
-  .d-controls .fx button:focus-visible,
+  .pos-controls .fx button:focus-visible,
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   /* and the switch says which it is in words, so nobody has to read a colour */
-  .d-controls .fx button[aria-pressed="false"]::after { content: ' off'; opacity: .5; }
-  .d-controls .fx button[aria-pressed="true"]::after { content: ' on'; opacity: .7; }
+  .pos-controls .fx button[aria-pressed="false"]::after { content: ' off'; opacity: .5; }
+  .pos-controls .fx button[aria-pressed="true"]::after { content: ' on'; opacity: .7; }
   .pick .fx .lab { margin: 0 2px 0 0; }
   .pick button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
   .pick button.die:disabled { opacity: .35; cursor: default; border-color: var(--line); }
@@ -83,11 +83,12 @@
     what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own \u2014 it sends your key presses to the board and plays back the samples that come back, so the delay you hear is a real journey rather than a setting: out to a server, down to the board and all the way back, about a tenth of a second. Play with the a-to-k row, the keys below, or a MIDI keyboard if you have one plugged in; z and x shift the octave, and the arrows and the random button move through the patches the board actually has, because it reads its own instrument library and sends back the names. The space and chorus settings are made on the board rather than here \u2014 this page only sends the numbers, the same way the mirror page sends its shader knobs.',
 
     readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
-    controls: [
-      { id: 'oct-', label: '−' },
-      { id: 'oct+', label: '+' },
-      { id: 'panic', label: 'notes off' },
-    ],
+    // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
+    // which put all three at the TOP of the page, a hand's width above the keys
+    // they act on. They are the keyboard's own controls and the keyboard draws
+    // them now — see the pad in demo/shell/keyboard.mjs. The row below is not
+    // empty: the space and chorus settings are appended into it further down.
+    controls: [],
   });
   guard(d);
 
@@ -96,7 +97,7 @@
   // MEANS, so choosing it after choosing a patch is backwards.
   const picks = el('div', 'pick');
   picks.append(el('span', 'lab', 'instrument'));
-  const controls = document.querySelector('.d-controls');
+  const controls = document.querySelector('.pos-controls');
   if (controls) controls.parentNode.insertBefore(picks, controls);
   else d.el.append(picks);
   // Pinned right on the instrument row: a patch belongs to the instrument, and
@@ -366,6 +367,11 @@
     base: 60,
     onDown: (note) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel: 100, channel: 0 })); },
     onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
+    // The keyboard releases what IT is holding; the board may be holding notes
+    // this page never pressed — one sent over MIDI, or by somebody else in the
+    // room — so the button has to reach the board as well.
+    onPanic: () => send({ type: 'note.panic' }),
+    onOctave: (n) => d.log(`octave: base note ${n} (${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][n % 12]}${Math.floor(n / 12) - 1})`),
   });
 
   // A real keyboard, where there is one — the shared component, so the
@@ -491,16 +497,14 @@
   // "random" means a different thing per instrument. Pappus has no patches at
   // all — it has 106 parameters — so rolling a program number there does
   // nothing audible, which is exactly how it sounded.
-  const octave = () => d.log(`octave: base note ${kb.base} (${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][kb.base % 12]}${Math.floor(kb.base / 12) - 1})`);
-  d.on('oct-', () => { kb.shiftOctave(-1); octave(); });
-  d.on('oct+', () => { kb.shiftOctave(1); octave(); });
-  // z / x as well, because a keyboard player's hands are already on the keys.
+  // z / x shift the octave too, because a keyboard player's hands are already
+  // on the keys and reaching for a 26 px button under them is a lost note. The
+  // pad's own buttons and the log line are the keyboard's — see `onOctave`.
   addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
     const k = e.key.toLowerCase();
-    if (k === 'z' || k === 'x') { kb.shiftOctave(k === 'z' ? -1 : 1); octave(); }
+    if (k === 'z' || k === 'x') kb.shiftOctave(k === 'z' ? -1 : 1);
   });
-  d.on('panic', () => send({ type: 'note.panic' }));
 
   // Steering round trip, every few seconds. This is the CONTROL plane, not the
   // audio: what a key press costs to reach the board, before anything is made.

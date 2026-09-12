@@ -19,14 +19,14 @@
 //   'faux'    — position:fixed over the viewport, which needs no API at all
 //
 // ⚠️ THE CLASS IS THE ONLY STYLING HOOK, NOT `:fullscreen`. A rule written
-// `.pane:fullscreen, .pane.d-full { … }` is DROPPED ENTIRELY by any browser
+// `.pane:fullscreen, .pane.pos-full { … }` is DROPPED ENTIRELY by any browser
 // that does not recognise `:fullscreen` — one unknown selector invalidates the
 // whole list — so grouping them would take the fallback down on precisely the
-// browsers that need it. Both paths set `.d-full`; faux adds `.d-faux` for the
+// browsers that need it. Both paths set `.pos-full`; faux adds `.pos-faux` for the
 // positioning it alone requires.
 
-const FULL = 'd-full';
-const FAUX = 'd-faux';
+const FULL = 'pos-full';
+const FAUX = 'pos-faux';
 
 /** What this browser can actually do. 'element', 'video' or false. */
 export function support() {
@@ -67,14 +67,14 @@ export async function toggle(el) {
   }
 
   el.classList.add(FULL, FAUX);
-  document.documentElement.classList.add('d-faux-host');
+  document.documentElement.classList.add('pos-faux-host');
   return 'faux';
 }
 
 export async function exit(el) {
   if (el.classList.contains(FAUX)) {
     el.classList.remove(FULL, FAUX);
-    document.documentElement.classList.remove('d-faux-host');
+    document.documentElement.classList.remove('pos-faux-host');
     return;
   }
   el.classList.remove(FULL);
