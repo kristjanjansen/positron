@@ -7,7 +7,17 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .pick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px; }
+  /* ⚠️ IT HAS TO WIDEN. A flex row of fixed-width buttons on a phone leaves a
+     column of stragglers down the left and empty space beside them; the
+     instrument names are different lengths, so nothing lines up. Same fix as
+     the slider group: let the row own the width and share it out. */
+  .pick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
+          width: 100%; }
+  .pick > button { flex: 1 1 auto; min-width: 84px; }
+  @media (max-width: 560px) {
+    .pick .fx { margin-left: 0; width: 100%; }
+    .pick .fx .pos-choice { flex: 1 1 auto; }
+  }
   .pick .fx, .pos-controls .fx { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
   .pos-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
                          text-transform: uppercase; margin: 0 2px 0 0; }
@@ -27,8 +37,6 @@
   .pos-controls .fx button:focus-visible,
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   /* and the switch says which it is in words, so nobody has to read a colour */
-  .pos-controls .fx button[aria-pressed="false"]::after { content: ' off'; opacity: .5; }
-  .pos-controls .fx button[aria-pressed="true"]::after { content: ' on'; opacity: .7; }
   .pick .fx .lab { margin: 0 2px 0 0; }
   .pick button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
   .pick button.die:disabled { opacity: .35; cursor: default; border-color: var(--line); }
@@ -71,6 +79,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createStepper } from '/shell/stepper.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createMidi } from '/shell/midi.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -80,7 +89,7 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own \u2014 it sends your key presses to the board and plays back the samples that come back, so the delay you hear is a real journey rather than a setting: out to a server, down to the board and all the way back, about a tenth of a second. Play with the a-to-k row, the keys below, or a MIDI keyboard if you have one plugged in; z and x shift the octave, and the arrows and the random button move through the patches the board actually has, because it reads its own instrument library and sends back the names. The space and chorus settings are made on the board rather than here \u2014 this page only sends the numbers, the same way the mirror page sends its shader knobs.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Play the a-to-k row, the drawn keys, or a MIDI keyboard; the arrows step through the patches the board actually has. Space and chorus are made on the board — this page only sends the numbers.',
 
     readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
@@ -301,8 +310,21 @@
       // before the effect block, which is pinned right with margin-left:auto
       picks.insertBefore(b, fxWrap);
     };
-    if (soundfonts.length) for (const sf of soundfonts) mk(sf.name, sf.name, { type: 'audio.start', source: 'fluidsynth', soundfont: sf.path });
-    else mk('sampled', 'fluidsynth', { type: 'audio.start', source: 'fluidsynth' });
+    // 🔴 ONE SAMPLED INSTRUMENT, NOT ONE PER FILE. This drew a button for every
+    // soundfont on the board under its raw filename, so the row read
+    // `FluidR3_GM` `sf_GMbank` `hexter` `yoshimi` — two of which are the SAME
+    // instrument, General MIDI, twice, named after the files they happen to
+    // live in. A visitor reading that has to know what a soundfont is before
+    // they can tell that two of the four choices are one choice.
+    //
+    // They are picked between here instead of shown: the fullest General MIDI
+    // set wins, because that is the only difference a listener could name.
+    const best = soundfonts.slice().sort((a, b) =>
+      (/fluidr3/i.test(b.name) ? 1 : 0) - (/fluidr3/i.test(a.name) ? 1 : 0)
+      || (b.bytes || 0) - (a.bytes || 0))[0];
+    mk('sampled', 'fluidsynth',
+       best ? { type: 'audio.start', source: 'fluidsynth', soundfont: best.path }
+            : { type: 'audio.start', source: 'fluidsynth' });
     for (const k of ['hexter', 'yoshimi']) {
       if (avail && avail[k] === false) continue;
       mk(k, k, { type: 'audio.start', source: k }, true);
@@ -334,22 +356,13 @@
   const CHORUS = [['off', 0], ['light', 0.35], ['wide', 0.7]];
   let spaceAt = 1, chorusAt = 0;      // a little room by default: dry is a test, not a sound
 
+  // ⚠️ `createChoice`, NOT SIX LOOSE BUTTONS. This row built its own by hand and
+  // it showed: no grouping, so three choices read as three unrelated controls;
+  // the wrong corner on every button; and a `::after` that appended ' on' or
+  // ' off' to each one, inherited from when this was a single toggle — so a
+  // three-way row rendered `dry off`, `room on`, `off on`. Which one is chosen
+  // is already said by colour and by aria-pressed.
   const spaceRow = el('span', 'fx');
-  const mkKnob = (label, options, get, set) => {
-    spaceRow.append(el('span', 'lab', label));
-    const made = options.map((opt, i) => {
-      const b = el('button', '', opt[0], { type: 'button', 'aria-pressed': String(i === get()) });
-      b.onclick = () => {
-        set(i);
-        made.forEach((x, k) => x.setAttribute('aria-pressed', String(k === i)));
-        sendSpace();
-        d.log(`${label} ${opt[0]}`);
-      };
-      spaceRow.append(b);
-      return b;
-    });
-    return made;
-  };
 
   /** One message, the whole state. Clamped again at the far end. */
   function sendSpace() {
@@ -357,8 +370,15 @@
     send({ type: 'fx.space', on: spaceAt > 0 || chorusAt > 0,
            mix: p.mix, room: p.room, damp: p.damp, chorus: CHORUS[chorusAt][1] });
   }
-  mkKnob('space', SPACE, () => spaceAt, (i) => { spaceAt = i; });
-  mkKnob('chorus', CHORUS, () => chorusAt, (i) => { chorusAt = i; });
+  const spacePick = createChoice({
+    label: 'space', options: SPACE.map(([n]) => [n, n]), at: spaceAt,
+    onPick: (_v, name, i) => { spaceAt = i; sendSpace(); d.log(`space ${name}`); },
+  });
+  const chorusPick = createChoice({
+    label: 'chorus', options: CHORUS.map(([n]) => [n, n]), at: chorusAt,
+    onPick: (_v, name, i) => { chorusAt = i; sendSpace(); d.log(`chorus ${name}`); },
+  });
+  spaceRow.append(spacePick.el, chorusPick.el);
   spaceRow.hidden = true;             // shown when an instrument that can be wrapped is up
   if (controls) { controls.style.display = 'flex'; controls.style.alignItems = 'center'; controls.append(spaceRow); }
   else d.el.append(spaceRow);
