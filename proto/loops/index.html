@@ -31,7 +31,7 @@
   #p-plot{height:230px}
   #p-strip-a,#p-strip-b{height:74px}
   #d-bars{height:150px}
-  #d-strip{height:330px}
+  #pos-strip{height:330px}
   table{border-collapse:collapse;width:100%;font-size:12px}
   th,td{text-align:right;padding:3px 7px;border-bottom:1px solid var(--line)}
   th{color:var(--dim);font-weight:500}
@@ -99,7 +99,7 @@ Both pieces below are that one field. Neither needed new machinery.</p>
     </div>
     <div class="card">
       <h2>the tape — attested solid, reconstruction hatched by tier</h2>
-      <canvas id="d-strip" height="300"></canvas>
+      <canvas id="pos-strip" height="300"></canvas>
     </div>
   </div>
   <div class="card">
@@ -238,7 +238,7 @@ function buildDis() {
     onTone: (p) => blip(p.f, 0.09 * (p.g ?? 1), 0.16, p.tier ?? 0) });
   dis.nest.onWrap(() => { syncLanes(); renderDis(); });
   if (dStrip) dStrip.dispose();
-  dStrip = createStrip($('#d-strip'), dis.child, { gutter: 128, follow: false, evidence: 'all', loop: true });
+  dStrip = createStrip($('#pos-strip'), dis.child, { gutter: 128, follow: false, evidence: 'all', loop: true });
   syncLanes();
   dStrip.fit(0, dis.loopMs);
   $('#d-ev').textContent = 'evidence: all';
