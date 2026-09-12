@@ -26,8 +26,8 @@ body {
 /* NO RULE UNDER THE INTRO. The heading, the sentence under it and the space
    below already separate it from the page; a line as well is a third channel
    saying what two are saying. Spacing kept, so nothing moves. */
-.d-head { padding-bottom: 12px; margin-bottom: 16px; }
-.d-back {
+.pos-head { padding-bottom: 12px; margin-bottom: 16px; }
+.pos-back {
   font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); text-decoration: none; display: inline-block; margin-bottom: 10px;
 }
@@ -35,21 +35,21 @@ body {
    the page gets to breathe. Phones keep the tight version — there the scarce
    thing is height, not calm. */
 @media (min-width: 600px) {
-  .d-back { margin-bottom: 30px; }
-  .d-what { margin-top: 12px; }
+  .pos-back { margin-bottom: 30px; }
+  .pos-what { margin-top: 12px; }
 }
-.d-back:hover { color: var(--hi); }
-.d-title { display: flex; align-items: baseline; gap: 10px; }
-.d-n { font: 600 11px/1.4 var(--mono); color: var(--hi); font-variant-numeric: tabular-nums; }
-.d-name {
+.pos-back:hover { color: var(--hi); }
+.pos-title { display: flex; align-items: baseline; gap: 10px; }
+.pos-n { font: 600 11px/1.4 var(--mono); color: var(--hi); font-variant-numeric: tabular-nums; }
+.pos-name {
   font: 600 17px/1.2 var(--mono); letter-spacing: .01em; margin: 0;
 }
-.d-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
+.pos-what { margin: 6px 0 0; color: var(--dim); font-size: 13.5px; max-width: 62ch; }
 
 /* how it works — one plain paragraph */
 
 /* ── readout ──────────────────────────────────────────────────────────── */
-.d-readout {
+.pos-readout {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
@@ -57,24 +57,24 @@ body {
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
    was hidden */
-.d-readout[hidden] { display: none; }
-.d-cell { background: var(--card); padding: 10px 12px; min-width: 0; }
-.d-k {
+.pos-readout[hidden] { display: none; }
+.pos-cell { background: var(--card); padding: 10px 12px; min-width: 0; }
+.pos-k {
   font: 500 9.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
   color: var(--dim2); display: block;
 }
-.d-v {
+.pos-v {
   font: 600 19px/1.25 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--fg); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.d-v[data-state="pending"] { color: var(--dim2); }
-.d-v[data-state="ok"]   { color: var(--ok); }
-.d-v[data-state="bad"]  { color: var(--bad); }
-.d-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 1.5px; }
+.pos-v[data-state="pending"] { color: var(--dim2); }
+.pos-v[data-state="ok"]   { color: var(--ok); }
+.pos-v[data-state="bad"]  { color: var(--bad); }
+.pos-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 1.5px; }
 
 /* ── controls ─────────────────────────────────────────────────────────── */
-.d-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
-button, .d-btn {
+.pos-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+button, .pos-btn {
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
   border-radius: 4px; padding: 0 14px; height: 34px; cursor: pointer;
@@ -87,14 +87,14 @@ button, .d-btn {
      manipulation` goes with it: it drops the 300 ms double-tap-to-zoom wait, so
      a key press sounds when it is pressed. Readouts, prose and the log keep
      their selection — copying a number out of those is a real thing to want,
-     which is the rule already stated at .d-strip below. */
+     which is the rule already stated at .pos-strip below. */
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none; touch-action: manipulation;
 }
 button:hover { border-color: var(--dim2); }
 button:active { background: var(--card); }
 button[disabled] { opacity: .4; cursor: default; }
-button.d-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600; }
+button.pos-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600; }
 
 /* A CONTROL AT WORK. Set by the shell whenever a control's handler returns a
    promise, cleared when it settles. Paint only: no spinner, no label change, no
@@ -116,40 +116,40 @@ button[data-busy="1"] {
     transparent 65%, transparent 100%);
   background-size: 220% 100%;
   background-repeat: no-repeat;
-  animation: d-sweep 1.1s linear infinite;
+  animation: pos-sweep 1.1s linear infinite;
 }
-button.d-pri[data-busy="1"] {
+button.pos-pri[data-busy="1"] {
   background-image: linear-gradient(100deg,
     transparent 0%, transparent 35%,
     rgba(11, 14, 20, .28) 50%,
     transparent 65%, transparent 100%);
 }
-@keyframes d-sweep { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+@keyframes pos-sweep { from { background-position: 160% 0; } to { background-position: -60% 0; } }
 @media (prefers-reduced-motion: reduce) {
   button[data-busy="1"] { animation: none; opacity: .62; }
 }
 
 /* ── slot: whatever the demo itself draws ─────────────────────────────── */
-.d-body { margin: 0 0 14px; }
-.d-body:empty { display: none; }
+.pos-body { margin: 0 0 14px; }
+.pos-body:empty { display: none; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
    competes with the page's actual primary control. */
-.d-tap {
+.pos-tap {
   display: block; width: 100%; margin: 0 0 10px;
   color: var(--hi); background: transparent; border-color: var(--hi);
   font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
 
 /* ── hardware (sound + midi) ──────────────────────────────────────────── */
-.d-hw { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.pos-hw { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 /* the direction label and its picker are one control: same box, same baseline */
-.d-hw-tag {
+.pos-hw-tag {
   font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
   color: var(--dim2); align-self: center;
 }
-.d-hw-pick {
+.pos-hw-pick {
   font: 500 12px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
   border-radius: 4px; padding: 0 10px; max-width: 100%;
@@ -162,20 +162,20 @@ button.d-pri[data-busy="1"] {
    a message longer than the box wrapped back to column zero — the continuation
    sat under the TIMESTAMP and read as a new entry that had lost its time.
    `auto 1fr` keeps every continuation under the message it belongs to. */
-.d-log {
+.pos-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   padding: 10px 12px; max-height: 150px; overflow-y: auto; margin: 0;
   display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-content: start;
 }
-.d-log:empty { display: none; }
-.d-line { display: contents; }
-.d-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-.d-m { min-width: 0; overflow-wrap: anywhere; }
-.d-line.hi .d-m, .d-log b { color: var(--fg); font-weight: 500; }
-.d-line.bad .d-m, .d-log i { color: var(--bad); font-style: normal; }
-.d-line.warn .d-m { color: var(--warn); }
-.d-line.ok .d-m { color: var(--ok); }
+.pos-log:empty { display: none; }
+.pos-line { display: contents; }
+.pos-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.pos-m { min-width: 0; overflow-wrap: anywhere; }
+.pos-line.hi .pos-m, .pos-log b { color: var(--fg); font-weight: 500; }
+.pos-line.bad .pos-m, .pos-log i { color: var(--bad); font-style: normal; }
+.pos-line.warn .pos-m { color: var(--warn); }
+.pos-line.ok .pos-m { color: var(--ok); }
 
 /* ── transport bar ────────────────────────────────────────────────────── */
 /* WRAP. Measured at 390 px (iPhone) this row overflowed its own card by 94 px
@@ -225,11 +225,11 @@ button.d-pri[data-busy="1"] {
    face. It is the one control on the bar that starts WRITING something, and the
    play button beside it is the site's yellow — two primaries in one colour
    would make them the same kind of thing. */
-.tbar-x.d-pri { color: var(--rec); background: color-mix(in oklab, var(--rec) 14%, var(--card2));
+.tbar-x.pos-pri { color: var(--rec); background: color-mix(in oklab, var(--rec) 14%, var(--card2));
   border-color: color-mix(in oklab, var(--rec) 55%, var(--line)); font-size: 17px; }
-.tbar-x.d-pri:hover { background: color-mix(in oklab, var(--rec) 24%, var(--card2)); }
+.tbar-x.pos-pri:hover { background: color-mix(in oklab, var(--rec) 24%, var(--card2)); }
 /* recording: solid, because it is now a state and not an offer */
-.tbar-x[data-on="1"], .tbar-x.d-pri[data-on="1"] {
+.tbar-x[data-on="1"], .tbar-x.pos-pri[data-on="1"] {
   color: #fff; background: var(--rec); border-color: var(--rec); font-size: 15px; }
 
 .tbar-scrub {
@@ -286,12 +286,12 @@ button.d-pri[data-busy="1"] {
 
    Selection is off HERE ONLY. The prose, the readout and the log stay
    selectable, because copying a number out of them is a real thing to want. */
-.d-strip, .tbar {
+.pos-strip, .tbar {
   touch-action: pan-y;
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
-.d-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+.pos-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
@@ -299,34 +299,34 @@ button.d-pri[data-busy="1"] {
 .strip-auto { height: 44px; }
 
 /* ── index ────────────────────────────────────────────────────────────── */
-.d-acts { list-style: none; margin: 0; padding: 0; }
-.d-act-h {
+.pos-acts { list-style: none; margin: 0; padding: 0; }
+.pos-act-h {
   font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
   color: var(--hi); margin: 26px 0 6px;
 }
-.d-row { border-bottom: 1px solid var(--line); }
-.d-row a {
+.pos-row { border-bottom: 1px solid var(--line); }
+.pos-row a {
   display: grid; grid-template-columns: 3.7em 1fr; gap: 2px 10px;
   padding: 12px 2px; color: inherit; text-decoration: none;
 }
-.d-row .n { grid-row: 1 / span 2; }
-.d-one { color: var(--dim); font-size: 13px; grid-column: 2; }
-.d-meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 3px; }
-.d-tag {
+.pos-row .n { grid-row: 1 / span 2; }
+.pos-one { color: var(--dim); font-size: 13px; grid-column: 2; }
+.pos-meta { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 3px; }
+.pos-tag {
   font: 500 9.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
   color: var(--dim2); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px;
 }
-.d-why {
+.pos-why {
   font: 500 10.5px/1.5 var(--mono); color: var(--warn);
   border: 1px dashed color-mix(in oklab, var(--warn) 45%, var(--line)); border-radius: 3px; padding: 0 6px;
 }
-.d-row a:active { background: var(--card); }
+.pos-row a:active { background: var(--card); }
 /* The first column is the day the page landed, not a rank: the front page
    sorts by it, and a rank renumbers itself every time the sort changes. */
-.d-row .n { font: 600 11px/1.4 var(--mono); color: var(--hi); opacity: .8; min-width: 3.4em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pos-row .n { font: 600 11px/1.4 var(--mono); color: var(--hi); opacity: .8; min-width: 3.4em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* The act still says where a row sits in the sequence, now that the ORDER no
    longer does. Same shape as a tag, dimmer, always first. */
-.d-act {
+.pos-act {
   font: 500 9.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
   color: var(--hi); opacity: .7; border: 1px solid color-mix(in oklab, var(--hi) 30%, var(--line));
   border-radius: 999px; padding: 1px 7px;
@@ -334,26 +334,26 @@ button.d-pri[data-busy="1"] {
 /* A capability this browser HAS but a page only wants — said, never enforced.
    demo/instrument keeps playing from its on-screen keys with no MIDI at all,
    so striking it off would be the index inventing a failure. */
-.d-why.soft { color: var(--dim2); border-style: dotted; border-color: var(--line); }
-.d-sub { font: 500 11.5px/1.5 var(--mono); color: var(--dim); margin: 4px 0 0; }
+.pos-why.soft { color: var(--dim2); border-style: dotted; border-color: var(--line); }
+.pos-sub { font: 500 11.5px/1.5 var(--mono); color: var(--dim); margin: 4px 0 0; }
 
 /* The headset offer. Only ever drawn inside a headset (caps.mjs), so it is
    sized for a hand-ray and a curved panel at arm's length rather than for a
    mouse: a big target, a lot of contrast, and no query string to type. */
-.d-xr-offer {
+.pos-xr-offer {
   display: grid; gap: 4px; margin: 14px 0 6px; padding: 18px 20px;
   border: 1px solid var(--hi); border-radius: 8px; text-decoration: none;
   background: color-mix(in oklab, var(--hi) 9%, var(--card));
   -webkit-tap-highlight-color: transparent;
 }
-.d-xr-offer .k { font: 600 11px/1.4 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); }
-.d-xr-offer .n { font: 600 26px/1.2 var(--mono); color: var(--fg); }
-.d-xr-offer .o { font: 400 15px/1.5 var(--mono); color: var(--dim); }
-.d-xr-offer .g { font: 500 13px/1.5 var(--mono); color: var(--hi); opacity: .85; margin-top: 4px; }
-.d-xr-offer:hover { background: color-mix(in oklab, var(--hi) 16%, var(--card)); }
-.d-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
-.d-row.todo { opacity: .6; }
-.d-row.todo a { cursor: default; }
+.pos-xr-offer .k { font: 600 11px/1.4 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); }
+.pos-xr-offer .n { font: 600 26px/1.2 var(--mono); color: var(--fg); }
+.pos-xr-offer .o { font: 400 15px/1.5 var(--mono); color: var(--dim); }
+.pos-xr-offer .g { font: 500 13px/1.5 var(--mono); color: var(--hi); opacity: .85; margin-top: 4px; }
+.pos-xr-offer:hover { background: color-mix(in oklab, var(--hi) 16%, var(--card)); }
+.pos-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
+.pos-row.todo { opacity: .6; }
+.pos-row.todo a { cursor: default; }
 
 /* Every video demo makes a bare <video> with no class, and this file had no
    `video` rule at all — so they were all browser-default while one page grew
@@ -371,7 +371,7 @@ video {
    `take` grew one the moment the rule above landed. */
 video[hidden] { display: none; }
 /* the house caption for a picture: the same small dim mono as the tags */
-.d-cap {
+.pos-cap {
   font: 500 9.5px/1.6 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); display: block; margin-top: 3px;
 }
@@ -415,55 +415,55 @@ video[hidden] { display: none; }
    It is deliberately NOT a different list of demos. Which pages run is decided
    by the probes in caps.mjs, which answer true or false on a laptop too. */
 .xr body { font-size: 17px; }
-.xr .d-row a { padding: 20px 6px; gap: 5px 14px; grid-template-columns: 4.6em 1fr; }
-.xr .d-row .nm { font-size: 20px; }
-.xr .d-row .n { font-size: 13px; min-width: 4.3em; opacity: 1; }
-.xr .d-one { font-size: 16px; line-height: 1.5; }
-.xr .d-tag, .xr .d-act, .xr .d-why { font-size: 12px; padding: 3px 10px; }
-.xr .d-meta { gap: 8px; margin-top: 6px; }
-.xr .d-name { font-size: 30px; }
-.xr .d-act-h { font-size: 13px; margin: 34px 0 8px; }
+.xr .pos-row a { padding: 20px 6px; gap: 5px 14px; grid-template-columns: 4.6em 1fr; }
+.xr .pos-row .nm { font-size: 20px; }
+.xr .pos-row .n { font-size: 13px; min-width: 4.3em; opacity: 1; }
+.xr .pos-one { font-size: 16px; line-height: 1.5; }
+.xr .pos-tag, .xr .pos-act, .xr .pos-why { font-size: 12px; padding: 3px 10px; }
+.xr .pos-meta { gap: 8px; margin-top: 6px; }
+.xr .pos-name { font-size: 30px; }
+.xr .pos-act-h { font-size: 13px; margin: 34px 0 8px; }
 /* A ray drifts, so a row must not need a steady hand to stay lit. */
-.xr .d-row a:hover { background: var(--card); }
+.xr .pos-row a:hover { background: var(--card); }
 
 /* And a DEMO page, which is the harder case: 670 px of height has to hold a
    paragraph, a readout, the controls and a log. So the prose gets smaller
    rather than larger — it is read once — while the readout and the controls,
    which are read WHILE something is changing, get bigger. Everything else
    gives up its margins. */
-.xr .d-what { font-size: 14px; line-height: 1.55; max-height: 8.5em; overflow-y: auto; }
-.xr .d-readout { gap: 10px 20px; }
-.xr .d-v { font-size: 22px; }
-.xr .d-k { font-size: 11px; }
-.xr .d-controls { gap: 10px; margin-bottom: 10px; }
-.xr button, .xr .d-btn { height: 44px; font-size: 15px; padding: 0 18px; }
-.xr .d-head { margin-bottom: 10px; }
-.xr .d-log { font-size: 12.5px; max-height: 9em; }
+.xr .pos-what { font-size: 14px; line-height: 1.55; max-height: 8.5em; overflow-y: auto; }
+.xr .pos-readout { gap: 10px 20px; }
+.xr .pos-v { font-size: 22px; }
+.xr .pos-k { font-size: 11px; }
+.xr .pos-controls { gap: 10px; margin-bottom: 10px; }
+.xr button, .xr .pos-btn { height: 44px; font-size: 15px; padding: 0 18px; }
+.xr .pos-head { margin-bottom: 10px; }
+.xr .pos-log { font-size: 12.5px; max-height: 9em; }
 
 /* ── filling the screen without a Fullscreen API ──────────────────────────
-   demo/shell/fullscreen.mjs sets `.d-full` on BOTH paths and adds `.d-faux`
+   demo/shell/fullscreen.mjs sets `.pos-full` on BOTH paths and adds `.pos-faux`
    when it had to do the work itself — which on an iPhone is always, because
    Safari there has no element fullscreen at all (only <video> can take the
    screen, via webkitEnterFullscreen).
 
    ⚠️ THESE ARE CLASSES AND NEVER `:fullscreen`. A browser that does not know
    `:fullscreen` throws away the WHOLE selector list it appears in, so
-   `.pane:fullscreen, .pane.d-full { … }` would delete the fallback on exactly
+   `.pane:fullscreen, .pane.pos-full { … }` would delete the fallback on exactly
    the browsers that depend on it. One hook, set from script, both paths. */
-/* ⚠️ TWO CLASSES, AND THE REASON IS SPECIFICITY, NOT STYLE. A bare `.d-faux`
+/* ⚠️ TWO CLASSES, AND THE REASON IS SPECIFICITY, NOT STYLE. A bare `.pos-faux`
    is (0,1,0) and loses to any page's own `.pane { position: relative }` — which
    is (0,1,0) too, in a <style> block that comes after this file. MEASURED: the
-   cover applied its height and z-index, `.d-faux` was on the element, and the
+   cover applied its height and z-index, `.pos-faux` was on the element, and the
    pane stayed 338px wide because it was still a grid item. Scoping it under the
    host class the same script already sets makes it (0,2,0) and it wins on
    specificity rather than on where the stylesheet happens to sit. */
-.d-faux-host .d-faux {
+.pos-faux-host .pos-faux {
   position: fixed; inset: 0; z-index: 60;
   width: 100%; height: 100dvh; max-width: none; margin: 0; border-radius: 0;
 }
 /* The page behind must not scroll under a cover that is only position:fixed,
    and iOS will happily rubber-band it. */
-.d-faux-host, .d-faux-host body { overflow: hidden; overscroll-behavior: none; }
+.pos-faux-host, .pos-faux-host body { overflow: hidden; overscroll-behavior: none; }
 
 /* ── slider (demo/shell/slider.mjs) ──────────────────────────────────────
    ⚠️ 34 px, the same as `button` above, because these share a flex row and a
@@ -524,3 +524,54 @@ video[hidden] { display: none; }
 /* An icon button is SQUARE: its width comes from the control's height, never
    from how wide the glyph happens to be in whatever font arrived. */
 .step button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
+
+/* ── the keyboard's pad (demo/shell/keyboard.mjs) ─────────────────────────
+   Octave down, octave up, notes off — drawn under the keys by the keyboard
+   itself, on every page that draws one. They used to be ordinary controls in
+   `.pos-controls`, at the top of the page, a hand's width from the keys they
+   act on and mixed in with buttons that do something else.
+
+   🔴 26 px, NOT 34. A standard control is 34 px and this row must not read as
+   one: it acts on the keyboard, not on the page, and a second row of
+   full-height buttons directly under the keys reads as the page's main
+   controls moved rather than as the keyboard's own. 26 px is 34 minus 8, and
+   8 px is the gap between two controls in a row — so the step down is one unit
+   of spacing this layout already uses, rather than a new number invented here.
+   It is also the smallest height that still leaves the 11 px label ~6 px of
+   air above and below; below that the text starts to touch its own border.
+
+   ⚠️ THE PAD BELONGS TO THE KEYBOARD, so the gap above it is small (4 px) and
+   the gap that used to sit under the keys moves to the pair as a whole. Two
+   things 10 px apart are two things; 4 px apart they are one. */
+.kbd { margin: 0 0 10px; }
+.kbd .keys { margin-bottom: 4px; }
+
+.kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* the same gutter label as a slider's, for the same reason: one word saying
+   what the control next to it moves, in a face that cannot be mistaken for the
+   control itself */
+.kpad-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+.kpad button {
+  height: var(--kpad-h); padding: 0 9px;
+  font: 500 11px/1 var(--mono); color: var(--dim);
+  background: var(--card); border-color: var(--line);
+}
+.kpad button:hover:not([disabled]) { color: var(--fg); border-color: var(--dim2); }
+
+/* ⚠️ THE OCTAVE PAIR REUSES `.step` AND ADDS NOTHING TO IT BUT SIZE. The
+   border overlap, the outer-only corners and the raise-on-hover are all in the
+   stepper's block above; this only says how big. Copying those rules at a new
+   height is how two controls quietly become two kinds of control.
+
+   🔴 AND THE WRAPPER GETS NO BORDER, NO BACKGROUND AND NO RADIUS. It is the
+   same one-pixel trap the slider's lane hit (see `.sld-lane`): there, a border
+   inset the box the handle travelled in and left 1 px of lane showing at each
+   end. Here, a border or a rounded corner on the wrapper would sit one pixel
+   outside the buttons' own — a doubled line down the middle of the join and a
+   sliver of wrapper poking out past every corner. The buttons carry the whole
+   shape; the wrapper is only a flex box. */
+.kpad .step { height: var(--kpad-h); }
+.kpad .step button.ico { width: var(--kpad-h); font-size: 13px; }

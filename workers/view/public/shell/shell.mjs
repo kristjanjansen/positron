@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '9cf423b-142429';
+export const BUILD = '466efb3-150159';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -26,12 +26,12 @@ export function mount({
   favicon();
   markHeadset();
 
-  const head = el('div', 'd-head');
-  if (index) head.append(el('a', 'd-back', '← demos', { href: index }));
-  const title = el('div', 'd-title');
-  title.append(el('h1', 'd-name', name));
+  const head = el('div', 'pos-head');
+  if (index) head.append(el('a', 'pos-back', '← demos', { href: index }));
+  const title = el('div', 'pos-title');
+  title.append(el('h1', 'pos-name', name));
   head.append(title);
-  if (what) head.append(el('p', 'd-what', what));
+  if (what) head.append(el('p', 'pos-what', what));
 
 
   // readout — every key gets a cell, all pending until set()
@@ -43,22 +43,22 @@ export function mount({
   // MACHINE contract is unchanged: a CDP script still reads `__demo.readout`,
   // and `verify.mjs` still asserts the page declares one.
   const cells = new Map();
-  const rb = el('div', 'd-readout');
+  const rb = el('div', 'pos-readout');
   if (!showReadout) rb.hidden = true;
   for (const [k, unit] of Object.entries(readout)) {
-    const cell = el('div', 'd-cell');
-    const v = el('span', 'd-v', '—');
+    const cell = el('div', 'pos-cell');
+    const v = el('span', 'pos-v', '—');
     v.dataset.state = 'pending';
-    cell.append(el('span', 'd-k', k), v);
-    if (unit) v.append(el('span', 'd-u', unit));
+    cell.append(el('span', 'pos-k', k), v);
+    if (unit) v.append(el('span', 'pos-u', unit));
     cells.set(k, v);
     rb.append(cell);
   }
 
-  const cbar = el('div', 'd-controls');
+  const cbar = el('div', 'pos-controls');
   const handlers = new Map();
   for (const c of controls) {
-    const b = el('button', c.primary ? 'd-pri' : '', c.label);
+    const b = el('button', c.primary ? 'pos-pri' : '', c.label);
     b.type = 'button';
     b.dataset.id = c.id;
     // `end: true` pushes a control to the far right of the row. It is for the
@@ -93,8 +93,8 @@ export function mount({
     cbar.append(b);
   }
 
-  const body = el('div', 'd-body');
-  const logEl = el('pre', 'd-log');
+  const body = el('div', 'pos-body');
+  const logEl = el('pre', 'pos-log');
 
   document.body.append(head, rb, cbar, body, logEl);
 
@@ -115,7 +115,7 @@ export function mount({
     if (!cells.has(k)) throw new Error(`readout '${k}' was not declared in mount()`);
     api.readout[k] = value;
     const v = cells.get(k);
-    const unit = v.querySelector('.d-u');
+    const unit = v.querySelector('.pos-u');
     v.textContent = value === null || value === undefined ? '—'
       : typeof value === 'number' ? fmtNum(value) : String(value);
     if (unit) v.append(unit);
@@ -132,9 +132,9 @@ export function mount({
     // continuation started under the timestamp and read as a new entry with no
     // time. Photographed on `mirror`: "…spans 157" then "of 255" hanging off
     // the left margin. A grid gives the message its own column to wrap inside.
-    const row = el('span', `d-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
-    row.append(el('span', 'd-t', (line.t / 1000).toFixed(2)));
-    row.append(el('span', 'd-m', line.msg));
+    const row = el('span', `pos-line${kind && kind !== 'info' ? ' ' + kind : ''}`);
+    row.append(el('span', 'pos-t', (line.t / 1000).toFixed(2)));
+    row.append(el('span', 'pos-m', line.msg));
     logEl.append(row);
     logEl.scrollTop = logEl.scrollHeight;
   }
@@ -267,7 +267,7 @@ export async function playOrPrompt(v, d) {
       return false;
     }
     d?.log("autoplay refused — tap to start", "bad");
-    const tap = el("button", "d-tap", "tap to play");
+    const tap = el("button", "pos-tap", "tap to play");
     tap.type = "button";
     const go = async () => {
       try { await v.play(); tap.remove(); d?.log("playing"); }

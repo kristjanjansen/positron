@@ -1,7 +1,7 @@
 // demo/shell/slider.mjs — a value you can drag, the same height as a button.
 //
 // ⚠️ IT MATCHES THE BUTTON, and that is the whole brief. Controls in this
-// project sit in one flex row — `.d-controls` — so anything that is not 34 px
+// project sit in one flex row — `.pos-controls` — so anything that is not 34 px
 // tall makes the row grow and pushes everything else off its baseline. The
 // lane and the thing that moves along it are the SAME height as each other and
 // as a button, with the same 4 px corner, so a row of buttons and sliders reads
@@ -14,7 +14,7 @@
 // at both ends, which reads as a bug in the layout and makes the extremes
 // impossible to hit.
 //
-// 🔴 `verify.mjs` CANNOT DRAG THIS. It presses `.d-controls button, .tbar-x`
+// 🔴 `verify.mjs` CANNOT DRAG THIS. It presses `.pos-controls button, .tbar-x`
 // with `element.click()`, which fires `click` and nothing else — MEASURED, and
 // the reason `demo/verify-quest.mjs` exists. So a page that ships a slider and
 // asserts nothing about it has an ungraded control. `set()` is exported for

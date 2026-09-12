@@ -88,10 +88,10 @@
 
   const stage = el('div', 'stage');
   const srcFig = el('figure');
-  srcFig.append(canvas, el('figcaption', 'd-cap', 'source'));
+  srcFig.append(canvas, el('figcaption', 'pos-cap', 'source'));
   const seqFig = el('figure');
   const seq = el('div', 'seq');
-  const seqCap = el('figcaption', 'd-cap', 'playback');
+  const seqCap = el('figcaption', 'pos-cap', 'playback');
   seqFig.append(seq, seqCap);
   stage.append(srcFig, seqFig);
   d.el.append(stage);
