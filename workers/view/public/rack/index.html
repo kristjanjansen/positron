@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+
+  // The studio Mac's room. `/box/` is this same page pointed at a Raspberry Pi —
+  // which is the argument: what crosses the relay is a note NUMBER, so neither
+  // end knows what kind of machine the other one is.
+  const ROOM = new URLSearchParams(location.search).get('room') || 'm1-1';
+  const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
+  const ID = Math.random().toString(36).slice(2, 8);
+  const RATE = 48000;
+
+  const d = mount({
+    name: 'rack',
+    what: 'A MacBook in a studio is running Ableton Live, and this page plays it. Press a key and the note number goes out over a socket, a small program on that machine hands it to Live over the Mac’s own MIDI bus, and a copy of what Live renders comes straight back as sound — so the delay you hear is a real journey rather than a setting. Nothing is routed through a virtual audio cable: the sound is taken as a copy of the one program, which is why Live keeps playing out of its own speakers at the same time.',
+    readout: { instrument: '', frames: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
+    controls: [
+      { id: 'play', label: 'Start and connect', primary: true },
+      { id: 'panic', label: 'notes off' },
+      { id: 'check', label: 'Check it' },
+    ],
+  });
+  guard(d);
+
+  let ws = null, ctx = null, playout = null, seq = 0;
+  let frames = 0, bytes = 0, lastSeq = -1, missing = 0, pingAt = 0, started = false;
+  let answered = false, instrument = null;
+  const line = el('p', 'pos-what', 'nothing has answered in this room yet');
+  d.el.append(line);
+
+  const send = (m) => { if (ws?.readyState !== 1) return false; ws.send(JSON.stringify({ ...m, from: `page-${ID}`, at: Date.now(), seq: seq++ })); return true; };
+
+  async function startAudio() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on. `resume()` waits on a gesture in a real browser and
+    // NEVER rejects, so awaiting it is a hang rather than an error.
+    ctx.resume().catch(() => {});
+    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
+    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+    playout.connect(ctx.destination);
+    // The cushion is OURS, not the browser's — which is the whole reason to
+    // carry the samples rather than use WebRTC.
+    playout.port.postMessage({ cmd: 'floor', ms: 60, adaptive: false });
+  }
+
+  function connect() {
+    ws = new WebSocket(RELAY);
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => { d.log(`joined ${ROOM}`); send({ type: 'rack.status' }); pingAt = performance.now(); };
+    ws.onclose = () => { d.log('socket closed — reconnecting'); setTimeout(connect, 1200); };
+    ws.onmessage = (e) => {
+      if (typeof e.data !== 'string') { onPcm(e.data); return; }
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m.from === `page-${ID}`) return;
+      if (m.type === 'rack.state' || m.type === 'rack.hello') {
+        if (pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
+        answered = true; instrument = m.instrument || 'an instrument';
+        d.set('instrument', instrument, 'ok');
+        line.textContent = `${instrument} on a MacBook, played from here`;
+      }
+    };
+  }
+
+  function onPcm(buf) {
+    const s = new DataView(buf).getUint32(0, true);
+    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE. `missing` counts gaps in the
+    // sender's own sequence, so it measures what the RELAY dropped rather than
+    // what this page asked for.
+    if (lastSeq >= 0 && s > lastSeq + 1) missing += s - lastSeq - 1;
+    lastSeq = s;
+    frames++; bytes += buf.byteLength;
+    if (playout) playout.port.postMessage({ pcm: new Int16Array(buf, 12) }, []);
+  }
+
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (n) => { kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel: 100 })); },
+    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
+  });
+  const midi = createMidi({
+    onDown: (n, vel) => { if (!kb.keyOf(n)) return; kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel })); },
+    onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
+    log: (l, k) => d.log(l, k),
+    onPorts: (n) => d.set('midi', n || midi?.state?.() || 'none'),
+  });
+
+  let t0 = performance.now(), f0 = 0, b0 = 0;
+  setInterval(() => {
+    const now = performance.now(), dt = (now - t0) / 1000;
+    if (dt >= 1) {
+      d.set('frames', frames);
+      d.set('rate', Math.round((frames - f0) / dt));
+      d.set('bitrate', Math.round((bytes - b0) * 8 / dt / 1000));
+      t0 = now; f0 = frames; b0 = bytes;
+    }
+  }, 1000);
+
+  d.on('play', async () => { await startAudio(); started = true; d.log('listening — press a key'); });
+  d.on('panic', () => { send({ type: 'note.panic' }); d.log('notes off'); });
+  d.on('check', async () => {
+    await startAudio();
+    const before = frames;
+    send({ type: 'note.on', note: 60, vel: 110 });
+    send({ type: 'note.on', note: 64, vel: 100 });
+    await new Promise((r) => setTimeout(r, 2200));
+    const during = frames - before;
+    send({ type: 'note.off', note: 60 }); send({ type: 'note.off', note: 64 });
+
+    d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
+    // Both branches, because a studio Mac that is off is the ordinary case and a
+    // page that only asserts the happy path has no coverage on those days.
+    d.assert('it says which of the two it is in', answered || line.textContent.includes('nothing has answered'),
+      answered ? `${instrument} is answering` : 'nothing is answering, and the page says so');
+    if (answered) {
+      d.assert('an instrument named itself', !!instrument, String(instrument));
+      d.assert('sound came back while keys were held', during > 20, `${during} frames of audio in 2.2 s`);
+      d.assert('the relay dropped none of it', missing === 0, `${missing} missing of ${frames}`);
+      d.assert('this page makes no sound of its own', !!ctx && !!playout, 'every sample arrived over the socket');
+    } else {
+      d.assert('silence is reported as silence', !frames, `${frames} frames`);
+    }
+  });
+
+  connect();
+  d.ready();
+</script>
+</html>

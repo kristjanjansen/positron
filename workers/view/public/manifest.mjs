@@ -209,6 +209,18 @@ export const DEMOS = [
   { name: 'strip', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
+  // The studio Mac as an instrument: the same page as /box/, pointed at a
+  // different machine. What crosses the relay is a note NUMBER, so neither end
+  // knows what kind of computer the other one is.
+  //
+  // ⚠️ NO LOOPBACK DEVICE. A Core Audio process tap takes a copy of what Live
+  // renders while that audio carries on to the speakers — so BlackHole, the
+  // Multi-Output Device and Live's own output setting are all out of the path.
+  // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
+  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000,
+    one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
+    tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
+
   // 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to
   // be an INSERT on /box/ wrapping the instruments — and a grain cloud has no
   // note-off, so releasing a key swapped one drone for another and every
