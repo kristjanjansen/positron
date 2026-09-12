@@ -51,7 +51,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createSlider } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { openWire } from '/shell/wire.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
 
@@ -166,7 +166,7 @@
     ['swarm', 0,   0.9, 0.01, '',   'how much they drift apart from each other'],
   ];
   const sliders = new Map();
-  const knobRow = el('div', 'knobs');
+  const knobRow = createSliderGroup();
   for (const [key, min, max, step, unit, why] of KNOBS) {
     const s = createSlider({
       label: key, min, max, step, unit, value: (min + max) / 3,
@@ -182,9 +182,9 @@
       },
     });
     sliders.set(key, s);
-    knobRow.append(s.el);
+    knobRow.add(s);
   }
-  d.el.append(knobRow);
+  d.el.append(knobRow.el);
 
   const seedRow = el('div', 'seed');
   const seedIn = el('input', '', null, { type: 'text', inputmode: 'numeric', placeholder: 'type a number',
