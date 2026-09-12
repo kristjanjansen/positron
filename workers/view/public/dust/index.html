@@ -10,7 +10,6 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
 
@@ -45,9 +44,7 @@
     // something arriving it is a distance behind the write head. The picture has
     // to be computed the same way the worklet computes it, or it is a different
     // claim from the sound.
-    const centre = follow
-      ? ((lastWrite - (1 - P.scan) * span) % 1 + 1) % 1
-      : P.scan * span;
+    const centre = ((lastWrite - (1 - P.scan) * span) % 1 + 1) % 1;
     const half = P.spray * span;
     scope?.range(((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre);
   }
@@ -59,27 +56,12 @@
   // A granulator with nothing to chew is not a granulator, so this one carries
   // its own material and works with the network unplugged.
   const CHORD = [48, 55, 60, 64, 67, 72];
-  // 🔴 TWENTY SECONDS OF 1965, SERVED FROM HERE. Estonian Radio's archive is
-  // somebody else's public archive — it cut this project's board off after a day
-  // of testing (LESSONS #50) — so these were pulled ONCE, through the board's
-  // own rate-limited, disk-cached, backoff-honouring code, and they came back
-  // from that cache without a single request being made. They are our own files
-  // now: this page never talks to err.ee, exactly as `grains` never does.
-  //
-  // ⚠️ A granulator is the one instrument where the material IS the instrument,
-  // and these two are chosen to be unlike each other: speech has consonants and
-  // silence, so short grains stutter and long ones turn words into texture;
-  // music is continuous and pitched, so it smears into a chord.
-  const SOURCES = [
-    ['a held chord', 'chord'],
-    ['1965, spoken', 'speech'],
-    ['1965, music', 'music'],
-  ];
-  const CLIPS = {
-    speech: { url: '/dust/1965-speech.m4a', says: '“3 x 2 KÜSIMUST”, Estonian Radio, 1965' },
-    music:  { url: '/dust/1965-music.m4a',  says: '“Külaskäik Bachi majamuuseumisse”, Estonian Radio, 1965' },
-  };
-  let source = 'chord';
+  // ⚠️ ONE SOURCE, AND THAT IS THE WHOLE PICKER GONE. This carried a microphone
+  // and then two 1965 excerpts; the recordings did not work SONICALLY — a
+  // granulator wants material that sustains, and speech is consonants and gaps
+  // while a 1965 transfer is already noisy before a single grain is cut from it.
+  // A held chord is the thing this page can make an argument with. A choice of
+  // one is not a choice, so the row went with them.
 
   async function startAudio() {
     if (ctx) return;
@@ -90,11 +72,7 @@
     await ctx.audioWorklet.addModule('/shell/granular-worklet.js');
     node = new AudioWorkletNode(ctx, 'granular', {
       numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
-      // ⚠️ LONGER THAN THE CLIPS. `fill` truncates to the ring, so an 8 s ring
-      // silently kept the first 8 seconds of a 20 s excerpt and the waveform
-      // underneath would have been a picture of a piece of the recording while
-      // saying it was the recording.
-      processorOptions: { bufferSeconds: 24 },
+      processorOptions: { bufferSeconds: 12 },
     });
     node.port.onmessage = (e) => {
       const m = e.data || {};
@@ -111,40 +89,13 @@
     };
     gain = ctx.createGain(); gain.gain.value = 0.9;
     node.connect(gain).connect(ctx.destination);
-    await pickSource(source);
+    buildChord();
     apply();
   }
 
-  /** Whatever is being chewed is just a node into the worklet's input. */
-  async function pickSource(which) {
-    source = which;
-    for (const o of osc) { try { o.stop(); } catch {} }
-    osc = [];
-    if (src) { try { src.disconnect(); } catch {} src = null; }
-    if (CLIPS[which]) {
-      // ⚠️ FILLED, NOT PLAYED IN. A clip poured into the ring in one go is a
-      // fixed piece of material, so `where` becomes a position IN THE
-      // RECORDING rather than a distance behind a moving write head — which is
-      // what makes the waveform underneath scrubbable. `follow` goes off for
-      // the same reason.
-      try {
-        const ab = await (await fetch(CLIPS[which].url)).arrayBuffer();
-        const decoded = await ctx.decodeAudioData(ab);
-        const mono = decoded.getChannelData(0);
-        node.port.postMessage({ cmd: 'clear' });
-        node.port.postMessage({ cmd: 'fill', pcm: mono }, [ ]);
-        follow = 0;
-        apply();
-        d.log(`${CLIPS[which].says} — ${decoded.duration.toFixed(1)} s, held and chewed`, 'hi');
-      } catch (e) {
-        d.log(`the clip did not load (${e.name || e}) — staying on the chord`, 'warn');
-        source = 'chord'; srcPick.set(0, true); return pickSource('chord');
-      }
-      return;
-    }
-    follow = 1;
-    // A chord rather than one note: a granulator reading one sine is a
-    // granulator you cannot hear working.
+
+  /** The material: a held saw chord, straight into the worklet's input. */
+  function buildChord() {
     const mix = ctx.createGain(); mix.gain.value = 0.16;
     for (const n of CHORD) {
       const o = ctx.createOscillator();
@@ -166,8 +117,9 @@
   // turned out to describe one surface that mostly sounded the same. Here you
   // steer the thing you can hear and the page does the arithmetic.
   const P = { overlap: 3, sizeMs: 120, scan: 0.5, spray: 0.06, pitch: 0, pan: 0.8 };
-  // 1 while something is arriving, 0 once a fixed clip is held — see pickSource.
-  let follow = 1;
+  // The chord is always arriving, so the scan is always a distance BEHIND the
+  // write head rather than an absolute point in a fixed recording.
+  const follow = 1;
 
   function apply() {
     const rate = Math.max(0.2, P.overlap / (P.sizeMs / 1000));
@@ -180,13 +132,6 @@
     d.set('grains', Math.round(rate));
   }
 
-  const srcPick = createChoice({
-    label: 'chewing', options: SOURCES,
-    onPick: async (v) => { await startAudio(); await pickSource(v); },
-  });
-  const pickRow = el('div', 'pos-controls');
-  pickRow.append(srcPick.el);
-  d.el.append(pickRow);
 
   scope = createGrainScope(d.el, { seconds: 4, height: 170 });
   scope.source('every tick is a grain this page started');
@@ -295,17 +240,6 @@
     d.assert('every tick in the picture is a grain this page actually started',
       sc.measured > 0 && sc.inferred === 0, `${sc.measured} reported by the engine, ${sc.inferred} guessed from audio`);
 
-    // A clip is the other half of this page's subject — the material IS the
-    // instrument — so it is checked rather than assumed to have loaded.
-    const heldBefore2 = stats.heldSec;
-    srcPick.set(1); await sleep(3500);
-    d.assert('a 1965 excerpt loads and fills the held seconds',
-      stats.heldSec > 15, `${stats.heldSec.toFixed(1)} s held, was ${heldBefore2.toFixed(1)}`);
-    const firedBefore = stats.fired;
-    await sleep(1200);
-    d.assert('and the grains keep coming from it', stats.fired > firedBefore,
-      `${stats.fired - firedBefore} grains off the recording`);
-    srcPick.set(0);
 
     P.overlap = 3; P.sizeMs = 120; apply();
     sliders.get('density').set(3, true); sliders.get('length').set(120, true);
