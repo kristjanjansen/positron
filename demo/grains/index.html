@@ -111,7 +111,7 @@
 
   // ── state ────────────────────────────────────────────────────────────────
   let me = null;                       // this connection's id, to drop our own echo
-  let answered = false, lastHeard = 0, rtt = null, stateAt = 0;
+  let answered = false, lastHeard = 0, rtt = null, stateAt = 0, stateId = null, searchId = null, loadId = null;
   let wantSource = null;               // a source this page asked the board to start
   let playing = null, onJack = false;  // what the board is sounding, and whether the granulator can reach it
   let archive = null;                  // when the board is playing the 1965 stream, what it is playing
@@ -407,6 +407,20 @@
     },
   });
   const send = (m) => !!wire.send(m);
+  /**
+   * Send, and keep the id that went out.
+   *
+   * ⚠️ FOLLOWING THE BOARD'S ANSWERS IS RIGHT; ACTING ON SOMEBODY ELSE'S IS NOT,
+   * and the difference cost twelve requests to a stranger's archive. The relay
+   * broadcasts, so a reply to another listener's `source.search` arrives here
+   * too — and this page's handler turned every one of them into a `source.load`
+   * of its own. Twelve loads went out for one press, each one a minute of ERR's
+   * bandwidth, which is precisely how this board got itself blocked once
+   * already. State may be read from any of the board's answers; an ACTION may
+   * only follow an answer to a question this page asked, which is what `re` is
+   * for. `wire.send` hands back the exact line, so the id is readable from it.
+   */
+  const sendId = (m) => { const out = wire.send(m); return out?.sent ? JSON.parse(out.line).id : null; };
 
   /**
    * The heartbeat, and the round trip, on one message.
@@ -422,7 +436,7 @@
    */
   function hello() {
     stateAt = performance.now();
-    send({ type: 'params.state' });
+    stateId = sendId({ type: 'params.state' });
   }
 
   /**
@@ -430,17 +444,20 @@
    * hanging: a page that waits forever looks like a page that is still loading,
    * and "nobody answered" is the answer this page most often has to give.
    */
-  function waitFor(type, ms) {
+  function waitFor(type, ms, re = null) {
     return new Promise((resolve) => {
-      const w = { type, resolve };
+      const w = { type, re, resolve };
       w.timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, ms);
       waiters.push(w);
     });
   }
   async function ask(msg, type, ms = 8000) {
-    const p = waitFor(type, ms);
-    if (!send(msg)) return null;
-    return p;
+    // The id first, so the wait is for THIS answer rather than for the next
+    // message of the same shape — which on a shared board can be the reply to
+    // somebody else's question, or their question itself.
+    const id = sendId(msg);
+    if (!id) return null;
+    return waitFor(type, ms, id);
   }
 
   /**
@@ -510,7 +527,9 @@
       d.log(`${m.character.m}/${m.character.n} · ${rate(m.m)} and ${rate(m.n)} grains a second · number ${m.seed}`, 'hi');
     }
     if (m.type === 'params.state') {
-      if (stateAt) { rtt = Math.round(performance.now() - stateAt); stateAt = 0; }
+      // Timed only when it answers THIS page's own question; the state below is
+      // absorbed from anybody's, because that is the board describing itself.
+      if (stateAt && m.re === stateId) { rtt = Math.round(performance.now() - stateAt); stateAt = 0; stateId = null; }
       fxOn = !!m.ok;
       grainSrc = m.source ?? null;
       // ⚠️ FOLLOW THE BOARD DOWN AS WELL AS UP, AND THIS WAS FOUND THE REAL
@@ -537,7 +556,8 @@
     // called from a browser at all — its JSON content type forces a preflight
     // that the archive answers 204 with no permission header — so the board is
     // the only end that can ask.
-    if (m.type === 'source.found') {
+    if (m.type === 'source.found' && m.re === searchId) {
+      searchId = null;
       if (!m.ok) {
         delete bFreeze.dataset.busy;
         d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `the archive: ${m.reason}`, 'warn');
@@ -548,19 +568,30 @@
         // the board already pulled instead of asking a stranger's archive for
         // the same audio twice.
         const atSec = 60 + 60 * Math.floor(Math.random() * 5);
-        send({ type: 'source.load', slug: pick.slug, atSec, dur: 60 });
+        loadId = sendId({ type: 'source.load', slug: pick.slug, atSec, dur: 60 });
         d.log(`${m.total} recordings from 1965 · taking a minute of ${pick.date} ${pick.title}`, 'hi');
       }
     }
     if (m.type === 'source.loaded') {
-      delete bFreeze.dataset.busy;
-      if (m.ok) { grainSrc = m; d.log(`held still in ${m.tookMs} ms — the keys play this minute now`, 'hi'); }
-      else d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `could not freeze it: ${m.reason}`, 'warn');
+      // ⚠️ SAY WHOSE. The buffers are the board's, not this page's: anyone in
+      // the room can put a minute in them, and reading "the keys play this
+      // minute now" about somebody else's press — with a different programme
+      // named beside it — is how a shared instrument looks broken. Seen for
+      // real: twelve of these in twenty seconds, one of them ours.
+      const mine = m.re === loadId;
+      if (mine) { loadId = null; delete bFreeze.dataset.busy; }
+      if (m.ok) {
+        grainSrc = m;
+        d.log(mine ? `held still in ${m.tookMs} ms — the keys play this minute now`
+                   : `somebody else put ${m.date} ${m.title} in the buffers`, 'hi');
+      } else if (mine) {
+        d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `could not freeze it: ${m.reason}`, 'warn');
+      }
     }
     if (m.type === 'source.cleared') { grainSrc = null; d.log('the buffers are recording again'); }
 
     for (const w of [...waiters]) {
-      if (w.type !== m.type) continue;
+      if (w.type !== m.type || (w.re && m.re !== w.re)) continue;
       clearTimeout(w.timer);
       waiters.splice(waiters.indexOf(w), 1);
       w.resolve(m);
@@ -605,7 +636,7 @@
   };
   bFreeze.onclick = () => {
     bFreeze.dataset.busy = '1';
-    send({ type: 'source.search', limit: 100 });
+    searchId = sendId({ type: 'source.search', limit: 100 });
     d.log('asking the board what the archive has…', 'hi');
   };
 
