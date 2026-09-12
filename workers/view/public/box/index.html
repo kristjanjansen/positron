@@ -70,6 +70,8 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createMidi } from '/shell/midi.mjs';
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -78,8 +80,9 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back the samples that come back. So the delay you hear is a real journey rather than a setting: out to a server, down to the board, and all the way back, about a tenth of a second. Play with the a-to-k row or the keys below; z and x shift the octave, and the arrows and the die move through the patches the board actually has — it reads its own instrument library and sends back the names, so every one of them makes a sound. 1965 is an instrument too: the board plays a random hour of Estonian radio from that year straight off the national archive, and the granular switch beside it chews up whatever is playing, radio or synth alike.',
-    readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s' },
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own \u2014 it sends your key presses to the board and plays back the samples that come back, so the delay you hear is a real journey rather than a setting: out to a server, down to the board and all the way back, about a tenth of a second. Play with the a-to-k row, the keys below, or a MIDI keyboard if you have one plugged in; z and x shift the octave, and the arrows and the random button move through the patches the board actually has, because it reads its own instrument library and sends back the names. The space and chorus settings are made on the board rather than here \u2014 this page only sends the numbers, the same way the mirror page sends its shader knobs.',
+
+    readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
     controls: [
       { id: 'oct-', label: '−' },
       { id: 'oct+', label: '+' },
@@ -100,74 +103,28 @@
   // choosing one is the next thing you do after choosing the other.
   // drawInstruments() inserts new instrument buttons before this block.
   const fxWrap = el('span', 'fx');
-  const patchPrev = el('button', '', '◀', { type: 'button', title: 'previous patch' });
-  const patchDie  = el('button', 'die', '🎲', { type: 'button', title: 'random patch' });
-  const patchNext = el('button', '', '▶', { type: 'button', title: 'next patch' });
+  const step = createStepper({
+    what: 'patch',
+    prev: () => { idx = (idx - 1 + span()) % span(); chosen = true; showPatch(); sendPatch(); },
+    next: () => { idx = (idx + 1) % span(); chosen = true; showPatch(); sendPatch(); },
+    random: () => { idx = Math.floor(Math.random() * span()); chosen = true; showPatch(); sendPatch(); },
+  });
   // ◀ ▶ then the die: stepping and rolling are different gestures, and the two
   // arrows read as a pair when nothing sits between them.
-  fxWrap.append(patchPrev, patchNext, patchDie);
+  fxWrap.append(step.el);
   // A press is what makes the patch line true — see showPatch().
-  patchPrev.onclick = () => { idx = (idx - 1 + span()) % span(); chosen = true; showPatch(); sendPatch(); };
-  patchNext.onclick = () => { idx = (idx + 1) % span(); chosen = true; showPatch(); sendPatch(); };
-  patchDie.onclick  = () => { idx = Math.floor(Math.random() * span()); chosen = true; showPatch(); sendPatch(); };
 
   const patchLine = el('p', 'patch', '—');
   // What is IN the grain buffers, when something was put there deliberately.
   // Its own line rather than a second clause on the patch line: one names the
   // sound, the other names the material, and they change for different reasons.
-  const sourceLine = el('p', 'patch', '');
-  d.el.append(patchLine, sourceLine);
+  d.el.append(patchLine);
 
   // Pappus is an effect, so it is a switch beside the instruments rather than
   // one of them: it wraps whatever is playing, and can go on and off underneath.
   // The effect lives on the SAME line as the instruments, pushed right: it is
   // not a fourth instrument, it wraps whichever one is chosen, and the gap says
   // so better than a second row would.
-  const fxRow = el('span', 'fx');
-  fxRow.append(el('span', 'lab', 'effect'));
-  const fxBtn = el('button', '', 'pappus', { type: 'button', 'aria-pressed': 'false' });
-  // Its own die, because a granular parameter roll and a patch change are
-  // different actions on different things — one surface has 106 knobs and no
-  // patches, the other has patches and no knobs.
-  const fxDie = el('button', 'die', '🎲', { type: 'button', title: 'roll the granular parameters' });
-  fxDie.disabled = true;
-  let fxOn = false;
-  fxBtn.onclick = () => {
-    fxOn = !fxOn;
-    fxBtn.setAttribute('aria-pressed', String(fxOn));
-    // The engine compiles a 2,030-line class library on first switch-on, about
-    // forty seconds; after that a toggle is just a re-patch.
-    if (fxOn) fxBtn.dataset.busy = '1';
-    send({ type: 'fx.pappus', on: fxOn });
-  };
-  fxDie.onclick = () => { send({ type: 'params.random' }); d.log('rolled the granular parameters', 'hi'); };
-  // 1965, as grain material. ERR's audio archive holds 543 items from that
-  // year; this asks the box for one at random and loads sixty seconds of it
-  // into the grain buffers, after which the keys play THAT rather than the
-  // instrument. One button, because choosing among 543 is a different page.
-  //
-  // ⚠️ The AUDIO archive. The 298 video items from 1965 are silent 16 mm film
-  // negatives, so the obvious half of the archive granulates nothing.
-  // ⚠️ NOT LABELLED 1965 ANY MORE. There is a `1965` on the instrument row now
-  // and it means something else: that one PLAYS the broadcast, live, as the
-  // thing the insert is wrapping. This one FREEZES a minute of it into the
-  // grain buffers, after which the keys play that minute and the instrument
-  // underneath goes quiet. The engine's own comment calls the two "genuinely
-  // different instruments", and two buttons wearing one word is the kind of
-  // thing this project has already paid for twice.
-  const fx1965 = el('button', '', 'load', { type: 'button', title: 'freeze a minute of 1965 into the grain buffers, so the keys play it' });
-  fx1965.disabled = true;
-  fx1965.onclick = () => {
-    fx1965.dataset.busy = '1';
-    send({ type: 'source.search', limit: 100 });
-    d.log('asking ERR for 1965…', 'hi');
-  };
-  fxRow.append(fxBtn, fxDie, fx1965);
-  picks.append(fxWrap);
-  // On the same row as the octave and panic buttons, pinned right: it is a
-  // per-performance switch like they are, not a per-instrument choice.
-  if (controls) { controls.style.display = 'flex'; controls.style.alignItems = 'center'; controls.append(fxRow); }
-  else d.el.append(fxRow);
 
   let ctx = null, playout = null, ws = null, seq = 0;
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
@@ -342,25 +299,75 @@
       if (avail && avail[k] === false) continue;
       mk(k, k, { type: 'audio.start', source: k }, true);
     }
-    // 1965 IS A SOURCE, NOT A FEATURE OF THE GRANULATOR. It belongs on this row
-    // because that is what it is: something making sound into the board's audio
-    // graph, the same as the synths beside it. The granular insert then works
-    // on it exactly as it works on them — switch the insert off and you hear
-    // the broadcast raw, switch it on and you hear it granulated — and nothing
-    // downstream needs a special case for it.
-    if (!avail || avail.archive !== false) {
-      mk('1965', 'archive', { type: 'audio.start', source: 'archive' }, true);
-    }
     arm(armed);
   }
   let armed = null;
   drawInstruments();
 
   // ── the keyboard, from the shell ─────────────────────────────────────────
+  // ── the space the note falls into ───────────────────────────────────────
+  // 🔴 REPLACES THE GRANULATOR, AND THE DIFFERENCE IS NOTE-OFF. `pappus` was an
+  // insert that REPLACED the signal, and a grain cloud has none — so releasing
+  // a key swapped one drone for another and every instrument's envelope, attack
+  // and patch character were washed out before you heard them, which is why the
+  // patch arrows and the die both stopped doing anything audible. A reverb
+  // passes the dry signal and adds a tail, so the note still stops when you let
+  // go. The granulator is not at fault and has its own page now; wrapping an
+  // instrument in it was.
+  //
+  // ⚠️ THE BOARD RENDERS, THE PAGE SENDS NUMBERS — the same split `mirror` uses
+  // for its shader knobs. Nothing is processed in this page: it plays what
+  // arrives and no more.
+  const SPACE = [
+    ['dry',  { mix: 0,    room: 0.2, damp: 6000 }],
+    ['room', { mix: 0.26, room: 0.35, damp: 7000 }],
+    ['hall', { mix: 0.4,  room: 0.8, damp: 4500 }],
+  ];
+  const CHORUS = [['off', 0], ['light', 0.35], ['wide', 0.7]];
+  let spaceAt = 1, chorusAt = 0;      // a little room by default: dry is a test, not a sound
+
+  const spaceRow = el('span', 'fx');
+  const mkKnob = (label, options, get, set) => {
+    spaceRow.append(el('span', 'lab', label));
+    const made = options.map((opt, i) => {
+      const b = el('button', '', opt[0], { type: 'button', 'aria-pressed': String(i === get()) });
+      b.onclick = () => {
+        set(i);
+        made.forEach((x, k) => x.setAttribute('aria-pressed', String(k === i)));
+        sendSpace();
+        d.log(`${label} ${opt[0]}`);
+      };
+      spaceRow.append(b);
+      return b;
+    });
+    return made;
+  };
+
+  /** One message, the whole state. Clamped again at the far end. */
+  function sendSpace() {
+    const [, p] = SPACE[spaceAt];
+    send({ type: 'fx.space', on: spaceAt > 0 || chorusAt > 0,
+           mix: p.mix, room: p.room, damp: p.damp, chorus: CHORUS[chorusAt][1] });
+  }
+  mkKnob('space', SPACE, () => spaceAt, (i) => { spaceAt = i; });
+  mkKnob('chorus', CHORUS, () => chorusAt, (i) => { chorusAt = i; });
+  spaceRow.hidden = true;             // shown when an instrument that can be wrapped is up
+  if (controls) { controls.style.display = 'flex'; controls.style.alignItems = 'center'; controls.append(spaceRow); }
+  else d.el.append(spaceRow);
+
   const kb = createKeyboard(d.el, {
     base: 60,
     onDown: (note) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel: 100, channel: 0 })); },
     onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
+  });
+
+  // A real keyboard, where there is one — the shared component, so the
+  // velocity-0 rule and the hot-plug listener live in one place.
+  const midi = createMidi({
+    onDown: (note, vel) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel, channel: 0 })); },
+    onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
+    log: (line, kind) => d.log(line, kind),
+    onPorts: (n) => d.set('midi', n || midi?.state?.() || 'none'),
   });
 
   // ── the socket ───────────────────────────────────────────────────────────
@@ -404,14 +411,6 @@
       if (m.type === 'box.pong' && pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
-      if (m.type === 'fx.pappus') {
-        fxOn = !!m.on;
-        delete fxBtn.dataset.busy;
-        fxBtn.setAttribute('aria-pressed', String(fxOn));
-        fxDie.disabled = !fxOn;
-        fx1965.disabled = !fxOn;
-        d.log(m.ok ? (fxOn ? 'pappus inserted' : 'pappus bypassed') : `pappus: ${m.reason}`, m.ok ? 'hi' : 'bad');
-      }
       // The box's own library. It arrives once per instrument change and is
       // ~34 KB for Yoshimi, well inside the relay's 256 KiB per message.
       if (m.type === 'voices.listed') {
@@ -439,57 +438,6 @@
         const at = patches.findIndex((p) => p.bank === m.bank && p.program === m.program);
         if (at >= 0) { idx = at; chosen = true; showPatch(); }
       }
-      // The roll names itself. The two characters are what it actually did;
-      // the seed is how to get this exact sound back, which is the difference
-      // between a die you can play and one you can only press.
-      if (m.type === 'params.rolled' && m.ok) {
-        patchLine.innerHTML = `<b>${m.character.m} / ${m.character.n}</b> · ${m.m.rate} and ${m.n.rate} grains per second`
-          + ` · <span class="dim">seed ${m.seed}</span>`;
-        d.log(`${m.character.m}/${m.character.n} · seed ${m.seed}`, 'hi');
-      }
-      // The box picks; the page only says which. A list of 543 in a browser is
-      // a different page, and the box is the thing that can reach the archive
-      // at all — the search cannot be called from a browser, because its JSON
-      // content type forces a preflight that answers 204 with no ACAO.
-      // ⚠️ SAY WHY. ERR blocked the board's address after a day of testing, and
-      // the button just sat there spinning — "nothing happened" reads as our
-      // bug when it is the archive asking us to wait. It is somebody else's
-      // public archive, so the honest thing is to name the wait and stop.
-      if (m.type === 'source.found' && !m.ok) {
-        delete fx1965.dataset.busy;
-        d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `1965: ${m.reason}`, 'warn');
-      }
-      if (m.type === 'source.loaded' && !m.ok && m.holdingOff) {
-        delete fx1965.dataset.busy;
-        d.log(`the archive asked us to wait — ${m.reason}`, 'warn');
-      }
-      if (m.type === 'source.found' && m.ok) {
-        const pick = m.items[Math.floor(Math.random() * m.items.length)];
-        // Somewhere past the announcer at the top, and far enough from the end
-        // that a minute of it exists.
-        // ⚠️ `atSec`, not `at` — `at` is the envelope's timestamp and wire.mjs
-        // writes over it, so the one control this button has silently did nothing.
-        send({ type: 'source.load', slug: pick.slug, atSec: 60 + Math.floor(Math.random() * 300), dur: 60 });
-        d.log(`${m.total} items from 1965 · loading ${pick.date} ${pick.title}`, 'hi');
-      }
-      if (m.type === 'source.loaded') {
-        delete fx1965.dataset.busy;
-        if (m.ok) {
-          sourceLine.innerHTML = `<b>${m.title}</b> · ${m.date} · ERR archive`;
-          d.log(`loaded in ${m.tookMs} ms — the keys now play this`, 'hi');
-        } else d.log(`1965: ${m.reason}`, 'warn');
-      }
-      // What the archive is playing. It goes on `sourceLine` — the line that
-      // already names what is IN the sound rather than what is making it —
-      // because that is the same question whether the material is in the grain
-      // buffers or coming down the wire live.
-      if (m.type === 'audio.started' && m.ok) {
-        if (m.archive) {
-          sourceLine.textContent = '';
-          sourceLine.append(el('b', '', m.archive.title || m.archive.slug),
-                            ` · ${m.archive.date} · ERR archive, from ${m.archive.atSec} s in`);
-        } else if (m.source !== 'archive') sourceLine.textContent = '';
-      }
       if (m.type === 'audio.started') {
         for (const c of picks.querySelectorAll('button')) delete c.dataset.busy;
         // Nothing playing on arrival: start the cheap instrument rather than
@@ -510,23 +458,20 @@
           arm(armed);
 
           // An insert can only reach a JACK instrument. FluidSynth writes to a
-          // pipe, so the switch is disabled rather than offered and refused.
           // ⚠️ ASK THE BOX, DO NOT KEEP A LIST. This was a list of instrument
           // names, so every new source meant remembering to add it here — and
-          // forgetting meant a switch that silently refused to arm, on a page
-          // that could not say why. Whether the insert can wrap something is a
-          // property of the SOURCE, and the box now reports it.
-          const wrappable = m.jack !== false;
-          fxBtn.disabled = !wrappable;
-          fxBtn.title = wrappable ? 'granular insert' : `${m.source} writes to a pipe, not to the audio graph the insert lives on`;
-          if (!wrappable && fxOn) { fxOn = false; fxBtn.setAttribute('aria-pressed', 'false'); fxDie.disabled = true; fx1965.disabled = true; }
+          // forgetting meant a control that silently refused to arm on a page
+          // that could not say why. Whether an insert can wrap something is a
+          // property of the SOURCE, and the box reports it.
+          spaceRow.hidden = m.jack === false;
+          if (m.jack === false) d.log(`${m.source} writes to a pipe rather than to the audio graph the reverb sits on, so there is no space to put it in`, 'warn');
+          else sendSpace();
           // A new instrument means a new library. Drop the old one FIRST, or
           // the arrows keep walking the previous instrument's list until the
           // reply lands — stepping through names that belong to something else.
           patches = []; idx = 0; banksInList = 0; chosen = false;
           showPatch();
           send({ type: 'voices.list', source: m.source });
-          if (m.fx) { fxOn = true; fxBtn.setAttribute('aria-pressed', 'true'); fxDie.disabled = false; fx1965.disabled = false; }
           d.log(`playing ${m.source}`, 'hi');
         }
         // ⚠️ NOT `d.set('playing', ...)`. There is no `playing` cell — the shell

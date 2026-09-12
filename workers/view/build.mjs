@@ -108,6 +108,12 @@ const FILES = [
   // listed above for the MoQ return path, and the page talks only to
   // ws.positron.studio. Served at /box/.
   ['rig/box/listen.html', 'box/index.html'],
+
+  // The component sandbox. ⚠️ EXPLICIT, because `demoFiles()` enumerates BUILT
+  // demos and `kit` is not one — it publishes no `__demo` and asserts nothing,
+  // so `built: false` is right and the copy has to be named here or /kit/ is a
+  // 404 with a row on the index pointing at it.
+  ['demo/kit/index.html', 'kit/index.html'],
   ...demoFiles(),
 ];
 

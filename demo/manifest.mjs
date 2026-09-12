@@ -203,6 +203,14 @@ export const DEMOS = [
   { name: 'strip', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
+  // Not a demo of anything — a page where every reusable control is present and
+  // wired to nothing, so one can be looked at and pushed around without a board,
+  // a relay or a stream. `built: false` because it publishes no `__demo` and
+  // asserts nothing: it is a mirror for the components, not a claim about them.
+  { name: 'kit', act: 0, created: '2026-09-12', built: false, page: '/kit/',
+    one: 'every reusable control on one page, wired to nothing',
+    tags: ['shell', 'no network'] },
+
   // ── pages that are not shelled demos, but are the point of the whole rig ──
   //
   // Both live outside demo/, so `built` stays false — it means "a shelled page

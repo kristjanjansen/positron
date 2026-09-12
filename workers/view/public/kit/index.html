@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON · kit</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .kit-h { font: 600 10.5px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+           color: var(--hi); margin: 30px 0 4px; }
+  .kit-n { font: 400 12.5px/1.6 var(--mono); color: var(--dim); margin: 0 0 12px; max-width: 62ch; }
+  .kit-n code { color: var(--fg); }
+  .kit-box { border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+             padding: 14px; margin: 0 0 8px; display: flex; flex-wrap: wrap;
+             gap: 10px; align-items: center; }
+  .kit-src { font: 400 11px/1.6 var(--mono); color: var(--dim2); white-space: pre-wrap;
+             margin: 0 0 6px; padding-left: 2px; }
+  .kit-out { font: 500 12px/1.6 var(--mono); color: var(--hi); min-height: 1.6em; }
+</style>
+
+<div class="d-head">
+  <div class="d-title"><h1 class="d-name">kit</h1></div>
+</div>
+
+<p class="kit-n" style="margin-top:10px">
+  Every reusable control in <code>demo/shell/</code>, on one page, wired to nothing.
+  It exists so a control can be looked at and pushed around without starting a
+  board, a relay or a stream — and so that two pages using the same component
+  cannot quietly drift into looking like two different components. Each block
+  shows how it is made.
+</p>
+
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+
+  const body = document.body;
+  const out = (t) => { const o = el('div', 'kit-out', t); return o; };
+  function section(title, note, src, build) {
+    body.append(el('h2', 'kit-h', title));
+    if (note) body.append(el('p', 'kit-n', note));
+    body.append(el('pre', 'kit-src', src));
+    const box = el('div', 'kit-box');
+    body.append(box);
+    build(box);
+  }
+
+  // ── buttons ─────────────────────────────────────────────────────────────
+  section('buttons', 'The baseline everything else matches: 34 px tall, 4 px corner. `d-pri` is the one primary per page — two primaries side by side say neither is the main path.',
+    `el('button', '', 'ordinary', { type: 'button' })
+el('button', 'd-pri', 'the primary one', { type: 'button' })`,
+    (box) => {
+      box.append(el('button', '', 'ordinary', { type: 'button' }));
+      const p = el('button', 'd-pri', 'the primary one', { type: 'button' }); box.append(p);
+      const dis = el('button', '', 'disabled', { type: 'button' }); dis.disabled = true; box.append(dis);
+      const busy = el('button', '', 'working', { type: 'button' }); busy.dataset.busy = '1'; box.append(busy);
+    });
+
+  // ── stepper ─────────────────────────────────────────────────────────────
+  section('stepper — shell/stepper.mjs',
+    'Back, a jump, forward. The jump goes in the MIDDLE: back and forward are one axis and a random is a jump along that same axis, not an afterthought on the end. No emoji — a coloured picture ignores the row’s font and sits off its baseline.',
+    `createStepper({ what: 'patch', prev, next, random })`,
+    (box) => {
+      const o = out('nothing pressed yet');
+      let at = 0;
+      const names = ['kaleidoscope', 'rings', 'weave', 'drift'];
+      const show = () => { o.textContent = `${at} — ${names[at]}`; };
+      const s = createStepper({
+        what: 'look',
+        prev: () => { at = (at + names.length - 1) % names.length; show(); },
+        next: () => { at = (at + 1) % names.length; show(); },
+        random: () => { at = Math.floor(Math.random() * names.length); show(); },
+      });
+      box.append(s.el, o);
+    });
+
+  // ── slider ──────────────────────────────────────────────────────────────
+  section('slider — shell/slider.mjs',
+    'Label, value, unit. The same 34 px as a button so a mixed row reads as one row of controls. The handle travels the lane MINUS its own width, so it sits flush in both corners rather than hanging out at the extremes — drag it to either end and the corners meet.',
+    `createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26 })
+createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
+    (box) => {
+      const o = out('—');
+      const a = createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26,
+        onInput: (v) => { o.textContent = `mix ${v.toFixed(2)}`; } });
+      const b = createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, value: 6000, unit: 'Hz',
+        onInput: (v) => { o.textContent = `damp ${v} Hz`; } });
+      const c = createSlider({ label: 'off', min: 0, max: 1, step: 0.1, value: 0.5 });
+      c.disabled(true);
+      box.append(el('button', '', 'a button, for height', { type: 'button' }), a.el, b.el, c.el, o);
+    });
+
+  // ── radio row ───────────────────────────────────────────────────────────
+  section('a choice of three',
+    'Not a component yet — `mirror` and `/box/` each build this by hand, which is exactly the drift this page exists to make visible. Three or four named settings beat a slider when the values have names and the names are the point.',
+    `steps.map(([text, value], i) =>
+  el('button', '', text, { 'aria-pressed': String(i === at) }))`,
+    (box) => {
+      const o = out('room');
+      const seg = el('div', 'seg');
+      ['dry', 'room', 'hall'].forEach((t, i) => {
+        const b = el('button', '', t, { type: 'button', 'aria-pressed': String(i === 1) });
+        b.onclick = () => { [...seg.children].forEach((x, k) => x.setAttribute('aria-pressed', String(k === i))); o.textContent = t; };
+        seg.append(b);
+      });
+      const knob = el('div', 'knob'); knob.append(el('span', '', 'SPACE'), seg);
+      box.append(knob, o);
+    });
+
+  // ── keyboard ────────────────────────────────────────────────────────────
+  section('keyboard — shell/keyboard.mjs',
+    'Two octaves, a-to-k on a real keyboard, pointer or touch on the drawn one. It REPORTS a note number and knows nothing about what makes the sound — which is why the same component serves a synth in the page and a Raspberry Pi in another building.',
+    `createKeyboard(parent, { base: 60, onDown, onUp })`,
+    (box) => {
+      const o = out('—');
+      const holder = el('div', '', null); holder.style.width = '100%';
+      box.append(holder);
+      const kb = createKeyboard(holder, {
+        base: 60,
+        onDown: (n) => { kb.lightNote(n, true); o.textContent = `note ${n} down`; },
+        onUp: (n) => { kb.lightNote(n, false); o.textContent = `note ${n} up`; },
+      });
+      box.append(o);
+    });
+
+  // ── readout ─────────────────────────────────────────────────────────────
+  section('readout cells',
+    'Every cell must be able to change. A cell showing a structural constant reads as a measurement and teaches the reader to skip the row — which is why 01’s always-1 `missed` became `worst`.',
+    `d.set('latency', 26.2);  d.set('holes', 0, 'warn')`,
+    (box) => {
+      const r = el('div', 'd-readout');
+      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'], ['lost', '0', '', ''], ['state', 'live', '', 'ok']]) {
+        const c = el('div', 'd-cell');
+        c.append(el('div', 'd-k', k));
+        const val = el('div', 'd-v', v);
+        if (state) val.dataset.state = state;
+        const line = el('div', '');
+        line.append(val); if (u) line.append(el('span', 'd-u', u));
+        c.append(line); r.append(c);
+      }
+      box.style.display = 'block'; box.append(r);
+    });
+
+  // ── colour ──────────────────────────────────────────────────────────────
+  section('what the colours mean',
+    'One meaning across every page. A mark’s colour says HOW IT LANDED, never which lane it is in — lane identity is the row, the label and the gutter swatch, three channels that already carry it.',
+    `grey = not played · slate = played, unmeasurable
+green = inside what it promised · amber/red = later`,
+    (box) => {
+      for (const [name, css, why] of [
+        ['grey', 'var(--dim2)', 'not played'],
+        ['slate', 'var(--dim)', 'played, and this lane cannot say how well'],
+        ['green', 'var(--ok)', 'inside what its way of firing promises'],
+        ['amber', 'var(--warn)', 'later than promised'],
+        ['red', 'var(--bad)', 'later still, or wrong'],
+        ['yellow', 'var(--hi)', 'the one thing this page is about'],
+      ]) {
+        const chip = el('span', '', null);
+        chip.style.cssText = `display:inline-block;width:14px;height:14px;border-radius:3px;background:${css};vertical-align:-2px;margin-right:7px`;
+        const w = el('span', '', null);
+        w.style.cssText = 'font:400 12px/1.6 var(--mono);color:var(--dim);margin-right:18px';
+        w.append(chip, `${name} — ${why}`);
+        box.append(w);
+      }
+    });
+
+  document.body.append(el('p', 'kit-n', 'Nothing on this page talks to a relay, a board or a stream. If a control looks wrong here, it is wrong everywhere.'));
+</script>
+</html>
