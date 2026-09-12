@@ -211,6 +211,36 @@
     void main(){ vec4 t = texture(uTex, vUv); o = vec4(t.rgb, t.a * uFade); }`;
 
   let progSky = null, progBox = null, progPanel = null, cube = null, quad = null;
+  // A look on its way in, and how far through it is.
+  let skyNew = null, boxNew = null, fadeFrom = 0;
+  const FADE_MS = 900;
+  /** 0..1, eased, or null when nothing is arriving. */
+  function fadeK() {
+    if (!skyNew) return null;
+    const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
+    return k * k * (3 - 2 * k);
+  }
+  /**
+   * ⚠️ CONSTANT-ALPHA BLENDING, AND `LEQUAL` WITH IT. The old picture is
+   * already in the framebuffer, so drawing the new one over it with
+   * `blendColor(0,0,0,k)` gives new*k + old*(1-k) for nothing — the same trick
+   * the board uses, and it needs no third program and no extra targets.
+   *
+   * The depth function is the part that is easy to miss: the second pass is the
+   * SAME geometry at the SAME depth, so the default `LESS` rejects every
+   * fragment of it and the fade does nothing at all while looking like it is
+   * wired up.
+   */
+  function fadeOn(k) {
+    gl.enable(gl.BLEND);
+    gl.blendColor(0, 0, 0, k);
+    gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
+    gl.depthFunc(gl.LEQUAL);
+  }
+  function fadeOff() {
+    gl.disable(gl.BLEND);
+    gl.depthFunc(gl.LESS);
+  }
   try { progSky = link(VS, SKY_FS); progBox = link(VS, BOX_FS); progPanel = link(PANEL_VS, PANEL_FS); }
   catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
 
@@ -386,6 +416,18 @@
       gl.uniformMatrix4fv(L.model, false, modelM(0, 2, 0, 26, 0, 0));
       gl.uniform1f(L.t, tSec); gl.uniform1f(L.hue, doc.hue);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      const k = fadeK();
+      if (k !== null) {
+        const NL = locs(skyNew);
+        gl.useProgram(skyNew);
+        gl.uniformMatrix4fv(NL.proj, false, proj);
+        gl.uniformMatrix4fv(NL.view, false, view);
+        gl.uniformMatrix4fv(NL.model, false, modelM(0, 2, 0, 26, 0, 0));
+        gl.uniform1f(NL.t, tSec); gl.uniform1f(NL.hue, doc.hue);
+        fadeOn(k);
+        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+        fadeOff();
+      }
     }
     gl.enable(gl.CULL_FACE);
     gl.cullFace(gl.BACK);
@@ -403,6 +445,23 @@
       gl.uniform3fv(L.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     });
+    const bk = fadeK();
+    if (bk !== null) {
+      const NB = locs(boxNew);
+      gl.useProgram(boxNew);
+      gl.uniformMatrix4fv(NB.proj, false, proj);
+      gl.uniformMatrix4fv(NB.view, false, view);
+      fadeOn(bk);
+      doc.things.forEach((t, i) => {
+        gl.uniformMatrix4fv(NB.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
+        const c = hueRGB(t.c);
+        const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
+        gl.uniform3fv(NB.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
+        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      });
+      fadeOff();
+      gl.useProgram(progBox);
+    }
 
     // ⚠️ THE POINTER HAS TO BE VISIBLE OR THE ROOM IS UNUSABLE. Dragging worked
     // before this and still felt like guessing, because nothing showed where
@@ -541,12 +600,16 @@
     }
     if (m.type === 'dev.shader') {
       try {
-        const next = link(VS, m.sky || SKY_FS);
+        const nextSky = link(VS, m.sky || SKY_FS);
         const nextBox = link(VS, m.box || BOX_FS);
-        progSky = next; progBox = nextBox;
-        progSky.__i = `sky${Date.now()}`; progBox.__i = `box${Date.now()}`;   // fresh uniform cache
-        setPanel('✓ new look, applied\nthe session kept going');
-        shipNow('dev.shader applied live');
+        nextSky.__i = `sky${Date.now()}`; nextBox.__i = `box${Date.now()}`;   // fresh uniform cache
+        // ⚠️ HELD, NOT SWAPPED. A shader changing between one frame and the
+        // next is a hard cut, and a hard cut across your whole field of view is
+        // a great deal more violent than the same cut in a browser pane. It
+        // dissolves over FADE_MS instead.
+        skyNew = nextSky; boxNew = nextBox; fadeFrom = performance.now();
+        setPanel('✓ new look\nfading in');
+        shipNow('dev.shader compiled — fading in');
       } catch (e) {
         // A shader that will not compile must not take the picture with it.
         setPanel(`✗ new look refused\n${String(e.message).slice(0, 30)}`);
@@ -604,6 +667,11 @@
     drawRoom(perspective(1.05, canvas.width / canvas.height, 0.1, 60),
              lookAt([Math.cos(a) * 6.5, 2.4, Math.sin(a) * 6.5], [0, 1.2, 0]), tSec);
     markShown(now);
+    if (skyNew && performance.now() - fadeFrom >= FADE_MS) {
+      gl.deleteProgram(progSky); gl.deleteProgram(progBox);
+      progSky = skyNew; progBox = boxNew; skyNew = boxNew = null;
+      d.log('the new look is now the look', 'ok');
+    }
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
   }
@@ -913,6 +981,15 @@
       shipNow(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err} · eye0 ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0}`);
     }
     markShown(now);
+    // ⚠️ RETIRED HERE, NOT INSIDE drawRoom — that runs once PER EYE, so swapping
+    // there would replace the programs between the left eye and the right and
+    // show two different looks in one frame.
+    if (skyNew && performance.now() - fadeFrom >= FADE_MS) {
+      gl.deleteProgram(progSky); gl.deleteProgram(progBox);
+      progSky = skyNew; progBox = boxNew; skyNew = boxNew = null;
+      setPanel('✓ the new look is the look');
+      shipNow('dev.shader live — the fade finished');
+    }
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
     d.set('worst', worst.toFixed(1));
@@ -1062,6 +1139,25 @@
     const far = moveThing(0, 40, 0.5, 40);      // through the wall, deliberately
     d.assert('a thing cannot be dragged out of the room',
       far === false && docOf(doc) === midway, far ? 'it went through the wall' : 'refused, document unchanged');
+
+    // ⚠️ THE FADE IS GRADED, because a crossfade is exactly the kind of thing
+    // that can be wired up and do nothing — the `LEQUAL` depth function is one
+    // line and without it every fragment of the incoming pass is rejected while
+    // the code reads as correct. A broken shader first, so the guard is known
+    // to say no before the pass is trusted to say yes.
+    const heldProg = progSky;
+    await onDev({ type: 'dev.shader', sky: '#version 300 es\nnot glsl at all' });
+    d.assert('a shader that will not compile is refused, and the picture keeps its own',
+      skyNew === null && progSky === heldProg, skyNew ? 'it started fading in anyway' : 'refused');
+
+    await onDev({ type: 'dev.shader' });          // no body: the built-in, recompiled
+    d.assert('a shader that compiles starts a fade rather than a cut',
+      skyNew !== null && progSky === heldProg,
+      skyNew ? `fading, old program still drawing` : 'no fade started');
+    await new Promise((r) => setTimeout(r, FADE_MS + 120));
+    d.assert('...and the fade retires the old picture when it finishes',
+      skyNew === null && progSky !== heldProg,
+      skyNew ? 'still fading' : 'the new look is the look');
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
