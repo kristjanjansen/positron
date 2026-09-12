@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* ── the material row ──────────────────────────────────────────────────
+     A radio row, same shape as the instrument row on /box/: exactly one of
+     these is what the grains are currently made of, and it is armed from what
+     the BOARD reports rather than from what was clicked — a page that joins a
+     board somebody else is already playing has clicked nothing. */
+  .mat { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 8px; }
+  .mat .lab { flex: none; color: var(--dim2); font: 500 11px/1 var(--mono);
+              letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
+  .mat button[aria-pressed="true"] {
+    color: var(--hi); border-color: var(--hi);
+    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
+  }
+  /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR — the shell's global focus ring is
+     the same yellow this row uses for "this is what you are hearing", and on
+     /box/ that made a focused-but-off switch read as an armed one. Pointer
+     presses lose the ring; keyboard focus keeps it, which is who needs it. */
+  .mat button:focus:not(:focus-visible) { outline: none; }
+  .mat button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
+  /* Starting a chain on the board takes ten to forty seconds — jackd, the
+     synth, a capture and the port wiring — so a button that just sits there
+     reads as a dead click. */
+  .mat button[data-busy] { color: var(--hi); border-color: var(--hi); animation: g-wait 1.1s ease-in-out infinite; }
+  @keyframes g-wait {
+    0%, 100% { background: color-mix(in oklab, var(--hi)  6%, var(--card2)); }
+    50%      { background: color-mix(in oklab, var(--hi) 26%, var(--card2)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mat button[data-busy] { animation: none; background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
+  }
+  .now  { font: 400 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 6px; }
+  .now b { color: var(--fg); font-weight: 500; }
+  /* The open question, in the place where it is actually being asked. */
+  .open { font: 400 12px/1.7 var(--mono); color: var(--dim2); margin: 0 0 14px; max-width: 74ch;
+          border-left: 2px solid var(--line2); padding-left: 10px; }
+
+  /* ── the roll, one block per granulator ────────────────────────────────
+     Per-half numbers sit under the half they describe, never in a table of
+     their own: joining a figure to the thing it is about across two elements
+     is what makes a legend necessary. */
+  .roll { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1px; background: var(--line); border: 1px solid var(--line);
+          border-radius: 4px; overflow: hidden; margin: 0 0 10px; }
+  .side { background: var(--card); padding: 10px 12px; min-width: 0; }
+  /* ⚠️ NOT `.k`. That is the shell's PIANO KEY — 74 px tall, bordered, its own
+     background — and this page appends a real keyboard from the same stylesheet,
+     so a label wearing that class drew an empty key inside each block. A page
+     that borrows a shared stylesheet borrows its whole namespace. */
+  .side .hd { display: block; font: 500 11px/1.4 var(--mono); color: var(--dim2);
+              letter-spacing: .06em; text-transform: uppercase; }
+  .side .ch { display: block; font: 600 17px/1.5 var(--mono); color: var(--hi); }
+  .side .nums { display: block; font: 400 11.5px/1.6 var(--mono); color: var(--dim); }
+  .seed { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 10px;
+          font: 400 12px/1.6 var(--mono); color: var(--dim); }
+  .seed input {
+    font: 500 13px/1 var(--mono); color: var(--fg); background: var(--card2);
+    border: 1px solid var(--line2); border-radius: 4px; padding: 0 10px; height: 34px; width: 11em;
+  }
+  .drift { font: 400 12px/1.7 var(--mono); color: var(--dim); margin: 0 0 12px; }
+  /* ⚠️ NEVER AN EMPTY PAGE. A board that is switched off and a board that is
+     playing must not look the same, which is the whole reason this block
+     exists — same rule as the chain on /rack/. */
+  .none { padding: 22px 14px; text-align: center; font: 500 13px/1.7 var(--mono); color: var(--dim2);
+          background: var(--card); border: 1px solid var(--line); border-radius: 4px; margin: 0 0 12px; }
+  .none b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 6px; font-weight: 600; }
+  .none span { display: block; max-width: 62ch; margin: 0 auto; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  // A seed in the URL is how a sound travels: the roll is a pure function of it,
+  // so this link and that link are the same instrument.
+  const WANT_SEED = /^\d{1,10}$/.test(q.get('seed') || '') ? Number(q.get('seed')) : null;
+
+  const d = mount({
+    name: 'grains',
+    what: 'A Raspberry Pi in another building keeps a rolling sixty seconds of whatever sound reaches it, cuts that recording into short overlapping fragments — grains — and plays them back as a cloud. Letting go of a key does not end a cloud, so this page drones rather than playing notes: that is what the thing is, and it is why it has a page of its own instead of sitting over the board’s instruments, whose attack and decay it was washing away. Rolling the dice gives each of its two halves a character and hands back the number that produced it, so a sound can be asked for again — this page asks for one twice and checks that the same number brings back the same settings. Nobody has to touch it after that: the board keeps nudging six of its settings along slow cycles that never line up, and the count below is how many times it has done so.',
+    // ⚠️ FIVE CELLS, MEASURED RATHER THAN GUESSED. It was eight, and five of
+    // those ellipsised — `answe…`, `fluid…`, `shatt…`. A readout cell here is
+    // 90 px of text whatever the window does (the page's own measure caps it,
+    // not the viewport), which is EIGHT characters at five cells and seven at
+    // six, so every value below is nine characters or fewer and the cells were
+    // counted backwards from that. The things that would not fit are names
+    // rather than numbers — which sound it is, what it is chewing — and they
+    // are on the two lines under this row, where they have room and context.
+    readout: {
+      board: '', sound: '',
+      'grains a second': '', 'moved on its own': '', 'round trip': 'ms',
+    },
+    controls: [
+      { id: 'on', label: 'Switch it on', primary: true },
+      { id: 'roll', label: 'Roll the dice' },
+      { id: 'again', label: 'Same number again' },
+      { id: 'check', label: 'Check it' },
+    ],
+  });
+  guard(d);
+
+  // ── state ────────────────────────────────────────────────────────────────
+  let me = null;                       // this connection's id, to drop our own echo
+  let answered = false, lastHeard = 0, rtt = null, stateAt = 0;
+  let wantSource = null;               // a source this page asked the board to start
+  let playing = null, onJack = false;  // what the board is sounding, and whether the granulator can reach it
+  let archive = null;                  // when the board is playing the 1965 stream, what it is playing
+  let fxOn = false, fxWhy = null, fed = null, switching = false;
+  let grainSrc = null;                 // a minute frozen into the buffers, when there is one
+  let roll = null;                     // the board's current roll: character, seed, every parameter
+  let drift = null, rolledAt = 0;
+  const driftLog = [];                 // {t, nudges} — every reading, so the window is real
+  let probe = null;                    // { quiet, held } — peak with nothing pressed, then with a key down
+  let frames = 0, gaps = 0, gapWarned = false, lastSeq = -1, firstFrame = 0, level = 0, levelAt = 0;
+  let collect = null;                  // set while a measurement is open
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const nowSeed = () => Math.floor(Math.random() * 1e6);
+  // What a seed is supposed to reproduce: the two characters and every
+  // continuous parameter of both halves. The same claim pappus-live.mjs makes
+  // against the board, made here against the board's own report of itself.
+  const settings = (r) => JSON.stringify({ c: r?.character, m: r?.m, n: r?.n });
+  /**
+   * Every reading of the board's own nudge counter, with the time it was taken.
+   *
+   * ⚠️ A SINGLE BASELINE VARIABLE WAS NOT ENOUGH, TWICE. Re-taken on every roll,
+   * it made the check compare a counter against a baseline set half a second
+   * earlier and report a drift that had stopped. Taken once and never again, it
+   * was silently thrown away whenever the board answered with no granulator
+   * (which happens between switching the insert on and the first roll, and
+   * after a restart of the service) and the next reading became a brand new
+   * "first" — one run reported 6 nudges in 1 s where 340 in 45 s was the truth.
+   * A list cannot have either bug: the window is whatever the page actually
+   * watched, and it is reported beside the count.
+   */
+  function markDrift() {
+    if (Number.isFinite(drift?.nudges)) {
+      driftLog.push({ t: Date.now(), nudges: drift.nudges });
+      if (driftLog.length > 400) driftLog.shift();
+    }
+  }
+  /** How much the board moved on its own, over how long. Null until two readings. */
+  function driftMoved() {
+    if (driftLog.length < 2) return null;
+    const a = driftLog[0], b = driftLog[driftLog.length - 1];
+    return { nudges: b.nudges - a.nudges, ms: b.t - a.t };
+  }
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const mat = el('div', 'mat');
+  mat.append(el('span', 'lab', 'material'));
+  const mkMat = (label, key, title) => {
+    const b = el('button', '', label, { type: 'button', 'aria-pressed': 'false', title });
+    b.dataset.mat = key;
+    mat.append(b);
+    return b;
+  };
+  const bInst = mkMat('the instrument on the board', 'instrument',
+    'granulate whatever the board is playing, as it plays it');
+  const bLive = mkMat('1965 radio, live', 'archive',
+    'the board plays an hour of Estonian radio from 1965 into the granulator and the grains follow it');
+  const FREEZE_TITLE = 'pull one minute onto the board and hold it in the grain buffers, so the keys play that minute';
+  const bFreeze = mkMat('freeze a minute of it', 'frozen', FREEZE_TITLE);
+  const nowLine = el('p', 'now', 'nothing has answered yet');
+  // ⚠️ THE SOURCE IS NOT SETTLED AND THE PAGE SAYS SO RATHER THAN IMPLYING AN
+  // ANSWER BY HAVING ONE BUTTON. The engine does not care what it is fed, so
+  // "what should it chew" is a real open question and it is the most
+  // interesting thing on the page; hiding it behind a single 1965 button would
+  // be the page answering it by accident.
+  const openQuestion = el('p', 'open', 'What the grains are made of is the open question here, not a setting with a right answer: '
+    + 'a granulator will chew anything. These are what the board can reach today — its own instruments, or an hour of Estonian '
+    + 'radio from 1965 off the national archive, live or with one minute of it held still. A microphone plugged into the board '
+    + 'is not on this row because its sound leaves by a path the granulator cannot reach yet, and freezing a minute writes a copy '
+    + 'to the board’s disk, which is why that one is a research button and not the point of the page.');
+  d.el.append(mat, nowLine, openQuestion);
+
+  const panel = el('div', '');
+  d.el.append(panel);
+
+  const seedRow = el('div', 'seed');
+  const seedIn = el('input', '', null, { type: 'text', inputmode: 'numeric', placeholder: 'type a number',
+                                         'aria-label': 'a number to roll from' });
+  const seedGo = el('button', '', 'Roll that number', { type: 'button' });
+  // The number lives HERE rather than in a readout cell: it is ten digits at
+  // worst, it is the one thing on the page somebody will want to copy, and it
+  // belongs beside the box that takes it back.
+  const seedNow = el('span', '', 'any whole number is a sound:');
+  seedRow.append(seedNow, seedIn, seedGo);
+  d.el.append(seedRow);
+
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (note) => { kb.lightNote(note, true); startAudio(); send({ type: 'note.on', note, vel: 100, channel: 0 }); },
+    onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
+  });
+  // A gutter carries what this lane MEASURED or what it IS, never instructions.
+  // Which of the two things a key does here depends on what is in the buffers,
+  // and the two are genuinely different instruments — so it is filled in by
+  // render() rather than written once.
+  const keyLine = el('p', 'now', '');
+  d.el.append(keyLine);
+
+  // ── drawing ──────────────────────────────────────────────────────────────
+  const secs = (ms) => `${Math.round(ms / 1000)} s`;
+  // The board rounds to three decimals; a tenth of a grain a second is already
+  // finer than anyone can hear, and 8.908 in a readout cell reads as precision
+  // somebody is claiming rather than as a rate.
+  const rate = (side) => (side.rate >= 10 ? side.rate.toFixed(0) : side.rate.toFixed(1));
+  function materialShort() {
+    if (!answered) return null;
+    if (grainSrc) return 'frozen';
+    if (playing === 'archive') return '1965 live';
+    if (playing) return playing;          // hexter · yoshimi · fluidsynth
+    return 'nothing';
+  }
+  function materialLong() {
+    if (!answered) return null;
+    if (grainSrc) return [el('b', '', grainSrc.title || grainSrc.slug),
+      ` · ${grainSrc.date} · ${grainSrc.dur} s from ${grainSrc.atSec} s in, held still in the grain buffers`];
+    if (playing === 'archive') return [el('b', '', archive?.title || '1965 radio'),
+      archive ? ` · ${archive.date} · playing live into the granulator from ${archive.atSec} s in` : ' · playing live into the granulator'];
+    if (playing) return [el('b', '', playing), ' · playing into the granulator, and the keys play it'];
+    return [el('b', '', 'nothing'), ' · the board has no sound running, so the granulator has an empty recording to read'];
+  }
+
+  function render() {
+    // ── the readout ──
+    // `answers` rather than `answering`, and `1.1+2.1` rather than `1.1 + 2.1`:
+    // two characters each, and the difference between a cell that reads and a
+    // cell that ends in an ellipsis on a phone. Measured at 390 px.
+    d.set('board', answered ? 'answers' : 'silent', answered ? 'ok' : 'bad');
+    d.set('round trip', rtt ?? null);
+    if (!frames) d.set('sound', 'nothing', answered ? 'bad' : undefined);
+    else if (level < 0.002) d.set('sound', 'silent');
+    else d.set('sound', `${Math.round(20 * Math.log10(level))} dB`, 'ok');
+    d.set('grains a second', roll ? `${rate(roll.m)}+${rate(roll.n)}` : null);
+    d.set('moved on its own', drift ? drift.nudges : null);
+
+    // ── the material row ──
+    const armed = grainSrc ? 'frozen' : playing === 'archive' ? 'archive' : playing ? 'instrument' : null;
+    for (const b of mat.querySelectorAll('button[data-mat]')) b.setAttribute('aria-pressed', String(b.dataset.mat === armed));
+    bFreeze.disabled = !fxOn;
+    bFreeze.title = fxOn ? FREEZE_TITLE : 'the granulator has to be switched on before a minute can be put into it';
+    nowLine.replaceChildren(...(answered ? materialLong() : ['nothing has answered in this room yet']));
+
+    // ── the panel: the roll, or the silence ──
+    // ⚠️ FOUR NAMED STATES, NOT TWO, AND THE THIRD ONE COST A RED SUITE. The
+    // board can be answering with its granulator NOT RUNNING — which is what a
+    // cold board looks like for the forty seconds it spends compiling a
+    // two-thousand line engine — and a page that only knows "playing" and
+    // "nobody home" describes that as the first one and reads as broken. Each
+    // of the four says what it is and what would change it.
+    panel.replaceChildren();
+    const st = !answered ? 'silent' : switching ? 'warming' : !fxOn ? 'off'
+      : !playing ? 'empty' : !roll ? 'idle' : 'live';
+    panel.dataset.state = st;
+    if (st !== 'live') {
+      const b = el('div', 'none');
+      const say = {
+        silent: ['Nobody is answering',
+          `nothing has replied in “${ROOM}”. The board is a Raspberry Pi that dials out to this room on its own; it has to be `
+          + 'switched on and running, and it cannot be woken from here. Everything below would be a number about a sound that '
+          + 'is not being made, so there are no numbers.'],
+        warming: ['Switching the granulator on',
+          'the board is answering. The first time it is asked, it compiles a two-thousand line engine before anything can be '
+          + 'heard, which takes about forty seconds; after that a switch is instant.'],
+        off: ['The granulator is not in the sound',
+          fxWhy ? `the board refused: ${fxWhy}` : 'the board is answering but nothing is granulating yet — press “Switch it on”'],
+        // It records its input, so with no input it is reading sixty seconds of
+        // silence. That is not a fault and it is not a sound either, and it
+        // happens whenever somebody else stops the board's instrument.
+        empty: ['Nothing is going into it',
+          'the granulator is running and the board has no instrument playing, so all it has to read is the last sixty seconds '
+          + 'of silence — press one of the material buttons above'],
+        idle: ['Nothing is rolled yet',
+          'the granulator is running and has been given no settings, so there is nothing to describe — press “Roll the dice”'],
+      }[st];
+      b.append(el('b', '', say[0]), el('span', '', say[1]));
+      panel.append(b);
+      keyLine.textContent = '';
+      return;
+    }
+    const box = el('div', 'roll');
+    for (const [k, side] of [['one', roll.m], ['two', roll.n]]) {
+      const s = el('div', 'side');
+      s.append(el('span', 'hd', `granulator ${k}`),
+               el('span', 'ch', k === 'one' ? roll.character.m : roll.character.n),
+               el('span', 'nums', `${rate(side)} grains a second · each ${Math.round(side.size * 1000)} ms long`
+                  + ` · reading ${side.scan.toFixed(2)} of the way through the sixty seconds`));
+      box.append(s);
+    }
+    panel.append(box);
+    // What the board has done to the sound since the roll, with nobody asking.
+    const moved = driftMoved();
+    panel.append(el('p', 'drift', drift?.on
+      ? `moving on its own · ${moved ? `${moved.nudges} nudges in the ${secs(moved.ms)} this page has been watching` : 'no reading yet'}`
+        + ', none of them asked for'
+        + ` · the slow one is reading at ${drift.scan ?? '—'} of the way through the sixty seconds`
+      : 'not moving on its own — the drift is switched off on the board'));
+    seedNow.textContent = roll
+      ? `this one is number ${roll.seed} — try another:`
+      : 'any whole number is a sound:';
+    keyLine.textContent = grainSrc
+      ? 'the keys pitch the grains themselves — eight voices, so eight notes at once, all reading the minute that is held still'
+      : 'the keys play the instrument going into the granulator, so the cloud follows what you play about a second later';
+  }
+
+  // ── audio out of this page ───────────────────────────────────────────────
+  let ctx = null, playout = null;
+  async function startAudio() {
+    if (ctx) return;
+    try { await openAudio(); }
+    // ⚠️ NEVER LET THE SPEAKERS TAKE THE PAGE DOWN. Everything measured here is
+    // read off the socket, so a browser that will not give this page an audio
+    // output still answers every question the page asks — but an unhandled
+    // rejection would reach guard() and mark the whole demo failed.
+    catch (e) { ctx = null; d.log(`no sound out of this page: ${e.message}`, 'bad'); }
+  }
+  async function openAudio() {
+    // ⚠️ ASK FOR 48 kHz. The board fixes 48000 and the worklet writes those
+    // samples into a ring drained at this context's own rate, so on a 44.1 kHz
+    // output the pitch is wrong by the ratio AND the ring overruns several
+    // times a second — periodic clicking, with every counter on this page
+    // reading green throughout.
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
+    if (ctx.sampleRate !== 48000) {
+      d.log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends 48000 — pitch will be off by `
+            + `${(48000 / ctx.sampleRate).toFixed(3)}x and you will hear clicks`, 'bad');
+    }
+    // ⚠️ Fire and move on. resume() waits on a user gesture in a real browser
+    // and never rejects, so awaiting it is a hang rather than an error — and
+    // the measurements below do not need it, because they read the frames off
+    // the socket rather than out of the speakers.
+    ctx.resume().catch(() => {});
+    await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
+    playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+    playout.connect(ctx.destination);
+    playout.port.postMessage({ cmd: 'floor', ms: 60, adaptive: false });
+  }
+
+  function onPcm(buf) {
+    const s = new DataView(buf).getUint32(0, true);
+    if (lastSeq >= 0 && s > lastSeq + 1) gaps += s - lastSeq - 1;
+    lastSeq = s; frames++;
+    // Audio is the board too, and the loudest possible proof of it: a room with
+    // nothing in it cannot produce a PCM frame.
+    lastHeard = Date.now();
+    if (!firstFrame) { firstFrame = performance.now(); answered = true; render(); }
+    const pcm = new Int16Array(buf, 12);
+    const f32 = new Float32Array(pcm.length);
+    let peak = 0;
+    for (let i = 0; i < pcm.length; i++) { const v = pcm[i] / 32768; f32[i] = v; const a = v < 0 ? -v : v; if (a > peak) peak = a; }
+    // ⚠️ THE LEVEL IS THE ONLY THING THAT CAN TELL A WORKING STREAM FROM A
+    // STREAM OF DIGITAL SILENCE, and this project has read three numbers wrong
+    // for exactly that reason. It decays rather than resetting, so a cloud
+    // between grains does not read as a dead board.
+    const t = performance.now();
+    level = Math.max(peak, level * Math.pow(0.5, (t - levelAt) / 400));
+    levelAt = t;
+    collect?.(peak);
+    playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
+    // Fifty frames a second is ONE source. Anything missing is the relay's own
+    // bucket dropping them — which is what two instruments streaming into one
+    // socket sounds like — and the sender is told nothing at all when that
+    // bites, so a counter here is the only place it can be seen.
+    if (!gapWarned && frames > 250 && gaps > frames * 0.02) {
+      gapWarned = true;
+      const fps = frames / Math.max(0.001, (performance.now() - firstFrame) / 1000);
+      d.log(`${gaps} frames never arrived out of ${frames + gaps}, and ${fps.toFixed(0)} a second are getting through`
+            + ' — the relay is dropping them, and it sounds like clicks', 'bad');
+    }
+    if (frames % 25 === 0) render();
+  }
+
+  /** Loudest thing that arrives in a window. Resolves a number, always. */
+  async function listen(ms) {
+    let p = 0;
+    collect = (v) => { if (v > p) p = v; };
+    await wait(ms);
+    collect = null;
+    return p;
+  }
+
+  // ── the socket ───────────────────────────────────────────────────────────
+  // openWire rather than a hand-rolled socket: it reconnects, it mints a new
+  // `from` per connection, and it refuses to send a payload field that the
+  // envelope would overwrite — which is the bug that made `source.load`'s only
+  // control silently do nothing for a day.
+  const waiters = [];
+  const wire = openWire(ROOM, {
+    onOpen: (from) => { me = from; d.log(`joined ${ROOM}`, 'hi'); hello(); send({ type: 'audio.status' }); },
+    onClose: () => { d.log('socket closed — reconnecting'); },
+    onMessage: (got) => {
+      if (got.kind === 'binary') { onPcm(got.data); return; }
+      if (got.kind !== 'json' || got.msg.from === me) return;
+      heard(got.msg);
+    },
+  });
+  const send = (m) => !!wire.send(m);
+
+  /**
+   * The heartbeat, and the round trip, on one message.
+   *
+   * ⚠️ NOT `box.ping`. The board's pong is `reply('box.pong', { at: … })` and
+   * `at` is an envelope field, so the envelope refuses to format it and the
+   * handler throws — asked directly, the board answers `box.error: "at" is an
+   * envelope field`. So the obvious round trip verb answers NOTHING on the
+   * board as it runs today, and a page timing it reads an empty cell forever.
+   * `params.state` is the cheapest verb that always answers, answers with no
+   * work behind it, and is worth asking anyway — so the round trip is timed on
+   * a question this page was going to ask regardless.
+   */
+  function hello() {
+    stateAt = performance.now();
+    send({ type: 'params.state' });
+  }
+
+  /**
+   * Wait for the next reply of a type. Resolves null on a timeout rather than
+   * hanging: a page that waits forever looks like a page that is still loading,
+   * and "nobody answered" is the answer this page most often has to give.
+   */
+  function waitFor(type, ms) {
+    return new Promise((resolve) => {
+      const w = { type, resolve };
+      w.timer = setTimeout(() => { waiters.splice(waiters.indexOf(w), 1); resolve(null); }, ms);
+      waiters.push(w);
+    });
+  }
+  async function ask(msg, type, ms = 8000) {
+    const p = waitFor(type, ms);
+    if (!send(msg)) return null;
+    return p;
+  }
+
+  /**
+   * ⚠️ A QUESTION AND ITS ANSWER CARRY THE SAME `type` ON THIS RELAY, AND THAT
+   * IS NOT A DETAIL — it is the bug that made this page report "10 nudges in
+   * 1 s" about a board that had moved 2,800 times. The relay is a broadcast:
+   * every client sees every other client's traffic, and the box answers
+   * `{type:'params.state', ok, roll, drift}` to a request that is itself
+   * `{type:'params.state'}`. So another listener merely ASKING looked exactly
+   * like the board answering with no granulator, and this page dutifully wiped
+   * everything it knew. Measured on the live room: nine `params.state` messages
+   * in four seconds, four of them other people's questions.
+   *
+   * The box stamps every answer with `re`, the id of the message it answers —
+   * which is how `pappus-live.mjs` has always matched replies — and its four
+   * unprompted announcements are named here. Nothing else is the board talking.
+   */
+  const ANNOUNCED = new Set(['box.hello', 'box.alive', 'audio.stopped', 'video.stopped']);
+  const fromBox = (m) => typeof m.re === 'string' || ANNOUNCED.has(m.type);
+
+  function heard(m) {
+    if (!fromBox(m)) return;           // somebody else asking the board something
+    answered = true; lastHeard = Date.now();
+    // The board says this every five seconds with nobody asking, which makes it
+    // the cheapest liveness there is — and it names what is sounding, so an
+    // instrument somebody else starts shows up here without this page polling
+    // for it. Only a CHANGE costs a question.
+    if (m.type === 'box.alive') {
+      if ((m.audio ?? null) !== playing) send({ type: 'audio.status' });
+      if (!m.audio) playing = null;
+    }
+    if (m.type === 'audio.stopped') { playing = null; send({ type: 'audio.status' }); }
+    if (m.type === 'box.hello') { d.log(`${m.name || 'the board'} is here`, 'hi'); hello(); send({ type: 'audio.status' }); }
+    if (m.type === 'audio.started') {
+      const was = playing;
+      if (m.ok) {
+        playing = m.source;
+        // An insert can only reach what is on the board's audio graph. The
+        // board reports that about the source rather than the page keeping a
+        // list of names, which is a list somebody always forgets to extend.
+        onJack = m.jack === true;
+        archive = m.archive ?? null;
+        fxOn = m.fx === 'pappus';
+        if (m.source !== was) d.log(`the board is playing ${m.source}${onJack ? '' : ' — which the granulator cannot reach'}`, 'hi');
+      } else {
+        playing = null; archive = null;
+        if (m.reason !== 'nothing playing') d.log(`the board could not start it: ${m.reason}`, 'bad');
+      }
+      // ⚠️ ONLY A REPLY ABOUT THE THING THAT WAS ASKED FOR STOPS THE WAITING
+      // MARK. This used to clear it on any `audio.started`, and the four-second
+      // heartbeat is an `audio.status` — so a press of "1965 radio, live" went
+      // back to looking idle a moment later while the board was still raising
+      // the chain, which reads as a dead button.
+      if (wantSource && (m.source === wantSource || !m.ok)) {
+        wantSource = null;
+        for (const b of mat.querySelectorAll('button')) delete b.dataset.busy;
+      }
+    }
+    if (m.type === 'fx.pappus') {
+      fxOn = !!m.on; fxWhy = m.ok ? null : m.reason; fed = m.fed ?? null;
+      d.log(m.ok ? (fxOn ? 'the granulator is in the sound' : 'the granulator is out of the sound') : `the granulator refused: ${m.reason}`,
+            m.ok ? 'hi' : 'bad');
+    }
+    if (m.type === 'params.rolled' && m.ok) {
+      roll = m; drift = m.drift ?? drift; rolledAt = Date.now();
+      markDrift();
+      d.log(`${m.character.m}/${m.character.n} · ${rate(m.m)} and ${rate(m.n)} grains a second · number ${m.seed}`, 'hi');
+    }
+    if (m.type === 'params.state') {
+      if (stateAt) { rtt = Math.round(performance.now() - stateAt); stateAt = 0; }
+      fxOn = !!m.ok;
+      grainSrc = m.source ?? null;
+      // ⚠️ FOLLOW THE BOARD DOWN AS WELL AS UP, AND THIS WAS FOUND THE REAL
+      // WAY: the box service restarted underneath a run, and the page went on
+      // printing a character, a grain rate and a nudge count for an engine that
+      // was no longer running — a readout about a sound nobody could hear. The
+      // board reporting no roll IS the answer, so it is taken as one.
+      //
+      // The 1.5 s is for the other order: a heartbeat asked a moment before a
+      // roll landed answers with the PREVIOUS settings, and letting that
+      // overwrite a fresh roll would blank the page for four seconds after
+      // every press.
+      if (Date.now() - rolledAt > 1500) {
+        roll = m.roll ?? null;
+        drift = m.drift ?? null;
+        // A granulator that went away takes its history with it; anything else
+        // would be counting across two different engines.
+        if (!drift && !fxOn) driftLog.length = 0;
+        else markDrift();
+      }
+    }
+    if (m.type === 'params.drifted') drift = m;
+    // The board picks the item; this page only says which. The search cannot be
+    // called from a browser at all — its JSON content type forces a preflight
+    // that the archive answers 204 with no permission header — so the board is
+    // the only end that can ask.
+    if (m.type === 'source.found') {
+      if (!m.ok) {
+        delete bFreeze.dataset.busy;
+        d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `the archive: ${m.reason}`, 'warn');
+      } else {
+        const pick = m.items[Math.floor(Math.random() * m.items.length)];
+        // Past the announcer at the top, far enough from the end that a minute
+        // of it exists, and on a whole minute — a repeat then lands on the copy
+        // the board already pulled instead of asking a stranger's archive for
+        // the same audio twice.
+        const atSec = 60 + 60 * Math.floor(Math.random() * 5);
+        send({ type: 'source.load', slug: pick.slug, atSec, dur: 60 });
+        d.log(`${m.total} recordings from 1965 · taking a minute of ${pick.date} ${pick.title}`, 'hi');
+      }
+    }
+    if (m.type === 'source.loaded') {
+      delete bFreeze.dataset.busy;
+      if (m.ok) { grainSrc = m; d.log(`held still in ${m.tookMs} ms — the keys play this minute now`, 'hi'); }
+      else d.log(m.holdingOff ? `the archive asked us to wait — ${m.reason}` : `could not freeze it: ${m.reason}`, 'warn');
+    }
+    if (m.type === 'source.cleared') { grainSrc = null; d.log('the buffers are recording again'); }
+
+    for (const w of [...waiters]) {
+      if (w.type !== m.type) continue;
+      clearTimeout(w.timer);
+      waiters.splice(waiters.indexOf(w), 1);
+      w.resolve(m);
+    }
+    render();
+  }
+
+  // The board is an object, not a session: it can be switched off, restarted or
+  // taken to another room while this page is open, and a page that goes on
+  // showing the last numbers it saw is a page lying about the present.
+  setInterval(() => {
+    if (wire.state() === 1) hello();
+    if (answered && Date.now() - lastHeard > 12000) {
+      answered = false; rtt = null;
+      d.log('the board stopped answering', 'bad');
+      render();
+    }
+  }, 4000);
+
+  // ── the material row's actions ───────────────────────────────────────────
+  bInst.onclick = async () => {
+    startAudio();
+    if (grainSrc) { send({ type: 'source.clear' }); d.log('giving the buffers back to whatever is playing'); }
+    // ⚠️ AND IT HAS TO SWITCH BACK OFF THE RADIO. This only started something
+    // when NOTHING was playing, so pressing it while 1965 was on the graph
+    // cleared the frozen minute and left the radio running — a button that
+    // says "the instrument on the board" and leaves you listening to a
+    // broadcast.
+    if (!playing || playing === 'archive') {
+      bInst.dataset.busy = '1'; wantSource = 'fluidsynth';
+      d.log(playing ? 'switching the radio off and starting the sampled instrument'
+                    : 'nothing was playing — starting the sampled instrument, which takes a few seconds on the board', 'hi');
+      send({ type: 'audio.start', source: 'fluidsynth' });
+    }
+  };
+  bLive.onclick = () => {
+    startAudio();
+    if (grainSrc) send({ type: 'source.clear' });
+    bLive.dataset.busy = '1'; wantSource = 'archive';
+    d.log('asking the board to play an hour of 1965 into the granulator', 'hi');
+    send({ type: 'audio.start', source: 'archive' });
+  };
+  bFreeze.onclick = () => {
+    bFreeze.dataset.busy = '1';
+    send({ type: 'source.search', limit: 100 });
+    d.log('asking the board what the archive has…', 'hi');
+  };
+
+  // ── rolling ──────────────────────────────────────────────────────────────
+  async function doRoll(seed) {
+    const r = await ask({ type: 'params.random', seed }, 'params.rolled', 8000);
+    if (!r) { d.log('nothing answered the roll', 'warn'); return null; }
+    if (!r.ok) { d.log(`the roll was refused: ${r.reason}`, 'bad'); return null; }
+    return r;
+  }
+  const rollFrom = (v) => {
+    // ⚠️ An empty box is not zero. `Number('')` is 0 and `Number.isInteger(0)`
+    // is true, so pressing the button with nothing typed rolled seed 0 and
+    // looked like the box had been ignored.
+    if (!v) { d.log('type a number first — any whole number is a different sound'); return; }
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) { d.log(`“${v}” is not a whole number`, 'warn'); return; }
+    doRoll(n);
+  };
+  seedGo.onclick = () => rollFrom(seedIn.value.trim());
+  seedIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') rollFrom(seedIn.value.trim()); });
+
+  // ── the controls ─────────────────────────────────────────────────────────
+  d.on('on', async () => {
+    startAudio();
+    // ⚠️ A WINDOW, NOT A RACE. Nobody answering is a real answer here, so this
+    // waits a bounded time and then reports silence rather than waiting forever
+    // and looking like it is still loading.
+    for (let i = 0; i < 20 && !answered; i++) await wait(250);
+    if (!answered) {
+      d.log(`nothing answered in “${ROOM}” — the board is not in this room`, 'warn');
+      render();
+      return;
+    }
+    // Something has to be going into it, or it granulates an empty recording
+    // and the page is honestly, uselessly silent.
+    const st = await ask({ type: 'audio.status' }, 'audio.started', 6000);
+    if (st && !st.ok) {
+      d.log('nothing was playing — starting the sampled instrument so there is something to chew', 'hi');
+      wantSource = 'fluidsynth';
+      await ask({ type: 'audio.start', source: 'fluidsynth' }, 'audio.started', 60000);
+    }
+    // First time this is asked of a cold board it compiles a two-thousand line
+    // engine, about forty seconds; after that it is a re-patch. `switching` is
+    // what lets the page say THAT rather than "it is off", which is the same
+    // sentence about two different situations.
+    switching = true; render();
+    const fx = await ask({ type: 'fx.pappus', on: true }, 'fx.pappus', 90000);
+    switching = false;
+    if (!fx) { d.log('the granulator did not answer in ninety seconds', 'warn'); render(); return; }
+    if (!fx.ok) { render(); return; }
+    // ⚠️ ADOPT BEFORE ROLLING. The board is shared and it keeps playing with
+    // nobody connected: if it already has settings, taking them over would
+    // change the sound under whoever is listening for no reason the page could
+    // name. A roll happens when there is nothing to adopt, or when asked for.
+    const state = await ask({ type: 'params.state' }, 'params.state', 6000);
+    if (WANT_SEED !== null) { d.log(`the address asks for number ${WANT_SEED}`, 'hi'); await doRoll(WANT_SEED); }
+    else if (state?.roll) d.log(`the board was already set to ${state.roll.character.m}/${state.roll.character.n} — keeping it`, 'hi');
+    else await doRoll(nowSeed());
+    // ⚠️ MEASURE THE SOUND, NOT THE FRAME COUNT. A stream of digital silence
+    // arrives at exactly the rate a working one does, so this holds a key and
+    // compares what comes back against what was coming back before it — the
+    // same before-and-after the box's own live test uses, and the only thing
+    // on this page that crosses the whole chain.
+    const quiet = await listen(900);
+    send({ type: 'note.on', note: 60, vel: 100, channel: 0 });
+    const held = await listen(1800);
+    send({ type: 'note.off', note: 60, channel: 0 });
+    probe = { quiet, held };
+    // ⚠️ SAY WHICH OF THE TWO THE NUMBERS MEAN. A cloud that was already
+    // droning is often LOUDER before the key than during it, and printing the
+    // pair without saying so reads as a failure on a working board.
+    d.log(`holding a key: ${held.toFixed(4)} against ${quiet.toFixed(4)} with nothing pressed — `
+          + (quiet <= 0.002 ? 'the key is what started it' : 'it was already droning, which is what a cloud does'),
+          held > 0.002 ? 'hi' : 'bad');
+    render();
+  });
+
+  d.on('roll', async () => {
+    const seed = nowSeed();
+    const r = await doRoll(seed);
+    if (!r) return;
+    // The two halves must be given DIFFERENT characters: rolling both from one
+    // distribution is what made every roll sound like one thing played twice.
+    d.assert('the roll comes back named, and carrying the number that made it',
+      r.seed === seed && typeof r.character?.m === 'string' && r.character.m !== r.character.n,
+      `${r.character?.m}/${r.character?.n} · number ${r.seed}`);
+  });
+
+  d.on('again', async () => {
+    if (!roll) { d.log('nothing has been rolled yet, so there is no number to ask for again'); return; }
+    const seed = roll.seed, before = settings(roll);
+    const r = await doRoll(seed);
+    if (!r) return;
+    // THE NEGATIVE CONTROL, and the honest version of it. The same number does
+    // NOT reproduce the same sound — the board's grain scheduler draws from its
+    // own free-running noise that nothing reseeds, so two goes at one setting
+    // hear different material by design. What it reproduces is the SETTINGS,
+    // which is what is asserted, because it is what is true.
+    d.assert('the same number gives back the same settings',
+      r.seed === seed && settings(r) === before,
+      r.seed !== seed ? `asked for ${seed}, got ${r.seed} — somebody else rolled at the same moment`
+        : settings(r) === before ? `${r.character.m}/${r.character.n}, ${rate(r.m)} and ${rate(r.n)} grains a second, twice`
+        : 'the same number came back with different settings');
+  });
+
+  d.on('check', () => {
+    d.assert('the page reached the relay', wire.state() === 1, `readyState ${wire.state()}`);
+    // ⚠️ ONE BRANCH PER NAMED STATE, AND THE COUNT MOVES WITH IT. This board is
+    // shared and it keeps running with nobody connected, so "answering" is not
+    // one condition: it can be compiling its engine, refusing the insert, or
+    // playing nothing at all into it — and asserting a running instrument's
+    // numbers in those states reported four failures about a board that was
+    // fine. Each state asserts what it can answer for and says which it was.
+    // Diff the count against the BRANCH: silent 4, answering-but-not-sounding 5,
+    // sounding 8 — 10 with the two rolls.
+    const st = panel.dataset.state;
+    const why = {
+      silent: 'the board is silent, and the page says so',
+      warming: 'the granulator is still compiling on the board — about forty seconds the first time',
+      off: `the granulator is not in the sound: ${fxWhy ?? 'nothing has switched it on'}`,
+      empty: 'the granulator is running with no instrument playing into it',
+      idle: 'the granulator is running with nothing rolled',
+      live: 'the board is answering and set up',
+    }[st];
+    d.assert('it says which of the two it is in', answered ? st !== 'silent' : st === 'silent', why);
+    if (!answered) {
+      d.assert('silence is reported as silence, not as an instrument that makes none',
+        panel.textContent.includes('Nobody is answering'), 'the panel names the silence');
+      d.assert('no sound is claimed that never arrived',
+        frames === 0 && d.api.readout.sound === 'nothing' && roll === null && level === 0,
+        `${frames} frames, sound cell “${d.api.readout.sound}”, nothing rolled`);
+      return;
+    }
+    d.assert('the board answered in this room', Number.isFinite(rtt), `${rtt} ms out to the board and back`);
+    d.assert('the page says what the grains are made of', !!materialShort(), String(materialShort()));
+    if (st !== 'live') {
+      // Not a pass dressed as one. The claim is that the page NAMES the state
+      // it is in — the same claim the silent branch makes — rather than drawing
+      // an instrument's numbers for a sound nobody is making.
+      d.assert('it says why there is nothing to hear yet, rather than printing numbers for a sound nobody is making',
+        panel.textContent.length > 40, why);
+      return;
+    }
+    d.assert('the granulator is switched on, with something playing into it',
+      fxOn && !!playing, `wrapping ${playing}${fed === false ? ' — nothing feeding it' : ''}`);
+    d.assert('a whole number describes the sound on screen',
+      !!roll && Number.isInteger(roll.seed) && roll.character.m !== roll.character.n,
+      roll ? `${roll.character.m}/${roll.character.n} · number ${roll.seed}` : 'nothing is rolled');
+    // The claim the whole page rests on: this is sound that was made on a
+    // machine somewhere else and came back, not a page making a noise.
+    d.assert('sound comes back from the board while a key is held',
+      !!probe && probe.held > 0.002,
+      probe ? `${probe.held.toFixed(4)} with a key down, ${probe.quiet.toFixed(4)} without`
+        + (probe.quiet <= 0.002 ? ' — the key started it' : ' — it was already droning')
+        : 'no key has been held yet — press “Switch it on”');
+    // Nothing that changes the sound was sent between these two readings. The
+    // page asked the board what it was doing, which is a question, not a knob.
+    const moved = driftMoved();
+    d.assert('the board keeps moving the sound, and nobody asked it to',
+      drift?.on === true && moved !== null && moved.nudges > 0,
+      drift?.on ? `${moved ? `${moved.nudges} nudges in ${secs(moved.ms)}` : 'only one reading so far'}, reading at ${drift.scan}`
+        : 'the drift is switched off on the board');
+  });
+
+  render();
+  d.log(`open this page with ?seed=<number> to come back to a sound, or ?room=<name> to reach another board`);
+  d.ready();
+</script>
+</html>
