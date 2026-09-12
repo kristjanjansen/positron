@@ -55,8 +55,45 @@ for as long as they have existed. LESSONS #52.
 - `rack` has **one control**. The keyboard carries its own `notes off`, and a
   page that checks itself only when asked is a page nobody checks.
 
+### The second half: the pages somebody actually has to use
+
+Four rounds of "this looks bad", all of them right, and the fixes are in
+LESSONS #57–#60.
+
+- 🔴 **`grains` was rebuilt.** It handed you a random number and nine sliders;
+  every roll landed in the middle of nine ranges, so all of them were one wash
+  wearing different digits. **Six named patches** now — each the whole sound
+  (instrument, held chord, all eighteen settings for both halves) — and the
+  randomiser picks **between patches, never between slider positions**. One
+  control left; the page checks itself when it switches on. The seed box, both
+  dice controls and "Check it" are gone.
+- **`/box/`**: `FluidR3_GM` and `sf_GMbank` were the same instrument twice,
+  named after their files — one `sampled` button now. The space and chorus rows
+  built their own buttons and carried a `::after` appending ' on'/' off' from
+  when the row was a single toggle, so a three-way row read `dry off`,
+  `room on`, `off on`. `createChoice` did all of it correctly and already
+  existed.
+- **The slider group.** Four sliders in a bare div do not line up: a wider label
+  pushes its own lane right. `createSliderGroup` shares one set of columns.
+  Measured at 390 px: every label, lane and value at one x, lanes 250 px wide
+  against the old 96.
+- **A zoomed phone screenshot was not a layout bug** — measured `scrollWidth`
+  390 against a 390 px window, nothing wider. Safari had double-tap zoomed.
+  `touch-action: manipulation` is on the document root now; pinch left alone.
+- **Two CLAUDE.md rules the session earned**: three sentences for a description
+  and no essays, and build from `/kit/` — asking when a component does not exist
+  rather than writing a fourth copy.
+
 ### Still open
 
+- 🔴 **`hexter` and `yoshimi` are still jargon** in `/box/`'s instrument row —
+  program names that mean nothing to a visitor. Renaming them is a naming
+  decision, not a bug fix, so it is waiting on a call rather than on work.
+- The XR room is planned and unbuilt: `plan-xr-room.md`. Three numbers gate it
+  and none exists — HRTF cost per source on the Adreno 740, the Quest's own
+  audio output latency, and whether `createMediaElementSource` works on that
+  browser. ⚠️ And a `PannerNode` wants MONO in, so an XR panel wants the
+  worklet's 1-channel path, not the stereo one added this session.
 - `carry` counts other clients' sequence numbers — pre-existing, reproduces on a
   pristine tree.
 - `.step` / `.sld` are still unprefixed; `.pos-choice` is prefixed. LAYOUT.md

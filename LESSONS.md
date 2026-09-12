@@ -1141,3 +1141,107 @@ The relay now reclaims. Two things were needed and neither is obvious:
 
 Eviction runs **only when the room is full**. An idle socket in a room with
 space costs nothing, and closing it would be a policy nobody asked for.
+
+## 57. A class only the script knows about is not a component
+
+Twice in one day, from the same shape. `choice.mjs` shipped emitting
+`.pos-choice` and `.pos-choice-l` with **nothing in `shell.css` matching
+either**, so `/kit` drew three loose default buttons under a heading-sized
+label. Then `grains` appended four sliders to `el('div', 'knobs')` — **a class
+with no CSS anywhere** — so they fell into block layout, touching, with every
+lane starting at a different x because a wider label pushes its own lane right.
+`SPRAY` is two characters longer than `RATE`, so two lanes were indented and two
+were not, on a control whose entire job is comparing four values at a glance.
+
+Both had careful header comments describing the layout they were supposed to
+have. `choice.mjs`'s even said the options must be segmented "the same way
+`stepper.mjs` does it". The comment was right and the code that would have done
+it did not exist.
+
+Three things:
+
+- **A component is the markup AND the stylesheet.** Shipping one without the
+  other produces a control that reads as unfinished, and it reads that way to
+  the person you are building for, not to you.
+- **This failure mode is specific to controls nobody else uses.** A shared class
+  is styled because three pages would break. A private one is styled by nobody.
+  Which is the argument for the kit, now a rule in CLAUDE.md: build from
+  `demo/shell/`, and when the thing you need is not there, **ask** rather than
+  quietly writing a fourth copy.
+- **A stack is not N controls in a div.** Four rows line up only if they share
+  one set of COLUMNS, which nothing but a grid on the container can give them.
+  Per-element spacing cannot fix an alignment problem.
+
+MEASURED after, at 390x844: label lefts all 16, lane lefts all 61, lane widths
+all 250 (was 96 — the lane had never been given the width that was there), value
+lefts all 323, vertical gaps 10/10/10. The knob is positioned as a PERCENTAGE of
+its own lane, so a fluid lane needed no script and no resize listener; it was
+already correct and had simply never been given room.
+
+## 58. A zoomed screenshot is not a broken layout
+
+A phone photo of `/rack/` came back at about 3x: one button filling the screen,
+keys running off both edges, text cut off — which reads as a layout that does
+not fit. MEASURED at 390x844: `document.scrollWidth` **390** against a **390 px**
+window and **nothing wider than the viewport**. There was no overflow. Safari
+had double-tap zoomed to a block.
+
+`touch-action: manipulation` was already on the controls and on the keys, so
+every tap that MATTERS was covered — and a double-tap anywhere else, on the
+paragraph or the readout or the empty space beside a key, still zooms the whole
+document. On a page whose entire interaction is rapid tapping, **the places you
+miss are exactly where a stray second tap lands.** It is on the document root
+now.
+
+⚠️ Pinch is deliberately left alone. Killing it takes a `gesturestart`
+preventDefault and removes the only way a reader can enlarge text they cannot
+read. A deliberate zoom is somebody asking; an accidental one is the page
+misfiring, and only the second is a bug.
+
+The general form: **before fixing a layout from a photograph, measure the
+layout.** The photograph shows what the browser DID, not what the page is.
+
+## 59. A randomiser over nine ranges makes one sound, every time
+
+`grains` handed you a whole number and nine sliders and called that a choice.
+Every roll landed in the middle of nine ranges — because that is what a uniform
+draw over nine dimensions does — so every sound was the same mid-density wash
+wearing different digits, and the number printed on screen meant nothing to
+anybody. The verdict from the person it was built for was **"mambo jumbo"**, and
+that was accurate.
+
+The engine had already learned half of this: `pappus.mjs` rolls a CHARACTER
+first and the numbers inside it, with a comment explaining exactly why. The page
+did not carry the lesson across. The fix goes one further — **six finished
+patches**, each one the whole sound (which instrument, which chord it holds,
+every setting for both halves), and **the randomiser picks between patches,
+never between slider positions.** A random position is how the mid-range wash
+comes back.
+
+- **Curation beats a distribution when the axes are not independent.** Nine
+  sliders do not describe nine choices; they describe one surface, most of which
+  sounds the same.
+- **A reproducible number is only worth showing if somebody wants it.** The
+  seed, the "same number again" control and the assert that the seed round-trips
+  were all correct, all tested, and all answering a question nobody asked.
+- ⚠️ **And when the page stopped rolling, a readout started lying.**
+  `params.state` answers with the last dice ROLL; the page now sets each
+  parameter directly, so the roll's names had stopped being in the sound while
+  the panel still drew them.
+
+## 60. Two files, one instrument, named after the files
+
+`/box/` drew a button per soundfont on the board, labelled with the filename:
+`FluidR3_GM` · `sf_GMbank` · `hexter` · `yoshimi`. **Two of those four are the
+same instrument** — General MIDI, twice — and a visitor has to know what a
+soundfont is before they can work that out. The page was showing its storage
+layout and calling it a menu.
+
+One `sampled` button now, picking the fullest set. The rule underneath:
+**enumerate what a listener could tell apart, not what the filesystem
+contains.** Two files that make the same sound are one choice; if they genuinely
+differed, the difference — not the filename — would be the label.
+
+⚠️ Still jargon in that row and unfixed on purpose: `hexter` and `yoshimi` are
+program names, meaningless to anyone who does not run the board. Renaming them
+is a naming decision, not a bug fix.
