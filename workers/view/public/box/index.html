@@ -87,14 +87,24 @@
      got 172 px, reverb 113 and chorus 120 of a 390 px screen. MEASURED. A
      component can only fill what its container gives it. */
   @media (max-width: 560px) {
-    .pick { flex-direction: column; align-items: stretch; gap: 10px; }
+    .pick { flex-direction: column; align-items: stretch; gap: 22px; }
     /* ⚠️ BOTH CONTAINERS. The reverb and chorus row is appended to
        `.pos-controls`, not to `.pick` — so a rule written for `.pick .fx` alone
        left them at 113 px and 120 px of a 390 px screen while the instrument
        row beside them went full width. Two homes, two selectors. */
+    /* ⚠️ 22 px BETWEEN GROUPS AGAINST 4 px INSIDE ONE. At an even 10 px the
+       CHORUS label sat as close to the reverb buttons ABOVE it as to its own
+       buttons below, so it read as belonging to neither — a label has to be
+       nearer the thing it labels than the thing it follows, or there are no
+       groups, only a column of controls. */
+    /* ⚠️ `display` IS PART OF IT. This set flex-direction, align-items and gap
+       and not display — and the computed display came back `block`, so all
+       three were inert and the two groups touched at a measured 0 px while the
+       stylesheet said 22. A flex property on a non-flex box is not an error,
+       it is silence. */
     .pick .fx, .pos-controls .fx, .fxhost {
-      margin-left: 0; width: 100%; flex-direction: column;
-      align-items: stretch; gap: 10px;
+      display: flex; margin-left: 0; width: 100%; flex-direction: column;
+      align-items: stretch; gap: 22px;
     }
 </style>
 
