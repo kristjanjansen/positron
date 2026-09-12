@@ -630,10 +630,11 @@ video[hidden] { display: none; }
 .pos-pick-n {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
-.pos-pick-caret { color: var(--dim2); font-size: 10px; flex: none; }
-/* Nothing to choose between: the caret would promise a list that is not there. */
-.pos-pick-cell[data-flat="1"] { cursor: default; }
-.pos-pick-cell[data-flat="1"] .pos-pick-caret { display: none; }
+/* ⚠️ NO CARET. It was a `▾` next to the name, on the theory that a dropdown
+   has to advertise itself — but this cell sits BETWEEN two arrows that already
+   say "this is a control", and a third glyph in the same 13 ch reads as
+   punctuation inside the patch name rather than as an affordance. The press
+   target is the whole cell, which is what the cursor says. */
 /* The real control, over the whole cell and invisible. `appearance: none` keeps
    Safari from drawing its own box THROUGH the zero opacity on some versions. */
 .pos-pick-sel {
@@ -647,10 +648,16 @@ video[hidden] { display: none; }
 .pos-pick-cell:has(.pos-pick-sel:focus-visible) { outline: 2px solid var(--dim2); outline-offset: 2px; z-index: 1; }
 .pos-pick-cell:hover { position: relative; z-index: 1; border-color: var(--line2); }
 /* ⚠️ A GAP, SO IT IS NOT A FOURTH STEP. The die is a different kind of move
-   from ‹ and ›, and joining it to them says it is the same kind. */
-.pos-pick-die { margin-left: 4px; border-radius: 4px; }
-/* The pips are SVG, so there is no font to fall back from — see picker.mjs. */
-.pos-pick-die { display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+   from ‹ and ›, and joining it to them says it is the same kind.
+   🔴 AND IT NEEDS ITS OWN SIZE. `.ico` is scoped `.step button.ico`, and this
+   button is deliberately OUTSIDE `.step` — so it matched nothing, took its
+   width from its content and drew a tall narrow slab beside two square arrows.
+   A shared class that only applies inside one container is not a shared class
+   from out here. */
+.pos-pick-die {
+  width: 34px; height: 34px; flex: none; padding: 0; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
 .pos-pick-die svg { display: block; }
 
 .step { display: inline-flex; align-items: center; height: 34px; }

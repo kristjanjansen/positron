@@ -27,11 +27,22 @@ const ROOM = arg('room', 'm1-1');
 const RELAY = arg('relay', 'wss://ws.positron.studio');
 const BIN = arg('bin', join(homedir(), 'positron-rack', 'bin'));
 const RATE = 48000;
-// Stereo, because Live's instruments ARE stereo — the Stage-73's chorus is a
-// width effect, and summing it to mono removes the thing that makes it sound
-// like that patch. The box stays mono (`arecord -c 1`), so both counts are on
-// the wire at once and NEITHER end may assume. See `audioChannels` below.
-const CH = 2;
+// 🔴 MONO BY DEFAULT, ON A MEASUREMENT. The argument for stereo was real —
+// Live's instruments ARE stereo and the Stage-73's chorus is a width effect
+// that summing destroys. It is also not what this rig is currently sending:
+// MEASURED 2026-09-12 over two captures off the relay, two different notes,
+// **557,760 of 557,760 frames had L and R BIT-IDENTICAL** (max|L-R| = 0). The
+// patch in Live is dual mono, so stereo was paying 1.54 Mbit/s to send the same
+// samples twice — double the bytes through a relay whose jitter is the thing
+// the listener's cushion has to absorb.
+//
+// `--channels 2` when the patch genuinely has width, and the page will believe
+// it because the count is ANNOUNCED and checked against `frameMs`. The default
+// is the honest one for what is actually playing.
+//
+// ⚠️ The box stays mono (`arecord -c 1`) either way, so both counts are on the
+// wire at once and NEITHER end may assume. See `audioChannels` below.
+const CH = Math.min(2, Math.max(1, Number(arg('channels', '1')) || 1));
 // 20 ms of audio. 50 frames a second against the relay's MEASURED ceiling of
 // 60 msg/s for EVERYTHING on it — which is why notes are cheap and nothing else
 // chats. The box runs the same cadence for the same reason.
@@ -39,7 +50,7 @@ const CH = 2;
 // ⚠️ STEREO DOUBLES THE BYTES, NOT THE MESSAGES. 3852 bytes a frame against
 // 1932, so 1.54 Mbit/s against 771 kbit/s — and the relay's cap is a MESSAGE
 // rate, not a byte rate, so the thing that could actually throttle this is
-// untouched. MEASURED after the change: 50/s, 1541 kbit/s, 0 dropped.
+// untouched. MEASURED at CH=2: 50/s, 1541 kbit/s, 0 dropped.
 const FRAME = RATE / 50;
 const FRAME_MS = 1000 * FRAME / RATE;
 
@@ -81,7 +92,12 @@ function startTap() {
       carry = carry.subarray(per);
       const out = new Int16Array(FRAME * CH);
       for (let i = 0; i < FRAME * CH; i++) {
-        let v = block.readFloatLE(i * 4);
+        // At CH=1 the tap still hands us interleaved stereo, so take the LEFT
+        // of each pair rather than every other float — reading straight through
+        // would play the two channels alternately, which is a half-rate stream
+        // an octave down. (They are bit-identical today, so left IS the sum;
+        // when they are not, this is a downmix decision and it is stated here.)
+        let v = block.readFloatLE((CH === 1 ? i * 2 : i) * 4);
         // 🔴 CLIP, DO NOT LET IT WRAP. `(v * 32767) | 0` on a float above 1.0
         // wraps through the sign bit, so the loudest moment of a track — the
         // one place headroom runs out — comes back as full-scale noise rather

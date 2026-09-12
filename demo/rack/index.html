@@ -15,8 +15,13 @@
   // The studio Mac's room. `/box/` is this same page pointed at a Raspberry Pi —
   // which is the argument: what crosses the relay is a note NUMBER, so neither
   // end knows what kind of machine the other one is.
-  const ROOM = new URLSearchParams(location.search).get('room') || 'm1-1';
-  const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'm1-1';
+  // `?relay=ws://127.0.0.1:8899` points this page at a relay on the LAN, which
+  // is the only way to tell "the sound is bad" from "the PATH to the sound is
+  // bad" — the two have opposite fixes and look identical from here. /box/ has
+  // had this override since it was written.
+  const RELAY = `${q.get('relay') || 'wss://ws.positron.studio'}/room/${ROOM}/ws`;
   const ID = Math.random().toString(36).slice(2, 8);
   const RATE = 48000;
 
@@ -52,7 +57,7 @@
 
   let ws = null, ctx = null, playout = null, seq = 0;
   let frames = 0, bytes = 0, lastSeq = -1, missing = 0, pingAt = 0, started = false;
-  let answered = false, instrument = null, namedItself = false;
+  let answered = false, instrument = null, namedItself = false, rateWarned = false;
   // 🔴 NOTHING HERE GUESSES HOW MANY CHANNELS ARE ARRIVING. 960 samples is a
   // valid 20 ms mono frame and a valid 10 ms stereo one, so the payload cannot
   // say — and guessing wrong plays an octave down, which sounds like a broken
@@ -75,6 +80,16 @@
     // ⚠️ Fire and move on. `resume()` waits on a gesture in a real browser and
     // NEVER rejects, so awaiting it is a hang rather than an error.
     ctx.resume().catch(() => {});
+    // 🔴 A SAMPLE RATE CANNOT BE INFERRED EITHER, AND NOBODY WAS CHECKING IT.
+    // The far end announces `rate` alongside `audioChannels` and `frameMs`, and
+    // this page ignored it while hard-coding 48000 — so a context that came back
+    // at another rate would play 48 kHz samples at 44.1 and fill the ring 8.8%
+    // faster than it drains: pitched down a tone and trimming every second or so,
+    // which is a noise complaint, not a pitch one. Chrome honours the request,
+    // which is exactly why nobody would ever see this fail by accident.
+    if (ctx.sampleRate !== RATE) {
+      d.log(`asked for ${RATE} Hz and got ${ctx.sampleRate} — every sample arriving at ${RATE} will play ${(RATE / ctx.sampleRate).toFixed(3)}x wrong`, 'bad');
+    }
     await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
     // Two out, so a stereo instrument stays stereo. A mono sender is upmixed
     // inside the worklet, so this is right either way.
@@ -160,6 +175,11 @@
         answered = true; instrument = m.instrument || 'an instrument';
         told = m;
         if (m.audioChannels !== claim) { claim = m.audioChannels; chProven = 0; chChecked = false; }
+      // The far end's rate against ours. Announced, so it can be checked.
+      if (m.rate && m.rate !== RATE && !rateWarned) {
+        rateWarned = true;
+        d.log(`the far end sends ${m.rate} Hz and this page plays at ${RATE} — nothing in the chain resamples`, 'bad');
+      }
         applyChannels();
         // It named itself ONCE, in the log, where a long name fits and a repeat
         // is not a new event. Every status reply carries it and nothing changed.
@@ -238,6 +258,11 @@
       // Both halves: that it was TOLD, and that the telling survived a check.
       d.assert('it was told how many channels, not left to guess', !!told?.audioChannels,
         `announced ${told?.audioChannels} at ${told?.frameMs} ms a frame`);
+      // Three things the far end ANNOUNCES and this page CHECKS rather than
+      // trusts: how many channels, how long a frame is, and what rate it is at.
+      d.assert('the sample rate it sends is the one this page plays at',
+        !!told?.rate && told.rate === RATE && ctx?.sampleRate === RATE,
+        `sent ${told?.rate} Hz · context ${ctx?.sampleRate} Hz`);
       d.assert('the frame length agrees with the channel count', chChecked && !chCorrected,
         chCorrected ? `it said ${claim}, the frames say ${chIn} — playing ${chIn}`
                     : `${chIn === 2 ? 'stereo' : 'mono'} checks out against ${told?.frameMs} ms`);
