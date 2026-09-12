@@ -18,8 +18,6 @@
      the GROUPS apart. */
   .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
           width: 100%; }
-  @media (max-width: 560px) {
-    .pick .fx { margin-left: 0; width: 100%; }
   }
   /* ⚠️ 18 px, NOT 6. `reverb [dry|room|hall] chorus [off|light|wide]` at a 6 px
      gap put the word CHORUS hard against the `hall` button, so the two groups
@@ -28,6 +26,7 @@
      no groups. */
   .pick .fx, .pos-controls .fx { display: inline-flex; gap: 18px; align-items: center; margin-left: auto;
                                  flex-wrap: wrap; }
+  .fxhost { display: flex; align-items: center; }
   .pos-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
                          text-transform: uppercase; margin: 0 2px 0 0; }
   .pos-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
@@ -77,6 +76,26 @@
   }
   .patch { font: 400 12px/1.6 var(--mono); color: var(--dim); }
   .patch b { color: var(--hi); font-weight: 400; }
+  /* ⚠️ LAST IN THE FILE ON PURPOSE. These have the same specificity as the
+     desktop rules above (`.pick .fx` is 0,2,0), so source order is the whole
+     of the cascade here — written earlier, `align-items: stretch` lost to
+     `align-items: center` and the controls stayed 113 px wide on a phone
+     while the computed style said column. */
+  /* ⚠️ THE ROW HAS TO STACK TOO, or the kit's phone rules do nothing visible.
+     `createChoice` puts its label on top and takes 100% of ITS OWN BOX at this
+     width — but the boxes were still side by side in a flex row, so instrument
+     got 172 px, reverb 113 and chorus 120 of a 390 px screen. MEASURED. A
+     component can only fill what its container gives it. */
+  @media (max-width: 560px) {
+    .pick { flex-direction: column; align-items: stretch; gap: 10px; }
+    /* ⚠️ BOTH CONTAINERS. The reverb and chorus row is appended to
+       `.pos-controls`, not to `.pick` — so a rule written for `.pick .fx` alone
+       left them at 113 px and 120 px of a 390 px screen while the instrument
+       row beside them went full width. Two homes, two selectors. */
+    .pick .fx, .pos-controls .fx, .fxhost {
+      margin-left: 0; width: 100%; flex-direction: column;
+      align-items: stretch; gap: 10px;
+    }
 </style>
 
 <script type="module">
@@ -499,7 +518,12 @@
   });
   spaceRow.append(spacePick.el, chorusPick.el);
   spaceRow.hidden = true;             // shown when an instrument that can be wrapped is up
-  if (controls) { controls.style.display = 'flex'; controls.style.alignItems = 'center'; controls.append(spaceRow); }
+  // ⚠️ A CLASS, NOT INLINE STYLE. This set `display` and `align-items` on the
+  // element, and an inline style beats every stylesheet — including the media
+  // query that puts these controls full width on a phone, which is why reverb
+  // and chorus stayed 113 px wide on a 390 px screen while the row above them
+  // went full width. Measured twice before the cause was the style attribute.
+  if (controls) { controls.classList.add('fxhost'); controls.append(spaceRow); }
   else d.el.append(spaceRow);
 
   const kb = createKeyboard(d.el, {

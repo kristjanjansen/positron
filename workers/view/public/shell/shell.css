@@ -574,6 +574,37 @@ video[hidden] { display: none; }
 .pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
 .pos-choice button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
 
+/* ── the kit's controls on a phone ────────────────────────────────────────
+   🔴 A LABEL BESIDE A GROUP IS A DESKTOP LUXURY. At 390 px the label eats the
+   front of the row and the segment gets whatever is left, so `instrument` used
+   277 px of 390, `reverb` 191 and `chorus` 198 — three ragged rows of different
+   lengths, each with a strip of dead space on the right, and each option a
+   different width from its neighbours in the row above. MEASURED before the
+   rule existed.
+
+   On a phone the label goes ON TOP and the group takes the whole width, so the
+   options share it evenly: three equal targets under a heading, which is also
+   the biggest each option can be for a thumb. */
+@media (max-width: 560px) {
+  .pos-choice { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; align-items: stretch; }
+  .pos-choice-l { display: block; }
+  .pos-choice .step { display: flex; width: 100%; }
+  /* `flex: 1 1 0` rather than `auto`, so `light` and `wide` are the same width
+     as `off` instead of each option sizing to its own word. */
+  .pos-choice .step button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+
+  /* The picker gets the same treatment, and the NAME is what stretches — the
+     arrows and the die are fixed targets and the name is the readout, so it is
+     the part with something to gain from the room. */
+  .pos-pick { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; width: 100%; }
+  .pos-pick-l { display: block; }
+  .pos-pick-seg { display: flex; width: 100%; }
+  .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
+  /* ⚠️ The die stays OUT of the group and stays SQUARE. It is a different kind
+     of move from the arrows, and stretching it would say it was a third one. */
+  .pos-pick > .pos-pick-die { justify-self: start; }
+}
+
 /* ── grain scope ──────────────────────────────────────────────────────────
    demo/shell/grain-scope.mjs. Time across, position-in-the-held-seconds up,
    and the colour says HOW a mark landed: filled green was reported by the thing
