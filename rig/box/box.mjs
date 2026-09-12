@@ -21,7 +21,8 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { VOICES, DEFAULT_SF, fluidAvailable, soundfontAt } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
-         pappusFx, pappusAvailable, pappusPanic, stopPappus } from './jacksynth.mjs';
+         pappusFx, pappusAvailable, pappusPanic, stopPappus,
+         spaceFx, spaceSet, spaceClamp, spaceState, stopSpace } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
@@ -315,6 +316,7 @@ async function archiveSource(msg) {
   return { hls: item.hls, atSec, ...archiveNow };
 }
 
+let spaceWas = false;     // an insert that was on before an instrument change
 async function startAudio(source = 'synth', msg = null) {
   // ⚠️ REPLACE, do not refuse. This used to return {already:true} when
   // anything was running, so picking a second instrument left the first one
@@ -342,6 +344,13 @@ async function startAudio(source = 'synth', msg = null) {
                fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
     }
     log(`switching ${running} -> ${source}`);
+    // 🔴 REMEMBER THE INSERT BEFORE STOPPING, because stopAudio() switches it
+    // off — correctly, since nothing is playing between the two instruments.
+    // Reading `spaceState()` afterwards therefore always answers "off", and the
+    // carry-over below silently did nothing. Caught by testing it: yoshimi ->
+    // hexter reported `on=false` with the reverb armed a second earlier. Two
+    // fixes in one edit that each work alone and cancel each other.
+    spaceWas = spaceState().on;
     stopAudio();
     await new Promise((r) => setTimeout(r, 600));   // let the old one actually die
   }
@@ -373,6 +382,16 @@ async function startAudio(source = 'synth', msg = null) {
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
     if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
+    // ⚠️ AND THE REVERB, for the same reason and it is not automatic. A
+    // switched-on insert that silently drops out from under a new instrument is
+    // worse than one that was never on: the page still shows it armed.
+    // `spaceState()` reads the GRAPH rather than a variable, so this asks what
+    // is true rather than what was last requested.
+    if (spaceWas || spaceState().on) {
+      const sr = await spaceFx(true, { instrumentPort: r.port, instrumentPortR: r.portR, onLog: (l) => log('space:', l) });
+      if (!sr?.ok) log(`space did not survive the instrument change — ${sr?.reason}`);
+      spaceWas = false;
+    }
     if (source === 'archive') watchArchiveListeners();
     return { ok: true, source, jack: true, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
              channels: r.channels, fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null,
@@ -474,6 +493,9 @@ function stopAudio() {
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
   if (midiIn) { midiIn.kill('SIGTERM'); midiIn = null; }
   if (audio) { audio.kill('SIGTERM'); audio = null; }
+  // The insert has nothing to wrap once nothing is playing, and an engine left
+  // running holds its JACK ports and a little CPU for no reason.
+  try { if (spaceState().on) spaceFx(false, { onLog: (l) => log('space:', l) }); } catch { /* never started */ }
   return { ok: true, was, frames: sentFrames };
 }
 
@@ -672,6 +694,74 @@ async function handle(msg) {
       // jackd, no capture.
       return reply('fx.pappus', { ...r, instrument: inst?.source ?? null });
     }
+
+    // ── the reverb, as an insert ─────────────────────────────────────────
+    //
+    // The OPPOSITE kind of insert to pappus. A grain cloud has no note-off, so
+    // wrapping an instrument in one washed out its envelope and the patch
+    // selector stopped doing anything audible. This one passes the dry signal
+    // and adds a tail: let go of the key and the note still stops.
+    //
+    //   fx.space {"on":true}                    put it in
+    //   fx.space {"mix":0.6,"room":0.8}         turn a knob, with no gap in the sound
+    //   fx.space {"on":false}                   take it out
+    //
+    // `on` LEFT OUT means "leave it as it is". A knob must not be able to
+    // switch an effect on: a page with four sliders would otherwise insert a
+    // reverb the first time anyone touched one.
+    //
+    // 🔴 `ok: true` FOR `on: true` MEANS AUDIO WAS HEARD COMING OUT OF IT, not
+    // that a process started or a port appeared. `fx.pappus` answered ok on the
+    // port and was seven seconds early, and everything sent into that gap went
+    // nowhere with no error. spaceFx() pushes a real tone through the insert on
+    // a subgraph nobody is listening to and measures what comes out; the
+    // numbers it measured come back in `heard`.
+    case 'fx.space': {
+      // A boolean or nothing — `msg.on !== false` would make every knob turn a
+      // switch, which is the bug the paragraph above is about.
+      const want = typeof msg.on === 'boolean' ? msg.on : null;
+      const onLog = (l) => log('space:', l);
+      const asked = spaceClamp(msg);            // 0..1, and damp in Hz — clamped in
+                                                // three places: here, and again in
+                                                // the orchestra, which is the only
+                                                // end that can be sure.
+      const st = () => spaceState();
+      if (want === true) {
+        // Same gate as pappus, and for the same reason: an insert can only
+        // reach what is ON THE JACK GRAPH.
+        if (!inst?.jack) return reply('fx.space.applied', {
+          ok: false, on: false, params: st().params,
+          reason: inst ? `${inst.source} writes to a pipe, not to JACK — the insert can only wrap what is on the JACK graph`
+                       : 'nothing is playing for an insert to wrap',
+        });
+        // ⚠️ TWO INSERTS, ONE GRAPH. Pappus has already taken the instrument
+        // off the capture and put itself there; adding this one would leave
+        // both feeding it, so you would hear a grain cloud AND a reverb at
+        // once. Refusing is loud, and switching the other one off under
+        // somebody is not this verb's business.
+        if (fxOn) return reply('fx.space.applied', {
+          ok: false, on: false, params: st().params,
+          reason: 'pappus is in the chain — send fx.pappus {"on":false} first, or you would hear both',
+        });
+      }
+      // Knobs only: one send, and wait to be told it landed.
+      if (want === null) {
+        const r = await spaceSet(asked, { onLog });
+        return reply('fx.space.applied', { ...r, on: st().on, instrument: inst?.source ?? null });
+      }
+      // Values BEFORE the switch, so a call carrying both inserts with the
+      // values the caller asked for rather than with the previous ones.
+      if (Object.keys(asked).length) await spaceSet(asked, { onLog });
+      const r = await spaceFx(want, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog });
+      log(`space ${want ? 'in' : 'out'}: ${r.ok ? 'ok' : r.reason}`);
+      return reply('fx.space.applied', { ...r, params: st().params, instrument: inst?.source ?? null });
+    }
+    // Everything the box knows about the reverb, including WHEN it last heard
+    // sound come out of it. Separate from `params.state`, which is the
+    // granulator's.
+    case 'fx.space.status':
+      return reply('fx.space.state', { ok: true, ...spaceState(), instrument: inst?.source ?? null });
+
     // A SEEDED roll, in one of six named characters.
     //
     // The old roll drew nine parameters uniformly and independently, which
@@ -987,7 +1077,12 @@ setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.
  * line and kill the service being started.
  */
 function sweepOrphans() {
-  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'ffmpeg', 'jackd']) {
+  // ⚠️ `csound` IS IN THIS LIST BECAUSE THE REVERB INSERT IS ONE. Without it an
+  // orphaned engine survives a service restart still holding `positron-space`'s
+  // JACK ports, so the next insert finds the names taken and patches into a
+  // process nobody is talking to — audible, uncontrollable, and indisting-
+  // uishable from the new one having failed.
+  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }
   }
