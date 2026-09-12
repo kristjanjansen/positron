@@ -93,9 +93,24 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Play the a-to-k row, the drawn keys, or a MIDI keyboard; the arrows step through the patches the board actually has. Reverb and chorus are made on the board — this page only sends the numbers.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey. Delay is half the trip to the board plus the sound this page is holding in hand, which makes it a floor rather than the whole figure — it cannot see the board’s own capture or this browser’s output. Play the a-to-k row, the drawn keys, or a MIDI keyboard; z and x move the octave. Reverb and chorus are made on the board — this page only sends the numbers.',
 
-    readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
+    // ⚠️ `frames`, `rate` and `midi` ALL WENT, and two of the three deserve a
+    // word. `frames` was an odometer. `midi` sat at `1` forever, which is the
+    // rule about a cell that cannot change — it is a capability, said once, in
+    // the log, where a sentence fits.
+    //
+    // 🔴 `rate` IS DIFFERENT, and its GUARD IS KEPT. It earned its place: two
+    // audio sources into one socket is what "garbled" sounds like here, and
+    // 50/s is one clean source while anything above it is that bug. But the
+    // cell read `50.1` on every run of every day, so it taught a reader to skip
+    // the row — the guard is a WARNING now, fired when the rate leaves the
+    // band, which is the only moment the number was ever worth reading.
+    //
+    // `delay`, `buffer` and `dropouts` are new. /box/ carried the same cushion
+    // as `rack` with NO number on it at all — which is how `rack` sounded wrong
+    // for an hour while six measurements said it was fine (LESSONS #52).
+    readout: { delay: 'ms', 'round trip': 'ms', buffer: 'ms', dropouts: '', bitrate: 'Mb/s', dropped: '' },
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
     // which put all three at the TOP of the page, a hand's width above the keys
     // they act on. They are the keyboard's own controls and the keyboard draws
@@ -156,6 +171,28 @@
   // so better than a second row would.
 
   let ctx = null, playout = null, ws = null, seq = 0;
+  let rtt = null, cushionMs = 0, breaks = -1, rateWarned = false;
+
+  /**
+   * How late the sound is, as far as this page can honestly account for it:
+   * half the round trip to the board and back, plus the cushion it is holding.
+   *
+   * ⚠️ IT IS A FLOOR, NOT THE FIGURE. What it does NOT contain: the board's own
+   * capture and encode, this browser's output latency (tens of ms and not
+   * readable from here), and the speaker. So it can only ever be an
+   * under-estimate — which is the honest direction for a number somebody will
+   * quote, and the paragraph above says so in words.
+   *
+   * ⚠️ AND HALF A ROUND TRIP IS AN ASSUMPTION. The path out and the path back
+   * are not required to cost the same, and this project has measured them not
+   * to: a Worker `/time` endpoint came back ±50 ms of BIAS rather than jitter.
+   * Halving is the best a page with one clock can do, and saying so is the
+   * difference between a measurement and a claim.
+   */
+  function showDelay() {
+    if (rtt == null) return;
+    d.set('delay', Math.round(rtt / 2 + cushionMs));
+  }
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
   let bytes = 0, firstFrame = 0, pingAt = 0, autoStarted = false;
   let soundfonts = [];
@@ -233,13 +270,13 @@
     const names = listed() ? patches.map((e) => e.name ?? '—')
                            : Array.from({ length: 128 }, (_, i) => patchName(i));
     step.options(names, Math.min(idx, names.length - 1));
-    step.show(chosen ? patchName(idx) : '—', chosen ? idx : undefined);
+    step.show(patchName(idx), idx);
   }
 
   function showPatch() {
     // The NAME lives in the control now, not in a line under it — it was in
     // both, which is the same word twice with nothing to say which is live.
-    step.show(chosen ? patchName(idx) : '—', idx);
+    step.show(patchName(idx), idx);
     if (listed()) {
       // ⚠️ DO NOT NAME A PATCH NOBODY CHOSE. Arriving at a board that is
       // already playing, this page has picked nothing and the instrument holds
@@ -247,7 +284,7 @@
       // would be a readout contradicting the thing it describes. It says how
       // many there are until somebody steps, and then it says which one.
       patchLine.textContent = '';
-      if (!chosen) { patchLine.textContent = `${patches.length} patches in ${banksInList} banks`; return; }
+      if (!chosen) { patchLine.textContent = `${patches.length} patches in ${banksInList} banks · the board is playing whatever it loaded, not this one`; return; }
       // Built as elements rather than as a string: these names come off another
       // machine's filesystem, and one with an ampersand in it would be a broken
       // line at best.
@@ -257,7 +294,7 @@
     }
     patchLine.textContent = chosen
       ? `${bankOf(idx) ? `bank ${bankOf(idx)} · ` : ''}${progOf(idx) + 1} of 128`
-      : '128 patches';
+      : '128 patches · the board is playing whatever it loaded, not this one';
   }
   // ⚠️ BANK SELECT IS CC 32 HERE, NOT CC 0. Read from Yoshimi's own config:
   //     MIDI Root CC 0        MIDI Bank CC 32        MIDI Program Change on
@@ -311,9 +348,33 @@
     await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
     playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
     playout.connect(ctx.destination);
+    // 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
+    // posted every 250 ms from inside the worklet; `rack` sounded noisy for an
+    // hour while six separate measurements said its stream was perfect, because
+    // the defect was downstream of every quantity being measured. A statistic
+    // nobody displays is not instrumentation.
+    playout.port.onmessage = (e) => {
+      const st = e.data?.stats; if (!st) return;
+      cushionMs = st.bufferedMs;
+      d.set('buffer', Math.round(st.bufferedMs));
+      showDelay();
+      const b = st.underruns + st.trimEvents;
+      if (b !== breaks) {
+        const first = breaks < 0;
+        breaks = b;
+        d.set('dropouts', b, b ? 'warn' : 'ok');
+        // Two opposite faults, so the LINE says which: running dry wants a
+        // bigger cushion and being trimmed wants a smaller one.
+        if (!first) d.log(`${st.underruns} ran dry, ${st.trimEvents} trimmed — cushion ${Math.round(st.bufferedMs)} ms`, 'warn');
+      }
+    };
     // The cushion is OURS, not the browser's — which is the whole reason to
-    // carry the samples ourselves rather than use WebRTC.
-    playout.port.postMessage({ cmd: 'floor', ms: 60, adaptive: false });
+    // carry the samples ourselves rather than use WebRTC. 100 ms adaptive to
+    // 250 for the reason measured on `rack`'s path: 60 ms is under the worst
+    // single arrival gap this relay produces (108.6 ms), and a cushion has no
+    // restoring force, so only a floor that grows when it is proved too small
+    // is safe over a long session.
+    playout.port.postMessage({ cmd: 'floor', ms: 100, adaptive: true, maxMs: 250 });
   }
 
   // Drawn IMMEDIATELY rather than on a reply: gating the selector on the box's
@@ -404,13 +465,25 @@
   // ⚠️ THE BOARD RENDERS, THE PAGE SENDS NUMBERS — the same split `mirror` uses
   // for its shader knobs. Nothing is processed in this page: it plays what
   // arrives and no more.
+  // ⚠️ `off`, NOT `dry`. This row said `dry · room · hall` beside a chorus row
+  // saying `off · light · wide` — the same idea in two words, one of which you
+  // have to already know. And it IS off: `mix: 0` with the chorus off sends
+  // `on: false`, so the insert comes out of the graph rather than sitting in it
+  // doing nothing. One vocabulary across two adjacent controls.
   const SPACE = [
-    ['dry',  { mix: 0,    room: 0.2, damp: 6000 }],
+    ['off',  { mix: 0,    room: 0.2, damp: 6000 }],
     ['room', { mix: 0.26, room: 0.35, damp: 7000 }],
     ['hall', { mix: 0.4,  room: 0.8, damp: 4500 }],
   ];
   const CHORUS = [['off', 0], ['light', 0.35], ['wide', 0.7]];
-  let spaceAt = 1, chorusAt = 0;      // a little room by default: dry is a test, not a sound
+  // ⚠️ BOTH OFF AT THE START, so the first thing you hear is the INSTRUMENT.
+  // This opened on `room` — a little reverb by default, on the argument that
+  // dry is a test rather than a sound. That argument is about mixing a record;
+  // this page exists to let you hear what a Raspberry Pi three hundred metres
+  // away is making, and putting an effect in front of it on arrival means the
+  // first patch you press is not the patch. Nothing is in the graph until you
+  // put it there.
+  let spaceAt = 0, chorusAt = 0;
 
   // ⚠️ `createChoice`, NOT SIX LOOSE BUTTONS. This row built its own by hand and
   // it showed: no grouping, so three choices read as three unrelated controls;
@@ -460,7 +533,8 @@
     onDown: (note, vel) => { kb.lightNote(note, true); startAudio().then(() => send({ type: 'note.on', note, vel, channel: 0 })); },
     onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
     log: (line, kind) => d.log(line, kind),
-    onPorts: (n) => d.set('midi', n || midi?.state?.() || 'none'),
+    // A capability, said once, in words. It was a cell reading `1` forever.
+    onPorts: (n) => d.log(n ? `${n} MIDI input${n > 1 ? 's' : ''} — play it` : 'no MIDI keyboard attached; the drawn keys and the a-to-k row still play', n ? 'hi' : 'info'),
   });
 
   // ── the socket ───────────────────────────────────────────────────────────
@@ -500,14 +574,20 @@
         bytes += e.data.byteLength;
         if (frames % 10 === 0) {
           const secs = (performance.now() - firstFrame) / 1000;
-          d.set('frames', frames);
           d.set('dropped', lost, lost ? 'bad' : 'ok');
           // 50/s is one clean source. Anything above it is TWO instruments
           // streaming into one socket, which is what a garbled stream sounds
           // like — so this cell is a fault detector, not decoration.
           const fps = frames / Math.max(0.001, secs);
-          d.set('rate', fps.toFixed(1), Math.abs(fps - 50) < 6 ? 'ok' : 'bad');
-          d.set('bitrate', Math.round(bytes * 8 / 1000 / Math.max(0.001, secs)));
+          // The guard without the cell — see the readout comment. Two sources
+          // interleaved into one socket reads as roughly double the rate, and
+          // that is the only thing this number has ever had to say.
+          if (Math.abs(fps - 50) >= 6 && !rateWarned) {
+            rateWarned = true;
+            d.log(`${fps.toFixed(1)} frames a second arriving where one clean source is 50 — `
+                  + (fps > 56 ? 'that is two instruments streaming at once' : 'frames are going missing'), 'bad');
+          }
+          d.set('bitrate', (bytes * 8 / 1e6 / Math.max(0.001, secs)).toFixed(2));
         }
         playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
         return;
@@ -516,7 +596,7 @@
       if (m.from === ID) return;
       // ONE CLOCK, both stamps: the box's performance.now() and ours share no
       // origin, so this is timed entirely here and contains no clock offset.
-      if (m.type === 'box.pong' && pingAt) { d.set('round trip', Math.round(performance.now() - pingAt)); pingAt = 0; }
+      if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); d.set('round trip', rtt); showDelay(); pingAt = 0; }
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
       // The box's own library. It arrives once per instrument change and is

@@ -63,7 +63,7 @@
 
   const d = mount({
     name: 'grains',
-    what: 'A Raspberry Pi holds the last sixty seconds of sound and replays it as thousands of short overlapping fragments. Pick a patch and it starts an instrument, holds a chord and chews it — the sliders move the cloud from there. Everything you hear is made on the board and sent back.',
+    what: 'A Raspberry Pi holds the last sixty seconds of sound and replays it as thousands of short overlapping fragments. The sound going in is Yoshimi; the granulator chewing it is Pappus, a norns engine running on plain SuperCollider. Pick a patch and it starts the instrument, holds a chord and chews it — the sliders move the cloud from there.',
     // ⚠️ FIVE CELLS, MEASURED RATHER THAN GUESSED. It was eight, and five of
     // those ellipsised — `answe…`, `fluid…`, `shatt…`. A readout cell here is
     // 90 px of text whatever the window does (the page's own measure caps it,
@@ -76,9 +76,15 @@
       board: '', sound: '',
       'grains a second': '', 'moved on its own': '', 'round trip': 'ms',
     },
+    // ⚠️ HIDDEN, NOT REMOVED. Pressing a key switches the granulator on, so the
+    // button is dead weight for a human — but `verify.mjs` presses
+    // `.pos-controls button` and every assert on this page hangs off this
+    // handler, so deleting it stops the page being tested while looking tidier.
+    // `?checks=1` brings it back.
     controls: [{ id: 'on', label: 'Switch it on', primary: true }],
   });
   guard(d);
+  if (!new URLSearchParams(location.search).has('checks')) d.button('on').hidden = true;
 
   // ── state ────────────────────────────────────────────────────────────────
   let me = null;                       // this connection's id, to drop our own echo
@@ -288,9 +294,13 @@
   });
   step.options(PATCHES.map((p) => p.name), 0);
   step.render = () => step.show(PATCHES[patch].name, patch);
+  // ⚠️ ABOVE THE SLIDERS, and inserted rather than appended. Choosing the sound
+  // comes before moving it, and the sliders are what you reach for second — but
+  // the picker cannot be BUILT until `applyPatch` exists, so its position on
+  // screen and its position in the file are different things.
   const patchRow = el('div', 'pick');
   patchRow.append(step.el);
-  d.el.append(patchRow);
+  d.el.insertBefore(patchRow, knobRow.el);
   step.render();
 
   const kb = createKeyboard(d.el, {
@@ -399,7 +409,7 @@
         + ', none of them asked for'
         + ` · the slow one is reading at ${drift.scan ?? '—'} of the way through the sixty seconds`
       : 'not moving on its own — the drift is switched off on the board'));
-    keyLine.textContent = 'the keys play whatever is going into the granulator';
+    keyLine.textContent = '';
   }
 
   // ── audio out of this page ───────────────────────────────────────────────

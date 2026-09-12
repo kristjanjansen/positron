@@ -1,6 +1,6 @@
 // demo/shell/picker.mjs — step through a list, or jump straight to one by name.
 //
-// ‹ | Brass 1 ▾ | ›    ⚅
+// ‹ | Brass 1 | ›    ⚅
 //
 // 🔴 WHY THIS EXISTS AND `stepper.mjs` WAS NOT ENOUGH. A stepper over a list of
 // three is fine. Over `/box/`'s patch library it is not: Yoshimi alone reaches
@@ -93,10 +93,9 @@ export function createPicker({ label, what = 'it', prev, next, random, onPick, c
   // The middle slot: our paint, the platform's list.
   const cell = el('span', 'pos-pick-cell');
   const name = el('span', 'pos-pick-n', '—');
-  const caret = el('span', 'pos-pick-caret', '▾');
   const select = el('select', 'pos-pick-sel', '', { 'aria-label': `choose a ${what}` });
   select.onchange = () => onPick?.(select.selectedIndex);
-  cell.append(name, caret, select);
+  cell.append(name, select);
 
   seg.append(back, cell, fwd);
 

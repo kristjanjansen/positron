@@ -131,8 +131,8 @@ export function createKeyboard(host, {
     octPair.append(b);
     return b;
   };
-  const downBtn = mkOct('−', 'down one octave', -1);
-  const upBtn = mkOct('+', 'up one octave', 1);
+  const downBtn = mkOct('−', 'down one octave (z)', -1);
+  const upBtn = mkOct('+', 'up one octave (x)', 1);
   pad.append(octPair);
   const panicBtn = make('button', 'kpad-right', 'notes off', {
     type: 'button', title: 'stop every note that is still sounding',
@@ -163,9 +163,34 @@ export function createKeyboard(host, {
   }
   paintPad();
 
+  // ⚠️ `z` AND `x` ARE THE OCTAVE, and they are part of the keyboard for the
+  // same reason the pad is: the row `a`..`k` is an octave of notes, and the one
+  // thing you need while playing it is the octave it sits in. Reaching for a
+  // mouse to move it is the interruption the pad already exists to remove — and
+  // a page that draws a keyboard should not have to bind this itself.
+  //
+  // They are next to each other, under the left hand, below the note row: the
+  // same place a tracker and a hardware synth put them, and far enough from
+  // `a`..`k` that a mis-press is a mis-press rather than a wrong note.
+  const OCT_KEYS = { z: -1, x: 1 };
+
   // preventDefault ONLY on mapped keys, or typing anywhere else on the page
   // stops working.
-  const onKeyDown = (e) => { if (e.repeat) return; const k = e.key.toLowerCase(); if (k in map) { e.preventDefault(); press(k, 'key'); } };
+  const onKeyDown = (e) => {
+    if (e.repeat) return;
+    // ⚠️ NOT WHILE SOMEBODY IS TYPING. `wire` has a compose box and `/box/` a
+    // room field; a global keydown that swallows `z` would make them unusable,
+    // and this listener is on `window`.
+    const t = e.target;
+    if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName || ''))) return;
+    const k = e.key.toLowerCase();
+    if (k in OCT_KEYS && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      api.shiftOctave(OCT_KEYS[k]);
+      return;
+    }
+    if (k in map) { e.preventDefault(); press(k, 'key'); }
+  };
   const onKeyUp = (e) => { const k = e.key.toLowerCase(); if (k in map) release(k, 'key'); };
   addEventListener('keydown', onKeyDown);
   addEventListener('keyup', onKeyUp);
