@@ -92,6 +92,25 @@ button, .pos-btn {
   -webkit-touch-callout: none; touch-action: manipulation;
 }
 button:hover { border-color: var(--dim2); }
+
+/* 🔴 DOUBLE-TAP ZOOM, ON A PAGE YOU PLAY WITH YOUR FINGERS. Photographed on
+   /rack/ on an iPhone: the page sitting at about 3x, one button filling the
+   screen, keys running off both edges — which reads as a broken layout and is
+   not one. MEASURED at 390x844: `document.scrollWidth` 390 against a 390 px
+   window and NOTHING wider than the viewport, so there is no overflow to fix.
+   Safari had simply zoomed to a block.
+
+   `touch-action: manipulation` was already on controls and on the keys, so the
+   taps that matter were covered — and a double-tap anywhere ELSE, on the
+   paragraph or the readout or the empty space beside a key, still zooms the
+   whole document. On a page whose whole interaction is rapid tapping, the
+   places you MISS are exactly where a stray second tap lands.
+
+   ⚠️ PINCH IS DELIBERATELY LEFT ALONE. Killing it needs a `gesturestart`
+   preventDefault and takes away the one way a reader can enlarge text they
+   cannot read — a deliberate zoom is somebody asking, an accidental one is the
+   page misfiring, and only the second is a bug. */
+html, body { touch-action: manipulation; }
 button:active { background: var(--card); }
 button[disabled] { opacity: .4; cursor: default; }
 button.pos-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600; }

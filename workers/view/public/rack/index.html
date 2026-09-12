@@ -156,7 +156,13 @@
     onDown: (n, vel) => { if (!kb.keyOf(n)) return; kb.lightNote(n, true); startAudio().then(() => send({ type: 'note.on', note: n, vel })); },
     onUp: (n) => { kb.lightNote(n, false); send({ type: 'note.off', note: n }); },
     log: (l, k) => d.log(l, k),
-    onPorts: (n) => d.set('midi', n || midi?.state?.() || 'none'),
+    // ⚠️ NOT `midi?.state?.()` HERE. `createMidi` calls `onPorts` synchronously
+    // on the no-MIDI path, so the callback runs while `const midi` is still in
+    // its temporal dead zone — and optional chaining does NOT save you, because
+    // the throw is on reading the binding, before any `?.` applies. It printed
+    // `Cannot access 'midi' before initialization` on a phone, in red, under a
+    // page that otherwise worked.
+    onPorts: (n) => d.set('midi', n || 'none'),
   });
 
   let t0 = performance.now(), f0 = 0, b0 = 0;
