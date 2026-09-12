@@ -234,6 +234,31 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   return {
     ok: true, w, h, fps, bitrate, gop, passes,
     params: () => ({ ...params }),
+    /**
+     * A whole new picture, down the same channel.
+     *
+     * ⚠️ BASE64, BECAUSE THE CHANNEL IS ONE COMMAND PER LINE. GLSL has
+     * newlines; escaping them would be a small format nobody else implements,
+     * and base64 is already in both standard libraries.
+     *
+     * ⚠️ AND THE BODY CARRIES NO `#version` LINE. The board compiles as
+     * `310 es` and the browser as `300 es`, so the header belongs to each end
+     * and only the body travels. A body arriving with its own header would
+     * compile on exactly one of them.
+     *
+     * The renderer compiles it on its own thread and keeps the running picture
+     * if it will not build — it prints SHADER-OK, SHADER-LIVE or
+     * SHADER-REFUSED, which is what the caller hears back.
+     */
+    shader: (body) => {
+      if (typeof body !== 'string' || !body.length) return { ok: false, reason: 'no shader body' };
+      if (body.length > 12000) return { ok: false, reason: `${body.length} bytes — larger than the channel takes` };
+      if (/#version/.test(body)) return { ok: false, reason: 'send the body without a #version line — each end adds its own' };
+      try {
+        render.stdin.write(`shader ${Buffer.from(body, 'utf8').toString('base64')}\n`);
+        return { ok: true, bytes: body.length };
+      } catch (e) { return { ok: false, reason: String(e.message).slice(0, 80) }; }
+    },
     /** One parameter down the control channel. Clamped at the far end too. */
     set: (key, value) => {
       if (!['seg', 'fb', 'scale', 'warp', 'hue'].includes(key) || !Number.isFinite(value)) return false;

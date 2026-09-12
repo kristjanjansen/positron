@@ -53,14 +53,42 @@ static const char *FS_BLUR =
   "  s+=texture(uPrev,uv+vec2(-1,1)*t).rgb; s+=texture(uPrev,uv+vec2(0,1)*t).rgb*2.0;\n"
   "  s+=texture(uPrev,uv+vec2(1,1)*t).rgb; o=vec4(s/16.0,1.0); }\n";
 
-static GLuint mkprog(const char*fs){
+// ⚠️ TWO FLAVOURS, AND THE DIFFERENCE IS WHETHER A BAD SHADER IS FATAL. At
+// startup it is: nothing is running yet and a build that cannot draw should say
+// so and stop. At RUNTIME it must not be — a shader arriving over the socket is
+// somebody typing, and a typo must never take down a picture that is being
+// watched, on a board whose recovery story is a reboot.
+static GLuint mkprog_try(const char*fs){
   GLuint v=glCreateShader(GL_VERTEX_SHADER),f=glCreateShader(GL_FRAGMENT_SHADER);
   glShaderSource(v,1,&VS,NULL); glCompileShader(v);
   glShaderSource(f,1,&fs,NULL); glCompileShader(f);
+  GLint cok=0; glGetShaderiv(f,GL_COMPILE_STATUS,&cok);
+  if(!cok){ char l[2048]; glGetShaderInfoLog(f,sizeof l,NULL,l); fprintf(stderr,"SHADER-REFUSED compile: %s\n",l);
+            glDeleteShader(v); glDeleteShader(f); return 0; }
   GLuint p=glCreateProgram(); glAttachShader(p,v); glAttachShader(p,f); glLinkProgram(p);
   GLint ok=0; glGetProgramiv(p,GL_LINK_STATUS,&ok);
-  if(!ok){ char l[4096]; glGetProgramInfoLog(p,sizeof l,NULL,l); fprintf(stderr,"link: %s\n",l); exit(2);}
+  glDeleteShader(v); glDeleteShader(f);
+  if(!ok){ char l[2048]; glGetProgramInfoLog(p,sizeof l,NULL,l); fprintf(stderr,"SHADER-REFUSED link: %s\n",l);
+           glDeleteProgram(p); return 0; }
   return p;
+}
+static GLuint mkprog(const char*fs){
+  GLuint p = mkprog_try(fs);
+  if(!p){ fprintf(stderr,"link failed at startup\n"); exit(2); }
+  return p;
+}
+
+/* base64, because a GLSL body has newlines and the control channel is one
+   command per line. 30 lines here against inventing an escaping scheme. */
+static int b64dec(const char*in, char*out, int cap){
+  static const char*T="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  int val=0, bits=-8, n=0;
+  for(const char*p=in; *p && *p!='='; p++){
+    const char*q=strchr(T,*p); if(!q) continue;
+    val=(val<<6)|(int)(q-T); bits+=6;
+    if(bits>=0){ if(n>=cap-1) return -1; out[n++]=(char)((val>>bits)&0xFF); bits-=8; }
+  }
+  out[n]=0; return n;
 }
 static void mktarget(int w,int h,GLuint*t,GLuint*f){
   glGenTextures(1,t); glBindTexture(GL_TEXTURE_2D,*t);
@@ -82,12 +110,45 @@ static void mktarget(int w,int h,GLuint*t,GLuint*f){
 // NON-BLOCKING, because this is read in the render loop: a blocking read with
 // nobody typing would stop the picture dead.
 static float g_seg = 8.0f, g_fb = 0.78f, g_scale = 4.0f, g_warp = 0.08f, g_hue = 1.0f;
+/* A shader that arrived over the wire, waiting for the render loop to take it.
+   ⚠️ COMPILED ON THE RENDER THREAD, NOT HERE. drain_stdin runs inside the loop
+   on this program, but GL calls belong where the context is current and keeping
+   that rule explicit is cheaper than remembering it. */
+static char  g_pending[16384];
+static int   g_pending_n = 0;
+/* The uniforms every pass wants, set defensively: a shader that arrived over
+   the wire need not declare all of them, and `glGetUniformLocation` returning
+   -1 for one it dropped is the normal case rather than an error. */
+static void draw_pass(GLuint prog, long i, int W, int H, GLuint src,
+                      float seg, float fb, float scale, float warp, float hue){
+  glUseProgram(prog);
+  GLint l;
+  if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,(float)(i/30.0));
+  if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
+  if((l=glGetUniformLocation(prog,"uSeg"))>=0) glUniform1f(l,seg);
+  if((l=glGetUniformLocation(prog,"uFb"))>=0) glUniform1f(l,fb);
+  if((l=glGetUniformLocation(prog,"uScale"))>=0) glUniform1f(l,scale);
+  if((l=glGetUniformLocation(prog,"uWarp"))>=0) glUniform1f(l,warp);
+  if((l=glGetUniformLocation(prog,"uHue"))>=0) glUniform1f(l,hue);
+  if((l=glGetUniformLocation(prog,"uPrev"))>=0){
+    glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
+  glDrawArrays(GL_TRIANGLES,0,3);
+}
+
 static void drain_stdin(void){
-  static char line[256]; static int len = 0;
+  /* 16 KiB: a base64 GLSL body is ~1.6 KiB today and the old 256-byte line
+     would have silently truncated it into a syntax error. */
+  static char line[16384]; static int len = 0;
   char c;
   while(read(0, &c, 1) == 1){
     if(c != '\n'){ if(len < (int)sizeof(line)-1) line[len++] = c; continue; }
     line[len] = 0; len = 0;
+    if(!strncmp(line, "shader ", 7)){
+      int n = b64dec(line+7, g_pending, sizeof g_pending);
+      if(n > 0){ g_pending_n = n; fprintf(stderr, "SHADER-QUEUED %d bytes\n", n); }
+      else { g_pending_n = 0; fprintf(stderr, "SHADER-REFUSED base64\n"); }
+      continue;
+    }
     char k[32]; float v;
     if(sscanf(line, "%31s %f", k, &v) == 2){
       if(!strcmp(k,"seg")) g_seg = v < 2.0f ? 2.0f : (v > 64.0f ? 64.0f : v);
@@ -116,6 +177,7 @@ int main(int argc,char**argv){
   GLuint vao; glGenVertexArrays(1,&vao); glBindVertexArray(vao);
   GLuint tA,fA,tB,fB; mktarget(W,H,&tA,&fA); mktarget(W,H,&tB,&fB);
   GLuint pK=mkprog(FS_KAL), pB=mkprog(FS_BLUR);
+  GLuint pKnew = 0; double fadeT0 = 0;
   glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glViewport(0,0,W,H);
   unsigned char*buf=malloc((size_t)W*H*4);
 
@@ -132,20 +194,42 @@ int main(int argc,char**argv){
   for(long i=0; forever || i<N; i++){
     drain_stdin();
     double a0=now_ms();
+    /* A shader that arrived since the last frame. Compiled HERE, where the
+       context is current, and taken only if it compiles — the running picture
+       is never put at risk by something somebody just typed. */
+    if(g_pending_n){
+      static char full[16512];
+      snprintf(full, sizeof full, "#version 310 es\n%s", g_pending);
+      g_pending_n = 0;
+      GLuint np = mkprog_try(full);
+      if(np){
+        if(pKnew) glDeleteProgram(pKnew);
+        pKnew = np; fadeT0 = now_ms();
+        fprintf(stderr, "SHADER-OK fading in\n");
+      }
+    }
+
     for(int p=0;p<PASSES;p++){
       GLuint prog=p?pB:pK;
-      glBindFramebuffer(GL_FRAMEBUFFER,dst); glUseProgram(prog);
-      GLint l;
-      if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,(float)(i/30.0));
-      if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
-      if((l=glGetUniformLocation(prog,"uSeg"))>=0) glUniform1f(l,g_seg);
-      if((l=glGetUniformLocation(prog,"uFb"))>=0) glUniform1f(l,g_fb);
-      if((l=glGetUniformLocation(prog,"uScale"))>=0) glUniform1f(l,g_scale);
-      if((l=glGetUniformLocation(prog,"uWarp"))>=0) glUniform1f(l,g_warp);
-      if((l=glGetUniformLocation(prog,"uHue"))>=0) glUniform1f(l,g_hue);
-      if((l=glGetUniformLocation(prog,"uPrev"))>=0){
-        glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,src); glUniform1i(l,0); }
-      glDrawArrays(GL_TRIANGLES,0,3);
+      glBindFramebuffer(GL_FRAMEBUFFER,dst);
+      draw_pass(prog, i, W, H, src, g_seg, g_fb, g_scale, g_warp, g_hue);
+      /* ⚠️ THE CROSSFADE IS CONSTANT-ALPHA BLENDING, NOT A MIX SHADER AND NOT
+         EXTRA TARGETS. The old picture is already in the framebuffer, so
+         drawing the new one over it with GL_CONSTANT_ALPHA gives
+         new*k + old*(1-k) for free — no third program, no extra memory on a
+         board that has little, and nothing to keep in step. */
+      if(p==0 && pKnew){
+        double k = (now_ms() - fadeT0) / 900.0;
+        if(k > 1.0) k = 1.0;
+        float kk = (float)(k*k*(3.0-2.0*k));               /* ease, as elsewhere */
+        glEnable(GL_BLEND);
+        glBlendColor(0.f,0.f,0.f,kk);
+        glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA);
+        draw_pass(pKnew, i, W, H, src, g_seg, g_fb, g_scale, g_warp, g_hue);
+        glDisable(GL_BLEND);
+        if(k >= 1.0){ glDeleteProgram(pK); pK = pKnew; pKnew = 0;
+                      fprintf(stderr, "SHADER-LIVE the new look is the look\n"); }
+      }
       GLuint tt=src; src=srct; srct=tt;
       GLuint tf=dst; dst=dst2; dst2=tf;
     }

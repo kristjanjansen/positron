@@ -845,6 +845,15 @@ async function handle(msg) {
     }
     // The two knobs the picture has. Named rather than numbered, because a
     // client should not have to know that the mirror count is a uniform.
+    // The same shader body the page just compiled for itself, compiled here as
+    // 310 es. That is the whole of "the same shader on two GPUs" — one text,
+    // two compilers, rather than two copies kept in step by hand.
+    case 'video.shader': {
+      if (!video) return reply('video.shader.applied', { ok: false, reason: 'no picture running' });
+      const r = video.shader(msg.body);
+      log(r.ok ? `new shader sent to the renderer — ${r.bytes} bytes` : `shader refused — ${r.reason}`);
+      return reply('video.shader.applied', r);
+    }
     case 'video.params': {
       if (!video) return reply('video.params', { ok: false, reason: 'no picture running' });
       // The page's names on the left, the renderer's uniforms on the right — a
