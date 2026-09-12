@@ -55,6 +55,7 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
   import { openWire } from '/shell/wire.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
 
@@ -273,6 +274,9 @@
     // A patch is the new truth about both halves, so the panel's source of
     // truth is reset with it.
     live = { m: { ...p.m }, n: { ...p.n } };
+    // What the patch ASKS FOR, drawn as ticks along the bottom. Nothing has
+    // confirmed it — that is exactly why it is an outline and not a mark.
+    scope?.expect({ rate: p.m.rate });
     for (const key of ['rate', 'size', 'spray', 'swarm']) sliders.get(key)?.set(p.m[key], true);
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
@@ -302,6 +306,9 @@
   patchRow.append(step.el);
   d.el.insertBefore(patchRow, knobRow.el);
   step.render();
+
+  const scope = createGrainScope(d.el, { seconds: 4, height: 140 });
+  scope.source('the board sends sound and no grain events, so this is what the sound shows');
 
   const kb = createKeyboard(d.el, {
     base: 60,
@@ -457,6 +464,21 @@
     const f32 = new Float32Array(pcm.length);
     let peak = 0;
     for (let i = 0; i < pcm.length; i++) { const v = pcm[i] / 32768; f32[i] = v; const a = v < 0 ? -v : v; if (a > peak) peak = a; }
+    // 🔴 THE SAME SCOPE `cloud` USES, AND IT DRAWS THIS DIFFERENTLY ON PURPOSE.
+    // The board sends audio and no grain events, so nothing here can say that a
+    // bump in the envelope WAS a grain — it might be a note, a delay tap or a
+    // reverb swell. So these are hollow slate marks labelled "inferred from the
+    // sound", against `cloud`'s filled green ones, and the gutter says which.
+    //
+    // ⚠️ THIS IS ALSO THE INSTRUMENT THAT WAS MISSING. On 2026-09-12 no
+    // granulator parameter on this board could be shown to change the returned
+    // audio — `mrate` 0.5 against 24, `pwet` 0 against 1, `melen` 1 against 8,
+    // all identical — and the sharpest number in that whole investigation was
+    // that the envelope NEVER dropped below a quarter of its own median at any
+    // setting, i.e. the sound is continuous and therefore not a grain cloud. A
+    // picture of the envelope says that in one look, in the page, without an
+    // ssh session.
+    scope.feed(f32, 48000);
     // ⚠️ THE LEVEL IS THE ONLY THING THAT CAN TELL A WORKING STREAM FROM A
     // STREAM OF DIGITAL SILENCE, and this project has read three numbers wrong
     // for exactly that reason. It decays rather than resetting, so a cloud
