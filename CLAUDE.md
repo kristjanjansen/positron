@@ -225,6 +225,41 @@ to recover.
 
 ## Platform facts
 
+- **`rack` plays Ableton Live from a browser and it is LIVE (2026-09-12).**
+  <https://positron.studio/rack/>, 15/15. A note number crosses the relay,
+  `rig/m1/live-agent.mjs` hands it to Live over CoreMIDI, and a **Core Audio
+  process tap** sends a copy of what Live renders back down the same socket —
+  so Live keeps playing out of its own speakers while the page hears it too.
+  `/box/` is the SAME PAGE pointed at a Raspberry Pi. **No BlackHole, no
+  Multi-Output Device, no Live Preferences click** — the tap removes the one
+  requirement the Live Object Model could not script, which is what parked the
+  old rig. It stays up by itself via `studio.positron.rack-agent.plist`
+  (a LaunchAGENT — TCC grants need a GUI session, a daemon would get silence
+  that reads as success). MEASURED: silence 0.00000, keys down **-5.3 dBFS**,
+  0 dropped of 801, 50 frames/s at 1541 kbit/s stereo, agent 4.2% of one core.
+  ⚠️ **The old "a capture started over ssh is deaf" rule does NOT apply here** —
+  that was `ffmpeg -f avfoundation`, whose TCC subject is the terminal;
+  `audiotap` disclaims responsibility and is its own subject, measured working
+  from an ssh-started process.
+- 🔴 **A CHANNEL COUNT CANNOT BE INFERRED FROM A PAYLOAD.** 960 int16s is a
+  valid 20 ms mono frame AND a valid 10 ms stereo one; guessing wrong plays an
+  octave down, which sounds like a broken instrument rather than a broken
+  header. The Mac sends stereo, the board sends mono, **both are on the relay at
+  once**. Senders declare `audioChannels` AND `frameMs`; receivers CHECK one
+  against the other (`samples / channels / rate` must equal `frameMs`).
+  ⚠️ Not `channels` — `box.mjs` has that and it means MIDI channels.
+  And **a measurement outranks a repeated claim**: proved by shipping a liar,
+  which exposed the page correcting itself and then being un-corrected by the
+  next status reply repeating the same wrong number.
+- 🔴 **A bit-clean stream can still sound broken, and the cushion is where.**
+  `pcm-playout` trimmed 15 ms of audio mid-note on ordinary jitter — floor
+  60 ms, slack 15 ms, frames arriving in 20 ms lumps, so ONE early frame tripped
+  it. The samples measured identical to the source (same pitch, same peak, zero
+  discontinuities) and the suite was green the whole time, because the defect is
+  downstream of every quantity being measured. Slack now follows the frame size
+  the worklet OBSERVES. **Every stage that can discard data needs a counter a
+  page actually displays** — these counters existed, posted every 250 ms, and
+  no page had ever read one.
 - **The Ableton rig is PARKED (2026-09-11) and it is parked working — 11/11.**
   Not broken, too heavy: six things must be true before a note sounds and
   **four are Preferences clicks with no API**, including Live's audio output
@@ -423,6 +458,22 @@ to recover.
   `blob.arrayBuffer()` is not storage, and two frames a millisecond apart will
   race each other into a table in the wrong order. Where order IS the product,
   serialise the handler through one promise chain.
+- 🔴 **A full relay room is a silent outage, and a redeploy does NOT clear it.**
+  `studio-1` sat at 16/16 and refused the board for hours — it logged
+  `closed 1006`, which is what a browser reports for the relay's `503`, so it
+  read as a network fault on the Pi while `/box/` was down for everyone. The
+  room was full of **orphaned harness Chromes of mine** (four profile groups,
+  118 processes); killing them took it 16 → 1 and the board rejoined unaided.
+  Hibernated sockets are RESTORED across a restart, so deploying the worker
+  changes nothing — only the object can close a socket. It now reclaims idle
+  ones **when the room is full only**, dating each from
+  `getWebSocketAutoResponseTimestamp` (survives hibernation; `wire.mjs` clients
+  ping and the runtime answers for free), an in-memory message time for agents
+  that never ping, and a DURABLE `serializeAttachment({at})` written once at
+  accept — because dating from the object's wake makes a dead socket
+  un-evictable forever. `GET /room/<name>/stats` now prints per-socket idle.
+  **Check `curl .../stats` before diagnosing any "cannot connect" on this
+  relay**, and kill stray `user-data-dir=/tmp/...` Chromes.
 - **The relay's own token bucket is readable off the wire**, and it is exact:
   at both 120 and 300 msg/s, three runs delivered **298 messages in three
   seconds** — `MSG_BURST` 120 plus 3 s at `MSG_PER_SEC` 60. The sender is told

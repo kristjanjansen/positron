@@ -51,6 +51,21 @@ const BYTE_BURST = 2 * 1024 * 1024;       // enough for a fat session in one go
 const MSG_PER_SEC = 60;                   // a separate bucket, for tiny-message floods
 const MSG_BURST = 120;
 const STRIKES = 20;                       // overruns tolerated before the socket is closed
+// 🔴 A FULL ROOM IS A SILENT OUTAGE, AND A DEPLOY DOES NOT CLEAR IT. MEASURED
+// 2026-09-12: `studio-1` sat at 16/16 and refused the box for hours — the board
+// dialled every 30 s and logged `closed 1006`, which reads as a network fault
+// on the board rather than a full room. Hibernated sockets are RESTORED across
+// a restart (that is the point of hibernation), so redeploying the worker does
+// not drop them: nothing outside the object can close a socket, so the object
+// has to do it.
+//
+// ⚠️ Liveness cannot come from "did it send recently" alone — a page that is
+// only LISTENING to audio sends nothing for minutes and is perfectly alive.
+// `getWebSocketAutoResponseTimestamp` is the signal that survives hibernation:
+// `wire.mjs` clients send 'ping' and the RUNTIME answers without waking this
+// object, so the timestamp is maintained for free. In-memory message times
+// cover the agents, which do not ping but do send constantly.
+const IDLE_MS = 10 * 60 * 1000;           // silent this long, and only if the room is full
 
 export class Relay {
   constructor(state) {
@@ -62,6 +77,10 @@ export class Relay {
     /** in-memory only. Hibernation resets it, which is fine: a room that has
      *  been idle long enough to hibernate is not mid-abuse. */
     this.buckets = new WeakMap();
+    /** last message time per socket, in memory only — lost on hibernation,
+     *  which is why it is only ever the OPTIMISTIC half of a liveness check. */
+    this.seen = new WeakMap();
+    this.evicted = 0;
     this.relayed = 0;
     this.dropped = 0;
     this.closed = 0;
@@ -82,6 +101,12 @@ export class Relay {
         relayedSinceWake: this.relayed,
         droppedSinceWake: this.dropped,
         closedForAbuseSinceWake: this.closed,
+        evictedIdleSinceWake: this.evicted,
+        // so a full room can be told from a busy one without guessing
+        idleMs: this.state.getWebSockets().map((ws) => {
+          const v = this.#idleMs(ws, Date.now());
+          return v === Infinity ? 'never spoke' : v;
+        }).sort((a, b) => (b === 'never spoke' ? 1 : a === 'never spoke' ? -1 : b - a)),
         limits: { maxBytes: MAX_BYTES, maxSockets: MAX_SOCKETS, bytesPerSec: BYTES_PER_SEC, msgPerSec: MSG_PER_SEC },
       });
     }
@@ -89,6 +114,7 @@ export class Relay {
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('expected websocket', { status: 426 });
     }
+    if (this.state.getWebSockets().length >= MAX_SOCKETS) this.#reclaim();
     if (this.state.getWebSockets().length >= MAX_SOCKETS) {
       // refuse rather than accept-and-drop: a client that is told no can retry
       return new Response(`room full (${MAX_SOCKETS})`, { status: 503 });
@@ -96,7 +122,50 @@ export class Relay {
 
     const pair = new WebSocketPair();
     this.state.acceptWebSocket(pair[1]);
+    // A socket that has just arrived and not yet spoken is alive, obviously —
+    // without this it looks exactly like one whose owner left.
+    this.seen.set(pair[1], Date.now());
+    // 🔴 AND THE SAME FACT AGAIN, DURABLY. The in-memory line above is lost on
+    // hibernation, and dating a restored socket from the object's WAKE instead
+    // makes it permanently un-evictable: every restart resets its apparent age,
+    // so a room full of dead sockets stays full forever — measured, that is
+    // exactly what `studio-1` did. ONE write per connection, never per message.
+    try { pair[1].serializeAttachment({ at: Date.now() }); } catch { /* nothing to lose */ }
     return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  /**
+   * How long since this socket last gave any sign of life. The runtime's
+   * ping/pong timestamp survives hibernation and costs nothing; the in-memory
+   * message time does not survive but covers senders that never ping.
+   */
+  #idleMs(ws, now) {
+    const auto = this.state.getWebSocketAutoResponseTimestamp(ws);
+    let last = Math.max(auto ? auto.getTime() : 0, this.seen.get(ws) || 0);
+    if (!last) {
+      // Never pinged, nothing sent since this object woke. Fall back to WHEN IT
+      // CONNECTED, which survives hibernation. A socket with no attachment at
+      // all predates this code, so it has been sitting there at least since the
+      // deploy — old by definition, and the only way the stuck rooms clear.
+      let at = 0;
+      try { at = ws.deserializeAttachment()?.at || 0; } catch { /* old socket */ }
+      last = at;
+    }
+    return last ? now - last : Infinity;
+  }
+
+  /**
+   * Close sockets that have been silent past IDLE_MS. Called ONLY when the room
+   * is full — an idle socket in a room with space costs nothing and evicting it
+   * would be a policy nobody asked for.
+   */
+  #reclaim() {
+    const now = Date.now();
+    for (const ws of this.state.getWebSockets()) {
+      if (this.#idleMs(ws, now) < IDLE_MS) continue;
+      try { ws.close(1001, 'idle'); } catch { /* already gone */ }
+      this.evicted++;
+    }
   }
 
   /**
@@ -124,6 +193,10 @@ export class Relay {
   }
 
   async webSocketMessage(ws, msg) {
+    // ⚠️ Before any cap or bucket check — a socket that is being rate-limited is
+    // very much alive, and marking liveness only on ACCEPTED messages would
+    // make the busiest client look like the deadest one.
+    this.seen.set(ws, Date.now());
     // A TRUE BYTE ROOF. `msg.byteLength` is undefined on a string, so the naive
     // `msg.byteLength > MAX_BYTES` never fires for text at all; and
     // `String.length` counts UTF-16 CODE UNITS, so 4000 units of emoji is 8000

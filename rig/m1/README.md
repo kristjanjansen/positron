@@ -1,5 +1,151 @@
 # m1 — play a machine in the next room
 
+> **Two rigs live in this file and they are not the same thing.**
+> **[The rack](#the-rack--play-ableton-live-from-a-browser-2026-09-12)** is
+> current, running, and unattended. **[The parked
+> rig](#-parked-2026-09-11--it-works-and-the-setup-is-too-heavy-to-keep-warm)**
+> below it is the older peer-to-peer path — it works, and it is parked.
+> Two agents with confusingly close names sit in this directory:
+> `live-agent.mjs` is the rack (plays Live), `rack-agent.mjs` is the parked
+> rig's *checkup* (answers "is it set up?"). Neither calls the other.
+
+---
+
+# The rack — play Ableton Live from a browser (2026-09-12)
+
+**Live at <https://positron.studio/rack/>.** Press a key in a browser anywhere:
+the note number crosses the relay, `live-agent.mjs` on the studio Mac hands it
+to Live over CoreMIDI, and a copy of what Live renders comes back down the same
+socket. `/box/` is the SAME PAGE pointed at a Raspberry Pi — what crosses the
+wire is a note number, so neither end knows what kind of machine the other is.
+
+    rig/m1/live-agent.mjs   the agent: notes in over the relay, audio out
+    rig/m1/audiotap.m       a Core Audio process tap — copies ONE app's output
+    rig/m1/midisend.c       notes out over CoreMIDI, held open on stdin
+    rig/m1/studio.positron.rack-agent.plist   keeps it running across reboots
+    demo/rack/index.html    the page
+
+## 🔴 No BlackHole. No Multi-Output Device. No Live Preferences click.
+
+This is the whole point of the rewrite. A Core Audio **process tap** takes a
+copy of one process's output *while that audio carries on to the speakers*, so
+the entire old routing chain is gone — and with it **the one requirement in
+this rig that the Live Object Model could not script**: Live's own audio output
+device. Live plays out of its own speakers and the page hears it at the same
+time.
+
+Of the [six things the parked rig needed](#-why-it-is-parked-the-setup-is-heavy-and-here-is-exactly-how-heavy),
+the rack needs four, and the two that went are the two that hurt:
+
+| the parked rig needed | the rack |
+|---|---|
+| Preferences → Audio → Output = BlackHole / Multi-Output | **gone** — the tap copies whatever Live is already playing |
+| AbletonOSC selected as a Control Surface | **not in the play path** — the agent makes no OSC call at all (grep it). Still needed to *change* a set with `live-setup.mjs` |
+| the agent in a login session, started by hand | **gone** — launchd, see below |
+| Mac awake · Live open with an armed track · IAC Bus 1 enabled for Track input | unchanged — still true, still clicks |
+
+⚠️ **And the old "a capture started over ssh is deaf" rule does NOT apply to the
+tap.** MEASURED 2026-09-12: the agent started over plain ssh with `nohup`
+reported `permission to record system audio: allowed` and delivered **-5.3
+dBFS** through the relay. That rule was about `ffmpeg -f avfoundation`, whose
+TCC subject is the terminal; `audiotap` disclaims responsibility and is its own
+subject (`studio.positron.audiotap`), so its grant does not depend on who
+started it. **Do not carry the ssh rule across to this rig** — it is the same
+sentence about a different mechanism, which is how a working path gets called
+broken.
+
+## Measured over the relay, 2026-09-12
+
+| | |
+|---|---|
+| nothing playing | **0.00000** peak |
+| three keys held | **0.54572 peak = -5.3 dBFS** — the same figure the old BlackHole chain read |
+| frames dropped | **0 of 801** |
+| on the wire | 50 frames/s · **1541 kbit/s** stereo |
+| the agent's cost | **4.2% of one core** (M1 Pro) for socket + framing + conversion; `audiotap` alone reads 0.0% |
+| suite | **15/15 green**, against the deploy |
+
+## The wire, and the one rule that matters on it
+
+12 bytes then samples: `uint32 LE` sequence, `float64 LE` sender clock, then
+interleaved `Int16`. Identical to the box, deliberately.
+
+🔴 **THE CHANNEL COUNT IS ANNOUNCED, NEVER INFERRED.** 960 int16s is a valid
+20 ms **mono** frame and an equally valid 10 ms **stereo** one — nothing in the
+payload can tell them apart, and guessing wrong plays an octave down, which
+sounds like a broken instrument rather than a broken header. The Mac is stereo
+and the board is mono (`arecord -c 1`), so **both counts are on the relay at
+once** and no page may assume. Each sender declares `audioChannels` *and*
+`frameMs`; the page CHECKS one against the other — `samples / channels / rate`
+must come out at `frameMs` — so a wrong announcement is visible rather than
+merely audible.
+
+⚠️ The field is `audioChannels`, **not** `channels` — `box.mjs` already has
+`channels` and it means MIDI channels (16, multitimbral).
+
+**Proved by breaking it.** An agent that announced 1 while sending 2 was run in
+the real room against the real page and the real harness: the check fired, said
+*"it said 1, the frames say 2 — playing 2"*, corrected itself, and the suite went
+14/14 → 13/14. That run also exposed a bug worth keeping written down — the
+correction was being undone by the NEXT status reply repeating the same wrong
+claim, so the page flip-flopped and its own readout said "corrected to 1" about
+a correction to 2. **A measurement outranks a repeated claim;** what re-opens
+the question is the sender *changing* its claim, which is real news.
+
+## 🔴 The stream was bit-clean and it still sounded broken
+
+Shipped, and the report came back *noisy and distorted* — with every
+measurement above still true. The tap's own capture at the source had **zero**
+sample jumps over 0.25; what arrived over the relay measured the **same** pitch
+to a tenth of a Hz, the same peak, zero jumps, 0 dropped. All correct, and none
+of it could find the bug, because the defect was **downstream of every quantity
+being measured**: `pcm-playout` trims its cushion back to the floor whenever
+occupancy passes `floor + slack`, and the numbers did not fit each other —
+**floor 60 ms, slack 15 ms, frames arriving in 20 ms lumps**, so one frame
+landing early threw ~15 ms of audio away mid-note, over and over.
+
+What found it was **giving the cushion a number**: `breaks` in the readout, and
+it read `0 ran dry, 1 trimmed` inside 2.2 s. Slack now follows the frame size
+the worklet OBSERVES, because every caller feeds a different one and none of
+them declares it. ⚠️ `/box/` and `grains` were doing the same thing, unreported,
+for as long as they have existed.
+
+**"The bytes are correct" and "the sound is correct" are different claims**, and
+a buffer sits between them. Every stage that can discard data needs a counter a
+page actually shows — these counters existed inside the worklet all along,
+posted every 250 ms, and no page had ever read one.
+
+## It stays up by itself
+
+`studio.positron.rack-agent.plist`, a **LaunchAgent, not a LaunchDaemon** —
+TCC grants belong to a logged-in GUI session and a daemon has none, so the tap
+would come back refused and emit correctly-clocked **silence**, which every
+layer above reports as success. Live is a GUI app anyway.
+
+```sh
+cp rig/m1/studio.positron.rack-agent.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/studio.positron.rack-agent.plist
+launchctl print gui/$(id -u)/studio.positron.rack-agent | grep -E 'state|pid'
+tail -f /tmp/rack-agent.log
+```
+
+**Proved by killing it:** `kill -9` the pid, and 12 s later it is back with a
+new pid and `permission to record system audio: allowed` — the grant survives an
+unattended restart with nobody at the keyboard.
+
+⚠️ **The full path to `node` in the plist is not pedantry.** launchd starts with
+a minimal PATH — the same one a non-interactive ssh gets — and `node` is not on
+it, on a machine where `which node` answers instantly in a login shell. That
+cost one start here.
+
+⚠️ **`audiotap` must not be rebuilt casually.** It is codesigned
+(`codesign --force --sign - --identifier studio.positron.audiotap`) and the TCC
+grant is attached to that identity; a rebuild needs somebody to click Allow
+again, in person.
+
+---
+
+
 `synth.html` runs on the instrument machine; `play.html` runs on yours. Notes go
 up a direct peer-to-peer link, the sound is synthesised there and comes back on
 the same connection. The Cloudflare relay carries ONLY the initial handshake.

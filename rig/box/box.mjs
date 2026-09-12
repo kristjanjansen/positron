@@ -1011,7 +1011,12 @@ function connect() {
     const s = state();
     log(`joined ${ROOM} · backend ${s.backend} · ${s.ports.length} ports${DRY ? ' · DRY' : ''}`);
     if (s.error) log(`  ALSA: ${s.error}${s.hint ? `\n  -> ${s.hint}` : ''}`);
+    // ⚠️ `audioChannels` is NOT `channels` three lines down — that one is MIDI
+    // channels (16, multitimbral). The board captures `arecord -c 1`, so it says
+    // ONE, and `demo/rack`'s Mac says two: both counts are on the relay at once
+    // and no page is left inferring which it is holding.
     send({ type: 'box.hello', name: NAME, backend: s.backend, ports: s.ports.length, dry: DRY, since,
+           audioChannels: 1, frameMs: 1000 * FRAME / RATE,
                  instruments: { synth: true, fluidsynth: fluidAvailable() && !!soundfontAt(), pappusFx: pappusAvailable(),
                                 ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) },
                  ...(s.error ? { error: s.error, hint: s.hint } : {}) });

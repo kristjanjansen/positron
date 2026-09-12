@@ -994,3 +994,150 @@ copies that to `/opt`, which is what the unit file executes — so the copy in
 about what is running. `push.sh` now writes to `/opt` and prints the md5 of what
 landed, because "it deployed" and "it says it deployed" have been different
 things here before.
+
+## 52. The stream was bit-clean and the sound was still broken
+
+`rack` went out, and the report came back: *noisy and distorted*. Everything
+measurable about the stream said it was fine, and each check was real:
+
+- the tap's own capture at the source — peak -12.4 dBFS, **zero** sample-to-
+  sample jumps over 0.25, biggest jump 0.1396;
+- what arrived over the relay, decoded and measured the same way — **same**
+  pitch to a tenth of a Hz, same peak, **zero** jumps, 0 frames dropped;
+- the suite — 14/14 green.
+
+All of that was true and none of it could find the bug, because **the defect was
+downstream of every quantity being measured**. The samples were perfect; the
+thing consuming them was throwing them away. `pcm-playout` trims its cushion
+back to the floor whenever occupancy exceeds `floor + slack`, and the numbers
+did not fit each other: **floor 60 ms, slack 15 ms, frames arriving in 20 ms
+lumps.** One frame landing early is enough to cross 75 ms, so ordinary jitter
+trimmed ~15 ms of audio mid-note, over and over. That is a click, it repeats,
+and it is invisible to every measurement above because it happens after them.
+
+What actually found it was **giving the cushion a number**. `breaks` in the
+readout — starves plus trims — went from an assertion nobody had written to
+`0 ran dry, 1 trimmed` in a 2.2 s window. The fix follows from the arithmetic:
+slack must exceed one frame, and the frame size is **observed rather than
+configured**, because every caller feeds a different one and none of them knows
+to declare it.
+
+Three things to carry:
+
+- **"The bytes are correct" and "the sound is correct" are different claims.**
+  Between them sits a buffer, and a buffer can ruin perfect input.
+- **Every stage that can discard data needs a counter on it.** This one had the
+  counters all along, inside the worklet, posted every 250 ms — and no page had
+  ever read them, so they might as well not have existed. A statistic nobody
+  displays is not instrumentation.
+- **A user's report beat six green measurements.** "Noisy and distorted" was the
+  only correct statement in the room for about an hour.
+
+⚠️ `/box/` and `grains` ask for the same 60 ms floor and were doing the same
+thing, unreported, for as long as they have existed.
+
+## 53. A channel count cannot be inferred, so it has to be announced — and checked
+
+960 int16s is a valid 20 ms **mono** frame and an equally valid 10 ms **stereo**
+one. Nothing in the payload separates them, and guessing wrong plays an octave
+down — which sounds like a broken instrument rather than a broken header, so it
+sends you looking in the wrong place. The Mac sends stereo and the Raspberry Pi
+sends mono (`arecord -c 1`), so **both are on the relay at once** and no page may
+assume.
+
+Each sender now declares `audioChannels` **and** `frameMs`, and the receiver
+checks one against the other: `samples / channels / rate` must come out at
+`frameMs`. A mono stream mislabelled stereo lands at half of it. That turns a
+wrong header from something you hear into something you read.
+
+⚠️ The field is `audioChannels`, **not** `channels` — `box.mjs` already had
+`channels` and it means MIDI channels (16, multitimbral). Two quantities under
+one name in one protocol is a bug waiting for somebody in a hurry.
+
+**Proved by breaking it**, which is the only reason the next part is known: an
+agent announcing 1 while sending 2 was run in the real room against the real
+page. The check fired and the suite went 14/14 → 13/14 — and the failure message
+read *"had to correct it to 1"* about a correction **to 2**. The page was
+correcting itself and then the next status reply repeated the same wrong claim
+and undid it, forever. **A measurement outranks a repeated claim.** Saying the
+same wrong thing twice is not new information; the sender *changing* its claim
+is, and that is what re-opens the question.
+
+## 54. A component whose CSS was never written
+
+`choice.mjs` shipped emitting `.pos-choice` and `.pos-choice-l`, and **nothing
+in `shell.css` matched either**. So `/kit` drew three loose default buttons
+under a heading-sized label — a control that reads as unfinished because half of
+it was never written. It had a careful header comment explaining that the
+options must be segmented "the same way `stepper.mjs` does it"; the comment was
+right and the code that would have done it did not exist.
+
+Two things: **a class only the script knows about is not a component**, and the
+segment now carries `step` — the stepper's own class — rather than a second
+implementation of the same 1 px border overlap. The fix for "these look like
+three unrelated buttons" already existed in the file next door.
+
+## 55. The ssh-deafness rule does not transfer to a process tap
+
+The parked m1 rig is written down as **"a capture started over ssh is deaf"**,
+measured, true, and the reason its agent had to live in a login session. It does
+**not** apply to `audiotap`. MEASURED 2026-09-12: started over plain ssh with
+`nohup`, it reported `permission to record system audio: allowed` and delivered
+**-5.3 dBFS** through the relay.
+
+The old rule was about `ffmpeg -f avfoundation`, whose TCC subject is the
+terminal that launched it. `audiotap` calls
+`responsibility_spawnattrs_setdisclaim` and re-execs, so it is its **own** TCC
+subject (`studio.positron.audiotap`) and its grant does not depend on who
+started it. Same sentence, different mechanism, opposite conclusion — which is
+how a working path gets called broken.
+
+It also survives launchd, proved by `kill -9`: back 12 s later with a new pid
+and the grant intact, nobody at the keyboard. 🔴 But it is a **LaunchAgent, not
+a LaunchDaemon** — TCC grants belong to a logged-in GUI session, and a daemon
+would get a refusal that presents as correctly-clocked **silence**, which every
+layer above reports as success.
+
+## 56. Orphaned harness browsers filled a relay room and took a live demo down
+
+`studio-1` sat at **16/16 sockets** and refused the board for hours. From the
+board it looked like a network fault — it dialled every 30 s and logged
+`closed 1006`, which is what a browser reports for a `503`, so the log said
+nothing about the real reason. **`/box/` was down for everyone**, and the first
+guess was the Raspberry Pi.
+
+The room was full of **my own leftover Chrome instances**: four orphaned profile
+groups from earlier harness runs — `demo-grains-fit`, `positron-grid`,
+`nodes-udd`, `nodes-udd2` — 118 processes between them, each holding a socket.
+Killing them took the room from 16 to 1 and the board rejoined on its next
+retry, unaided.
+
+This is LESSONS #39 with worse consequences. That one says a second browser of
+your own makes the HARNESS read broken; this one says it takes **the live site**
+down with it, for as long as the processes survive — and they survive a lot,
+because nothing reaps them. Three of the full suite's three failures were this,
+and all three demos went green when re-run alone.
+
+⚠️ **A redeploy does NOT clear a full room.** Hibernated WebSockets are RESTORED
+across a restart — that is what hibernation is for — so the obvious lever does
+nothing, and the object itself is the only thing that can close a socket.
+Measured: deployed twice, sockets stayed at 16 both times.
+
+The relay now reclaims. Two things were needed and neither is obvious:
+
+- **Liveness cannot be "did it send recently".** A page that is only LISTENING
+  to audio sends nothing for minutes and is perfectly alive.
+  `getWebSocketAutoResponseTimestamp` is the signal that survives hibernation —
+  `wire.mjs` clients send `ping` and the RUNTIME answers without waking the
+  object — and an in-memory message time covers the agents, which never ping but
+  send constantly.
+- **The fallback clock has to be DURABLE.** The first attempt dated a socket
+  with no signal from the object's WAKE, which makes it permanently
+  un-evictable: every restart resets its apparent age. Measured — all sixteen
+  reported the same idle time, exactly the time since wake, forever. One
+  `serializeAttachment({at})` at accept (once per connection, never per message)
+  fixes it, and a socket with no attachment at all predates the code, so it is
+  old by definition.
+
+Eviction runs **only when the room is full**. An idle socket in a room with
+space costs nothing, and closing it would be a policy nobody asked for.
