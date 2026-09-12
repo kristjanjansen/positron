@@ -232,8 +232,8 @@ export const DEMOS = [
   // 1.5 s windows at different densities — and `verify.mjs` stops collecting
   // 400 ms after the last assert. Without it the page reports 2 asserts and
   // reads as broken while working perfectly.
-  { name: 'cloud', act: 4, created: '2026-09-12', built: true, settleMs: 14000,
-    one: 'a grain cloud made in the page, with every grain drawn as it fires',
+  { name: 'dust', act: 4, created: '2026-09-12', built: true, settleMs: 14000,
+    one: 'a granulator in the page, with the sound it is eating drawn underneath',
     tags: ['AudioWorklet', 'WebAudio'] },
   { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
     one: 'a granular engine on a Raspberry Pi, rolled from a seed you can get back',

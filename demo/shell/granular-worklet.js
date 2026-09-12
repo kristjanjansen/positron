@@ -75,8 +75,18 @@ class Granular extends AudioWorkletProcessor {
     this.nextGrainAt = 0;      // in absolute frames
     this.events = [];          // grain starts, drained to the main thread
     this.lastPost = 0;
+    this.lastPeaks = 0;
     this.started = 0;
     this.fired = 0;
+    // 🔴 THE BUFFER'S OWN SHAPE, SENT UP FOR DRAWING. A grain's read position
+    // as a number between 0 and 1 is not a place anybody can hear. Drawn ON the
+    // waveform it came from it is: you see the scan sitting in the loud part,
+    // the scatter reaching back into the quiet part before it, and a freeze
+    // stopping the picture dead. The first scope plotted position against time
+    // with no material behind it, and the verdict was that it did nothing for
+    // the person playing — which was true.
+    this.PEAKS = 320;
+    this.peaks = new Float32Array(this.PEAKS);
 
     this.port.onmessage = (e) => {
       const d = e.data || {};
@@ -194,6 +204,25 @@ class Granular extends AudioWorkletProcessor {
       }
     }
     if (this.grains.length) this.grains = this.grains.filter((g) => !g.done);
+
+    // ── the buffer's shape ───────────────────────────────────────────────
+    // 12 Hz and strided. A peak over the whole ring every quantum would be the
+    // audio thread doing drawing; this is ~60k reads a second, a rounding error
+    // beside the grains themselves.
+    if (currentFrame - this.lastPeaks >= sampleRate / 12) {
+      this.lastPeaks = currentFrame;
+      const per = Math.max(1, Math.floor(this.cap / this.PEAKS));
+      const stride = Math.max(1, Math.floor(per / 48));
+      for (let b = 0; b < this.PEAKS; b++) {
+        let mx = 0;
+        const from = b * per, to = Math.min(this.cap, from + per);
+        for (let i = from; i < to; i += stride) { const a = Math.abs(this.ring[i]); if (a > mx) mx = a; }
+        this.peaks[b] = mx;
+      }
+      // A copy, because a Float32Array handed over is detached and the next
+      // pass would write into nothing.
+      this.port.postMessage({ peaks: Float32Array.from(this.peaks), write: this.wr / this.cap, filled: this.filled / this.cap });
+    }
 
     // ── report ───────────────────────────────────────────────────────────
     // Batched at 20 Hz. One message per grain would be 24 postMessages a second

@@ -15,8 +15,8 @@
   import { createGrainScope } from '/shell/grain-scope.mjs';
 
   const d = mount({
-    name: 'cloud',
-    what: 'This page holds the last few seconds of sound and replays them as hundreds of short overlapping fragments, all of it made here rather than fetched. The picture underneath is every one of those fragments: across is when it played, up is where in the held seconds it read from, and each mark is filled because the thing that started it said so rather than being guessed from the sound. Density is how much the fragments overlap — under one they leave gaps you hear as stuttering, around three they fuse into a cloud.',
+    name: 'dust',
+    what: 'This page holds the last few seconds of sound and replays them as hundreds of short overlapping fragments, all of it made here rather than fetched. The picture is that held sound drawn as a waveform, and the lit band on it is the stretch the fragments are being taken from — every tick flickering inside it is one fragment, at the exact point it read. Density is how much they overlap: under one they leave gaps you hear as stuttering, around three they fuse.',
     // Six cells, all of which move. `overlap` is the one to steer by: it is
     // density x length, and it is the difference between a stutter and a cloud.
     readout: { overlap: '', grains: '/s', 'at once': '', held: 's', measured: '', late: 'ms' },
@@ -30,6 +30,21 @@
   const RATE = 48000;
   let ctx = null, node = null, src = null, gain = null, osc = [], scope = null;
   let stats = { live: 0, fired: 0, heldSec: 0, overlap: 0 }, firedAt = [], lateMs = 0;
+  let lastWrite = 0, lastFilled = 1;
+
+  /**
+   * The lit range: where in the material grains are being taken from. It has to
+   * be computed the same way the worklet computes it or the picture is a
+   * different claim from the sound — `follow` reads at a distance BEHIND the
+   * write head, so the range moves with the recording rather than sitting at a
+   * fixed place on screen.
+   */
+  function showRange() {
+    const span = Math.max(0.02, lastFilled);
+    const centre = ((lastWrite - (1 - P.scan) * span) % 1 + 1) % 1;
+    const half = P.spray * span;
+    scope?.range(((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre);
+  }
 
   // ── the sound going in ───────────────────────────────────────────────────
   // 🔴 THE PAGE MAKES ITS OWN, and that is deliberate. `grains` needs a
@@ -64,6 +79,9 @@
       // swell. These are not inferred.
       if (m.grains?.length) { scope.marks(m.grains); firedAt.push({ t: performance.now(), n: m.grains.length }); }
       if (firedAt.length > 200) firedAt.splice(0, firedAt.length - 200);
+      // The held sound itself, which is what makes every other mark a PLACE
+      // rather than a number.
+      if (m.peaks) { scope.buffer(m.peaks, { write: m.write, filledFrac: m.filled }); lastFilled = m.filled; lastWrite = m.write; showRange(); }
     };
     gain = ctx.createGain(); gain.gain.value = 0.9;
     node.connect(gain).connect(ctx.destination);
@@ -119,9 +137,7 @@
       cmd: 'set', rate, sizeMs: P.sizeMs, scan: P.scan, spray: P.spray,
       pitch: Math.pow(2, P.pitch / 12), pan: P.pan, level: 0.7, follow: 1,
     });
-    // What the settings IMPLY, drawn as an outline so it can never be mistaken
-    // for what happened.
-    scope?.expect({ rate, sizeMs: P.sizeMs, scan: P.scan, spray: P.spray });
+    showRange();
     d.set('overlap', P.overlap.toFixed(2), P.overlap < 1 ? 'warn' : 'ok');
     d.set('grains', Math.round(rate));
   }
@@ -134,8 +150,8 @@
   pickRow.append(srcPick.el);
   d.el.append(pickRow);
 
-  scope = createGrainScope(d.el, { seconds: 4, height: 160 });
-  scope.source('the granulator in this page reports every grain it starts');
+  scope = createGrainScope(d.el, { seconds: 4, height: 170 });
+  scope.source('every tick is a grain this page started');
 
   const KNOBS = [
     ['density', 0.2, 8,   0.1,  '',   'how much the fragments overlap — under one you hear gaps', (v) => { P.overlap = v; }],
@@ -238,8 +254,8 @@
     // ⚠️ AND THE PICTURE IS MEASURED, NOT DRAWN FROM THE SETTINGS. A scope fed
     // parameters would look identical and mean nothing.
     const sc = scope.stats();
-    d.assert('every mark in the picture was reported by the thing that fired it',
-      sc.measured > 0 && sc.inferred === 0, `${sc.measured} measured, ${sc.inferred} inferred`);
+    d.assert('every tick in the picture is a grain this page actually started',
+      sc.measured > 0 && sc.inferred === 0, `${sc.measured} reported by the engine, ${sc.inferred} guessed from audio`);
 
     P.overlap = 3; P.sizeMs = 120; apply();
     sliders.get('density').set(3, true); sliders.get('length').set(120, true);
