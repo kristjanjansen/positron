@@ -43,7 +43,8 @@
 <script type="module">
   import { el } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createSlider } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
 
   const body = document.body;
@@ -102,21 +103,38 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
       box.append(el('button', '', 'a button, for height', { type: 'button' }), a.el, b.el, c.el, o);
     });
 
+  // ── several sliders ─────────────────────────────────────────────────────
+  section('sliders stacked — shell/slider.mjs',
+    'Four of them share one set of columns, which is the only thing that can line them up: a wider label would otherwise push its own lane right, so two lanes start indented and two do not. The lane takes the width that is actually there rather than its standalone 96 px — on a 390 px phone that is 250 px against 96, measured. Put four values in a column and the point is comparing them at a glance, so anything ragged costs exactly the thing they are for.',
+    `createSliderGroup([rate, size, spray, swarm])`,
+    (box) => {
+      const o = out('—');
+      const g = createSliderGroup([
+        createSlider({ label: 'rate', min: 0.5, max: 24, step: 0.1, value: 8.2, unit: '/s',
+          onInput: (v) => { o.textContent = `rate ${v} /s`; } }),
+        createSlider({ label: 'size', min: 0.02, max: 0.4, step: 0.01, value: 0.14, unit: 's',
+          onInput: (v) => { o.textContent = `size ${v} s`; } }),
+        createSlider({ label: 'spray', min: 0, max: 0.5, step: 0.01, value: 0.17,
+          onInput: (v) => { o.textContent = `spray ${v}`; } }),
+        createSlider({ label: 'swarm', min: 0, max: 0.9, step: 0.01, value: 0.3,
+          onInput: (v) => { o.textContent = `swarm ${v}`; } }),
+      ]);
+      box.append(g.el, o);
+    });
+
   // ── radio row ───────────────────────────────────────────────────────────
-  section('a choice of three',
-    'Not a component yet — `mirror` and `/box/` each build this by hand, which is exactly the drift this page exists to make visible. Three or four named settings beat a slider when the values have names and the names are the point.',
-    `steps.map(([text, value], i) =>
-  el('button', '', text, { 'aria-pressed': String(i === at) }))`,
+  section('a choice of three — shell/choice.mjs',
+    'Three or four named settings beat a slider when the values have names and the names are the point. One group rather than loose buttons: gaps would make three choices look like three unrelated controls and put the label further from what it labels than the options are from each other. It borrows the stepper’s own join — a pixel of border overlap, outer corners only — rather than carrying a second copy of it. No state word on the button: which one is chosen is already said by colour and by aria-pressed, and saying it again in words was wrong two thirds of the time.',
+    `createChoice({ label: 'space', options: [['dry',0],['room',1],['hall',2]], at: 1, onPick })`,
     (box) => {
       const o = out('room');
-      const seg = el('div', 'seg');
-      ['dry', 'room', 'hall'].forEach((t, i) => {
-        const b = el('button', '', t, { type: 'button', 'aria-pressed': String(i === 1) });
-        b.onclick = () => { [...seg.children].forEach((x, k) => x.setAttribute('aria-pressed', String(k === i))); o.textContent = t; };
-        seg.append(b);
+      const c = createChoice({
+        label: 'space',
+        options: [['dry', 0], ['room', 1], ['hall', 2]],
+        at: 1,
+        onPick: (_v, name) => { o.textContent = name; },
       });
-      const knob = el('div', 'knob'); knob.append(el('span', '', 'SPACE'), seg);
-      box.append(knob, o);
+      box.append(c.el, o);
     });
 
   // ── keyboard ────────────────────────────────────────────────────────────

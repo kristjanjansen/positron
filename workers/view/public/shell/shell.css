@@ -515,6 +515,34 @@ video[hidden] { display: none; }
   background: var(--hi); border-radius: 4px; pointer-events: none;
 }
 .sld-lane[aria-disabled] { opacity: .4; cursor: default; }
+/* ⚠️ SHARED COLUMNS, OR NOTHING LINES UP. Four sliders each laying themselves
+   out means four different label widths, so four lanes start at four different
+   x positions and four values end wherever their lane left them — photographed
+   on /grains/ on a phone. The fix is not spacing, it is making the four rows
+   share ONE set of columns, which only a grid on the container can do.
+
+   `minmax(0, 1fr)` on the lane is the "use the width that is there" half: on a
+   390 px phone the lane takes what the label and value leave, rather than
+   sitting at its standalone 96 px with the rest of the row empty. The knob is
+   positioned as a PERCENTAGE of its lane in `slider.mjs`, so a fluid lane needs
+   no script and no resize listener — it was already correct, it had just never
+   been given room. `max-width` keeps a desktop row from becoming a metre long.
+
+   ⚠️ `display: contents` is what puts each slider's three parts into those
+   columns. It removes the wrapper's own box, NOT its custom properties —
+   `--sld-knob` still inherits, which is the one thing that would have broken. */
+.sld-group {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 10px 12px;
+  width: 100%; max-width: 560px;
+}
+.sld-group .sld { display: contents; }
+/* the standalone 96 px is for a slider sitting in a row of buttons; in a group
+   the column decides */
+.sld-group .sld-lane { width: auto; }
+
 .sld-v {
   font: 500 12px/1 var(--mono); color: var(--fg);
   /* `min-width` is set per slider from its own widest possible value — see

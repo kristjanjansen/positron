@@ -24,6 +24,29 @@
 import { el } from './shell.mjs';
 
 /**
+ * Several sliders stacked, sharing one set of columns.
+ *
+ * 🔴 A STACK IS NOT FOUR SLIDERS IN A DIV, and `grains` proved it: it appended
+ * them to `el('div', 'knobs')`, a class with **no CSS anywhere** — so they fell
+ * into block layout, touching, and every lane started at a different x because
+ * a wider label pushes its own lane right. `SPRAY` is two characters longer
+ * than `RATE`, so two lanes were indented and two were not, on a control whose
+ * entire job is comparing four values at a glance. That is the second class in
+ * one day that a component emitted and no stylesheet matched.
+ *
+ * The columns are shared, which is the only thing that can align them: one
+ * `max-content` column for the labels, one `1fr` for the lanes so they take the
+ * width that is actually there, one `max-content` for the values. Each slider
+ * becomes `display: contents` so its three parts land in those columns rather
+ * than in a box of its own.
+ */
+export function createSliderGroup(sliders = []) {
+  const wrap = el('div', 'sld-group');
+  for (const s of sliders) wrap.append(s.el ?? s);
+  return { el: wrap, add: (s) => { wrap.append(s.el ?? s); return s; } };
+}
+
+/**
  * @param {object} o
  * @param {string} o.label     shown before the lane, uppercased by CSS
  * @param {number} o.min
