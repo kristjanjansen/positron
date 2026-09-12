@@ -74,13 +74,18 @@ container it can trust. `demo/` is the wall that makes "enumerate, don't list"
 safe — it is not organising the demos, it is fencing the enumeration away from
 the secrets.
 
-**The CSS prefix is `d-`, for `demo-`, and it now styles pages that are not
-demos.** The name is wrong; the cost is not. MEASURED: **956 references across
-36 class names**, 8 of them inside harness selectors, for a rename no visitor
-can see. If it is ever done, do it in one commit, then `grep` the OLD form
-everywhere, then diff the per-demo assert counts — a page whose controls the
-harness can no longer select reads GREEN while asserting nothing, which has
-happened here twice.
+**~~The CSS prefix is `d-`~~ — DONE 2026-09-12, it is `pos-` now.** The
+reasoning above said not to: 956 references for a rename no visitor can see.
+That held right up until three components written the same day shipped
+UNPREFIXED, at which point the cost of NOT doing it became a split convention
+every future component has to pick a side in.
+
+⚠️ **The first attempt corrupted 164 files.** It matched BARE WORDS —
+`const step` became `const pos-step` — rather than class names. The `d-*` names
+are hyphenated and distinctive and were safe both times. If the remaining
+unprefixed ones (`.step`, `.sld`, `.choice`) are ever renamed, match
+`class="…"` attributes and CSS selectors, never a bare identifier. And syntax
+check every module before believing it worked.
 
 **And the 23 `plan-*.md` files stay at the root.** Moving them into `plan/` is
 MEASURED at **421 references** — 74 paths and 347 bare prose citations like

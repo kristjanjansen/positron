@@ -61,7 +61,7 @@ as a measurement teaches a reader to ignore the whole row.
 
 ### 19. A control the harness cannot reach reads as a broken page
 
-`verify.mjs` presses buttons in `.d-controls` and nothing else. A hardware
+`verify.mjs` presses buttons in `.pos-controls` and nothing else. A hardware
 button mounted in the page body produced `page asserted something — 0`, which
 looks exactly like a demo that does not work. Same shape as #2 and #13: the
 suite was not wrong, it was not reaching the thing.
@@ -405,12 +405,12 @@ parameters straight to `map`, `forEach` or `filter`.
 ### 41. Hide a control the harness needs; do not remove it
 
 Asked to drop the debugging buttons, the obvious move is to delete them. But
-`verify.mjs` presses `.d-controls button`, so a removed control is a subject the
+`verify.mjs` presses `.pos-controls button`, so a removed control is a subject the
 suite silently stops testing (#19, from the other side). They are `hidden` and
 still in the DOM, `?checks=1` shows them, and the assert count is unchanged.
 
 The same shape decided where the compose box went. "Move send below the box"
-reads as *move the button* — which would take it out of `.d-controls` entirely,
+reads as *move the button* — which would take it out of `.pos-controls` entirely,
 and reorder every press besides, since the harness walks them in document
 order. Moving the BOX above the bar puts the same pixels on screen at no cost.
 **When a layout request would move an element out of the harness's reach, move

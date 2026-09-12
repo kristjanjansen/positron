@@ -29,24 +29,24 @@ import { el } from './shell.mjs';
 export function createHardware(d, {
   label = 'Enable soundcard / MIDI and play', onAudio, onMidi, onMidiIn,
 } = {}) {
-  const btn = el('button', 'd-pri', label, { type: 'button' });
+  const btn = el('button', 'pos-pri', label, { type: 'button' });
   // TWO pickers, each labelled in the UI with its direction. MIDI in and MIDI
   // out are different devices doing different jobs — one is told when to act,
   // the other reports when something happened — and a control called just
   // "MIDI" cannot say which one you are choosing.
-  const outPick = el('select', 'd-hw-pick', null, { 'aria-label': 'MIDI output device' });
-  const inPick = el('select', 'd-hw-pick', null, { 'aria-label': 'MIDI input device' });
-  const outTag = el('span', 'd-hw-tag', 'out');
-  const inTag = el('span', 'd-hw-tag', 'in');
+  const outPick = el('select', 'pos-hw-pick', null, { 'aria-label': 'MIDI output device' });
+  const inPick = el('select', 'pos-hw-pick', null, { 'aria-label': 'MIDI input device' });
+  const outTag = el('span', 'pos-hw-tag', 'out');
+  const inTag = el('span', 'pos-hw-tag', 'in');
   for (const e of [outPick, inPick, outTag, inTag]) e.hidden = true;
-  // ALL THREE LIVE IN `.d-controls`. Two reasons, and both were learned the
+  // ALL THREE LIVE IN `.pos-controls`. Two reasons, and both were learned the
   // hard way in one sitting: verify.mjs presses every button in that row and
   // nothing else, so a control mounted anywhere else is one the suite cannot
   // reach — it read as "page asserted nothing" and looked like a broken demo.
   // And a device picker that sits BELOW the thing it configures reads as
   // output rather than as a control; it belongs beside the button that turned
   // the device on.
-  const row = document.querySelector('.d-controls') || d.el;
+  const row = document.querySelector('.pos-controls') || d.el;
   row.append(btn, outTag, outPick, inTag, inPick);
 
   const state = {

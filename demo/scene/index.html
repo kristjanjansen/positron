@@ -1212,7 +1212,7 @@
       sessionStorage.removeItem('scene-resume');
       d.log('updated — press "Put it in your room" to go back in', 'ok');
       const b = d.button('ar') || d.button('enter');
-      if (b) { b.classList.add('d-pri'); b.textContent = '↩ Back in — update taken'; }
+      if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in — update taken'; }
     }
   } catch { /* private mode */ }
   // A room to stand in before anything is pressed, so the stage is never empty.

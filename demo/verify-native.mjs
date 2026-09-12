@@ -90,7 +90,7 @@ const ev = async (expr) => {
   return r.result?.result?.value;
 };
 console.log('ready:', await ev('!!window.__demo'));
-console.log('press:', await ev(`document.querySelectorAll('.d-controls button')[0].click()`));
+console.log('press:', await ev(`document.querySelectorAll('.pos-controls button')[0].click()`));
 await sleep(14000);
 
 const state = await ev(`JSON.stringify({

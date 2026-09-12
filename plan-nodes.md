@@ -1179,7 +1179,7 @@ best-shaped thing yet for reproducing it**, because a graph that draws perfectly
 and patches nothing looks *exactly* like one that works.
 
 🔴 **MEASURED TODAY, in the suite's own headless Chrome with its own flags.**
-`demo/verify.mjs` exercises a page by selecting `.d-controls button, .tbar-x` and
+`demo/verify.mjs` exercises a page by selecting `.pos-controls button, .tbar-x` and
 calling `.click()` on each. What that dispatches:
 
 | the harness does | the page receives |

@@ -217,7 +217,7 @@ for (const t of targets) {
     }
   }
 
-  const strip = await ev('!!document.querySelector("canvas.d-strip")');
+  const strip = await ev('!!document.querySelector("canvas.pos-strip")');
   if (strip) {
     // SAMPLE AFTER A FRAME, and more than once. `resize()` in strip.mjs assigns
     // canvas.width, which CLEARS the canvas, and only then schedules a redraw —
@@ -232,7 +232,7 @@ for (const t of targets) {
     // passing.
     const sample = () => ev(`(async () => {
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const c = document.querySelector('canvas.d-strip');
+      const c = document.querySelector('canvas.pos-strip');
       const g = c.getContext('2d');
       const d = g.getImageData(0, 0, c.width, c.height).data;
       let lit = 0;
@@ -251,7 +251,7 @@ for (const t of targets) {
   // a transport verb rather than a side action (`take` puts Record there). A
   // control the harness cannot press is a subject the suite cannot reach, which
   // is how three pages stayed green while never playing a frame.
-  const SEL = '.d-controls button, .tbar-x';
+  const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
     await ev(`document.querySelectorAll(${JSON.stringify(SEL)})[${i}].click()`);

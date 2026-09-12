@@ -85,15 +85,15 @@ for (const engine of ENGINES) {
     console.log('  ok    __demo.ready');
 
     // press the primary control, the same way verify.mjs does
-    await exec("document.querySelectorAll('.d-controls button')[0].click()");
+    await exec("document.querySelectorAll('.pos-controls button')[0].click()");
     console.log(`  ...   started; settling ${SETTLE_MS / 1000}s`);
     await sleep(SETTLE_MS);
 
     const snap = JSON.parse(await exec(`
       const d = window.__demo;
       const vals = {};
-      document.querySelectorAll('.d-readout .d-cell').forEach((c) => {
-        const k = c.querySelector('.d-k'); const v = c.querySelector('.d-v');
+      document.querySelectorAll('.pos-readout .pos-cell').forEach((c) => {
+        const k = c.querySelector('.pos-k'); const v = c.querySelector('.pos-v');
         if (k && v) vals[k.textContent.trim().toLowerCase()] = v.textContent.trim();
       });
       return JSON.stringify({

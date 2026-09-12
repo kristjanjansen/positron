@@ -362,7 +362,7 @@ await mkdir(OUT, { recursive: true });
   // NEWEST FIRST on the front page, story order everywhere else. byNewest()
   // returns a copy for exactly this reason — the array is still the sequence.
   const rows = byNewest(DEMO_MANIFEST).map((d, i) => '  ' + rowHTML(d, i)).join('\n');
-  const notes = '<h2 class="d-act-h">notes</h2>\n<ol class="d-acts">'
+  const notes = '<h2 class="pos-act-h">notes</h2>\n<ol class="pos-acts">'
     + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');

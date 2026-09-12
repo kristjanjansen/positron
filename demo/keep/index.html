@@ -84,7 +84,7 @@
   const canvas = el('canvas');
   canvas.width = W; canvas.height = H;
   const g = canvas.getContext('2d');
-  srcFig.append(canvas, el('figcaption', 'd-cap', 'sent'));
+  srcFig.append(canvas, el('figcaption', 'pos-cap', 'sent'));
 
   const seqFig = el('figure');
   const seq = el('div', 'seq');
@@ -94,7 +94,7 @@
   // THE NUMBER SITS ON THE PICTURE IT DESCRIBES. How far the copy travelled is
   // a property of THIS pane, so it goes in its caption rather than in a row of
   // figures somewhere else that the reader has to join up.
-  const seqCap = el('figcaption', 'd-cap', 'received');
+  const seqCap = el('figcaption', 'pos-cap', 'received');
   const legText = () => (legs.length ? `received  +${Math.round(median(legs))} ms` : 'received');
   seqFig.append(seq, seqCap);
   stage.append(srcFig, seqFig);

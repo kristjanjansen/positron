@@ -223,9 +223,9 @@ for (const t of targets) {
   // Press every control, in order — the same contract as verify.mjs, and for
   // the same stated reason: a control the harness cannot press is a subject the
   // suite cannot reach.
-  const n = await evalIn(`document.querySelectorAll('.d-controls button').length`);
+  const n = await evalIn(`document.querySelectorAll('.pos-controls button').length`);
   for (let i = 0; i < n; i++) {
-    await evalIn(`document.querySelectorAll('.d-controls button')[${i}].click()`);
+    await evalIn(`document.querySelectorAll('.pos-controls button')[${i}].click()`);
     await sleep(i === 0 ? (t.settleMs ?? 4000) : 1200);
   }
   // ⚠️ AND A PAGE WITH NO CONTROLS MUST STILL BE WAITED FOR. `mirror` starts

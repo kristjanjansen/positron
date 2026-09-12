@@ -799,7 +799,7 @@ for (const t of targets) {
   // session without an activation. `.tbar-x` too: a page may put a control
   // inside the transport bar, and a control the harness cannot press is a
   // subject the suite cannot reach.
-  const SEL = '.d-controls button, .tbar-x';
+  const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
     await ev(`document.querySelectorAll(${JSON.stringify(SEL)})[${i}].click()`, { gesture: true });
