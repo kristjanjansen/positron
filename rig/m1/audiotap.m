@@ -24,6 +24,29 @@
 //
 // ⚠️ It also captures LIVE specifically rather than whatever is on the output
 // device, so a notification arriving mid-take is not in the stream.
+//
+// 🔴 STATUS 2026-09-12: NOT WORKING, AND IT FAILS IN THE MOST MISLEADING WAY
+// AVAILABLE. It finds the process, negotiates 48000 Hz / 2 ch / float32,
+// reaches `ready`, and delivers buffers at exactly the right rate — 379 KB/s
+// against the 384 KB/s that format implies — and EVERY SAMPLE IS ZERO.
+// MEASURED against a source a human in the room could hear.
+//
+// Two diagnoses were made and both were wrong, which is worth recording so the
+// next person does not repeat them:
+//
+//   1. "It is a TCC permission." A bare binary has no Info.plist so it cannot
+//      prompt, which made this very plausible. But running it from the login
+//      session under iTerm2 — the route that fixed the deaf ffmpeg capture —
+//      changed nothing.
+//   2. "The aggregate has no sub-device to clock it." Genuinely a bug, and
+//      fixed below: an aggregate driven by nothing still starts and still hands
+//      back correctly sized silence. It was not the cause either.
+//
+// What has NOT been tried, and is where to go next: comparing this line by line
+// against `insidegui/AudioCap`, which is Apple-sample-derived and known to
+// work. The likely candidates are the sub-tap UID (this uses the description's
+// UUID rather than reading `kAudioTapPropertyUID` back off the created tap) and
+// reading `mBuffers[0]` when the tap may deliver non-interleaved buffers.
 
 #import <Foundation/Foundation.h>
 #import <CoreAudio/CoreAudio.h>
@@ -117,15 +140,33 @@ int main(int argc, char **argv) {
     OSStatus st = AudioHardwareCreateProcessTap(desc, &gTap);
     if (st) { fprintf(stderr, "the tap was refused (%d) — has this binary been granted audio recording permission?\n", (int)st); return 2; }
 
+    // 🔴 THE AGGREGATE NEEDS A REAL DEVICE IN IT, AND AN EMPTY SUB-DEVICE LIST
+    // IS WHY THIS RETURNED SILENCE. A tap is not a clock: the aggregate has to
+    // be driven by an actual device's I/O cycle, and with `subDeviceList: @[]`
+    // it starts, reports `ready`, hands back buffers of exactly the right size
+    // at exactly the right rate — and every sample is zero. That looks so much
+    // like a permissions refusal that it cost two wrong diagnoses.
+    AudioObjectID outDev = kAudioObjectUnknown; UInt32 ds = sizeof(outDev);
+    AudioObjectPropertyAddress da = { kAudioHardwarePropertyDefaultOutputDevice,
+                                      kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+    AudioObjectGetPropertyData(kAudioObjectSystemObject, &da, 0, NULL, &ds, &outDev);
+    CFStringRef outUID = NULL; UInt32 us = sizeof(outUID);
+    AudioObjectPropertyAddress ua = { kAudioDevicePropertyDeviceUID,
+                                      kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+    AudioObjectGetPropertyData(outDev, &ua, 0, NULL, &us, &outUID);
+    if (outUID) fprintf(stderr, "clocked by %s\n", [(__bridge NSString *)outUID UTF8String]);
+
     NSString *tapUID = desc.UUID.UUIDString;
     NSDictionary *agg = @{
       @(kAudioAggregateDeviceNameKey):      @"positron-tap",
       @(kAudioAggregateDeviceUIDKey):       [NSUUID UUID].UUIDString,
+      @(kAudioAggregateDeviceMainSubDeviceKey): outUID ? (__bridge NSString *)outUID : @"",
       // Private: it must not appear in everybody's sound menu.
       @(kAudioAggregateDeviceIsPrivateKey): @YES,
       @(kAudioAggregateDeviceIsStackedKey): @NO,
       @(kAudioAggregateDeviceTapAutoStartKey): @YES,
-      @(kAudioAggregateDeviceSubDeviceListKey): @[],
+      @(kAudioAggregateDeviceSubDeviceListKey):
+        outUID ? @[ @{ @(kAudioSubDeviceUIDKey): (__bridge NSString *)outUID } ] : @[],
       @(kAudioAggregateDeviceTapListKey): @[ @{ @(kAudioSubTapUIDKey): tapUID,
                                                 @(kAudioSubTapDriftCompensationKey): @YES } ],
     };
