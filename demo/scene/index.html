@@ -96,6 +96,7 @@
       { id: 'roll', label: 'Roll a room', primary: true },
       { id: 'again', label: 'Same seed again' },
       { id: 'enter', label: 'Put it on your face' },
+      { id: 'ar', label: 'Put it in your room' },
       { id: 'bad', label: 'Try an impossible room' },
     ],
   });
@@ -116,7 +117,13 @@
   // build step, and a 600 KB renderer to draw boxes would be the first
   // bundler-shaped dependency in it — the same argument plan-nodes §1.5 made
   // about importing a node editor.
-  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, xrCompatible: true });
+  // 🔴 `alpha: true` IS WHAT MAKES PASSTHROUGH POSSIBLE AT ALL. In an
+  // `immersive-ar` session the compositor puts the real room BEHIND whatever
+  // this page draws, and it can only do that through transparent pixels — with
+  // `alpha: false` the framebuffer has no alpha to clear to zero and the room
+  // is replaced by black rather than composited under. The flat and VR paths
+  // clear to opaque, so nothing else changes.
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
   if (!gl) { d.log('no WebGL2 in this browser — there is nothing to draw with', 'bad'); }
 
   const compile = (t, src) => {
@@ -289,7 +296,10 @@
     // both; a headset showed black. A viewport is not a clip region, and
     // `gl.scissor` is the thing that would make it one.
     if (doClear) {
-      gl.clearColor(0.02, 0.03, 0.045, 1);
+      // Transparent in passthrough: every pixel this page does not draw is a
+      // pixel of your actual room.
+      if (arMode) gl.clearColor(0, 0, 0, 0);
+      else gl.clearColor(0.02, 0.03, 0.045, 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     } else {
       // Each eye still needs its OWN depth cleared, or the second eye tests
@@ -304,15 +314,21 @@
     // ones pointing AWAY. Cull the other way round rather than turning culling
     // off — a room drawn with both faces writes depth from the near wall and
     // hides everything inside it.
-    gl.useProgram(progSky);
-    let L = locs(progSky);
-    gl.cullFace(gl.FRONT); gl.enable(gl.CULL_FACE);
-    gl.uniformMatrix4fv(L.proj, false, proj);
-    gl.uniformMatrix4fv(L.view, false, view);
-    gl.uniformMatrix4fv(L.model, false, modelM(0, 2, 0, 26, 0, 0));
-    gl.uniform1f(L.t, tSec); gl.uniform1f(L.hue, doc.hue);
-    gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-
+    // ⚠️ NO WALLS IN PASSTHROUGH. The walls ARE the room in the other two
+    // modes; in passthrough your own room is the room, and drawing a box around
+    // you would be drawing over the thing you asked to see.
+    let L;
+    if (!arMode) {
+      gl.useProgram(progSky);
+      L = locs(progSky);
+      gl.cullFace(gl.FRONT); gl.enable(gl.CULL_FACE);
+      gl.uniformMatrix4fv(L.proj, false, proj);
+      gl.uniformMatrix4fv(L.view, false, view);
+      gl.uniformMatrix4fv(L.model, false, modelM(0, 2, 0, 26, 0, 0));
+      gl.uniform1f(L.t, tSec); gl.uniform1f(L.hue, doc.hue);
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+    }
+    gl.enable(gl.CULL_FACE);
     gl.cullFace(gl.BACK);
     gl.useProgram(progBox);
     L = locs(progBox);
@@ -407,8 +423,9 @@
   // ── the headset ─────────────────────────────────────────────────────────
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
   // Taken once, at load, away from any gesture — see enter().
-  let headsetKnown = null;
+  let headsetKnown = null, arKnown = null, arMode = false;
   navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; }, () => { headsetKnown = false; });
+  navigator.xr?.isSessionSupported('immersive-ar').then((v) => { arKnown = v; }, () => { arKnown = false; });
 
   /**
    * What demo/verify-quest.mjs reads to turn its compositor line from context
@@ -423,10 +440,12 @@
    * on the far side of the boundary.
    */
   const publishXR = () => {
-    window.__demo.xr = { presenting: xrOk, mode: xrOk ? 'immersive-vr' : 'window', frames: xrFrames };
+    window.__demo.xr = { presenting: xrOk, mode: xrOk ? (arMode ? 'immersive-ar' : 'immersive-vr') : 'window', frames: xrFrames };
   };
-  async function enter() {
+  async function enter(mode = 'immersive-vr') {
+    arMode = mode === 'immersive-ar';
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'warn'); return false; }
+    if (arMode && arKnown === false) { d.log('this headset will not composite over your room', 'warn'); return false; }
     // 🔴 NO AWAIT BEFORE `requestSession`. It needs a TRANSIENT user activation,
     // and awaiting anything first can spend it — so the support answer is the
     // one already taken at load (`headsetKnown`), never a fresh await here.
@@ -449,8 +468,8 @@
       // ⚠️ `local-floor` is REQUIRED, not optional: the room is authored in
       // metres from the floor, and on `local` the origin is wherever the head
       // happened to be, which puts a 0.3 m cube at eye height.
-      session = await step('requestSession',
-        navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] }));
+      session = await step(`requestSession ${mode}`,
+        navigator.xr.requestSession(mode, { requiredFeatures: ['local-floor'] }));
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
       // the handler entirely — so the session could START and the page then die
@@ -483,12 +502,15 @@
     // the layer genuinely exists. MEASURED: every step of entry logged `ok`
     // and the very next statement was the one that killed it — which is why
     // the instrumentation had to go in before the cause could be guessed at.
-    shipNow(`session created · refresh ${session.frameRate || 'not reported'}`);
+    // `environmentBlendMode` is the browser telling you what it will actually
+    // do with your transparent pixels: `opaque` means passthrough is NOT
+    // happening whatever the session was called.
+    shipNow(`session created · ${mode} · blend ${session.environmentBlendMode || 'not reported'} · refresh ${session.frameRate || 'not reported'}`);
     cancelAnimationFrame(raf);
-    badge.innerHTML = 'headset · <b>you are in the room</b>';
-    d.set('view', 'headset', 'ok');
+    badge.innerHTML = arMode ? 'passthrough · <b>the room is yours</b>' : 'headset · <b>you are in the room</b>';
+    d.set('view', arMode ? 'your room' : 'headset', 'ok');
     session.addEventListener('end', () => {
-      xrOk = false; session = null; publishXR(); badge.innerHTML = 'window · <b>session ended</b>';
+      xrOk = false; session = null; arMode = false; publishXR(); badge.innerHTML = 'window · <b>session ended</b>';
       d.set('view', 'window'); raf = requestAnimationFrame(flat);
     });
     // 🔴 ANY CONTROLLER BUTTON LEAVES. A page that puts someone in a room it
@@ -607,6 +629,32 @@
     d.set('seed', String(seed));
   });
 
+  d.on('ar', async () => {
+    let got = false;
+    try { got = await enter('immersive-ar'); }
+    catch (e) {
+      shipNow(`FAIL enter(ar) — ${e.name}: ${e.message}`);
+      d.log(`passthrough failed — ${e.name}: ${e.message}`, 'bad');
+      try { await session?.end(); } catch { /* may not exist */ }
+      session = null; xrOk = false; arMode = false;
+    }
+    d.assert('it knows whether this headset can show your room',
+      arKnown === true || arKnown === false, `immersive-ar supported: ${arKnown}`);
+    if (got) {
+      d.assert('a passthrough session started', !!session && arMode);
+      // ⚠️ ASSERT ON THE BLEND MODE, NOT ON THE SESSION NAME. A session can be
+      // called `immersive-ar` and still composite `opaque`, which is a room
+      // replaced rather than a room seen through — and it looks like a bug in
+      // the drawing rather than in the session.
+      d.assert('the compositor really is showing your room',
+        session?.environmentBlendMode && session.environmentBlendMode !== 'opaque',
+        `blend mode ${session?.environmentBlendMode}`);
+    } else {
+      d.assert('with no passthrough it says so and stays in the window',
+        !xrOk, `immersive-ar supported: ${arKnown}`);
+    }
+  });
+
   d.on('enter', async () => {
     // ⚠️ A LAST NET. Every individual await inside enter() is guarded now, but
     // the bug that cost two runs was a plain synchronous statement BETWEEN the
@@ -688,7 +736,7 @@
   // itself waiting on a timer that had stopped being generous.
   addEventListener('error', (e) => shipNow(`FAIL uncaught — ${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno}`));
   addEventListener('unhandledrejection', (e) => shipNow(`FAIL unhandled rejection — ${e.reason?.message || e.reason}`));
-  for (const id of ['roll', 'again', 'enter', 'bad']) {
+  for (const id of ['roll', 'again', 'enter', 'ar', 'bad']) {
     const b = d.button(id);
     if (b) b.addEventListener('click', () => ship?.(`pressed "${b.textContent}"`), true);
   }
