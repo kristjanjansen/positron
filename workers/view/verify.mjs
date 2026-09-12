@@ -183,16 +183,16 @@ ok('index', 'served 200 html', await evaluate(`document.title`) === 'POSITRON', 
 // generator promises: one row per manifest entry, and every LINKED row pointing
 // at a real target. Deployed demos live at /<nn>-<name>/ — build.mjs strips the
 // `demo/` prefix — so the old `/demo/` check could not have passed either.
-const rows = await evaluate(`[...document.querySelectorAll('li.d-row')].length`);
-const links = await evaluate(`[...document.querySelectorAll('li.d-row a[href]')].map(a => a.getAttribute('href'))`);
-// Notes render as `li.d-row` too, so the expected count is both lists — which
+const rows = await evaluate(`[...document.querySelectorAll('li.pos-row')].length`);
+const links = await evaluate(`[...document.querySelectorAll('li.pos-row a[href]')].map(a => a.getAttribute('href'))`);
+// Notes render as `li.pos-row` too, so the expected count is both lists — which
 // is exactly the kind of detail a typed-in number gets wrong the first time.
 ok('index', 'lists every demo and note row', rows === DEMOS.length + NOTES.length,
    `${rows} rows, manifest has ${DEMOS.length} demos + ${NOTES.length} notes`);
 ok('index', 'linked rows point at a demo, a proto or a note',
    links.length > 0 && links.every((h) => /^\/\d\d-[a-z]+\/$/.test(h) || h.startsWith('/proto/') || h.startsWith('/notes/')),
    `${links.length} linked: ${links.slice(0, 6).join(' ')}…`);
-const tap = await evaluate(`(() => { const r = document.querySelector('li.d-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
+const tap = await evaluate(`(() => { const r = document.querySelector('li.pos-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');
 await shot('0-index');
