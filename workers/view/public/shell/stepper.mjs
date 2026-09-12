@@ -21,26 +21,34 @@ import { el } from './shell.mjs';
  * @param {object} o
  * @param {() => void} o.prev      step back
  * @param {() => void} o.next      step forward
- * @param {() => void} o.random    jump somewhere
+ * @param {() => void} [o.random]  jump somewhere — omit it and the group is
+ *                                 just the two arrows, corners still correct
  * @param {string} [o.what]        what is being stepped, for the titles
  * @param {string} [o.cls]         extra class on the wrapper
  * @returns {{el: HTMLElement, buttons: HTMLButtonElement[], disabled: (v:boolean)=>void}}
  */
 export function createStepper({ prev, next, random, what = 'it', cls = '' }) {
   const wrap = el('span', `step ${cls}`.trim());
-  const mk = (label, title, fn) => {
-    const b = el('button', '', label, { type: 'button', title });
+  const mk = (label, title, fn, cls = '') => {
+    const b = el('button', cls, label, { type: 'button', title });
     b.onclick = fn;
     wrap.append(b);
     return b;
   };
-  const buttons = [
-    mk('‹', `the ${what} before this one`, prev),
+  // ⚠️ THE ARROWS ARE SQUARE, THE WORD IS NOT. An icon button whose width comes
+  // from its glyph is a different width in every font — `.ico` fixes it to the
+  // control's own height so `‹` and `›` are 34x34 and the group reads as one
+  // object rather than as three things that happen to be adjacent.
+  const buttons = [mk('‹', `the ${what} before this one`, prev, 'ico')];
+  // ⚠️ OPTIONAL, AND THE CORNERS STILL HAVE TO BE RIGHT WITHOUT IT. A stepper
+  // is useful over a list of two, where a jump means nothing. CSS rounds by
+  // :first-child/:last-child, so dropping the middle needs no special case.
+  if (random) {
     // Spelled out, because "what does the middle one do" is a question a symbol
-    // cannot answer and this is the only one of the three that is not obvious.
-    mk('random', `jump to any ${what}`, random),
-    mk('›', `the ${what} after this one`, next),
-  ];
+    // cannot answer, and it is the only one of the three that is not obvious.
+    buttons.push(mk('random', `jump to any ${what}`, random));
+  }
+  buttons.push(mk('›', `the ${what} after this one`, next, 'ico'));
   return {
     el: wrap,
     buttons,
