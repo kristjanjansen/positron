@@ -514,6 +514,19 @@ video[hidden] { display: none; }
    ⚠️ Rounded by :first-child/:last-child, so the group is still correct when
    the middle button is left out — a stepper over a list of two has nothing to
    randomise and should not have to be styled differently to say so. */
+/* ⚠️ THIS BLOCK DID NOT EXIST AND THE COMPONENT SHIPPED WITHOUT IT. choice.mjs
+   emitted `.pos-choice` and `.pos-choice-l` and nothing styled either, so /kit
+   drew three loose default buttons under a heading-sized label — a component
+   that reads as unfinished because half of it was never written. A class only
+   the script knows about is not a component. */
+.pos-choice { display: inline-flex; align-items: center; gap: 8px; height: 34px; }
+.pos-choice-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+.pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
+.pos-choice button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+
 .step { display: inline-flex; align-items: center; height: 34px; }
 .step button { border-radius: 0; margin-left: -1px; }
 .step button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
@@ -553,6 +566,9 @@ video[hidden] { display: none; }
 .kbd .keys { margin-bottom: 4px; }
 
 .kpad { --kpad-h: 26px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* `notes off` is not a third octave button — it undoes something rather than
+   moving somewhere, so it sits apart from the pair instead of beside it. */
+.kpad-right { margin-left: auto; }
 /* the same gutter label as a slider's, for the same reason: one word saying
    what the control next to it moves, in a face that cannot be mistaken for the
    control itself */

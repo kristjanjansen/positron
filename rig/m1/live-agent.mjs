@@ -27,10 +27,21 @@ const ROOM = arg('room', 'm1-1');
 const RELAY = arg('relay', 'wss://ws.positron.studio');
 const BIN = arg('bin', join(homedir(), 'positron-rack', 'bin'));
 const RATE = 48000;
-// 20 ms of mono audio. 50 frames a second against the relay's MEASURED ceiling
-// of 60 msg/s for EVERYTHING on it — which is why notes are cheap and nothing
-// else chats. The box runs the same cadence for the same reason.
+// Stereo, because Live's instruments ARE stereo — the Stage-73's chorus is a
+// width effect, and summing it to mono removes the thing that makes it sound
+// like that patch. The box stays mono (`arecord -c 1`), so both counts are on
+// the wire at once and NEITHER end may assume. See `audioChannels` below.
+const CH = 2;
+// 20 ms of audio. 50 frames a second against the relay's MEASURED ceiling of
+// 60 msg/s for EVERYTHING on it — which is why notes are cheap and nothing else
+// chats. The box runs the same cadence for the same reason.
+//
+// ⚠️ STEREO DOUBLES THE BYTES, NOT THE MESSAGES. 3852 bytes a frame against
+// 1932, so 1.54 Mbit/s against 771 kbit/s — and the relay's cap is a MESSAGE
+// rate, not a byte rate, so the thing that could actually throttle this is
+// untouched. MEASURED after the change: 50/s, 1541 kbit/s, 0 dropped.
 const FRAME = RATE / 50;
+const FRAME_MS = 1000 * FRAME / RATE;
 
 const FROM = `m1-${Math.random().toString(36).slice(2, 8)}`;
 let ws = null, seq = 0, aseq = 0, sent = 0, held = new Set();
@@ -64,17 +75,19 @@ function startTap() {
   tap.stdout.on('data', (chunk) => {
     carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
     // float32 stereo in, int16 mono out: 8 bytes per input frame, 2 per output.
-    const per = FRAME * 8;
+    const per = FRAME * CH * 4;   // float32 bytes for one outgoing frame
     while (carry.length >= per) {
       const block = carry.subarray(0, per);
       carry = carry.subarray(per);
-      const out = new Int16Array(FRAME);
-      for (let i = 0; i < FRAME; i++) {
-        // ⚠️ MIX, DO NOT DROP A CHANNEL. Taking the left only halves a hard-
-        // panned instrument to silence, which reads as the tap having failed.
-        const l = block.readFloatLE(i * 8), r = block.readFloatLE(i * 8 + 4);
-        let v = (l + r) * 0.5;
-        v = v > 1 ? 1 : v < -1 ? -1 : v;         // clip rather than wrap
+      const out = new Int16Array(FRAME * CH);
+      for (let i = 0; i < FRAME * CH; i++) {
+        let v = block.readFloatLE(i * 4);
+        // 🔴 CLIP, DO NOT LET IT WRAP. `(v * 32767) | 0` on a float above 1.0
+        // wraps through the sign bit, so the loudest moment of a track — the
+        // one place headroom runs out — comes back as full-scale noise rather
+        // than as slight distortion. A tap reads Live's master AFTER its own
+        // limiter, so this is rare and it is not impossible.
+        v = v > 1 ? 1 : v < -1 ? -1 : v;
         out[i] = (v * 32767) | 0;
       }
       sendPcm(out);
@@ -90,6 +103,22 @@ function startTap() {
   });
   tap.on('exit', (c) => { log(`audiotap exited (${c})`); tap = null; });
 }
+
+/**
+ * 🔴 THE CHANNEL COUNT IS ANNOUNCED, NEVER INFERRED. 960 int16s is a valid
+ * 20 ms mono frame and an equally valid 10 ms stereo one, so nothing in the
+ * payload can tell them apart — and guessing wrong plays an octave down, which
+ * sounds like a broken instrument rather than a broken header. `frameMs` is
+ * sent alongside so the receiver can CHECK the announcement instead of trusting
+ * it: samples / channels / rate must come out at frameMs, and a mono stream
+ * mislabelled stereo lands at half of it.
+ *
+ * ⚠️ NOT `channels` — box.mjs already has that field and it means MIDI
+ * channels (16, multitimbral). Two different quantities under one name in one
+ * protocol is a bug waiting for someone in a hurry.
+ */
+const describe = () => ({ instrument: 'Ableton Live', rate: RATE, audioChannels: CH,
+                          frameMs: FRAME_MS, msgPerSec: 1000 / FRAME_MS });
 
 function sendPcm(int16) {
   if (ws?.readyState !== 1) return;
@@ -108,7 +137,7 @@ function connect() {
   ws.onopen = () => {
     backoff = 500;
     log(`joined ${ROOM} as ${FROM}`);
-    send({ type: 'rack.hello', instrument: 'Ableton Live', rate: RATE, msgPerSec: 50 });
+    send({ type: 'rack.hello', ...describe() });
     startTap();
   };
   ws.onmessage = (e) => {
@@ -129,8 +158,8 @@ function connect() {
         held.clear(); note('panic');
         return send({ type: 'note.panic', ok: true });
       case 'rack.status':
-        return send({ type: 'rack.state', ok: true, instrument: 'Ableton Live',
-                      tap: !!tap, midi: !!midi, frames: sent, held: held.size, rate: RATE });
+        return send({ type: 'rack.state', ok: true, ...describe(),
+                      tap: !!tap, midi: !!midi, frames: sent, held: held.size });
     }
   };
   ws.onclose = () => { log(`socket closed — back in ${backoff} ms`); setTimeout(connect, backoff); backoff = Math.min(8000, backoff * 2); };

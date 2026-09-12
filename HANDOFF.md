@@ -1,7 +1,68 @@
-# Handoff — 2026-09-11 (end of session 18)
+# Handoff — 2026-09-12 (end of session 19)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching.
+
+## Session 19 — a browser plays Ableton Live, and a bit-clean stream sounded broken
+
+**`rack` is live at <https://positron.studio/rack/>, 15/15.** Press a key: the
+note number crosses the relay, `rig/m1/live-agent.mjs` on the studio Mac hands
+it to Live over CoreMIDI, and a **Core Audio process tap** sends a copy of what
+Live renders back down the same socket. `/box/` is the same page pointed at a
+Raspberry Pi — what crosses the wire is a note number, so neither end knows what
+kind of machine the other is. Full detail in `rig/m1/README.md`, which now opens
+with the rack and keeps the parked peer-to-peer rig below it.
+
+**The tap is what unparked this.** No BlackHole, no Multi-Output Device, no Live
+Preferences click — it copies one process's output while that audio carries on
+to the speakers, which removes the one requirement the Live Object Model could
+not script. Two of the four un-restorable clicks are gone; Live open with an
+armed track and IAC Bus 1 enabled remain.
+
+It stays up by itself now: `studio.positron.rack-agent.plist`, a **LaunchAgent**
+(TCC grants need a GUI session; a daemon would get a refusal that presents as
+correctly-clocked silence). Proved with `kill -9` — back in 12 s, grant intact.
+
+### The hour that is worth reading
+
+Shipped, and the report came back **"noisy and distorted"** while six separate
+measurements said it was fine: the tap's capture at the source had zero sample
+discontinuities, what arrived over the relay measured the same pitch to a tenth
+of a Hz with zero jumps and 0 dropped, and the suite was 14/14 green. **All true,
+none of it able to find the bug** — the defect was downstream of every quantity
+being measured. `pcm-playout` trims its cushion whenever occupancy passes
+`floor + slack`, and floor 60 ms against 15 ms of slack with frames arriving in
+20 ms lumps means **one early frame throws ~15 ms of audio away mid-note**,
+repeatedly. What found it was putting a number on the cushion: `breaks` read
+`0 ran dry, 1 trimmed` inside 2.2 s. Slack now follows the frame size the
+worklet observes. ⚠️ `/box/` and `grains` were doing the same thing, unreported,
+for as long as they have existed. LESSONS #52.
+
+### Also this session
+
+- **Stereo, announced and checked.** A channel count cannot be inferred from a
+  payload — 960 int16s is a valid 20 ms mono frame and a valid 10 ms stereo one.
+  Senders declare `audioChannels` + `frameMs`; the page checks one against the
+  other. Proved by shipping a liar, which also exposed the page correcting
+  itself and then being un-corrected by the next status reply. **A measurement
+  outranks a repeated claim.** LESSONS #53.
+- **`choice.mjs` had no CSS at all** — it emitted classes nothing styled, so
+  `/kit` drew loose default buttons under a heading-sized label. Its segment now
+  reuses `step` rather than reimplementing the join. LESSONS #54.
+- **The keyboard pad** lost its `octave` word (thirteen keys already print their
+  octave) and `notes off` moved to the right, away from the pair it is not part
+  of.
+- `rack` has **one control**. The keyboard carries its own `notes off`, and a
+  page that checks itself only when asked is a page nobody checks.
+
+### Still open
+
+- `carry` counts other clients' sequence numbers — pre-existing, reproduces on a
+  pristine tree.
+- `.step` / `.sld` are still unprefixed; `.pos-choice` is prefixed. LAYOUT.md
+  records why the full rename was priced and rejected twice.
+- The keyboard pad is outside `.pos-controls` by design, so the suite cannot
+  press it — and the three built demos that draw it assert nothing about it.
 
 ## Session 18 — the granular insert was mostly switched off, and nobody could tell
 

@@ -111,11 +111,12 @@ export function createKeyboard(host, {
   el.append(keysEl);
 
   // ── the pad ──────────────────────────────────────────────────────────────
-  // One word before the pair rather than a word on each button: `octave −` and
-  // `octave +` say "octave" twice and push the two glyphs apart, and two
+  // ⚠️ NO WORD AT ALL. It was `octave` once before the pair — better than a word
+  // on each button, and still one more thing to read on a control whose two
+  // glyphs sit under a row of keys that are already labelled with their octave
+  // number. Thirteen keys reading `C4` say what − and + move. Two
   // buttons that have to be read to be told apart are not one control.
   const pad = make('div', 'kpad');
-  pad.append(make('span', 'kpad-l', 'octave'));
   // ⚠️ IT WEARS `.step`, WHICH IS THE STEPPER'S CLASS, AND THAT IS THE POINT.
   // The segmented geometry — borders overlapped by a pixel so a join is one
   // line, corners rounded only on the outer two, the hovered button raised so
@@ -133,7 +134,7 @@ export function createKeyboard(host, {
   const downBtn = mkOct('−', 'down one octave', -1);
   const upBtn = mkOct('+', 'up one octave', 1);
   pad.append(octPair);
-  const panicBtn = make('button', '', 'notes off', {
+  const panicBtn = make('button', 'kpad-right', 'notes off', {
     type: 'button', title: 'stop every note that is still sounding',
   });
   panicBtn.onclick = () => api.panic();

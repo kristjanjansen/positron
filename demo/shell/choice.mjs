@@ -34,7 +34,10 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
 
   const wrap = el('span', 'pos-choice');
   if (label) wrap.append(el('span', 'pos-choice-l', label));
-  const seg = el('span', 'pos-choice-seg');
+  // ⚠️ `step` IS THE JOIN, and it is reused rather than reimplemented. The 1 px
+  // border overlap, the outer-only corners and the raise-on-hover all live in
+  // that one block; a second copy here is the drift this page exists to catch.
+  const seg = el('span', 'step pos-choice-seg');
   wrap.append(seg);
 
   const buttons = options.map(([name], i) => {
