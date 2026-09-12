@@ -572,7 +572,27 @@ video[hidden] { display: none; }
   color: var(--dim2); white-space: nowrap;
 }
 .pos-choice button { font: 500 11px/1 var(--mono); padding: 0 11px; }
-.pos-choice button[aria-pressed="true"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+/* 🔴 AN EDGE, NOT A FILL. A solid `--hi` block is the loudest thing this
+   palette has, and a row of three options with one of them filled makes the
+   chosen one shout while the other two disappear — on a phone, where the group
+   is full width, it is a bar of pure yellow across the screen. The edge says
+   the same thing at a tenth of the volume, and it leaves the LABEL readable in
+   the page's own text colour instead of knocking it out to the background.
+   ⚠️ AND THE FILL IS WHAT COLLIDES WITH FOCUS. The shell's :focus-visible is
+   `2px solid var(--hi)`, so a filled armed state and a focused unarmed one were
+   already two yellow shapes meaning different things (LESSONS #43). Focus is
+   grey on these, below. */
+.pos-choice button[aria-pressed="true"] {
+  color: var(--hi);
+  border-color: var(--hi);
+  background: color-mix(in oklab, var(--hi) 12%, var(--card2));
+}
+/* Focus is grey here and nowhere near the armed colour — one colour, one
+   meaning, which is the rule this project already applies to marks in a strip. */
+.pos-choice button:focus:not(:focus-visible),
+.pos-pick button:focus:not(:focus-visible) { outline: none; }
+.pos-choice button:focus-visible,
+.pos-pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
 
 /* ── the kit's controls on a phone ────────────────────────────────────────
    🔴 A LABEL BESIDE A GROUP IS A DESKTOP LUXURY. At 390 px the label eats the
