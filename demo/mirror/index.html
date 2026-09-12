@@ -152,7 +152,11 @@
     // you to press something is a page that shows you nothing. That removes
     // this project's usual harness hook, so demo/verify-gl.mjs waits for
     // `__demo.ready` and reads the asserts rather than pressing buttons.
-    controls: [],
+    // ⚠️ ONE CONTROL, AND IT IS THE ARGUMENT OF THE PAGE. The knobs change
+    // numbers a shader reads; this replaces the shader itself, on both machines,
+    // from one text — which is the thing this demo exists to show and was until
+    // now only reachable by sending a message by hand.
+    controls: [{ id: 'look', label: 'Next look' }],
   });
   guard(d);
 
@@ -340,18 +344,22 @@
    * somebody typed a semicolon wrong, on a demo whose entire job is to be
    * looked at.
    */
-  window.__applyShader = function applyShader(body) {
-    try {
-      const next = makeProg(body);
-      tmpA ||= target(); tmpB ||= target();
-      incoming = next; fadeFrom = performance.now();
-      d.log('a new look arrived — fading it in over 0.9 s');
-      return true;
-    } catch (e) {
-      d.log(`the new look would not compile — keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
-      return false;
-    }
-  };
+  d.on('look', async () => {
+    lookAt_ = (lookAt_ + 1) % LOOKS.length;
+    const { name, body } = LOOKS[lookAt_];
+    const okHere = window.__applyShader(body);
+    d.log(`“${name}” — ${okHere ? 'fading in here' : 'refused here'}`);
+    // The SAME body to the board, which compiles it as 310 es.
+    // ⚠️ `send` throws on a closed socket rather than returning false, and a
+    // page with no board in the room is the ordinary case — so the state is
+    // read before the attempt rather than inferred from whether it blew up.
+    const open = ctl?.readyState === 1;
+    let sent = false;
+    if (open) { try { send({ type: 'video.shader', body }); sent = true; } catch { sent = false; } }
+    d.assert('the new look compiled in this browser', okHere, name);
+    d.assert('and the same body went to the box, when there is one',
+      sent || !open, open ? (sent ? 'sent' : 'the socket refused it') : 'no board in the room, so nothing to send');
+  });
 
   function choose(key, idx) {
     const k = KNOBS[key];
@@ -446,6 +454,59 @@
       o = vec4(mix(c, fb, uFb), 1.0); }`;
   const FS = GLSL300 + FS_BODY;
 
+  /**
+   * Other looks, on the SAME uniforms — so the three knobs keep meaning what
+   * they say whichever one is running. A body that invented its own controls
+   * would make the knobs lie, which is worse than not having the body.
+   *
+   * These are deliberately short. The point is not a shader library; it is that
+   * a picture can be replaced while it is being watched, on two machines at
+   * once, and you can see it happen.
+   */
+  const HEAD = `
+    precision highp float;
+    uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
+    uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp; uniform float uHue;
+    out vec4 o;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+      return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+    vec2 fold(vec2 uv){ float a=atan(uv.y,uv.x), r=length(uv), seg=6.2831853/uSeg;
+      a = abs(mod(a + 0.5*seg, seg) - 0.5*seg); return vec2(cos(a), sin(a))*r; }
+  `;
+  const LOOKS = [
+    { name: 'kaleidoscope', body: FS_BODY },
+    { name: 'rings', body: HEAD + `
+      void main(){
+        vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes.y;
+        vec2 k = fold(uv);
+        float r = length(k);
+        float band = sin(r*uScale*6.0 - uT*1.4 + n(k*2.0)*6.2831*uWarp*4.0);
+        vec3 c = 0.5 + 0.5*cos(6.2831*(r*1.4 + vec3(0.0,0.33,0.67)*uHue) + uT*0.5);
+        c *= smoothstep(-0.2, 0.9, band);
+        vec3 fb = texture(uPrev, k*0.94 + 0.5).rgb;
+        o = vec4(mix(c, fb, uFb), 1.0); }` },
+    { name: 'weave', body: HEAD + `
+      void main(){
+        vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes.y;
+        vec2 k = fold(uv) * uScale;
+        float g = sin(k.x*3.0 + uT) * sin(k.y*3.0 - uT*0.7);
+        vec2 dd = fold(uv) + uWarp*vec2(sin(k.y*2.0+uT), cos(k.x*2.0-uT));
+        vec3 c = 0.5 + 0.5*cos(6.2831*(g*0.5 + vec3(0.0,0.33,0.67)*uHue) + uT);
+        vec3 fb = texture(uPrev, dd*0.9 + 0.5).rgb;
+        o = vec4(mix(c*abs(g), fb, uFb), 1.0); }` },
+    { name: 'drift', body: HEAD + `
+      void main(){
+        vec2 uv = (gl_FragCoord.xy - 0.5*uRes)/uRes.y;
+        vec2 k = fold(uv);
+        float w = n(k*uScale + uT*0.15) + 0.5*n(k*uScale*2.2 - uT*0.1);
+        vec2 dd = k + uWarp*3.0*vec2(cos(w*6.2831), sin(w*6.2831));
+        vec3 c = 0.5 + 0.5*cos(6.2831*(w*1.6 + vec3(0.0,0.4,0.8)*uHue) - uT*0.3);
+        vec3 fb = texture(uPrev, dd*0.97 + 0.5).rgb;
+        o = vec4(mix(c*0.8, fb, min(0.93, uFb+0.12)), 1.0); }` },
+  ];
+  let lookAt_ = 0;
+
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
   // ⚠️ LOCK THE LOCAL PICTURE TO THE BOARD'S FRAME NUMBER WHEN ONE IS ARRIVING.
@@ -538,6 +599,28 @@
     let cur = makeProg(FS_BODY), incoming = null, fadeFrom = 0;
     let tmpA = null, tmpB = null;
     const FADE_MS = 900;
+
+    /**
+     * ⚠️ DEFINED IN HERE, WHERE `makeProg` LIVES. It sat at module scope
+     * reaching for `makeProg`, `tmpA` and `incoming` — all locals of this
+     * block — so every call threw a ReferenceError that the catch below
+     * dutifully reported as "the new look would not compile". A guard that
+     * turns a scoping mistake into a plausible message about somebody else's
+     * shader is worse than no guard: the harness read `FAIL … rings` and the
+     * shader was fine.
+     */
+    window.__applyShader = function applyShader(body) {
+      try {
+        const next = makeProg(body);
+        tmpA ||= target(); tmpB ||= target();
+        incoming = next; fadeFrom = performance.now();
+        d.log('a new look arrived — fading it in over 0.9 s');
+        return true;
+      } catch (e) {
+        d.log(`the new look would not compile — keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
+        return false;
+      }
+    };
 
     const prog = cur.p;
     gl.useProgram(prog);
