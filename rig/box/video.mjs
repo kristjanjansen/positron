@@ -215,8 +215,20 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     if (!t) return;
     const m = t.match(/^renderer\s+(.+?)\s\s/);
     if (m && !renderer) renderer = m[1].trim();
+    // 🔴 THE RENDERER'S VERDICT IS THE ONLY ONE WORTH REPORTING. Writing to a
+    // pipe succeeds whether or not the shader on the other end compiles, so
+    // `shader()` used to answer `ok: true` for a body the renderer then
+    // refused — a count of what was QUEUED reading identically to what
+    // LANDED, which is `createMidiLane.scheduled()` in a new costume. The
+    // caller waits for one of these lines instead.
+    for (const line of t.split('\n')) {
+      if (/^SHADER-OK/.test(line)) pendingShader?.({ ok: true, detail: 'compiled, fading in' });
+      else if (/^SHADER-REFUSED/.test(line)) pendingShader?.({ ok: false, reason: line.replace(/^SHADER-REFUSED\s*/, '').slice(0, 160) });
+    }
     onLog?.(`render: ${t}`);
   });
+  // Set while a shader is in flight; called by the line above, once.
+  let pendingShader = null;
   enc.stderr?.on('data', (d) => { const t = String(d).trim(); if (t) onLog?.(`ffmpeg: ${t}`); });
   let stopping = false;
   for (const [name, p] of [['renderer', render], ['encoder', enc]]) {
@@ -250,13 +262,21 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
      * if it will not build — it prints SHADER-OK, SHADER-LIVE or
      * SHADER-REFUSED, which is what the caller hears back.
      */
-    shader: (body) => {
+    shader: async (body) => {
       if (typeof body !== 'string' || !body.length) return { ok: false, reason: 'no shader body' };
       if (body.length > 12000) return { ok: false, reason: `${body.length} bytes — larger than the channel takes` };
       if (/#version/.test(body)) return { ok: false, reason: 'send the body without a #version line — each end adds its own' };
       try {
+        // ⚠️ WAIT FOR THE COMPILER, NOT FOR THE PIPE. A write to stdin succeeds
+        // whatever the GLSL says; the answer that matters comes back on stderr
+        // one frame later. A second is generous — the board took 35 ms.
+        const verdict = new Promise((res) => {
+          pendingShader = (v) => { pendingShader = null; res(v); };
+          setTimeout(() => { if (pendingShader) { pendingShader = null; res({ ok: false, reason: 'the renderer did not answer' }); } }, 1500);
+        });
         render.stdin.write(`shader ${Buffer.from(body, 'utf8').toString('base64')}\n`);
-        return { ok: true, bytes: body.length };
+        const v = await verdict;
+        return v.ok ? { ok: true, bytes: body.length, detail: v.detail } : v;
       } catch (e) { return { ok: false, reason: String(e.message).slice(0, 80) }; }
     },
     /** One parameter down the control channel. Clamped at the far end too. */
