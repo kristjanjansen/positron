@@ -531,6 +531,12 @@ video[hidden] { display: none; }
    `.pos-controls`, at the top of the page, a hand's width from the keys they
    act on and mixed in with buttons that do something else.
 
+   ⚠️ UNPREFIXED, to match the keyboard it belongs to — `.keys`, `.k`, `.kn`,
+   `.kk` — rather than the `pos-` convention. LAYOUT.md lists `.step`, `.sld`
+   and `.choice` as the ones still to be prefixed; this block goes with the
+   keyboard's own names and should be swept in the same pass, not before it.
+   Two conventions inside one component is the thing to avoid here.
+
    🔴 26 px, NOT 34. A standard control is 34 px and this row must not read as
    one: it acts on the keyboard, not on the page, and a second row of
    full-height buttons directly under the keys reads as the page's main
