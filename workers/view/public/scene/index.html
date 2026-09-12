@@ -95,7 +95,7 @@
 
   const d = mount({
     name: 'scene',
-    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up and carries it, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second.`,
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up, the thumbstick pushes it further away or pulls it closer, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second. Nothing is allowed to sit inside arm's reach of your head: if something ends up there the room moves it out, because a thing you cannot back away from is one you cannot aim at either.`,
     readout: { seed: '', things: '', moved: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
@@ -570,7 +570,7 @@
     }
     if (m.type === 'dev.reload') {
       reloadOffered = m.build || 'a new build';
-      setPanel(`● update ready — ${reloadOffered}\nsqueeze BOTH grips to take it`, 60000);
+      setPanel(`● update ready — ${reloadOffered}\npress A to take it`, 60000);
       d.log(`an update is ready (${reloadOffered}) — reload when you want it`);
       shipNow(`dev.reload offered — ${reloadOffered}`);
     }
@@ -612,6 +612,12 @@
   // ── the headset ─────────────────────────────────────────────────────────
   let session = null, xrSpace = null, xrOk = false, xrFrames = 0, frameViews = 0;
   let rayNow = null, aimed = null, aimedDist = 0;
+  // ⚠️ NOTHING GETS TO BE CLOSER THAN THIS. A cube 20 cm from your eyes is not
+  // a small cube, it is a wall — and you cannot aim at what you cannot back
+  // away from.
+  const MIN_HOLD = 0.4, BUBBLE = 0.45;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  let lastShove = 0, aWas = false;
 
   /**
    * A long thin box lying along a controller's ray.
@@ -771,13 +777,11 @@
       }
       held = null;
     });
-    session.addEventListener('squeeze', () => {
-      // Both grips at once is the only two-handed gesture here, which is why it
-      // carries the one action you cannot undo.
-      const gripping = [...session.inputSources].filter((i) => i.gamepad?.buttons?.[1]?.pressed).length;
-      if (reloadOffered && gripping >= 2) { takeReload(); return; }
-      shipNow('grip — leaving'); session?.end().catch(() => {});
-    });
+    // 🔴 "BOTH GRIPS" ASSUMED TWO CONTROLLERS, AND ONE IS NORMAL. Reported
+    // from the headset: a gesture that cannot be made is not a gesture, and it
+    // was the only way to accept an update. The A/X button carries it now —
+    // one hand, one press, and it exists on every Touch controller.
+    session.addEventListener('squeeze', () => { shipNow('grip — leaving'); session?.end().catch(() => {}); });
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
     // rather than leaving somebody standing in it. MEASURED: two runs ended
@@ -816,8 +820,15 @@
       const o = [m[12], m[13], m[14]];
       const dir = [-m[8], -m[9], -m[10]];        // -Z of the ray's own frame
       if (held) {
-        // Carry it at the distance it was grabbed from, so a thing does not
-        // rush at your face the moment you pick it up.
+        // ⚠️ PUSH AND PULL WITH THE THUMBSTICK. Carrying a thing at exactly the
+        // distance it was grabbed from means a thing that is already too close
+        // can only ever stay too close — reported from the headset, and it is
+        // the difference between holding something and being stuck with it.
+        // Axis 3 is the thumbstick's Y on a Touch controller; axis 1 on
+        // whatever reports only one stick.
+        const ax = src.gamepad?.axes || [];
+        const push = (ax[3] ?? ax[1] ?? 0);
+        if (Math.abs(push) > 0.15) held.dist = clamp(held.dist - push * 0.05, MIN_HOLD, 8);
         moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
       }
       rayNow = { o, dir, m };
@@ -826,7 +837,35 @@
         aimed = hit ? hit.i : null;
         aimedDist = hit ? hit.dist : 0;
       }
+      // A/X is button 4 on a Touch controller. Edge-triggered, or holding it
+      // through one frame would fire the reload several times.
+      const aDown = !!src.gamepad?.buttons?.[4]?.pressed;
+      if (aDown && !aWas && reloadOffered) takeReload();
+      aWas = aDown;
       break;                                      // one pointer is enough here
+    }
+
+    // 🔴 A THING INSIDE YOUR HEAD CANNOT BE GRABBED OUT OF IT. Dragging
+    // something too close leaves it unaimable and uncomfortable, with no way
+    // back — so the room pushes it out rather than waiting to be asked. Rate
+    // limited, because doing it every frame would be a shove rather than a
+    // nudge, and it says so on the panel because a room that rearranges itself
+    // silently is a room you cannot trust.
+    if (doc && !held && performance.now() - lastShove > 1200) {
+      const hp = pose.transform.position;
+      const near = doc.things.findIndex((t) =>
+        Math.hypot(t.x - hp.x, t.y - hp.y, t.z - hp.z) < BUBBLE);
+      if (near >= 0) {
+        const t = doc.things[near];
+        let dx = t.x - hp.x, dy = t.y - hp.y, dz = t.z - hp.z;
+        const len = Math.hypot(dx, dy, dz) || 1;
+        // Straight out from your head, to arm's length.
+        if (moveThing(near, hp.x + (dx / len) * 0.9, hp.y + (dy / len) * 0.9, hp.z + (dz / len) * 0.9)) {
+          lastShove = performance.now();
+          setPanel('moved a thing out of your face\nthumbstick pushes what you hold', 4000);
+          shipNow(`shoved thing ${near} out of the bubble`);
+        }
+      }
     }
 
     let eye = 0;
