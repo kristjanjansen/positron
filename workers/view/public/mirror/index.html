@@ -332,6 +332,27 @@
   document.addEventListener('fullscreenchange', syncFull);
   document.addEventListener('webkitfullscreenchange', syncFull);
 
+  /**
+   * A new picture, arriving over the same socket everything else here uses.
+   *
+   * ⚠️ COMPILE BEFORE COMMITTING TO IT. A shader that will not link must leave
+   * the running one alone — the alternative is a page that goes black because
+   * somebody typed a semicolon wrong, on a demo whose entire job is to be
+   * looked at.
+   */
+  window.__applyShader = function applyShader(body) {
+    try {
+      const next = makeProg(body);
+      tmpA ||= target(); tmpB ||= target();
+      incoming = next; fadeFrom = performance.now();
+      d.log('a new look arrived — fading it in over 0.9 s');
+      return true;
+    } catch (e) {
+      d.log(`the new look would not compile — keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
+      return false;
+    }
+  };
+
   function choose(key, idx) {
     const k = KNOBS[key];
     k.at = idx;
@@ -399,7 +420,13 @@
   const VS = `#version 300 es
     void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
       gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
-  const FS = `#version 300 es
+  // ⚠️ THE BODY IS SHARED, THE HEADER IS NOT. The board compiles this same
+  // text as `#version 310 es` and the browser as `300 es`, so what travels over
+  // the socket is the BODY and each end puts its own first line on it. Until
+  // now the two copies agreed by discipline: edit one, forget the other, and
+  // nothing anywhere says so. One text, two compilers.
+  const GLSL300 = '#version 300 es\n';
+  const FS_BODY = `
     precision highp float;
     uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
     uniform float uSeg; uniform float uFb; uniform float uScale; uniform float uWarp; uniform float uHue;
@@ -417,6 +444,7 @@
       vec3 c = 0.5 + 0.5 * cos(6.2831 * (w + vec3(0.0, 0.33, 0.67) * uHue) + uT);
       vec3 fb = texture(uPrev, dd * 0.9 + 0.5).rgb;
       o = vec4(mix(c, fb, uFb), 1.0); }`;
+  const FS = GLSL300 + FS_BODY;
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
@@ -475,20 +503,45 @@
     chip.here = short.trim().slice(0, 32);
     relabel('here');
 
-    const prog = gl.createProgram();
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    /** One compiled picture, with its uniforms found once. */
+    function makeProg(body) {
+      const p = gl.createProgram();
+      gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+      gl.attachShader(p, compile(gl.FRAGMENT_SHADER, GLSL300 + body));
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+      const g = (n) => gl.getUniformLocation(p, n);
+      return { p, uT: g('uT'), uRes: g('uRes'), uPrev: g('uPrev'), uSeg: g('uSeg'),
+               uFb: g('uFb'), uScale: g('uScale'), uWarp: g('uWarp'), uHue: g('uHue') };
+    }
+    // ⚠️ MIXING IS A THIRD PROGRAM, NOT A UNIFORM IN THE OTHER TWO. A crossfade
+    // done with an `uAlpha` would only work on shaders that agreed to carry
+    // one — and the whole point is to accept a body somebody just wrote. Two
+    // pictures, drawn to their own targets, mixed by something that knows
+    // nothing about either.
+    const MIX_FS = GLSL300 + `
+      precision highp float;
+      uniform sampler2D uA, uB; uniform float uMix; uniform vec2 uRes;
+      out vec4 o;
+      void main(){ vec2 uv = gl_FragCoord.xy / uRes;
+        o = vec4(mix(texture(uA, uv).rgb, texture(uB, uv).rgb, uMix), 1.0); }`;
+    let mixP = null;
+    const mixProg = () => (mixP ||= (() => {
+      const p = gl.createProgram();
+      gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+      gl.attachShader(p, compile(gl.FRAGMENT_SHADER, MIX_FS));
+      gl.linkProgram(p);
+      const g = (n) => gl.getUniformLocation(p, n);
+      return { p, uA: g('uA'), uB: g('uB'), uMix: g('uMix'), uRes: g('uRes') };
+    })());
+
+    let cur = makeProg(FS_BODY), incoming = null, fadeFrom = 0;
+    let tmpA = null, tmpB = null;
+    const FADE_MS = 900;
+
+    const prog = cur.p;
     gl.useProgram(prog);
-    const uT = gl.getUniformLocation(prog, 'uT');
-    const uRes = gl.getUniformLocation(prog, 'uRes');
-    const uPrev = gl.getUniformLocation(prog, 'uPrev');
-    const uSeg = gl.getUniformLocation(prog, 'uSeg');
-    const uFb = gl.getUniformLocation(prog, 'uFb');
-    const uScale = gl.getUniformLocation(prog, 'uScale');
-    const uWarp = gl.getUniformLocation(prog, 'uWarp');
-    const uHue = gl.getUniformLocation(prog, 'uHue');
+    const { uT, uRes, uPrev, uSeg, uFb, uScale, uWarp, uHue } = cur;
     gl.bindVertexArray(gl.createVertexArray());
     // The feedback tap needs the same ping-pong the C does: two targets, swapped
     // every frame, with the previous one bound as the texture.
@@ -517,17 +570,46 @@
         d.log('the box stopped sending — this pane is free-running again', 'warn');
         stat('box', { fps: null, kbit: null });
       }
-      gl.uniform1f(uT, (lockedFrame ?? i) / 30);
-      gl.uniform2f(uRes, W, H);
-      gl.uniform1f(uSeg, P.mirrors);
-      gl.uniform1f(uFb, 0.78);
-      gl.uniform1f(uScale, P.grain);
-      gl.uniform1f(uWarp, 0.08);
-      gl.uniform1f(uHue, P.hue);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, A.t);
-      gl.uniform1i(uPrev, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const tNow = (lockedFrame ?? i) / 30;
+      const paint = (pr, fbo) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.viewport(0, 0, W, H);
+        gl.useProgram(pr.p);
+        gl.uniform1f(pr.uT, tNow);
+        gl.uniform2f(pr.uRes, W, H);
+        gl.uniform1f(pr.uSeg, P.mirrors);
+        gl.uniform1f(pr.uFb, 0.78);
+        gl.uniform1f(pr.uScale, P.grain);
+        gl.uniform1f(pr.uWarp, 0.08);
+        gl.uniform1f(pr.uHue, P.hue);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, A.t);
+        gl.uniform1i(pr.uPrev, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      };
+
+      if (!incoming) {
+        paint(cur, B.f);
+      } else {
+        // ⚠️ THE MIXED RESULT IS WHAT FEEDS BACK, not either half. This shader
+        // reads its own previous frame; feeding it one arm of a crossfade would
+        // make the trail disagree with the picture and the fade would look like
+        // a glitch rather than a dissolve.
+        const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
+        paint(cur, tmpA.f);
+        paint(incoming, tmpB.f);
+        const M = mixProg();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
+        gl.viewport(0, 0, W, H);
+        gl.useProgram(M.p);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tmpA.t); gl.uniform1i(M.uA, 0);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tmpB.t); gl.uniform1i(M.uB, 1);
+        gl.uniform1f(M.uMix, k * k * (3 - 2 * k));        // smoothstep, so it eases
+        gl.uniform2f(M.uRes, W, H);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.activeTexture(gl.TEXTURE0);
+        if (k >= 1) { cur = incoming; incoming = null; d.log('the new look is now the look', 'ok'); }
+      }
       // Blit to the canvas so it is visible, then swap.
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, B.f);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
@@ -558,6 +640,22 @@
     if (typeof e.data !== 'string') return;
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;
+    // ⚠️ THE SAME BODY GOES TO BOTH ENDS. This page compiles it as 300 es and
+    // forwards it untouched to the board, which compiles it as 310 es — so the
+    // demo's claim ("the same shader, two GPUs") becomes literally one text
+    // rather than two copies kept in step by hand.
+    if (msg.type === 'dev.shader' && typeof msg.body === 'string') {
+      const okHere = window.__applyShader(msg.body);
+      if (okHere && msg.toBox !== false) {
+        send({ type: 'video.shader', body: msg.body });
+        d.log('sent the same body to the box');
+      }
+      return;
+    }
+    if (msg.type === 'video.shader.applied') {
+      d.log(msg.ok ? 'the box took the new look too' : `the box refused it — ${msg.reason}`, msg.ok ? 'ok' : 'warn');
+      return;
+    }
     if (msg.type === 'video.started') {
       if (!msg.ok) {
         // `video.status` answers this when nothing is running, which is not a
