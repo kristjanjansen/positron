@@ -274,9 +274,11 @@
     // A patch is the new truth about both halves, so the panel's source of
     // truth is reset with it.
     live = { m: { ...p.m }, n: { ...p.n } };
-    // What the patch ASKS FOR, drawn as ticks along the bottom. Nothing has
-    // confirmed it — that is exactly why it is an outline and not a mark.
-    scope?.expect({ rate: p.m.rate });
+    // ⚠️ NOTHING DRAWN FROM THE PATCH. The scope used to take an `expect()` of
+    // what the settings imply; it does not any more, and the reason is this
+    // page. Drawing the requested grain rate here would put a confident row of
+    // ticks under an audio stream that has never been shown to contain a single
+    // grain — a page illustrating its own settings and calling it a reading.
     for (const key of ['rate', 'size', 'spray', 'swarm']) sliders.get(key)?.set(p.m[key], true);
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
