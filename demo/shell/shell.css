@@ -455,3 +455,39 @@ video[hidden] { display: none; }
 /* The page behind must not scroll under a cover that is only position:fixed,
    and iOS will happily rubber-band it. */
 .d-faux-host, .d-faux-host body { overflow: hidden; overscroll-behavior: none; }
+
+/* ── slider (demo/shell/slider.mjs) ──────────────────────────────────────
+   ⚠️ 34 px, the same as `button` above, because these share a flex row and a
+   control of a different height makes the row grow and knocks everything else
+   off its baseline. The lane and the handle are the SAME height as each other
+   and as a button, with the same 4 px corner — a row of buttons and sliders
+   should read as one row of controls, not as two kinds of thing. */
+.sld { --sld-knob: 20px; display: inline-flex; align-items: center; gap: 8px; height: 34px; }
+.sld-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+/* ⚠️ AN INSET SHADOW, NOT A BORDER, and it is the difference between the
+   handle meeting the corner and missing it by a pixel. A border insets the
+   PADDING BOX the handle is positioned in, so its travel is short by one pixel
+   at each end — MEASURED: 1 px of lane showing past the handle at both
+   extremes, on a control whose whole brief was that it sits flush. A shadow
+   paints the same line and takes no space. */
+.sld-lane {
+  position: relative; display: block; width: 96px; height: 34px;
+  background: var(--card2); box-shadow: inset 0 0 0 1px var(--line2); border-radius: 4px;
+  cursor: pointer; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.sld-lane:focus-visible { outline: 2px solid var(--hi); outline-offset: 1px; }
+/* `left` is set from script as a share of the TRAVEL, never of the width, so
+   the two ends land flush — see slider.mjs. */
+.sld-knob {
+  position: absolute; top: 0; left: 0; width: var(--sld-knob); height: 34px;
+  background: var(--hi); border-radius: 4px; pointer-events: none;
+}
+.sld-lane[aria-disabled] { opacity: .4; cursor: default; }
+.sld-v {
+  font: 500 12px/1 var(--mono); color: var(--fg);
+  font-variant-numeric: tabular-nums; min-width: 4.2em; white-space: nowrap;
+}
