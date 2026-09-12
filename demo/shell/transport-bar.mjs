@@ -55,7 +55,7 @@ export function createTransportBar(host, deck, {
   scrub.append(fill, headDot);
   // `extras` — page buttons that belong to the TRANSPORT rather than beside it.
   // Recording is the case that earned this: on `take` it is a transport verb,
-  // not a side control, and putting it in `.d-controls` would have said it was
+  // not a side control, and putting it in `.pos-controls` would have said it was
   // something you do to the page rather than to the playhead. They sit next to
   // the toggle and are returned by id so a page can relabel or disable one.
   const extraEls = new Map();
@@ -64,7 +64,7 @@ export function createTransportBar(host, deck, {
     // its text instead of the 38px square, and the uppercase treatment the
     // rest of the furniture uses. A square sized for one glyph either clips a
     // word or is padded around it, and both read as a mistake.
-    const b = el('button', `tbar-x${x.primary ? ' d-pri' : ''}${x.word ? ' tbar-word' : ''}`,
+    const b = el('button', `tbar-x${x.primary ? ' pos-pri' : ''}${x.word ? ' tbar-word' : ''}`,
       x.label, { type: 'button' });
     // The label is a GLYPH, so it is not a name. `aria` is what a screen reader
     // reads and what a test looks for; without it the control is "●".

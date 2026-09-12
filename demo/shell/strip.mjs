@@ -16,7 +16,7 @@ export const SIZES = { mini: 'strip-mini', default: 'strip', deep: 'strip-deep',
 
 export function createStripView(host, deck, { size = 'default', lanes = [], ...opts } = {}) {
   const cls = SIZES[size] || SIZES.default;
-  const canvas = el('canvas', `d-strip ${cls}`);
+  const canvas = el('canvas', `pos-strip ${cls}`);
   host.append(canvas);
 
   // gutter narrows with the sanctioned sizes; mini has no room for labels

@@ -341,25 +341,25 @@ export function shortDate(iso) {
 export function rowHTML(d, i, opt = {}) {
   const href = opt.blocked ? null : targetOf(d);
   const bits = [];
-  if (ACTS.has(d.act)) bits.push(`<span class="d-act">${ACTS.get(d.act)}</span>`);
-  for (const t of d.tags || []) bits.push(`<span class="d-tag">${t}</span>`);
+  if (ACTS.has(d.act)) bits.push(`<span class="pos-act">${ACTS.get(d.act)}</span>`);
+  for (const t of d.tags || []) bits.push(`<span class="pos-tag">${t}</span>`);
   const why = opt.blocked ? opt.says : d.why;
-  if (why) bits.push(`<span class="d-why">${why}</span>`);
+  if (why) bits.push(`<span class="pos-why">${why}</span>`);
   const open = href ? `<a href="${href}">` : '<a>';
   const needs = needsOf(d);
-  return `<li class="d-row${href ? '' : ' todo'}"${needs.length ? ` data-needs="${needs.join(' ')}"` : ''}>${open}`
+  return `<li class="pos-row${href ? '' : ' todo'}"${needs.length ? ` data-needs="${needs.join(' ')}"` : ''}>${open}`
     + `<span class="n">${shortDate(d.created)}</span>`
     + `<span class="nm">${d.name}</span>`
-    + `<span class="d-one">${d.one || ''}</span>`
-    + `<span class="d-meta">${bits.join('')}</span>`
+    + `<span class="pos-one">${d.one || ''}</span>`
+    + `<span class="pos-meta">${bits.join('')}</span>`
     + '</a></li>';
 }
 
 /** and the note row, for the same reason */
 export function noteHTML(n) {
-  return '<li class="d-row"><a href="/notes/' + n.doc + '">'
+  return '<li class="pos-row"><a href="/notes/' + n.doc + '">'
     + '<span class="n">·</span>'
     + '<span class="nm">' + n.title + '</span>'
-    + '<span class="d-one">' + n.one + '</span>'
+    + '<span class="pos-one">' + n.one + '</span>'
     + '</a></li>';
 }

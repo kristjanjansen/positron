@@ -525,7 +525,7 @@ Slug `wire`, **built 2026-09-09**. One page, three things on it:
 **Three visible controls** — *Send it*, *Send and keep it*, *Clear history*.
 The three that exercise
 mechanism (binary, the roof, the retention cap) are **hidden, not removed**:
-the harness presses `.d-controls button`, and a control it cannot reach is a
+the harness presses `.pos-controls button`, and a control it cannot reach is a
 subject the suite silently stops testing. `?checks=1` shows them.
 
 **What it measures** (every cell moves): round trip via the hibernation

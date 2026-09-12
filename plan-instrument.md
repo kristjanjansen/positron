@@ -176,7 +176,7 @@ Do not ship it as a demo that is dead without a second Mac.
 - **A shared module with one caller is a claim, not a unification.** Grep the
   importers before calling anything shared (LESSONS #30).
 - **A flag that selects which demo you are is not reuse.** §2.
-- **`verify.mjs` presses `.d-controls button` in document order.** A keyboard
+- **`verify.mjs` presses `.pos-controls button` in document order.** A keyboard
   built in the page body is invisible to it (LESSONS #19), and moving an existing
   control to make room reorders every press (#41). Put the keys where the harness
   is not, and keep the *controls* where it is.

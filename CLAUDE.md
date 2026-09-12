@@ -298,9 +298,9 @@ to recover.
   real API, falls back to a `position:fixed` cover that needs no API, and says
   which ran. ⚠️ **Style it with a CLASS, never `:fullscreen`** — a browser that
   does not know that pseudo-class discards the entire selector list it appears
-  in, so `.pane:fullscreen, .pane.d-full { … }` would delete the fallback on
+  in, so `.pane:fullscreen, .pane.pos-full { … }` would delete the fallback on
   precisely the browsers that need it. And the utility needs (0,2,0): MEASURED,
-  a bare `.d-faux` lost to a page's own `.pane { position: relative }` on source
+  a bare `.pos-faux` lost to a page's own `.pane { position: relative }` on source
   order and the cover stayed 338px wide inside its grid.
 - **A long press on a control raises the iOS text LOUPE, and `user-select:
   none` does not stop it.** `-webkit-touch-callout: none` is the one that does.

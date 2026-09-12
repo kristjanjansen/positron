@@ -9,11 +9,11 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="icon" href="/favicon.ico">
 
-<div class="d-head">
-  <div class="d-title"><h1 class="d-name">positron</h1></div>
+<div class="pos-head">
+  <div class="pos-title"><h1 class="pos-name">positron</h1></div>
 </div>
 
-<ol class="d-acts" id="rows"></ol>
+<ol class="pos-acts" id="rows"></ol>
 
 <script type="module">
   import { NOTES, byNewest, rowHTML, noteHTML } from '/manifest.mjs';
@@ -24,7 +24,7 @@
   // NEWEST FIRST — byNewest() copies, so the array is still the story order.
   document.getElementById('rows').innerHTML = byNewest().map(rowHTML).join('');
   document.body.insertAdjacentHTML('beforeend',
-    '<h2 class="d-act-h">notes</h2><ol class="d-acts">' + NOTES.map(noteHTML).join('') + '</ol>');
+    '<h2 class="pos-act-h">notes</h2><ol class="pos-acts">' + NOTES.map(noteHTML).join('') + '</ol>');
 
   // Same call the deployed index makes, on rows this page rendered itself.
   // markIndex also puts the headset offer at the top when there is one —

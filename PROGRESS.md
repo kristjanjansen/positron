@@ -633,7 +633,7 @@ structurally cannot see. Second instance, one screenshot of the DEPLOYED page:
   ours.
 - **Two visible controls**, *Send it* and *Clear*. The three that exercise
   mechanism are HIDDEN, not removed, because the harness presses
-  `.d-controls button` and a control it cannot reach is a subject the suite
+  `.pos-controls button` and a control it cannot reach is a subject the suite
   silently stops testing (#19). `?checks=1` shows them.
 - **Clear covers every room the index knows of.** A DO namespace cannot be
   enumerated, so a reserved `__index` instance keeps room names as they start
@@ -642,14 +642,14 @@ structurally cannot see. Second instance, one screenshot of the DEPLOYED page:
   by name, and hold up to `cap` rows until something writes to them again,
   because the prune runs on write. The assert says "every room it knows of",
   which is the true claim rather than the flattering one.
-- **Everything wraps.** `.d-log` already did; the two panes this page adds did
+- **Everything wraps.** `.pos-log` already did; the two panes this page adds did
   not, and at 390 px a 110-byte line showed about 40 characters of itself. The
   direction label wrapped onto two lines in a 58 px column until it became one
   word (`out`/`echo`/`in`/`bytes in`).
 
 Then a third pass, all of it from looking rather than from a failing assert:
 the composer moved ABOVE the control bar so Send sits under the thing it sends
-(moving the BUTTON instead would have taken it out of `.d-controls`, the only
+(moving the BUTTON instead would have taken it out of `.pos-controls`, the only
 place the harness looks, and reordered every press, since it walks them in
 document order); the **keep checkbox became a second button**, because keeping
 is a different act rather than a setting on this one; and **Clear history** lost
@@ -723,7 +723,7 @@ Each one a real defect, and each fix measured:
 | iOS stretched the camera | iOS ignores a 640x360 request and returns PORTRAIT | `drawCamera()` |
 | then "no video" | cover shows **32% of a portrait frame** | contain |
 | numbers unequal, wrong end | one bigger said one mattered more | both 84 px, at the top; row at the bottom |
-| iOS selected the page | press-drag on a canvas starts a text selection | `pan-y` + no selection on `.d-strip`/`.tbar` |
+| iOS selected the page | press-drag on a canvas starts a text selection | `pan-y` + no selection on `.pos-strip`/`.tbar` |
 
 Verification that each geometry move kept the pixels readable: **burn →
 readBurned, 600 exact, 0 wrong, worst 0 ms**, re-run after every move of `ROW`.
@@ -1129,7 +1129,7 @@ different answers); the device list is a `<select>` that appears as soon as
 access is granted, even empty, because a hidden control is indistinguishable
 from a page that never asked.
 
-**It also has to live in `.d-controls`.** Mounted anywhere else, `verify.mjs`
+**It also has to live in `.pos-controls`.** Mounted anywhere else, `verify.mjs`
 never presses it — which read as `page asserted something — 0` and looked like
 a broken demo rather than an unpressed button.
 
