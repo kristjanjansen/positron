@@ -488,6 +488,12 @@
       session = null;
       return false;
     }
+    // ⚠️ RESET THE WORST-GAP AT THE START OF EACH SESSION. It was a max since
+    // PAGE LOAD, so it swallowed the flat loop and every mode switch — 310 ms
+    // then 453 ms across two runs, neither of which says anything about frame
+    // pacing inside a headset. A number that has to be disclaimed every time it
+    // is quoted is measured wrong, not explained badly.
+    worst = 0; lastFrame = 0; xrFrames = 0;
     xrOk = true; publishXR();
     // 🔴 `session.renderState.baseLayer` IS NULL HERE, AND READING IT IS WHAT
     // MADE THE ROOM BLACK. `updateRenderState()` does not apply immediately —
@@ -542,7 +548,7 @@
     const pose = frame.getViewerPose(xrSpace);
     if (!pose) return;
     xrFrames++; publishXR();
-    if (ship && xrFrames % 120 === 0) ship(`${xrFrames} frames drawn in the headset · worst gap ${worst.toFixed(1)} ms`);
+    if (ship && xrFrames % 120 === 0) ship(`${xrFrames} frames this session · worst gap in-session ${worst.toFixed(1)} ms`);
     if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);

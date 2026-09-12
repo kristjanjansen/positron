@@ -244,7 +244,17 @@ to recover.
   and `scene` holds **89.8 fps** in it — full rate. The 2D window really is
   **1280x670 CSS at dpr 1**. `session.frameRate` is **not reported**. The user
   agent says **"Quest 3" on a 3S**, which is the empirical form of the claim
-  that the two cannot be told apart.
+  that the two cannot be told apart. **Passthrough works and is real**:
+  `immersive-ar` reports `environmentBlendMode: alpha-blend` and holds
+  **90.0 fps** — the same as VR's 89.8, so compositing over the room costs
+  nothing measurable here.
+- 🔴 **`alpha: false` on the WebGL context makes passthrough impossible.** The
+  compositor puts the real room behind the page and can only do that through
+  transparent pixels; with no alpha there is nothing to clear to zero and the
+  room is replaced by black instead of composited under. And **assert on
+  `environmentBlendMode`, never on the session name** — a session can be called
+  `immersive-ar` and still composite `opaque`, which presents as a drawing bug
+  rather than a session one.
 - 🔴 **`session.renderState.baseLayer` is NULL until the next animation frame.**
   `updateRenderState()` queues; it does not apply. Reading
   `baseLayer.framebufferWidth` one line after creating a session throws a
