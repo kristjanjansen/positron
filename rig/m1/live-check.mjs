@@ -1,9 +1,9 @@
 // live-check.mjs — is the Ableton Live rig actually set up, or does it only
 // look like it?
 //
-//   node rig/pro-instrument/live-check.mjs                 # against mbp
-//   LIVE_HOST=… PRO_SSH=… node rig/pro-instrument/live-check.mjs
-//   node rig/pro-instrument/live-check.mjs --json          # for the relay agent
+//   node rig/m1/live-check.mjs                 # against mbp
+//   LIVE_HOST=… M1_SSH=… node rig/m1/live-check.mjs
+//   node rig/m1/live-check.mjs --json          # for the relay agent
 //
 // Every link in the chain gets its own line, with the value it read. A chain
 // where eight of nine links report "fine" and the ninth is never tested is the
@@ -21,12 +21,12 @@ import { promisify } from 'node:util';
 import { ask } from './live-osc.mjs';
 
 const run = promisify(execFile);
-// `PRO_SSH=local` means "you are already ON the studio machine" — which is how
+// `M1_SSH=local` means "you are already ON the studio machine" — which is how
 // rack-agent.mjs runs, and it must not ssh to itself. That is not a tidiness
 // point: `ssh localhost` needs Remote Login to accept a key for this user, and
 // when it does not the check reports "the studio machine answers: no ssh" about
 // the machine it is running on. MEASURED, first run of the agent.
-const SSH = process.env.PRO_SSH || 'mbp';
+const SSH = process.env.M1_SSH || 'mbp';
 const LOCAL = SSH === 'local' || SSH === 'localhost';
 const TRACK = Number(process.env.LIVE_TRACK || 0);
 const JSON_OUT = process.argv.includes('--json');
@@ -97,7 +97,7 @@ if (names) {
   const instruments = (devices || []).slice(1).filter(Boolean);
   if (instruments.length) ok('the track carries an instrument', instruments.join(', '));
   else bad('the track carries an instrument', 'none',
-           `node rig/pro-instrument/live-setup.mjs "Stage-73 V2" ${TRACK}`);
+           `node rig/m1/live-setup.mjs "Stage-73 V2" ${TRACK}`);
 
   // "All Ins" is a superset of IAC and is what a fresh track has, so it PASSES
   // — refusing it would fail a rig that works. Named explicitly is better only

@@ -33,6 +33,6 @@ console.log(pad('  ... same trip THROUGH the Durable Object', 42) + pad(q(echoes
 console.log('');
 console.log('the Durable Object itself costs', (q(echoes,50) - q(pongs,50)).toFixed(2), 'ms at typical');
 console.log('');
-console.log('A note to the Pro is TWO of these trips: out to the edge and down to');
-console.log('the Pro, then its receipt back up and down to me. Predicted round trip:');
+console.log('A note to the M1 is TWO of these trips: out to the edge and down to');
+console.log('the M1, then its receipt back up and down to me. Predicted round trip:');
 console.log('  2 x', q(echoes,50).toFixed(2), '=', (2*q(echoes,50)).toFixed(1), 'ms');

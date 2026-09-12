@@ -31,7 +31,7 @@ if (arg('--relay')) q.set('moqRelay', arg('--relay'));
 if (arg('--relay-for')) q.set('moqRelayFor', arg('--relay-for'));
 if (arg('--cert')) q.set('moqCert', arg('--cert'));
 for (const k of ['latencyMax', 'groupMs', 'frameUs']) if (arg('--' + k)) q.set(k, arg('--' + k));
-const url = `http://127.0.0.1:8890/rig/pro-instrument/synth.html?${q}`;
+const url = `http://127.0.0.1:8890/rig/m1/synth.html?${q}`;
 
 spawn('pkill', ['-f', UDD]);
 await sleep(1500);

@@ -2,7 +2,7 @@
 
 ## Session 16 (2026-09-10) — one real encoder, three transports, and a picture proved readable at the far end (user: "read md's" → "can you run simple obs hls/webrtc/moq stream tests?" → "clean up")
 
-HANDOFF item **0ad** discharged: OBS on the Pro now publishes to LL-HLS, WHEP
+HANDOFF item **0ad** discharged: OBS on the M1 now publishes to LL-HLS, WHEP
 and MoQ from the SAME source, driven entirely over obs-websocket from this Mac.
 Two background agents closed **0aa** (Csound's section-local `t`) and **0a**
 (the `t` → `type` sweep) in parallel.
@@ -45,7 +45,7 @@ the wide-area path are NOT separated.
 about what Live reports for itself: 512 samples at 48 kHz is 10.7 ms plus its
 stated 13.7 ms output latency.
 
-**The chain, with every link measured**: key press → 7.5 ms → the Pro → Web MIDI
+**The chain, with every link measured**: key press → 7.5 ms → the M1 → Web MIDI
 → IAC Bus 1 → Live/Drift (track meter 0.807) → Multi-Output → BlackHole → MoQ →
 58 ms at the ear.
 
@@ -74,7 +74,7 @@ at 420 ms spacing exactly ONE note of thirty was counted. At 1300 ms it is 14 of
 
 ### The Pro as an instrument, and Ableton behind it
 
-`rig/pro-instrument/` — a page on the Pro is the instrument, a page here plays
+`rig/m1/` — a page on the M1 is the instrument, a page here plays
 it. Notes go up a direct peer-to-peer DataChannel; the sound comes back on the
 same connection or over MoQ.
 
@@ -129,7 +129,7 @@ to it**, so its audio device stays a one-time manual setting.
 ### The rig
 
 `rig/obs-pro/` — `source.html` (the OBS picture), `serve.mjs` (serves it over
-the LAN), `pro-proxy.mjs` (runs ON the Pro), `shot.mjs`, `read-hls.mjs`,
+the LAN), `m1-proxy.mjs` (runs ON the M1), `shot.mjs`, `read-hls.mjs`,
 `stream.mjs` (one driver, three transports), `clear-recordings.mjs`.
 
 **The source is `demo/shell/pattern.mjs` itself, fetched at request time — never
@@ -173,11 +173,11 @@ while logging a failure is worse than one that refuses.
 
 ### Two blockers, neither of which announces itself
 
-- **macOS Local Network Privacy is granted PER APP.** `curl` on the Pro fetched
+- **macOS Local Network Privacy is granted PER APP.** `curl` on the M1 fetched
   the LAN URL 200; Chrome and OBS on the same machine got
   `ERR_ADDRESS_UNREACHABLE` — a pure black frame with nothing in any OBS log.
   Terminal processes inherit the grant; `.app` bundles do not. Solved by
-  proxying through 127.0.0.1 on the Pro rather than asking for a GUI click,
+  proxying through 127.0.0.1 on the M1 rather than asking for a GUI click,
   which also keeps `pattern.mjs` un-forked.
 - **`BrowserHWAccel=true` renders EVERY browser source black** on a Mac with no
   attached display. Separated from "my page is broken" by pointing the source at
@@ -388,7 +388,7 @@ audio. AbletonOSC's own docs state nothing about latency or precision, which is
 reason enough — and plan-uuu-local's first trap says never put anything back in
 the per-beat path.
 
-### OBS on the Pro, and the MoQ plugin that was always there
+### OBS on the M1, and the MoQ plugin that was always there
 
 **OBS 32.2.2** (brew cask) with **obs-websocket 5.7.4 on 4455**, auth on,
 reachable from the other Mac over the LAN — `GetVersion` answers in ~7.5 ms with

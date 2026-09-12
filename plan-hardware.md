@@ -1,11 +1,11 @@
 # plan-hardware — the box that IS the instrument, with no laptop under it
 
-Status: **not started.** Written 2026-09-10, out of `rig/pro-instrument/` reaching
+Status: **not started.** Written 2026-09-10, out of `rig/m1/` reaching
 58 ms key→ear with Ableton Live on the other machine — and that other machine
 being a Mac Pro running a headless browser, which is a large and expensive way to
 hold a MIDI cable.
 
-Read `rig/pro-instrument/README.md` first; every number below comes from it or
+Read `rig/m1/README.md` first; every number below comes from it or
 from HANDOFF item 0. `demo/notes/hardware-box.md` is the prose version of the
 same argument for a reader who does not work here. `plan-instrument.md` owns what
 the two instrument PAGES share and this plan owes it deference — nothing here
@@ -32,7 +32,7 @@ is in §2: the latency is not where the interesting boards are good.
 makes the number attributable.**
 
 Here is the whole budget, measured, on one clock, pressed here and heard here
-(`rig/pro-instrument/README.md`):
+(`rig/m1/README.md`):
 
 | leg | measured | who owns it |
 |---|---|---|
@@ -309,7 +309,7 @@ the Pi, that prints four facts and asserts nothing:
 - `await AudioEncoder.isConfigSupported({codec:'opus', sampleRate:48000, numberOfChannels:1, bitrate:64000, opus:{frameDuration:5000, application:'lowdelay'}})`
 - whether `getUserMedia({audio:true})` RESOLVES, REJECTS, or does neither
 
-The last one is written that way on purpose. `rig/pro-instrument` has that exact
+The last one is written that way on purpose. `rig/m1` has that exact
 failure open on macOS right now — neither the success nor the failure line
 logged, so the promise is still pending — and a pending promise is a different
 defect from a refusal. Report the capability, not the error string.
@@ -530,7 +530,7 @@ core for surprises.
 
 ### MEASURED 2026-09-10: raw PCM goes through, and Opus is unnecessary here
 
-`rig/pro-instrument/ws-audio-probe.mjs`, through the deployed relay, echo timed
+`rig/m1/ws-audio-probe.mjs`, through the deployed relay, echo timed
 on one clock so no offset is in it:
 
 | configuration | kbit/s | msg/s | delivered | loss | round trip p50/p95 |

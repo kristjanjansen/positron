@@ -231,16 +231,16 @@ to recover.
   device, which the Live Object Model cannot set. A capture started over ssh is
   deaf, so its relay agent must live in a login session — the box is a service
   that dials out on boot, this is a performance instrument you wake on purpose.
-  `rig/pro-instrument/README.md` has the measurements, the two traps and the
+  `rig/m1/README.md` has the measurements, the two traps and the
   revisit order. `/rack/` stays live and reports silence AS silence.
 - **An avfoundation device INDEX is a shared mutable global, exactly like a
   fixed port.** `ffmpeg -f avfoundation -i ":0"` meant the microphone when
-  `rig/pro-instrument/README.md` was written and means **BlackHole** today —
+  `rig/m1/README.md` was written and means **BlackHole** today —
   and both read **-91.0 dB**, where one reading proves "this capture is deaf"
   and the other proves "nothing is playing", which are opposite conclusions
   from an identical number. The README's own deafness control had been
   measuring the wrong device. Resolve by NAME from
-  `-list_devices true` every time; `rig/pro-instrument/live-check.mjs` does.
+  `-list_devices true` every time; `rig/m1/live-check.mjs` does.
 - **WebXR, MEASURED on a Quest 3 (Browser 150.1 / Chromium 150, Adreno 740),
   2026-09-12.** The framebuffer is **3360x1760, two views, 1680x1760 per eye**,
   and `scene` holds **89.8 fps** in it — full rate. The 2D window really is

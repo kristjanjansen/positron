@@ -2,7 +2,7 @@
 //
 // Extracted from `instrument`, which had the good one: black keys drawn as
 // black keys, pointer capture so a held finger is a held note, and a separate
-// colour for a note somebody ELSE played. `rig/pro-instrument` had grown eight
+// colour for a note somebody ELSE played. `rig/m1` had grown eight
 // equal grey buttons instead, and its mapping drifted diatonic because the
 // picture could not show a sharp — the shape constrains the mapping, so the
 // shape comes first.
