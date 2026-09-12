@@ -209,6 +209,17 @@ export const DEMOS = [
   { name: 'strip', act: 0, created: '2026-09-04', built: true,
     one: 'deep time, uncertain dates, and a statistic that names what it dropped',
     tags: ['timeline', 'canvas'] },
+  // 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to
+  // be an INSERT on /box/ wrapping the instruments — and a grain cloud has no
+  // note-off, so releasing a key swapped one drone for another and every
+  // instrument's envelope, attack and patch character were washed out before
+  // you heard them. The patch selector and the die both stopped doing anything
+  // audible. The engine is not at fault; wrapping an instrument in it was.
+  // Here, being droney is the point rather than a defect.
+  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
+    one: 'a granular engine on a Raspberry Pi, rolled from a seed you can get back',
+    tags: ['SuperCollider', 'relay', 'PCM', 'live board'] },
+
   // Not a demo of anything — a page where every reusable control is present and
   // wired to nothing, so one can be looked at and pushed around without a board,
   // a relay or a stream. `built: false` because it publishes no `__demo` and
@@ -233,7 +244,7 @@ export const DEMOS = [
     tags: ['WS', 'relay', 'PCM', 'live board'] },
 
   // A CHECKUP, not a player — and that is what makes it shippable. The playing
-  // page (rig/pro-instrument/play.html) needs a peer with Ableton open, so it
+  // page (rig/m1/play.html) needs a peer with Ableton open, so it
   // is a dead link for a visitor; asking whether the rig is set up is a real
   // answer in BOTH states, and the interesting one is usually "it is not".
   //
