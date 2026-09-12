@@ -58,6 +58,15 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   });
   const knob = el('span', 'sld-knob');
   const read = el('span', 'sld-v', '');
+  // ⚠️ RESERVE THE WIDEST VALUE, DO NOT LET IT JUMP. `0.5` and `12.40` are
+  // different widths, so the number moved — and worse, so did everything to the
+  // right of it — on every drag, which makes a value you are trying to read
+  // while listening impossible to read. The width is computed from the widest
+  // string this slider can ever show rather than guessed at: both ends, at this
+  // slider's own decimal places, plus the unit. `ch` is exact here because the
+  // face is monospaced and the cell is `tabular-nums`.
+  const widest = Math.max(...[min, max].map((v) => `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`.length));
+  read.style.minWidth = `${widest}ch`;
   lane.append(knob);
   wrap.append(name, lane, read);
 

@@ -256,14 +256,14 @@ export const DEMOS = [
   // For the record, from 2026-09-10 and not what this page shows: playing it
   // costs 6.00 ms typical over a direct peer link against 68.90 ms via the
   // relay, and presses over 100 ms go 0 of 100 against 4 of 100.
-  // ⚠️ ITS ASSERT COUNT IS SUPPOSED TO MOVE, which is the one demo here where
-  // that is true. Studio silent: 10/10 with 4 page asserts. Studio answering:
-  // 12/12 with 6. Both branches are real and both are asserted when they occur
-  // — the page cannot force the studio Mac to be off, so it cannot run both in
-  // one pass. Diff the count against the branch, not against the last run.
-  { name: 'rack', act: 4, created: '2026-09-10', built: true, settleMs: 5000,
-    one: 'ask a studio Mac whether its Ableton Live rig is really set up, link by link',
-    tags: ['Ableton Live', 'CoreMIDI', 'WS', 'relay'] },
+  // `rack` was a demo and is archived at archive/demos/rack-index.html, pulled
+  // before the M1 <-> Live side is rearchitected rather than left pointing at a
+  // design that is about to change. What it proved is worth keeping here: the
+  // chain runs end to end — midisend -> IAC -> Live -> Arturia Stage-73 V2 ->
+  // BlackHole — with a held chord reading -29.1 dB peak against a -91.0 dB
+  // silence baseline, 61.9 dB of separation, and its checkup found the output
+  // clipping at full scale when nothing else had. rig/m1/ and plan-rack.md hold
+  // the rest.
 ];
 
 /** Written notes, rendered by /notes/ from markdown. */

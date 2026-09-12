@@ -7,34 +7,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* ── the material row ──────────────────────────────────────────────────
-     A radio row, same shape as the instrument row on /box/: exactly one of
-     these is what the grains are currently made of, and it is armed from what
-     the BOARD reports rather than from what was clicked — a page that joins a
-     board somebody else is already playing has clicked nothing. */
-  .mat { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 8px; }
-  .mat .lab { flex: none; color: var(--dim2); font: 500 11px/1 var(--mono);
-              letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
-  .mat button[aria-pressed="true"] {
-    color: var(--hi); border-color: var(--hi);
-    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
-  }
-  /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR — the shell's global focus ring is
-     the same yellow this row uses for "this is what you are hearing", and on
-     /box/ that made a focused-but-off switch read as an armed one. Pointer
-     presses lose the ring; keyboard focus keeps it, which is who needs it. */
-  .mat button:focus:not(:focus-visible) { outline: none; }
-  .mat button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
-  /* Starting a chain on the board takes ten to forty seconds — jackd, the
-     synth, a capture and the port wiring — so a button that just sits there
-     reads as a dead click. */
-  .mat button[data-busy] { color: var(--hi); border-color: var(--hi); animation: g-wait 1.1s ease-in-out infinite; }
   @keyframes g-wait {
     0%, 100% { background: color-mix(in oklab, var(--hi)  6%, var(--card2)); }
     50%      { background: color-mix(in oklab, var(--hi) 26%, var(--card2)); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .mat button[data-busy] { animation: none; background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
   }
   .now  { font: 400 12px/1.6 var(--mono); color: var(--dim); margin: 0 0 6px; }
   .now b { color: var(--fg); font-weight: 500; }
@@ -265,9 +240,6 @@
     d.set('moved on its own', drift ? drift.nudges : null);
 
     // ── the material row ──
-    const armed = playing ? 'instrument' : null;
-    for (const b of mat.querySelectorAll('button[data-mat]')) b.setAttribute('aria-pressed', String(b.dataset.mat === armed));
-    nowLine.replaceChildren(...(answered ? materialLong() : ['nothing has answered in this room yet']));
 
     // ── the panel: the roll, or the silence ──
     // ⚠️ FOUR NAMED STATES, NOT TWO, AND THE THIRD ONE COST A RED SUITE. The
@@ -526,7 +498,6 @@
       // the chain, which reads as a dead button.
       if (wantSource && (m.source === wantSource || !m.ok)) {
         wantSource = null;
-        for (const b of mat.querySelectorAll('button')) delete b.dataset.busy;
       }
     }
     if (m.type === 'fx.pappus') {
@@ -591,20 +562,6 @@
   }, 4000);
 
   // ── the material row's actions ───────────────────────────────────────────
-  bInst.onclick = async () => {
-    startAudio();
-    // ⚠️ AND IT HAS TO SWITCH BACK OFF THE RADIO. This only started something
-    // when NOTHING was playing, so pressing it while something was on the graph
-    // cleared the frozen minute and left the radio running — a button that
-    // says "the instrument on the board" and leaves you listening to a
-    // broadcast.
-    if (!playing) {
-      bInst.dataset.busy = '1'; wantSource = SOURCE;
-      d.log(playing ? 'switching the radio off and starting the sampled instrument'
-                    : 'nothing was playing — starting the sampled instrument, which takes a few seconds on the board', 'hi');
-      send({ type: 'audio.start', source: SOURCE });
-    }
-  };
 
   // ── rolling ──────────────────────────────────────────────────────────────
   async function doRoll(seed) {
