@@ -31,7 +31,14 @@ s.waitForBoot({
             1.0.wait;
             // Enough to make it audible with nothing plugged in: pick one of the
             // shipped loops as the grain source, open the gate pattern, run.
-            e.cmd(\msrc, 1);
+            // 🔴 BOTH GRANULATORS RECORD. This read `msrc 1` — which is OFF —
+            // so granulator ONE never captured the instrument at all, for the
+            // life of this file. The source table is 1 OFF, 2 STEREO, 3 MONO L,
+            // 4 MONO R; there is no 0, and 1 does not merely pause the write,
+            // it erases (see pappus.mjs, LESSONS #46). So half of a two-half
+            // granulator has been playing an empty buffer while `grains` drew
+            // nine numbers for it and a slider moved them.
+            e.cmd(\msrc, 2);
             e.cmd(\nsrc, 2);
             e.cmd(\amp, 1.0);
             e.cmd(\mswarm, 0.6);
