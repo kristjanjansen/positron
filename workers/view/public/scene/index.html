@@ -53,6 +53,26 @@
   const REPORT_PARAM = new URLSearchParams(location.search).get('report');
   let ship = null;
 
+  /**
+   * A line that must arrive even if the event loop is about to be throttled.
+   *
+   * 🔴 THE BATCHED SHIPPER LOST EVERYTHING PAST `requestSession`. MEASURED on a
+   * Quest 3: every flat assert arrived, then `pressed "Put it on your face"`,
+   * then nothing at all — no session line, no error, no assert. createShipper
+   * holds lines for 2 s before POSTing, and entering an immersive session is
+   * exactly the moment a browser stops being generous with timers. So the
+   * lines that say WHERE something hung cannot be the ones waiting on a timer.
+   *
+   * `sendBeacon` exists for this: the request is handed to the browser and
+   * survives whatever the page does next.
+   */
+  const shipNow = (line) => {
+    if (!ship) return;
+    ship(line);
+    try { navigator.sendBeacon?.('https://pub.positron.studio/log',
+      new Blob([`${(performance.now() / 1000).toFixed(2)} ${line}`], { type: 'text/plain' })); } catch { /* diagnostics */ }
+  };
+
   /** Is `navigator.xr` the browser's, or something installed over it? */
   function nativeXR() {
     if (!navigator.xr) return { native: false, why: 'no navigator.xr at all' };
@@ -404,22 +424,38 @@
     // This is the whole reason the first attempt on a real Quest produced no
     // asserts at all: the handler threw where nothing was reporting.
     if (headsetKnown === false) { d.log('no headset here — the window above is the same room', 'warn'); return false; }
+    // ⚠️ A DEADLINE ON EVERY STEP. A rejected promise reports itself; one that
+    // simply never settles does not, and that is what the first two headset
+    // runs looked like from here — a session the user was standing in, with no
+    // line saying which await had not come back. Anything that has not
+    // answered in 6 s is a failure with a name.
+    const step = async (what, p) => {
+      shipNow(`… ${what}`);
+      const out = await Promise.race([p,
+        new Promise((_, no) => setTimeout(() => no(new Error(`${what} never returned`)), 6000))]);
+      shipNow(`ok  ${what}`);
+      return out;
+    };
     try {
       // ⚠️ `local-floor` is REQUIRED, not optional: the room is authored in
       // metres from the floor, and on `local` the origin is wherever the head
       // happened to be, which puts a 0.3 m cube at eye height.
-      session = await navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] });
+      session = await step('requestSession',
+        navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] }));
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
       // the handler entirely — so the session could START and the page then die
       // with no assert, no log line and no way to tell that from "the button
       // was never pressed". That is what the first headset run looked like.
-      await gl.makeXRCompatible();
+      await step('makeXRCompatible', gl.makeXRCompatible());
+      shipNow('… XRWebGLLayer');
       session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
-      xrSpace = await session.requestReferenceSpace('local-floor');
+      shipNow('ok  XRWebGLLayer');
+      xrSpace = await step('requestReferenceSpace local-floor',
+        session.requestReferenceSpace('local-floor'));
     } catch (e) {
       d.log(`the headset refused the session — ${e.name}: ${e.message}`, 'bad');
-      ship?.(`FAIL session — ${e.name}: ${e.message}`);
+      shipNow(`FAIL session — ${e.name}: ${e.message}`);
       try { await session?.end(); } catch { /* it may never have started */ }
       session = null;
       return false;
@@ -436,7 +472,26 @@
       xrOk = false; session = null; publishXR(); badge.innerHTML = 'window · <b>session ended</b>';
       d.set('view', 'window'); raf = requestAnimationFrame(flat);
     });
+    // 🔴 ANY CONTROLLER BUTTON LEAVES. A page that puts someone in a room it
+    // cannot draw, with no way out except the system menu, is worse than a page
+    // that never entered — and "press the Meta button" is not an answer a page
+    // gets to give about its own bug.
+    for (const ev of ['select', 'squeeze']) {
+      session.addEventListener(ev, () => { shipNow(`${ev} — leaving`); session?.end().catch(() => {}); });
+    }
+    // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
+    // session started, the room is black and staying black; end it and say so
+    // rather than leaving somebody standing in it. MEASURED: two runs ended
+    // with exactly that and no line explaining either.
+    setTimeout(() => {
+      if (session && xrFrames === 0) {
+        shipNow('FAIL no frame drawn 4 s after the session started — leaving on my own');
+        d.log('the headset session drew nothing — ended it rather than leave you in the dark', 'bad');
+        session.end().catch(() => {});
+      }
+    }, 4000);
     session.requestAnimationFrame(onXR);
+    shipNow('session running — requestAnimationFrame registered');
     return true;
   }
 
@@ -461,11 +516,10 @@
       drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0);
       eye++;
     }
-    if (ship && xrFrames === 1) {
+    if (xrFrames === 1) {
       const err = gl.getError();
-      ship(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err}`);
       const vp0 = layer.getViewport(pose.views[0]);
-      ship(`eye 0 viewport ${vp0.x},${vp0.y} ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0}`);
+      shipNow(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err} · eye0 ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0}`);
     }
     markShown(now);
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
