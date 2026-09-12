@@ -491,3 +491,24 @@ video[hidden] { display: none; }
   font: 500 12px/1 var(--mono); color: var(--fg);
   font-variant-numeric: tabular-nums; min-width: 4.2em; white-space: nowrap;
 }
+
+/* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────
+   🔴 ONE OBJECT, NOT THREE BUTTONS. Laid out with a gap, each button carried
+   its own full border and its own four rounded corners, so the group read as
+   three separate controls that happened to be adjacent — and every join showed
+   TWO borders side by side. A segmented control overlaps them by exactly one
+   pixel so a join is one line, and rounds only the outer corners.
+
+   ⚠️ Rounded by :first-child/:last-child, so the group is still correct when
+   the middle button is left out — a stepper over a list of two has nothing to
+   randomise and should not have to be styled differently to say so. */
+.step { display: inline-flex; align-items: center; height: 34px; }
+.step button { border-radius: 0; margin-left: -1px; }
+.step button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.step button:last-child { border-radius: 0 4px 4px 0; }
+/* ⚠️ The pressed one has to come FORWARD or its own border is painted over by
+   the neighbour that overlaps it, and the highlight loses one side. */
+.step button:hover, .step button:focus-visible { position: relative; z-index: 1; }
+/* An icon button is SQUARE: its width comes from the control's height, never
+   from how wide the glyph happens to be in whatever font arrived. */
+.step button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
