@@ -11,22 +11,28 @@
      column of stragglers down the left and empty space beside them; the
      instrument names are different lengths, so nothing lines up. Same fix as
      the slider group: let the row own the width and share it out. */
-  .pick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
+  /* ⚠️ THE ROW LAYS OUT GROUPS, NOT BUTTONS. It used to be a flex row of
+     individual buttons with a 6 px gap and `flex: 1 1 auto` on each, which is
+     why three mutually exclusive instruments read as three unrelated controls.
+     The instruments are one `createChoice` now and the row only has to space
+     the GROUPS apart. */
+  .pick { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 0 0 14px;
           width: 100%; }
-  .pick > button { flex: 1 1 auto; min-width: 84px; }
   @media (max-width: 560px) {
     .pick .fx { margin-left: 0; width: 100%; }
-    .pick .fx .pos-choice { flex: 1 1 auto; }
   }
-  .pick .fx, .pos-controls .fx { display: inline-flex; gap: 6px; align-items: center; margin-left: auto; }
+  /* ⚠️ 18 px, NOT 6. `reverb [dry|room|hall] chorus [off|light|wide]` at a 6 px
+     gap put the word CHORUS hard against the `hall` button, so the two groups
+     read as one row of six options with a stray word in the middle. The gap
+     between two groups has to be bigger than the gap inside one, or there are
+     no groups. */
+  .pick .fx, .pos-controls .fx { display: inline-flex; gap: 18px; align-items: center; margin-left: auto;
+                                 flex-wrap: wrap; }
   .pos-controls .fx .lab { color: var(--dim2); font: 500 11px/1 var(--mono); letter-spacing: .06em;
                          text-transform: uppercase; margin: 0 2px 0 0; }
   .pos-controls button.die { font-size: 15px; line-height: 1; padding: 4px 9px; }
   .pos-controls button.die:disabled, .pos-controls .fx button:disabled {
     opacity: .35; cursor: default; border-color: var(--line); }
-  .pos-controls .fx button[aria-pressed="true"] {
-    color: var(--hi); border-color: var(--hi);
-    background: color-mix(in oklab, var(--hi) 16%, var(--card2)); }
   /* ⚠️ FOCUS MUST NOT WEAR THE ARMED COLOUR. The shell's global rule is
      `:focus-visible { outline: 2px solid var(--hi) }` — the same green the
      armed state uses — so a focused-but-OFF switch was indistinguishable from
@@ -50,13 +56,11 @@
   .pick button:focus-visible { outline: 2px solid var(--dim2); outline-offset: 2px; }
   .pick .lab { flex: none; color: var(--dim2); font: 500 11px/1 var(--mono);
                letter-spacing: .06em; text-transform: uppercase; margin-right: 4px; }
-  /* the armed instrument gets the same treatment the transport bar gives its
-     armed rate, and demo/score gives its selected line: a fill as well as an
-     edge, because colour alone in a row of buttons reads as noise */
-  .pick button[aria-pressed="true"] {
-    color: var(--hi); border-color: var(--hi);
-    background: color-mix(in oklab, var(--hi) 16%, var(--card2));
-  }
+  /* 🔴 NO `[aria-pressed]` RULE HERE. There was one, and it was the bug: it has
+     the same specificity as the kit's `.pos-choice button[aria-pressed="true"]`
+     and sits later in the cascade, so EVERY createChoice on this page — reverb
+     and chorus included — silently lost the kit's chosen state and wore this
+     page's instead. One meaning, one definition, in shell.css. */
   /* Starting a JACK instrument takes ten to forty seconds — jackd, the synth,
      a capture, then the port wiring. A button that just sits there reads as a
      dead click, so it breathes until the box confirms. */
@@ -78,7 +82,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
-  import { createStepper } from '/shell/stepper.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createMidi } from '/shell/midi.mjs';
 
@@ -89,7 +93,7 @@
 
   const d = mount({
     name: 'box',
-    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Play the a-to-k row, the drawn keys, or a MIDI keyboard; the arrows step through the patches the board actually has. Space and chorus are made on the board — this page only sends the numbers.',
+    what: 'The instrument is a Raspberry Pi somewhere else, and this page makes no sound of its own — it sends your key presses to the board and plays back what comes back, so the delay you hear is a real journey of about a tenth of a second. Play the a-to-k row, the drawn keys, or a MIDI keyboard; the arrows step through the patches the board actually has. Reverb and chorus are made on the board — this page only sends the numbers.',
 
     readout: { frames: '', dropped: '', rate: '/s', 'round trip': 'ms', bitrate: 'kbit/s', midi: '' },
     // NO PAGE CONTROLS. Octave down, octave up and notes off used to be here,
@@ -105,7 +109,10 @@
   // Above the patch controls: the instrument decides what a patch number even
   // MEANS, so choosing it after choosing a patch is backwards.
   const picks = el('div', 'pick');
-  picks.append(el('span', 'lab', 'instrument'));
+  // ⚠️ NO LABEL HERE. `createChoice` draws its own, so the page adding one drew
+  // `INSTRUMENT INSTRUMENT` — the cost of half-moving a hand-built row onto a
+  // component: the markup the component replaces has to go, not just the part
+  // that looked broken.
   const controls = document.querySelector('.pos-controls');
   if (controls) controls.parentNode.insertBefore(picks, controls);
   else d.el.append(picks);
@@ -113,14 +120,19 @@
   // choosing one is the next thing you do after choosing the other.
   // drawInstruments() inserts new instrument buttons before this block.
   const fxWrap = el('span', 'fx');
-  const step = createStepper({
+  // 🔴 A STEPPER IS NOT A WAY TO CHOOSE ONE OF 878. Yoshimi's library on this
+  // board is 878 reachable instruments and hexter's cartridges are 128, and the
+  // old control was `‹ random ›` with the name printed BESIDE it as dead text —
+  // so the name had the useful half of a list (you can read where you are) and
+  // none of the other half (you can go somewhere). The name is the control now:
+  // press it and the platform's own list opens.
+  const step = createPicker({
     what: 'patch',
     prev: () => { idx = (idx - 1 + span()) % span(); chosen = true; showPatch(); sendPatch(); },
     next: () => { idx = (idx + 1) % span(); chosen = true; showPatch(); sendPatch(); },
     random: () => { idx = Math.floor(Math.random() * span()); chosen = true; showPatch(); sendPatch(); },
+    onPick: (i) => { idx = pickIndex(i); chosen = true; showPatch(); sendPatch(); },
   });
-  // ◀ ▶ then the die: stepping and rolling are different gestures, and the two
-  // arrows read as a pair when nothing sits between them.
   fxWrap.append(step.el);
   // ⚠️ ATTACHED HERE. The line that put `fxWrap` into the row lived inside the
   // granulator block that was removed, so `picks.insertBefore(b, fxWrap)` threw
@@ -207,7 +219,27 @@
     if (current?.startsWith('fluid')) return GM[p] ?? `program ${p}`;
     return `program ${p}`;
   };
+  /** Dropdown index -> patch index. They coincide: a listed instrument is
+   *  walked by list position, and a fixed table is walked by program within
+   *  bank 0, which is the same number. */
+  const pickIndex = (i) => i;
+
+  /** The list the dropdown offers. For Yoshimi that is the board's own
+   *  enumeration; for a fixed table it is bank 0, which is the only bank whose
+   *  programs have names. ⚠️ The ARROWS can still walk past the end of this
+   *  into higher banks — `show()` leaves the select alone when the index is
+   *  outside it, rather than pointing at the wrong row. */
+  function refreshPicker() {
+    const names = listed() ? patches.map((e) => e.name ?? '—')
+                           : Array.from({ length: 128 }, (_, i) => patchName(i));
+    step.options(names, Math.min(idx, names.length - 1));
+    step.show(chosen ? patchName(idx) : '—', chosen ? idx : undefined);
+  }
+
   function showPatch() {
+    // The NAME lives in the control now, not in a line under it — it was in
+    // both, which is the same word twice with nothing to say which is live.
+    step.show(chosen ? patchName(idx) : '—', idx);
     if (listed()) {
       // ⚠️ DO NOT NAME A PATCH NOBODY CHOSE. Arriving at a board that is
       // already playing, this page has picked nothing and the instrument holds
@@ -215,15 +247,17 @@
       // would be a readout contradicting the thing it describes. It says how
       // many there are until somebody steps, and then it says which one.
       patchLine.textContent = '';
-      if (!chosen) { patchLine.append(el('b', '', '—'), ` · ${patches.length} patches in ${banksInList} banks`); return; }
+      if (!chosen) { patchLine.textContent = `${patches.length} patches in ${banksInList} banks`; return; }
       // Built as elements rather than as a string: these names come off another
       // machine's filesystem, and one with an ampersand in it would be a broken
       // line at best.
       const e = patches[idx];
-      patchLine.append(el('b', '', e?.name ?? '—'), ` · ${e?.bankName ?? ''} · ${idx + 1} of ${patches.length}`);
+      patchLine.append(el('span', '', e?.bankName ?? ''), ` · ${idx + 1} of ${patches.length}`);
       return;
     }
-    patchLine.innerHTML = `<b>${patchName(idx)}</b>${bankOf(idx) ? ` · bank ${bankOf(idx)}` : ''}`;
+    patchLine.textContent = chosen
+      ? `${bankOf(idx) ? `bank ${bankOf(idx)} · ` : ''}${progOf(idx) + 1} of 128`
+      : '128 patches';
   }
   // ⚠️ BANK SELECT IS CC 32 HERE, NOT CC 0. Read from Yoshimi's own config:
   //     MIDI Root CC 0        MIDI Bank CC 32        MIDI Program Change on
@@ -287,29 +321,35 @@
   // A radio row: exactly one instrument is armed, and it is armed on load
   // rather than after the first click — a page that shows no selection while
   // something IS playing is lying about its own state.
+  // ⚠️ THE BOX NAMES THE SAMPLED INSTRUMENT BY ITS FILE. `audio.started` sends
+  // `soundfont: …/FluidR3_GM.sf2` and this page reduced that to `FluidR3_GM` —
+  // which never equalled the source name `fluidsynth`, so an equality test
+  // armed NOTHING whenever the sampled instrument was the one playing. There is
+  // one sampled button now, so anything that is not a known JACK source is it.
   const arm = (name) => {
-    for (const b of picks.querySelectorAll('button'))
-      b.setAttribute('aria-pressed', String(b.dataset.src === name));
+    if (!instPick) return;
+    const src = !name ? null : (name === 'hexter' || name === 'yoshimi') ? name : 'fluidsynth';
+    const i = instOpts.findIndex(([, v]) => v.src === src);
+    // `set` is QUIET here: arming is reporting what the board says is playing,
+    // not choosing — firing onPick would start the instrument all over again.
+    if (i >= 0) instPick.set(i, true);
+    // Nothing playing has no armed button, and `createChoice` cannot say "none"
+    // — so say it here rather than leave a stale one lit.
+    else instPick.buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
   };
+  let instPick = null, instOpts = [];
   function drawInstruments() {
-    // ⚠️ Only the INSTRUMENT buttons. Clearing every button in this row also
-    // removed the effect switch and its die, and appending the new ones then
-    // put them after the effect block — which is the layout falling apart in
-    // two ways from one line. Instrument buttons are the ones with data-src.
-    for (const b of [...picks.querySelectorAll('button[data-src]')]) b.remove();
-    const mk = (label, src, msg, slow) => {
-      const b = el('button', '', label, { type: 'button', 'aria-pressed': 'false' });
-      b.dataset.src = src;
-      b.onclick = async () => {
-        await startAudio();
-        arm(src);
-        if (slow) { b.dataset.busy = '1'; d.log(`${label}: starting`, 'hi'); }
-        send({ type: 'audio.stop' });
-        setTimeout(() => send(msg), 400);
-      };
-      // before the effect block, which is pinned right with margin-left:auto
-      picks.insertBefore(b, fxWrap);
-    };
+    // 🔴 ONE SEGMENTED GROUP, FROM THE KIT. These were loose flex buttons with
+    // a 6 px gap, so three mutually exclusive choices read as three unrelated
+    // controls — the exact complaint `choice.mjs` was written to answer, on the
+    // page that complaint came from. Worse, the page's own
+    // `.pick button[aria-pressed="true"]` then repainted the kit's chosen state
+    // for the reverb and chorus rows too: same specificity as
+    // `.pos-choice button[aria-pressed="true"]` and later in the cascade, so
+    // every `createChoice` on this page silently lost its own look.
+    const opts = [];
+    instPick?.el.remove();
+    instPick = null;
     // 🔴 ONE SAMPLED INSTRUMENT, NOT ONE PER FILE. This drew a button for every
     // soundfont on the board under its raw filename, so the row read
     // `FluidR3_GM` `sf_GMbank` `hexter` `yoshimi` — two of which are the SAME
@@ -322,13 +362,29 @@
     const best = soundfonts.slice().sort((a, b) =>
       (/fluidr3/i.test(b.name) ? 1 : 0) - (/fluidr3/i.test(a.name) ? 1 : 0)
       || (b.bytes || 0) - (a.bytes || 0))[0];
-    mk('sampled', 'fluidsynth',
-       best ? { type: 'audio.start', source: 'fluidsynth', soundfont: best.path }
-            : { type: 'audio.start', source: 'fluidsynth' });
+    opts.push(['sampled', { src: 'fluidsynth', slow: false, msg:
+      best ? { type: 'audio.start', source: 'fluidsynth', soundfont: best.path }
+           : { type: 'audio.start', source: 'fluidsynth' } }]);
     for (const k of ['hexter', 'yoshimi']) {
       if (avail && avail[k] === false) continue;
-      mk(k, k, { type: 'audio.start', source: k }, true);
+      opts.push([k, { src: k, slow: true, msg: { type: 'audio.start', source: k } }]);
     }
+    instOpts = opts;
+    instPick = createChoice({
+      label: 'instrument',
+      options: opts,
+      onPick: async (v, label, i) => {
+        await startAudio();
+        arm(v.src);
+        // Starting a JACK instrument takes ten to forty seconds, so the button
+        // breathes until the board confirms — a control that just sits there
+        // reads as a dead click.
+        if (v.slow) { instPick.buttons[i].dataset.busy = '1'; d.log(`${label}: starting`, 'hi'); }
+        send({ type: 'audio.stop' });
+        setTimeout(() => send(v.msg), 400);
+      },
+    });
+    picks.insertBefore(instPick.el, fxWrap);
     arm(armed);
   }
   let armed = null;
@@ -371,7 +427,11 @@
            mix: p.mix, room: p.room, damp: p.damp, chorus: CHORUS[chorusAt][1] });
   }
   const spacePick = createChoice({
-    label: 'space', options: SPACE.map(([n]) => [n, n]), at: spaceAt,
+    // ⚠️ `reverb`, NOT `space`. "Space" is what it does to your ear and "reverb"
+    // is what it is called by everyone who has met one; a visitor who knows the
+    // word gets no help from the poetic one, and a visitor who does not is no
+    // better off either.
+    label: 'reverb', options: SPACE.map(([n]) => [n, n]), at: spaceAt,
     onPick: (_v, name, i) => { spaceAt = i; sendSpace(); d.log(`space ${name}`); },
   });
   const chorusPick = createChoice({
@@ -407,7 +467,22 @@
   function connect() {
     ws = new WebSocket(`${RELAY}/room/${ROOM}/ws`);
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => { d.log(`joined ${ROOM}`, 'hi'); send({ type: 'sf.list' }); send({ type: 'audio.status' }); };
+    ws.onopen = () => {
+      d.log(`joined ${ROOM}`, 'hi');
+      // 🔴 TAKE THE GRANULATOR OUT, BECAUSE THIS PAGE CANNOT EXPRESS IT.
+      // The insert belongs to `grains` now and its controls were cut from here
+      // — but cutting a control does not clear the STATE it used to set, and
+      // the board is shared hardware. An insert left in by a `grains` tab that
+      // was simply closed goes on wrapping whatever this page plays, and with
+      // nothing arriving it feeds its own delay: MEASURED 2026-09-12, the board
+      // streamed a steady **-6.1 dBFS** subsonic drone (everything a multiple
+      // of ~8.8 Hz) while `box.alive` reported `voices: 0` — true about notes
+      // and false about sound. One `fx.pappus {on:false}` took it to digital
+      // silence, which is the A/B.
+      send({ type: 'fx.pappus', on: false });
+      send({ type: 'sf.list' });
+      send({ type: 'audio.status' });
+    };
     // The relay's Durable Object can be restarted under us; without this the
     // page keeps its buttons and answers nobody, which looks like a dead box.
     ws.onclose = () => { d.log('socket closed — reconnecting'); setTimeout(connect, 1000); };
@@ -454,6 +529,7 @@
             patches.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
           banksInList = m.bankCount ?? m.banks.length;
           idx = 0; lastBank = -1;
+          refreshPicker();
           showPatch();
           d.log(`${m.source}: ${patches.length} patches in ${m.bankCount} banks`, 'hi');
           // The board checked its own bank map against its own files. Saying
@@ -503,6 +579,9 @@
           // the arrows keep walking the previous instrument's list until the
           // reply lands — stepping through names that belong to something else.
           patches = []; idx = 0; banksInList = 0; chosen = false;
+          // The fixed table belongs to the instrument that just came up, so the
+          // dropdown has to be rebuilt even when no list arrives.
+          refreshPicker();
           showPatch();
           send({ type: 'voices.list', source: m.source });
           d.log(`playing ${m.source}`, 'hi');

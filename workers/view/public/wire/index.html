@@ -17,21 +17,14 @@
     font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: #0b0e14;
     border: 1px solid var(--line); border-radius: 3px; padding: 6px 8px; min-width: 0;
   }
-  .compose .verb { width: 92px; }
   .compose .body { flex: 1 1 140px; }
-  .compose .keep { display: flex; align-items: center; gap: 5px; }
   /* Everything here WRAPS. A line of JSON is 110-odd bytes and a phone is
      about 45 characters wide, so `nowrap` plus an ellipsis hid most of the one
      thing this page exists to show — and an ellipsis is the signal that
      something is in the wrong place, not a styling choice to live with. */
-  .lines { font: 400 11px/1.55 var(--mono); margin: 0 0 10px; }
-  .lines .row { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #ffffff08; }
-  .lines .dir { width: 58px; flex: none; color: var(--dim2); }
-  .lines .dir.out { color: var(--hi); }
-  .lines .dir.echo { color: var(--ok, #6ee7a8); }
-  .lines .sz { width: 46px; flex: none; color: var(--dim); text-align: right; }
-  .lines .txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
-  .lines .txt b { color: var(--fg); font-weight: 500; }
+  /* the list itself is `demo/shell/messages.mjs` now — this page carried the
+     only copy of it and drew the history a second, different way */
+  .pos-msgs { margin: 0 0 10px; }
   .pane { border: 1px solid var(--line); border-radius: 4px; background: var(--card); padding: 10px; margin: 0 0 10px; }
   .pane h2 { font: 500 11px/1 var(--mono); color: var(--dim2); margin: 0 0 7px; letter-spacing: .04em; text-transform: uppercase; }
   .pane .gut { font: 400 11px/1.5 var(--mono); color: var(--dim); margin: 7px 0 0; }
@@ -45,6 +38,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { openWire, LIMITS } from '/shell/wire.mjs';
+  import { createMessageList } from '/shell/messages.mjs';
 
   const q = new URLSearchParams(location.search);
   // ONE shared room by default. It used to be a room per tab, which made
@@ -66,15 +60,15 @@
     what: `Compose a message and watch the exact bytes travel — out, and back again, because the relay returns
            your own message to you and that echo is what gives everyone one order. Every message carries a kind, a
            sender, a time and a counter, and the counter is how a loss becomes visible: the relay drops anything
-           over ${(LIMITS.maxBytes / 1024) | 0} KiB or past its rate limit without telling the sender. Messages
-           you send and keep also go to a small history, read back over an ordinary web request and already on
-           the page when you arrive.`,
-    readout: { 'round trip': 'ms', delivery: 'ms', sent: '', kept: '', missing: '' },
+           over ${(LIMITS.maxBytes / 1024) | 0} KiB or past its rate limit without telling the sender. A message
+           you store also goes to a small history, which is already on the page when you arrive — the stored
+           column says which ones went there.`,
+    readout: { 'round trip': 'ms', delivery: 'ms', sent: '', stored: '', missing: '' },
     controls: [
       { id: 'send', label: 'Send it', primary: true },
       // ONE primary. Two yellow buttons side by side say neither is the main
-      // path, and the base act is sending — keeping is the variant.
-      { id: 'store', label: 'Send and keep it' },
+      // path, and the base act is sending — storing is the variant.
+      { id: 'store', label: 'Send and store it' },
       { id: 'bytes', label: 'Send the same as bytes' },
       { id: 'toobig', label: 'Try one that is too big' },
       { id: 'overfill', label: 'Overfill the history' },
@@ -86,12 +80,15 @@
 
   // ── the composer ────────────────────────────────────────────────────────
   const compose = el('div', 'compose');
-  const verb = el('input', 'verb', null, { type: 'text', value: 'note', 'aria-label': 'kind of message' });
+  // ⚠️ NO `kind` FIELD. It was a text box whose value went straight into the
+  // envelope's `type`, which asked a visitor to invent a protocol before they
+  // could say hello — and every one of them typed nothing and sent `note`. The
+  // kind of a message somebody types into a box is CHAT; the page knows that
+  // without being told, and the other kinds on this page (`toobig`, `fill`,
+  // `chatter`) are set by the checks that send them, where they mean something.
+  const TYPE = 'chat';
   const body = el('input', 'body', null, { type: 'text', value: 'hello', 'aria-label': 'what it says' });
-  // No checkbox: keeping is a different ACT, not a setting on this one, so it
-  // is a second button under the box rather than a state you have to read back
-  // off a tick before you press send.
-  compose.append(el('label', null, 'kind'), verb, el('label', null, 'says'), body);
+  compose.append(el('label', null, 'says'), body);
   // The composer goes ABOVE the control bar, so Send sits under the thing it
   // sends. Moving the BUTTON instead would take it out of `.pos-controls`, which
   // is the only place the harness looks — a control it cannot reach is a
@@ -100,37 +97,38 @@
   const cbar = d.button('send').parentElement;
   cbar.parentNode.insertBefore(compose, cbar);
 
-  const lines = el('div', 'lines');
-  d.el.append(lines);
-
-  const histPane = el('div', 'pane');
-  const histOut = el('pre', null, 'reading…');
-  const histGut = el('div', 'gut', `room ${ROOM} · keeps the newest ${CAP} · only what was marked keep`);
-  histPane.append(el('h2', null, 'the history, over an ordinary web request'), histOut, histGut);
-  d.el.append(histPane);
+  // 🔴 ONE LIST. Live traffic and the stored history are the SAME MESSAGES —
+  // they were a row of coloured gutters and a <pre> of raw lines in two panes,
+  // so one message looked like two unrelated things depending on which half of
+  // the page it was in, and the history half lost the direction, the size and
+  // the stored mark. There is nothing to compare across two panes that a
+  // COLUMN does not say better: `stored` is the whole of the difference.
+  //
+  // ⚠️ NO HEADING EITHER. It said "the history, over an ordinary web request",
+  // which is a claim about the TRANSPORT — the subject of the paragraph and of
+  // an assert, not a label over a list of messages.
+  const pane = el('div', 'pane');
+  const msgs = createMessageList({ cap: 40, empty: 'nothing here yet' });
+  const histGut = el('div', 'gut', `room ${ROOM} · keeps the newest ${CAP}`);
+  pane.append(msgs.el, histGut);
+  d.el.append(pane);
 
   // ── state ───────────────────────────────────────────────────────────────
   const shown = [];
-  const stored = [];            // the exact lines we asked to be kept, in order
+  let seeded = false;           // the history is the list's first content, once
+  const stored = [];            // the exact lines we asked to be stored, in order
   const deliveries = [];
   let recording = false, recordNote = 'not asked yet';
 
   const short = (s, n = 260) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-  function show(dir, bytes, text, hi) {
+  function show(dir, bytes, text, hi, wasStored) {
     shown.push({ dir, bytes, text });
-    const row = el('div', 'row');
-    row.append(
-      el('span', `dir ${dir === 'out' ? 'out' : hi ? 'echo' : ''}`, dir),
-      el('span', 'sz', `${bytes} B`),
-    );
-    const t = el('span', 'txt');
-    t.innerHTML = hi ? `<b>${escape(short(text))}</b>` : escape(short(text));
-    row.append(t);
-    lines.prepend(row);
-    while (lines.children.length > 4) lines.lastChild.remove();
+    // The component writes with textContent, so the hand-rolled `<` and `&`
+    // escaping this page carried is gone — a message is data, and building it
+    // into innerHTML was one paste away from being markup.
+    msgs.add({ dir: dir === 'out' ? 'out' : hi ? 'echo' : 'in', bytes, stored: !!wasStored, text: short(text), hi });
   }
-  const escape = (s) => s.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
 
   function render() {
     const s = wire.stats();
@@ -153,7 +151,7 @@
       // The sender stamps `at` and the relay never re-stamps, which is why this
       // number is honest even though the relay has no idea what time it is.
       if (mine) deliveries.push(Date.now() - got.msg.at);
-      show(mine ? 'echo' : 'in', got.bytes, got.data, mine);
+      show(mine ? 'echo' : 'in', got.bytes, got.data, mine, mine && stored.includes(got.data));
       render();
     },
   });
@@ -175,7 +173,8 @@
 
   function put(msg) {
     const out = wire.send(msg);
-    if (out) show('out', out.bytes, out.sent ? out.line : `refused here — ${out.bytes} B is over the ${LIMITS.maxBytes} B roof`);
+    if (out) show('out', out.bytes, out.sent ? out.line : `refused here — ${out.bytes} B is over the ${LIMITS.maxBytes} B roof`,
+                  false, out.sent && !!msg.store);
     if (out?.sent && msg.store) stored.push(out.line);
     render();
     return out;
@@ -210,8 +209,16 @@
     const num = (k) => Number(new RegExp(`${k}=(\\d+)`).exec(header)?.[1] ?? 0);
     const held = num('kept'); const seen = num('seen'); const oldest = num('oldest');
     const rows = text.split('\n').filter(Boolean);
-    d.set('kept', held);
-    histOut.textContent = rows.length ? rows.map((r) => short(r)).join('\n') : '(nothing kept yet)';
+    d.set('stored', held);
+    // ⚠️ THE HISTORY SEEDS THE LIST, IT DOES NOT REPLACE IT. This is read again
+    // after almost every check, and re-setting the list each time would wipe
+    // the live rows the check had just put there — the page would delete the
+    // evidence it exists to show. Rows that arrived before this tab did are
+    // what the list starts with; everything after is live traffic on top.
+    if (!seeded) {
+      seeded = true;
+      msgs.set(rows.map((r) => ({ dir: 'stored', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
+    }
     histGut.textContent = `room ${ROOM} · ${held} held of ${seen} seen · cap ${CAP} · `
       + `oldest ${oldest ? new Date(oldest).toISOString().slice(11, 19) : '—'} · ${recordNote}`;
     return { rows, held, seen, oldest };
@@ -229,7 +236,7 @@
   d.on('send', async () => {
     const rtt = await wire.ping();
     if (rtt !== null) d.set('round trip', rtt);
-    const out = put({ type: verb.value || 'note', value: body.value, store: false });
+    const out = put({ type: TYPE, value: body.value, store: false });
     const back = out?.sent ? await echoOf(out.line) : null;
     render();
     d.assert('relay open', wire.state() === 1, String(wire.state()));
@@ -241,26 +248,26 @@
   });
 
   d.on('store', async () => {
-    // The same message, kept. Two acts, one press apart — which is also the
+    // The same message, stored. Two acts, one press apart — which is also the
     // pair the history's held-of-seen counts are made of.
-    const out = put({ type: verb.value || 'note', value: body.value, store: true });
+    const out = put({ type: TYPE, value: body.value, store: true });
     const back = out?.sent ? await echoOf(out.line) : null;
     let h = { rows: [], held: 0, seen: 0 };
     let reached = true;
     try { h = await readHistory(); } catch { reached = false; }
-    d.assert('a kept message comes back AND lands in the history',
+    d.assert('a stored message comes back AND lands in the history',
       back !== null && reached && h.rows.includes(out.line),
       out ? `${out.bytes} B · ${h.held} held of ${h.seen} seen` : 'not sent');
-    d.assert('the one sent without keeping is not in there',
+    d.assert('the one sent without storing is not in there',
       reached && !h.rows.some((r) => r.includes('"store":false')),
-      `${h.rows.length} rows, none of them unkept`);
+      `${h.rows.length} rows, none of them unstored`);
     render();
   });
 
   d.on('bytes', async () => {
     // The same payload, as bytes: the two paths are one press apart, and the
     // relay's contract says it carries them unchanged.
-    const payload = new TextEncoder().encode(`${verb.value}:${body.value}`);
+    const payload = new TextEncoder().encode(`${TYPE}:${body.value}`);
     lastBinaryIn = null;
     const seqBefore = wire.stats().seq;
     const out = wire.sendBinary(payload.buffer);
@@ -284,7 +291,7 @@
     // it — which is the only way a receiver can know anything went missing.
     const before = wire.stats().missing;
     const refused = put({ type: 'toobig', value: 'x'.repeat(LIMITS.maxBytes + 1024) });
-    const after = put({ type: verb.value || 'note', value: 'the one after the hole', store: true });
+    const after = put({ type: TYPE, value: 'the one after the hole', store: true });
     if (after?.sent) await echoOf(after.line);
     const s = wire.stats();
     d.assert('one over the roof is refused, not truncated', refused?.sent === false,
@@ -296,8 +303,8 @@
 
   d.on('overfill', async () => {
     // Retention is a decision, not a default. One that is delivered and NOT
-    // kept, then one more than the room holds.
-    const passing = put({ type: 'chatter', value: 'delivered, not kept', store: false });
+    // stored, then one more than the room holds.
+    const passing = put({ type: 'chatter', value: 'delivered, not stored', store: false });
     if (passing?.sent) await echoOf(passing.line);
     for (let i = 1; i <= CAP + 1; i++) put({ type: 'fill', value: `fill ${i}`, store: true });
     await sleep(400);
@@ -308,8 +315,8 @@
     d.assert('the history answers over an ordinary web request', reached && recording, recordNote);
     d.assert('it hands back our own lines in the order the socket delivered them',
       order.count > 0 && order.ok, `${order.count} of ours among ${h.rows.length}`);
-    d.assert('what was not marked keep is delivered but not kept',
-      passing?.sent === true && !h.rows.some((r) => r.includes('delivered, not kept')),
+    d.assert('what was not marked store is delivered but not stored',
+      passing?.sent === true && !h.rows.some((r) => r.includes('delivered, not stored')),
       `${h.held} held of ${h.seen} seen`);
     d.assert('the cap holds: one more in, the oldest out', h.held === CAP,
       `${h.held} held against a cap of ${CAP}`);
@@ -342,7 +349,7 @@
   // part, and a button to fetch it left the page looking empty until you asked.
   let opening = { rows: [], held: 0 };
   let openOk = true;
-  try { opening = await readHistory(); } catch { openOk = false; histOut.textContent = '(the history did not answer)'; }
+  try { opening = await readHistory(); } catch { openOk = false; msgs.clear('the history did not answer'); }
   d.assert('the history is on the page before anything is sent', openOk && recording,
     openOk ? `${opening.held} held on arrival · ${recordNote}` : recordNote);
   d.log(`room ${ROOM} · open a second copy to see both sides · ?checks=1 shows the checks`, 'hi');

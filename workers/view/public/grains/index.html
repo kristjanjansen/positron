@@ -37,9 +37,10 @@
      its own text width leaves a phone with a stepper and an acre of nothing
      beside it — the same complaint as the sliders, one row up. `1fr` here is
      the same fix as `minmax(0,1fr)` there. */
-  .pick { display: grid; grid-template-columns: max-content 1fr; align-items: center;
-          gap: 10px; margin: 0 0 12px; max-width: 560px; }
-  .pick-n { font: 600 15px/1 var(--mono); color: var(--hi); }
+  /* The name is inside the control now, so this row only has to place one
+     thing — the two-column grid and `.pick-n` existed to put a label beside a
+     stepper, which is what `createPicker` does for itself. */
+  .pick { display: flex; align-items: center; margin: 0 0 12px; }
   .drift { font: 400 12px/1.7 var(--mono); color: var(--dim); margin: 0 0 12px; }
   /* ⚠️ NEVER AN EMPTY PAGE. A board that is switched off and a board that is
      playing must not look the same, which is the whole reason this block
@@ -53,7 +54,7 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
-  import { createStepper } from '/shell/stepper.mjs';
+  import { createPicker } from '/shell/picker.mjs';
   import { openWire } from '/shell/wire.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
 
@@ -145,12 +146,19 @@
    * numbers; the roll table in pappus.mjs is where these ranges come from, so a
    * slider cannot ask for something a roll would never produce.
    *
-   * ⚠️ BOTH HALVES AT ONCE. The engine has two independent grain streams, `m`
-   * and `n`, and a roll gives them different characters on purpose — that
-   * difference is most of what makes it sound like something rather than like a
-   * effect. One slider moving both keeps the relation while changing the scale,
-   * which is the useful handle; two sliders per parameter would be eight
-   * controls and no clearer.
+   * 🔴 ONE SLIDER, TWO HALVES, AND THE RELATION BETWEEN THEM SURVIVES. The
+   * comment here used to claim that sending one value to both "keeps the
+   * relation while changing the scale". It does not — it OVERWRITES the
+   * relation: `slow drift` loads granulator one at 2.2 grains a second and two
+   * at 1.4, and the first drag of the rate slider made both of them the same
+   * number. So the patches were built to have two unlike halves, the page said
+   * they were unlike, and one touch of any control made them identical. That is
+   * why both granulators sounded the same.
+   *
+   * The slider now moves half one and carries half two with it at the PATCH's
+   * own ratio, which is what "changing the scale" was supposed to mean. A ratio
+   * needs a non-zero base, so a patch whose half one is 0 keeps the DIFFERENCE
+   * instead — `spray` and `strum` are legitimately zero in several patches.
    */
   const KNOBS = [
     ['rate',  0.5, 24,  0.1, '/s',  'how often a grain starts'],
@@ -169,9 +177,11 @@
       // one lost. `onChange` sends one message when the hand stops.
       onChange: (v) => {
         if (!fxOn) { d.log('switch the granulator on first', 'warn'); return; }
+        const other = partner(key, v);
+        setLive(key, v, other);
         send({ type: 'params.set', cmd: `m${key}`, args: [v] });
-        send({ type: 'params.set', cmd: `n${key}`, args: [v] });
-        d.log(`${key} ${v}${unit ? ' ' + unit : ''} — ${why}`);
+        send({ type: 'params.set', cmd: `n${key}`, args: [other] });
+        d.log(`${key} ${v} and ${round(other)}${unit ? ' ' + unit : ''} — ${why}`);
       },
     });
     sliders.set(key, s);
@@ -215,6 +225,29 @@
   ];
 
   let patch = 0, holding = [];
+  // 🔴 WHAT WAS ACTUALLY SENT, not what the patch table says. `render()` drew
+  // `PATCHES[patch].m/n` — the values a patch loads — so every slider move left
+  // the panel describing settings that had already left the sound. Same shape
+  // as the `params.state` bug this page was fixed for once already: a readout
+  // answering with something that used to be true.
+  // ⚠️ SEEDED FROM THE PATCH, NOT EMPTY. `render()` runs on the first frame that
+  // arrives, long before anything is applied, and an empty object put
+  // `undefined.toFixed()` on the page's own error line — a readout that starts
+  // blank is a readout that throws.
+  let live = { m: { ...PATCHES[0].m }, n: { ...PATCHES[0].n } };
+  const round = (x) => Math.round(x * 1000) / 1000;
+  const clampTo = (key, v) => {
+    const k = KNOBS.find(([n]) => n === key);
+    return k ? Math.min(k[2], Math.max(k[1], v)) : v;
+  };
+  /** Half two's value for a slider on half one, at the patch's own relation. */
+  function partner(key, v) {
+    const p = PATCHES[patch];
+    const base = p.m[key], mate = p.n[key];
+    if (base > 0 && mate > 0) return round(clampTo(key, v * (mate / base)));
+    return round(clampTo(key, v + (mate - base)));
+  }
+  function setLive(key, mv, nv) { live.m[key] = mv; live.n[key] = nv; }
 
   /** Release the old chord, load the new instrument, hold the new chord, set both halves. */
   async function applyPatch(i) {
@@ -231,12 +264,19 @@
     for (const n of p.notes) { send({ type: 'note.on', note: n, vel: 80, channel: 0 }); holding.push(n); }
     for (const [k, v] of Object.entries(p.m)) send({ type: 'params.set', cmd: `m${k}`, args: [v] });
     for (const [k, v] of Object.entries(p.n)) send({ type: 'params.set', cmd: `n${k}`, args: [v] });
+    // A patch is the new truth about both halves, so the panel's source of
+    // truth is reset with it.
+    live = { m: { ...p.m }, n: { ...p.n } };
     for (const key of ['rate', 'size', 'spray', 'swarm']) sliders.get(key)?.set(p.m[key], true);
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
   }
 
-  const step = createStepper({
+  // The name IS the control — press it and the six sounds are a list. It used
+  // to be a stepper with the name printed beside it as dead text, so the one
+  // thing you read had none of the behaviour you wanted from it.
+  const step = createPicker({
+    label: 'sound',
     what: 'sound',
     prev: () => applyPatch(patch - 1),
     next: () => applyPatch(patch + 1),
@@ -244,11 +284,12 @@
     // nine ranges is the middle of all nine almost every time — one wash, every
     // time, which is the thing this page was before.
     random: () => applyPatch(Math.floor(Math.random() * (PATCHES.length - 1)) + patch + 1),
+    onPick: (i) => applyPatch(i),
   });
+  step.options(PATCHES.map((p) => p.name), 0);
+  step.render = () => step.show(PATCHES[patch].name, patch);
   const patchRow = el('div', 'pick');
-  const patchName = el('span', 'pick-n', '');
-  step.render = () => { patchName.textContent = PATCHES[patch].name; };
-  patchRow.append(step.el, patchName);
+  patchRow.append(step.el);
   d.el.append(patchRow);
   step.render();
 
@@ -339,10 +380,13 @@
     // a readout describing settings that left the sound minutes ago.
     const p = PATCHES[patch];
     const box = el('div', 'roll');
-    for (const [k, side] of [['one', p.m], ['two', p.n]]) {
+    for (const [k, side] of [['one', live.m], ['two', live.n]]) {
       const s = el('div', 'side');
+      // ⚠️ NO PATCH NAME IN HERE. It was printed in BOTH halves and is now in
+      // the picker as well — the same two words three times, and the one thing
+      // in the block that is identical between the two halves, in a block whose
+      // entire job is showing how they differ.
       s.append(el('span', 'hd', `granulator ${k}`),
-               el('span', 'ch', p.name),
                el('span', 'nums', `${side.rate} grains a second · each ${Math.round(side.size * 1000)} ms long`
                   + ` · reading ${side.scan.toFixed(2)} of the way through the sixty seconds`));
       box.append(s);
@@ -734,7 +778,7 @@
       drift?.on ? `${moved ? `${moved.nudges} nudges in ${secs(moved.ms)}` : 'only one reading so far'}, reading at ${drift.scan}`
         : 'the drift is switched off on the board');
     d.assert('a named patch is on screen, chosen rather than rolled',
-      !!PATCHES[patch] && patchName.textContent === PATCHES[patch].name,
+      !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,
       `${PATCHES[patch].name} · ${PATCHES[patch].voice} · ${PATCHES[patch].notes.length} notes`);
   }
 
