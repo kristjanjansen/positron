@@ -190,7 +190,14 @@ function checkImports(copied) {
 
 function demoFiles() {
   const out = [];
-  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json']);
+  // ⚠️ MEDIA TOO. This was code and stylesheets only, so a demo that carries a
+  // sound file shipped the page and not the sound — a 404 the page cannot
+  // recover from and the build had no reason to mention. `dust` carries two
+  // 1965 excerpts; the allowlist is still an allowlist, because this directory
+  // is the wall that keeps `enumerate, don't list` away from the repo root.
+  const OK = new Set(['.html', '.mjs', '.js', '.css', '.json',
+                      '.m4a', '.mp3', '.opus', '.ogg', '.wav', '.webm',
+                      '.png', '.jpg', '.jpeg', '.svg', '.webp']);
   for (const d of DEMO_MANIFEST) {
     if (!d.built) continue;
     const dir = `demo/${d.name}`;
