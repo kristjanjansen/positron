@@ -49,11 +49,37 @@ body {
 /* how it works — one plain paragraph */
 
 /* ── readout ──────────────────────────────────────────────────────────── */
+/* 🔴 FLEX, NOT GRID, AND THE EVEN-COUNT RULE WAS NOT ENOUGH. This was
+   `repeat(auto-fit, minmax(96px, 1fr))`, and CLAUDE.md's rule — a readout has
+   an EVEN number of cells — was written on the belief that a phone gets two
+   columns, so an even count always fills its last row. MEASURED, on a real
+   page, and the belief is wrong: 96 px plus a 1 px gap gives **three** columns
+   from about 353 px of content upward, which is every phone anyone owns.
+
+     4 cells   HOLE of 2 from 353 to 426 px   iPhone SE 375 · iPhone 12-15 390 · Pixel 412
+     6 cells   HOLE of 2 from 427 to 620 px, and a hole of 4 at 560
+
+   So the rule held only below 353 px, and four-cell readouts have been holing
+   on the commonest screen there is. ⚠️ The hole is not cosmetic: the row is one
+   background showing through 1 px gaps, so a missing slot is a patch of a
+   DIFFERENT COLOUR with nothing in it, which reads as a cell that failed to
+   load rather than one that does not exist.
+
+   Flex fixes it for every count at every width, because the last row's items
+   GROW to fill what is left — `flex: 1 1 96px` is the same "at least 96, share
+   the rest" the grid was asking for, minus the fixed column count that was
+   causing the hole. A last row with wider cells is not a hole; it is the same
+   row, shared differently.
+
+   ⚠️ THE EVEN-COUNT RULE STAYS ANYWAY, and it is now editorial rather than
+   structural: an odd readout always has a weakest cell, and being made to find
+   it is the point. `mount()` still throws. */
 .pos-readout {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  display: flex; flex-wrap: wrap;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
 }
+.pos-readout > * { flex: 1 1 96px; min-width: 0; }
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
    was hidden */

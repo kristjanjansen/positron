@@ -520,10 +520,20 @@ to recover.
   way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
 
 - 🔴 **A READOUT HAS AN EVEN NUMBER OF CELLS, AND AN ODD ONE IS CUT, NEVER
-  PADDED.** The row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets two
-  columns and an odd count leaves a HOLE in the last row — a slot of a different
-  colour with nothing in it, which reads as a cell that failed to load rather
-  than one that does not exist. A blank filler is the wrong repair: it adds a
+  PADDED.** ⚠️ **THE REASON GIVEN HERE WAS WRONG AND THE RULE SURVIVES ANYWAY.**
+  It used to say the row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone
+  gets two columns and an odd count leaves a HOLE in the last row. MEASURED on a
+  real page 2026-09-13: 96 px plus a 1 px gap gives **three** columns from about
+  353 px of content upward, which is every phone anyone owns — so a **4-cell**
+  readout holed from 353 to 426 px (iPhone SE 375, iPhone 12–15 **390**, Pixel
+  412) and a **6-cell** one holed from 427 to 620, four slots wide at 560. An
+  even count guaranteed nothing above two columns, and four-cell readouts had
+  been holing on the commonest screen there is. The row is **flex** now, so the
+  last row's cells GROW to fill it at every width and every count — verified at
+  thirteen widths, both counts, all filling.
+  So the even rule is now **editorial, not structural**: an odd readout always
+  has a weakest cell, and being made to find it is the point. `mount()` still
+  throws. The hole it used to describe is gone. A blank filler is the wrong repair: it adds a
   thing to look at that says nothing. Trimming is the right one, because an odd
   readout always has a weakest cell — usually a constant (`llhls`' `target`,
   `rack`'s 50/s `rate`, `moq`'s `version`) or something a neighbour already
