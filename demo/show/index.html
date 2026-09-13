@@ -10,9 +10,13 @@
   /* 380, not 240: the shared pattern is drawn on a 1280 grid, and below about
      400 px of display width its clocks stop being readable. At 380 the pair
      stacks on a normal card instead of sitting side by side too small to read,
-     which is the right trade for a picture whose whole job is to be read. */
+     which is the right trade for a picture whose whole job is to be read.
+
+     No vertical margins anywhere below: the gap between the tiles, the
+     played-back picture, the segment row and the transport bar is
+     `.pos-body > * + *` in shell.css, one rhythm for every page. */
   .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-          gap: 6px; margin: 0 0 10px; }
+          gap: 6px; }
   .box { position: relative; }
   .box canvas, .box video { width: 100%; display: block; background: #000;
                             border: 1px solid var(--line); border-radius: 3px; }
@@ -20,9 +24,13 @@
               letter-spacing: .08em; text-transform: uppercase;
               color: var(--fg); background: #0b0e14aa; border-radius: 3px; padding: 1px 5px; }
   video.back { width: 100%; display: block; background: #000; border: 1px solid var(--line);
-               border-radius: 3px; margin: 0 0 10px; }
-  .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2); margin: 0 0 8px;
+               border-radius: 3px; }
+  .segs { font: 500 10px/1.6 var(--mono); color: var(--dim2);
           display: flex; flex-wrap: wrap; gap: 3px; }
+  /* A row with nothing in it still takes its 22 px, which reads as something
+     that failed to render. `display:flex` beats the UA's `[hidden]` rule, so
+     the hidden case has to be said here. */
+  .segs[hidden] { display: none; }
   .segs i { font-style: normal; border: 1px solid var(--line2); border-radius: 2px; padding: 0 4px; }
 </style>
 
@@ -58,8 +66,14 @@
 
   const d = mount({
     name: 'show',
-    what: 'Live over WebRTC, recorded off the far end of that hop, replayed on the timeline.',
-    readout: { source: '', live: 'ms', fps: '', segments: '', kib: 'KiB', dur: 's' },
+    what: 'A picture goes live over WebRTC to a second connection in this same page, '
+      + 'and what that far end receives — decode losses and all — is what gets '
+      + 'recorded. Press Go live and record 3 s, then Play it back and scrub the '
+      + 'result. live is how long the first frame took to arrive and fps is what the '
+      + 'far end is decoding now; the rest is the size and length of what was kept.',
+    // `kib` was a key that only repeated its own unit, and `dur` an abbreviation
+    // of a word that fits.
+    readout: { source: '', live: 'ms', fps: '', segments: '', total: 'KiB', length: 's' },
     // ONE primary that does the whole capture leg, and it is FIRST on purpose.
     // verify.mjs sleeps `settleMs` only after control 0 and 650 ms after every
     // other one, and it stops collecting asserts as soon as 400 ms pass with no
@@ -98,6 +112,7 @@
   back.style.display = 'none';
   d.el.append(back);
   const segsEl = el('div', 'segs');
+  segsEl.hidden = true;                        // until there is a segment in it
   d.el.append(segsEl);
 
   let camStream = null;
@@ -301,8 +316,11 @@
   let recording = false, recTrack = null, mime = null, bytes = 0;
 
   function paintSegs() {
-    d.set('segments', segs.length);
-    d.set('kib', Math.round(bytes / 1024));
+    // Blank, never 0: this also runs on the reset at the top of a recording,
+    // and a zero there reads as a confident measurement of an empty archive.
+    d.set('segments', segs.length || '');
+    d.set('total', bytes ? Math.round(bytes / 1024) : '');
+    segsEl.hidden = segs.length === 0;
     segsEl.replaceChildren(...segs.slice(-20).map((b, i) =>
       el('i', '', `${segs.length - Math.min(20, segs.length) + i}:${Math.round(b.size / 1024)}k`)));
   }
@@ -371,7 +389,7 @@
       back.currentTime = 0;
     }
     duration = Number.isFinite(back.duration) ? back.duration : null;
-    if (duration != null) d.set('dur', Math.round(duration * 100) / 100);
+    if (duration != null) d.set('length', Math.round(duration * 100) / 100);
     return duration;
   }
 
