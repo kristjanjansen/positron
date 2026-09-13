@@ -942,20 +942,31 @@
       }
     }
 
-    let eye = 0;
-    for (const view of pose.views) {
-      const vp = layer.getViewport(view);
-      gl.viewport(vp.x, vp.y, vp.width, vp.height);
-      gl.scissor(vp.x, vp.y, vp.width, vp.height);
-      // Only the FIRST eye clears the shared framebuffer; the rest clear depth
-      // inside their own scissor. See drawRoom.
-      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0, pose);
-      eye++;
-    }
-    // The panel, head-locked and low-left, drawn after everything so nothing
-    // occludes it. It fades out on its own — a status line that stays up
-    // forever is furniture in your field of view.
-    if (pose && panelTex && performance.now() < panelUntil + 900) {
+    /**
+     * The panel, head-locked and low-left, drawn after the room in EACH EYE so
+     * nothing occludes it. It fades out on its own — a status line that stays
+     * up forever is furniture in your field of view.
+     *
+     * 🔴 INSIDE THE EYE LOOP, AND IT WAS NOT. This block used to sit after the
+     * loop and read `proj` and `view` — a parameter of `drawRoom` and the
+     * loop's own `const`, neither of which exists out there. MEASURED on a
+     * Quest 3, 2026-09-13: `Uncaught ReferenceError: proj is not defined @
+     * :970`, **385 times in one 49-second session**, so the panel has never
+     * once been drawn in a headset.
+     *
+     * ⚠️ AND IT IS WHY THE gl 1282 INSTRUMENTATION REPORTED NOTHING. The throw
+     * escapes the frame callback, and the `xrFrames === 1` check that ships
+     * the first frame's `getError()` runs AFTER this — so on every frame the
+     * panel was due, the check never ran. The log carries no `first headset
+     * frame` line at all. An uncaught error inside a render loop does not stop
+     * the loop; it silently removes everything below it.
+     *
+     * Per eye is also the only correct place for it: both eyes share one
+     * framebuffer, so a head-locked quad drawn once lands in whichever
+     * viewport happened to be current.
+     */
+    function drawPanel(proj, viewMat) {
+      if (!pose || !panelTex || performance.now() >= panelUntil + 900) return;
       const fade = Math.max(0, Math.min(1, (panelUntil + 900 - performance.now()) / 900));
       const hm = pose.transform.matrix;
       const M = new Float32Array([
@@ -968,7 +979,7 @@
       gl.useProgram(progPanel);
       const PL = locs(progPanel);
       gl.uniformMatrix4fv(PL.proj, false, proj);
-      gl.uniformMatrix4fv(PL.view, false, view);
+      gl.uniformMatrix4fv(PL.view, false, viewMat);
       gl.uniformMatrix4fv(PL.model, false, M);
       gl.uniform1f(PL.fade, fade);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, panelTex);
@@ -979,6 +990,18 @@
       gl.drawArrays(gl.TRIANGLES, 0, quad.count);
       gl.bindVertexArray(null);
       gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    }
+
+    let eye = 0;
+    for (const view of pose.views) {
+      const vp = layer.getViewport(view);
+      gl.viewport(vp.x, vp.y, vp.width, vp.height);
+      gl.scissor(vp.x, vp.y, vp.width, vp.height);
+      // Only the FIRST eye clears the shared framebuffer; the rest clear depth
+      // inside their own scissor. See drawRoom.
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0, pose);
+      drawPanel(view.projectionMatrix, view.transform.inverse.matrix);
+      eye++;
     }
 
     if (xrFrames === 1) {
