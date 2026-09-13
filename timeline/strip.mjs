@@ -1140,8 +1140,25 @@ export function createStrip(canvas, deck, opts = {}) {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     return S.wallAnchor.pos + (now - S.wallAnchor.wall);
   }
-  if (opts.armWall !== false && deck.transport && deck.transport.onState) {
-    // arm on the first play, so the gap counts from the moment the piece started
+  // 🔴 OFF UNLESS A PAGE ASKS, AND THE EVIDENCE IS THE PAGES THEMSELVES. This
+  // armed on the first play by default, and of the thirteen pages that use a
+  // strip, TEN pass `armWall: false` and the other three call `armWall(anchor)`
+  // with an anchor of their own (`keep` and `take` a part's start, `now` the
+  // real clock). **Not one page wanted the default** — and the seven that never
+  // mentioned it were getting a cursor they had not asked for.
+  //
+  // What it measures is how far the piece has fallen behind real time since it
+  // first played. That is the number to watch on a LIVE feed, and it is noise
+  // on a fixture: once the playhead stops, the gap just counts how long ago you
+  // finished. PHOTOGRAPHED on `draw` — an amber band across half the strip and
+  // `209.31 s` beside it, which is the age of the browser tab and not a fact
+  // about the drawing. The reader's words were "I do not understand what that
+  // 209.31 s and dark yellow area is", which is the correct response to it.
+  //
+  // ⚠️ A default that turns a second cursor ON is a default that has to be
+  // right about every page that never thought about it. `opts.armWall === true`
+  // keeps the auto-arm for anything that genuinely wants it on first play.
+  if (opts.armWall === true && deck.transport && deck.transport.onState) {
     const off = deck.transport.onState((st) => {
       if (st && st.reason === 'play' && !S.wallAnchor) armWall(deck.position());
     });
