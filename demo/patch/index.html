@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* One row for the two things you choose before anything crosses: which file,
+     and how loud. The shell's `.pos-body > * + *` rhythm owns the gap ABOVE
+     this row; what is set here is only how its two controls sit beside each
+     other, which is a claim about those two and nothing else. */
+  .pick { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .pick .sld { flex: 1 1 220px; }
+</style>
+
+<script type="module">
+  // THE SUBJECT IS THE FILE, NOT THE SYNTHESISER.
+  //
+  // `plan-visuals.md` §1.2 argues that a fragment shader is a document — "~2 KB
+  // of GLSL plus ~200 bytes of parameters reproduces it at any resolution" —
+  // and works out when generated code may cross a wire. The sound half of that
+  // argument had never been written down here. This page is it: a SuperCollider
+  // synth definition is a few hundred bytes that completely describe an
+  // instrument, they survive a round trip over the relay unchanged, and at the
+  // far end more than one engine can read them.
+  //
+  // ⚠️ AND IT IS NOT THE SAME QUESTION AS "SHOULD A DEMO SHIP scsynth".
+  // `research/supercollider-browser-2026-09.md` §5 answered that one — no,
+  // 1,701,983 B against a 6,659 B worklet — and the number is right and does not
+  // bear on this. What is being priced here is a PORTABLE ASSET FORMAT, where
+  // the engine is a reader you fetch once and the asset is the thing that
+  // travels.
+  //
+  // 🔴 WHY IT MATTERS BEYOND THE CURIOSITY. `grains` says the worklet in the
+  // page and scsynth on the Raspberry Pi are "the same granulator". They are
+  // not: one is a reimplementation that sounds comparable. Two ends run the
+  // same instrument only if the SAME DEFINITION runs on both, and this is the
+  // smallest page that makes that literal rather than approximate.
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createMessageList } from '/shell/messages.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { graph, RATE, OP, readSynthDef, toVersion2, kindsOf, hexHead, sameBytes }
+    from '/shell/synthdef.mjs';
+  import { playHere, unknownParts, KNOWN } from '/shell/synthdef-audio.mjs';
+  import { startEngine, levelOver, engineBytes } from './engine.mjs';
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'patch-demo';
+
+  const d = mount({
+    name: 'patch',
+    what: 'A sound can be written down as a file of a few hundred bytes, and this is a page about the file. '
+        + 'Press Start it up: the bytes go out over a relay and come back, and only the copy that came back is played — '
+        + 'first by SuperCollider itself, compiled to run inside this page, then by a small reader written here that '
+        + 'refuses any file it cannot read all of rather than guessing at the rest. '
+        + 'The numbers are the size of the file and how many building blocks it holds, how long the round trip took, '
+        + 'and how loud each reader got, with the same meter reading silence beside them.',
+    // SIX, AND EVERY ONE MOVES. They read in pairs: what the file is (size,
+    // parts) · that it crossed something, and what it cost to be able to read it
+    // at all is in the log rather than here (round trip) · and the three
+    // loudness readings that are the whole claim — one per reader, plus the
+    // control that makes both of them mean anything.
+    //
+    // 🔴 IT WAS EIGHT AND EIGHT LEAVES A HOLE. `.pos-readout` is
+    // `repeat(auto-fit, minmax(96px, 1fr))`, so a 686 px body takes SEVEN
+    // columns and an eighth cell wrapped onto a line of its own beside six
+    // empty ones — a slab of card colour with nothing in it, which reads as a
+    // row that failed to load. PHOTOGRAPHED, and it is the same defect `rack`
+    // cut two cells to fix ("a nine-cell row wrapped, leaving two cells and a
+    // hole"). The two that went are `start up`, which is about the engine
+    // rather than the file and is already in the log, and `not known`, which is
+    // 0 for two of the three files and whose real content — the NAMES of the
+    // parts the browser cannot read — never fitted in a cell anyway.
+    //
+    // ⚠️ AND THE NUMBERS ARE FOUR DECIMALS, NOT SIX. `0.075043` is eight
+    // glyphs in a 19 px monospace cell and drew `0.074…`. An ellipsis here
+    // means the content is in the wrong place, not that the box needs widening
+    // — the assert still compares against exact zero, and the log still prints
+    // six places, so nothing is claimed more loosely than it is measured.
+    //
+    // 🔴 `silence` IS THE DEAFNESS CONTROL AND IT IS NOT DECORATION. Without it
+    // "SuperCollider 0.0750" and "this meter is stuck at 0.0750" are the same
+    // reading. This project has produced three separate "it is silent"
+    // conclusions from a meter pointed at the wrong thing, so the control gets
+    // a cell rather than a line in the log.
+    //
+    // ⚠️ NOT avgCPU. The engine reports one, and research §2.1 measured it
+    // reading 0 at every load including 8,585 building blocks — a cell that
+    // cannot change is not a measurement.
+    readout: {
+      size: 'B', parts: '', 'round trip': 'ms',
+      SuperCollider: '', 'the browser': '', silence: '',
+    },
+    controls: [
+      // 🔴 CONTROL 0 IS THE SLOW ONE ON PURPOSE. `verify.mjs` gives `settleMs`
+      // to the first control and to nothing else, and every assert on this page
+      // sits behind a 1.7 MB fetch, an engine boot and three round trips.
+      { id: 'start', label: 'Start it up', primary: true },
+      { id: 'sc', label: 'Play in SuperCollider' },
+      { id: 'here', label: 'Play in the browser' },
+      { id: 'stop', label: 'Stop', end: true },
+    ],
+  });
+  guard(d);
+
+  // ── the definitions ───────────────────────────────────────────────────────
+  //
+  // Two written here, byte by byte, and one compiled by a real SuperCollider
+  // somewhere else years ago.
+  //
+  // ⚠️ THE THIRD ONE IS THE ONLY EVIDENCE THAT THE READER IS RIGHT. CLAUDE.md:
+  // "when you implement somebody else's format, only their implementation can
+  // grade you" — `timeline/csound.mjs` was 22/22 green for months with two real
+  // defects because it was compared against its own arithmetic. A file this
+  // repo wrote and then read back proves only that it is self-consistent.
+  // `sonic-pi-beep.scsyndef` came out of sclang and nothing here touched it, so
+  // parsing it to the exact byte is a claim about the FORMAT rather than about
+  // this code's habits.
+
+  /** Two detuned ramps, which is the oldest drone there is. */
+  function drone() {
+    const g = graph('positron-drone');
+    const [freq, amp, detune] = g.params([['freq', 110], ['amp', 0.15], ['detune', 1.01]]);
+    const a = g.block('LFSaw', RATE.sample, [freq, g.value(0)]);
+    const f2 = g.block('BinaryOpUGen', RATE.slow, [freq, detune], 1, OP.mul);
+    const b = g.block('LFSaw', RATE.sample, [f2, g.value(0)]);
+    const sum = g.block('BinaryOpUGen', RATE.sample, [a, b], 1, OP.add);
+    const half = g.block('BinaryOpUGen', RATE.sample, [sum, g.value(0.5)], 1, OP.mul);
+    const out = g.block('BinaryOpUGen', RATE.sample, [half, amp], 1, OP.mul);
+    g.out(out, out);
+    return g.bytes();
+  }
+
+  /** One sine multiplied by another — a bell without an envelope on it. */
+  function bell() {
+    const g = graph('positron-bell');
+    const [freq, amp, ratio] = g.params([['freq', 440], ['amp', 0.15], ['ratio', 2.01]]);
+    const tone = g.block('SinOsc', RATE.sample, [freq, g.value(0)]);
+    const up = g.block('BinaryOpUGen', RATE.slow, [freq, ratio], 1, OP.mul);
+    const ring = g.block('SinOsc', RATE.sample, [up, g.value(0)]);
+    const mixed = g.block('BinaryOpUGen', RATE.sample, [tone, ring], 1, OP.mul);
+    const out = g.block('BinaryOpUGen', RATE.sample, [mixed, amp], 1, OP.mul);
+    g.out(out, out);
+    return g.bytes();
+  }
+
+  /**
+   * The one nobody here wrote.
+   *
+   * ⚠️ IT IS THE OLD LAYOUT AND THAT IS THE WHOLE POINT OF CONVERTING IT.
+   * Files shipped with Sonic Pi are format version 1; a SuperCollider from this
+   * decade writes version 2, where every count and index is twice as wide.
+   * Testing the reader on version 1 alone would have proved the wrong thing
+   * (research §7), and shipping version 1 to the engine would prove nothing
+   * about the file the Raspberry Pi would actually produce.
+   */
+  async function fromSonicPi() {
+    const res = await fetch('./vendor/sonic-pi-beep.scsyndef');
+    if (!res.ok) throw new Error(`the shipped file answered ${res.status}`);
+    const v1 = new Uint8Array(await res.arrayBuffer());
+    const up = toVersion2(v1);
+    d.log(`sonic-pi-beep · the old layout, ${v1.length} B, widened to ${up.bytes.length} B`);
+    return up.bytes;
+  }
+
+  const FILES = [
+    ['bell', bell, { freq: 440, amp: 0.15, ratio: 2.01 }],
+    ['drone', drone, { freq: 110, amp: 0.15, detune: 1.01 }],
+    // A one-shot: it has an envelope and frees itself, so it is heard rather
+    // than held. `sustain` and `release` are stretched so there is something
+    // for a meter to read.
+    ['sonic-pi-beep', fromSonicPi, { note: 69, amp: 1, sustain: 1, release: 0.3 }],
+  ];
+
+  // ── the page's own sound ──────────────────────────────────────────────────
+  //
+  // ⚠️ FIRED, NEVER AWAITED. `AudioContext.resume()` waits on a user gesture in
+  // a real browser and does NOT reject, so awaiting it is a hang rather than an
+  // error — it cost this project two demos in one session. Sound is allowed to
+  // be late; the measurement is not.
+  let ctx = null, hereMeter = null, hereFrame = null;
+  function ears() {
+    if (ctx) return ctx;
+    ctx = new AudioContext();
+    ctx.resume?.().catch(() => {});
+    hereMeter = ctx.createAnalyser();
+    hereMeter.fftSize = 2048;
+    hereMeter.connect(ctx.destination);
+    hereFrame = new Float32Array(hereMeter.fftSize);
+    return ctx;
+  }
+  const hereLevel = () => {
+    if (!hereMeter) return 0;
+    hereMeter.getFloatTimeDomainData(hereFrame);
+    let s = 0;
+    for (const v of hereFrame) s += v * v;
+    return Math.sqrt(s / hereFrame.length);
+  };
+
+  // ── the page ──────────────────────────────────────────────────────────────
+  const pick = el('div', 'pick');
+  const msgs = createMessageList({
+    cap: 24,
+    // The column says one more fact about a row, and here the fact is whether
+    // the bytes that came back are the bytes that went out.
+    mark: 'same',
+    empty: 'nothing has crossed yet',
+  });
+
+  const loud = createSlider({
+    label: 'loudness', min: 0, max: 0.4, step: 0.01, value: 0.15,
+    onInput: (v) => {
+      if (scNode && sc) sc.set(scNode, 'amp', v);
+      hereVoice?.set('amp', v);
+    },
+  });
+
+  const choice = createChoice({
+    label: 'file',
+    options: FILES.map(([name], i) => [name, i]),
+    onPick: (i) => { void select(i); },
+  });
+  pick.append(choice.el, loud.el);
+  d.el.append(pick, msgs.el);
+
+  // ── what is loaded right now ──────────────────────────────────────────────
+  let current = null;          // { label, bytes, parsed, def, unknown, defaults }
+  // What each file measured, so the readout FOLLOWS THE CHOICE rather than
+  // freezing on whichever one the checks happened to finish with. A readout
+  // saying `size 339` beside a loudness taken from a 2,370 B file describes
+  // nothing that exists.
+  const measured = new Map();  // file index -> { ms, sc, here }
+  const sizes = new Map();     // file index -> bytes, for the price at the end
+  let sc = null;               // the SuperCollider engine, once it is up
+  let scNode = null;           // the one thing it is playing
+  let hereVoice = null;        // the one thing the browser is playing
+  const loadedInSc = new Set();
+
+  async function select(i) {
+    const [label, make, defaults] = FILES[i];
+    let bytes;
+    try { bytes = await make(); }
+    catch (e) { d.log(`${label}: ${e.message}`, 'bad'); return null; }
+    // READ OUT OF THE FILE, never out of the thing that wrote it. A page that
+    // prints the writer's variables is reporting its own intentions.
+    const parsed = readSynthDef(bytes);
+    const def = parsed.defs[0];
+    const unknown = unknownParts(def);
+    current = { label, bytes, parsed, def, unknown, defaults, index: i };
+    d.set('size', bytes.length);
+    d.set('parts', def.blocks.length);
+    sizes.set(i, bytes.length);
+    const m = measured.get(i);
+    d.set('round trip', m?.ms ?? '');
+    d.set('SuperCollider', m?.sc ?? '');
+    d.set('the browser', m?.here ?? '');
+    d.log(`${def.name} · ${parsed.head} version ${parsed.version} · ${bytes.length} B`
+      + ` · ${def.blocks.length} building blocks · ${kindsOf(def).length} kinds`
+      + ` · ${def.paramNames.length} settings`);
+    return current;
+  }
+
+  // ── crossing the relay ────────────────────────────────────────────────────
+  //
+  // ⚠️ A BINARY FRAME CARRIES NO ENVELOPE, and `demo/shell/wire.mjs` says so
+  // rather than papering over it: nothing inside raw bytes can declare a type
+  // or a sequence number. The relay sends every frame back to everyone
+  // INCLUDING THE SENDER (`workers/relay/src/index.js`, "VERBATIM, to everyone,
+  // sender included"), so the copy that comes back is a real round trip through
+  // a Durable Object in another country and not a local echo — but it has to be
+  // recognised by its content, which is exactly the comparison this page wants
+  // to make anyway.
+  let waiting = null;
+  const wire = openWire(ROOM, {
+    onOpen: (from) => d.log(`relay open · room ${ROOM} · this connection is ${from}`),
+    onClose: () => d.log('relay closed', 'warn'),
+    onMessage: (got) => {
+      if (got.kind !== 'binary' || !waiting) return;
+      const back = new Uint8Array(got.data);
+      waiting.resolve({ back, ms: performance.now() - waiting.t0 });
+      waiting = null;
+    },
+  });
+
+  /**
+   * Send the bytes and wait for the relay to hand them back.
+   *
+   * Resolves `{ back: null }` rather than hanging when nothing returns: a
+   * measurement that never comes back is worse than one that says it could not
+   * be taken, and this page then has something to print.
+   */
+  function cross(bytes, label) {
+    msgs.add({ dir: 'out', bytes: bytes.length, hi: true,
+      text: `${label} · ${hexHead(bytes, 8)} …` });
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const timer = setTimeout(() => {
+        if (waiting?.timer !== timer) return;
+        waiting = null;
+        msgs.add({ dir: 'in', text: 'nothing came back — the relay did not answer' });
+        resolve({ back: null, ms: null });
+      }, 5000);
+      waiting = { t0, timer, resolve: (r) => { clearTimeout(timer); resolve(r); } };
+      const out = wire.sendBinary(bytes);
+      if (!out) {
+        clearTimeout(timer);
+        waiting = null;
+        msgs.add({ dir: 'out', text: 'the relay socket is not open — nothing was sent' });
+        resolve({ back: null, ms: null });
+      }
+    });
+  }
+
+  // ── playing ───────────────────────────────────────────────────────────────
+  function stopAll() {
+    if (sc) { sc.free(scNode); scNode = null; }
+    hereVoice?.stop();
+    hereVoice = null;
+  }
+
+  async function playInSc(bytes, def, defaults) {
+    if (!sc) { d.log('SuperCollider is not up yet — press Start it up', 'warn'); return false; }
+    if (!loadedInSc.has(def.name)) {
+      const took = await sc.load(bytes);
+      if (!took) {
+        // No `/fail` exists for this: over 64 KiB the server answers NOTHING
+        // (research §8.2). Silence is the failure, so it is named as one.
+        d.log(`SuperCollider never acknowledged ${def.name} — ${bytes.length} B`, 'bad');
+        return false;
+      }
+      loadedInSc.add(def.name);
+      d.log(`SuperCollider took ${def.name}, ${bytes.length} B, and said so itself`);
+    }
+    if (scNode) sc.free(scNode);
+    scNode = sc.play(def.name, { ...defaults, ...(defaults.amp !== undefined ? { amp: loud.get() } : {}) });
+    return true;
+  }
+
+  function playInBrowser(def, defaults) {
+    hereVoice?.stop();
+    hereVoice = null;
+    const v = playHere(ears(), def, { params: { ...defaults, amp: loud.get() }, destination: hereMeter });
+    if (!v.played) {
+      d.log(`the browser's own reader does not know ${v.unknown.join(', ')} — `
+        + `it knows ${KNOWN.join(', ')}, so it plays nothing rather than part of the file`, 'warn');
+      return null;
+    }
+    for (const c of v.caveats) d.log(`not identical: ${c}`, 'warn');
+    hereVoice = v;
+    return v;
+  }
+
+  // ── the checks ────────────────────────────────────────────────────────────
+  async function check() {
+    ears();
+    const t0 = performance.now();
+    sc = await startEngine({ log: (s) => d.log(s) });
+    d.log(`ready to read a file ${Math.round(performance.now() - t0)} ms after the button`);
+
+    d.assert('SuperCollider came up in this page', sc.sampleRate > 0,
+      `${sc.mode} · ${sc.sampleRate} Hz · boot ${Math.round(sc.bootMs)} ms`);
+
+    for (let i = 0; i < FILES.length; i++) {
+      choice.set(i, true);
+      const it = await select(i);
+      // 🔴 A FILE THAT WILL NOT EVEN PARSE MUST FAIL LOUDLY, NOT VANISH.
+      // MEASURED by breaking `toVersion2` on purpose — leaving one count 16
+      // bits wide made `sonic-pi-beep` throw inside `select()`, and the loop
+      // simply skipped it: the page went from 20 asserts to 15 and only the
+      // aggregate at the end noticed. A shrinking assert total is how four
+      // checks went missing unnoticed in this project once already, so the
+      // skip now says so in an assert of its own.
+      if (!it) {
+        d.assert(`${FILES[i][0]} says what it is, read back out of its own bytes`, false,
+          'the file could not be read at all');
+        continue;
+      }
+      const { label, bytes, parsed, def, unknown, defaults } = it;
+
+      d.assert(`${label} says what it is, read back out of its own bytes`,
+        parsed.head === 'SCgf' && parsed.version === 2 && def.blocks.length > 0,
+        `${parsed.head} v${parsed.version} · ${def.name} · ${bytes.length} B · ${def.blocks.length} parts`);
+
+      const { back, ms } = await cross(bytes, `${def.name} · ${def.blocks.length} parts`);
+      const same = !!back && sameBytes(bytes, back);
+      const row = { ms: back ? Math.round(ms) : '', sc: '', here: '' };
+      measured.set(i, row);
+      if (back) {
+        d.set('round trip', row.ms);
+        msgs.add({ dir: 'echo', bytes: back.length, mark: same,
+          text: same ? `came back after ${Math.round(ms)} ms` : 'came back DIFFERENT' });
+      }
+      d.assert(`${label} came back off the relay unchanged`, same,
+        back ? `${back.length} B in ${Math.round(ms)} ms` : 'nothing came back');
+
+      // 🔴 THE COPY THAT CAME BACK IS WHAT GETS PLAYED. Playing the local one
+      // would make the round trip decorative — the page would look identical
+      // whether or not anything crossed, which is the shape of a control that
+      // is inert while appearing live.
+      const played = back || bytes;
+      const playable = readSynthDef(played).defs[0];
+
+      const took = await playInSc(played, playable, defaults);
+      d.assert(`SuperCollider took ${label} and said so itself`, took, `${played.length} B`);
+      const scLevel = took ? await levelOver(() => sc.level(), 500, 250) : 0;
+      d.assert(`SuperCollider made a sound from ${label}`, scLevel > 0.001, scLevel.toFixed(6));
+      row.sc = took ? scLevel.toFixed(4) : '';
+      d.set('SuperCollider', row.sc);
+      sc.free(scNode); scNode = null;
+
+      const voice = playInBrowser(playable, defaults);
+      if (unknown.length) {
+        // The refusing branch. It is not a failure — it is the reader saying
+        // which parts of somebody else's file it cannot run, which is the thing
+        // a page that claimed "the same instrument" never said.
+        d.assert(`the browser's reader refuses ${label} and names what it cannot read`,
+          voice === null && unknown.length > 0, `${unknown.length} kinds: ${unknown.join(', ')}`);
+        d.set('the browser', '');
+      } else {
+        const hereLev = await levelOver(hereLevel, 500, 250);
+        d.assert(`the browser's own reader made a sound from ${label}`, hereLev > 0.001,
+          hereLev.toFixed(6));
+        row.here = hereLev.toFixed(4);
+        d.set('the browser', row.here);
+      }
+      stopAll();
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    // ── the deafness control ────────────────────────────────────────────────
+    // Without this every reading above is compatible with a meter that is
+    // stuck. It is measured on BOTH meters, because they are two meters.
+    const quietSc = await levelOver(() => sc.level(), 400, 200);
+    const quietHere = await levelOver(hereLevel, 400, 0);
+    d.set('silence', Math.max(quietSc, quietHere).toFixed(4));
+    d.assert('with nothing playing both meters read exactly zero',
+      quietSc === 0 && quietHere === 0,
+      `SuperCollider ${quietSc.toFixed(6)} · the browser ${quietHere.toFixed(6)}`);
+
+    // ── does a setting actually reach the engine ────────────────────────────
+    //
+    // ⚠️ THIS IS THE ASSERT THAT GRADES THE ARITHMETIC IN THE FILE. Reading the
+    // bytes back proves they are self-consistent and nothing more; a wrong
+    // number in the multiply would write a perfectly well-formed file that adds
+    // instead. Turning the loudness to zero can only silence the output if the
+    // engine really is multiplying by it.
+    await select(0);
+    choice.set(0, true);
+    const it = current;
+    await playInSc(it.bytes, it.def, it.defaults);
+    const loudLevel = await levelOver(() => sc.level(), 400, 250);
+    sc.set(scNode, 'amp', 0);
+    const offLevel = await levelOver(() => sc.level(), 400, 350);
+    const server = await sc.ask(scNode, 'amp');
+    d.assert('a setting sent to SuperCollider changes what it makes',
+      loudLevel > 0.001 && offLevel === 0 && server === 0,
+      `${loudLevel.toFixed(6)} -> ${offLevel.toFixed(6)} · the server reads it back as ${server}`);
+    sc.free(scNode); scNode = null;
+
+    const v = playInBrowser(it.def, { ...it.defaults, amp: 0.15 });
+    const hereLoud = await levelOver(hereLevel, 400, 250);
+    v?.set('amp', 0);
+    const hereOff = await levelOver(hereLevel, 400, 350);
+    d.assert('the same setting changes what the browser makes',
+      hereLoud > 0.001 && hereOff < hereLoud / 10,
+      `${hereLoud.toFixed(6)} -> ${hereOff.toFixed(6)}`);
+    stopAll();
+
+    // ── and the thing the whole page is about ───────────────────────────────
+    //
+    // 🔴 THE PRICE, MEASURED HERE RATHER THAN QUOTED. research §5 set
+    // 1,701,983 B of engine against a 6,659 B worklet and said a demo page
+    // cannot justify 256x. That is a true statement about a demo's SOUND
+    // ENGINE. It is not a statement about an asset format, where the reader is
+    // fetched once and the thing that travels is the file — so the two numbers
+    // go side by side and the judgement stays with whoever reads them.
+    const engine = engineBytes();
+    const travelled = [...measured.keys()].length
+      ? FILES.map((_, i) => sizes.get(i) || 0).reduce((a, b) => a + b, 0) : 0;
+    d.log(`the reader cost at least ${engine.atLeast.toLocaleString('en-US')} B across `
+      + `${engine.files} files, once — the sound module it loads inside the worklet is not in `
+      + `the page's own accounting · the three definitions are `
+      + `${travelled.toLocaleString('en-US')} B together · `
+      + `${Math.round(engine.atLeast / Math.max(1, travelled))}x`, 'hi');
+    d.assert('every file went to both engines, and the reader is fetched once',
+      loadedInSc.size === FILES.length && engine.atLeast > 1e6 && travelled > 0
+      && travelled < engine.atLeast / 100,
+      `${loadedInSc.size} of ${FILES.length} into SuperCollider · the browser ran `
+      + `${FILES.length - 1} and refused 1 · reader ${engine.atLeast.toLocaleString('en-US')} B `
+      + `against ${travelled.toLocaleString('en-US')} B of definitions`);
+
+    await select(0);
+    choice.set(0, true);
+    d.log(`room ${ROOM} · the Raspberry Pi could join this room and get the same bytes`, 'hi');
+  }
+
+  // ── controls ──────────────────────────────────────────────────────────────
+  d.on('start', async () => {
+    if (sc) { d.log('already up'); return; }
+    await check();
+  });
+  d.on('sc', async () => {
+    if (!current) return;
+    if (await playInSc(current.bytes, current.def, current.defaults)) {
+      d.log(`SuperCollider is playing ${current.def.name}`);
+    }
+  });
+  d.on('here', () => {
+    if (!current) return;
+    if (playInBrowser(current.def, current.defaults)) {
+      d.log(`the browser is playing ${current.def.name}`);
+    }
+  });
+  d.on('stop', () => { stopAll(); d.log('stopped'); });
+
+  // The file is read and shown at once — a page whose subject is a file should
+  // say what the file is before anything is pressed. Nothing is fetched, no
+  // sound starts, and the 1.7 MB engine stays exactly where it is.
+  await select(0);
+  d.ready();
+</script>
+</html>

@@ -283,6 +283,32 @@ export const DEMOS = [
     one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
     tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
 
+  // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
+  // a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
+  // any resolution" — and works out when generated code may cross a wire. This
+  // is the sound half of that argument, which had never been written down: a
+  // SuperCollider synth definition is a few hundred bytes that completely
+  // describe an instrument, they survive the relay unchanged, and at the far
+  // end TWO different engines read the same ones.
+  //
+  // ⚠️ NOT THE QUESTION research §5 ANSWERED. That one priced shipping scsynth
+  // as a demo's sound engine — 1,701,983 B against a 6,659 B worklet, correctly
+  // no. The engine here is a reader fetched once and only when asked; the
+  // subject is the asset that travels.
+  //
+  // settleMs covers a 1.7 MB fetch, the engine boot (~630 ms measured), three
+  // round trips over the relay and six loudness windows. Every assert on this
+  // page sits behind control 0.
+  //
+  // ⚠️ THREE OF ITS TWENTY ASSERTS ARE ABOUT SOMEBODY ELSE'S NETWORK, so a red
+  // run here is not automatically a regression — the same caveat CLAUDE.md
+  // already carries for `now` and `carry`. MEASURED by taking the relay away
+  // (`--host-resolver-rules=MAP ws.positron.studio 127.0.0.1:1`): 17 of 20,
+  // the three round-trip asserts saying `nothing came back`, and nothing hung.
+  { name: 'patch', act: 4, created: '2026-09-13', built: true, settleMs: 30000,
+    one: 'a sound written down as a few hundred bytes, sent over the relay, and played by two different engines',
+    tags: ['SuperCollider', 'WebAssembly', 'relay', 'WebAudio'] },
+
   // Not a demo of anything — a page where every reusable control is present and
   // wired to nothing, so one can be looked at and pushed around without a board,
   // a relay or a stream. `built: false` because it publishes no `__demo` and

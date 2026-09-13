@@ -112,6 +112,38 @@ const FILES = [
   // used to need a hand-written line here AND a matching rewrite in
   // demo/server.mjs. Two pages, four edits, in two files, with nothing to notice
   // if only one of the pair was made. Each declares its own `src` now.
+  // ── patch: SuperCollider's own sound server, vendored ─────────────────────
+  //
+  // ⚠️ LISTED BY NAME, because `demoFiles()` enumerates ONE directory level and
+  // filters to web extensions — it would take neither the `.wasm` nor anything
+  // under `vendor/chunks/`. That is the containment argument working as
+  // intended rather than a gap to widen: this is 1.86 MB of third-party binary
+  // and it should cost somebody a deliberate line.
+  //
+  // 🔴 THE CHUNKS ARE NOT OPTIONAL EVEN THOUGH THEY ARE NEVER FETCHED.
+  // `supersonic.js` holds `import("./chunks/midi_manager-….js")` and one for
+  // gamepads — dynamic imports that a page using neither will never run, but
+  // `checkImports()` reads the source and would refuse the build over them, and
+  // rightly: an import with no deployed file is a 404 waiting for the first
+  // person to plug in a controller. `chunk-V5WXEJ46.js` IS loaded, statically.
+  //
+  // LICENCE: the engine is scsynth (GPL-3.0-or-later) on clockwork
+  // (AGPL-3.0-or-later) and the combined work is AGPL-3.0-or-later — the one
+  // licence where serving over a network is the trigger, and this serves it
+  // over a network. The texts ship beside the binaries rather than living in
+  // somebody's memory. The `.scsyndef` is from the MIT-licensed synthdefs
+  // package and is an ASSET, not part of the reader.
+  ['demo/patch/vendor/supersonic.js', 'patch/vendor/supersonic.js'],
+  ['demo/patch/vendor/chunks/chunk-V5WXEJ46.js', 'patch/vendor/chunks/chunk-V5WXEJ46.js'],
+  ['demo/patch/vendor/chunks/gamepad_manager-G6XPZUN2.js', 'patch/vendor/chunks/gamepad_manager-G6XPZUN2.js'],
+  ['demo/patch/vendor/chunks/midi_manager-LJCLWFJF.js', 'patch/vendor/chunks/midi_manager-LJCLWFJF.js'],
+  ['demo/patch/vendor/clockwork_audio_worklet.js', 'patch/vendor/clockwork_audio_worklet.js'],
+  ['demo/patch/vendor/scsynth-nrt.wasm', 'patch/vendor/scsynth-nrt.wasm'],
+  ['demo/patch/vendor/sonic-pi-beep.scsyndef', 'patch/vendor/sonic-pi-beep.scsyndef'],
+  ['demo/patch/vendor/LICENSE-supersonic-scsynth', 'patch/vendor/LICENSE-supersonic-scsynth'],
+  ['demo/patch/vendor/LICENSE-supersonic-scsynth-core', 'patch/vendor/LICENSE-supersonic-scsynth-core'],
+  ['demo/patch/vendor/LICENSE-supersonic-scsynth-synthdefs', 'patch/vendor/LICENSE-supersonic-scsynth-synthdefs'],
+
   ...extraPages(),
   ...demoFiles(),
 ];
