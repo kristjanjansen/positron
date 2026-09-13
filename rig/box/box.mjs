@@ -260,6 +260,38 @@ const bankCC = (source) => (source === 'yoshimi' ? yoshimiList().bankCC ?? 32 : 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
 
+// ── shipping the grains ──────────────────────────────────────────────────────
+//
+// FOUR A SECOND, WHATEVER THE GRAIN RATE. sclang already batches at 250 ms;
+// this matches that cadence rather than inventing a second one, because two
+// buffers at different rates is a queue with a delay nobody chose.
+//
+// ⚠️ THE RELAY DROPS EVERYTHING PAST 60 msg/s AND TELLS THE SENDER NOTHING —
+// measured, twice, exactly 298 messages delivered in three seconds at both 120
+// and 300 msg/s. One message per grain would arrive as a sparse cloud that
+// reads as a quiet granulator rather than as a dropped message, so the count of
+// grains in the window travels WITH the list and a reader can tell the two
+// apart.
+const GRAIN_TTL = 30000;        // how long one `grain.report` keeps it shipping
+let grainUntil = 0, grainPump = null;
+function startGrainPump() {
+  if (grainPump) return;
+  grainPump = setInterval(() => {
+    if (Date.now() > grainUntil) { stopGrainPump(); pap?.report(false); return; }
+    const g = pap?.takeGrains?.();
+    if (!g || (!g.list.length && !g.seen)) return;
+    // ⚠️ `heardAt`, NOT `at`. `at` is an ENVELOPE field and `format()` THROWS
+    // on the collision — which it did, here, and took the whole box down with
+    // it until systemd restarted it. That throw is LESSONS #45: `at` once ate
+    // a payload field silently and ffmpeg was asked to seek to second
+    // 1,789,103,743,118, so session 18 made the collision loud on purpose. It
+    // worked exactly as intended on the first person to hit it since.
+    send({ type: 'grain.marks', seen: g.seen, marks: g.list, heardAt: g.at });
+  }, 250);
+  grainPump.unref?.();
+}
+function stopGrainPump() { if (grainPump) { clearInterval(grainPump); grainPump = null; } }
+
 const state = () => {
   // `error` and `hint` ride along rather than being logged and dropped: the box
   // is in another room, so "ALSA is not working, and here is what to do" has to
@@ -793,6 +825,28 @@ async function handle(msg) {
       const want = msg.on !== false;
       const changed = want ? pappus().startDrift(msg.hz) : pappus().stopDrift();
       return reply('params.drifted', { ok: true, on: want, changed, ...pappus().driftStats() });
+    }
+    // ── the grains, as they fire ──────────────────────────────────────────
+    //
+    // 🔴 THE ONE THING AUDIO CANNOT CARRY. A page drawing this granulator
+    // beside one in a browser can mark every grain on the browser's side and
+    // none on this one, because a bump in an envelope might be a note, a delay
+    // tap or a reverb swell. The engine reports each grain as `GrainBuf` is
+    // triggered; this is the door it leaves by.
+    //
+    // ⚠️ ASKED FOR, AND IT STOPS ASKING ITSELF. Reporting costs the engine
+    // sixteen live SendReply UGens and this room four messages a second, and a
+    // page that is closed cannot tell anybody. So a request expires: the box
+    // keeps shipping for GRAIN_TTL after the last `grain.report`, and a page
+    // that wants the picture re-asks while it is open. A board still shouting
+    // at an empty room a week later is the shape of failure this avoids.
+    case 'grain.report': {
+      if (!fxOn) return reply('grain.reported', { ok: false, reason: 'pappus is not switched on' });
+      const want = msg.on !== false;
+      grainUntil = want ? Date.now() + GRAIN_TTL : 0;
+      pappus().report(want);
+      if (want) startGrainPump(); else stopGrainPump();
+      return reply('grain.reported', { ok: true, on: want, forMs: want ? GRAIN_TTL : 0 });
     }
     case 'params.state':
       return reply('params.state', {

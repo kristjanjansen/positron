@@ -40,6 +40,44 @@ const execFileP = promisify(execFile);
 export const SCLANG_PORT = 57120, SCLANG_ADDR = '/pappus/cmd';
 
 /**
+ * Where sclang forwards the per-grain reports. ⚠️ DECIDED IN `run-pappus.scd`
+ * AND MIRRORED HERE, and that is one number in two files — which this project
+ * has a rule about. It is here rather than there because node is the end that
+ * BINDS it; if it ever moves, both change or neither works, and the failure is
+ * silent in the worst direction (the socket binds, nothing arrives, and the
+ * page reads "this granulator fires no grains" about one firing hundreds a
+ * second).
+ */
+export const GRAIN_PORT = 57321;
+
+/**
+ * The smallest OSC reader that can read what sclang sends: an address, a type
+ * tag string, then ints and floats. It is here rather than in a library
+ * because `jacksynth.mjs` only ever needed to WRITE OSC — this is the first
+ * thing in the box that has to read any.
+ */
+function readOsc(b) {
+  let i = 0;
+  const str = () => {
+    const z = b.indexOf(0, i);
+    const v = b.toString('ascii', i, z);
+    i = (z + 4) & ~3;                  // OSC pads every string to four bytes
+    return v;
+  };
+  const addr = str();
+  if (i >= b.length) return { addr, args: [] };
+  const tags = str();
+  const args = [];
+  for (const t of tags.slice(1)) {
+    if (t === 'i') { args.push(b.readInt32BE(i)); i += 4; }
+    else if (t === 'f') { args.push(b.readFloatBE(i)); i += 4; }
+    else if (t === 's') { args.push(str()); }
+    else return { addr, args };        // a tag we do not read stops the parse
+  }
+  return { addr, args };
+}
+
+/**
  * A seeded PRNG, because an unrepeatable die is a die you cannot use.
  *
  * The old `randomise()` called Math.random directly, so a roll that landed on
@@ -390,6 +428,38 @@ export function driftValues(base, tSec, side = 0) {
  */
 export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {}) {
   const udp = createSocket('udp4');
+
+  // ── the grains the engine reports ────────────────────────────────────────
+  //
+  // 🔴 THIS IS THE ONE THING NOTHING DOWNSTREAM CAN RECONSTRUCT. A page drawing
+  // this granulator beside one running in a browser could mark every grain on
+  // the browser's side and none on this one, because a grain inferred from an
+  // output envelope might be a note, a delay tap or a reverb swell. The engine
+  // reports each one as `GrainBuf` is triggered (see `report` in
+  // Engine_Pappus.sc), sclang batches them at 250 ms, and this is where they
+  // land.
+  //
+  // ⚠️ A RING, NOT A LIST. Nothing here knows when a reader will next ask, and
+  // at 24 grains a second across sixteen voices an unbounded array is a leak
+  // with a slow fuse. `seen` is the honest count and is NOT capped — it is what
+  // lets a reader tell "few grains" from "few kept".
+  const GRAIN_KEEP = 400;
+  let grainRing = [], grainSeen = 0, grainAt = 0;
+  const grainUdp = createSocket('udp4');
+  grainUdp.on('message', (b) => {
+    let m;
+    try { m = readOsc(b); } catch { return; }
+    if (m.addr !== '/pgrain' || !m.args.length) return;
+    grainAt = Date.now();
+    grainSeen += m.args[0] | 0;
+    // pairs of (position in the buffer, which half fired it)
+    for (let i = 1; i + 1 < m.args.length; i += 2) {
+      grainRing.push({ pos: m.args[i], half: m.args[i + 1] | 0 });
+    }
+    if (grainRing.length > GRAIN_KEEP) grainRing = grainRing.slice(-GRAIN_KEEP);
+  });
+  grainUdp.on('error', () => { /* nothing is listening; that is not an error here */ });
+  try { grainUdp.bind(GRAIN_PORT, '127.0.0.1'); } catch { /* already bound */ }
   /**
    * TWO THINGS, AND THEY USED TO BE ONE. `rolled` is the last dice roll, which
    * is what `params.state` reports and what a page draws a character from.
@@ -473,6 +543,20 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
   };
 
   return {
+    /**
+     * Every grain reported since the last ask, and then the ring is emptied —
+     * so two readers cannot both claim the same grains, and a reader that
+     * stops asking does not accumulate a backlog it will later draw all at
+     * once as a burst that never happened.
+     */
+    takeGrains() {
+      const list = grainRing; grainRing = [];
+      const seen = grainSeen; grainSeen = 0;
+      return { list, seen, at: grainAt };
+    },
+    /** Ask the engine to report, or to stop. Off is the default. */
+    report(on) { send('report', on ? 1 : 0); return !!on; },
+
     send,
     set,
     roll: (seed, opts) => apply(rollPappus(seed), opts),
@@ -529,7 +613,11 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
      */
     notes: makeVoices(send),
 
-    close: () => { if (timer) clearInterval(timer); try { udp.close(); } catch { /* already */ } },
+    close: () => {
+      if (timer) clearInterval(timer);
+      try { udp.close(); } catch { /* already */ }
+      try { grainUdp.close(); } catch { /* already */ }
+    },
   };
 }
 
