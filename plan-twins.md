@@ -156,9 +156,36 @@ queued as "make the board report grains" and is now load-bearing rather than
 a nicety. It serves both ends: free in a tab with no relay in the path, and
 batched at ~250 ms for the board's measured 60 msg/s ceiling.
 
-**Order, therefore:** vendor wasm scsynth → Pappus in a tab → `SendReply` →
-delete the worklet. Not before, because deleting it first leaves the page with
-one lane and no picture.
+⚠️ **AND THE ORDER WAS WRONG WHEN IT WAS FIRST WRITTEN HERE — IT PUT THE
+EXPENSIVE HALF FIRST.** `research/supercollider-browser-2026-09.md` §5 already
+argued against scsynth in a tab for this project, on numbers: **1,701,983 B of
+wasm against a 6,659 B worklet** for the same audible result, AGPL-3.0-or-later
+on a page that is served over a network, and a command surface whose every word
+("synthdef", "node id", "audio bus") the jargon rule bans. Its sharpest point is
+the one that matters here: *"a wasm scsynth is as opaque as the Pi — you would
+still be inferring grain behaviour from output envelopes"*.
+
+That objection assumes the engine cannot be changed. **It can — we own
+`Engine_Pappus.sc`.** And the moment `SendReply` goes in, it goes in for the
+BOARD as well, which means the Raspberry Pi's card gets the same picture the
+page's has. At which point most of the reason to ship 1.86 MB of AGPL wasm has
+gone: both lanes are fully drawn, the comparison is explicit, and what remains
+is making them the same INSTRUMENT — which is BARE and the shared source,
+neither of which needs wasm.
+
+**Order, corrected:**
+
+1. **`SendReply` on the grain trigger in `Engine_Pappus.sc`**, batched at
+   ~250 ms for the relay's measured 60 msg/s ceiling. Cheap, bounded, wanted on
+   its own merits, and needed by every path.
+2. **BARE and the shared source** (§2, §3, §4a) — the two granulators become
+   the same instrument, with both pictures already drawn.
+3. **Then re-ask whether scsynth in a tab is still worth it.** It may be: the
+   identical-graph claim is genuinely stronger than a comparison. But it should
+   be re-argued against the numbers above rather than assumed, and by then the
+   page can show exactly what is still different.
+
+The worklet is deleted at step 3 if step 3 happens, and not before.
 
 The additive table survives as ONE shape among several, and it keeps one real
 use: it is the only source whose expected spectrum is known in closed form, so
