@@ -305,9 +305,20 @@ export const DEMOS = [
   // already carries for `now` and `carry`. MEASURED by taking the relay away
   // (`--host-resolver-rules=MAP ws.positron.studio 127.0.0.1:1`): 17 of 20,
   // the three round-trip asserts saying `nothing came back`, and nothing hung.
-  { name: 'patch', act: 4, created: '2026-09-13', built: true, settleMs: 30000,
-    one: 'a sound written down as a few hundred bytes, sent over the relay, and played by two different engines',
-    tags: ['SuperCollider', 'WebAssembly', 'relay', 'WebAudio'] },
+  // 🔴 `patch` IS OFF THE SITE — asked for, and it has already served its
+  // purpose. It existed to ask whether a synth definition can travel as a
+  // message the way a shader does; the answer is yes, and it is now a fact
+  // rather than a page. What it proved is in
+  // `research/supercollider-browser-2026-09.md` §10 and in the commits, and the
+  // thing it proved is being built INTO `grains`, where two granulators can run
+  // the same definition instead of one page demonstrating that they could.
+  //
+  // ⚠️ THE FILES STAY ON DISK AND ARE NOT DEAD. `demo/patch/vendor/` holds the
+  // vendored, licensed SuperSonic engine and `engine.mjs` boots, meters and
+  // collects OSC from it — that is the infrastructure the `grains` rewire runs
+  // on. Removing the ROW takes the page off the deploy; deleting the directory
+  // would take the engine with it. When `grains` has moved what it needs to a
+  // shared home, the leftovers can go.
 
   // Not a demo of anything — a page where every reusable control is present and
   // wired to nothing, so one can be looked at and pushed around without a board,
