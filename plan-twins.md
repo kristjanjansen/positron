@@ -36,10 +36,23 @@ true rather than to caption it away.
 lines of somebody else's engine, and a rung that skips four stages is a rung
 that makes those stages unreachable by anyone who did not already know them.
 
-`rig/box/norns/TINY.md` is the precedent and the shape to copy: it records what
-each cut removed, what it saved in bytes and UGens, and — the part that matters
-— **what the cut costs the sound**. Do the same here, in
-`rig/box/norns/CHAIN.md`, before a line of BARE is written:
+✅ **DONE 2026-09-13 — `rig/box/norns/CHAIN.md`.** Every stage, its controls,
+what TINY has already taken out of it, and what removing it costs the sound.
+Three things it turned up that change the plan below:
+
+- **The chain can ALREADY be skipped at run time.** SIGNAL is a routing matrix
+  — `oin1 1, pin1 0` sends a granulator straight to the output today, with no
+  recompile. So BARE is not the only way to get a dry cloud; what it buys is
+  that the UGens stop existing and stop costing CPU, which is a narrower claim
+  than the one §3 was making.
+- **RESONATOR is already a pass-through on the board**, because TINY removed
+  both the 48-`Ringz` modal bank and the eight string voices. Half of what BARE
+  was going to remove is gone on the machine we are comparing against.
+- 🔴 **The meters would start lying.** Seven of them sit on a control bus, one
+  per stage. A meter reading zero because a stage was compiled out looks
+  exactly like a meter reading zero because a stage is broken.
+
+The original requirement, kept because it is the rule rather than the task:
 
 - **RESONATOR** — a Rings-style modal/string resonator. What MODAL and STRING
   are, what `structure`/`bright`/`damp`/`position` do, and the fact that TINY
