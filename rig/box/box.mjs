@@ -810,6 +810,18 @@ async function handle(msg) {
       const r = pappus().roll(Number.isInteger(msg.seed) ? msg.seed : undefined, { voices: !grainSource });
       // Movement is on by default once there is something to move. It is not a
       // control the page offers — see `params.drift` for why it exists at all.
+      //
+      // ⚠️ SO `params.drift {on:false}` FOLLOWED BY A ROLL IS A NO-OP, and that
+      // cost a whole measurement run. `pappus-live.mjs` switched the drift off,
+      // rolled ten seeds, and took every capture believing nothing was moving
+      // while `DRIFT` walked scan · spray · swarm · tilt · size · sos at 8 Hz
+      // underneath — which is why two DIFFERENT seeds measured ten times closer
+      // together than one seed measured to itself.
+      //
+      // It is deliberate and it stays: a page that rolls wants the movement.
+      // The reply below carries `drift: driftStats()` so a caller can SEE it
+      // came back on, and anything measuring must switch it off AFTER the roll,
+      // not before. The harness does that in one place now.
       pappus().startDrift();
       log(`rolled ${r.character.m}/${r.character.n} · seed ${r.seed} · ${r.m.rate}/${r.n.rate} grains per second`);
       return reply('params.rolled', { ok: true, on: 'pappus', ...r, characters: CHARACTER_NAMES, drift: pappus().driftStats() });
