@@ -388,8 +388,13 @@
         warming: ['Switching the granulator on',
           'the board is answering. The first time it is asked, it compiles a two-thousand line engine before anything can be '
           + 'heard, which takes about forty seconds; after that a switch is instant.'],
-        off: ['The granulator is not in the sound',
-          fxWhy ? `the board refused: ${fxWhy}` : 'the board is answering but nothing is granulating yet — press “Switch it on”'],
+        // ⚠️ ONLY WHEN THE BOARD REFUSED. This used to say "nothing is
+        // granulating yet — press Switch it on" at a visitor who has no such
+        // button any more (it is behind ?checks=1) about a state that clears
+        // itself the moment a key is pressed. A panel that describes a normal
+        // moment as a problem, and names a fix that is not on screen, is worse
+        // than no panel.
+        off: ['The board would not switch it on', `the board refused: ${fxWhy}`],
         // It records its input, so with no input it is reading sixty seconds of
         // silence. That is not a fault and it is not a sound either, and it
         // happens whenever somebody else stops the board's instrument.
@@ -797,7 +802,7 @@
     const why = {
       silent: 'the board is silent, and the page says so',
       warming: 'the granulator is still compiling on the board — about forty seconds the first time',
-      off: `the granulator is not in the sound: ${fxWhy ?? 'nothing has switched it on'}`,
+      off: fxWhy ? `the board refused to switch the granulator on: ${fxWhy}` : 'switching the granulator on',
       empty: 'the granulator is running with no instrument playing into it',
       idle: 'the granulator is running with nothing rolled',
       live: 'the board is answering and set up',
