@@ -160,19 +160,20 @@
   // The first demo to take the drawer (plan-diagram §7). It goes where the
   // paragraph was, above the numbers, because it is the thing to read first.
   //
-  // 🔴 THREE BOXES, AND THE SECOND GRANULATOR IS NAMED INSIDE THE BOX THAT
-  // HOLDS IT — MEASURED, NOT PREFERRED. The true shape here is a fork: the
-  // same four settings go to a granulator in this page AND out to the one on
-  // the board. Drawn as one — `this page` branching to `a granulator here` and
-  // to `Cloudflare`, which is right and legible at 688 px — it is FALSE at
-  // 358 px: below 560 px the drawer stacks every box in one column and draws a
-  // forward link as a straight vertical at its source's centre, so the branch
-  // to Cloudflare runs behind the granulator box and a phone reads
-  // `this page → a granulator here → Cloudflare`. That is a path this page
-  // does not have, has never measured, and is exactly the plausible wrong
-  // story (granulate here, then send it). So each granulator is named in the
-  // box of the machine that runs it, which is plan-diagram §3's own rule for
-  // two programs in one device, and the picture is true at both widths.
+  // 🔴 EACH GRANULATOR IS A BOX INSIDE THE MACHINE THAT RUNS IT. It was a
+  // `sub` on the machine — `this page` / `a granulator in it` — which draws
+  // the two as ONE thing doing one job, and they are not one thing: the
+  // granulator is IN the page, the way the other one is in the board. That is
+  // the shape, so the drawer draws it.
+  //
+  // ⚠️ AND IT IS STILL NOT A FORK, WHICH IS WHAT IT LOOKED LIKE FIRST. Drawn
+  // as one — `this page` branching to `a granulator here` and to `Cloudflare`,
+  // right and legible at 688 px — it was FALSE at 358 px: below 560 px every
+  // box stacks in one column, so the branch to Cloudflare ran behind the
+  // granulator box and a phone read `this page → a granulator here →
+  // Cloudflare`, a path this page does not have and has never measured. A box
+  // inside a box says the same true thing at both widths and has no second
+  // branch to route.
   //
   // ⚠️ EVERY ARROW IS A THING THIS PAGE ASSERTS. `four settings` is the
   // `params.set` pair `setKnob` sends, under "the page reached the relay";
@@ -194,21 +195,52 @@
     caption: 'The blend decides how much of each you hear, so one can become the other while both '
       + 'keep running. Press Hold and the board stops listening: its grains then come only from the '
       + 'minute it already has, which is when the settings start to do something you can hear.',
+    // ⚠️ A BOX'S SENTENCE SAYS WHAT IT DOES HERE, NEVER ITS NAME AGAIN.
+    // Hovering `Raspberry Pi` used to put `Raspberry Pi — another granulator`
+    // under the picture, beside a browser tooltip saying the same, over a box
+    // already saying it: three channels, one fact. These are the fourth
+    // sentence of the paragraph that is not in `what` any more.
+    // 🔴 AND THEY ARE STATIC. A sentence that recomputed itself from a live
+    // number is the slop prose this page had two paragraphs of; these describe
+    // a fixed picture and never change while anybody is looking at them.
     nodes: [
-      { id: 'you', label: 'this page', sub: 'a granulator in it', kind: 'here' },
-      { id: 'cf', label: 'Cloudflare', sub: 'passes it all on', kind: 'cloud' },
-      { id: 'pi', label: 'Raspberry Pi', sub: 'another granulator', kind: 'device' },
+      { id: 'you', label: 'this page', kind: 'here',
+        note: 'Everything you press is in this browser, and so is **one of the two granulators**.',
+        children: [{ id: 'here', label: 'a granulator',
+          note: 'Two hundred lines written for this page, so it keeps making grains '
+              + 'with **the network unplugged**.' }] },
+      { id: 'cf', label: 'Cloudflare', sub: 'passes it all on', kind: 'cloud',
+        note: 'A computer rented by the hour, so the two ends never have to find each '
+            + 'other. It **changes nothing** on the way through.' },
+      // ⚠️ `called Pappus` IS A NAME, NOT JARGON — CLAUDE.md, decided
+      // 2026-09-13. It is what the program on the board is called, and hiding
+      // it behind a friendly word would hide the one fact this box carries.
+      { id: 'pi', label: 'Raspberry Pi', kind: 'device',
+        note: 'A small board in the studio, on a network of its own, which this page '
+            + 'reaches **only through Cloudflare**.',
+        children: [{ id: 'there', label: 'a granulator', sub: 'called Pappus',
+          note: '**Pappus** is the board’s granulator: the same four settings, '
+              + 'a different program making the grains.' }] },
     ],
     links: [
       // ⚠️ `four settings`, NOT `the four settings` — MEASURED. In one column
-      // an arrow's name gets half a box minus 16 px, so the article costs four
-      // characters the drawer does not have below a 375 px phone: it reported
-      // `the four…` at 343 px, which is a 17-character label in a 93 px slot.
-      // Dropping one word is clean down to a 360 px screen.
+      // an arrow's name gets the room beside it in the row it sits in, and the
+      // article costs four characters the drawer does not have on a narrow
+      // phone: it reported `the four…` at 343 px, a 17-character label in a
+      // 93 px slot. Dropping one word is clean down to 258 px.
+      //
+      // 🔴 EVERY ARROW IS NAMED, AND THE TWO MIDDLE ONES SAY `the same`
+      // BECAUSE THAT IS WHAT CROSSES THEM. A bare arrow says only "these two
+      // are connected", which the line already said. The relay hands on
+      // exactly what it was given, so the second hop of each direction carries
+      // the same thing as the first — which is the fact, and inventing a
+      // different word for it would be a small lie. MEASURED at 258 / 288 /
+      // 320 / 343 / 375 / 390 / 560 / 688 px: nothing shortened at any of
+      // them, with four names in the picture instead of two.
       { from: 'you', to: 'cf', label: 'four settings' },
-      { from: 'cf', to: 'pi', label: '' },
+      { from: 'cf', to: 'pi', label: 'the same four' },
       { from: 'pi', to: 'cf', label: 'sound and grains', back: true },
-      { from: 'cf', to: 'you', label: '', back: true },
+      { from: 'cf', to: 'you', label: 'the same back', back: true },
     ],
   });
 

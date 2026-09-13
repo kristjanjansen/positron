@@ -967,9 +967,19 @@ video[hidden] { display: none; }
    drawer decides every coordinate; this decides only what the ink looks like,
    which is the one half that belongs in a stylesheet.
 
-   🔴 GREY, WITH A TINT THAT IS ALMOST NOT THERE. 11% of a hue in a box's
-   stroke and 4% in its fill — enough to say "these two are the same sort of
-   thing", not enough to read as a legend that needs explaining.
+   🔴 GREY, WITH A TINT THAT SAYS WHICH MACHINE A BOX IS. 26% of a hue in a
+   box's stroke and 8% in its fill — this page, a computer somebody rents, a
+   machine in a room. Colour says WHERE something runs and nothing else, so a
+   box drawn inside another takes its container's hue; it is never a place in
+   a sequence, which is CLAUDE.md's one-meaning-for-colour rule.
+
+   ⚠️ IT WAS 11% AND 4%, WHICH IS BELOW BEING SEEN, and the repair is measured
+   rather than tasted. `--line2` is ALREADY a blue-grey (oklab b ≈ -0.033), so
+   11% of #5b9bd5 moves b by 0.0074 and LIGHTNESS by 0.038 — the tinted box
+   reads as a slightly lighter grey rather than as blue, which is why the
+   person it was drawn for asked for colour coding while looking at a picture
+   that already had it. 26% moves b by 0.0176, about 2.4x, and is legible at a
+   glance while still obviously grey-family.
 
    🔴 AND NEVER YELLOW, for a structural reason rather than a taste one. `--hi`
    is the playhead, the primary control, the one thing on a page you are meant
@@ -979,7 +989,7 @@ video[hidden] { display: none; }
    control on the site already shares.
 
    🔴 COLOUR IS NEVER THE ONLY CHANNEL. `kind` also moves the stroke: a device
-   is heavy, a rented computer is dashed, `here` is the one box with a filled
+   is heavy, a rented computer is dotted, `here` is the one box with a filled
    back. Photocopy the picture or take the colour out of it and the four still
    read as four. That is also why the hover rules at the bottom change only
    colours — overriding the weight or the dash there would delete the channel
@@ -1004,6 +1014,10 @@ video[hidden] { display: none; }
   margin: 8px 0 0; min-height: 1.55em; max-width: 62ch;
 }
 .pos-dg-cap[data-on] { color: var(--fg); }
+/* a box's sentence takes `**bold**` and nothing else; the heavier face alone is
+   the emphasis, and it gets the foreground colour so the emphasised half is not
+   also the dimmest thing on the line. */
+.pos-dg-cap strong { font-weight: 600; color: var(--fg); }
 
 .pos-dg-n { cursor: default; }
 .pos-dg-n:focus-visible { outline-offset: 3px; }
@@ -1036,19 +1050,43 @@ video[hidden] { display: none; }
 .pos-dg-n[data-kind="here"] .pos-dg-box {
   fill: var(--line); stroke: var(--dim2); stroke-width: 1.2;
 }
-/* somebody else's computer, rented by the hour — dashed, because its edge is
-   the one thing in the picture that is not ours */
+/* somebody else's computer, rented by the hour — DOTTED, because its edge is
+   the one thing in the picture that is not ours.
+   ⚠️ DOTTED RATHER THAN DASHED, LOOKED AT RATHER THAN ARGUED ABOUT. It was
+   `5 3`: an 8 px period around a box 40 px tall, which reads as a marching-ants
+   selection, and every rounded corner loses a whole dash to the curve. `1 3`
+   is a 4 px period, even round the corners, and still unmistakably not solid.
+   Round caps were tried and are nearly solid at this weight, so the default
+   butt caps stay. */
 .pos-dg-n[data-kind="cloud"] .pos-dg-box {
-  fill: color-mix(in oklab, #5b9bd5 4%, var(--card2));
-  stroke: color-mix(in oklab, #5b9bd5 11%, var(--line2));
-  stroke-width: 1.2; stroke-dasharray: 5 3;
+  fill: color-mix(in oklab, #5b9bd5 8%, var(--card2));
+  stroke: color-mix(in oklab, #5b9bd5 26%, var(--line2));
+  stroke-width: 1.2; stroke-dasharray: 1 3;
 }
 /* a machine in a room somewhere — heavy, because it is a physical thing */
 .pos-dg-n[data-kind="device"] .pos-dg-box {
-  fill: color-mix(in oklab, #a98ad6 4%, var(--card2));
-  stroke: color-mix(in oklab, #a98ad6 11%, var(--line2));
+  fill: color-mix(in oklab, #a98ad6 8%, var(--card2));
+  stroke: color-mix(in oklab, #a98ad6 26%, var(--line2));
   stroke-width: 2;
 }
+
+/* A CONTAINER — a machine with the programs on it drawn as boxes inside it.
+   Its back is whatever the picture sits on, not a panel of its own: a
+   container that painted its own fill would put a flat sheet behind the boxes
+   it holds and delete the one thing nesting is for, which is that they are ON
+   it. The hue still arrives through the stroke.
+
+   ⚠️ `transparent`, NOT `none`. `fill: none` is not PAINTED, so the default
+   `pointer-events: visiblePainted` falls straight through the middle of the
+   box and hovering a container does nothing except on its 1 px edge.
+
+   ⚠️ AND IT NEEDS (0,3,0), WRITTEN AFTER THE KINDS. `.pos-dg-n[data-kind="…"]
+   .pos-dg-box` is (0,3,0) and also matches this rect, so a plainer selector
+   loses and the rule reads as absent rather than as beaten — the same
+   specificity tie the `[data-on]` rules below this already carry a warning
+   about. The `[data-on]` rules come after and DO win, which is wanted: a
+   hovered container gets a back for as long as the pointer is on it. */
+.pos-dg-n[data-kind] .pos-dg-cbox { fill: transparent; }
 
 /* ⚠️ THESE GO LAST AND THAT IS LOAD-BEARING, NOT TIDINESS. `.pos-dg-n[data-on]
    .pos-dg-box` and `.pos-dg-n[data-kind="cloud"] .pos-dg-box` are both (0,3,0)

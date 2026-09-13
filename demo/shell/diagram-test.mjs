@@ -20,12 +20,16 @@
 //   - a branch drawn straight through the box in its way looks like a path
 //     that does not exist, and it is the SECOND branch that breaks, so the
 //     first one still looks right.
+//   - a container whose height is a GUESS rather than a measurement looks
+//     right with one box in it and wrong with three, which nobody tries.
+//   - a bold run that toggles on every marker turns one typo into a sentence
+//     that is bold from the mistake to the full stop, and reads as a decision.
 //
-// Six of these are NEGATIVE CONTROLS: a check that cannot fail is a check that
-// is decoration, so each of the four claims above is also run against an input
+// Nine of these are NEGATIVE CONTROLS: a check that cannot fail is a check that
+// is decoration, so each of the claims above is also run against an input
 // that must break it.
 
-import { assignColumns, backLevels, wrapLines, layout, captionTexts, METRICS }
+import { assignColumns, backLevels, wrapLines, layout, captionTexts, boldParts, METRICS }
   from './diagram.mjs';
 
 let pass = 0, fail = 0;
@@ -92,6 +96,31 @@ const FORK = {
   ],
 };
 
+// A MACHINE WITH TWO PROGRAMS ON IT, which is the case a `sub` under a name
+// draws as one thing. The note reaches ONE of the two programs and the OTHER
+// one answers, so a link that names a box inside a container has to be a real
+// link rather than a link to the container with a caption.
+const NEST = {
+  nodes: [
+    { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+      note: 'The browser you are reading this in.' },
+    { id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
+      { id: 'synth', label: 'a synthesiser', sub: 'plays the note' },
+      { id: 'rec', label: 'a recorder', sub: 'keeps a minute' },
+    ] },
+  ],
+  links: [
+    { from: 'you', to: 'synth', label: 'note number' },
+    { from: 'rec', to: 'you', label: 'the last minute', back: true },
+  ],
+};
+
+/** a box by id, whether it is a box in the picture or a box inside one */
+const boxOf = (L, id) => L.nodes.find((n) => n.id === id)
+  || L.nodes.flatMap((n) => n.kids || []).find((k) => k.id === id);
+const inside = (k, c) => k.x > c.x && k.x + k.w < c.x + c.w
+                      && k.y > c.y && k.y + k.h < c.y + c.h;
+
 // every (x, y) in a path string. Every command the drawer emits — M, L, Q —
 // takes coordinate PAIRS and nothing else, so the numbers alternate all the
 // way through and a regular expression is enough.
@@ -102,6 +131,7 @@ const pathPoints = (d) => {
   return out;
 };
 const PAD_GUESS = 2 + 4;    // where the outermost return lane starts
+const EDGE_OUT = 2;         // diagram.mjs's own offset into a box's edge
 const findLink = (L, from, to) => L.links.find((l) => l.from === from && l.to === to);
 
 console.log('\n== columns: the longest forward path, and nothing else ==');
@@ -534,6 +564,203 @@ console.log('\n== and no name has its own arrow drawn through it ==');
     metrics: { ...METRICS, labSize: 18, labLh: 23, subSize: 15, subLh: 19 } });
   ok('bigger type makes taller boxes', big.boxH > small.boxH,
      `${small.boxH} px against ${big.boxH} px`);
+}
+
+console.log('\n== a box inside a box ==');
+
+{
+  // 🔴 A CONTAINER IS MEASURED FROM WHAT IS IN IT. Nothing here re-derives the
+  // drawer's own formula — that is the mistake `timeline/csound.mjs` made for
+  // months, where the check and the code shared a misreading. These are the
+  // things a READER sees: each box is inside its container on all four sides,
+  // the two do not overlap each other, and the container's own name is above
+  // the first of them.
+  const L = layout(NEST, { width: 660, measure });
+  const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth'), rec = boxOf(L, 'rec');
+  ok('a box inside a container is drawn inside it, on all four sides',
+     L.mode === 'row' && inside(synth, pi) && inside(rec, pi),
+     `container ${pi.x}..${pi.x + pi.w} x ${pi.y}..${pi.y + pi.h}; ` +
+     `synth ${synth.x}..${synth.x + synth.w} x ${synth.y}..${synth.y + synth.h}`);
+  ok('and two of them do not sit on top of each other',
+     synth.y + synth.h <= rec.y && synth.h === rec.h,
+     `synth ends at ${synth.y + synth.h}, the recorder starts at ${rec.y}`);
+  ok('the container\'s own name is above the boxes it holds',
+     pi.labY[0] < synth.y, `its name sits at ${pi.labY[0]}, the first box at ${synth.y}`);
+}
+
+{
+  // 🔴 NEGATIVE CONTROL, and it is the one that matters: a container whose
+  // height was a GUESS — a constant, or the plain box height plus a number —
+  // would come out the same whatever was put in it. A third box in it must
+  // make it taller, and the picture with it must be taller still.
+  const two = layout(NEST, { width: 660, measure });
+  const three = layout({ ...NEST, nodes: [NEST.nodes[0],
+    { ...NEST.nodes[1], children: [...NEST.nodes[1].children,
+      { id: 'log', label: 'a log', sub: 'says what it did' }] }] },
+    { width: 660, measure });
+  ok('NEGATIVE CONTROL: a third box inside makes the container taller',
+     three.boxH > two.boxH && three.height > two.height,
+     `${two.boxH} px becomes ${three.boxH} px, and the picture ${two.height} -> ${three.height}`);
+  // and the plain box beside it keeps up, because a row of unequal boxes ranks
+  // them — which is the rule that was already here for two lines of type
+  const you = boxOf(three, 'you'), pi = boxOf(three, 'pi');
+  ok('and every box in the row is still one height', you.h === pi.h,
+     `${you.h} px and ${pi.h} px`);
+}
+
+{
+  // 🔴 EVERY LAYOUT THAT EXISTED BEFORE NESTING COMES OUT BYTE-IDENTICAL, and
+  // this is the cheap in-suite half of that claim: the same description with
+  // an EMPTY `children` on every box must be the same picture to the last
+  // decimal. If any of the new arithmetic ran unconditionally it would show
+  // up here as a diff. (The other half is every spec in this file and in
+  // /kit/ diffed against the version before the change, at 17 widths.)
+  //
+  // ⚠️ AND IT TAKES TWO ASSERTS, because the obvious one is an A/B where both
+  // arms share the bug: layout(spec) against layout(spec + `children: []`)
+  // comes out equal even when the nesting arithmetic runs unconditionally,
+  // since it then runs on BOTH. MEASURED by sabotage — forcing the container
+  // branch always on left this at 63/63 until the second line existed. So the
+  // result is also checked for any TRACE of nesting: no empty list, no key.
+  const L = layout(TRIP, { width: 660, measure });
+  const plain = JSON.stringify(L);
+  const withKey = JSON.stringify(layout(
+    { ...TRIP, nodes: TRIP.nodes.map((n) => ({ ...n, children: [] })) },
+    { width: 660, measure }));
+  ok('a description with nothing inside any box is unchanged, to the last decimal',
+     plain === withKey, `${plain.length} characters, identical`);
+  ok('and it carries no trace of nesting — no empty list, no key',
+     L.nodes.every((n) => !('kids' in n)) && !('inside' in L),
+     `${L.nodes.length} boxes, keys ${Object.keys(L.nodes[0]).join(' ')}`);
+}
+
+{
+  // 🔴 LEFT TO RIGHT, AN ARROW REACHES THE BOX IT NAMES. The ground between a
+  // container's edge and a box inside it is empty sideways, so the arrowhead
+  // lands on the synthesiser rather than on the board — which is the whole
+  // reason a link may name a box inside a container at all.
+  const L = layout(NEST, { width: 660, measure });
+  const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth'), you = boxOf(L, 'you');
+  const note = findLink(L, 'you', 'synth');
+  const end = pathPoints(note.d).at(-1);
+  ok('left to right the arrow reaches the box it names, not the machine',
+     end[0] > pi.x && end[0] <= synth.x, `it ends at x ${end[0]}, ` +
+     `the machine's edge is ${pi.x} and the box inside it starts at ${synth.x}`);
+  // 🔴 AND ITS NAME IS MEASURED AGAINST THE GAP BETWEEN THE MACHINES, NOT
+  // AGAINST THE LINE. The line is longer, because it carries on past the
+  // container's edge to the box inside it — and the room beside that last
+  // stretch is not empty, it is the container. A name budgeted on the run
+  // would be written over the machine it is entering, which is the same defect
+  // as a name under a box, one layer in. So the budget is the shorter number
+  // and the name sits at the middle of the gap.
+  const run = Math.abs(end[0] - pathPoints(note.d)[0][0]);
+  const gap = (pi.x - EDGE_OUT - 1) - (you.x + you.w + EDGE_OUT) - 1;
+  const cut = L.cuts.find((c) => c.id === 'you to synth');
+  ok('and its name is in the gap between the machines, not inside one',
+     note.lx > you.x + you.w && note.lx < pi.x,
+     `"${note.lab.lines.join(' ')}" is at ${note.lx}, between ${you.x + you.w} and ${pi.x}`);
+  ok('and it is budgeted on that gap, which is SHORTER than the arrow',
+     cut && cut.width === gap && gap < run,
+     `${cut ? cut.width : '-'} px of room for a name beside a ${Math.round(run)} px arrow`);
+}
+
+{
+  // 🔴 STACKED, THE SAME ARROW STOPS AT THE MACHINE — and that is not an
+  // inconsistency, it is the same rule: a container's name is at the TOP of
+  // it, so a run coming down from above would cross the words `Raspberry Pi`
+  // on its way in. MEASURED on screen before this: it did exactly that.
+  const L = layout(NEST, { width: 320, measure });
+  const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth');
+  const note = findLink(L, 'you', 'synth');
+  const end = pathPoints(note.d).at(-1);
+  ok('in one column it stops at the machine, clear of the container\'s own name',
+     L.mode === 'column' && end[1] <= pi.y && end[1] < pi.labY[0] && synth.y > pi.labY[0],
+     `it ends at y ${end[1]}, the machine starts at ${pi.y} and its name sits at ${pi.labY[0]}`);
+}
+
+{
+  // 🔴 TWO BOXES IN ONE CONTAINER HAVE NO ROUTE BETWEEN THEM, so the link is
+  // dropped and REPORTED. Drawing it silently is the defect this is here to
+  // prevent: a line between two boxes that share a container has nowhere to go
+  // that is not through one of them.
+  const L = layout({ ...NEST,
+    links: [...NEST.links, { from: 'synth', to: 'rec', label: 'straight on' }] },
+    { width: 660, measure });
+  ok('a link between two boxes in one container is dropped AND reported',
+     (L.inside || []).length === 1 && !findLink(L, 'synth', 'rec'),
+     `${(L.inside || []).length} reported: ` +
+     (L.inside || []).map((l) => `${l.from} to ${l.to}`).join(', '));
+}
+
+{
+  // 🔴 A COLUMN IS A STATEMENT ABOUT THE MACHINES. A link naming a box inside
+  // one must be counted against the machine, or the program gets a column of
+  // its own and the picture says the signal visits a place it never leaves.
+  const L = layout({
+    nodes: [
+      { id: 'you', label: 'here' },
+      { id: 'pi', label: 'a board', children: [{ id: 'synth', label: 'a program' }] },
+      { id: 'far', label: 'over there' },
+    ],
+    links: [{ from: 'you', to: 'synth', label: 'in' }, { from: 'pi', to: 'far', label: 'on' }],
+  }, { width: 660, measure });
+  const xs = L.nodes.map((n) => n.x);
+  ok('a box inside a machine does not take a column of its own',
+     L.nodes.length === 3 && xs[0] < xs[1] && xs[1] < xs[2] && new Set(xs).size === 3,
+     `three boxes at x ${xs.join(', ')} — the program is inside the middle one`);
+}
+
+console.log('\n== the line under the picture says what a box DOES ==');
+
+{
+  // 🔴 A BOX'S SENTENCE IS WHAT THE LINE WILL HOLD, SO IT IS WHAT THE HEIGHT
+  // IS RESERVED FOR. Reserving against the box's NAME while the pointer shows
+  // its sentence is the same defect as reserving against the box while the
+  // pointer shows the caption — one step further in, and it moves the page by
+  // the difference.
+  const L = layout(NEST, { width: 660, measure });
+  const t = captionTexts({ caption: 'a caption' }, L.nodes);
+  ok('the reserved list holds a box\'s SENTENCE, not its name',
+     t.includes(NEST.nodes[0].note) && !t.includes(boxOf(L, 'you').title),
+     `"${t[1]}" rather than "${boxOf(L, 'you').title}"`);
+  ok('and every box inside a container is in it too',
+     t.includes(boxOf(L, 'synth').title) && t.includes(boxOf(L, 'rec').title),
+     `${t.length} strings for ${L.nodes.length} boxes and 2 inside one of them`);
+  // 🔴 NEGATIVE CONTROL: a box with no sentence still has to be measured, or
+  // the list quietly loses boxes and the reservation is short for exactly the
+  // ones nobody wrote a sentence for.
+  ok('NEGATIVE CONTROL: a box with no sentence still contributes its name',
+     t.includes(boxOf(L, 'pi').title) && boxOf(L, 'pi').note === undefined,
+     `"${boxOf(L, 'pi').title}"`);
+}
+
+console.log('\n== bold, and nothing else ==');
+
+{
+  const r = boldParts('the same four settings, **unchanged**, on to the board');
+  ok('two asterisks make one bold run and the asterisks go',
+     r.length === 3 && r[1].bold && r[1].text === 'unchanged'
+       && !r[0].bold && !r[2].bold,
+     r.map((p) => `${p.bold ? 'BOLD' : 'plain'} "${p.text}"`).join(' · '));
+  ok('and the sentence survives it whole',
+     r.map((p) => p.text).join('') === 'the same four settings, unchanged, on to the board',
+     r.map((p) => p.text).join(''));
+}
+
+{
+  // 🔴 NEGATIVE CONTROL: the tempting implementation toggles on every marker
+  // it meets, which turns one typo into a sentence that is bold from the
+  // mistake to the full stop — a rendering bug that reads as a decision. An
+  // unpaired marker has to stay on the page as two asterisks.
+  const r = boldParts('a sentence with one ** in it and no closing pair');
+  ok('NEGATIVE CONTROL: an unpaired marker is text, and nothing goes bold',
+     r.length === 1 && !r[0].bold
+       && r[0].text === 'a sentence with one ** in it and no closing pair',
+     r.map((p) => `${p.bold ? 'BOLD' : 'plain'} "${p.text}"`).join(' · '));
+  const plain = boldParts('no marks at all');
+  ok('a sentence with no marks is one plain run',
+     plain.length === 1 && !plain[0].bold && plain[0].text === 'no marks at all',
+     `${plain.length} run`);
 }
 
 console.log(`\n${pass} ok, ${fail} failed\n`);
