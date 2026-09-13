@@ -1,8 +1,22 @@
 # plan-uuu-local — U:'s scores through our compiler, with the network out of the TIMING path
 
-Status: **not started, and mostly already true.** Written 2026-09-07 out of the
-question "could uuu's local material run through the vClick compiler, and does
-needing a network kill it?"
+Status: ⚠️ **CORRECTED 2026-09-14 — it was NOT "mostly already true", and it was
+wrong in both directions at once.** ✅ **P1 fails at the first statement of the
+first file:** `compileCsound` THROWS `tempoMap: non-finite point 0,NaN` on BOTH
+real scores in `tarmoj/vclick` (`server/simple-4-4.sco`, `server/test.sco`),
+because line 12 of each reads `t 0 $REPTEMPO` and `#define` / `$MACRO` is
+unsupported. With a twelve-line macro pass in front, both compile clean and every
+`i` line is accounted for. ✅ **§3's "single most important unknown" is settled and
+the answer is no** — neither real score contains a single `m` or `n`, so the
+quotation win is theoretical until somebody re-notates. ✅ And §6's *"`t` is
+SECTION-LOCAL — KNOWN OPEN"* trap is **fixed**, §3's "22/22" is now **42/42**,
+and §4's *"a local relay does not exist"* is superseded (run the real worker:
+`wrangler dev --local --ip 0.0.0.0 --port 8892`). The body below is otherwise
+unchanged; read **`research/uuu-integration-2026-09.md`** first, which carries
+the measurements and what follows from them.
+
+Written 2026-09-07 out of the question "could uuu's local material run through
+the vClick compiler, and does needing a network kill it?"
 
 Primary source is `demo/notes/uuu-positron.md` — read §3 before this file, which
 is only the plan that follows from it. `timeline/csound.mjs`'s header cites that
