@@ -21,10 +21,12 @@
   import { docOf, validate as validate0 } from '/shell/seed.mjs';
   import { touchOf } from '/shell/xr-panel.mjs';
   import {
-    createXRRoom, roomOf, spaced, clashes, radiusOf, r4,
+    createXRRoom, roomOf, spaced, clashes, radiusOf, r4, holdM,
     GAP, DROP_PASSES, FADE_MS, ROOM_OPTIONAL_FEATURES,
     perspective, lookAt,
   } from '/shell/xr-room.mjs';
+  import { createXRHands, BUTTON, AXIS } from '/shell/xr-hands.mjs';
+  import { createXRTablet, valueFromU, TABLET } from '/shell/xr-tablet.mjs';
 
   // ── the room is a module now ────────────────────────────────────────────
   // 🔴 THE PICTURE AND THE RULES ABOUT IT LIVE IN demo/shell/xr-room.mjs. The
@@ -123,7 +125,7 @@
 
   const d = mount({
     name: 'scene',
-    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up, the thumbstick pushes it further away or pulls it closer, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second. Nothing is allowed to sit inside anything else or inside arm's reach of your head: the roll spaces the things out before you see them, a thing let go inside another is pushed back out along the line between their centres, and a thing that ends up in your face is moved away from it.`,
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. Your right hand gets a pointer and your left a small screen — a stand-in shape rather than a picture of your real controller — with a slider on it that fades the dotted floor; the trigger picks a thing up or moves that slider, the thumbstick pushes what you are holding nearer or further, the grip drops you back out, and letting go sends the room to everyone else in it, once, rather than ninety times a second. Nothing is allowed to sit inside anything else or inside arm's reach of your head: the roll spaces the things out before you see them, a thing let go inside another is pushed back out along the line between their centres, and a thing that ends up in your face is moved away from it.`,
     readout: { seed: '', things: '', moved: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
@@ -210,10 +212,24 @@
   // is the whole reason it is a module. `say` is the BEACON, never the batched
   // shipper: the room's lines about your real floor arrive while a session is
   // starting, which is exactly when a 2 s timer stops being generous.
-  let room = null;
+  let room = null, tablet = null, xrHands = null;
   if (gl) {
     quad = unitQuad();
     room = createXRRoom(gl, { log: (m, k) => d.log(m, k), say: shipNow });
+    // ── the small screen on your left hand, and the one control on it ──────
+    // 🔴 THE CONTROLS ARE A LIST IN `xr-tablet.mjs`, NOT A THING THIS PAGE
+    // BUILDS. A second control is one line there and both pages that stand in
+    // this room get it, which is the only way "the same interface in both kinds
+    // of session" survives somebody adding a knob. `ctx` is what a control's
+    // `apply` is handed, so nothing on the tablet reaches into the room itself.
+    tablet = createXRTablet({ ctx: { room } });
+    room.setTablet(tablet);
+    tablet.applyAll();          // the dots start where the slider says, not at a default
+    // 🔴 ONE INPUT PATH, AND IT CANNOT TELL VR FROM AR. Every controller, the
+    // pointer, the tablet and its slider come out of this one module, which has
+    // no session mode in it at all — so the interface is identical in both
+    // modes structurally rather than by two paths agreeing today.
+    xrHands = createXRHands({ tablet, log: (m, k) => d.log(m, k), say: shipNow });
   }
 
   // ── the status panel: text drawn to a canvas, uploaded as a texture ─────
@@ -515,6 +531,50 @@
   }
 
   // ── the flat window, which is also how the desktop harness sees it ──────
+  /**
+   * 🔴 THE TABLET AND ONE CONTROLLER, SHOWN IN THE WINDOW TOO, AND IT IS NOT
+   * DECORATION. Two reasons, and the second is the one that matters.
+   *
+   * 1. A visitor with no headset can read the thing this page now has a control
+   *    on. Otherwise the only way to see it is to own a Quest.
+   * 2. ⚠️ IT IS THE ONLY WAY A LAPTOP EVER RUNS THE TABLET'S DRAW CALL. Without
+   *    it the quad, its new sampler and its texture bind are reached for the
+   *    first time on the FIRST FRAME OF A HEADSET SESSION — where a pending
+   *    `gl.getError()` costs the one run somebody was going to do. With it,
+   *    `demo/verify-gl.mjs`'s "no WebGL error is pending" covers the tablet on
+   *    every run of the suite, on real ANGLE, for free.
+   *
+   * The pose is synthesised where a left hand would be if you were standing at
+   * the camera — down and to the left, turned so its face looks back at you.
+   * The stand-in is drawn with it, because a tablet floating on nothing would
+   * be a picture of something that does not happen.
+   */
+  function previewTablet(eye) {
+    if (!room) return;
+    const target = [0, 1.2, 0];
+    const n = (v) => { const l = Math.hypot(...v) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const X = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const L = n([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
+    const camR = n(X(L, [0, 1, 0]));
+    const pos = [
+      eye[0] + L[0] * 0.8 - camR[0] * 0.24,
+      eye[1] + L[1] * 0.8 - camR[1] * 0.24 - 0.26,
+      eye[2] + L[2] * 0.8 - camR[2] * 0.24,
+    ];
+    // The grip's +Z runs from the eye into the controller, so its -Z — the
+    // thumb, and the top face the tablet lies on — looks back at whoever is
+    // reading it. Right-handed: X = Z x up, Y = Z x X.
+    const f = n([pos[0] - eye[0], pos[1] - eye[1], pos[2] - eye[2]]);
+    const r = n(X(f, [0, 1, 0]));
+    const u = X(f, r);
+    const m = new Float32Array([
+      r[0], r[1], r[2], 0,
+      u[0], u[1], u[2], 0,
+      f[0], f[1], f[2], 0,
+      pos[0], pos[1], pos[2], 1]);
+    room.setInput({ hands: [{ m, handedness: 'left' }], pointer: null, tabletM: holdM(m), hit: null });
+  }
+
   let raf = 0, t0 = performance.now(), lastFrame = 0;
   function flat(now) {
     raf = requestAnimationFrame(flat);
@@ -525,6 +585,7 @@
     const tSec = (now - t0) / 1000;
     const a = tSec * 0.12;
     const eye = [Math.cos(a) * 6.5, 2.4, Math.sin(a) * 6.5];
+    previewTablet(eye);
     drawRoom(perspective(1.05, canvas.width / canvas.height, 0.1, 60),
              lookAt(eye, [0, 1.2, 0]), tSec, true, eye);
     markShown(now);
@@ -591,6 +652,16 @@
       // them is true at a time.
       surfaces: room?.planes.state ?? 'no room', grid: room?.planes.from ?? '—',
       planes: room?.planes.count ?? 0, labels: room ? { ...room.planes.labels } : {},
+      // 🔴 THE LINE TWO HEADSET RUNS ARE COMPARED ON, AND IT HAS NO MODE IN IT.
+      // The owner will do one pass of VR and one of passthrough, not three — so
+      // "is the controller interface the same in both?" has to be answerable by
+      // putting the two logs side by side. This string is built entirely out of
+      // declarations: sizes, counts, ranges, which hand gets what, which gamepad
+      // index is the trigger. If it ever differs between two runs, something in
+      // the controller path learned what kind of session it was in.
+      ui: xrHands ? xrHands.fingerprint() : 'no controller interface built',
+      dots: room ? room.gridAlpha : null,
+      tabletUploadMs: room ? room.tabletUploadMs : null,
     };
   };
   async function enter(mode = 'immersive-vr') {
@@ -754,6 +825,16 @@
     });
 
     session.addEventListener('selectstart', () => {
+      // 🔴 A PRESS THAT LANDS ON THE TABLET BELONGS TO THE TABLET. Without this
+      // line the same trigger would move a slider AND grab whatever is behind
+      // it — two things happening from one press, one of which you cannot see,
+      // which is the worst way for a control to be wrong. The tablet's own
+      // press is read off the gamepad inside `xr-hands`, so this handler only
+      // has to stand aside.
+      if (xrHands?.over) {
+        shipNow('trigger on the tablet — the slider has it, nothing was grabbed');
+        return;
+      }
       if (!rayNow) return;
       held = pick(rayNow.o, rayNow.dir);
       shipNow(held ? `grabbed thing ${held.i} at ${held.dist.toFixed(2)} m` : 'trigger — nothing under the pointer');
@@ -914,33 +995,37 @@
       });
       shipNow(`hands · ${session.inputSources.length} source(s) · ${bits.join(' · ')} · space local-floor`);
     }
-    // 🔴 THE GRIP, FOR THE CONTROLLERS AND THE TABLET. This loop already asks
-    // for the target ray every frame; the grip is one more `getPose` and it is
-    // what a held thing hangs off. `plan-xr-hands` §1.
-    const grips = [];
-    for (const src of session.inputSources) {
-      if (!src.gripSpace) continue;
-      const gp = frame.getPose(src.gripSpace, xrSpace);
-      if (gp) grips.push({ m: gp.transform.matrix, handedness: src.handedness });
-    }
-    room?.setHands(grips);
-
-    for (const src of session.inputSources) {
-      if (!src.targetRaySpace) continue;
-      const rp = frame.getPose(src.targetRaySpace, xrSpace);
-      if (!rp) continue;
-      const m = rp.transform.matrix;
-      const o = [m[12], m[13], m[14]];
-      const dir = [-m[8], -m[9], -m[10]];        // -Z of the ray's own frame
+    // 🔴 EVERY CONTROLLER, THE POINTER AND THE TABLET, FROM ONE CALL — AND IT
+    // DOES NOT KNOW WHAT KIND OF SESSION IT IS IN. `arMode` appears nowhere
+    // between here and the end of this block, and that is the requirement
+    // rather than a coincidence: the controller interface has to be identical
+    // in VR and in passthrough, and two paths meant to be the same drift. The
+    // only thing the two modes differ on is what the ROOM is drawn on, which is
+    // `observePlanes` and `buildOwnRoom` and nothing else.
+    //
+    // ⚠️ IT ALSO REPLACES A `break`. The old loop took the FIRST source with a
+    // ray, so with two controllers it aimed with whichever the array happened
+    // to put first — an index standing in for a question the runtime answers.
+    // `handedness` answers it: the right hand points, the left carries the
+    // tablet, and the fallback when there is only one of them is written down.
+    const inp = xrHands.observe(frame, xrSpace, session);
+    room?.setInput(inp);
+    const src = inp.pointerSrc;
+    if (inp.pointer && src) {
+      const { m, o, dir } = inp.pointer;
       if (held) {
         // ⚠️ PUSH AND PULL WITH THE THUMBSTICK. Carrying a thing at exactly the
         // distance it was grabbed from means a thing that is already too close
         // can only ever stay too close — reported from the headset, and it is
         // the difference between holding something and being stuck with it.
-        // Axis 3 is the thumbstick's Y on a Touch controller; axis 1 on
-        // whatever reports only one stick.
+        // ⚠️ THE INDEX IS NO LONGER A GUESS. It was `ax[3] ?? ax[1]`, typed
+        // against a controller nobody had asked the name of; `AXIS.stickY` is
+        // read out of the input-profiles registry's own `profile.json` for
+        // `meta-quest-touch-plus` — which says 3, so the guess was right and is
+        // now a fact. The `?? ax[1]` fallback stays for anything that reports
+        // only one stick. See BUTTON/AXIS in xr-hands.mjs.
         const ax = src.gamepad?.axes || [];
-        const push = (ax[3] ?? ax[1] ?? 0);
+        const push = (ax[AXIS.stickY] ?? ax[1] ?? 0);
         if (Math.abs(push) > 0.15) held.dist = clamp(held.dist - push * 0.05, MIN_HOLD, 8);
         moveThing(held.i, o[0] + dir[0] * held.dist, o[1] + dir[1] * held.dist, o[2] + dir[2] * held.dist);
       }
@@ -950,12 +1035,18 @@
         aimed = hit ? hit.i : null;
         aimedDist = hit ? hit.dist : 0;
       }
-      // A/X is button 4 on a Touch controller. Edge-triggered, or holding it
-      // through one frame would fire the reload several times.
-      const aDown = !!src.gamepad?.buttons?.[4]?.pressed;
+      // A/X is button 4, and that too is the registry's answer rather than a
+      // guess. Edge-triggered, or holding it through one frame would fire the
+      // reload several times.
+      const aDown = !!src.gamepad?.buttons?.[BUTTON.primary]?.pressed;
       if (aDown && !aWas && reloadOffered) takeReload();
       aWas = aDown;
-      break;                                      // one pointer is enough here
+    } else {
+      // ⚠️ NO POINTER MEANS NO BEAM, rather than a beam where one last was. A
+      // ray left hanging in the air after the controller went to sleep is a
+      // page reporting a thing it no longer knows — the same rule the stand-ins
+      // follow, which is why they are drawn only for a grip that RESOLVED.
+      rayNow = null; aimed = null; aimedDist = 0;
     }
 
     // 🔴 A THING INSIDE YOUR HEAD CANNOT BE GRABBED OUT OF IT. Dragging
@@ -1058,6 +1149,19 @@
       const err = gl.getError();
       const vp0 = layer.getViewport(pose.views[0]);
       shipNow(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err} · eye0 ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0} · grid ${room?.hasGrid ? 'drawing' : 'NOT drawing'} on ${room?.planes.from}`);
+      // 🔴 THE FINGERPRINT, ON THE FIRST FRAME OF EVERY SESSION. This is the
+      // line to hold beside the other mode's. It is shipped from inside the
+      // session on purpose — a string printed at page load could not have been
+      // affected by a branch that only exists once a session is running, and it
+      // is exactly that branch this line is meant to make visible.
+      // ⚠️ AND IT CARRIES WHETHER THE TABLET'S SHADER COMPILED, because the
+      // line that says it did not is written during `attach()` — at page load,
+      // before `maybeReport` has built the shipper — so on this page it would
+      // be swallowed. A failure that only reaches a log nobody has opened yet
+      // is a failure nobody sees.
+      shipNow(`controller interface · ${xrHands ? xrHands.fingerprint() : 'NONE BUILT'}`
+        + ` · its face ${room?.hasTablet ? 'compiled' : 'WOULD NOT COMPILE, so there is no tablet in here'}`
+        + ` · this session is ${arMode ? 'immersive-ar' : 'immersive-vr'}, and nothing before this dot depends on that`);
       // The grid's own line, on the panel, because the 2-D page is behind your
       // face and this is the one thing in here that is a claim ABOUT your room.
       if (room) setPanel(room.planes.short, 6000);
@@ -1158,6 +1262,28 @@
     d.set('seed', String(seed));
   });
 
+  /**
+   * 🔴 THE CHECK THAT SAYS THE TWO MODES CANNOT HAVE DRIFTED.
+   *
+   * Called from BOTH session buttons, so it runs once on the VR path and once
+   * on the passthrough one, in the same run, on any machine. It compares the
+   * controller interface's own description of itself across the two — and
+   * refuses any session word appearing in it, because a fingerprint that can
+   * say "passthrough" is a fingerprint that could differ.
+   *
+   * ⚠️ IT IS NOT A SUBSTITUTE FOR THE HEADSET LINE, it is the other half. This
+   * grades the two code paths on a laptop; the beacon line on the first frame
+   * of each session is what the owner holds side by side after one pass of each.
+   */
+  let uiSeen = null;
+  const gradeUI = (where) => {
+    const now = xrHands ? xrHands.fingerprint() : 'no controller interface built';
+    if (uiSeen === null) uiSeen = now;
+    d.assert('the controller interface is the same whichever kind of session this is',
+      now === uiSeen && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(now),
+      `${where} — ${now}`);
+  };
+
   d.on('ar', async () => {
     let got = false;
     try { got = await enter('immersive-ar'); }
@@ -1167,6 +1293,7 @@
       try { await session?.end(); } catch { /* may not exist */ }
       session = null; xrOk = false; arMode = false;
     }
+    gradeUI('passthrough');
     d.assert('it knows whether this headset can show your room',
       arKnown === true || arKnown === false, `immersive-ar supported: ${arKnown}`);
     if (got) {
@@ -1200,6 +1327,7 @@
     // Both branches are real and both are asserted. A headset is the only place
     // the first two can pass, which is exactly why demo/verify.mjs cannot grade
     // this page and verify-quest.mjs has to exist.
+    gradeUI('headset');
     d.assert('it knows whether there is a headset here',
       typeof navigator.xr === 'object' || navigator.xr === undefined,
       navigator.xr ? 'WebXR present' : 'no WebXR in this browser');
@@ -1257,6 +1385,115 @@
     d.assert('a thing dropped inside another is pushed back out',
       sank && went > 0 && apart >= need,
       sank ? `${apart.toFixed(2)} m apart, needs ${need.toFixed(2)} m` : 'it would not go in');
+
+    // ⚠️ THE THING ON YOUR HAND IS GRADED HERE TOO, AND IT IS ALL ARITHMETIC.
+    // The tablet's pose, the slider's ends and the floor are `Float32Array(16)`s
+    // and three divisions; only the PICTURE needs a headset. Leaving them to
+    // the device would mean the half most likely to be silently wrong — a press
+    // landing in the wrong place — is only ever checked where nothing is
+    // watching. `demo/shell/xr-pick-test.mjs` grades the same arithmetic under
+    // node with six negative controls; these three are the page saying the same
+    // thing about the code it actually loaded.
+    const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
+    const TM = holdM(I);
+    const axis = [-I[8], -I[9], -I[10]];               // the controller's own -Z
+    const perp = Math.abs(TM[0] * axis[0] + TM[1] * axis[1] + TM[2] * axis[2])
+      + Math.abs(TM[4] * axis[0] + TM[5] * axis[1] + TM[6] * axis[2]);
+    const det = TM[0] * (TM[5] * TM[10] - TM[6] * TM[9])
+      - TM[4] * (TM[1] * TM[10] - TM[2] * TM[9])
+      + TM[8] * (TM[1] * TM[6] - TM[2] * TM[5]);
+    d.assert('the tablet lies flat on the controller\'s top face, square to it rather than at an angle',
+      perp < 1e-6 && det > 0,
+      `off-square by ${perp.toExponential(2)}, and its front face is the one you can see (${det.toExponential(2)})`);
+
+    const c0 = TABLET.controls[0];
+    d.assert('dragging the slider from end to end reaches both ends of the number it drives',
+      valueFromU(0, c0) === c0.min && valueFromU(1, c0) === c0.max
+      && valueFromU(-3, c0) === c0.min && valueFromU(4, c0) === c0.max,
+      `${c0.label} ${valueFromU(0, c0)}..${valueFromU(1, c0)}${c0.unit}, and a drag off the edge is clamped`);
+
+    // 🔴 ASK THE PICTURE, BECAUSE AN EMPTY FACE AND A FACE THAT WAS NEVER DRAWN
+    // LOOK THE SAME FROM OUTSIDE. A canvas whose draw silently did nothing — a
+    // missing `roundRect`, a font that never loaded, a version counter that
+    // never advanced — reads exactly like a tablet nobody wired up, and in a
+    // headset it reads as a dead screen. So: is there ink on it, and DOES THE
+    // INK MOVE WHEN THE NUMBER DOES. The second half is the one that earns its
+    // place — a knob drawn at a fixed position passes the first on its own,
+    // which is a statistic that is constant by construction over the defect it
+    // is meant to catch.
+    //
+    // ⚠️ AND THE QUANTITY IS THE WIDTH THE CHANGE COVERS, NOT HOW MUCH INK
+    // THERE IS. Counting lit pixels was tried first and it was the wrong
+    // question by exactly one step: the track is already opaque along its whole
+    // length, so filling part of it adds no pixels at all, and the 8% the count
+    // did move was the NUMBER going from one digit to three. It would have
+    // passed with the slider nailed in place. A slider is a thing that changes
+    // ACROSS THE WIDTH, so the measurement is how far apart the leftmost and
+    // rightmost changed pixels are.
+    if (tablet) {
+      const was = tablet.value(c0.key);
+      const tctx = tablet.canvas.getContext('2d');
+      const shot = (v) => { tablet.set(c0.key, v); tablet.draw(); return tctx.getImageData(0, 0, TABLET.px, TABLET.py).data; };
+      const A = shot(c0.min), B = shot(c0.max);
+      let ink = 0, moved = 0, x0 = Infinity, x1 = -1;
+      for (let i = 0; i < A.length; i += 4) {
+        if (A[i + 3] > 8) ink++;
+        const dd = Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1])
+          + Math.abs(A[i + 2] - B[i + 2]) + Math.abs(A[i + 3] - B[i + 3]);
+        if (dd > 24) {
+          const x = (i >> 2) % TABLET.px;
+          moved++; if (x < x0) x0 = x; if (x > x1) x1 = x;
+        }
+      }
+      const span = x1 >= 0 ? (x1 - x0) / TABLET.px : 0;
+      d.assert('this browser can draw the tablet, and the slider moves across its face',
+        room.hasTablet && ink > 2000 && moved > 1000 && span > 0.6,
+        `${room.hasTablet ? 'its face compiled' : 'ITS FACE WOULD NOT COMPILE'} · ${ink} lit pixels`
+        + ` · ${moved} of them change between ${c0.min}${c0.unit} and ${c0.max}${c0.unit},`
+        + ` across ${(span * 100).toFixed(0)}% of its width`);
+
+      // 🔴 THE PRESS, THE DRAG AND THE LETTING GO — GRADED WITHOUT A HEADSET.
+      // A controller ray needs hands; a hit is `{u, v}` and everything after it
+      // is ordinary code, so leaving the whole cycle to the device would mean
+      // the part most likely to be quietly wrong is only ever exercised where
+      // nobody is watching. The interesting case is the THIRD one: once the
+      // trigger has hold of a slider, running the ray off the side of the
+      // tablet must clamp rather than drop it — which is how every slider a
+      // hand has ever used behaves, and is the one a `hit === null` check
+      // written the obvious way gets wrong.
+      const hitAt = (u) => ({ t: 0.3, u, v: 0.25, front: true });
+      tablet.release();
+      tablet.set(c0.key, (c0.min + c0.max) / 2);
+      const took = tablet.press(hitAt(0.02));
+      const atLeft = tablet.value(c0.key);
+      tablet.drag(hitAt(0.98));
+      const atRight = tablet.value(c0.key);
+      tablet.drag(null);                       // the ray ran off the edge
+      const kept = tablet.value(c0.key);
+      tablet.release();
+      const afterLetGo = tablet.drag(hitAt(0.02));
+      d.assert('a press takes hold of the slider, follows the ray, keeps its grip off the edge, and lets go',
+        took && atLeft === c0.min && atRight === c0.max && kept === c0.max && afterLetGo === false,
+        `took ${took} · ${atLeft} then ${atRight}${c0.unit} · off the edge it stayed at ${kept} · after letting go a drag does nothing: ${afterLetGo === false}`);
+      // ⚠️ AND THE NUMBER HAS TO DO SOMETHING. A slider that moves a readout and
+      // nothing else is a control that looks live and is inert — the same shape
+      // as an optional-chained fullscreen call. This is the far side of that
+      // boundary: what the dots are ACTUALLY drawn at.
+      d.assert('...and the dots are drawn at the number the slider is showing',
+        Math.abs(room.gridAlpha - tablet.value(c0.key) / 100) < 1e-6,
+        `${c0.label} ${tablet.value(c0.key)}${c0.unit}, dots at ${room.gridAlpha}`);
+      tablet.set(c0.key, was); tablet.draw();
+    }
+
+    // 🔴 A FLOOR, AND NO WALLS THIS PAGE MADE UP. In an opaque session the page
+    // knows exactly one surface — `local-floor` puts the origin on it — and a
+    // wall at 5 m would be a claim about where your room ends that is always
+    // wrong. Real walls arrive only from a headset that measured them.
+    const surf = room?.surfaces || [];
+    const flatOne = surf.length === 1 && surf[0].m[8] === 0 && surf[0].m[9] === 1 && surf[0].m[10] === 0;
+    d.assert('with nothing measured the page draws one horizontal floor and no walls',
+      flatOne && room.grid.span / 2 >= room.grid.fadeFar,
+      `${surf.length} surface(s), ${room?.grid.span} m across against a fade that ends at ${room?.grid.fadeFar} m`);
 
     // ⚠️ THE FADE IS GRADED, because a crossfade is exactly the kind of thing
     // that can be wired up and do nothing — the `LEQUAL` depth function is one
