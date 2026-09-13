@@ -97,8 +97,22 @@ Engine_Pappus : CroneEngine {
 		env = "PAPPUS_LITE".getenv;
 		if(env.notNil) {
 			env = env.asString.toLower;
-			if(#["1", "lite", "true", "yes"].includes(env)) { ^true };
-			if(#["0", "full", "false", "no"].includes(env)) { ^false };
+			// 🔴 `indexOfEqual`, NOT `includes`. MEASURED on the board
+			// 2026-09-13, with PAPPUS_LITE=1 plainly visible to sclang:
+			//
+			//   e == "1"                                -> true
+			//   #["1","lite","true","yes"].includes(e)  -> FALSE
+			//   .indexOf(e)                             -> nil
+			//
+			// `includes` compares by IDENTITY. Two Strings with the same
+			// characters are different objects, so this check reads correctly,
+			// tests true under `==`, and was always false — PAPPUS_LITE has
+			// never worked in either direction since it was written. Nobody
+			// noticed because the fall-through reads the device tree, and a
+			// Pi answers LITE anyway; it only showed up when a weighing run
+			// asked for LITE on purpose and got FULL.
+			if(#["1", "lite", "true", "yes"].indexOfEqual(env).notNil) { ^true };
+			if(#["0", "full", "false", "no"].indexOfEqual(env).notNil) { ^false };
 		};
 		path = Platform.userHomeDir ++ "/dust/data/pappus/mode.txt";
 		if(File.exists(path)) {

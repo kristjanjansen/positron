@@ -289,7 +289,44 @@ drawing side agrees with LITE about what exists — Lua draws no GR2 box on LITE
 at all, so nothing reads it. Nothing has ever heard of BARE, which is why BARE's
 four cannot borrow that excuse.
 
-### How to weigh it — NOT DONE, and these are the commands
+### ✅ WEIGHED 2026-09-13 — all four arms, one machine, one sitting
+
+| rung | bytes | UGens | headroom to 64 KiB |
+|---|---|---|---|
+| FULL | 121,425 | 2,812 | — |
+| LITE | 74,733 | 1,722 | — |
+| **TINY** | **64,733** | **1,467** | **803 B** |
+| **BARE** | **43,551** | **941** | **21,985 B** |
+
+Against the pre-`report` table (118,597 / 73,297 / 63,297): **`report` and the
+BARE plumbing cost TINY 1,436 bytes**, taking its headroom from 2,239 down to
+**803**. TINY still loads in a browser — but it is now within one modest feature
+of not doing so, and the next thing added to the granulator should be weighed
+before it is shipped rather than after.
+
+BARE is **43,551 B and 941 UGens** — a third of FULL, and two thirds of TINY
+gone. `plan-twins` §3 guessed "much smaller than TINY"; it is, and by more than
+the SOUND difference suggests, because RESONATOR's excitation chain, BRIGHTNESS's
+filter, two dozen `Lag.kr` and two `Limiter`s were all still being BUILT and run
+into a `DC.ar([0,0])` on TINY.
+
+🔴 **AND THE RUN FOUND A DEAD FLAG.** `PAPPUS_LITE=1` reported FULL. The env var
+was reaching sclang — measured, `"PAPPUS_LITE".getenv` returned `"1"` — and the
+membership test was the fault:
+
+    e == "1"                                 ->  true
+    #["1","lite","true","yes"].includes(e)   ->  FALSE
+    #["1","lite","true","yes"].indexOf(e)    ->  nil
+
+**`Array.includes` compares by IDENTITY.** Two Strings with the same characters
+are different objects, so the check read correctly, tested true under `==`, and
+was always false — `PAPPUS_LITE` had never worked in either direction since it
+was written, in EITHER direction, and nobody noticed because the fall-through
+reads the device tree and a Pi answers LITE anyway. It only surfaced when a
+weighing run asked for LITE on purpose and got FULL. Fixed with `indexOfEqual`;
+`PAPPUS_LITE=1` now reports LITE and `PAPPUS_LITE=full` reports FULL.
+
+### How it was weighed, and how to do it again
 
 🔴 **No byte count for BARE appears anywhere in this repo, because nobody has
 taken one.** `sclang` is only on the board. TINY.md's own warning is why an
