@@ -20,6 +20,32 @@ list, so nothing is carried only in a conversation.
     four sliders should show them moving, or the page changes under you with no
     account of what changed. This is a shell change, so it lands for `/box/`
     and the kit at the same time.
+- **Make the Raspberry Pi's picture the same KIND of picture.** Right now the
+  left card draws the held sound with the read band and every grain on it, and
+  the right card draws a scrolling waveform of what arrived — so the two panes
+  are not comparable, which is most of what a side-by-side is for. What the
+  board would have to send, in rough order of cost:
+  - **a peak envelope of the grain buffer** — ~600 floats for sixty seconds,
+    on demand or every second. That alone puts the WAVEFORM and the read band
+    on the right card, since `driftStats` already reports both read centres.
+    ⚠️ Needs reading a scsynth Buffer back (`/b_getn` in chunks) — bounded but
+    real work in `rig/box/`.
+  - **the grains themselves** — a `SendReply.kr` on the grain trigger in
+    `Engine_Pappus.sc`. At 0.5–24 grains a second per granulator this is ~48/s
+    at the top, which fits under the relay's measured 60 msg/s ceiling only if
+    it is BATCHED (one message per 250 ms carrying the positions since the
+    last). ⚠️ The relay drops silently past its cap, so an unbatched version
+    would look like a sparse cloud rather than like a dropped message.
+  - Until one of those exists the right card must go on saying what it cannot
+    show, in words — inferring grains from audio is the picture this page
+    already deleted once.
+- **The slider group on a desktop.** Two columns with a generous x gap rather
+  than one tall stack — `draw` got a `pos-pair` modifier for exactly this
+  (`.sld-group.pos-pair`, six columns above 720 px) and `grains` and `/box/`
+  should use the same thing rather than a second spelling of it. ⚠️ Shared
+  columns only matter when sliders are STACKED; side by side there is nothing
+  to line up, which is why the modifier is a media query and not a new class of
+  group.
 - **The two-SuperColliders card.** Not a page — the third card on `grains`,
   beside the two that are there. `PAPPUS_TINY=1` is on the board and is proven
   to load in a tab (63,297 B under the silent 64 KiB `/d_recv` cap), so the

@@ -241,12 +241,52 @@ export async function whepPlay(url, video, { log = () => {}, onTrack } = {}) {
       });
     });
   }
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/sdp' },
-    body: pc.localDescription.sdp,
-  });
-  if (!res.ok) throw new Error(`WHEP ${res.status}`);
+  const res = await offerSdp(url, pc.localDescription.sdp, { log });
   await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
   return { pc, inbound, location: res.headers.get('location') };
+}
+
+/**
+ * POST an offer, and treat a 409 as NOT YET rather than NO.
+ *
+ * 🔴 THIS IS `keep`'s UNEXPLAINED 409, AND IT WAS A RACE. Cloudflare answers a
+ * WHEP subscribe with 409 while the input is not publishing — and a page that
+ * publishes and then immediately subscribes is asking in the gap between the
+ * WHIP POST returning and ICE/DTLS finishing, which is a window of a second or
+ * so that usually closes first and sometimes does not. `waitForWhip` above was
+ * written for the same fault on a different page, where the container's own
+ * status was available to wait on; a page publishing from itself has no such
+ * signal, so the honest move is to ask again.
+ *
+ * ⚠️ A RECOVERY ACTION IS NOT FREE (CLAUDE.md). It is bounded at five retries
+ * over ~7 s, it YIELDS rather than spinning, it re-posts the SAME offer (a 409
+ * means nothing was created, so there is no second session to leak), and every
+ * other status fails immediately — a 404 or a 500 is not going to become a 201
+ * by being asked twice.
+ *
+ * Exported so `demo/shell/live-test.mjs` can drive it with a stubbed fetch:
+ * a guard nobody has seen fire is a guard nobody knows they have.
+ */
+export const WHEP_RETRY = { tries: 5, firstMs: 600, stepMs: 400 };
+
+export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  let res = null, waited = 0;
+  for (let i = 0; ; i++) {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/sdp' },
+      body: sdp,
+    });
+    if (res.status !== 409 || i >= WHEP_RETRY.tries) break;
+    const back = WHEP_RETRY.firstMs + i * WHEP_RETRY.stepMs;
+    waited += back;
+    log(`409 — nothing is publishing to that input yet; asking again in ${back} ms`);
+    await sleep(back);
+  }
+  if (!res.ok) {
+    throw new Error(`WHEP ${res.status}`
+      + (res.status === 409 ? ` — still nothing publishing after ${(waited / 1000).toFixed(1)} s of asking` : ''));
+  }
+  if (waited) log(`attached after ${(waited / 1000).toFixed(1)} s of waiting for the publish to go live`, 'hi');
+  return res;
 }
