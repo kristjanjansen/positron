@@ -96,11 +96,54 @@ is a free side effect worth measuring rather than assuming.
 
 ### 4a. The input generator, which is the first piece of work
 
+**Generated SEPARATELY at each end from one set of parameters — not generated
+once and shipped.** This was asked as a question, which means the document did
+not say it, so it is said here first.
+
+The rejected option is worth writing down because it sounds better than it is:
+generate the sound once and send the AUDIO to both granulators. The two would
+then chew identical samples by construction and nothing would need measuring.
+But it puts the relay IN FRONT OF the board's granulator — jitter, a cushion,
+loss, a 60 msg/s cap — so the comparison becomes *a granulator on clean audio*
+against *a granulator on network audio*, which is a worse confound than the one
+it removes. And the board stops being an instrument and becomes an effects unit
+fed from a browser, which is most of what the page is claiming.
+
+So: one spec, two builders, nothing audio crossing the wire ahead of either
+granulator. The price is that "the same input" is a claim to be MEASURED rather
+than assumed, and that price is what the rest of this section pays.
+
+
 **The material comes before the granulator.** Nothing below §4 is worth
 measuring until both ends are chewing the same thing.
 
-What it is: a small parameterised source — waveform, fundamental, a chord or
-interval, level, and a movement or two — described once and built twice.
+🔴 **AND THE SOURCE IS ADDITIVE — A TABLE OF SINE PARTIALS, NOT "A SAWTOOTH".**
+This is the design decision the whole section turns on, and it falls straight
+out of building the sound twice.
+
+"A sawtooth at 110 Hz" does not survive two engines. WebAudio's
+`OscillatorNode` with `type: 'sawtooth'` is band-limited by a wavetable the
+specification never pins down; SuperCollider's `Saw.ar` is band-limited by a
+different method; Csound's `vco2` is a third. All three are sawtooths and none
+of them is the SAME sawtooth — they differ in harmonic rolloff, in how many
+partials survive near Nyquist, and in phase. "The same input" would then be a
+hope, and a check written against it would pass or fail on which engine
+happened to roll off sooner.
+
+A SINE is the one waveform every synthesis engine produces identically. So a
+shape is a TABLE OF PARTIALS and `saw` is a name for `1/n` rather than a
+primitive; truncating the table at `count` IS the band-limiting, expressed as a
+number both ends share. `count` becomes an honest brightness control as a side
+effect, and the input check can finally say something — "both ends read 0.16
+rms" is satisfied by two completely different sounds, while "every partial is
+within x dB of its twin and there is nothing above partial N in either" is not.
+
+Built: `demo/shell/source.mjs` (`partialsOf` is pure, so both ends expand the
+same spec with the same function and a disagreement is about SYNTHESIS rather
+than arithmetic) and `demo/shell/source-test.mjs`, 12/12, four of them negative
+controls.
+
+Parameters: `shape`, `count`, `hz`, `chord`, `level`, `spread`.
 
 Where the board's copy comes from, in preference order:
 
