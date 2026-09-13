@@ -681,7 +681,18 @@ video[hidden] { display: none; }
 
    ⚠️ FIXED GUTTERS, FLUID TEXT, AND EVERYTHING WRAPS. An ellipsis here would
    hide the one thing the page exists to show. */
-.pos-msgs { font: 400 11px/1.55 var(--mono); }
+/* ⚠️ A FLOOR, LIKE THE LOG'S. The list collapsed to one line of "nothing here
+   yet" and then grew as rows arrived, so everything under it — the log, the
+   whole page — moved every time a message landed. On a page whose controls are
+   directly above it, that means the button you are about to press again is not
+   where it was. The floor is the same height a few rows occupy, so arriving
+   messages fill the box rather than inflate it. */
+.pos-msgs {
+  font: 400 11px/1.55 var(--mono);
+  min-height: 132px;
+  max-height: 300px;
+  overflow-y: auto;
+}
 .pos-msgs-row {
   display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #ffffff08;
 }

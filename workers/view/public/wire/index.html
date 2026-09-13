@@ -110,7 +110,11 @@
   // which is a claim about the TRANSPORT — the subject of the paragraph and of
   // an assert, not a label over a list of messages.
   const pane = el('div', 'pane');
-  const msgs = createMessageList({ cap: 40, empty: 'nothing here yet' });
+  const msgs = createMessageList({ cap: 40,
+    // The empty state says what to DO, not merely that nothing is there — this
+    // is the one moment on the page where a visitor has arrived and nothing has
+    // happened yet, and `nothing here yet` leaves them to guess.
+    empty: 'nothing sent yet — press Send, and watch the bytes go out and come back' });
   // ⚠️ NO GUTTER LINE. It read `room wire · 0 held of 1 seen · cap 8 · oldest —
   // · recording, keeps 8` — five facts nobody asked for, four of which never
   // change, under a list that already shows what is stored. The counts that
@@ -224,7 +228,11 @@
     // what the list starts with; everything after is live traffic on top.
     if (!seeded) {
       seeded = true;
-      msgs.set(rows.map((r) => ({ dir: 'stored', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
+      // ⚠️ NO DIRECTION ON A HISTORY ROW. These said `stored` in the direction
+      // column AND carried the `stored` tag — the same word twice on one row.
+      // Direction means out / echo / in, and a message that was here before
+      // this tab was has none; the tag is what says it was kept.
+      msgs.set(rows.map((r) => ({ dir: '', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
     }
     return { rows, held, seen, oldest };
   }
