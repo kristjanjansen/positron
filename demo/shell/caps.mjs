@@ -221,14 +221,10 @@ function addWhy(row, text, kind) {
  * precisely how `rowHTML` printed `undefined` over every demo name for an
  * afternoon.
  */
-function offerHeadset(root) {
-  const head = root.querySelector('.pos-title');
-  if (!head || root.querySelector('.pos-xr-offer')) return;
-  head.insertAdjacentHTML('afterend', `
-    <a class="pos-xr-offer" href="/scene/">
-      <span class="k">you are in a headset</span>
-      <span class="n">scene</span>
-      <span class="o">a room built from one number — roll it, and the same number rebuilds it exactly</span>
-      <span class="g">open it, then press “Run in VR”</span>
-    </a>`);
-}
+// 🔴 REMOVED 2026-09-13 — `offerHeadset` used to insert a "you are in a
+// headset" card above the list, pointing at `scene`. It was the right answer
+// to a list where the two headset pages sat in the middle of thirty rows; they
+// are now the FIRST TWO ROWS on every index (see `byNewest`), so the card
+// repeated, in a bigger box, what the eye already lands on. A second way to
+// reach the same page is not emphasis, it is a duplicate.
+function offerHeadset() { /* the list itself does this now */ }

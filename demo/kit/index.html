@@ -26,6 +26,19 @@
   .kit-src { font: 400 11px/1.6 var(--mono); color: var(--dim2); white-space: pre-wrap;
              margin: 0 0 6px; padding-left: 2px; }
   .kit-out { font: 500 12px/1.6 var(--mono); color: var(--hi); min-height: 1.6em; }
+  /* A block holding a diagram is not a row of controls: the picture wants the
+     whole width and the report under it wants the line below, so these two
+     turn the flex row off rather than fighting it with `flex: 1 1 100%` on
+     each child. Setting `display` matters — a flex property on a non-flex box
+     is silence, and a flex CHILD of a `flex-wrap` row is sized by its content
+     no matter what width it asks for. */
+  .kit-wide { display: block; }
+  /* the phone case. A fixed width so the one-column layout can be seen on a
+     desktop, `max-width` so it is never wider than a real phone. */
+  .kit-phone { width: 320px; max-width: 100%; }
+  .kit-cut { font: 400 11px/1.6 var(--mono); color: var(--dim); margin-top: 8px;
+             white-space: pre-wrap; }
+  .kit-cut b { color: var(--warn); font-weight: 500; }
 </style>
 
 <div class="pos-head">
@@ -43,11 +56,12 @@
 <script type="module">
   import { el } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup, GLIDE_MS } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
 
@@ -124,6 +138,47 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
           onInput: (v) => { o.textContent = `swarm ${v}`; } }),
       ]);
       box.append(g.el, o);
+    });
+
+  // ── two across, and a glide ─────────────────────────────────────────────
+  section('two across, and a patch that glides — shell/slider.mjs',
+    'Above 720 px the pair shares six columns instead of stacking; below it, it '
+    + 'falls back to the stacked three, because side by side there is nothing to '
+    + 'line up. Press a sound and the handles travel rather than teleport — the '
+    + 'value itself lands at once, so nothing downstream waits for the picture.',
+    `createSliderGroup([...], { pair: true })
+s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
+    (box) => {
+      const o = out('press a sound');
+      const mk = (label, min, max, step, value, unit) =>
+        createSlider({ label, min, max, step, value, unit,
+          onInput: (v) => { o.textContent = `${label} ${v}${unit ? ' ' + unit : ''}`; } });
+      const knobs = [
+        mk('rate', 0.5, 24, 0.1, 2.2, '/s'),
+        mk('size', 0.02, 0.4, 0.01, 0.3, 's'),
+        mk('where', 0, 1, 0.01, 0.35, ''),
+        mk('spray', 0, 0.5, 0.01, 0.12, ''),
+      ];
+      const g = createSliderGroup(knobs, { pair: true });
+      const sounds = [
+        ['slow drift', [2.2, 0.30, 0.35, 0.12]],
+        ['glass rain', [14, 0.05, 0.50, 0.40]],
+        ['deep hum', [0.9, 0.38, 0.50, 0.08]],
+      ];
+      const row = el('div', 'pos-controls');
+      for (const [name, vals] of sounds) {
+        const b = el('button', '', name, { type: 'button' });
+        b.addEventListener('click', () => {
+          // ⚠️ QUIET AND GLIDING AT THE SAME TIME, which is the pair a patch
+          // wants: no callback storm back into whatever loaded the patch, and
+          // a handle you can watch move. They are separate options for exactly
+          // that reason.
+          knobs.forEach((k, i) => k.set(vals[i], { quiet: true, glideMs: GLIDE_MS }));
+          o.textContent = `${name} — four settings over ${GLIDE_MS} ms`;
+        });
+        row.append(b);
+      }
+      box.append(g.el, row, o);
     });
 
   // ── radio row ───────────────────────────────────────────────────────────
@@ -216,6 +271,152 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
       });
       strip.fit?.();
     });
+
+  // ── the flow diagram ────────────────────────────────────────────────────
+  // 🔴 THE ONLY WAY TO KNOW THE WRAPPING IS RIGHT IS TO SEE FOUR AWKWARD ONES
+  // SIDE BY SIDE. Every other component on this page can be judged from one
+  // example; this one cannot, because what it does well or badly is decided by
+  // strings nobody has typed yet. So the four cases below are the deliberately
+  // difficult ones — a clean round trip, a label too long for its box, two
+  // return paths that would sit on top of each other, and the whole thing at
+  // the width of a phone.
+  //
+  // ⚠️ AND EACH ONE REPORTS WHAT IT HAD TO CUT. A drawer that quietly shortens
+  // a label leaves the author believing the label fits: the picture looks
+  // fine, and the missing half is only found by somebody reading the page on a
+  // narrower screen. The line under each picture names every label that was
+  // shortened and the width it had to fit — because a cut label is a label
+  // that is too long, which is a thing to go and fix, not a feature.
+  //
+  // It also says whether the type was MEASURED or estimated. `getComputedText-
+  // Length()` answers 0 inside a hidden ancestor, and every string then
+  // "fits" — one line per box, no wrapping, no cuts. That failure reads as a
+  // wrapping bug and is an attachment bug, so it gets its own word here rather
+  // than being inferred from a picture that looks a bit too tidy.
+  function diagramCase(box, spec, { phone = false } = {}) {
+    box.classList.add('kit-wide');
+    const holder = el('div', phone ? 'kit-phone' : null);
+    const report = el('div', 'kit-cut');
+    box.append(holder, report);
+    createDiagram(holder, spec, {
+      onRender: (i) => {
+        report.textContent =
+          `${i.mode === 'row' ? 'left to right' : 'one column'} · ${i.width} px wide` +
+          ` · boxes ${i.boxW} by ${i.boxH} px · ` +
+          (i.measured ? 'type measured in the page' : 'TYPE ESTIMATED — nothing was measured');
+        if (!i.cuts.length) { report.append(' · nothing cut'); return; }
+        report.append(el('b', '', ` · ${i.cuts.length} shortened to fit:`));
+        for (const c of i.cuts) {
+          report.append(`\n    ${c.id} — its ${c.where} at ${Math.round(c.width)} px` +
+                        `\n      ${c.full}\n      became  ${c.shown}`);
+        }
+      },
+    });
+  }
+
+  section('a flow diagram — shell/diagram.mjs',
+    'A picture of where the signal goes, for a page whose subject is a path ' +
+    'rather than a number. The page hands over a list of boxes and a list of ' +
+    'arrows and nothing else; every position on screen is worked out from ' +
+    'those. Hover a box and the line under the picture says what that box ' +
+    'does — there is no tooltip, on purpose.',
+    `createDiagram(host, {
+  title: 'a key press, and what it costs',
+  caption: 'one line under the picture',
+  nodes: [{ id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' }, …],
+  links: [{ from: 'you', to: 'relay', label: 'note number' },
+          { from: 'relay', to: 'you', label: '', back: true }],
+})`,
+    (box) => diagramCase(box, {
+      title: 'a key press, and what it costs',
+      caption: 'A key press leaves this browser, crosses a computer rented from ' +
+               'Cloudflare and arrives at a Raspberry Pi in the studio. The board ' +
+               'plays the note and the sound comes back the same way.',
+      nodes: [
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+      ],
+      links: [
+        { from: 'you', to: 'relay', label: 'note number' },
+        { from: 'relay', to: 'box', label: '' },
+        { from: 'box', to: 'relay', label: 'the sound', back: true },
+        { from: 'relay', to: 'you', label: '', back: true },
+      ],
+    }));
+
+  section('a label that does not fit',
+    'A box is filled, a word is never allowed to run out past a border, and a ' +
+    'word too wide for the box on its own is broken inside the word. What is ' +
+    'left over becomes an ellipsis on the last line — and the whole string ' +
+    'stays on the box, so the browser still shows it on hover and a screen ' +
+    'reader still reads all of it. The line under the picture is the point of ' +
+    'this block: it names what was shortened.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'four boxes, three of them badly written',
+      caption: 'Three of these labels are too long and one of them has no spaces ' +
+               'in it at all. Nothing overflows; the report says what it cost.',
+      nodes: [
+        { id: 'mic', label: 'a microphone on a stand in the corner of the studio',
+          sub: 'this line is much too long to fit as well', kind: 'device' },
+        { id: 'wifi', label: 'StudioBackRoom2GHz', sub: 'the studio Wi-Fi' },
+        { id: 'pi', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+        { id: 'you', label: 'your browser', sub: 'listening', kind: 'here' },
+      ],
+      links: [
+        { from: 'mic', to: 'wifi', label: 'sound' },
+        { from: 'wifi', to: 'pi', label: 'a name for this arrow that will never fit' },
+        { from: 'pi', to: 'you', label: 'sound' },
+      ],
+    }));
+
+  section('two return paths that must not overlap',
+    'A return path runs UNDER the row, never back between the boxes — two ' +
+    'lines between the same pair of boxes and the eye cannot tell the way out ' +
+    'from the way home. Two of them go at different depths, shortest nearest ' +
+    'the boxes, so neither is hidden under the other.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'sound out, and two things sent back',
+      caption: 'One return path covers the whole picture and one covers a single ' +
+               'step, so they would cross. They are drawn at two depths instead.',
+      nodes: [
+        { id: 'mic', label: 'a microphone', sub: 'in the studio', kind: 'device' },
+        { id: 'pi', label: 'Raspberry Pi', sub: 'packs the sound', kind: 'device' },
+        { id: 'cf', label: 'Cloudflare', sub: 'passes it on', kind: 'cloud' },
+        { id: 'you', label: 'your browser', sub: 'plays it back', kind: 'here' },
+      ],
+      links: [
+        { from: 'mic', to: 'pi', label: '' },
+        { from: 'pi', to: 'cf', label: 'small pieces' },
+        { from: 'cf', to: 'you', label: '' },
+        { from: 'you', to: 'mic', label: 'how far behind', back: true },
+        { from: 'cf', to: 'pi', label: 'slow down', back: true },
+      ],
+    }));
+
+  section('the same picture at the width of a phone',
+    'Below about 560 px the whole thing becomes one column, top to bottom, in ' +
+    'the order the signal takes — and the return paths move to the left-hand ' +
+    'gutter. A left-to-right diagram on a phone is a diagram nobody reads. ' +
+    'Nothing in the description changes; only the drawing does.',
+    '',
+    (box) => diagramCase(box, {
+      title: 'a key press, and what it costs',
+      caption: 'The same four links as the first block, at 320 px.',
+      nodes: [
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+      ],
+      links: [
+        { from: 'you', to: 'relay', label: 'note number' },
+        { from: 'relay', to: 'box', label: '' },
+        { from: 'box', to: 'relay', label: 'the sound', back: true },
+        { from: 'relay', to: 'you', label: '', back: true },
+      ],
+    }, { phone: true }));
 
   // ── readout ─────────────────────────────────────────────────────────────
   // 🔴 AN EVEN NUMBER OF CELLS, AND A PENDING ONE SHOWS AN EM DASH AND NOTHING

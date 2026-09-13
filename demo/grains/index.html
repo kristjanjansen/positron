@@ -66,7 +66,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup, glide, GLIDE_MS } from '/shell/slider.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { buildSource, SHAPES, sourceMessage } from '/shell/source.mjs';
@@ -302,7 +302,10 @@
   /** the knob's name on the engine — `where` is `scan` on both of them */
   const cmdOf = (key) => (key === 'where' ? 'scan' : key);
   const sliders = new Map();
-  const knobRow = createSliderGroup();
+  // TWO ACROSS on a desktop, four stacked on a phone — the same `pair` modifier
+  // /draw/ uses, not a second spelling of it. Four knobs a metre long was a
+  // column of lanes with an empty half-screen beside it.
+  const knobRow = createSliderGroup([], { pair: true });
   for (const [key, min, max, step, unit, why] of KNOBS) {
     const s = createSlider({
       label: key, min, max, step, unit, value: (min + max) / 3,
@@ -431,13 +434,39 @@
     // up on the same numbers — otherwise choosing a sound would change one
     // pane and leave the other on whatever was there before, which is two
     // instruments wearing one control surface.
+    // 🔴 A QUARTER SECOND, NOT ONE BLOCK — and MEASURED against the board
+    // before it was built. `Engine_Pappus.sc` puts `Lag.kr(…, lagt)` on every
+    // one of these with `lagt = 0.02`, which is 20 ms: enough that a step in a
+    // control signal does not click, nowhere near enough to be a change of
+    // sound. So the board jumps too, and the page is not gliding for
+    // decoration — it is gliding because a grain rate going 2.2 to 20 in one
+    // render quantum is a click rather than a new setting.
+    // ⚠️ ONE SHAPE AND ONE DURATION for the handle and the sound: `glide()`
+    // draws both from `GLIDE_MS`, so the knob is a picture of what the worklet
+    // is doing rather than a second animation that happens to look similar.
+    // ⚠️ STOP THE LAST GLIDE WHERE IT IS AND CARRY ON FROM THERE — do not finish
+    // it first. Two patches inside a quarter second would otherwise jump the
+    // sound to the first patch's settings and then drag it back, an audible
+    // lurch caused entirely by the smoothing. `from` is read after the stop, so
+    // it is wherever the interrupted move had reached — the same rule the
+    // handles follow, which is why they stay a picture of it.
+    endLocalGlide?.(false); endLocalGlide = null;
+    const from = { ...K };
+    const to = {};
     for (const key of KNOBS.map(([k]) => k)) {
       const v = p.m[cmdOf(key)];
       if (v === undefined) continue;
-      K[key] = v;
-      sliders.get(key)?.set(v, true);
+      to[key] = v;
+      sliders.get(key)?.set(v, { quiet: true, glideMs: GLIDE_MS });
     }
-    applyLocal();
+    // The page engine is on this side of the wire, so a ramp costs nothing but
+    // a postMessage a frame — about fifteen of them, none of which leave the
+    // tab. The board gets ONE `params.set` per parameter, above, for the reason
+    // in the comment there.
+    endLocalGlide = glide((k) => {
+      for (const key of Object.keys(to)) K[key] = from[key] + (to[key] - from[key]) * k;
+      applyLocal();
+    }, { ms: GLIDE_MS });
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
   }
@@ -564,8 +593,16 @@
   // The patch below writes into this too, so the two lanes cannot drift apart
   // into two different sounds wearing one control surface.
   const K = { rate: 2.2, size: 0.3, where: 0.5, spray: 0.12 };
+  /** stops the patch glide below; `true` sends it to the end rather than freezing it */
+  let endLocalGlide = null;
 
   function setKnob(key, v, why, unit, toBoard) {
+    // ⚠️ FINISH IT, DO NOT FREEZE IT. A hand on one knob during a patch glide
+    // has to win — but abandoning the glide where it stands would leave the
+    // other three parameters half way between two patches while their handles
+    // already show the new numbers, which is the page lying about its own
+    // sound. Jump the rest to the patch, then take the drag.
+    endLocalGlide?.(true); endLocalGlide = null;
     K[key] = v;
     applyLocal();
     if (!toBoard) return;
