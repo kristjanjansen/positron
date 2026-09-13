@@ -1,62 +1,78 @@
 # Queue — open work, 2026-09-13
 
-Rewritten at the end of session 21. Everything struck from the old list was
-DONE that day; what is below is what is actually left.
+Rewritten at 15:40 after the session-21 sweep. ⚠️ The previous version of this
+block was STALE THE DAY IT WAS WRITTEN in three places — it said `pappus-live`
+had never met the engine (it had, 17/18), that TINY was unweighed with `report`
+in (803 B headroom), and that `grains` had not adopted the diagram (it had).
+A queue is only useful if striking things off is part of finishing them.
 
 ## Needs a headset — one run answers four questions at once
 
-Open `scene`, press **Run in VR**, look around, exit. Then `mirror`. The log at
+Open `scene`, press **Run in VR**, look around, exit. Then `mirror`. Both index
+rows now link with `?xr=1`, which scrolls the Run control under your hand — a
+link cannot start a session, so the press is still yours. The log at
 `https://pub.positron.studio/logs?format=text` will carry:
 
-- **`room surfaces · …`** — whether Quest Browser grants `plane-detection` at
-  all, how many surfaces come back and what `semanticLabel`s they carry. This
-  decides whether the boxes-clipping-into-walls fix is even available; the
-  thing-against-thing half is already done (2,667 overlapping pairs -> 0).
+- **`room surfaces · …`** — whether Quest Browser grants `plane-detection`, how
+  many surfaces, what `semanticLabel`s. ⚠️ MEASURED: 11 in AR, none in VR, so
+  check the MODE before concluding anything about Space Setup — a page already
+  blamed Space Setup for this once and cost a rescan.
 - **`hands · N source(s) · … · space local-floor`** — why box manipulation
-  stopped and the ray sat at the feet. `local` has its origin at the HEAD and
-  `local-floor` at the FEET, which is exactly what was described.
+  stopped and the ray sat at the feet.
 - **`first frame: the framebuffer is NOT complete`**, or its absence. `gl 1282`
-  was traced to `firstDraw` and `scene` also reported **1286** once —
-  INVALID_FRAMEBUFFER_OPERATION, which is drawing before the framebuffer is
-  ready rather than a malformed call.
-- **the dotted grid** — whether it composites over passthrough at all.
+  traced to `firstDraw`; `scene` also reported **1286** once.
+- **the dotted grid over passthrough**, and whether it is on real surfaces (it
+  is drawn in a different colour on purpose, so it can be believed).
   ⚠️ `blendFuncSeparate(SRC_ALPHA, 1-SRC_ALPHA, ONE, 1-SRC_ALPHA)` is the one
-  line nobody has been able to test; if it is wrong the dots wash out or punch
-  a hole, they do not crash.
+  line nobody has tested; wrong, the dots wash out or punch a hole, no crash.
 
 ## Needs the board — take turns, it is one Raspberry Pi
 
-⚠️ The RELAY is no longer a constraint (128 sockets, 1000 msg/s since
-2026-09-13). The DEVICE is: one JACK graph, one instrument.
+⚠️ The RELAY is not the constraint (128 sockets, 1000 msg/s since 2026-09-13).
+The DEVICE is: one JACK graph, one instrument.
 
-- **Re-run `pappus-live` against the board.** Its fixes are committed and
-  self-tested 14/14 but have never met the engine. The last run read 13/17 and
-  found that `params.random` re-arms the drift, so every capture was taken with
-  scan · spray · swarm · tilt · size · sos walking underneath.
-  `node rig/box/pappus-live.mjs --room studio-1 > /tmp/pappus-live.txt 2>&1`
-- **Weigh TINY against the 64 KiB ceiling with `report` in.** `CHAIN.md`
-  records 2,239 bytes of headroom and the sixteen new `SendReply` UGens are
-  unweighed. A `SynthDesc` has no compiled def before the engine allocates, so
-  it needs a running engine.
-- 🔴 **`plan-twins.md` — make the two granulators the same instrument.**
-  `CHAIN.md` is written, so BARE is unblocked. ⚠️ And CHAIN.md found that the
-  chain can ALREADY be skipped at run time (`oin1 1, pin1 0`), that RESONATOR is
-  already a pass-through under TINY, and that the seven per-stage meters would
-  start lying if stages were compiled out.
+- 🔴 **`plan-twins.md` — make the two granulators the same instrument.** IN
+  FLIGHT. `CHAIN.md` is written and BARE is weighed, so it is unblocked.
+- **`plan-gesture` P4 — the same gesture driving the board.** Blocked behind
+  twins only because both want the device. P3 is done and REFUTED §3's
+  argument, so read the correction before building on it.
 
 ## Needs nobody — just time
 
-- **`plan-diagram` §7: a page adopts the diagram.** The drawer is built and
-  26/26 with a `/kit/` section; `grains` is the named first adopter, its `what`
-  paragraph becoming a caption.
-- **`plan-gesture` P3 and P4** — both readings of one gesture side by side
-  (which settles §3's 2-D-vs-two-1-D question on a real hand rather than by
-  inference), then the same gesture driving the board.
+- **`LESSONS.md` has not been touched since session 20** and there are at least
+  four entries' worth of material from session 21 alone: the deadline that fired
+  during a permission prompt, the edit script that discarded already-matched
+  edits, the measurement that ran at the wrong moment, and the clamp that
+  overrode a value its caller had declared. PROGRESS.md records what happened;
+  LESSONS.md is where the RULE goes, and the rule is the reusable part.
+- **`CLAUDE.md`'s header is stale**: it says 31 shelled demos of 37 rows and 449
+  asserts. The manifest is **33 built of 39**. The assert total needs a full
+  run, which needs the board free.
 - **The two-SuperColliders card** — ⚠️ deliberately AFTER plan-twins, and it may
   never be worth it: `research/supercollider-browser-2026-09.md` §5 prices it at
   1.86 MB of AGPL wasm against a 6,659 B worklet for the same audible result.
   Re-argue it against those numbers, do not assume it.
-- **The session writeup** — PROGRESS.md and a session-21 handoff.
+
+## Plans written and never started — eleven of them
+
+None is blocked; they are a choice about what this is for, not a backlog.
+Grouped by what they would make true:
+
+- **The archive, which is what the timeline was built for.**
+  `plan-archive-timeline` (1965 on the line, played from ERR) and
+  `plan-live-timeline` (ERR live with the present as the right-hand end).
+  ⚠️ ERR blocks live segments BY PROGRAMME, not by age — `flipper` already
+  sweeps for it, so the hard part has a working answer.
+- **The box as an instrument in its own right.** `plan-hardware` (no laptop
+  under it), `plan-instrument` (one instrument, two ends, shared parts),
+  `plan-voice` (split the keyboard, bass below, pads above).
+- **The timeline's own unfinished corners.** `plan-take` (a recording you can
+  scrub with nothing on the wire), `plan-score` (one normalized score, three
+  languages), `plan-glass` (the fourth clock owner), `plan-session` (a show off
+  the wire kept for six hours — "no longer blocked, §1b is the build").
+- **Tidying that pays for itself.** `plan-names` (one write path tiered by
+  credential) and `plan-uuu-local` (mostly already true, so mostly a checking
+  job).
 
 ## Needs you, not me
 
