@@ -157,18 +157,41 @@ without an option flag per caller, it is not a component yet.
 
 Each step ends with something measurable. None of them needs the one after it.
 
-**P1 — the pad replaces the canvas in `draw`.** Same two records (evidence and
+**P1 — the pad replaces the canvas in `draw`.** ✅ DONE — and it PAID rather
+than cost. ⚠️ §4's signature was incomplete: no host argument (every other kit
+component takes `(host, opts)`), no end-of-gesture signal, and no way for a
+caller to draw a SECOND reading over the pad, which is the whole of `draw`.
+And the reusability test passed for real rather than in principle — the same
+component ran as a sync control (x = offset in ms, y = rate) with NO flag; the
+one rule that makes it work is that an axis maps its NEAR edge to `min`, so an
+upward axis is `min > max`: the same two numbers the other way round, not an
+option.
+
+(original:) Same two records (evidence and
 throttled), same smoothing knob, but the surface is an XY pad with named axes
 rather than a bare canvas. `data-gesture` stays, so `verify.mjs` keeps dragging
 it. *Proves: nothing is lost by componentising — the same five asserts, the
 same numbers.*
 
-**P2 — a transport under it.** `createDeck` over the recorded samples, the
-transport bar, and the playhead driving a ghost cursor across the pad. Record,
-then play, and watch the hand move again. *Proves: `sampleAt` at the playhead
-equals what the record says, at 20 positions, to within the interpolator's own
-error — which is `pointer-adapter`'s measured 0.042 px, not a threshold anybody
-picked.*
+**P2 — a transport under it.** ✅ DONE 2026-09-13, `draw` 12/12 → **19/19**.
+`createDeck` over the recorded samples, the transport bar, and the playhead
+driving a mark across the pad.
+
+⚠️ **AND "TO WITHIN 0.042 px" WAS WRONG.** That number is `proto/paths`
+measuring the deck's folded state against the ANALYTIC TRUTH of a synthetic
+Lissajous — the reconstruction error of a 100 ms record, not the agreement
+between two reads of one record. On a real gesture the same quantity is
+0.075–0.15 px, so the check as written here would have failed a correct page.
+It is the width of "agree", not a tolerance.
+
+🔴 **AND THE CHECK IT NAMES CANNOT FAIL ON ITS OWN**, which is the more useful
+correction: the transport's answer and the page's blue line come from ONE
+interpolator, so the arithmetic cancels and reads exactly 0.0. What it grades
+is the PLUMBING, and it needs a negative control to have teeth — proved by
+breaking it three ways: an `'attested'` evidence policy gave 20.6 px, three of
+thirty samples reaching the lane gave 368 px, and `value: () => null` (every
+number right, nothing drawn) took the ink assert to 0 while every cell stayed
+green.
 
 **P3 — both readings of the same gesture, side by side.** The 2-D path against
 two 1-D series, drawn together, error of each against the full-rate evidence.
@@ -194,8 +217,15 @@ outside. **`demo/shell/cc-adapter.mjs` is already promoted for this.**
 
 ## 6. Traps, each of which has already cost a day here
 
+- 🔴 **`createDeck` THROWS on a tier-1 continuous kind with no explicit
+  evidence policy** — and under `'attested'` the internal fold silently
+  withholds the successor and degrades to a hold, which is a correct-looking
+  page reading 20 px out. Not in this list until `draw` hit it.
 - 🔴 **The overdub law fires an event scheduled BEHIND the playhead
-  immediately.** Right for a note — you hear what you just played — and wrong
+  immediately** — ⚠️ though MEASURED 2026-09-13, `scheduleEvent` only overdubs
+  when `running && rate > 0`, so rebuilding a lane while PAUSED is safe. The
+  `assertAt` is still needed for a knob moved during playback; the trap as
+  written below overstated the paused case. Right for a note — you hear what you just played — and wrong
   for a level: a curve authored in the past must not move the current value.
   `proto/automation` re-asserts at the playhead to undo it (seam S4). Anything
   drawing a curve behind the playhead needs the same line.
