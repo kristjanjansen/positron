@@ -61,29 +61,61 @@ Nothing below needs writing. It needs USING.
 Measured on the XY prototype, 8 s gesture, 5 series:
 `6408 → 409 rows, 18 keyframes, range [0, 8650] ms, lead-in 250 ms`.
 
+And measured on `draw` itself, 2026-09-13, 201 samples in and 30 kept:
+holding the last sample is **34.47 px** out, straight lines **2.29**, the
+time-knotted spline **0.348** — the spline is **99x** closer than holding, on a
+line where **96.7%** of what you see was never recorded.
+
 ---
 
-## 3. The decision that is actually open
+## 3. The decision, and it is DECIDED — one 2-D series
 
 **Does an XY pad record ONE two-dimensional series, or TWO one-dimensional
-ones?** This is not a style question and both answers ship somewhere real:
+ones?** Both answers ship somewhere real:
 
 |  | one `pointer` sample | two `cc` series |
 |---|---|---|
-| x and y can disagree | **never** — one sample, one instant | yes: the gate is per series, so x can be logged and y held back |
+| x and y can disagree | **never** — one sample, one instant | yes: the gate is per series, so x can be logged while y is held back |
+| knot spacing in time | one set of knots, one clock | **two sets, at different instants** |
 | what is drawn between knots | a 2-D spline through the path | two independent 1-D ramps |
-| corner behaviour | the curve rounds it | the axes ramp separately, so a corner becomes a diagonal |
 | what a hardware controller sends | nothing — this shape is ours | exactly this |
-| what a synth can be driven by | needs converting | directly |
+| what a synth can be driven by | needs converting at send time | directly |
 
-🔴 **The honest move is to hold both and SHOW the difference**, because nobody
-here has measured it and the page is the instrument for measuring it. A fast
-corner drawn once, reconstructed both ways, with the error of each against the
-full-rate evidence lane, answers a question this project keeps asking sideways.
-That measurement IS the page's subject, the way `draw`'s subject is 93.4% of a
-line being invented.
+🔴 **Record ONE two-dimensional series. Derive the two when they leave.** The
+argument is not symmetry, it is a number `draw` produced on 2026-09-13 while
+answering a different question.
 
-Decide it with the measurement, not before.
+The page kept **30 samples either way** and reconstructed with the same
+time-knotted spline, once with the samples spaced evenly in time and once with
+the same number placed where the line turns:
+
+| where the 30 samples went | error in time | error as a shape |
+|---|---|---|
+| **evenly in time** | **0.348 px** | **0.672 px** |
+| where the line bends | 3.005 px | 0.960 px |
+
+Evenly wins both, and by **8.6x** on the one that matters for playback. The
+cause is not the placement, it is that **a reconstruction parameterised by time
+is dominated by how evenly its knots are spaced in time** — samples chosen by
+spatial deviation ignore time completely, so the spline overshoots between the
+far-apart ones.
+
+Two independent 1-D series is that failure by construction, and worse: each
+axis's knots are unevenly spaced in time AND the two axes disagree about which
+instants were worth keeping. So a pad that records two series is choosing the
+arrangement this repo has now measured as 8.6x worse, in exchange for a
+conversion that costs nothing at send time — one 2-D sample becomes two control
+messages carrying the same timestamp.
+
+⚠️ **The converse is not a choice and stays supported.** Two 1-D series is what
+a hardware controller actually sends, and `demo/shell/cc-adapter.mjs` exists to
+receive exactly that. The decision above is about what OUR pad writes down, not
+about what we can read.
+
+Left to measure, because the argument above is inference from one gesture: the
+same comparison on a real hand at a real corner, and whether re-parameterising
+DP's knots by arc length recovers the shape metric. Neither changes the
+decision; both would sharpen it.
 
 ---
 
@@ -140,9 +172,11 @@ picked.*
 
 **P3 — both readings of the same gesture, side by side.** The 2-D path against
 two 1-D series, drawn together, error of each against the full-rate evidence.
-*Proves §3, with a number.* ⚠️ Assert the ORDER and the RATIO, never a pixel
-threshold — a threshold gets tuned until it passes, which is how `draw`'s
-"inside a pixel" check had to be replaced the day a real gesture met it.
+*Confirms §3 on a real hand rather than on inference.* ⚠️ Assert the ORDER and
+the RATIO, never a pixel threshold — a threshold gets tuned until it passes,
+which is how `draw`'s "inside a pixel" check had to be replaced the day a real
+gesture met it. And write the check down BEFORE running it: §3's number exists
+because a check was written the wrong way round and the page refused it.
 
 **P4 — a second actuator, so it is not one page's private machinery.** The
 obvious one is `rack`/`box`: the same recorded gesture, sent as control change
