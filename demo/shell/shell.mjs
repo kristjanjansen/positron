@@ -83,6 +83,12 @@ export function mount({
   }
 
   const cbar = el('div', 'pos-controls');
+  // ⚠️ A ROW WITH NOTHING IN IT STILL TAKES ITS MARGIN. `.pos-controls` carries
+  // 14 px under it, so a page that declares no controls — `lanes`, and `draw`
+  // now that its one button lives in its own footer row — got a band of dead
+  // space between the readout and the page, which reads as something that
+  // failed to render rather than as nothing being there.
+  if (!controls.length) cbar.hidden = true;
   const handlers = new Map();
   for (const c of controls) {
     const b = el('button', c.primary ? 'pos-pri' : '', c.label);
