@@ -126,6 +126,8 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
+  import { createPanel } from '/shell/panel.mjs';
+  import { createXRPanels, beacon } from '/shell/xr-panel.mjs';
   import { toggle as toggleFull, watch as watchFull, support as fullSupport } from '/shell/fullscreen.mjs';
   import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
 
@@ -135,7 +137,7 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere.',
+    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and that picture hangs on one panel in front of you, with the frame rate it holds in there printed under it.',
     // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
     // so it goes in that picture's own bar rather than in a row above both —
     // joining a figure to its ink across two elements is exactly what makes a
@@ -143,12 +145,20 @@
     // it means without repeating the word every time. The machine surface is
     // `__demo.panes`, set below.
     readout: {},
-    // ⚠️ NO CONTROLS. The board is asked to draw on connect and the checks run
-    // themselves — see `runChecks` — because a page whose first act is asking
-    // you to press something is a page that shows you nothing. That removes
-    // this project's usual harness hook, so demo/verify-gl.mjs waits for
-    // `__demo.ready` and reads the asserts rather than pressing buttons.
-    controls: [],
+    // ⚠️ ONE CONTROL, AND IT IS THE ONE THAT CANNOT HAPPEN BY ITSELF. The board
+    // is asked to draw on connect and the checks run themselves — see
+    // `runChecks` — because a page whose first act is asking you to press
+    // something is a page that shows you nothing, and demo/verify-gl.mjs
+    // therefore waits for `__demo.ready` rather than relying on a press.
+    // Entering a headset is the exception: `requestSession` needs a user
+    // gesture and there is no way to ask for one politely, so it gets a button.
+    //
+    // 🔴 IT IS DECLARED HERE RATHER THAN APPENDED TO THE ROW. `verify-gl.mjs`
+    // presses `.pos-controls button` and nothing else — a control anywhere else
+    // is never exercised and its asserts never run. This page has already paid
+    // for that once: the look stepper sat in the knob row for one revision and
+    // the assert count went 9 -> 7 while the page read GREEN.
+    controls: [{ id: 'xr', label: 'Put it on your face' }],
   });
   guard(d);
 
@@ -454,6 +464,85 @@
     }).filter(Boolean).join(' · ');
   }
 
+  // ── the panel that hangs in a headset ────────────────────────────────────
+  //
+  // `plan-xr-room.md` §4.1: "One panel, one transport, measured." This is that
+  // panel. It is a canvas — a picture with a footer of real numbers under it,
+  // drawn by demo/shell/panel.mjs — and a canvas is the one thing that works in
+  // both places: the page can show it, and an immersive session can hand the
+  // same canvas to the graphics card and hang it in the room.
+  //
+  // 🔴 THE 2-D PAGE IS INVISIBLE ONCE A HEADSET IS ON. The log, the two bars and
+  // every number in them are behind your face, so anything worth reading while
+  // wearing it has to be drawn INTO the picture. That is why the numbers are in
+  // the footer rather than left in the bars where they already live.
+  const PANEL_W = 640, PANEL_H = 400;          // css units; the canvas is 2x this
+  const panel = createPanel({ width: PANEL_W, height: PANEL_H, title: 'mirror' });
+  // ⚠️ DRAWN ONLY WHEN SOMEBODY IS LOOKING AT IT. Copying the picture into the
+  // panel and laying out five numbers costs real time every frame, and this
+  // page MEASURES ITS OWN FRAME RATE — a decoration that quietly lowers the
+  // number the page exists to report is worse than no decoration. It is off
+  // until a session is running, and turned on for a quarter of a second when
+  // the checks want to look at it.
+  let wantPanel = false, panelDrawn = 0;
+  // Assigned inside the renderer block below, because that is where they live.
+  // ⚠️ DECLARED UP HERE, though: this file has already been bitten three times
+  // by reading a `let` before its line ran — `knobRow`, `lockedFrame` and
+  // `LOOKS` — and each one was a blank page with no log line saying why.
+  let mirrorStep = null, flatRaf = 0, xr = null;
+  let startFlat = () => {}, stopFlat = () => {};
+
+  /**
+   * Which picture goes on the panel, and what to say when there is none.
+   *
+   * ⚠️ THE BOX FIRST, BECAUSE IT IS THE ONE THAT CROSSED A NETWORK. A panel is
+   * only interesting if it is showing something a transport carried; the local
+   * shader is the fallback so that the panel is never empty on a laptop with no
+   * board switched on.
+   *
+   * ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO IN WORDS. A frozen frame reads as a
+   * broken stream — `plan-xr-room.md` §5.6, and the same rule as a blank readout
+   * cell collapsing "we did not look" into "we looked and it was fine".
+   */
+  function panelSource() {
+    // One second is the same silence this page already treats as "the box
+    // stopped sending" when it unlocks the local frame counter.
+    if (farDecoded > 0 && performance.now() - lockedAt < 1000) return { src: far.c, from: 'the box' };
+    if (gl && drewAny > 0) return { src: local.c, from: 'your browser' };
+    return { src: null, from: null };
+  }
+
+  /**
+   * ⚠️ CALLED FROM INSIDE THE RENDER CALLBACK THAT JUST DREW, never on a timer
+   * of its own. The left-hand canvas is a 3-D surface with no preserved
+   * drawing buffer, so it can only be copied in the same turn as the frame that
+   * filled it — read it a task later and you get a cleared surface, which would
+   * reach the panel as a black rectangle that looks like a broken stream.
+   */
+  function drawPanel() {
+    const { src, from } = panelSource();
+    const live = xr?.state?.presenting === true;
+    const fps = live ? xr.state.fps : (localFps || null);
+    panel.draw({
+      source: src,
+      state: src ? 'live' : 'nothing is drawing here yet',
+      footer: [
+        ['picture', from ?? ''],
+        ['fps', fps == null ? '' : fps.toFixed(1)],
+        // Frames of THIS picture: the ones drawn inside the headset while one
+        // is on, and the ones drawn on this page while it is not.
+        ['frames', String(live ? xr.state.frames : drewAny)],
+        // ⚠️ THE PROCESSOR'S TIME, NOT THE CARD'S. This is how long it takes to
+        // hand the panel to the graphics card each frame; the card's own time
+        // for the copy cannot be read from here at all, and `fps` beside it is
+        // the number that would actually notice a problem.
+        ['copy', live && xr.state.uploadCpuMs != null ? `${xr.state.uploadCpuMs.toFixed(2)} ms` : ''],
+        ['headset', live && xr.state.fb ? `${xr.state.fb.w}x${xr.state.fb.h}` : ''],
+      ],
+    });
+    panelDrawn++;
+  }
+
   // ── the picture, here ────────────────────────────────────────────────────
   //
   // ⚠️ THIS IS THE SAME SHADER AS rig/vis/v3dpipe.c, PORTED RATHER THAN
@@ -681,7 +770,14 @@
     // surface and report a flat field on a picture that is fine.
     window.__lastFbo = null;
 
-    const frame = () => {
+    // ⚠️ ONE FRAME, AND A SCHEDULER THAT IS NOT PART OF IT. Inside a headset
+    // this page's own requestAnimationFrame stops being the clock — the session
+    // has its own, at the headset's rate — so the thing that draws a frame has
+    // to be callable from either. It was one function with its own
+    // `requestAnimationFrame` at the bottom, which meant the left-hand picture
+    // simply froze the moment a session started, and a frozen picture on a
+    // panel reads as a broken stream rather than as a stopped loop.
+    const step = () => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
       gl.viewport(0, 0, W, H);
       // ⚠️ A LOCK WITH NO TIMEOUT FREEZES THE THING IT LOCKED. When the box
@@ -746,10 +842,133 @@
       i++; tick++; drewAny++;
       const now = performance.now();
       if (now - lastAt >= 1000) { localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now; stat('here', { fps: localFps }); }
-      requestAnimationFrame(frame);
+      // The panel, in the same turn as the frame it is copying — see drawPanel.
+      if (wantPanel) drawPanel();
     };
-    requestAnimationFrame(frame);
+    const loop = () => { flatRaf = requestAnimationFrame(loop); step(); };
+    mirrorStep = step;
+    startFlat = () => { if (!flatRaf) flatRaf = requestAnimationFrame(loop); };
+    stopFlat = () => { if (flatRaf) { cancelAnimationFrame(flatRaf); flatRaf = 0; } };
+    startFlat();
   }
+
+  // ── the same panel, in a headset ─────────────────────────────────────────
+  //
+  // 🔴 THE SESSION ITSELF IS demo/shell/xr-panel.mjs, NOT THIS PAGE. Getting
+  // into an immersive session is the most expensive code in this repo to get
+  // right — five separate defects, every one of them found by a real Quest and
+  // every one of them silent from outside — so it lives in one module and this
+  // page hands it a canvas and a way to keep that canvas up to date. The rules
+  // it holds are listed at the top of that file.
+  xr = createXRPanels({
+    // 1.28 m across at 1.6 m in front of you: about 44 degrees, which is wide
+    // enough to read without moving and narrow enough to turn away from. Being
+    // able to turn away from it is the whole of the gaze-gating in
+    // `plan-xr-room.md` §2, so the panel is placed in the room rather than
+    // pinned to your face.
+    panels: [{ canvas: panel.canvas, w: 1.28, h: 0.80 }],
+    log: (m, k) => d.log(m, k),
+    // ⚠️ THIS PAGE'S OWN LOOP IS THE THING THAT STOPS. Inside a session the
+    // headset owns the clock, so the shader is stepped from here — without it
+    // the panel would carry the last frame drawn before the session started,
+    // which is a frozen picture and reads as a broken stream.
+    onFrame: () => { mirrorStep?.(); drawPanel(); },
+    onEnd: () => { startFlat(); },
+  });
+  // ⚠️ THE LIVE OBJECT, NOT A SNAPSHOT OF IT. `state` is written in place every
+  // frame, so a harness reading `__demo.xr.fps` gets this frame's number rather
+  // than whatever was true the last time somebody remembered to publish. Two
+  // copies that can disagree is how a readout ends up describing something the
+  // page is not doing.
+  window.__demo.xr = xr.state;
+
+  d.on('xr', async () => {
+    // ⚠️ WAIT FOR THE PROBE, NEVER RE-ASK IT. Whether this browser can show an
+    // immersive session is answered once at load, away from any gesture,
+    // because asking again here can spend the user activation `requestSession`
+    // needs. On a very fast press the answer may not be back yet, and a bounded
+    // wait is the difference between "we have not looked" and "there is none".
+    for (let i = 0; i < 20 && xr.supported() === null; i++) await new Promise((r) => setTimeout(r, 50));
+    let got = false;
+    try {
+      got = await xr.enter();
+      // One clock at a time. Both loops calling `step` would draw this page's
+      // picture twice per headset frame and report double the frame rate.
+      if (got) stopFlat();
+    } catch (e) {
+      // ⚠️ A LAST NET, ON THE BEACON. Every await inside the module is guarded,
+      // but the failure that cost two headset runs was a plain synchronous
+      // statement between the guarded parts — and a handler whose failure mode
+      // is silence cannot be trusted to its own internal care. The batched
+      // shipper is no use here: entering a session is exactly when timers stop
+      // being generous.
+      beacon(`FAIL enter() — ${e.name}: ${e.message}`);
+      d.log(`entering failed — ${e.name}: ${e.message}`, 'bad');
+      try { await xr.end(); } catch { /* it may never have started */ }
+      startFlat();
+    }
+
+    // Both branches are real and both are asserted. Only a headset can reach
+    // the first, which is why nothing on a laptop grades the part of this that
+    // matters — see the note in runChecks.
+    d.assert('it knows whether a headset can show this page',
+      xr.supported() === true || xr.supported() === false,
+      `a headset that can show this: ${xr.supported()}`);
+    if (got) {
+      // ⚠️ A BOUNDED WAIT FOR A SECOND OF FRAMES, not for the first one. The
+      // frame rate is counted over a one-second window, and the FIRST of those
+      // seconds contains the shader compiling and the panel's first, largest
+      // copy to the graphics card — so a rate read at the first frame is a
+      // number about starting up rather than about running. It is bounded
+      // because a session that never draws must report that, not hang here.
+      for (let i = 0; i < 40 && (xr.state.fps == null || xr.state.frames < 60); i++) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const fps = xr.state.fps == null ? null : xr.state.fps.toFixed(1);
+      d.assert('the panel is in the headset and frames are going into it',
+        xr.state.frames > 0 && !!xr.state.fb,
+        xr.state.fb
+          ? `${xr.state.fb.w}x${xr.state.fb.h}, ${xr.state.eye.w}x${xr.state.eye.h} an eye, ${xr.state.frames} frames`
+          : 'nothing drew');
+      // 🔴 THE NUMBER `plan-xr-room.md` §4.1 EXISTS TO GET: a Quest 3 holds 89.8
+      // frames a second in an empty room, and what one panel's worth of picture
+      // costs against that is the open question the rest of the room depends on.
+      //
+      // ⚠️ GRADED AGAINST WHAT THIS HEADSET PROMISES, NEVER AGAINST A TYPED
+      // NUMBER. A fixed floor of 60 was tried and it flapped on the first thing
+      // that ran at 60 — a threshold sitting exactly on a plausible refresh rate
+      // has no warning left in it. Where the headset says what it runs at, nine
+      // tenths of that is the floor; where it will not say — and a Quest 3 does
+      // not — 55 is a stall detector and the detail says so, because a number
+      // whose basis is invisible cannot be argued with.
+      const promised = xr.state.frameRate
+        ?? (xr.state.supportedFrameRates?.length ? Math.max(...xr.state.supportedFrameRates) : null);
+      d.assert('and it holds the rate this headset promises, with the picture on it',
+        xr.state.fps != null && xr.state.fps >= (promised ? promised * 0.9 : 55),
+        `${fps ?? 'no rate measured'} a second against ${promised ? `${promised} promised` : 'a headset that will not say what it runs at, so 55 is only a stall floor'}`
+        + ` · the copy to the card costs ${xr.state.uploadCpuMs == null ? '—' : xr.state.uploadCpuMs.toFixed(2)} ms of processor time, worst ${xr.state.uploadWorstMs == null ? '—' : xr.state.uploadWorstMs.toFixed(2)} ms`);
+      // ⚠️ ASSERT ON THE ERROR FLAG. A page will draw a right-looking picture
+      // with an error pending — a Quest did exactly that, for an attribute
+      // binding made one call too late, and nobody would have seen it by
+      // looking.
+      d.assert('and it drew with no graphics error pending',
+        xr.state.glError === 0,
+        xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError}`);
+    } else if (xr.supported() === true) {
+      // 🔴 A HEADSET THAT REFUSED IS NOT A LAPTOP, and the assert below would
+      // have said it was. "There is no headset here" and "there is one and it
+      // would not start" are opposite conclusions and they were reading as the
+      // same pass — the same collapse as a blank cell meaning both "we did not
+      // look" and "we looked and it was fine". The line above says which step
+      // did not come back; this says that it is a failure.
+      d.assert('a headset is here, so the session has to start', false,
+        'it did not — the line above says which step never came back');
+    } else {
+      d.assert('with no headset it says so and keeps drawing here',
+        !xr.state.presenting && (drewAny > 0 || !gl),
+        `a headset that can show this: ${xr.supported()} · ${drewAny} frames drawn here`);
+    }
+  });
 
   // ── the picture, from the board ──────────────────────────────────────────
   //
@@ -1007,6 +1226,52 @@
       // exact pixels are not.
       d.assert('there is a picture in it, not a flat field', spread > 60,
                `the widest colour channel spans ${spread} of 255`);
+
+      // ── the panel, graded on a laptop ───────────────────────────────────
+      //
+      // ⚠️ THE HALF THAT DOES NOT NEED A HEADSET IS GRADED WITHOUT ONE. That
+      // the picture lands on the panel and that the numbers are under it is
+      // ordinary code and can be checked here; what only a Quest can say — the
+      // frame rate it holds in a 3360x1760 framebuffer — is asserted by the
+      // control above and by nothing on this machine. Leaving all of it to the
+      // device would mean the only test of it runs where nobody is watching.
+      wantPanel = true;
+      await new Promise((r) => setTimeout(r, 300));
+      wantPanel = false;
+      // With no local renderer there is no frame callback to ride on, so draw
+      // it once directly rather than reporting an absent panel as a broken one.
+      if (!panelDrawn) drawPanel();
+      let picSpread = 0, footInk = 0;
+      try {
+        const sc = panel.canvas.width / PANEL_W;          // device pixels per unit
+        // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
+        // mistake this page already made once. panel.mjs writes the title in
+        // near-white at the top left and its "nothing arriving yet" line across
+        // the middle, so a spread taken over the whole picture area would be
+        // measuring the TEXT and would pass just as well with no picture at
+        // all. A statistic that is high by construction over your subject is
+        // blind, not weak.
+        const pic = panel.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
+        const lo = [255, 255, 255], hi = [0, 0, 0];
+        for (let i = 0; i < pic.length; i += 4) {
+          for (let k = 0; k < 3; k++) {
+            const v = pic[i + k];
+            if (v < lo[k]) lo[k] = v;
+            if (v > hi[k]) hi[k] = v;
+          }
+        }
+        picSpread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+        // And the footer strip really has ink in it: the numbers are half of
+        // what a panel is for, and a panel with a picture and no numbers is a
+        // decoration.
+        const foot = panel.ctx.getImageData(14 * sc, 346 * sc, (PANEL_W - 28) * sc, 40 * sc).data;
+        for (let i = 0; i < foot.length; i += 4) {
+          if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
+        }
+      } catch (e) { d.log(`the panel could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
+      d.assert('the panel carries this picture with its numbers under it',
+        picSpread > 30 && footInk > 200,
+        `the widest colour channel spans ${picSpread} of 255 · ${footInk} lit pixels in the footer`);
       // The far pane, only if the board answered. A lane with nothing to say
       // says so in words rather than counting as a failure.
       if (farDecoded > 0) {
