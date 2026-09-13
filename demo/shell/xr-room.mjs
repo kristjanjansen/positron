@@ -289,6 +289,22 @@ export const GRID = {
 // there; in VR it is behind the things and stays out of their way.
 const GRID_COL_VR = [0.56, 0.64, 0.76], GRID_ALPHA_VR = 0.5;
 const GRID_COL_AR = [0.72, 0.86, 1.0], GRID_ALPHA_AR = 0.9;
+// 🔴 A DIFFERENT COLOUR WHEN THE GRID IS ON **YOUR** SURFACES, and it is there
+// because the claim was challenged: "did you render the grid? make it another
+// colour for me to believe". Quite right. The log said `11 surface(s) from
+// your room` while the picture said nothing, and a page that reports a thing
+// it cannot show is asking to be taken on trust — which this project does not
+// do anywhere else.
+//
+// GREEN means every dot you can see is sitting on a plane your headset
+// reported. Blue means it is the page's own 10 m room. It is the same
+// distinction the gutter prints, in the one channel you cannot miss while
+// wearing the thing.
+//
+// ⚠️ It is not decoration and it must not become decoration: if the grid ever
+// snaps to real walls while still drawing blue, that is a bug in which room it
+// thinks it is on, and the colour is how you would find out.
+const GRID_COL_YOURS = [0.44, 0.92, 0.62];
 
 export const FADE_MS = 900;
 
@@ -459,7 +475,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
       const walls = planes.labels.wall || 0;
       planes.note = `${planes.count} surface(s) from your room — ${bits} — grid is on them, floor at y=${planes.floorY.toFixed(2)} m`
-        + (walls ? '' : ' · NO wall surfaces came back, so there are no dotted walls');
+        + (walls ? '' : ' · NO wall surfaces came back, so there are no dotted walls')
+        + ' · the dots are GREEN because they are on your surfaces';
       planes.short = `floor: your room\n${planes.count} surfaces, ${walls} walls`;
       planes.from = 'your room';
     } else if (planes.state === 'none') {
@@ -642,7 +659,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.uniform1f(U.cell, GRID.cell);
       gl.uniform1f(U.dot, GRID.dot);
       gl.uniform2f(U.fade, GRID.fadeNear, GRID.fadeFar);
-      gl.uniform3fv(U.col, ar ? GRID_COL_AR : GRID_COL_VR);
+      const yours = planes.state === 'yours';
+      gl.uniform3fv(U.col, yours ? GRID_COL_YOURS : (ar ? GRID_COL_AR : GRID_COL_VR));
       gl.uniform1f(U.alpha, ar ? GRID_ALPHA_AR : GRID_ALPHA_VR);
       gl.uniform3fv(U.eye, eye || [0, 1.6, 0]);
       // ⚠️ SEPARATE ALPHA, because in passthrough the destination starts at
