@@ -464,8 +464,14 @@
 
   const pad = createXyPad(d.el, {
     label: 'draw a line',
-    x: { label: 'across', min: 0, max: PAD.w, unit: 'px' },
-    y: { label: 'down', min: 0, max: PAD.h, unit: 'px' },
+    // ⚠️ `x` AND `y`, NOT `across` AND `down`. Asked for. The long words were
+    // chosen under the no-jargon rule, and that rule is about this project's
+    // PRIVATE vocabulary — a fold, a lane, an evidence gate — not about the two
+    // most widely known axis names there are. On a pad whose whole subject is a
+    // pair of numbers, `x` and `y` are what a reader already calls them, and
+    // two short labels also stop the strip's gutter paying for two long ones.
+    x: { label: 'x', min: 0, max: PAD.w, unit: 'px' },
+    y: { label: 'y', min: 0, max: PAD.h, unit: 'px' },
     // rule 1: this arrives for EVERY coalesced sample. It marks the derived
     // record stale and returns — the picture is redrawn once a frame by the
     // pad, and rebuilding a 900-point spline per sample would be three or four
@@ -515,8 +521,7 @@
     // pixel counts. `growing` is the state that actually means "a hand is down
     // right now", which is the only time the line must show everything
     // regardless of where the playhead is.
-    upTo: () => (traceIsTake && !growing && stored.length > 1
-      && deck.position() < deck.range[1] ? base + deck.position() : null),
+    upTo: () => inkLimit(),
     overlay: (ctx, v) => paintSecondReading(ctx, v),
     // 🔴 NO MARK. The white line now stops AT the playhead, so its end IS the
     // cursor — a ringed dot on top of that point is a second indicator for one
@@ -524,6 +529,24 @@
     // the pad stopped drawing its own labels.
     showMark: false,
   });
+
+  /**
+   * HOW FAR THE INK GOES, as one function, because TWO lines read it now.
+   * 🔴 The blue line grows with the cursor as well — asked for, and it is the
+   * only version that makes sense: with white stopping at the playhead and blue
+   * drawn to the end, the picture showed a reconstruction of a gesture that had
+   * not happened yet, and the gap between them stopped being the thing the page
+   * is about. Both lines end at the same instant, so what you watch while it
+   * plays is the DIFFERENCE arriving, which is the subject.
+   * ⚠️ One function rather than the same condition typed twice: two copies of
+   * this would agree today and disagree the first time either is touched, and
+   * the symptom would be two lines ending in different places — which reads as
+   * a reconstruction error rather than as a layout bug.
+   */
+  function inkLimit() {
+    return (traceIsTake && !growing && stored.length > 1
+      && deck.position() < deck.range[1]) ? base + deck.position() : null;
+  }
 
   /** Rebuild everything derived from the SPARSE RECORD as it stands — without
    *  re-deriving the record itself, because the check below hands it a record
@@ -540,7 +563,12 @@
       const step = Math.max(2, (t1 - t0) / 900);
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
-        drawnPoints++; drawn.push(s);
+        // ⚠️ THE INSTANT TRAVELS WITH THE POINT. Cutting the blue line at the
+        // playhead needs to know WHEN each rebuilt point is, and a count would
+        // not do it — the rebuild walks time in even steps, the capture does
+        // not, so the nth blue point and the nth white sample are different
+        // moments.
+        drawnPoints++; drawn.push({ ...s, t });
         // the same instants, read from the two separate records
         const q = atApart(t); if (q) drawnApart.push(q);
       }
@@ -573,23 +601,43 @@
     // two`, `times worse`) and the picture could not say which of three lines
     // was the subject. `drawnApart` is still computed on every recompute,
     // because the check below grades it; only the stroke is gone.
+    // 🔴 HALF-TRANSPARENT. Asked for, and it settles a fight the picture was
+    // having with itself: white is what happened and blue is a reading OF it,
+    // so blue drawn at full weight over white reads as a second, competing
+    // fact. At 0.5 the white shows through wherever the two agree — which is
+    // most of the line — and the blue only becomes visible where it DEPARTS.
+    // The page is about the difference, so the difference is what the ink
+    // spends itself on.
+    const cut = inkLimit();
+    ctx.save();
+    ctx.globalAlpha = 0.5;
     ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6;
     ctx.beginPath();
     let first = true;
     for (const s of drawn) {
+      if (cut !== null && s.t > cut) break;
       const [px, py] = v.px(s.x, s.y);
       if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
     }
     ctx.stroke();
+    ctx.restore();
     // The samples that are actually attested, so "kept" is a thing you can
     // count on screen rather than only in a cell. They belong to the sparse
     // record, so they are the record's colour — a third hue here would say
     // they were a third kind of thing.
+    // ⚠️ AND THEY STOP WHERE THEIR OWN LINE STOPS. A dot is a sample of the
+    // blue record, so dots past the cut would be the record asserting samples
+    // for a stretch of line it is not drawing — a count on screen that does not
+    // match the line under it.
+    ctx.save();
+    ctx.globalAlpha = 0.5;
     ctx.fillStyle = C.guess;
     for (const p of stored) {
+      if (cut !== null && p.at > cut) break;
       const [px, py] = v.px(p.x, p.y);
       ctx.beginPath(); ctx.arc(px, py, 2.4, 0, Math.PI * 2); ctx.fill();
     }
+    ctx.restore();
   }
 
   /** recompute and repaint NOW — for a knob, or for a check that is about to
@@ -725,9 +773,9 @@
   const view = createStripView(d.el, deck, {
     size: 'auto',
     lanes: [
-      { id: 'x', kind: KIND, as: 'continuous', label: 'across', min: 0, max: PAD.w,
+      { id: 'x', kind: KIND, as: 'continuous', label: 'x', min: 0, max: PAD.w,
         value: (p) => p && p.x, color: C.guess },
-      { id: 'y', kind: KIND, as: 'continuous', label: 'down', min: 0, max: PAD.h,
+      { id: 'y', kind: KIND, as: 'continuous', label: 'y', min: 0, max: PAD.h,
         value: (p) => p && p.y, color: C.guess },
     ],
   });
@@ -1047,20 +1095,35 @@
     // a count would be a threshold tuned until it passed, and it could not tell
     // "the line is short because the cursor is early" from "the line failed to
     // draw". Early < middle < end, and end is the whole line back.
-    const whiteAt = (t) => {
+    // ⚠️ BOTH LINES, NOT JUST THE WHITE ONE. The blue reconstruction grows with
+    // the cursor too, and a check that only watched the white one would stay
+    // green while blue silently went back to being drawn to the end — which is
+    // the exact defect this pairing exists to prevent, because a blue line
+    // running past the white one reads as a RECONSTRUCTION ERROR rather than as
+    // a drawing bug. ⚠️ Blue is counted by its own shape, not by "not white":
+    // it is drawn at half alpha over a dark ground, so it is dim and blue-
+    // dominant, and a loose test would count the pad's own grid.
+    const inkAt = (t) => {
       deck.seek(t); pad.paint();
       const d2 = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
-      let n = 0;
-      for (let i = 0; i < d2.length; i += 4) if (d2[i] > 200 && d2[i + 1] > 200 && d2[i + 2] > 200) n++;
-      return n;
+      let white = 0, blue = 0;
+      for (let i = 0; i < d2.length; i += 4) {
+        const r = d2[i], g = d2[i + 1], b = d2[i + 2];
+        if (r > 200 && g > 200 && b > 200) white++;
+        else if (b > 90 && b - r > 25 && g > r) blue++;
+      }
+      return { white, blue };
     };
+    const whiteAt = (t) => inkAt(t).white;
     const end = deck.range[1];
-    const early = whiteAt(end * 0.25), mid = whiteAt(end * 0.6), whole = whiteAt(end);
+    const a = inkAt(end * 0.25), b2 = inkAt(end * 0.6), c2 = inkAt(end);
     deck.seek(end / 2); pad.paint();
-    d.assert('the line stops where the cursor is, so the cursor needs no mark of its own',
-      early < mid && mid < whole && early > 0,
-      `${early} lit at a quarter through, ${mid} at three fifths, ${whole} at the end — `
-      + `the end of the white line IS the playhead, over ${Math.round(end)} ms`);
+    d.assert('both lines stop where the cursor is, so the cursor needs no mark of its own',
+      a.white < b2.white && b2.white < c2.white && a.white > 0
+      && a.blue < b2.blue && b2.blue < c2.blue && a.blue > 0,
+      `white ${a.white} -> ${b2.white} -> ${c2.white} and blue ${a.blue} -> ${b2.blue} -> ${c2.blue} `
+      + `at a quarter, three fifths and the end — both ends of the ink ARE the playhead, `
+      + `over ${Math.round(end)} ms`);
   }
 
   render();
