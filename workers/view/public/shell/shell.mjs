@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '968d9e7-062302';
+export const BUILD = 'a387557-064248';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -154,6 +154,10 @@ export function mount({
     // two blocks meant the mechanism went unread and the lead said too little.
     on: (id, fn) => handlers.set(id, fn),
     button: (id) => cbar.querySelector(`[data-id="${id}"]`),
+    /** Empty the log and the `logs` array together. A control that clears what
+     *  a page HOLDS should clear what the page SAID about it too, or the lines
+     *  left behind describe a state that no longer exists. */
+    clearLog: () => { api.logs.length = 0; logEl.textContent = ''; },
     ready: () => { api.ready = true; log('ready', 'hi'); },
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,

@@ -1,3 +1,32 @@
+
+/**
+ * 🔴 ONE LOOK FOR "THE RAY IS ON THIS", EVERYWHERE.
+ *
+ * A room with a highlight per page is a room where you learn the highlight
+ * again in every corner. This is the whole rule, and both `scene`'s things and
+ * an XR panel take it from here rather than each inventing one:
+ *
+ *   aimed   the ray is on it            brighter, and very slightly bigger
+ *   held    you have hold of it         brighter still, and bigger still
+ *
+ * ⚠️ SIZE AS WELL AS BRIGHTNESS, and the size is the half that matters in a
+ * headset. Brightness alone is a poor signal there — the panel is emissive, the
+ * room around it is not, and a 35% lift reads as "that one happens to be pale"
+ * rather than "that one is under your pointer". A thing that grows when you
+ * point at it is unambiguous at any brightness, and it survives being looked at
+ * from an angle, which a specular highlight does not.
+ *
+ * ⚠️ AND IT IS NOT A COLOUR CHANGE. In this project colour says HOW SOMETHING
+ * LANDED; a hue that also means "you are pointing at it" is two meanings on one
+ * channel, which is the rule a focus ring already broke here once (LESSONS #43).
+ */
+export const TOUCH = {
+  none:  { lit: 1.00, scale: 1.000 },
+  aimed: { lit: 1.35, scale: 1.035 },
+  held:  { lit: 1.80, scale: 1.075 },
+};
+export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOUCH.aimed : TOUCH.none);
+
 // demo/shell/xr-panel.mjs — panel.mjs canvases, hung in front of you in a
 // headset, with the frame rate measured while you are standing in them.
 //
@@ -141,6 +170,8 @@ export function createXRPanels({
   let gl = null, prog = null, quad = null, U = null;
   let session = null, space = null;
   let placed = null, armed = false, armAt = 0;
+  // What the trigger has hold of, and how far away it was when it was grabbed.
+  let grabbing = null, grabDist = 0;
   let tick = 0, tickAt = 0, lastFrame = 0;
   const tex = new Map();                      // canvas -> WebGLTexture
   const uploads = [];                         // CPU ms per frame, for a median
@@ -321,7 +352,12 @@ export function createXRPanels({
       beacon(`${why} — leaving`);
       session?.end().catch(() => {});
     };
-    session.addEventListener('selectstart', () => leave('trigger'));
+    // 🔴 TRIGGER GRABS, GRIP LEAVES — the same split `scene` already settled
+    // on, for the same reason: a page must keep a way out that belongs to it,
+    // and dragging needs a button, so the two cannot be the same button. Both
+    // used to exit here, which left nothing to drag with.
+    session.addEventListener('selectstart', (e) => { if (armed) grabbing = e.inputSource || true; });
+    session.addEventListener('selectend', () => { grabbing = null; });
     session.addEventListener('squeezestart', () => leave('grip'));
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black: end it and say so
@@ -404,6 +440,37 @@ export function createXRPanels({
         // One panel is straight ahead; several fan out around you, which is
         // where `plan-xr-room.md` §2 is going.
         n === 1 ? 0 : (i - (n - 1) / 2) * 0.7));
+      grabDist = panels[0]?.dist ?? dist;
+    }
+
+    // ── dragging ─────────────────────────────────────────────────────────
+    // While the trigger is down the panel rides the controller at the distance
+    // it was grabbed at, and keeps facing you. ⚠️ IT STILL FACES THE HEAD, not
+    // the controller: a panel you can turn edge-on to yourself is a panel you
+    // can lose, and there is no second hand here to turn it back (one
+    // controller, measured, in this user's hands).
+    if (grabbing && placed) {
+      const src = grabbing.targetRaySpace ? grabbing : null;
+      const rp = src && frame.getPose(src.targetRaySpace, space);
+      if (rp) {
+        const m = rp.transform.matrix, o = rp.transform.position;
+        // -Z of the ray's frame is forward.
+        const px = o.x - m[8] * grabDist,
+              py = o.y - m[9] * grabDist,
+              pz = o.z - m[10] * grabDist;
+        const hp = pose.transform.position;
+        let fx = px - hp.x, fz = pz - hp.z;
+        const l = Math.hypot(fx, fz) || 1;
+        fx /= l; fz /= l;
+        const p0 = panels[0];
+        const wM = p0.w ?? 1.2, hM = p0.h ?? 0.75;
+        placed[0] = new Float32Array([
+          -fz * wM, 0, fx * wM, 0,
+          0, hM, 0, 0,
+          -fx, 0, -fz, 0,
+          px, py, pz, 1,
+        ]);
+      }
     }
 
     let eye = 0;

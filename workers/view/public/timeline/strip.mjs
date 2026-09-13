@@ -1169,7 +1169,13 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.font = '10px ui-monospace, Menlo, monospace';
     // truncate by MEASUREMENT, not by a hardcoded character count: a lane label
     // must fit whatever gutter the client asked for.
-    const avail = S.gutterPx - 15;
+    // ⚠️ ROOM AROUND THE LABEL. The swatch sat 4 px from the edge and the text
+    // 11 px, which put a lane's name hard against its own left border and
+    // against the plot on the right. `avail` moves with the inset or the
+    // measured truncation would be computed against a width the text no longer
+    // has.
+    const LABEL_X = 18, SWATCH_X = 8;
+    const avail = S.gutterPx - LABEL_X - 8;
     const clip = (s) => {
       if (ctx.measureText(s).width <= avail) return s;
       let n = s.length;
@@ -1180,9 +1186,9 @@ export function createStrip(canvas, deck, opts = {}) {
       if (!L.show) continue;
       const st = L._style || {};
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
-      ctx.fillRect(4, L.y + 4, 3, Math.min(14, L.height - 8));
+      ctx.fillRect(SWATCH_X, L.y + 6, 3, Math.min(14, L.height - 12));
       ctx.fillStyle = T.ink;
-      ctx.fillText(clip(String(L.label ?? L.id)), 11, L.y + 13);
+      ctx.fillText(clip(String(L.label ?? L.id)), LABEL_X, L.y + 15);
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
       const caps = (deck.caps && L.kind !== undefined) ? (() => { try { return deck.caps(L.kind); } catch { return null; } })() : null;

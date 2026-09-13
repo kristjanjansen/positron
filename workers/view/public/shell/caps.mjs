@@ -229,6 +229,6 @@ function offerHeadset(root) {
       <span class="k">you are in a headset</span>
       <span class="n">scene</span>
       <span class="o">a room built from one number — roll it, and the same number rebuilds it exactly</span>
-      <span class="g">open it, then press “Put it on your face”</span>
+      <span class="g">open it, then press “Run in VR”</span>
     </a>`);
 }

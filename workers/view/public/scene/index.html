@@ -19,6 +19,7 @@
 <script type="module">
   import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
   import { world as world0, docOf, validate as validate0 } from '/shell/seed.mjs';
+  import { touchOf } from '/shell/xr-panel.mjs';
 
   // ⚠️ ALIASED, NOT USED DIRECTLY. An imported binding cannot be reassigned, and
   // tier 3 of the update story replaces the generator while a session is live.
@@ -100,8 +101,8 @@
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
       { id: 'again', label: 'Same seed again' },
-      { id: 'enter', label: 'Put it on your face' },
-      { id: 'ar', label: 'Put it in your room' },
+      { id: 'enter', label: 'Run in VR' },
+      { id: 'ar', label: 'Run in XR' },
       { id: 'bad', label: 'Try an impossible room' },
     ],
   });
@@ -436,13 +437,18 @@
     gl.uniformMatrix4fv(L.proj, false, proj);
     gl.uniformMatrix4fv(L.view, false, view);
     doc.things.forEach((t, i) => {
-      gl.uniformMatrix4fv(L.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
+      const tch0 = touchOf(held?.i === i, aimed === i);
+      gl.uniformMatrix4fv(L.model, false,
+        modelM(t.x, t.y, t.z, t.s * tch0.scale, t.rx, t.ry + tSec * t.spin));
       // The thing under the pointer, and the thing in your hand, are lit
       // differently — colour says WHAT IS HAPPENING to it, which is the same
       // rule every other page here follows about colour.
+      // ONE LOOK, from the kit — see TOUCH in xr-panel.mjs. Brighter AND
+      // slightly bigger, because in a headset brightness alone reads as "that
+      // one is pale" rather than "that one is under your pointer".
       const c = hueRGB(t.c);
-      const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
-      gl.uniform3fv(L.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
+      const tch = touchOf(held?.i === i, aimed === i);
+      gl.uniform3fv(L.col, [c[0] * tch.lit, c[1] * tch.lit, c[2] * tch.lit]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     });
     const bk = fadeK();
@@ -473,12 +479,12 @@
       gl.uniformMatrix4fv(L.model, false, beamM(rayNow.m, len));
       gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-      const hx = rayNow.o[0] + rayNow.dir[0] * len,
-            hy = rayNow.o[1] + rayNow.dir[1] * len,
-            hz = rayNow.o[2] + rayNow.dir[2] * len;
-      gl.uniformMatrix4fv(L.model, false, modelM(hx, hy, hz, aimed !== null || held ? 0.045 : 0.022, 0, tSec));
-      gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.55, 0.92, 0.9]);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      // 🔴 NO MARKER AT THE END OF THE RAY. There was a small box there, and
+      // from the headset it reads as a fourth object in the room — one that
+      // follows you and cannot be picked up. The beam already says where you
+      // are aiming, and the THING says when the aim has landed, now that it
+      // grows as well as brightens. A cursor is for a screen where nothing
+      // else can react.
     }
     gl.bindVertexArray(null);
   }
@@ -1210,7 +1216,7 @@
   try {
     if (sessionStorage.getItem('scene-resume')) {
       sessionStorage.removeItem('scene-resume');
-      d.log('updated — press "Put it in your room" to go back in', 'ok');
+      d.log('updated — press "Run in XR" to go back in', 'ok');
       const b = d.button('ar') || d.button('enter');
       if (b) { b.classList.add('pos-pri'); b.textContent = '↩ Back in — update taken'; }
     }
