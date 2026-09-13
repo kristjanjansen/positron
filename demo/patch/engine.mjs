@@ -110,10 +110,18 @@ export async function startEngine({ audioContext, log = () => {} } = {}) {
       // no late reply — so without this the only signal is a timeout, which is
       // indistinguishable from a wedged engine, a lost socket, or a definition
       // that loaded and makes no sound. Naming it costs one comparison.
-      // ⚠️ `SIZE_CEILING` is the number BOTH ends default to, declared once in
-      // `synthdef.mjs`, so the browser and the board cannot disagree about what
-      // will load — and why it is that number is still open
-      // (`research/synthdef-size-limit-2026-09.md`).
+      // ⚠️ `SIZE_CEILING` IS THE BROWSER'S NUMBER AND NOBODY ELSE'S, and the
+      // sentence that used to be here — "the number BOTH ends default to" — was
+      // wrong. MEASURED (`research/synthdef-size-limit-2026-09.md`): sclang
+      // hands anything over 16,383 bytes to `/d_load`, which read a megabyte off
+      // disk in 44 ms, so the board has never been near a ceiling. This one is
+      // SuperSonic's own OSC receive path: 65,520 bytes of definition load and
+      // 65,521 do not, derived here from a 65,504-byte message budget.
+      // 🔴 AND IT IS NOT THE ONLY CEILING. `research/supercollider-browser-
+      // 2026-09.md` §10.3: the real Pappus TINY graph clears this one by 787
+      // bytes and clears the interconnect-buffer pool by FIVE buffers of 64,
+      // and the two refusals are the same silence. A definition that gets no
+      // reply is not necessarily too big.
       const room = fitsCeiling(bytes);
       if (!room.fits) {
         return { ok: false, why: `${room.bytes} bytes is ${-room.margin} over the `
