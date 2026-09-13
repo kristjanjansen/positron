@@ -1,5 +1,31 @@
 // demo/shell/granular-worklet.js — a grain cloud, in the page.
 //
+// 🔴 NOTHING IMPORTS THIS TODAY (2026-09-14) AND IT IS NOT DEAD — READ THIS
+// BEFORE DELETING IT.
+//
+// It was the LEFT PANE of `/grains/`, opposite a Raspberry Pi, under a line
+// claiming "the same granulator in this page and on a Raspberry Pi". That claim
+// was false: a reimplementation that sounds similar is not the same instrument.
+// Both panes now load the SAME compiled `pappus.scsyndef` into real
+// SuperCollider — wasm scsynth in the tab, the board's own sound server on the
+// Pi — so a disagreement between them is finally about one instrument in two
+// places (`demo/grains/engine.mjs`).
+//
+// ⚠️ WHAT IT STOPPED BEING IS HALF OF A COMPARISON. What it still IS, is the
+// argument `research/supercollider-browser-2026-09.md` §5 makes and which
+// nothing above touches: **6,659 bytes against 1,701,983**, no licence to
+// carry, no ceiling to fit under, and every line of it readable. A page about
+// WRITING a granulator — what a grain window is, why overlap is the parameter
+// that matters, why a hard edge clicks twenty times a second — is a page this
+// file is the subject of rather than the plumbing for. That page does not exist
+// yet; this is what it would be built on.
+//
+// ⚠️ AND ITS FIRST PARAGRAPH IS NOW HISTORY, NOT A FINDING. The 2026-09-12
+// measurement below was taken with `msos` at 0, where Pappus hands its input
+// back verbatim with not one grain in it — so "no parameter changes the sound"
+// was true of a passthrough and said nothing about the granulator. See
+// `plan-twins.md` and `rig/box/norns/CHAIN.md`. Nothing was broken.
+//
 // 🔴 WHY THIS EXISTS. The granulator this project already has runs on a
 // Raspberry Pi three hundred metres away, and on 2026-09-12 we measured that
 // NO parameter sent to it changes the sound that comes back: `mrate` 0.5

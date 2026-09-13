@@ -53,6 +53,34 @@ Things that are not obvious and have each cost a day:
   trigger, not per swarm duplicate — so the count it yields is `rate` x gated
   voices, and MEASURED at one voice by default: `mrate` 8 reports 8.0 a second,
   4 reports 4.0, 16 reports 16.0.
+- 🔴 **`gates` DECIDES WHETHER THE INSTRUMENT EXISTS, AND ALL-ZEROS IS SILENT
+  IN THE WORST POSSIBLE WAY — MEASURED 2026-09-14.** The trigger is
+  `trig * (gates[i] > 0.001) * coin * egate` (line 804), so with every gate shut
+  **no grain ever fires and no `/pgrain` is ever sent** — while PASSTHROUGH GOES
+  ON WORKING. The board streams audio at fifty frames a second, answers every
+  question, reports the right material and the right settings, and makes
+  nothing. `/grains/` read that as "the board is silent" for a whole session.
+
+      the page's exact configuration      rms 0.000000   0.0 grains/s   (299 frames)
+      + gates [1,0,0,0,0,0,0,0]           rms 0.016037   1.5 grains/s   (302 frames)
+
+  ⚠️ **AND NOTHING REOPENS THEM BY ITSELF.** The eight voices are played like a
+  keyboard (`makeVoices` in `pappus.mjs`): it starts with **every gate shut**,
+  `note.off` shuts one and `note.panic` shuts all eight. A page whose notes go
+  to the INSTRUMENT rather than to the granulator — which `/grains/` is — never
+  opens one, so a single `note.panic` from anybody silences that page for ever
+  after. This is LESSONS #46's `src 1` in a sharper costume: **state the board
+  keeps, that a page depends on and never sets**. `/grains/` sets `gates`,
+  `gates2`, `probs`, `probs2` and `epattern` now, every time.
+
+  ⚠️ **The board was saying so the whole time and nobody read it.**
+  `params.state` returns `notes.gate`, and it read `[0,0,0,0,0,0,0,0]` through
+  every failing run. 🔴 It was also the KEYBOARD's mirror rather than the
+  engine's truth, so once a page wrote `gates` through the raw `params.set`
+  door the board reported every voice shut about a granulator firing grains —
+  two authorities on one number, publishing the wrong one. `params.set gates`
+  now updates that mirror, and the page prints the count beside its grain
+  assert so the next zero says why.
 - 🔴 **`sos` IS NOT A FLAVOUR CONTROL — AT 0 THIS STAGE OUTPUTS ITS INPUT AND
   NOT ONE GRAIN.** Line 945:
 
@@ -95,6 +123,26 @@ voices**, one per row.
 48-`Ringz` modal bank plus ~96 `Lag.kr` (**3,526 B**) and the eight string
 voices (**3,344 B**). So on the board today — which runs `PAPPUS_TINY=1` — this
 stage is already a pass-through.
+
+🔴 **AND THAT IS NOW A RECORDED DECISION RATHER THAN A DEFAULT — 2026-09-13.**
+The board had been moved to LITE earlier the same day; it is back on
+`PAPPUS_TINY=1` on purpose, because `/grains/` runs the SAME definition in a
+browser and TINY is the only rung SuperSonic will load (64,733 B loads six
+times, LITE's 74,733 refuses five —
+`research/supercollider-browser-2026-09.md` §10). **The rung is proved from the
+board's own `Engine_Pappus: TINY graph` line**, ⚠️ never from `PAPPUS READY`,
+which prints `lite=true` on TINY too.
+
+MEASURED here, on this board, with a chord held through the insert and `pin1` at
+its default 0.7 so the grains enter at this stage: **`pwet 1` reads exactly
+0.000000 / −180.0 dBFS**, against **0.002723 / −39.2 dBFS** at `pwet 0` one
+second earlier and 0.000000 with nothing held. Turn the whole signal through a
+stage that is not built and there is no signal. On LITE the same arm reads
+0.030–0.041. ⚠️ The two non-zero rows are what stop the zero being a deaf probe.
+
+That is the price of comparability, taken knowingly. ⚠️ **Do not drift the board
+back to LITE without changing `/grains/`** — the page's claim is that one graph
+runs in two places, and the rung is how it is true.
 
 **What removing it costs the sound:** the pitched, struck, bell-and-string
 character. A grain cloud through the modal bank is tuned; without it the cloud

@@ -94,6 +94,36 @@ That accounts for everything that executes. What remains is writing:
    decodes it. An argument that carries a free item is wrong even when its
    conclusion is defensible. Re-priced honestly, the reader is **181 lines**.
 
+   🔴 **AND THE THIRD VENDORED THING TOOK THE SAME EXIT, 2026-09-14 — SuperSonic
+   (wasm scsynth) IS AT `demo/shell/vendor/` NOW.** It lived at
+   `demo/patch/vendor/` while `patch` was its only reader. Two things changed on
+   one day: `patch` came off the site (its row is gone from `demo/manifest.mjs`,
+   so nothing under `demo/patch/` is copied at all), and `/grains/` started
+   booting the same engine to run Pappus in the tab. A page fetching
+   `/patch/vendor/…` would be asking for a URL with **nothing behind it**, which
+   is `moq.mjs` exactly.
+
+   The alternative was a second copy under `demo/grains/vendor/`, and it is
+   worse than it looks: **1.7 MB of AGPL WebAssembly twice**, and a drift
+   between the copies is SILENT because each page goes on working.
+
+   What replaces rule 6's protection is the same pair as above —
+   `checkPresent()` and `checkVendorUrls()` — plus one more, because these
+   binaries have a second failure mode the meshes do not:
+
+   🔴 **`checkCompiledDefs()`, for an artefact that can go STALE rather than
+   missing.** `demo/grains/defs/*.scsyndef` are compiled by sclang **on the
+   Raspberry Pi** out of `rig/box/norns/Engine_Pappus.sc` and `PosSource.sc`;
+   `/grains/` loads them into the tab and claims, in its own diagram, that the
+   browser is running the graph the board is running. Edit the engine and the
+   board recompiles on its next restart while the checked-in file does not — so
+   the tab runs the OLD graph beside the board's new one, **nothing 404s,
+   nothing throws, and every number on the page still agrees**, because both
+   ends are measured the same way. `demo/grains/defs/PROVENANCE.json` records
+   the md5 of every source and every artefact and the build refuses on any
+   disagreement, with the recompile recipe in the message. ⚠️ `checkVendorUrls`
+   was widened to `/…/vendor/…` **and** `/…/defs/…` for the same reason.
+
 ---
 
 ## When to take a library, and when to write it

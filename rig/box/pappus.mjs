@@ -40,6 +40,14 @@ import { oscMessage } from './jacksynth.mjs';
 // would be two authorities on one number, which is the mistake plan-twins is
 // about, one level down. (push.sh ships every `../../` import beside the box.)
 import { partialsOf } from '../../demo/shell/source.mjs';
+// 🔴 AND ONE EXPANDER FOR `PosSource` TOO, FOR THE SAME REASON, ONE LEVEL UP.
+// `sourceArgs` used to be written out below. It moved to `demo/shell/` the day
+// `/grains/` started loading the SAME compiled `PosSource.scsyndef` into wasm
+// scsynth in the tab: the browser has to build the same amplitude table, the
+// same semitone array and the same three scalars, and a second copy of that
+// arithmetic is two authorities on one number.
+import { sourceArgs, SOURCE_VOICES, SOURCE_PARTIALS } from '../../demo/shell/source-args.mjs';
+export { sourceArgs, SOURCE_VOICES, SOURCE_PARTIALS };
 
 const execFileP = promisify(execFile);
 
@@ -59,58 +67,6 @@ export const GRAIN_PORT = 57321;
 /** The doors `run-pappus.scd` opens for the generated material. */
 export const POS_ON = '/pos/on', POS_SET = '/pos/set', POS_SETN = '/pos/setn',
              POS_TABLE = '/pos/table', POS_CONFIRM = '/pos/confirm';
-
-/**
- * ⚠️ THE DEF'S ARRAY SIZES, AND THEY ARE STRUCTURAL. A SynthDef's control array
- * is fixed when the def is built (`PosSource.sc`, `maxVoices` / `maxPartials`),
- * so these are not limits chosen here — they are a fact about the compiled
- * graph, mirrored. `setn` past the end of a control array is not an error in
- * scsynth, it writes into whatever control comes next, so a spec that does not
- * fit is REFUSED by name rather than truncated into a different sound.
- */
-export const SOURCE_VOICES = 6, SOURCE_PARTIALS = 24;
-
-/**
- * The spec, as the numbers `PosSource` wants.
- *
- * 🔴 ONE SHARED TABLE, AND THE REFUSAL IS THE POINT. `partialsOf` normalises
- * across the partials that SURVIVE Nyquist, so if it drops any, two voices no
- * longer share one amplitude table and a single 24-entry control cannot
- * describe the sound. That is refused here with the count in words, rather than
- * sent anyway — a board rendering a quietly different spectrum from the page is
- * precisely the confound this whole path exists to remove, and it would show up
- * as "the comparison is noisy".
- */
-export function sourceArgs(spec = {}, rate = 48000) {
-  const plan = partialsOf(spec, rate);
-  const s = plan.spec;
-  if (s.chord.length > SOURCE_VOICES) {
-    return { ok: false, reason: `${s.chord.length} notes; the engine's def holds ${SOURCE_VOICES}`, plan };
-  }
-  if (s.count > SOURCE_PARTIALS) {
-    return { ok: false, reason: `${s.count} partials; the engine's def holds ${SOURCE_PARTIALS}`, plan };
-  }
-  if (plan.dropped > 0) {
-    return { ok: false, reason: `${plan.dropped} partials land above Nyquist, so the voices no longer share one table`, plan };
-  }
-  // Voice 0's table, at the finished amplitudes. Every voice shares it when
-  // nothing was dropped — which is what the guard above makes true.
-  const amps = new Array(SOURCE_PARTIALS).fill(0);
-  for (const p of plan.partials) if (p.voice === 0) amps[p.partial - 1] = p.amp;
-  const semis = new Array(SOURCE_VOICES).fill(0);
-  for (let v = 0; v < SOURCE_VOICES; v++) semis[v] = s.chord[v] ?? s.chord[s.chord.length - 1] ?? 0;
-  return {
-    ok: true, plan,
-    // ⚠️ NO `level` AND NO `shape`. The table carries the level — `partialsOf`
-    // normalised it — and scaling again in the def would be a second authority
-    // on one number. `shape` is not a control at all: the engine renders a
-    // table, and a waveform NAME cannot cross to a different engine without
-    // meaning two different sounds (PosSource.sc's header).
-    scalars: { hz: s.hz, nvoices: s.chord.length, spread: s.spread },
-    semis, amps,
-    partials: plan.partials.length,
-  };
-}
 
 /**
  * The smallest OSC reader that can read what sclang sends: an address, a type
@@ -778,6 +734,33 @@ function makeVoices(send) {
       flush(); return i;
     },
     panic() { held.fill(null); gate.fill(0); age.fill(0); flush(); },
+    /**
+     * 🔴 SOMEBODY WROTE `gates` DIRECTLY, SO THIS MIRROR HAS TO FOLLOW IT.
+     *
+     * `state()` is what `params.state` reports as `notes.gate`, and it was the
+     * KEYBOARD's model rather than the engine's. `params.set {cmd:'gates'}`
+     * goes straight out as OSC and never passed through here — so a page that
+     * opened the gates itself (which `/grains/` now does, because it plays no
+     * notes into the granulator) left the board reporting
+     * `[0,0,0,0,0,0,0,0]` about a granulator firing grains.
+     *
+     * ⚠️ Two authorities on one number, and the wrong one was being published.
+     * A readout that contradicts the thing it describes is worse than none —
+     * measured 2026-09-14 as `0 of the board's 8 voices open` printed beside a
+     * board reporting 2.2 grains a second.
+     *
+     * ⚠️ `held` IS DELIBERATELY NOT TOUCHED. Nobody pressed a key, so no note
+     * is being held; claiming one would be the same mistake in the other
+     * direction. Voices opened this way are open and unheld, which is exactly
+     * what a granulator driven as an insert is.
+     */
+    adopt(g) {
+      if (!Array.isArray(g)) return;
+      for (let i = 0; i < N && i < g.length; i++) {
+        gate[i] = g[i] > 0.001 ? 1 : 0;
+        if (!gate[i]) { held[i] = null; age[i] = 0; }
+      }
+    },
     state: () => ({ held: held.slice(), pitch: pitch.slice(), gate: gate.slice() }),
   };
 }

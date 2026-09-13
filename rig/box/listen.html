@@ -207,6 +207,16 @@
 
   let ctx = null, playout = null, ws = null, seq = 0;
   let rtt = null, cushionMs = 0, breaks = -1, rateWarned = false;
+  /**
+   * What the BOARD says its insert is — `'pappus'` or `null`, and `undefined`
+   * until it has said anything.
+   *
+   * ⚠️ NOT A GUESS AND NOT THIS PAGE'S REQUEST. Two pages drive one Raspberry
+   * Pi and until 2026-09-14 each of them assumed its own last message was still
+   * true. The board is the only end that knows, so this follows what it says
+   * and never what this page asked for.
+   */
+  let insert;
 
 
   let frames = 0, lost = 0, last = -1, avail = null, current = null, idx = 0, lastBank = -1;
@@ -573,7 +583,22 @@
       // of ~8.8 Hz) while `box.alive` reported `voices: 0` — true about notes
       // and false about sound. One `fx.pappus {on:false}` took it to digital
       // silence, which is the A/B.
-      send({ type: 'fx.pappus', on: false });
+      //
+      // 🔴 `onlyIfIdle`, ADDED 2026-09-14, AND IT DOES NOT WEAKEN ANY OF THAT.
+      // The fault above is an insert left by a tab that CLOSED, and a closed
+      // tab stops talking — so the board still clears it, measured in
+      // `rig/box/insert-test.mjs`. What this stops is the OTHER half of the
+      // same coin: two pages share one Raspberry Pi, `/grains/` switches the
+      // granulator ON because it is that page's entire subject, and this page
+      // switched it off merely by LOADING. Whichever you opened last won,
+      // silently, and the other went on drawing a picture that was no longer
+      // true.
+      //
+      // ⚠️ THE BOARD ANSWERS OUT LOUD EITHER WAY, and that matters more than
+      // the arbitration: a refusal names the holder and how long ago it was
+      // heard from, and this page logs it. An arbitration nobody can see turns
+      // a visible problem into an invisible one.
+      send({ type: 'fx.pappus', on: false, onlyIfIdle: true });
       send({ type: 'sf.list' });
       send({ type: 'audio.status' });
     };
@@ -619,6 +644,23 @@
       // The ping still runs — it is how this page knows the board is answering
       // at all — it just has no cell of its own any more.
       if (m.type === 'box.pong' && pingAt) { rtt = Math.round(performance.now() - pingAt); pingAt = 0; }
+      // 🔴 THE GRANULATOR, WHICH THIS PAGE DOES NOT CONTROL AND MUST NOT HIDE.
+      // The board reports its insert in `fx.pappus`, in `audio.started` and in
+      // the five-second `box.alive` — so a change made by a `/grains/` tab in
+      // another window shows up here without this page asking for anything.
+      // ⚠️ ONLY WHEN IT CHANGES. A line that re-stated the same fact every five
+      // seconds would bury the log, and a live SENTENCE that rewrites itself is
+      // the thing CLAUDE.md has a rule about.
+      if (m.fx !== undefined && m.fx !== insert) {
+        insert = m.fx;
+        d.log(insert
+          ? `another page has the granulator in the sound${m.fxBy ? ` — it asked ${m.fxAgoSec} s ago` : ''}`
+            + ' · this page has no controls for it, so what you hear is being shaped elsewhere'
+          : 'the granulator is out of the sound — what you hear is the instrument', insert ? 'warn' : 'info');
+      }
+      // And the one case this page DID ask about: it asked for the granulator
+      // to go and was told no, with a reason. Said once, when it happens.
+      if (m.type === 'fx.pappus' && m.kept) d.log(`left the granulator in — ${m.reason}`, 'warn');
       if (m.type === 'box.hello') { avail = m.instruments ?? null; drawInstruments(); send({ type: 'sf.list' }); }
       if (m.type === 'sf.listed') { soundfonts = m.soundfonts || []; drawInstruments(); }
       // The box's own library. It arrives once per instrument change and is

@@ -264,6 +264,59 @@ without the board (`plan-hardware` §8.6):
 What a container cannot answer is anything involving the kernel: no `/dev/snd`,
 and `snd-virmidi` / `snd-aloop` are not in its kernel to load.
 
+## 🔴 Two pages, one board, and who holds the granulator (2026-09-14)
+
+`/box/` sends `fx.pappus {on:false}` on load. `/grains/` sends `{on:true}`.
+**Whichever you opened last won, silently**, and the other page went on drawing
+a picture that was no longer true — which is the worst shape of failure there
+is, because nothing anywhere said so.
+
+⚠️ **Both pages were right.** `/box/` has no controls for the insert, and one
+left behind by a `grains` tab that CLOSED wraps whatever it plays and feeds its
+own delay: measured 2026-09-12, a steady **-6.1 dBFS** subsonic drone while
+`box.alive` reported `voices: 0`. And the granulator is the entire subject of
+`/grains/`. So the repair is not to stop either of them.
+
+**First half: the board says what it is doing, and who asked.** The box is the
+only end that knows; the pages were guessing. `insertState()` rides on
+`fx.pappus`, on `audio.started` and on the **five-second `box.alive`** —
+
+    fx      'pappus' | null
+    fxBy     the client id that last changed it
+    fxAgoSec how long ago
+    fxHeld   whether that client has been heard from recently
+
+— so a page learns about a change it did not make **without polling**, and both
+pages now say so in words. 🔴 **This half is the one that matters.** A page that
+says *"another page took the granulator out of the sound"* is correct and
+honest with no arbitration at all; **arbitration that hides the conflict is
+worse than none**, because it turns a visible problem into an invisible one.
+
+**Second half: `fx.pappus {on:false, onlyIfIdle:true}`.** Opt-in, and `/box/`
+sends it on load. It refuses — **out loud**, `ok:true, on:true, kept:true` with
+the holder and both ages in the reply — when the insert was asked for by a
+DIFFERENT client that the box has heard from inside `INSERT_HELD_MS` (15 s).
+
+🔴 **NO LEASE, NOTHING TO RELEASE, NOTHING TO LEAK.** A lease nobody can clear
+is how `studio-1` sat full for hours. The relay solves the same problem by
+DATING each socket (`getWebSocketAutoResponseTimestamp`) and reclaiming idle
+ones; this is that idea in a smaller costume, on the only evidence the box
+actually has — **a client that is still there keeps talking**. `/grains/` polls
+`params.state` and re-asks `grain.report` every four seconds, so a live tab is
+three messages inside the window and a closed one is zero. A client id is minted
+per CONNECTION, so a claim can never outlive the tab that made it.
+
+⚠️ **`/box/` is `listen.html`, it is `built: false`, and `demo/verify.mjs`
+cannot see it** — it publishes no `__demo` and has zero asserts. That is why
+both halves live on the BOARD and why there is a harness for them:
+**`node rig/box/insert-test.mjs --room studio-1`, 8/8**, with two connections
+(one pretending to be `/grains/`, one pretending to be `/box/`) because a single
+socket would pass vacuously — a client is never held off by its own claim. It
+carries two negative controls: a **plain** `{on:false}` must still be obeyed, so
+the old behaviour stays one message away for a wedged board; and a holder that
+**stops talking** must lose its claim, which is the fault `/box/`'s switch-off
+was written for in the first place.
+
 ## What still needs the board
 
 Named rather than faked, because a fake that passes is worse than a gap written
@@ -284,6 +337,8 @@ down:
 | `box.mjs` | the service: relay socket, request handlers, synth and capture |
 | `ask.mjs` | a terminal client — the proof that the browser is not the interface |
 | `test.mjs` | 38 checks, no hardware |
+| `insert-test.mjs` | 8 checks against a running box: who holds the granulator, and what happens when two pages want different things |
+| `norns/writedefs.scd` | compiles `pappus-<rung>.scsyndef` and `possource.scsyndef` on the board, for `/grains/` to load in a browser |
 | `live-test.mjs` | 13 checks against a running box, over the real relay |
 | `bench.mjs` | replaces the estimated Pi column with a measurement |
 | `setup.sh` | run once on the Pi |

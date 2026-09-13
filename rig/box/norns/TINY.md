@@ -108,3 +108,37 @@ well as in the browser: a comparison between a 2,780-UGen graph on a Pi and a
 1,451-UGen graph in a tab is not a comparison of where the sound is made, it is
 two different instruments. With the flag on both, it is one engine in two
 places.
+
+## 🔴 The board is on TINY, and it cost the modal bank — DECIDED 2026-09-13
+
+`/etc/default/positron-box` now reads `PAPPUS_TINY=1`, and the board's own log
+line says `Engine_Pappus: TINY graph` — ⚠️ **not `PAPPUS READY`, which prints
+`lite=true` on TINY as well and cannot tell the two rungs apart.**
+
+This is a decision, not a drift. `/grains/` runs the SAME definition in a
+browser now, and TINY is the only rung measured to load in the engine this repo
+ships: SuperSonic took TINY's 64,733 B six times and refused LITE's 74,733 five
+(`research/supercollider-browser-2026-09.md` §10). The alternative — LITE at
+both ends — has no browser to run in.
+
+**The price, measured on this board today rather than quoted.** A chord held on
+fluidsynth through the insert, `pin1` at its default 0.7 so the grains enter at
+RESONATOR, sweeping that stage's wet mix:
+
+| a chord held, through TINY | rms | peak |
+|---|---:|---:|
+| `pwet 0` — RESONATOR dry | 0.002723 | −39.2 dBFS |
+| 🔴 **`pwet 1` — all RESONATOR** | **0.000000** | **−180.0 dBFS** |
+| `pwet` back to 0 | 0.000230 | −62.0 dBFS |
+| CONTROL, nothing held | 0.000000 | −180.0 dBFS |
+
+Exactly zero, because TINY compiles out the 48-`Ringz` modal bank and the eight
+string voices and this stage is a pass-through with nothing to pass — turn the
+whole signal through it and there is no signal. On LITE the same arm reads
+0.030–0.041. ⚠️ **The control that makes the zero mean something is the row
+above and below it**: a probe that reads 0.000000 everywhere is a deaf probe,
+and this one hears 0.002723 through the same path one second earlier.
+
+That loss is the price of comparability and it was taken on purpose. ⚠️ **Do not
+put the board back on LITE without changing `/grains/`** — that page's whole
+claim is that one graph runs in two places, and the rung is how it is true.
