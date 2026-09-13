@@ -782,9 +782,29 @@ registerRenderer('continuous', (ctx, L, C) => {
     try { const p = C.deck.sampleAt(L.kind, t, { evidence: C.evidence }); const v = val(p); return Number.isFinite(v) ? { x: x(t), y: y(v) } : null; }
     catch { return null; }
   };
-  const a = edge(C.t0); if (a) pts.push(a);
+  // 🔴 THE LINE STOPS WHERE THE DATA STOPS. It used to run to both edges of the
+  // visible window, because `deck.sampleAt` HOLDS the first and last knot
+  // outside them — so a two-second gesture on an eight-second line drew six
+  // seconds of perfectly flat blue at each end. Reported from a screenshot, and
+  // the objection is exact: that flat run is not a measurement of anything. It
+  // is the interpolator's boundary rule, drawn as if it were a signal, and on a
+  // page whose subject is "how much of this line was never recorded" it is the
+  // worst possible thing to draw.
+  //
+  // ⚠️ `edge` STAYS, for the case it was written for: a window scrolled INTO
+  // the middle of a long recording, where the first visible sample is genuinely
+  // preceded by data. So the edges are only asked for when the rows actually
+  // extend past them.
+  //
+  // `L.span` overrides it where a lane knows its own extent better than its
+  // rows do.
+  const first = rows.length ? rows[0].at : null;
+  const last = rows.length ? rows[rows.length - 1].at : null;
+  const from = L.span?.[0] ?? first;
+  const to = L.span?.[1] ?? last;
+  if (from !== null && from < C.t0) { const a = edge(C.t0); if (a) pts.push(a); }
   for (const r of rows) { const v = val(r.payload); if (Number.isFinite(v)) pts.push({ x: x(r.at), y: y(v) }); }
-  const b = edge(C.t1); if (b) pts.push(b);
+  if (to !== null && to > C.t1) { const b = edge(C.t1); if (b) pts.push(b); }
   strokePoly(ctx, pts, style);
   if (L.dots !== false && rows.length < C.width / 6) {
     ctx.save(); ctx.fillStyle = style.color; ctx.globalAlpha = 0.9;

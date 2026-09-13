@@ -708,6 +708,16 @@ counts against the last known total after any change.
   5.0 ms, so the DOCUMENTED BASELINE was amber. Colour and words must come
   from one table, so a green bar can never be described in language that
   sounds like a failure.
+- 🔴 **VERTICAL SPACING IS A RULE, NOT A PER-PAGE DECISION.** Elements on a demo
+  page do not sit tight against each other. `shell.css` sets ONE rhythm —
+  `.pos-body > * + * { margin-top: 22px }` — on the GAP BETWEEN siblings rather
+  than on each element's own margin, so a lone element carries no gap to
+  nothing and two adjacent ones cannot disagree about how much air is between
+  them. A page that needs a different gap somewhere is a page making a claim
+  about that one relationship, and it says so in a comment. ⚠️ The failure this
+  fixes is not ugliness: a pad, a strip, a transport bar, a knob row and a log
+  with nothing between them read as ONE dense block, and a reader cannot tell
+  which control belongs to which picture.
 - **One position surface per page.** A page with a strip passes
   `createTransportBar(…, { scrub: false })`: two horizontal time axes at
   different scales, stacked, is not a redundancy but a contradiction. The
