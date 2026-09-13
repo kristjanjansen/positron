@@ -24,6 +24,52 @@
 import { el } from './shell.mjs';
 
 /**
+ * How long a glide takes. ONE number, because a knob and the sound it stands
+ * for must not move at different speeds — a page that ramps its engine over a
+ * quarter second while the knob snaps is two controls wearing one label.
+ */
+export const GLIDE_MS = 250;
+
+const reducedMotion = () =>
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+
+/**
+ * Call `onFrame(k)` with k running 0 -> 1 over `ms`, eased, and exactly once
+ * at 1. Returns `stop(finish)`: `stop()` leaves the glide where it is,
+ * `stop(true)` jumps it to the end.
+ *
+ * ⚠️ IT ALWAYS LANDS, and rAF alone cannot promise that. A background tab
+ * stops animation frames, so an rAF-only glide can halt half way — which for a
+ * knob is a cosmetic stall and for a sound is a granulator stuck between two
+ * patches with nothing on screen saying so. A timer just past the end finishes
+ * it; timers are throttled in a background tab but they do still fire.
+ *
+ * The shape is smoothstep: it leaves and arrives at rest, so the start and the
+ * end of the move are the two places nothing jerks.
+ */
+export function glide(onFrame, { ms = GLIDE_MS } = {}) {
+  if (!(ms > 0)) { onFrame(1); return () => {}; }
+  const t0 = performance.now();
+  let raf = 0, timer = 0, done = false;
+  const stop = (finish = false) => {
+    if (done) return;
+    done = true;
+    cancelAnimationFrame(raf); clearTimeout(timer);
+    if (finish) onFrame(1);
+  };
+  const step = () => {
+    if (done) return;
+    const t = Math.min(1, (performance.now() - t0) / ms);
+    onFrame(t * t * (3 - 2 * t));
+    if (t >= 1) { stop(); return; }
+    raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+  timer = setTimeout(() => stop(true), ms + 60);
+  return stop;
+}
+
+/**
  * Several sliders stacked, sharing one set of columns.
  *
  * 🔴 A STACK IS NOT FOUR SLIDERS IN A DIV, and `grains` proved it: it appended
@@ -64,7 +110,9 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  * @param {number} [o.digits]  decimal places, default inferred from step
  * @param {(v:number)=>void} [o.onInput]   every move — cheap things only
  * @param {(v:number)=>void} [o.onChange]  on release, and on a keyboard step
- * @returns {{el:HTMLElement, get:()=>number, set:(v:number, quiet?:boolean)=>number, disabled:(v:boolean)=>void}}
+ * @returns {{el:HTMLElement, get:()=>number,
+ *   set:(v:number, opt?:boolean|{quiet?:boolean, glideMs?:number})=>number,
+ *   disabled:(v:boolean)=>void}}
  */
 export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
                                digits, onInput, onChange } = {}) {
@@ -100,21 +148,71 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   lane.append(knob);
   wrap.append(name, lane, read);
 
-  function paint() {
-    const t = span ? (v - min) / span : 0;
+  const show = (x) => `${x.toFixed(dp)}${unit ? ' ' + unit : ''}`;
+  // Where the handle is DRAWN, which is `v` except while a glide is running.
+  // Kept so a second glide starts from the pixel you can see rather than from
+  // the value that pixel is on its way to.
+  let shown = v;
+
+  /**
+   * @param [at] the position to draw, default the real value.
+   * ⚠️ `aria-*` ALWAYS CARRIES `v`, NEVER `at`. A glide is a drawing; a screen
+   * reader that was read eight intermediate numbers on a patch change would be
+   * told about an animation nobody asked it to narrate, and the last one it
+   * heard would be whatever frame it caught.
+   */
+  function paint(at = v) {
+    shown = at;
+    const t = span ? (at - min) / span : 0;
     // Percentage of the TRAVEL, not of the lane: `calc` subtracts the handle's
     // own width so the two ends land flush. See the note at the top.
     knob.style.left = `calc(${(t * 100).toFixed(3)}% - ${(t * 100).toFixed(3)} * var(--sld-knob) / 100)`;
-    read.textContent = `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`;
+    read.textContent = show(at);
     lane.setAttribute('aria-valuenow', String(v));
-    lane.setAttribute('aria-valuetext', read.textContent);
+    lane.setAttribute('aria-valuetext', show(v));
   }
 
-  function set(next, quiet = false) {
+  let stopGlide = null;
+  const endGlide = (finish) => { stopGlide?.(finish); stopGlide = null; };
+
+  /**
+   * @param next
+   * @param [opt]  `true` for the old quiet flag, or `{ quiet, glideMs }`.
+   *
+   * 🔴 THE VALUE LANDS AT ONCE, ONLY THE DRAWING GLIDES. `get()` answers with
+   * the new number on the line after the call and the callbacks fire once, on
+   * the same tick they always did — so a glide can never make a harness read a
+   * stale value, and `verify.mjs`, which stops collecting 400 ms after the last
+   * assert, never has to wait for one. What moves over `glideMs` is the handle
+   * and the number under it: a patch that changes four settings shows four
+   * handles travelling instead of redrawing the panel as if nothing happened.
+   *
+   * ⚠️ `quiet` still means exactly what it meant — no `onInput`, no `onChange`.
+   * The glide is a separate opt-in, so every existing caller is unchanged.
+   */
+  function set(next, opt = false) {
+    const o = (opt && typeof opt === 'object') ? opt : { quiet: !!opt };
     const was = v;
     v = clamp(next);
-    paint();
-    if (!quiet && v !== was) { onInput?.(v); onChange?.(v); }
+    const from = shown;
+    endGlide(false);
+    // Reduced motion is a request about the SCREEN, and this is the screen.
+    // shell.css's global `animation: none` cannot reach a glide driven from
+    // script, so the one place that can ask is here.
+    if (o.glideMs > 0 && v !== from && !reducedMotion()) {
+      // ⚠️ PAINT ONCE BEFORE THE GLIDE, AND THIS IS NOT COSMETIC. `glide()`
+      // makes its first call inside an animation frame, so without this the
+      // `aria-*` attributes carry the OLD value for one frame — MEASURED: a
+      // probe reading `aria-valuenow` on the line after `set()` got the
+      // previous patch's number, which is exactly the stale read this file's
+      // header promises a harness will never see. `shown` is where the handle
+      // already is, so this moves nothing.
+      paint(shown);
+      stopGlide = glide((k) => paint(from + (v - from) * k), { ms: o.glideMs });
+    } else {
+      paint();
+    }
+    if (!o.quiet && v !== was) { onInput?.(v); onChange?.(v); }
     return v;
   }
 
@@ -132,6 +230,8 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   let dragging = false;
   lane.addEventListener('pointerdown', (e) => {
     if (lane.hasAttribute('aria-disabled')) return;
+    // A hand on the control outranks an animation of the last patch.
+    endGlide(false);
     dragging = true;
     lane.setPointerCapture(e.pointerId);
     v = clamp(fromX(e.clientX)); paint(); onInput?.(v);

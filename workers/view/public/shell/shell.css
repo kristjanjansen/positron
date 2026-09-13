@@ -408,11 +408,10 @@ button.pos-pri[data-busy="1"] {
 .pos-xr-offer:hover { background: color-mix(in oklab, var(--hi) 16%, var(--card)); }
 .pos-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
 /* The two headset pages, emphasised with NO EXTRA UI — no badge, no heading, no
-   second list. The name they already have, brighter, and a hairline on the edge
-   of the row they already occupy. Anything more would be a legend, and a legend
-   is what this index does not have. */
+   second list, no rule down the edge. Just the name they already have, brighter.
+   Anything drawn beside a row is a legend, and a legend is what this index does
+   not have. */
 .pos-row[data-xr] .nm { color: var(--fg); }
-.pos-row[data-xr] { box-shadow: inset 2px 0 0 color-mix(in oklab, var(--hi) 55%, var(--line)); }
 .pos-row.todo { opacity: .6; }
 .pos-row.todo a { cursor: default; }
 
@@ -476,7 +475,18 @@ video[hidden] { display: none; }
    It is deliberately NOT a different list of demos. Which pages run is decided
    by the probes in caps.mjs, which answer true or false on a laptop too. */
 .xr body { font-size: 17px; }
-.xr .pos-row a { padding: 20px 6px; gap: 5px 14px; grid-template-columns: 4.6em 1fr; }
+/* ⚠️ 22px OFF THE LEFT, NOT 6. Read through a headset the list sits against the
+   panel's own edge and the first column has nowhere to breathe — reported from
+   a Quest. The date column is `--hi`, so at 6px the yellow is touching the
+   frame. */
+.xr .pos-row a { padding: 20px 6px 20px 22px; gap: 5px 14px; grid-template-columns: 4.6em 1fr; }
+/* and the rule between rows is a hairline at desktop distance and invisible at
+   headset distance — the separator has to scale with the type that sits on it,
+   like everything else in this block.
+   ⚠️ `border-BOTTOM`, and the first version of this line said `border-top-width`
+   — a width for a border that does not exist, which is not an error, it is
+   silence. LESSONS #65, in the stylesheet that records it. */
+.xr .pos-row { border-bottom-width: 2px; }
 .xr .pos-row .nm { font-size: 20px; }
 .xr .pos-row .n { font-size: 13px; min-width: 4.3em; opacity: 1; }
 .xr .pos-one { font-size: 16px; line-height: 1.5; }
@@ -587,13 +597,33 @@ video[hidden] { display: none; }
    side by side there is nothing to line up, stacked there is everything.
    (0,2,0) beats the base rule on weight, so source order is not load-bearing
    here — but the media block still goes after it, because the day it becomes a
-   tie is the day it silently stops working. */
+   tie is the day it silently stops working.
+
+   🔴 THE SEAM HAS TO BE WIDER THAN THE GAPS INSIDE A SLIDER, OR THERE IS NO
+   PAIR. `column-gap` sets all five gaps at once, so the 20 px it used to carry
+   put exactly 20 px between a slider's label and its lane, between its lane and
+   its number, AND between that number and the next slider's label — MEASURED on
+   /draw/ at 1280 px: 296|376 label, 396 lane, 562 value ending 605, next label
+   at 625. Six things evenly spaced read as one row of six, not as two sliders.
+   This is `.pick .fx`'s 18-px lesson one component over: the gap between two
+   groups has to be bigger than the gap inside one, or there are no groups.
+
+   So the intra-slider gap goes back to the stacked layout's 12 px — a slider
+   should not change shape because the window got wider — and the extra space is
+   spent only at the seam, as left padding on the SECOND slider's label. Padding
+   on a `max-content` grid item widens that column, which is the one place CSS
+   grid lets a single gap be different from its neighbours.
+
+   ⚠️ `:nth-child(even)` is the right column and this is why: items auto-place
+   in order across six columns, so slider n takes columns 1–3 when n is odd and
+   4–6 when n is even. Nothing here may span a column or that stops being true. */
 @media (min-width: 720px) {
   .sld-group.pos-pair {
     grid-template-columns: repeat(2, max-content minmax(0, 1fr) max-content);
     max-width: none;
-    column-gap: 20px;
+    column-gap: 12px;
   }
+  .sld-group.pos-pair > .sld:nth-child(even) > .sld-l { padding-left: var(--sld-seam, 32px); }
 }
 /* the standalone 96 px is for a slider sitting in a row of buttons; in a group
    the column decides */
