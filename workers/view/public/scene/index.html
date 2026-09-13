@@ -629,7 +629,12 @@
       session = await step(`requestSession ${mode}`,
         navigator.xr.requestSession(mode, {
           requiredFeatures: ['local-floor'],
-          optionalFeatures: [...ROOM_OPTIONAL_FEATURES],
+          // ⚠️ `hand-tracking` IS OPTIONAL, for the same reason every room
+          // feature is: in `requiredFeatures` a headset with hands switched
+          // off would be refused a session entirely. Asking costs nothing and
+          // the probe below reports what came back — including "nothing",
+          // which is an answer.
+          optionalFeatures: [...ROOM_OPTIONAL_FEATURES, 'hand-tracking'],
         }));
       room?.markAsked();
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
@@ -777,6 +782,46 @@
     // naming which of the three it is.
     if (!raysSaid && session.inputSources.length) {
       raysSaid = true;
+      // 🔴 WHAT IS IN YOUR HANDS, ONCE — the measurement `plan-xr-hands` needs
+      // and the page can take for free while it is already in a session.
+      //
+      // `targetRaySpace` is where you are POINTING and `gripSpace` is where
+      // your HAND is; a rendered controller or anything held hangs off the
+      // grip, and this page has only ever asked for the ray. `profiles` is how
+      // the input-profiles registry picks a model. `hand` is the 25-joint
+      // skeleton, present only if the runtime granted `hand-tracking`.
+      //
+      // ⚠️ IN ITS OWN try. An uncaught error inside a render loop does not
+      // stop the loop, it silently removes everything below it — this page
+      // lost its status panel for its entire life to exactly that, and a probe
+      // that kills the renderer to report on the renderer is worse than no
+      // probe. Shipped with `shipNow`, because a 2 s batch does not survive a
+      // session.
+      try {
+        const seen = [...session.inputSources].map((src, i) => {
+          const bits = [`${i}:${src.handedness}`];
+          bits.push(src.profiles?.length ? src.profiles[0] : 'no profile');
+          const grip = src.gripSpace && frame.getPose(src.gripSpace, xrSpace);
+          if (!src.gripSpace) bits.push('NO gripSpace');
+          else if (!grip) bits.push('grip did not resolve');
+          else {
+            const m = grip.transform.matrix, o = grip.transform.orientation;
+            bits.push(`grip ${m[12].toFixed(2)},${m[13].toFixed(2)},${m[14].toFixed(2)}`);
+            bits.push(`quat ${o.x.toFixed(2)},${o.y.toFixed(2)},${o.z.toFixed(2)},${o.w.toFixed(2)}`);
+          }
+          if (!src.hand) bits.push('no hand');
+          else {
+            let posed = 0;
+            for (const joint of src.hand.values()) { if (frame.getJointPose?.(joint, xrSpace)) posed++; }
+            bits.push(`hand ${src.hand.size} joints, ${posed} posed`);
+          }
+          bits.push(`axes ${src.gamepad?.axes?.length ?? 0} buttons ${src.gamepad?.buttons?.length ?? 0}`);
+          return bits.join(' ');
+        });
+        shipNow(`in your hands · ${seen.join(' || ')}`);
+      } catch (e) {
+        shipNow(`in your hands: could not be read — ${e.name}: ${e.message}`);
+      }
       const bits = [...session.inputSources].map((src, i) => {
         if (!src.targetRaySpace) return `${i}:${src.handedness} NO targetRaySpace`;
         const rp = frame.getPose(src.targetRaySpace, xrSpace);
