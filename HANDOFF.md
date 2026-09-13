@@ -48,23 +48,42 @@ The DEVICE is: one JACK graph, one instrument.
 - **`CLAUDE.md`'s header is stale**: it says 31 shelled demos of 37 rows and 449
   asserts. The manifest is **33 built of 39**. The assert total needs a full
   run, which needs the board free.
-- ~~The two-SuperColliders card~~ — 🔴 **PRICED AND REJECTED 2026-09-13, do not
-  re-litigate.** It is not `twins`: twins makes the two granulators that ALREADY
-  EXIST (the board's real scsynth, the browser's 251-line worklet) into one
-  instrument. This was a page running scsynth compiled to WebAssembly beside the
-  board's. `research/supercollider-browser-2026-09.md` §5 prices it at
-  **1,701,983 B against 6,659 B for the same audible result** — 256x on a demo
-  page — plus an OSC command surface, node graph, synthdef loader and buffer
-  allocator to expose about six knobs, every word of which the jargon rule bans.
-  ⚠️ AND THE SIZE IS NOT THE DECIDING ARGUMENT: **a wasm scsynth is as opaque as
-  the Pi**, so grain behaviour would still be inferred from output envelopes —
-  which is precisely the measurement that failed and cost a session. The worklet
-  reports every grain start because it is the code that starts them.
-  ⚠️ The one real argument the other way is **UGen quality** — `GrainBuf`,
-  `DynKlank`, `PitchShift`, `Compander` are decades-tuned and a hand-rolled
-  resonator bank will sound worse before it sounds better. If that bites,
-  **Faust is the escape hatch, not scsynth**: 48 KB, and `zita_rev1` /
-  `fi.resonbp` are the same calibre of code.
+- 🔴 **A SYNTH DEFINITION THAT TRAVELS AS A MESSAGE, LIKE A SHADER DOES.** IN
+  FLIGHT. ⚠️ This REPLACES the "two SuperColliders side by side" card, which was
+  struck earlier the same day on reasoning that answered a different question —
+  the strike and its numbers are in commit fd706e1 and the numbers are still
+  correct, they are just not about this.
+
+  What was priced: *"do we need scsynth to make granular sound in a browser?"*
+  Answer, correctly, no — 1,701,983 B against a 6,659 B worklet. What was never
+  asked: *"can a synth definition travel as a message, the way a shader does?"*
+  The payload there is not a demo's sound engine, it is a portable asset format,
+  and the 256x figure does not bear on it. `plan-visuals.md` already makes this
+  exact argument for the graphics half — *"~2 KB of GLSL plus ~200 bytes of
+  parameters reproduces it at any resolution"* — and works through the security
+  seam for generated code crossing the wire. The audio equivalent had never been
+  written down.
+
+  🔴 AND IT FIXES A CLAIM THIS REPO IS ALREADY MAKING. `twins` says the browser
+  worklet and the board's scsynth are "the same instrument". **They are not** —
+  the worklet is a reimplementation that sounds comparable. Two ends run the
+  same instrument only if the SAME DEFINITION runs on both. This takes that
+  claim from approximate to literal, which is the strongest argument for the
+  work and was missed by the pass that rejected it.
+
+  ✅ The hard part is ALREADY PROVED END TO END (`research/…§2.1`): a
+  format-version-2 binary handed to wasm scsynth as raw bytes over `/d_recv`
+  loads and plays — `rms_peak 0.502336`, deafness control `0.000000`. 8,585
+  UGens with zero dropped audio. Pappus's 50 UGens intersect SuperSonic's
+  unsupported list at EMPTY.
+  ⚠️ `avgCPU`/`peakCPU` read `0` at every load including 8,585 UGens — not
+  populated in this build, so never display them. ⚠️ Shipped Sonic Pi files are
+  format 1 and modern sclang writes format 2; testing 1 proves the wrong thing.
+
+  ⚠️ The one real argument the other way is still UGen quality — `GrainBuf`,
+  `DynKlank`, `PitchShift`, `Compander` are decades-tuned. If that bites,
+  **Faust is the escape hatch, not scsynth**: 48 KB.
+
 
 ## Plans written and never started — eleven of them
 
