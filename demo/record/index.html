@@ -7,13 +7,20 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
+  /* No vertical margins anywhere in here: the gap between the picture, the
+     segment row and everything else is `.pos-body > * + *` in shell.css, one
+     rhythm for every page. */
   canvas.src { width: 100%; max-width: 440px; display: block; background: #000;
-               border: 1px solid var(--line); border-radius: 4px; margin: 0 0 10px; }
-  .segs { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 0 10px; }
+               border: 1px solid var(--line); border-radius: 4px; }
+  .segs { display: flex; flex-wrap: wrap; gap: 3px; }
+  /* A row with nothing in it still takes its 22 px, which reads as something
+     that failed to render. `display:flex` beats the UA's `[hidden]` rule, so
+     the hidden case has to be said here. */
+  .segs[hidden] { display: none; }
   .segs i { font: 500 9.5px/1.6 var(--mono); color: var(--dim2); border: 1px solid var(--line);
             border-radius: 2px; padding: 1px 5px; }
   .segs i.held { color: var(--hi); border-color: var(--hi); }
-  .segs i.shipped { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, var(--line)); }
+  .segs i.gone { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 40%, var(--line)); }
 </style>
 
 <script type="module">
@@ -24,8 +31,20 @@
 
   const d = mount({
     name: 'record',
-    what: 'Record in segments and ship each closed one, so disk stays flat instead of growing with the show.',
-    readout: { segments: 'closed', held: 'on disk', peak: 'high-water', total: 'KiB' },
+    what: 'Every two seconds the recording closes a segment, which is handed off and '
+      + 'then dropped, so the bytes being held never grow past one segment however '
+      + 'long the show runs. Press Start recording: sent climbs with the show while '
+      + 'worst — the most ever held at one time — stays where it is. Nothing actually '
+      + 'leaves this page; the hand-off is stood in for, and capture is the page that '
+      + 'really uploads.',
+    // 🔴 EVERY CELL HAS TO BE ABLE TO MOVE. This row used to count SEGMENTS held
+    // and at high-water, and both were pinned: a segment is handed off 300 ms
+    // after it closes and the next one is 2 s away, so `held` read 0 and `peak`
+    // read 1 on every run this page has ever had. The same two quantities in
+    // KiB move — `holding` steps up and back down once a segment, `worst` is
+    // the ceiling it never passes — and the pair of them against `sent` is the
+    // whole finding, visible without reading a word.
+    readout: { segments: '', holding: 'KiB', worst: 'KiB', sent: 'KiB' },
     controls: [
       { id: 'rec', label: 'Start recording', primary: true },
       { id: 'stop', label: 'Stop' },
@@ -43,21 +62,29 @@
   const g = canvas.getContext('2d');
   d.el.append(canvas);
   const segsEl = el('div', 'segs');
+  segsEl.hidden = true;                        // until there is a segment in it
   d.el.append(segsEl);
 
   let frame = 0;
   setInterval(() => { burn(g, W, H, frame++, { hue: hueFor('record') }); }, 40);
 
-  let rec = null, closed = 0, held = 0, peak = 0, totalBytes = 0;
+  // Counts drive the asserts (a bound of two segments is the claim); bytes
+  // drive the readout, because the counts cannot move and the bytes can.
+  let rec = null, closed = 0, held = 0, peak = 0;
+  let heldBytes = 0, peakBytes = 0, sentBytes = 0;
   const disk = new Map();
 
   function paintSegs() {
     d.set('segments', closed);
-    d.set('held', held);
-    d.set('peak', peak, peak <= 2 ? 'ok' : 'bad');
-    d.set('total', Math.round(totalBytes / 1024));
+    d.set('holding', Math.round(heldBytes / 1024));
+    d.set('worst', Math.round(peakBytes / 1024), peak <= 2 ? 'ok' : 'bad');
+    // ⚠️ BLANK, NOT 0, BEFORE THE FIRST HAND-OFF. A zero here reads as a very
+    // confident measurement of nothing sent, when in truth the first segment
+    // closed 300 ms ago and has not been handed off yet.
+    d.set('sent', sentBytes ? Math.round(sentBytes / 1024) : '');
+    segsEl.hidden = disk.size === 0;
     segsEl.replaceChildren(...[...disk.entries()].slice(-24).map(([n, s]) =>
-      el('i', s.shipped ? 'shipped' : 'held', `${n}:${Math.round(s.bytes / 1024)}k`)));
+      el('i', s.shipped ? 'gone' : 'held', `${n}:${Math.round(s.bytes / 1024)}k`)));
   }
 
   /**
@@ -71,6 +98,8 @@
     if (!s || s.shipped) return;
     s.shipped = true;
     held--;
+    heldBytes -= s.bytes;
+    sentBytes += s.bytes;
     paintSegs();
   }
 
@@ -84,8 +113,9 @@
       if (!e.data || !e.data.size) return;
       closed++;
       held++;
-      totalBytes += e.data.size;
+      heldBytes += e.data.size;
       peak = Math.max(peak, held);
+      peakBytes = Math.max(peakBytes, heldBytes);
       disk.set(closed, { bytes: e.data.size, shipped: false });
       paintSegs();
       // "upload" then delete — the ship is what keeps the disk flat
@@ -109,14 +139,14 @@
     // a 2 s timeslice needs 2 s to produce anything
     for (let i = 0; i < 40 && closed === 0; i++) await new Promise((r) => setTimeout(r, 200));
     d.assert('segments are closing', closed > 0, `${closed} closed`);
-    d.assert('disk high-water is bounded', peak <= 2, `${peak} segment(s) at once`);
-    d.assert('shipping frees the disk', held <= 2, `${held} held`);
-    d.assert('cost is O(1), not O(show length)', peak <= 2 && closed >= 1,
-      `${closed} segments recorded, never more than ${peak} on disk`);
-    d.log('the R2 leg is proto/archive’s node harness; this page is the disk behaviour');
+    d.assert('never holds more than two segments', peak <= 2,
+      `${peak} at once, ${Math.round(peakBytes / 1024)} KiB`);
+    d.assert('handing one off frees what it took', held <= 2, `${held} still held`);
+    d.assert('what is held does not grow with the show', peak <= 2 && closed >= 1,
+      `${closed} segments recorded, never more than ${peak} held at once`);
   });
 
-  d.log('the ship-then-delete is the point: disk stays flat as the show grows');
+  d.log(`segments close every ${SEG_MS / 1000} s`);
   d.ready();
 </script>
 </html>

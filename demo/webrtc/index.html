@@ -7,7 +7,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 10px; }
+  /* No margin: the gap between the picture and everything else is
+     `.pos-body > * + *` in shell.css, one rhythm for every page. */
+  video { width: 100%; display: block; background: #000; border-radius: 4px; }
   .hold { font: 500 10.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
           border: 1px solid var(--line2); border-radius: 999px; padding: 2px 9px; color: var(--dim2); }
   .hold[data-on="1"] { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 45%, var(--line2)); }
@@ -19,8 +21,19 @@
 
   const d = mount({
     name: 'webrtc',
-    what: 'The same live input over WHEP instead of HLS. Same burned-in clock, so the two are comparable.',
-    readout: { rtt: 'ms', fps: '', video: '', paused: '' },
+    what: 'The same live picture the HLS pages play, delivered over WHEP instead: one '
+      + 'POST of an offer, one answer back, and the frames arrive over WebRTC. Press '
+      + 'Start the stream and play — this page starts the publisher itself and then '
+      + 'waits for it, so the first seconds are the stream coming up. round trip is '
+      + 'the network round trip to Cloudflare and NOT how far behind the picture is; '
+      + 'nothing on this page measures that.',
+    // 🔴 `rtt` WAS A KEY THAT READ AS A LATENCY CLAIM. Quoting this number
+    // beside a glass-to-glass one flattered WHEP by about three times once
+    // already (CLAUDE.md, candidate-pair RTT). The words now say what it is,
+    // and `state` says `playing`/`paused` rather than `playing rs4` — the
+    // readyState behind it is in the assert's detail, where a number that needs
+    // a spec to read belongs.
+    readout: { 'round trip': 'ms', fps: '', picture: '', state: '' },
     controls: [
       { id: 'go', label: 'Start the stream and play', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -132,10 +145,9 @@
   setInterval(async () => {
     if (!pc) return;
     // the element's own view, which is where the black frame actually lives
-    d.set('video', video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame',
+    d.set('picture', video.videoWidth ? `${video.videoWidth}x${video.videoHeight}` : 'no frame',
       video.videoWidth ? 'ok' : 'bad');
-    d.set('paused', video.paused ? `paused rs${video.readyState}` : `playing rs${video.readyState}`,
-      video.paused ? 'bad' : 'ok');
+    d.set('state', video.paused ? 'paused' : 'playing', video.paused ? 'bad' : 'ok');
     notePresented();
     const stats = await pc.getStats().catch(() => null);
     if (!stats) return;
@@ -153,7 +165,7 @@
         };
       }
       if (s.type === 'candidate-pair' && s.state === 'succeeded' && Number.isFinite(s.currentRoundTripTime)) {
-        d.set('rtt', s.currentRoundTripTime * 1000);
+        d.set('round trip', s.currentRoundTripTime * 1000);
       }
     }
   }, 1000);

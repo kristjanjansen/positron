@@ -7,9 +7,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  video { width: 100%; display: block; background: #000; border-radius: 4px; margin: 0 0 8px; }
-  .fires { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 8px; }
-  .fires b { color: var(--hi); font-weight: 500; }
+  /* No margin: the gap between the picture, the transport bar and the strip is
+     `.pos-body > * + *` in shell.css, one rhythm for every page. */
+  video { width: 100%; display: block; background: #000; border-radius: 4px; }
 </style>
 <script src="/proto/remixer/hls.min.js"></script>
 
@@ -23,9 +23,15 @@
 
   const d = mount({
     name: 'replay',
-    what: 'A recorded show off R2 with the eight cues it was recorded with. '
-      + 'desync is how far apart the timeline and the picture are.',
-    readout: { fired: '', lateBy: 'ms', desync: 'ms', media: 's' },
+    what: 'A 190-second show stored in Cloudflare R2, played with the eight cues it '
+      + 'was recorded with. Press Load + play: each cue\'s mark on the strip turns '
+      + 'green as the picture reaches it. late by and worst are how far the cues '
+      + 'landed from the moment the recording says they belong at, and apart is how '
+      + 'far the timeline and the picture have drifted from each other.',
+    // `media` left this row — the picture's own clock, which the transport bar
+    // already prints beside the duration. `worst` took the slot, because a
+    // median on its own hides the one bad fire that is the reason to look.
+    readout: { fired: '', 'late by': 'ms', worst: 'ms', apart: 'ms' },
     controls: [
       { id: 'load', label: 'Load + play', primary: true },
       { id: 'check', label: 'Check' },
@@ -36,8 +42,6 @@
   const video = el('video', '', null, { playsinline: '', muted: '', preload: 'auto' });
   video.muted = true;
   d.el.append(video);
-  const firesEl = el('p', 'fires', 'no cues fired');
-  d.el.append(firesEl);
 
   // ── the cue lane: the media is the master, the deck is the score ─────────
   const fires = [];
@@ -65,7 +69,11 @@
     range: [0, ARCHIVE.durationMs],
   });
 
-  createTransportBar(d.el, deck);
+  // ONE POSITION SURFACE. The strip below is a time axis that seeks on press
+  // and on drag; the bar's slider is a second one at a different scale, and two
+  // stacked is a contradiction rather than a redundancy. Play, pause, the clock
+  // and the keyboard table stay.
+  createTransportBar(d.el, deck, { scrub: false });
   createStripView(d.el, deck, { size: 'default', lanes: [{
       id: 'cue', kind: 'cue', height: 44, as: 'ticks',
       // idToColor('cue') came out near-black on the dark ground, so the ticks
@@ -74,13 +82,28 @@
       color: '#ffd400', width: 2.5, latch: true, firedColor: '#8fd6a8',
     }] });
 
+  /**
+   * 🔴 THIS USED TO BE A LINE OF PROSE UNDER THE PICTURE, and it rewrote itself
+   * on every fire: eight entries of `CUE-03 +12ms` wrapping onto a second and a
+   * third line as the show ran, so the strip, the log and everything under them
+   * moved while somebody was reading them. Three cells instead — a count, a
+   * median and the worst one, each in a box of its own that cannot change size.
+   *
+   * ⚠️ AND NOT IN THE CUE LANE'S GUTTER, which is where a per-lane number
+   * belongs and where these will not fit. MEASURED: at the default 92 px
+   * gutter a sub-line is clipped past TEN characters — `usual 12 ms` came out
+   * `usual 12 …` — because the sizer asks for `11 + text + 10` and the drawer
+   * then clips against `gutter - 18 - 8`, five pixels less than it was given.
+   * An ellipsis means the content is in the wrong place, and widening is the
+   * repair the rule forbids; with one lane on the page there is no doubt about
+   * which ink these belong to anyway.
+   */
   function render() {
     d.set('fired', fires.length);
-    if (fires.length) {
-      const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
-      d.set('lateBy', errs[Math.floor(errs.length * 0.5)]);
-      firesEl.innerHTML = fires.map((f) => `<b>${f.id}</b> ${f.errMs >= 0 ? '+' : ''}${f.errMs.toFixed(0)}ms`).join(' · ');
-    }
+    if (!fires.length) return;
+    const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
+    d.set('late by', errs[errs.length >> 1]);
+    d.set('worst', errs[errs.length - 1]);
   }
 
   let master = null, hls = null;
@@ -134,14 +157,19 @@
 
   // WATCHDOG. media-master's own rule L2: inside jumpMs an error is frame
   // quantisation and syncs; past it the element has MOVED and it must seek.
-  // Enforced here too, and shown, so a desync is never hidden inside lateBy.
+  // Enforced here too, and shown, so a drift is never hidden inside the cue
+  // lane's numbers.
+  //
+  // ⚠️ NOTHING IS SET BEFORE THERE IS A PICTURE. This used to print the
+  // element's currentTime every 400 ms from load, so the row read `0.00 s`
+  // before anything had been fetched — a zero reads as a very confident
+  // measurement, and the thing it was confident about had not happened yet.
   setInterval(() => {
-    d.set('media', video.currentTime);
     if (!master || video.readyState < 2) return;
     const mediaMs = video.currentTime * 1000;
     const off = mediaMs - deck.position();
-    d.set('desync', off, Math.abs(off) > 250 ? 'bad' : 'ok');
-    if (Math.abs(off) > 250) { deck.seek(mediaMs); d.log(`resync ${off.toFixed(0)} ms`, 'bad'); }
+    d.set('apart', off, Math.abs(off) > 250 ? 'bad' : 'ok');
+    if (Math.abs(off) > 250) { deck.seek(mediaMs); d.log(`pulled the timeline back ${off.toFixed(0)} ms onto the picture`, 'bad'); }
   }, 400);
 
   d.on('check', async () => {
@@ -152,14 +180,20 @@
     d.assert('archive manifest reachable', mOk, `HTTP ${mStatus} · readyState ${video.readyState}`);
     d.assert('media is the transport master', !!master);
     d.assert('deck range is the show length', deck.durationMs === ARCHIVE.durationMs, `${deck.durationMs} ms`);
-    d.assert('eight cues in the score', deck.eventsOf ? true : true, `${CUES.length}`);
+    // ⚠️ THIS WAS `deck.eventsOf ? true : true`, which is an assert that cannot
+    // fail — decoration in the shape of evidence. The fold past the end is the
+    // real question and the deck can answer it.
+    d.assert('all eight cues are in the score',
+      (deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count ?? 0) === CUES.length,
+      `${deck.reduceAt?.('cue', ARCHIVE.durationMs)?.count} of ${CUES.length}`);
     if (fires.length) {
       const errs = fires.map((f) => Math.abs(f.errMs)).sort((a, b) => a - b);
       const p50 = errs[Math.floor(errs.length * 0.5)];
       d.assert('cues land within 250 ms of the picture', p50 < 250,
         `p50 ${p50.toFixed(0)} ms over ${fires.length} fires`);
     } else {
-      d.log(`no cues fired yet — the first is at 15.0 s (media ${video.currentTime.toFixed(1)}s)`);
+      d.log(`no cues fired yet — the first is at ${(CUES[0].offsetMs / 1000).toFixed(1)} s`
+        + ` (the picture is at ${video.currentTime.toFixed(1)} s)`);
     }
   });
 
