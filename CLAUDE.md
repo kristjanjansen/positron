@@ -748,6 +748,19 @@ counts against the last known total after any change.
   you delete such a block, REHOME WHAT IT SAID — deleting the display without
   the facts is how a page quietly stops reporting something, which is worse
   than saying it badly.
+- 🔴 **SEPARATION IS SPACING, NOT LINES — AND AN EMPTY BOX IS A LINE.**
+  `shell.css` sets one vertical rhythm on the gap between siblings, so a divider
+  is a second channel saying what the spacing already says; `.pos-head` carries
+  a note saying exactly that and has no rule under it. ⚠️ **The failure is not
+  only an explicit divider.** MEASURED on `/typist/`: a page declaring
+  `readout: null` still got a `.pos-readout` div with no children, and its own
+  1 px border top and bottom rendered as a **2 px full-width band 24 px above
+  the controls** — a horizontal rule nobody wrote, reported as "old UI creeping
+  in", which it was, just not in the way it looked. **A page that opts out of a
+  surface must opt out of its BOX too**, and that cannot be the page's job to
+  remember — the shell hides an empty readout now, the same way
+  `.pos-controls[hidden]` already handles an empty control row that was leaving
+  a 14 px band behind. A container with nothing in it must not paint its edges.
 - 🔴 **VERTICAL SPACING IS A RULE, NOT A PER-PAGE DECISION.** Elements on a demo
   page do not sit tight against each other. `shell.css` sets ONE rhythm —
   `.pos-body > * + * { margin-top: 22px }` — on the GAP BETWEEN siblings rather

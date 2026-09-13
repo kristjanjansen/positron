@@ -74,7 +74,19 @@ export function mount({
 
   const cells = new Map();
   const rb = el('div', 'pos-readout');
-  if (!showReadout) rb.hidden = true;
+  // 🔴 AND HIDDEN WHEN IT HAS NOTHING IN IT, WHICH IS A DIFFERENT CASE AND WAS
+  // NOT HANDLED. `readout: null` empties the row without removing it, so the
+  // shell appended a childless `<div class="pos-readout">` — and shell.css
+  // gives that div `border: 1px solid var(--line)`. MEASURED on `/typist/`:
+  // height **2.0 px, 0 children**, a full-width band made entirely of a box's
+  // own two borders, sitting 24 px above the controls. **A horizontal rule
+  // nobody wrote**, reported as "old UI creeping in" — which it was, just not
+  // in the way it looked.
+  // ⚠️ A page that opts out of a surface has to opt out of its BOX too, and
+  // that cannot be the page's job to remember: it is the same shape as
+  // `.pos-controls[hidden]` two rules below, where an empty control row left a
+  // 14 px band behind. A container with nothing in it must not paint its edges.
+  if (!showReadout || !keys.length) rb.hidden = true;
   for (const [k, unit] of Object.entries(readout)) {
     const cell = el('div', 'pos-cell');
     const v = el('span', 'pos-v', '');
