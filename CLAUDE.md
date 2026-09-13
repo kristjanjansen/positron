@@ -663,6 +663,14 @@ counts against the last known total after any change.
   readout key with a sentence under it explaining it is lateness in
   milliseconds, and that it is NOT stream latency — a reader assumed exactly
   that, which is what prompted this rule.
+  ⚠️ **A THING'S NAME IS NOT JARGON — DECIDED 2026-09-13, do not re-litigate.**
+  `hexter`, `Yoshimi`, `FluidSynth`, `Pappus`, `Ableton Live`, `SuperCollider`
+  are what those programs are CALLED, and the open question of renaming them in
+  `/box/`'s instrument row is answered: leave them. A friendly label invented
+  here would be a name nobody can search for, and it would hide which program
+  is making the sound — the one fact that page exists to report. The rule is
+  about words that describe a MECHANISM in this project's private vocabulary
+  (a fold, a lane, an evidence gate), not about proper nouns.
 - **A constant belongs beside the thing it governs, not in a header.** `how()`
   took a spec line of real values (`looks 100 ms ahead · re-checks every 25 ms`)
   on the theory that constants beat prose. They do — when someone is looking for
