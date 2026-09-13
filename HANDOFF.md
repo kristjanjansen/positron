@@ -62,6 +62,201 @@ Open `scene`, press **Run in VR**, look around, exit. Then `mirror`. The log at
 
 - **`positron-demo`'s RTMPS key is still unrotated.** `SECRETS-ROTATION.md`.
 
+# Handoff — 2026-09-13 (end of session 21)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 21 — three defects closed by measurement, and the instrument that blacked out a headset
+
+🔴 **THE HEADLINE: three things carried as open defects were closed by finding
+out they were not true, and one of them had its disproof written in PROGRESS.md
+five sessions ago.** `keep`'s unexplained 409 (session 14) is a WHEP race —
+Cloudflare answers a subscribe with 409 for the ~1 s between the WHIP POST
+returning and ICE/DTLS finishing — and is now a bounded retry, five over ~7 s,
+re-posting the same offer, with 404 and 500 failing at once (7/7 in
+`demo/shell/live-test.mjs`, `keep` 20/20 live). The board's reverb noise
+(-4.1 dBFS, carried since 09-12) **does not reproduce**: six four-second arms
+over the relay all read 0.000000 / -180.0 dBFS. And `workers/pub`'s "stale
+container image" is **false and has been since 2026-09-08** — the deployed image
+was pushed 7m59s after the last commit to touch `container/server.mjs`, and the
+container's pattern and `demo/shell/pattern.mjs` emit byte-identical ffmpeg
+filter chains.
+
+⚠️ **Six arms of zero is the shape of a deaf instrument.** The reverb verdict
+only means anything because a note held through the SAME path in the SAME run
+read 0.041883 / peak -22.3 dBFS. And the FIRST probe was deaf — it waited on a
+reply of type `fx.space` while the box answers `fx.space.applied`, so the reverb
+was never switched on and four arms compared four identical silences.
+
+⚠️ **Do not "fix" the pub container by redeploying.** The Dockerfile pins
+nothing; `node:22-alpine` is now ffmpeg 8.1.2 against a live image built on
+ffmpeg 7, and a gratuitous deploy restarts the only instance into Cloudflare's
+45 s stale-publisher lockout. The genuinely stale copies are
+`rig/obs-docker/clock.html` and `rig/whep/publish.html` (ROW_X 40 / ROW_Y 100 /
+ROW_H 80 against 80/584/56).
+
+### What went wrong, which is the part to read
+
+🔴 **A 6 s deadline on a step that asks a human a question left a headset
+black.** `requestSession immersive-vr never returned`, twice, restart required —
+and it had not hung, it was waiting for the owner to answer the room-data
+permission prompt this page causes by asking for planes and hands. The deadline
+fired, the page tore down its own entry path, **and then the session started**:
+a headset in an immersive session no code owned. The instrument built to turn a
+hang into a named failure caused one. The prompting step gets 90 s now and says
+what it is waiting for, and 🔴 `Promise.race` does not cancel the loser, so the
+late session is caught and ENDED.
+
+🔴 **The hand probe asked at the one moment it could not be answered** — on the
+first frame with any input source, i.e. while you are still holding the
+controllers. It could only ever say `no hand`. It re-reports on
+`inputsourceschange` now, and `session.enabledFeatures` separates "hand tracking
+is off" from "you were holding a controller", which have opposite next steps.
+
+🔴 **The page blamed Space Setup for what was the session mode**, and that guess
+cost a room rescan and a serious suggestion of reinstalling the headset.
+MEASURED minutes apart, one room, one grant, one scan: `immersive-ar` returns
+**11 surfaces** (door · ceiling · 4 walls · window · bed · 2 shelves · floor, at
+y=-0.07 m), `immersive-vr` returns **none**. Read it off `environmentBlendMode`,
+never the session name.
+
+🔴 **An edit script asserts as it goes and only WRITES AT THE END**, so a failed
+assertion silently discarded the edits that had already matched. `drawHeld` was
+never added while the call to it was — and the symptom was two unrelated asserts
+red, because the throw set the room not-ok and `applyLook` refuses then: **a
+missing function reported itself as "no fade started"**.
+
+🔴 **A build from the working tree deployed two agents' unverified in-flight
+work.** Same hazard as `git add -A`, in the deploy costume. Two later commits
+held files back rather than repeat it.
+
+🔴 **My LESSONS #61 hypothesis was disproved by the engine's own arithmetic.**
+`sxf = (msos.max(mlock)/0.6).clip(0,1)`, so at `mlock 1` the cosine term is zero
+and the instrument is not in the capture at all — the buffer was already held.
+The real cause is ~32 dB into the master Compander and Limiter: through the
+chain RMS 0.25–0.32 and wobble 0.16–0.22 oct, against 0.006–0.008 and
+0.01–0.15 oct with the chain muted. The effect is under the noise the chain
+itself adds.
+
+🔴 **`push.sh` had been shipping the engine to a path sclang never reads.**
+`Engine_Pappus.sc` is a SuperCollider CLASS, compiled from sclang's Extensions
+directory; `/opt/positron-box` is not on its class path. The new command
+answered `no command 'report'` while the copy in `/opt` had it and matched the
+md5 `push.sh` printed. LESSONS #39 in a third costume. ⚠️ And `$HOME` inside an
+ssh string expands on the LOCAL machine.
+
+🔴 **`PAPPUS_LITE` has never worked in either direction.** `Array.includes`
+compares by identity, so `#["1","lite",…].includes(getenv(…))` is always false
+while `==` is true. Hidden because the fall-through reads the device tree and a
+Pi answers LITE anyway.
+
+🔴 **`scene`'s head-locked panel threw 385 times in one 49-second session**
+(`ReferenceError: proj is not defined`) and that is why yesterday's gl
+instrumentation reported nothing — the `xrFrames === 1` check runs after that
+block. The status panel had never once been drawn in a headset.
+
+### gl 1282 is named
+
+Three entries on a Quest 3: **1282 twice and 1286 once**, first frame. 1286 is
+`INVALID_FRAMEBUFFER_OPERATION` — drawing into a framebuffer that is not ready,
+not a state bug. `mirror`'s by-phase instrumentation puts its 1282 at
+**`firstDraw`**, the same instant under another name. `scene` now asks
+`checkFramebufferStatus` on frame one.
+
+### What shipped
+
+- **`demo/shell/xr-room.mjs`** — the room extracted, `mirror` in it, a dotted
+  grid that is GREEN on surfaces the headset reported and blue on the page's own
+  10 m room. Nothing in the room is inside anything else: over 2,000 rooms /
+  440,186 pairs, overlapping pairs **2,667 → 0** and the tightest gap anywhere
+  -0.731 m → +0.0398 m. 🔴 The sabotage is the lesson — with the fix off the
+  sweep went red **while the single-room check passed**, because one room in
+  three was already clean. Controllers and a held tablet hang off `gripSpace`,
+  primitives rather than glTF (a CDN fetch in the entry path is the one place a
+  slow answer has already cost three runs). ⚠️ The LEFT grip did not resolve
+  while the right did, in the same frame.
+- **The harness can DRAG and TYPE** — `data-gesture` and `data-typing`, real CDP
+  events. ⚠️ Input runs AFTER the controls, because a page that must be armed
+  before it records must be armed before it is drawn on. ⚠️ The drag supplies
+  its timestamps 16 ms apart so the sample rate is not a measurement of the
+  harness. ⚠️ And a threshold above what the harness can reach is a check that
+  does not exist: `typist`'s live check wanted 12 edits where it types 10, so it
+  silently never ran.
+- **Every run gets its own relay room.** A fixed room name is a shared mutable
+  global — the port lesson at the WebSocket layer. ⚠️ Four rooms keep their
+  names because the name is a machine's address (`studio-1`, `m1-1`) or the
+  room's subject is its own history (`wire`).
+- **The relay's caps are open**: 16 / 60 msg/s / 512 KiB/s → **128 / 1000 msg/s
+  / 8 MiB/s**. They were guesses defended as limits. ⚠️ The measured part
+  stands: at both 120 and 300 msg/s it delivered exactly 298 messages in three
+  seconds and the sender was told nothing. ⚠️ A live Durable Object keeps its
+  code, so `/stats` is what tells a failed edit from a sleeping room.
+- **The board reports every grain** — `SendReply` on the grain trigger, 19
+  messages / 57 grains in 4.6 s, batched at 250 ms, expiring 30 s after the last
+  request. ⚠️ `SendReply`'s `cmdName` IS the OSC address; an unregistered
+  command leaves `report` unset; both read as "this granulator fires no grains".
+  And `grain.marks` is BROADCAST, so it carries no `re` and the page's `fromBox`
+  filter dropped all 13 the relay was measured carrying.
+- **`params.set` moves the drift centre**, so a page that sets patches instead of
+  rolling dice finally has something for the drift to circle: nudges 0 → 48 in
+  6 s at 8 Hz. ⚠️ `.set`, not `.send`, or the drift integrates its own output.
+- **The four rungs weighed, one machine, one sitting**: FULL 121,425 B / LITE
+  74,733 / **TINY 64,733** / BARE 43,551. ⚠️ `report` plus the BARE plumbing
+  cost TINY 1,436 bytes — headroom against the silent 64 KiB `/d_recv` ceiling
+  is now **803 B**, one modest feature from not loading. Weigh before shipping.
+- **`pappus-live` is a shuffle test.** 🔴 Three takes cannot express a verdict
+  (smallest obtainable p is 0.100); the old spread estimator was degenerate;
+  |median(A) − median(B)| has 0% power at n=5. Exact Wilcoxon + Hodges-Lehmann,
+  five repeats, and **a check with no resolution ABSTAINS and still exits 1**.
+  `--self-test` 18/18; against the board **17/18, one abstain**.
+- **`typist`** (proto/text, five ancestors that all refused arrow keys) and
+  **`memento`** (plan-gesture P5, a knob against a clip graded by the clock
+  burned into the picture: median -14 to -20 ms). ⚠️ Grading `memento` against
+  the playhead is nearly vacuous — a 15%-wrong mapping still agreed to within a
+  frame, because `mediaMaster` anchors the playhead to the element's own clock.
+- **`draw` rebuilt** on `demo/shell/xy-pad.mjs`, with a transport, a timeline and
+  a record button. 🔴 A phantom endpoint had been halving the curve: smoothed
+  error 0.344 → 0.147 px. 🔴 And placing samples where the line bends LOSES to
+  spacing them evenly, 0.348 px against 3.005 — which decides plan-gesture §3 in
+  favour of one two-dimensional series.
+- **`grains`** is two granulators side by side with an equal-power crossfade, one
+  additive source built at both ends from one spec, and plan-diagram's first
+  adopted picture. 🔴 `diagram.mjs` cannot draw a FORK yet — the branch routes
+  behind a box on a phone and tells a plausible wrong story.
+- **New plans**: `plan-twins.md`, `plan-diagram.md`, `plan-xr-hands.md`,
+  `plan-gesture.md`, and `rig/box/norns/CHAIN.md`.
+
+### Still open
+
+- ⚠️ **No full `verify.mjs` run this session** — per-demo counts only, all green
+  where run. CLAUDE.md's header is stale: it says 31 demos of 37 rows and 449
+  asserts; the manifest is now **33 built of 39 rows**.
+- ⚠️ **`mirror` was never 44/44** — a number I had been quoting. It measured
+  21/21 alone before anything was touched (23/23 now); the 44 was
+  `verify-gl.mjs`'s own total, and `verify.mjs` hands gl demos off rather than
+  grading them.
+- ⚠️ **Nothing was added to LESSONS.md this session.** The last entry is #65,
+  written in session 20. At least the edit-script discard, the prompt-aware
+  deadline, the identity `includes`, and the class-path copy have earned one.
+- 🔴 **`diagram.mjs` needs a fork fix** before any page can draw a branch, and a
+  re-layout while the pointer is on a box leaves the caption stuck and then
+  measures ITS height for the reservation — the next un-hover grows the block by
+  78 px, the exact jump the reservation exists to prevent.
+- **`mount()`'s even-count rule only protects the two-column case.** `grains`'
+  four cells render 3+1 with a hole at 390 px, because auto-fit resolves to
+  three columns there.
+- **TINY leaves orphans** — sixteen `Lag.kr` tuning strings that do not exist and
+  a stereo Limiter over a bank guaranteed silent. A one-line fix that buys back
+  headroom, left alone because it changes TINY's size and that cannot be re-taken
+  from here.
+- **`summarise` and `separated` in `rig/box/measure.mjs` are imported by
+  nothing.**
+- ⚠️ **The queue at the top of this file was written at 15:18 and three of its
+  items were finished after that**: `pappus-live` DID meet the engine (17/18 with
+  one abstain), TINY WAS weighed with `report` in (803 B of headroom), and
+  `grains` DID adopt the diagram.
+
 # Handoff — 2026-09-13 (end of session 20)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
