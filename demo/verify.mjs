@@ -428,9 +428,17 @@ for (const t of targets) {
   ok('__demo.ready', ready);
   if (!ready) { console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`); continue; }
 
-  const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport })');
+  const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport, readoutOptOut: !!__demo.readoutOptOut })');
   ok('identity matches manifest', meta.name === t.name, meta.name);
-  ok('declares a readout', meta.keys.length > 0, meta.keys.join(','));
+  // ⚠️ A PAGE MAY DECLARE THAT IT HAS NOTHING TO PUT IN A READOUT, but it has
+  // to SAY SO — `readout: null` rather than an omitted field, so "this page's
+  // subject is visible rather than numeric" cannot be confused with "somebody
+  // forgot". `typist` is the case: the document IS the readout, and a row of
+  // cells repeating the letters and the cursor position was the same facts
+  // twice. An absent field is still a failure.
+  ok(meta.readoutOptOut ? 'declares that it has no readout, on purpose' : 'declares a readout',
+    meta.readoutOptOut || meta.keys.length > 0,
+    meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
   if (meta.hasT) {
     const t0 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing, seekable: __demo.transport.seekable, lattice: __demo.transport.lattice, rate: __demo.transport.rate })');

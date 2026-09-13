@@ -17,7 +17,13 @@ const LOG_CAP = 400;
 export function mount({
   name = 'demo',
   what = '',
-  readout = {},          // key -> unit string ('ms', 's', '' …)
+  // key -> unit string ('ms', 's', '' …). ⚠️ `null` is DIFFERENT from `{}` and
+  // from leaving it out: it says this page has deliberately no readout because
+  // its subject is visible rather than numeric, and the harness checks for that
+  // declaration rather than accepting an empty one. `typist` is the case — the
+  // document IS the readout, and cells repeating the letters and the cursor
+  // position were the same facts twice.
+  readout = {},
   showReadout = true,    // false: published on __demo, not drawn — see below
   controls = [],         // [{id, label, primary?}]
   index = '/',
@@ -57,6 +63,8 @@ export function mount({
   // It throws rather than warns so the suite catches it on the next run: every
   // demo is driven by `verify.mjs`, so a page that breaks this cannot reach a
   // visitor without going red first.
+  const readoutOptOut = readout === null;
+  if (readoutOptOut) readout = {};
   const keys = Object.keys(readout);
   if (keys.length % 2) {
     throw new Error(
@@ -137,6 +145,8 @@ export function mount({
     ready: false,
     failed: null,
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),
+    // the DECLARATION, so a harness can tell "no cells on purpose" from "none yet"
+    readoutOptOut,
     how: null,
     logs: [],
     asserts: [],

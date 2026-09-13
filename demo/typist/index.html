@@ -165,23 +165,35 @@
 
   const d = mount({
     name: 'typist',
-    what: 'Type into the carriage and every change is written down as what it did to the '
-      + 'document — where the text changed and what it changed to — never as the key you '
-      + 'pressed. Press play to watch a recording type itself back at the speed it was '
-      + 'typed, drag the line under it to any moment — the text, the cursor and the '
-      + 'highlight all come back to what they were, without a single keystroke being '
-      + 'replayed — and zoom that line in until each mark turns into the letter it '
-      + 'recorded. "Worked out" counts the deletions where nothing said what had been '
-      + 'removed, so the text before and after had to be compared — which is what five '
-      + 'earlier versions of this got wrong.',
-    // Every cell moves. `letters` and `cursor` are the document AT THE PLAYHEAD,
-    // so they change while it types and while you drag; `checked` and `apart`
-    // are the two readings of it being compared, which only happens while
-    // something is moving.
-    readout: { edits: '', letters: '', cursor: '', 'worked out': '', checked: '', apart: '' },
+    // ⚠️ SHORT, AND IT HAS DRIFTED LONG TWICE. Each addition was defensible on
+    // its own — the zoom needed naming, the replay claim was the point — and
+    // the result was four sentences nobody reads. What a visitor needs: what
+    // this is, what to press, what the numbers mean.
+    what: 'Type, and every change is written down as what it did to the document — where '
+      + 'the text changed and what it changed to — never as the key you pressed. Press '
+      + 'play to watch it type itself back, drag the line to any moment, and zoom in '
+      + 'until each mark becomes the letter it recorded. "Worked out" counts the '
+      + 'deletions where nothing said what had been removed, so the text before and '
+      + 'after had to be compared.',
+    // 🔴 NO READOUT. Asked for, and this is the one page where it was in the
+    // way: the document IS the readout — you can see the letters, the cursor
+    // and the highlight, and a row of cells repeating them in numbers is the
+    // same facts twice. `worked out`, `checked` and `apart` are about the
+    // page's argument rather than about what you are doing, and they are all
+    // stated by the checks, which is where an argument belongs.
+    readout: null,
+    // ⚠️ `own` IS BACK AS A CONTROL EVEN THOUGH THE PAGE OPENS THERE, and the
+    // ORDER is load-bearing. `verify.mjs` presses every control in the order
+    // they are declared, so whichever is LAST is the state the page is in when
+    // the harness starts typing — and the live check ("what is being typed
+    // right now rebuilds from its own edits") only has a subject if the box is
+    // writable. Declared the other way round it read 9 of 10 asserts, green,
+    // with the one that grades the half a visitor actually uses simply absent.
+    // It also has to exist for a human: once you have played the recording,
+    // there has to be a way back to your own typing.
     controls: [
+      { id: 'back', label: 'Play a recording' },
       { id: 'own', label: 'Type your own', primary: true },
-      { id: 'back', label: 'Back to the recording' },
     ],
   });
   guard(d);
@@ -201,15 +213,21 @@
   });
   carriage.append(paper, keys);
 
+  // 🔴 THE `rebuilt` BLOCK IS GONE FROM THE PAGE AND THE COMPARISON IS NOT.
+  // It showed the same document a second time, rebuilt from the edits, so a
+  // reader could see the two agree — and what that actually looks like is the
+  // same paragraph printed twice with nothing to tell them apart, because they
+  // agree. A check that passes silently is what an assert is FOR; the elements
+  // stay off the page and `rbText`/`rbVerdict` keep their fill so every check
+  // below reads exactly what it read before.
   const rebuilt = el('div', 'rebuilt');
   const rbText = el('pre', 'rb-t');
   const rbVerdict = el('div', 'rb-v');
-  rebuilt.append(el('span', 'rb-k', 'the same document, rebuilt from the edits up to here'),
-                 rbText, rbVerdict);
+  rebuilt.append(rbText, rbVerdict);
 
   const barHost = el('div', '');
   const stripHost = el('div', '');
-  d.el.append(carriage, rebuilt, barHost, stripHost);
+  d.el.append(carriage, barHost, stripHost);
 
   const css = getComputedStyle(document.documentElement);
   const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
@@ -572,20 +590,14 @@
     readout();
   }
 
-  function readout() {
-    d.set('edits', log.length || '');
-    d.set('letters', log.length ? folded.text.length : '');
-    d.set('cursor', log.length
-      ? (folded.selection[0] === folded.selection[1] ? String(folded.selection[0])
-         : `${folded.selection[0]}–${folded.selection[1]}`)
-      : '');
-    const dels = log.filter((r) => r.op.type === OP_DELETE);
-    const workedOut = dels.filter(hadToBeWorkedOut).length;
-    d.set('worked out', dels.length ? workedOut : '');
-    d.set('checked', cmp.compares || '');
-    d.set('apart', cmp.compares ? cmp.divergences : '',
-      cmp.compares ? (cmp.divergences ? 'bad' : 'ok') : '');
-  }
+  // ⚠️ THE CELLS ARE GONE AND THE COUNTERS ARE NOT. `cmp.compares` and
+  // `cmp.divergences` are what the live check reads, and `hadToBeWorkedOut`
+  // still feeds an assert — deleting the arithmetic along with the row it used
+  // to print into would have taken two checks with it, silently, which is this
+  // page's own lesson about an assert count that drops while reading green.
+  // The numbers now go to the LANE GUTTERS, beside the ink they describe,
+  // which is where this project puts a per-lane figure anyway.
+  function readout() { gutters(); }
 
   /** A deletion whose range no event reported: the selection before it was a
    *  collapsed cursor, so the only place the removed range could come from is
@@ -677,7 +689,7 @@
   }
 
   d.on('own', startOwn);
-  d.on('back', () => { loadRecording(); d.log('the recording is back'); });
+  d.on('back', () => { loadRecording(); d.log('playing the shipped recording — press play'); });
 
   // ── the checks ───────────────────────────────────────────────────────────
   //
@@ -911,6 +923,15 @@
   }
 
   // ── go ───────────────────────────────────────────────────────────────────
+  // 🔴 IT OPENS ON YOUR OWN TYPING, NOT ON THE SHIPPED RECORDING. Asked for.
+  // The page's first act was to play somebody else's document at you, so the
+  // thing it is actually about — that YOUR typing is being written down as
+  // edits — was two clicks away and most visitors never got there. Now the box
+  // has the cursor in it and the line below is empty, and it fills as you type.
+  // ⚠️ The recording is still SHIPPED and still the subject of eight checks:
+  // it is a fixture, and a fixture does not have to be the opening screen.
+  // `loadRecording()` still runs first, because the log lines and the checks
+  // below are all about it — `startOwn()` then clears the page back to empty.
   const loaded = loadRecording();
   const ins = loaded.rows.filter((r) => r.op.type === OP_INSERT);
   const kinds = {};
@@ -928,6 +949,14 @@
 
   requestAnimationFrame(frame);
   d.ready();
-  check(loaded).catch((e) => d.fail(e));
+  // 🔴 GRADE THE FIXTURE FIRST, THEN HAND THE PAGE OVER EMPTY — and the order
+  // is load-bearing, not tidiness. `startOwn()` disposes the deck, destroys the
+  // strip and empties the log, and `check()` reads all three; calling it first
+  // took the page from **22 asserts to 7** while every remaining one stayed
+  // green. That is this page's own lesson arriving from the other direction:
+  // the count is the regression test, and nothing else would have said a word.
+  // ⚠️ `check` is async — it awaits frames — so this cannot be two statements
+  // in a row, it has to be chained.
+  check(loaded).then(startOwn).catch((e) => d.fail(e));
 </script>
 </html>
