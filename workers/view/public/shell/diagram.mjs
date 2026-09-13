@@ -274,11 +274,19 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   let leftInset = 0;
   let colBoxW = 0;
   if (mode === 'column') {
-    // The return paths run down the LEFT of the column, so that gutter has to
-    // hold both the deepest of them and the widest thing written beside one.
-    // `backs.length` is the worst case for the depth — every path on its own
-    // level — and is used because the real levels need positions that need
-    // this width. It over-reserves when two paths share a level; the
+    // The return paths run down the LEFT of the column, so that gutter holds
+    // two things SIDE BY SIDE and not one: the lanes the paths run in, and the
+    // names written beside them.
+    //
+    // ⚠️ MEASURED, with the two stacked instead: `the sound` was drawn with a
+    // return path running straight through it, because the gutter was sized to
+    // whichever of the two was wider rather than to both together. A name that
+    // has a line through it reads as a name in the wrong place, which is what
+    // it was.
+    //
+    // `backs.length` is the worst case for the number of lanes — every path on
+    // a level of its own — and is used because the real levels need positions
+    // that need this width. It over-reserves when two paths share a lane; the
     // alternative is laying the whole thing out twice.
     const budget = Math.max(LINK_MIN, Math.min(LINK_MAX, Math.round(avail * 0.30)));
     let widest = 0;
@@ -288,7 +296,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       widest = Math.max(widest, measure.link(wrapped.lines[0] || ''));
     }
     leftInset = backs.length
-      ? Math.max(10 + BACK_STEP * backs.length, Math.ceil(widest) + 10)
+      ? Math.ceil(widest) + 16 + (backs.length - 1) * BACK_STEP
       : 0;
     colBoxW = Math.min(avail - leftInset - PAD * 2, BOX_MAX_W_COL);
   }
@@ -359,6 +367,14 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
     const f = at.get(l.from), t = at.get(l.to);
     return [f.cx - ATTACH_OFF, t.cx + ATTACH_OFF];
   }));
+  // ⚠️ A NAME UNDER A RETURN PATH NEEDS THE DEPTH TO MAKE ROOM FOR IT.
+  // MEASURED with two loopbacks and the step at a flat 14 px: `slow down` sat
+  // on top of the line belonging to the path below it. Two paths that do not
+  // overlap is a claim about the PATHS, and the names are a second layer that
+  // has to clear as well — so when any of them is named, the step grows by one
+  // line of that type rather than by a number picked to look right.
+  const named = backs.some((l) => l.label);
+  const step = BACK_STEP + (named ? Math.round(m.linkLh) : 0);
   let deepest = bottom;
   let backLabelled = false;
 
@@ -379,7 +395,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
       continue;
     }
     const i = backs.indexOf(l);
-    const dy = bottom + BACK_FIRST + level[i] * BACK_STEP;
+    const dy = bottom + BACK_FIRST + level[i] * step;
     deepest = Math.max(deepest, dy);
     const sx = f.cx - ATTACH_OFF, tx = t.cx + ATTACH_OFF;
     const sy = f.y + boxH, ty = t.y + boxH + EDGE_OUT + 1;
@@ -397,7 +413,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
     }
     if (lab.lines.length) backLabelled = true;
     drawn.push({ ...l, d, lab, lx: (sx + tx) / 2, ly: dy + 4 + m.linkSize * 0.85,
-                 anchor: 'middle', stack: 'none', level: level[i] });
+                 anchor: 'middle', stack: 'none', level: level[i], depth: dy });
   }
 
   const height = Math.round(
@@ -450,7 +466,9 @@ function placeColumn(nodes, links, { col, avail, w, boxH, leftInset, m, measure,
       continue;
     }
     const i = backs.indexOf(l);
-    const bx = Math.max(PAD + 4, leftInset - 10 - level[i] * BACK_STEP);
+    // the lanes fill the LEFT of the gutter and the names the right of it, so
+    // a deeper path moves further left and never under a name
+    const bx = PAD + 4 + (backs.length - 1 - level[i]) * BACK_STEP;
     const sy = f.cy - ATTACH_OFF / 2, ty = t.cy + ATTACH_OFF / 2;
     const sx = f.x - EDGE_OUT, tx = t.x - EDGE_OUT - 1;
     const k = ty < sy ? 1 : -1;
@@ -465,7 +483,7 @@ function placeColumn(nodes, links, { col, avail, w, boxH, leftInset, m, measure,
                   shown: lab.lines.join(' '), width: backBudget });
     }
     drawn.push({ ...l, d, lab, lx: t.x - 6, ly: ty - 5,
-                 anchor: 'end', stack: 'none', level: level[i] });
+                 anchor: 'end', stack: 'none', level: level[i], bx });
   }
 
   return { width: avail, height: Math.round(bottom + PAD), nodes: placed, links: drawn };
@@ -679,6 +697,23 @@ export function createDiagram(host, spec, { onRender } = {}) {
       g.addEventListener('blur', hide);
       field.append(g);
     }
+
+    // 🔴 THE LINE UNDER THE PICTURE KEEPS ITS HEIGHT, OR HOVERING MOVES THE
+    // PAGE. A three-line caption replaced by a five-word sentence is two lines
+    // shorter, so everything below the diagram jumps up the moment the pointer
+    // touches a box and back down when it leaves — on a page of several
+    // diagrams that is the whole article twitching under the cursor. The tallest
+    // thing the line will ever hold is reserved once per layout, which costs a
+    // few reflows here and nothing at all afterwards.
+    cap.style.minHeight = '';
+    let capH = cap.offsetHeight;
+    const keep = cap.textContent;
+    for (const n of L.nodes) {
+      cap.textContent = n.title || n.label.full;
+      capH = Math.max(capH, cap.offsetHeight);
+    }
+    cap.textContent = keep;
+    cap.style.minHeight = `${capH}px`;
 
     api.cuts = L.cuts;
     api.mode = L.mode;

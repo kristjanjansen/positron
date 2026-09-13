@@ -179,6 +179,15 @@ console.log('\n== the two layouts, and where one becomes the other ==');
      y.you < y.relay && y.relay < y.box, `y ${y.you} · ${y.relay} · ${y.box}`);
   ok('the return paths route to the LEFT of the boxes, and have room',
      [...xs][0] > 0, `the column starts ${[...xs][0]} px in`);
+  // 🔴 THE GUTTER HOLDS TWO THINGS SIDE BY SIDE, NOT ONE ON TOP OF THE OTHER.
+  // This failed on screen first: `the sound` was drawn with a return path
+  // running straight through it, because the gutter had been sized to
+  // whichever of the lane and the name was wider. A name with a line through
+  // it reads as a name in the wrong place, which is exactly what it was.
+  const named = L.links.filter((l) => l.back && l.lab.lines.length);
+  ok('a return path never runs through its own name',
+     named.length > 0 && named.every((l) => l.lx - ruler(l.lab.lines[0]) >= l.bx + 6),
+     named.map((l) => `"${l.lab.lines[0]}" starts at ${Math.round(l.lx - ruler(l.lab.lines[0]))} px, its lane is at ${l.bx}`).join(' · '));
 }
 
 {

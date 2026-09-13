@@ -21,10 +21,110 @@
   import { world as world0, docOf, validate as validate0 } from '/shell/seed.mjs';
   import { touchOf } from '/shell/xr-panel.mjs';
 
+  // ── nothing sits inside anything else ───────────────────────────────────
+  // 🔴 THE GENERATOR PLACES EACH THING WITHOUT LOOKING AT THE ONES ALREADY
+  // THERE, so two of them can occupy the same piece of space. Reported from a
+  // Quest 2026-09-13, and MEASURED over 200 seeds before this landed: 264
+  // overlapping pairs of 46,440, in 135 of 200 rooms, the worst of them 0.615 m
+  // deep — one thing swallowing another. In a window that reads as an odd
+  // shape; in a headset it is a thing you cannot walk round, because it is not
+  // one thing.
+  //
+  // ⚠️ THE BALL, NOT THE BOX. Things SPIN (`ry + tSec * spin` in the draw), so
+  // a box-against-box test is true this frame and false the next, and a
+  // separation that holds at one instant is not a rule. The circumscribed
+  // sphere of a cube of edge s — s·√3/2 — is the only bound that survives every
+  // rotation, and it is the same ball `pick` aims with, read from this one
+  // constant rather than typed in both places.
+  //
+  // 🔴 AND THE ROOM MUST STILL BE A FUNCTION OF ITS SEED. Everything below is
+  // arithmetic on the generated numbers: no clock, no `Math.random`, no
+  // iteration order that depends on anything but the index. Roll the same seed
+  // twice and it is still byte for byte the same room, which is the claim the
+  // negative control makes and the whole reason a room fits in four bytes.
+  const radiusOf = (t) => t.s * 0.87;
+  // Air between two surfaces, and it is doing two jobs. It has to clear the
+  // document's own rounding — MEASURED at a gap of zero, 128 pairs of 46,440
+  // were pushed to exactly touching and then ROUNDED back into contact, by
+  // 1.3e-4 m, which 1 cm already fixes. 4 cm is for the eye: two things a
+  // rounding error apart are one shape with a seam in it, and the rule is meant
+  // to make two things look like two.
+  const GAP = 0.04;
+  // MEASURED over 400 seeds: 11 passes was the most any room needed, and 342 of
+  // them settled in two. The cap is here so a pathological room cannot spin,
+  // not because rooms reach it.
+  const SPREAD_PASSES = 24;
+  // How many goes a DROPPED thing gets at finding somewhere to be. It is far
+  // larger than the placement number because only one thing moves here — the
+  // rest of the room is nailed down — so it has to walk out of a crowd rather
+  // than have the crowd open up. MEASURED over 123,027 drops made dead centre
+  // into another thing: 8 goes left 146 of them still overlapping, 48 leaves 3.
+  // ⚠️ AND 64 ALSO LEAVES 3 — the same three. They are not slow to converge,
+  // they do not converge: the thing bounces between two neighbours, clearing
+  // each by entering the other. More passes buy nothing, the residue is 0.064 m
+  // at its worst rather than the 0.73 m a generator can produce, and the honest
+  // thing is to say so here rather than claim a guarantee this does not have.
+  const DROP_PASSES = 48;
+  // Rooms the negative control rolls to grade the rule across the seed space.
+  // 64 of them is ~1,300 things and ~14,000 pair tests, which is a few ms.
+  const SWEEP = 64;
+  const r4 = (v) => Math.round(v * 10000) / 10000;
+
+  /** The same room, with every thing pushed off every other thing. */
+  function spaced(w) {
+    const th = (w?.things || []).map((t) => ({ ...t }));
+    for (let pass = 0; pass < SPREAD_PASSES; pass++) {
+      let shifted = false;
+      for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
+        const a = th[i], b = th[j];
+        const need = radiusOf(a) + radiusOf(b) + GAP;
+        let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        let len = Math.hypot(dx, dy, dz);
+        if (len >= need - 1e-6) continue;
+        // Two centres in the same place have no line between them to push
+        // along. The direction comes from the pair's own indices — a random one
+        // would be a different room on every roll.
+        if (len < 1e-6) { dx = Math.cos(i + j); dy = 0.3; dz = Math.sin(i + j); len = Math.hypot(dx, dy, dz); }
+        const k = (need - len) / len / 2;        // half the shortfall each, along the line
+        a.x -= dx * k; a.y -= dy * k; a.z -= dz * k;
+        b.x += dx * k; b.y += dy * k; b.z += dz * k;
+        shifted = true;
+      }
+      if (!shifted) break;
+    }
+    // Rounded the way the generator rounds — see seed.mjs. The document is
+    // compared byte for byte, so it has to leave here canonical.
+    return { ...w, things: th.map((t) => ({ ...t, x: r4(t.x), y: r4(t.y), z: r4(t.z) })) };
+  }
+
+  /**
+   * How the things in a room stand to one another: how many pairs are inside
+   * each other, how deep the worst of them is, and the tightest gap there is
+   * between two surfaces.
+   *
+   * `closest` is what the asserts print when they pass — a pass that prints
+   * only "0 pairs" says the same thing about a room with 4 cm to spare and one
+   * with 4 metres, and the number that moves is the one worth reading.
+   */
+  function clashes(w) {
+    const th = w?.things || [];
+    let pairs = 0, deep = 0, closest = Infinity;
+    for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
+      const a = th[i], b = th[j];
+      const gap = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - radiusOf(a) - radiusOf(b);
+      if (gap < 0) { pairs++; deep = Math.max(deep, -gap); }
+      closest = Math.min(closest, gap);
+    }
+    return { pairs, deep, closest: Number.isFinite(closest) ? closest : 0 };
+  }
+
   // ⚠️ ALIASED, NOT USED DIRECTLY. An imported binding cannot be reassigned, and
   // tier 3 of the update story replaces the generator while a session is live.
   // Every call below goes through these.
-  let world = world0, validate = validate0;
+  // ⚠️ AND THE SEPARATION IS PART OF `world`, NOT OF THE CALLERS. A rule applied
+  // at three call sites is a rule missing from the fourth — and a generator
+  // swapped in live over the wire would arrive without it.
+  let world = (seed) => spaced(world0(seed)), validate = validate0;
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'scene-demo';
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
@@ -96,7 +196,7 @@
 
   const d = mount({
     name: 'scene',
-    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up, the thumbstick pushes it further away or pulls it closer, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second. Nothing is allowed to sit inside arm's reach of your head: if something ends up there the room moves it out, because a thing you cannot back away from is one you cannot aim at either.`,
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. In a headset the trigger picks a thing up, the thumbstick pushes it further away or pulls it closer, the grip drops you back out, and letting go sends the room to everyone else in it — once, on release, rather than ninety times a second. Nothing is allowed to sit inside anything else or inside arm's reach of your head: the roll spaces the things out before you see them, a thing let go inside another is pushed back out along the line between their centres, and a thing that ends up in your face is moved away from it.`,
     readout: { seed: '', things: '', moved: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
@@ -535,7 +635,6 @@
   function moveThing(i, x, y, z) {
     const t = doc?.things?.[i];
     if (!t) return false;
-    const r4 = (v) => Math.round(v * 10000) / 10000;
     const next = { ...t, x: r4(x), y: r4(y), z: r4(z) };
     const trial = { ...doc, things: doc.things.map((o, k) => (k === i ? next : o)) };
     // ⚠️ THE SAME `validate` THE RELAY PATH USES. A hand can drag a thing
@@ -545,6 +644,53 @@
     if (validate(trial)) return false;
     doc = trial;
     return true;
+  }
+
+  /**
+   * A thing let go inside another is pushed out along the line between their
+   * centres. Returns how far it went, in metres, or 0 if it was already clear.
+   *
+   * ⚠️ ONLY THE DROPPED THING MOVES. Relaxing the whole room on a drop would
+   * shift things somebody else in the room is holding, and a room that
+   * rearranges itself because you put one object down is a room you cannot
+   * arrange. The placement rule runs once, on a room nobody is touching; this
+   * one answers for the one thing you just let go of.
+   *
+   * It resolves the DEEPEST overlap each time round and moves the thing to
+   * exactly that one's surface, because pushing clear of one thing can push
+   * into a second. Measured against the obvious alternative — stepping out of
+   * every overlap at once — this one moves a dropped thing 0.62 m on average
+   * and 1.65 m at the very worst, where stepping out of all of them at once
+   * averages 2.39 m and reaches 4.32 m. A thing that flies across the room
+   * when you let go of it has not been put down.
+   */
+  function pushClear(i) {
+    const me = doc?.things?.[i];
+    if (!me) return 0;
+    let x = me.x, y = me.y, z = me.z;
+    for (let pass = 0; pass < DROP_PASSES; pass++) {
+      let worst = null, deepest = 1e-6;
+      for (let k = 0; k < doc.things.length; k++) {
+        if (k === i) continue;
+        const o = doc.things[k];
+        const need = radiusOf(me) + radiusOf(o) + GAP;
+        const len = Math.hypot(x - o.x, y - o.y, z - o.z);
+        if (need - len > deepest) { deepest = need - len; worst = { o, len, need }; }
+      }
+      if (!worst) break;
+      let dx = x - worst.o.x, dy = y - worst.o.y, dz = z - worst.o.z, len = worst.len;
+      if (len < 1e-6) {
+        // Dropped dead centre, with no line between the two to push along.
+        // Outward from where you are standing is the direction with room in it.
+        dx = x; dy = 0; dz = z; len = Math.hypot(dx, dy, dz);
+        if (len < 1e-6) { dx = 1; dy = 0; dz = 0; len = 1; }
+      }
+      const k = worst.need / len;
+      x = worst.o.x + dx * k; y = worst.o.y + dy * k; z = worst.o.z + dz * k;
+    }
+    const went = Math.hypot(x - me.x, y - me.y, z - me.z);
+    if (went < 1e-4) return 0;
+    return moveThing(i, x, y, z) ? went : 0;
   }
 
   // ── the socket ──────────────────────────────────────────────────────────
@@ -628,7 +774,7 @@
         // A cache-busted URL is a NEW module, which is the only way to get a
         // second copy of one the browser has already evaluated.
         const mod = await import(`/shell/seed.mjs?v=${encodeURIComponent(m.v || Date.now())}`);
-        world = mod.world; validate = mod.validate;
+        world = (seed) => spaced(mod.world(seed)); validate = mod.validate;
         setPanel('✓ new generator, applied\nroll to see it');
         shipNow(`dev.module applied live — v${m.v}`);
       } catch (e) {
@@ -711,13 +857,14 @@
       m[12] - m[8] * len * 0.5, m[13] - m[9] * len * 0.5, m[14] - m[10] * len * 0.5, 1]);
   }
 
-  /** Nearest thing the ray passes through, or null. Spheres, because a cube of
-   *  edge s is well enough approximated by a ball of radius s*0.87 for aiming,
-   *  and an exact box test would be twenty lines nobody can check by eye. */
+  /** Nearest thing the ray passes through, or null. Spheres, from the same
+   *  `radiusOf` the separation rule uses — an exact box test would be twenty
+   *  lines nobody can check by eye, and aiming at one ball while being kept
+   *  apart by another would be two different shapes for one thing. */
   function pick(o, dir) {
     let best = null;
     doc?.things?.forEach((t, i) => {
-      const r = t.s * 0.87;
+      const r = radiusOf(t);
       const ox = o[0] - t.x, oy = o[1] - t.y, oz = o[2] - t.z;
       const b = ox * dir[0] + oy * dir[1] + oz * dir[2];
       const c = ox * ox + oy * oy + oz * oz - r * r;
@@ -846,7 +993,13 @@
         // thing would be 90 msg/s into a relay whose measured ceiling is 60,
         // and the relay tells a sender NOTHING when that bites — it simply
         // drops. The room everyone else sees converges when you let go.
-        shipNow(`dropped thing ${held.i} — document now ${docOf(doc).length} bytes`);
+        // 🔴 AND IT IS LET GO WHERE IT IS, WHICH CAN BE INSIDE SOMETHING ELSE.
+        // The push happens BEFORE the send, so what goes out is the room as it
+        // will be — a corrected position arriving a message later would show
+        // everyone else the thing jumping after it landed.
+        const out = pushClear(held.i);
+        if (out) setPanel(`moved it clear of another thing\n${out.toFixed(2)} m`, 2500);
+        shipNow(`dropped thing ${held.i}${out ? ` · pushed ${out.toFixed(2)} m clear` : ''} — document now ${docOf(doc).length} bytes`);
         send({ type: 'scene.room', doc });
       }
       held = null;
@@ -872,6 +1025,7 @@
     return true;
   }
 
+  let raysSaid = false;
   function onXR(now, frame) {
     if (!session) return;
     session.requestAnimationFrame(onXR);
@@ -882,10 +1036,47 @@
     if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    // 🔴 IS THE FRAMEBUFFER EVEN COMPLETE? MEASURED on a Quest 3 2026-09-13,
+    // three entries into this page: `gl error 1282` twice and `gl error 1286`
+    // once, on the FIRST frame — and 1286 is INVALID_FRAMEBUFFER_OPERATION,
+    // which is not a state bug at all, it is drawing into a framebuffer that is
+    // not ready. `mirror`'s by-phase instrumentation put its own 1282 at
+    // `firstDraw` in the same minute, which is the same instant by another
+    // name. This says WHICH, in words, instead of leaving a number to guess at.
+    if (xrFrames === 1) {
+      const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      if (st !== gl.FRAMEBUFFER_COMPLETE) {
+        shipNow(`first frame: the framebuffer is NOT complete — status ${st}`);
+      }
+    }
     const tSec = (now - t0) / 1000;
     // A ray per hand, in room coordinates. `targetRaySpace` is the pointer the
     // runtime draws; using it rather than the grip means what you aim at is
     // what you get.
+    // 🔴 SAY WHAT THE HANDS ARE, ONCE. Reported from a Quest 2026-09-13: "I did
+    // not have box manipulation any more, some ray was where my feet were" —
+    // and the session log carries ZERO `grabbed` lines, where the run before it
+    // carried many. From outside, three different faults look identical: no
+    // input sources at all (so the ray you see is the runtime's own), sources
+    // with no `targetRaySpace`, and a pose resolving against the wrong
+    // reference space (which puts the ray on the floor, because `local` has
+    // its origin at the head and `local-floor` at the feet).
+    //
+    // ⚠️ INSTRUMENT THE ENTRY PATH BEFORE GUESSING AT IT — this page's own
+    // history is three headset runs that were indistinguishable from outside
+    // until a line was shipped before and after every await. One line, once,
+    // naming which of the three it is.
+    if (!raysSaid && session.inputSources.length) {
+      raysSaid = true;
+      const bits = [...session.inputSources].map((src, i) => {
+        if (!src.targetRaySpace) return `${i}:${src.handedness} NO targetRaySpace`;
+        const rp = frame.getPose(src.targetRaySpace, xrSpace);
+        if (!rp) return `${i}:${src.handedness} pose did not resolve`;
+        const m = rp.transform.matrix;
+        return `${i}:${src.handedness} at ${m[12].toFixed(2)},${m[13].toFixed(2)},${m[14].toFixed(2)}`;
+      });
+      shipNow(`hands · ${session.inputSources.length} source(s) · ${bits.join(' · ')} · space local-floor`);
+    }
     for (const src of session.inputSources) {
       if (!src.targetRaySpace) continue;
       const rp = frame.getPose(src.targetRaySpace, xrSpace);
@@ -1055,6 +1246,13 @@
     d.assert('no WebGL error is pending', glErr === 0, glErr === 0 ? 'clean' : `gl.getError() ${glErr}`);
     d.assert('the room is a document, and it is valid', !!doc && validate(doc) === null,
       doc ? `${doc.things.length} things, ${docOf(doc).length} bytes` : 'none');
+    // ⚠️ THE ROOM ON SCREEN, not a sample of one. Every other check of the
+    // separation rule runs against rooms nobody is looking at; this is the one
+    // that grades the one a visitor is standing in.
+    const cl = clashes(doc);
+    d.assert('nothing in this room is inside anything else', !!doc && cl.pairs === 0,
+      cl.pairs ? `${cl.pairs} pairs, the worst ${cl.deep.toFixed(3)} m deep`
+               : `tightest pair ${cl.closest.toFixed(3)} m apart`);
     d.assert('the page reached the relay', ws?.readyState === 1, `readyState ${ws?.readyState}`);
     d.assert('the room changed only when the message came back', echoed || ws?.readyState !== 1,
       echoed ? 'own message echoed' : 'no relay — drew locally and said so');
@@ -1082,6 +1280,21 @@
       `${before.length} bytes, ${before === after ? 'identical' : 'DIFFERENT'}`);
     d.assert('a different seed makes a different room', between !== after,
       between === after ? 'two seeds gave one room' : 'they differ');
+    // ⚠️ ONE ROOM PASSING SAYS NOTHING ABOUT A GENERATOR. MEASURED without the
+    // separation rule: 135 of 200 rooms held at least one pair inside each
+    // other, so a check of the single room on screen misses the defect about
+    // one roll in three — and that is exactly what it did the first time this
+    // rule was broken on purpose, where the room in front of the harness passed
+    // and this line reported 79 overlapping pairs.
+    // The seeds are spread rather than counted 0, 1, 2: consecutive numbers
+    // are not a sample of a 32-bit space.
+    let clash = 0, tight = Infinity;
+    for (let k = 1; k <= SWEEP; k++) {
+      const c = clashes(world((k * 2654435761) >>> 0));
+      clash += c.pairs; tight = Math.min(tight, c.closest);
+    }
+    d.assert(`no seed in a sweep of ${SWEEP} puts one thing inside another`, clash === 0,
+      clash ? `${clash} overlapping pairs` : `tightest pair in ${SWEEP} rooms ${tight.toFixed(3)} m apart`);
     d.set('seed', String(seed));
   });
 
@@ -1168,6 +1381,22 @@
     const far = moveThing(0, 40, 0.5, 40);      // through the wall, deliberately
     d.assert('a thing cannot be dragged out of the room',
       far === false && docOf(doc) === midway, far ? 'it went through the wall' : 'refused, document unchanged');
+
+    // ⚠️ THE DROP RULE, GRADED WITHOUT A HEADSET. A controller ray needs hands;
+    // "it was let go inside another one and came back out" is one call and a
+    // distance, and leaving it to the device would mean the rule is only ever
+    // checked where nothing is watching. Dropped DEAD CENTRE on purpose, which
+    // is the case with no line between the two to push along — the one an
+    // implementation is most likely to get wrong and least likely to meet.
+    const host = doc.things[1];
+    const sank = moveThing(0, host.x, host.y, host.z);
+    const went = pushClear(0);
+    const out = doc.things[0];
+    const apart = Math.hypot(out.x - host.x, out.y - host.y, out.z - host.z);
+    const need = radiusOf(out) + radiusOf(host);
+    d.assert('a thing dropped inside another is pushed back out',
+      sank && went > 0 && apart >= need,
+      sank ? `${apart.toFixed(2)} m apart, needs ${need.toFixed(2)} m` : 'it would not go in');
 
     // ⚠️ THE FADE IS GRADED, because a crossfade is exactly the kind of thing
     // that can be wired up and do nothing — the `LEQUAL` depth function is one
