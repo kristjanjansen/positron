@@ -473,11 +473,18 @@
     bar = createTransportBar(barHost, deck, { scrub: false });
     view = createStripView(stripHost, deck, {
       size: 'auto', follow: false, armWall: false, gutter: 132,
-      // 42/38/38: two gutter lines need about 40 px of lane, so a shorter row
-      // silently drops the second one — which is where the count lives.
-      lanes: [laneOf(OP_INSERT, 'typed', 42),
-              laneOf(OP_DELETE, 'taken back', 38),
-              laneOf(OP_SELECT, 'cursor', 38)],
+      // 36 EACH, AND THE NUMBER IS ARITHMETIC, NOT TASTE. The gutter draws a
+      // lane's name at y+12 and its numbers at y+21 and y+31, and refuses any
+      // line that would fall past `height - 2` — so two numbers need 33 px of
+      // lane and this asks for 36. ⚠️ A LANE THAT IS ONE PIXEL SHORT DROPS ITS
+      // LAST LINE IN SILENCE, and the last line is where the count lives: the
+      // strip is doing the right thing (never spill into the next lane) and the
+      // page still loses a number with nothing to say it happened. That is why
+      // these three are equal and why the arithmetic is written down. It was
+      // 42/38/38 against a looser spacing.
+      lanes: [laneOf(OP_INSERT, 'typed', 36),
+              laneOf(OP_DELETE, 'taken back', 36),
+              laneOf(OP_SELECT, 'cursor', 36)],
     });
     gutters();
   }
