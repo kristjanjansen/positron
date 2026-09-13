@@ -55,26 +55,45 @@
 export const MAGIC = 'SCgf';
 
 /**
- * 🔴 THE CEILING BOTH ENDS DEFAULT TO. One number, declared once, so the
- * browser and the Raspberry Pi cannot disagree about what will load.
+ * THE LARGEST DEFINITION THAT CAN BE SENT OVER A SOCKET AND ARRIVE.
  *
- * The point is not the number, it is that it is the SAME number. "The same
- * instrument, two ends" is only literally true while a definition loads in
- * both — and the two engines have different appetites, so the smaller one sets
- * the table. MEASURED (research §8.2): over this size wasm scsynth answers
- * NOTHING AT ALL to `/d_recv` — no `/fail`, no late reply, no console line. A
- * silent refusal is the worst failure shape available, because a definition
- * that was never received is indistinguishable from one that loaded and makes
- * no sound.
+ * Over this size wasm scsynth answers NOTHING AT ALL to `/d_recv` — no `/fail`,
+ * no late reply, no thrown exception, no console line, no counter moving. A
+ * silent refusal is the worst failure shape there is, because a definition that
+ * was never received is indistinguishable from one that loaded and makes no
+ * sound; both answer `/fail /s_new "SynthDef not found"`.
  *
- * ⚠️ WHY 64 KiB IS THIS NUMBER IS UNDER INVESTIGATION, and the answer may move
- * it — `research/synthdef-size-limit-2026-09.md`. The candidates have different
- * consequences: an OSC datagram limit binds the MESSAGE and so binds the
- * browser but not the board (which can `/d_load` from disk), while a format or
- * buffer limit binds both. That is exactly why it is a named constant with a
- * pointer to the open question rather than `65536` typed into three files.
+ * ⚠️ IT IS NOT A UNIVERSAL CEILING AND THE COMMENT HERE USED TO SAY IT WAS.
+ * "The ceiling both ends default to" was written before it had been measured.
+ * Measured, the BOARD has no ceiling at all: sclang routes anything over 16,383
+ * bytes to `/d_load`, which read a megabyte from disk in 44 ms — so every rung
+ * of Pappus, FULL included, already loads there and always has. This binds a
+ * BROWSER, which has no disk to load from.
  */
-export const SIZE_CEILING = 64 * 1024;
+// 🔴 65,488 — NOT 65,536, AND THE ROUND NUMBER WAS WRONG IN THE DANGEROUS
+// DIRECTION. `64 * 1024` passed a 65,536-byte definition through `fitsCeiling`
+// and into the silent refusal this constant exists to prevent: the guard said
+// yes and the engine said nothing.
+//
+// MEASURED by bisection, `research/synthdef-size-limit-2026-09.md`:
+//
+//   browser (SuperSonic)        largest definition that loads  65,520
+//   native scsynth over UDP     largest definition that loads  65,488
+//   native scsynth over TCP     none found at 1,000,000
+//   native /d_load from disk    none found at 1,000,000, 44 ms
+//
+// 🔴 AND IT BINDS THE MESSAGE, NOT THE DEFINITION — proved rather than argued:
+// adding 12 bytes of completion message moved the definition edge from 65,520
+// to 65,504, **exactly 16**, the wire cost. In both framings the largest
+// MESSAGE that loads is 65,536. So the budget is on the message and the
+// definition ceiling is whatever is left after framing.
+//
+// The number here is the NATIVE UDP figure, which is the smaller of the two, so
+// anything that fits here fits in a browser too. ⚠️ Its origin is
+// `SC_ComPort.cpp`'s `kTextBufSize = 65536` on the UDP port — and on native
+// that buffer can never actually be reached, because an IPv4 UDP payload maxes
+// at 65,507, 29 bytes below it.
+export const SIZE_CEILING = 65488;
 
 /** Does this definition fit the ceiling both ends honour? Reports the margin,
  *  because "how close" is the question anybody asks next. */
