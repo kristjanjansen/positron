@@ -19,9 +19,34 @@ Engine_Pappus : CroneEngine {
 	// during the SynthDef function, so the def that gets compiled is
 	// already the right one; nothing is switched at run time.
 	var <lite = false;
-	// 🔴 TINY — a third rung, so the graph fits a browser. wasm scsynth refuses
-	// a `/d_recv` over 64 KiB SILENTLY (measured: 52,730 B loads, 68,892 B gets
-	// no reply at all), and LITE compiles to 73,297 — 11.8% over. TINY drops the
+	// 🔴 TINY — a third rung, so the graph fits the browser engine THIS REPO
+	// SHIPS, which is SuperSonic. The old wording here was "wasm scsynth refuses
+	// a /d_recv over 64 KiB", and that sentence is FALSE about wasm scsynth: it
+	// is true about SuperSonic alone, and as written it would have outlived the
+	// engine it was about.
+	//
+	// MEASURED 2026-09-13, `research/scsynth-wasm-official-2026-09.md`, both
+	// engines driven by the same generator:
+	//
+	//   SuperSonic (what we ship)   65,520 B      silent above
+	//   the OFFICIAL wasm backend  860,000 B      13.1x more
+	//
+	// 🔴 LITE (74,733) AND FULL (121,425) BOTH LOAD IN THE OFFICIAL BUILD — FULL
+	// is 14% of its ceiling, and 68,892, the number this comment used to cite as
+	// getting no reply at all, loads there in 157 ms. So the cut is real and the
+	// REASON is not portable: it belongs to one port, not to WebAssembly, not to
+	// SuperCollider, and not to any hardware. ⚠️ And 64 KiB is not even
+	// SuperSonic's own number — it comes from IPv4's 16-bit length field via
+	// scsynth's UDP receive buffer, on a transport that has no packets at all.
+	//
+	// ⚠️ TINY STAYS. The engine we deploy is the one that binds, TINY at 64,733
+	// fits where LITE at 74,733 does not, and the official build is not
+	// vendorable — the only binary anyone can fetch is one person's laptop build,
+	// dated the day its pull request OPENED, with a JS surface that no longer
+	// matches `develop`. If that changes, this rung is the first thing to
+	// re-price.
+	//
+	// LITE compiles to 73,297 — 11.8% over SuperSonic. TINY drops the
 	// 48-filter modal bank, which is ~96 Lag.kr and 48 Ringz that SuperCollider
 	// will not strip just because nothing reads them: an unconnected UGen is
 	// still in the graph, so the construction has to be SKIPPED, not bypassed.

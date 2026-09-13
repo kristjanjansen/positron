@@ -192,6 +192,7 @@ from a matching constant and matching behaviour, not a line I can cite. 📄 Wor
 recording that the **official** SC wasm port (`server/scsynth/SC_WebAudio.cpp`,
 merged to `develop` 2026-06-06) has no cap at all: its `sendOsc` is
 `malloc(size); memcpy(…)`. The 64 KiB is SuperSonic's, not WebAssembly's.
+✅ **That reading is now a measurement — §9, and it takes 860,000 bytes.**
 
 ---
 
@@ -548,3 +549,61 @@ message and watching the definition edge drop by exactly 16. That is cheaper
 than any amount of reading, it is falsifiable in one run, and it is CLAUDE.md's
 "when two hypotheses have opposite fixes, build the measurement that separates
 them first".
+
+---
+
+## 9 · The OFFICIAL wasm backend, measured the same way (2026-09-13)
+
+§1.5 ended with a code reading: SuperCollider's own WebAssembly port has no cap,
+because `SC_WebAudio.cpp::sendOsc` is `malloc(size); memcpy(…)`. ✅ That is now a
+measurement. Full write-up in **`research/scsynth-wasm-official-2026-09.md`**;
+the part that belongs beside the numbers above:
+
+| | largest definition that loads | what it says when it will not |
+|---|---|---|
+| **official wasm** (prebuilt, see below) | **860,000** — a chain of 24,570 `SinOsc` | console `Aborted(OOM)` from a worker · `window.onerror` fires · **engine dead** |
+| SuperSonic 0.81.0 | **65,520** | nothing on any channel · engine survives |
+| native, UDP | 65,488 | `EMSGSIZE` at the sender |
+| native, TCP | none found at 1,000,000 | — |
+
+✅ **13.1 times SuperSonic**, measured with the identical generator out of
+`demo/shell/synthdef.mjs`, one fresh engine per rung, confirmed three times
+alternating either side, and re-run once with every other Chrome on the machine
+killed. Deafness control 0.000000 → 0.070902 in every engine, which is the same
+pair of numbers SuperSonic gave (0.070715).
+
+🔴 **68,892 loads there in 157 ms** — the number `Engine_Pappus.sc` cites as the
+smallest that gets no reply. ✅ So do BARE 43,551, TINY 64,733, LITE 74,733 and
+FULL 121,425. FULL sits at 14% of that engine's ceiling.
+
+**Three things that change how the number above should be read, and none of them
+are in this file's framing:**
+
+1. 🔴 **It is not a byte ceiling.** ✅ 880,000 bytes of CONSTANTS load in the same
+   engine that dies on 880,000 bytes of UGens; the constants generator got to
+   1,000,000. The limit is the module's **fixed 16 MB wasm heap**, and a UGen
+   costs far more of it than its 35 bytes in the file.
+2. 🔴 **There is a second, much lower limit of a completely different kind.** ✅ A
+   **2,886-byte** definition is refused outright when 65 of its oscillators must
+   be alive at once — `maxWireBufs`, biting at `/d_recv` and silent in exactly
+   the way §5 describes. ✅ Broken on purpose: at `maxWireBufs 128` the same
+   65-voice definition loads and the cliff moves past 128.
+3. 🔴 **The failure is louder AND worse.** ✅ `window.onerror` fires and the
+   console carries `Aborted(OOM)` — so an application can see it, which
+   SuperSonic never allows — but the engine is then **dead**, where SuperSonic
+   keeps serving. §4's table above stays true of SuperSonic and does not
+   generalise.
+
+⚠️ **Provenance, plainly: this was one person's build.**
+`supercollider.dennis-scheiba.com/scsynth.wasm`, 1,496,154 B, `Last-Modified`
+**2026-03-21** — the day PR #7428 opened, 2½ months before it merged — with
+`/Users/scheiba/github/supercollider` in its string table. ✅ Its JavaScript
+surface does **not** match `develop`'s `SC_WebAudio.cpp` today. It is evidence
+about the upstream approach, not a commit anyone can pin, and **not something to
+vendor**.
+
+🔴 **And the consequence for §6.2's open question.** That section said TINY's
+justification should be rewritten but left "the browser cannot take the bigger
+one" standing as true. ✅ It is true **of SuperSonic**, which is what this repo
+ships, and false of wasm scsynth as a class. Keep TINY; name SuperSonic in the
+comment. `research/scsynth-wasm-official-2026-09.md` §8 is the flat verdict.
