@@ -281,8 +281,36 @@ const HEAD_H = KIT.labelPx + KIT.headGap + KIT.valuePx;
 const ROW_CONTENT = Math.max(KIT.laneH + RING_OUT * 2, KIT.btnH + BTN_RING_OUT * 2, HEAD_H);
 const ROW_H = ROW_CONTENT + KIT.rowGap;
 
+// 🔴 EQUAL AIR ON ALL FOUR SIDES, MEASURED TO THE INK AND NOT TO THE BOX.
+// Reported from the headset as unequal, and `PAD` was already the same number
+// both ways — 48 design px left, right, top and bottom, and the canvas aspect
+// matches the object's, so it was equal in MILLIMETRES too. The eye was still
+// right, and this is why:
+//
+// a row's box is `ROW_CONTENT` tall, which is the tallest of the three kinds —
+// and the tallest is the BUTTON PLUS ITS FOCUS RING, not the slider's lane. So
+// the slider's lane sits centred in a box taller than itself, and the visible
+// gap from the canvas edge to the first thing you can SEE is `PAD` plus half
+// that difference. Horizontally there is no such allowance: the lane runs to
+// exactly `PAD` from the edge.
+//
+// So the padding was equal to the LAYOUT and unequal to the READER. Measured
+// both ways, the vertical gap to the ink was 48 + (ROW_CONTENT − laneH)/2
+// against 48 across — and the ring is invisible until something has the
+// pointer on it, which is most of the time.
+//
+// ⚠️ THE FIX IS TO PAD TO THE INK, NOT TO SHRINK THE RING. The ring still needs
+// its room or it is clipped by the canvas edge, which reads as a drawing fault;
+// it is now taken OUT of the outer pad instead of added to it. ⚠️ And the two
+// ends differ because the two kinds differ: the first row is a slider and the
+// last is a button, whose ring is the larger one.
+const INK_TOP = (ROW_CONTENT - KIT.laneH) / 2;        // ring air above row 0's lane
+const INK_BOT = (ROW_CONTENT - KIT.btnH) / 2;         // ring air below the last button
+const PAD_TOP = Math.max(0, PAD - INK_TOP);
+const PAD_BOT = Math.max(0, PAD - INK_BOT);
+
 /** The canvas, in DESIGN pixels, for `n` controls. */
-const pyFor = (n) => PAD + Math.max(1, n) * ROW_H - KIT.rowGap + PAD;
+const pyFor = (n) => PAD_TOP + Math.max(1, n) * ROW_H - KIT.rowGap + PAD_BOT;
 const DESIGN_W = 768;
 const DESIGN_H = pyFor(DEFAULT_CONTROLS.length);
 
@@ -412,7 +440,7 @@ const rrect = (g, x, y, w, h, r) => { rpath(g, x, y, w, h, r); g.fill(); };
  * wrong is the invisible one — a press landing on a row that is not the row
  * under the knob, with nothing on screen to say so.
  */
-const rowsTop = () => PAD;
+const rowsTop = () => PAD_TOP;
 const rowsBottom = () => DESIGN_H - PAD;
 const rowH = () => ROW_H;
 const rowTop = (i) => rowsTop() + i * ROW_H;
@@ -508,7 +536,7 @@ export const TABLET = {
   pad: PAD, fillAlpha: FILL_ALPHA, scale: SCALE,
   designW: DESIGN_W, designH: DESIGN_H, lane: LANE, btn: BTN, kit: KIT, headW: HEAD_W,
   holdMs: HOLD_MS, holdSteps: HOLD_STEPS,
-  rowH: ROW_H, rowContent: ROW_CONTENT, rowsTop: PAD,
+  rowH: ROW_H, rowContent: ROW_CONTENT, rowsTop: PAD_TOP, padTop: PAD_TOP, padBot: PAD_BOT,
   controls: DEFAULT_CONTROLS,
 };
 Object.defineProperty(TABLET, 'fingerprint', {
