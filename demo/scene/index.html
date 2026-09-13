@@ -914,6 +914,17 @@
       });
       shipNow(`hands · ${session.inputSources.length} source(s) · ${bits.join(' · ')} · space local-floor`);
     }
+    // 🔴 THE GRIP, FOR THE CONTROLLERS AND THE TABLET. This loop already asks
+    // for the target ray every frame; the grip is one more `getPose` and it is
+    // what a held thing hangs off. `plan-xr-hands` §1.
+    const grips = [];
+    for (const src of session.inputSources) {
+      if (!src.gripSpace) continue;
+      const gp = frame.getPose(src.gripSpace, xrSpace);
+      if (gp) grips.push({ m: gp.transform.matrix, handedness: src.handedness });
+    }
+    room?.setHands(grips);
+
     for (const src of session.inputSources) {
       if (!src.targetRaySpace) continue;
       const rp = frame.getPose(src.targetRaySpace, xrSpace);

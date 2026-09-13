@@ -179,6 +179,51 @@ export function beamM(m, len) {
     m[12] - m[8] * len * 0.5, m[13] - m[9] * len * 0.5, m[14] - m[10] * len * 0.5, 1]);
 }
 
+/**
+ * A small box at the grip pose — the controller stand-in.
+ *
+ * 🔴 A PRIMITIVE, NOT A MODEL, and that is a decision rather than a shortcut.
+ * `profiles` comes back as `meta-quest-touch-plus`, so the WebXR input-profiles
+ * registry would hand over a real glTF — at the price of a loader, a second
+ * renderer for its material, and a CDN fetch inside the entry path, which is
+ * the one place in this page where a slow answer has already cost three
+ * headset runs. A stand-in answers the question a model is being asked
+ * ("where is my hand, and is it tracking?") completely. `plan-xr-hands` §4.
+ */
+export function gripM(m, sx = 0.045, sy = 0.045, sz = 0.10) {
+  return new Float32Array([
+    m[0] * sx, m[1] * sx, m[2] * sx, 0,
+    m[4] * sy, m[5] * sy, m[6] * sy, 0,
+    m[8] * sz, m[9] * sz, m[10] * sz, 0,
+    m[12], m[13], m[14], 1]);
+}
+
+/**
+ * The tablet's model matrix, from a grip pose: lifted above the fist, pushed
+ * forward, tilted back towards the face, and scaled to its size in metres.
+ *
+ * ⚠️ THE TILT IS AROUND THE GRIP'S OWN RIGHT AXIS, not the world's. A slab
+ * rotated in world space swings away the moment you turn your wrist, which is
+ * the difference between something held and something floating near you.
+ */
+export function holdM(m, o = HOLD) {
+  const rx = m[0], ry = m[1], rz = m[2];          // the grip's right
+  const ux = m[4], uy = m[5], uz = m[6];          // its up
+  const fx = m[8], fy = m[9], fz = m[10];         // its forward (+Z, so -Z aims)
+  const c = Math.cos(o.tilt), sn = Math.sin(o.tilt);
+  // up and forward rotated about right; right is untouched by its own rotation
+  const nux = ux * c + fx * sn, nuy = uy * c + fy * sn, nuz = uz * c + fz * sn;
+  const nfx = fx * c - ux * sn, nfy = fy * c - uy * sn, nfz = fz * c - uz * sn;
+  const px = m[12] + ux * o.up + fx * o.fwd;
+  const py = m[13] + uy * o.up + fy * o.fwd;
+  const pz = m[14] + uz * o.up + fz * o.fwd;
+  return new Float32Array([
+    rx * o.w, ry * o.w, rz * o.w, 0,
+    nux * o.h, nuy * o.h, nuz * o.h, 0,
+    nfx, nfy, nfz, 0,
+    px, py, pz, 1]);
+}
+
 /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
 export const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
 
@@ -235,7 +280,7 @@ export const BOX_FS = `#version 300 es
 // the walls run, and in passthrough it is the only thing this page draws that
 // is ABOUT your room rather than in front of it — so it is dots rather than
 // lines (lines read as a cage), it fades out with distance rather than ending
-// in a hard rectangle, and every fourth dot is a metre marker so the spacing
+// in a hard rectangle, and the dots are one size — see the note in main()
 // can be read rather than guessed.
 //
 // ⚠️ THE WIDTH COMES FROM `fwidth` ON THE RAW COORDINATE, not on the folded
@@ -268,8 +313,12 @@ const GRID_FS = `#version 300 es
   void main(){
     vec2 fw = fwidth(vM);
     float w = max(max(fw.x, fw.y), 1e-5);
-    float a = max(dotsAt(vM, uCell, uDot, w) * 0.55,
-                  dotsAt(vM, uCell * 4.0, uDot * 2.2, w));
+    // ⚠️ ONE DOT SIZE. Every fourth dot used to be 2.2x as a metre marker, and
+    // it went because it was asked for: through a headset the two sizes read as
+    // two grids rather than as one grid with a scale on it, and the thing the
+    // grid is for is the surface, not the measurement. The cell is still
+    // 0.25 m, so a metre is still four dots for anyone counting.
+    float a = dotsAt(vM, uCell, uDot, w);
     a *= 1.0 - smoothstep(uFade.x, uFade.y, distance(vW, uEye));
     a *= clamp(uDot * 2.0 / w, 0.0, 1.0);
     a *= uAlpha;
@@ -277,11 +326,66 @@ const GRID_FS = `#version 300 es
     o = vec4(uCol, a); }`;
 
 /** The page's own room, in metres, when your real one cannot be had. */
+/**
+ * The held tablet — a dark, slightly see-through slab with rounded corners.
+ *
+ * 🔴 A SIGNED-DISTANCE ROUNDED RECTANGLE, NOT A TEXTURE AND NOT GEOMETRY. The
+ * corner radius is computed per pixel from the quad's own coordinate, so it is
+ * exact at any size and at any distance from the eye — a rounded PNG would be
+ * soft the moment you brought it close, and rounded geometry would need
+ * tessellation to look like anything. It is the same trick the grid uses one
+ * shader up, for the same reason.
+ *
+ * ⚠️ It is DARK and it is TRANSPARENT, which on a headset are the same
+ * decision: a bright opaque panel held at arm's length is a lamp in your
+ * vision, and in passthrough it blots out the room it is supposed to be part
+ * of. `uAlpha` stays under 0.8 and the fill stays under 0.2 luminance.
+ */
+const HOLD_VS = `#version 300 es
+  in vec3 aPos;
+  uniform mat4 uProj, uView, uModel;
+  out vec2 vP;
+  void main(){ vP = aPos.xy; gl_Position = uProj * uView * uModel * vec4(aPos, 1.0); }`;
+const HOLD_FS = `#version 300 es
+  precision highp float;
+  in vec2 vP;
+  uniform vec3 uCol; uniform float uAlpha; uniform float uAspect; uniform float uRadius;
+  out vec4 o;
+  float roundRect(vec2 p, vec2 half_, float r){
+    vec2 q = abs(p) - half_ + r;
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
+  void main(){
+    // into a space where one unit is one unit, so the radius is not stretched
+    vec2 p = vec2(vP.x * uAspect, vP.y);
+    float d = roundRect(p, vec2(0.5 * uAspect, 0.5), uRadius);
+    // one pixel of feather, from the derivative — no magic number, and it is
+    // right at every distance
+    float w = fwidth(d);
+    float a = 1.0 - smoothstep(-w, w, d);
+    if (a <= 0.002) discard;
+    // a hairline edge, so it reads as an object rather than as a smudge
+    float edge = 1.0 - smoothstep(0.0, 0.004 + w, abs(d + 0.002));
+    vec3 c = mix(uCol, vec3(0.62, 0.68, 0.78), edge * 0.55);
+    o = vec4(c, a * uAlpha); }`;
+
+/** The slab, in metres, and where it sits relative to the hand holding it. */
+const HOLD = {
+  w: 0.17, h: 0.115,       // about a small phone
+  radius: 0.055,           // in the shader's own units, not metres
+  col: [0.10, 0.11, 0.13],
+  alpha: 0.72,
+  // ⚠️ ABOVE AND IN FRONT OF THE GRIP, AND TILTED BACK. The grip pose is
+  // roughly where your fist is; a slab drawn AT it is inside your hand. These
+  // three numbers are the difference between holding something and wearing it,
+  // and they are the ones to change first if it reads wrong in a headset.
+  up: 0.055, fwd: -0.045, tilt: -0.55,
+};
+
 export const GRID = {
   span: 10,        // the floor square's side, and the walls' width
   wallH: 3,        // how far up the walls go from the floor
   cell: 0.25,      // dot spacing
-  dot: 0.011,      // dot radius; every fourth one is 2.2x this
+  dot: 0.011,      // dot radius — ONE size, see below
   fadeNear: 4.5,   // metres from the eye where the dots start to go
   fadeFar: 11,
 };
@@ -351,7 +455,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     p.__u = {};
     for (const n of ['uProj', 'uView', 'uModel', 'uT', 'uHue', 'uCol',
-                     'uSize', 'uOrigin', 'uCell', 'uDot', 'uEye', 'uFade', 'uAlpha']) {
+                     'uSize', 'uOrigin', 'uCell', 'uDot', 'uEye', 'uFade', 'uAlpha',
+                     'uAspect', 'uRadius']) {
       const loc = gl.getUniformLocation(p, n);
       if (loc) p.__u[n.slice(1).toLowerCase()] = loc;
     }
@@ -392,7 +497,13 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     return { vao, count: P.length / 3 };
   }
 
-  let cur = null, incoming = null, fadeFrom = 0, gridProg = null;
+  let cur = null, incoming = null, fadeFrom = 0, gridProg = null, holdProg = null;
+  // ⚠️ WHICHEVER HAND IS FREE. MEASURED on a Quest 3: two sources appeared and
+  // the LEFT grip did not resolve while the right did, in the same frame. So
+  // preferring left with a fallback to anything is not a style choice — it is
+  // the difference between a tablet and nothing at all.
+  const HOLD_HAND = 'left';
+  let hands = [];
   let cube = null, quad = null, ok = false;
 
   /** Hand the room a context. Idempotent, and it says whether it took. */
@@ -408,6 +519,11 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // ⚠️ THE GRID IS ALLOWED TO FAIL ON ITS OWN. It is the newest thing here
     // and the only one that needs `fwidth`; a driver that will not compile it
     // must cost the dots, never the room.
+    try { holdProg = link(HOLD_VS, HOLD_FS, ['aPos']); }
+    // ⚠️ `log`, NOT `onLog`. There is no `onLog` in this scope, so a failed
+    // compile would have thrown a ReferenceError out of `attach` — a handler
+    // for a failure that fails.
+    catch (e) { holdProg = null; log(`the held panel would not compile — ${e.message}`, 'warn'); }
     try { gridProg = link(GRID_VS, GRID_FS, ['aPos']); }
     catch (e) { log(`the floor grid would not compile — ${e.message}`, 'warn'); }
     return true;
@@ -728,6 +844,38 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     }
   }
 
+  /**
+   * The slab, on whichever hand is holding it.
+   *
+   * ⚠️ NOT INSIDE THE OPAQUE PASS. It is transparent, so it is drawn after the
+   * room or it blends against whatever happened to be in the depth buffer.
+   * Depth TEST stays on — a tablet behind a cube should be behind it — but
+   * depth WRITE goes off, or it punches a hole the second eye cannot fill.
+   */
+  function drawHeld(proj, view) {
+    if (!holdProg || !hands.length) return;
+    const on = hands.find((h) => h && h.m && h.handedness === HOLD_HAND)
+      || hands.find((h) => h && h.m);
+    if (!on) return;
+    const U = holdProg.__u;
+    gl.useProgram(holdProg);
+    gl.uniformMatrix4fv(U.proj, false, proj);
+    gl.uniformMatrix4fv(U.view, false, view);
+    gl.uniformMatrix4fv(U.model, false, holdM(on.m));
+    gl.uniform3fv(U.col, HOLD.col);
+    gl.uniform1f(U.alpha, HOLD.alpha);
+    if (U.aspect) gl.uniform1f(U.aspect, HOLD.w / HOLD.h);
+    if (U.radius) gl.uniform1f(U.radius, HOLD.radius);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
+    gl.bindVertexArray(quad.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, quad.count);
+    gl.bindVertexArray(null);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+  }
+
   function drawInner({ proj, view, tSec = 0, doc = null, clear = true, ar = false,
                        aimed = null, held = null, ray = null, aimedDist = 0,
                        eye = null, grid = true, touch = null } = {}) {
@@ -835,10 +983,24 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     }
+
+    // 🔴 ONE BOX PER HAND THAT ACTUALLY RESOLVED, and "resolved" is the point.
+    // MEASURED on a Quest 3: two sources appeared and the LEFT grip did not
+    // resolve while the right did, in the same frame. A page that draws a
+    // controller wherever it last saw one would leave a box sitting in the air;
+    // a page that draws only what the runtime answered for shows you exactly
+    // what it knows, which is also the debugging instrument.
+    for (const h of hands) {
+      if (!h || !h.m) continue;
+      gl.uniformMatrix4fv(L.model, false, gripM(h.m));
+      gl.uniform3fv(L.col, h.handedness === 'left' ? [0.34, 0.37, 0.44] : [0.30, 0.33, 0.39]);
+      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+    }
     gl.bindVertexArray(null);
 
-    // Last, because it is transparent and has to blend over what is behind it.
+    // Last, because these are transparent and have to blend over what is behind.
     if (grid) drawGrid(proj, view, ar, eye);
+    drawHeld(proj, view);
   }
 
   /**
@@ -880,7 +1042,17 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     return true;
   }
 
-  const room = { attach, draw, applyLook, retire, observePlanes, markAsked, planes, grid: GRID };
+  /**
+   * What is in the hands this frame: `[{ m, handedness }]`, where `m` is a GRIP
+   * pose matrix in room coordinates.
+   *
+   * ⚠️ GRIP, NOT TARGET RAY. The ray is where you are POINTING and the grip is
+   * where your HAND is; a controller drawn at the ray floats in front of you,
+   * and a tablet drawn there is unreachable. `plan-xr-hands` §1.
+   */
+  function setHands(list) { hands = Array.isArray(list) ? list : []; }
+
+  const room = { attach, draw, applyLook, retire, observePlanes, markAsked, setHands, planes, grid: GRID, HOLD };
   // ⚠️ GETTERS, NOT COPIES. `look` is what a page compares before and after a
   // refused shader, and a field written once would answer about whichever
   // instant it was written in.
