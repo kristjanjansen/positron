@@ -22,6 +22,17 @@
 //           off these, so there is no second `needs:` list to forget
 //   why   — for a row with no target: why it is not clickable
 //
+//   room  — 'fixed' means DO NOT give this demo a private room per harness
+//           run. Every other page's room name is a rendezvous it invented, and
+//           a fixed one is a shared mutable global in the WebSocket layer —
+//           two runs of the suite land in the same room and watch each other's
+//           traffic. These four are different: `studio-1` is the ADDRESS OF
+//           THE RASPBERRY PI, `m1-1` is the studio Mac's agent, and `wire`'s
+//           whole subject is the history its room already holds. Renaming
+//           those does not isolate a run, it points it at nothing.
+//           ⚠️ It does not make them safe to run in parallel either — there is
+//           one Pi with one JACK graph. A room was never that constraint.
+//
 //   created — the day the page first landed, and it is WRITTEN DOWN rather
 //           than derived. A creation date is immutable, so a literal here can
 //           never go stale — while `git log` would answer differently the
@@ -89,7 +100,7 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000,
+  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
@@ -110,7 +121,7 @@ export const DEMOS = [
     one: 'a room built from one number — roll it, and the same number rebuilds it exactly',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
-  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000,
+  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -128,6 +139,22 @@ export const DEMOS = [
   { name: 'take', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
+  // The 2025 experiment finished: an automation lane bound to a media clip,
+  // which died at one missing mapping — an absolute stamp had to reach a
+  // foreign media element's own position and then a pixel, and nothing
+  // converted. The clip is generated IN THE PAGE so the clock burned into the
+  // picture can be read back and compared with the playhead, which is the check
+  // the prototype could not make: it proved its four mappings against its own
+  // arithmetic.
+  //
+  // settleMs does the same two jobs it does on `take`. Control 0 does not exist
+  // here, so only the second one counts: it sizes the wait for the FIRST
+  // assert, and every assert sits behind a recorded clip, a drawn pass and a
+  // five-point seek sweep. Shrink it and the suite reads zero asserts and calls
+  // a working page broken.
+  { name: 'memento', act: 3, created: '2026-09-13', built: true, settleMs: 13000,
+    one: 'move a knob while a clip plays; it lands on the same line and comes back in the right place',
+    tags: ['MediaRecorder', 'timeline', 'canvas', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
@@ -214,7 +241,7 @@ export const DEMOS = [
   // renders while that audio carries on to the speakers — so BlackHole, the
   // Multi-Output Device and Live's own output setting are all out of the path.
   // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
-  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000,
+  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
 
@@ -252,7 +279,7 @@ export const DEMOS = [
   // the same thing is running on a Raspberry Pi in another building. Side by
   // side with a crossfade, the difference between the two panes IS the subject,
   // and the page now checks a granulator even when the board is down.
-  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
+  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000, room: 'fixed',
     one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
     tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
 
