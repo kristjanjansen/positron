@@ -207,3 +207,131 @@ run at all); whether two WebGL2 contexts are affordable; and passthrough, which
 was not attempted — `blend opaque`, and `session.frameRate` is still **not
 reported**, consistent with the earlier Quest findings.
 
+
+---
+
+## 10 · MEASURED 2026-09-13 — the sky goes, the picture is rendered in the headset, and the panels move
+
+`mirror` now enters **both** kinds of session (`Run in VR`, `Run in XR`), hangs
+**two** panels rather than one, draws the LEFT one with the headset's own
+graphics context instead of copying a canvas in, and lights the floor with the
+picture's average colour. `scene` is untouched: every one of these is a per-page
+option on `demo/shell/xr-panel.mjs`, and the full GL suite reads **77/77** with
+`scene` at the same 37 asserts it had before.
+
+### What is in the room now
+
+**No sky, no objects, a floor.** `room: { sky: false, things: false, bg: [...] }`.
+⚠️ **The walls were carrying the light.** `SKY_FS`'s brightness was raised from
+0.16 to 0.34 once because "the room reads as black" through a headset; with the
+cube gone that is now literally what is behind the floor. What is left to carry
+the place is the floor's 22 m of dots (fading from 4.5 m to 11 m), the two
+panels, the controllers, and the glow. **It is a dark room on purpose and the
+background is a chosen constant** rather than one inherited from a page that
+still has walls.
+
+🔴 **VR-with-no-sky and passthrough converge in the code and not in the eye.**
+One `draw()` serves both — the only differences left are the clear (transparent
+against `bg`) and the fact that **planes arrive in an AR session and not in a VR
+one**. That is why offering the second mode cost one word in `requestSession`
+and four asserts.
+
+### The fake light, and what it is not
+
+The floor's dots take the colour of the left panel's picture and a faint pool is
+washed between them, falling off as a gaussian round the panels' mean position.
+The colour is the **measured average** of that canvas, sampled at 5 Hz into an
+8x8 canvas. **It is not a light**: nothing is integrated over the panel's area,
+nothing falls off as 1/r², nothing is shadowed, nothing bounces, and nothing
+else in the room is lit by it. The list is in the comment above `GRID_FS`.
+
+⚠️ **The first version was invisible and the comment describing it was wrong.**
+MEASURED off a rendered frame: with the pool squared and a radius of 2.4 m, the
+brightest point came out at **~7 of 255** — a panel hangs 1.6 m above the floor,
+so even directly underneath most of the falloff is already spent. Linear in `g`,
+radius 3.0 m and an amplitude that tracks the picture's luminance puts it at
+**34 of 255 against a 12 of 255 floor**. ⚠️ It also stopped the `discard` in
+`GRID_FS` culling most floor fragments within ~4 m of the panels; that is one
+cheap blended fragment per pixel there and the frame rate is the check.
+
+### The picture, rendered in the headset — §5.1 answered a second way
+
+🔴 **A page's own WebGL canvas is a DIFFERENT CONTEXT from the session's.** Its
+programs and textures do not exist there, so "the shader is already compiled in
+the session" is false and a canvas can only ever arrive as a bitmap copied every
+frame. `mirror`'s shader machinery now takes its context as an argument and
+there are two instances of it — one on the flat canvas, one inside the session.
+
+MEASURED on this laptop (ANGLE Metal, M2 Pro), 960x534 = 0.51 Mpix a frame:
+
+```
+0.48 – 0.67 ms on the card    →  760 – 1070 Mpix/s
+```
+
+consistent with the ~50 Mpix/s this same shader holds on the Pi's GPU (§3.4 of
+`plan-visuals`) and with it being ALU-bound rather than fill-bound.
+
+🔴 **AND THE LAPTOP CANNOT SAY WHERE THAT TIME GOES.** A quarter-size probe runs
+beside the full pass so the two can be compared; four runs with no code between
+them answered **0.24x, 0.72x, 0.73x, 0.82x**. A verdict quoted from any one of
+those would have been confident and wrong, so `verdictOnCost()` now refuses to
+attribute the cost when the card's own samples disagree with themselves by more
+than 2.5x, and prints the dispersion instead. The Quest run collects far more
+samples over a longer window and may well produce a verdict; **that is the
+reading that counts**, and this laptop's is only proof the instrument works.
+
+⚠️ **The A/B is a whole path against a whole path, not one extra pass.** Live ON
+removes a 2-D compose and a 1280x800 `texImage2D` and adds a 960x534 render;
+live OFF is the other way round. The thumbstick click swaps them inside the
+session and both arms are beaconed with the second's frame rate beside them.
+
+**Resolution is derived, not chosen**: the panel is 1.28 m at 1.6 m = 43.6°, a
+Quest eye is 1680 px over ~95°, so the panel covers ~770 of them and 960 is a
+margin over that. Height follows the picture area's own aspect.
+
+### Picking a panel up
+
+A **grab bar** hangs under each panel — the Quest lobby's affordance, and it
+keeps the picture free for the right-hand ray that already drives the tablet.
+Grabbed at the ray's hit rather than at the centre; **faces you continuously
+while held and holds that facing when you let go**; yaw only, upright, aimed at
+the head. Bounded to 0.55–6.0 m out and 0.45–3.0 m up, so it cannot be put
+anywhere you could not walk to it. The thumbstick pushes it away and pulls it
+back while held.
+
+⚠️ **This drag has never run in a headset.** The exit scan used to end the
+session on button 0, which is the same press that arms the grab — so it could
+not have worked before today. The arithmetic is pure and exported (`grabOffset`,
+`heldAt`, `facing`, `barOf`) and the page grades it on a laptop against the same
+functions the session calls; **all three checks were broken on purpose and all
+three went red.** What a laptop still cannot say is whether it FEELS right.
+
+### The thing that changed most: a laptop can now see the headset's picture
+
+🔴 `createXRPanels(...).preview()` drives the **same per-eye draw** with a
+hand-made projection into an off-screen canvas, reads the error flag and the
+pixels back, and can hand out a PNG. `Page.captureScreenshot` cannot see an
+immersive view, so before this the only reviewer of anything 3-D here was
+somebody wearing a headset.
+
+It paid for itself on its first run, twice: a **framebuffer feedback loop**
+(a live renderer leaves its own FBO bound and the texture it returns is that
+FBO's attachment — `GL_INVALID_OPERATION` and an empty frame) and a **backtick
+inside a shader template literal** that killed the whole module. Both would have
+been headset runs.
+
+⚠️ **It says nothing about frame rate.** No compositor, no reprojection, no
+3360x1760 framebuffer — the same refusal `verify-gl.mjs` makes about
+SwiftShader.
+
+### Still open after this
+
+- 🔴 **`gl error 1282` on the first Quest frame is NOT explained.** The preview
+  reads `clean` on this machine, so whatever the Quest is reporting is not
+  reproduced here. Do not claim it fixed.
+- **Whether the panels are LEGIBLE**, which only a face answers.
+- **Whether the room reads as a place with no sky in it** — the floor, the glow
+  and two panels are all it has, and that is a judgement, not a measurement.
+- **Whether the drag feels right**, and whether the bar is where a hand expects.
+- HRTF cost per source (§5.2), Quest audio output latency (§5.3), the doff
+  watchdog (§5.5) — untouched.
