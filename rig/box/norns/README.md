@@ -81,4 +81,31 @@ a number on the `rung` poll.
 Its own constraint, worth knowing before adding to it: one `SynthDef` sitting
 close to **scsynth's fixed pool of 64 audio interconnect buffers**.
 
+🔴 **AND THAT IS NOT A THEORETICAL LIMIT — THE FIRST SYNTH ADDED BESIDE PAPPUS
+HIT IT.** `PosSource.sc` (the material `grains` sends, plan-twins §4a) was first
+written as one `SinOsc` per partial: six voices of twenty-four is **1,151 UGens
+and 46,815 bytes**, and scsynth refused to load it at `numWireBufs` 64 *and* at
+128 —
+
+    exception in GraphDef_Load: exceeded number of interconnect buffers.
+    *** ERROR: SynthDef posSource not found
+
+— after which every `/s_new` for it failed and the only symptom a page could see
+was silence. `Mix.fill` holds every partial live at once, so the wires scale with
+the table. Rewritten as a WAVETABLE (one `Osc.ar` per voice, whatever the table
+holds) it is **4,508 bytes and 104 UGens** for the same sound. `run-pappus.scd`
+also asks for 128 wire buffers now, as headroom rather than as the repair.
+
+⚠️ **A NODE ID IS NOT EVIDENCE THAT A SYNTH EXISTS.** `Synth.new` allocates one
+on the CLIENT and returns before the server has read the message, so it answered
+`node 1002` about the def that had just failed to load. Ask the server: `/s_get`
+replies only for a node that is really there, with the value it really holds.
+`/pos/confirm` in `run-pappus.scd` is that question.
+
+`PosSource.sc` is a CLASS, so it lives in the Extensions directory like the
+engine and `CroneEngine.sc` — `push.sh` installs all three. A class that is not
+there does not fail loudly: sclang's compile stops at the first unknown name,
+`PAPPUS READY` never prints, and `fx.pappus` reports *"the engine came up but
+never reported READY"*.
+
 Licence: Pappus declares none. R&D only.

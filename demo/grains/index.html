@@ -195,6 +195,22 @@
   let probe = null;                    // { quiet, held } — peak with nothing pressed, then with a key down
   let frames = 0, gaps = 0, gapWarned = false, lastSeq = -1, firstFrame = 0, level = 0, levelAt = 0;
   let boardGrains = 0;                 // how many the board has reported to this page
+  /**
+   * Every batch the board has sent, with the time it landed — so a RATE can be
+   * taken over a window this page actually watched.
+   *
+   * ⚠️ A RUNNING TOTAL OVER A START TIME IS THE WRONG COLLECTOR HERE, and it
+   * read 0.6 a second about a board firing 2.2. `grain.report` EXPIRES after
+   * 30 s and this page only re-asks once the granulator is on, so on a cold
+   * board — forty seconds of compiling — the counting window opens long before
+   * the reports are continuous, and the dead time goes into the denominator.
+   * A sliding window over the arrivals cannot have that bug.
+   */
+  const grainLog = [];                 // {t, seen}
+  // What the BOARD says it is chewing — the engine's own answer, not this
+  // page's request. plan-twins §4a: the two panes are only comparable if the
+  // material is the same, and this is the end that can be asked.
+  let made = null;                     // { partials, topHz, engine } | { reason }
   let collect = null;                  // set while a measurement is open
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -404,6 +420,43 @@
    * ⚠️ The two halves are deliberately unlike each other. Giving both the same
    * numbers is what made the old roll sound like one thing played twice.
    */
+  /**
+   * 🔴 GRAINS ONLY, AND IT IS A NUMBER OUT OF THE ENGINE'S SOURCE. `sos` is not
+   * a flavour control — at the value the patches below used to carry it, this
+   * board was not granulating at all.
+   *
+   *     Engine_Pappus.sc:945
+   *       sxf  = (msos.max(mlock) / 0.6).clip(0, 1)
+   *       gsum = gsum * sin(sxf * pi/2)  +  [capl, capr] * cos(sxf * pi/2)
+   *
+   * `capl`/`capr` is the LIVE INPUT. So `sos 0` is `cos(0) = 1` on the input and
+   * `sin(0) = 0` on the grains: the granulator's output is its own input,
+   * verbatim, and `sos 0.6` is the first value that is all grains. MEASURED over
+   * the relay on a held note, sweeping `mrate` 0.5 against 24 at each `sos`:
+   *
+   *     sos 0     0.030519 against 0.030519   — the same to six digits
+   *     sos 0.3   0.021687 against 0.028364
+   *     sos 0.6   0.004981 against 0.041123   — 8.3x
+   *     sos 1     0.007658 against 0.043263
+   *
+   * and the gaps appear with it: the fifth-percentile envelope against the
+   * median reads 0.981 at `sos 0` (a continuous drone) and 0.000 at `sos 0.6`
+   * with a slow rate (real silence between grains).
+   *
+   * ⚠️ THIS IS THE 2026-09-12 PUZZLE, CLOSED. "No granulator parameter on this
+   * board could be shown to change the returned audio — mrate 0.5 against 24,
+   * pwet 0 against 1, melen 1 against 8, all identical", and "the envelope NEVER
+   * dropped below a quarter of its own median at any setting". Every one of
+   * those sweeps was taken at `sos 0`, which is the engine passing its input
+   * through. Nothing was broken.
+   *
+   * ⚠️ AND 0.6 RATHER THAN 1, because `sos` also sets how much of the old buffer
+   * is kept: the blend reaches grains-only at 0.6 while the RECORD keeps going
+   * to 1.0, so 1 is a frozen buffer. The engine's own comment says so. Two
+   * patches here were at 0.10 and 0.15 — a quarter grains, three quarters live
+   * instrument — on a page whose other pane is grains and nothing else.
+   */
+  const SOS = 0.6;
   const PATCHES = [
     { name: 'slow drift', voice: 'pad', notes: [43, 50, 55, 62],
       m: { rate: 2.2, size: 0.30, scan: 0.35, spray: 0.12, swarm: 0.35, tilt: -0.2, delay: 0.35, sos: 0.45, strum: 0.05 },
@@ -463,8 +516,35 @@
     // played by the OUTGOING instrument — which reads as the patch not working.
     await wait(140);
     for (const n of p.notes) { send({ type: 'note.on', note: n, vel: 80, channel: 0 }); holding.push(n); }
-    for (const [k, v] of Object.entries(p.m)) send({ type: 'params.set', cmd: `m${k}`, args: [v] });
-    for (const [k, v] of Object.entries(p.n)) send({ type: 'params.set', cmd: `n${k}`, args: [v] });
+    for (const [k, v] of Object.entries(p.m)) send({ type: 'params.set', cmd: `m${k}`, args: [k === 'sos' ? Math.max(SOS, v) : v] });
+    for (const [k, v] of Object.entries(p.n)) send({ type: 'params.set', cmd: `n${k}`, args: [k === 'sos' ? Math.max(SOS, v) : v] });
+    // 🔴 SET, NEVER INHERITED — plan-twins §5. `mscanmode` decides what `mscan`
+    // MEANS, and the engine's default is 1 STRETCH, where it is a playhead speed
+    // mapped -1..+2 rather than a position. This page's slider says "how far into
+    // the held sound they read from", its own engine reads an absolute place, and
+    // the board's grain reports carry an absolute place — so 2 POSITION is the
+    // only mode under which those three are the same claim.
+    // ⚠️ ONE-BASED, and an out-of-range value is silence rather than an error
+    // (LESSONS #62). 1 STRETCH · 2 POSITION · 3 DELAY SYNC · 4 DELAY FREE.
+    for (const h of ['m', 'n']) send({ type: 'params.set', cmd: `${h}scanmode`, args: [2] });
+    // 🔴 AND SO IS THE CAPTURE, AND NOT SETTING IT LEFT THE BOARD BROKEN FOR THE
+    // NEXT VISITOR. `src` is 1 OFF · 2 STEREO · 3 MONO L · 4 MONO R, and OFF does
+    // not merely pause the write — it ERASES, because retain zero and record zero
+    // writes `0·new + 0·old` over the window in real time (LESSONS #46). "Hold
+    // what it has" sets `src 1` and `lock 1`, this page never set either of them
+    // anywhere else, and the board is an OBJECT: it keeps whatever the last
+    // person left. So a visitor who pressed Hold and closed the tab handed the
+    // next one a granulator with an empty buffer and no way to fill it.
+    //
+    // MEASURED, and it is what caught this: the same check read 0.0432 against
+    // 0.0000 on one run of the suite and 0.0000 against 0.0000 on the next three,
+    // with no code between them — because the suite presses every control, so
+    // every run left `msrc 1` behind for the run after it. A page that depends on
+    // state it never sets is a page that works exactly once.
+    for (const h of ['m', 'n']) {
+      send({ type: 'params.set', cmd: `${h}src`, args: [held ? 1 : 2] });
+      send({ type: 'params.set', cmd: `${h}lock`, args: [held ? 1 : 0] });
+    }
     // ⚠️ ASKED FOR, NOT ASSUMED. Setting a parameter gives the board's slow
     // movement a centre; it does not switch the movement on, because
     // `params.set` is also the surface a harness sweeps one parameter through
@@ -479,8 +559,10 @@
     // that, and stops the moment the page goes away.
     send({ type: 'grain.report', on: true });
     // A patch is the new truth about both halves, so the panel's source of
-    // truth is reset with it.
-    live = { m: { ...p.m }, n: { ...p.n } };
+    // truth is reset with it. ⚠️ WITH THE SAME CLAMP THE WIRE GOT — a `live`
+    // holding the table's `sos` while the board holds `SOS` is a readout
+    // describing a setting nobody sent.
+    live = { m: { ...p.m, sos: Math.max(SOS, p.m.sos) }, n: { ...p.n, sos: Math.max(SOS, p.n.sos) } };
     // ⚠️ NOTHING DRAWN FROM THE PATCH. The scope used to take an `expect()` of
     // what the settings imply; it does not any more, and the reason is this
     // page. Drawing the requested grain rate here would put a confident row of
@@ -599,14 +681,26 @@
   let lwrite = 0, lfilled = 1;
 
   /**
-   * The lit band, computed the way the WORKLET computes it. The chord is always
-   * arriving, so the read point is a distance BEHIND the write head rather than
-   * an absolute place in a fixed recording — draw it any other way and the
-   * picture is a different claim from the sound.
+   * The lit band, computed the way the WORKLET computes it.
+   *
+   * 🔴 AN ABSOLUTE PLACE IN THE RECORDING, NOT A DISTANCE BEHIND THE WRITE HEAD
+   * — CHANGED 2026-09-13, and the reason is the other pane. `where` used to mean
+   * two different things: this worklet ran with `follow: 1`, a fixed distance
+   * behind the write head, while the same number went to the board as `mscan`
+   * with `mscanmode` never set at all. Pappus's default mode is 1 STRETCH, where
+   * `mscan` is not a position but a PLAYHEAD SPEED mapped -1..+2 — so 0.333 is
+   * freeze and 1.0 is double speed forwards. One slider, one number, three
+   * meanings.
+   *
+   * POSITION is the one that makes every surface agree: it is what the slider's
+   * own label says ("how far into the held sound they read from"), it is what
+   * the board's grain reports carry (`pos`, a fraction of the whole buffer), and
+   * it is the only one that still means anything once Hold freezes the buffer
+   * and there is no write head to sit behind.
    */
   function showRange() {
     const span = Math.max(0.02, lfilled);
-    const centre = ((lwrite - (1 - K.where) * span) % 1 + 1) % 1;
+    const centre = ((K.where % 1) + 1) % 1;
     const half = K.spray * span;
     scope.range(((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre);
   }
@@ -646,7 +740,9 @@
   function applyLocal() {
     lnode?.port.postMessage({
       cmd: 'set', rate: K.rate, sizeMs: K.size * 1000, scan: K.where, spray: K.spray,
-      pitch: 1, pan: 0.8, level: 0.7, follow: 1,
+      // `follow: 0` — `where` is a place in the recording at BOTH ends. See
+      // showRange(); the board is told `mscanmode 2` for the same reason.
+      pitch: 1, pan: 0.8, level: 0.7, follow: 0,
     });
     showRange();
   }
@@ -812,6 +908,16 @@
       box.append(s);
     }
     panel.append(box);
+    // 🔴 WHAT BOTH OF THEM ARE CHEWING, which is the claim the side-by-side
+    // rests on and was false until 2026-09-13: the page granulated a table of
+    // sines and the board granulated whichever instrument happened to be
+    // running. One description now, expanded by one function at both ends.
+    panel.append(el('p', 'drift', made?.partials
+      ? `both are chewing the same ${SPEC.shape} — ${made.partials} sine partials over ${SPEC.chord.length} notes,`
+        + ' made separately at each end from one description'
+      : made?.reason
+        ? `the board would not make the material: ${made.reason}`
+        : 'the board has not said what it is chewing yet'));
     // What the board has done to the sound with nobody asking — or, when it is
     // doing nothing, that and the reason. ⚠️ This printed `moving on its own ·
     // 0 nudges … reading at —` about a board that was moving nothing at all: a
@@ -908,13 +1014,23 @@
     if (frames % 25 === 0) render();
   }
 
-  /** Loudest thing that arrives in a window. Resolves a number, always. */
+  /**
+   * Loudest thing that arrives in a window, and HOW MANY FRAMES ARRIVED.
+   *
+   * 🔴 THE FRAME COUNT IS NOT DECORATION. A peak of 0 means "silence" and it
+   * also means "nothing reached this page", and those are opposite findings: one
+   * is a board making no sound and the other is a relay, a socket or a second
+   * browser of mine getting in the way. Measured the hard way — a run of this
+   * page read `0.0000 with it up, 0.0000 with it down` with a stray headless
+   * Chrome of mine still holding the room, which is CLAUDE.md's own warning
+   * arriving as a red assert about the board.
+   */
   async function listen(ms) {
-    let p = 0;
-    collect = (v) => { if (v > p) p = v; };
+    let p = 0, n = 0;
+    collect = (v) => { n++; if (v > p) p = v; };
     await wait(ms);
     collect = null;
-    return p;
+    return { peak: p, frames: n };
   }
 
   // ── the socket ───────────────────────────────────────────────────────────
@@ -1091,7 +1207,10 @@
     // comes with the list so a short list reads as few grains rather than as a
     // dropped message.
     if (m.type === 'grain.marks' && Array.isArray(m.marks)) {
-      boardGrains += m.seen || m.marks.length;
+      const seen = m.seen || m.marks.length;
+      boardGrains += seen;
+      grainLog.push({ t: performance.now(), seen });
+      while (grainLog.length > 2 && grainLog[0].t < performance.now() - 12000) grainLog.shift();
       for (const g of m.marks) boardScope.mark({ pos: g.pos, half: g.half, level: 1 });
       // the read band, from the board's own report of where it is reading
       if (Number.isFinite(drift?.scan)) {
@@ -1101,6 +1220,20 @@
       }
     }
     if (m.type === 'params.drifted') drift = m;
+    // 🔴 THE BOARD'S ANSWER ABOUT THE MATERIAL, WHICH IS THE WHOLE OF §4a. The
+    // page and the board expand the same spec with the same `partialsOf`, and
+    // the board builds it with `PosSource.sc` on its own scsynth — so the two
+    // granulators finally chew the same thing. `engine` is what scsynth ANSWERED
+    // when asked for a control value, not what the box sent: a node id proves
+    // nothing, because sclang allocates one before the server has read the
+    // message and it answered `node 1002` about a def that had failed to load.
+    if (m.type === 'source.applied') {
+      made = m.ok ? { partials: m.partials, topHz: m.topHz, engine: m.engine } : { reason: m.reason };
+      d.log(m.ok
+        ? `the board is chewing the same material — ${m.partials} sine partials, top ${m.topHz} Hz`
+          + `, and its own engine says ${m.engine?.voices} notes at ${Math.round(m.engine?.hz)} Hz`
+        : `the board would not build the material: ${m.reason}`, m.ok ? 'hi' : 'bad');
+    }
     // The board picks the item; this page only says which. The search cannot be
     // called from a browser at all — its JSON content type forces a preflight
     // that the archive answers 204 with no permission header — so the board is
@@ -1123,6 +1256,12 @@
     // Re-ask for the grains well inside the box's 30 s expiry, so the picture
     // survives as long as the page is open and stops on its own when it is not.
     if (fxOn && wire.state() === 1) send({ type: 'grain.report', on: true });
+    // The board is an object, not a session: it can be restarted with this page
+    // open, and it comes back with the instrument in the granulator's input and
+    // no generated material at all. `made === null` is "it has never answered",
+    // which is the only state worth re-asking from — a refusal has a reason and
+    // asking again every four seconds would just repeat it.
+    if (fxOn && made === null && wire.state() === 1) send(sourceMessage(SPEC));
     if (answered && Date.now() - lastHeard > 12000) {
       answered = false; rtt = null;
       d.log('the board stopped answering', 'bad');
@@ -1201,6 +1340,18 @@
     const state = await ask({ type: 'params.state' }, 'params.state', 6000);
     void state;
     await applyPatch(patch);
+    // 🔴 THE MATERIAL, AND IT IS AWAITED — plan-twins §4a. One description, two
+    // builders: this page expands the spec with `partialsOf` for its own
+    // worklet, and the board expands the SAME spec with the SAME function and
+    // hands it to `PosSource.sc` on its own scsynth.
+    //
+    // ⚠️ AWAITED BECAUSE THE CHECK BELOW BRANCHES ON IT. Sent and forgotten, the
+    // reply landed several seconds later — after `probeSound()` had already
+    // chosen the key branch and measured an instrument that was about to be
+    // unplugged. Read 0.1434 against 0.0870 and passed, which is a check
+    // grading a transition.
+    const src = await ask({ type: 'source.set', spec: SPEC }, 'source.applied', 20000);
+    if (!src) d.log('the board did not answer about the material', 'warn');
     render();
   }
 
@@ -1217,11 +1368,74 @@
    * about a working board. Enabling is a side effect; measuring is the check.
    */
   async function probeSound() {
-    const quiet = await listen(900);
+    // 🔴 TWO WAYS TO MAKE THE BOARD LOUDER, AND THE FIRST ONE IS BETTER — and it
+    // had to change, because the generated material MADE THE KEY PROBE VACUOUS.
+    // With `PosSource` feeding the granulator the instrument is unplugged from
+    // it (it has to be: scsynth sums its input bus, so an instrument still
+    // patched in is a second material nobody declared), so a held key changes
+    // nothing — and the old assert would still have passed, on the drone that
+    // was there before the key and after it. A check that cannot fail is not a
+    // check.
+    //
+    // Turning the MATERIAL down and up crosses strictly more of the chain than
+    // a key does: this page's own description, the relay, the box, the shared
+    // `partialsOf`, sclang, the wavetable, the granulator, the capture, and the
+    // relay again. A key only ever reached the instrument.
+    //
+    // ⚠️ 0.001 RATHER THAN 0. An all-zero amplitude table is a `/b_gen sine1`
+    // edge nobody here has tested; a peak of 0.001 is -60 dB, which is silence
+    // by any threshold on this page and is an ordinary value all the way down.
+    if (made?.partials) {
+      // 🔴 LOUD FIRST, QUIET SECOND, AND THAT ORDER IS A MEASUREMENT. A
+      // granulator answers a change of material only when its write head next
+      // passes the point the grains are reading, so the two directions cost
+      // very different amounts of time: `bufclear` empties the ring and the
+      // QUIET arm lands inside a second, while the LOUD arm has to wait for the
+      // head to come round — measured at about six seconds at this page's own
+      // settings, and variable, because where the head is when `bufclear` lands
+      // is not something anybody chose.
+      //
+      // Three shapes of this check were wrong before this one. A flat 1.6 s
+      // read 0.0880 against 0.0821 (the old material still in the ring). A
+      // shortened `mbuflen` read 0.0000 twice over. A fixed 1.8 s on the loud
+      // arm read the QUIET level twice, three runs out of three. So the slow
+      // direction is waited on in one-second slices until there is something to
+      // report, and the fast one follows it.
+      const hi = { peak: 0, frames: 0 };
+      for (let i = 0; i < 12 && hi.peak < 0.01; i++) {
+        const slice = await listen(1000);
+        hi.frames += slice.frames;
+        if (slice.peak > hi.peak) hi.peak = slice.peak;
+      }
+      // ⚠️ AWAITED, AND `bufclear` ONLY AFTER IT. Sent together, the two race:
+      // `params.set` is one hop to the box and straight out as OSC, while
+      // `source.set` has to reach sclang, fill the wavetable that is not playing
+      // and crossfade to it. Emptying the ring BEFORE the material goes quiet
+      // just refills it with the loud one — measured, a down arm that read
+      // 0.0331 against a 0.0555 up arm on one run in three while the other two
+      // read 0.0000.
+      await ask({ type: 'source.set', spec: { ...SPEC, level: 0.001 } }, 'source.applied', 15000);
+      send({ type: 'params.set', cmd: 'bufclear', args: [1] });
+      await wait(1200);
+      const lo = await listen(1200);
+      // ⚠️ PUT IT BACK. The check ends on the quiet arm, and a page that left
+      // the material turned down would hand the next visitor a granulator
+      // chewing something 60 dB below what the screen says it is chewing —
+      // which is the same class of mistake as leaving `msrc 1` behind.
+      send(sourceMessage(SPEC));
+      probe = { quiet: lo.peak, held: hi.peak, frames: lo.frames + hi.frames, how: 'material' };
+      d.log(`the material turned down and up: ${hi.peak.toFixed(4)} against ${lo.peak.toFixed(4)} over `
+            + `${probe.frames} frames — the board is making the sound this page described`,
+            hi.peak > 0.002 ? 'hi' : 'bad');
+      render();
+      return;
+    }
+    const lo = await listen(900);
     send({ type: 'note.on', note: 60, vel: 100, channel: 0 });
-    const held = await listen(1800);
+    const hi = await listen(1800);
     send({ type: 'note.off', note: 60, channel: 0 });
-    probe = { quiet, held };
+    const quiet = lo.peak, held = hi.peak;
+    probe = { quiet, held, frames: lo.frames + hi.frames, how: 'key' };
     // ⚠️ SAY WHICH OF THE TWO THE NUMBERS MEAN. A cloud that was already
     // droning is often LOUDER before the key than during it, and printing the
     // pair without saying so reads as a failure on a working board.
@@ -1287,7 +1501,9 @@
     // numbers in those states reported four failures about a board that was
     // fine. Each state asserts what it can answer for and says which it was.
     // Diff the count against the BRANCH: silent 4, answering-but-not-sounding 5,
-    // sounding 8 — 10 with the two rolls.
+    // sounding 8 — 12 with the drift, the board's grains, the patch, the shared
+    // material and the grain rate. (It was 10 before plan-twins landed §4a and
+    // §5 here; the two new ones are the material and the rate.)
     const st = panel.dataset.state;
     const why = {
       silent: 'the board is silent, and the page says so',
@@ -1323,11 +1539,19 @@
       `${PATCHES[patch].m.rate} against ${PATCHES[patch].n.rate} grains a second`);
     // The claim the whole page rests on: this is sound that was made on a
     // machine somewhere else and came back, not a page making a noise.
-    d.assert('sound comes back from the board while a key is held',
-      !!probe && probe.held > 0.002,
-      probe ? `${probe.held.toFixed(4)} with a key down, ${probe.quiet.toFixed(4)} without`
-        + (probe.quiet <= 0.002 ? ' — the key started it' : ' — it was already droning')
-        : 'no key has been held yet — press “Switch it on”');
+    // ⚠️ AND IT HAS TO SEPARATE THE TWO, NOT JUST BE LOUD. Both branches now
+    // require the quiet arm to be QUIET — with the material driven from this
+    // page there is something to turn down, so "it was already droning" stops
+    // being an excuse the check has to accept.
+    d.assert(probe?.how === 'material'
+      ? 'the board is making the sound this page described, and stops when it is turned down'
+      : 'sound comes back from the board while a key is held',
+      !!probe && probe.held > 0.002 && (probe.how === 'material' ? probe.quiet < probe.held * 0.5 : true),
+      probe ? (probe.frames === 0
+        ? 'not one audio frame arrived in either window — nothing was measured, and that is a socket rather than a silence'
+        : `${probe.held.toFixed(4)} with it up, ${probe.quiet.toFixed(4)} with it down, over ${probe.frames} frames`
+          + (probe.how === 'material' ? ' — the material is this page’s own description' : ''))
+        : 'nothing has been measured yet — press “Switch it on”');
     // 🔴 THE MECHANISM AND WHETHER IT HAS ANYTHING TO ACT ON — NOT THE COUNT ON
     // ITS OWN. This asserted `nudges > 0` and read red for a reason that was
     // true and was not a timing fault: the movement circled the last dice roll
@@ -1378,6 +1602,48 @@
     d.assert('the board’s grains are reported by the engine that fired them, not guessed from its audio',
       boardGrains > 0 && bs.measured > 0,
       `${boardGrains} reported by the board, ${bs.measured} drawn, ${bs.inferred} guessed from audio`);
+
+    // 🔴 THE CLAIM plan-twins §4a EXISTS FOR. Two panes side by side are a claim
+    // that they are comparable, and until today that claim was false for a
+    // reason nothing on the page could see: this end granulated a table of sines
+    // and the board granulated whatever instrument was running. Both ends now
+    // expand ONE spec with ONE function (`partialsOf`), and the board builds it
+    // on its own scsynth.
+    //
+    // ⚠️ IT ASSERTS THE ENGINE'S OWN ANSWER, not the box's. `engine.voices` and
+    // `engine.hz` come back from an `/s_get` to scsynth, which replies only for a
+    // node that really exists holding the value it really holds — and the first
+    // version of this path reported `node 1002, engineOn true` about a SynthDef
+    // that had failed to load, because `Synth.new` allocates an id on the client
+    // before the server has read the message.
+    const lp = lsrc?.plan?.partials?.length ?? 0;
+    d.assert('both granulators are chewing the same description, and the board’s engine says so',
+      !!made?.partials && made.partials === lp && made.engine?.voices === SPEC.chord.length,
+      made?.partials
+        ? `${lp} sine partials here, ${made.partials} on the board, and scsynth answers ${made.engine?.voices} notes at ${Math.round(made.engine?.hz)} Hz`
+        : made?.reason ? `the board refused: ${made.reason}` : 'the board has not answered about the material');
+    // 🔴 `rate` HAS TO MEAN ONE THING — plan-twins §5, and it is measured here
+    // rather than assumed. The board's granulator has eight voices and each can
+    // bring up swarm duplicates, so "grains a second" could have meant anything
+    // from 1x to 50x the number on the slider. MEASURED over the relay: at
+    // `mrate` 8 the engine reported 8.0 grains a second, at 4 it reported 4.0, at
+    // 16 it reported 16.0 — one voice is gated by default, so the slider's number
+    // IS grains a second on both engines and no division is needed.
+    //
+    // ⚠️ COUNTED ON THE FAR SIDE. These are the board's own `SendReply` per
+    // trigger, not anything this page asked for. Tolerant by a factor of two
+    // because a patch can open more voices and because the window starts
+    // whenever the first report happens to land.
+    // ⚠️ THE FIRST BATCH'S GRAINS FIRED BEFORE THE WINDOW OPENED, so its count
+    // is the one dropped rather than an arbitrary one — the span is measured
+    // from its arrival, and everything after it happened inside that span.
+    const gspan = grainLog.length > 1 ? (grainLog[grainLog.length - 1].t - grainLog[0].t) / 1000 : 0;
+    const gsec = gspan > 0.5 ? grainLog.slice(1).reduce((t, g) => t + g.seen, 0) / gspan : 0;
+    d.assert('a grain a second means the same thing on both engines',
+      gsec > 0 && gsec >= K.rate * 0.4 && gsec <= K.rate * 2.5,
+      gspan > 0.5
+        ? `${gsec.toFixed(1)} a second reported by the board over ${gspan.toFixed(0)} s, against ${K.rate.toFixed(1)} asked for`
+        : 'the board has not reported two batches of grains yet');
 
     d.assert('a named patch is on screen, chosen rather than rolled',
       !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,

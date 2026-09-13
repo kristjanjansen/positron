@@ -21,7 +21,7 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { VOICES, DEFAULT_SF, fluidAvailable, soundfontAt } from './fluid.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
-         pappusFx, pappusAvailable, pappusPanic, stopPappus,
+         pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
          spaceFx, spaceSet, spaceClamp, spaceState, stopSpace } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, errSearch, errItem, errExcerpt, loadBuffers, errStatus, CHARACTER_NAMES } from './pappus.mjs';
@@ -61,6 +61,17 @@ let synth = null, stopSynth = null, midiIn = null, inst = null;
 // interleaved samples, 100 msg/s into a 60 msg/s relay. Measured twice.
 let starting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
+/**
+ * The generated material, when a page has asked for one.
+ *
+ * 🔴 NOT `grainSource`, WHICH IS THE ARCHIVE. That one is a minute of 1965
+ * written into the grain buffer from disk; this is a sound BUILT on the board,
+ * right now, from the same description a browser is building it from
+ * (plan-twins §4a). Two things called "source" in one file is how a rename
+ * costs an afternoon, so the difference is written down here rather than
+ * inferred from which handler set it.
+ */
+let madeSource = null;     // { spec, partials, top } while PosSource is feeding pappus
 let lastHeard = Date.now();
 // The granulator's own surface — the die, the drift and the grain buffers. Its
 // OSC socket is opened once and kept, separately from `pappusFx`'s patching,
@@ -258,6 +269,7 @@ function yoshimiList() {
 const bankCC = (source) => (source === 'yoshimi' ? yoshimiList().bankCC ?? 32 : 32);
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
 
 // ── shipping the grains ──────────────────────────────────────────────────────
@@ -413,7 +425,14 @@ async function startAudio(source = 'synth', msg = null) {
     log(`${source} up · port ${r.port} · midi ${r.midi ? 'in' : 'NONE'}`);
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
-    if (fxOn) await pappusFx(true, { instrumentPort: r.port, onLog: (l) => log('pappus:', l) });
+    if (fxOn) await pappusFx(true, { instrumentPort: r.port, instrumentPortR: r.portR, onLog: (l) => log('pappus:', l) });
+    // ⚠️ AND THE GENERATED MATERIAL, for the same reason and it is not
+    // automatic: `pappusFx(true)` patches the NEW instrument into the
+    // granulator's input, which is the one thing a generated source needs not
+    // to happen. Without this, choosing an instrument silently puts it back in
+    // the buffer beside the sines, and the two panes stop being comparable
+    // while every readout still says they are.
+    if (fxOn && madeSource) sourceFeed(true, { instrumentPort: r.port, instrumentPortR: r.portR, onLog: (l) => log('source:', l) });
     // ⚠️ AND THE REVERB, for the same reason and it is not automatic. A
     // switched-on insert that silently drops out from under a new instrument is
     // worse than one that was never on: the page still shows it armed.
@@ -720,8 +739,22 @@ async function handle(msg) {
         reason: inst ? `${inst.source} writes to a pipe, not to JACK — the insert can only wrap what is on the JACK graph`
                       : 'nothing is playing for an insert to wrap',
       });
-      const r = await pappusFx(want, { instrumentPort: inst?.port, onLog: (l) => log('pappus:', l) });
+      const r = await pappusFx(want, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog: (l) => log('pappus:', l) });
       if (r.ok) fxOn = want;
+      // ⚠️ `pappusFx(true)` RE-PATCHES THE INSTRUMENT INTO THE GRANULATOR, which
+      // is right for every other caller and is exactly what a generated source
+      // had disconnected. Put it back the way the source wants it, in the one
+      // place that knows both.
+      // And when there is no source: ask sclang to drop any synth it is still
+      // holding. sclang OUTLIVES this process — `pappusFx` adopts a running one
+      // rather than compiling a 2,030-line class again — so a restarted box can
+      // inherit a source synth it never started, playing into a granulator that
+      // now has the instrument patched in as well.
+      if (r.ok && want) {
+        if (madeSource) sourceFeed(true, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog: (l) => log('source:', l) });
+        else pappus().sourceOff();
+      }
+      if (r.ok && !want) madeSource = null;
       // Switching off returns the sampler to its cheap path: one process, no
       // jackd, no capture.
       return reply('fx.pappus', { ...r, instrument: inst?.source ?? null });
@@ -852,6 +885,70 @@ async function handle(msg) {
     // keeps shipping for GRAIN_TTL after the last `grain.report`, and a page
     // that wants the picture re-asks while it is open. A board still shouting
     // at an empty room a week later is the shape of failure this avoids.
+    // ── the material, built here from the page's own description ─────────
+    //
+    // 🔴 THE POINT OF THE WHOLE PATH (plan-twins §4a). `grains` draws this
+    // granulator beside one in a browser and calls them comparable. They were
+    // not, and the biggest reason by a distance was not the granulator: the
+    // page chewed a table of sine partials and this board chewed whatever
+    // instrument happened to be running. One spec, expanded by ONE function
+    // (`partialsOf`, imported by both ends), rendered here by `PosSource.sc`.
+    //
+    // ⚠️ NOT `source.load`, WHICH IS THE ARCHIVE. That writes a minute of 1965
+    // into the grain buffer from disk. This one generates.
+    //
+    // ⚠️ AND THE INSTRUMENT COMES OUT OF THE INPUT, RATHER THAN BEING STOPPED.
+    // scsynth fills its input bus from JACK before any synth runs, so an
+    // instrument still patched to `SuperCollider:in_1` is summed with the
+    // generated material and the granulator chews a third thing neither end can
+    // describe. Stopping it is not the fix: `posbox`, the capture whose frames
+    // are the audio a page HEARS, is raised as part of the instrument's own
+    // chain, so `audio.stop` would take the result away with the material.
+    case 'source.set': {
+      const onLog = (l) => log('source:', l);
+      if (msg.on === false) {
+        pap?.sourceOff();
+        madeSource = null;
+        const back = sourceFeed(false, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog });
+        return reply('source.applied', { ok: true, on: false, instrument: inst?.source ?? null, fed: back.fed });
+      }
+      if (!fxOn) return reply('source.applied', { ok: false, on: false, reason: 'pappus is not switched on, so there is nothing to feed' });
+      const r = pappus().source(msg.spec ?? {});
+      if (!r.ok) return reply('source.applied', { ok: false, on: !!madeSource, reason: r.reason });
+      madeSource = { spec: r.spec, partials: r.partials, top: r.top };
+      const feed = sourceFeed(true, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog });
+      // 🔴 `ok` MEANS THE ENGINE HAS IT, not that this process sent it — the
+      // same standard `fx.space` holds itself to, and the one this handler
+      // failed on its first run. scsynth answers `/s_get` only for a node that
+      // really exists, with the value it really holds, so the wait is for THAT
+      // and the reply carries it. Three seconds because a first `/s_new` after
+      // a def load is the slow case and a fixed one-beat sleep answered before
+      // the server had spoken.
+      let st = pappus().sourceState();
+      for (let i = 0; i < 30 && !st.on; i++) { await wait(100); st = pappus().sourceState(); }
+      // ⚠️ AND THE VALUES ARE COMPARED, not merely present. A node that exists
+      // holding the def's DEFAULTS is a node that never received the spec, and
+      // it would sound almost right — `hz` within a tenth of a hertz and the
+      // voice count exact is what says the table arrived with it.
+      const holds = st.on && st.voices === r.spec.chord.length && Math.abs(st.hz - r.spec.hz) < 0.1;
+      if (!holds) {
+        log(`source: the engine did not confirm it — node ${st.node}, ${st.voices} voices, ${st.hz} Hz`);
+        return reply('source.applied', {
+          ok: false, on: false, reason: st.on
+            ? `the engine holds ${st.voices} voices at ${st.hz} Hz, not ${r.spec.chord.length} at ${r.spec.hz}`
+            : 'the engine never answered — the synth was not built',
+          node: st.node, partials: r.partials,
+        });
+      }
+      log(`source: ${r.partials} sine partials, top ${Math.round(r.top)} Hz, engine node ${st.node}`);
+      return reply('source.applied', {
+        ok: true, on: true, partials: r.partials, spec: r.spec, topHz: Math.round(r.top),
+        // What the ENGINE answered, which is the only part of this that is
+        // evidence rather than intent.
+        engine: { node: st.node, voices: st.voices, hz: st.hz, saidMs: st.ms },
+        instrument: inst?.source ?? null, fed: feed.fed,
+      });
+    }
     case 'grain.report': {
       if (!fxOn) return reply('grain.reported', { ok: false, reason: 'pappus is not switched on' });
       const want = msg.on !== false;
@@ -863,6 +960,11 @@ async function handle(msg) {
     case 'params.state':
       return reply('params.state', {
         ok: fxOn, roll: pap?.current() ?? null, drift: pap?.driftStats() ?? null, source: grainSource,
+        // 🔴 WHAT IT IS CHEWING, for a page that joined after somebody else set
+        // it. `made` is the generated material (plan-twins §4a) and `source`
+        // above is the archive — two different answers to "what is in the
+        // buffer", and a page that cannot tell them apart draws the wrong one.
+        made: madeSource ? { ...madeSource, engine: pap?.sourceState() ?? null } : null,
         // Which voice slots are open and at what interval. ⚠️ This is what the
         // box SENT, not what the engine did with it — a count on this side of
         // the wire is not evidence about the far side (CLAUDE.md). It is here

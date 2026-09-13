@@ -34,6 +34,12 @@ import { promisify } from 'node:util';
 import { homedir } from 'node:os';
 import { mkdirSync, existsSync, statSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { oscMessage } from './jacksynth.mjs';
+// 🔴 ONE EXPANDER, TWO MACHINES. `partialsOf` turns a spec into the exact list
+// of sines both ends have to make, and it is imported rather than reimplemented
+// — the page calls the same function on the same spec. Reimplementing it here
+// would be two authorities on one number, which is the mistake plan-twins is
+// about, one level down. (push.sh ships every `../../` import beside the box.)
+import { partialsOf } from '../../demo/shell/source.mjs';
 
 const execFileP = promisify(execFile);
 
@@ -49,6 +55,62 @@ export const SCLANG_PORT = 57120, SCLANG_ADDR = '/pappus/cmd';
  * second).
  */
 export const GRAIN_PORT = 57321;
+
+/** The doors `run-pappus.scd` opens for the generated material. */
+export const POS_ON = '/pos/on', POS_SET = '/pos/set', POS_SETN = '/pos/setn',
+             POS_TABLE = '/pos/table', POS_CONFIRM = '/pos/confirm';
+
+/**
+ * ⚠️ THE DEF'S ARRAY SIZES, AND THEY ARE STRUCTURAL. A SynthDef's control array
+ * is fixed when the def is built (`PosSource.sc`, `maxVoices` / `maxPartials`),
+ * so these are not limits chosen here — they are a fact about the compiled
+ * graph, mirrored. `setn` past the end of a control array is not an error in
+ * scsynth, it writes into whatever control comes next, so a spec that does not
+ * fit is REFUSED by name rather than truncated into a different sound.
+ */
+export const SOURCE_VOICES = 6, SOURCE_PARTIALS = 24;
+
+/**
+ * The spec, as the numbers `PosSource` wants.
+ *
+ * 🔴 ONE SHARED TABLE, AND THE REFUSAL IS THE POINT. `partialsOf` normalises
+ * across the partials that SURVIVE Nyquist, so if it drops any, two voices no
+ * longer share one amplitude table and a single 24-entry control cannot
+ * describe the sound. That is refused here with the count in words, rather than
+ * sent anyway — a board rendering a quietly different spectrum from the page is
+ * precisely the confound this whole path exists to remove, and it would show up
+ * as "the comparison is noisy".
+ */
+export function sourceArgs(spec = {}, rate = 48000) {
+  const plan = partialsOf(spec, rate);
+  const s = plan.spec;
+  if (s.chord.length > SOURCE_VOICES) {
+    return { ok: false, reason: `${s.chord.length} notes; the engine's def holds ${SOURCE_VOICES}`, plan };
+  }
+  if (s.count > SOURCE_PARTIALS) {
+    return { ok: false, reason: `${s.count} partials; the engine's def holds ${SOURCE_PARTIALS}`, plan };
+  }
+  if (plan.dropped > 0) {
+    return { ok: false, reason: `${plan.dropped} partials land above Nyquist, so the voices no longer share one table`, plan };
+  }
+  // Voice 0's table, at the finished amplitudes. Every voice shares it when
+  // nothing was dropped — which is what the guard above makes true.
+  const amps = new Array(SOURCE_PARTIALS).fill(0);
+  for (const p of plan.partials) if (p.voice === 0) amps[p.partial - 1] = p.amp;
+  const semis = new Array(SOURCE_VOICES).fill(0);
+  for (let v = 0; v < SOURCE_VOICES; v++) semis[v] = s.chord[v] ?? s.chord[s.chord.length - 1] ?? 0;
+  return {
+    ok: true, plan,
+    // ⚠️ NO `level` AND NO `shape`. The table carries the level — `partialsOf`
+    // normalised it — and scaling again in the def would be a second authority
+    // on one number. `shape` is not a control at all: the engine renders a
+    // table, and a waveform NAME cannot cross to a different engine without
+    // meaning two different sounds (PosSource.sc's header).
+    scalars: { hz: s.hz, nvoices: s.chord.length, spread: s.spread },
+    semis, amps,
+    partials: plan.partials.length,
+  };
+}
 
 /**
  * The smallest OSC reader that can read what sclang sends: an address, a type
@@ -446,9 +508,25 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
   const GRAIN_KEEP = 400;
   let grainRing = [], grainSeen = 0, grainAt = 0;
   const grainUdp = createSocket('udp4');
+  // 🔴 WHAT THE SERVER SAYS IT HOLDS — AND THE FIRST VERSION OF THIS WAS A LIE
+  // THAT READ AS EVIDENCE. It reported the node id sclang answered with, which
+  // `Synth.new` allocates on the CLIENT before the server has read the message:
+  // measured on the board, it answered `node 1002, engineOn true` about a def
+  // that had failed to load, and a page would have drawn "the board is chewing
+  // the same material" over silence. `/pos/confirm` asks scsynth for a CONTROL
+  // VALUE instead, so nothing arrives here unless the node is really there with
+  // the numbers really in it.
+  let srcNode = -1, srcOn = false, srcAt = 0, srcVoices = -1, srcHz = -1;
   grainUdp.on('message', (b) => {
     let m;
     try { m = readOsc(b); } catch { return; }
+    if (m.addr === '/possrc' && m.args.length >= 2) {
+      srcOn = (m.args[0] | 0) > 0; srcNode = m.args[1] | 0;
+      srcVoices = m.args.length > 2 ? Math.round(m.args[2]) : -1;
+      srcHz = m.args.length > 3 ? m.args[3] : -1;
+      srcAt = Date.now();
+      return;
+    }
     if (m.addr !== '/pgrain' || !m.args.length) return;
     grainAt = Date.now();
     grainSeen += m.args[0] | 0;
@@ -484,6 +562,23 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
     const m = oscMessage(SCLANG_ADDR, [cmd, ...args]);
     udp.send(m, 0, m.length, port, host);
   };
+  // The generated material's three doors. ⚠️ SCALARS AND ARRAYS ARE DIFFERENT
+  // MESSAGES — `n_set` and `n_setn` — and sclang cannot tell which a value
+  // wants from its arity, so a one-element array would silently become a
+  // scalar and write only the first entry of a 24-entry table.
+  const posRaw = (addr, args) => {
+    const m = oscMessage(addr, args);
+    udp.send(m, 0, m.length, port, host);
+  };
+  const posOn = (on) => posRaw(POS_ON, [on ? 1 : 0]);
+  const posSet = (name, v) => posRaw(POS_SET, [name, v]);
+  const posSetn = (name, vals) => posRaw(POS_SETN, [name, ...vals]);
+  const posConfirm = () => posRaw(POS_CONFIRM, []);
+  // ⚠️ ITS OWN DOOR, NOT `setn`. The amplitudes are not a control any more —
+  // they are a WAVETABLE, and sclang has to fill the buffer that is not
+  // currently being read and then crossfade to it. That is three server
+  // operations in an order only sclang can hold.
+  const posTable = (amps) => posRaw(POS_TABLE, amps);
 
   /** Send one side's values with its m/n prefix. */
   const sendSide = (pre, vals) => { for (const [k, v] of Object.entries(vals)) send(pre + k, v); };
@@ -556,6 +651,42 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
     },
     /** Ask the engine to report, or to stop. Off is the default. */
     report(on) { send('report', on ? 1 : 0); return !!on; },
+
+    /**
+     * The material, built on the board from the page's own description.
+     *
+     * ⚠️ THE SCALARS GO LAST. `nvoices` silences the voices above the chord and
+     * `amps` carries the level, so setting the table before the count means one
+     * block at most where a six-voice table is playing through four voices —
+     * inaudible, but it is also the order that cannot produce a loud transient,
+     * and a granulator's input is exactly where a transient becomes permanent.
+     */
+    source(spec, { rate = 48000 } = {}) {
+      const a = sourceArgs(spec, rate);
+      if (!a.ok) return { ok: false, reason: a.reason, partials: a.plan.partials.length };
+      srcOn = false; srcNode = -1; srcVoices = -1; srcHz = -1; srcAt = 0;
+      posOn(true);
+      posTable(a.amps);
+      posSetn('semis', a.semis);
+      for (const [k, v] of Object.entries(a.scalars)) posSet(k, v);
+      // ⚠️ AFTER THE VALUES, NEVER BEFORE. The reply carries the control values
+      // scsynth actually holds, so asking first would confirm the def's
+      // DEFAULTS and call them the spec — a check that passes on a board that
+      // never received anything.
+      posConfirm();
+      return { ok: true, partials: a.partials, spec: a.plan.spec, top: a.plan.partials.reduce((t, p) => Math.max(t, p.hz), 0) };
+    },
+    /** Ask again. Cheap, and it is how a caller waits for the engine's answer. */
+    sourceConfirm() { posConfirm(); },
+    /** Release it. The def's own envelope frees the node once it has faded. */
+    sourceOff() { srcOn = false; srcNode = -1; srcVoices = -1; srcHz = -1; posOn(false); return true; },
+    /**
+     * What the ENGINE said, not what was asked for. `node` is `-1` when sclang
+     * has no synth; `ms` is how long ago it last answered, so a stale claim
+     * reads as stale rather than as current.
+     */
+    sourceState: () => ({ on: srcOn, node: srcNode, voices: srcVoices, hz: srcHz,
+                          ms: srcAt ? Date.now() - srcAt : null }),
 
     send,
     set,

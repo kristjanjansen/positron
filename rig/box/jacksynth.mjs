@@ -213,12 +213,39 @@ export const JACK_SYNTHS = {
 /**
  * Pappus as an INSERT, not an instrument.
  *
- * Off:  instrument -> posbox (the capture)
- * On:   instrument -> SuperCollider:in_1 ... SuperCollider:out_1 -> posbox
+ * Off:  instrument L+R -> posbox (the capture)
+ * On:   instrument L+R -> SuperCollider:in_1/in_2 ... out_1/out_2 -> posbox
  *
  * The engine keeps running while it is bypassed, because it takes half a
  * minute to compile a 2,030-line class library and nobody wants that between
  * two presses of a button. Bypassing is a re-patch, which is instant.
+ *
+ * 🔴 BOTH CHANNELS, AND THE RIGHT ONE WAS BYPASSING THE INSERT ENTIRELY UNTIL
+ * 2026-09-13. `startJackSynth` connects an instrument's LEFT AND RIGHT ports to
+ * `posbox:input_1`, deliberately — many ports into one input sum in JACK, and
+ * that mono-SUM is what makes a capture of a stereo instrument honest (see the
+ * comment there: mono-left read a note as 1661 Hz where mono-sum read 2029 Hz).
+ * This function then disconnected only the LEFT one and inserted only the LEFT
+ * one, so with the granulator switched on a page heard
+ *
+ *     the granulator's left output  +  the instrument's right channel, DRY
+ *
+ * MEASURED on the board, `jack_lsp -c`: `posbox:input_1` had two sources,
+ * `yoshimi:right` and `SuperCollider:out_1`. Two things follow. The insert
+ * could never be heard on its own — every measurement of "what does this
+ * granulator do" taken through this capture had the dry instrument summed into
+ * it — and the granulator was being FED in mono-left, which is the exact defect
+ * the capture comment was written about, one stage upstream.
+ *
+ * ⚠️ It also fits the open puzzle of 2026-09-12, recorded in `grains`: no
+ * granulator parameter could be shown to change the returned audio, and "the
+ * envelope NEVER dropped below a quarter of its own median at any setting". A
+ * dry instrument summed under a grain cloud is exactly that shape. That is a
+ * consistent explanation and not a proof, and it is written here as the first
+ * thing to re-run rather than as a finding.
+ *
+ * `spaceFx` below had this right all along — it patches `port` AND `portR` —
+ * which is why the two inserts disagreed about what a page could hear.
  */
 let pappusProc = null;
 /**
@@ -234,6 +261,16 @@ let pappusProc = null;
  * them, with no error anywhere, and the page said the material was loaded.
  *
  * The engine prints `PAPPUS READY` when it means it. That is the signal.
+ *
+ * ⚠️ AND IT PRINTS IT LAST, since 2026-09-13 — because "it means it" turned out
+ * to need one more thing. The line used to go out at the TOP of the engine
+ * callback, and `run-pappus.scd`'s own startup Routine then waited a second and
+ * set `mrate 0.5`, `msrc 2`, `amp`, `ingain` and `run` on top of whatever the
+ * client had sent in that second, since the client had been told it could start.
+ * MEASURED: `grains` asked for 2.2 grains a second on a cold board and the
+ * engine reported 0.5, which is that file's own default arriving late. It failed
+ * only on the FIRST visit after a restart, which is the visit nobody is
+ * watching. Anything moved into that Routine has to stay above the line.
  */
 let pappusReady = false;
 
@@ -241,13 +278,18 @@ export function pappusAvailable() {
   return ['sclang', 'jackd'].every(have) && existsSync('/opt/positron-box/rig/box/norns/run-pappus.scd');
 }
 
-export async function pappusFx(on, { instrumentPort, onLog } = {}) {
-  const CAP = 'posbox:input_1', SCIN = 'SuperCollider:in_1', SCOUT = 'SuperCollider:out_1';
+export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = {}) {
+  const CAP = 'posbox:input_1';
+  const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
+  const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
   if (!on) {
     if (instrumentPort) {
       sh(`jack_disconnect "${instrumentPort}" ${SCIN} 2>/dev/null`);
+      if (instrumentPortR) sh(`jack_disconnect "${instrumentPortR}" ${SCIN2} 2>/dev/null`);
       sh(`jack_disconnect ${SCOUT} ${CAP} 2>/dev/null`);
+      sh(`jack_disconnect ${SCOUT2} ${CAP} 2>/dev/null`);
       sh(`jack_connect "${instrumentPort}" ${CAP} 2>/dev/null`);
+      if (instrumentPortR) sh(`jack_connect "${instrumentPortR}" ${CAP} 2>/dev/null`);
     }
     onLog?.('pappus bypassed');
     return { ok: true, on: false };
@@ -289,14 +331,69 @@ export async function pappusFx(on, { instrumentPort, onLog } = {}) {
   }
 
   // Insert it: the instrument stops feeding the capture directly and feeds
-  // Pappus instead, and Pappus feeds the capture.
+  // Pappus instead, and Pappus feeds the capture. ⚠️ BOTH CHANNELS EACH WAY —
+  // see the header. A right channel left on the capture is a dry instrument
+  // under everything the insert does; a right channel not patched to `in_2` is
+  // a granulator fed in mono-left.
   if (instrumentPort) {
     sh(`jack_disconnect "${instrumentPort}" ${CAP} 2>/dev/null`);
     sh(`jack_connect "${instrumentPort}" ${SCIN} 2>/dev/null`);
   }
+  if (instrumentPortR) {
+    sh(`jack_disconnect "${instrumentPortR}" ${CAP} 2>/dev/null`);
+    sh(`jack_connect "${instrumentPortR}" ${SCIN2} 2>/dev/null`);
+  }
   sh(`jack_connect ${SCOUT} ${CAP} 2>/dev/null`);
-  onLog?.(instrumentPort ? 'pappus inserted' : 'pappus running, nothing feeding it');
-  return { ok: true, on: true, fed: !!instrumentPort, ready: pappusReady };
+  // ⚠️ AND THE GRANULATOR'S OWN RIGHT CHANNEL, for the same reason one stage
+  // down: Pappus pans — SPRAY, TILT and the delay taps all place things in the
+  // stereo field — so capturing only `out_1` drops whatever it put on the right.
+  // Many ports into one input sum in JACK, so this is the mono-SUM the capture
+  // comment in `startJackSynth` argues for, applied to the thing that is
+  // actually playing.
+  sh(`jack_connect ${SCOUT2} ${CAP} 2>/dev/null`);
+  onLog?.(instrumentPort
+    ? `pappus inserted${instrumentPortR ? '' : ' (mono source — no right channel)'}`
+    : 'pappus running, nothing feeding it');
+  return { ok: true, on: true, fed: !!instrumentPort, stereo: !!instrumentPortR, ready: pappusReady };
+}
+
+/**
+ * Take the instrument OUT of the granulator's input, or put it back.
+ *
+ * 🔴 THE SOURCE AND THE INSTRUMENT CANNOT BOTH BE IN THERE. `PosSource.sc`
+ * writes to scsynth's own input bus, and scsynth fills that bus from JACK at the
+ * top of every block — so with `<instrument> -> SuperCollider:in_1` still
+ * patched, the granulator chews the SUM of the two. That is not "the same input
+ * at both ends" (plan-twins §4a), it is a third material neither end can
+ * describe, and it would read as the comparison being noisy rather than as the
+ * wiring being wrong.
+ *
+ * ⚠️ AND THE INSTRUMENT IS NOT STOPPED, IT IS UNPLUGGED. `posbox` — the ffmpeg
+ * capture whose frames are the audio a page hears — is raised as part of the
+ * instrument's own chain, so `audio.stop` would take the sound of the result
+ * away along with the material. Disconnecting one JACK link leaves the capture
+ * where it is, and `pappusFx` still owns the other end of the insert.
+ */
+export function sourceFeed(on, { instrumentPort, instrumentPortR, onLog } = {}) {
+  const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
+  if (!instrumentPort) return { ok: true, instrument: null, fed: false };
+  // `on` here means "the generated source is the material", so the INSTRUMENT
+  // is disconnected. Named for what is being asked for rather than for what is
+  // done to the wire, because every caller is asking the first question.
+  // ⚠️ BOTH CHANNELS. Unplugging only the left one leaves the right one in the
+  // granulator's buffer, which is not "the same input at both ends" — it is the
+  // page's material plus half an instrument, and it would read as the
+  // comparison being noisy rather than as the wiring being wrong.
+  const said = [];
+  for (const [port, bus] of [[instrumentPort, SCIN], [instrumentPortR, SCIN2]]) {
+    if (!port) continue;
+    said.push(on ? sh(`jack_disconnect "${port}" ${bus} 2>&1`) : sh(`jack_connect "${port}" ${bus} 2>&1`));
+  }
+  onLog?.(on ? `${instrumentPort} unplugged from the granulator` : `${instrumentPort} feeding the granulator again`);
+  // jack_connect answers non-empty on failure AND on "already connected"; the
+  // second is not an error, so the text travels rather than a boolean nobody
+  // can interpret.
+  return { ok: true, instrument: instrumentPort, fed: !on, said: said.join(' ').trim() || null };
 }
 
 export function pappusOsc(cmdName, ...args) {

@@ -49,7 +49,32 @@ Things that are not obvious and have each cost a day:
   default follows the write head, which is why a granulator with the instrument
   still playing in sounds like the instrument (LESSONS #61).
 - **`report`** (added 2026-09-13) fires a `/pgrain` per grain carrying the read
-  position, gated on the trigger and off by default.
+  position, gated on the trigger and off by default. One report per VOICE per
+  trigger, not per swarm duplicate — so the count it yields is `rate` x gated
+  voices, and MEASURED at one voice by default: `mrate` 8 reports 8.0 a second,
+  4 reports 4.0, 16 reports 16.0.
+- 🔴 **`sos` IS NOT A FLAVOUR CONTROL — AT 0 THIS STAGE OUTPUTS ITS INPUT AND
+  NOT ONE GRAIN.** Line 945:
+
+      sxf  = (msos.max(mlock) / 0.6).clip(0, 1)
+      gsum = gsum * sin(sxf * pi/2)  +  [capl, capr] * cos(sxf * pi/2)
+
+  `capl`/`capr` is the LIVE INPUT, and 0 is the engine's default. The blend
+  reaches grains-only at **0.6** while the RECORD keeps going to 1.0, so 0.6 is
+  the first all-grains value and 1 is a frozen buffer — that gap is deliberate
+  and the engine's own comment explains it. MEASURED over the relay on a held
+  note, sweeping `mrate` 0.5 against 24: **identical to six digits at `sos 0`**
+  (0.030519 both) and **8.26x apart at 0.6** (0.004981 against 0.041123). The
+  fifth-percentile envelope over its median goes 0.981 → 0.000 with it.
+
+  ⚠️ **This is the 2026-09-12 "no granulator parameter changes the returned
+  audio" investigation, closed, and nothing was broken.** Every sweep in it was
+  taken at `sos 0`. Full table in `plan-twins.md`.
+- ⚠️ **`run 0` DOES NOT SILENCE IT, for the same reason.** The grain clock stops
+  and the reports go to zero, and at `sos 0` the level does not move by one part
+  in ten thousand over sixteen seconds — because what is coming out was never
+  the grains. Anyone checking that a granulator is running by stopping it needs
+  `sos` up first.
 
 **BARE keeps all of it.** The granulator is the subject; everything below is
 what sits between it and the listener.
@@ -417,24 +442,27 @@ Then fill the table below, and add a BARE column to TINY.md's cut list.
 
 ## The rungs, as they stand
 
-| | bytes | UGens | fits a browser |
-|---|---|---|---|
-| FULL | 118,597 | 2,780 | no |
-| LITE | 73,297 | 1,706 | no |
-| **TINY** | **63,297** | **1,451** | **yes** |
-| BARE | ⚠️ **built, NOT WEIGHED** | — | — |
+✅ **ALL FOUR WEIGHED 2026-09-13, one machine, one sitting.** This table used to
+end with an empty BARE row and a paragraph explaining why a number nobody took
+does not go in a table. The number has been taken.
 
-🔴 **BARE's row is empty because nobody has run it, and a number nobody
-took does not go in a table.** The code is in `Engine_Pappus.sc` and the
-commands that fill the row are at the end of the BARE section above. Until
-somebody runs them, every claim about what BARE saves is arithmetic on a guess
-— and TINY.md's own warning is that *the size does not track the UGen count*,
-so the guess would be wrong in an unknown direction.
+| | bytes | UGens | fits a browser | headroom to 64 KiB |
+|---|---|---|---|---|
+| FULL | 121,425 | 2,812 | no | — |
+| LITE | 74,733 | 1,722 | no | — |
+| **TINY** | **64,733** | **1,467** | **yes** | **803 B** |
+| **BARE** | **43,551** | **941** | **yes** | **21,985 B** |
 
-⚠️ **TINY's headroom is 2,239 bytes** against the 64 KiB `/d_recv` ceiling that
-wasm scsynth enforces silently. The `report` control added on 2026-09-13 costs
-sixteen `SendReply` UGens and two controls, and **that cost has not been
-measured against this ceiling** — `SynthDesc` has no compiled def before the
-engine allocates, so it needs a running engine to weigh. If TINY stops fitting,
-that is not a reason to drop `report`; it is a reason to build BARE, which
-removes far more than it adds.
+⚠️ **THESE ARE NOT THE 118,597 / 73,297 / 63,297 FIGURES THIS FILE USED TO
+CARRY, AND THE DIFFERENCE IS `report`.** That was a different build, taken
+before the per-grain reports were added; mixing a new BARE number into that
+table would have been comparing two builds. `report` and the BARE plumbing cost
+TINY **1,436 bytes**, taking its headroom from 2,239 down to **803**. TINY still
+loads in a browser and is now one modest feature from not doing so — the next
+thing added to the granulator gets weighed before it ships, not after.
+
+⚠️ **The board runs TINY, not BARE** (`/etc/default/positron-box`,
+`PAPPUS_TINY=1`), which `plan-twins.md` §7 is deliberate about. **TINY implies
+LITE, so the board has ONE granulator**, and every `grain.marks` it has ever
+sent carries `half: 0`. Anything that reads the `n…` half of a command on this
+board is reading a control that exists, takes a value and drives nothing.
