@@ -561,14 +561,24 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
    * line in the log. A grid at the page's own floor that does not say it is the
    * page's own floor is a measurement claiming to be about your room.
    */
+  // How long an AR session may keep answering "no surfaces" before that counts
+  // as an answer. MEASURED: a Quest 3 took **200 ms** from session start to
+  // handing over 11 surfaces; 2.5 s is an order of magnitude of headroom on the
+  // one number anybody has. ⚠️ It is a floor on PATIENCE, not a timeout — the
+  // room is still accepted whenever it turns up, including long after this.
+  const EMPTY_GRACE_MS = 2500;
+
   const planes = {
     asked: false,        // did a session request `plane-detection`
+    emptySince: 0,       // when the headset first answered "none" — see observePlanes
     opaque: null,        // is this a VR session — see markAsked, and `none` in describe
     // 🔴 SIX ANSWERS, NOT A BOOLEAN. `not asked` (no session yet), `waiting`
     // (asked, no frame has answered), `refused` (the session was never given
     // the feature), `unreadable` (it answered and we could not parse it),
-    // `none` (granted, and your room has no surfaces in it), `yours` (we are
-    // standing in a mapped room). A boolean would collapse at least three
+    // `none` (granted, and your room has no surfaces in it — and ONLY after
+    // `EMPTY_GRACE_MS`, because the first empty answer is not the final one),
+    // `yours` (we are standing in a mapped room). A boolean would collapse at
+    // least three
     // different findings — including "we did not look" and "we looked and
     // there is nothing" — into one word, which is the collapse this project
     // keeps paying for.
@@ -723,7 +733,33 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       planeQuads = quads;
       planes.count = quads.length;
       planes.labels = labels;
-      planes.state = quads.length ? 'yours' : 'none';
+      // 🔴 AN EMPTY SET ON THE FIRST FRAMES IS NOT AN ANSWER, AND CALLING IT
+      // ONE MADE THIS PAGE BLAME SPACE SETUP FOR THE SECOND TIME. MEASURED on
+      // a Quest 3, 2026-09-13, ONE passthrough session:
+      //
+      //   6.30 s   "your headset reported NO surfaces — Space Setup may never
+      //            have been run here"
+      //   6.50 s   11 surface(s) — shelf 2 · wall 4 · ceiling 1 · bed 1 ·
+      //            floor 1 · window 1 · door 1
+      //
+      // 200 ms apart. The room was there the whole time; the headset simply had
+      // not finished handing it over. The previous fix taught this message to
+      // distinguish VR from AR — correctly — and left the assumption underneath
+      // untouched: that the FIRST empty answer is the final one. A diagnosis
+      // that is right about the mechanism and wrong about the timing reads
+      // exactly like a diagnosis that is right, and this one cost a room rescan
+      // and a serious suggestion of reinstalling the headset.
+      //
+      // ⚠️ The grace period is on the CLOCK, not on a frame count: a page that
+      // is drawing slowly would otherwise wait longer in wall time for the same
+      // verdict, and the thing being waited on is the headset's scan, which
+      // does not care how fast we render.
+      if (quads.length) { planes.state = 'yours'; planes.emptySince = 0; }
+      else if (planes.state !== 'yours') {
+        // stay in `waiting` until the headset has had its say
+        planes.emptySince = planes.emptySince || performance.now();
+        planes.state = (performance.now() - planes.emptySince) > EMPTY_GRACE_MS ? 'none' : 'waiting';
+      }
       if (lowest !== null) { planes.floorY = lowest; if (floorY !== lowest) { floorY = lowest; buildOwnRoom(); } }
       describe();
     } catch (e) {
