@@ -6,97 +6,86 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* NO transport bar here on purpose: space is the loop pedal, and the shell's
-     transport table binds space to play/pause. One key, one meaning. */
-  .keys { display: flex; gap: 3px; margin: 0 0 10px; touch-action: none; }
-  .k {
-    flex: 1 1 0; min-width: 0; height: 84px; border-radius: 4px;
-    background: var(--card2); border: 1px solid var(--line2);
-    display: grid; place-items: end center; padding-bottom: 8px;
-    font: 500 10px/1 var(--mono); color: var(--dim2);
-    -webkit-tap-highlight-color: transparent; user-select: none; cursor: pointer;
-  }
-  .k.sharp { background: #0e1219; color: var(--dim2); }
-  .k.down { background: var(--hi); color: #0b0e14; border-color: var(--hi); }
-  .lay { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
-  .lay b { color: var(--fg); font-weight: 500; }
-  .lay .m { color: var(--bad); }
-</style>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  // NO transport bar here on purpose: space is the loop pedal, and the shell's
+  // transport table binds space to play/pause. One key, one meaning.
+  import { mount, guard } from '/shell/shell.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createKeyboard } from '/shell/keyboard.mjs';
   import { workerTickHost } from '/timeline/transport.mjs';
   import { createLooper, stats, phaseErrors } from '/proto/looper/looper.mjs';
   import { createVoices } from '/proto/looper/synth.mjs';
 
-  // WebAudio only. No MIDI, no Web MIDI permission, no hardware — 17 instrument
+  // WebAudio only. No MIDI, no Web MIDI permission, no hardware — `instrument`
   // is where MIDI lives.
-  const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12 };
-  const SHARP = new Set(['w', 'e', 't', 'y', 'u']);
-  const BASE = 60;
-
   const d = mount({
     name: 'looper',
-    what: 'Keyboard into a WebAudio synth, then loop it. No MIDI, no network.',
-    readout: { latency: 'ms', layers: '', onsets: '', phase: 'ms' },
+    what: 'A keyboard into a synthesiser made of WebAudio, with a loop pedal on '
+        + 'it. Press Start audio, play the letter keys, then tap space once to '
+        + 'start recording and again to close the loop — what you played in '
+        + 'between repeats while you play over it. Latency is how late this '
+        + 'browser says its own audio is, and off is how far from the beat the '
+        + 'notes coming back round actually landed.',
+    readout: { latency: 'ms', layers: '', notes: '', off: 'ms' },
     controls: [
       { id: 'boot', label: 'Start audio', primary: true },
       { id: 'pedal', label: 'Rec / commit' },
-      { id: 'demo', label: 'Play a bar' },
+      { id: 'demo', label: 'Record a loop for me' },
       { id: 'check', label: 'Check' },
     ],
   });
   guard(d);
 
-  let ctx = null, ear = null, voices = null, looper = null, strip = null;
+  let ctx = null, ear = null, voices = null, looper = null, view = null;
   const onsets = [];
-  const down = new Set();
-  const keyEls = new Map();
+  const HI = getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400';
 
   // ── keys ────────────────────────────────────────────────────────────────
-  const kb = el('div', 'keys');
-  for (const k of Object.keys(KEYMAP)) {
-    const b = el('div', `k${SHARP.has(k) ? ' sharp' : ''}`, k);
-    b.addEventListener('pointerdown', (e) => { b.setPointerCapture(e.pointerId); press(k, e); });
-    b.addEventListener('pointerup', (e) => release(k, e));
-    b.addEventListener('pointercancel', (e) => release(k, e));
-    keyEls.set(k, b);
-    kb.append(b);
+  // THE SHARED KEYBOARD (demo/shell/keyboard.mjs). This page carried its own
+  // until today — the same thirteen keys at a different height, with the
+  // letter where the note name should be, no octave pad and no `notes off`,
+  // styled by a block that shadowed the component's own `.k` rules.
+  //
+  // 🔴 AND THE ONE THING THAT KEPT IT: `onDown(note, how)` does not hand over
+  // the EVENT, and this looper measures `stampSkewMs` — the distance between
+  // the hardware timestamp the browser put on the input event and the moment
+  // the handler ran. Taking `performance.now()` in the handler instead would
+  // make that distance exactly 0, which is a fabricated measurement rather
+  // than a missing one. So the stamp is caught on the way past, in the CAPTURE
+  // phase on `window`: a capture listener on an ancestor runs before any
+  // listener on the target, so `lastStamp` is always the event that caused the
+  // `onDown` about to arrive. The check below grades it — a stale or missing
+  // stamp shows up as a skew that is negative or tens of milliseconds wide.
+  //
+  // One extra argument on the component's `onDown`/`onUp` deletes all of this.
+  let lastStamp = null;
+  const stamp = (e) => {
+    lastStamp = (e && Number.isFinite(e.timeStamp) && e.timeStamp > 0) ? e.timeStamp : performance.now();
+  };
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'keydown', 'keyup']) {
+    addEventListener(type, stamp, true);
   }
-  d.el.append(kb);
-  const layEl = el('p', 'lay', 'no layers');
-  d.el.append(layEl);
 
-  const nowStamp = () => performance.now();
-  const stampOf = (ev) => (ev && Number.isFinite(ev.timeStamp) && ev.timeStamp > 0 ? ev.timeStamp : nowStamp());
-  const noteOf = (k) => BASE + KEYMAP[k];
+  const kb = createKeyboard(d.el, {
+    base: 60,
+    onDown: (note) => { kb.lightNote(note, true); capture('note-on', note); },
+    onUp: (note) => { kb.lightNote(note, false); capture('note-off', note); },
+    onOctave: (base) => d.log(`octave moved — the leftmost key is note ${base}`),
+  });
 
-  function press(k, ev) {
-    if (!looper || down.has(k)) return;
-    down.add(k);
-    keyEls.get(k)?.classList.add('down');
-    looper.capture({ at: stampOf(ev), handlerAt: nowStamp(), type: 'note-on',
-                     note: noteOf(k), vel: 100, source: 'kbd', layer: looper.layers.length });
-  }
-  function release(k, ev) {
-    if (!looper || !down.has(k)) return;
-    down.delete(k);
-    keyEls.get(k)?.classList.remove('down');
-    looper.capture({ at: stampOf(ev), handlerAt: nowStamp(), type: 'note-off',
-                     note: noteOf(k), source: 'kbd', layer: looper.layers.length });
+  function capture(type, note) {
+    if (!looper) return;
+    const handlerAt = performance.now();
+    looper.capture({ at: lastStamp ?? handlerAt, handlerAt, type, note,
+                     vel: type === 'note-on' ? 100 : undefined,
+                     source: 'kbd', layer: looper.layers.length });
   }
 
   addEventListener('keydown', (e) => {
-    if (e.repeat) return;
-    const k = e.key.toLowerCase();
-    if (k === ' ') { e.preventDefault(); pedal(); return; }
-    if (k in KEYMAP) { e.preventDefault(); press(k, e); }
-  });
-  addEventListener('keyup', (e) => {
-    const k = e.key.toLowerCase();
-    if (k in KEYMAP) release(k, e);
+    if (e.repeat || e.key !== ' ') return;
+    e.preventDefault();
+    pedal();
   });
 
   // ── boot ────────────────────────────────────────────────────────────────
@@ -113,30 +102,62 @@
     voices = createVoices(ctx, { dest: ear, onOnset: (r) => onsets.push(r) });
     const clock = { domain: 'wall', now: () => performance.now() };
     looper = createLooper({ clock, newHost: () => workerTickHost(), voices, ctx,
-                            toleranceMs: 5, onLayer: renderLayers });
+                            toleranceMs: 5, onLayer: showLayers });
     looper.start(clock.now());
-
-    const lat = { base: ctx.baseLatency || 0, output: ctx.outputLatency || 0 };
-    d.set('latency', (lat.output || lat.base) * 1000, 'ok');
-    const pdeck = looper.parent;
-    if (pdeck && pdeck.transport) {
-      strip = createStripView(d.el, pdeck, {
-        size: 'mini',
-        lanes: [{ id: 'note', kind: 'note', height: 40, as: 'ticks' }],
-      });
-    } else {
-      d.log(`no parent deck to draw (${typeof pdeck})`);
-    }
-    d.log(`audio ${ctx.state} · base ${(lat.base * 1000).toFixed(1)} ms · out ${(lat.output * 1000).toFixed(1)} ms`);
+    meters();
+    d.log(`audio ${ctx.state} · out ${((ctx.outputLatency || ctx.baseLatency || 0) * 1000).toFixed(1)} ms`);
     window.__L = { looper, voices, ctx, onsets };
   }
 
-  function renderLayers() {
+  // ── the line ────────────────────────────────────────────────────────────
+  // 🔴 IT WAS POINTED AT A DECK THAT CAN NEVER HOLD A NOTE. `looper.parent` is
+  // described in looper.mjs as "a bare deck: it holds no items, it only carries
+  // position" — so a `note` lane over it was empty on every load and always
+  // would be, inside a 44 px box fitted to that deck's ONE-HOUR range. An empty
+  // lane reads as a component that failed rather than as one with nothing to
+  // say. The notes live on the child deck a committed layer owns, so that is
+  // what this draws, and it is rebuilt when a new layer takes over.
+  function showLayers() {
     if (!looper) return;
     const n = looper.layers.length;
-    d.set('layers', n);
-    layEl.innerHTML = n === 0 ? 'no layers'
-      : looper.layers.map((l, i) => `<b>L${i}</b> ${Math.round(l.loopMs ?? looper.loopMs)}ms`).join(' · ');
+    d.set('layers', n || '');          // never 0: nothing recorded yet is nothing
+    const layer = looper.layers[n - 1];
+    if (!layer) return;
+    view?.destroy();
+    view = createStripView(d.el, layer.deck, {
+      size: 'auto', follow: false,
+      // the component draws its own window width in the top-left corner, which
+      // here sat on top of the first axis label. The window IS the loop and
+      // never changes, so there is nothing for it to report.
+      zoomReadout: false,
+      lanes: [{ id: 'note', kind: 'note', label: `loop ${n - 1}`, height: 30, as: 'ticks',
+                width: 2, color: HI,
+                // NOTE-ONS ONLY. Every note is two rows, and a mark for the
+                // release would carry the same letter a few pixels later — the
+                // same key drawn twice, and a `glyphState` that counts marks
+                // with nothing to say alongside ones that ran out of room.
+                filter: (r) => !r.payload?.off,
+                // WHICH KEY, DRAWN ON THE MARK, wherever the zoom has left room
+                // for it. A comb of identical ticks says when you played and
+                // never what. `keyOf` is asked of the keyboard rather than kept
+                // in a second table here, so moving the octave moves both.
+                glyphOf: (r) => kb.keyOf(r.payload?.note) || '' }],
+    });
+    view.strip.fit(0, layer.loopMs);
+    gutter();
+    d.log(`loop ${n - 1} · ${layer.items.length} notes in ${Math.round(layer.loopMs)} ms`, 'hi');
+  }
+
+  /** The loop's own number beside its own ink, not in a table somewhere else.
+   *  ⚠️ SIX CHARACTERS, MEASURED. `0.40 s round` came back as `0.40 s rou…`:
+   *  the component sizes the gutter from `GUT_SUB_X + text` and then clips the
+   *  line against `GUT_LABEL_X + 8`, which is 5 px narrower — so a sub-label
+   *  cut to exactly the width that was measured for it still ellipsizes. */
+  function gutter() {
+    const layer = looper?.layers.at(-1);
+    if (!view || !layer) return;
+    view.strip.lanes()[0].subLabel = [`${(layer.loopMs / 1000).toFixed(2)} s`];
+    view.strip.invalidate();
   }
 
   // armRecord / commitLayer, exactly as proto/looper/index.html drives it
@@ -145,52 +166,97 @@
     const at = performance.now();
     if (!looper.recording()) {
       looper.armRecord(at);
-      d.log(looper.layers.length === 0 ? 'recording — sets the loop length' : 'overdubbing', 'hi');
-    } else {
-      const layer = looper.commitLayer(at);
-      d.log(`committed L${looper.layers.length - 1} · ${Math.round(looper.loopMs)} ms`, 'hi');
-      if (!layer) d.log('nothing captured in that pass', 'bad');
+      d.log(looper.layers.length === 0 ? 'recording — this pass sets the length' : 'overdubbing', 'hi');
+    } else if (!looper.commitLayer(at)) {
+      d.log('nothing was played in that pass', 'bad');
     }
-    renderLayers();
+    showLayers();
   }
 
   d.on('boot', () => boot().catch((e) => d.fail(e)));
   d.on('pedal', pedal);
 
-  // a deterministic bar so a harness (and a human without a keyboard) can play
+  // A whole gesture in one press, for a visitor with no keyboard to hand and
+  // for the suite — which presses each control once, 650 ms apart, and would
+  // otherwise never close a loop and never draw anything. Arm, four notes,
+  // commit, inside 400 ms.
   d.on('demo', async () => {
     await boot().catch((e) => d.fail(e));
     if (!looper) return;
+    if (!looper.recording()) pedal();
     const seq = ['a', 'd', 'f', 'h'];
     for (let i = 0; i < seq.length; i++) {
-      setTimeout(() => { press(seq[i]); setTimeout(() => release(seq[i]), 140); }, i * 250);
+      setTimeout(() => {
+        // through the keyboard, so the keys light and the capture path is the
+        // one a finger takes. `lastStamp` is set here because no input event
+        // caused these — leaving the previous press's stamp would be the exact
+        // stale reading the check below exists to catch.
+        lastStamp = performance.now();
+        kb.press(seq[i], 'key');
+        setTimeout(() => { lastStamp = performance.now(); kb.release(seq[i], 'key'); }, 80);
+      }, i * 100);
     }
-    d.log(`played ${seq.length} notes`);
+    setTimeout(() => { if (looper.recording()) pedal(); }, 400);
   });
 
   d.on('check', () => {
     d.assert('audio context running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
     d.assert('WebAudio voices', !!voices);
     const heard = onsets.length;
-    d.set('onsets', heard);
+    d.set('notes', heard || '');
     d.assert('synth produced onsets', heard > 0, String(heard));
-    const lanes = looper?.loopLanes?.() ?? null;
-    if (looper && looper.layers.length) {
-      const pe = phaseErrors(onsets.filter((o) => Number.isFinite(o.phase)), { loopMs: looper.loopMs });
+
+    // THE STAMP THE SHARED KEYBOARD DOES NOT PASS ON, graded rather than
+    // trusted. Every captured row keeps both times; the handler cannot run
+    // before the event, and a stale stamp would show up here as a negative or
+    // an absurd skew.
+    const skews = (looper?.trace ?? []).map((r) => r.stampSkewMs).filter(Number.isFinite);
+    const worst = skews.length ? Math.max(...skews) : null;
+    // ⚠️ `worst > 0` IS THE WHOLE ASSERT. Every other shape of this check
+    // passes when the stamp is fabricated: taking `performance.now()` in the
+    // handler and calling it the event time makes every skew exactly 0, which
+    // is >= 0 and under any ceiling. A real hardware stamp is always a little
+    // before the handler that reads it, so the gap is the evidence.
+    d.assert('every key press keeps the browser\'s own timestamp, not the handler\'s',
+      skews.length > 0 && worst > 0 && skews.every((s) => s >= 0) && worst < 250,
+      skews.length ? `${skews.length} presses · the handler ran ${worst.toFixed(2)} ms `
+                   + 'after the event at worst, 0 would mean it was never asked'
+                   : 'nothing captured');
+
+    const layer = looper?.layers.at(-1);
+    d.assert('the pedal turned what was played into a loop', !!layer,
+      layer ? `loop ${layer.index} · ${layer.items.length} notes in ${Math.round(layer.loopMs)} ms`
+            : 'no loop — press Rec / commit twice around some notes');
+    // A LANE THAT DREW NOTHING IS THE DEFECT THIS PAGE CARRIED FOR A WEEK, and
+    // it never went red because nothing asked the picture a question.
+    const ink = view ? view.strip.inkOf('note') : 0;
+    d.assert('the loop is drawn on the line', ink > 0, `${ink} lit pixels`);
+
+    if (layer) {
+      const pe = phaseErrors(onsets.filter((o) => Number.isFinite(o.phase)), { loopMs: layer.loopMs });
       if (pe.length) {
         const st = stats(pe);
-        d.set('phase', st.p50);
-        d.assert('phase error under tolerance', Math.abs(st.p50) < 25, `p50 ${st.p50.toFixed(1)} ms`);
+        d.set('off', st.p50);
+        d.log(`off the beat: median ${st.p50.toFixed(1)} ms over ${pe.length} playbacks`);
+      } else {
+        d.log('nothing has played back yet — let the loop go round once');
       }
-    } else {
-      d.log('no layers yet — press Rec / commit twice around some notes');
     }
-    d.log(`lanes ${JSON.stringify(lanes)?.slice(0, 120)}`);
   });
 
-  setInterval(() => { d.set('onsets', onsets.length); }, 300);
+  function meters() {
+    if (!ctx) return;
+    // READ EVERY TICK, NOT ONCE AT BOOT. `outputLatency` moves when the output
+    // device does — plug in headphones and it changes — and a cell filled once
+    // and never again is a constant wearing a measurement's clothes.
+    const out = (ctx.outputLatency || ctx.baseLatency || 0) * 1000;
+    d.set('latency', out || '', out ? 'ok' : '');
+    d.set('notes', onsets.length || '');
+    gutter();
+  }
+  setInterval(meters, 300);
 
-  d.log('keys a w s e d f t g y h u j k · space = pedal');
+  d.log('keys a w s e d f t g y h u j k · z and x move the octave · space is the pedal');
   d.ready();
 </script>
 </html>

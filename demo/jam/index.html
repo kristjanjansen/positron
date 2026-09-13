@@ -7,11 +7,12 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .pulse { display: flex; gap: 4px; margin: 0 0 10px; }
+  /* A row of squares, one per beat, always the same height whatever is
+     happening — the one thing on this page that redraws several times a
+     second. No margins of its own: shell.css owns the vertical rhythm. */
+  .pulse { display: flex; gap: 4px; }
   .pulse i { flex: 1; height: 46px; border-radius: 3px; background: var(--card2); border: 1px solid var(--line); }
   .pulse i.on { background: var(--hi); border-color: var(--hi); }
-  .who { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
-  .who b { color: var(--fg); font-weight: 500; }
 </style>
 
 <script type="module">
@@ -25,8 +26,13 @@
 
   const d = mount({
     name: 'jam',
-    what: 'Two browsers on one pulse. The clock is peer-corrected, because two documents cannot compare their own.',
-    readout: { offset: 'ms', rtt: 'ms', peers: '', beat: '' },
+    what: 'Two browsers counting the same eight beats out loud, without either '
+        + 'of them leading. Press Start audio and join, then open this page a '
+        + 'second time — in another tab, or on a phone — and the two click '
+        + 'together. The offset is how far this browser\'s clock had to be '
+        + 'moved to agree with the others, and the round trip is how long a '
+        + 'message takes to reach one of them and come back.',
+    readout: { offset: 'ms', 'round trip': 'ms', others: '', beat: '' },
     controls: [
       { id: 'start', label: 'Start audio and join', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -38,10 +44,12 @@
   const cells = [];
   for (let i = 0; i < BEATS; i++) { const c = el('i'); cells.push(c); bar.append(c); }
   d.el.append(bar);
-  const who = el('p', 'who', 'not joined');
-  d.el.append(who);
 
   let ctx = null, peer = null, timer = null, lastBeat = -1, fired = 0;
+  // `null`, not `''` — alone the roster string IS empty, so starting it empty
+  // meant the first state was never reported and the log said nothing at all
+  // about being on your own.
+  let roster = null;
 
   function click(at) {
     if (!ctx) return;
@@ -79,15 +87,30 @@
       d.set('beat', `${beat + 1}/${BEATS}`);
     }, 12);
 
+    // 🔴 NO PARAGRAPH OF WHO IS HERE. This page used to rewrite one line per
+    // peer twice a second — `<b>tbko31</b> rtt 12.4ms offset -3.1ms` — so the
+    // block changed its own height as people came and went, and a reader had
+    // to re-read a sentence to find a digit that had moved. Every figure in it
+    // is in a cell above; who is in the room is a state CHANGE, so it goes in
+    // the log, once, when it changes.
     setInterval(() => {
       const ps = peer.peers();
-      d.set('offset', peer.offsetMs());
-      d.set('peers', ps.length);
+      // ⚠️ BLANK, NOT 0, WHEN NOBODY ELSE IS HERE. `offsetMs()` really does
+      // return exactly 0 alone — with no peer there is nothing to correct to,
+      // and inventing a correction would be the bug the check below guards —
+      // but a cell reading `0 ms` claims a correction was measured and came out
+      // at nothing. There is no measurement until somebody else turns up.
+      d.set('offset', ps.length ? peer.offsetMs() : '');
+      d.set('others', ps.length);
       const best = ps.filter((p) => Number.isFinite(p.rttMs) && p.rttMs < Infinity);
-      if (best.length) d.set('rtt', Math.min(...best.map((p) => p.rttMs)));
-      who.innerHTML = ps.length
-        ? ps.map((p) => `<b>${p.id}</b> rtt ${Number.isFinite(p.rttMs) ? p.rttMs.toFixed(1) : '?'}ms offset ${p.offsetMs.toFixed(1)}ms`).join('<br>')
-        : 'alone in the room — open this page again to hear two in sync';
+      d.set('round trip', best.length ? Math.min(...best.map((p) => p.rttMs)) : '');
+      const now = ps.map((p) => p.id).sort().join(' ');
+      if (now !== roster) {
+        roster = now;
+        d.log(ps.length
+          ? `in the room: ${ps.map((p) => `${p.id} ${Number.isFinite(p.rttMs) ? `${p.rttMs.toFixed(1)} ms away` : 'not timed yet'}`).join(' · ')}`
+          : 'alone in the room — open this page again for a second player', 'hi');
+      }
     }, 500);
   });
 
@@ -97,6 +120,12 @@
     d.assert('shared clock is not the local one', !!peer && peer.clock.domain === 'shared-epoch',
       peer?.clock.domain ?? 'none');
     d.assert('the pulse is running', fired > 0, `${fired} click(s)`);
+    // THE PICTURE, GRADED AGAINST THE NUMBER. The squares are the only thing
+    // this page draws, and nothing had ever asked whether the lit one is the
+    // beat the shared clock is actually on.
+    const lit = cells.findIndex((c) => c.classList.contains('on'));
+    d.assert('the lit square is the beat the shared clock is on', lit === lastBeat && lit >= 0,
+      `square ${lit + 1} lit, clock says ${lastBeat + 1} of ${BEATS}`);
     if (peer) {
       const ps = peer.peers();
       // alone, offset must be exactly 0: with no peer there is nothing to
