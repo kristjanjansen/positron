@@ -89,7 +89,7 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, settleMs: 5000,
+  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000,
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
@@ -106,7 +106,7 @@ export const DEMOS = [
   // The Immersive Web Emulator satisfies both on a laptop, which makes it
   // useful for writing the page and worthless as evidence about a device —
   // research/quest-xr calls that "the iPhone mistake in a new accent".
-  { name: 'scene', act: 0, created: '2026-09-11', built: true, gl: true, settleMs: 6000,
+  { name: 'scene', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 6000,
     one: 'a room built from one number — roll it, and the same number rebuilds it exactly',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
@@ -341,7 +341,16 @@ export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
 export function byNewest(list = DEMOS) {
   return list
     .map((d, i) => [d, i])
-    .sort((a, b) => (b[0].created || '').localeCompare(a[0].created || '') || a[1] - b[1])
+    // 🔴 THE HEADSET PAGES FIRST, then newest. They are the newest thing this
+    // project can do and the only two that need a device to be seen at all, so
+    // a visitor with one in their hands should not have to scroll past
+    // everything else to find them. ⚠️ `xr` is a FLAG, not a tag — a `WebXR`
+    // tag would reach `caps.mjs`, which turns tags into REQUIREMENTS, and both
+    // of these pages work perfectly well in an ordinary browser. Marking them
+    // as needing a headset would un-link them for everybody who has not got
+    // one, which is the opposite of the point.
+    .sort((a, b) => (b[0].xr ? 1 : 0) - (a[0].xr ? 1 : 0)
+      || (b[0].created || '').localeCompare(a[0].created || '') || a[1] - b[1])
     .map(([d]) => d);
 }
 
@@ -387,7 +396,7 @@ export function rowHTML(d, i, opt = {}) {
   if (why) bits.push(`<span class="pos-why">${why}</span>`);
   const open = href ? `<a href="${href}">` : '<a>';
   const needs = needsOf(d);
-  return `<li class="pos-row${href ? '' : ' todo'}"${needs.length ? ` data-needs="${needs.join(' ')}"` : ''}>${open}`
+  return `<li class="pos-row${href ? '' : ' todo'}"${d.xr ? ' data-xr="1"' : ''}${needs.length ? ` data-needs="${needs.join(' ')}"` : ''}>${open}`
     + `<span class="n">${shortDate(d.created)}</span>`
     + `<span class="nm">${d.name}</span>`
     + `<span class="pos-one">${d.one || ''}</span>`

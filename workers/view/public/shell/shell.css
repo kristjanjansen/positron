@@ -407,6 +407,12 @@ button.pos-pri[data-busy="1"] {
 .pos-xr-offer .g { font: 500 13px/1.5 var(--mono); color: var(--hi); opacity: .85; margin-top: 4px; }
 .pos-xr-offer:hover { background: color-mix(in oklab, var(--hi) 16%, var(--card)); }
 .pos-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
+/* The two headset pages, emphasised with NO EXTRA UI — no badge, no heading, no
+   second list. The name they already have, brighter, and a hairline on the edge
+   of the row they already occupy. Anything more would be a legend, and a legend
+   is what this index does not have. */
+.pos-row[data-xr] .nm { color: var(--fg); }
+.pos-row[data-xr] { box-shadow: inset 2px 0 0 color-mix(in oklab, var(--hi) 55%, var(--line)); }
 .pos-row.todo { opacity: .6; }
 .pos-row.todo a { cursor: default; }
 
@@ -881,3 +887,103 @@ video[hidden] { display: none; }
    shape; the wrapper is only a flex box. */
 .kpad .step { height: var(--kpad-h); }
 .kpad .step button.ico { width: var(--kpad-h); font-size: 13px; }
+
+/* ── the flow diagram (demo/shell/diagram.mjs) ─────────────────────────────
+   A picture of where the signal goes, for a page whose subject is a path. The
+   drawer decides every coordinate; this decides only what the ink looks like,
+   which is the one half that belongs in a stylesheet.
+
+   🔴 GREY, WITH A TINT THAT IS ALMOST NOT THERE. 11% of a hue in a box's
+   stroke and 4% in its fill — enough to say "these two are the same sort of
+   thing", not enough to read as a legend that needs explaining.
+
+   🔴 AND NEVER YELLOW, for a structural reason rather than a taste one. `--hi`
+   is the playhead, the primary control, the one thing on a page you are meant
+   to look at. A yellow-tinted box would compete with that everywhere it
+   appears — and mixed into grey it goes muddy besides. No box in this block
+   touches `--hi`; the only place it appears is the focus ring, which every
+   control on the site already shares.
+
+   🔴 COLOUR IS NEVER THE ONLY CHANNEL. `kind` also moves the stroke: a device
+   is heavy, a rented computer is dashed, `here` is the one box with a filled
+   back. Photocopy the picture or take the colour out of it and the four still
+   read as four. That is also why the hover rules at the bottom change only
+   colours — overriding the weight or the dash there would delete the channel
+   that survives greyscale for exactly as long as the pointer is over it.      */
+
+.pos-dg { margin: 0 0 14px; width: 100%; min-width: 0; }
+.pos-dg-t {
+  font: 600 10px/1.4 var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim2); margin: 0 0 6px;
+}
+.pos-dg-t[hidden] { display: none; }
+/* `display: block` because an inline svg sits on a text baseline and leaves a
+   few pixels of descender space under it, which reads as a caption that has
+   drifted away from its picture. */
+.pos-dg-svg { display: block; overflow: hidden; }
+
+/* the line under the picture, which is the caption until a box is hovered and
+   that box's own sentence while it is. One line, one place to look; there is
+   no tooltip anywhere in this component and there should not be one. */
+.pos-dg-cap {
+  font: 400 12.5px/1.55 var(--sans); color: var(--dim);
+  margin: 8px 0 0; min-height: 1.55em; max-width: 62ch;
+}
+.pos-dg-cap[data-on] { color: var(--fg); }
+
+.pos-dg-n { cursor: default; }
+.pos-dg-n:focus-visible { outline-offset: 3px; }
+.pos-dg-box { fill: var(--card2); stroke: var(--line2); stroke-width: 1; }
+/* ⚠️ `--line2`, NOT `--line`. The plan names `--line` for a box's edge, and at
+   #1f2937 it is genuinely invisible against `--card` — which is the background
+   every /kit/ block and several demo panels are drawn on. One step up is still
+   grey and still subtle, and it is a border you can see. */
+
+.pos-dg-lab {
+  font: 500 12px/1 var(--mono); fill: var(--fg);
+}
+.pos-dg-sub {
+  font: 400 10px/1 var(--mono); fill: var(--dim2);
+}
+.pos-dg-llab {
+  font: 400 9.5px/1 var(--mono); fill: var(--dim2);
+}
+
+/* the arrows. A return path is a step quieter than a forward one — it is
+   already told apart by its route (under the row, never between the boxes) and
+   by which way its head points, so the third channel is deliberately faint. */
+.pos-dg-link { fill: none; stroke: var(--dim); stroke-width: 1.1; stroke-linecap: round; }
+.pos-dg-back { stroke: var(--dim2); }
+.pos-dg-head { fill: var(--dim); }
+.pos-dg-head-b { fill: var(--dim2); }
+
+/* `here` — the browser you are reading this in. The only box with a lighter
+   back, and it needs no hue at all: being filled is the whole signal. */
+.pos-dg-n[data-kind="here"] .pos-dg-box {
+  fill: var(--line); stroke: var(--dim2); stroke-width: 1.2;
+}
+/* somebody else's computer, rented by the hour — dashed, because its edge is
+   the one thing in the picture that is not ours */
+.pos-dg-n[data-kind="cloud"] .pos-dg-box {
+  fill: color-mix(in oklab, #5b9bd5 4%, var(--card2));
+  stroke: color-mix(in oklab, #5b9bd5 11%, var(--line2));
+  stroke-width: 1.2; stroke-dasharray: 5 3;
+}
+/* a machine in a room somewhere — heavy, because it is a physical thing */
+.pos-dg-n[data-kind="device"] .pos-dg-box {
+  fill: color-mix(in oklab, #a98ad6 4%, var(--card2));
+  stroke: color-mix(in oklab, #a98ad6 11%, var(--line2));
+  stroke-width: 2;
+}
+
+/* ⚠️ THESE GO LAST AND THAT IS LOAD-BEARING, NOT TIDINESS. `.pos-dg-n[data-on]
+   .pos-dg-box` and `.pos-dg-n[data-kind="cloud"] .pos-dg-box` are both (0,3,0)
+   — a specificity TIE, which source order breaks. Written above the kinds,
+   hovering a dashed box would change nothing at all and the rule would look
+   absent rather than beaten. That is LESSONS #65's third case, and the tell is
+   the same: read the computed style, not the rule. */
+.pos-dg-n[data-on] .pos-dg-box {
+  stroke: var(--fg);
+  fill: color-mix(in oklab, var(--fg) 7%, var(--card2));
+}
+.pos-dg-n[data-on] .pos-dg-sub { fill: var(--dim); }
