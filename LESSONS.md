@@ -71,6 +71,11 @@ suite was not wrong, it was not reaching the thing.
 Gating 01's asserts on five drift rows read as "asserted nothing", because
 `verify.mjs` plays for 500 ms — which is one mark. Assert on the first row.
 
+Second instance, session 21: `typist`'s live check wanted **12 edits where the
+harness types 10**, so it silently never ran at all. Eight now, and it reads
+`10 moments compared, 0 apart`. **A threshold above what the harness can reach
+is a check that does not exist**, and it costs nothing to read green.
+
 ### 21. A default built for measurement is not a default built for a human
 
 `createAudioLane` emits a ONE-SAMPLE impulse so threshold detection can find its
@@ -618,6 +623,18 @@ Four consecutive fixes were each correct and each failed to change the symptom:
 Being right about a mechanism says nothing about whether it dominates. Ask "what
 would I expect to see if this were the cause, and do I see it?" before shipping.
 
+⚠️ **The same rule applies to an ARGUMENT, not only to a fix** (session 21).
+`plan-gesture` §3 decided that a gesture is ONE two-dimensional series rather
+than two one-dimensional ones, and rested that on an **8.6x** number produced
+while answering a different question — where to PLACE samples. Measured head on:
+per-axis-ness costs **~2x** and time-blind placement costs **~14x**, so the
+argument had charged one mechanism for a cost the other dominated, and at 500 ms
+the order even crosses (#71). The DECISION survived, on a row of §3's own table
+the measurement never touched — one sample, one instant, which is atomicity
+rather than error magnitude — and the plan was corrected in place rather than
+making the code agree with it. **A right decision resting on a wrong argument is
+still a defect, because the next decision leans on the argument.**
+
 ### 5. Instrument the quantity that discriminates, then stop guessing
 
 Two hypotheses survived a long time: *the device cannot keep up* versus *the live
@@ -995,6 +1012,18 @@ about what is running. `push.sh` now writes to `/opt` and prints the md5 of what
 landed, because "it deployed" and "it says it deployed" have been different
 things here before.
 
+⚠️ **A third location, session 21: `push.sh` had been shipping the engine to a
+path sclang never reads.** `Engine_Pappus.sc` and `CroneEngine.sc` are
+SuperCollider CLASSES, compiled out of sclang's Extensions directory, and
+`/opt/positron-box` is not on its class path at all. MEASURED: the new command
+answered `CroneEngine: no command 'report'` while the copy in `/opt` had it and
+matched the md5 `push.sh` had printed — two copies, two md5s, and the one being
+verified was the one nobody compiles. **An md5 is evidence only about the copy
+the RUNTIME reads**, and one machine holds several places code can live — a
+service unit's directory, a language's class path, a home directory — each read
+by something different. ⚠️ And `$HOME` inside an ssh string expands on the
+LOCAL machine, so the first version of that fix built every path for the Mac.
+
 ## 52. The stream was bit-clean and the sound was still broken
 
 `rack` went out, and the report came back: *noisy and distorted*. Everything
@@ -1344,8 +1373,255 @@ failure looked like the rule was absent:
   but not `display`, and the computed display was `block`.** All three were
   inert. **A flex property on a non-flex box is not an error, it is silence** —
   the groups touched at a measured 0 px while the stylesheet said 22.
+- 🔴 **It was INHERITED past** (session 21, on every demo at once). `.pos-log`
+  is a `<pre>`, so `white-space: pre` inherited into `.pos-m` and made its
+  `overflow-wrap: anywhere` inert — while the comment above that rule claimed
+  the opposite. The repair is `pre-wrap`, not `normal`, because the log aligns
+  itself with spaces. Verified the same way: 4 lines and no sideways scroll,
+  against 1 line and **1608 px of overflow** when sabotaged.
 
 The tell in every case was the same and it is cheap: read the COMPUTED style,
 not the rule. `getComputedStyle` said `flex column center` while the file said
 `stretch`, which is what a specificity tie looks like from outside.
 
+
+## 66. A deadline on a step that asks a human a question (session 21)
+
+`scene`'s entry path ships a log line before and after every await with a
+deadline behind it, so that a hang becomes a named failure rather than a black
+screen. On a Quest 3 it produced `requestSession immersive-vr never returned`
+**twice**, headset black, restart required — and nothing had hung. The page asks
+for plane detection and hand tracking, the runtime therefore raises a
+**room-data permission prompt**, and the owner was reading it. **Six seconds is
+a deadline for a machine.**
+
+🔴 What happened next is the part worth keeping. The deadline fired, the page
+declared failure and tore its own entry path down, **and then the session
+started** — a headset standing in an immersive session that no code owned,
+drawing nothing, with no render loop, no exit-on-any-button and no bail-out
+timer, because all three are registered after the step that had just "failed".
+*The instrument built to turn a hang into a named failure caused one.*
+
+Two rules, and the second is the portable one:
+
+- **A step that can put a dialog in front of a person is on human time.** The
+  prompting step gets 90 s and says *"is there a permission prompt waiting for
+  you?"* instead of "never returned"; everything after the session keeps the
+  short deadline, because `makeXRCompatible` is not going to ask anybody
+  anything. A timeout is a statement about who you are waiting for, so it has to
+  be set per step rather than per file.
+- 🔴 **`Promise.race` does not cancel the loser.** The request was still in
+  flight, so "give up" produced a resource nobody owned rather than nothing at
+  all. **A timeout on an operation that ACQUIRES something must keep hold of the
+  promise and dispose of what arrives late.** The late session is now caught and
+  ENDED, so the worst case is "it did not start" instead of a restart.
+
+scene 28/28.
+
+## 67. Three ways code can be present, correct, and inert (session 21)
+
+#65's shape, one layer down from the stylesheet. Each of these read as working,
+and none of them could affect anything:
+
+- **It ran at the wrong moment.** The strip's gutter sizer was correct and ran
+  in `resize()`. But `setLanes` does not resize, and a page sets `L.subLabel` by
+  reaching into the lane object long after both have run — `typist` does it
+  every time its numbers change — so the width was decided while the strip had
+  no lanes, or no numbers in them, and never revisited. MEASURED in that state:
+  **a lane handed a 458 px number still got a 92 px gutter.** It runs in
+  `layout()` now, cached on the TEXT, because nothing tells us when a client
+  mutates a label. The tell is a question, not a search: **ask when a function
+  runs against when its input arrives.**
+- **It was computed and never read.** `media-master` derived `ctChangedAt` and
+  used it nowhere, while the file's own comment had claimed the guard for months
+  — "preferred only when the callback arrived AFTER the last observed change of
+  `currentTime`". Read now, it catches what the existing rejection cannot: a
+  scrub SMALLER than `jumpMs`, which parks the vector on the pre-scrub picture
+  up to 250 ms out with no creep to notice it by. The tell is #30's: **grep for
+  the READER, not the declaration.**
+- **It sat below a throw.** `scene`'s head-locked panel read a parameter of
+  `drawRoom` and one of the per-eye loop's own `const`s from outside both, so it
+  threw `ReferenceError: proj is not defined` **385 times in one 49-second
+  session** and the panel has never once been drawn in a headset. The
+  `xrFrames === 1` block that ships the first frame's `getError()` sits after
+  it, so that session's device log carries **no `first headset frame` line at
+  all** — the previous day's by-phase instrumentation, deleted by a
+  ReferenceError three lines above it. **An uncaught error in a render loop does
+  not stop the loop; it removes everything below it** while 3,840 frames go by.
+  So **an instrument that reports nothing is a claim about the instrument
+  first.**
+
+⚠️ **And the reason the first one was found at all is the more valuable rule.
+NEITHER SHIPPED PAGE EXERCISED IT** — `typist` declares `gutter: 132` and `draw`
+takes the 92 px default with short labels, so a sizer that did nothing read
+identical on both, at every width, for as long as it existed. Finding it needed
+a **positive control built on purpose**: one real lane fed a growing number at
+390 px, which walks the gutter 92 → 111 → 150 (cap) as the text goes 0 → 90 →
+187 px. **A capability no caller exercises is covered by none of them, however
+many callers there are**, and the only way to learn that is to write the caller
+that does.
+
+## 68. A clamp that overrides what the caller declared, and does not say so (session 21)
+
+`typist` passes `gutter: 132` because it knows what its lanes carry. Below
+`narrowAt` the strip did `Math.min(132, 46)` and gave it 46. Photographed on an
+iPhone: three lanes reading `ty…`, `52…`, `64…` — a lane whose name and BOTH of
+its measured numbers were each a single ellipsis. The page asked, was ignored,
+and had no way to find out.
+
+The reasoning in the comment was that a 92 px label column eats a quarter of a
+360 px plot. That prices the plot and forgets to price the words, and it is the
+worst available trade: the gutter still took its slice and gave nothing back for
+it. CLAUDE.md already says that anything truncating with an ellipsis is in the
+WRONG PLACE — here it was in the right place at a made-up width.
+
+**A default may be overridden by a caller. A caller's explicit value may not be
+overridden by a default.** When the value genuinely cannot be honoured there are
+three honest moves — honour it, refuse it, or report it — and a silent
+substitution is none of them, because it removes the only evidence that the
+caller and the library disagree. `narrowAt`/`gutterNarrow` are gone; the width
+is MEASURED, bounded below by `gutterBase` so pages do not each get a different
+left edge, and above by `gutterMaxFrac` (0.42) of the canvas. typist and draw at
+360/390/430/520/900: nothing cut, every line drawn.
+
+## 69. An edit script that asserts as it goes, and writes at the end (session 21)
+
+A patch script checked each of its edits against the buffer as it applied them
+and wrote the file once at the end. A later assertion failed, the script exited
+— **and every edit that had already matched went with it.** The call to
+`drawHeld` had landed in a pass that completed; the function itself was in the
+pass that did not, so the page shipped a call to a function that does not exist.
+
+🔴 **The symptom named something else entirely.** `drawInner` threw `drawHeld is
+not defined` every frame, `draw`'s catch set the room not-ok, and `applyLook`
+refuses while the room is not ok — so **a missing function reported itself as
+"no fade started"**, in two unrelated asserts. What found it in one look was the
+page's own log line, which said exactly what it was.
+
+Two things:
+
+- **A tool that mutates a file is all-or-nothing, or it says what it did.**
+  Anything else leaves the tree in a state nobody chose and nobody is told
+  about, and that state is indistinguishable from an edit that simply did not
+  match.
+- **The distance between a throw and its red assert is unbounded**, so a failure
+  message is a starting point and never a diagnosis. Read the log line before
+  reading the assert. Two of the three mistakes in that same commit were the
+  same species — `onLog` was not in scope, so the handler for a failed compile
+  would itself have thrown, and `hands` and `HOLD_HAND` were never declared.
+
+scene + mirror 49/49 after.
+
+## 70. Sabotage catches DECORATION, not only regressions (session 21)
+
+#7 says prove a guard fires. This is the same move aimed at the **test you just
+wrote for the fix you just made**, and it is a quieter failure, because
+everything is green either way.
+
+`diagram.mjs` gained two new checks and **both passed on the old, broken code**:
+
+| the test | why it was decoration |
+|---|---|
+| the gutter is sized by what its names need | it used widths where the old flat-30% rule never bit either way |
+| a name clears a diagonal line | it measured clearance at the label's MIDPOINT, which is exactly where the broken rule was already correct |
+
+Both were rewritten until they went red on the old code, and both carry a
+comment saying why. Three more of the same shape in one day, each caught only
+by breaking something on purpose:
+
+- The room's overlap fix: with it disabled the 2,000-room sweep went red **while
+  the single-room check PASSED** — 1,301 of 2,000 rooms had an overlap, so one
+  room in three was already clean and a check of the room on screen misses this
+  two times in three.
+- `pappus-live`: forcing its resolution guard stuck ON read **17/17**, because
+  an abstain and a separation are both "not a failure", so a guard stuck on
+  looks exactly like a working one. A deterministic case (five wobbles apart
+  MUST be resolvable) is what separates them.
+- `media-master`: the new `ctChangedAt` check passes against a fake whose
+  `currentTime` never changes, so the sabotage would not have gone red — the
+  check had to be given an element that moves. (#61: before believing a control
+  proves absence, check that it can produce presence.)
+
+**A test written after the fix passes on the fix by construction.** The only
+thing that separates a check from decoration is watching it go red on the broken
+code — and the sabotage has to be able to show the defect: at the point where
+the old rule was already correct, on inputs where it never bit, or against a
+fake that cannot exhibit the thing, broken is as green as fixed. `typist`'s
+glyph check is the shape to copy, because its two sabotages are opposite
+failures: never test for room reads **52 of 52** legible, never draw a glyph
+reads **0 of 52**, and the shipped assert (1 of 52 at 20 px/s, 6 of 6 at 400)
+cannot pass under either.
+
+## 71. A ratio met on the first run is a threshold wearing a ratio's clothes (session 21)
+
+`plan-gesture` P3 pre-registered `> 2x` before measuring anything, and the first
+run returned **2.1x**. Pre-registration is what is supposed to stop a threshold
+being tuned until it passes, and here it did not help, because the quantity is
+not a constant — the same comparison across the knob's OWN range spans
+**9.0x → 1.9x → 0.5x**, and at the top the order crosses:
+
+| sample every | one 2-D record | as two 1-D records |
+|---|---|---|
+| 100 ms (the default) | 0.146 px | 1.9–2.4x worse |
+| 300 ms (top of the knob) | 4.32 px | 1.9x worse |
+| 500 ms (past the knob) | 24.63 px | **0.5x — two records WIN** |
+
+So `> 2x` was a property of ONE gesture at ONE knob position, and shipping it
+would have meant a check that holds at the default and is false at settings the
+page itself offers. What ships asserts the ORDER at every rate the knob offers,
+plus "the gap reaches 2x somewhere in that range" — both ends of the ladder,
+never its middle. Broken on purpose: gating both axes together gives 1.0x and 30
+of 30 shared instants, and it goes red.
+
+**Before asserting on a ratio, measure it across the range of every control that
+feeds it.** A ratio is a relationship only where it does not change sign;
+everywhere else it is a number that happened on the day you wrote it, and a
+number pre-registered is still a number.
+
+## 72. A flag whose fall-through gives the same answer is a flag nobody tests (session 21)
+
+`PAPPUS_LITE=1` reported FULL while `getenv` plainly returned `"1"`:
+
+    e == "1"                                ->  true
+    #["1","lite","true","yes"].includes(e)  ->  FALSE
+    .indexOf(e)                             ->  nil
+
+`Array.includes` compares by IDENTITY in sclang, and two Strings with the same
+characters are different objects. The check read correctly, tested true under
+`==`, and **was always false — in both directions, since the day it was
+written.**
+
+🔴 The reason it survived that long is the general rule. The fall-through reads
+the device tree, and a Raspberry Pi answers LITE anyway, so on the machine
+anybody would have tried it on, **the broken flag and a working flag produce the
+same rung**. A flag is only tested by setting it to each of its values and
+reading back which branch the program thinks it is in, on a machine where the
+default DISAGREES with the flag. Here that took a weighing run asking for LITE
+on purpose and getting FULL — 121,425 B against 74,733. Fixed with
+`indexOfEqual` and proved both ways: `=1` reports LITE, `=full` reports FULL.
+
+⚠️ And the portable half: **in any language where strings are objects, a
+membership test may be an identity test.** `==` and `includes` disagreeing about
+the same two values is silent, and it reads as a perfectly ordinary guard.
+
+## 73. A list of open work is stale within hours unless striking off is part of finishing (session 21)
+
+The queue at the top of `HANDOFF.md` was written at 15:18 and **three of its
+items were false by 18:45**: it said `pappus-live` had never met the engine (it
+had — 17/18 with one abstain), that TINY was unweighed with `report` in (803 B
+of headroom), and that `grains` had not adopted the diagram (it had). All three
+were finished within four hours of the block being typed, by the session that
+typed it.
+
+Nothing was wrong when it was written, and nothing was wrong with the work. What
+was missing is that **striking an item off is part of finishing it, not a sweep
+at the end** — a sweep happens when a session closes and the list is read when
+the next one opens, so every finished item spends that gap lying to the only
+person who reads it. The three were recorded as having been stale rather than
+quietly edited away, which is the only reason they can be quoted here.
+
+⚠️ The same failure at a larger scale, in this file: **`LESSONS.md` went from
+session 20 to session 21 untouched** while one day produced eight entries' worth
+of material. `PROGRESS.md` records what HAPPENED; this file records the RULE.
+Only the second transfers to a different file on a different day, so a session
+that writes the story and not the rule has kept the half that cannot be reused.
