@@ -506,10 +506,10 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
       return {
         on: !!timer, nudges: moved,
         sinceMs: centredAt ? Date.now() - centredAt : null,
-        // BOTH HALVES. A page drawing where the engine is reading had one
-        // measured centre and one it had to fall back to asking for, which is
-        // an asymmetry with no cause except that this only reported side m.
-        // `side` shifts the phase, so the two are genuinely different numbers.
+        // BOTH HALVES, because reporting only side m made any page drawing
+        // where the engine reads have one measured centre and one it had to
+        // fall back to asking for — an asymmetry with no cause. `side` shifts
+        // the phase, so the two are genuinely different numbers.
         scan: centre ? driftValues(centre.m, t, 0).scan ?? null : null,
         scanN: centre ? driftValues(centre.n, t, 1).scan ?? null : null,
       };

@@ -89,6 +89,9 @@ body {
    empty control row needs saying here — otherwise `cbar.hidden = true` sets the
    attribute, changes nothing, and leaves the 14 px band it was meant to remove. */
 .pos-controls[hidden] { display: none; }
+/* a slider group inside a control row takes the width the buttons leave, so its
+   lanes are as long as the row allows rather than stopping at 560 px */
+.pos-controls .sld-group { flex: 1 1 300px; }
 button, .pos-btn {
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
@@ -572,6 +575,20 @@ video[hidden] { display: none; }
   width: 100%; max-width: 560px;
 }
 .sld-group .sld { display: contents; }
+/* TWO SLIDERS ACROSS, on a screen wide enough for it — six columns rather than
+   three, so the pair shares one grid instead of stacking. Below the breakpoint
+   it falls back to the stacked three, which is where sharing columns matters:
+   side by side there is nothing to line up, stacked there is everything.
+   (0,2,0) beats the base rule on weight, so source order is not load-bearing
+   here — but the media block still goes after it, because the day it becomes a
+   tie is the day it silently stops working. */
+@media (min-width: 720px) {
+  .sld-group.pos-pair {
+    grid-template-columns: repeat(2, max-content minmax(0, 1fr) max-content);
+    max-width: none;
+    column-gap: 20px;
+  }
+}
 /* the standalone 96 px is for a slider sitting in a row of buttons; in a group
    the column decides */
 .sld-group .sld-lane { width: auto; }
@@ -681,11 +698,6 @@ video[hidden] { display: none; }
   background: var(--card);
 }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
-/* The second picture — the held seconds with the read window on them — is its
-   own rectangle under the first, because the two have different x-axes: the
-   waveform above is the last few seconds ARRIVING, this is the whole minute
-   being held. Stacked without a gap they read as one picture with two rows. */
-.pos-scope-w { margin-top: 14px; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
