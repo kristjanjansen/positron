@@ -637,3 +637,45 @@ or reading the OSC buffer constant out of the wasm build and filing it upstream.
 
 **Superseded: the limit is no longer UNMEASURED inside that range.**
 
+### 8.2 The limit is 64 KiB, bisected (2026-09-13)
+
+A ladder of generated SynthDefs — `Mix.fill(n, …)` with n from 10 to 440,
+compiled by sclang and written straight to disk, no server — pushed through
+`/d_recv` one at a time:
+
+| bytes | result |
+|---|---|
+| 2,115 … 40,590 | ✅ LOADED |
+| **52,730** | ✅ **LOADED — the largest that does** |
+| **68,892** | ❌ **no reply — the smallest that does not** |
+| 89,150 | ❌ no reply |
+
+✅ **65,536 sits inside that bracket.** The cap on a `/d_recv` into wasm scsynth
+is 64 KiB, it is silent (no `/fail`, no reply of any kind), and it is the same
+under both transports.
+
+**Which makes this an arithmetic problem, not a wall:**
+
+| | bytes | over 64 KiB |
+|---|---|---|
+| pappus FULL (2,780 UGens) | 118,597 | +81% |
+| **pappus LITE (1,706 UGens)** | **73,297** | **+11.8%** |
+
+LITE needs to lose **7,761 bytes**. The engine already gates whole stages on its
+own `lite` flag — granulator two becomes `DC.ar`, a meter becomes `DC.kr`, the
+feed network and two later stages are skipped — so a further rung in the same
+idiom is the obvious lever, and the RESONATOR is the obvious thing on it: 48
+modal filters that are not the subject of a granulator comparison, and whose
+`pfrq`/`pamp` arrays nothing sends anyway.
+
+⚠️ **That is a decision, not a task.** Cutting a stage means the browser runs a
+DIFFERENT graph from the board, which weakens "the same engine in two places" to
+"the same granulator in two places". The granulator is the subject, so it may
+well be the right trade — but it should be made deliberately rather than
+discovered afterwards.
+
+⚠️ The M1 went to sleep mid-bisect (`Host is down`). The ladder was generated on
+the Raspberry Pi instead, which is free: **a `.scsyndef` is a platform-
+independent binary**, and `writeDefFile` needs no server, no audio device and no
+JACK.
+
