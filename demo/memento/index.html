@@ -622,22 +622,16 @@
       return { el: video, pos: mediaToPos(video.currentTime), key: 'clip' };
     }, {
       toleranceMs: SYNC_TOL_MS,
-      // ⚠️ THE FRAME-CALLBACK SENSOR IS OFF HERE, AND IT IS NOT A PREFERENCE.
-      // MEASURED on this page: after a seek with the element PAUSED, the
-      // playhead crept forward ~180 ms over the next 250 ms while
-      // `currentTime` sat still at the position it had been sent to. L4b
-      // carries a frame sample onto the wall clock as
-      // `mediaTime + (wall − expectedDisplayTime) × rate`, and `rate` is read
-      // off `playbackRate` alone — which is 1 on a paused element — so a
-      // stationary picture is extrapolated forward until the sample goes stale
-      // at `rvfcStaleMs`. The library's own comment states a second guard that
-      // would also have caught it ("preferred only when the callback arrived
-      // AFTER the last observed change of currentTime"): `ctChangedAt` is
-      // computed in `sensorDeltaMs` and never read. Reported, not patched —
-      // `timeline/*` is not this page's to edit. The burned clock in the
-      // picture is a better sensor than rVFC for what this page measures
-      // anyway, and it is the one being graded.
-      useRvfc: false,
+      // THE FRAME-CALLBACK SENSOR IS ON — the library default, and this page
+      // is where it was found to be wrong. MEASURED here: after a seek with
+      // the element PAUSED the playhead crept ~180 ms over the next 250 ms
+      // while `currentTime` sat still on the frame it had been sent to, and
+      // `keyboard seek lands` read `2437 ~ 2225`. L4b carried a frame sample
+      // at `playbackRate`, WHICH IS 1 ON A PAUSED ELEMENT, so a stationary
+      // picture was extrapolated forward until the sample went stale. Fixed in
+      // `timeline/media-master.mjs` (the carry rate is 0 unless the picture is
+      // moving) and held there by `timeline/lab/prop-media-sensor.mjs`, so the
+      // `useRvfc: false` that used to sit on this line is gone.
       onEvent: (e) => d.log(`clock: ${e.reason}${e.key ? ` · ${e.key}` : ''}`),
     });
 

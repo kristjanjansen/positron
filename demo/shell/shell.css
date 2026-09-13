@@ -232,9 +232,21 @@ button.pos-pri[data-busy="1"] {
 /* ⚠️ A GRID, SO A LONG LINE WRAPS INSIDE ITS OWN COLUMN. As one padded string
    a message longer than the box wrapped back to column zero — the continuation
    sat under the TIMESTAMP and read as a new entry that had lost its time.
-   `auto 1fr` keeps every continuation under the message it belongs to. */
+   `auto 1fr` keeps every continuation under the message it belongs to.
+
+   🔴 AND UNTIL 2026-09-13 IT DID NOT WRAP AT ALL, WHILE THIS COMMENT SAID IT
+   DID — on every demo. The box is a `<pre>`, so the UA's `white-space: pre`
+   inherited into `.pos-m` and left its `overflow-wrap: anywhere` INERT: with no
+   wrap opportunity anywhere in the line there is nothing for `overflow-wrap` to
+   take, and `overflow-y: auto` computes `overflow-x` to `auto` beside it, so a
+   long line scrolled SIDEWAYS out of the column instead. `pre-wrap` and not
+   `normal`: the log aligns itself with spaces (`ok  ` against `FAIL `) and
+   `normal` collapses them. A rule that is present and inert is worse than one
+   that is missing, and a comment that claims it works is worse again — the only
+   proof is the COMPUTED style of `.pos-m`, never this file. */
 .pos-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
+  white-space: pre-wrap;                /* ← a <pre> is `pre`; see above */
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   /* ⚠️ A HEIGHT EVEN WITH NOTHING IN IT. The log collapsed to zero until the
      first line arrived and then shoved the whole page down — and on a page
@@ -248,6 +260,9 @@ button.pos-pri[data-busy="1"] {
 .pos-log:empty::before { content: 'nothing logged yet'; color: var(--dim2); }
 .pos-line { display: contents; }
 .pos-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+/* `min-width: 0` lets the 1fr column shrink; `overflow-wrap: anywhere` breaks a
+   long unbroken token (a URL, a base64 id). Both need the `pre-wrap` above to
+   do anything at all. */
 .pos-m { min-width: 0; overflow-wrap: anywhere; }
 .pos-line.hi .pos-m, .pos-log b { color: var(--fg); font-weight: 500; }
 .pos-line.bad .pos-m, .pos-log i { color: var(--bad); font-style: normal; }

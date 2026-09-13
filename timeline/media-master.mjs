@@ -58,10 +58,42 @@
 //
 //     THE RULE, and it is deliberately conservative:
 //       · a frame callback stores {mediaTime, expectedDisplayTime, at};
-//       · `mediaTime` is preferred only when the callback arrived AFTER the
-//         last observed change of `currentTime` AND is younger than
-//         `rvfcStaleMs` — so a hidden tab (rVFC stops, `timeupdate` does not)
-//         falls back to `currentTime` automatically, with no visibility API;
+//       · the sample must be younger than `rvfcStaleMs` — so a hidden tab
+//         (rVFC stops, `timeupdate` does not) falls back to `currentTime`
+//         automatically, with no visibility API;
+//       · 🔴 IT IS CARRIED AT THE RATE THE PICTURE IS MOVING, AND THAT IS
+//         NOT `playbackRate`. `playbackRate` reads 1 on a PAUSED element, so
+//         carrying by it extrapolates a stationary picture forward.
+//         MEASURED on `demo/memento/` 2026-09-13: after a seek with the
+//         element paused the playhead crept +180 ms over 250 ms while
+//         `currentTime` sat still on the frame it had been sent to, then
+//         snapped back when the sample went stale — `2437 ~ 2225` on the
+//         shared `keyboard seek lands` check, and the page worked around it
+//         by turning the sensor off. Paused, ended or seeking, the carry rate
+//         is 0: the sample still says WHICH FRAME IS ON THE GLASS, it just
+//         stops claiming that frame is moving.
+//       · WHILE THE PICTURE IS NOT MOVING, a sample older than the last
+//         observed move of `currentTime` is old news and is dropped — the
+//         element was sent somewhere and the compositor has not caught up, and
+//         only `currentTime` knows where it was sent. (This is the guard this
+//         comment claimed for months while `ctChangedAt` was computed and
+//         never read.) ⚠️ It is NOT applied while the picture IS moving, and
+//         that is not a stylistic choice: during playback `currentTime` moves
+//         on nearly every tick and is NOTICED a tick late, inside `tick()`, so
+//         an unconditional form rejects every sample and switches L4b off for
+//         good. A fake element whose `currentTime` never changes passes the
+//         broken version; `timeline/lab/prop-media-sensor.mjs` S4 moves it,
+//         which is the only reason that check can fail.
+//       · THE HOLE THE PAIR STILL LEAVES, written down because a guard that
+//         moved is a guard whose new blind spot nobody has looked for: a scrub
+//         SMALLER than `jumpMs` while the element is PLAYING is caught by
+//         neither test — the pre-scrub frame is carried at rate 1 and read as
+//         the picture, so the vector can trail where the element was sent by
+//         up to `jumpMs` for up to `rvfcStaleMs`. It ends the instant one
+//         frame is presented, and a seek presents one. The same bound covers a
+//         decoder that stalls without clearing `paused`: it is carried forward
+//         until the sample goes stale at `rvfcStaleMs`, and L3 has it after
+//         `stallMs`. Both are bounded and neither is detected;
 //       · the correction is applied as a DELTA, `(mediaTime − currentTime)`,
 //         so the `{el, pos, key}` source form — whose `pos` is by construction
 //         `anchor + el.currentTime * 1000` in every client — gets it for free
@@ -146,6 +178,7 @@ export function mediaMaster(deck, source, {
     lastCorrectionMs: null, lastJumpMs: null, key: null, stalled: false, driving: false,
     // L4b accounting: the sensor is measured, not assumed.
     rvfc: { supported: null, registered: 0, frames: 0, used: 0, stale: 0, rejected: 0,
+            superseded: 0,
             lastMediaTime: null, lastExpectedDisplayMs: null, lastDeltaMs: null,
             lastRawDeltaMs: null, samples: 0, dropped: 0 },
   };
@@ -168,6 +201,15 @@ export function mediaMaster(deck, source, {
 
   function rvfcSupported(el) {
     return !!(el && typeof el.requestVideoFrameCallback === 'function');
+  }
+  /** THE RATE THE PICTURE IS MOVING AT — which is not `playbackRate`, because
+   *  `playbackRate` is 1 on a paused element. A frame sample is carried onto
+   *  the wall clock by this; at 0 the carry is the identity and the sample says
+   *  only which frame is on the glass. See L4b. */
+  function carryRate(el) {
+    if (el.paused || el.ended || el.seeking) return 0;
+    const r = el.playbackRate;
+    return Number.isFinite(r) && r > 0 ? r : 1;
   }
   function armRvfc(el) {
     if (!useRvfc || variableFps || disposed || el !== rvEl || rvArmed) return;
@@ -210,7 +252,7 @@ export function mediaMaster(deck, source, {
     if (ct !== lastCt) { lastCt = ct; ctChangedAt = wall; }
     if (!useRvfc || variableFps || !rv) return 0;
     armRvfc(el);                       // a dropped re-arm must not blind us forever
-    const rate = Number.isFinite(el.playbackRate) && el.playbackRate > 0 ? el.playbackRate : 1;
+    const rate = carryRate(el);        // 0 while the picture is not moving (L4b)
     // rVFC's sample is a PAIR, not a scalar: `mediaTime` is the PTS of the frame
     // the compositor will show AT `expectedDisplayTime`. Read as a bare number
     // it is ~half a frame to a frame AHEAD of `currentTime`, and that offset is
@@ -227,6 +269,14 @@ export function mediaMaster(deck, source, {
     S.rvfc.lastDeltaMs = +d.toFixed(4);
     S.rvfc.lastRawDeltaMs = +raw.toFixed(4);
     if (wall - rv.at > rvfcStaleMs) { S.rvfc.stale++; return 0; }
+    // While the picture is FROZEN (rate 0), a sample taken before the last
+    // observed move of `currentTime` describes a picture that has been
+    // superseded: the element was sent somewhere and the compositor has not
+    // caught up yet. Only `currentTime` knows where it was sent, and the
+    // disagreement can be far smaller than `jumpMs`, so the rejection below
+    // cannot see it. ⚠️ Rate 0 only — see L4b for why applying this during
+    // playback switches the sensor off for good rather than guarding it.
+    if (rate === 0 && rv.at < ctChangedAt) { S.rvfc.superseded++; return 0; }
     // A frame sample from BEFORE a discontinuity must never be carried across
     // it: past the jump threshold the element has MOVED (L2) and only
     // `currentTime` knows where to. This is what keeps the sensor swap from
@@ -344,7 +394,8 @@ export function mediaMaster(deck, source, {
       if (!useRvfc || variableFps || !rv || el !== rvEl) return base;
       const w = now();
       if (w - rv.at > rvfcStaleMs) return base;
-      const rate = Number.isFinite(el.playbackRate) && el.playbackRate > 0 ? el.playbackRate : 1;
+      const rate = carryRate(el);                  // L4b: paused/ended/seeking carries at 0
+      if (rate === 0 && rv.at < ctChangedAt) return base;   // superseded picture
       const edt = Number.isFinite(rv.expectedDisplayTime) ? rv.expectedDisplayTime : rv.at;
       const d = (rv.mediaTime + ((w - edt) / 1000) * rate - el.currentTime) * 1000;
       return Math.abs(d) > jumpMs ? base : base + d;
