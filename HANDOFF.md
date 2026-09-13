@@ -1,4 +1,140 @@
-# Handoff — 2026-09-12 (end of session 19)
+# Handoff — 2026-09-13 (end of session 20)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 20 — the granulator was never broken, and SuperCollider runs in a tab
+
+🔴 **THE HEADLINE, AND IT COST THE DAY: a granulator reading the present sounds
+like the present.** "Moving the sliders does nothing for sound" was reported
+repeatedly and was true, and nothing was wrong with the engine. Pappus reads
+grains from a ring buffer whose read head FOLLOWS the write head, so with an
+instrument still playing in, the grains re-read material as it arrives and the
+output is a copy of the input — at any rate, size or scan position. **No sweep
+of the parameters could have shown it. Only removing the input could.**
+
+    input live      mrate 0.5 / 6 / 24   rms 0.0575 / 0.0579 / 0.0580
+    input REMOVED   mrate 0.5            rms 0.0642  flutter 0.377  gaps/s 0.0
+    input REMOVED   mrate 24             rms 0.0410  flutter 0.692  gaps/s 4.6
+
+`grains` has **`Hold what it has`** for exactly this, and it switches itself on
+now. Reproduced on the real board after the fix: gaps/s 0.0 → 0.7 the instant
+Hold engages, and rms 0.0411 / 0.0550 / 0.0425 as the rate goes low-high-low.
+
+**And two real defects underneath it.** `run-pappus.scd` sent `msrc 1` — which is
+**OFF** — so **granulator ONE never recorded the instrument**, for the life of
+that file, while the page drew nine numbers for it and a slider moved them. And
+every probe run against the board on 2026-09-12 used `msrc 0`, which is not a
+source at all: the table is 1 OFF, 2 STEREO, 3 MONO L, 4 MONO R, there is no 0,
+and a 0 fails every gate silently. Those probes measured an empty buffer.
+LESSONS #61 and #62.
+
+### SuperCollider runs in a browser, and both ends run the same graph
+
+🔴 **`/d_recv` refuses anything over 64 KiB and says NOTHING** — no `/fail`, no
+reply; the first thing the server says is `/fail /s_new "SynthDef not found"`
+seconds later, which points at the wrong thing entirely. Bisected with a ladder
+of generated SynthDefs: **52,730 B loads, 68,892 B does not**, identical under
+both transports, so it is scsynth's own OSC path. LESSONS #63.
+
+That made it arithmetic. Pappus FULL is 118,597 B (+81%), LITE 73,297 (+11.8%),
+and four compile-time cuts give **TINY at 63,297 B / 1,451 UGens, which LOADS**.
+The board runs the same one — `PAPPUS_TINY=1` in `/etc/default/positron-box` —
+because comparing 2,780 UGens on a Pi against 1,451 in a tab is two different
+instruments. `rig/box/norns/TINY.md` has the cuts and what each saved.
+⚠️ SuperCollider does not strip an unconnected UGen, and def size does not track
+UGen count: the shimmer is ONE UGen and cost 236 bytes; four delay taps are ~28
+and cost 2,894. LESSONS #64.
+
+⚠️ The oracle that found all this needed **controls before it could say
+anything** — the source direct into the analyser, and scsynth playing a shipped
+def — because "silence at every setting" and "this harness is deaf" are the same
+reading without them. Both wrong negative controls are recorded in #61.
+
+### A Quest held 90.0 fps with a panel in it
+
+`mirror` has one XR panel, and the headset answered the question `plan-xr-room`
+§4.1 existed to ask: **90.0 fps against `scene`'s 89.8 with no panel**, so
+video-to-texture costs nothing measurable on an Adreno 740. `texImage2D`
+0.10–0.20 ms, framebuffer 3360x1760 read from the device by a second page.
+The exits met a real controller for the first time. "A bit laggy" turned out to
+be **one frame at entry**: `worst gap 41.8 ms` never moves after the first
+second while fps goes 84.5 → 90.0 and stays.
+
+🔴 **`gl error 1282` on the first frame, still open.** One `getError()` covered
+everything since context creation and could name nothing, so it is instrumented
+BY PHASE now (quad / textures / program / upload / bindFramebuffer / firstDraw)
+and the next headset run says where. No fix was guessed: the draw loop reads
+clean against all five documented defects and desktop is 44/44 green.
+
+### draw — the gesture demo that already existed
+
+`proto/paths/` was finished and measured and had never been given a page.
+`demo/draw/` is the page; the adapter is promoted to
+`demo/shell/pointer-adapter.mjs` unchanged. **721 samples in, 59 kept, 900 points
+drawn from them — 93.4% of the line is invented** — at hold 20.59 px, linear
+0.679, smoothed 0.090.
+
+⚠️ **There are more of these.** Seven protos hold a page and are absent from the
+manifest; three look finished: `text` (1,222 lines, a stateful-document kind),
+`automation` (1,765 — an automation lane bound to a video clip, which the user
+wants renamed **memento**), and `osc` (a benchmark, not a demo).
+
+### The kit grew, and three pages stopped fighting it
+
+`picker` (a stepper cannot choose one of Yoshimi's 878 — the name IS the control,
+over an invisible native select), `messages`, `panel`, `grain-scope`,
+`pointer-adapter`. `/box/` had its own `[aria-pressed]` rule repainting EVERY
+`createChoice` on the page — same specificity, later in the cascade.
+
+⚠️ **Five ways a CSS rule can be present and inert** cost three attempts at one
+phone layout: wrong container, an inline style beating a media query, a
+specificity TIE decided by source order, and — the sharpest — a rule that set
+`flex-direction`/`align-items`/`gap` but not `display`, where the computed
+display was `block` and all three were silent. LESSONS #65. Read the COMPUTED
+style, not the rule.
+
+### Things I got wrong, since they are the useful part
+
+- **Hiding `Switch it on`** left `grains` inert for every visitor: `fx.pappus`
+  is sent from that handler and nowhere else. I asserted "a key press starts it"
+  without checking; one grep would have shown it.
+- **`git add -A` swept another agent's in-flight work** into a commit about
+  something else. Third instance of a hazard CLAUDE.md already records.
+  Repaired with `git notes` on a762474, not a rewrite.
+- **Making `Hold` primary moved it to control 0**, and `settleMs` lands there
+  ONLY — so a ~40 s engine compile lost its budget and a cold board would have
+  read `page asserted something — 0`.
+- **The first grain visualiser was built for me, not the player.** "This viz
+  does nothing to me, perhaps to you" was exactly right: it plotted position
+  against time with no material behind it. It draws the held sound as a waveform
+  now, with the read range lit on it.
+- **Nine of my own harness Chromes** were holding relay sockets again (#56).
+
+### The readout got a shape rule
+
+**An even number of cells, and an odd one is CUT, never padded.** A phone gets
+two columns, so an odd count leaves a hole of a different colour in the last row
+— which reads as a cell that failed to load rather than one that does not exist.
+Twelve pages were odd; each lost its weakest cell (a constant, or something a
+neighbour already implied). `mount()` throws on an odd count so the suite catches
+it. And nothing unmeasured prints as `0` or as a lone unit — `''`, `null` and
+`NaN` are one em dash with the unit hidden.
+
+**Suite 449/449 green, 31 built demos of 37 rows.**
+
+### Still open
+
+- 🔴 `gl 1282` — instrumented, needs one headset run.
+- **The two-SuperColliders page** — unblocked, not built.
+- **grains' drift has no centre**: the board circles the last DICE ROLL and the
+  page stopped rolling, so `nudges` stays 0. Needs a box-side `params.apply`, or
+  `params.set` updating `applied`.
+- `text` / `automation`→`memento` promotions, following `draw`'s pattern.
+- The reverb insert adds **-4.1 dBFS of noise with no input** (measured; insert
+  removed gives digital silence). Board-side.
+- `keep`'s 409, the unrotated RTMPS key, `workers/pub`'s stale container image.
+
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
 (newest first) → the plan you're touching.

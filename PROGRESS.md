@@ -1,4 +1,141 @@
-# Progress log — 2026-08-25 → 09-12  (newest first)
+# Progress log — 2026-08-25 → 09-13  (newest first)
+
+## Session 20 (2026-09-13) — the granulator was never broken; SuperCollider in a tab; a Quest at 90 fps
+
+**The day's real finding: a granulator reading the present sounds like the
+present.** "Moving the sliders does nothing" was reported four times and was
+true, and the engine was fine. Pappus's read head FOLLOWS its write head
+(`mscanmode 1`), so with an instrument still playing in, every grain re-reads
+material as it arrives — the output is a copy of the input at any rate, size or
+scan position. No parameter sweep can show this. Only removing the input can.
+
+| input | mrate | rms | flutter | gaps/s |
+|---|---|---|---|---|
+| live | 0.5 / 6 / 24 | 0.0575 / 0.0579 / 0.0580 | — | — |
+| **removed** | 0.5 | 0.0642 | 0.377 | **0.0** |
+| **removed** | 24 | 0.0410 | 0.692 | **4.6** |
+
+Proved first on real scsynth (M1), then reproduced on the board after shipping
+`Hold what it has`: gaps/s 0.0 → 0.7 the instant it engages. LESSONS #61.
+
+**Two real defects underneath it.** `run-pappus.scd` sent `msrc 1`, which is
+**OFF** — granulator ONE never recorded, ever, while the page drew nine numbers
+for it. And every board probe on 09-12 used `msrc 0`, which is not a source at
+all (1 OFF, 2 STEREO, 3 MONO L, 4 MONO R; there is no 0), so those probes
+measured an empty buffer. LESSONS #62.
+
+### SuperCollider runs in a browser, and both ends now run the same graph
+
+🔴 **`/d_recv` refuses anything over 64 KiB and says NOTHING.** No `/fail`, no
+reply; the first thing the server says is `/fail /s_new "SynthDef not found"`
+seconds later, which points at the wrong thing. Bisected with generated defs:
+**52,730 B loads, 68,892 B does not**, identical on both the postMessage and SAB
+transports — it is scsynth's own OSC path, not the wasm shim. LESSONS #63.
+
+| Pappus build | bytes | UGens | loads in a browser |
+|---|---|---|---|
+| FULL | 118,597 | 2,780 | no |
+| LITE | 73,297 | 1,780 | no |
+| **TINY** | **63,297** | **1,451** | **yes** |
+
+Four compile-time cuts (modal bank, string voices, shimmer, half the delay
+taps) — `rig/box/norns/TINY.md`. The board runs TINY too, via `PAPPUS_TINY=1`
+in `/etc/default/positron-box`, so the two ends are the identical graph rather
+than two different instruments. ⚠️ Def size does not track UGen count and SC does
+not strip an unconnected UGen: the shimmer is ONE UGen and cost 236 bytes, four
+delay taps are ~28 and cost 2,894. LESSONS #64.
+
+The oracle needed **two controls before it could say anything** — source direct
+into the analyser, and scsynth playing a shipped def — because "silence at every
+setting" and "this harness is deaf" read identically without them.
+
+### A Quest 3 held 90.0 fps with a video panel in it
+
+`mirror` has an XR panel, and the headset answered `plan-xr-room` §4.1:
+**90.0 fps** against `scene`'s 89.8 with none, so video-to-texture costs nothing
+measurable on an Adreno 740. `texImage2D` 0.10–0.20 ms; framebuffer 3360x1760.
+"A bit laggy" was **one frame at entry** — `worst gap 41.8 ms` never moves after
+the first second while fps climbs 84.5 → 90.0 and stays. The exits met a real
+controller for the first time and work.
+
+🔴 **`gl error 1282` on frame one, still open.** One `getError()` covered
+everything since context creation and could name nothing, so it is instrumented
+by phase now (quad / textures / program / upload / bindFramebuffer / firstDraw).
+No fix guessed: the loop reads clean against all five documented XR defects and
+desktop is 44/44.
+
+### draw, and the protos nobody had noticed
+
+`proto/paths/` was finished and measured and had no page. `demo/draw/` is that
+page; the adapter is promoted to `demo/shell/pointer-adapter.mjs` unchanged.
+**721 samples in, 59 kept, 900 points drawn — 93.4% of the line is invented**, at
+hold 20.59 px / linear 0.679 / smoothed 0.090. The assert is on ORDER
+(smoothed < linear < hold), not on a threshold, so it cannot be tuned green.
+⚠️ Six more protos hold a page and are absent from the manifest; three look
+finished: `text` (1,222 lines), `automation` (1,765, to be renamed **memento**),
+`osc` (a benchmark, not a demo).
+
+### The kit grew by five, and three pages stopped fighting it
+
+`picker` (a stepper cannot choose one of 878 — the name IS the control, over an
+invisible native select), `messages`, `panel`, `grain-scope`, `pointer-adapter`.
+`/box/` had its own `[aria-pressed]` rule repainting every `createChoice` on the
+page — same specificity, later in the cascade.
+
+⚠️ **Five ways a CSS rule can be present and inert** cost three attempts at one
+phone layout: wrong container; an inline style beating a media query; a
+specificity TIE decided by source order; and a rule that set `flex-direction`,
+`align-items` and `gap` but not `display`, where the computed display was
+`block` and all three were silent. Read the COMPUTED style. LESSONS #65.
+
+### What I got wrong, since that is the useful part
+
+- **Hiding `Switch it on`** left `grains` inert for every visitor — `fx.pappus`
+  is sent from that handler and nowhere else. I asserted "a key press starts it"
+  without checking; one grep would have shown it.
+- **`git add -A` swept another agent's in-flight work** into an unrelated commit.
+  Third instance of a hazard CLAUDE.md already records. Repaired with `git notes`
+  on a762474, not a rewrite.
+- **Making `Hold` primary moved it to control 0**, and `settleMs` lands there
+  ONLY — a ~40 s engine compile lost its budget and a cold board would have read
+  `page asserted something — 0`.
+- **The first grain visualiser was built for me, not the player** ("this viz
+  does nothing to me, perhaps to you"). It now draws the held sound as a
+  waveform with the read range lit on it.
+- Nine of my own harness Chromes were holding relay sockets again (#56).
+
+### The readout got a shape rule
+
+**An even number of cells, and when it is odd the answer is to CUT one.** The row
+is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets two columns and an odd
+count leaves a HOLE in the last row — a slot of a different colour with nothing
+in it, which reads as a cell that failed to load. Padding it with a blank adds a
+thing to look at that says nothing; trimming works because an odd readout always
+has a weakest cell. Twelve pages were odd and every one is better for losing one:
+
+| page | cut | why |
+|---|---|---|
+| `draw` | every sample | `kept` and `invented %` already carry the ratio |
+| `flipper` | window | the DVR depth, pinned at ~120 min |
+| `grains` | round trip | the board answering is the signal, not the ms |
+| `keep` | takes | `line` says how much there is |
+| `llhls` | target | a constant read out of the playlist |
+| `moq` | version | already in the pill above it |
+| `rack` | rate | 50/s from the first second, forever |
+| `reel` | newsreels | a count that stops changing after load |
+| `room` | joined | the same number as `others` once everyone is in |
+| `shout` | burst | in the log line already |
+| `take` | mime | a constant string once recording starts |
+| `wire` | round trip | `delivery` is the same quantity on the far side |
+
+`mount()` throws on an odd count, so the suite catches it — proved twice by the
+run that went red mid-edit. And **nothing unmeasured prints as `0` or as a lone
+unit**: `''`, `null` and `NaN` all become one em dash with the unit hidden. An
+empty string used to empty the cell and leave the unit standing alone — a `%`
+with no number in front of it — and a page pre-setting a counter to 0 is worse,
+because a zero reads as a very confident measurement.
+
+Suite **449/449** after the sweep.
 
 ## Session 19 (2026-09-12) — a browser plays Ableton Live; a clean stream that sounded broken; four rounds of UI
 

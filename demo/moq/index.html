@@ -34,7 +34,7 @@
   const d = mount({
     name: 'moq',
     what: 'Browser to browser over MoQ. The clock is burned into the pixels, so the latency is read back off the picture.',
-    readout: { latency: 'ms', p95: 'ms', fps: '', frames: '', version: '' },
+    readout: { latency: 'ms', p95: 'ms', fps: '', frames: '' },
     controls: [
       { id: 'go', label: 'Connect and publish', primary: true },
       { id: 'check', label: 'Run the checks' },
@@ -72,7 +72,6 @@
     leg = await startMoq({ out, ns, role, forceTransport, codec, log: (m, k) => d.log(m, k) });
     pill.dataset.on = '1';
     pill.textContent = `relay: ${leg.version}`;
-    d.set('version', leg.version);
 
     setInterval(() => {
       const s = leg.stats;

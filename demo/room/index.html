@@ -37,7 +37,7 @@
       + 'frame carries the same burned-in clock, so a far window read against '
       + 'yours is how far behind it is, and FIRST is how long it took to '
       + 'appear.',
-    readout: { others: '', joined: '', first: 'ms', size: '', dropped: '' },
+    readout: { others: '', first: 'ms', size: '', dropped: '' },
     controls: [
       { id: 'join', label: 'Join', primary: true },
       { id: 'camera', label: 'Use the camera' },
@@ -148,7 +148,6 @@
     // no `?? 0`: a number this page has not observed is an em dash, and before
     // anyone joins there is nothing to report rather than a confident zero
     d.set('others', pcs.size || null);
-    d.set('joined', pcs.size ? joined : null, joined === pcs.size && pcs.size > 0 ? 'ok' : '');
     d.set('dropped', pcs.size ? gone : null, gone ? 'bad' : '');
 
     // WHAT ACTUALLY ARRIVED, not what we sent. WebRTC starts a new sender low
