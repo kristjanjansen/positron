@@ -20,6 +20,7 @@
   import { createXyPad, PAD } from '/shell/xy-pad.mjs';
   import { holdSample, lerpSample, catmullSample, makePointerAdapter } from '/shell/pointer-adapter.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
   import { createDeck, observePosition } from '/timeline/transport.mjs';
 
   const d = mount({
@@ -443,7 +444,31 @@
     if (s && Number.isFinite(s.x)) { ghost = s; pad.repaint(); }
   });
 
-  createTransportBar(d.el, deck);
+  // 🔴 THE GESTURE AS A SIGNAL, NOT ONLY AS A PATH. The pad shows WHERE the
+  // hand went; this shows WHEN — x and y against time, on the line the
+  // transport actually scrubs. They are the same thirty samples read two ways,
+  // and the second reading is the one that makes the timing visible: a fast
+  // corner is a steep edge here and just a bend up there.
+  //
+  // The polyline comes from the strip's own `continuous` renderer, which calls
+  // `deck.sampleAt(kind, t)` — so it is drawn through the SAME interpolator the
+  // page's blue line and the playhead's mark use. Three surfaces, one answer;
+  // if they ever disagree it is because something real changed, not because a
+  // third drawing path was written.
+  const view = createStripView(d.el, deck, {
+    size: 'auto',
+    lanes: [
+      { id: 'x', kind: KIND, as: 'continuous', label: 'across', min: 0, max: PAD.w,
+        value: (p) => p && p.x, color: C.guess },
+      { id: 'y', kind: KIND, as: 'continuous', label: 'down', min: 0, max: PAD.h,
+        value: (p) => p && p.y, color: C.guess },
+    ],
+  });
+
+  // ⚠️ ONE POSITION SURFACE PER PAGE. The strip seeks on press AND on drag,
+  // which the bar's slider does not — two horizontal time axes at different
+  // scales, both scrubbing, is a contradiction rather than a redundancy.
+  createTransportBar(d.el, deck, { scrub: false });
 
   // UNDER the pad and its transport, because they change the picture above
   // them and a control that sits below what it moves is read in the order it is
