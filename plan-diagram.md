@@ -90,9 +90,9 @@ graph layer could later hand us. Nothing in it should be about pixels.
       title: 'a key press, and what it costs',
       caption: 'one line under the diagram',
       nodes: [
-        { id: 'you',   label: 'your browser',      sub: 'a key press',   kind: 'here'  },
-        { id: 'relay', label: 'Cloudflare',        sub: 'a Durable Object relay', kind: 'cloud' },
-        { id: 'box',   label: 'Raspberry Pi',      sub: 'yoshimi → pappus', kind: 'device' },
+        { id: 'you',   label: 'your browser',      sub: 'a key press',      kind: 'here'   },
+        { id: 'relay', label: 'Cloudflare',        sub: 'passes it along',  kind: 'cloud'  },
+        { id: 'box',   label: 'Raspberry Pi',      sub: 'plays the note',   kind: 'device' },
       ],
       links: [
         { from: 'you',   to: 'relay', label: 'note number' },
@@ -101,6 +101,13 @@ graph layer could later hand us. Nothing in it should be about pixels.
         { from: 'relay', to: 'you',   label: '', back: true },
       ],
     }
+
+⚠️ **AND THE FIRST VERSION OF THAT EXAMPLE BROKE §7'S OWN RULE.** It read
+`sub: 'yoshimi → pappus'` and `'a Durable Object relay'` — two program names
+and a piece of Cloudflare's vocabulary, in the very document that says a
+diagram label is held to exactly the same standard as the paragraph it
+replaces. A plan that demonstrates its own rule being broken is worse than one
+that does not mention it.
 
 **`sub` is the second level, and one level of nesting is enough.** The note
 asks whether devices need to contain their software. They do not: a device with
@@ -123,8 +130,21 @@ Left to right, one column per step, computed from the links:
   box's edge.
 - 🔴 **`back: true` links route UNDER the row**, not between the boxes — a
   return path drawn through the forward path is the thing that makes signal
-  diagrams unreadable. Under, with the arrow pointing back, at a depth that
-  grows with how far it travels so two loopbacks never overlap.
+  diagrams unreadable. Under, with the arrow pointing back.
+  ⚠️ **"AT A DEPTH THAT GROWS WITH HOW FAR IT TRAVELS" WAS WRONG AND IS
+  CORRECTED.** Two return paths of IDENTICAL length that overlap — one spanning
+  boxes 1–3, the other 2–4 — get the same depth from a distance rule and are
+  drawn as one line, with the second silently absent. The implementation uses
+  INTERVAL COLOURING instead (shortest first, shallowest free depth), which is
+  strictly stronger and also keeps the picture shallower, because two paths
+  that share no ground can share a depth. Proved by sabotage: a literal
+  distance table fails two asserts, one of them *"two returns that share no
+  ground share a depth"*.
+- ⚠️ **A FORWARD CYCLE, which this section did not consider.** It happens the
+  first time an author forgets `back: true`. Left alone the column relaxation
+  runs to its cap and returns 14/15/16 — a seventeen-box-wide picture of a
+  three-step path. Links pointing at an earlier box in the spec's own node list
+  are dropped, with a warning.
 - **Below ~560 px the whole thing becomes one column, top to bottom**, and the
   loopbacks route to the left. A horizontal diagram on a phone is a diagram
   nobody reads.
@@ -161,7 +181,9 @@ So: measure and break, once, in a shared helper.
 The note: *"subtle colour coding, very subtle, in general grey, mix in some
 colours to grey, but don't go muddy by mixing in yellows."*
 
-- The field, the boxes and the arrows are `--line` / `--card2` / `--dim`.
+- The field, the boxes and the arrows are `--line2` / `--card2` / `--dim`.
+  ⚠️ **NOT `--line` for an edge**: #1f2937 on `--card` (#11151d), which is the
+  background of every `/kit/` block, is not a border anybody can see.
 - A `kind` mixes **8–12% of a hue into the stroke and 4% into the fill**, no
   more. At that strength it reads as "these two are the same sort of thing"
   without reading as a legend.
