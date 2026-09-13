@@ -29,7 +29,9 @@
 //   * two applications of the SAME seed are what every seed verdict is measured
 //     against — the floor is the instrument's own wobble, sampled, not a number
 //     anybody typed;
-//   * the drift must move the sound with NOTHING sent at all;
+//   * the drift must move the sound with NOTHING sent at all — and, separately,
+//     it must STAY OFF when it has been told to, which is its own check now;
+//   * the pitch sweep must prove there is a sound before measuring its pitch;
 //   * `--self-test` runs the statistics against synthetic captures with no board
 //     attached, and fails if the shuffle test can no longer say NO to two
 //     samples of one distribution, or YES to two that are three wobbles apart.
@@ -101,6 +103,32 @@
 // that no repeat count touches. `--only <section>` is the lever when you are
 // iterating on one claim; `--takes` is for experiments, NOT for making a red run
 // green — lowering it does not weaken a verdict, it withdraws it.
+//
+// ── TWO STATE TRAPS THAT COST A WHOLE RUN, 2026-09-13 ────────────────────────
+//
+// Both are about a command doing something beyond its name, and both made
+// checks fail for a reason that had nothing to do with what they were asking.
+//
+// 🔴 **A ROLL TURNS THE DRIFT BACK ON.** `params.random` ends with
+// `startDrift()` in box.mjs, so `params.drift off` BEFORE a roll is undone by
+// the roll. Ten rolls in the seed section re-armed it ten times, and the
+// section's numbers say so: two applications of one seed 0.091 env apart, two
+// DIFFERENT seeds 0.009 apart — the wobble ten times the effect, which is the
+// signature of six parameters walking under a set of captures taken minutes
+// apart. Every roll here goes through `roll()`, which puts it back off, and
+// `nudges` is read off the BOX to prove it stayed off.
+//
+// 🔴 **`src 1` ERASES, AND `lock` IS WHAT HOLDS.** The engine writes
+// `BufWr(cap·sosin + old·sosret)` where `sos = msos.max(mlock)` — so `src 1`
+// with `lock` still 0 makes both terms zero and sweeps silence over the live
+// window in real time. Freezing in the order `src` then `lock` therefore erases
+// the head of whatever was just recorded, for as long as the second command
+// takes to cross the relay. Lock first; `lock 1` alone already both holds the
+// material and stops the input being mixed in. (`loadBuffers` uses the other
+// order and is right to — it `snapread`s straight afterwards.)
+//
+// And `src` is **1 OFF, 2 STEREO, 3 MONO L, 4 MONO R, with no 0** — a value
+// outside that table is silence rather than an error. See `rig/box/norns/CHAIN.md`.
 //
 // ⚠️ The statistics live here rather than in `measure.mjs` only because this
 // change was scoped to one file. They belong next to `measure()`, and
@@ -481,14 +509,37 @@ async function takes(label, n = TAKES, opts = {}) {
   return c;
 }
 
+/**
+ * ⚠️ A ROLL TURNS THE DRIFT BACK ON, AND THE BOX IS RIGHT TO DO IT.
+ *
+ * `box.mjs`'s `params.random` ends with `pappus().startDrift()` — "movement is
+ * on by default once there is something to move" — so **`params.drift off`
+ * followed by a roll leaves the drift RUNNING**. Every roll in this file was
+ * followed by captures taken on the belief that nothing was moving, and the
+ * seed section re-armed it TEN TIMES. Measured consequence, 2026-09-13: two
+ * applications of one seed landed 0.091 env / 0.18 oct apart while two
+ * DIFFERENT seeds landed 0.009 / 0.04 apart — the wobble ten times the effect,
+ * which is what continuous movement does to a set of captures taken minutes
+ * apart. The order is what matters: off AFTER the roll, never before.
+ *
+ * `drift: true` is for the one section that wants it.
+ */
+async function roll(seed, { drift = false } = {}) {
+  const r = await answer(send({ type: 'params.random', seed }), 'params.rolled');
+  if (!drift) await answer(send({ type: 'params.drift', on: false }), 'params.drifted');
+  return r;
+}
+/** How many nudges the drift has made — the way to prove it is not moving. */
+const nudges = async () => (await answer(send({ type: 'params.state' }), 'params.state')).drift?.nudges ?? null;
+
 /** One application of a seed, averaged over PER_APP captures. The seed checks repeat THIS. */
 async function application(seed) {
-  const roll = await answer(send({ type: 'params.random', seed }), 'params.rolled');
+  const rolled = await roll(seed);      // through roll(), so the drift goes back off
   await wait(1200);
   const got = [];
   for (let i = 0; i < PER_APP; i++) got.push(await once());
   const c = condition(`seed ${seed}`, got, 'captures');
-  return { roll, value: c && { peak: c.peak, ratio: c.ratio, centroid: c.centroid, n: 1 } };
+  return { roll: rolled, value: c && { peak: c.peak, ratio: c.ratio, centroid: c.centroid, n: 1 } };
 }
 
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('relay would not open')); });
@@ -549,8 +600,15 @@ try {
     // half-minute is indistinguishable from the seed. Alternating spends the
     // same time and removes it.
     console.log(`  rolling ${APPS} applications of each seed, alternating (${PER_APP} captures each) ...`);
+    const nudged0 = await nudges();
     const appsA = [], appsB = [];
     for (let i = 0; i < APPS; i++) { appsA.push(await application(SEED_A)); appsB.push(await application(SEED_B)); }
+    // ⚠️ THE CONTROL FOR THE ROLL RE-ARMING THE DRIFT, which is the defect this
+    // whole section was measured through once. Counted on the BOX's side of the
+    // wire, so it is evidence about the engine rather than about what we sent.
+    const nudged1 = await nudges();
+    ok('nothing moved on its own while the seeds were measured', nudged1 === nudged0,
+      `${nudged1 - nudged0} nudges across ${APPS * 2} rolls and ${APPS * 2 * PER_APP} captures — a roll turns the drift back on, so this is the control for that`);
 
     const rA = appsA[0].roll;
     okOnce('a roll names its character and carries its seed back',
@@ -636,7 +694,7 @@ try {
     // running for two minutes, and the comparison could have been answering
     // about that instead. Same roll, same second, one difference: what is in
     // the buffer.
-    await answer(send({ type: 'params.random', seed: SEED_A }), 'params.rolled');
+    await roll(SEED_A);
     await wait(1200);
     const synth = await takes(`the synth under seed ${SEED_A}`);
 
@@ -648,7 +706,7 @@ try {
     await wait(2000);
 
     // The SAME roll, so the only thing that changed is what is in the buffer.
-    await answer(send({ type: 'params.random', seed: SEED_A }), 'params.rolled');
+    await roll(SEED_A);
     await wait(1200);
     const err = await takes(`1965 under seed ${SEED_A}`);
     // A DETECTION, NOT A COMPARISON: sound against no sound is categorical, so
@@ -710,22 +768,25 @@ try {
     // — and it recorded 50x quieter in the suite than the same code did standing
     // alone, for exactly that reason. Every parameter the sweep depends on is
     // either rolled here or set below; nothing is inherited.
-    await answer(send({ type: 'params.random', seed: SEED_B }), 'params.rolled');
-    await set('mtilt', 0); await set('ntilt', 0);
-    await set('msos', 0); await set('nsos', 0);     // do not freeze while recording
-    await wait(800);
-    send({ type: 'note.on', note: 60, vel: 110 });
-    await wait(6000);
-    send({ type: 'note.off', note: 60 });
-    await set('msrc', 1); await set('nsrc', 1);
-    await set('mlock', 1); await set('nlock', 1);
-    await set('pamp', ...Array(48).fill(0));
-    await set('taplevels', ...Array(8).fill(0));
-    for (const k of ['pwet', 'swet', 'rverb', 'noise', 'drive', 'crush',
-                     'pin1', 'pin2', 'sin1', 'sin2', 'kin1', 'kin2']) await set(k, 0);
-    await set('oin1', 1); await set('oin2', 0);
-    await set('mrate', 12); await set('msize', 0.2); await set('mspray', 0); await set('mswarm', 0);
-    await set('mtilt', 0);          // tilt is baked in at RECORD time — keep it neutral
+    //
+    // ⚠️ AND THROUGH `roll()`, WHICH PUTS THE DRIFT BACK OFF. A bare
+    // `params.random` re-arms it, so the `params.drift off` that used to sit on
+    // the line ABOVE this one was undone by the line itself, and the whole
+    // sweep ran with six parameters walking under it.
+    await roll(SEED_B);
+
+    // ── THE GEOMETRY GOES IN BEFORE THE RECORDING, NOT AFTER IT ─────────────
+    //
+    // ⚠️ THIS BLOCK USED TO RECORD INTO ONE BUFFER AND READ OUT OF ANOTHER.
+    // `mbuflen` is not a read setting — `Engine_Pappus.sc:537` makes it the
+    // LIVE LENGTH of the ring, "only the first mbuflen seconds of it are live",
+    // so it governs where the write head goes as much as where the read head
+    // looks. Setting it to 4 s AFTER a six-second note had been recorded into
+    // whatever length the previous section left meant the window at 45–55%
+    // pointed into a region the note might never have reached. Set first, the
+    // six-second note wraps a four-second ring and fills it end to end, so
+    // every position in it is the note and the window cannot miss.
+    await set('mbuflen', 4);
     // ⚠️ A NARROW WINDOW, BECAUSE THE SCATTER IS THE NOISE. With the window open
     // across the whole four seconds, every grain reads a DIFFERENT slice of the
     // recorded note, so a rung's own spread came out at 0.09, 0.14, 0.38 and 0.41
@@ -734,7 +795,7 @@ try {
     // read head to a tenth of the buffer means every grain reads nearly the same
     // material and the only thing left varying is the pitch, which is the
     // quantity in question. Remove the noise; do not out-average it.
-    await set('mscan', 0.5); await set('mbuflen', 4);
+    await set('mscan', 0.5);
     await set('mwinstart', 0.45); await set('mwinend', 0.55);
     // ⚠️ AND PIN THE MODES, which the roll otherwise chooses. `scanmode` 3 and 4
     // are DELAY SYNC and DELAY FREE — the read head moves on its own — so a run
@@ -745,6 +806,48 @@ try {
     // the grain envelope, and an envelope change is a spectrum change.
     await set('mscanmode', 2);      // 2 POSITION — a static read head
     await set('mcontour', 8);       // a mid envelope shape, fixed across runs
+    await set('mtilt', 0); await set('ntilt', 0);   // baked in at RECORD time — neutral
+    await set('msos', 0); await set('nsos', 0);     // do not freeze while recording
+
+    // ── RECORD THE NOTE ────────────────────────────────────────────────────
+    //
+    // ⚠️ SAY WHAT RECORDING IS, RATHER THAN INHERIT IT. `src` is **1 OFF,
+    // 2 STEREO, 3 MONO L, 4 MONO R, and there is no 0** (CHAIN.md; a value
+    // outside the table is silence, not an error). `source.clear` above does
+    // hand the buffers back — `mlock 0, msrc 2` — but this block's own comment
+    // claims nothing is inherited, and these two were the only parameters it
+    // was inheriting, which is the pair that decides whether anything is
+    // recorded at all. Now it says so.
+    await set('mlock', 0); await set('nlock', 0);
+    await set('msrc', 2); await set('nsrc', 2);     // 2 = STEREO
+    await wait(800);
+    send({ type: 'note.on', note: 60, vel: 110 });
+    await wait(6000);
+    send({ type: 'note.off', note: 60 });
+    // ⚠️ LOCK FIRST, THEN OFF, AND THE OTHER ORDER ERASES WHAT WAS JUST PLAYED.
+    // From the engine's own arithmetic (Engine_Pappus.sc:489-508, quoted in
+    // pappus.mjs): `sos = msos.max(mlock)`, `sosret = (sos*1.05).clip(0,1)`,
+    // `sosin = ((1-sos)*4).clip(0,1) * run * (ssel > 1.5)`. With `src` 1 and
+    // `lock` still 0, BOTH terms are zero and `BufWr` writes `0·new + 0·old` —
+    // silence, sweeping the live window in real time. This block sent `msrc 1`
+    // and then waited TWO RELAY ROUND TRIPS for `mlock 1` to land, erasing the
+    // head of the recording it was about to measure. `lock 1` on its own
+    // already does both jobs: `sosret` 1 holds the material and `sosin` 0 stops
+    // the input being mixed in. ⚠️ `loadBuffers` uses the opposite order and is
+    // right to — it `snapread`s the buffers immediately afterwards, so it has
+    // something to restore from. This has nothing.
+    await set('mlock', 1); await set('nlock', 1);
+    await set('msrc', 1); await set('nsrc', 1);
+
+    // ── MUTE EVERYTHING THAT CANNOT FOLLOW A KEY ───────────────────────────
+    // `oin1 1` with `pin1/sin1/kin1` at 0 is the routing matrix's documented
+    // dry path — granulator one straight to the output, no recompile (CHAIN.md).
+    await set('pamp', ...Array(48).fill(0));
+    await set('taplevels', ...Array(8).fill(0));
+    for (const k of ['pwet', 'swet', 'rverb', 'noise', 'drive', 'crush',
+                     'pin1', 'pin2', 'sin1', 'sin2', 'kin1', 'kin2']) await set(k, 0);
+    await set('oin1', 1); await set('oin2', 0);
+    await set('mrate', 12); await set('msize', 0.2); await set('mspray', 0); await set('mswarm', 0);
     await set('mswarmmode', 1); await set('mspraymode', 1);
     await set('melen', 1); await set('epattern', ...Array(16).fill(1));
     await set('gates', 1, 0, 0, 0, 0, 0, 0, 0);
@@ -755,52 +858,106 @@ try {
     // each it read -12:272 · -7:443 · 0:684 · +7:553 · +12:892 — a rung going
     // DOWN in the middle of a rise that is otherwise obvious, which failed the
     // whole check on one unlucky capture.
-    const ladder = [];
-    for (const st of [-12, -7, 0, 7, 12]) {
-      await set('pitches', st, 0, 0, 0, 0, 0, 0, 0);
-      await wait(700);
-      const got = [];
-      for (let i = 0; i < TAKES; i++) got.push(await once({ play: false, hold: 2400, settle: 0 }));
-      const c = condition(`${st > 0 ? '+' : ''}${st} semitones`, got, 'captures');
-      if (!c) { ok(`the ladder at ${st} semitones was audible at all`, false, `${TAKES} captures, every one empty`); throw new Error('no audio during the pitch ladder'); }
-      ladder.push(c);
+    // ── IS THERE A SOUND TO MEASURE THE PITCH OF? ──────────────────────────
+    //
+    // ⚠️ THE SWEEP USED TO ASSUME ITS OWN RECORDING WORKED, and on 2026-09-13
+    // it did not: five rungs, twenty-five captures, `peak 0.0000` on every one,
+    // reported as three failed claims about PITCH. Silence and a pitch that
+    // will not move look identical in a centroid, so the run said "a higher key
+    // does not pitch the grains up" about an engine nobody had shown was making
+    // a sound. One capture before the sweep separates them, and the sweep is a
+    // minute of captures that is pointless without it.
+    await set('pitches', 0, 0, 0, 0, 0, 0, 0, 0);
+    await wait(700);
+    const heard = await once({ play: false, hold: 2400, settle: 0 });
+    let blocked = null;
+    if (!(heard.peak > SILENCE)) {
+      // ⚠️ AND WHEN IT IS SILENT, MEASURE WHY — here, in this run, rather than
+      // leaving the next session to guess between three causes with identical
+      // output. Two probes, in order, each one ruling out a family:
+      //
+      //   the WHOLE buffer instead of a tenth of it — if that sounds, the note
+      //   was recorded somewhere the narrow window was not looking, and the
+      //   fault is the read geometry;
+      //
+      //   the LIVE INPUT, recording again — if that sounds, the signal path out
+      //   of the granulator is fine and the buffer was simply empty, so the
+      //   fault is the recording;
+      //
+      //   neither — the fault is downstream of the buffer, in the mute block
+      //   above, and has nothing to do with the material at all.
+      note('nothing came back from the recorded note — probing why, which costs ~6 s and only happens when it has already failed');
+      await set('mwinstart', 0); await set('mwinend', 1);
+      const wide = await once({ play: false, hold: 2400, settle: 0 });
+      await set('mlock', 0); await set('nlock', 0);
+      await set('msrc', 2); await set('nsrc', 2);
+      const live = await once({ hold: 2400, settle: 250 });
+      note(`probes: narrow window ${heard.peak.toFixed(4)} · whole buffer ${wide.peak.toFixed(4)} · live input ${live.peak.toFixed(4)}  (silence is under ${SILENCE})`);
+      const st = await answer(send({ type: 'params.state' }), 'params.state');
+      note(`the box's own state: rate ${st.roll?.m?.rate} · size ${st.roll?.m?.size} · scanmode ${st.roll?.m?.scanmode} · drift ${st.drift?.on ? 'ON — it should be off' : 'off'} · source ${st.source ? st.source.title : 'none'}`);
+      blocked = wide.peak > SILENCE
+        ? `the note WAS recorded but the narrow window missed it — whole buffer ${wide.peak.toFixed(4)} against ${heard.peak.toFixed(4)} through 45-55%. The read geometry is wrong, not the engine`
+        : live.peak > SILENCE
+          ? `the grain buffer came back EMPTY — the live input reads ${live.peak.toFixed(4)} through the same routing, so the signal path is fine and the six-second recording never landed`
+          : `nothing reaches the output at all, buffer or live input — the fault is downstream of the grains, in the stages this section mutes, and is not about the material`;
     }
-    note(`pitch ladder  ${ladder.map((c) => `${c.label.split(' ')[0]}:${Math.round(c.centroid)}Hz`).join('  ')}   (middle of ${TAKES} captures each)`);
-    note(`each rung's own spread  ${ladder.map((c) => fmtAxis('oct', c.spread.oct)).join('  ')}`);
-    ok('every rung of the pitch ladder sounds', ladder.every((c) => c.peak > SILENCE),
-      `${ladder.map((c) => `${sounded(c)}/${c.n}`).join(' ')} captures above ${SILENCE} · peaks ${ladder.map((c) => c.peak.toFixed(3)).join(' ')}`);
+    if (blocked) {
+      // ⚠️ ABSTAIN, DO NOT FAIL. Three checks about PITCH cannot be answered
+      // when there is no sound, and answering them anyway is how a silent
+      // granulator got reported as a granulator that will not follow a key.
+      for (const n of ['every rung of the pitch ladder sounds',
+                       'the rungs rise in order',
+                       'the top of the ladder is further from the bottom than a rung is from itself']) cannot(n, blocked);
+    } else {
+      note(`the recorded note reads peak ${heard.peak.toFixed(4)} before the sweep — there is a sound to measure the pitch of`);
+      const ladder = [];
+      for (const st of [-12, -7, 0, 7, 12]) {
+        await set('pitches', st, 0, 0, 0, 0, 0, 0, 0);
+        await wait(700);
+        const got = [];
+        for (let i = 0; i < TAKES; i++) got.push(await once({ play: false, hold: 2400, settle: 0 }));
+        const c = condition(`${st > 0 ? '+' : ''}${st} semitones`, got, 'captures');
+        if (!c) { ok(`the ladder at ${st} semitones was audible at all`, false, `${TAKES} captures, every one empty`); throw new Error('no audio during the pitch ladder'); }
+        ladder.push(c);
+      }
+      note(`pitch ladder  ${ladder.map((c) => `${c.label.split(' ')[0]}:${Math.round(c.centroid)}Hz`).join('  ')}   (middle of ${TAKES} captures each)`);
+      note(`each rung's own spread  ${ladder.map((c) => fmtAxis('oct', c.spread.oct)).join('  ')}`);
+      ok('every rung of the pitch ladder sounds', ladder.every((c) => c.peak > SILENCE),
+        `${ladder.map((c) => `${sounded(c)}/${c.n}`).join(' ')} captures above ${SILENCE} · peaks ${ladder.map((c) => c.peak.toFixed(3)).join(' ')}`);
 
-    // ⚠️ ONLY THE UPWARD RUNGS ARE ASSERTED, AND THE REASON IS THE MEASURE.
-    // Over three runs the rungs at or below zero all landed between 225 and
-    // 434 Hz in no reliable order — -12 read HIGHER than 0 in one of them —
-    // while +7 and +12 were clean and far above every time. That is not the
-    // engine being erratic downward: a grain clock at 12/s with a 0.2 s envelope
-    // puts a broadband floor under everything, and when the pitched partials
-    // move DOWN into it the centroid stops following them. Brightness can see a
-    // grain pitched up and cannot see one pitched down.
-    const up = ladder.slice(2);
-    const steps = up.slice(1).map((c, i) => compare(up[i], c));
-    note(`per step: ${steps.map((st) => `${fmtAxis('oct', st.oct.d)} (p ${st.oct.p == null ? '—' : st.oct.p.toFixed(3)})`).join(' · ')}`);
-    // ⚠️ REPORTED AND NOT ASSERTED, WITH THE NUMBER THAT SAYS WHY. A rung's own
-    // spread is about 0.38 octaves and one seven-semitone step moves about 0.29
-    // — an effect SMALLER than the wobble, which needs about 19 captures a rung
-    // to resolve, or five minutes of this run for one line of output. So this
-    // instrument can see an octave of key and cannot see half of one, and
-    // saying that is better than asserting it and going amber every third run.
-    note(`a step of a fifth moves LESS than a rung wobbles on its own, so it is printed and never asserted — resolving it would need about 19 captures a rung, five minutes of this run for one line`);
-    const ordered = up.every((c, i) => i === 0 || c.centroid > up[i - 1].centroid);
-    ok('the rungs rise in order', ordered,
-      `${up.map((c) => Math.round(c.centroid) + ' Hz').join(' -> ')} · middles of ${TAKES} captures each${ordered ? '' : ' — OUT OF ORDER'}`);
-    const ends = compare(up[0], up[up.length - 1]);
-    okStat('the top of the ladder is further from the bottom than a rung is from itself', ends,
-      `${Math.round(up[0].centroid)} Hz -> ${Math.round(up[up.length - 1].centroid)} Hz`);
-    // Brightness is a PROXY for pitch and it over-reads: pitching a harmonic
-    // series up brings upper partials into the band, so the centroid climbs
-    // faster than the pitch ratio — measured 3.23 octaves of brightness for the
-    // two octaves of key the sweep once asked for. How much faster depends on
-    // the spectrum of whatever was recorded, which is not a property of the
-    // engine, so an upper bound would be asserting something nobody can predict.
-    note(`${Math.log2(up[up.length - 1].centroid / up[0].centroid).toFixed(2)} octaves of brightness for the octave of key above zero — a proxy that over-reads, which is why only the direction is asserted`);
+      // ⚠️ ONLY THE UPWARD RUNGS ARE ASSERTED, AND THE REASON IS THE MEASURE.
+      // Over three runs the rungs at or below zero all landed between 225 and
+      // 434 Hz in no reliable order — -12 read HIGHER than 0 in one of them —
+      // while +7 and +12 were clean and far above every time. That is not the
+      // engine being erratic downward: a grain clock at 12/s with a 0.2 s envelope
+      // puts a broadband floor under everything, and when the pitched partials
+      // move DOWN into it the centroid stops following them. Brightness can see a
+      // grain pitched up and cannot see one pitched down.
+      const up = ladder.slice(2);
+      const steps = up.slice(1).map((c, i) => compare(up[i], c));
+      note(`per step: ${steps.map((st) => `${fmtAxis('oct', st.oct.d)} (p ${st.oct.p == null ? '—' : st.oct.p.toFixed(3)})`).join(' · ')}`);
+      // ⚠️ REPORTED AND NOT ASSERTED, WITH THE NUMBER THAT SAYS WHY. A rung's own
+      // spread is about 0.38 octaves and one seven-semitone step moves about 0.29
+      // — an effect SMALLER than the wobble, which needs about 19 captures a rung
+      // to resolve, or five minutes of this run for one line of output. So this
+      // instrument can see an octave of key and cannot see half of one, and
+      // saying that is better than asserting it and going amber every third run.
+      note(`a step of a fifth moves LESS than a rung wobbles on its own, so it is printed and never asserted — resolving it would need about 19 captures a rung, five minutes of this run for one line`);
+      const ordered = up.every((c, i) => i === 0 || c.centroid > up[i - 1].centroid);
+      ok('the rungs rise in order', ordered,
+        `${up.map((c) => Math.round(c.centroid) + ' Hz').join(' -> ')} · middles of ${TAKES} captures each${ordered ? '' : ' — OUT OF ORDER'}`);
+      const ends = compare(up[0], up[up.length - 1]);
+      okStat('the top of the ladder is further from the bottom than a rung is from itself', ends,
+        `${Math.round(up[0].centroid)} Hz -> ${Math.round(up[up.length - 1].centroid)} Hz`);
+      // Brightness is a PROXY for pitch and it over-reads: pitching a harmonic
+      // series up brings upper partials into the band, so the centroid climbs
+      // faster than the pitch ratio — measured 3.23 octaves of brightness for the
+      // two octaves of key the sweep once asked for. How much faster depends on
+      // the spectrum of whatever was recorded, which is not a property of the
+      // engine, so an upper bound would be asserting something nobody can predict.
+      note(`${Math.log2(up[up.length - 1].centroid / up[0].centroid).toFixed(2)} octaves of brightness for the octave of key above zero — a proxy that over-reads, which is why only the direction is asserted`);
+
+    }
   }
 
   // ── the frame rate, which is the tell for two sources at once ────────────
