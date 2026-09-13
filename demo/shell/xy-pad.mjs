@@ -109,6 +109,7 @@ function fmtFor(a) {
  */
 export function createXyPad(host, {
   label = '', x, y, onStart, onInput, onDone, value, overlay, upTo, gesture = true,
+  showMark = true,
 } = {}) {
   ensureCss();
   const ax = axis(x, 'x'), ay = axis(y, 'y');
@@ -273,9 +274,14 @@ export function createXyPad(host, {
     // whatever the caller makes of the same gesture, over the top
     if (overlay) overlay(ctx, view);
 
-    // and where something ELSE says the point is now
+    // and where something ELSE says the point is now — when the caller still
+    // wants a mark for it. ⚠️ `showMark: false` is for a pad that ALREADY ENDS
+    // ITS LINE AT THE PLAYHEAD: there, the mark is a second thing pointing at
+    // the place the line already stops, and two indicators for one position
+    // read as two positions. The value is still asked for and still reaches
+    // `upTo`; only the dot is gone.
     const v = value && value();
-    if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) mark(v);
+    if (showMark && v && Number.isFinite(v.x) && Number.isFinite(v.y)) mark(v);
 
     ctx.restore();
   }
