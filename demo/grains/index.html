@@ -77,11 +77,6 @@
       board: '', sound: '',
       'grains a second': '', 'moved on its own': '', 'round trip': 'ms',
     },
-    // ⚠️ HIDDEN, NOT REMOVED. Pressing a key switches the granulator on, so the
-    // button is dead weight for a human — but `verify.mjs` presses
-    // `.pos-controls button` and every assert on this page hangs off this
-    // handler, so deleting it stops the page being tested while looking tidier.
-    // `?checks=1` brings it back.
     controls: [
       // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
       // real scsynth 2026-09-13: with the instrument still playing IN, the
@@ -101,12 +96,17 @@
       //
       // Order and PRIMARY are independent: `hold` is still the one that looks
       // like the main path, and `on` is hidden from a visitor anyway.
-      { id: 'on', label: 'Switch it on' },
-      { id: 'hold', label: 'Hold what it has', primary: true },
+      // 🔴 VISIBLE, AND FIRST IN BOTH SENSES. This was hidden behind ?checks=1
+      // on the reasoning that pressing a key starts the granulator. It does
+      // not: `fx.pappus {on:true}` is sent from THIS HANDLER and nowhere else,
+      // so hiding it left a visitor with no way to switch the instrument on and
+      // a page that does nothing. Asserted without checking, which is the whole
+      // of the mistake.
+      { id: 'on', label: 'Switch it on', primary: true },
+      { id: 'hold', label: 'Hold what it has' },
     ],
   });
   guard(d);
-  if (!new URLSearchParams(location.search).has('checks')) d.button('on').hidden = true;
 
   // ── state ────────────────────────────────────────────────────────────────
   let me = null;                       // this connection's id, to drop our own echo
@@ -445,13 +445,9 @@
         warming: ['Switching the granulator on',
           'the board is answering. The first time it is asked, it compiles a two-thousand line engine before anything can be '
           + 'heard, which takes about forty seconds; after that a switch is instant.'],
-        // ⚠️ ONLY WHEN THE BOARD REFUSED. This used to say "nothing is
-        // granulating yet — press Switch it on" at a visitor who has no such
-        // button any more (it is behind ?checks=1) about a state that clears
-        // itself the moment a key is pressed. A panel that describes a normal
-        // moment as a problem, and names a fix that is not on screen, is worse
-        // than no panel.
-        off: ['The board would not switch it on', `the board refused: ${fxWhy}`],
+        off: fxWhy
+          ? ['The board would not switch it on', `the board refused: ${fxWhy}`]
+          : ['The granulator is not in the sound', 'press “Switch it on” — the board compiles the engine the first time, which takes about forty seconds'],
         // It records its input, so with no input it is reading sixty seconds of
         // silence. That is not a fault and it is not a sound either, and it
         // happens whenever somebody else stops the board's instrument.
