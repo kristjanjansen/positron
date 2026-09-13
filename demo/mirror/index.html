@@ -137,7 +137,7 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and that picture hangs on one panel in front of you, with the frame rate it holds in there printed under it.',
+    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and that picture hangs on one panel in a room built from a seed, on a floor marked out in dots, with the frame rate it holds in there printed under it.',
     // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
     // so it goes in that picture's own bar rather than in a row above both —
     // joining a figure to its ink across two elements is exactly what makes a
@@ -538,6 +538,12 @@
         // the number that would actually notice a problem.
         ['copy', live && xr.state.uploadCpuMs != null ? `${xr.state.uploadCpuMs.toFixed(2)} ms` : ''],
         ['headset', live && xr.state.fb ? `${xr.state.fb.w}x${xr.state.fb.h}` : ''],
+        // ⚠️ WHOSE FLOOR THE DOTS ARE ON, where it can be read while wearing
+        // the thing. The 2-D page is behind your face, and "the grid is on your
+        // real floor" and "the grid is at a height this page guessed" look
+        // identical from inside — one of them is a measurement of your room and
+        // the other is not, so the panel says which.
+        ['floor', live ? (xr.state.room?.floor ?? '') : ''],
       ],
     });
     panelDrawn++;
@@ -867,6 +873,13 @@
     // `plan-xr-room.md` §2, so the panel is placed in the room rather than
     // pinned to your face.
     panels: [{ canvas: panel.canvas, w: 1.28, h: 0.80 }],
+    // 🔴 AND IT HANGS IN A ROOM, NOT IN NOTHING. The same seed `scene` opens
+    // with, through the same module, so this is that room rather than one like
+    // it — a floor and walls marked out in dots, and the dots move onto YOUR
+    // floor and YOUR walls where the headset will report them. A panel in a
+    // black void has no scale to be judged against and no floor to stand on,
+    // and it reads as a rectangle rather than as a screen in a place.
+    room: { seed: 424242 },
     log: (m, k) => d.log(m, k),
     // ⚠️ THIS PAGE'S OWN LOOP IS THE THING THAT STOPS. Inside a session the
     // headset owns the clock, so the shader is stepped from here — without it
@@ -914,6 +927,26 @@
     d.assert('it knows whether a headset can show this page',
       xr.supported() === true || xr.supported() === false,
       `a headset that can show this: ${xr.supported()}`);
+
+    // ⚠️ THE ROOM IS ARITHMETIC, SO A LAPTOP CAN GRADE IT. The panel's frame
+    // rate needs a headset and nothing here can change that — but whether the
+    // room was built at all, and whether the page can SAY where the dotted
+    // floor came from, are answerable on this machine. Leaving both to the
+    // device would mean the only test of the new half runs where nothing is
+    // watching. Both run on every branch, headset or not.
+    const R = xr.state.room;
+    d.assert('the panel hangs in a room, and the room is a real document',
+      !!R?.on && R.things > 0, R?.on ? `seed ${R.seed}, ${R.things} things` : 'no room — the panel would hang in nothing');
+    // 🔴 "NO SURFACES" MUST NEVER BE DRAWN AS "NO WALLS". Real room data is
+    // optional and it does not gate the grid: with none, the dots go on the
+    // page's own floor and the page has to SAY that is what they are. The
+    // sentence is the assert, because a grid nobody can attribute is a picture
+    // claiming to be a measurement.
+    d.assert('and it says whose floor the dotted grid is on',
+      typeof R?.note === 'string' && R.note.length > 10
+      && ['not asked', 'waiting', 'refused', 'unreadable', 'none', 'yours'].includes(R.surfaces),
+      `${R?.surfaces} · ${R?.note}`);
+
     if (got) {
       // ⚠️ A BOUNDED WAIT FOR A SECOND OF FRAMES, not for the first one. The
       // frame rate is counted over a one-second window, and the FIRST of those

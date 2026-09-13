@@ -71,10 +71,14 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 // arrived, then the press, then nothing at all. `navigator.sendBeacon` survives
 // it, so `beacon()` below is what the entry path uses.
 //
-// ⚠️ demo/scene STILL CARRIES ITS OWN COPY and was deliberately left alone. It
-// is the page a real headset has already graded, its session also holds a room,
-// a controller ray and grab-and-move, and moving it onto this module is a
-// change only a device can re-grade. Do that on a day with a Quest to hand.
+// ⚠️ demo/scene STILL CARRIES ITS OWN SESSION and was deliberately left alone.
+// It is the page a real headset has already graded, its session holds a
+// controller ray and grab-and-move, and moving it onto this module is a change
+// only a device can re-grade. Do that on a day with a Quest to hand. What the
+// two DO now share is the PICTURE: demo/shell/xr-room.mjs draws the room for
+// both, so a panel hanging here hangs in the same room `scene` shows.
+
+import { createXRRoom, roomOf, ROOM_OPTIONAL_FEATURES } from './xr-room.mjs';
 
 const REPORT = new URLSearchParams(location.search).get('report');
 
@@ -160,16 +164,35 @@ function placeFacing(headMat, headPos, wM, hM, dist, yaw) {
  * @param {() => void} [o.onEnd]
  * @param {(msg:string, kind?:string) => void} [o.log]
  * @param {number} [o.dist]  metres in front of you
+ * @param {boolean|{seed?:number}} [o.room]  hang the panels INSIDE the room
+ *        `scene` builds — the same module, the same seed arithmetic, and the
+ *        same dotted floor and walls. `true` takes the default seed.
  * @returns {{ supported: () => (boolean|null), enter: () => Promise<boolean>,
  *             end: () => Promise<void>, state: object }}
  */
 export function createXRPanels({
   panels = [], onFrame = null, onEnd = null, log = () => {},
-  dist = 1.6, clear = [0.02, 0.03, 0.045, 1], deadManMs = 4000,
+  dist = 1.6, clear = [0.02, 0.03, 0.045, 1], deadManMs = 4000, room = null,
 } = {}) {
   let gl = null, prog = null, quad = null, U = null;
   let session = null, space = null;
   let placed = null, armed = false, armAt = 0;
+
+  // ── the room the panels hang in ────────────────────────────────────────
+  // 🔴 A PANEL IN NOTHING IS NOT A PLACE. Before this, an immersive session
+  // here was one rectangle in a black void — no floor, no scale, nothing to
+  // judge the panel's distance against — and `scene` had a whole room sitting
+  // in one page nobody else could use. It is one module now, so the room this
+  // draws is byte for byte the room `scene` rolls.
+  //
+  // ⚠️ THE DOCUMENT IS BUILT AT LOAD, THE CONTEXT IS NOT. The room is four
+  // bytes of seed and some arithmetic, so it can be built and CHECKED on a
+  // laptop with no headset — but a WebGL2 context for every desktop visitor who
+  // will never press the button is a cost with nothing on the other side of it.
+  // `attach()` happens on the way into a session.
+  const roomSeed = (room && typeof room === 'object' && Number.isFinite(room.seed)) ? room.seed >>> 0 : 424242;
+  const roomDoc = room ? roomOf(roomSeed) : null;
+  const theRoom = room ? createXRRoom(null, { log, say: beacon }) : null;
 
   /**
    * 🔴 WHICH CALL, NOT WHETHER. `gl.getError()` returns the FIRST error since
@@ -233,7 +256,25 @@ export function createXRPanels({
     uploadCpuMs: null,
     uploadWorstMs: null,
     panelPixels: null,         // the texture actually being uploaded
+    // ⚠️ WHERE THE PANEL IS HANGING, AND WHERE THE GRID'S FLOOR CAME FROM.
+    // Published so one headset run answers both without anybody reading a log,
+    // and so a laptop can still grade the half that is arithmetic. `surfaces`
+    // is a WORD and there are six of them — see the list beside `planes` in
+    // xr-room.mjs — because "we did not look", "we were refused", "it answered
+    // and we could not read it" and "your room has no surfaces in it" are four
+    // different findings, and a boolean would collapse all four into one.
+    room: room
+      ? { on: true, seed: roomSeed, things: roomDoc.things.length, surfaces: 'not asked', floor: 'the page', note: '' }
+      : { on: false, seed: null, things: 0, surfaces: 'no room', floor: 'nothing', note: 'this page hangs its panels in an empty session' },
   };
+  if (theRoom) {
+    // A getter each, because the room writes its own verdict in place as the
+    // frames go by and a field copied once would answer about page load.
+    Object.defineProperty(state.room, 'surfaces', { get: () => theRoom.planes.state, enumerable: true });
+    Object.defineProperty(state.room, 'floor', { get: () => theRoom.planes.from, enumerable: true });
+    Object.defineProperty(state.room, 'note', { get: () => theRoom.planes.note, enumerable: true });
+    Object.defineProperty(state.room, 'grid', { get: () => theRoom.hasGrid, enumerable: true });
+  }
   // ⚠️ A GETTER, NOT A COPY. The probe resolves after this object is built, so a
   // field written once here would publish `null` forever — a machine surface
   // saying "we never looked" about a browser that answered a second later.
@@ -282,6 +323,13 @@ export function createXRPanels({
       tex.set(p.canvas, t);
     }
     glCheck('textures');
+    // The room compiles into the SAME context as the panels — one framebuffer,
+    // one set of attribute slots, one clear rule. A second context here would
+    // be a second thing to get `alpha: true` wrong on.
+    if (theRoom) {
+      theRoom.attach(gl);
+      glCheck('room');
+    }
     return true;
   }
 
@@ -313,8 +361,19 @@ export function createXRPanels({
       // ⚠️ `local-floor` IS REQUIRED, not optional: the panel hangs at eye
       // height measured from the floor, and on `local` the origin is wherever
       // your head happened to be when the session started.
+      // 🔴 `plane-detection` IS OPTIONAL AND IT MUST STAY OPTIONAL. It is what
+      // lets the dotted grid lie on the floor you are actually standing on
+      // rather than on the page's guess at one — but a headset whose owner has
+      // never run Space Setup, or who says no to the permission, must still get
+      // a room. In `requiredFeatures` this line would turn "I have not mapped
+      // my house" into "this page refuses to start", and the grid would be
+      // gated on a thing it is not allowed to be gated on.
       session = await step('requestSession immersive-vr',
-        navigator.xr.requestSession('immersive-vr', { requiredFeatures: ['local-floor'] }));
+        navigator.xr.requestSession('immersive-vr', {
+          requiredFeatures: ['local-floor'],
+          ...(theRoom ? { optionalFeatures: [...ROOM_OPTIONAL_FEATURES] } : {}),
+        }));
+      theRoom?.markAsked();
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace escaping the
       // handler means the session STARTS and the page then dies with no line —
@@ -453,6 +512,14 @@ export function createXRPanels({
     state.uploadCpuMs = sorted[sorted.length >> 1];
     state.uploadWorstMs = Math.max(state.uploadWorstMs ?? 0, cost);
 
+    // ── your real floor and walls, if this headset will say ───────────────
+    // ⚠️ ONCE PER FRAME, BEFORE THE EYE LOOP — the answer is the same for both
+    // eyes. 🔴 AND IT CANNOT THROW: `frame.detectedPlanes` raises on a session
+    // that was not granted the feature, and an uncaught error in a frame
+    // callback does not stop the loop, it silently deletes everything below it.
+    // The module swallows it, marks the session refused and stops asking.
+    theRoom?.observePlanes(frame, space);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     if (state.frames === 0) glCheck('bindFramebuffer');
     gl.enable(gl.DEPTH_TEST);
@@ -498,6 +565,7 @@ export function createXRPanels({
       }
     }
 
+    const hp = pose.transform.position;
     let eye = 0;
     for (const view of pose.views) {
       const vp = layer.getViewport(view);
@@ -506,7 +574,24 @@ export function createXRPanels({
       // 🔴 ONLY THE FIRST VIEW CLEARS COLOUR — defect 3. `gl.clear` ignores the
       // viewport and both eyes share one framebuffer, so a colour clear on the
       // second view wipes the first eye's picture and the headset goes black.
-      if (eye === 0) {
+      // The room does exactly the same arithmetic when it is drawing, which is
+      // why `clear` is handed to it rather than done twice.
+      if (theRoom?.ok) {
+        theRoom.draw({
+          proj: view.projectionMatrix, view: view.transform.inverse.matrix,
+          tSec: now / 1000, doc: roomDoc, clear: eye === 0, ar: false,
+          eye: [hp.x, hp.y, hp.z],
+        });
+        // ⚠️ THE PANELS ARE IN FRONT OF THE ROOM, ON PURPOSE, and this one
+        // line is what says so. A thing from the room standing between you and
+        // the panel would hide the numbers this page exists to report — and
+        // unlike `scene`'s things, nothing here can pick it up and move it out
+        // of the way. Clearing depth inside this eye's scissor puts the room
+        // behind the screen and leaves the screen readable.
+        gl.enable(gl.SCISSOR_TEST);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.disable(gl.SCISSOR_TEST);
+      } else if (eye === 0) {
         gl.clearColor(clear[0], clear[1], clear[2], clear[3]);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       } else {
@@ -517,6 +602,13 @@ export function createXRPanels({
         gl.clear(gl.DEPTH_BUFFER_BIT);
         gl.disable(gl.SCISSOR_TEST);
       }
+      // ⚠️ A SCREEN HAS NO BACK. The room turns face culling ON (it has to —
+      // its walls are a cube seen from the inside), and a panel you can walk
+      // behind and find gone is a panel that looks broken rather than
+      // one-sided. Turned off again for the panels, every frame, because the
+      // room's state is the room's business and this is the only place that
+      // knows a quad is a screen.
+      gl.disable(gl.CULL_FACE);
       gl.useProgram(prog);
       gl.uniformMatrix4fv(U.proj, false, view.projectionMatrix);
       gl.uniformMatrix4fv(U.view, false, view.transform.inverse.matrix);
@@ -544,7 +636,8 @@ export function createXRPanels({
       // The first phase that was dirty, not merely that one was.
       state.glError = glErrors.length ? Number(glErrors[0].split(':')[1]) : 0;
       state.glWhere = glErrors.join(' ') || 'clean';
-      beacon(`first headset frame · fb ${state.fb.w}x${state.fb.h} · ${state.views} views · eye0 ${state.eye.w}x${state.eye.h} · gl ${state.glWhere} · panel ${panels[0]?.canvas.width}x${panels[0]?.canvas.height}`);
+      beacon(`first headset frame · fb ${state.fb.w}x${state.fb.h} · ${state.views} views · eye0 ${state.eye.w}x${state.eye.h} · gl ${state.glWhere} · panel ${panels[0]?.canvas.width}x${panels[0]?.canvas.height}`
+        + (theRoom ? ` · room seed ${roomSeed}, ${roomDoc.things.length} things · grid ${theRoom.hasGrid ? 'drawing' : 'NOT drawing'} on ${theRoom.planes.from}` : ' · no room, the panel hangs in nothing'));
       log(`drawing ${state.fb.w}x${state.fb.h}, ${state.eye.w}x${state.eye.h} an eye`, 'hi');
     }
 
