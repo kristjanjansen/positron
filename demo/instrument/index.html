@@ -6,13 +6,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  .src { font: 400 11.5px/1.7 var(--mono); color: var(--dim); margin: 0 0 10px; }
-  .src b { color: var(--fg); font-weight: 500; }
-</style>
-
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard } from '/shell/shell.mjs';
   import { createVoices } from '/proto/looper/synth.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
 
@@ -22,8 +17,14 @@
 
   const d = mount({
     name: 'instrument',
-    what: 'Play an instrument that is somewhere else. What crosses the relay is a note NUMBER, so it carries music rather than a device protocol and cannot tell a keyboard from a tapped screen. With nobody else here the sound is made in this page; when another machine offers to make it, the sound comes back as live audio and the page times how late it is.',
-    readout: { midi: '', sent: '', received: '', latency: 'ms', sound: '', heard: 'ms' },
+    what: 'A keyboard whose sound may be coming out of a different machine. '
+        + 'Press Start audio and join, then play the keys — with nobody else in '
+        + 'the room this page makes the sound itself, and when another machine '
+        + 'offers to, Hear the other machine brings its audio back over the '
+        + 'same connection. Two of the cells are delays: how late a note '
+        + 'arriving from the other player is, and how long a press here takes to '
+        + 'come back as sound.',
+    readout: { midi: '', sound: '', sent: '', received: '', 'note in': 'ms', 'sound back': 'ms' },
     controls: [
       { id: 'start', label: 'Start audio and join', primary: true },
       { id: 'midi', label: 'Ask for MIDI' },
@@ -41,10 +42,16 @@
     onDown: (note, how) => press(note, how),
     onUp: (note) => release(note),
   });
-  const srcEl = el('p', 'src', 'no source yet');
-  d.el.append(srcEl);
+  // 🔴 NO LINE OF PROSE UNDER THE KEYS. It read `bd3f1a played note 64 (touch)`
+  // and rewrote itself on every note somebody else sent — a page narrating its
+  // own state in a sentence, at whatever rate the other player types. All three
+  // facts in it are already somewhere fixed: WHICH note lights the key in the
+  // colour that means somebody else, HOW MANY is the `received` cell, and WHO
+  // is a state change, so it goes in the log the first time each player is
+  // heard from, with whether the note came off a MIDI device or a screen.
+  const heardFrom = new Set();
 
-  let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not asked';
+  let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not yet';
   const lat = [];
 
   // --- where the sound is made -------------------------------------------
@@ -105,7 +112,7 @@
       if (m.from === ID) return;                    // the relay echoes to us too
       if (m.type === 'here' && m.ns) {           // a machine offering to be the synth
         synth = { from: m.from, ns: m.ns, moqRelay: m.moqRelay || null, moqCert: m.moqCert || null };
-        d.set('sound', `offered by ${m.from}`);
+        d.set('sound', 'offered');
         d.log(`a synth is here: ${m.from}`, 'hi');
         return;
       }
@@ -115,11 +122,14 @@
       }
       if (m.type === 'on') {
         received++;
-        if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('latency', lat[lat.length - 1]); }
+        if (Number.isFinite(m.at)) { lat.push(Date.now() - m.at); d.set('note in', lat[lat.length - 1]); }
         d.set('received', received);
         play(m.note, m.vel ?? 100);
         kb.lightNote(m.note, true, 'remote');
-        srcEl.innerHTML = `<b>${m.from}</b> played note ${m.note} (${m.src ?? '?'})`;
+        if (!heardFrom.has(m.from)) {
+          heardFrom.add(m.from);
+          d.log(`${m.from} is playing, ${m.src === 'midi' ? 'off a MIDI device' : 'off a screen'}`, 'hi');
+        }
       } else if (m.type === 'off') {
         stop(m.note);
         kb.lightNote(m.note, false, 'remote');
@@ -135,11 +145,19 @@
    * that matters.
    */
   d.on('remote', async () => {
-    if (!ws || ws.readyState !== 1) { d.set('sound', 'join first', 'bad'); return; }
+    // ⚠️ A CELL HOLDS ONE SHORT WORD, NOT A SENTENCE. `.pos-v` is one line
+    // with an ellipsis on it, so `nobody else here — this page is the
+    // instrument` arrived on screen as `here (…` — a readout reporting that its
+    // own value was too long. MEASURED on a 390 px phone, where six cells means
+    // three columns: the value is 19 px monospace in a 94 px box, so EIGHT
+    // CHARACTERS is the budget, and `not asked` (nine) still clipped. The
+    // sentence belongs in the log, which wraps.
+    if (!ws || ws.readyState !== 1) { d.set('sound', 'offline', 'bad'); return; }
     if (!synth) {
       source = 'here';
-      d.set('sound', 'nobody else here — this page is the instrument');
-      d.log('no synth in this room; open rig/m1/synth.html on another machine');
+      d.set('sound', 'here');
+      d.log('nobody else is in this room, so the sound is made in this page — '
+          + 'open rig/m1/synth.html on another machine for the other half', 'hi');
       return;
     }
     pc = new RTCPeerConnection({ iceServers: [] });   // same room: host candidates
@@ -148,7 +166,8 @@
       remoteAudio = remoteAudio || Object.assign(new Audio(), { autoplay: true });
       remoteAudio.srcObject = e.streams[0];
       source = 'remote';
-      d.set('sound', `made by ${synth.from}`, 'ok');
+      d.set('sound', 'far end', 'ok');
+      d.log(`the sound is now coming from ${synth.from}`, 'hi');
       listenForOnsets(e.streams[0]);
     };
     const o = await pc.createOffer(); await pc.setLocalDescription(o);
@@ -179,18 +198,20 @@
       ears.push(performance.now() - earPending.t0);
       earPending = null;
       const s = [...ears].sort((a, b) => a - b);
-      d.set('heard', Math.round(s[Math.floor(s.length / 2)]));
+      d.set('sound back', Math.round(s[Math.floor(s.length / 2)]));
     };
   }
 
   // MIDI is optional and its absence is REPORTED, not hidden: most browsers
   // and every headless run have no device, and the demo must still be true.
   d.on('midi', async () => {
-    if (!navigator.requestMIDIAccess) { midiState = 'unsupported'; d.set('midi', midiState, 'bad'); return; }
+    if (!navigator.requestMIDIAccess) { midiState = 'no API'; d.set('midi', midiState, 'bad'); return; }
     try {
       const access = await navigator.requestMIDIAccess({ sysex: false });
       const ins = [...access.inputs.values()];
-      midiState = ins.length ? `${ins.length} input(s)` : 'granted, no device';
+      // one or two words, for the same reason `sound` is: the cell is one line
+      // wide and the detail is in the log under it
+      midiState = ins.length ? `${ins.length} in` : 'none';
       d.set('midi', midiState, ins.length ? 'ok' : '');
       for (const input of ins) {
         input.onmidimessage = ({ data }) => {
@@ -202,7 +223,7 @@
         };
       }
       d.log(`midi: ${midiState}`);
-    } catch (e) { midiState = `denied (${e.name})`; d.set('midi', midiState, 'bad'); }
+    } catch (e) { midiState = 'denied'; d.set('midi', midiState, 'bad'); d.log(`midi: ${e.name}`, 'bad'); }
   });
 
   d.on('check', () => {
@@ -216,11 +237,26 @@
     d.assert('says where the sound is made', !!d.api.readout.sound, String(d.api.readout.sound));
     d.assert('sound source matches what is connected', (source === 'remote') === !!(pc && remoteAudio),
       `${source}, peer ${pc ? 'yes' : 'no'}`);
+
+    // 🔴 THE KEYBOARD'S OWN PAD IS NOT IN `.pos-controls`, SO THE HARNESS
+    // CANNOT PRESS IT. keyboard.mjs says so in its header: a page that draws
+    // the pad and asserts nothing about it ships three ungraded controls. The
+    // effect needs no click — `shiftOctave` returns the new leftmost note and
+    // every key's printed name moves with it.
+    const wasBase = kb.base;
+    const wasName = kb.keysEl.querySelector('.kn')?.textContent ?? '';
+    const moved = kb.shiftOctave(1);
+    const nowName = kb.keysEl.querySelector('.kn')?.textContent ?? '';
+    kb.shiftOctave(-1);
+    d.assert('the octave buttons move every key on the keyboard',
+      moved === wasBase + 12 && nowName !== wasName && kb.base === wasBase,
+      `${wasName} became ${nowName} and came back · note ${wasBase} -> ${moved} -> ${kb.base}`);
+
     d.log(`open again with ?room=${ROOM} to play into another browser`);
   });
 
   d.set('midi', midiState);
-  d.set('sound', 'here (nobody else yet)');
+  d.set('sound', 'here');
   d.ready();
 </script>
 </html>
