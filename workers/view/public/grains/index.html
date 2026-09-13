@@ -91,8 +91,18 @@
       // sweep reads flutter 0.377 against 0.692 and 0.0 against 4.6 gaps a
       // second. It was never a broken engine; a granulator reading the present
       // sounds like the present, however you set it.
-      { id: 'hold', label: 'Hold what it has', primary: true },
+      // ⚠️ `on` IS FIRST BECAUSE `settleMs` LANDS ON CONTROL 0 ONLY, and this
+      // page's slow control is this one: raising the insert compiles a
+      // 2,030-line engine, about forty seconds. verify.mjs says so in its own
+      // words — "a demo whose slow control is not the first gets nothing from
+      // it here" — and putting `hold` first briefly took that budget away and
+      // left the compile on a ~35 s ceiling, where a cold board would have read
+      // `page asserted something — 0`, i.e. totally broken.
+      //
+      // Order and PRIMARY are independent: `hold` is still the one that looks
+      // like the main path, and `on` is hidden from a visitor anyway.
       { id: 'on', label: 'Switch it on' },
+      { id: 'hold', label: 'Hold what it has', primary: true },
     ],
   });
   guard(d);
