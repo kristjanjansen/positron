@@ -73,11 +73,38 @@ ssh "$USER_@$IP" 'cd /opt/positron-box/rig/vis 2>/dev/null && {
   ls -la v3dpipe 2>/dev/null || echo "   no v3dpipe — visuals will report unavailable"
 }'
 
+# ⚠️ THE ENGINE HAS A SECOND HOME, AND sclang ONLY READS THAT ONE.
+#
+# `Engine_Pappus.sc` and `CroneEngine.sc` are SuperCollider CLASSES, so sclang
+# compiles them from its Extensions directory — /opt/positron-box is not on its
+# class path at all. Shipping the engine to /opt and restarting therefore
+# changes NOTHING, silently: the service comes up, the engine loads, every
+# command works, and it is the previous version of the file.
+#
+# MEASURED 2026-09-13: an added command read `CroneEngine: no command 'report'`
+# and `PAPPUS READY 106 commands` while the copy in /opt had the new one and
+# matched its md5. Two copies, two different md5s, and the md5 this script was
+# printing was the one nobody compiles. That is LESSONS #39 in a third costume —
+# ~/positron against /opt was the first, /opt against Extensions is this one.
+# ⚠️ NOT `$HOME`. This string is interpolated into an ssh command by the LOCAL
+# shell, so `$HOME` would expand to the Mac's home directory and every path
+# below would be built for the wrong machine — a copy that succeeds into
+# somewhere nothing reads, which is the exact failure this block exists to fix.
+SC_EXT="/home/$USER_/.local/share/SuperCollider/Extensions"
+echo "== the SuperCollider classes, to the path sclang actually compiles"
+ssh "$USER_@$IP" "mkdir -p $SC_EXT/pappus/lib && \
+  cp $DEST/rig/box/norns/Engine_Pappus.sc $SC_EXT/pappus/lib/Engine_Pappus.sc && \
+  cp $DEST/rig/box/norns/CroneEngine.sc $SC_EXT/CroneEngine.sc && echo '   classes installed'"
+
 echo "== what landed, against what was sent"
 # Not "ok" — the md5 of the file that will actually execute. Printing a success
 # line is not evidence that a copy happened (CLAUDE.md).
-ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/pappus.mjs 2>/dev/null"
-md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" 2>/dev/null || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs"
+# ⚠️ THE ENGINE'S md5 IS THE ONE FROM THE EXTENSIONS PATH, not from $DEST — see
+# the block above. Printing $DEST's copy is printing a file nothing reads.
+ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/pappus.mjs \
+  $SC_EXT/pappus/lib/Engine_Pappus.sc 2>/dev/null"
+md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/Engine_Pappus.sc" 2>/dev/null \
+  || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/Engine_Pappus.sc"
 
 if [ "$RESTART" = 1 ]; then
   echo "== restarting"
