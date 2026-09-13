@@ -351,7 +351,16 @@ export const extraPages = () =>
        .map((d) => [d.src, `${d.page.replace(/^\/|\/$/g, '')}/index.html`]);
 
 /** the link target for a row, or null when it has none */
-export const targetOf = (d) => (d.built ? `/${d.name}/` : d.page || null);
+/**
+ * The link target for a row.
+ *
+ * ⚠️ `?xr=1` ON THE HEADSET ROWS, AND IT CANNOT START THE SESSION ITSELF.
+ * WebXR needs a TRANSIENT USER ACTIVATION, so no link can enter VR — the page
+ * still needs one press. What the flag buys is that the press is the first
+ * thing under your hand: the page scrolls its own Run-in-VR control into view
+ * and focuses it, so from the index it is link, tap, in.
+ */
+export const targetOf = (d) => (d.built ? `/${d.name}/${d.xr ? '?xr=1' : ''}` : d.page || null);
 
 /**
  * Newest first, and the array is left alone.

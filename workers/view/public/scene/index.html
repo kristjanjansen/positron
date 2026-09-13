@@ -606,12 +606,28 @@
     // ⚠️ A DEADLINE ON EVERY STEP. A rejected promise reports itself; one that
     // simply never settles does not, and that is what the first two headset
     // runs looked like from here — a session the user was standing in, with no
-    // line saying which await had not come back. Anything that has not
-    // answered in 6 s is a failure with a name.
-    const step = async (what, p) => {
+    // line saying which await had not come back.
+    //
+    // 🔴 BUT 6 s IS NOT A DEADLINE FOR A STEP THAT CAN ASK A HUMAN A QUESTION,
+    // AND THAT COST A BLACK HEADSET. MEASURED on a Quest 3, 2026-09-13:
+    // `requestSession immersive-vr` did not hang — it was waiting for the
+    // owner to answer a ROOM-DATA PERMISSION PROMPT, which appeared because
+    // this page asks for plane detection and hand tracking as optional
+    // features. The deadline fired underneath it, the page declared failure and
+    // tore its own entry path down, and THEN the session started: a headset
+    // standing in an immersive session that no code owned, drawing nothing.
+    // Black, and a restart to get out.
+    //
+    // So a step that can prompt gets a human's worth of time, and the failure
+    // says what it is probably waiting for rather than "never returned".
+    // Everything after the session is machinery and keeps the short one —
+    // `makeXRCompatible` is not going to ask anybody anything.
+    const step = async (what, p, ms = 6000) => {
       shipNow(`… ${what}`);
       const out = await Promise.race([p,
-        new Promise((_, no) => setTimeout(() => no(new Error(`${what} never returned`)), 6000))]);
+        new Promise((_, no) => setTimeout(() => no(new Error(
+          `${what} did not answer in ${ms / 1000} s`
+          + (ms > 6000 ? ' — is there a permission prompt waiting for you?' : ''))), ms))]);
       shipNow(`ok  ${what}`);
       return out;
     };
@@ -626,8 +642,14 @@
       // run Space Setup, or who says no to the permission, must still get a
       // room. In `requiredFeatures` this line would turn "I have not mapped my
       // house" into "this page refuses to start".
-      session = await step(`requestSession ${mode}`,
-        navigator.xr.requestSession(mode, {
+      // 🔴 90 s, BECAUSE THIS ONE ASKS YOU A QUESTION. See `step`.
+      //
+      // ⚠️ AND THE PROMISE IS KEPT, NOT ABANDONED. If the deadline wins, the
+      // request is still in flight — and a session that arrives after the page
+      // has given up is a headset in VR that nothing is drawing. It is caught
+      // and ENDED, so the worst case is "it did not start" rather than a black
+      // room and a restart.
+      const ask = navigator.xr.requestSession(mode, {
           requiredFeatures: ['local-floor'],
           // ⚠️ `hand-tracking` IS OPTIONAL, for the same reason every room
           // feature is: in `requiredFeatures` a headset with hands switched
@@ -635,7 +657,16 @@
           // the probe below reports what came back — including "nothing",
           // which is an answer.
           optionalFeatures: [...ROOM_OPTIONAL_FEATURES, 'hand-tracking'],
-        }));
+        });
+      let gaveUp = false;
+      ask.then((late) => {
+        if (!gaveUp) return;
+        shipNow('the session arrived after this page gave up waiting — ending it rather than leaving you in a room nothing is drawing');
+        try { late.end(); } catch { /* already gone */ }
+      }, () => { /* a rejection is reported by the step below */ });
+      try {
+        session = await step(`requestSession ${mode}`, ask, 90000);
+      } catch (e) { gaveUp = true; throw e; }
       room?.markAsked();
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
@@ -1242,5 +1273,14 @@
   // A room to stand in before anything is pressed, so the stage is never empty.
   roll(424242);
   d.ready();
+
+  // ⚠️ ARRIVED FROM THE INDEX WITH `?xr=1` — put the one press that matters
+  // under the hand. A link CANNOT enter VR: WebXR needs a transient user
+  // activation, so the button still has to be pressed. This only means you do
+  // not have to find it, which through a headset is most of the work.
+  if (new URLSearchParams(location.search).has('xr')) {
+    const b = d.button('enter');
+    if (b) { b.scrollIntoView({ block: 'center' }); setTimeout(() => b.focus(), 60); }
+  }
 </script>
 </html>

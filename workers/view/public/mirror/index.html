@@ -1320,4 +1320,13 @@
     if (farDecoded === 0) d.log('the box did not send in 12 s — checking the left pane only', 'warn');
     runChecks();
   })();
+
+  // ⚠️ ARRIVED FROM THE INDEX WITH `?xr=1` — put the one press that matters
+  // under the hand. A link CANNOT enter VR: WebXR needs a transient user
+  // activation, so the button still has to be pressed. This only means you do
+  // not have to find it, which through a headset is most of the work.
+  if (new URLSearchParams(location.search).has('xr')) {
+    const b = d.button('xr');
+    if (b) { b.scrollIntoView({ block: 'center' }); setTimeout(() => b.focus(), 60); }
+  }
 </script>
