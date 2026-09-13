@@ -578,7 +578,25 @@
     const err = error();
     const errApart = error(atApart);
     d.set('kept', stored.length || '');
-    d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
+    // 🔴 AGAINST WHAT WAS CAPTURED, NOT AGAINST HOW FINELY THE LINE IS DRAWN.
+    // This divided by `drawnPoints`, which is the REBUILD RESOLUTION — the loop
+    // above walks the gesture in `(t1-t0)/900` steps, so `drawnPoints` is about
+    // 900 whatever you do. The cell was therefore `100 × (1 − kept/900)` and
+    // could not come down: turning `sample every` all the way to 10 ms on a 3 s
+    // gesture keeps ~300 samples and still reads **66.7% invented**. Reported
+    // as "cannot get most kept", which is exactly right — the number was
+    // measured against a constant this page picked for SMOOTHNESS, and no
+    // control on the page moves it.
+    //
+    // The honest denominator is what the browser actually gave us. "How much of
+    // what you see no sample attests" is kept against CAPTURED, and it reaches
+    // 0 when the gate is fine enough to keep every sample — which is a state
+    // the knob can actually get to.
+    // ⚠️ `evidence`, not `drawn`: one is the full-rate record of what happened,
+    // the other is this page's own redrawing of it, and only the first is a
+    // measurement of anything.
+    d.set('invented', evidence.length
+      ? (100 * (1 - Math.min(1, stored.length / evidence.length))).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
     d.set('worst', err ? err.worst.toFixed(2) : '');
     d.set('as two', errApart ? errApart.mean.toFixed(3) : '');
@@ -873,9 +891,17 @@
 
     // 🔴 THE ONE THIS PAGE EXISTS FOR. Most of the line you see was never
     // recorded — say how much, in the same breath as how wrong it is.
-    const invented = 100 * (1 - stored.length / drawnPoints);
-    d.assert('most of the drawn line was never recorded', invented > 80,
-      `${drawnPoints} points drawn from ${stored.length} samples — ${invented.toFixed(1)}% invented`);
+    // ⚠️ AGAINST WHAT WAS CAPTURED, the same denominator the cell uses. It
+    // divided by `drawnPoints` — the rebuild resolution, ~900 whatever you do —
+    // so the assert and the readout could report DIFFERENT percentages for the
+    // same gesture, and briefly did: the cell said 0.0% at 10 ms while this
+    // line said 96.7%. Two numbers with one name is worse than either being
+    // wrong, because whichever a reader happens to see becomes the fact.
+    const invented = 100 * (1 - Math.min(1, stored.length / evidence.length));
+    d.assert('most of the drawn line was never recorded, at the rate the page opens on',
+      invented > 80,
+      `${evidence.length} samples captured, ${stored.length} kept — ${invented.toFixed(1)}% of the `
+      + `line you see is joined up rather than recorded`);
 
     // ⚠️ ASSERT THE ORDER, NOT A THRESHOLD. The three reconstructions are the
     // subject, and a threshold on any one of them says nothing about whether
