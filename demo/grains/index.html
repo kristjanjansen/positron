@@ -669,6 +669,8 @@
   function heard(m) {
     if (!fromBox(m)) return;           // somebody else asking the board something
     answered = true; lastHeard = Date.now();
+    // The board has spoken, so there is something to switch on. Once.
+    if (!enabledOnce) { enabledOnce = true; enable(); }
     // The board says this every five seconds with nobody asking, which makes it
     // the cheapest liveness there is — and it names what is sounding, so an
     // instrument somebody else starts shows up here without this page polling
@@ -784,7 +786,22 @@
       : 'listening again — the grains follow the instrument, so they sound like it', 'hi');
   });
 
-  d.on('on', async () => {
+  // 🔴 IT SWITCHES ITSELF ON. This page's entire subject is the granulator, so
+  // arriving with it off is a page that does nothing until you find a button —
+  // and the state it arrives in is "the board is answering but nothing is
+  // granulating", which is a normal moment being reported as a problem.
+  //
+  // ⚠️ ONCE, AND NOT WHILE IT IS ALREADY HAPPENING. The board is shared and
+  // raising the insert takes ~40 s, so a second request mid-compile is a second
+  // engine. `enabling` guards the window the reply has not closed yet.
+  let enabling = false, enabledOnce = false;
+  async function enable() {
+    if (enabling || fxOn) return;
+    enabling = true;
+    try { await enableNow(); } finally { enabling = false; }
+  }
+
+  async function enableNow() {
     startAudio();
     // ⚠️ A WINDOW, NOT A RACE. Nobody answering is a real answer here, so this
     // waits a bounded time and then reports silence rather than waiting forever
@@ -819,11 +836,22 @@
     const state = await ask({ type: 'params.state' }, 'params.state', 6000);
     void state;
     await applyPatch(patch);
-    // ⚠️ MEASURE THE SOUND, NOT THE FRAME COUNT. A stream of digital silence
-    // arrives at exactly the rate a working one does, so this holds a key and
-    // compares what comes back against what was coming back before it — the
-    // same before-and-after the box's own live test uses, and the only thing
-    // on this page that crosses the whole chain.
+    render();
+  }
+
+  /**
+   * ⚠️ MEASURE THE SOUND, NOT THE FRAME COUNT — and measure it where the CHECK
+   * is, not where the switching-on is. A stream of digital silence arrives at
+   * exactly the rate a working one does, so this holds a key and compares what
+   * comes back against what was coming back before it: the only thing on this
+   * page that crosses the whole chain.
+   *
+   * It lived inside `enable()` until the page started switching itself on, at
+   * which point the control's own `enable()` returned early — already on — and
+   * skipped the measurement, so the assert read "no key has been held yet"
+   * about a working board. Enabling is a side effect; measuring is the check.
+   */
+  async function probeSound() {
     const quiet = await listen(900);
     send({ type: 'note.on', note: 60, vel: 100, channel: 0 });
     const held = await listen(1800);
@@ -836,6 +864,17 @@
           + (quiet <= 0.002 ? 'the key is what started it' : 'it was already droning, which is what a cloud does'),
           held > 0.002 ? 'hi' : 'bad');
     render();
+  }
+
+  // The control is still here, still pressed by the harness, and now it is the
+  // one that CHECKS as well — a page that checks itself only when asked is a
+  // page nobody checks.
+  d.on('on', async () => {
+    await enable();
+    // Wait out an enable that is already in flight — the page starts one the
+    // moment the board answers, and the harness can press this before it ends.
+    for (let i = 0; i < 160 && enabling; i++) await wait(500);
+    if (fxOn) await probeSound();
     checkAll();
   });
 
