@@ -7,9 +7,36 @@ instrument and the pipeline as much as possible."*
 
 ✅ **§2, §3, §4a, §4b step 1 and §5 are DONE (2026-09-13).** The two ends now
 chew one description, `where` means one thing, and the board's own engine
-answers for what it holds. §4b step 3 — scsynth in a tab — is untouched and is
-still a question rather than a plan. What each section did, and what it got
-wrong, is written into the section itself rather than collected here.
+answers for what it holds. What each section did, and what it got wrong, is
+written into the section itself rather than collected here.
+
+🔴 **§4b step 3 IS DONE TOO — 2026-09-14 — AND THE DOCUMENT'S OWN TITLE IS NOW
+LITERAL.** `/grains/` runs **real SuperCollider at both ends, loading the same
+compiled `pappus.scsyndef`**: wasm scsynth in the tab, the board's own sound
+server on the Pi, TINY at both. The page is 17/17 with the board live, and the
+three claims that had never been made before are made by the engines rather
+than by the page:
+
+| | measured, 2026-09-14 |
+|---|---|
+| the left pane really is SuperCollider | **64,733 B** of compiled SynthDef taken in **23 ms**, `/n_go`, **1,571 building blocks running** (1,467 Pappus + 104 `PosSource`) |
+| the material is built before it is read | `/g_queryTree.reply 0 0 2 3001 -1 posSource 3000 -1 pappus` — the SERVER's own answer, not the page's |
+| a grain a second means one thing | **2.2 a second in the tab and 2.2 on the board, against 2.2 asked for** — both graded against the slider, never against each other |
+| both ends stop when told | tab **0.005569 → 0.000000** at `amp 0`; board **0.0964 → 0.0002** with the material turned down |
+| one description, two engines | 72 sine partials at each end, this page's scsynth answering **6 notes at 131 Hz** and the board's the same |
+
+⚠️ **AND THE BOARD IS ON TINY AGAIN, KNOWINGLY** — `PAPPUS_TINY=1` in
+`/etc/default/positron-box`, proved from the board's own `Engine_Pappus: TINY
+graph` line. The price is the modal bank: at `pwet 1` TINY reads **exactly
+0.000000** where LITE reads 0.030–0.041. Recorded in `rig/box/norns/TINY.md`
+and `CHAIN.md` so it is a decision rather than a drift.
+
+⚠️ **§6's two-pane comparison is STILL NOT DONE.** What changed is that the
+reason it was hard has halved: the engines are the same now, so a disagreement
+is no longer confounded by "two different programs". The remaining obstacles are
+the ones §6a names and they are untouched — the two ends are at different
+LEVELS, and a granulator chewing a stationary drone returns that drone, so rms
+cannot see a change of `rate`, `where` or `spray` at all.
 
 🔴 **AND THE LARGEST SINGLE REASON THE TWO PANES SOUNDED NOTHING ALIKE IS NOT IN
 THE TABLE BELOW, BECAUSE NOBODY KNEW IT.** `Engine_Pappus.sc:945`:
@@ -316,17 +343,30 @@ neither of which needs wasm.
    ~250 ms for the relay's measured 60 msg/s ceiling. Done 2026-09-13; the
    `report` control and the `grain.marks` broadcast.
 2. ✅ **BARE and the shared source** (§2, §3, §4a). Done 2026-09-13.
-3. ⏳ **Then re-ask whether scsynth in a tab is still worth it.** Untouched, and
-   the argument has MOVED since it was written. Against it: 1,701,983 B of wasm
-   against a 6,659 B worklet, AGPL-3.0-or-later on a page served over a network,
-   a command surface whose every word the jargon rule bans, and TINY's headroom
-   to the 64 KiB `/d_recv` ceiling is now **803 bytes** — one modest feature from
-   not fitting. For it: the two ends are still different engines, which is
-   exactly why §4a's table-of-sines constraint had to be put back, and that
-   constraint is a real limit on what the material can ever be. It is a live
-   question, not a queued task.
+3. ✅ **DONE 2026-09-14 — scsynth in a tab, and the answer was yes.** The
+   argument against it was 1,701,983 B of wasm against a 6,659 B worklet,
+   AGPL-3.0-or-later on a page served over a network, a jargon-heavy command
+   surface, and 803 bytes of headroom. What settled it is that the page was
+   making a claim it could not support: *"the same granulator in this page and
+   on a Raspberry Pi"*, about two different programs. A reimplementation that
+   sounds similar is not the same instrument, and no amount of matched settings
+   makes it one.
+   - The bytes are paid **only by somebody who presses something** — the engine
+     is imported inside `startPappus()`, so a visit costs the page.
+   - The jargon never reaches the reader: the page says *"SuperCollider in a
+     tab"* and *"every tick is a grain the engine reported firing"*.
+   - The vendored engine moved to `demo/shell/vendor/` (`LAYOUT.md`), because
+     `patch` came off the site the same day and a `/patch/…` URL would have had
+     nothing behind it.
 
-The worklet is deleted at step 3 if step 3 happens, and not before.
+🔴 **AND THE WORKLET IS NOT DELETED, WHICH THIS LINE USED TO SAY IT WOULD BE.**
+`demo/shell/granular-worklet.js` stays on disk with nothing importing it, and
+its own header now says so. The reason is that §5's argument for it was never
+about being half of this comparison: a page about **writing** a granulator —
+what a window is, why overlap is the parameter that matters, why a hard edge
+clicks twenty times a second — is a page that file is the SUBJECT of. That page
+does not exist yet. Deleting the only readable granulator in the repo to tidy up
+after a rewire would be throwing away the thing the rewire did not replace.
 
 The additive table survives as ONE shape among several, and it keeps one real
 use: it is the only source whose expected spectrum is known in closed form, so

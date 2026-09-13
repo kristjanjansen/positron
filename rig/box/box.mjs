@@ -61,6 +61,56 @@ let synth = null, stopSynth = null, midiIn = null, inst = null;
 // interleaved samples, 100 msg/s into a 60 msg/s relay. Measured twice.
 let starting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
+
+/**
+ * 🔴 WHO ASKED FOR THE INSERT, AND WHEN — because two pages fight over one
+ * Raspberry Pi and until 2026-09-14 neither of them could see it happening.
+ *
+ * `/grains/` switches the granulator ON, because the granulator is its entire
+ * subject. `/box/` switches it OFF on load, and that is right and stays right:
+ * an insert left in by a `grains` tab that was simply CLOSED goes on wrapping
+ * whatever `/box/` plays and feeds its own delay — MEASURED 2026-09-12, a
+ * steady -6.1 dBFS subsonic drone while `box.alive` reported `voices: 0`.
+ *
+ * So whichever page you opened last won, SILENTLY, and the other one went on
+ * drawing a picture that was no longer true. ⚠️ That is the worst shape there
+ * is, and it is the reason the first half of this is REPORTING rather than
+ * arbitration: arbitration that hides a conflict converts a visible problem
+ * into an invisible one. The board knows the truth about its own insert; the
+ * pages were guessing. Now it says so — in `fx.pappus`, in `audio.status` and
+ * in the five-second `box.alive`, so a page learns about a change it did not
+ * make without polling for it.
+ *
+ * ⚠️ A CLIENT ID IS PER CONNECTION (`openWire` mints a new `from` every time),
+ * so this is never a claim that outlives the tab that made it.
+ */
+let fxAsked = null;        // { by, at, on } — the last client to change it
+
+/**
+ * When each client was last heard from, so "is anybody still there" can be
+ * answered without a lease.
+ *
+ * 🔴 NO TTL, NO RELEASE, NOTHING TO LEAK. A lease nobody can clear is how
+ * `studio-1` sat full for hours (CLAUDE.md). The relay solves the same problem
+ * by DATING each socket — `getWebSocketAutoResponseTimestamp` — and reclaiming
+ * the idle ones; this is that idea in a smaller costume, on the only evidence
+ * the box actually has: a client that is still there keeps talking. `/grains/`
+ * asks `params.state` and re-asks `grain.report` every four seconds, so a live
+ * tab is three messages inside this window and a closed one is zero.
+ */
+const clientSeen = new Map();          // from -> ms
+const INSERT_HELD_MS = 15000;          // ~3 of `/grains/`'s 4 s polls
+const stillHere = (who) => !!who && (Date.now() - (clientSeen.get(who) ?? 0)) < INSERT_HELD_MS;
+/** What the box will say about its own insert, to anybody who asks or listens. */
+function insertState() {
+  const by = fxAsked?.by ?? null;
+  return {
+    fx: fxOn ? 'pappus' : null,
+    fxBy: by,
+    fxAgoSec: fxAsked ? Math.round((Date.now() - fxAsked.at) / 1000) : null,
+    fxHeld: fxOn && !!fxAsked?.on && stillHere(by),
+  };
+}
 /**
  * The generated material, when a page has asked for one.
  *
@@ -385,7 +435,7 @@ async function startAudio(source = 'synth', msg = null) {
     // no-op that reported success, which reads as a broken button.
     if (running === source && source !== 'fluidsynth' && source !== 'archive') {
       return { ok: true, already: true, source: running, jack: !!inst?.jack, port: inst?.port ?? null,
-               fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null };
+               ...insertState(), archive: source === 'archive' ? archiveNow : null };
     }
     log(`switching ${running} -> ${source}`);
     // 🔴 REMEMBER THE INSERT BEFORE STOPPING, because stopAudio() switches it
@@ -445,7 +495,7 @@ async function startAudio(source = 'synth', msg = null) {
     }
     if (source === 'archive') watchArchiveListeners();
     return { ok: true, source, jack: true, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
-             channels: r.channels, fx: fxOn ? 'pappus' : null, archive: source === 'archive' ? archiveNow : null,
+             channels: r.channels, ...insertState(), archive: source === 'archive' ? archiveNow : null,
              idleStopMin: source === 'archive' ? ARCHIVE_IDLE_MS / 60000 : undefined };
   }
 
@@ -736,11 +786,45 @@ async function handle(msg) {
       // the source reports about itself.
       if (want && !inst?.jack) return reply('fx.pappus', {
         ok: false,
+        ...insertState(),
         reason: inst ? `${inst.source} writes to a pipe, not to JACK — the insert can only wrap what is on the JACK graph`
                       : 'nothing is playing for an insert to wrap',
       });
+      // 🔴 `onlyIfIdle` — "take it out, UNLESS somebody is still using it".
+      //
+      // This is the second half of the two-pages-fight repair and it is
+      // deliberately the smaller half. `/box/` sends it on load: it still
+      // clears an insert left behind by a tab that CLOSED, which is the real
+      // fault it was written for, and it no longer removes one that a `grains`
+      // tab is looking at right now.
+      //
+      // ⚠️ IT REFUSES OUT LOUD. `ok: true, on: true, kept: true` with the
+      // holder and the ages in the reply, so the page can say "another tab
+      // asked for this 4 s ago" rather than quietly showing the wrong picture.
+      // An arbitration nobody can see is worse than none.
+      //
+      // ⚠️ AND IT IS OPT-IN. A caller that does not send it gets the old
+      // behaviour exactly, which is what keeps `fx.pappus {on:false}` a thing a
+      // person can type to fix a wedged board.
+      if (!want && msg.onlyIfIdle === true && fxOn && fxAsked?.on
+          && fxAsked.by !== msg.from && stillHere(fxAsked.by)) {
+        const heldFor = Math.round((Date.now() - fxAsked.at) / 1000);
+        const heardAgo = Math.round((Date.now() - clientSeen.get(fxAsked.by)) / 1000);
+        return reply('fx.pappus', {
+          // ⚠️ `on: true` EXPLICITLY. Every page reads `m.on` off this reply to
+          // set its own idea of the insert, and `insertState()` reports `fx`
+          // rather than `on` — so a refusal without this would answer "ok" and
+          // then tell the page the granulator is off, which is the silent wrong
+          // picture this whole change exists to stop.
+          ok: true, on: true, kept: true, ...insertState(), instrument: inst?.source ?? null,
+          reason: `another page asked for the granulator ${heldFor} s ago and was heard from ${heardAgo} s ago`,
+        });
+      }
       const r = await pappusFx(want, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog: (l) => log('pappus:', l) });
-      if (r.ok) fxOn = want;
+      // ⚠️ RECORDED ONLY WHEN IT ACTUALLY CHANGED. A request that failed leaves
+      // the previous holder in place, or the page that got a refusal would be
+      // recorded as the owner of an insert it never raised.
+      if (r.ok) { fxOn = want; fxAsked = { by: msg.from ?? null, at: Date.now(), on: want }; }
       // ⚠️ `pappusFx(true)` RE-PATCHES THE INSTRUMENT INTO THE GRANULATOR, which
       // is right for every other caller and is exactly what a generated source
       // had disconnected. Put it back the way the source wants it, in the one
@@ -757,7 +841,7 @@ async function handle(msg) {
       if (r.ok && !want) madeSource = null;
       // Switching off returns the sampler to its cheap path: one process, no
       // jackd, no capture.
-      return reply('fx.pappus', { ...r, instrument: inst?.source ?? null });
+      return reply('fx.pappus', { ...r, ...insertState(), instrument: inst?.source ?? null });
     }
 
     // ── the reverb, as an insert ─────────────────────────────────────────
@@ -1002,6 +1086,13 @@ async function handle(msg) {
       // drift to move around. `.send` is the raw door and stays raw, because
       // the drift's own nudges go out through it.
       const centred = pappus().set(cmd, ...args);
+      // 🔴 AND IF IT WAS THE VOICE GATES, THE KEYBOARD'S MIRROR FOLLOWS IT.
+      // `notes.gate` in `params.state` is what a page reads to find out whether
+      // this granulator can fire at all — and it was the KEYBOARD's model, so a
+      // page that opened the gates through this raw door left the board
+      // reporting every voice shut about a granulator making grains. One
+      // authority, and this is the line that keeps it one.
+      if (cmd === 'gates') pappus().notes.adopt(args);
       // It does NOT switch the movement on. `params.set` is the MEASUREMENT
       // surface: a sweep that turned the drift on under itself would be
       // grading a moving target, and `pappus-live.mjs` opens by turning it off
@@ -1159,13 +1250,18 @@ async function handle(msg) {
         ? { ok: true, room: VIDEO_ROOM, ...videoShape() }
         : { ok: false, reason: 'no picture running', available: videoAvailable(), renderer: V3DPIPE });
 
+    // ⚠️ `insertState()` RATHER THAN `fx:` ALONE, AND IT WAS THE THIRD PLACE
+    // THIS LINE IS WRITTEN. Two pages share this board and neither could see
+    // the other change the insert; a page that asks what is playing is asking
+    // the question the answer belongs to, so it gets the holder and the ages
+    // here as well as in `fx.pappus` and the heartbeat.
     case 'audio.status':
-      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, fx: fxOn ? 'pappus' : null,
+      return reply('audio.started', inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState(),
                                             soundfont: inst.soundfont ?? null,
                                             archive: inst.source === 'archive' ? archiveNow : null }
-        : stopSynth ? { ok: true, source: 'synth' }
-        : audio ? { ok: true, source: 'capture' }
-        : { ok: false, reason: 'nothing playing' });
+        : stopSynth ? { ok: true, source: 'synth', ...insertState() }
+        : audio ? { ok: true, source: 'capture', ...insertState() }
+        : { ok: false, reason: 'nothing playing', ...insertState() });
     case 'box.ping':    return reply('box.pong', { at: Date.now() });
     default: return false;      // another client's traffic; the relay is verbatim
   }
@@ -1204,6 +1300,19 @@ function connect() {
     if (typeof e.data !== 'string') return;               // audio is ours, outbound only
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;      // never answer yourself
+    // ⚠️ EVERY MESSAGE, NOT JUST THE ONES WITH A HANDLER. This is the only
+    // evidence the box has that a client is still at the other end, and a page
+    // that is merely LISTENING still polls. Dating it here rather than inside
+    // `handle()` means a verb nobody implements still proves somebody is there.
+    if (typeof msg.from === 'string') {
+      clientSeen.set(msg.from, Date.now());
+      // Bounded, so a long-lived box does not accumulate every tab that ever
+      // visited. Anything this old cannot hold an insert anyway.
+      if (clientSeen.size > 64) {
+        const cut = Date.now() - INSERT_HELD_MS;
+        for (const [k, t] of clientSeen) if (t < cut) clientSeen.delete(k);
+      }
+    }
     // handle() is async now (raising a JACK chain takes seconds), so a throw
     // arrives as a rejection — an unhandled one would take the service down.
     Promise.resolve().then(() => handle(msg)).catch((err) => {
@@ -1245,7 +1354,11 @@ function connect() {
 
 // Alive before you need it: a heartbeat means "the box is fine, the question is
 // elsewhere" can be answered without going to the room.
-setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames }), 5000).unref?.();
+// ⚠️ AND IT CARRIES THE INSERT NOW. Two pages share this board and neither
+// could see the other change it; a heartbeat that already says what is playing
+// is the cheapest place to say who the granulator belongs to, because a page
+// learns about a change it did not make without asking for anything.
+setInterval(() => send({ type: 'box.alive', name: NAME, upSec: Math.round((Date.now() - since) / 1000), audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null, voices: synth?.voices ?? 0, frames: sentFrames, ...insertState() }), 5000).unref?.();
 
 /**
  * ⚠️ Sweep orphans at startup. Audio children (jackd, a synth, an ffmpeg

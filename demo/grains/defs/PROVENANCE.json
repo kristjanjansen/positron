@@ -1,0 +1,27 @@
+{
+  "what": "The two SuperCollider definitions /grains/ loads into the browser engine. Compiled by sclang ON THE BOARD, not built here.",
+  "why": "/grains/ claims the same graph runs in the browser and on the Raspberry Pi. That is only true if these bytes came out of the same Engine_Pappus.sc the board's service compiles, so they are a build artefact OF THE BOARD and are produced there.",
+  "howToRemake": "scp rig/box/norns/{Engine_Pappus.sc,PosSource.sc,writedefs.scd} to the board, put the classes where sclang reads them (/home/positron/.local/share/SuperCollider/Extensions/pappus/lib/), then: XDG_RUNTIME_DIR=/tmp/rt QT_QPA_PLATFORM=offscreen PAPPUS_TINY=1 PAPPUS_OUT=/tmp/defs sclang -u 57125 /tmp/writedefs.scd — then copy the files here and re-run this file's hashes.",
+  "compiledOn": "raspberrypi, the studio board, sclang 3.13.0, 2026-09-13, PAPPUS_TINY=1",
+  "sources": {
+    "rig/box/norns/Engine_Pappus.sc": "8f689bfa1d18f3508f1f75884ab447d6",
+    "rig/box/norns/PosSource.sc": "b7372eb4e1b0fe6b86a94b30e3efa522"
+  },
+  "artefacts": {
+    "pappus-tiny.scsyndef": {
+      "md5": "08e8129fd73720997b2a3ae25b8f5afb",
+      "bytes": 64733,
+      "rung": "TINY",
+      "ugens": 1467,
+      "controls": 103,
+      "note": "byte-identical to the capture in research/supercollider-browser-2026-09.md §10, taken by a different script on a different run"
+    },
+    "possource.scsyndef": {
+      "md5": "f27011c5ab7df7dcafea37644cdd8a79",
+      "bytes": 4508,
+      "ugens": 104,
+      "note": "one Osc.ar per voice reading a wavetable — plan-twins §4a-i weighed the explicit-SinOsc rendering at 1,151 UGens and 46,815 bytes, which scsynth refused"
+    }
+  },
+  "guard": "workers/view/build.mjs REFUSES the build when any hash above disagrees with the file on disk. A stale artefact is otherwise silent in the worst direction: the browser would run an OLD graph while the board runs a new one, and the page's whole claim is that they are the same."
+}

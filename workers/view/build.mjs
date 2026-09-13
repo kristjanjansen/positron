@@ -25,6 +25,7 @@ import { dirname, join, extname } from 'node:path';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -112,13 +113,28 @@ const FILES = [
   // used to need a hand-written line here AND a matching rewrite in
   // demo/server.mjs. Two pages, four edits, in two files, with nothing to notice
   // if only one of the pair was made. Each declares its own `src` now.
-  // ── patch: SuperCollider's own sound server, vendored ─────────────────────
+  // ── SuperCollider's own sound server, vendored ────────────────────────────
   //
-  // ⚠️ LISTED BY NAME, because `demoFiles()` enumerates ONE directory level and
+  // ⚠️ LISTED BY NAME, because `shellFiles()` enumerates ONE directory level and
   // filters to web extensions — it would take neither the `.wasm` nor anything
   // under `vendor/chunks/`. That is the containment argument working as
   // intended rather than a gap to widen: this is 1.86 MB of third-party binary
   // and it should cost somebody a deliberate line.
+  //
+  // 🔴 IT MOVED HERE FROM `demo/patch/vendor/` ON 2026-09-13, AND THE REASON IS
+  // THAT `patch` IS OFF THE SITE. Its row is gone from `demo/manifest.mjs`, so
+  // nothing under `demo/patch/` is copied any more — and `/grains/` now boots
+  // this engine to run Pappus in the tab. A page fetching `/patch/vendor/…`
+  // would be asking for a URL with nothing behind it, which is `moq.mjs`
+  // exactly: a module holding a path a rename had moved, 404ing with nothing
+  // saying so, killing the page for a reason no log line mentions.
+  //
+  // 🔴 AND NOT A SECOND COPY UNDER `demo/grains/vendor/`, which `LAYOUT.md`
+  // rule 6 would suggest. Two copies of a 1.7 MB AGPL binary can drift apart
+  // and the drift is SILENT, because each page goes on working. One copy; the
+  // protection the rule was giving is replaced by `checkPresent()` and
+  // `checkVendorUrls()` below, both proved by breaking them. Same argument, and
+  // the same departure, as the controller meshes in the next block.
   //
   // 🔴 THE CHUNKS ARE NOT OPTIONAL EVEN THOUGH THEY ARE NEVER FETCHED.
   // `supersonic.js` holds `import("./chunks/midi_manager-….js")` and one for
@@ -131,18 +147,36 @@ const FILES = [
   // (AGPL-3.0-or-later) and the combined work is AGPL-3.0-or-later — the one
   // licence where serving over a network is the trigger, and this serves it
   // over a network. The texts ship beside the binaries rather than living in
-  // somebody's memory. The `.scsyndef` is from the MIT-licensed synthdefs
-  // package and is an ASSET, not part of the reader.
-  ['demo/patch/vendor/supersonic.js', 'patch/vendor/supersonic.js'],
-  ['demo/patch/vendor/chunks/chunk-V5WXEJ46.js', 'patch/vendor/chunks/chunk-V5WXEJ46.js'],
-  ['demo/patch/vendor/chunks/gamepad_manager-G6XPZUN2.js', 'patch/vendor/chunks/gamepad_manager-G6XPZUN2.js'],
-  ['demo/patch/vendor/chunks/midi_manager-LJCLWFJF.js', 'patch/vendor/chunks/midi_manager-LJCLWFJF.js'],
-  ['demo/patch/vendor/clockwork_audio_worklet.js', 'patch/vendor/clockwork_audio_worklet.js'],
-  ['demo/patch/vendor/scsynth-nrt.wasm', 'patch/vendor/scsynth-nrt.wasm'],
-  ['demo/patch/vendor/sonic-pi-beep.scsyndef', 'patch/vendor/sonic-pi-beep.scsyndef'],
-  ['demo/patch/vendor/LICENSE-supersonic-scsynth', 'patch/vendor/LICENSE-supersonic-scsynth'],
-  ['demo/patch/vendor/LICENSE-supersonic-scsynth-core', 'patch/vendor/LICENSE-supersonic-scsynth-core'],
-  ['demo/patch/vendor/LICENSE-supersonic-scsynth-synthdefs', 'patch/vendor/LICENSE-supersonic-scsynth-synthdefs'],
+  // somebody's memory. ⚠️ `sonic-pi-beep.scsyndef` and its MIT synthdefs
+  // licence did NOT come across: that was `patch`'s demo asset and nothing
+  // fetches it any more, and a vendored file with no consumer in the shared kit
+  // is a thing for somebody to wonder about later.
+  ['demo/shell/vendor/supersonic.js', 'shell/vendor/supersonic.js'],
+  ['demo/shell/vendor/chunks/chunk-V5WXEJ46.js', 'shell/vendor/chunks/chunk-V5WXEJ46.js'],
+  ['demo/shell/vendor/chunks/gamepad_manager-G6XPZUN2.js', 'shell/vendor/chunks/gamepad_manager-G6XPZUN2.js'],
+  ['demo/shell/vendor/chunks/midi_manager-LJCLWFJF.js', 'shell/vendor/chunks/midi_manager-LJCLWFJF.js'],
+  ['demo/shell/vendor/clockwork_audio_worklet.js', 'shell/vendor/clockwork_audio_worklet.js'],
+  ['demo/shell/vendor/scsynth-nrt.wasm', 'shell/vendor/scsynth-nrt.wasm'],
+  ['demo/shell/vendor/LICENSE-supersonic-scsynth', 'shell/vendor/LICENSE-supersonic-scsynth'],
+  ['demo/shell/vendor/LICENSE-supersonic-scsynth-core', 'shell/vendor/LICENSE-supersonic-scsynth-core'],
+
+  // ── the two definitions `/grains/` loads into that engine ─────────────────
+  //
+  // 🔴 NOT VENDORED AND NOT BUILT HERE: these are compiled by sclang ON THE
+  // BOARD, by `rig/box/norns/writedefs.scd`, out of the same
+  // `Engine_Pappus.sc` and `PosSource.sc` the Raspberry Pi's own service
+  // compiles. `/grains/` claims the browser runs the graph the board runs, and
+  // that claim is only true while these bytes came from there.
+  //
+  // ⚠️ `demoFiles()` cannot take them — a subdirectory, and `.scsyndef` is not
+  // a web extension — so they are named here, and `checkCompiledDefs()` below
+  // refuses the build when either one has drifted from the source it was
+  // compiled from. A stale artefact is silent in the worst direction: the tab
+  // runs last week's graph beside the board's today, and the page goes on
+  // saying they are the same instrument.
+  ['demo/grains/defs/pappus-tiny.scsyndef', 'grains/defs/pappus-tiny.scsyndef'],
+  ['demo/grains/defs/possource.scsyndef', 'grains/defs/possource.scsyndef'],
+  ['demo/grains/defs/PROVENANCE.json', 'grains/defs/PROVENANCE.json'],
 
   // ── the controller models, vendored ───────────────────────────────────────
   //
@@ -223,7 +257,18 @@ function checkImports(copied) {
     let text = '';
     try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
     const dir = dirname(dst);
-    for (const m of text.matchAll(/(?:import[^'"]*?|from\s*)['"](\.\/[^'"]+|\/[^'"]+)['"]/g)) {
+    // ⚠️ `[^'"\n]`, AND THE NEWLINE IS THE PART THAT WAS MISSING. Without it
+    // the `import…` alternative runs across line breaks, so any IDENTIFIER
+    // containing the word — `importMs` — swallowed everything up to the next
+    // quoted string and reported `grains/engine.mjs imports /status.reply`
+    // about an OSC address in a comparison twelve lines below it. It refused a
+    // build over two things that are not imports, and `demo/patch/engine.mjs`
+    // had the same variable and passed only because the string that followed it
+    // happened to be a real deployed path. A guard that can refuse for a reason
+    // that is not true teaches people to edit the guard.
+    // A multi-line `import { … } from '…'` is still caught: its specifier
+    // follows `from`, which is the second alternative.
+    for (const m of text.matchAll(/(?:import[^'"\n]*?|from\s*)['"](\.\/[^'"]+|\/[^'"]+)['"]/g)) {
       const spec = m[1];
       if (spec.startsWith('./')) {
         const rel = (dir === '.' ? '' : dir + '/') + spec.slice(2);
@@ -414,6 +459,24 @@ function favicon() {
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
+//
+// 🔴 EVERY REFUSAL FIRST, BEFORE ONE BYTE IS WRITTEN OR DELETED — AND THAT WAS
+// NOT TRUE UNTIL 2026-09-14, WHILE `checkPresent`'S OWN COMMENT SAID IT WAS.
+// All four calls sat BELOW the copy loop, so a listed file that was not on disk
+// did not produce the named refusal this file goes to such trouble to write: it
+// produced a raw `ENOENT` from `copyFile` in the middle of the run, on top of
+// an `OUT` that had already been emptied — a half-built output directory and a
+// stack trace, which is the exact failure the comment claimed was prevented.
+// MEASURED by moving `scsynth-nrt.wasm` aside and watching it happen.
+//
+// The checks read FILES and the repo, never OUT, so there was never a reason
+// for them to be down there. Function declarations hoist; the calls moved and
+// nothing else did.
+checkImports(FILES);
+checkPresent(FILES);
+checkVendorUrls(FILES);
+checkCompiledDefs();
+
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
@@ -469,7 +532,6 @@ for (const [src, dst] of FILES) {
 }
 // Same spirit as the duplicate-destination guard above, for the other silent
 // break: an import with nothing deployed behind it.
-checkImports(FILES);
 
 /**
  * 🔴 REFUSE THE BUILD IF A LISTED FILE IS NOT THERE.
@@ -495,7 +557,6 @@ function checkPresent(copied) {
     process.exit(1);
   }
 }
-checkPresent(FILES);
 
 /**
  * 🔴 AND REFUSE A `vendor/` URL IN THE SOURCE WITH NOTHING DEPLOYED BEHIND IT.
@@ -519,7 +580,12 @@ function checkVendorUrls(copied) {
     if (!['.html', '.mjs', '.js'].includes(extname(dst))) continue;
     let text = '';
     try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
-    for (const m of text.matchAll(/['"`](\/[A-Za-z0-9_-]+\/vendor\/[^'"`${}]*)['"`]/g)) {
+    // ⚠️ `defs` AS WELL AS `vendor`, ADDED 2026-09-13. `/grains/` fetches two
+    // compiled SynthDefs from `/grains/defs/`. They are not vendored — they are
+    // build artefacts of the Raspberry Pi — but the hazard is identical: a
+    // string in the source, no import to follow, and a 404 at runtime that
+    // leaves the page booting for ever with nothing in the log.
+    for (const m of text.matchAll(/['"`](\/[A-Za-z0-9_-]+\/(?:vendor|defs)\/[^'"`${}]*)['"`]/g)) {
       const rel = m[1].replace(/^\//, '');
       // a bare directory prefix is a base that gets a filename appended at
       // runtime — check the DIRECTORY has something in it
@@ -529,12 +595,65 @@ function checkVendorUrls(copied) {
     }
   }
   if (bad.length) {
-    console.error('\nBUILD REFUSED — vendor paths in the source with nothing deployed behind them:');
+    console.error('\nBUILD REFUSED — vendor/defs paths in the source with nothing deployed behind them:');
     for (const b of bad) console.error('  ' + b);
     process.exit(1);
   }
 }
-checkVendorUrls(FILES);
+
+/**
+ * 🔴 AND REFUSE A COMPILED SynthDef THAT NO LONGER MATCHES ITS SOURCE.
+ *
+ * `demo/grains/defs/*.scsyndef` are built by sclang ON THE BOARD out of
+ * `rig/box/norns/Engine_Pappus.sc` and `PosSource.sc`. `/grains/` loads them
+ * into wasm scsynth in the tab and claims, in its own first paragraph, that the
+ * browser is running the graph the Raspberry Pi is running.
+ *
+ * That claim has one silent failure and this is it: somebody edits the engine,
+ * the board recompiles on its next restart, and the checked-in artefact does
+ * not — so the tab runs the OLD graph beside the board's new one and every
+ * number on the page goes on agreeing, because both ends are still measured
+ * the same way. Nothing 404s, nothing throws, and the page's whole subject is
+ * quietly false.
+ *
+ * `PROVENANCE.json` records the md5 of every source and every artefact. This
+ * re-takes both and refuses the build on any disagreement, with the recipe in
+ * the message — the artefact cannot be rebuilt here, so the refusal has to say
+ * where it is rebuilt.
+ *
+ * ⚠️ IT IS A HASH OF THE SOURCE, NOT OF THE COMPILER. A different sclang could
+ * still produce different bytes from the same `.sc`; that is why the artefact's
+ * own hash is checked too, so at least "the file in the repo is the file that
+ * was weighed" is never in doubt.
+ */
+function checkCompiledDefs() {
+  const dir = 'demo/grains/defs';
+  let doc;
+  try { doc = JSON.parse(readFileSync(join(REPO, dir, 'PROVENANCE.json'), 'utf8')); }
+  catch (e) {
+    console.error(`\nBUILD REFUSED — ${dir}/PROVENANCE.json could not be read: ${e.message}`);
+    process.exit(1);
+  }
+  const bad = [];
+  const sum = (rel) => createHash('md5').update(readFileSync(join(REPO, rel))).digest('hex');
+  for (const [rel, want] of Object.entries(doc.sources || {})) {
+    let got = null;
+    try { got = sum(rel); } catch { bad.push(`${rel} is not on disk`); continue; }
+    if (got !== want) bad.push(`${rel} has changed — ${want} recorded, ${got} on disk`);
+  }
+  for (const [name, meta] of Object.entries(doc.artefacts || {})) {
+    const rel = `${dir}/${name}`;
+    let got = null;
+    try { got = sum(rel); } catch { bad.push(`${rel} is not on disk`); continue; }
+    if (got !== meta.md5) bad.push(`${rel} is not the file that was weighed — ${meta.md5} recorded, ${got} on disk`);
+  }
+  if (bad.length) {
+    console.error('\nBUILD REFUSED — the compiled SynthDefs /grains/ ships no longer match what they came from:');
+    for (const b of bad) console.error('  ' + b);
+    console.error(`\n  Recompile on the board and re-take the hashes:\n  ${doc.howToRemake}`);
+    process.exit(1);
+  }
+}
 console.log(`copied ${FILES.length} files`);
 
 // explode the committed JSONL caches into addressable static assets

@@ -279,9 +279,17 @@ export const DEMOS = [
   // the same thing is running on a Raspberry Pi in another building. Side by
   // side with a crossfade, the difference between the two panes IS the subject,
   // and the page now checks a granulator even when the board is down.
-  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000, room: 'fixed',
-    one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
-    tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
+  // 🔴 `the same granulator` IS TRUE NOW, AND IT WAS NOT BEFORE (2026-09-13).
+  // This line said it while the left pane was a 251-line AudioWorklet written
+  // for this page — a reimplementation that sounds similar is not the same
+  // instrument. Both panes load the SAME `pappus.scsyndef`, compiled by sclang
+  // ON THE BOARD, one into wasm scsynth in the tab and one into the Pi's own
+  // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
+  // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
+  // audio output, not a hand-written worklet.
+  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 60000, room: 'fixed',
+    one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
+    tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
 
   // 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
   // a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
