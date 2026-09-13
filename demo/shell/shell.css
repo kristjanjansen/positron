@@ -66,11 +66,18 @@ body {
 .pos-v {
   font: 600 19px/1.25 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--fg); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* ⚠️ AN EMPTY CELL STILL TAKES ITS LINE. A block box with no inline content
+     in it is zero pixels tall — line-height does not apply to nothing — so a
+     row of unmeasured cells would collapse to the height of its labels and the
+     readout would change shape the moment a number arrived. */
+  min-height: 1.25em;
 }
 .pos-v[data-state="pending"] { color: var(--dim2); }
-/* a pending cell shows an em dash and NOTHING ELSE — a lone `%` or `px` sitting
-   where a number should be reads as a value that went missing rather than one
-   that has not been taken yet */
+/* a pending cell shows NOTHING AT ALL — not a number, and not the unit either.
+   A lone `%` or `px` sitting where a number should be reads as a value that
+   went missing rather than one that has not been taken yet, and the em dash
+   this used to draw read as a row of failed readings rather than a row of
+   cells waiting. The key above it already says the cell is there. */
 .pos-v[data-state="pending"] .pos-u { display: none; }
 .pos-v[data-state="ok"]   { color: var(--ok); }
 .pos-v[data-state="bad"]  { color: var(--bad); }

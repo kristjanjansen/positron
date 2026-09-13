@@ -155,6 +155,69 @@ async function ev(expr) {
   return r.result.value;
 }
 
+/**
+ * Drag across every `[data-gesture]` element on the page, with real pointer
+ * events. Returns how many surfaces were drawn on.
+ *
+ * THE PATH IS A LISSAJOUS, not a straight line, and the reason is measurement:
+ * a straight drag is reconstructed exactly by every interpolator, so a page
+ * comparing hold against linear against a spline would grade all three as
+ * perfect and its whole subject would vanish into a tie. A curve separates
+ * them.
+ *
+ * ⚠️ TIMESTAMPS ARE SUPPLIED. `Input.dispatchMouseEvent` takes one, and
+ * without it every sample would be stamped when the round trip happened —
+ * so the gesture's input rate would be a measurement of this harness's
+ * latency rather than of anything on the page. `ev.timeStamp` in the page is
+ * what a capture gate reads, so it has to be the honest one.
+ */
+async function gesture() {
+  const n = await ev(`document.querySelectorAll('[data-gesture]').length`);
+  if (!n) return 0;
+  const STEPS = 200, STEP_MS = 16;          // 200 samples over 3.2 s
+  for (let k = 0; k < n; k++) {
+    // ⚠️ SCROLL IT INTO VIEW FIRST, AND RE-READ THE RECTANGLE AFTER. Headless
+    // Chrome's default viewport is 800x600 and these pages are taller than
+    // that, so a canvas half way down the page has a bounding rectangle whose
+    // lower half is BELOW THE VIEWPORT — and an input event dispatched at a
+    // y past the viewport lands on nothing at all, silently. The first run of
+    // this helper read `page asserted something — 0` for exactly that, while
+    // the identical drag in a 900px window produced 200 moves and 5 asserts.
+    const b = await ev(`(() => {
+      const e = document.querySelectorAll('[data-gesture]')[${k}];
+      e.scrollIntoView({ block: 'center' });
+      const r = e.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height,
+               vw: innerWidth, vh: innerHeight };
+    })()`);
+    if (!b || b.w < 20 || b.h < 20) continue;
+    // and clamp to what is actually on screen, for a surface taller than the
+    // viewport even after scrolling
+    const top = Math.max(0, b.y), bot = Math.min(b.vh, b.y + b.h);
+    if (bot - top < 20) continue;
+    b.y = top; b.h = bot - top;
+    // inset, so the ends of the path are not clamped against the edges
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const ax = b.w * 0.40, ay = b.h * 0.38;
+    const at = (i) => {
+      const u = i / STEPS;
+      return { x: cx + ax * Math.sin(2 * Math.PI * u + 0.4), y: cy + ay * Math.sin(4 * Math.PI * u) };
+    };
+    // TimeSinceEpoch, in SECONDS, which is what the CDP Input domain wants.
+    const t0 = Date.now() / 1000;
+    const p0 = at(0);
+    await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: p0.x, y: p0.y, button: 'left', clickCount: 1, buttons: 1, timestamp: t0 });
+    for (let i = 1; i <= STEPS; i++) {
+      const p = at(i);
+      await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'left', buttons: 1, timestamp: t0 + (i * STEP_MS) / 1000 });
+    }
+    const pn = at(STEPS);
+    await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pn.x, y: pn.y, button: 'left', clickCount: 1, buttons: 0, timestamp: t0 + (STEPS * STEP_MS) / 1000 });
+    await sleep(120);
+  }
+  return n;
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
 const ok = (label, cond, detail) => {
@@ -251,6 +314,22 @@ for (const t of targets) {
   // a transport verb rather than a side action (`take` puts Record there). A
   // control the harness cannot press is a subject the suite cannot reach, which
   // is how three pages stayed green while never playing a frame.
+  // ── a page whose input is a DRAG ────────────────────────────────────────
+  //
+  // 🔴 `element.click()` FIRES NO POINTER EVENTS, so a page that is drawn on
+  // rather than pressed was a subject this harness could not reach at all.
+  // `draw` carried a `Draw one for me` button purely so that something here
+  // had something to press — a page answering its own question, and the line
+  // it graded was not the line the page is about.
+  //
+  // Any element marked `data-gesture` gets a real drag instead: CDP mouse
+  // events, which Chrome turns into genuine pointerdown/move/up with
+  // `getCoalescedEvents` and all. The TIMESTAMPS are supplied explicitly and
+  // are 16 ms apart, so the page sees a gesture at a plausible input rate
+  // regardless of how fast the round trips happen to go — a drag paced by the
+  // CDP transport would be a measurement of the CDP transport.
+  await gesture();
+
   const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
