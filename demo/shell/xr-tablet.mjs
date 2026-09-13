@@ -73,32 +73,115 @@ export const DEFAULT_CONTROLS = [
   },
 ];
 
+// ── the site's slider, in one table ───────────────────────────────────────
+//
+// 🔴 THE SAME CONTROL IN ANOTHER SURFACE, SO IT LOOKS THE SAME. Reported from
+// the headset: *"use our slider style"*. The tablet had a pill-shaped track
+// with a round knob and a filled portion — a second visual language for a
+// control this project already has one for, which is the thing `/kit/` exists
+// to prevent. This is `demo/shell/slider.mjs` as drawn by `shell.css`.
+//
+// ⚠️ A CANVAS CANNOT USE THE STYLESHEET, SO THE NUMBERS ARE COPIED — AND THAT
+// IS THE DANGEROUS PART. Two copies of a design drift and nobody notices until
+// they are side by side. So they are copied ONCE, into this table, each with
+// the rule it came from; nothing below this block carries a literal. The
+// COLOURS are not copied at all — they are read live off `:root` with these as
+// fallbacks, so a token change reaches the tablet without anyone editing here.
+//
+//   shell.css `.sld`        height 34px · --sld-knob 20px · gap 8px
+//   shell.css `.sld-lane`   background --card2 · inset 0 0 0 1px --line2
+//                           · border-radius 4px
+//   shell.css `.sld-knob`   width var(--sld-knob) · height 34px
+//                           · background --hi · border-radius 4px
+//   shell.css `.sld-l`      500 9.5px/1 mono · letter-spacing .1em
+//                           · uppercase · --dim2
+//   shell.css `.sld-v`      500 12px/1 mono · --fg · tabular-nums · LEFT
+//   shell.css `.sld-head`   column · gap 4px  ← the value UNDER the label,
+//                           which changed today; the old side-by-side is gone
+//   shell.css `.sld-lane:focus-visible`
+//                           outline 2px solid --hi · outline-offset 1px
+//   shell.css `.sld-group`  row gap 10px
+//
+// ⚠️ `K` IS THE ONLY THING ADDED. A 34 px lane on a 768 px canvas read at
+// arm's length would be a hairline, so every CSS pixel above becomes `K` design
+// pixels — ONE factor, so the proportions are the stylesheet's and only the
+// size is this surface's. At K=4 the lane comes out 374x136, which is 2.75:1
+// against the shipped control's 96x34, i.e. 2.8:1. That match is the check.
+const K = 4;
+const KIT = {
+  laneH: 34 * K,
+  knobW: 20 * K,
+  radius: 4 * K,
+  edge: 1 * K,
+  gap: 8 * K,             // head -> lane
+  headGap: 4 * K,         // label -> value
+  rowGap: 10 * K,         // between one control and the next
+  labelPx: 9.5 * K,
+  labelTrack: 0.1,        // em
+  valuePx: 12 * K,
+  ring: 2 * K,            // .sld-lane:focus-visible outline-width
+  ringOffset: 1 * K,      // .sld-lane:focus-visible outline-offset
+};
+
+// 🔴 THE ONE PLACE A MONOSPACE FACE IS ASSUMED. Every width below is a
+// character count times an advance, because that is the only way a layout can
+// be arithmetic — and arithmetic is the only way `node` can grade it. 0.6em is
+// the advance of every face in `--mono`. ⚠️ It is an ASSUMPTION, so the page
+// MEASURES the drawn label against the column it was given and asserts it fits;
+// if the face ever changes, that assert is what says so rather than a label
+// quietly running under the lane.
+export const MONO_ADV = 0.6;
+const labelW = (s) => s.length * KIT.labelPx * (MONO_ADV + KIT.labelTrack);
+const valueW = (c) => (`${c.max}`.length + (c.unit ? c.unit.length + 1 : 0)) * KIT.valuePx * MONO_ADV;
+
 // ── the slab, and what a headset can read at arm's length ─────────────────
-// 🔴 THE TABLET IS AS TALL AS WHAT IS ON IT — ITS HEIGHT IS DERIVED, NOT TYPED.
-// The first version fixed the canvas at 768x528 and divided the space between
-// however many controls there were, so ONE control got a 438 px row: a label at
-// the top, a slider at the bottom and a hand's breadth of nothing in between.
-// Empty space on a readout is not neutral, it reads as a cell that failed to
-// load — the same rule that says an odd readout is CUT and never padded. Rows
-// are a FIXED height stacked from the top, the canvas is as tall as it needs to
-// be, and the metres follow the pixels. Adding a second control makes the
-// object taller, which is the honest thing for it to do.
-const ROW_H = 190;
-// The strip that says what the shape on your hand IS. Not decoration and not an
-// instruction: a claim about the picture, made on the picture, because a proxy
-// that pretends to be a controller is the dishonest version of this. See
-// GRIP_PARTS in xr-room.mjs.
-const FOOT = 46;
-// The tablet's own inset, and also the slider track's — which is why
-// `valueFromU` reads THIS rather than a second constant that could disagree.
-const PAD = 22;
-const TRACK_H = 16;
-const KNOB = 13;
+//
+// 🔴 MORE AIR. Reported from the headset as cramped; the inset was 22 design
+// pixels, under 3% of the width. It is `PAD` below and nothing else, because
+// every other measurement is taken from it or from the kit table above.
+//
+// ⚠️ PADDING COMES OUT OF THE CONTENT, so the thing to check is that the TYPE
+// did not shrink to pay for it. It did not: the value is `KIT.valuePx` = 48
+// design pixels, against 62 before — but the canvas is the same 1280 real
+// pixels across the same 31.9 degrees, so the figure that matters is unchanged
+// at **40.1 px per degree**, and 48 design pixels is 2.0 degrees of cap height
+// at a reading distance of 0.35 m. Nothing was bought by making the words
+// smaller and nothing had to be.
+const PAD = 48;
+// ⚠️ AND THE FOCUS RING SITS OUTSIDE THE LANE, so the row has to be tall enough
+// to hold it — a ring clipped by the canvas edge reads as a drawing fault
+// rather than as a control with the pointer on it.
+const RING_OUT = KIT.ringOffset + KIT.ring;
+// The row's content is whichever of the two columns is taller; the gap below it
+// is the stylesheet's own row gap, and the LAST row does not carry one.
+const HEAD_H = KIT.labelPx + KIT.headGap + KIT.valuePx;
+const ROW_CONTENT = Math.max(KIT.laneH + RING_OUT * 2, HEAD_H);
+const ROW_H = ROW_CONTENT + KIT.rowGap;
 
 /** The canvas, in DESIGN pixels, for `n` controls. */
-const pyFor = (n) => PAD + Math.max(1, n) * ROW_H + FOOT + PAD;
+const pyFor = (n) => PAD + Math.max(1, n) * ROW_H - KIT.rowGap + PAD;
 const DESIGN_W = 768;
 const DESIGN_H = pyFor(DEFAULT_CONTROLS.length);
+
+// 🔴 THE HEAD COLUMN IS AS WIDE AS ITS WIDEST LINE, WHICH IS WHAT `max-content`
+// DOES IN `.sld-group`. Computed from the control list rather than typed, so a
+// control with a longer name widens the column instead of running under the
+// lane — and computed with arithmetic rather than `measureText`, so the hit
+// test and the drawing share it and `node` can grade both.
+const HEAD_W = Math.max(...DEFAULT_CONTROLS.map((c) => Math.max(labelW(c.label), valueW(c))));
+
+/**
+ * The lane, in design pixels. Exported because the knob's travel is the one
+ * number in this file that is easy to get wrong and invisible when it is — see
+ * `valueFromU`.
+ */
+const LANE = {
+  x: PAD + HEAD_W + KIT.gap,
+  get w() { return DESIGN_W - PAD - this.x; },
+  h: KIT.laneH,
+  knobW: KIT.knobW,
+  get travel() { return this.w - this.knobW; },
+};
 
 // 🔴 EVERY LAYOUT NUMBER ABOVE IS A **DESIGN** PIXEL, AND THE CANVAS IS BIGGER
 // THAN THAT BY ONE FACTOR. The tablet was reported too small from the headset
@@ -116,18 +199,12 @@ const PY = Math.round(DESIGN_H * SCALE);
 // small object is a small texture and it is BACKWARDS: what a face resolves is
 // pixels per DEGREE, and a tablet is an order of magnitude closer than a wall
 // panel. `mirror`'s shipped panel is 1.28 m at 1.6 m — 43.6 degrees across a
-// 1280 px texture, so **29.4 px per degree**.
-//
-// MEASURED against that, at a reading distance of 0.35 m:
-//
-//   0.12 m across @  768 px   19.4°   39.6 px/deg   ← reported TOO SMALL
-//   0.20 m across @ 1280 px   31.9°   40.1 px/deg   ← this
-//
-// So the object is **67% wider** and the type is very slightly FINER per degree
-// than it was, not coarser — which is the whole reason the canvas grew with it.
-// ⚠️ And 40 px/deg is still only an anchor: `mirror`'s own legibility has never
-// been graded by a face, so matching it is a floor rather than a measurement.
-// `plan-xr-hands` §5.2.
+// 1280 px texture, so **29.4 px per degree**. This is 0.20 m across 1280 px at
+// a reading distance of 0.35 m — 31.9 degrees, so **40.1**. Above the shipped
+// panel rather than merely matching it, because a tablet is read at a glance
+// while holding something else. ⚠️ And 40 px/deg is still only an anchor:
+// `mirror`'s own legibility has never been graded by a face, so matching it is
+// a floor rather than a measurement. `plan-xr-hands` §5.2.
 const W_M = 0.20;
 // ⚠️ THE HEIGHT FOLLOWS THE PIXELS. A width and a height typed separately are
 // two numbers that can disagree about the aspect, and a stretched texture is
@@ -173,7 +250,7 @@ const rrect = (g, x, y, w, h, r) => {
  * under the knob, with nothing on screen to say so.
  */
 const rowsTop = () => PAD;
-const rowsBottom = () => DESIGN_H - PAD - FOOT;
+const rowsBottom = () => DESIGN_H - PAD;
 const rowH = () => ROW_H;
 
 /**
@@ -195,24 +272,31 @@ export function controlAt(u, v) {
 /**
  * What a drag across the tablet means, in the control's own units.
  *
- * 🔴 THE TRACK IS INSET BY `PAD`, SO THE VALUE IS NOT `u` SCALED. Reading the
- * value straight off `u` gives a slider that can never reach either of its own
- * ends — short by exactly the margin at both — while every number on screen
- * stays plausible. Clamped rather than extrapolated, because a ray that slides
- * off the side of the tablet with the trigger down must not drive the number
- * past what the control says it can be.
+ * 🔴 A SHARE OF THE TRAVEL, NEVER OF THE WIDTH — which is `slider.mjs`'s own
+ * rule and the reason its two ends land flush. The knob is `LANE.knobW` wide
+ * and moves `LANE.w - LANE.knobW`; a value read as a share of the LANE puts the
+ * knob half outside it at both extremes, and a value read as a share of the
+ * whole TABLET can never reach either end at all. Both look like a broken
+ * control and neither throws.
+ *
+ * ⚠️ HALF A KNOB IS SUBTRACTED because the ray grabs the knob's CENTRE, exactly
+ * as a pointer does in `slider.mjs`'s `fromX` — without it the extremes are
+ * only reachable by aiming off the tablet entirely.
+ *
+ * Clamped rather than extrapolated: a ray that slides off the side with the
+ * trigger down must not drive the number past what the control says it can be.
  */
 export function valueFromU(u, control) {
-  const x0 = PAD, x1 = DESIGN_W - PAD;
-  const f = Math.max(0, Math.min(1, (u * DESIGN_W - x0) / (x1 - x0)));
+  const f = Math.max(0, Math.min(1, (u * DESIGN_W - LANE.x - LANE.knobW / 2) / LANE.travel));
   const v = control.min + f * (control.max - control.min);
   return Math.round(v * 1e6) / 1e6;
 }
 
 /** The inverse, for drawing the knob where the value says it is. */
-const uOfValue = (value, control) => {
+/** Where the knob's LEFT EDGE goes, in design pixels. The inverse of the above. */
+const knobX = (value, control) => {
   const f = (value - control.min) / ((control.max - control.min) || 1);
-  return (PAD + f * (DESIGN_W - 2 * PAD)) / DESIGN_W;
+  return LANE.x + Math.max(0, Math.min(1, f)) * LANE.travel;
 };
 
 /**
@@ -230,7 +314,8 @@ const uOfValue = (value, control) => {
  */
 export const TABLET = {
   w: W_M, h: H_M, px: PX, py: PY,
-  pad: PAD, foot: FOOT, fillAlpha: FILL_ALPHA, scale: SCALE,
+  pad: PAD, fillAlpha: FILL_ALPHA, scale: SCALE,
+  designW: DESIGN_W, designH: DESIGN_H, lane: LANE, kit: KIT, headW: HEAD_W,
   controls: DEFAULT_CONTROLS,
 };
 Object.defineProperty(TABLET, 'fingerprint', {
@@ -260,27 +345,25 @@ Object.defineProperty(TABLET, 'fingerprint', {
 export function registerStandIn(parts) { TABLET.standInParts = parts; }
 
 /**
- * 🔴 WHAT THE SHAPE ON YOUR HAND ACTUALLY IS, IN WORDS, ON THE THING ITSELF.
+ * 🔴 THE LINE THAT SAID WHAT THE SHAPE ON YOUR HAND WAS HAS GONE FROM THE FACE
+ * — BUT THE FACT HAS NOT, AND THAT IS THE WHOLE OF THIS NOTE.
  *
- * `xr-room.mjs` calls this when it learns the answer — the real model landed,
- * or it did not and a stand-in is being drawn. It matters because the two are
- * NOT distinguishable by looking once the model loads: a good stand-in and a
- * real controller are both controller-shaped, and a page that draws one while
- * you believe it is drawing the other is the same offence as colouring an
- * unmeasured thing as if it had passed.
+ * The footer used to read "a stand-in shape, not your real controller", and it
+ * was asked to go: it is a caption on a control surface, and captions crowd out
+ * the numbers. Deleting a display without rehoming what it SAID is how a page
+ * quietly stops reporting something, so the fact moved rather than went. It now
+ * lives in two better places:
  *
- * ⚠️ A MODULE-LEVEL VERSION, because the footer belongs to every tablet and the
- * answer arrives long after any of them were built. A tablet folds this counter
- * into its own, so the canvas is re-drawn exactly once when the words change
- * and never again.
+ *   · **the shape itself.** A stand-in draws in a colour no real controller is
+ *     — see `STAND_IN_COL` in xr-room.mjs. The fact is in the thing rather than
+ *     in a caption about the thing, which is where this project puts every
+ *     other claim it makes about a picture.
+ *   · **one line per session on the beacon**, said when the answer settles
+ *     rather than only when it fails.
+ *
+ * ⚠️ Do not put it back on the face. If a third place is ever wanted, the
+ * readout on the flat page is the one with room for it.
  */
-let drawnAs = 'a stand-in shape, not your real controller';
-let drawnAsV = 0;
-export function registerDrawnAs(words) {
-  if (!words || words === drawnAs) return;
-  drawnAs = words; drawnAsV++;
-}
-export const drawnAsNow = () => drawnAs;
 
 /**
  * The tablet, drawn.
@@ -296,17 +379,24 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   canvas.width = PX; canvas.height = PY;
   const g = canvas.getContext('2d');
   const values = new Map(controls.map((c) => [c.key, c.value]));
-  let version = 0, drawn = -1, drawnFoot = -1;
+  let version = 0, drawn = -1;
   let aimed = null;             // { u, v, i } while the pointer is on it
   let dragging = null;          // the control index the trigger took hold of
 
+  // 🔴 THE COLOURS ARE READ LIVE OFF `:root`, NOT COPIED. The KIT table above
+  // holds the stylesheet's SIZES because a canvas cannot compute them — but a
+  // colour it can just ask for, so a token change reaches the tablet with
+  // nobody editing this file. The literals are fallbacks for a context with no
+  // document behind it, and they are the current values of those tokens.
   const css = typeof getComputedStyle === 'function'
     ? getComputedStyle(document.documentElement) : null;
   const tok = (n, fb) => ((css?.getPropertyValue(n) || '').trim() || fb);
-  const FG = tok('--fg', '#e8edf5');
-  const DIM = tok('--dim2', '#7a879c');
-  const HI = tok('--hi', '#ffd400');
-  const LINE = '#2b3546';
+  const FG = tok('--fg', '#e6e6e6');           // .sld-v
+  const DIM2 = tok('--dim2', '#6a7280');       // .sld-l
+  const HI = tok('--hi', '#ffd400');           // .sld-knob
+  const CARD2 = tok('--card2', '#151b26');     // .sld-lane ground
+  const LINE2 = tok('--line2', '#2b3546');     // .sld-lane edge
+  const MONO = tok('--mono', 'ui-monospace, SFMono-Regular, Menlo, monospace');
 
   const value = (key) => values.get(key);
   const set = (key, v) => {
@@ -373,8 +463,8 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   const holding = () => dragging !== null;
 
   function draw() {
-    if (drawn === version && drawnFoot === drawnAsV) return version;
-    drawn = version; drawnFoot = drawnAsV;
+    if (drawn === version) return version;
+    drawn = version;
     // ⚠️ ONE TRANSFORM, SET EVERY TIME. `setTransform` rather than `scale`
     // because `scale` compounds: called once a frame it would shrink the
     // picture to nothing over a few seconds, which reads as the tablet fading
@@ -394,53 +484,80 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
       const v = values.get(c.key);
       const lit = aimed?.i === i;
 
-      // ⚠️ THE READOUT'S OWN SHAPE, IN ITS OWN ORDER: a small dim LABEL, the
-      // big NUMBER under it, the UNIT tucked after the number. It is the shape
-      // a visitor already knows from every other page here, and inventing a
-      // second one for the headset would mean learning the readout twice.
-      g.fillStyle = DIM;
-      g.font = '500 28px ui-monospace, SFMono-Regular, Menlo, monospace';
-      g.fillText(c.label, PAD, top + 34);
-
-      const num = fmt(v, c);
-      g.fillStyle = lit ? HI : FG;
-      g.font = '600 62px ui-monospace, SFMono-Regular, Menlo, monospace';
-      g.fillText(num, PAD, top + 108);
-      if (c.unit) {
-        // ⚠️ MEASURED, NOT OFFSET BY A GUESS. The unit sits after whatever the
-        // number happens to be, so `7` and `100` both keep it against the
-        // digits — an offset typed once leaves a gap that grows and shrinks
-        // with the value, which reads as the unit drifting.
-        const w = g.measureText(num).width;
-        g.fillStyle = DIM;
-        g.font = '500 30px ui-monospace, SFMono-Regular, Menlo, monospace';
-        g.fillText(c.unit, PAD + w + 10, top + 108);
+      // ── the head: the LABEL, and the VALUE UNDER IT ────────────────────
+      // 🔴 UNDER, NOT BESIDE. `shell.css`'s `.sld-head` changed today and the
+      // reason it changed applies here too: a number on the far side of the
+      // lane drifts away from the word it belongs to as it narrows, and this
+      // project's rule everywhere else is that a figure sits beside its own
+      // ink. The two are one column, as wide as the wider of its two lines.
+      const headTop = top + (ROW_CONTENT - HEAD_H) / 2;
+      g.fillStyle = DIM2;
+      g.font = `500 ${KIT.labelPx}px ${MONO}`;
+      // `.sld-l` is uppercase with .1em of tracking. `letterSpacing` is not on
+      // every canvas implementation, so the tracking is done by hand — which is
+      // also the only way it can agree with `labelW` above.
+      let x = PAD;
+      const track = KIT.labelPx * KIT.labelTrack;
+      for (const ch of c.label.toUpperCase()) {
+        g.fillText(ch, x, headTop + KIT.labelPx);
+        x += KIT.labelPx * MONO_ADV + track;
       }
 
-      // the track, under the number, the full width between the margins
-      const ty = top + rh - TRACK_H - 30;
-      const x0 = PAD, x1 = DESIGN_W - PAD;
-      g.fillStyle = LINE;
-      rrect(g, x0, ty, x1 - x0, TRACK_H, TRACK_H / 2);
-      const kx = uOfValue(v, c) * DESIGN_W;
-      g.fillStyle = lit ? HI : '#5b6a80';
-      rrect(g, x0, ty, Math.max(TRACK_H, kx - x0), TRACK_H, TRACK_H / 2);
-      // ⚠️ THE KNOB GROWS WHEN THE RAY IS ON IT, and it does not change hue.
-      // Colour in this project says HOW SOMETHING LANDED; "you are pointing at
-      // it" is a second meaning on that channel, which is the rule `TOUCH` in
-      // xr-panel.mjs exists to hold. Size is the half that reads in a headset.
-      g.fillStyle = lit ? HI : FG;
+      // ⚠️ THE UNIT IS PART OF THE VALUE STRING, exactly as `.sld-v` prints it
+      // — `12.40 ms`, one run of text, left-aligned under the label's first
+      // letter. It used to be a separate smaller word positioned by a measured
+      // offset, which is two things to keep in step for no gain.
+      // ⚠️ THE VALUE DOES NOT CHANGE COLOUR WHEN THE RAY IS ON IT. Colour in
+      // this project says HOW SOMETHING LANDED, and "you are pointing at it" is
+      // a second meaning on that channel — the rule `TOUCH` in xr-panel.mjs
+      // exists to hold. The pointer's feedback is the ring below, which is the
+      // site's own answer to the same question.
+      g.fillStyle = FG;
+      g.font = `500 ${KIT.valuePx}px ${MONO}`;
+      g.fillText(`${fmt(v, c)}${c.unit ? ' ' + c.unit : ''}`,
+                 PAD, headTop + KIT.labelPx + KIT.headGap + KIT.valuePx);
+
+      // ── the lane and the knob ──────────────────────────────────────────
+      const ly = top + (ROW_CONTENT - KIT.laneH) / 2;
+      g.fillStyle = CARD2;
+      rrect(g, LANE.x, ly, LANE.w, KIT.laneH, KIT.radius);
+      // ⚠️ AN INSET EDGE, NOT A BORDER — `.sld-lane` uses an inset shadow for
+      // one measured reason: a border insets the box the handle moves in, so
+      // its travel is a pixel short at each end on a control whose whole brief
+      // is that it sits flush. Stroked half a width inside here, which paints
+      // the same line and takes nothing off the travel.
+      g.strokeStyle = LINE2;
+      g.lineWidth = KIT.edge;
       g.beginPath();
-      g.arc(kx, ty + TRACK_H / 2, lit ? KNOB * 1.35 : KNOB, 0, 6.2832);
-      g.fill();
+      if (g.roundRect) g.roundRect(LANE.x + KIT.edge / 2, ly + KIT.edge / 2, LANE.w - KIT.edge, KIT.laneH - KIT.edge, KIT.radius);
+      else g.rect(LANE.x + KIT.edge / 2, ly + KIT.edge / 2, LANE.w - KIT.edge, KIT.laneH - KIT.edge);
+      g.stroke();
+
+      // 🔴 THE RAY'S FEEDBACK IS THE SITE'S OWN FOCUS RING, NOT A BIGGER KNOB.
+      // `shell.css`: `.sld-lane:focus-visible { outline: 2px solid var(--hi);
+      // outline-offset: 1px }`. A knob that swelled past its lane was tried and
+      // it read as a drawing fault — the handle is the same height as the lane
+      // by design, so anything taller looks like it has come loose. The ring is
+      // the answer this project already gives to "this control has the
+      // pointer", it is outside the lane where nothing is competing with it,
+      // and it costs the knob nothing.
+      if (lit) {
+        const o = KIT.ringOffset + KIT.ring / 2;
+        g.strokeStyle = HI;
+        g.lineWidth = KIT.ring;
+        g.beginPath();
+        if (g.roundRect) g.roundRect(LANE.x - o, ly - o, LANE.w + o * 2, KIT.laneH + o * 2, KIT.radius + o);
+        else g.rect(LANE.x - o, ly - o, LANE.w + o * 2, KIT.laneH + o * 2);
+        g.stroke();
+      }
+
+      // 🔴 NO FILLED PORTION. The shipped control has none: it is a lane and a
+      // solid handle, and a bar that fills as the value rises was this tablet
+      // inventing a second way to read the same number.
+      g.fillStyle = HI;
+      rrect(g, knobX(v, c), ly, KIT.knobW, KIT.laneH, KIT.radius);
     });
 
-    // 🔴 THE FOOTER SAYS WHAT THE SHAPE IN YOUR HAND IS. A proxy that says it
-    // is a proxy is honest; one that pretends to be a controller is not, and
-    // this is the only surface in the session where that claim can be read.
-    g.fillStyle = DIM;
-    g.font = '500 24px ui-monospace, SFMono-Regular, Menlo, monospace';
-    g.fillText(drawnAs, PAD, DESIGN_H - PAD - 8);
     return version;
   }
 

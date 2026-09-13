@@ -22,7 +22,7 @@
 // decoration, the convention `diagram-test.mjs` already set here.
 
 import { pickQuad, uvToPixels } from './xr-pick.mjs';
-import { controlAt, valueFromU, DEFAULT_CONTROLS, TABLET } from './xr-tablet.mjs';
+import { controlAt, valueFromU, DEFAULT_CONTROLS, TABLET, MONO_ADV } from './xr-tablet.mjs';
 import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE } from './xr-room.mjs';
 import { dedupe, SAME_THING_M } from './xr-hands.mjs';
 
@@ -268,25 +268,60 @@ const at = (target) => {
   // above the first row. A hit test that answered "row 0" for the whole face
   // would pass every case above and turn the line that says the shape is a
   // stand-in into a slider.
-  ok('the footer and the top margin are not controls',
+  ok('the margins are not controls',
      controlAt(0.5, 0.99) === null && controlAt(0.5, 0.005) === null);
 
   // 🔴 THE SLIDER'S ENDS, AND THEY ARE NOT AT u 0 AND u 1. The track is inset
   // by the tablet's own margin, so a value read straight off `u` would be short
   // at both ends by exactly that inset — a slider that cannot reach its own
   // maximum, with every number in the readout still green.
+  const L = TABLET.lane, W = TABLET.designW;
   const lo = valueFromU(0, c[0]), hi = valueFromU(1, c[0]);
-  const mid = valueFromU(0.5, c[0]);
   ok('dragging to either end of the track reaches the control\'s own ends',
      near(lo, c[0].min) && near(hi, c[0].max),
      `${lo} .. ${hi} against a declared ${c[0].min} .. ${c[0].max}`);
-  ok('...and the middle of the track is the middle of the range',
-     near(mid, (c[0].min + c[0].max) / 2), `${mid}`);
-  // NEGATIVE CONTROL: past the end is clamped, not extrapolated. A ray that
-  // slides off the side of the tablet while the trigger is down must not drive
-  // the number past what the control says it can be.
+
+  // 🔴 A SHARE OF THE TRAVEL, NOT OF THE LANE AND NOT OF THE TABLET — which is
+  // `slider.mjs`'s rule and the one that makes both ends land flush. The three
+  // readings differ, so the test has to name which it wants: the midpoint of
+  // the RANGE sits where the knob's own centre reaches the middle of its
+  // travel, which is NOT the middle of the lane and is nowhere near the middle
+  // of the tablet.
+  const midU = (L.x + L.knobW / 2 + L.travel / 2) / W;
+  ok('...and the middle of the TRAVEL is the middle of the range',
+     near(valueFromU(midU, c[0]), (c[0].min + c[0].max) / 2),
+     `${valueFromU(midU, c[0])} at u ${midU.toFixed(3)} — the middle of the TABLET (u 0.5) would read ${valueFromU(0.5, c[0])}`);
+
+  // NEGATIVE CONTROL, and it is the one that catches the mistake this rule
+  // exists for: if the value were a share of the LANE rather than of the
+  // travel, the knob's left edge at the maximum would hang `knobW` past the
+  // lane's right edge. The two ends must land flush INSIDE it.
+  const endsFlush = Math.abs((L.x + L.travel) + L.knobW - (L.x + L.w)) < 1e-9;
+  ok('the knob\'s two ends land flush inside the lane, neither short nor over',
+     endsFlush && L.travel > 0 && L.travel < L.w,
+     `travel ${L.travel} of a ${L.w} lane, knob ${L.knobW} — ${L.travel + L.knobW} back to ${L.w}`);
+
+  // NEGATIVE CONTROL: past the end is clamped, not extrapolated.
   ok('a drag that runs off the end is clamped rather than extrapolated',
      valueFromU(-3, c[0]) === c[0].min && valueFromU(4, c[0]) === c[0].max);
+
+  // 🔴 THE LANE HAS TO LOOK LIKE THE SHIPPED ONE, AND THAT IS A NUMBER.
+  // `shell.css` gives `.sld-lane` 96x34 and `--sld-knob` 20 — so the shipped
+  // control is 2.82:1 with a knob 0.588 of its height. A table of constants
+  // copied out of a stylesheet is exactly the kind of thing that drifts, so the
+  // proportions are asserted rather than trusted.
+  ok('the tablet\'s lane has the shipped control\'s proportions',
+     Math.abs(L.w / L.h - 96 / 34) < 0.15 && near(L.knobW / L.h, 20 / 34, 1e-9),
+     `${(L.w / L.h).toFixed(2)}:1 against 2.82:1 · knob ${(L.knobW / L.h).toFixed(3)} of the lane against 0.588`);
+
+  // ⚠️ AND THE HEAD COLUMN HAS TO FIT ITS OWN LABEL. `HEAD_W` is arithmetic on
+  // a character count — the one place a monospace advance is assumed — so the
+  // assumption is checked against the widest label the list can hold. The PAGE
+  // measures the drawn text too; this is the half a laptop can do with no font.
+  const widest = Math.max(...c.map((x) => x.label.length));
+  ok('the head column is wide enough for the longest label on it',
+     TABLET.headW >= widest * TABLET.kit.labelPx * (MONO_ADV + TABLET.kit.labelTrack) - 1e-6,
+     `${TABLET.headW.toFixed(0)} design px for ${widest} characters`);
 }
 
 {
