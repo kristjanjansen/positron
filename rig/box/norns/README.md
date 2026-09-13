@@ -69,6 +69,15 @@ It reads the device tree and builds a different graph per board — LITE on a Pi
 (one granulator, 24 resonators), **FULL on a Pi 4** (two granulators, 48).
 Confirmed at runtime here: `lite mode: false`. Override with `PAPPUS_LITE=1`.
 
+Two smaller rungs are compiled in below that, each a set of `if`s around the
+CONSTRUCTION rather than gains set to zero — SuperCollider does not strip an
+unconnected UGen. `PAPPUS_TINY=1` fits the graph under wasm scsynth's silent
+64 KiB `/d_recv` ceiling (`TINY.md`); `PAPPUS_BARE=1` implies it and builds no
+RESONATOR, DELAY, COLOUR or REVERB at all (`CHAIN.md`). Both are read by
+PRESENCE — `=0` turns them ON — and the granulator is untouched on every rung.
+The engine names the rung it compiled in its first log line, and reports it as
+a number on the `rung` poll.
+
 Its own constraint, worth knowing before adding to it: one `SynthDef` sitting
 close to **scsynth's fixed pool of 64 audio interconnect buffers**.
 

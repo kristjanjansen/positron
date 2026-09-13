@@ -161,12 +161,222 @@ a grain cloud reads as a place rather than as a texture.
   skips stages, these must still mean something** — a meter reading zero
   because a stage was compiled out looks exactly like a meter reading zero
   because a stage is broken, and the board's own status would start lying.
-  Either report them as absent or do not report them.
+  Either report them as absent or do not report them. ✅ **Answered
+  2026-09-13: on BARE they report `-1`.** See the BARE section below.
 - **Master:** `mcomp` `fade` `run` `bypass` `amp` `ingain` `limceil`.
 - **`snapwrite` / `snapread`** move the grain buffer to and from disk;
   `bufclear` and `delayclear` empty them.
 
 ---
+
+## BARE — the fourth rung, and what it does not build
+
+    PAPPUS_BARE=1     GRAINSWARM straight to the master. RESONATOR, DELAY,
+                      COLOUR and REVERB are not built.
+
+Implemented 2026-09-13 in `Engine_Pappus.sc`. It implies `PAPPUS_TINY` the same
+way TINY implies LITE — a rung that is not a subset of the one above it is not a
+rung, it is a variant — so the ladder is `FULL > LITE > TINY > BARE`.
+
+⚠️ **Set by PRESENCE, not by value.** `PAPPUS_BARE=0` turns it ON, because
+`PAPPUS_TINY` already behaves that way and one sharp edge shared by two
+neighbouring flags is easier to hold than two different rules. `PAPPUS_LITE` is
+the only one of the three that reads its value.
+
+🔴 **COMPILE-TIME, NEVER A RUNTIME ZERO, AND THAT IS THE WHOLE CLAIM.** The
+routing matrix at the top of this file can already send a granulator past the
+chain at run time (`oin1 1, pin1 0`), with no recompile and no flag. What BARE
+buys is narrower and is the only thing it buys: **the UGens stop existing.**
+SuperCollider does not strip an unconnected one, so `pwet 0` changes the sound
+and not one byte of the def, and every filter in a bypassed stage still costs a
+Pi 4 the same every block. Every cut is an `if` around the CONSTRUCTION.
+
+### What each `if` removes
+
+| stage | what stops being built on BARE | already gone on TINY |
+|---|---|---|
+| RESONATOR | three noise generators + a BPF (the excitation), one `PlayBuf` chain per loop file, an `Amplitude` follower, an `HPF`, BRIGHTNESS's `LPF`, ~24 `Lag.kr`, and **two `Limiter`s** | the 48-`Ringz` modal bank (3,526 B) and the eight string voices (3,344 B) |
+| DELAY | the `Phasor`, the feedback `BufRd` and its tilt pair, the `BufWr`, four taps (`Phasor` + `BufRd` + `Pan2` + 3 `Lag.kr` each), the output tilt, and eight `AllpassC` of DIFFUSE | four of the eight taps (2,894 B, ~28 UGens) |
+| COLOUR | drive's saturator and its fitted make-up, crush's quantiser and its two `Latch`/`Impulse` rate reducers, LOSS (two cascaded `LPF` on LITE, an `FFT`/`IFFT` pair on FULL), the envelope follower, the noise wash and its loop players, WOW's modulated `DelayC` | — |
+| REVERB | six `CombL`, two `LPF`, four `AllpassC` | the shimmer's one `PitchShift` (236 B) |
+| the feedback bus | **both ends** — no `LocalIn.ar(3)`, no `LocalOut`. COLOUR owned two channels and REVERB the third, and BARE has neither user | — |
+
+⚠️ **RESONATOR is where the "it is already a pass-through" intuition is wrong.**
+TINY took the bank and the strings, which is what makes the *sound* a wire — but
+the excitation chain, the brightness filter, two dozen `Lag.kr` and **two
+`Limiter`s** were all still being built and still running every block, feeding a
+`DC.ar([0, 0])`. A stage that costs nothing audibly is not a stage that costs
+nothing.
+
+### What BARE deliberately keeps
+
+- **Every command.** `pwet`, `rverb`, `swet`, `taptimes`, `drive`, `crush` and
+  the rest are still declared and still `set` a control; they simply have
+  nothing to drive. That is LITE's own precedent for the `n…` controls, quoted
+  at the top of this section of the engine: *"nothing in Lua has to know, no
+  command becomes an error, and a pset written on a Pi 4 loads here without
+  complaint."* A page sending `pwet` to a BARE engine gets no error.
+- **`bypass`.** Its two `Select`s happen to live in COLOUR's tail on the full
+  graph, and they do **not** go with the stage — BARE rebuilds them, so
+  `bypass 1` still hands the input straight out.
+- **The buffers behind the buffer commands.** `dbuf` shrinks from 11 s to 0.1 s
+  rather than disappearing, so `delayclear` stays a real command with a real
+  buffer behind it — the same thing LITE does for the second granulator's
+  capture, and for the same reason: a command that raises is worse than one that
+  does nothing. `bufclear`, `snapwrite` and `snapread` are untouched.
+- **The master: COMP, level, fade, limiter.** COMP is not one of the four named
+  stages and it is the one master colour left in the path — but `mcomp 0` makes
+  the `Compander` an *exact* identity (threshold 1, both slopes 1, make-up 1),
+  so a page can null it with no recompile. That is the test for whether
+  something belongs in a compile-time rung at all: a `Compander` is one UGen and
+  can be made exactly transparent; forty-eight `Ringz` are neither. ⚠️ **A
+  comparison against the browser granulator should send `mcomp 0`** — at its
+  default of 0.2 it is compressing.
+
+### 🔴 The four feed points collapse into one, and they SUM
+
+`pin`/`sin`/`kin`/`oin` are where each granulator joins the chain, and the
+defaults put it in at the HEAD (`pin 0.7`) with the other three at zero.
+Honouring only `oin` on BARE would have compiled a rung that is **silent out of
+the box**, and silent for every patch written on any other rung — LESSONS #62's
+shape exactly, where a value that is not in the table is not an error, it is
+nothing.
+
+Summing is not a compromise, it is what the full chain already does: with every
+stage's WET at zero each stage passes its input through and adds the next feed,
+so `RESONATOR > DELAY > COLOUR > out` is literally `pin + sin + kin + oin` —
+the same 2.8x at four feeds of 0.7 that the routing comment in the engine
+measures. One `Lag.kr` for the sum rather than four.
+
+⚠️ **BARE IS EARLIER THAN THE SAME SETTINGS ON TINY, AND THAT IS NOT A SUM.**
+SC's `Limiter` looks ahead by its `dur` and delays its output by it, so
+RESONATOR's output limiter alone puts **50 ms** of pure delay in the dry path,
+plus WOW's ~0.5 ms `DelayC` in COLOUR and (on FULL only) LOSS's 512-sample
+`DelayN`. So the level and the routing match; the ALIGNMENT does not. A
+sample-aligned A/B between rungs would read as a total mismatch for a reason
+that is not the chain. ⚠️ That figure is read off the UGen's documented
+behaviour, not measured here — check it before quoting it.
+
+### 🔴 The meters: absent reads `-1`, and never `0`
+
+The seven meters are the reason this was not a free rung. On BARE, four of the
+boxes on SIGNAL do not exist, and **a meter reading zero because a stage was
+compiled out is indistinguishable from one reading zero because the stage is
+broken** — the board's status is what a page reads, so the second reading is the
+one somebody would act on.
+
+What was implemented:
+
+- **`-1` on the bus for every stage that was not built** — meters 2 (GRAINSWARM
+  2, which LITE removed), 3, 4, 5 and 6. `-1` cannot be a measurement: every
+  real meter here is an `Amplitude`, which is a magnitude and is never negative,
+  so a reader who has never heard of BARE can still separate the two with `< 0`.
+  One shared `DC.kr(-1)`, not five — an unconnected UGen is still a UGen and so
+  is a duplicated constant.
+- **All seven polls stay registered.** A poll that vanishes is a lookup that
+  fails on the Lua side, which is the same argument the `n…` controls make.
+  Nothing disappears; the value carries the meaning.
+- **A new `rung` poll** — `0` FULL, `1` LITE, `2` TINY, `3` BARE — sits beside
+  them, because `-1` on its own is a magic number. This is what makes it
+  answerable rather than merely encoded. sclang only: no UGen, no bus.
+- **A line in the log at alloc**, since the log is where this board's state
+  actually gets read from, and `prRungName` now names the rung. ⚠️ The old line
+  said `LITE` for TINY as well, so it could not tell a 73 KB graph from a 63 KB
+  one.
+
+⚠️ **LITE's own `mt2` is still a zero and is allowed to be**, because the
+drawing side agrees with LITE about what exists — Lua draws no GR2 box on LITE
+at all, so nothing reads it. Nothing has ever heard of BARE, which is why BARE's
+four cannot borrow that excuse.
+
+### How to weigh it — NOT DONE, and these are the commands
+
+🔴 **No byte count for BARE appears anywhere in this repo, because nobody has
+taken one.** `sclang` is only on the board. TINY.md's own warning is why an
+estimate is not offered instead: *the size does not track the UGen count* — the
+shimmer is one UGen and cost 236 bytes, four delay taps are ~28 and cost 2,894.
+
+⚠️ **This does not need the Pi.** The def size is a pure function of the source
+and the flags, with two exceptions that must be pinned either way: `prLiteMode`
+reads the device tree (force it with `PAPPUS_LITE`) and the size depends on how
+many `.wav` files sit in `pappus/audio/` next to the class, because FULL builds
+one `PlayBuf` chain per file. **So take all four arms on ONE machine in one
+sitting** — the 118,597 / 73,297 / 63,297 figures above were taken on the board
+before `report` was added, and mixing a new BARE number into that table would be
+comparing two different builds.
+
+    # 1. ship the engine to the path sclang actually compiles, and restart
+    #    nothing yet
+    ./rig/box/push.sh --no-restart            # or: ./rig/box/push.sh <ip>
+    BOX=<the address push.sh printed>
+
+    # 2. the board's own audio has to be out of the way: one exclusive card,
+    #    one scsynth. Check, do not assume.
+    ssh positron@$BOX 'sudo systemctl stop positron-box; \
+      pkill -9 -x sclang; pkill -9 -x scsynth; sleep 1; \
+      echo "sclang $(pgrep -cx sclang) scsynth $(pgrep -cx scsynth)"'
+
+    # 3. a dummy JACK — a clock, no soundcard. ⚠️ JACK's control socket is
+    #    per-user: this must be the SAME user sclang runs as.
+    ssh positron@$BOX 'pgrep -x jackd >/dev/null || \
+      (setsid jackd -r -d dummy -r 48000 -p 1024 >/tmp/jackd.log 2>&1 &); \
+      sleep 2; pgrep -cx jackd'
+
+    # 4. somewhere for Qt's runtime dir, and the weighing script below
+    ssh positron@$BOX 'mkdir -p /tmp/rt'
+
+⚠️ **Put the script on the board as its own file — do not wrap it in a heredoc
+inside the block above.** The block is indented, so the indentation would go
+into the heredoc's own terminator and it would never close. `scp` it, or paste
+it into `cat > /tmp/weigh.scd` at an unindented prompt. It lives in `/tmp` on the
+board rather than in this repo because it is a measurement, not a fixture.
+
+```supercollider
+// /tmp/weigh.scd on the board
+s.options.numOutputBusChannels = 2;
+s.options.numInputBusChannels  = 2;
+s.options.sampleRate = 48000;
+s.options.memSize = 65536;
+s.waitForBoot({
+    var ctx = (
+        server: s, xg: Group.new(s),
+        // Engine_Pappus.sc — in_b is an ARRAY, out_b is a SINGLE bus
+        in_b: [Bus.new(\audio, s.options.numOutputBusChannels,     1, s),
+               Bus.new(\audio, s.options.numOutputBusChannels + 1, 1, s)],
+        out_b: Bus.new(\audio, 0, 2, s)
+    );
+    Engine_Pappus.new(ctx, { arg e;
+        var d = SynthDescLib.global[\pappus].def;
+        ("WEIGH lite=" ++ e.lite ++ " tiny=" ++ e.tiny ++ " bare=" ++ e.bare
+            ++ " bytes=" ++ d.asBytes.size
+            ++ " ugens=" ++ d.children.size
+            ++ " commands=" ++ e.listCommands.size).postln;
+        Routine({ s.quit; 1.wait; 0.exit; }).play(AppClock);
+    });
+});
+```
+
+    # 5. FOUR ARMS, ONE AT A TIME, each in its own sclang. A fixed server port
+    #    is a shared mutable global: two of these at once measure each other.
+    for F in "" "PAPPUS_LITE=1" "PAPPUS_TINY=1" "PAPPUS_BARE=1"; do
+      ssh positron@$BOX "env $F XDG_RUNTIME_DIR=/tmp/rt \
+        QT_QPA_PLATFORM=offscreen QTWEBENGINE_DISABLE_SANDBOX=1 \
+        sclang /tmp/weigh.scd 2>&1 | grep -E '^(WEIGH|Engine_Pappus|ERROR)'"
+    done
+
+    # 6. PUT THE BOARD BACK. It is a service that dials out on boot; leaving it
+    #    stopped is an outage nobody is standing next to.
+    ssh positron@$BOX 'sudo systemctl start positron-box; sleep 3; \
+      systemctl is-active positron-box'
+
+⚠️ **Confirm the arms are actually different before believing any of them.** The
+`lite=`/`tiny=`/`bare=` fields are in the output for exactly that reason: an
+environment variable that did not reach `sclang` gives four identical rows, and
+four identical rows read as "the flags do nothing" rather than as "the flags
+never arrived". And ⚠️ `PAPPUS_BARE=1` alone must report `tiny=true lite=true` —
+if it does not, the ladder is not a ladder.
+
+Then fill the table below, and add a BARE column to TINY.md's cut list.
 
 ## The rungs, as they stand
 
@@ -175,7 +385,14 @@ a grain cloud reads as a place rather than as a texture.
 | FULL | 118,597 | 2,780 | no |
 | LITE | 73,297 | 1,706 | no |
 | **TINY** | **63,297** | **1,451** | **yes** |
-| BARE | not built | — | — |
+| BARE | ⚠️ **built, NOT WEIGHED** | — | — |
+
+🔴 **BARE's row is empty because nobody has run it, and a number nobody
+took does not go in a table.** The code is in `Engine_Pappus.sc` and the
+commands that fill the row are at the end of the BARE section above. Until
+somebody runs them, every claim about what BARE saves is arithmetic on a guess
+— and TINY.md's own warning is that *the size does not track the UGen count*,
+so the guess would be wrong in an unknown direction.
 
 ⚠️ **TINY's headroom is 2,239 bytes** against the 64 KiB `/d_recv` ceiling that
 wasm scsynth enforces silently. The `report` control added on 2026-09-13 costs

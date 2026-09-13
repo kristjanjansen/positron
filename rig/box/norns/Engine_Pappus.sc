@@ -27,6 +27,18 @@ Engine_Pappus : CroneEngine {
 	// still in the graph, so the construction has to be SKIPPED, not bypassed.
 	// The granulator is untouched, which is the point — it is the subject.
 	var <tiny = false;
+	// 🔴 BARE — a fourth rung. GRAINSWARM straight to the master: RESONATOR,
+	// DELAY, COLOUR and REVERB are not built at all. `grains` draws this
+	// engine beside a granulator running in a browser, and after the material
+	// itself the chain between the board's grains and the ear is the largest
+	// structural reason the two sound nothing alike.
+	//
+	// It implies TINY the same way TINY implies LITE, because a rung that is
+	// not a subset of the one above it is not a rung, it is a variant. The
+	// granulator is untouched — it is the subject, and every cut is
+	// downstream of it. CHAIN.md holds what each removed stage was, which is
+	// what makes this reversible rather than merely absent.
+	var <bare = false;
 	// the seven meters' last shared bus read, and when it was taken
 	var mlast, mtime = 0;
 	var bufdur = 60.0;
@@ -114,6 +126,15 @@ Engine_Pappus : CroneEngine {
 				dt.contains(k) }).not;
 	}
 
+	// Which rung got compiled, as a word. The old line said LITE for TINY as
+	// well, so the log could not tell a 73 KB graph from a 63 KB one.
+	prRungName {
+		if(bare) { ^"BARE" };
+		if(tiny) { ^"TINY" };
+		if(lite) { ^"LITE" };
+		^"FULL";
+	}
+
 	// mkdir -p, one level at a time. File.mkdir will not create parents.
 	prMakeDir { arg path;
 		var parts, acc;
@@ -136,9 +157,23 @@ Engine_Pappus : CroneEngine {
 		// be. Everything below reads it.
 		lite = this.prLiteMode;
 		tiny = "PAPPUS_TINY".getenv.notNil;
+		// ⚠️ SET BY PRESENCE, NOT BY VALUE — PAPPUS_BARE=0 turns it ON, which
+		// is exactly what PAPPUS_TINY already does. Matched on purpose: one
+		// sharp edge shared by two rungs of one ladder is easier to hold than
+		// two different rules for two neighbouring flags. PAPPUS_LITE is the
+		// only one of the three that reads its value.
+		bare = "PAPPUS_BARE".getenv.notNil;
+		if(bare) { tiny = true };
 		if(tiny) { lite = true };
-		("Engine_Pappus: " ++ (lite.if({ "LITE" }, { "FULL" })) ++ " graph")
-			.postln;
+		("Engine_Pappus: " ++ this.prRungName ++ " graph").postln;
+		// SAY IT IN THE LOG, ONCE. A meter reading -1 is only unambiguous to
+		// somebody who already knows what -1 means here, and the log is where
+		// this board's state actually gets read from.
+		if(bare) {
+			("Engine_Pappus: BARE — RESONATOR, DELAY, COLOUR and REVERB are "
+				++ "not built. Meters 2-6 read -1, which means ABSENT, not "
+				++ "silent. Every command still exists.").postln;
+		};
 
 		// GRAINSWARM capture. TWO MONO BUFFERS PER GRANULATOR, left and
 		// right, because GrainBuf reads a mono buffer - "the buffer holding a
@@ -175,7 +210,15 @@ Engine_Pappus : CroneEngine {
 		// DELAY delay line. Mono: taps are panned out to stereo, and keeping
 		// the feedback path mono is what stops the image wandering as it
 		// regenerates.
-		dbuf = Buffer.alloc(srv, (deldur * srv.sampleRate).asInteger, 1);
+		//
+		// BARE does not build DELAY, so this is a tenth of a second there
+		// rather than eleven — two megabytes nothing would ever read. It is
+		// allocated rather than left nil for the same reason LITE keeps a
+		// stub capture buffer for the granulator it does not have:
+		// `delayclear` stays a real command with a real buffer behind it, and
+		// a command that raises is worse than one that does nothing.
+		dbuf = Buffer.alloc(srv,
+			((bare.if({ 0.1 }, { deldur })) * srv.sampleRate).asInteger, 1);
 
 		// NOISE's loop sources - every .wav file dropped into audio/, next
 		// to this class file's own directory, becomes a noise-type option,
@@ -188,8 +231,14 @@ Engine_Pappus : CroneEngine {
 		// this mix, as its own recorded peak.
 		audioDir = PathName(Engine_Pappus.filenameSymbol.asString).pathOnly
 			++ "../audio/";
+		// ...and BARE reads none of them: the only two players are
+		// RESONATOR's excitation and COLOUR's noise, and both stages are
+		// gone. Reading the folder anyway is a few megabytes of resident
+		// audio nothing can reach. ⚠️ This changes no byte of the def — the
+		// players were already not built — so it is memory and boot time
+		// only, and it does not belong in the size table.
 		loopbufs = [];
-		if(File.exists(audioDir)) {
+		if(bare.not and: { File.exists(audioDir) }) {
 			var files = PathName(audioDir).files.select({ arg pn;
 				pn.extension.toLower == "wav" });
 			files = files.sort({ arg a, b;
@@ -404,6 +453,10 @@ Engine_Pappus : CroneEngine {
 			var nlp, nloopsel, nlooprate, nloop;
 			var mixed, sent, outsig;
 			var mt1, mt2, mt3, mt4, mt5, mt6, mt7;
+			// BARE's own two: the shared "this stage was not built" meter
+			// value, and the one control-rate gain its four collapsed feed
+			// points share.
+			var absent, bfeed;
 
 			// =============================================================
 			// INPUT
@@ -446,9 +499,16 @@ Engine_Pappus : CroneEngine {
 			// costs here, whichever direction it goes: an SC graph is acyclic
 			// and evaluated in a fixed order, so nothing can read something
 			// computed after it within the same block.
-			plfb = LocalIn.ar(3);
-			fb = plfb[0..1];
-			shimmerfb = plfb[2];
+
+			// ⚠️ BARE BUILDS NEITHER END OF THIS. Both users — COLOUR's crush
+			// and REVERB's shimmer — are compiled out on that rung, and a
+			// LocalIn whose LocalOut does not exist is a UGen reading a bus
+			// nothing ever writes.
+			if(bare.not) {
+				plfb = LocalIn.ar(3);
+				fb = plfb[0..1];
+				shimmerfb = plfb[2];
+			};
 
 			// fixed detune table, in octaves. A table rather than a random UGen
 			// so anything using it is stable and repeatable.
@@ -918,13 +978,41 @@ Engine_Pappus : CroneEngine {
 			// Amplitude.kr costs no audio wire; holding six stereo signals
 			// alive to the bottom of the graph so they could be measured
 			// together would cost twelve.
+
+			// 🔴 A METER FOR A STAGE THAT WAS NOT BUILT READS -1, AND NEVER 0.
+			//
+			// Seven meters sit on a control bus, one per box on SIGNAL, and on
+			// BARE four of those boxes do not exist. A meter reading zero
+			// because a stage was compiled out is indistinguishable from a
+			// meter reading zero because the stage is broken — and the board's
+			// status is what a page reads, so the second reading is the one
+			// somebody would act on. Zero is a measurement.
+			//
+			// -1 cannot be one: every real meter here is an Amplitude, which
+			// is a magnitude and is never negative. So the VALUE carries "not
+			// built" rather than a caption somewhere else having to carry it,
+			// and a reader who has never heard of BARE can still tell the two
+			// apart with `< 0`.
+			//
+			// ALL SEVEN POLLS STAY REGISTERED. A poll that vanishes is a
+			// lookup that fails on the Lua side, which is the same argument
+			// the `n` controls make below — and the `rung` poll registered
+			// beside them says WHICH rung produced the -1, so nobody has to
+			// infer it from a stage that is merely quiet.
+			//
+			// One DC.kr shared by all of them, not five. An unconnected UGen
+			// is still a UGen, and so is a duplicated constant.
+			absent = if(bare) { DC.kr(-1) };
 			mt1 = Amplitude.kr((gsum[0] + gsum[1]) * 0.5, 0.01, 0.2);
 			// LITE's GRAINSWARM 2 has nothing to measure, and a meter that
-			// follows an Amplitude of silence is still an Amplitude. Lua
-			// draws no GR2 box on SIGNAL in LITE, so nothing reads this.
-			mt2 = if(lite) { DC.kr(0) } {
+			// follows an Amplitude of silence is still an Amplitude. Lua draws
+			// no GR2 box on SIGNAL in LITE, so nothing reads this — which is
+			// why LITE's is allowed to be a zero and BARE's four are not: the
+			// drawing side agrees with LITE about what exists, and has never
+			// heard of BARE.
+			mt2 = if(bare) { absent } { if(lite) { DC.kr(0) } {
 				Amplitude.kr((gsum2[0] + gsum2[1]) * 0.5, 0.01, 0.2);
-			};
+			} };
 
 			// =============================================================
 			// RESONATOR - a Rings-style modal/string resonator
@@ -972,6 +1060,79 @@ Engine_Pappus : CroneEngine {
 				}
 			};
 
+			// =============================================================
+			// BARE — the grains go straight to the master
+			// =============================================================
+			// PAPPUS_BARE=1 compiles the fourth rung on this engine's own
+			// ladder: RESONATOR, DELAY, COLOUR and REVERB are not built.
+			// `grains` draws this engine beside a granulator running in a
+			// browser and the two sound nothing alike; after the material
+			// itself, this chain is the largest structural reason.
+			//
+			// 🔴 COMPILE-TIME, NEVER A RUNTIME ZERO. SIGNAL can already route a
+			// granulator past the whole chain at run time — `oin1 1, pin1 0`
+			// does it today with no recompile — and that is a different and
+			// smaller claim. SuperCollider does not strip an unconnected UGen,
+			// so `pwet 0` changes the SOUND and not one byte of the def, and
+			// leaves every filter in it costing a Pi 4 the same every block.
+			// Each cut below is an `if` around the CONSTRUCTION.
+			//
+			// 🔴 THE GRANULATOR IS UNTOUCHED. Every cut is downstream of
+			// GRAINSWARM, which is the subject. BARE implies TINY implies
+			// LITE, so there is already only one granulator here — that is
+			// LITE's cut, not this one.
+			//
+			// ⚠️ EVERY COMMAND STILL EXISTS AND STILL LANDS SOMEWHERE
+			// HARMLESS. pwet, rverb, swet, taptimes, drive, crush and the rest
+			// are all still declared above and still set a control; they
+			// simply have nothing to drive, the same way every `n` control
+			// does on LITE. Nothing outside has to know which rung it is
+			// talking to, no command becomes an error, and a pset written on a
+			// Pi 4 loads here without complaint.
+			//
+			// 🔴 THE FOUR FEED POINTS COLLAPSE INTO ONE, AND THEY SUM.
+			//
+			// pin/sin/kin/oin are where each granulator joins the chain, and
+			// the DEFAULTS put it in at the head (`pin 0.7`) with the other
+			// three at zero. Honouring only `oin` here would compile a rung
+			// that is silent out of the box, and silent for every patch
+			// written on any other rung — LESSONS #62's shape exactly, where a
+			// value that is not in the table is not an error, it is nothing.
+			//
+			// Summing is not a compromise, it is what the full chain already
+			// does: with every stage's WET at zero each stage passes its input
+			// through and adds the next feed, so RESONATOR > DELAY > COLOUR >
+			// out is literally pin + sin + kin + oin — the same 2.8x at four
+			// feeds of 0.7 that the routing comment above measures. One Lag.kr
+			// for the sum rather than four, for the same reason LITE drops
+			// gfeed's second term rather than multiplying it by silence.
+			//
+			// pin2/sin2/kin2/oin2 land nowhere, because the second granulator
+			// does not exist on LITE and below. They are still declared and
+			// still settable.
+			if(bare) {
+				bfeed = Lag.kr(pin1 + sin1 + kin1 + oin1, 0.05);
+				kout = [gsum[0] * bfeed, gsum[1] * bfeed];
+				// BYPASS, rebuilt here because COLOUR's tail owns it on
+				// the full graph and COLOUR is gone.
+				kout = [Select.ar(bypass, [kout[0], in[0]]),
+					Select.ar(bypass, [kout[1], in[1]])];
+				mt3 = absent; mt4 = absent; mt5 = absent; mt6 = absent;
+			};
+
+			// 🔴 BARE DOES NOT BUILD RESONATOR.
+			//
+			// TINY already took the 48-Ringz modal bank and the eight string
+			// voices, so what is left reads like a pass-through and is not
+			// one: three noise generators and a BPF for the excitation, one
+			// PlayBuf chain per loop file, an Amplitude follower, an HPF,
+			// BRIGHTNESS's LPF, a score of Lag.kr, and TWO Limiters. All of it
+			// runs every block on a board whose RESONATOR is already a wire.
+			//
+			// What it costs the sound: on this board, nothing — TINY had taken
+			// the bank and the strings already, and CHAIN.md holds what those
+			// cost. What it costs the GRAPH is the measurement in TINY.md.
+			if(bare.not) {
 			pin = gfeed.value(pin1, pin2);
 			pmono = (pin[0] + pin[1]) * 0.5;
 
@@ -1220,6 +1381,7 @@ Engine_Pappus : CroneEngine {
 			presig = Limiter.ar(presig, (-1).dbamp, 0.05);
 			mt3 = Amplitude.kr((presig[0] + presig[1]) * 0.5, 0.01, 0.2);
 			msig = presig;
+			};
 
 			// =============================================================
 			// DELAY - multitap delay
@@ -1238,6 +1400,23 @@ Engine_Pappus : CroneEngine {
 			// A serial chain with injections rather than a tap selector: the
 			// signal always flows forwards, and the only question is where
 			// each granulator gets on.
+
+			// 🔴 BARE DOES NOT BUILD DELAY.
+			//
+			// The line itself — a Phasor, the feedback BufRd with its tilt
+			// pair, and the BufWr — plus TINY's four taps, each a Phasor, a
+			// BufRd, a Pan2 and three Lag.kr, plus the output tilt and the
+			// eight AllpassC of DIFFUSE.
+			//
+			// The 11 s buffer shrinks to 0.1 s up in prAlloc rather than going
+			// away, so `delayclear` stays a real command with a real buffer
+			// behind it — the same thing LITE does for the second granulator's
+			// capture, and for the same reason: a command that raises is worse
+			// than one that does nothing.
+			//
+			// What it costs the sound: rhythm, and most of the sense of space
+			// that is not the reverb.
+			if(bare.not) {
 			sdry = presig + gfeed.value(sin1, sin2);
 			// what goes INTO the delay line is what the stage was given: the
 			// taps are a read of the line, not a second copy of the input
@@ -1316,6 +1495,7 @@ Engine_Pappus : CroneEngine {
 			smix = Lag.kr(swet, lagt).clip(0, 1);
 			ssend = (smix * 0.5pi).cos;
 			ssig = (sdry * ssend) + (wetsig * (smix * 0.5pi).sin);
+			};
 
 			// =============================================================
 			// COLOUR
@@ -1324,6 +1504,30 @@ Engine_Pappus : CroneEngine {
 			// went to WOW and the master is not a stage you aim. Routed to the
 			// granulator tap they hear BOTH, which is the only answer that
 			// cannot silently drop half the instrument.
+
+			// 🔴 BARE DOES NOT BUILD COLOUR.
+			//
+			// Drive's saturator and its fitted make-up, crush's quantiser and
+			// its two Latch/Impulse rate reducers, LOSS (two cascaded LPF on
+			// LITE, a real FFT/IFFT pair on FULL), the envelope follower, the
+			// noise wash with its three generators and its loop players, and
+			// WOW's modulated DelayC.
+			//
+			// ⚠️ COLOUR owns two of the three feedback channels and REVERB
+			// owns the third, so BARE has no user for the LocalIn/LocalOut
+			// pair at all and builds neither end — see the LocalIn site up in
+			// INPUT.
+			//
+			// ⚠️ BYPASS DOES NOT GO WITH THE STAGE. Its two Selects happen to
+			// live in COLOUR's tail on the full graph; the BARE block above
+			// rebuilds them, so `bypass 1` still hands the input straight out.
+			// A command that still exists has to still do what it says.
+			//
+			// What it costs the sound: grit — the difference between a clean
+			// granulator and one that sounds like hardware. On this rung that
+			// is the point rather than the price: the page it is being
+			// compared against has no grit either.
+			if(bare.not) {
 			mt4 = Amplitude.kr((ssig[0] + ssig[1]) * 0.5, 0.01, 0.2);
 			dry = ssig + gfeed.value(kin1, kin2);
 			sig = dry;
@@ -1637,12 +1841,17 @@ Engine_Pappus : CroneEngine {
 				Select.ar(bypass, [outsig[1], in[1]])
 			];
 			mt5 = Amplitude.kr((kout[0] + kout[1]) * 0.5, 0.01, 0.2);
+			};
 
 			// ---- THE MIX ----
 			// COLOUR's output plus anything routed straight past everything.
 			// This is SIGNAL: there is no mixer stage of its own, because a
 			// mixer whose faders are all somewhere else is just a sum.
-			omix = kout + gfeed.value(oin1, oin2);
+			// On BARE there is nothing to route PAST: the four feed points
+			// were summed into one up in the BARE block, which is what the
+			// serial chain does anyway when every stage is dry. A fifth feed
+			// here would count `oin` twice.
+			omix = if(bare) { kout } { kout + gfeed.value(oin1, oin2) };
 
 			// ---- COMP, the one master control ----
 			// Moved here from COLOUR, where it was compressing the colour
@@ -1697,6 +1906,23 @@ Engine_Pappus : CroneEngine {
 			// and handed back to the tank's input, so a held chord keeps
 			// climbing instead of only decaying. At zero it is an ordinary
 			// tail.
+
+			// 🔴 BARE DOES NOT BUILD REVERB.
+			//
+			// Six CombL, two LPF and LITE's four AllpassC — the tank itself.
+			// TINY had already dropped the shimmer's PitchShift, so this cut
+			// is what was left.
+			//
+			// ⚠️ VERB at zero IS an honest bypass, an equal-power pair of
+			// gains, and the comment above says so — which is exactly why the
+			// stage has to be cut at compile time instead. A wet/dry at zero
+			// is inaudible and still costs six comb filters, two filters and
+			// four allpasses every block, for ever. That difference is the
+			// whole of this rung.
+			//
+			// What it costs the sound: the tail, and with it most of the
+			// reason a grain cloud reads as a place rather than as a texture.
+			if(bare.not) {
 			ramt = Lag.kr(rverb, lagt).clip(0, 1);
 			rtl = Lag.kr(rtime, lagt).clip(0, 1);
 			rsize = 1 + (rtl * 2);
@@ -1783,12 +2009,21 @@ Engine_Pappus : CroneEngine {
 			rkeep = (ramt * 0.5pi).cos;
 			outsig = (outsig * rkeep) + (rwet * rsend);
 			mt6 = Amplitude.kr((outsig[0] + outsig[1]) * 0.5, 0.01, 0.2);
+			};
 
 			// Everything that has to cross a block boundary, written once - a
 			// SynthDef gets one LocalOut and it has to sit here, after the
 			// last thing that reads from it exists, which is now REVERB's
 			// shimmer send rather than COLOUR's crush.
-			LocalOut.ar(crushfb ++ [shimmerout]);
+
+			// ⚠️ ...AND BARE WRITES NEITHER END OF IT. Both users are gone —
+			// COLOUR's two crush error channels and REVERB's shimmer send — so
+			// there is no LocalIn up in INPUT either. A LocalOut nothing reads
+			// is a UGen writing a bus nobody samples every block, which is the
+			// same mistake as a gain set to zero.
+			if(bare.not) {
+				LocalOut.ar(crushfb ++ [shimmerout]);
+			};
 
 			// THE HIDDEN MASTER CHAIN IS GONE.
 			//
@@ -1983,6 +2218,18 @@ Engine_Pappus : CroneEngine {
 				mlast[i];
 			});
 		};
+
+		// WHICH RUNG THIS IS, as a number: 0 FULL, 1 LITE, 2 TINY, 3 BARE.
+		//
+		// It sits beside the meters because it is what makes their -1
+		// legible. A meter reading -1 says "this stage was not built"; this
+		// says which rung did it, without a reader having to know the ladder
+		// or having to guess from a stage that is merely quiet. sclang only —
+		// no UGen, no bus, and the SynthDef knows nothing about it.
+		this.addPoll(\rung, {
+			if(bare) { 3 } { if(tiny) { 2 } { if(lite) { 1 } { 0 } } };
+		});
+
 		// wipe the capture buffer - a new project starts on silence, not on
 		// whatever the last one happened to leave in there
 		this.addCommand("bufclear", "i", { arg msg;

@@ -1,6 +1,7 @@
 # TINY — the same engine, small enough for a browser
 
-`PAPPUS_TINY=1` compiles a fourth rung on Pappus's own ladder. It exists for one
+`PAPPUS_TINY=1` compiles a third rung on Pappus's own ladder — `FULL > LITE >
+TINY`, with `BARE` below it since 2026-09-13 (CHAIN.md). It exists for one
 reason, and the reason is a hard number.
 
 ## The number
@@ -27,6 +28,13 @@ is scsynth's own OSC receive path and nothing on the page's side can raise it.
 | FULL | 118,597 | 2,780 |
 | LITE | 73,297 | 1,706 |
 | **TINY** | **63,297** | **1,451** |
+| BARE | ⚠️ built 2026-09-13, **not weighed** | — |
+
+🔴 **BARE's row is blank on purpose.** The rung exists in `Engine_Pappus.sc` and
+nobody has run it: `sclang` is only on the board. An estimate would be worse
+than a blank, for the reason two lines below — the size does not track the UGen
+count, so a guess is wrong in an unknown direction. `CHAIN.md`'s BARE section
+holds what it removes, why, and the exact commands that fill this row.
 
 Four cuts, each in the engine's own idiom (`lite` already gates whole stages):
 
@@ -52,13 +60,46 @@ runtime zero.
 236 bytes; four delay taps are ~28 and cost 2,894. Measure each cut; do not
 estimate it.
 
+⚠️ **AND TINY LEFT ORPHANS BEHIND, FOUND 2026-09-13 WHILE BUILDING BARE.** Cut 2
+skipped the eight string VOICES and nothing else, so the things that fed them
+are all still constructed and still running every block against a signal that is
+identically zero:
+
+- `svfrq` and `svamp` — **sixteen `Lag.kr`** plus their clips, tuning eight
+  strings that do not exist
+- `sdet` and `spos` — STRUCTURE's detune and POSITION's pick offset, read by
+  nobody
+- `fstring`'s `DC.ar([0, 0])`, its damping normalisation, and the MODE
+  crossfade that sums two silences
+- 🔴 **a stereo `Limiter`** (`fsum = Limiter.ar(fsum, 0.9, 0.02)`) holding down
+  a bank that is guaranteed silent
+
+That is this file's own headline rule happening to this file: *SuperCollider
+does not strip an unconnected UGen.* It is **not fixed here**, deliberately —
+the fix is a one-line `if(tiny.not)` around the excitation and string tuning,
+but it would change TINY's compiled size, and the 63,297 B in the table above
+cannot be re-taken from this machine. Fix it and re-weigh in the same sitting,
+or not at all. BARE is unaffected: it removes the whole stage.
+
 ## Running it
 
+    PAPPUS_BARE=1        GRAINSWARM straight to the master — and it
+                         implies TINY. See CHAIN.md.
     PAPPUS_TINY=1        the 64 KiB graph — and it implies LITE
     (unset)              exactly as before; `lite` is still `prLiteMode`
 
-The flag is off by default, so this file is a drop-in replacement for the
+The flags are off by default, so this file is a drop-in replacement for the
 upstream engine and the board behaves identically until somebody asks.
+
+⚠️ **`PAPPUS_TINY` and `PAPPUS_BARE` are read by PRESENCE, not by value** —
+`PAPPUS_TINY=0` turns TINY ON. `PAPPUS_BARE` matches it deliberately: one sharp
+edge shared by two rungs of one ladder is easier to hold than two rules for two
+neighbouring flags. `PAPPUS_LITE` is the only one that reads its value, and it
+takes `1/lite/true/yes` or `0/full/false/no`.
+
+The engine now names the rung in its own log line — it used to say `LITE` for
+TINY as well, so a 73 KB graph and a 63 KB one printed the same thing — and a
+`rung` poll reports it as a number (0 FULL, 1 LITE, 2 TINY, 3 BARE).
 
 **Both ends run the same graph.** That is the reason to put TINY on the BOARD as
 well as in the browser: a comparison between a 2,780-UGen graph on a Pi and a
