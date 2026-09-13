@@ -22,6 +22,17 @@
 //           off these, so there is no second `needs:` list to forget
 //   why   — for a row with no target: why it is not clickable
 //
+//   room  — 'fixed' means DO NOT give this demo a private room per harness
+//           run. Every other page's room name is a rendezvous it invented, and
+//           a fixed one is a shared mutable global in the WebSocket layer —
+//           two runs of the suite land in the same room and watch each other's
+//           traffic. These four are different: `studio-1` is the ADDRESS OF
+//           THE RASPBERRY PI, `m1-1` is the studio Mac's agent, and `wire`'s
+//           whole subject is the history its room already holds. Renaming
+//           those does not isolate a run, it points it at nothing.
+//           ⚠️ It does not make them safe to run in parallel either — there is
+//           one Pi with one JACK graph. A room was never that constraint.
+//
 //   created — the day the page first landed, and it is WRITTEN DOWN rather
 //           than derived. A creation date is immutable, so a literal here can
 //           never go stale — while `git log` would answer differently the
@@ -89,7 +100,7 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000,
+  { name: 'mirror', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
@@ -110,7 +121,7 @@ export const DEMOS = [
     one: 'a room built from one number — roll it, and the same number rebuilds it exactly',
     tags: ['WebXR', 'WebGL2', 'relay', 'seeded'] },
 
-  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000,
+  { name: 'wire', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -214,7 +225,7 @@ export const DEMOS = [
   // renders while that audio carries on to the speakers — so BlackHole, the
   // Multi-Output Device and Live's own output setting are all out of the path.
   // MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
-  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000,
+  { name: 'rack', act: 4, created: '2026-09-12', built: true, settleMs: 12000, room: 'fixed',
     one: 'play Ableton Live on a studio Mac from here, with no virtual audio cable',
     tags: ['Ableton Live', 'CoreMIDI', 'CoreAudio tap', 'relay', 'PCM'] },
 
@@ -252,7 +263,7 @@ export const DEMOS = [
   // the same thing is running on a Raspberry Pi in another building. Side by
   // side with a crossfade, the difference between the two panes IS the subject,
   // and the page now checks a granulator even when the board is down.
-  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
+  { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000, room: 'fixed',
     one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
     tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
 

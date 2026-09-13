@@ -313,7 +313,35 @@ for (const t of targets) {
   // the probe picks AV1, every recorded MoQ number was taken on VP8, and a
   // fallback the harness cannot select is a fallback nobody has run.
   //   DEMO_QUERY='codec=vp8' node demo/verify.mjs moq
-  const query = process.env.DEMO_QUERY ? `?${process.env.DEMO_QUERY}` : '';
+  // 🔴 A FIXED ROOM NAME IS A SHARED MUTABLE GLOBAL, and this repo learned that
+  // about PORTS and never applied it to rooms. `serve()` takes the next free
+  // port and `verify-gl` reads back the CDP port it got, precisely because a
+  // fixed one meant a harness attached to the previous run's Chrome and
+  // reported that run's flags. Every demo here defaults to a NAMED room —
+  // `cues-demo`, `jam-demo`, `scene-demo`, `room-demo` — so two runs of the
+  // suite, or a run and a visitor, land in the same one and see each other's
+  // traffic. That is the same bug in the WebSocket layer.
+  //
+  // So a harness run gets a room of its own, per demo, per run. It costs one
+  // query parameter and it removes a whole class of "I was competing with
+  // myself", which this project has paid for twice: nine orphaned Chromes
+  // filled `studio-1` and took a live demo down (LESSONS #56), and a full run
+  // went 429 -> 420 -> 429 with no code between.
+  //
+  // ⚠️ TWO ROOMS ARE NOT LIKE THAT AND MUST NOT BE OVERRIDDEN. `room: 'fixed'`
+  // in the manifest means the name is not a rendezvous this page invented, it
+  // is the ADDRESS OF A MACHINE — `studio-1` is where the Raspberry Pi is and
+  // `m1-1` is where the studio Mac's agent is — or a room whose SUBJECT is the
+  // history it shares (`wire` reads its own backlog back). Renaming those does
+  // not isolate a run, it points it at nothing.
+  //
+  // ⚠️ AND A DEVICE IS STILL EXCLUSIVE. A private room does not give a second
+  // client its own Raspberry Pi: there is one JACK graph and one instrument, so
+  // board-bound demos still have to take turns. Rooms were never that problem;
+  // conflating the two is what made them look like one.
+  const own = t.room === 'fixed' ? '' : `room=v-${t.name}-${Math.random().toString(36).slice(2, 8)}`;
+  const q = [process.env.DEMO_QUERY, own].filter(Boolean).join('&');
+  const query = q ? `?${q}` : '';
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
 
