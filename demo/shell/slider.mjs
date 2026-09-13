@@ -127,6 +127,7 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   }
 
   const wrap = el('span', 'sld');
+  const head = el('span', 'sld-head');
   const name = el('span', 'sld-l', label || '');
   const lane = el('span', 'sld-lane', null, {
     // A real slider to anything that asks: a screen reader, and a keyboard.
@@ -146,7 +147,23 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   const widest = Math.max(...[min, max].map((v) => `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`.length));
   read.style.minWidth = `${widest}ch`;
   lane.append(knob);
-  wrap.append(name, lane, read);
+  // 🔴 THE NUMBER GOES UNDER ITS OWN LABEL, NOT ON THE FAR SIDE OF THE LANE.
+  // Asked for, and it fixes a spacing complaint that was never about spacing.
+  // A slider used to be THREE grid columns — label, lane, number — so a row of
+  // two sliders was six evenly-spaced things and the eye could not tell where
+  // one slider ended. Worse, the third column is as wide as the widest value
+  // that slider can ever show, so the gap before the NEXT slider's label was a
+  // different width on every row. PHOTOGRAPHED on /draw/: `SAMPLE EVERY` sat
+  // tight against its lane while `100 ms` and `SMOOTHING` had a visibly larger
+  // gap between them — the same `column-gap`, three different-looking spaces,
+  // because one of the columns was sized by its content.
+  //
+  // Stacked, a slider is TWO columns and the label column is as wide as the
+  // wider of its two lines. The number is beside the word it belongs to, which
+  // is this project's rule for every other figure it prints (a lane's numbers
+  // go in that lane's gutter, never in a table somewhere else).
+  head.append(name, read);
+  wrap.append(head, lane);
 
   const show = (x) => `${x.toFixed(dp)}${unit ? ' ' + unit : ''}`;
   // Where the handle is DRAWN, which is `v` except while a glide is running.

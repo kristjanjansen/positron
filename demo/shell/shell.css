@@ -613,13 +613,19 @@ video[hidden] { display: none; }
    ⚠️ `display: contents` is what puts each slider's three parts into those
    columns. It removes the wrapper's own box, NOT its custom properties —
    `--sld-knob` still inherits, which is the one thing that would have broken. */
+/* TWO columns per slider, not three — see the note in slider.mjs. The label
+   column is as wide as the wider of its two lines, and there is no
+   content-sized column between one slider and the next, which is what made the
+   gaps look uneven when they were all the same number. */
 .sld-group {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: 10px 12px;
   width: 100%; max-width: 560px;
 }
+/* the label and its number, stacked, as ONE grid item */
+.sld-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .sld-group .sld { display: contents; }
 /* TWO SLIDERS ACROSS, on a screen wide enough for it — six columns rather than
    three, so the pair shares one grid instead of stacking. Below the breakpoint
@@ -649,11 +655,15 @@ video[hidden] { display: none; }
    4–6 when n is even. Nothing here may span a column or that stops being true. */
 @media (min-width: 720px) {
   .sld-group.pos-pair {
-    grid-template-columns: repeat(2, max-content minmax(0, 1fr) max-content);
+    grid-template-columns: repeat(2, max-content minmax(0, 1fr));
     max-width: none;
     column-gap: 12px;
   }
-  .sld-group.pos-pair > .sld:nth-child(even) > .sld-l { padding-left: var(--sld-seam, 32px); }
+  /* ⚠️ FOUR columns now, so slider n takes 1-2 when odd and 3-4 when even —
+     `:nth-child(even)` is still the right column, and still only because
+     nothing here spans. The seam padding moves to the HEAD, which is the grid
+     item the label now lives inside. */
+  .sld-group.pos-pair > .sld:nth-child(even) > .sld-head { padding-left: var(--sld-seam, 32px); }
 }
 /* the standalone 96 px is for a slider sitting in a row of buttons; in a group
    the column decides */
@@ -661,10 +671,14 @@ video[hidden] { display: none; }
 
 .sld-v {
   font: 500 12px/1 var(--mono); color: var(--fg);
+  /* ⚠️ LEFT, not right. Under its label it lines up with the first letter of
+     the word it belongs to; right-aligned it would drift away from the word as
+     the number narrows, which is the shift this reserved width exists to stop. */
+  text-align: left;
   /* `min-width` is set per slider from its own widest possible value — see
      slider.mjs. `tabular-nums` is what makes that width exact: without it a 1
      is narrower than a 0 and the number still shifts inside its reserved box. */
-  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
 /* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────
