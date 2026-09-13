@@ -337,7 +337,7 @@
       }
       loadedInSc.add(def.name);
       d.log(`SuperCollider took ${def.name}, ${took.bytes} B, and said so itself `
-        + `— ${took.margin} B under the ${SIZE_CEILING}-byte ceiling both ends keep`);
+        + `— ${took.margin} B under the ${SIZE_CEILING}-byte ceiling a socket can carry`);
     }
     if (scNode) sc.free(scNode);
     scNode = sc.play(def.name, { ...defaults, ...(defaults.amp !== undefined ? { amp: loud.get() } : {}) });

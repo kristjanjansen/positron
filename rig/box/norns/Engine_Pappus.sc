@@ -92,26 +92,6 @@ Engine_Pappus : CroneEngine {
 	// which is where the tests run - is FULL. Unknown is not the same as
 	// slow, and crippling a developer's laptop to be safe would hide the
 	// full graph from the only place it is easy to look at.
-	// Did anything EXPLICITLY ask for the full graph? Distinct from
-	// `prLiteMode` returning false, which also happens when nothing said
-	// anything and the device tree is unreadable. ⚠️ `indexOfEqual`, never
-	// `includes` — see the note in prLiteMode; `includes` compares by identity
-	// and silently answers false for two Strings with the same characters.
-	prFullAsked {
-		var env, path, txt;
-		env = "PAPPUS_LITE".getenv;
-		if(env.notNil) {
-			env = env.asString.toLower;
-			if(#["0", "full", "false", "no"].indexOfEqual(env).notNil) { ^true };
-		};
-		path = Platform.userHomeDir ++ "/dust/data/pappus/mode.txt";
-		if(File.exists(path)) {
-			txt = File.readAllString(path);
-			if(txt.notNil) { if(txt.toLower.contains("full")) { ^true } };
-		};
-		^false
-	}
-
 	prLiteMode {
 		var env, path, txt, dt = "";
 		env = "PAPPUS_LITE".getenv;
@@ -190,39 +170,19 @@ Engine_Pappus : CroneEngine {
 		// FIRST, before anything is allocated: which graph is this going to
 		// be. Everything below reads it.
 		lite = this.prLiteMode;
-		// 🔴 TINY IS THE DEFAULT NOW, AND THE REASON IS A CEILING, NOT A CPU.
-		// It used to default to FULL and only the deployed
-		// /etc/default/positron-box made the board TINY — so the CODE's answer
-		// and the BOARD's answer were different, and anybody reading this file
-		// to find out what the board runs read the wrong one.
-		//
-		// The governing number is 64 KiB, which is what a definition may weigh
-		// and still load into BOTH engines — the browser's wasm scsynth and
-		// this one. "The same instrument, two ends" is only literally true
-		// while one definition loads in both, and the smaller appetite sets the
-		// table. WEIGHED 2026-09-13, with `report` in:
-		//
-		//   BARE   43,551 B   fits, 21,985 spare
-		//   TINY   64,733 B   fits,     803 spare
-		//   LITE   74,733 B   OVER by  9,197
-		//   FULL  121,425 B   OVER by 55,889
-		//
-		// So TINY is the largest rung that fits and it is what you get unless
-		// you ask for something else. ⚠️ The browser's refusal above the
-		// ceiling is SILENT — no /fail, no reply at all — which is why this is
-		// a default rather than a warning.
-		// ⚠️ And why 64 KiB is the number is an OPEN QUESTION:
-		// research/synthdef-size-limit-2026-09.md. If it turns out to bind the
-		// message rather than the definition, this board can `/d_load` from its
-		// own disk and the ceiling stops binding HERE while still binding the
-		// browser — at which point this default is wrong and should go back.
-		tiny = true;
-		// An explicit request for the big graph turns it off. `prLiteMode`
-		// returns false only when something SAID full — an env var or mode.txt
-		// — never merely by failing to say lite, so this cannot be tripped by
-		// a board that simply has no device tree.
-		if(this.prFullAsked) { tiny = false; lite = false };
-		if("PAPPUS_TINY".getenv.notNil) { tiny = true };
+		// 🔴 THE 64 KiB CEILING DOES NOT BIND THIS ENGINE, AND A CHANGE MADE
+		// EARLIER TODAY ON THE ASSUMPTION THAT IT DID HAS BEEN REVERTED.
+		// MEASURED, `research/synthdef-size-limit-2026-09.md`: sclang's `.add`
+		// routes anything over **16,383 bytes** to `/d_load`, which reads from
+		// disk and took a MEGABYTE in 44 ms. BARE 43,551, TINY 64,733, LITE
+		// 74,733 and FULL 121,425 are all above 16,383 — so every rung has
+		// always gone by that path and every rung already loads here. The
+		// ceiling binds a BROWSER, which has no disk to load from.
+		// ⚠️ The default is therefore what it was: the rung is a decision about
+		// this board's CPU and about what you want to compare, never about what
+		// will fit. Leaving a constraint in place with a justification that has
+		// been disproved is how an undefendable cut survives.
+		tiny = "PAPPUS_TINY".getenv.notNil;
 		// ⚠️ SET BY PRESENCE, NOT BY VALUE — PAPPUS_BARE=0 turns it ON, which
 		// is exactly what PAPPUS_TINY already does. Matched on purpose: one
 		// sharp edge shared by two rungs of one ladder is easier to hold than

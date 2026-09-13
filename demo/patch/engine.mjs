@@ -117,7 +117,7 @@ export async function startEngine({ audioContext, log = () => {} } = {}) {
       const room = fitsCeiling(bytes);
       if (!room.fits) {
         return { ok: false, why: `${room.bytes} bytes is ${-room.margin} over the `
-          + `${SIZE_CEILING}-byte ceiling both ends keep — it was not sent` };
+          + `${SIZE_CEILING}-byte ceiling a socket can carry — it was not sent` };
       }
       const done = waitFor((m) => m[0] === '/done' && m[1] === '/d_recv');
       sonic.send('/d_recv', bytes);
