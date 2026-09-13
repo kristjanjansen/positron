@@ -18,113 +18,40 @@
 
 <script type="module">
   import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
-  import { world as world0, docOf, validate as validate0 } from '/shell/seed.mjs';
+  import { docOf, validate as validate0 } from '/shell/seed.mjs';
   import { touchOf } from '/shell/xr-panel.mjs';
+  import {
+    createXRRoom, roomOf, spaced, clashes, radiusOf, r4,
+    GAP, DROP_PASSES, FADE_MS, ROOM_OPTIONAL_FEATURES,
+    perspective, lookAt,
+  } from '/shell/xr-room.mjs';
 
-  // ── nothing sits inside anything else ───────────────────────────────────
-  // 🔴 THE GENERATOR PLACES EACH THING WITHOUT LOOKING AT THE ONES ALREADY
-  // THERE, so two of them can occupy the same piece of space. Reported from a
-  // Quest 2026-09-13, and MEASURED over 200 seeds before this landed: 264
-  // overlapping pairs of 46,440, in 135 of 200 rooms, the worst of them 0.615 m
-  // deep — one thing swallowing another. In a window that reads as an odd
-  // shape; in a headset it is a thing you cannot walk round, because it is not
-  // one thing.
+  // ── the room is a module now ────────────────────────────────────────────
+  // 🔴 THE PICTURE AND THE RULES ABOUT IT LIVE IN demo/shell/xr-room.mjs. The
+  // generator places each thing without looking at the ones already there, so
+  // two of them can occupy the same piece of space — MEASURED over 200 seeds,
+  // 264 overlapping pairs of 46,440, the worst 0.615 m deep. The separation
+  // rule, the ball it uses, the sky, the things and the per-eye loop all moved
+  // there together, because `mirror` now stands in the same room and a rule
+  // applied in one page is a rule missing from the other.
   //
-  // ⚠️ THE BALL, NOT THE BOX. Things SPIN (`ry + tSec * spin` in the draw), so
-  // a box-against-box test is true this frame and false the next, and a
-  // separation that holds at one instant is not a rule. The circumscribed
-  // sphere of a cube of edge s — s·√3/2 — is the only bound that survives every
-  // rotation, and it is the same ball `pick` aims with, read from this one
-  // constant rather than typed in both places.
+  // What stayed here is what is about THIS page: the seed that crosses the
+  // wire, the socket it crosses, the live-update tiers, picking things up, and
+  // the sweep the negative control rolls.
   //
-  // 🔴 AND THE ROOM MUST STILL BE A FUNCTION OF ITS SEED. Everything below is
-  // arithmetic on the generated numbers: no clock, no `Math.random`, no
-  // iteration order that depends on anything but the index. Roll the same seed
-  // twice and it is still byte for byte the same room, which is the claim the
-  // negative control makes and the whole reason a room fits in four bytes.
-  const radiusOf = (t) => t.s * 0.87;
-  // Air between two surfaces, and it is doing two jobs. It has to clear the
-  // document's own rounding — MEASURED at a gap of zero, 128 pairs of 46,440
-  // were pushed to exactly touching and then ROUNDED back into contact, by
-  // 1.3e-4 m, which 1 cm already fixes. 4 cm is for the eye: two things a
-  // rounding error apart are one shape with a seam in it, and the rule is meant
-  // to make two things look like two.
-  const GAP = 0.04;
-  // MEASURED over 400 seeds: 11 passes was the most any room needed, and 342 of
-  // them settled in two. The cap is here so a pathological room cannot spin,
-  // not because rooms reach it.
-  const SPREAD_PASSES = 24;
-  // How many goes a DROPPED thing gets at finding somewhere to be. It is far
-  // larger than the placement number because only one thing moves here — the
-  // rest of the room is nailed down — so it has to walk out of a crowd rather
-  // than have the crowd open up. MEASURED over 123,027 drops made dead centre
-  // into another thing: 8 goes left 146 of them still overlapping, 48 leaves 3.
-  // ⚠️ AND 64 ALSO LEAVES 3 — the same three. They are not slow to converge,
-  // they do not converge: the thing bounces between two neighbours, clearing
-  // each by entering the other. More passes buy nothing, the residue is 0.064 m
-  // at its worst rather than the 0.73 m a generator can produce, and the honest
-  // thing is to say so here rather than claim a guarantee this does not have.
-  const DROP_PASSES = 48;
   // Rooms the negative control rolls to grade the rule across the seed space.
   // 64 of them is ~1,300 things and ~14,000 pair tests, which is a few ms.
   const SWEEP = 64;
-  const r4 = (v) => Math.round(v * 10000) / 10000;
-
-  /** The same room, with every thing pushed off every other thing. */
-  function spaced(w) {
-    const th = (w?.things || []).map((t) => ({ ...t }));
-    for (let pass = 0; pass < SPREAD_PASSES; pass++) {
-      let shifted = false;
-      for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
-        const a = th[i], b = th[j];
-        const need = radiusOf(a) + radiusOf(b) + GAP;
-        let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
-        let len = Math.hypot(dx, dy, dz);
-        if (len >= need - 1e-6) continue;
-        // Two centres in the same place have no line between them to push
-        // along. The direction comes from the pair's own indices — a random one
-        // would be a different room on every roll.
-        if (len < 1e-6) { dx = Math.cos(i + j); dy = 0.3; dz = Math.sin(i + j); len = Math.hypot(dx, dy, dz); }
-        const k = (need - len) / len / 2;        // half the shortfall each, along the line
-        a.x -= dx * k; a.y -= dy * k; a.z -= dz * k;
-        b.x += dx * k; b.y += dy * k; b.z += dz * k;
-        shifted = true;
-      }
-      if (!shifted) break;
-    }
-    // Rounded the way the generator rounds — see seed.mjs. The document is
-    // compared byte for byte, so it has to leave here canonical.
-    return { ...w, things: th.map((t) => ({ ...t, x: r4(t.x), y: r4(t.y), z: r4(t.z) })) };
-  }
-
-  /**
-   * How the things in a room stand to one another: how many pairs are inside
-   * each other, how deep the worst of them is, and the tightest gap there is
-   * between two surfaces.
-   *
-   * `closest` is what the asserts print when they pass — a pass that prints
-   * only "0 pairs" says the same thing about a room with 4 cm to spare and one
-   * with 4 metres, and the number that moves is the one worth reading.
-   */
-  function clashes(w) {
-    const th = w?.things || [];
-    let pairs = 0, deep = 0, closest = Infinity;
-    for (let i = 0; i < th.length; i++) for (let j = i + 1; j < th.length; j++) {
-      const a = th[i], b = th[j];
-      const gap = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) - radiusOf(a) - radiusOf(b);
-      if (gap < 0) { pairs++; deep = Math.max(deep, -gap); }
-      closest = Math.min(closest, gap);
-    }
-    return { pairs, deep, closest: Number.isFinite(closest) ? closest : 0 };
-  }
 
   // ⚠️ ALIASED, NOT USED DIRECTLY. An imported binding cannot be reassigned, and
   // tier 3 of the update story replaces the generator while a session is live.
   // Every call below goes through these.
-  // ⚠️ AND THE SEPARATION IS PART OF `world`, NOT OF THE CALLERS. A rule applied
-  // at three call sites is a rule missing from the fourth — and a generator
-  // swapped in live over the wire would arrive without it.
-  let world = (seed) => spaced(world0(seed)), validate = validate0;
+  // ⚠️ AND THE SEPARATION IS PART OF `world`, NOT OF THE CALLERS — `roomOf` is
+  // the generator WITH the rule already on it. A rule applied at three call
+  // sites is a rule missing from the fourth, and a generator swapped in live
+  // over the wire would arrive without it, which is why the tier-3 handler
+  // rebuilds the same wrapper rather than taking `mod.world` raw.
+  let world = roomOf, validate = validate0;
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'scene-demo';
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
@@ -241,65 +168,19 @@
     const p = gl.createProgram();
     gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
     gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
-    // 🔴 BEFORE linkProgram, NOT AFTER. One VAO feeds both programs with
-    // position at 0 and normal at 1, so both have to agree on that — and
+    // 🔴 BEFORE linkProgram, NOT AFTER. One VAO feeds every program here with
+    // position at 0 and normal at 1, so they all have to agree on that — and
     // `bindAttribLocation` only takes effect at the NEXT link, so calling it
     // after linking is a no-op that reads like a fix. It was called after, on
-    // one of the two programs, and the Quest reported GL_INVALID_OPERATION
-    // (1282) on its first frame for it. It drew anyway, because the linker
-    // happened to pick the same slots — which is the worst kind of working.
+    // one of the programs, and the Quest reported GL_INVALID_OPERATION (1282)
+    // on its first frame for it. It drew anyway, because the linker happened to
+    // pick the same slots — which is the worst kind of working.
     gl.bindAttribLocation(p, 0, 'aPos');
     gl.bindAttribLocation(p, 1, 'aNrm');
     gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
     return p;
   };
-
-  // The walls run demo/mirror's shader, unchanged apart from losing the
-  // feedback tap — the same kaleidoscope and domain warp, so the surface of
-  // this room is the picture that page already measures on two GPUs.
-  const SKY_FS = `#version 300 es
-    precision highp float;
-    uniform float uT; uniform float uHue; out vec4 o;
-    in vec3 vP;
-    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
-    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
-      return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
-    void main(){
-      vec3 p = normalize(vP);
-      vec2 uv = vec2(atan(p.z, p.x) / 6.2831853, p.y * 0.5);
-      float a = uv.x * 6.2831853, r = length(vec2(uv.x, uv.y)) + 0.35, seg = 6.2831853 / 8.0;
-      a = abs(mod(a + 0.5*seg, seg) - 0.5*seg);
-      vec2 k = vec2(cos(a), sin(a)) * r;
-      float w = n(k*3.0 + uT*0.06) + 0.5*n(k*6.0 - uT*0.04) + 0.25*n(k*12.0 + uT*0.1);
-      vec3 c = 0.5 + 0.5*cos(6.2831*(w + vec3(0.0,0.33,0.67)) + uHue*6.2831);
-      // Held down hard: this is a WALL, behind the things you are looking at,
-      // and a bright surround in a headset is the difference between a room and
-      // a migraine.
-      // ⚠️ 0.16 WAS TOO DARK. It was chosen against a bright laptop panel, where
-      // it reads as a held-back surround; through a headset there is no ambient
-      // light to compare it with and the room reads as black. 0.34 with the
-      // same colour, so the walls are still behind the things and not competing
-      // with them.
-      o = vec4(c * 0.34, 1.0); }`;
-
-  const BOX_FS = `#version 300 es
-    precision highp float;
-    in vec3 vN; in vec3 vW; uniform vec3 uCol; out vec4 o;
-    void main(){
-      vec3 n = normalize(vN);
-      float l = 0.35 + 0.65 * max(0.0, dot(n, normalize(vec3(0.4, 0.9, 0.25))));
-      o = vec4(uCol * l, 1.0); }`;
-
-  const VS = `#version 300 es
-    in vec3 aPos; in vec3 aNrm;
-    uniform mat4 uProj, uView, uModel;
-    out vec3 vN; out vec3 vW; out vec3 vP;
-    void main(){
-      vP = aPos;
-      vN = mat3(uModel) * aNrm;
-      vec4 w = uModel * vec4(aPos, 1.0); vW = w.xyz;
-      gl_Position = uProj * uView * w; }`;
 
   const PANEL_VS = `#version 300 es
     in vec3 aPos; in vec3 aNrm;
@@ -311,63 +192,10 @@
     in vec2 vUv; uniform sampler2D uTex; uniform float uFade; out vec4 o;
     void main(){ vec4 t = texture(uTex, vUv); o = vec4(t.rgb, t.a * uFade); }`;
 
-  let progSky = null, progBox = null, progPanel = null, cube = null, quad = null;
-  // A look on its way in, and how far through it is.
-  let skyNew = null, boxNew = null, fadeFrom = 0;
-  const FADE_MS = 900;
-  /** 0..1, eased, or null when nothing is arriving. */
-  function fadeK() {
-    if (!skyNew) return null;
-    const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
-    return k * k * (3 - 2 * k);
-  }
-  /**
-   * ⚠️ CONSTANT-ALPHA BLENDING, AND `LEQUAL` WITH IT. The old picture is
-   * already in the framebuffer, so drawing the new one over it with
-   * `blendColor(0,0,0,k)` gives new*k + old*(1-k) for nothing — the same trick
-   * the board uses, and it needs no third program and no extra targets.
-   *
-   * The depth function is the part that is easy to miss: the second pass is the
-   * SAME geometry at the SAME depth, so the default `LESS` rejects every
-   * fragment of it and the fade does nothing at all while looking like it is
-   * wired up.
-   */
-  function fadeOn(k) {
-    gl.enable(gl.BLEND);
-    gl.blendColor(0, 0, 0, k);
-    gl.blendFunc(gl.CONSTANT_ALPHA, gl.ONE_MINUS_CONSTANT_ALPHA);
-    gl.depthFunc(gl.LEQUAL);
-  }
-  function fadeOff() {
-    gl.disable(gl.BLEND);
-    gl.depthFunc(gl.LESS);
-  }
-  try { progSky = link(VS, SKY_FS); progBox = link(VS, BOX_FS); progPanel = link(PANEL_VS, PANEL_FS); }
+  let progPanel = null, quad = null;
+  try { progPanel = link(PANEL_VS, PANEL_FS); }
   catch (e) { d.log(`shader: ${e.message}`, 'bad'); }
 
-  function unitCube() {
-    // 6 faces, flat normals. Positions in -0.5..0.5 so `s` is an edge length.
-    const P = [], N = [];
-    const faces = [[[1,0,0],[0,1,0],[0,0,1]], [[-1,0,0],[0,1,0],[0,0,-1]],
-                   [[0,1,0],[0,0,1],[1,0,0]], [[0,-1,0],[0,0,-1],[1,0,0]],
-                   [[0,0,1],[0,1,0],[-1,0,0]], [[0,0,-1],[0,1,0],[1,0,0]]];
-    for (const [nrm, u, v] of faces) {
-      const c = nrm.map((x) => x * 0.5);
-      const q = [[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]];
-      for (const [a, b] of q) {
-        P.push(c[0] + (u[0]*a + v[0]*b)*0.5, c[1] + (u[1]*a + v[1]*b)*0.5, c[2] + (u[2]*a + v[2]*b)*0.5);
-        N.push(...nrm);
-      }
-    }
-    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
-    for (const [data, loc] of [[P, 0], [N, 1]]) {
-      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
-    }
-    gl.bindVertexArray(null);
-    return { vao, count: P.length / 3 };
-  }
   function unitQuad() {
     const P = [-0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0];
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -377,7 +205,16 @@
     gl.bindVertexArray(null);
     return { vao, count: 6 };
   }
-  if (gl) { cube = unitCube(); quad = unitQuad(); }
+  // 🔴 THE ROOM. Everything this page draws except its own status panel comes
+  // out of here — and so does what `mirror` draws behind its video panel, which
+  // is the whole reason it is a module. `say` is the BEACON, never the batched
+  // shipper: the room's lines about your real floor arrive while a session is
+  // starting, which is exactly when a 2 s timer stops being generous.
+  let room = null;
+  if (gl) {
+    quad = unitQuad();
+    room = createXRRoom(gl, { log: (m, k) => d.log(m, k), say: shipNow });
+  }
 
   // ── the status panel: text drawn to a canvas, uploaded as a texture ─────
   // 🔴 THE 2D PAGE IS INVISIBLE INSIDE AN IMMERSIVE SESSION. `d.log` and the
@@ -423,36 +260,6 @@
     badge.innerHTML = `window · <b>${rendererName}</b>`;
   }
 
-  // ── the smallest matrix library that does this job ──────────────────────
-  // Column-major, like GL wants. Written out rather than imported because it is
-  // forty lines and the alternative is a dependency.
-  const mul = (a, b) => { const o = new Float32Array(16);
-    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-      let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; }
-    return o; };
-  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
-  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-  const norm = (a) => { const l = Math.hypot(...a) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
-
-  const modelM = (x, y, z, s, rx, ry) => {
-    const cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
-    // R = Ry * Rx, then uniform scale, then translate.
-    return new Float32Array([
-      s*cy,        0,     s*(-sy),      0,
-      s*(sy*sx),   s*cx,  s*(cy*sx),    0,
-      s*(sy*cx),  -s*sx,  s*(cy*cx),    0,
-      x, y, z, 1]);
-  };
-  const perspective = (fov, asp, n, f) => { const t = 1 / Math.tan(fov / 2);
-    return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]); };
-  const lookAt = (eye, at) => {
-    const z = norm(sub(eye, at)), x = norm(cross([0,1,0], z)), y = cross(z, x);
-    return new Float32Array([
-      x[0], y[0], z[0], 0,  x[1], y[1], z[1], 0,  x[2], y[2], z[2], 0,
-      -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]);
-  };
-
   // ── the room itself ─────────────────────────────────────────────────────
   let doc = null;              // the document the room IS
   let refused = 0, applied = 0;
@@ -462,131 +269,34 @@
   let appliedAt = 0, shown = true, lastToFrame = null;
   let worst = 0, toFrame = [];
   const lastDocs = [];         // for the negative control
-  const U = {};                // uniform locations, filled on first draw
+  // Only the status panel's program belongs to this page now; the room's own
+  // uniforms are the room's business.
+  let PU = null;
+  const panelLocs = () => (PU ||= {
+    proj: gl.getUniformLocation(progPanel, 'uProj'),
+    view: gl.getUniformLocation(progPanel, 'uView'),
+    model: gl.getUniformLocation(progPanel, 'uModel'),
+    tex: gl.getUniformLocation(progPanel, 'uTex'),
+    fade: gl.getUniformLocation(progPanel, 'uFade'),
+  });
 
-  function locs(p) {
-    if (U[p.__i]) return U[p.__i];
-    const g = (n) => gl.getUniformLocation(p, n);
-    return (U[p.__i] = { proj: g('uProj'), view: g('uView'), model: g('uModel'),
-                         t: g('uT'), hue: g('uHue'), col: g('uCol'),
-                         tex: g('uTex'), fade: g('uFade') });
-  }
-  if (gl) { progSky.__i = 'sky'; progBox.__i = 'box'; progPanel.__i = 'panel'; }
-
-  /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
-  const hueRGB = (h) => [0, 0.33, 0.67].map((o) => 0.45 + 0.55 * Math.cos(6.2831 * (h + o)));
-
-  function drawRoom(proj, view, tSec, doClear = true, pose = null) {
-    if (!gl || !doc) return;
-    gl.enable(gl.DEPTH_TEST);
-    // 🔴 `gl.clear` IGNORES THE VIEWPORT — it clears the whole framebuffer.
-    // Both eyes render into ONE framebuffer side by side, so clearing on the
-    // second view wiped everything the first had just drawn. The comment in
-    // onXR said "only the first may clear it" and the code then cleared on
-    // both; a headset showed black. A viewport is not a clip region, and
-    // `gl.scissor` is the thing that would make it one.
-    if (doClear) {
-      // Transparent in passthrough: every pixel this page does not draw is a
-      // pixel of your actual room.
-      if (arMode) gl.clearColor(0, 0, 0, 0);
-      else gl.clearColor(0.02, 0.03, 0.045, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    } else {
-      // Each eye still needs its OWN depth cleared, or the second eye tests
-      // against the first eye's depths and drops most of the room.
-      gl.enable(gl.SCISSOR_TEST);
-      gl.clear(gl.DEPTH_BUFFER_BIT);
-      gl.disable(gl.SCISSOR_TEST);
-    }
-    gl.bindVertexArray(cube.vao);
-
-    // The walls: one big cube seen from the inside, so the front faces are the
-    // ones pointing AWAY. Cull the other way round rather than turning culling
-    // off — a room drawn with both faces writes depth from the near wall and
-    // hides everything inside it.
-    // ⚠️ NO WALLS IN PASSTHROUGH. The walls ARE the room in the other two
-    // modes; in passthrough your own room is the room, and drawing a box around
-    // you would be drawing over the thing you asked to see.
-    let L;
-    if (!arMode) {
-      gl.useProgram(progSky);
-      L = locs(progSky);
-      gl.cullFace(gl.FRONT); gl.enable(gl.CULL_FACE);
-      gl.uniformMatrix4fv(L.proj, false, proj);
-      gl.uniformMatrix4fv(L.view, false, view);
-      gl.uniformMatrix4fv(L.model, false, modelM(0, 2, 0, 26, 0, 0));
-      gl.uniform1f(L.t, tSec); gl.uniform1f(L.hue, doc.hue);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-      const k = fadeK();
-      if (k !== null) {
-        const NL = locs(skyNew);
-        gl.useProgram(skyNew);
-        gl.uniformMatrix4fv(NL.proj, false, proj);
-        gl.uniformMatrix4fv(NL.view, false, view);
-        gl.uniformMatrix4fv(NL.model, false, modelM(0, 2, 0, 26, 0, 0));
-        gl.uniform1f(NL.t, tSec); gl.uniform1f(NL.hue, doc.hue);
-        fadeOn(k);
-        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-        fadeOff();
-      }
-    }
-    gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
-    gl.useProgram(progBox);
-    L = locs(progBox);
-    gl.uniformMatrix4fv(L.proj, false, proj);
-    gl.uniformMatrix4fv(L.view, false, view);
-    doc.things.forEach((t, i) => {
-      const tch0 = touchOf(held?.i === i, aimed === i);
-      gl.uniformMatrix4fv(L.model, false,
-        modelM(t.x, t.y, t.z, t.s * tch0.scale, t.rx, t.ry + tSec * t.spin));
-      // The thing under the pointer, and the thing in your hand, are lit
-      // differently — colour says WHAT IS HAPPENING to it, which is the same
-      // rule every other page here follows about colour.
-      // ONE LOOK, from the kit — see TOUCH in xr-panel.mjs. Brighter AND
-      // slightly bigger, because in a headset brightness alone reads as "that
-      // one is pale" rather than "that one is under your pointer".
-      const c = hueRGB(t.c);
-      const tch = touchOf(held?.i === i, aimed === i);
-      gl.uniform3fv(L.col, [c[0] * tch.lit, c[1] * tch.lit, c[2] * tch.lit]);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+  /**
+   * One view of the room, with this page's state handed across in one place.
+   *
+   * ⚠️ `clear` IS PER EYE AND ONLY THE FIRST ONE MAY SAY YES — `gl.clear`
+   * ignores the viewport, both eyes share one framebuffer, and a colour clear
+   * on the second view wipes what the first drew. The module holds that rule;
+   * the caller holds the eye index.
+   *
+   * `eye` is where the viewer is, and it is only used by the dotted grid, whose
+   * dots fade out with distance rather than ending in a hard rectangle.
+   */
+  function drawRoom(proj, view, tSec, doClear = true, eye = null) {
+    if (!room || !doc) return;
+    room.draw({
+      proj, view, tSec, doc, clear: doClear, ar: arMode, eye,
+      aimed, held, aimedDist, ray: xrOk ? rayNow : null, touch: touchOf,
     });
-    const bk = fadeK();
-    if (bk !== null) {
-      const NB = locs(boxNew);
-      gl.useProgram(boxNew);
-      gl.uniformMatrix4fv(NB.proj, false, proj);
-      gl.uniformMatrix4fv(NB.view, false, view);
-      fadeOn(bk);
-      doc.things.forEach((t, i) => {
-        gl.uniformMatrix4fv(NB.model, false, modelM(t.x, t.y, t.z, t.s, t.rx, t.ry + tSec * t.spin));
-        const c = hueRGB(t.c);
-        const lit = held?.i === i ? 1.8 : (aimed === i ? 1.35 : 1);
-        gl.uniform3fv(NB.col, [c[0] * lit, c[1] * lit, c[2] * lit]);
-        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-      });
-      fadeOff();
-      gl.useProgram(progBox);
-    }
-
-    // ⚠️ THE POINTER HAS TO BE VISIBLE OR THE ROOM IS UNUSABLE. Dragging worked
-    // before this and still felt like guessing, because nothing showed where
-    // you were aiming — reported from the headset, and it is the difference
-    // between a control and a coincidence. A beam down the ray, and a marker
-    // at the point it stops.
-    if (rayNow && xrOk) {
-      const len = held ? held.dist : (aimedDist || 2.4);
-      gl.uniformMatrix4fv(L.model, false, beamM(rayNow.m, len));
-      gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
-      // 🔴 NO MARKER AT THE END OF THE RAY. There was a small box there, and
-      // from the headset it reads as a fourth object in the room — one that
-      // follows you and cannot be picked up. The beam already says where you
-      // are aiming, and the THING says when the aim has landed, now that it
-      // grows as well as brightens. A cursor is for a screen where nothing
-      // else can react.
-    }
-    gl.bindVertexArray(null);
   }
 
   // ── applying a room, which is the only way the room ever changes ────────
@@ -752,14 +462,12 @@
     }
     if (m.type === 'dev.shader') {
       try {
-        const nextSky = link(VS, m.sky || SKY_FS);
-        const nextBox = link(VS, m.box || BOX_FS);
-        nextSky.__i = `sky${Date.now()}`; nextBox.__i = `box${Date.now()}`;   // fresh uniform cache
-        // ⚠️ HELD, NOT SWAPPED. A shader changing between one frame and the
-        // next is a hard cut, and a hard cut across your whole field of view is
-        // a great deal more violent than the same cut in a browser pane. It
-        // dissolves over FADE_MS instead.
-        skyNew = nextSky; boxNew = nextBox; fadeFrom = performance.now();
+        // ⚠️ HELD, NOT SWAPPED — the module dissolves the new look over
+        // FADE_MS rather than cutting to it, because a hard cut across your
+        // whole field of view is a great deal more violent than the same cut in
+        // a browser pane. It throws if the body will not compile, and the
+        // picture keeps its own.
+        room.applyLook({ sky: m.sky, box: m.box });
         setPanel('✓ new look\nfading in');
         shipNow('dev.shader compiled — fading in');
       } catch (e) {
@@ -816,14 +524,11 @@
     gl.viewport(0, 0, canvas.width, canvas.height);
     const tSec = (now - t0) / 1000;
     const a = tSec * 0.12;
+    const eye = [Math.cos(a) * 6.5, 2.4, Math.sin(a) * 6.5];
     drawRoom(perspective(1.05, canvas.width / canvas.height, 0.1, 60),
-             lookAt([Math.cos(a) * 6.5, 2.4, Math.sin(a) * 6.5], [0, 1.2, 0]), tSec);
+             lookAt(eye, [0, 1.2, 0]), tSec, true, eye);
     markShown(now);
-    if (skyNew && performance.now() - fadeFrom >= FADE_MS) {
-      gl.deleteProgram(progSky); gl.deleteProgram(progBox);
-      progSky = skyNew; progBox = boxNew; skyNew = boxNew = null;
-      d.log('the new look is now the look', 'ok');
-    }
+    if (room?.retire()) d.log('the new look is now the look', 'ok');
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
   }
@@ -838,24 +543,6 @@
   const MIN_HOLD = 0.4, BUBBLE = 0.45;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   let lastShove = 0, aWas = false;
-
-  /**
-   * A long thin box lying along a controller's ray.
-   *
-   * `modelM` cannot do this: it scales uniformly and only rotates about two
-   * axes, while a beam needs the controller's OWN orientation and a different
-   * scale down each axis. Taking the rotation straight out of the pose matrix
-   * is both shorter and exact.
-   */
-  function beamM(m, len) {
-    const sx = 0.004, sy = 0.004;
-    return new Float32Array([
-      m[0] * sx, m[1] * sx, m[2] * sx, 0,
-      m[4] * sy, m[5] * sy, m[6] * sy, 0,
-      m[8] * len, m[9] * len, m[10] * len, 0,
-      // -Z is forward, so the box's centre sits half a length down the ray
-      m[12] - m[8] * len * 0.5, m[13] - m[9] * len * 0.5, m[14] - m[10] * len * 0.5, 1]);
-  }
 
   /** Nearest thing the ray passes through, or null. Spheres, from the same
    *  `radiusOf` the separation rule uses — an exact box test would be twenty
@@ -893,7 +580,18 @@
    * on the far side of the boundary.
    */
   const publishXR = () => {
-    window.__demo.xr = { presenting: xrOk, mode: xrOk ? (arMode ? 'immersive-ar' : 'immersive-vr') : 'window', frames: xrFrames };
+    window.__demo.xr = {
+      presenting: xrOk, mode: xrOk ? (arMode ? 'immersive-ar' : 'immersive-vr') : 'window', frames: xrFrames,
+      // ⚠️ WHERE THE DOTTED GRID IS, AND WHY — published so one headset run
+      // answers it without anybody reading the log. `surfaces` is the state in
+      // a word (six of them; the list is beside `planes` in xr-room.mjs) and
+      // `grid` is what the floor under the dots actually is, because "nobody
+      // asked", "we were refused", "your room reported no surfaces" and "your
+      // room has no walls" are four different statements and at most one of
+      // them is true at a time.
+      surfaces: room?.planes.state ?? 'no room', grid: room?.planes.from ?? '—',
+      planes: room?.planes.count ?? 0, labels: room ? { ...room.planes.labels } : {},
+    };
   };
   async function enter(mode = 'immersive-vr') {
     arMode = mode === 'immersive-ar';
@@ -921,8 +619,19 @@
       // ⚠️ `local-floor` is REQUIRED, not optional: the room is authored in
       // metres from the floor, and on `local` the origin is wherever the head
       // happened to be, which puts a 0.3 m cube at eye height.
+      // 🔴 `plane-detection` IS OPTIONAL AND IT MUST STAY OPTIONAL. Asking for
+      // your real floor and walls is worth doing — in passthrough it is the
+      // difference between a grid floating at the page's guess and a grid lying
+      // on the floor you are standing on — but a headset whose owner has never
+      // run Space Setup, or who says no to the permission, must still get a
+      // room. In `requiredFeatures` this line would turn "I have not mapped my
+      // house" into "this page refuses to start".
       session = await step(`requestSession ${mode}`,
-        navigator.xr.requestSession(mode, { requiredFeatures: ['local-floor'] }));
+        navigator.xr.requestSession(mode, {
+          requiredFeatures: ['local-floor'],
+          optionalFeatures: [...ROOM_OPTIONAL_FEATURES],
+        }));
+      room?.markAsked();
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
       // the handler entirely — so the session could START and the page then die
@@ -1168,7 +877,7 @@
         hm[13] - hm[9] * 1.25 - hm[5] * 0.30 - hm[1] * 0.16,
         hm[14] - hm[10] * 1.25 - hm[6] * 0.30 - hm[2] * 0.16, 1]);
       gl.useProgram(progPanel);
-      const PL = locs(progPanel);
+      const PL = panelLocs();
       gl.uniformMatrix4fv(PL.proj, false, proj);
       gl.uniformMatrix4fv(PL.view, false, viewMat);
       gl.uniformMatrix4fv(PL.model, false, M);
@@ -1183,6 +892,16 @@
       gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
     }
 
+    // ── your real floor and walls, if this headset will say ────────────────
+    // ⚠️ ONCE PER FRAME, BEFORE THE EYE LOOP — the answer is the same for both
+    // eyes, and asking twice would be two reads of a set the runtime rebuilds.
+    // 🔴 AND IT CANNOT THROW. `frame.detectedPlanes` raises on a session that
+    // was not granted the feature, and an uncaught error in a frame callback
+    // does not stop the loop, it silently deletes everything below it — which
+    // is precisely how this page lost its status panel and its gl-error check.
+    // The module swallows it, marks the session refused and never asks again.
+    room?.observePlanes(frame, xrSpace);
+    const hp0 = pose.transform.position;
     let eye = 0;
     for (const view of pose.views) {
       const vp = layer.getViewport(view);
@@ -1190,7 +909,8 @@
       gl.scissor(vp.x, vp.y, vp.width, vp.height);
       // Only the FIRST eye clears the shared framebuffer; the rest clear depth
       // inside their own scissor. See drawRoom.
-      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0, pose);
+      drawRoom(view.projectionMatrix, view.transform.inverse.matrix, tSec, eye === 0,
+               [hp0.x, hp0.y, hp0.z]);
       drawPanel(view.projectionMatrix, view.transform.inverse.matrix);
       eye++;
     }
@@ -1198,15 +918,16 @@
     if (xrFrames === 1) {
       const err = gl.getError();
       const vp0 = layer.getViewport(pose.views[0]);
-      shipNow(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err} · eye0 ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0}`);
+      shipNow(`first headset frame · fb ${layer.framebufferWidth}x${layer.framebufferHeight} · ${pose.views.length} views · gl error ${err} · eye0 ${vp0.width}x${vp0.height} · things ${doc ? doc.things.length : 0} · grid ${room?.hasGrid ? 'drawing' : 'NOT drawing'} on ${room?.planes.from}`);
+      // The grid's own line, on the panel, because the 2-D page is behind your
+      // face and this is the one thing in here that is a claim ABOUT your room.
+      if (room) setPanel(room.planes.short, 6000);
     }
     markShown(now);
     // ⚠️ RETIRED HERE, NOT INSIDE drawRoom — that runs once PER EYE, so swapping
     // there would replace the programs between the left eye and the right and
     // show two different looks in one frame.
-    if (skyNew && performance.now() - fadeFrom >= FADE_MS) {
-      gl.deleteProgram(progSky); gl.deleteProgram(progBox);
-      progSky = skyNew; progBox = boxNew; skyNew = boxNew = null;
+    if (room?.retire()) {
       setPanel('✓ the new look is the look');
       shipNow('dev.shader live — the fade finished');
     }
@@ -1403,19 +1124,19 @@
     // line and without it every fragment of the incoming pass is rejected while
     // the code reads as correct. A broken shader first, so the guard is known
     // to say no before the pass is trusted to say yes.
-    const heldProg = progSky;
+    const heldLook = room?.look;
     await onDev({ type: 'dev.shader', sky: '#version 300 es\nnot glsl at all' });
     d.assert('a shader that will not compile is refused, and the picture keeps its own',
-      skyNew === null && progSky === heldProg, skyNew ? 'it started fading in anyway' : 'refused');
+      !room?.incoming && room?.look === heldLook, room?.incoming ? 'it started fading in anyway' : 'refused');
 
     await onDev({ type: 'dev.shader' });          // no body: the built-in, recompiled
     d.assert('a shader that compiles starts a fade rather than a cut',
-      skyNew !== null && progSky === heldProg,
-      skyNew ? `fading, old program still drawing` : 'no fade started');
+      !!room?.incoming && room?.look === heldLook,
+      room?.incoming ? `fading, old program still drawing` : 'no fade started');
     await new Promise((r) => setTimeout(r, FADE_MS + 120));
     d.assert('...and the fade retires the old picture when it finishes',
-      skyNew === null && progSky !== heldProg,
-      skyNew ? 'still fading' : 'the new look is the look');
+      !room?.incoming && room?.look !== heldLook,
+      room?.incoming ? 'still fading' : 'the new look is the look');
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
