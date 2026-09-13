@@ -78,6 +78,18 @@ list, so nothing is carried only in a conversation.
   - Until one of those exists the right card must go on saying what it cannot
     show, in words — inferring grains from audio is the picture this page
     already deleted once.
+- **A flow-diagram drawer — `plan-diagram.md`, planned and not started.** To
+  replace the `what` paragraph on pages whose subject is a PATH, with a caption
+  under it. Decisions already taken there: **SVG with the text inside it** (a
+  DOM-text-over-canvas mix needs the layout computed twice in two coordinate
+  systems and puts a label where it can end up beside the wrong box); **a small
+  JSON of our own, not Mermaid** (Mermaid has nodes and edges where this needs
+  devices, software and a network boundary, and its layout is dagre's rather
+  than the left-to-right lanes the brief asks for); **one level of nesting, as
+  a `sub` line** rather than boxes inside boxes; loopbacks routed UNDER the row;
+  and grey with 8–12% of a hue mixed in, ⚠️ never yellow, because `--hi` means
+  "look here" everywhere else in this project. Starts in `/kit/` with six
+  awkward cases, then `grains` adopts it first.
 - **The slider group on a desktop.** Two columns with a generous x gap rather
   than one tall stack — `draw` got a `pos-pair` modifier for exactly this
   (`.sld-group.pos-pair`, six columns above 720 px) and `grains` and `/box/`
