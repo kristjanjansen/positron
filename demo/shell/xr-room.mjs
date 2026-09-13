@@ -27,7 +27,7 @@
 // asked once behind a try and never asked again after a refusal.
 
 import { world as world0 } from './seed.mjs';
-import { TABLET, registerStandIn, registerDrawnAs } from './xr-tablet.mjs';
+import { TABLET, registerStandIn } from './xr-tablet.mjs';
 import { readGLB } from './xr-glb.mjs';
 
 // ── nothing sits inside anything else ─────────────────────────────────────
@@ -215,13 +215,37 @@ export function beamM(m, len) {
  * the handle your fist is round, the SQUARE TOP FACE the tablet lies on, and a
  * nub where the thumbstick is so the thing has a visible orientation.
  */
+/**
+ * 🔴 THE STAND-IN SAYS IT IS A STAND-IN BY BEING A COLOUR NO CONTROLLER IS.
+ *
+ * The tablet used to carry a line reading "a stand-in shape, not your real
+ * controller". That line has gone — it was a caption on a control surface and
+ * it crowded out the numbers — but the FACT it carried has not, because
+ * deleting a display without rehoming what it said is how a page quietly stops
+ * reporting something.
+ *
+ * So it moved into the thing rather than a caption about the thing. The real
+ * `meta-quest-touch-plus` model is white-grey; this is `--warn` amber, held
+ * down so it is not a lamp in a dark room. You cannot mistake one for the other
+ * and there is nothing to read.
+ *
+ * ⚠️ AND THIS IS NOT THE GREEN GRID AGAIN. That colour was a proof device — it
+ * answered "did you really render on my surfaces?" once, and was retired the
+ * day it was believed, because a proof device that lingers is decoration with a
+ * story attached. This one reports a condition that RECURS and varies per run:
+ * an unknown controller profile, or a model that would not load. It is the same
+ * register as amber on a mark — "this landed in the degraded way" — which is
+ * the one meaning colour is allowed to carry here.
+ */
+export const STAND_IN_COL = [0.62, 0.49, 0.27];
 export const GRIP_PARTS = [
   // The body: butt, tapering handle, and the wider rounded head the face plate
   // is on. `sy` flattens the circle into the oval a Touch controller actually
   // is — the profile is a body of revolution and the squash is one number.
-  { name: 'body', mesh: 'body', sx: 1, sy: 0.88, sz: 1, at: 0, col: [0.26, 0.29, 0.35] },
+  { name: 'body', mesh: 'body', sx: 1, sy: 0.88, sz: 1, at: 0, col: STAND_IN_COL },
   // The thumbstick, which is the only part that says WHICH WAY UP the thing is.
-  { name: 'thumbstick', mesh: 'stick', sx: 1, sy: 1, sz: 1, at: 0.038, col: [0.52, 0.57, 0.67] },
+  { name: 'thumbstick', mesh: 'stick', sx: 1, sy: 1, sz: 1, at: 0.038,
+    col: STAND_IN_COL.map((v) => Math.min(1, v * 1.45)) },
 ];
 registerStandIn(GRIP_PARTS.length);
 
@@ -839,6 +863,14 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // have not looked" and "we looked and there is none" are different findings
   // and the footer prints different words for them.
   let modelProg = null;
+  // ⚠️ ONE LINE PER SESSION, ON THE SUCCESS PATH AS WELL AS THE FAILURE ONE.
+  // `loadModel` says what it found, ONCE per page load — so a model fetched
+  // during the flat preview is never mentioned again, and a headset session
+  // that follows it would carry no line about the controllers at all. The
+  // reader would then have "no line" meaning both "it worked" and "nothing
+  // asked", which is the collapse this project keeps paying for. Reset by
+  // `markAsked`, which is the one call that means a session started.
+  let saidThisSession = false;
   const models = new Map();            // profile|handedness -> entry
   let modelSaid = false;
 
@@ -1056,6 +1088,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
    *   session can be called `immersive-ar` and still composite opaque.
    */
   function markAsked(opaque) {
+    saidThisSession = false;          // a new session gets its own controller line
     planes.asked = true;
     if (opaque !== undefined) planes.opaque = !!opaque;
     if (planes.state === 'not asked') planes.state = 'waiting';
@@ -1644,7 +1677,6 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
         + ` · read in ${tParse.toFixed(1)} ms into ${m.count} vertices from ${m.stats.primitives} primitives`
         + ` · texture ${m.stats.imageBytes} bytes, decoded and uploaded in ${tGpu.toFixed(1)} ms`);
       if (!modelSaid) { modelSaid = true; log('your real controllers are being drawn, from their own models', 'ok'); }
-      registerDrawnAs('the real controller models');
       return entry;
     } catch (e) {
       models.set(key, false);
@@ -1652,7 +1684,6 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       // read it while wearing the thing.
       say(`FAIL controllers · ${profile} ${handedness} — ${e.message} · drawing the stand-in instead`);
       log(`no model for your controller (${e.message}) — drawing a stand-in`, 'warn');
-      registerDrawnAs('a stand-in shape, not your real controller');
       return false;
     }
   }
@@ -1676,6 +1707,21 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     tabletM = h?.tabletM || null;
     tabletHit = h?.hit || null;
     uploadTablet();
+    // 🔴 SAY WHAT THE CONTROLLERS ARE, ONCE, WHEN THE ANSWER HAS SETTLED — and
+    // say it whichever way it settled. The tablet no longer carries the words,
+    // so this is the only place a reader can find out WITHOUT looking at the
+    // shape; and because it is per session rather than per page load, a run
+    // whose model was already cached still reports.
+    if (!saidThisSession && hands.length) {
+      const w = room.controllers;
+      if (w === 'model' || w === 'stand-in') {
+        saidThisSession = true;
+        say(`controllers · this session is drawing ${w === 'model'
+          ? 'your REAL controller models'
+          : 'the amber STAND-IN — no model for this profile, or it would not load'}`
+          + ` · ${hands.map((h) => `${h.handedness}:${h.profile}`).join(' | ')}`);
+      }
+    }
   }
 
   /**

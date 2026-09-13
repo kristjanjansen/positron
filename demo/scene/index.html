@@ -1467,22 +1467,45 @@
       const tctx = tablet.canvas.getContext('2d');
       const shot = (v) => { tablet.set(c0.key, v); tablet.draw(); return tctx.getImageData(0, 0, TABLET.px, TABLET.py).data; };
       const A = shot(c0.min), B = shot(c0.max);
+      // 🔴 THE QUANTITY IS HOW FAR THE KNOB CROSSES ITS OWN LANE, and it took
+      // two goes to ask that. Counting lit pixels was the first attempt and it
+      // was the wrong question by one step — the lane is opaque along its whole
+      // length, so moving the knob adds no pixels at all, and the 8% the count
+      // did move was the NUMBER going from one digit to three. Measuring the
+      // changed span across the WHOLE tablet was the second, and it now reads
+      // mostly the value text, which sits in the head column and changes width.
+      // Restricted to x past the lane's left edge, the only thing that can
+      // change is the knob, and the span it covers must be the lane.
+      const laneX0 = Math.round(TABLET.lane.x * TABLET.scale);
       let ink = 0, moved = 0, x0 = Infinity, x1 = -1;
       for (let i = 0; i < A.length; i += 4) {
         if (A[i + 3] > 8) ink++;
+        const x = (i >> 2) % TABLET.px;
+        if (x < laneX0) continue;
         const dd = Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1])
           + Math.abs(A[i + 2] - B[i + 2]) + Math.abs(A[i + 3] - B[i + 3]);
-        if (dd > 24) {
-          const x = (i >> 2) % TABLET.px;
-          moved++; if (x < x0) x0 = x; if (x > x1) x1 = x;
-        }
+        if (dd > 24) { moved++; if (x < x0) x0 = x; if (x > x1) x1 = x; }
       }
-      const span = x1 >= 0 ? (x1 - x0) / TABLET.px : 0;
-      d.assert('this browser can draw the tablet, and the slider moves across its face',
-        room.hasTablet && ink > 2000 && moved > 1000 && span > 0.6,
+      const laneW = TABLET.lane.w * TABLET.scale;
+      const span = x1 >= 0 ? (x1 - x0 + 1) : 0;
+      d.assert('this browser can draw the tablet, and the knob crosses its whole lane',
+        room.hasTablet && ink > 2000 && moved > 1000 && span > laneW * 0.95,
         `${room.hasTablet ? 'its face compiled' : 'ITS FACE WOULD NOT COMPILE'} · ${ink} lit pixels`
-        + ` · ${moved} of them change between ${c0.min}${c0.unit} and ${c0.max}${c0.unit},`
-        + ` across ${(span * 100).toFixed(0)}% of its width`);
+        + ` · the knob sweeps ${span.toFixed(0)} px of a ${laneW.toFixed(0)} px lane`
+        + ` between ${c0.min}${c0.unit} and ${c0.max}${c0.unit}`);
+
+      // ⚠️ THE ONE PLACE A MONOSPACE ADVANCE IS ASSUMED, MEASURED AGAINST THE
+      // REAL FACE. `HEAD_W` is a character count times 0.6em, because a layout
+      // has to be arithmetic for `node` to grade it — so the page checks that
+      // assumption with the font actually loaded. A label wider than its column
+      // runs under the lane, which reads as a layout somebody never looked at.
+      tctx.font = `500 ${TABLET.kit.labelPx}px ${getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace'}`;
+      const drawn = Math.max(...TABLET.controls.map((c) =>
+        tctx.measureText(c.label.toUpperCase()).width
+        + (c.label.length - 1) * TABLET.kit.labelPx * TABLET.kit.labelTrack));
+      d.assert('...and the real font fits the column the arithmetic reserved for it',
+        drawn <= TABLET.headW,
+        `${drawn.toFixed(1)} px drawn into ${TABLET.headW.toFixed(1)} px reserved`);
 
       // 🔴 THE PRESS, THE DRAG AND THE LETTING GO — GRADED WITHOUT A HEADSET.
       // A controller ray needs hands; a hit is `{u, v}` and everything after it
