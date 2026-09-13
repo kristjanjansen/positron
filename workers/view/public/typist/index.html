@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* ── the carriage ────────────────────────────────────────────────────────
+     ONE BOX, TWO LAYERS PINNED TOGETHER. The <textarea> on top is invisible
+     and takes every keystroke; the <pre> underneath draws the text, the block
+     cursor and the highlight AT THE OFFSETS THE BROWSER REPORTS. So the cursor
+     you see is the caret the editor really has, not a picture of one — which
+     matters on this page more than anywhere, because where the caret is IS the
+     thing five earlier versions of this got wrong.
+
+     ⚠️ THE TWO LAYERS MUST SHARE EVERY METRIC or they drift apart by a
+     character and the cursor lands in the wrong place. They are set once, on
+     `.type`, and both layers carry that class — never set a font or a padding
+     on one of them alone. */
+  .carriage { position: relative; background: var(--card); border: 1px solid var(--line);
+              border-radius: 4px; overflow: hidden; }
+  .type {
+    font: 600 clamp(15px, 3.7vw, 20px)/1.75 var(--mono);
+    letter-spacing: .02em; font-variant-ligatures: none; tab-size: 4;
+    padding: 18px 16px; margin: 0; border: 0;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
+  }
+  .paper { color: var(--fg); height: 9.4em; overflow: hidden; }
+  .keys {
+    position: absolute; inset: 0; width: 100%; height: 100%; resize: none; outline: 0;
+    background: transparent; color: transparent; overflow: hidden;
+    caret-color: transparent;          /* the drawn one is the one to look at */
+    -webkit-touch-callout: none;
+  }
+  .keys::selection { background: transparent; }
+  .keys::-moz-selection { background: transparent; }
+  .hint { color: var(--dim2); font-weight: 500; }
+
+  /* The block cursor. Zero net width — `.62em` wide with `-.31em` either side —
+     so putting it in the line cannot move a single character of the layer it is
+     drawn over. */
+  .cur { display: inline-block; width: .62em; margin: 0 -.31em; background: var(--hi);
+         color: var(--bg);          /* inverse video: the letter under it still reads */
+         vertical-align: baseline; animation: typ-blink 1.06s steps(1) infinite; }
+  @keyframes typ-blink { 0%, 54% { opacity: 1 } 55%, 100% { opacity: .12 } }
+  /* `--hi` at 22%: a highlight, not a second piece of ink */
+  .sel { background: rgba(255, 212, 0, .22); border-radius: 2px; }
+
+  /* the same document, rebuilt — quieter, because it is the check rather than
+     the performance */
+  .rebuilt { margin-top: 10px; background: var(--card); border: 1px solid var(--line);
+             border-radius: 4px; padding: 9px 12px 11px; }
+  .rb-k { font: 500 9.5px/1.4 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+          color: var(--dim2); display: block; }
+  .rb-t { font: 500 12.5px/1.6 var(--mono); color: var(--dim); margin: 6px 0 0;
+          white-space: pre-wrap; word-break: break-word; max-height: 5.5em; overflow: auto; }
+  .rb-t .cur { animation: none; opacity: .8; }
+  .rb-v { font: 500 11px/1.4 var(--mono); color: var(--dim2); margin-top: 7px; }
+  .rb-v[data-apart="1"] { color: var(--bad); }
+</style>
+
+<!-- 🔴 THE RECORDING, AND IT IS EVIDENCE RATHER THAN A DEMONSTRATION. Every row
+     below came out of a real `beforeinput`/`input` pair in Chrome on
+     2026-09-13, driven by real key events over CDP: nine cursor keys, ten
+     backspaces, a word selected and typed over, a clipboard paste, an
+     emoji-keyboard insert and three composition steps. Nothing in it was
+     written by hand, which is the only reason the page is allowed to make
+     claims about it. `truth` is what the browser itself had in the box when
+     the recording stopped — read off the element, not computed from these
+     rows — so the page has something to be checked against that it did not
+     produce. -->
+<script type="application/x-ndjson" id="take">
+{"v":1,"kind":"text-op","capture":"beforeinput+input+selectionchange","document":"plain-text","recorded":"2026-09-13","through":"real key events in Chrome over CDP","truth":{"value":"tere\nthe recorder records\nthe act of recording ✓","selStart":48,"selEnd":48},"t0Us":1789293630944700,"ops":73}
+{"at":1789293630944700,"kind":"text-op","source":"live","op":{"type":"insert","range":[0,0],"text":"t","inputType":"insertCompositionText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[0,0]}}
+{"at":1789293631109100,"kind":"text-op","source":"live","op":{"type":"insert","range":[1,1],"text":"er","inputType":"insertCompositionText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[0,1]}}
+{"at":1789293631282100,"kind":"text-op","source":"live","op":{"type":"insert","range":[3,3],"text":"e","inputType":"insertCompositionText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[0,3]}}
+{"at":1789293631608600,"kind":"text-op","source":"live","op":{"type":"insert","range":[4,4],"text":"\n","inputType":"insertLineBreak","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[4,4]}}
+{"at":1789293631776500,"kind":"text-op","source":"live","op":{"type":"insert","range":[5,5],"text":"t","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[5,5]}}
+{"at":1789293631878400,"kind":"text-op","source":"live","op":{"type":"insert","range":[6,6],"text":"h","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[6,6]}}
+{"at":1789293631987100,"kind":"text-op","source":"live","op":{"type":"insert","range":[7,7],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[7,7]}}
+{"at":1789293632064800,"kind":"text-op","source":"live","op":{"type":"insert","range":[8,8],"text":" ","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[8,8]}}
+{"at":1789293632150000,"kind":"text-op","source":"live","op":{"type":"insert","range":[9,9],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[9,9]}}
+{"at":1789293632234600,"kind":"text-op","source":"live","op":{"type":"insert","range":[10,10],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[10,10]}}
+{"at":1789293632328900,"kind":"text-op","source":"live","op":{"type":"insert","range":[11,11],"text":"c","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[11,11]}}
+{"at":1789293632411000,"kind":"text-op","source":"live","op":{"type":"insert","range":[12,12],"text":"o","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[12,12]}}
+{"at":1789293632500400,"kind":"text-op","source":"live","op":{"type":"insert","range":[13,13],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[13,13]}}
+{"at":1789293632594600,"kind":"text-op","source":"live","op":{"type":"insert","range":[14,14],"text":"d","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[14,14]}}
+{"at":1789293632672600,"kind":"text-op","source":"live","op":{"type":"insert","range":[15,15],"text":"i","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[15,15]}}
+{"at":1789293632742000,"kind":"text-op","source":"live","op":{"type":"insert","range":[16,16],"text":"n","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[16,16]}}
+{"at":1789293632846500,"kind":"text-op","source":"live","op":{"type":"insert","range":[17,17],"text":"g","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[17,17]}}
+{"at":1789293632940400,"kind":"text-op","source":"live","op":{"type":"insert","range":[18,18],"text":" ","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[18,18]}}
+{"at":1789293633044400,"kind":"text-op","source":"live","op":{"type":"insert","range":[19,19],"text":"d","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[19,19]}}
+{"at":1789293633137300,"kind":"text-op","source":"live","op":{"type":"insert","range":[20,20],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[20,20]}}
+{"at":1789293633242300,"kind":"text-op","source":"live","op":{"type":"insert","range":[21,21],"text":"v","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[21,21]}}
+{"at":1789293633348500,"kind":"text-op","source":"live","op":{"type":"insert","range":[22,22],"text":"i","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[22,22]}}
+{"at":1789293633419000,"kind":"text-op","source":"live","op":{"type":"insert","range":[23,23],"text":"c","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[23,23]}}
+{"at":1789293633528600,"kind":"text-op","source":"live","op":{"type":"insert","range":[24,24],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[24,24]}}
+{"at":1789293633976000,"kind":"text-op","source":"live","op":{"type":"delete","range":[24,25],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[25,25]}}
+{"at":1789293634073500,"kind":"text-op","source":"live","op":{"type":"delete","range":[23,24],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[24,24]}}
+{"at":1789293634169900,"kind":"text-op","source":"live","op":{"type":"delete","range":[22,23],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[23,23]}}
+{"at":1789293634266300,"kind":"text-op","source":"live","op":{"type":"delete","range":[21,22],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[22,22]}}
+{"at":1789293634362600,"kind":"text-op","source":"live","op":{"type":"delete","range":[20,21],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[21,21]}}
+{"at":1789293634459400,"kind":"text-op","source":"live","op":{"type":"delete","range":[19,20],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[20,20]}}
+{"at":1789293634556300,"kind":"text-op","source":"live","op":{"type":"delete","range":[18,19],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[19,19]}}
+{"at":1789293634654500,"kind":"text-op","source":"live","op":{"type":"delete","range":[17,18],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[18,18]}}
+{"at":1789293634754100,"kind":"text-op","source":"live","op":{"type":"delete","range":[16,17],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[17,17]}}
+{"at":1789293634852900,"kind":"text-op","source":"live","op":{"type":"delete","range":[15,16],"inputType":"deleteContentBackward","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[16,16]}}
+{"at":1789293634951300,"kind":"text-op","source":"live","op":{"type":"insert","range":[15,15],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[15,15]}}
+{"at":1789293635053200,"kind":"text-op","source":"live","op":{"type":"insert","range":[16,16],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[16,16]}}
+{"at":1789293635457700,"kind":"text-op","source":"live","op":{"type":"insert","range":[17,17],"text":"\n","inputType":"insertLineBreak","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[17,17]}}
+{"at":1789293635615100,"kind":"text-op","source":"live","op":{"type":"insert","range":[18,18],"text":"t","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[18,18]}}
+{"at":1789293635694000,"kind":"text-op","source":"live","op":{"type":"insert","range":[19,19],"text":"y","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[19,19]}}
+{"at":1789293635791500,"kind":"text-op","source":"live","op":{"type":"insert","range":[20,20],"text":"p","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[20,20]}}
+{"at":1789293635892100,"kind":"text-op","source":"live","op":{"type":"insert","range":[21,21],"text":"i","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[21,21]}}
+{"at":1789293635967600,"kind":"text-op","source":"live","op":{"type":"insert","range":[22,22],"text":"n","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[22,22]}}
+{"at":1789293636046900,"kind":"text-op","source":"live","op":{"type":"insert","range":[23,23],"text":"g","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[23,23]}}
+{"at":1789293636479700,"kind":"text-op","source":"live","op":{"type":"select","range":[11,11],"dir":"none"}}
+{"at":1789293636596600,"kind":"text-op","source":"live","op":{"type":"select","range":[17,17],"dir":"none"}}
+{"at":1789293636701000,"kind":"text-op","source":"live","op":{"type":"insert","range":[17,17],"text":" ","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[17,17]}}
+{"at":1789293636782300,"kind":"text-op","source":"live","op":{"type":"insert","range":[18,18],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[18,18]}}
+{"at":1789293636876500,"kind":"text-op","source":"live","op":{"type":"insert","range":[19,19],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[19,19]}}
+{"at":1789293636964000,"kind":"text-op","source":"live","op":{"type":"insert","range":[20,20],"text":"c","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[20,20]}}
+{"at":1789293637045400,"kind":"text-op","source":"live","op":{"type":"insert","range":[21,21],"text":"o","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[21,21]}}
+{"at":1789293637124300,"kind":"text-op","source":"live","op":{"type":"insert","range":[22,22],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[22,22]}}
+{"at":1789293637199200,"kind":"text-op","source":"live","op":{"type":"insert","range":[23,23],"text":"d","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[23,23]}}
+{"at":1789293637271900,"kind":"text-op","source":"live","op":{"type":"insert","range":[24,24],"text":"s","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[24,24]}}
+{"at":1789293637696000,"kind":"text-op","source":"live","op":{"type":"select","range":[32,32],"dir":"none"}}
+{"at":1789293637812900,"kind":"text-op","source":"live","op":{"type":"select","range":[26,26],"dir":"none"}}
+{"at":1789293638282300,"kind":"text-op","source":"live","op":{"type":"insert","range":[26,26],"text":"the act of ","inputType":"insertFromPaste","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[26,26]}}
+{"at":1789293638729800,"kind":"text-op","source":"live","op":{"type":"select","range":[43,43],"dir":"none"}}
+{"at":1789293638846400,"kind":"text-op","source":"live","op":{"type":"select","range":[42,43],"dir":"backward"}}
+{"at":1789293638929800,"kind":"text-op","source":"live","op":{"type":"select","range":[41,43],"dir":"backward"}}
+{"at":1789293639015100,"kind":"text-op","source":"live","op":{"type":"select","range":[40,43],"dir":"backward"}}
+{"at":1789293639096400,"kind":"text-op","source":"live","op":{"type":"select","range":[39,43],"dir":"backward"}}
+{"at":1789293639179900,"kind":"text-op","source":"live","op":{"type":"select","range":[38,43],"dir":"backward"}}
+{"at":1789293639262900,"kind":"text-op","source":"live","op":{"type":"select","range":[37,43],"dir":"backward"}}
+{"at":1789293639334000,"kind":"text-op","source":"live","op":{"type":"insert","range":[37,43],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[37,43]}}
+{"at":1789293639407300,"kind":"text-op","source":"live","op":{"type":"insert","range":[38,38],"text":"e","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[38,38]}}
+{"at":1789293639490100,"kind":"text-op","source":"live","op":{"type":"insert","range":[39,39],"text":"c","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[39,39]}}
+{"at":1789293639568200,"kind":"text-op","source":"live","op":{"type":"insert","range":[40,40],"text":"o","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[40,40]}}
+{"at":1789293639654900,"kind":"text-op","source":"live","op":{"type":"insert","range":[41,41],"text":"r","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[41,41]}}
+{"at":1789293639761600,"kind":"text-op","source":"live","op":{"type":"insert","range":[42,42],"text":"d","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[42,42]}}
+{"at":1789293639855400,"kind":"text-op","source":"live","op":{"type":"insert","range":[43,43],"text":"i","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[43,43]}}
+{"at":1789293639939600,"kind":"text-op","source":"live","op":{"type":"insert","range":[44,44],"text":"n","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[44,44]}}
+{"at":1789293640049200,"kind":"text-op","source":"live","op":{"type":"insert","range":[45,45],"text":"g","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[45,45]}}
+{"at":1789293640429400,"kind":"text-op","source":"live","op":{"type":"insert","range":[46,46],"text":" ✓","inputType":"insertText","anchor":"caret"},"meta":{"targetRanges":0,"preSel":[46,46]}}
+</script>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { makeLogDeck } from '/timeline/logdeck.mjs';
+  import {
+    makeTextOpAdapter, deriveOp, selectOp, foldOps, toJsonl, fromJsonl,
+    OP_INSERT, OP_DELETE, OP_SELECT,
+  } from '/shell/text-adapter.mjs';
+
+  const KIND = 'text-op';
+  const RATES = [0.25, 0.5, 1, 2, 4];
+  const SETTLE_MS = 40;          // how far either side of an edit a comparison is skipped
+  const COALESCE_MS = 40;        // a drag of the cursor is one move, not forty
+
+  const d = mount({
+    name: 'typist',
+    what: 'Type into the carriage and every change is written down as what it did to the '
+      + 'document — where the text changed and what it changed to — never as the key you '
+      + 'pressed. Press play to watch a recording type itself back at the speed it was '
+      + 'typed, and drag the line under it to any moment: the text, the cursor and the '
+      + 'highlight come back to exactly what they were then, without a single keystroke '
+      + 'being replayed. "Worked out" counts the deletions where nothing said what had been '
+      + 'removed, so the text before and after had to be compared — which is what five '
+      + 'earlier versions of this got wrong.',
+    // Every cell moves. `letters` and `cursor` are the document AT THE PLAYHEAD,
+    // so they change while it types and while you drag; `checked` and `apart`
+    // are the two readings of it being compared, which only happens while
+    // something is moving.
+    readout: { edits: '', letters: '', cursor: '', 'worked out': '', checked: '', apart: '' },
+    controls: [
+      { id: 'own', label: 'Type your own', primary: true },
+      { id: 'back', label: 'Back to the recording' },
+    ],
+  });
+  guard(d);
+
+  // ── the surfaces ─────────────────────────────────────────────────────────
+  const carriage = el('div', 'carriage');
+  const paper = el('pre', 'type paper');
+  // `data-typing` is how `verify.mjs` knows to TYPE into this element rather
+  // than click it. A page whose subject is typing was a page the suite could
+  // not reach at all — it presses buttons and drags `[data-gesture]`, and
+  // neither of those produces an `input` event. The twin of the drag helper
+  // dispatches real key events here, so what the checks below grade is a
+  // gesture the browser made, the same as yours.
+  const keys = el('textarea', 'type keys', null, {
+    spellcheck: 'false', autocomplete: 'off', autocorrect: 'off', autocapitalize: 'off',
+    'aria-label': 'the document', 'data-typing': 'document',
+  });
+  carriage.append(paper, keys);
+
+  const rebuilt = el('div', 'rebuilt');
+  const rbText = el('pre', 'rb-t');
+  const rbVerdict = el('div', 'rb-v');
+  rebuilt.append(el('span', 'rb-k', 'the same document, rebuilt from the edits up to here'),
+                 rbText, rbVerdict);
+
+  const barHost = el('div', '');
+  const stripHost = el('div', '');
+  d.el.append(carriage, rebuilt, barHost, stripHost);
+
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
+  // COLOUR NAMES WHAT THE EDIT DID, and it is allowed to here: nothing on this
+  // page is measured for lateness, so the green/amber/red scale the timing
+  // pages use is not in play and cannot be confused with it. Each of the three
+  // also has its own row, its own label and its own count in the gutter.
+  const INK = {
+    [OP_INSERT]: tok('--hi', '#ffd400'),
+    [OP_DELETE]: tok('--bad', '#e0908a'),
+    [OP_SELECT]: tok('--dim', '#8b93a1'),
+  };
+
+  // ── state ────────────────────────────────────────────────────────────────
+  const blank = () => ({ text: '', selection: [0, 0], dir: 'none' });
+  const freshProv = () => ({ seen: 0, withRange: 0, ignored: 0 });
+
+  let log = [];            // the rows, append-only, stamped from the EVENT
+  let live = blank();      // built one edit at a time — the actuate side
+  let folded = blank();    // rebuilt from the whole prefix — the reduce side
+  let prov = freshProv();
+  let deck = null, bar = null, view = null, adapter = null;
+  let capturing = false;   // true between `Type your own` and the first play
+  let opPos = [];          // each edit's position on the line, for the skip window
+  let lastAssertWall = 0;
+  let pre = null;          // the beforeinput snapshot
+  const cmp = { compares: 0, divergences: 0, lags: 0, skips: 0, last: null };
+
+  // What a key would look like if one were ever stored. Used by the count in
+  // the cursor row's gutter AND by the check below, so the two cannot drift.
+  const KEYISH = /(^|[^a-z])key|shift|ctrl|alt|meta|modifier|keycode/i;
+  const keysStored = (rows) => rows.filter((r) => Object.keys(r.op).some((k) => KEYISH.test(k))).length;
+
+  const nowUs = () => Math.round((performance.timeOrigin + performance.now()) * 1000);
+  // ⚠️ STAMP FROM THE EVENT. `ev.timeStamp` is the browser's own clock for when
+  // the key happened; reading a clock in the handler measures when we got round
+  // to it, and the gap is not a constant anybody can subtract later.
+  const evUs = (ev) => Math.round((performance.timeOrigin + ev.timeStamp) * 1000);
+
+  /**
+   * Apply ONE edit to a document. This is a SECOND, INDEPENDENT implementation
+   * of the same semantics as the module's `foldOps()`, and it is deliberate:
+   * this one runs one edit at a time as the recording plays, that one runs over
+   * the whole prefix on a seek, and the two documents on screen agreeing is
+   * what says the second is right. One shared function would make the check a
+   * tautology.
+   */
+  function applyOne(st, op) {
+    const n = st.text.length;
+    const a = Math.max(0, Math.min(n, op.range[0]));
+    const b = Math.max(a, Math.min(n, op.range[1]));
+    if (op.type === OP_SELECT) return { text: st.text, selection: [a, b], dir: op.dir || 'none' };
+    if (op.type === OP_INSERT) {
+      const t = op.text || '';
+      return { text: st.text.slice(0, a) + t + st.text.slice(b),
+               selection: [a + t.length, a + t.length], dir: 'none' };
+    }
+    return { text: st.text.slice(0, a) + st.text.slice(b), selection: [a, a], dir: 'none' };
+  }
+
+  // ── drawing a document ───────────────────────────────────────────────────
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  /** text + the block cursor (or the highlight) exactly where the offsets say. */
+  function drawDoc(into, st, { blink = true } = {}) {
+    const n = st.text.length;
+    const a = Math.max(0, Math.min(n, st.selection[0]));
+    const b = Math.max(a, Math.min(n, st.selection[1]));
+    const head = esc(st.text.slice(0, a));
+    const tail = esc(st.text.slice(b));
+    const mid = a === b
+      // the cursor stands ON the next character, the way a terminal one does,
+      // and takes the character with it when there is one
+      ? `<span class="cur">${esc(st.text.slice(a, a + 1)) || ' '}</span>`
+      : `<span class="sel">${esc(st.text.slice(a, b))}</span>`;
+    const after = a === b && a < n ? esc(st.text.slice(a + 1)) : tail;
+    into.innerHTML = head + mid + after + '​';
+  }
+
+  function drawPaper() {
+    if (!live.text && !capturing) {
+      paper.innerHTML = '<span class="hint">press play to watch the recording, '
+        + 'or Type your own and start typing</span>';
+      return;
+    }
+    drawDoc(paper, live);
+    // THE CARRIAGE ADVANCES. A page taller than the box would otherwise type
+    // itself out of sight; rolling the paper so the cursor's line stays in
+    // view is what a carriage does, and it keeps the two layers aligned
+    // because both are scrolled to the same offset.
+    const cur = paper.querySelector('.cur, .sel');
+    if (cur) {
+      const want = Math.max(0, cur.offsetTop - paper.clientHeight + cur.offsetHeight + 22);
+      if (Math.abs(paper.scrollTop - want) > 1) paper.scrollTop = want;
+      keys.scrollTop = paper.scrollTop;
+    }
+  }
+
+  /** The live document into the box the browser types into. Never called while
+   *  capturing: there the browser owns the element and we only read it. */
+  function writeThrough() {
+    if (keys.value !== live.text) keys.value = live.text;
+    try { keys.setSelectionRange(live.selection[0], live.selection[1], live.dir || 'none'); }
+    catch { /* a selection the element will not take is not worth a page error */ }
+    drawPaper();
+  }
+
+  // ── capture: beforeinput / input / selectionchange, and no keydown ───────
+  // There is no `keydown` listener in this file. Grep for it — that is the
+  // point of the page. An arrow key produces no `beforeinput`, so it cannot
+  // enter the recording even by accident; what it does is move the cursor, and
+  // the cursor's new place rides as its own edit.
+  keys.addEventListener('beforeinput', (ev) => {
+    if (!capturing) return;
+    let ranges = 0;
+    try { ranges = ev.getTargetRanges ? ev.getTargetRanges().length : 0; } catch { ranges = 0; }
+    prov.seen++;
+    if (ranges > 0) prov.withRange++;
+    pre = { value: keys.value, s: keys.selectionStart, e: keys.selectionEnd,
+            inputType: ev.inputType, ranges, atUs: evUs(ev) };
+  });
+
+  keys.addEventListener('input', (ev) => {
+    if (!capturing) return;
+    const p = pre || { value: live.text, s: keys.selectionStart, e: keys.selectionEnd,
+                       inputType: ev.inputType || '', ranges: -1, atUs: evUs(ev) };
+    pre = null;
+    const it = p.inputType || ev.inputType || '';
+    // THE RANGE COMES FROM THE DOCUMENT, not from the key and not from the
+    // selection before the edit. For a backspace the selection before the edit
+    // is a collapsed cursor and says nothing about what went; the text before
+    // and after says exactly what went.
+    const op = deriveOp(p.value, keys.value, keys.selectionStart, it);
+    if (!op) { prov.ignored++; return; }        // an edit with no plain-text diff
+    push({ at: p.atUs, kind: KIND, source: 'live', op,
+           meta: { targetRanges: p.ranges, preSel: [p.s, p.e] } });
+  });
+
+  document.addEventListener('selectionchange', () => {
+    if (!capturing || document.activeElement !== keys) return;
+    const s = keys.selectionStart, e = keys.selectionEnd;
+    const dir = keys.selectionDirection || 'none';
+    if (live.selection[0] === Math.min(s, e) && live.selection[1] === Math.max(s, e)) return;
+    const prev = log[log.length - 1];
+    const at = nowUs();
+    if (prev && prev.op.type === OP_SELECT && at - prev.at < COALESCE_MS * 1000) {
+      prev.op.range = [Math.min(s, e), Math.max(s, e)];
+      prev.op.dir = dir;
+      live = applyOne(live, prev.op);
+      paintAll();
+      return;
+    }
+    push({ at, kind: KIND, source: 'live', op: selectOp(s, e, dir) });
+  });
+
+  /** One recorded edit: onto the log, onto the document, onto the line. */
+  function push(row) {
+    const prev = log[log.length - 1];
+    if (prev && row.at <= prev.at) row.at = prev.at + 1;   // strictly ordered
+    log.push(row);
+    live = applyOne(live, row.op);
+    if (!deck) rebuild();                    // the first edit sets the origin
+    else {
+      const at = deck.toPos(row.at);
+      opPos.push(at);
+      // ⚠️ AHEAD OF THE PLAYHEAD, ALWAYS. The library fires anything scheduled
+      // behind the playhead at once — right for a note, wrong for a document,
+      // where it would apply an edit a second time. It cannot happen here: the
+      // playhead is parked while you type and every stamp is later than the
+      // last, and `apply()` below refuses to touch the document while
+      // capturing, which is the belt to that brace.
+      deck.schedule({ at, kind: KIND, id: `op-${log.length - 1}`,
+                      payload: { kind: KIND, source: row.source, op: row.op,
+                                 meta: row.meta, atUs: row.at, i: log.length - 1, at } });
+      deck.setRange('auto');
+      // ⚠️ AND THE PICTURE HAS TO BE TOLD. The line fits itself to the range
+      // once, when it is built — so a recording that GROWS left the window
+      // sitting on its first half-second, showing six of seventy-one edits
+      // with two of the three rows empty while the clock above read 7.7 s.
+      view?.strip.fit();
+    }
+    paintAll();
+  }
+
+  // ── the line ─────────────────────────────────────────────────────────────
+  function laneOf(type, label, height) {
+    return {
+      id: type, kind: KIND, label, height, width: 2, as: 'ticks', terse: true,
+      color: INK[type],
+      filter: (r) => r.payload?.op?.type === type,
+      describeRow: (r) => {
+        const op = r.payload.op;
+        if (op.type === OP_SELECT) {
+          return [op.range[0] === op.range[1] ? `cursor to ${op.range[0]}`
+                                              : `${op.range[0]} to ${op.range[1]} held`,
+                  'no key was recorded'];
+        }
+        if (op.type === OP_DELETE) {
+          return [`${op.range[1] - op.range[0]} gone at ${op.range[0]}`,
+                  r.payload.meta && r.payload.meta.preSel[0] === r.payload.meta.preSel[1]
+                    ? 'range from the text' : 'range from the selection'];
+        }
+        const t = op.text || '';
+        return [`${JSON.stringify(t.length > 12 ? t.slice(0, 12) + '…' : t)} at ${op.range[0]}`,
+                op.inputType === 'insertFromPaste' ? 'pasted'
+                  : op.inputType === 'insertCompositionText' ? 'a composition step'
+                  : op.inputType === 'insertLineBreak' ? 'a new line' : 'typed'];
+      },
+    };
+  }
+
+  /** Build (or rebuild) the whole timeline around the rows we hold now. */
+  function rebuild() {
+    bar?.destroy(); view?.destroy();
+    try { deck?.dispose(); } catch { /* already gone */ }
+    bar = view = deck = null;
+    cmp.compares = cmp.divergences = cmp.lags = cmp.skips = 0;
+    cmp.last = null;
+    if (!log.length) { opPos = []; return; }   // nothing to put on a line yet
+
+    adapter = makeTextOpAdapter({
+      apply(payload) {
+        // the recording drives the document — unless you are typing, in which
+        // case the browser does and nothing else may touch it
+        if (capturing) return;
+        live = applyOne(live, payload.op);
+        writeThrough();
+      },
+      assert(state) {
+        // A SEEK RESTORES, IT DOES NOT REPLAY. The whole prefix is folded to
+        // one document and written in one go; the alternative — replaying
+        // every keystroke up to there — is the shape this kind exists to
+        // avoid, and it gets slower the further in you drag.
+        //
+        // 🔴 AND IT IS REFUSED WHILE YOU ARE TYPING, for the same reason
+        // `apply` is. MEASURED: without this, the first letter of your own
+        // recording vanished. Building the line around that first edit ends in
+        // a `seek(0)`, position 0 is a quarter of a second BEFORE it, so the
+        // fold there is an empty document — and writing it through emptied the
+        // box the letter had just gone into. The letter stayed in the
+        // recording, which is why the two readings then disagreed by one
+        // character for the rest of the session and said so.
+        if (capturing) return;
+        live = { text: state.text, selection: state.selection.slice(), dir: state.dir };
+        folded = { text: state.text, selection: state.selection.slice(), dir: state.dir };
+        lastAssertWall = performance.now();
+        writeThrough();
+      },
+    });
+    // The kind declares `rate: true` but carries no list of speeds, and the one
+    // transport bar renders its speeds from that list. Handed over here rather
+    // than added to the module, which is promoted unchanged.
+    adapter.caps.rates = RATES;
+
+    deck = makeLogDeck({
+      lanes: [{ kind: KIND, rows: log, adapter }],
+      leadInMs: 250, tailMs: 400,
+    });
+    opPos = log.map((r) => deck.toPos(r.at)).sort((a, b) => a - b);
+    if (!capturing) deck.seek(0);       // a seek is an actuation; see `assert`
+
+    bar = createTransportBar(barHost, deck, { scrub: false });
+    view = createStripView(stripHost, deck, {
+      size: 'auto', follow: false, armWall: false, gutter: 132,
+      // 42/38/38: two gutter lines need about 40 px of lane, so a shorter row
+      // silently drops the second one — which is where the count lives.
+      lanes: [laneOf(OP_INSERT, 'typed', 42),
+              laneOf(OP_DELETE, 'taken back', 38),
+              laneOf(OP_SELECT, 'cursor', 38)],
+    });
+    gutters();
+  }
+
+  /** Per-row numbers beside their own ink, never in a table somewhere else. */
+  function gutters() {
+    if (!view) return;
+    const n = (t) => log.filter((r) => r.op.type === t).length;
+    const chars = log.filter((r) => r.op.type === OP_INSERT)
+      .reduce((a, r) => a + (r.op.text || '').length, 0);
+    const gone = log.filter((r) => r.op.type === OP_DELETE)
+      .reduce((a, r) => a + (r.op.range[1] - r.op.range[0]), 0);
+    const by = { [OP_INSERT]: [`${n(OP_INSERT)} edits`, `${chars} letters in`],
+                 [OP_DELETE]: [`${n(OP_DELETE)} edits`, `${gone} letters out`],
+                 [OP_SELECT]: [`${n(OP_SELECT)} moves`, `${keysStored(log)} keys stored`] };
+    for (const L of view.strip.lanes()) if (by[L.id]) L.subLabel = by[L.id];
+    view.strip.invalidate();
+  }
+
+  // ── the two readings, compared ───────────────────────────────────────────
+  const same = (a, b) => !!a && !!b && a.text === b.text
+    && a.selection[0] === b.selection[0] && a.selection[1] === b.selection[1];
+
+  function nearEdit(pos, win) {
+    for (const p of opPos) { if (p > pos + win) break; if (Math.abs(p - pos) <= win) return true; }
+    return false;
+  }
+
+  function compareAt(pos) {
+    const st = deck.reduceAt(KIND, pos);
+    if (!st) return;
+    folded = { text: st.text, selection: st.selection.slice(), dir: st.dir };
+    // ⚠️ THE SKIP WINDOW IS A WALL-CLOCK QUANTITY. What it excludes is the
+    // moment around an edit where one reading has it and the other has not yet
+    // — scheduler jitter, a few milliseconds of real time. Written as a
+    // constant in positions it is three times too narrow at 3x, which is how
+    // this check once reported three mismatches that were not there.
+    const win = SETTLE_MS * Math.max(1, deck.rate() || deck.targetRate());
+    if (nearEdit(pos, win) || performance.now() - lastAssertWall < 60) { cmp.skips++; return; }
+    cmp.compares++;
+    if (same(folded, live)) return;
+    // one dispatch either side and it is a fire that has not landed yet; any
+    // other difference is the rebuild disagreeing, which is the only number
+    // here that would mean something is wrong
+    const lag = same(deck.reduceAt(KIND, pos - win), live) || same(deck.reduceAt(KIND, pos + win), live);
+    if (lag) cmp.lags++;
+    else { cmp.divergences++; cmp.last = { pos: +pos.toFixed(1), a: live.text, b: folded.text }; }
+  }
+
+  function paintAll() {
+    if (capturing) {
+      folded = foldOps(log.map((r) => ({ op: r.op })));
+      cmp.compares++;
+      if (!same(folded, live)) { cmp.divergences++; cmp.last = { pos: null, a: live.text, b: folded.text }; }
+      gutters();
+      checkLive();
+    }
+    drawPaper();
+    drawDoc(rbText, folded, { blink: false });
+    const apart = cmp.divergences > 0;
+    rbVerdict.dataset.apart = apart ? '1' : '0';
+    rbVerdict.textContent = !cmp.compares ? 'nothing compared yet'
+      : apart ? `apart at ${cmp.last && cmp.last.pos} — the rebuild disagrees`
+      : `the same, ${cmp.compares} times over`
+        + (cmp.lags ? ` · ${cmp.lags} caught mid-edit` : '');
+    readout();
+  }
+
+  function readout() {
+    d.set('edits', log.length || '');
+    d.set('letters', log.length ? folded.text.length : '');
+    d.set('cursor', log.length
+      ? (folded.selection[0] === folded.selection[1] ? String(folded.selection[0])
+         : `${folded.selection[0]}–${folded.selection[1]}`)
+      : '');
+    const dels = log.filter((r) => r.op.type === OP_DELETE);
+    const workedOut = dels.filter(hadToBeWorkedOut).length;
+    d.set('worked out', dels.length ? workedOut : '');
+    d.set('checked', cmp.compares || '');
+    d.set('apart', cmp.compares ? cmp.divergences : '',
+      cmp.compares ? (cmp.divergences ? 'bad' : 'ok') : '');
+  }
+
+  /** A deletion whose range no event reported: the selection before it was a
+   *  collapsed cursor, so the only place the removed range could come from is
+   *  the text before and after. */
+  const hadToBeWorkedOut = (r) => !!r.meta && r.meta.preSel[0] === r.meta.preSel[1]
+    && (r.op.range[0] !== r.meta.preSel[0] || r.op.range[1] !== r.meta.preSel[1]);
+
+  // ── the frame loop ───────────────────────────────────────────────────────
+  let lastPos = null;
+  function frame() {
+    if (deck && !capturing) {
+      // ⚠️ ONLY WHERE THE PLAYHEAD MOVED. Comparing the same two documents
+      // sixty times a second while nothing is happening climbs `checked` into
+      // the thousands without having looked at anything, which teaches a
+      // reader to ignore the cell.
+      const pos = deck.position();
+      if (deck.playing() || pos !== lastPos) { lastPos = pos; compareAt(pos); paintAll(); }
+    }
+    if (capturing && deck && deck.playing()) stopCapture();
+    requestAnimationFrame(frame);
+  }
+
+  // ── what you do to it ────────────────────────────────────────────────────
+  function stopCapture() {
+    if (!capturing) return;
+    capturing = false;
+    keys.readOnly = true;
+    d.log(`your recording: ${log.length} edits, ${live.text.length} letters`, 'hi');
+    if (deck) deck.seek(0);
+  }
+
+  function startOwn() {
+    bar?.destroy(); view?.destroy();
+    try { deck?.dispose(); } catch { /* already gone */ }
+    bar = view = deck = null;
+    log = []; opPos = []; live = blank(); folded = blank(); prov = freshProv();
+    cmp.compares = cmp.divergences = cmp.lags = cmp.skips = 0;
+    capturing = true;
+    keys.readOnly = false;
+    keys.value = '';
+    keys.focus();
+    paintAll();
+    d.log('typing now — arrow keys, backspace, selection and paste are all welcome');
+  }
+
+  function loadRecording() {
+    const src = document.getElementById('take').textContent.trim();
+    const { header, rows } = fromJsonl(src);
+    capturing = false;
+    keys.readOnly = true;
+    log = rows;
+    live = blank(); folded = blank();
+    rebuild();
+    paintAll();
+    return { header, rows, src };
+  }
+
+  // 🔴 A LIVE TAKE GRADES ITSELF, ONCE. The eight checks below are about the
+  // SHIPPED recording — real key events, captured from a real browser — and
+  // they are the page's argument. But they say nothing about the capture
+  // running right now, which is the half a reader is actually using and the
+  // half that was broken twice while this page was being built (a fold at
+  // position 0 emptied the box the first letter had gone into, and the strip
+  // fitted itself once and drew six of seventy-one edits). Neither could have
+  // been caught by a button.
+  //
+  // ⚠️ ONCE, on the first take that is long enough. `d.assert` appends, so
+  // checking on every keystroke would grow the count without end and make
+  // "diff the per-demo assert count" — this project's cheapest regression test
+  // — meaningless. And the threshold is on EDITS rather than on time, because
+  // a take is finished when there is something in it, not when a clock says so.
+  let liveChecked = false;
+  function checkLive() {
+    // EIGHT, and the number is the smallest take with something to say rather
+    // than a round one: a few characters, a correction and a cursor move is
+    // what makes this kind different from an append-only log, and that is
+    // eight edits. It was twelve, which is more than the harness types, so the
+    // check silently never ran — a threshold above what can reach it is a
+    // check that does not exist.
+    if (liveChecked || !capturing || log.length < 8) return;
+    liveChecked = true;
+    // The two readings of what is being typed RIGHT NOW: the box the browser
+    // holds, and the document rebuilt from the edits alone. They have to agree
+    // at every moment compared, not merely at the end — a rebuild that is right
+    // only at the last character is a rebuild that cannot be scrubbed.
+    d.assert('what is being typed right now rebuilds from its own edits, at every moment',
+      cmp.compares > 0 && cmp.divergences === 0,
+      `${cmp.compares} moments compared, ${cmp.divergences} apart, ${log.length} edits so far`);
+  }
+
+  d.on('own', startOwn);
+  d.on('back', () => { loadRecording(); d.log('the recording is back'); });
+
+  // ── the checks ───────────────────────────────────────────────────────────
+  //
+  // 🔴 NOTHING TYPES FOR YOU. There is no control that fabricates a session:
+  // what is graded below is either the recording — real key events, captured
+  // through the browser's own editing pipeline, with the browser's own text
+  // kept beside it as ground truth — or two scripted comparisons that exist to
+  // give the page's method something to be better than.
+
+  /**
+   * 🔴 THE ANCESTORS' METHOD, KEPT AS CODE, because a check needs something to
+   * be better than and this one loses every time (the checks below say by how
+   * much).
+   *
+   * Five earlier text recorders in this lineage stored `{key, shift}` on
+   * `keydown` and replayed with `value += shift ? key.toUpperCase() : key`,
+   * dropping anything whose key name was longer than one character —
+   * time/public/demo2.html:27/:64, demo12.html:74/:134,
+   * demo-timeline-component.html:97/:111, demo/pages/keyboard.vue:142,
+   * keyboard2.vue:177. So every arrow key vanishes, and the cursor advances by
+   * one however many characters actually went in.
+   */
+  function asAnAncestorWould(strokes) {
+    let text = '', caret = 0;
+    for (const k of strokes) {
+      if (k.key.length !== 1) continue;                       // arrows: dropped
+      const ch = k.shift ? k.key.toUpperCase() : k.key;       // resolved a SECOND time
+      text = text.slice(0, caret) + ch + text.slice(caret);
+      caret++;                                                // one, whatever went in
+    }
+    return { text, caret };
+  }
+
+  /** What a plain text box does with those keystrokes — the browser's part,
+   *  written out so both methods can be fed the same session. The recording
+   *  above is the evidence that this is what a browser really reports. */
+  function asABoxWould(strokes) {
+    let text = '', caret = 0;
+    const steps = [];
+    for (const k of strokes) {
+      const before = text, was = caret;
+      if (k.key === 'ArrowLeft') caret = Math.max(0, caret - 1);
+      else if (k.key === 'ArrowRight') caret = Math.min(text.length, caret + 1);
+      else if (k.key === 'Backspace') {
+        if (caret > 0) { text = text.slice(0, caret - 1) + text.slice(caret); caret--; }
+      } else {
+        const ch = k.shift ? k.key.toUpperCase() : k.key;
+        text = text.slice(0, caret) + ch + text.slice(caret);
+        caret += ch.length;
+      }
+      // `range` is where the edit REALLY happened, which is what a record has
+      // to get right and what neither method is told.
+      const range = before === text ? null
+        : k.key === 'Backspace' ? [was - 1, was] : [was, was];
+      steps.push({ before, after: text, caret, was, range,
+                   moved: before === text && was !== caret });
+    }
+    return { text, caret, steps };
+  }
+
+  /** The naive half of the derivation, on its own: the shortest range that
+   *  explains the change, with nothing to settle it when the same letter
+   *  repeats. This is what the page would have if it ignored the cursor. */
+  function shortestRange(oldText, newText) {
+    let p = 0;
+    const maxP = Math.min(oldText.length, newText.length);
+    while (p < maxP && oldText.charCodeAt(p) === newText.charCodeAt(p)) p++;
+    let s = 0;
+    const maxS = Math.min(oldText.length - p, newText.length - p);
+    while (s < maxS && oldText.charCodeAt(oldText.length - 1 - s) === newText.charCodeAt(newText.length - 1 - s)) s++;
+    const removed = oldText.length - p - s, inserted = newText.length - p - s;
+    return inserted === 0
+      ? { type: OP_DELETE, range: [p, p + removed] }
+      : { type: OP_INSERT, range: [p, p + removed], text: newText.slice(p, p + inserted) };
+  }
+
+  /** Both derivations over one scripted session, as this page records it. */
+  function recordSession(strokes, derive) {
+    const ops = [];
+    for (const st of asABoxWould(strokes).steps) {
+      if (st.moved) { ops.push(selectOp(st.caret, st.caret)); continue; }
+      if (st.before === st.after) continue;
+      ops.push(derive(st.before, st.after, st.caret));
+    }
+    return foldOps(ops.map((op) => ({ op })));
+  }
+
+  const quietProbes = (n = 3) => {
+    const gaps = [];
+    for (let i = 1; i < opPos.length; i++) gaps.push({ mid: (opPos[i - 1] + opPos[i]) / 2, w: opPos[i] - opPos[i - 1] });
+    gaps.sort((a, b) => b.w - a.w);
+    return gaps.slice(0, n).map((g) => +g.mid.toFixed(2)).sort((a, b) => a - b);
+  };
+
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  async function check({ header, rows, src }) {
+    // ── what is in the recording ──────────────────────────────────────────
+    const fields = new Set();
+    for (const r of rows) for (const k of Object.keys(r.op)) fields.add(k);
+    const moves = rows.filter((r) => r.op.type === OP_SELECT).length;
+    d.assert('not one key was written down — only what changed, and to what',
+      rows.length > 0 && keysStored(rows) === 0,
+      `${rows.length} edits, ${moves} of them cursor moves; every edit carries `
+      + `${[...fields].sort().join(', ')}`);
+
+    const dels = rows.filter((r) => r.op.type === OP_DELETE);
+    const workedOut = dels.filter(hadToBeWorkedOut);
+    d.assert('a backspace never says what it removed, so the text before and after is compared',
+      dels.length > 0 && workedOut.length === dels.length,
+      `${workedOut.length} of ${dels.length} deletions — the cursor was sitting at one place `
+      + `and the range that went was somewhere else`);
+
+    // ── the two scripted comparisons ──────────────────────────────────────
+    // Type "the recorder", walk the cursor back eight places, type "own " —
+    // an insert in the middle, which is the case every ancestor refused.
+    const middle = [...'the recorder'].map((c) => ({ key: c })).concat(
+      Array.from({ length: 8 }, () => ({ key: 'ArrowLeft' })),
+      [...'own '].map((c) => ({ key: c })));
+    const truthMiddle = asABoxWould(middle);
+    const ours = recordSession(middle, deriveOp);
+    const theirs = asAnAncestorWould(middle);
+    d.assert('replaying the keys instead of the edits puts the letters in the wrong place',
+      ours.text === truthMiddle.text && theirs.text !== truthMiddle.text,
+      `the box holds ${JSON.stringify(truthMiddle.text)}; edits replay to `
+      + `${JSON.stringify(ours.text)}; keys replay to ${JSON.stringify(theirs.text)}`);
+
+    // ⚠️ THE SAME LETTER, FOUR TIMES. Walk the cursor to the front of "aaa" and
+    // type another "a": the text before and after cannot say WHICH of the four
+    // was typed, because every answer produces "aaaa". The cursor after the
+    // edit is the only thing that can, and this is the reason the derivation
+    // is not a plain diff.
+    //
+    // 🔴 AND THE LETTERS COME OUT RIGHT EITHER WAY, which is what makes it
+    // dangerous rather than merely wrong: each edit carries its own absolute
+    // range, so a misplaced one does not corrupt the next. What it corrupts is
+    // the CURSOR at that moment — invisible until somebody drags back to it,
+    // which is the one thing this kind exists to make possible.
+    const repeat = [...'aaa'].map((c) => ({ key: c })).concat(
+      [{ key: 'ArrowLeft' }, { key: 'ArrowLeft' }, { key: 'ArrowLeft' }], [{ key: 'a' }]);
+    const edits = asABoxWould(repeat).steps.filter((s) => s.range);
+    const shows = (r) => `[${r[0]},${r[1]}]`;
+    const ranges = (derive) => edits.map((s) => derive(s.before, s.after, s.caret).range);
+    const withCursor = ranges(deriveOp);
+    const onText = ranges((a, b) => shortestRange(a, b));
+    const truthRanges = edits.map((s) => s.range);
+    const wrong = (got) => got.filter((r, i) => r[0] !== truthRanges[i][0] || r[1] !== truthRanges[i][1]).length;
+    const last = edits.length - 1;
+    d.assert('where a letter repeats, the cursor settles which one was typed',
+      wrong(withCursor) === 0 && wrong(onText) > 0,
+      `typing a fourth "a" at the front of "aaa" is written down as `
+      + `${shows(withCursor[last])} with the cursor and ${shows(onText[last])} without it, `
+      + `truly ${shows(truthRanges[last])} — same letters either way, `
+      + `${wrong(onText)} of ${truthRanges.length} ranges wrong, so the cursor comes back `
+      + `at ${onText[last][0] + 1} instead of ${truthRanges[last][0] + 1}`);
+
+    // ── the recording, played and rebuilt ─────────────────────────────────
+    // Every edit applied one at a time against the whole prefix rebuilt from
+    // nothing — two implementations, compared at every one of the edits.
+    let step = blank(), agreed = 0, firstOff = null;
+    for (let i = 0; i < rows.length; i++) {
+      step = applyOne(step, rows[i].op);
+      const whole = foldOps(rows.slice(0, i + 1).map((r) => ({ op: r.op })));
+      if (same(step, whole)) agreed++;
+      else if (firstOff === null) firstOff = i;
+    }
+    d.assert('every edit applied one at a time agrees with the document rebuilt from the start',
+      rows.length > 0 && agreed === rows.length,
+      `${agreed} of ${rows.length} moments, text and cursor both`
+      + (firstOff === null ? '' : ` — first apart at edit ${firstOff}`));
+
+    // Drag to three quiet places and read the BOX back — the browser's own
+    // value and selection, not ours.
+    const probes = quietProbes(3);
+    let restored = 0;
+    const seen = [];
+    for (const pos of probes) {
+      deck.seek(pos);
+      await nextFrame();
+      const want = deck.reduceAt(KIND, pos);
+      const got = { text: keys.value, selection: [keys.selectionStart, keys.selectionEnd] };
+      seen.push(`${(pos / 1000).toFixed(2)}s ${got.text.length}ch [${got.selection}]`);
+      if (same(want, got)) restored++;
+    }
+    d.assert('drag to any moment and the box holds that moment, cursor included',
+      probes.length === 3 && restored === 3,
+      `${restored} of ${probes.length} — ${seen.join(' · ')}`);
+    deck.seek(0);
+    await nextFrame();
+
+    // ── against the browser's own text ────────────────────────────────────
+    const truth = header && header.truth;
+    const whole = foldOps(rows.map((r) => ({ op: r.op })));
+    d.assert('the whole recording rebuilds the text the browser itself had, character for character',
+      !!truth && whole.text === truth.value
+        && whole.selection[0] === truth.selStart && whole.selection[1] === truth.selEnd,
+      truth ? `${whole.text.length} of ${truth.value.length} characters, cursor `
+              + `[${whole.selection}] against the box's [${truth.selStart},${truth.selEnd}]`
+            : 'the recording carries no text to be checked against');
+
+    const again = toJsonl(rows, header);
+    const back = fromJsonl(again);
+    d.assert('the recording survives a round trip through a plain text file',
+      again === src && back.rows.length === rows.length
+        && foldOps(back.rows.map((r) => ({ op: r.op }))).text === whole.text,
+      `${src.length} bytes, ${src.split('\n').length} lines, ${back.rows.length} edits back`);
+  }
+
+  // ── go ───────────────────────────────────────────────────────────────────
+  const loaded = loadRecording();
+  const ins = loaded.rows.filter((r) => r.op.type === OP_INSERT);
+  const kinds = {};
+  for (const r of ins) kinds[r.op.inputType || 'insertText'] = (kinds[r.op.inputType || 'insertText'] || 0) + 1;
+  d.log(`the recording: ${loaded.rows.length} edits over `
+    + `${(deck.durationMs / 1000).toFixed(1)}s, typed on ${(loaded.header.recorded || '').slice(0, 10)}`);
+  d.log(`how it was typed: ${Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(', ')}`);
+  // NOTES §3, carried onto the page: the browser has a way to tell an editor
+  // exactly which part of the document an edit is about, and on a plain text
+  // box it never does — the ranges live somewhere the page cannot reach.
+  const offered = loaded.rows.filter((r) => r.meta).length;
+  const withRange = loaded.rows.filter((r) => r.meta && r.meta.targetRanges > 0).length;
+  d.log(`the browser named the part of the document being edited ${withRange} times in `
+    + `${offered} chances, so the range comes from the text itself`);
+
+  requestAnimationFrame(frame);
+  d.ready();
+  check(loaded).catch((e) => d.fail(e));
+</script>
+</html>

@@ -235,6 +235,16 @@ export const DEMOS = [
   { name: 'draw', act: 0, created: '2026-09-13', built: true,
     one: 'record a gesture, play it back, and see how much of the line was never recorded',
     tags: ['pointer', 'timeline', 'canvas'] },
+  // The last of the protos to be given a page, promoted from proto/text/: the
+  // text recorder this lineage failed to write five times. Every earlier one
+  // listened to `keydown` and rebuilt the cursor by hand, so every one refused
+  // arrow keys and the newest regressed to append-only. This writes down what
+  // each change DID to the document, which is what makes a seek a fold rather
+  // than a replay — 73 edits captured through a real browser, rebuilt to the
+  // browser's own text character for character.
+  { name: 'typist', act: 0, created: '2026-09-13', built: true,
+    one: 'type, and it types itself back — drag to any moment and the words and the cursor come back',
+    tags: ['timeline', 'text', 'local only'] },
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
   // two pages about one subject and the split cost the better half of each:
   // `dust` had the picture — a granulator in the page reports every grain it
