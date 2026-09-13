@@ -65,14 +65,16 @@
            column says which ones went there.`,
     readout: { 'round trip': 'ms', delivery: 'ms', sent: '', stored: '', missing: '' },
     controls: [
-      { id: 'send', label: 'Send it', primary: true },
-      // ONE primary. Two yellow buttons side by side say neither is the main
-      // path, and the base act is sending — storing is the variant.
-      { id: 'store', label: 'Send and store it' },
+      // ⚠️ NO PRIMARY HERE. A primary is for a page with one main path, and
+      // this page's whole subject is the DIFFERENCE between sending and
+      // storing — lighting one of the two says the other is a variant, which
+      // is the claim the page exists to examine.
+      { id: 'send', label: 'Send' },
+      { id: 'store', label: 'Send & store' },
       { id: 'bytes', label: 'Send the same as bytes' },
       { id: 'toobig', label: 'Try one that is too big' },
       { id: 'overfill', label: 'Overfill the history' },
-      { id: 'clear', label: 'Clear history' },
+      { id: 'clear', label: 'Clear all' },
     ],
   });
   guard(d);
@@ -109,7 +111,12 @@
   // an assert, not a label over a list of messages.
   const pane = el('div', 'pane');
   const msgs = createMessageList({ cap: 40, empty: 'nothing here yet' });
-  const histGut = el('div', 'gut', `room ${ROOM} · keeps the newest ${CAP}`);
+  // ⚠️ NO GUTTER LINE. It read `room wire · 0 held of 1 seen · cap 8 · oldest —
+  // · recording, keeps 8` — five facts nobody asked for, four of which never
+  // change, under a list that already shows what is stored. The counts that
+  // matter are readout cells; the rest was bookkeeping on screen.
+  const histGut = el('div', 'gut');
+  histGut.hidden = true;
   pane.append(msgs.el, histGut);
   d.el.append(pane);
 
@@ -219,8 +226,6 @@
       seeded = true;
       msgs.set(rows.map((r) => ({ dir: 'stored', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
     }
-    histGut.textContent = `room ${ROOM} · ${held} held of ${seen} seen · cap ${CAP} · `
-      + `oldest ${oldest ? new Date(oldest).toISOString().slice(11, 19) : '—'} · ${recordNote}`;
     return { rows, held, seen, oldest };
   }
 
@@ -329,6 +334,9 @@
     // mop up the rooms this page left behind when it kept one per tab, and it
     // has done that job. A two-word button must not be wired to a wider blast
     // radius than it names.
+    // "Clear all" clears the log too — the lines above describe messages that
+    // are about to stop existing.
+    d.clearLog();
     let wiped = null;
     try {
       const res = await fetch(`${BACKLOG}/room/${ROOM}/clear`, { method: 'POST', signal: AbortSignal.timeout(8000) });

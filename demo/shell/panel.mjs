@@ -26,8 +26,13 @@
 // ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO. `plan-xr-room.md` §5.6: a frozen
 // frame reads as a broken stream. `state` is drawn where you cannot miss it.
 
-const PAD = 14;                 // one pad off every edge, like the test pattern
-const FOOT = 46;                // the footer strip's height at 1x
+// 🔴 NO PAD AROUND THE PICTURE. A panel in a headset is a SCREEN, and a screen
+// with a margin around its image reads as a photograph of a screen. The picture
+// goes edge to edge and the only inset is the footer's own text. Reported from
+// the device, and it is the same instinct that took the border off a television.
+const PAD = 10;                 // text inset inside the footer ONLY
+const FOOT = 44;                // the footer strip's height at 1x
+const ROUND = 18;               // the corner radius, at 1x
 
 /**
  * @param {object} o
@@ -66,11 +71,18 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
     ctx.scale(s, s);
     const w = W / s, h = H / s;
 
+    // Rounded, and CLIPPED to the rounding — a radius drawn only as a border
+    // leaves square corners of picture poking out past it.
+    ctx.clearRect(0, 0, w, h);
+    const round = (r) => { ctx.beginPath(); ctx.roundRect(0, 0, w, h, r); };
+    round(ROUND);
+    ctx.save();
+    ctx.clip();
     ctx.fillStyle = FIELD;
     ctx.fillRect(0, 0, w, h);
 
-    const picH = h - FOOT - PAD * 2;
-    const picW = w - PAD * 2;
+    const picH = h - FOOT;
+    const picW = w;
 
     // ── the picture ──────────────────────────────────────────────────────
     if (source) {
@@ -81,7 +93,7 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
         // showing the frame and showing a third of it.
         const k = Math.min(picW / sw, picH / sh);
         const dw = sw * k, dh = sh * k;
-        ctx.drawImage(source, PAD + (picW - dw) / 2, PAD + (picH - dh) / 2, dw, dh);
+        ctx.drawImage(source, (picW - dw) / 2, (picH - dh) / 2, dw, dh);
       }
     } else {
       // Not a frozen frame and not an empty box: words.
@@ -89,24 +101,26 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
       ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace';
       ctx.textBaseline = 'middle';
       ctx.fillText(typeof state === 'string' && state !== 'live' ? state : 'nothing arriving yet',
-                   PAD + 2, PAD + picH / 2);
+                   PAD + 2, picH / 2);
     }
 
-    // ── the title, and whether it is live ────────────────────────────────
+    // ── whether it is live ───────────────────────────────────────────────
+    // 🔴 NO TITLE IN THE CORNER. It sat over the picture, which is the one
+    // thing a panel exists to show, and it said something that never changed —
+    // the same rule as a readout cell that cannot move. What the panel IS
+    // belongs in the footer beside its numbers, where it is read once.
     ctx.font = '600 12px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = FG;
-    if (title) ctx.fillText(title, PAD + 2, PAD + 2);
     if (state !== 'live') {
       const say = state === 'still' ? 'not live' : String(state);
       ctx.fillStyle = HI;
       ctx.textAlign = 'right';
-      ctx.fillText(say, w - PAD - 2, PAD + 2);
+      ctx.fillText(say, w - PAD - 2, PAD);
       ctx.textAlign = 'left';
     }
 
     // ── the footer ───────────────────────────────────────────────────────
-    const fy = h - FOOT - PAD + 6;
+    const fy = h - FOOT + 8;
     ctx.strokeStyle = LINE; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(PAD, fy - 8); ctx.lineTo(w - PAD, fy - 8); ctx.stroke();
 
@@ -126,12 +140,15 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
       ctx.fillText(v == null || v === '' ? '—' : String(v), x, fy + 12);
     });
 
+    ctx.restore();
     // The one you are looking at. An edge rather than a wash: a tint over the
-    // picture changes the thing the panel exists to show.
+    // picture changes the thing the panel exists to show. Drawn AFTER the clip
+    // is released so the stroke is not half eaten by its own rounding.
     ctx.strokeStyle = gazed ? OK : LINE;
-    ctx.lineWidth = gazed ? 2 : 1;
-    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
-
+    ctx.lineWidth = gazed ? 2.5 : 1;
+    ctx.beginPath();
+    ctx.roundRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth, ROUND - 1);
+    ctx.stroke();
     ctx.restore();
     version++;
   }

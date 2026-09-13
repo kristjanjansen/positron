@@ -46,20 +46,24 @@
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { markAdapter } from '/shell/fixture.mjs';
 
   const body = document.body;
   const out = (t) => { const o = el('div', 'kit-out', t); return o; };
   function section(title, note, src, build) {
     body.append(el('h2', 'kit-h', title));
     if (note) body.append(el('p', 'kit-n', note));
-    body.append(el('pre', 'kit-src', src));
+    if (src) body.append(el('pre', 'kit-src', src));
     const box = el('div', 'kit-box');
     body.append(box);
     build(box);
   }
 
   // ── buttons ─────────────────────────────────────────────────────────────
-  section('buttons', 'The baseline everything else matches: 34 px tall, 4 px corner. `pos-pri` is the one primary per page — two primaries side by side say neither is the main path.',
+  section('buttons', '',
     `el('button', '', 'ordinary', { type: 'button' })
 el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
     (box) => {
@@ -71,7 +75,7 @@ el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
 
   // ── stepper ─────────────────────────────────────────────────────────────
   section('stepper — shell/stepper.mjs',
-    'Back, a jump, forward. The jump goes in the MIDDLE: back and forward are one axis and a random is a jump along that same axis, not an afterthought on the end. No emoji — a coloured picture ignores the row’s font and sits off its baseline.',
+    '',
     `createStepper({ what: 'patch', prev, next, random })`,
     (box) => {
       const o = out('nothing pressed yet');
@@ -89,7 +93,7 @@ el('button', 'pos-pri', 'the primary one', { type: 'button' })`,
 
   // ── slider ──────────────────────────────────────────────────────────────
   section('slider — shell/slider.mjs',
-    'Label, value, unit. The same 34 px as a button so a mixed row reads as one row of controls. The handle travels the lane MINUS its own width, so it sits flush in both corners rather than hanging out at the extremes — drag it to either end and the corners meet.',
+    '',
     `createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.26 })
 createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
     (box) => {
@@ -105,7 +109,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── several sliders ─────────────────────────────────────────────────────
   section('sliders stacked — shell/slider.mjs',
-    'Four of them share one set of columns, which is the only thing that can line them up: a wider label would otherwise push its own lane right, so two lanes start indented and two do not. The lane takes the width that is actually there rather than its standalone 96 px — on a 390 px phone that is 250 px against 96, measured. Put four values in a column and the point is comparing them at a glance, so anything ragged costs exactly the thing they are for.',
+    '',
     `createSliderGroup([rate, size, spray, swarm])`,
     (box) => {
       const o = out('—');
@@ -124,7 +128,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── radio row ───────────────────────────────────────────────────────────
   section('a choice of three — shell/choice.mjs',
-    'Three or four named settings beat a slider when the values have names and the names are the point. One group rather than loose buttons: gaps would make three choices look like three unrelated controls and put the label further from what it labels than the options are from each other. It borrows the stepper’s own join — a pixel of border overlap, outer corners only — rather than carrying a second copy of it. No state word on the button: which one is chosen is already said by colour and by aria-pressed, and saying it again in words was wrong two thirds of the time.',
+    '',
     `createChoice({ label: 'space', options: [['dry',0],['room',1],['hall',2]], at: 1, onPick })`,
     (box) => {
       const o = out('room');
@@ -139,7 +143,7 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── keyboard ────────────────────────────────────────────────────────────
   section('keyboard — shell/keyboard.mjs',
-    'Two octaves, a-to-k on a real keyboard, pointer or touch on the drawn one. It REPORTS a note number and knows nothing about what makes the sound — which is why the same component serves a synth in the page and a Raspberry Pi in another building. The small row underneath comes with it and cannot be switched off: those three are the keyboard’s own controls, and every page that draws a keyboard wanted all three. 26 px rather than the standard 34, because it acts on the keys above it and must not read as the page’s own row of buttons moved down. Push the octave to either end and the button that has nowhere left to go goes dim.',
+    '',
     `createKeyboard(parent, { base: 60, onDown, onUp, onOctave, onPanic })`,
     (box) => {
       const o = out('—');
@@ -158,9 +162,64 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
       box.append(o);
     });
 
+  // ── picker ──────────────────────────────────────────────────────────────
+  section('picker — shell/picker.mjs',
+    '',
+    `createPicker({ label: 'sound', what: 'patch', prev, next, random, onPick })`,
+    (box) => {
+      const NAMES = ['Brass 1', 'E.Piano 1', 'Vibraphone Soft', 'Koto', 'Steel Drum'];
+      let at = 0;
+      const o = el('div', 'kit-out', NAMES[0]);
+      const p = createPicker({
+        label: 'sound', what: 'patch',
+        prev: () => show(at - 1), next: () => show(at + 1),
+        random: () => show(Math.floor(Math.random() * NAMES.length)),
+        onPick: (i) => show(i),
+      });
+      function show(i) {
+        at = ((i % NAMES.length) + NAMES.length) % NAMES.length;
+        p.show(NAMES[at], at); o.textContent = NAMES[at];
+      }
+      p.options(NAMES, 0); show(0);
+      box.append(p.el, o);
+    });
+
+  // ── the strip ───────────────────────────────────────────────────────────
+  section('the timeline — shell/strip.mjs', '', '',
+    (box) => {
+      // ⚠️ A DECK NEEDS AN ADAPTER PER KIND, and without one the lane draws
+      // NOTHING — a tall empty box, no error, no warning. That is what this
+      // section was on its first attempt, and an empty component in a sandbox
+      // is worse than an absent one: it reads as the component being broken.
+      const t0 = 0, SPAN = 8000;
+      const items = [];
+      for (let i = 0; i < 14; i++) {
+        items.push({ id: `n${i}`, kind: 'mark', at: t0 + (i + 0.5) * (SPAN / 15),
+                     payload: { label: `${i + 1}` } });
+      }
+      const { adapter } = markAdapter({ rates: [1] });
+      const deck = createDeck({ items, adapters: { mark: adapter }, range: [t0, t0 + SPAN] });
+      const { strip } = createStripView(box, deck, {
+        // 'auto' takes exactly the height its lanes need — 'default' left a
+        // band of empty canvas under a single lane.
+        size: 'auto',
+        // ⚠️ NO SUBLABEL. `14 marks · 8 s` still ellipsized — the gutter is
+        // narrower than fourteen characters at this width — and an ellipsis
+        // means the content is in the wrong place, not that the box wants
+        // widening. A lane's own name is enough in a sandbox.
+        // The swatch on the lane's left border AND the marks themselves take
+        // the page's primary colour — `L.color` is the one place that is set,
+        // and `styleFor` hands it to both.
+        lanes: [{ id: 'mark', kind: 'mark',
+                  color: getComputedStyle(document.documentElement)
+                           .getPropertyValue('--hi').trim() || '#ffd400' }],
+      });
+      strip.fit?.();
+    });
+
   // ── readout ─────────────────────────────────────────────────────────────
   section('readout cells',
-    'Every cell must be able to change. A cell showing a structural constant reads as a measurement and teaches the reader to skip the row — which is why 01’s always-1 `missed` became `worst`.',
+    '',
     `d.set('latency', 26.2);  d.set('holes', 0, 'warn')`,
     (box) => {
       const r = el('div', 'pos-readout');
@@ -182,14 +241,14 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
 
   // ── colour ──────────────────────────────────────────────────────────────
   section('what the colours mean',
-    'One meaning across every page. A mark’s colour says HOW IT LANDED, never which lane it is in — lane identity is the row, the label and the gutter swatch, three channels that already carry it.',
+    '',
     `grey = not played · slate = played, unmeasurable
 green = inside what it promised · amber/red = later`,
     (box) => {
       for (const [name, css, why] of [
         ['grey', 'var(--dim2)', 'not played'],
-        ['slate', 'var(--dim)', 'played, and this lane cannot say how well'],
-        ['green', 'var(--ok)', 'inside what its way of firing promises'],
+        ['slate', 'var(--dim)', 'played, unmeasurable'],
+        ['green', 'var(--ok)', 'inside what it promised'],
         ['amber', 'var(--warn)', 'later than promised'],
         ['red', 'var(--bad)', 'later still, or wrong'],
         ['yellow', 'var(--hi)', 'the one thing this page is about'],

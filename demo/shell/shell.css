@@ -113,7 +113,26 @@ button:hover { border-color: var(--dim2); }
 html, body { touch-action: manipulation; }
 button:active { background: var(--card); }
 button[disabled] { opacity: .4; cursor: default; }
-button.pos-pri { color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600; }
+/* ⚠️ THE GLOW IS A HALO, NOT A BIGGER BUTTON. `box-shadow` costs no layout, so
+   the primary can carry light without moving anything beside it — a border or
+   an outline here would shift the row by a pixel and the whole control bar with
+   it. Two shadows: a tight one that reads as edge light at any size, and a wide
+   soft one that only shows on a dark ground. Kept low: a primary has to be the
+   brightest thing in the row, not the brightest thing on the page. */
+button.pos-pri {
+  color: #0b0e14; background: var(--hi); border-color: var(--hi); font-weight: 600;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--hi) 40%, transparent),
+              0 4px 18px -4px color-mix(in oklab, var(--hi) 55%, transparent);
+}
+button.pos-pri:hover {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--hi) 60%, transparent),
+              0 5px 22px -4px color-mix(in oklab, var(--hi) 75%, transparent);
+}
+/* ⚠️ A DISABLED OR BUSY PRIMARY DOES NOT GLOW. Light means "press this"; a
+   button that cannot be pressed saying it louder than the others is the same
+   defect as a focus ring wearing the armed colour. */
+button.pos-pri:disabled, button.pos-pri[data-busy="1"] { box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { button.pos-pri { transition: none; } }
 
 /* A CONTROL AT WORK. Set by the shell whenever a control's handler returns a
    promise, cleared when it settles. Paint only: no spinner, no label change, no
@@ -184,10 +203,16 @@ button.pos-pri[data-busy="1"] {
 .pos-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
-  padding: 10px 12px; max-height: 150px; overflow-y: auto; margin: 0;
+  /* ⚠️ A HEIGHT EVEN WITH NOTHING IN IT. The log collapsed to zero until the
+     first line arrived and then shoved the whole page down — and on a page
+     where a control WRITES to the log, pressing it moved the button you were
+     about to press again. A floor costs one empty box and buys a layout that
+     does not jump. */
+  padding: 10px 12px; min-height: 86px; max-height: 150px; overflow-y: auto; margin: 0;
   display: grid; grid-template-columns: auto 1fr; gap: 0 10px; align-content: start;
 }
-.pos-log:empty { display: none; }
+/* NOT `display: none` when empty — see the floor above. It keeps its box. */
+.pos-log:empty::before { content: 'nothing logged yet'; color: var(--dim2); }
 .pos-line { display: contents; }
 .pos-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
 .pos-m { min-width: 0; overflow-wrap: anywhere; }
@@ -586,6 +611,15 @@ video[hidden] { display: none; }
   color: var(--hi);
   border-color: var(--hi);
   background: color-mix(in oklab, var(--hi) 12%, var(--card2));
+  /* 🔴 RAISED, OR THE BORDER IS BROKEN ON THE MIDDLE ONE. The segment overlaps
+     its buttons by -1 px so a join reads as one line — which means each button
+     is drawn OVER its left neighbour's right edge. A chosen button in the
+     middle therefore had its own yellow border painted out on one or both
+     sides by the plain neighbours drawn after it, and looked chewed. The
+     effect is invisible on the first and last option, which is exactly why it
+     survived a screenshot. `:hover` already had this; the armed state did not. */
+  position: relative;
+  z-index: 1;
 }
 /* Focus is grey here and nowhere near the armed colour — one colour, one
    meaning, which is the rule this project already applies to marks in a strip. */
@@ -652,17 +686,25 @@ video[hidden] { display: none; }
   display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px solid #ffffff08;
 }
 .pos-msgs-row:last-child { border-bottom: 0; }
-.pos-msgs-dir { width: 44px; flex: none; color: var(--dim2); }
+.pos-msgs-dir { width: 34px; flex: none; color: var(--dim2); }
 .pos-msgs-dir.out  { color: var(--hi); }
 .pos-msgs-dir.echo { color: var(--ok); }
 /* Rows that were already in the history when this tab arrived — they have no
    direction, because nobody here sent them. */
 .pos-msgs-dir.stored { color: var(--dim2); }
-.pos-msgs-sz { width: 46px; flex: none; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
+.pos-msgs-sz { width: 40px; flex: none; color: var(--dim2); text-align: right;
+               font-size: 10px; font-variant-numeric: tabular-nums; }
 /* Always the same width whether or not it says anything, so the eye reads a
-   column instead of hunting for marks. */
-.pos-msgs-store { width: 46px; flex: none; color: var(--dim2); }
-.pos-msgs-store.yes { color: var(--ok); }
+   column instead of hunting for marks.
+   ⚠️ NOT THE ECHO COLOUR. `stored` was `--ok` green and so is `echo`, so two
+   different facts about a row — where it came from, and whether it was kept —
+   were saying themselves in one colour. A TAG rather than a word in a hue:
+   direction owns colour here, and this owns a shape. */
+.pos-msgs-store { width: 52px; flex: none; color: var(--dim2); }
+.pos-msgs-store.yes {
+  color: var(--fg); border: 1px solid var(--line2); border-radius: 3px;
+  padding: 0 4px; font-size: 9.5px; letter-spacing: .04em; align-self: center;
+}
 .pos-msgs-txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pos-msgs-txt[data-hi] { color: var(--fg); }
 .pos-msgs-empty { color: var(--dim2); padding: 3px 0; }

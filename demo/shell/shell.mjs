@@ -154,6 +154,10 @@ export function mount({
     // two blocks meant the mechanism went unread and the lead said too little.
     on: (id, fn) => handlers.set(id, fn),
     button: (id) => cbar.querySelector(`[data-id="${id}"]`),
+    /** Empty the log and the `logs` array together. A control that clears what
+     *  a page HOLDS should clear what the page SAID about it too, or the lines
+     *  left behind describe a state that no longer exists. */
+    clearLog: () => { api.logs.length = 0; logEl.textContent = ''; },
     ready: () => { api.ready = true; log('ready', 'hi'); },
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,
