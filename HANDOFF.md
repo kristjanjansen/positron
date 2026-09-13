@@ -20,6 +20,17 @@ list, so nothing is carried only in a conversation.
     four sliders should show them moving, or the page changes under you with no
     account of what changed. This is a shell change, so it lands for `/box/`
     and the kit at the same time.
+- 🔴 **MAKE THE TWO GRANULATORS THE SAME INSTRUMENT — `plan-twins.md`.** They
+  ship side by side today and sound nothing alike, and every reason is
+  structural: different material, `rate` meaning 10–50x more density on the
+  board (eight voices x `swarm` duplicates), and a whole chain between the
+  board's grains and the ear (RESONATOR > DELAY > COLOUR > REVERB). A page
+  drawing two panes is claiming they are comparable, and right now that is
+  false. ⚠️ **THE FIRST TASK IS `rig/box/norns/CHAIN.md`, NOT THE CUT** — write
+  down what every stage is and what removing it costs the sound, the way
+  `TINY.md` did, so a `PAPPUS_BARE` rung is reversible rather than a stage
+  nobody who did not already know it can find again. A stage with no entry in
+  that file may not be skipped.
 - **Make the Raspberry Pi's picture the same KIND of picture.** Right now the
   left card draws the held sound with the read band and every grain on it, and
   the right card draws a scrolling waveform of what arrived — so the two panes
