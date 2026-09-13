@@ -117,46 +117,76 @@ than assumed, and that price is what the rest of this section pays.
 **The material comes before the granulator.** Nothing below §4 is worth
 measuring until both ends are chewing the same thing.
 
-🔴 **AND THE SOURCE IS ADDITIVE — A TABLE OF SINE PARTIALS, NOT "A SAWTOOTH".**
-This is the design decision the whole section turns on, and it falls straight
-out of building the sound twice.
+🔴 **THE SOURCE IS ONE SUPERCOLLIDER SYNTHDEF, RUN IN BOTH PLACES.** Not a
+WebAudio generator and a SuperCollider generator kept in step — one definition,
+two machines.
 
-"A sawtooth at 110 Hz" does not survive two engines. WebAudio's
-`OscillatorNode` with `type: 'sawtooth'` is band-limited by a wavetable the
-specification never pins down; SuperCollider's `Saw.ar` is band-limited by a
-different method; Csound's `vco2` is a third. All three are sawtooths and none
-of them is the SAME sawtooth — they differ in harmonic rolloff, in how many
-partials survive near Nyquist, and in phase. "The same input" would then be a
-hope, and a check written against it would pass or fail on which engine
-happened to roll off sooner.
+⚠️ **AND THE FIRST VERSION OF THIS SECTION WAS WRONG, WHICH IS WHY IT SAYS SO.**
+It argued that the source had to be ADDITIVE — a table of sine partials, with
+`saw` as a name for `1/n` — because "a sawtooth at 110 Hz" does not survive two
+engines: WebAudio's `type: 'sawtooth'` is band-limited by a wavetable the
+specification never pins down, `Saw.ar` by a different method, Csound's `vco2`
+by a third. Every word of that is true and **it only matters while the two ends
+are different engines.** They are not going to be. Once scsynth runs in the tab,
+`Saw.ar` is `Saw.ar` on both machines and is identical by construction — so the
+additive constraint buys nothing and forbids everything: no real sawtooth, no
+noise, no sample, no richer material later. It was a constraint invented for a
+problem we are deciding not to have.
 
-A SINE is the one waveform every synthesis engine produces identically. So a
-shape is a TABLE OF PARTIALS and `saw` is a name for `1/n` rather than a
-primitive; truncating the table at `count` IS the band-limiting, expressed as a
-number both ends share. `count` becomes an honest brightness control as a side
-effect, and the input check can finally say something — "both ends read 0.16
-rms" is satisfied by two completely different sounds, while "every partial is
-within x dB of its twin and there is nothing above partial N in either" is not.
+**A shape is therefore whatever the engine can make.** `SinOsc`, `Saw`, `Pulse`,
+noise, a buffer — and the spec names one rather than describing a spectrum. A
+sine is a fine place to start and is not the ceiling.
 
-Built: `demo/shell/source.mjs` (`partialsOf` is pure, so both ends expand the
-same spec with the same function and a disagreement is about SYNTHESIS rather
-than arithmetic) and `demo/shell/source-test.mjs`, 12/12, four of them negative
-controls.
+`rig/box/norns/PosSource.sc` is that definition. It writes to Pappus's own
+input bus (`context.in_b[0].index`), so the granulator picks it up with NO JACK
+RE-PATCH — and a re-patch is what made `fx.pappus` answer `ok` seven seconds
+before anything could be heard.
 
-Parameters: `shape`, `count`, `hz`, `chord`, `level`, `spread`.
+### 4b. ✅ DECIDED — the AudioWorklet granulator goes
 
-Where the board's copy comes from, in preference order:
+Once Pappus runs in a tab, the page's own granulator is dropped. Two granulator
+implementations is the same mistake as two sawtooths one level up, and keeping
+it would mean every finding had to say which of the three engines it was about.
 
-1. **SuperCollider.** scsynth is already on the board, and `PAPPUS_TINY` is
-   already proven to load in a browser — so once the wasm lane exists, the
-   SAME SynthDef generates the input at both ends and the question stops being
-   a question. This is the answer that converges with the two-SuperColliders
-   card rather than competing with it.
-2. **Csound.** Already on the board for `space`, an orchestra is TEXT rather
-   than compiled bytes, and its browser build is mature. Cheaper today,
-   and it leaves two generators to keep in step.
-3. A JACK client in node writing a generated buffer. Most control, most code,
-   and a third audio path to maintain.
+⚠️ **AND THAT COSTS THE PICTURE, WHICH HAS TO BE BOUGHT BACK.** The reason the
+left card can draw every grain is that OUR worklet reports each one; Pappus
+reports none, in a tab or on a Pi. So dropping the worklet means adding a
+`SendReply` on the grain trigger in `Engine_Pappus.sc` — which is already
+queued as "make the board report grains" and is now load-bearing rather than
+a nicety. It serves both ends: free in a tab with no relay in the path, and
+batched at ~250 ms for the board's measured 60 msg/s ceiling.
+
+**Order, therefore:** vendor wasm scsynth → Pappus in a tab → `SendReply` →
+delete the worklet. Not before, because deleting it first leaves the page with
+one lane and no picture.
+
+The additive table survives as ONE shape among several, and it keeps one real
+use: it is the only source whose expected spectrum is known in closed form, so
+it is what the INPUT CHECK below measures against. That is a test fixture, not
+the design.
+
+Parameters, engine-independent and unchanged by the correction: `shape`, `hz`,
+`chord`, `level`, `spread`, and `count` where the shape is the additive one.
+
+What was built before the correction, and what it is worth now:
+`demo/shell/source.mjs` + `source-test.mjs`, 12/12. The SPEC and the pure
+`partialsOf` expander survive and are the fixture; **the WebAudio builder in it
+is a stopgap and is expected to be deleted** when the tab runs scsynth. Nothing
+further goes into that lane.
+
+**SuperCollider, and the ranking that used to be here is gone with the rest of
+the correction.** scsynth is already on the board; `PAPPUS_TINY` is already
+proven to load in a tab; Pappus reads its input from a bus
+(`context.in_b[0].index`), so a source synth writing to that bus feeds the
+granulator with no JACK re-patch at all — and a re-patch is what made
+`fx.pappus` answer `ok` seven seconds before anything could be heard.
+
+Csound and a node JACK client were listed as cheaper alternatives. They are
+cheaper today and they both leave TWO generators to keep in step, which is the
+same mistake as two sawtooths one level up.
+
+🔴 **SO THE REAL BLOCKER IS VENDORING WASM SCSYNTH**, and everything in this
+section is queued behind it rather than around it.
 
 ⚠️ **And the input stage gets its own check, on both ends.** Measure the
 generated source BEFORE the granulator — same fundamental, same rms, same
@@ -164,6 +194,12 @@ spectral shape, within a tolerance taken from a measurement rather than picked.
 Measuring it at the output measures the granulator too, which is the mistake
 this repo keeps paying for: an A/B where both arms share the defect returns
 "identical", and identical reads as fine.
+
+The additive shape is what that check runs on, because its spectrum is known
+without measuring anything. A `Saw.ar` on both ends should agree far more
+exactly than the check can resolve — and if it ever does not, the additive
+fixture is how you find out whether the disagreement is in the oscillator or in
+everything after it.
 
 The current source is deliberately dull and that is acknowledged, not defended
 — it is a held saw chord because a granulator wants material that sustains, and
