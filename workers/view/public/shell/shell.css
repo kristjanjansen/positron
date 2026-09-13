@@ -630,7 +630,10 @@ video[hidden] { display: none; }
    and the colour says HOW a mark landed: filled green was reported by the thing
    that started it, hollow slate was inferred from audio alone, outline is what
    the settings merely imply. */
-.pos-scope { margin: 0 0 12px; }
+/* ⚠️ ROOM ABOVE IT. The scope sits under whatever control row a page puts
+   before it, and at 12 px it read as part of that row rather than as its own
+   thing — a picture needs a margin on the side it is being crowded from. */
+.pos-scope { margin: 22px 0 12px; }
 .pos-scope-c {
   display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px;
   background: var(--card);

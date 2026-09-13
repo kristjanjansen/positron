@@ -1245,3 +1245,107 @@ differed, the difference — not the filename — would be the label.
 ⚠️ Still jargon in that row and unfixed on purpose: `hexter` and `yoshimi` are
 program names, meaningless to anyone who does not run the board. Renaming them
 is a naming decision, not a bug fix.
+
+## 61. A granulator reading the present sounds like the present (session 20)
+
+"Moving the sliders does nothing for sound" was true, reported repeatedly, and
+had nothing wrong with the engine behind it.
+
+Pappus reads its grains from a ring buffer whose read head FOLLOWS the write
+head (`mscanmode 1`). With an instrument still playing in, the grains are
+re-reading material as it arrives, so the output is a copy of the input — at any
+grain rate, any grain size, any scan position. MEASURED on real scsynth 3.14.1
+and then again on the board over the relay:
+
+    input live      mrate 0.5 / 6 / 24   rms 0.0575 / 0.0579 / 0.0580
+    input REMOVED   mrate 0.5            rms 0.0642  flutter 0.377  gaps/s 0.0
+    input REMOVED   mrate 24             rms 0.0410  flutter 0.692  gaps/s 4.6
+
+**No sweep of the parameters could have found this, because the parameters were
+never the variable.** Only removing the input could. The page has a `Hold`
+control now — `lock` to keep the material and `src 1` to stop the input being
+mixed into it — and it is the primary one, because it is the difference between
+an instrument and a very expensive copy.
+
+⚠️ **Two of my own negative controls were wrong, and a wrong control is worse
+than none** — it produces a confident null. `mswarm 0` is not "no grains": it
+controls grain DUPLICATES and their detune (`swiva`/`swivb` are −7/−12/+7/+12),
+so it measured inert for a reason that said nothing about the subject. And
+moving `mscan` did not discriminate either, because of the follow above. Before
+believing a control proves absence, check that it can produce presence.
+
+## 62. A value outside an enum is not an error, it is silence
+
+`msrc` selects the granulator's source: **1 OFF, 2 STEREO, 3 MONO L, 4 MONO R**.
+There is no 0. A 0 fails every gate in the graph — `ssel > 1.5`, `> 2.5`,
+`> 3.5` are all false — so nothing is ever captured, the granulator plays an
+empty buffer, and it does so correctly and silently. Every probe run against the
+board on 2026-09-12 used `msrc 0` and therefore measured nothing about pappus at
+all; a whole day of "the parameter does nothing" readings were about an empty
+buffer.
+
+🔴 **And the board had the same shape in its own startup.** `run-pappus.scd` sent
+`msrc 1` — OFF — so **granulator ONE never recorded the instrument**, for the
+life of that file, while `grains` drew nine numbers for it and a slider moved
+them. `1` does not even pause the write; it erases (#46).
+
+The general form: when a parameter is an ENUM, a value outside it does not throw
+and does not warn. It selects nothing, and selecting nothing is a valid,
+inaudible state. Read the table before sending the number.
+
+## 63. A cap with no error is indistinguishable from a bug in your own code
+
+wasm scsynth refuses a `/d_recv` over **64 KiB** and says NOTHING — no `/fail`,
+no reply of any kind. The first thing the server says is
+`/fail "/s_new" "SynthDef not found"` some seconds later, which points at the
+wrong thing entirely: it reads as "my synthdef name is wrong" or "my buffers did
+not allocate", and both were investigated first.
+
+Bisected with a ladder of generated SynthDefs: 52,730 B loads, 68,892 B does
+not, and 65,536 is inside the bracket. Identical under both transports, so it is
+scsynth's own OSC path.
+
+⚠️ **And the library returns a SUCCESS OBJECT for it.** `loadSynthDef('pappus')`
+answered `{"name":"pappus","size":118597}` with no `synthdef/loaded` reply
+behind it. Third instance of #22's shape in this project: a value that reports
+INTENT while reading exactly like one that reports DELIVERY. Watch the server's
+own reply, never the wrapper's return.
+
+The bracket is what turned this from "impossible" into arithmetic — LITE was
+11.8% over, and four compile-time cuts made it fit.
+
+## 64. SuperCollider does not strip an unconnected UGen
+
+Making a stage silent and making it CHEAP are different edits. Setting a gain to
+zero, or leaving a value unread, changes the sound and does not change one byte
+of the compiled def — every UGen constructed inside the SynthDef function is in
+the graph whether or not anything reads it. Removing bytes means skipping the
+CONSTRUCTION, behind a compile-time `if`.
+
+⚠️ **And the size does not track the UGen count.** Measured, cutting from
+LITE: the shimmer is ONE `PitchShift` and cost 236 bytes; four delay taps are
+~28 UGens and cost 2,894. Measure each cut, never estimate it — the four cuts
+came to 10,000 bytes and no two of them were predictable from their size on
+screen.
+
+## 65. Three ways a CSS rule can be present and inert (session 20)
+
+`/box/`'s phone layout was written three times before it did anything, and each
+failure looked like the rule was absent:
+
+- **It was in the wrong container.** The reverb row is appended to
+  `.pos-controls`, not to `.pick`, so a selector for one silently missed it.
+- **An inline style beat it.** The page set `display` and `align-items` with
+  `element.style`, which beats every stylesheet including a media query.
+- **It lost a specificity TIE.** `.pick .fx` in a media block has the same
+  weight as `.pick .fx` outside one, so SOURCE ORDER decided and the desktop
+  rule won. Media blocks go last.
+- 🔴 **And the sharpest: the rule set `flex-direction`, `align-items` and `gap`
+  but not `display`, and the computed display was `block`.** All three were
+  inert. **A flex property on a non-flex box is not an error, it is silence** —
+  the groups touched at a measured 0 px while the stylesheet said 22.
+
+The tell in every case was the same and it is cheap: read the COMPUTED style,
+not the rule. `getComputedStyle` said `flex column center` while the file said
+`stretch`, which is what a specificity tie looks like from outside.
+

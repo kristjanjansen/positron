@@ -156,3 +156,54 @@ with one, which already killed a two-grip idea once.
    frame that reads as a broken stream. The repo rule already: a blank cell
    collapses "we did not look" and "we looked and it was fine".
 7. **The room works with one controller.** Measured constraint, not a guess.
+
+---
+
+## 9 · MEASURED ON A QUEST, 2026-09-13 — §5.1 and §5.2 are answered
+
+`mirror`'s panel ran on the real headset. From the device's own log
+(`pub.positron.studio/logs`), build `968d9e7-050248`:
+
+```
+first headset frame · fb 3360x1760 · 2 views · eye0 1680x1760
+                    · gl error 1282 · panel 1280x800
+  85 frames · 84.5 fps · worst gap 41.8 ms · upload 0.20 ms
+1169 frames · 90.0 fps · worst gap 41.8 ms · upload 0.10 ms
+a button — leaving
+session ended · 1230 frames · 90.0 fps
+```
+
+✅ **One panel holds 90.0 fps** against `scene`'s 89.8 with no panel at all. So
+**video-to-texture costs nothing measurable on an Adreno 740**, which is the
+number §4.1 existed to get and the one every other panel depended on. §5.1 is
+answered: yes.
+
+✅ **`texImage2D` + compose: 0.10–0.20 ms** for a 1280×800 canvas. ⚠️ CPU time
+only; the card's own time still needs a timer extension nobody has read there.
+
+✅ **The framebuffer is 3360×1760, two views, 1680×1760 an eye** — read from the
+device by a second page, independently confirming `scene`'s earlier figure
+rather than quoting it.
+
+✅ **The exits work against a real controller.** "a button — leaving" is the
+first time the any-button scan has met hardware; `inputSources` is empty in a
+synthetic session, so this was untestable until now.
+
+⚠️ **The lag report is one frame at entry, not sustained.** "a bit laggy" came
+with `worst gap 41.8 ms` — and that figure NEVER MOVES after the first second
+while fps goes 84.5 → 90.0 and stays. One dropped frame on entry, then nothing.
+Do not chase it as a frame-rate problem; it is a startup hitch.
+
+🔴 **`gl error 1282` ON THE FIRST FRAME, STILL.** `GL_INVALID_OPERATION`, which
+this project already documents as the state where a page draws a right-looking
+picture with an error pending. The page reported it, which is what the rule
+asks; it now needs FIXING rather than noting, and it is the first thing to do
+before more panels.
+
+**Still unmeasured after this run:** whether the panel is LEGIBLE at 1.28 m wide
+from a 1280×800 texture (only a face answers that, and the report was about lag,
+not reading); HRTF cost per source (§5.2 is untouched — no audio was in this
+run at all); whether two WebGL2 contexts are affordable; and passthrough, which
+was not attempted — `blend opaque`, and `session.frameRate` is still **not
+reported**, consistent with the earlier Quest findings.
+
