@@ -25,7 +25,10 @@
 
   const d = mount({
     name: 'draw',
-    what: 'Press record, then draw a line with a finger or a mouse: this page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player rebuilds from that record, and the pink one is the same gesture written down as two separate records instead — one per direction, each choosing its own moments to save a number. The yellow mark is where the blue record says your hand was at the position the bar is showing, so press play and it retraces the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each line sits from what happened, and how much of what you see no sample attests at all.',
+    // ⚠️ THREE SENTENCES, and it had quietly become five — describing a pink
+    // line and a yellow mark that are both gone now. A description that
+    // advertises things the page no longer draws is worse than a short one.
+    what: 'Press record, then draw a line with a finger or a mouse: the page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. White is everything that happened and blue is what a player rebuilds from that record, so press play — or drag the bar — and the white line follows the cursor instead of showing you the part that has not happened yet. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each reading sits from what happened, and how much of what you see no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     //
@@ -236,9 +239,9 @@
    * smoothing `s`, with whatever neighbours there are.
    *
    * 🔴 IT IS ALSO THE ADAPTER'S `interpolate`, and that is deliberate. The blue
-   * line, the yellow mark and the transport's own read of the record all come
-   * through here, so the picture and the playhead cannot disagree about what
-   * the same record says. What that costs is worth writing down: the check
+   * line and the transport's own read of the record both come through here, so
+   * the picture and the playhead cannot disagree about what the same record
+   * says. What that costs is worth writing down: the check
    * below compares the transport's answer against this page's, and since both
    * end in this function it CANNOT catch an arithmetic mistake in it — what it
    * catches is the plumbing (a record the transport never received, a seek that
@@ -415,20 +418,17 @@
   // emphasis on the invented line and made the page look like it was about the
   // reconstruction. It is about the DIFFERENCE. The reconstruction is blue: a
   // second reading of the same gesture, present and legible without competing.
-  // Not `--hi`, which is the playhead's colour here as on every page — and on
-  // this page the playhead really is on the pad, as the mark.
-  // ⚠️ AND A THIRD LINE THAT IS NEITHER OF THE OTHER TWO'S COLOUR AND NEITHER
-  // OF THE PAGE'S TWO MEANINGS. The split reading is pink: not white (the
-  // capture), not blue (the record this page is about), not `--hi` (the
-  // playhead), and deliberately not `--bad` red or `--ok` green — it is a
-  // second way of writing the gesture down, not a verdict, and painting the
-  // loser red would be the picture asserting the conclusion the numbers are
-  // there to reach. It is dashed, which says "another reading of the same
-  // thing" without competing for weight with the one the page is about.
+  // Not `--hi`, which is the playhead's colour on every page — and on this page
+  // the playhead is the END OF THE WHITE LINE, which is why there is no dot.
   //
-  // It is also outside both pixel buckets the checks at the bottom count:
-  // near-white needs all three channels over 200 (g is 122 here) and the mark
-  // needs blue under 100 (b is 182), so a third line cannot inflate either.
+  // ⚠️ `apart` IS KEPT AND NOTHING STROKES IT. The split reading had a third
+  // line here, dashed and pink, and the first thing anybody asked about this
+  // page was "what is the dotted line?" — which is the entire verdict on it.
+  // The colour stays because the reasoning behind it is worth having if the
+  // line ever comes back: not white (the capture), not blue (the record this
+  // page is about), not `--hi` (the playhead), and deliberately not `--bad` red
+  // or `--ok` green, because painting the loser red would be the picture
+  // asserting the conclusion the numbers are there to reach.
   const C = { guess: '#7aa2f7', apart: '#ff7ab6' };
 
   // ⚠️ DECLARED BEFORE THE PAD, because the pad PAINTS as it is built and its
@@ -503,9 +503,26 @@
     //
     // ⚠️ A TIME, NOT A COUNT. `base + position` is the stamp the capture
     // carries; a count would need this page to know how the pad coalesced.
-    upTo: () => (traceIsTake && deck.playing() && stored.length > 1
-      ? base + deck.position() : null),
+    // 🔴 ONLY AS FAR AS THE CURSOR, WHETHER IT IS PLAYING OR BEING DRAGGED.
+    // It was gated on `deck.playing()`, so scrubbing showed the whole line with
+    // a mark sliding along it — and a line you can already see all of does not
+    // need a cursor to tell you where you are in it. The gate is the POSITION,
+    // not the transport state: at the very end the whole line is back, which is
+    // what a finished drawing should look like.
+    // ⚠️ NOT `!recording` — that was the obvious gate and it is the wrong one.
+    // Record stays ARMED after a gesture ends, so the line would never follow
+    // the cursor until you disarmed it, and the check read three identical
+    // pixel counts. `growing` is the state that actually means "a hand is down
+    // right now", which is the only time the line must show everything
+    // regardless of where the playhead is.
+    upTo: () => (traceIsTake && !growing && stored.length > 1
+      && deck.position() < deck.range[1] ? base + deck.position() : null),
     overlay: (ctx, v) => paintSecondReading(ctx, v),
+    // 🔴 NO MARK. The white line now stops AT the playhead, so its end IS the
+    // cursor — a ringed dot on top of that point is a second indicator for one
+    // position, which reads as two. Asked for, and right for the same reason
+    // the pad stopped drawing its own labels.
+    showMark: false,
   });
 
   /** Rebuild everything derived from the SPARSE RECORD as it stands — without
@@ -549,21 +566,13 @@
   function paintSecondReading(ctx, v) {
     if (dirty) recompute();
     if (drawn.length < 2) return;
-    // THE SAME GESTURE AS TWO RECORDS, UNDERNEATH — the alternative, drawn so
-    // it can be looked at rather than only read off a cell.
-    if (drawnApart.length > 1) {
-      ctx.save();
-      ctx.strokeStyle = C.apart; ctx.lineWidth = 1.6;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      let start = true;
-      for (const q of drawnApart) {
-        const [px, py] = v.px(q.x, q.y);
-        if (start) { ctx.moveTo(px, py); start = false; } else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.restore();
-    }
+    // 🔴 THE SAME GESTURE AS TWO RECORDS IS STILL MEASURED AND NO LONGER DRAWN.
+    // It was a third line, dashed and pink, and the first question anybody
+    // asked about this page was "what is the dotted line?" — which is the whole
+    // verdict on it. It answers a question the page asks in its NUMBERS (`as
+    // two`, `times worse`) and the picture could not say which of three lines
+    // was the subject. `drawnApart` is still computed on every recompute,
+    // because the check below grades it; only the stroke is gone.
     ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6;
     ctx.beginPath();
     let first = true;
@@ -1024,8 +1033,34 @@
     }
     d.assert('there is a line on the pad, not just numbers in cells', lit > 4000,
       `${lit} lit pixels`);
-    d.assert('the playhead draws a mark on the pad, not just a number', markPx > 50,
-      `${markPx} pixels of mark at ${Math.round(deck.position())} ms`);
+    // 🔴 THE LINE'S END IS THE PLAYHEAD NOW, so that is what gets checked.
+    // This assert used to count yellow pixels for a ringed dot; the dot is gone
+    // because the white line stops at the cursor and two indicators for one
+    // position read as two. ⚠️ The CLAIM has not been weakened — it was "the
+    // playhead is visible on the pad, not just a number in a cell", and it
+    // still is — but it is now tested by the thing that carries it. Deleting
+    // the assert along with the dot would have quietly dropped the page from 21
+    // asserts to 20 while reading green, which is this project's cheapest
+    // regression test going blind.
+    //
+    // Measured as a RELATIONSHIP across three positions, never a pixel count:
+    // a count would be a threshold tuned until it passed, and it could not tell
+    // "the line is short because the cursor is early" from "the line failed to
+    // draw". Early < middle < end, and end is the whole line back.
+    const whiteAt = (t) => {
+      deck.seek(t); pad.paint();
+      const d2 = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
+      let n = 0;
+      for (let i = 0; i < d2.length; i += 4) if (d2[i] > 200 && d2[i + 1] > 200 && d2[i + 2] > 200) n++;
+      return n;
+    };
+    const end = deck.range[1];
+    const early = whiteAt(end * 0.25), mid = whiteAt(end * 0.6), whole = whiteAt(end);
+    deck.seek(end / 2); pad.paint();
+    d.assert('the line stops where the cursor is, so the cursor needs no mark of its own',
+      early < mid && mid < whole && early > 0,
+      `${early} lit at a quarter through, ${mid} at three fifths, ${whole} at the end — `
+      + `the end of the white line IS the playhead, over ${Math.round(end)} ms`);
   }
 
   render();
