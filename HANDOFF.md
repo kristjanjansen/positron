@@ -1,3 +1,44 @@
+# Queue — open work, newest first
+
+Session 21 is in progress; its writeup is not here yet. What is below is the
+list, so nothing is carried only in a conversation.
+
+- **Smooth the slider changes on a patch change and on randomise.** Choosing a
+  sound jumps every setting at once, in the sound and on screen, and a
+  granulator's parameters are exactly the ones a jump is audible in — a grain
+  rate going 2.2 → 20 in one block is a click, not a change of sound.
+  Two halves, and they are not the same work:
+  - **the value** — the page engine can ramp inside the worklet (one
+    `linearRampToValueAtTime`-shaped glide per parameter, ~250 ms). The board
+    cannot: `params.set` is a step, and sending a ramp of values down a relay
+    that drops silently past 60 msg/s is the wrong answer. ⚠️ **MEASURE FIRST
+    whether Pappus already lags its own parameters** — `Engine_Pappus.sc` has
+    `Lag.kr` on a lot of them, and if the step is already smoothed at the
+    engine there is nothing to build on that side and the two panes would end
+    up gliding differently for no reason.
+  - **the knob** — `slider.mjs`'s `set(v, quiet)` snaps. A patch that moves
+    four sliders should show them moving, or the page changes under you with no
+    account of what changed. This is a shell change, so it lands for `/box/`
+    and the kit at the same time.
+- **The two-SuperColliders card.** Not a page — the third card on `grains`,
+  beside the two that are there. `PAPPUS_TINY=1` is on the board and is proven
+  to load in a tab (63,297 B under the silent 64 KiB `/d_recv` cap), so the
+  claim is the identical 1,451-UGen graph in a browser and on a Pi. What is
+  missing is wasm scsynth vendored into the repo.
+- **The defect backlog**, which is the current focus: `keep`'s unexplained 409,
+  the reverb insert adding **-4.1 dBFS** of noise with no input (board-side),
+  `pappus-live.mjs` grading a stochastic engine from single takes (14–16 of 17,
+  failures MOVE between runs), and `workers/pub`'s pre-session-12 container
+  image.
+- **`plan-gesture.md`** — P1–P4: the XY pad component, a transport under it,
+  the same gesture recorded and played back, then driving the board. §3 is
+  decided: one 2-D series, measured.
+- **`text`** — the last finished proto with no page, 1,222 lines.
+- 🔴 **`gl 1282` on the Quest** — instrumented by phase, waiting on a headset run.
+- **`positron-demo`'s RTMPS key** is still unrotated; see `SECRETS-ROTATION.md`.
+
+---
+
 # Handoff — 2026-09-13 (end of session 20)
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
