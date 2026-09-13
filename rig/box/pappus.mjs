@@ -501,11 +501,19 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
      * timer has run — a page uses it to tell "no tick yet" from "not moving",
      * and at 8 Hz those are 125 ms apart.
      */
-    driftStats: () => ({
-      on: !!timer, nudges: moved,
-      sinceMs: centredAt ? Date.now() - centredAt : null,
-      scan: centre ? driftValues(centre.m, (Date.now() - t0) / 1000, 0).scan ?? null : null,
-    }),
+    driftStats: () => {
+      const t = (Date.now() - t0) / 1000;
+      return {
+        on: !!timer, nudges: moved,
+        sinceMs: centredAt ? Date.now() - centredAt : null,
+        // BOTH HALVES. A page drawing where the engine is reading had one
+        // measured centre and one it had to fall back to asking for, which is
+        // an asymmetry with no cause except that this only reported side m.
+        // `side` shifts the phase, so the two are genuinely different numbers.
+        scan: centre ? driftValues(centre.m, t, 0).scan ?? null : null,
+        scanN: centre ? driftValues(centre.n, t, 1).scan ?? null : null,
+      };
+    },
 
     /**
      * NOTES INTO GRAINS — what makes a recording playable as an instrument.

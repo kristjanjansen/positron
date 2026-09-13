@@ -681,6 +681,11 @@ video[hidden] { display: none; }
   background: var(--card);
 }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
+/* The second picture — the held seconds with the read window on them — is its
+   own rectangle under the first, because the two have different x-axes: the
+   waveform above is the last few seconds ARRIVING, this is the whole minute
+   being held. Stacked without a gap they read as one picture with two rows. */
+.pos-scope-w { margin-top: 14px; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
