@@ -218,6 +218,86 @@ async function gesture() {
   return n;
 }
 
+/**
+ * Type into every `[data-typing]` element, with real key events.
+ *
+ * The twin of `gesture()` above, and it exists for the same reason: a page
+ * whose subject is TYPING was a subject this harness could not reach, because
+ * a click produces no `input` event and a drag produces no text. `typist`
+ * found two real bugs the first time it was driven this way — a fold at
+ * position 0 emptying the box the first letter had just gone into, and a strip
+ * that fits itself once and so drew six of seventy-one edits — neither of
+ * which any button press could have surfaced.
+ *
+ * The sequence is not a word, it is the three things five previous text
+ * adapters got wrong: characters, a BACKSPACE (which never says what it
+ * removed), and an ARROW KEY (which moves the caret with no input event at
+ * all). A page that only ever sees appended characters is a page whose whole
+ * argument goes untested.
+ *
+ * ⚠️ UNLIKE THE DRAG, THE TIMING HERE IS REAL. `Input.insertText` takes no
+ * timestamp, so the recorded intervals are this harness's round trips. That is
+ * acceptable because no claim on this page is about input RATE — but it would
+ * not be on a page that measured one, and the difference is worth knowing
+ * before reusing this.
+ */
+async function typing() {
+  const n = await ev(`document.querySelectorAll('[data-typing]').length`);
+  if (!n) return 0;
+  let done = 0;
+  const focus = (k) => ev(`(() => {
+    const e = document.querySelectorAll('[data-typing]')[${k}];
+    if (!e || e.disabled || e.readOnly) return false;
+    e.scrollIntoView({ block: 'center' });
+    e.focus();
+    return document.activeElement === e;
+  })()`);
+  for (let k = 0; k < n; k++) {
+    let ok = await focus(k);
+    // ⚠️ A PAGE MAY HAVE TO BE ARMED BEFORE IT CAN BE TYPED INTO, and the
+    // PRIMARY control is this shell's convention for the main path. `typist`
+    // starts on a shipped recording with the box read-only, and the control
+    // loop above leaves it there because the last button pressed put it back.
+    // So: if every field refuses focus, press the primary once and ask again.
+    //
+    // 🔴 AND THE COUNT REPORTED IS THE NUMBER ACTUALLY TYPED INTO, not the
+    // number found. The first version returned the number of elements and
+    // printed "typed into 1 field" about a read-only box it had skipped — a
+    // harness reporting work it did not do, which is worse than reporting none.
+    if (!ok) {
+      await ev(`document.querySelector('.pos-controls button.pos-pri')?.click()`);
+      await sleep(400);
+      ok = await focus(k);
+    }
+    if (!ok) continue;
+    done++;
+    for (const step of [
+      { text: 'the harness types' },
+      { key: 'Backspace' }, { key: 'Backspace' }, { key: 'Backspace' },
+      { text: 'ed this' },
+      { key: 'ArrowLeft' }, { key: 'ArrowLeft' }, { key: 'ArrowLeft' }, { key: 'ArrowLeft' },
+      { text: 'really ' },
+    ]) {
+      if (step.text) {
+        await S('Input.insertText', { text: step.text });
+      } else {
+        // a named key needs both halves; `windowsVirtualKeyCode` is what makes
+        // Backspace and the arrows act rather than merely arrive
+        const code = { Backspace: 8, ArrowLeft: 37, ArrowRight: 39 }[step.key];
+        for (const type of ['keyDown', 'keyUp']) {
+          await S('Input.dispatchKeyEvent', {
+            type, key: step.key, code: step.key,
+            windowsVirtualKeyCode: code, nativeVirtualKeyCode: code,
+          });
+        }
+      }
+      await sleep(40);
+    }
+    await sleep(200);
+  }
+  return done;
+}
+
 // ── run ─────────────────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
 const ok = (label, cond, detail) => {
@@ -343,6 +423,13 @@ for (const t of targets) {
     await sleep(i === 0 && t.settleMs ? t.settleMs : 650);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
+
+  // AFTER the controls, not before: a page that offers "type your own" has to
+  // be put into that state first, and the control loop is what does it. The
+  // drag runs before them for the opposite reason — `draw`'s only control
+  // CLEARS the canvas.
+  const typed = await typing();
+  if (typed) console.log(`        (typed into ${typed} field${typed > 1 ? 's' : ''})`);
 
   // Some checks are async (`replay` fetches the manifest before asserting), so
   // a fixed sleep either flakes or wastes time. Wait for the assert count to
