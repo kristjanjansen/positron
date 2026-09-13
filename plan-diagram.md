@@ -9,8 +9,10 @@ inside those devices… subtle colour coding, in general grey… start it in a k
 page… for now I need it for documentation, basically replacing the current big
 description texts in the demo pages."*
 
-⚠️ **Planned, not started.** No hurry was stated explicitly, so this document
-is the deliverable until somebody says otherwise.
+⚠️ **Built.** `demo/shell/diagram.mjs`, six blocks in `/kit/`, `grains` drawing
+its own path. This document is the brief and the record of what was corrected
+in it; where a section was wrong, the correction is written into that section
+rather than at the end, so nobody reads the wrong half first.
 
 ---
 
@@ -54,9 +56,9 @@ cutting** — because canvas has no text layout at all, only `measureText`. Ever
 wrap would be hand-rolled, and the hand-rolled version is where the ellipsis
 bugs live.
 
-SVG gives: real text with real font metrics, `<title>` for the accessible name,
-hover without hit-testing arithmetic, crisp at any scale, and one object to
-copy. The cost is that SVG has no automatic wrapping either — see §5, which is
+SVG gives: real text with real font metrics, an accessible name (`aria-label` —
+see §8 for why NOT `<title>`), hover without hit-testing arithmetic, crisp at
+any scale, and one object to copy. The cost is that SVG has no automatic wrapping either — see §5, which is
 the one genuinely fiddly part and is worth doing once, properly, in a place
 every diagram shares.
 
@@ -92,15 +94,30 @@ graph layer could later hand us. Nothing in it should be about pixels.
       nodes: [
         { id: 'you',   label: 'your browser',      sub: 'a key press',      kind: 'here'   },
         { id: 'relay', label: 'Cloudflare',        sub: 'passes it along',  kind: 'cloud'  },
-        { id: 'box',   label: 'Raspberry Pi',      sub: 'plays the note',   kind: 'device' },
+        { id: 'box',   label: 'Raspberry Pi',                               kind: 'device',
+          note: 'A small board in the studio with **a speaker on it**.',
+          children: [
+            { id: 'synth', label: 'a synthesiser', sub: 'plays the note' },
+            { id: 'rec',   label: 'a recorder',    sub: 'keeps a minute' },
+          ] },
       ],
       links: [
         { from: 'you',   to: 'relay', label: 'note number' },
-        { from: 'relay', to: 'box',   label: '' },
-        { from: 'box',   to: 'relay', label: 'PCM', back: true },
-        { from: 'relay', to: 'you',   label: '', back: true },
+        { from: 'relay', to: 'synth', label: 'the same number' },
+        { from: 'rec',   to: 'relay', label: 'the sound', back: true },
+        { from: 'relay', to: 'you',   label: 'the same',  back: true },
       ],
     }
+
+🔴 **AND EVERY ARROW IS NAMED, WHICH THIS EXAMPLE ORIGINALLY WAS NOT.** Two of
+its four links had `label: ''`, which draws a line saying only "these two are
+connected" — a thing the reader could already see. Asked for directly: *"add
+labels to all diagram connectors."* A name says what CROSSES, never what the
+arrow does: `four settings`, `the sound it made`, `every grain it fired`.
+`connects to`, `sends to` and `next` are the arrowhead in words and are worse
+than leaving it bare. Where a relay hands on exactly what it was given, the
+second hop says `the same four` — which is the fact, and inventing a different
+word for it would be a small lie.
 
 ⚠️ **AND THE FIRST VERSION OF THAT EXAMPLE BROKE §7'S OWN RULE.** It read
 `sub: 'yoshimi → pappus'` and `'a Durable Object relay'` — two program names
@@ -109,12 +126,41 @@ diagram label is held to exactly the same standard as the paragraph it
 replaces. A plan that demonstrates its own rule being broken is worse than one
 that does not mention it.
 
-**`sub` is the second level, and one level of nesting is enough.** The note
-asks whether devices need to contain their software. They do not: a device with
-its program named underneath reads as one thing that does one job, which is
-what the picture is for. Real nesting buys a box-in-a-box and costs a layout
-engine. If a demo ever needs two programs in one device, they are two nodes
-with the same `kind` — and that will look right, because they ARE two things.
+**`sub` is the second level** — and 🔴 **"REAL NESTING IS NOT WORTH A LAYOUT
+ENGINE" WAS WRONG AND IS CORRECTED.** This section said a device with its
+program named underneath "reads as one thing that does one job, which is what
+the picture is for". It reads as one thing because it IS drawn as one thing,
+and that is the bug: `grains` shipped `this page` / `a granulator in it`, and
+the person it was written for said the picture *"does not show that this page
+has a granulator inside it"*. A `sub` is a second line about the SAME box; a
+program running on a machine is a second BOX. The fallback this section offered
+— two nodes with the same `kind` — was tried in `grains` and withdrawn, because
+side by side they are a FORK, and a fork is the one shape that was not drawable
+at all until §4 was corrected. Two things that are not beside each other should
+not be drawn beside each other.
+
+**A box may hold boxes, one level deep.** `children` on a node. The container
+is measured from what is in it plus its padding, in both layouts; every box in
+the picture then takes the tallest height, which is the rule that was already
+there for two lines of type. A link may name the container or any box inside
+one. What it cost: about 90 lines, and every layout with nothing nested comes
+out **byte-identical** — 272 of 272 across eight descriptions, two rulers and
+seventeen widths, plus an in-suite check that a box with nothing in it carries
+no trace of the nesting at all. (That second check is not decoration: the
+obvious one — the same spec with and without an empty `children` — is an A/B
+where both arms share the bug, and it stayed green with the container
+arithmetic forced permanently on.)
+
+🔴 **AND A LINK INTO A BOX INSIDE A CONTAINER ATTACHES DIFFERENTLY IN THE TWO
+LAYOUTS, FOR ONE REASON.** A container's own name is at the TOP of it with its
+boxes under, so the ground between its edge and a box inside it is EMPTY
+sideways and FULL downwards. Left to right the arrow reaches the box it names;
+stacked, the same arrow would cross the words `Raspberry Pi` on its way in —
+MEASURED on screen, it did — so there it stops at the machine. Two boxes in the
+SAME container have no route between them at all: that link is dropped and
+reported, because drawing it would need a third routing rule for a picture
+nothing has asked for yet. The obvious next want is `grains`' board, which runs
+an instrument INTO its granulator.
 
 ---
 
@@ -232,7 +278,14 @@ So: measure and break, once, in a shared helper.
       things the picture is about.
   **The rule now: a name is measured against the space it is actually drawn in,
   and when the picture cannot hold everything the order is the box's own words,
-  then the arrows' names, then empty space.** What a box needs is exactly its
+  then the arrows' names, then empty space.**
+  ⚠️ **AND "THE SPACE IT IS DRAWN IN" IS NOT "THE LENGTH OF THE LINE" once a
+  box can hold boxes.** An arrow that names a program reaches PAST its
+  machine's edge to the box inside it, so its run is longer than the gap
+  between the two machines — and the extra length is not empty, it is the
+  container. A name budgeted on the run would be written over the machine it is
+  entering. The budget is the gap between the machines and the name sits in the
+  middle of it; the arrow may be longer, and usually is. What a box needs is exactly its
   `sub`'s own width, because a `sub` gets one line and is never wrapped — so the
   priority costs no second layout pass. Measured after at 258 / 320 / 390 px:
   every real block cuts nothing at any of them, boxes included.
@@ -251,9 +304,20 @@ colours to grey, but don't go muddy by mixing in yellows."*
 - The field, the boxes and the arrows are `--line2` / `--card2` / `--dim`.
   ⚠️ **NOT `--line` for an edge**: #1f2937 on `--card` (#11151d), which is the
   background of every `/kit/` block, is not a border anybody can see.
-- A `kind` mixes **8–12% of a hue into the stroke and 4% into the fill**, no
-  more. At that strength it reads as "these two are the same sort of thing"
-  without reading as a legend.
+- A `kind` says **WHICH MACHINE A BOX IS**, and nothing else — this page, a
+  computer somebody rents, a machine in a room. That is the meaning, written
+  down here and in /kit/, and it is a fact about the box rather than a place in
+  a sequence, which is what CLAUDE.md's one-meaning-for-colour rule requires. A
+  box drawn INSIDE another takes its container's hue, because it runs there.
+- 🔴 **"8–12% INTO THE STROKE AND 4% INTO THE FILL" WAS BELOW THE THRESHOLD OF
+  BEING SEEN, AND IS CORRECTED TO 26% AND 8%.** Those numbers were picked, not
+  measured, and the person they were drawn for asked for *"slight colour
+  coding"* while looking at a picture that already had it. MEASURED in oklab at
+  11%: `--line2` is ALREADY a blue-grey (b ≈ -0.033), so 11% of #5b9bd5 moves b
+  by 0.0074 and lightness by 0.038 — i.e. the tinted box reads as slightly
+  LIGHTER rather than as blue, which is not a hue at all. At 26% the shift is
+  0.0176, about 2.4x, and both hues are legible at a glance while still
+  obviously grey-family. Still nowhere near a legend.
 - ⚠️ **No yellow, and the reason is structural rather than taste.** `--hi` is
   #ffd400 and this project uses it for exactly one thing — the playhead, the
   primary control, the thing you are meant to look at. A yellow-tinted box
@@ -261,8 +325,15 @@ colours to grey, but don't go muddy by mixing in yellows."*
   goes muddy, which the note says independently.
 - 🔴 **Colour must not be the only channel.** One meaning for colour across
   every demo is already a rule here; a `kind` also decides the box's SHAPE
-  detail — a device gets a heavier stroke, a cloud a dashed one, `here` a
-  solid fill — so the picture survives greyscale and colour blindness.
+  detail — a device gets a heavier stroke, a rented computer a broken one,
+  `here` a solid fill — so the picture survives greyscale and colour blindness.
+- **DOTTED, NOT DASHED, and it was looked at rather than argued about.** The
+  rented computer's edge was `stroke-dasharray: 5 3`. Photographed at 258 px
+  side by side with `1 3`: the dashes are an 8 px period on a box 40 px tall,
+  so the border reads as a marching-ants selection and each rounded corner
+  loses a whole dash to the curve. The dots are a 4 px period, even round the
+  corners, and still unmistakably not a solid line. Round caps were tried too
+  and are nearly solid at this stroke weight; the default butt caps won.
 
 ---
 
@@ -278,19 +349,25 @@ labels side by side. The kit section should draw:
 - one with a deliberately over-long label, to show the cut,
 - one with two loopbacks that must not overlap,
 - one at phone width,
-- and a FORK — the same description drawn twice, at a laptop width and a phone
+- a FORK — the same description drawn twice, at a laptop width and a phone
   width, because that is the one case where the two disagreed and looking at
-  either alone could not have caught it.
+  either alone could not have caught it,
+- and A BOX INSIDE A BOX, also drawn twice at both widths, for the same reason:
+  an arrow that names a program reaches it left to right and stops at the
+  machine when the picture is stacked, and one width cannot show that.
 
-**Then one demo page adopts it**, and `grains` is the obvious first: it is two
-granulators in two buildings with a relay between them, and its `what`
-paragraph is currently three sentences doing a diagram's job. The paragraph
-does not vanish — it becomes a **caption**, which is what the note asks for.
+**Then one demo page adopts it**, and `grains` was the first: two granulators
+in two buildings with a relay between them, and a `what` paragraph doing a
+diagram's job. The paragraph does not vanish — it becomes a **caption**, and
+the part of it that belongs to one box becomes that box's `note`.
 
 ⚠️ **A diagram is not exempt from the writing rules.** No jargon in a label, no
 internal vocabulary, and every word a visitor sees is held to the same standard
 as the paragraph it replaces. A picture is a better place to put a shape and a
-worse place to hide a word nobody understands.
+worse place to hide a word nobody understands. ⚠️ But a THING'S NAME is not
+jargon — `Cloudflare`, `Raspberry Pi`, `Pappus` are what those things are
+called, and a friendly label invented here would be a name nobody can search
+for.
 
 ---
 
@@ -306,8 +383,33 @@ and this project has a rule limiting it to two or three short lines for exactly
 that reason. A line under the picture is read in place, has room, and costs no
 positioning code at all.
 
-`<title>` on each node gives the native browser tooltip for free, which is the
-accessible path and needs no work.
+🔴 **`<title>` ON EACH NODE WAS EXACTLY WRONG AND IS GONE.** This section
+called the native tooltip "free". It is not free: it is drawn ON TOP of the box
+it names, so pointing at `Raspberry Pi` said its name in the box, its name and
+`sub` again in a yellow tooltip over the box, and the same words a third time
+in the line under the picture. Reported as *"3x same info. why? rm browser
+tooltip."* — and the root `<svg>` had one as well, covering the whole picture.
+The accessible name moves to `aria-label`, which no browser draws and every
+screen reader reads, and it carries the box's name, its `sub` UNCUT and its
+sentence, so nothing is lost by removing the thing that was showing it twice.
+
+**And the line says what the box DOES, in a sentence the box does not repeat.**
+Hovering used to write `Raspberry Pi — another granulator` under a box already
+reading `Raspberry Pi` / `another granulator`. A node now carries a `note`: one
+or two sentences saying what it is for here, which is the half of the paragraph
+a drawing cannot say. ⚠️ It takes `**bold**` and NOTHING else — written out in
+`boldParts`, twelve lines, because a markdown library for one inline form is a
+dependency to read the release notes of forever. An unpaired `**` stays on the
+page as two asterisks rather than turning the rest of the sentence bold, which
+is the failure mode of the version that toggles on every marker.
+
+⚠️ **AND THE RESERVATION IS TAKEN THROUGH THE SAME WRITER THAT DRAWS IT.**
+Measuring these strings with `textContent` would measure `**bold**` as six
+literal asterisks in the ordinary face, while the hover draws a heavier one
+that is wider — so a sentence reserved at three lines could be drawn in four,
+which is the jump the whole mechanism exists to prevent, reintroduced by the
+measurement instead of by the drawing. `captionTexts` also walks the boxes
+INSIDE containers, or hovering one of those is a height nobody reserved.
 
 ⚠️ **THE LINE HAS TO BE PUT BACK BY THE DRAWER, AND `pointerleave` CANNOT DO
 IT.** A re-layout destroys every box, so a pointer resting on one never gets

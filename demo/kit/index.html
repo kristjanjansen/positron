@@ -288,6 +288,13 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
   // shortened and the width it had to fit — because a cut label is a label
   // that is too long, which is a thing to go and fix, not a feature.
   //
+  // 🔴 AND THIS REPORT IS NOW THE ONLY PLACE A CUT SHOWS. The full string used
+  // to sit in an svg `<title>`, i.e. in the browser's own tooltip, which is
+  // gone: a tooltip drew the box's name ON TOP of the box while the line under
+  // the picture was saying the same words, three channels for one fact. The
+  // whole string is still in `aria-label` for a screen reader; nothing draws
+  // it. So a cut that nobody reads here is a cut nobody reads at all.
+  //
   // It also says whether the type was MEASURED or estimated. `getComputedText-
   // Length()` answers 0 inside a hidden ancestor, and every string then
   // "fits" — one line per box, no wrapping, no cuts. That failure reads as a
@@ -319,13 +326,19 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     'rather than a number. The page hands over a list of boxes and a list of ' +
     'arrows and nothing else; every position on screen is worked out from ' +
     'those. Hover a box and the line under the picture says what that box ' +
-    'does — there is no tooltip, on purpose.',
+    'does, in a sentence the box itself does not repeat — there is no tooltip ' +
+    'anywhere in this component, native or hand-built, on purpose. Colour says ' +
+    'WHICH MACHINE a box is and nothing else: the filled one is the browser ' +
+    'you are reading this in, the one with a broken edge is a computer ' +
+    'somebody rents, the heavy one is a machine in a room. A box drawn inside ' +
+    'another takes its colour, because it runs there.',
     `createDiagram(host, {
   title: 'a key press, and what it costs',
   caption: 'one line under the picture',
-  nodes: [{ id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' }, …],
+  nodes: [{ id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+            note: 'What this box does here. **Two asterisks** is the only mark it takes.' }, …],
   links: [{ from: 'you', to: 'relay', label: 'note number' },
-          { from: 'relay', to: 'you', label: '', back: true }],
+          { from: 'relay', to: 'you', label: 'the same sound', back: true }],
 })`,
     (box) => diagramCase(box, {
       title: 'a key press, and what it costs',
@@ -333,15 +346,21 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
                'Cloudflare and arrives at a Raspberry Pi in the studio. The board ' +
                'plays the note and the sound comes back the same way.',
       nodes: [
-        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' },
-        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud' },
-        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+          note: 'The browser you are reading this in. It sends **one number** and '
+              + 'waits.' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud',
+          note: 'A computer rented by the hour, so the two ends never have to find '
+              + 'each other. It **changes nothing** on the way through.' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device',
+          note: 'A small board in the studio with **a speaker and a microphone** on '
+              + 'it, reached only through the rented computer.' },
       ],
       links: [
         { from: 'you', to: 'relay', label: 'note number' },
-        { from: 'relay', to: 'box', label: '' },
+        { from: 'relay', to: 'box', label: 'the same number' },
         { from: 'box', to: 'relay', label: 'the sound', back: true },
-        { from: 'relay', to: 'you', label: '', back: true },
+        { from: 'relay', to: 'you', label: 'the same', back: true },
       ],
     }));
 
@@ -349,8 +368,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     'A box is filled, a word is never allowed to run out past a border, and a ' +
     'word too wide for the box on its own is broken inside the word. What is ' +
     'left over becomes an ellipsis on the last line — and the whole string ' +
-    'stays on the box, so the browser still shows it on hover and a screen ' +
-    'reader still reads all of it. The line under the picture is the point of ' +
+    'stays on the box for a screen reader, though nothing draws it any more: ' +
+    'a cut is a label that is too long, which is a thing to go and fix rather ' +
+    'than to hide behind a hover. The line under the picture is the point of ' +
     'this block: it names what was shortened.',
     '',
     (box) => diagramCase(box, {
@@ -371,6 +391,58 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       ],
     }));
 
+  // ── a box inside a box ──────────────────────────────────────────────────
+  // 🔴 THE SAME SPEC AT BOTH WIDTHS, BECAUSE THE TWO ANSWER A LINK INTO A
+  // BOX INSIDE A CONTAINER DIFFERENTLY — and that is the whole of what there
+  // is to look at here. A container's own name is at the TOP of it with its
+  // boxes under, so the ground between its edge and a box inside it is empty
+  // SIDEWAYS and full DOWNWARDS. Left to right an arrow reaches the box it
+  // names; stacked, the same arrow would cross the words `Raspberry Pi` on
+  // the way in, so it stops at the machine.
+  section('a box inside a box',
+    'A machine and the programs on it are not one thing, and a `sub` under a ' +
+    'name draws them as one. A box can hold boxes instead: they are measured ' +
+    'like any other box and the container is measured from them plus its ' +
+    'padding, so nothing here is a guess. An arrow can name the machine or ' +
+    'one program on it, and a program takes the colour of the machine it ' +
+    'runs in — the hue says where something runs, so a box inside a purple ' +
+    'one is purple.',
+    `nodes: [{ id: 'pi', label: 'Raspberry Pi', kind: 'device', children: [
+            { id: 'synth', label: 'a synthesiser', sub: 'plays the note' },
+            { id: 'rec',   label: 'a recorder',    sub: 'keeps a minute' }] }]
+links: [{ from: 'you', to: 'synth', label: 'note number' },   // into a box INSIDE it
+        { from: 'rec', to: 'you',   label: 'the last minute', back: true }]`,
+    (box) => {
+      const nested = {
+        title: 'one board, two programs on it',
+        caption: 'The board runs two programs and the picture says which one each ' +
+                 'arrow reaches: the note goes to the synthesiser, and it is the ' +
+                 'recorder that answers.',
+        nodes: [
+          { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+            note: 'The browser you are reading this in. It sends **one number** and '
+                + 'waits.' },
+          { id: 'pi', label: 'Raspberry Pi', kind: 'device',
+            note: 'One board, in a room, running **two programs at once** — which '
+                + 'is why it is drawn as a box with boxes in it.',
+            children: [
+              { id: 'synth', label: 'a synthesiser', sub: 'plays the note',
+                note: 'Makes the sound. It is **this** box the note number reaches, '
+                    + 'not the board in general.' },
+              { id: 'rec', label: 'a recorder', sub: 'keeps a minute',
+                note: 'Keeps **the last sixty seconds** of whatever the board is '
+                    + 'making, and sends it when it is asked.' },
+            ] },
+        ],
+        links: [
+          { from: 'you', to: 'synth', label: 'note number' },
+          { from: 'rec', to: 'you', label: 'the last minute', back: true },
+        ],
+      };
+      diagramCase(box, nested);
+      diagramCase(box, nested, { phone: true });
+    });
+
   section('two return paths that must not overlap',
     'A return path runs UNDER the row, never back between the boxes — two ' +
     'lines between the same pair of boxes and the eye cannot tell the way out ' +
@@ -388,9 +460,9 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         { id: 'you', label: 'your browser', sub: 'plays it back', kind: 'here' },
       ],
       links: [
-        { from: 'mic', to: 'pi', label: '' },
+        { from: 'mic', to: 'pi', label: 'what it heard' },
         { from: 'pi', to: 'cf', label: 'small pieces' },
-        { from: 'cf', to: 'you', label: '' },
+        { from: 'cf', to: 'you', label: 'the same pieces' },
         { from: 'you', to: 'mic', label: 'how far behind', back: true },
         { from: 'cf', to: 'pi', label: 'slow down', back: true },
       ],
@@ -436,9 +508,15 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         links: [
           { from: 'you', to: 'near', label: 'settings' },
           { from: 'you', to: 'cf', label: 'and out' },
-          { from: 'cf', to: 'pi', label: '' },
+          // ⚠️ `the same` RATHER THAN `the same sound`, MEASURED. A gutter is
+          // sized by the widest name in it, so a longer one here would take
+          // the width straight out of the boxes — and this block's subs were
+          // already cut down once for exactly that. Eight characters is under
+          // `the sound`, so the picture is the same size it was with two of
+          // these five arrows unnamed.
+          { from: 'cf', to: 'pi', label: 'the same four' },
           { from: 'pi', to: 'cf', label: 'the sound', back: true },
-          { from: 'cf', to: 'you', label: '', back: true },
+          { from: 'cf', to: 'you', label: 'the same', back: true },
         ],
       };
       diagramCase(box, branch);
@@ -455,15 +533,21 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       title: 'a key press, and what it costs',
       caption: 'The same four links as the first block, at 320 px.',
       nodes: [
-        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here' },
-        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud' },
-        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device' },
+        { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
+          note: 'The browser you are reading this in. It sends **one number** and '
+              + 'waits.' },
+        { id: 'relay', label: 'Cloudflare', sub: 'passes messages on', kind: 'cloud',
+          note: 'A computer rented by the hour. It **changes nothing** on the way '
+              + 'through.' },
+        { id: 'box', label: 'Raspberry Pi', sub: 'plays the note', kind: 'device',
+          note: 'A small board in the studio, reached **only through the rented '
+              + 'computer**.' },
       ],
       links: [
         { from: 'you', to: 'relay', label: 'note number' },
-        { from: 'relay', to: 'box', label: '' },
+        { from: 'relay', to: 'box', label: 'the same number' },
         { from: 'box', to: 'relay', label: 'the sound', back: true },
-        { from: 'relay', to: 'you', label: '', back: true },
+        { from: 'relay', to: 'you', label: 'the same', back: true },
       ],
     }, { phone: true }));
 

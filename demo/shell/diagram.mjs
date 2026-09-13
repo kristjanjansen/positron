@@ -9,11 +9,39 @@
 //   const dg = createDiagram(host, {
 //     title: 'a key press, and what it costs',
 //     caption: 'one line under the picture',
-//     nodes: [{ id:'you', label:'your browser', sub:'a key press', kind:'here' }, ...],
+//     nodes: [{ id:'you', label:'your browser', sub:'a key press', kind:'here',
+//               note: 'The browser you are reading this in. **It makes the sound too.**',
+//               children: [{ id:'synth', label:'a synthesiser', sub:'in the page' }] }, ...],
 //     links: [{ from:'you', to:'relay', label:'note number' },
 //             { from:'relay', to:'you', label:'', back:true }],
 //   });
 //   dg.cuts   // every label the drawer had to shorten, with the full text
+//
+// ⚠️ A BOX CAN HOLD BOXES, AND THAT IS HOW A MACHINE SAYS WHAT RUNS ON IT.
+// `children` puts one or more boxes INSIDE another, measured from what they
+// need plus padding rather than from a guessed height, in both layouts. The
+// plan said one level of nesting was enough and that a program could be named
+// in its machine's `sub` — which is true right up to the point where the
+// machine and the program are two different things a link can reach: an arrow
+// may target a container or any box inside one. Two boxes in the SAME
+// container have no route between them and that link is dropped with a
+// warning, because drawing it would mean a third routing rule for a picture
+// nothing has asked for yet.
+//
+// 🔴 THERE IS NO `title` ATTRIBUTE ANYWHERE IN HERE, AND THAT IS THE POINT.
+// A box used to carry an SVG `<title>`, which the browser draws as a native
+// tooltip — so pointing at one said `Raspberry Pi` in the box, `Raspberry Pi —
+// another granulator` in a yellow tooltip ON TOP of it, and the same words
+// again in the line under the picture. Three channels saying one thing is the
+// defect a legend is. The accessible name the `<title>` was also carrying moves
+// to `aria-label`, which no browser draws, so a screen reader keeps everything
+// the sighted reader just stopped seeing twice.
+//
+// `note` is what the line under the picture says while a box is hovered: a
+// SENTENCE about what that box does here, not its name a second time. It takes
+// `**bold**` and nothing else — two asterisks, written out in `boldParts`,
+// because a markdown library for one inline form is a dependency to read the
+// release notes of forever.
 //
 // 🔴 IT DRAWS A DESCRIPTION, IT IS NEVER A DRAWING. Nothing anywhere positions
 // a box. A page hands over the structure above and this file decides every
@@ -51,6 +79,14 @@ const GAP_X_MAX     = 58;   // between columns: an arrow plus room for its name
 const GAP_X_MIN     = 34;
 const GAP_Y         = 16;   // between two boxes sharing a column
 const GAP_Y_COL     = 30;   // between two boxes in the one-column layout
+// A CONTAINER IS MEASURED FROM WHAT IS IN IT. These three numbers are the only
+// thing the arithmetic adds: the room around the boxes inside, the room between
+// two of them, and the room under the container's own words. Equal padding on
+// all four sides is deliberate — a box inset further from one edge than another
+// reads as a box that has drifted rather than one that is held.
+const CHILD_PAD     = 8;    // a container's edge to the boxes inside it
+const CHILD_GAP     = 6;    // between two boxes inside one container
+const HEAD_GAP      = 7;    // a container's own words to its first box
 const BOX_TARGET_W  = 122;  // narrow the gaps until a box is at least this wide
 const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
 const BOX_MAX_W     = 190;
@@ -208,9 +244,13 @@ function skipsABox(l, pos) {
  * truncates with an ellipsis is in the wrong place. That rule is about gutters
  * and readouts, and here it applies to whoever wrote the label — so every cut
  * is collected on `dg.cuts` and /kit/ prints them. The full string always
- * survives in the box's `<title>`, where the browser shows it on hover and a
- * screen reader reads all of it: nothing is ever lost, only hidden, and the
- * author is told exactly which.
+ * survives in the box's `aria-label`, which a screen reader reads and no
+ * browser draws: nothing is lost, only hidden, and the author is told exactly
+ * which. ⚠️ IT USED TO SURVIVE IN A `<title>`, and that is a NATIVE TOOLTIP —
+ * the whole string drawn on top of the box the moment a pointer rests on it,
+ * beside a line under the picture already saying the same words. Hiding a cut
+ * behind a hover also let a too-long label feel harmless; it is not, and the
+ * report is the point.
  *
  * @param {string} text
  * @param {number} maxWidth               in px
@@ -233,7 +273,7 @@ export function wrapLines(text, maxWidth, maxLines, measure) {
     if (!cur) {
       // One word wider than the whole box. Broken mid-word rather than allowed
       // to run out past the border: an overflowing word is a box that looks
-      // broken, a broken word is one you can still finish reading in <title>.
+      // broken, a broken word is one that is still whole in `aria-label`.
       const pieces = splitWord(w, maxWidth, measure);
       for (let k = 0; k < pieces.length - 1; k++) lines.push(pieces[k]);
       cur = pieces[pieces.length - 1];
@@ -266,6 +306,67 @@ function splitWord(word, maxWidth, measure) {
 }
 
 /**
+ * One flat list of boxes out of a description that nests one level.
+ *
+ * ⚠️ A CHILD TAKES ITS CONTAINER'S `kind`, and that is the colour rule rather
+ * than a shortcut: the hue says WHICH MACHINE a box is, so a program drawn
+ * inside a machine is that machine's colour. What tells the two apart is that
+ * one is inside the other — position and size, which survive greyscale.
+ *
+ * `_kids` and `_owner` are scratch, deleted before `layout` returns anything.
+ *
+ * @returns {{tops: object[], kids: object[], owner: Map<string,string>}}
+ */
+function unpack(spec) {
+  const tops = [], kids = [], owner = new Map();
+  for (const n of (spec.nodes || [])) {
+    const t = { ...n };
+    const cs = (n.children || []).map((c) => ({ ...c, kind: c.kind || n.kind }));
+    delete t.children;
+    t._kids = cs;
+    for (const c of cs) {
+      // one level, and a second one is REPORTED rather than half-drawn: a box
+      // inside a box inside a box is a diagram that wants to be a file tree.
+      if (c.children) delete c.children;
+      c._kids = [];
+      c._owner = n.id;
+      owner.set(c.id, n.id);
+      kids.push(c);
+    }
+    tops.push(t);
+  }
+  return { tops, kids, owner };
+}
+
+/**
+ * `**bold**`, and nothing else, split into runs.
+ *
+ * ⚠️ AN UNPAIRED `**` STAYS ON THE PAGE AS TWO ASTERISKS. The tempting
+ * implementation toggles on every marker it meets, which turns one typo into a
+ * sentence that is bold from the mistake to the full stop — a rendering bug
+ * that looks like a writing decision. A run has to be closed to exist.
+ *
+ * @param {string} text
+ * @returns {Array<{text: string, bold: boolean}>}
+ */
+export function boldParts(text) {
+  const s = String(text ?? '');
+  const out = [];
+  let i = 0;
+  for (;;) {
+    const open = s.indexOf('**', i);
+    if (open < 0) break;
+    const close = s.indexOf('**', open + 2);
+    if (close < 0) break;
+    if (open > i) out.push({ text: s.slice(i, open), bold: false });
+    if (close > open + 2) out.push({ text: s.slice(open + 2, close), bold: true });
+    i = close + 2;
+  }
+  if (i < s.length) out.push({ text: s.slice(i), bold: false });
+  return out;
+}
+
+/**
  * Every pixel in the picture, from the description and a way to measure type.
  *
  * No document is touched, so this runs under node with a made-up ruler. The
@@ -276,10 +377,19 @@ function splitWord(word, maxWidth, measure) {
  */
 export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   const m = { ...METRICS, ...metrics };
-  const nodes = (spec.nodes || []).map((n) => ({ ...n }));
-  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const { tops: nodes, kids, owner } = unpack(spec);
+  const byId = new Map(nodes.concat(kids).map((n) => [n.id, n]));
+  // which box on the FLOW a given box belongs to: itself, or the machine it is
+  // drawn inside. Every question about where a link goes is asked of this.
+  const ref = (id) => owner.get(id) || id;
+  const inside = [];
   const links = (spec.links || [])
     .filter((l) => byId.has(l.from) && byId.has(l.to) && l.from !== l.to)
+    // 🔴 TWO BOXES IN ONE CONTAINER HAVE NO ROUTE BETWEEN THEM. Dropped and
+    // reported rather than drawn: every routing rule here is about the space
+    // OUTSIDE the boxes, and a line between two boxes that share a container
+    // would need a third one for a picture nothing has asked for yet.
+    .filter((l) => { const ok = ref(l.from) !== ref(l.to); if (!ok) inside.push(l); return ok; })
     .map((l) => ({ ...l }));
   const cuts = [];
   const avail = Math.max(140, Math.floor(width));
@@ -289,7 +399,13 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
              nodes: [], links: [], cuts, cycle: false };
   }
 
-  const { col, cycle } = assignColumns(nodes, links);
+  // The columns are a statement about the MACHINES, so a link that names a box
+  // inside one is asked about its machine — otherwise a program in the middle
+  // of a chain would be given a column of its own and the picture would say the
+  // signal visits a place it never leaves.
+  const { col, cycle } = assignColumns(nodes,
+    links.map((l) => ({ ...l, from: ref(l.from), to: ref(l.to) })));
+  for (const c of kids) col.set(c.id, col.get(c._owner));
   const cols = Math.max(...nodes.map((n) => col.get(n.id))) + 1;
 
   // ── how wide a box gets, and whether the row layout is possible at all ──
@@ -318,6 +434,7 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       .sort((a, b) => a.c - b.c || a.i - b.i)
       .map((o) => o.n);
     rowOf = new Map(order.map((n, r) => [n.id, r]));
+    for (const c of kids) rowOf.set(c.id, rowOf.get(c._owner));
 
     // The return paths run down the LEFT of the column and the forward links
     // that skip a box down the RIGHT, so each gutter holds two things SIDE BY
@@ -371,6 +488,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     // reserving a gutter nothing had asked for.
     let boxNeed = 0;
     for (const n of nodes) boxNeed = Math.max(boxNeed, measure.sub(n.sub || ''));
+    // a box INSIDE a container is inset, so what it needs is what it needs
+    // plus the room its container holds around it
+    for (const c of kids) boxNeed = Math.max(boxNeed, measure.sub(c.sub || '') + CHILD_PAD * 2);
     boxNeed = Math.min(Math.ceil(boxNeed) + BOX_PAD_X * 2, BOX_MAX_W_COL);
     const room = avail - PAD * 2 - boxNeed;
     if (leftInset + rightInset > room) {
@@ -397,35 +517,52 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
 
   // ── the type, which decides how tall every box is ──────────────────────
   // One height for every box, taken from the tallest. Boxes of different
-  // heights in one row is a picture where the tall one looks important.
-  let boxH = 0;
-  for (const n of nodes) {
-    n._lab = wrapLines(n.label, inner, 2, measure.lab);
-    n._sub = wrapLines(n.sub, inner, 1, measure.sub);
+  // heights in one row is a picture where the tall one looks important. A
+  // container is taller than a plain box by what it holds — and it hands that
+  // height to every other box in the picture rather than keeping it, for the
+  // same reason: a row of unequal panels ranks them.
+  const kidInner = Math.max(20, w - CHILD_PAD * 2 - BOX_PAD_X * 2);
+  const fit = (n, width) => {
+    n._lab = wrapLines(n.label, width, 2, measure.lab);
+    n._sub = wrapLines(n.sub, width, 1, measure.sub);
     if (n._lab.cut) {
       cuts.push({ id: n.id, where: 'label', full: n._lab.full,
-                  shown: n._lab.lines.join(' '), width: inner });
+                  shown: n._lab.lines.join(' '), width });
     }
     if (n._sub.cut) {
       cuts.push({ id: n.id, where: 'sub', full: n._sub.full,
-                  shown: n._sub.lines.join(' '), width: inner });
+                  shown: n._sub.lines.join(' '), width });
     }
-    const block = n._lab.lines.length * m.labLh
-                + (n._sub.lines.length ? SUB_GAP + m.subLh : 0);
-    boxH = Math.max(boxH, block + BOX_PAD_Y * 2);
+  };
+  // in the order they were written, boxes inside a container included, so the
+  // report reads down the description rather than by where the drawer got to
+  for (const n of nodes) { fit(n, inner); for (const c of n._kids) fit(c, kidInner); }
+
+  const own = (n) => n._lab.lines.length * m.labLh
+                   + (n._sub.lines.length ? SUB_GAP + m.subLh : 0);
+  let kidH = 0;
+  for (const c of kids) kidH = Math.max(kidH, own(c) + BOX_PAD_Y * 2);
+  kidH = Math.round(kidH);
+  let boxH = 0;
+  for (const n of nodes) {
+    boxH = Math.max(boxH, n._kids.length
+      ? own(n) + HEAD_GAP + n._kids.length * kidH
+        + (n._kids.length - 1) * CHILD_GAP + CHILD_PAD * 2
+      : own(n) + BOX_PAD_Y * 2);
   }
   boxH = Math.round(boxH);
 
   const out = mode === 'row'
-    ? placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, cuts })
-    : placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInset,
+    ? placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts })
+    : placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
                            backBudget, skipBudget, m, measure, cuts });
 
-  for (const n of nodes) { delete n._lab; delete n._sub; }
-  return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out };
+  for (const n of nodes.concat(kids)) { delete n._lab; delete n._sub; }
+  return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out,
+           ...(inside.length ? { inside } : {}) };
 }
 
-function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, cuts }) {
+function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, m, measure, cuts }) {
   const total = cols * w + (cols - 1) * gapX;
   const left = Math.max(PAD, Math.round((avail - total) / 2));
 
@@ -463,9 +600,19 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
     const r = inCol[c].indexOf(n);
     const x = left + c * (w + gapX);
     const y = top + Math.round((tallest - colH[c]) / 2) + r * (boxH + GAP_Y);
-    return box(n, x, y, w, boxH, m);
+    return box(n, x, y, w, boxH, m, kidH);
   });
-  const at = new Map(placed.map((p) => [p.id, p]));
+  const at = new Map();
+  for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
+  // 🔴 A LINK ATTACHES TO THE BOX IT NAMES AND ITS NAME GOES OUTSIDE THE
+  // MACHINE THAT BOX IS IN. Those are two different boxes the moment anything
+  // is nested: an arrow into a program dives through its machine's edge, which
+  // is the picture, while a name at the midpoint of that dive would be written
+  // inside the machine, on top of whatever else is in there. So the path is
+  // built from the box and the name from `outer`, and with nothing nested the
+  // two are the same object — which is why a picture with no container in it
+  // comes out unchanged to the last decimal.
+  const outer = (id) => at.get(owner.get(id) || id);
   const bottom = top + tallest;
 
   // ── the return paths, under the row ───────────────────────────────────
@@ -475,7 +622,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   // the way home.
   const backs = links.filter((l) => l.back);
   const level = backLevels(backs.map((l) => {
-    const f = at.get(l.from), t = at.get(l.to);
+    const f = outer(l.from), t = outer(l.to);
     return [f.cx - ATTACH_OFF, t.cx + ATTACH_OFF];
   }));
   // ⚠️ A NAME UNDER A RETURN PATH NEEDS THE DEPTH TO MAKE ROOM FOR IT.
@@ -496,15 +643,21 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   const drawn = [];
   for (const l of links) {
     const f = at.get(l.from), t = at.get(l.to);
+    const fm = outer(l.from), tm = outer(l.to);   // the machines they are in
     if (!l.back) {
       const o = overs.indexOf(l);
       if (o < 0) {
-        const x1 = f.x + w + EDGE_OUT, y1 = f.cy;
+        const x1 = f.x + f.w + EDGE_OUT, y1 = f.cy;
         const x2 = t.x - EDGE_OUT - 1, y2 = t.cy;
-        const lab = wrapLines(l.label, gapX - 6, 2, measure.link);
+        // the gap between the two MACHINES, which is the room the name has —
+        // never the length of the line, which reaches further whenever one end
+        // of it is a box inside one of them
+        const ox1 = fm.x + fm.w + EDGE_OUT, ox2 = tm.x - EDGE_OUT - 1;
+        const budget = ox2 - ox1 - 1;
+        const lab = wrapLines(l.label, budget, 2, measure.link);
         if (lab.cut) {
           cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
-                      shown: lab.lines.join(' '), width: gapX - 6 });
+                      shown: lab.lines.join(' '), width: budget });
         }
         // ⚠️ "SIX PIXELS ABOVE THE MIDDLE" IS ONLY CLEAR OF A HORIZONTAL
         // ARROW. A fork puts two boxes in one column, so its arrows are
@@ -524,23 +677,31 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
         const half = Math.max(...lab.lines.map((t) => measure.link(t)), 0) / 2;
         const rise = x2 === x1 ? 0 : Math.abs((y2 - y1) / (x2 - x1)) * half;
         const falls = y2 > y1;
+        const lx = (ox1 + ox2) / 2;
+        // where the LINE is under the name. The two are the same point in a
+        // picture with nothing nested, and the old expression is kept for that
+        // case so it cannot drift by a float's last bit.
+        const ym = (ox1 === x1 && ox2 === x2) ? (y1 + y2) / 2
+                 : y1 + (y2 - y1) * ((lx - x1) / (x2 - x1));
         drawn.push({ ...l, d: `M${r1(x1)} ${r1(y1)} L${r1(x2)} ${r1(y2)}`,
-                     lab, lx: (x1 + x2) / 2,
-                     ly: falls ? (y1 + y2) / 2 + rise + 4 + m.linkSize * 0.85
-                               : (y1 + y2) / 2 - rise - 6,
+                     lab, lx,
+                     ly: falls ? ym + rise + 4 + m.linkSize * 0.85
+                               : ym - rise - 6,
                      anchor: 'middle', stack: falls ? 'none' : 'up' });
         continue;
       }
       // over the row, out of the source's TOP edge and down into the target's
+      // — off the MACHINE both ends, because a lane that dived into a box
+      // inside one would cross that container's own words on the way
       const dy = top - LANE_FIRST - overLevel[o] * overStep;
-      const sx = f.cx + ATTACH_OFF, tx = t.cx - ATTACH_OFF;
+      const sx = fm.cx + ATTACH_OFF, tx = tm.cx - ATTACH_OFF;
       const budget = laneBudget(sx, tx);
       const lab = wrapLines(l.label, budget, 1, measure.link);
       if (lab.cut) {
         cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                     shown: lab.lines.join(' '), width: budget });
       }
-      drawn.push({ ...l, d: acrossLane(sx, f.y, tx, t.y - EDGE_OUT - 1, dy, -1),
+      drawn.push({ ...l, d: acrossLane(sx, fm.y, tx, tm.y - EDGE_OUT - 1, dy, -1),
                    lab, lx: (sx + tx) / 2, ly: dy - 5, anchor: 'middle',
                    stack: 'none', level: overLevel[o], depth: dy });
       continue;
@@ -548,8 +709,8 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
     const i = backs.indexOf(l);
     const dy = bottom + LANE_FIRST + level[i] * step;
     deepest = Math.max(deepest, dy);
-    const sx = f.cx - ATTACH_OFF, tx = t.cx + ATTACH_OFF;
-    const sy = f.y + boxH, ty = t.y + boxH + EDGE_OUT + 1;
+    const sx = fm.cx - ATTACH_OFF, tx = tm.cx + ATTACH_OFF;
+    const sy = fm.y + fm.h, ty = tm.y + tm.h + EDGE_OUT + 1;
     const d = acrossLane(sx, sy, tx, ty, dy, 1);
     const budget = laneBudget(sx, tx);
     const lab = wrapLines(l.label, budget, 1, measure.link);
@@ -567,7 +728,7 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   return { width: avail, height, nodes: placed, links: drawn };
 }
 
-function placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInset,
+function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftInset, rightInset,
                              backBudget, skipBudget, m, measure, cuts }) {
   // ⚠️ ONE COLUMN IS NOT THE ROW LAYOUT ROTATED. A horizontal diagram on a
   // phone is a diagram nobody reads, so below the break the steps stack top to
@@ -577,19 +738,23 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInse
   // gutters that cannot collide, and neither line is ever behind a box.
   const x = leftInset + PAD;
   const placed = order.map((n, r) =>
-    box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m));
-  const at = new Map(placed.map((p) => [p.id, p]));
+    box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m, kidH));
+  const at = new Map();
+  for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
+  // the machine a box is drawn inside, or the box itself — see placeRow, where
+  // the same two lines carry the same rule
+  const outer = (id) => at.get(owner.get(id) || id);
   const bottom = PAD + placed.length * boxH + (placed.length - 1) * GAP_Y_COL;
   const right = x + w;
 
   const backs = links.filter((l) => l.back);
   const level = backLevels(backs.map((l) => {
-    const f = at.get(l.from), t = at.get(l.to);
+    const f = outer(l.from), t = outer(l.to);
     return [f.cy - ATTACH_OFF / 2, t.cy + ATTACH_OFF / 2];
   }));
   const overs = links.filter((l) => skipsABox(l, rowOf));
   const overLevel = backLevels(overs.map((l) => {
-    const f = at.get(l.from), t = at.get(l.to);
+    const f = outer(l.from), t = outer(l.to);
     return [f.cy + ATTACH_OFF / 2, t.cy - ATTACH_OFF / 2];
   }));
   // 🔴 A STEP'S NAME TAKES THE ROW IT SITS IN, NOT HALF A BOX. Between two
@@ -616,13 +781,23 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInse
 
   const drawn = [];
   for (const l of links) {
-    const f = at.get(l.from), t = at.get(l.to);
+    // 🔴 IN ONE COLUMN EVERY LINK ATTACHES TO THE MACHINE, NEVER TO A BOX
+    // INSIDE IT — and the row layout is the opposite, for one reason that
+    // decides both. A container's own name sits at the TOP of it with its
+    // boxes under, so the ground between a container's edge and a box inside
+    // it is EMPTY sideways and FULL downwards. Here every run is vertical:
+    // MEASURED, an arrow drawn into a box inside `Raspberry Pi` ran straight
+    // through the words `Raspberry Pi` on its way, which is the same defect as
+    // a lane through its own name and has three checks of its own already.
+    // Left to right the same arrow crosses nothing but padding, so there it
+    // reaches the box it names.
+    const f = outer(l.from), t = outer(l.to);
     if (!l.back) {
       const o = overs.indexOf(l);
       if (o < 0) {
         const down = rowOf.get(l.to) > rowOf.get(l.from);
-        const y1 = down ? f.y + boxH + EDGE_OUT : f.y - EDGE_OUT;
-        const y2 = down ? t.y - EDGE_OUT - 1 : t.y + boxH + EDGE_OUT + 1;
+        const y1 = down ? f.y + f.h + EDGE_OUT : f.y - EDGE_OUT;
+        const y2 = down ? t.y - EDGE_OUT - 1 : t.y + t.h + EDGE_OUT + 1;
         const lab = wrapLines(l.label, fwdBudget, 1, measure.link);
         if (lab.cut) {
           cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
@@ -644,7 +819,7 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInse
       // left gutter's rule, mirrored.
       const bx = right + rightInset - 4 - (overs.length - 1 - overLevel[o]) * LANE_STEP;
       const sy = f.cy + ATTACH_OFF / 2, ty = t.cy - ATTACH_OFF / 2;
-      const sx = f.x + w + EDGE_OUT, tx = t.x + w + EDGE_OUT + 1;
+      const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w + EDGE_OUT + 1;
       const lab = wrapLines(l.label, skipBudget, 1, measure.link);
       if (lab.cut) {
         cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
@@ -725,16 +900,41 @@ function sideLane(sx, sy, tx, ty, bx, hs) {
  * is WHICH STRINGS were measured, not how.
  */
 export function captionTexts(spec, nodes) {
-  return [spec?.caption || '']
-    .concat((nodes || []).map((n) => n.title || n.label?.full || ''));
+  // what the line will SAY for a box — its own sentence if it has one, its
+  // name if it does not. Reserving against the name while the pointer shows
+  // the sentence is the same defect as reserving against the box while the
+  // pointer shows the caption, one step further in.
+  const says = (n) => n?.note || n?.title || n?.label?.full || '';
+  const out = [spec?.caption || ''];
+  for (const n of (nodes || [])) {
+    out.push(says(n));
+    for (const k of (n.kids || [])) out.push(says(k));
+  }
+  return out;
 }
 
-/** one box's geometry, and the baseline of every line of type inside it */
-function box(n, x, y, w, h, m) {
+/**
+ * one box's geometry, and the baseline of every line of type inside it — plus,
+ * for a container, the boxes it holds.
+ *
+ * 🔴 A CONTAINER IS MEASURED FROM ITS CONTENTS, NOT GUESSED AT. `h` already
+ * holds the room its children need (`layout` took the tallest of every box in
+ * the picture, containers included), so the only thing left here is to put the
+ * words and the boxes in it: the whole block — the container's own name, the
+ * gap under it, every child and every gap between them — is centred in the
+ * height, exactly as a plain box's two lines of type are. A container that
+ * top-aligned its contents would sit differently from every other box in the
+ * row for a reason a reader cannot see.
+ */
+function box(n, x, y, w, h, m, kidH) {
   const lab = n._lab, sub = n._sub;
-  const block = lab.lines.length * m.labLh + (sub.lines.length ? SUB_GAP + m.subLh : 0);
+  const ks = n._kids || [];
+  const own = lab.lines.length * m.labLh + (sub.lines.length ? SUB_GAP + m.subLh : 0);
+  const stack = ks.length
+    ? HEAD_GAP + ks.length * kidH + (ks.length - 1) * CHILD_GAP : 0;
+  const block = own + stack;
   const top = y + (h - block) / 2;
-  return {
+  const out = {
     id: n.id, kind: n.kind || 'plain', x, y, w, h,
     cx: x + w / 2, cy: y + h / 2,
     label: lab, sub,
@@ -742,6 +942,16 @@ function box(n, x, y, w, h, m) {
     subY: r1(top + lab.lines.length * m.labLh + SUB_GAP + m.subLh / 2 + m.subSize * 0.35),
     title: [lab.full, sub.full].filter(Boolean).join(' — '),
   };
+  if (n.note) out.note = String(n.note);
+  if (ks.length) {
+    let ky = top + own + HEAD_GAP;
+    out.kids = ks.map((c) => {
+      const p = box(c, x + CHILD_PAD, ky, w - CHILD_PAD * 2, kidH, m, 0);
+      ky += kidH + CHILD_GAP;
+      return p;
+    });
+  }
+  return out;
 }
 
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -791,7 +1001,11 @@ export function createDiagram(host, spec, { onRender } = {}) {
     defs.append(mk);
   }
   svg.append(defs);
-  svg.append(s('title', null, spec.title || 'a diagram'));
+  // ⚠️ `aria-label`, NEVER `<title>`. A `<title>` on the svg root is a NATIVE
+  // TOOLTIP over the whole picture, so the drawer that says it has no tooltips
+  // had one covering everything. `role="img"` plus a label is the same
+  // accessible name with nothing drawn.
+  svg.setAttribute('aria-label', spec.title || 'a diagram');
 
   // The ruler. Parked off to one side rather than hidden, because a
   // `display: none` ancestor is precisely what makes getComputedTextLength
@@ -804,7 +1018,22 @@ export function createDiagram(host, spec, { onRender } = {}) {
 
   const cap = document.createElement('figcaption');
   cap.className = 'pos-dg-cap';
-  cap.textContent = spec.caption || '';
+  // ⚠️ ONE FUNCTION WRITES THIS LINE, and the height reservation calls the
+  // SAME one. Bold is wider than the face beside it, so a sentence measured as
+  // plain text and drawn with a bold run in it can take one more line than was
+  // reserved — which is the jump this whole mechanism exists to prevent,
+  // reintroduced by the measurement instead of by the drawing.
+  const say = (text) => {
+    cap.textContent = '';
+    for (const part of boldParts(text)) {
+      if (!part.text) continue;
+      if (!part.bold) { cap.append(part.text); continue; }
+      const b = document.createElement('strong');
+      b.textContent = part.text;
+      cap.append(b);
+    }
+  };
+  say(spec.caption || '');
 
   wrap.append(head, svg, cap);
   host.append(wrap);
@@ -814,7 +1043,7 @@ export function createDiagram(host, spec, { onRender } = {}) {
   /** the line under the picture, back to what it says when nothing is hovered */
   const resetCaption = () => {
     delete cap.dataset.on;
-    cap.textContent = spec.caption || '';
+    say(spec.caption || '');
   };
 
   // ── measuring ─────────────────────────────────────────────────────────
@@ -859,6 +1088,77 @@ export function createDiagram(host, spec, { onRender } = {}) {
     };
   }
 
+  /**
+   * one box, drawn — a plain one, a container, or a box inside a container.
+   *
+   * 🔴 A CONTAINER AND THE BOXES IN IT ARE SIBLINGS IN THE MARKUP, never
+   * nested `<g>`s, and that is a CSS decision rather than a drawing one:
+   * `.pos-dg-n[data-kind="here"] .pos-dg-box` is a DESCENDANT selector, so a
+   * box drawn inside a `here` group would take the container's styling as well
+   * as its own, and hovering the machine would restyle everything in it. Two
+   * flat groups cannot do that. The nesting a reader sees is geometry, which
+   * is where this file keeps everything else.
+   */
+  const nodeGroup = (n) => {
+    const g = s('g', { class: 'pos-dg-n', 'data-kind': n.kind, tabindex: '0' });
+    // 🔴 `aria-label`, NOT `<title>`. A `<title>` here is the browser's own
+    // tooltip, which drew this box's name ON TOP of the box while the line
+    // under the picture was already saying it — the same words in three
+    // places. The label is the only thing a screen reader now has, so it
+    // carries the whole of the box: its name and its sub UNCUT, which keeps
+    // the promise that shortening hides text and never loses it, and the
+    // sentence, which is what a sighted reader gets from the caption.
+    //
+    // ⚠️ WITH THE ASTERISKS TAKEN OUT. A reader of the page sees a heavier
+    // face; a reader of this attribute would have heard "star star" twice a
+    // sentence, which is the mark leaking out of the one place that renders
+    // it. MEASURED on /grains/ before this line existed.
+    const spoken = (t) => boldParts(t).map((q) => q.text).join('');
+    g.setAttribute('aria-label',
+      [n.title, n.note && spoken(n.note)].filter(Boolean).join('. '));
+    g.append(s('rect', {
+      class: n.kids ? 'pos-dg-box pos-dg-cbox' : 'pos-dg-box',
+      x: n.x + 0.5, y: n.y + 0.5, width: n.w - 1, height: n.h - 1, rx: 5, ry: 5,
+    }));
+    if (n.label.lines.length) {
+      const t = s('text', { class: 'pos-dg-lab', x: r1(n.cx), y: n.labY[0],
+                            'text-anchor': 'middle' });
+      n.label.lines.forEach((line, i) => {
+        t.append(s('tspan', { x: r1(n.cx), y: n.labY[i] }, line));
+      });
+      g.append(t);
+    }
+    if (n.sub.lines.length) {
+      g.append(s('text', { class: 'pos-dg-sub', x: r1(n.cx), y: n.subY,
+                           'text-anchor': 'middle' }, n.sub.lines[0]));
+    }
+    // Hovering writes what this box DOES into the line under the picture.
+    // Not a tooltip: a tooltip is drawn on top of the thing it describes and
+    // is read again every time you point at one, so it has to stay two short
+    // lines. A line under the picture is read in place, has room for a whole
+    // sentence, and costs no positioning code at all.
+    //
+    // ⚠️ AND IT SAYS SOMETHING THE BOX DOES NOT. It used to write the box's
+    // own name and sub — `Raspberry Pi — another granulator`, under a box
+    // reading `Raspberry Pi` / `another granulator` — so pointing at a box
+    // repeated it. `note` is a sentence about what that box is for here; with
+    // none written the name is still better than an empty line.
+    const show = () => {
+      g.dataset.on = '1';
+      cap.dataset.on = '1';
+      say(n.note || n.title || n.label.full);
+    };
+    const hide = () => {
+      delete g.dataset.on;
+      resetCaption();
+    };
+    g.addEventListener('pointerenter', show);
+    g.addEventListener('pointerleave', hide);
+    g.addEventListener('focus', show);
+    g.addEventListener('blur', hide);
+    return g;
+  };
+
   let lastW = -1;
 
   function render() {
@@ -893,7 +1193,16 @@ export function createDiagram(host, spec, { onRender } = {}) {
     resetCaption();
     field.textContent = '';
 
-    // links first, so a box is never drawn under its own arrow
+    // 🔴 THREE PASSES, AND THE ORDER IS THE WHOLE OF IT. Containers first,
+    // because an arrow that reaches a box INSIDE one has to cross that
+    // container's edge and would otherwise be painted over by the machine it
+    // is entering — the fork bug in a new costume, where a line ends somewhere
+    // the reader cannot see it end. Then the links, so no box is drawn under
+    // its own arrow. Then every box that holds nothing, which is the layer the
+    // reader is meant to read. With no container in the picture the first pass
+    // emits nothing and the order is what it always was.
+    for (const n of L.nodes) if (n.kids) field.append(nodeGroup(n));
+
     for (const l of L.links) {
       field.append(s('path', {
         class: l.back ? 'pos-dg-link pos-dg-back' : 'pos-dg-link',
@@ -906,50 +1215,16 @@ export function createDiagram(host, spec, { onRender } = {}) {
       l.lab.lines.forEach((line, i) => {
         t.append(s('tspan', { x: r1(l.lx), dy: i ? m.linkLh : 0 }, line));
       });
-      if (l.lab.cut) t.append(s('title', null, l.lab.full));
+      // the whole name for a screen reader, with NO native tooltip — this is
+      // the same trade the boxes make, and a cut is reported on `cuts` for the
+      // author rather than hidden behind a hover for the reader
+      if (l.lab.cut) t.setAttribute('aria-label', l.lab.full);
       field.append(t);
     }
 
     for (const n of L.nodes) {
-      const g = s('g', { class: 'pos-dg-n', 'data-kind': n.kind, tabindex: '0' });
-      // <title> FIRST, so the browser's own tooltip and a screen reader both
-      // get the whole string — the promise that a cut hides text and never
-      // loses it. It costs nothing and it is the accessible path, which is why
-      // there is no hand-built tooltip anywhere in this file.
-      g.append(s('title', null, n.title));
-      g.append(s('rect', { class: 'pos-dg-box', x: n.x + 0.5, y: n.y + 0.5,
-                           width: n.w - 1, height: n.h - 1, rx: 5, ry: 5 }));
-      if (n.label.lines.length) {
-        const t = s('text', { class: 'pos-dg-lab', x: r1(n.cx), y: n.labY[0],
-                              'text-anchor': 'middle' });
-        n.label.lines.forEach((line, i) => {
-          t.append(s('tspan', { x: r1(n.cx), y: n.labY[i] }, line));
-        });
-        g.append(t);
-      }
-      if (n.sub.lines.length) {
-        g.append(s('text', { class: 'pos-dg-sub', x: r1(n.cx), y: n.subY,
-                             'text-anchor': 'middle' }, n.sub.lines[0]));
-      }
-      // Hovering writes what this box does into the line UNDER the picture.
-      // Not a tooltip: a tooltip is drawn on top of the thing it describes and
-      // is read again every time you point at one, so it has to stay two short
-      // lines. A line under the picture is read in place, has room for a whole
-      // sentence, and costs no positioning code at all.
-      const show = () => {
-        g.dataset.on = '1';
-        cap.dataset.on = '1';
-        cap.textContent = n.title || n.label.full;
-      };
-      const hide = () => {
-        delete g.dataset.on;
-        resetCaption();
-      };
-      g.addEventListener('pointerenter', show);
-      g.addEventListener('pointerleave', hide);
-      g.addEventListener('focus', show);
-      g.addEventListener('blur', hide);
-      field.append(g);
+      if (n.kids) for (const k of n.kids) field.append(nodeGroup(k));
+      else field.append(nodeGroup(n));
     }
 
     // 🔴 THE LINE UNDER THE PICTURE KEEPS ITS HEIGHT, OR HOVERING MOVES THE
@@ -965,19 +1240,36 @@ export function createDiagram(host, spec, { onRender } = {}) {
     // hovered, and the one moment they differ is the one moment a re-layout
     // is running — which is when this code is reached. MEASURED at the point
     // the two came apart: `min-height: 19px` under a 97 px caption, so the
-    // next un-hover grew the block by 78 px. `captionTexts` names the set.
+    // next un-hover grew the block by 78 px. `captionTexts` names the set,
+    // which now includes every box's own SENTENCE and every box inside a
+    // container — the two things this line can hold that the boxes did not
+    // used to have.
+    //
+    // ⚠️ AND IT IS MEASURED THROUGH `say`, THE SAME WRITER THE HOVER USES.
+    // Setting `textContent` here would measure `**bold**` as six characters of
+    // literal asterisks in the ordinary face, while the hover draws a heavier
+    // one that is wider — so the string that reserved three lines could be
+    // drawn in four. A reservation taken with a different renderer is not a
+    // reservation.
     cap.style.minHeight = '';
-    const keep = cap.textContent;
+    const keep = [...cap.childNodes];       // put back exactly what was there
     let capH = 0;
     for (const text of captionTexts(spec, L.nodes)) {
-      cap.textContent = text;
+      say(text);
       capH = Math.max(capH, cap.offsetHeight);
     }
-    cap.textContent = keep;
+    cap.textContent = '';
+    cap.append(...keep);
     cap.style.minHeight = `${capH}px`;
 
     api.cuts = L.cuts;
     api.mode = L.mode;
+    for (const l of L.inside || []) {
+      // two boxes inside one container, with a line asked for between them.
+      // Reported rather than drawn: see the header.
+      console.warn(`[diagram] ${l.from} and ${l.to} are in the same box, `
+        + 'so there is no room for an arrow between them — it is not drawn');
+    }
     if (L.cycle) {
       // every link pointing forward in a loop means somebody forgot a
       // `back: true`. The picture is still drawn — a diagram that looks wrong
