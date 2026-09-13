@@ -9,17 +9,20 @@
 <style>
   .pad { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px;
          background: var(--card); touch-action: none; cursor: crosshair; }
-  .gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 12px; }
+  /* the row under the canvas: the knob that changes it, and the one
+     destructive button, pushed to the far end of the same row */
+  .foot { margin-top: 18px; }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createSlider } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { holdSample, lerpSample, catmullSample } from '/shell/pointer-adapter.mjs';
 
   const d = mount({
     name: 'draw',
-    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and one sample every tenth of a second — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The knob under it is how much a player is allowed to invent between two samples — at nothing the line is a staircase, at everything it is a curve through the same points — and the numbers say how far that sits from what happened, and how much of the blue line no sample attests.',
+    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The two knobs under it are how often a sample is written down and how much a player is allowed to invent between two of them, and the two buttons beside them decide where those samples go — evenly in time, or the same number of them placed where the line turns.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
@@ -33,9 +36,12 @@
     // The suite reaches it the real way now: `verify.mjs` dispatches actual
     // pointer events across any element marked `data-gesture`, so what the
     // checks below grade is a drag, the same as yours.
-    controls: [
-      { id: 'clear', label: 'Clear' },
-    ],
+    // ⚠️ EMPTY ON PURPOSE. The shell's control bar sits ABOVE the page body,
+    // and this page's only button belongs under the canvas beside the knob —
+    // in the row it acts on, at the far end of it, away from the surface you
+    // draw on. `verify.mjs` presses `.pos-controls button` wherever the row
+    // is, so the footer row below is reached exactly like a top one.
+    controls: [],
   });
   guard(d);
 
@@ -44,8 +50,91 @@
   // this page decimated by emptying its own buffer (`realTimePoints.length =
   // 0`), so the comparison it existed to make had already eaten its own ground
   // truth. `evidence` is every sample and is never touched by the throttle.
-  const STORE_MS = 100;
-  let evidence = [], stored = [], lastStoreAt = -1e9;
+  // The rate is a CONTROL, because it is the other half of this page's
+  // question. The knob below the canvas says how much a player may invent
+  // between two samples; this says how many samples there are to invent
+  // between. Move it and `kept`, `invented` and `off by` all move — at 20 ms
+  // interpolation has almost nothing to do, and at half a second no
+  // interpolator rescues a fast corner.
+  let storeMs = 100;
+  // 'clock' — one sample every `storeMs`. 'bends' — the same NUMBER of samples,
+  // placed where the line actually turns. Two strategies, not two points on one
+  // axis, which is why this is a pair of buttons and the smoothing is a knob.
+  let where = 'clock';
+  let evidence = [], stored = [];
+
+  /**
+   * The sparse record, DERIVED from the evidence rather than taken instead of
+   * it — so the rate can change after the fact and the same gesture can be
+   * asked the question again.
+   *
+   * 🔴 THE LAST SAMPLE IS ALWAYS KEPT. A plain wall-clock throttle drops the
+   * endpoint whenever a gesture ends mid-interval, and every replay then
+   * undershoots the place the hand actually reached. It is rule 2 of the
+   * capture discipline in `demo/shell/cc-adapter.mjs` and it belongs here for
+   * the same reason.
+   */
+  function onAClock() {
+    const out = [];
+    let last = -1e9;
+    for (const p of evidence) {
+      if (p.at - last >= storeMs) { last = p.at; out.push(p); }
+    }
+    const end = evidence[evidence.length - 1];
+    if (out[out.length - 1] !== end) out.push(end);
+    return out;
+  }
+
+  /**
+   * 🔴 THE SAME NUMBER OF SAMPLES, PUT WHERE THE LINE BENDS.
+   *
+   * A clock spends its budget evenly, which means it spends most of it on the
+   * straight parts — where a player could have worked the line out anyway —
+   * and arrives at a corner with nothing left. This keeps the two ends, then
+   * repeatedly adds whichever point sits furthest from the straight line
+   * between the samples already kept (Douglas-Peucker, top down), until it has
+   * as many as the clock would have taken.
+   *
+   * ⚠️ THE COUNT IS HELD EQUAL ON PURPOSE. "Better because it kept more" is not
+   * a finding, it is a bigger file. Equal count is the only comparison that
+   * says anything about WHERE samples should go.
+   */
+  function whereItBends(target) {
+    const n = evidence.length;
+    if (n <= 2 || target >= n) return evidence.slice();
+    const keep = new Set([0, n - 1]);
+    // deviation of point i from the chord a..b, in pixels
+    const dev = (a, b, i) => {
+      const A = evidence[a], B = evidence[b], P = evidence[i];
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const L = Math.hypot(dx, dy);
+      if (L < 1e-6) return Math.hypot(P.x - A.x, P.y - A.y);
+      return Math.abs(dy * (P.x - A.x) - dx * (P.y - A.y)) / L;
+    };
+    // the worst point inside each open segment, kept as a small work list
+    const worstIn = (a, b) => {
+      let best = -1, bestD = -1;
+      for (let i = a + 1; i < b; i++) { const dd = dev(a, b, i); if (dd > bestD) { bestD = dd; best = i; } }
+      return { i: best, d: bestD };
+    };
+    const segs = [{ a: 0, b: n - 1, ...worstIn(0, n - 1) }];
+    while (keep.size < target) {
+      let pick = -1, pickD = -1;
+      for (let k = 0; k < segs.length; k++) if (segs[k].i > 0 && segs[k].d > pickD) { pickD = segs[k].d; pick = k; }
+      if (pick < 0) break;                       // nothing left that bends
+      const { a, b, i } = segs[pick];
+      keep.add(i);
+      segs.splice(pick, 1, { a, b: i, ...worstIn(a, i) }, { a: i, b, ...worstIn(i, b) });
+    }
+    return [...keep].sort((x, y) => x - y).map((i) => evidence[i]);
+  }
+
+  function decimate() {
+    stored = [];
+    if (!evidence.length) return;
+    const clocked = onAClock();
+    stored = where === 'bends' ? whereItBends(clocked.length) : clocked;
+  }
 
   // ⚠️ STAMP AT SOURCE. `event.timeStamp` is the browser's own clock for when
   // the input happened; `performance.now()` read in the handler is when we got
@@ -55,7 +144,6 @@
 
   function push(at, x, y, pressure) {
     evidence.push({ at, x, y, pressure });
-    if (at - lastStoreAt >= STORE_MS) { lastStoreAt = at; stored.push({ at, x, y, pressure }); }
   }
 
   // ── reconstruction ───────────────────────────────────────────────────────
@@ -109,8 +197,6 @@
   cv.width = W * 2; cv.height = H * 2;
   cv.style.aspectRatio = `${W} / ${H}`;
   d.el.append(cv);
-  const gut = el('div', 'gut', 'draw on it with a finger or a mouse');
-  d.el.append(gut);
   const ctx = cv.getContext('2d');
 
   const css = getComputedStyle(document.documentElement);
@@ -127,7 +213,7 @@
   const C = { drawn: tok('--fg', '#e6e6e6'), guess: '#7aa2f7', dim: tok('--dim', '#8b93a1'),
               card: tok('--card', '#11151d') };
 
-  let drawnPoints = 0;
+  let drawnPoints = 0, drawn = [];
   function paint() {
     ctx.save();
     ctx.scale(2, 2);
@@ -145,6 +231,7 @@
     // What a player reconstructs from the sparse record, sampled at the rate a
     // screen actually draws — which is why most of it is invented.
     drawnPoints = 0;
+    drawn = [];
     if (stored.length > 1) {
       const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
       const step = Math.max(2, (t1 - t0) / 900);
@@ -152,7 +239,7 @@
       let first = true;
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
-        drawnPoints++;
+        drawnPoints++; drawn.push(s);
         if (first) { ctx.moveTo(s.x, s.y); first = false; } else ctx.lineTo(s.x, s.y);
       }
       ctx.stroke();
@@ -180,7 +267,30 @@
     return n ? { mean: sum / n, worst, n } : null;
   }
 
+  /**
+   * How far the reconstruction sits from what happened AS A SHAPE — nearest
+   * point on the drawn line to each sample, with time thrown away.
+   *
+   * 🔴 TWO QUESTIONS, AND THEY HAVE DIFFERENT ANSWERS. `error()` asks "where
+   * does the record say the hand was at 4.212 s", which is what a playback
+   * needs. This asks "does the ink go through the same places", which is what
+   * a drawing needs. A record can be excellent at one and poor at the other,
+   * and this page measured exactly that on its first run.
+   */
+  function shapeError() {
+    if (evidence.length < 2 || drawn.length < 2) return null;
+    let sum = 0, worst = 0, n = 0;
+    for (const e of evidence) {
+      let best = Infinity;
+      for (const s of drawn) { const dd = (s.x - e.x) ** 2 + (s.y - e.y) ** 2; if (dd < best) best = dd; }
+      const dist = Math.sqrt(best);
+      sum += dist; if (dist > worst) worst = dist; n++;
+    }
+    return n ? { mean: sum / n, worst, n } : null;
+  }
+
   function render() {
+    decimate();
     paint();
     const err = error();
     // no `0` before there is anything to count — an untouched canvas has not
@@ -189,13 +299,6 @@
     d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
     d.set('worst', err ? err.worst.toFixed(2) : '');
-    const how = smooth <= HOLD ? 'held at the last sample'
-      : smooth >= SMOOTH ? 'smoothed through them'
-        : smooth === LINEAR ? 'joined by straight lines'
-          : smooth < LINEAR ? 'between held and straight' : 'between straight and smoothed';
-    gut.textContent = stored.length
-      ? `${stored.length} samples kept of ${evidence.length} · ${drawnPoints} points drawn from them, ${how}`
-      : 'draw on it with a finger or a mouse';
   }
 
   // ── drawing with a finger ────────────────────────────────────────────────
@@ -225,19 +328,37 @@
     cv.addEventListener(t, () => { drawing = false; render(); check(); });
   }
 
-  function reset() { evidence = []; stored = []; lastStoreAt = -1e9; }
+  function reset() { evidence = []; stored = []; }
 
-  // UNDER the canvas, because it changes the picture above it and a control
-  // that sits below what it moves is read in the order it is used.
-  const pick = createSlider({
-    label: 'smoothing', min: 0, max: 100, step: 1, value: 100, unit: '%',
-    onInput: (v) => { smooth = v / 100; render(); },
+  // UNDER the canvas, because they change the picture above them and a control
+  // that sits below what it moves is read in the order it is used. A GROUP, not
+  // two sliders in a div: `createSliderGroup` shares one set of columns, so the
+  // longer label cannot push its own lane sideways.
+  const knobs = createSliderGroup([
+    createSlider({
+      label: 'sample every', min: 10, max: 500, step: 10, value: 100, unit: 'ms',
+      onInput: (v) => { storeMs = v; render(); },
+    }),
+    createSlider({
+      label: 'smoothing', min: 0, max: 100, step: 1, value: 100, unit: '%',
+      onInput: (v) => { smooth = v / 100; render(); },
+    }),
+  ]);
+  const put = createChoice({
+    label: 'samples go',
+    options: [['evenly in time', 'clock'], ['where the line bends', 'bends']],
+    at: 0,
+    onPick: (v) => { where = v; render(); },
   });
-  const row = el('div', 'pos-controls');
-  row.append(pick.el);
-  d.el.insertBefore(row, gut);
 
-  d.on('clear', () => { reset(); render(); });
+  // The destructive one, at the far end of the row — deleting what you just
+  // made must not sit shoulder to shoulder with the thing that changes it.
+  const clear = el('button', '', 'Clear', { type: 'button', 'data-end': '1' });
+  clear.addEventListener('click', () => { reset(); render(); });
+
+  const row = el('div', 'pos-controls foot');
+  row.append(knobs.el, put.el, clear);
+  d.el.append(row);
 
   // ── the page checks itself, once, on the first line you finish ───────────
   // Not on every `pointerup`: `d.assert` appends, so checking on each one would
@@ -281,6 +402,40 @@
     d.assert('smoothing is many times closer than holding the last sample',
       errs.hold / errs.catmull > 5,
       `${(errs.hold / errs.catmull).toFixed(0)}x closer — ${errs.catmull.toFixed(3)} px against ${errs.hold.toFixed(2)} px`);
+
+    // 🔴 THE ONE THAT ANSWERS "HOW DO I MAKE THIS BETTER". Three levers exist —
+    // keep more samples, interpolate better, or put the samples somewhere
+    // cleverer — and only the third one is free. This grades the third with the
+    // COUNT HELD EQUAL, so it cannot win by keeping more.
+    const measure = (w) => { where = w; decimate(); paint(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
+    const evenly = measure('clock');
+    const bends = measure('bends');
+    where = 'clock'; render();
+
+    // 🔴 THIS CHECK WAS WRITTEN THE OTHER WAY ROUND AND THE PAGE REFUSED IT.
+    // The guess was that the same number of samples, put where the line turns,
+    // must beat samples spaced evenly — a straight stretch needs almost none
+    // and a corner needs them all. MEASURED, 30 samples either way, both ways:
+    //
+    //                      in time      as a shape
+    //   evenly in time     0.347 px     0.674 px
+    //   where it bends     3.009 px     0.958 px
+    //
+    // Evenly wins BOTH, and by 8.7x on the one that matters for playback. The
+    // reason is the reconstruction, not the placement: the blue line is a
+    // spline knotted on TIME, and picking samples by how far they sit from a
+    // straight line ignores time completely — so the knots come out unevenly
+    // spaced in the one dimension the curve is parameterised by, and it
+    // overshoots between the far-apart ones.
+    //
+    // So the answer to "how do I make the blue line closer" is: keep samples
+    // more often, or interpolate better. NOT: be cleverer about which ones you
+    // keep. Placing by shape is right for a line nobody replays — a coastline
+    // on a map — and wrong for a gesture that has to happen at the right time.
+    d.assert('a line replayed on a clock wants samples spaced on that clock, not samples where it bends',
+      evenly.t < bends.t && bends.n <= evenly.n,
+      `${evenly.n} samples either way — in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
+      + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
 
     // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
     // in a cell over a blank canvas is the defect this project has hit twice.

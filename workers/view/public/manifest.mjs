@@ -360,7 +360,11 @@ export function shortDate(iso) {
 export function rowHTML(d, i, opt = {}) {
   const href = opt.blocked ? null : targetOf(d);
   const bits = [];
-  if (ACTS.has(d.act)) bits.push(`<span class="pos-act">${ACTS.get(d.act)}</span>`);
+  // ⚠️ NO ACT PILL. Every row carried the name of its act in a yellow pill —
+  // `the substrate`, `one stream`, `many people` — which is the loudest ink on
+  // a row whose subject is the demo, and it repeated down the column because
+  // neighbours share an act. The act is still the story order and still groups
+  // the sequence page; it is not a label each row has to wear.
   for (const t of d.tags || []) bits.push(`<span class="pos-tag">${t}</span>`);
   const why = opt.blocked ? opt.says : d.why;
   if (why) bits.push(`<span class="pos-why">${why}</span>`);

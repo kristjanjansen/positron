@@ -26,9 +26,9 @@
           border-radius: 4px; overflow: hidden; margin: 0 0 10px; }
   .side { background: var(--card); padding: 10px 12px; min-width: 0; }
   /* ⚠️ NOT `.k`. That is the shell's PIANO KEY — 74 px tall, bordered, its own
-     background — and this page appends a real keyboard from the same stylesheet,
-     so a label wearing that class drew an empty key inside each block. A page
-     that borrows a shared stylesheet borrows its whole namespace. */
+     background — so a label wearing that class drew an empty key inside each
+     block, back when this page drew a keyboard. A page that borrows a shared
+     stylesheet borrows its whole namespace whether it draws keys or not. */
   .side .hd { display: block; font: 500 11px/1.4 var(--mono); color: var(--dim2);
               letter-spacing: .06em; text-transform: uppercase; }
   .side .ch { display: block; font: 600 17px/1.5 var(--mono); color: var(--hi); }
@@ -57,7 +57,6 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { createKeyboard } from '/shell/keyboard.mjs';
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
@@ -385,17 +384,39 @@
   const scope = createGrainScope(d.el, { seconds: 4, height: 140 });
   scope.source('the board sends sound and no grain events, so this is what the sound shows');
 
-  const kb = createKeyboard(d.el, {
-    base: 60,
-    onDown: (note) => { kb.lightNote(note, true); startAudio(); send({ type: 'note.on', note, vel: 100, channel: 0 }); },
-    onUp: (note) => { kb.lightNote(note, false); send({ type: 'note.off', note, channel: 0 }); },
-  });
-  // A gutter carries what this lane MEASURED or what it IS, never instructions.
-  // Which of the two things a key does here depends on what is in the buffers,
-  // and the two are genuinely different instruments — so it is filled in by
-  // render() rather than written once.
-  const keyLine = el('p', 'now', '');
-  d.el.append(keyLine);
+  /**
+   * 🔴 THE SETTINGS, DRAWN ON THE MINUTE THEY ACT ON. The numbers in the panel
+   * below say `reading 0.35 of the way through the sixty seconds`, which is a
+   * number rather than a place; here the same number is a band on the minute,
+   * and the drift walking it along is something you watch rather than a count.
+   *
+   * ⚠️ CENTRES FROM THE BOARD WHERE THERE ARE ANY. `params.state` comes back
+   * with the engine's own current read position for BOTH halves, and those are
+   * drawn solid; the width is `spray`, which the board does not report, so it
+   * is what this page sent. Nothing here is a grain — the board reports none,
+   * and a row of ticks derived from the requested rate is the picture this page
+   * already deleted once.
+   */
+  function paintWindows() {
+    const centre = (measured, asked) => (Number.isFinite(measured) ? measured : (asked ?? 0.5));
+    scope.window([
+      { label: 'one', at: centre(drift?.scan, live.m.scan), spray: live.m.spray,
+        rate: live.m.rate, size: live.m.size, measured: Number.isFinite(drift?.scan) },
+      { label: 'two', at: centre(drift?.scanN, live.n.scan), spray: live.n.spray,
+        rate: live.n.rate, size: live.n.size, measured: Number.isFinite(drift?.scanN) },
+    ], { seconds: 60 });
+  }
+
+  // 🔴 NO KEYBOARD. There was one, and pressing it did nothing you could hear:
+  // a patch holds its own chord, `Hold what it has` then stops the board
+  // listening, and from that moment the grains come only from the minute
+  // already in the buffer — so a new note reaches an instrument that is no
+  // longer feeding anything. A control that looks live and is inert is worse
+  // than no control, and this page's whole subject is a granulator reading
+  // material that is already there.
+  //
+  // The note the CHECK holds is sent directly (see `probeSound`), because that
+  // is a measurement rather than an instrument.
 
   // ── drawing ──────────────────────────────────────────────────────────────
   const secs = (ms) => `${Math.round(ms / 1000)} s`;
@@ -410,11 +431,12 @@
   }
   function materialLong() {
     if (!answered) return null;
-    if (playing) return [el('b', '', playing), ' · playing into the granulator, and the keys play it'];
+    if (playing) return [el('b', '', playing), ' · playing into the granulator, and the patch holds its own chord'];
     return [el('b', '', 'nothing'), ' · the board has no sound running, so the granulator has an empty recording to read'];
   }
 
   function render() {
+    paintWindows();
     // ── the readout ──
     // `answers` rather than `answering`, and `1.1+2.1` rather than `1.1 + 2.1`:
     // two characters each, and the difference between a cell that reads and a
@@ -468,7 +490,6 @@
       }[st];
       b.append(el('b', '', say[0]), el('span', '', say[1]));
       panel.append(b);
-      keyLine.textContent = '';
       return;
     }
     // ⚠️ THE PATCH, NOT THE BOARD'S LAST ROLL. `params.state` answers with the
@@ -494,7 +515,6 @@
     // 0 nudges … reading at —` about a board that was moving nothing at all: a
     // headline claim with its own contradiction printed beside it.
     panel.append(el('p', 'drift', driftLine()));
-    keyLine.textContent = '';
   }
 
   // ── audio out of this page ───────────────────────────────────────────────
@@ -973,6 +993,22 @@
           ? `switched on and circling nothing — ${moved ? `${moved.nudges} nudges in ${secs(moved.ms)}` : 'no window yet'}, `
             + 'which is the right count for a board with no roll to circle, not a stalled timer'
           : dstate === 'off' ? 'the movement is switched off on the board' : 'the board said nothing about movement');
+    // 🔴 NOTHING IN THE SUITE LOOKS AT INK, and this picture's whole risk is
+    // being a confident drawing of numbers nobody measured. Two claims in one:
+    // there are pixels in it, and the centre of each band came back FROM the
+    // engine rather than being the value this page sent it.
+    const win = scope.el.querySelector('.pos-scope-w');
+    const lit = (() => {
+      if (!win || !win.width) return 0;
+      const px = win.getContext('2d').getImageData(0, 0, win.width, win.height).data;
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i] > 70 && px[i + 1] > 55) n++;
+      return n;
+    })();
+    d.assert('the picture of where it reads is drawn, and both centres are the board’s own',
+      lit > 200 && Number.isFinite(drift?.scan) && Number.isFinite(drift?.scanN),
+      `${lit} lit pixels · one at ${drift?.scan ?? 'not said'}, two at ${drift?.scanN ?? 'not said'}`);
+
     d.assert('a named patch is on screen, chosen rather than rolled',
       !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,
       `${PATCHES[patch].name} · ${PATCHES[patch].voice} · ${PATCHES[patch].notes.length} notes`);

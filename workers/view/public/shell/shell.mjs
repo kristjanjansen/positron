@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '9291139-084321';
+export const BUILD = '4797604-090341';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -83,6 +83,12 @@ export function mount({
   }
 
   const cbar = el('div', 'pos-controls');
+  // ⚠️ A ROW WITH NOTHING IN IT STILL TAKES ITS MARGIN. `.pos-controls` carries
+  // 14 px under it, so a page that declares no controls — `lanes`, and `draw`
+  // now that its one button lives in its own footer row — got a band of dead
+  // space between the readout and the page, which reads as something that
+  // failed to render rather than as nothing being there.
+  if (!controls.length) cbar.hidden = true;
   const handlers = new Map();
   for (const c of controls) {
     const b = el('button', c.primary ? 'pos-pri' : '', c.label);
