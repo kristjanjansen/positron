@@ -135,9 +135,11 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
       ctx.fillText(String(k).toUpperCase(), x, fy);
       ctx.fillStyle = v == null || v === '' ? DIM : FG;
       ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
-      // ⚠️ AN EM DASH, NOT A ZERO. A missing measurement must print as ABSENT
-      // — a zero reads as a very impressive measurement.
-      ctx.fillText(v == null || v === '' ? '—' : String(v), x, fy + 12);
+      // ⚠️ NOTHING, NOT A ZERO. A missing measurement prints as ABSENT — a
+      // zero reads as a very impressive measurement of nothing. It drew an em
+      // dash until 2026-09-13; the label above the slot already says the slot
+      // is there, and a column of dashes reads as failed readings.
+      if (v != null && v !== '') ctx.fillText(String(v), x, fy + 12);
     });
 
     ctx.restore();

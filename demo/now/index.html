@@ -493,8 +493,8 @@
         for (const r of Object.values(j || {})) {
           const at = Number(r?.startTime) * 1000;
           if (!Number.isFinite(at) || !at) continue;
-          const clean = (r.programName || r.programNameTx || r.name || '—').replace(/\*\s*$/, '').trim();
-          rows.push({ at, name: clean || '—', repeat: r.automaticReplay === 'Y' });
+          const clean = (r.programName || r.programNameTx || r.name || '').replace(/\*\s*$/, '').trim();
+          rows.push({ at, name: clean || '', repeat: r.automaticReplay === 'Y' });
         }
       } catch { /* the schedule is decoration; the line stands without it */ }
       return rows;

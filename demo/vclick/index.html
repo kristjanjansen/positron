@@ -443,7 +443,7 @@
     const pos = parent.position();
     d.set('beat', Math.round(tm.beatAtMs(pos) * 100) / 100);
     const fold = parent.reduceAt('note', pos);
-    d.set('fold', fold && Number.isFinite(fold.count) ? fold.count : '—');
+    d.set('fold', fold && Number.isFinite(fold.count) ? fold.count : '');
   }, 200);
 
   d.on('sound', () => {
