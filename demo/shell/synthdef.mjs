@@ -54,6 +54,35 @@
 
 export const MAGIC = 'SCgf';
 
+/**
+ * 🔴 THE CEILING BOTH ENDS DEFAULT TO. One number, declared once, so the
+ * browser and the Raspberry Pi cannot disagree about what will load.
+ *
+ * The point is not the number, it is that it is the SAME number. "The same
+ * instrument, two ends" is only literally true while a definition loads in
+ * both — and the two engines have different appetites, so the smaller one sets
+ * the table. MEASURED (research §8.2): over this size wasm scsynth answers
+ * NOTHING AT ALL to `/d_recv` — no `/fail`, no late reply, no console line. A
+ * silent refusal is the worst failure shape available, because a definition
+ * that was never received is indistinguishable from one that loaded and makes
+ * no sound.
+ *
+ * ⚠️ WHY 64 KiB IS THIS NUMBER IS UNDER INVESTIGATION, and the answer may move
+ * it — `research/synthdef-size-limit-2026-09.md`. The candidates have different
+ * consequences: an OSC datagram limit binds the MESSAGE and so binds the
+ * browser but not the board (which can `/d_load` from disk), while a format or
+ * buffer limit binds both. That is exactly why it is a named constant with a
+ * pointer to the open question rather than `65536` typed into three files.
+ */
+export const SIZE_CEILING = 64 * 1024;
+
+/** Does this definition fit the ceiling both ends honour? Reports the margin,
+ *  because "how close" is the question anybody asks next. */
+export const fitsCeiling = (bytes) => {
+  const n = bytes.byteLength ?? bytes.length ?? 0;
+  return { fits: n <= SIZE_CEILING, bytes: n, margin: SIZE_CEILING - n };
+};
+
 /** The four rates a building block can run at, named the way a page can print them. */
 export const RATE = { once: 0, slow: 1, sample: 2, demand: 3 };
 export const RATE_NAME = ['once', 'slow', 'per sample', 'on demand'];
