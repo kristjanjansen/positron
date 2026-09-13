@@ -288,9 +288,19 @@ export const PLACE = {
   near: 0.55, far: 6.0,
   lowest: 0.45,            // the CENTRE's lowest y above the floor
   highest: 3.0,
-  barH: 0.045,             // the grab bar's height
-  barGap: 0.022,           // air between the panel's lower edge and the bar
-  barShare: 0.42,          // how much of the panel's width the bar spans
+  // ⚠️ THE BAR'S THREE NUMBERS, SET BY LOOKING AT IT IN A HEADSET. The first
+  // guess was 0.42 of the width, 45 mm tall, 22 mm clear — and in the headset it
+  // read as a second object competing with the picture rather than as a handle
+  // on it. Asked for narrower, shorter and further off: **0.28 of the width,
+  // 32 mm, 38 mm clear**. A handle should be findable and unremarkable; the
+  // picture is the thing you came to look at.
+  // ⚠️ The gap grew as the bar shrank, deliberately — a smaller handle sitting
+  // closer reads as part of the frame, and the whole reason it is separate is
+  // that "the ray on the picture" and "the ray on the handle" have to be
+  // different gestures.
+  barH: 0.032,             // the grab bar's height
+  barGap: 0.038,           // air between the panel's lower edge and the bar
+  barShare: 0.28,          // how much of the panel's width the bar spans
   pushPerSec: 1.6,         // metres a second, on a fully pushed thumbstick
   stickDead: 0.25,         // below this the stick is at rest
 };
