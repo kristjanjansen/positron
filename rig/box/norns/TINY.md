@@ -23,18 +23,20 @@ is scsynth's own OSC receive path and nothing on the page's side can raise it.
 
 ## What TINY drops, and what it must not
 
-| | bytes | UGens |
-|---|---|---|
-| FULL | 118,597 | 2,780 |
-| LITE | 73,297 | 1,706 |
-| **TINY** | **63,297** | **1,451** |
-| BARE | ⚠️ built 2026-09-13, **not weighed** | — |
+✅ **WEIGHED 2026-09-13**, all four arms on one machine in one sitting.
 
-🔴 **BARE's row is blank on purpose.** The rung exists in `Engine_Pappus.sc` and
-nobody has run it: `sclang` is only on the board. An estimate would be worse
-than a blank, for the reason two lines below — the size does not track the UGen
-count, so a guess is wrong in an unknown direction. `CHAIN.md`'s BARE section
-holds what it removes, why, and the exact commands that fill this row.
+| | bytes | UGens | headroom to 64 KiB |
+|---|---|---|---|
+| FULL | 121,425 | 2,812 | — |
+| LITE | 74,733 | 1,722 | — |
+| **TINY** | **64,733** | **1,467** | **803 B** |
+| **BARE** | **43,551** | **941** | **21,985 B** |
+
+⚠️ **THE OLD 118,597 / 73,297 / 63,297 ROW WAS A DIFFERENT BUILD** — taken
+before `report`. `report` and the BARE plumbing cost TINY **1,436 bytes**, so
+its headroom went from 2,239 to **803**: still inside the ceiling, and now one
+modest feature from not being. The cuts below are all still TINY's; BARE's
+column is in `CHAIN.md`, which holds what it removes and why.
 
 Four cuts, each in the engine's own idiom (`lite` already gates whole stages):
 

@@ -92,8 +92,14 @@ ssh "$USER_@$IP" 'cd /opt/positron-box/rig/vis 2>/dev/null && {
 # somewhere nothing reads, which is the exact failure this block exists to fix.
 SC_EXT="/home/$USER_/.local/share/SuperCollider/Extensions"
 echo "== the SuperCollider classes, to the path sclang actually compiles"
+# ⚠️ EVERY CLASS, NOT JUST THE ENGINE. `PosSource.sc` is a class too, so the
+# paragraph above applies to it word for word — and it is newer, so it is the
+# one most likely to be left behind. A missing class does not fail loudly:
+# sclang's compile stops at the first unknown name, `PAPPUS READY` never prints,
+# and `fx.pappus` reports "the engine came up but never reported READY".
 ssh "$USER_@$IP" "mkdir -p $SC_EXT/pappus/lib && \
   cp $DEST/rig/box/norns/Engine_Pappus.sc $SC_EXT/pappus/lib/Engine_Pappus.sc && \
+  cp $DEST/rig/box/norns/PosSource.sc $SC_EXT/pappus/lib/PosSource.sc && \
   cp $DEST/rig/box/norns/CroneEngine.sc $SC_EXT/CroneEngine.sc && echo '   classes installed'"
 
 echo "== what landed, against what was sent"
@@ -102,9 +108,12 @@ echo "== what landed, against what was sent"
 # ⚠️ THE ENGINE'S md5 IS THE ONE FROM THE EXTENSIONS PATH, not from $DEST — see
 # the block above. Printing $DEST's copy is printing a file nothing reads.
 ssh "$USER_@$IP" "md5sum $DEST/rig/box/box.mjs $DEST/rig/box/pappus.mjs \
-  $SC_EXT/pappus/lib/Engine_Pappus.sc 2>/dev/null"
-md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/Engine_Pappus.sc" 2>/dev/null \
-  || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/Engine_Pappus.sc"
+  $DEST/rig/box/norns/run-pappus.scd \
+  $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
+md5sum "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+  "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
+  || md5 -r "$SRC/box.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+     "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then
   echo "== restarting"
