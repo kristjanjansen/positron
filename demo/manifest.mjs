@@ -139,6 +139,22 @@ export const DEMOS = [
   { name: 'take', act: 3, created: '2026-09-07', built: true, settleMs: 13000,
     one: 'record two takes; they land end to end on one line and it plays and scrubs as one',
     tags: ['getUserMedia', 'MediaRecorder', 'timeline', 'local only'] },
+  // The 2025 experiment finished: an automation lane bound to a media clip,
+  // which died at one missing mapping — an absolute stamp had to reach a
+  // foreign media element's own position and then a pixel, and nothing
+  // converted. The clip is generated IN THE PAGE so the clock burned into the
+  // picture can be read back and compared with the playhead, which is the check
+  // the prototype could not make: it proved its four mappings against its own
+  // arithmetic.
+  //
+  // settleMs does the same two jobs it does on `take`. Control 0 does not exist
+  // here, so only the second one counts: it sizes the wait for the FIRST
+  // assert, and every assert sits behind a recorded clip, a drawn pass and a
+  // five-point seek sweep. Shrink it and the suite reads zero asserts and calls
+  // a working page broken.
+  { name: 'memento', act: 3, created: '2026-09-13', built: true, settleMs: 13000,
+    one: 'move a knob while a clip plays; it lands on the same line and comes back in the right place',
+    tags: ['MediaRecorder', 'timeline', 'canvas', 'local only'] },
   // The round trip a browser can make on its own: publish out through a worker
   // that holds the key, subscribe back, and record the copy that came back.
   // settleMs covers the WHIP handshake, the WHEP handshake and one take.
