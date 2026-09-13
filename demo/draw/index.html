@@ -7,21 +7,24 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .pad { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px;
-         background: var(--card); touch-action: none; cursor: crosshair; }
-  /* the row under the canvas: the knob that changes it, and the one
-     destructive button, pushed to the far end of the same row */
+  /* The pad styles itself — it is `demo/shell/xy-pad.mjs` now, not a canvas
+     this page dresses. What is left here is layout: the row under the transport
+     that carries the knob and the one destructive button, pushed to the far end
+     of the same row. */
   .foot { margin-top: 18px; }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
-  import { holdSample, lerpSample, catmullSample } from '/shell/pointer-adapter.mjs';
+  import { createXyPad, PAD } from '/shell/xy-pad.mjs';
+  import { holdSample, lerpSample, catmullSample, makePointerAdapter } from '/shell/pointer-adapter.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createDeck, observePosition } from '/timeline/transport.mjs';
 
   const d = mount({
     name: 'draw',
-    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The two knobs under it are how often a sample is written down and how much a player is allowed to invent between two of them, and moving either one moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
+    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player would reconstruct from the sparse record, and the yellow mark is where that record says your hand was at the position the bar is showing — press play and watch it retrace the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
@@ -33,10 +36,11 @@
     // line this page is about.
     //
     // The suite reaches it the real way now: `verify.mjs` dispatches actual
-    // pointer events across any element marked `data-gesture`, so what the
-    // checks below grade is a drag, the same as yours.
+    // pointer events across any element marked `data-gesture`, which the pad
+    // carries for every page that mounts one — so what the checks below grade
+    // is a drag, the same as yours.
     // ⚠️ EMPTY ON PURPOSE. The shell's control bar sits ABOVE the page body,
-    // and this page's only button belongs under the canvas beside the knob —
+    // and this page's only button belongs under the pad beside the knob —
     // in the row it acts on, at the far end of it, away from the surface you
     // draw on. `verify.mjs` presses `.pos-controls button` wherever the row
     // is, so the footer row below is reached exactly like a top one.
@@ -48,9 +52,12 @@
   // 🔴 TWO APPEND-ONLY LANES, NEVER ONE MUTABLE ARRAY. The 2025 ancestor of
   // this page decimated by emptying its own buffer (`realTimePoints.length =
   // 0`), so the comparison it existed to make had already eaten its own ground
-  // truth. `evidence` is every sample and is never touched by the throttle.
+  // truth. `evidence` is every sample and is never touched by the throttle; it
+  // is the PAD's capture, handed over as the live array, and the pad starts a
+  // fresh one on the next gesture rather than emptying this one.
+  //
   // The rate is a CONTROL, because it is the other half of this page's
-  // question. The knob below the canvas says how much a player may invent
+  // question. The knob below the pad says how much a player may invent
   // between two samples; this says how many samples there are to invent
   // between. Move it and `kept`, `invented` and `off by` all move — at 20 ms
   // interpolation has almost nothing to do, and at half a second no
@@ -137,16 +144,6 @@
     stored = evidence.length ? onAClock() : [];
   }
 
-  // ⚠️ STAMP AT SOURCE. `event.timeStamp` is the browser's own clock for when
-  // the input happened; `performance.now()` read in the handler is when we got
-  // round to it. The lineage re-stamped in the handler and this project has a
-  // rule about it — the gap is not a constant anybody could subtract later.
-  const stampMs = (ev) => ev.timeStamp;
-
-  function push(at, x, y, pressure) {
-    evidence.push({ at, x, y, pressure });
-  }
-
   // ── reconstruction ───────────────────────────────────────────────────────
   // The adapter's own interpolators, which is the whole reason this page did
   // not need writing: `holdSample`, `lerpSample` and `catmullSample` are the
@@ -165,6 +162,38 @@
   let smooth = SMOOTH;
   const mix = (p, q, k) => ({ ...p, x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
 
+  /**
+   * The reconstruction, as ONE function — between two attested samples, at
+   * smoothing `s`, with whatever neighbours there are.
+   *
+   * 🔴 IT IS ALSO THE ADAPTER'S `interpolate`, and that is deliberate. The blue
+   * line, the yellow mark and the transport's own read of the record all come
+   * through here, so the picture and the playhead cannot disagree about what
+   * the same record says. What that costs is worth writing down: the check
+   * below compares the transport's answer against this page's, and since both
+   * end in this function it CANNOT catch an arithmetic mistake in it — what it
+   * catches is the plumbing (a record the transport never received, a seek that
+   * asserts nothing, interpolation refused), which is what P2 is about. The
+   * arithmetic is graded separately, against the evidence, by `error()`.
+   *
+   * ⚠️ REFLECTED AT THE ENDS, and by `catmullSample` rather than by hand. This
+   * page used to build its own phantom — a DUPLICATE of the near sample placed
+   * one interval earlier, which halves the tangent — while its comment claimed
+   * a reflection. Handing the ends over as `undefined` gets the adapter's
+   * measured behaviour (FIX-3) and makes the comment true.
+   */
+  function blend(a, b, u, ctx, s = smooth) {
+    const held = holdSample(a);
+    if (s <= HOLD) return held;
+    const straight = lerpSample(a, b, u);
+    if (s <= LINEAR) return mix(held, straight, s / LINEAR);
+    // ⚠️ TIME-KNOTTED. A wall-clock throttle never produces evenly spaced
+    // samples, so uniform knots bend the curve toward whichever sample happened
+    // to arrive late.
+    const p0 = (ctx && ctx.prev) || null, p3 = (ctx && ctx.next) || null;
+    return mix(straight, catmullSample(p0, a, b, p3, u), (s - LINEAR) / (SMOOTH - LINEAR));
+  }
+
   /** Where the sparse record says the pen was at time `t`, at smoothing `s`. */
   function at(t, s = smooth) {
     const n = stored.length;
@@ -174,84 +203,195 @@
     let i = 0;
     while (i < n - 2 && stored[i + 1].at <= t) i++;
     const a = stored[i], b = stored[i + 1];
-    const held = holdSample(a);
-    if (s <= HOLD) return held;
     const u = (t - a.at) / Math.max(1e-6, b.at - a.at);
-    const straight = lerpSample(a, b, u);
-    if (s <= LINEAR) return mix(held, straight, s / LINEAR);
-    // ⚠️ TIME-KNOTTED, and reflected at the ends. A wall-clock throttle never
-    // produces evenly spaced samples, so uniform knots bend the curve toward
-    // whichever sample happened to arrive late; and without phantom endpoints
-    // the first and last segments have no curve at all.
-    const p0 = stored[i - 1] || { ...a, at: a.at - (b.at - a.at) };
-    const p3 = stored[i + 2] || { ...b, at: b.at + (b.at - a.at) };
-    return mix(straight, catmullSample(p0, a, b, p3, u), (s - LINEAR) / (SMOOTH - LINEAR));
+    return blend(a, b, u, { prev: stored[i - 1], next: stored[i + 2] }, s);
   }
 
-  // ── the picture ──────────────────────────────────────────────────────────
-  const W = 960, H = 520;
-  // `data-gesture` is how `verify.mjs` knows to DRAG across this element
-  // instead of clicking it. A page whose only input is a drag was a page the
-  // suite could not exercise at all, which is why this page used to carry a
-  // button that drew for you.
-  const cv = el('canvas', 'pad', null, { 'data-gesture': 'draw' });
-  cv.width = W * 2; cv.height = H * 2;
-  cv.style.aspectRatio = `${W} / ${H}`;
-  d.el.append(cv);
-  const ctx = cv.getContext('2d');
+  /** The full-rate truth at `t` — what the hand ACTUALLY did, straight-lined
+   *  between two samples a few milliseconds apart. */
+  function truthAt(t) {
+    const n = evidence.length;
+    if (!n) return null;
+    if (t <= evidence[0].at) return evidence[0];
+    if (t >= evidence[n - 1].at) return evidence[n - 1];
+    let i = 0;
+    while (i < n - 2 && evidence[i + 1].at <= t) i++;
+    const a = evidence[i], b = evidence[i + 1];
+    const u = (t - a.at) / Math.max(1e-6, b.at - a.at);
+    return lerpSample(a, b, u);
+  }
 
-  const css = getComputedStyle(document.documentElement);
-  const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
-  // 🔴 WHAT YOU DREW IS WHITE AND IT IS THE LOUDEST THING HERE. It was the
-  // other way round — your line dark underneath, the reconstruction in the
-  // page's yellow on top — which put the emphasis on the invented line and
-  // made the page look like it was about the reconstruction. It is about the
-  // DIFFERENCE, and the thing that actually happened is the one to see first.
-  // The reconstruction is blue: a second reading of the same gesture, present
-  // and legible without competing. Not `--hi`, which every page uses for the
-  // playhead and the primary button, and which at 1.6 px over a dark field is
-  // the brightest ink on screen.
-  const C = { drawn: tok('--fg', '#e6e6e6'), guess: '#7aa2f7', dim: tok('--dim', '#8b93a1'),
-              card: tok('--card', '#11151d') };
+  // ── the transport ────────────────────────────────────────────────────────
+  // ONE DECK for the page's life — the bar binds its deck at construction, so
+  // a deck built after the first gesture leaves the bar pointing at something
+  // nobody is playing. The lane is rebuilt (`sched.clear()` + re-schedule)
+  // whenever the record changes, which is every move of the rate knob.
+  const KIND = 'pointer';
+  // 🔴 THE EVIDENCE POLICY IS NOT OPTIONAL HERE. Interpolating between two
+  // attested samples IS restoration (tier 1), so `sampleAt` and the fold both
+  // THROW on a deck that has not chosen — and under 'attested' the fold is
+  // handed no successor at all and degrades to holding the last sample, which
+  // is this page's own 34 px baseline wearing a transport. Chosen once, here.
+  const RESTORED = { restored: { maxTier: 1 } };
+  // a deck with nothing in it still needs a window; long enough that pressing
+  // play on an empty page does not immediately hit the end
+  const IDLE_MS = 8000;
 
-  let drawnPoints = 0, drawn = [];
-  function paint() {
-    ctx.save();
-    ctx.scale(2, 2);
-    ctx.fillStyle = C.card; ctx.fillRect(0, 0, W, H);
+  let ghost = null;          // where the transport says the hand is
+  let base = 0;              // the raw stamp that deck position 0 means
 
-    // The truth, in white and underneath: every sample the browser gave us.
-    if (evidence.length > 1) {
-      ctx.strokeStyle = C.drawn; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(evidence[0].x, evidence[0].y);
-      for (const p of evidence) ctx.lineTo(p.x, p.y);
-      ctx.stroke();
+  const pointer = makePointerAdapter({
+    mode: 'catmull',
+    // BOTH DOORS. `actuate` is the attested fire as the playhead crosses a
+    // sample; `assertState` is the fold after a seek, and `pointer-adapter`
+    // routes both here. A state of null (a fold with nothing behind it) never
+    // arrives — the adapter drops it — so the mark can go stale, which is
+    // exactly what the check below watches for.
+    onActuate: (s) => {
+      if (s && Number.isFinite(s.x) && Number.isFinite(s.y)) { ghost = s; pad.repaint(); }
+    },
+  });
+  pointer.interpolate = (a, b, u, ctx) => blend(a, b, u, ctx);
+
+  const deck = createDeck({
+    items: [], adapters: { [KIND]: pointer },
+    range: [0, IDLE_MS], evidence: RESTORED,
+  });
+
+  /**
+   * Hand the record to the transport. Called when a gesture ends and whenever
+   * the rate knob changes what the record IS — not on every sample, because a
+   * lane rebuilt per pointermove is a lane nobody plays.
+   *
+   * ⚠️ NORMALISED TO ZERO. The samples carry `event.timeStamp`, which is
+   * milliseconds since the page loaded — so a gesture drawn four seconds in
+   * would give the bar a clock reading `0:04.210 / 0:03.200`. A recording
+   * starts at zero. The payload's `at` is normalised too, because the adapter
+   * interpolates against the POSITION it is asked for.
+   *
+   * ⚠️ AND THEN RE-ASSERT AT THE PLAYHEAD. The overdub law fires an event
+   * scheduled behind the playhead immediately — right for a note, wrong for a
+   * position, which would leave the mark at the end of the line rather than
+   * where the playhead is.
+   */
+  function publish() {
+    deck.sched.clear();
+    if (stored.length < 2) {
+      base = 0; ghost = null;
+      deck.setRange([0, IDLE_MS]);
+      return;
     }
+    base = stored[0].at;
+    for (let i = 0; i < stored.length; i++) {
+      const p = stored[i];
+      const at0 = p.at - base;
+      deck.schedule({ at: at0, kind: KIND, id: `s${i}`,
+                      payload: { at: at0, x: p.x, y: p.y, pressure: p.pressure } });
+    }
+    // `max(1, …)`: two samples can carry the SAME timestamp — a coalesced pair
+    // at the same millisecond — and a zero-width range is refused outright.
+    deck.setRange([0, Math.max(1, Math.ceil(stored[stored.length - 1].at - base))]);
+    deck.assertAt(deck.position(), KIND);
+  }
 
-    // What a player reconstructs from the sparse record, sampled at the rate a
-    // screen actually draws — which is why most of it is invented.
+  // 🔴 WHAT YOU DREW IS WHITE AND IT IS THE LOUDEST THING HERE — and the pad
+  // draws it, not this page. It was the other way round once: your line dark
+  // underneath, the reconstruction in the page's yellow on top, which put the
+  // emphasis on the invented line and made the page look like it was about the
+  // reconstruction. It is about the DIFFERENCE. The reconstruction is blue: a
+  // second reading of the same gesture, present and legible without competing.
+  // Not `--hi`, which is the playhead's colour here as on every page — and on
+  // this page the playhead really is on the pad, as the mark.
+  const C = { guess: '#7aa2f7' };
+
+  // ⚠️ DECLARED BEFORE THE PAD, because the pad PAINTS as it is built and its
+  // paint calls this page's overlay — a `let` below it is in its temporal dead
+  // zone at exactly that moment, and the page dies before `ready`.
+  let dirty = true;          // the derived record is stale
+  let drawnPoints = 0, drawn = [];
+
+  // ── the pad ──────────────────────────────────────────────────────────────
+  // The surface is `demo/shell/xy-pad.mjs`: it owns the capture, it draws it,
+  // and it hands every sample over at full rate. This page owns the second
+  // record and the second reading, which is what it is about.
+  //
+  // The axes are the pad's own pixels, because that is genuinely this page's
+  // unit — every number it prints is a distance on this surface.
+  const pad = createXyPad(d.el, {
+    label: 'draw a line',
+    x: { label: 'across', min: 0, max: PAD.w, unit: 'px' },
+    y: { label: 'down', min: 0, max: PAD.h, unit: 'px' },
+    // rule 1: this arrives for EVERY coalesced sample. It marks the derived
+    // record stale and returns — the picture is redrawn once a frame by the
+    // pad, and rebuilding a 900-point spline per sample would be three or four
+    // pictures per frame that nobody sees.
+    onInput: () => { dirty = true; },
+    onStart: () => { evidence = pad.trace(); ghost = null; dirty = true; },
+    onDone: () => { render(); publish(); check(); },
+    value: () => ghost,
+    overlay: (ctx, v) => paintSecondReading(ctx, v),
+  });
+
+  /** Rebuild everything derived from the SPARSE RECORD as it stands — without
+   *  re-deriving the record itself, because the check below hands it a record
+   *  built another way and needs that one graded, not this one.
+   *
+   *  No canvas: the error functions used to depend on a paint having happened,
+   *  so they could not be asked a question without redrawing the page. */
+  function rebuild() {
     drawnPoints = 0;
     drawn = [];
     if (stored.length > 1) {
       const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
       const step = Math.max(2, (t1 - t0) / 900);
-      ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6; ctx.beginPath();
-      let first = true;
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
         drawnPoints++; drawn.push(s);
-        if (first) { ctx.moveTo(s.x, s.y); first = false; } else ctx.lineTo(s.x, s.y);
       }
-      ctx.stroke();
-      // The samples that are actually attested, so "kept" is a thing you can
-      // count on screen rather than only in a cell. They belong to the sparse
-      // record, so they are the record's colour — a third hue here would say
-      // they were a third kind of thing.
-      ctx.fillStyle = C.guess;
-      for (const p of stored) { ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill(); }
     }
-    ctx.restore();
+    // no `0` before there is anything to count — an untouched pad has not
+    // measured zero samples, it has not measured
+    const err = error();
+    d.set('kept', stored.length || '');
+    d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
+    d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
+    d.set('worst', err ? err.worst.toFixed(2) : '');
+    dirty = false;
+  }
+
+  /** the record, then everything derived from it */
+  function recompute() { decimate(); rebuild(); }
+
+  /** The SECOND reading of the same gesture, drawn over the pad's capture.
+   *  Runs inside the pad's own paint, once a frame. */
+  function paintSecondReading(ctx, v) {
+    if (dirty) recompute();
+    if (drawn.length < 2) return;
+    ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    let first = true;
+    for (const s of drawn) {
+      const [px, py] = v.px(s.x, s.y);
+      if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+    // The samples that are actually attested, so "kept" is a thing you can
+    // count on screen rather than only in a cell. They belong to the sparse
+    // record, so they are the record's colour — a third hue here would say
+    // they were a third kind of thing.
+    ctx.fillStyle = C.guess;
+    for (const p of stored) {
+      const [px, py] = v.px(p.x, p.y);
+      ctx.beginPath(); ctx.arc(px, py, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  /** recompute and repaint NOW — for a knob, or for a check that is about to
+   *  measure the picture it just asked for. */
+  function render() {
+    evidence = pad.trace();
+    recompute();
+    pad.paint();
   }
 
   /** How far the reconstruction sits from what actually happened. Measured
@@ -290,74 +430,50 @@
     return n ? { mean: sum / n, worst, n } : null;
   }
 
-  function render() {
-    decimate();
-    paint();
-    const err = error();
-    // no `0` before there is anything to count — an untouched canvas has not
-    // measured zero samples, it has not measured
-    d.set('kept', stored.length || '');
-    d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
-    d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
-    d.set('worst', err ? err.worst.toFixed(2) : '');
-  }
+  function reset() { pad.clear(); evidence = pad.trace(); stored = []; ghost = null; }
 
-  // ── drawing with a finger ────────────────────────────────────────────────
-  let drawing = false;
-  const spot = (ev) => {
-    const r = cv.getBoundingClientRect();
-    return { x: (ev.clientX - r.left) * (W / r.width), y: (ev.clientY - r.top) * (H / r.height) };
-  };
-  cv.addEventListener('pointerdown', (ev) => {
-    reset(); drawing = true;
-    // A synthetic pointer (the harness dispatches real pointer events through
-    // CDP) can refuse capture; losing capture costs nothing here, because the
-    // canvas is the only thing being drawn on.
-    try { cv.setPointerCapture(ev.pointerId); } catch { /* not capturable */ }
-    const p = spot(ev); push(stampMs(ev), p.x, p.y, ev.pressure || 0.5); render();
+  // While it is PLAYING the mark moves between the attested samples, which fire
+  // ten times a second at the default rate — a mark that only moved on a fire
+  // would step rather than travel. Paused, nothing here writes: the fold after
+  // a seek is the only thing that moves the mark, which is what the check below
+  // is able to grade.
+  observePosition(deck.transport, ({ pos }) => {
+    if (!deck.playing() || stored.length < 2) return;
+    const s = deck.sampleAt(KIND, pos);
+    if (s && Number.isFinite(s.x)) { ghost = s; pad.repaint(); }
   });
-  cv.addEventListener('pointermove', (ev) => {
-    if (!drawing) return;
-    // ⚠️ COALESCED. A browser hands one `pointermove` per frame and hides the
-    // samples between; `getCoalescedEvents` is the difference between a record
-    // of the input and a record of the repaint.
-    const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
-    for (const e of evs) { const p = spot(e); push(stampMs(e), p.x, p.y, e.pressure || 0.5); }
-    render();
-  });
-  for (const t of ['pointerup', 'pointercancel']) {
-    cv.addEventListener(t, () => { drawing = false; render(); check(); });
-  }
 
-  function reset() { evidence = []; stored = []; }
+  createTransportBar(d.el, deck);
 
-  // UNDER the canvas, because they change the picture above them and a control
-  // that sits below what it moves is read in the order it is used. A GROUP, not
-  // two sliders in a div: `createSliderGroup` shares one set of columns, so the
-  // longer label cannot push its own lane sideways.
+  // UNDER the pad and its transport, because they change the picture above
+  // them and a control that sits below what it moves is read in the order it is
+  // used. A GROUP, not two sliders in a div: `createSliderGroup` shares one set
+  // of columns, so the longer label cannot push its own lane sideways.
   const knobs = createSliderGroup([
     createSlider({
-      // 10..300, and the top end is MEASURED rather than picked. Thinning the
-      // same gesture at each interval: 20 ms 0.04 px · 50 ms 0.14 · 100 ms 0.35
-      // · 200 ms 1.72 · 300 ms 5.45 · 500 ms 26.35 — and holding the last
+      // 10..300, and the top end is MEASURED rather than picked. Thinning one
+      // 3.2 s gesture at each interval: 20 ms 0.01 px · 50 ms 0.03 · 100 ms
+      // 0.15 · 200 ms 1.17 · 300 ms 4.32 · 500 ms 24.63 — and holding the last
       // sample is 34 px, so by half a second interpolation has stopped
       // rescuing anything and the rest of the travel would be a region that is
-      // uniformly broken. Under ~50 ms is the other dead end: 0.14 px and
-      // 0.04 px are both invisible, so the knob would be moving a number
+      // uniformly broken. Under ~50 ms is the other dead end: 0.03 px and
+      // 0.01 px are both invisible, so the knob would be moving a number
       // nobody can see. The range kept is the one where moving it changes the
-      // picture.
+      // picture. (The page LOGS this ladder for whatever line you drew — these
+      // are from the suite's drag, re-measured after the ends were reflected
+      // properly, which moved every figure.)
       label: 'sample every', min: 10, max: 300, step: 10, value: 100, unit: 'ms',
-      onInput: (v) => { storeMs = v; render(); },
+      onInput: (v) => { storeMs = v; render(); publish(); },
     }),
     createSlider({
       label: 'smoothing', min: 0, max: 100, step: 1, value: 100, unit: '%',
-      onInput: (v) => { smooth = v / 100; render(); },
+      onInput: (v) => { smooth = v / 100; render(); deck.assertAt(deck.position(), KIND); },
     }),
   ], { pair: true });
   // The destructive one, at the far end of the row — deleting what you just
   // made must not sit shoulder to shoulder with the thing that changes it.
   const clear = el('button', '', 'Clear', { type: 'button', 'data-end': '1' });
-  clear.addEventListener('click', () => { reset(); render(); });
+  clear.addEventListener('click', () => { reset(); render(); publish(); });
 
   const row = el('div', 'pos-controls foot');
   row.append(knobs.el, clear);
@@ -410,7 +526,7 @@
     // keep more samples, interpolate better, or put the samples somewhere
     // cleverer — and only the third one is free. This grades the third with the
     // COUNT HELD EQUAL, so it cannot win by keeping more.
-    const measure = (pick) => { stored = pick(); paint(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
+    const measure = (pick) => { stored = pick(); rebuild(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
     const evenly = measure(onAClock);
     const bends = measure(() => whereItBends(evenly.n));
     render();
@@ -440,31 +556,96 @@
       `${evenly.n} samples either way — in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
       + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
 
+    // ── the transport, at twenty positions ─────────────────────────────────
+    //
+    // 🔴 WHAT THIS CAN AND CANNOT CATCH, because that is the first question to
+    // ask of any comparison. The transport's answer and this page's come from
+    // ONE interpolator (see `blend`), so the arithmetic cancels and an error in
+    // it is invisible here. What does NOT cancel is everything between: whether
+    // the record reached the lane at all, whether a seek folds and asserts,
+    // whether the bracket picks the right pair and its neighbours, whether the
+    // evidence policy lets the fold interpolate. Each of those fails by tens of
+    // pixels, not by fractions.
+    //
+    // So the check is: seek, and compare the mark's distance from the HAND
+    // against the record's own distance from the hand at the same instant. Two
+    // real numbers, which must agree.
+    //
+    // ⚠️ 0.042 px IS NOT A THRESHOLD SOMEBODY PICKED, and it is also not a
+    // claim about this gesture. It is `proto/paths`' measured seek accuracy for
+    // this adapter — a 100 ms record of an analytic Lissajous, read back at
+    // three seek positions — so it is the smallest difference that has ever
+    // meant anything for this kind, used here as the width of "agree".
+    const SEEK_TOL = 0.042;
+    const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
+    const probes = [];
+    let fresh = 0;
+    for (let k = 0; k < 20; k++) {
+      const raw = t0 + ((t1 - t0) * k) / 19;
+      ghost = null;                        // a stale mark must not pass for a fresh one
+      deck.seek(raw - base);
+      const hand = truthAt(raw), rec = at(raw);
+      // the same position with interpolation REFUSED: the firewall hands back
+      // the last attested sample, which is this page's 34 px baseline again
+      const held = deck.sampleAt(KIND, raw - base, { evidence: 'attested' });
+      if (ghost) fresh++;
+      probes.push({
+        mark: ghost ? Math.hypot(ghost.x - hand.x, ghost.y - hand.y) : Infinity,
+        rec: Math.hypot(rec.x - hand.x, rec.y - hand.y),
+        held: held ? Math.hypot(held.x - hand.x, held.y - hand.y) : 0,
+      });
+    }
+    const mean = (key) => probes.reduce((a, p) => a + p[key], 0) / probes.length;
+    const mk = mean('mark'), rc = mean('rec'), hl = mean('held');
+    d.assert('the playhead puts the hand where the record says it was',
+      fresh === 20 && Math.abs(mk - rc) <= SEEK_TOL && hl > rc * 5,
+      `${fresh}/20 seeks answered — the mark lands ${mk.toFixed(3)} px from the hand against the record's own `
+      + `${rc.toFixed(3)} px (${Math.abs(mk - rc).toExponential(1)} apart); refusing to interpolate: ${hl.toFixed(2)} px`);
+
     // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
     // range and nothing on the page said which end of it is worth being at, so
     // it says so here: the same gesture, thinned at each interval, each one
     // reconstructed the same way.
     const keep = storeMs;
     const ladder = [20, 50, 100, 200, 300, 500].map((ms) => {
-      storeMs = ms; decimate(); paint();
+      storeMs = ms; recompute();
       return `${ms}ms ${stored.length}n ${error(SMOOTH).mean.toFixed(2)}px`;
     });
-    storeMs = keep; render();
+    storeMs = keep;
+    render();
+    publish();
     d.log(`what the rate buys: ${ladder.join(' · ')}`);
 
+    // Park the playhead in the middle, so the mark below is somewhere with a
+    // line under it rather than at an endpoint.
+    deck.seek(deck.range[1] / 2);
+    // ⚠️ AND PAINT IT. The mark moves on a fold, and the pad repaints on the
+    // next animation frame — reading the pixels in the same turn would read the
+    // frame before the seek and report a mark that is there as missing.
+    pad.paint();
+
     // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
-    // in a cell over a blank canvas is the defect this project has hit twice.
-    const lit = (() => {
-      const px = ctx.getImageData(0, 0, cv.width, cv.height).data;
-      let n = 0;
-      for (let i = 0; i < px.length; i += 4) if (px[i] > 60 || px[i + 1] > 60) n++;
-      return n;
-    })();
-    d.assert('there is a line on the canvas, not just numbers in cells', lit > 4000,
+    // in a cell over a blank pad is the defect this project has hit twice.
+    //
+    // 🔴 NEAR-WHITE, not "red or green over 60". The pad draws a grid and its
+    // axis names now, and a test loose enough to count those is a test a blank
+    // pad can pass. The captured line is the only near-white ink on the
+    // surface, which is why the pad keeps its own furniture dim.
+    const px = pad.ctx.getImageData(0, 0, pad.el.width, pad.el.height).data;
+    let lit = 0, markPx = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      if (r > 200 && g > 200 && b > 200) lit++;
+      else if (r > 200 && g > 150 && g < 240 && b < 100) markPx++;   // --hi #ffd400
+    }
+    d.assert('there is a line on the pad, not just numbers in cells', lit > 4000,
       `${lit} lit pixels`);
+    d.assert('the playhead draws a mark on the pad, not just a number', markPx > 50,
+      `${markPx} pixels of mark at ${Math.round(deck.position())} ms`);
   }
 
   render();
+  publish();
   d.ready();
 </script>
 </html>
