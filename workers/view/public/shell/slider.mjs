@@ -40,8 +40,15 @@ import { el } from './shell.mjs';
  * becomes `display: contents` so its three parts land in those columns rather
  * than in a box of its own.
  */
-export function createSliderGroup(sliders = []) {
-  const wrap = el('div', 'sld-group');
+/**
+ * @param sliders
+ * @param [opt.pair]  two sliders ACROSS on a wide screen rather than stacked.
+ *   Side by side there is nothing to line up; stacked there is everything, so
+ *   it falls back to the stacked three columns below the breakpoint and the
+ *   shared-column argument still holds where it applies.
+ */
+export function createSliderGroup(sliders = [], { pair = false } = {}) {
+  const wrap = el('div', `sld-group${pair ? ' pos-pair' : ''}`);
   for (const s of sliders) wrap.append(s.el ?? s);
   return { el: wrap, add: (s) => { wrap.append(s.el ?? s); return s; } };
 }

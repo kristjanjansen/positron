@@ -44,21 +44,6 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   wrap.append(canvas, gut);
   host.append(wrap);
 
-  // ── the second picture: the settings, on the material they act on ────────
-  //
-  // 🔴 A SEPARATE CANVAS, NOT A SECOND THING DRAWN ON THE FIRST. The waveform
-  // above is the last few seconds of sound ARRIVING; this is the whole minute
-  // the engine is holding. Two different x-axes, and stacking them in one
-  // rectangle would invite exactly the reading the picture must not support —
-  // that the lit window sits over the sound you can see.
-  //
-  // ⚠️ IT DRAWS A CENTRE AND A WIDTH, NEVER A GRAIN. The first version of the
-  // grain picture drew ticks derived from the requested rate, which is a
-  // confident row of marks under a stream never shown to contain one grain.
-  // Every lane below says whether its centre is the engine's OWN report or
-  // what this page asked for, and the gutter says it again in words.
-  let winCv = null, winGut = null, lanes = null, winSeconds = 60;
-
   const ctx = canvas.getContext('2d');
   const css = getComputedStyle(document.documentElement);
   const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
@@ -81,7 +66,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     canvas.style.width = `${W}px`; canvas.style.height = `${H}px`;
   }
   size();
-  new ResizeObserver(() => { size(); sizeWin(); }).observe(wrap);
+  new ResizeObserver(size).observe(wrap);
 
   // ── state ────────────────────────────────────────────────────────────────
   let peaks = null, writeAt = 0, filled = 0;      // the material
@@ -129,102 +114,10 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       while (scroll.length && scroll[0].t < cut) scroll.shift();
     },
 
-    /**
-     * What the engine has been told to read, drawn on the seconds it holds.
-     *
-     * @param list  [{label, at, spray, rate, size, measured}] — `at` and
-     *              `spray` are fractions of the held seconds; `measured` says
-     *              the centre came back FROM the engine rather than from what
-     *              this page sent it.
-     */
-    window(list, { seconds: secs = 60 } = {}) {
-      lanes = list || null;
-      winSeconds = secs;
-      if (!lanes || !lanes.length) { if (winCv) { winCv.remove(); winGut.remove(); winCv = winGut = null; } return; }
-      if (!winCv) {
-        winCv = el('canvas', 'pos-scope-c pos-scope-w');
-        winGut = el('div', 'pos-scope-gut', '');
-        wrap.append(winCv, winGut);
-        sizeWin();
-      }
-    },
-
     source(name) { sourceName = name; },
     clear() { live.length = 0; scroll.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
     stats: () => ({ ...counts, flickering: live.length }),
   };
-
-  const LANE_H = 30, LANE_GAP = 6, WIN_PAD = 10;
-  function sizeWin() {
-    if (!winCv || !lanes) return;
-    const h = WIN_PAD * 2 + lanes.length * LANE_H + (lanes.length - 1) * LANE_GAP;
-    const w = Math.max(200, Math.round(wrap.getBoundingClientRect().width));
-    if (winCv.width !== Math.round(w * dpr) || winCv.height !== Math.round(h * dpr)) {
-      winCv.width = Math.round(w * dpr); winCv.height = Math.round(h * dpr);
-      winCv.style.width = `${w}px`; winCv.style.height = `${h}px`;
-    }
-    return { w, h };
-  }
-
-  function paintWindow() {
-    if (!winCv || !lanes || !lanes.length) return;
-    const dim = sizeWin();
-    if (!dim) return;
-    const { w, h } = dim;
-    const g = winCv.getContext('2d');
-    g.save();
-    g.scale(dpr, dpr);
-    g.fillStyle = C.field; g.fillRect(0, 0, w, h);
-
-    let measured = 0;
-    lanes.forEach((L, i) => {
-      const y = WIN_PAD + i * (LANE_H + LANE_GAP);
-      // the held seconds, as a track
-      g.fillStyle = C.line; g.fillRect(0, y, w, LANE_H);
-      // ten-second marks, so the axis is a duration and not a bar
-      g.fillStyle = C.field;
-      for (let t = 10; t < winSeconds; t += 10) g.fillRect((t / winSeconds) * w, y, 1, LANE_H);
-
-      // where it reads: the centre, and how far grains scatter from it
-      const at = Math.max(0, Math.min(1, L.at ?? 0.5));
-      const half = Math.max(0.004, (L.spray ?? 0) / 2);
-      const x1 = (at - half) * w, x2 = (at + half) * w;
-      g.fillStyle = 'rgba(255,212,0,.10)';
-      g.fillRect(Math.max(0, x1), y, Math.min(w, x2) - Math.max(0, x1), LANE_H);
-      if (x1 < 0) g.fillRect(w + x1, y, -x1, LANE_H);
-      if (x2 > w) g.fillRect(0, y, x2 - w, LANE_H);
-
-      // ⚠️ SOLID WHEN THE ENGINE SAID SO, DASHED WHEN WE ASKED FOR IT. Those
-      // are different claims and they must not look alike.
-      g.strokeStyle = C.hi; g.lineWidth = 1.5;
-      if (L.measured) measured++; else g.setLineDash([3, 3]);
-      g.beginPath(); g.moveTo(at * w + 0.5, y); g.lineTo(at * w + 0.5, y + LANE_H); g.stroke();
-      g.setLineDash([]);
-
-      g.font = `500 10px ${MONO}`;
-      g.textBaseline = 'middle';
-      g.fillStyle = C.dim;
-      g.fillText(L.label ?? '', 6, y + LANE_H / 2);
-      const right = `${fmtRate(L.rate)} a second · each ${Math.round((L.size ?? 0) * 1000)} ms`;
-      g.textAlign = 'right';
-      g.fillText(right, w - 6, y + LANE_H / 2);
-      g.textAlign = 'left';
-    });
-
-    g.strokeStyle = C.line; g.lineWidth = 1;
-    g.strokeRect(0.5, 0.5, w - 1, h - 1);
-    g.restore();
-
-    // The gutter carries what the picture IS, not how to use it.
-    const all = lanes.length;
-    winGut.textContent = `the ${winSeconds} seconds the engine is holding · the lit band is where grains are taken from · `
-      + (measured === all ? 'both centres are the engine’s own'
-        : measured === 0 ? 'the centres are what this page asked for, not what the engine reported'
-          : `${measured} of ${all} centres come back from the engine; the dashed one is what this page asked for`);
-  }
-
-  const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
-  const fmtRate = (r) => (r == null ? '?' : r >= 10 ? r.toFixed(0) : r.toFixed(1));
 
   // ── paint ────────────────────────────────────────────────────────────────
   function paint() {
@@ -313,7 +206,6 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         ? `this is the sound that arrived, and all that can honestly be drawn${sourceName ? ` — ${sourceName}` : ''}`
         : 'nothing yet';
 
-    paintWindow();
     raf = requestAnimationFrame(paint);
   }
   let raf = requestAnimationFrame(paint);

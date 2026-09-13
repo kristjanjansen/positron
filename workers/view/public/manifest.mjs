@@ -235,9 +235,16 @@ export const DEMOS = [
   { name: 'draw', act: 0, created: '2026-09-13', built: true,
     one: 'record a gesture, play it back, and see how much of the line was never recorded',
     tags: ['pointer', 'timeline', 'canvas'] },
+  // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
+  // two pages about one subject and the split cost the better half of each:
+  // `dust` had the picture — a granulator in the page reports every grain it
+  // fires, so every mark is MEASURED — and this had the claim, which is that
+  // the same thing is running on a Raspberry Pi in another building. Side by
+  // side with a crossfade, the difference between the two panes IS the subject,
+  // and the page now checks a granulator even when the board is down.
   { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
-    one: 'a granular engine on a Raspberry Pi, rolled from a seed you can get back',
-    tags: ['SuperCollider', 'relay', 'PCM', 'live board'] },
+    one: 'the same granulator in this page and on a Raspberry Pi, side by side, with a blend between them',
+    tags: ['AudioWorklet', 'SuperCollider', 'relay', 'PCM', 'live board'] },
 
   // Not a demo of anything — a page where every reusable control is present and
   // wired to nothing, so one can be looked at and pushed around without a board,

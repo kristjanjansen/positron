@@ -49,6 +49,19 @@
           background: var(--card); border: 1px solid var(--line); border-radius: 4px; margin: 0 0 12px; }
   .none b { display: block; color: var(--fg); font-size: 15px; margin-bottom: 6px; font-weight: 600; }
   .none span { display: block; max-width: 62ch; margin: 0 auto; }
+  /* Two engines, two pictures, side by side — the `mirror` shape, because the
+     difference between the two panes IS the subject. One column on a phone:
+     side by side at 390 px is two pictures nobody can read. */
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 4px; }
+  @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
+  .pane { background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; min-width: 0; }
+  .pane .hd { display: block; margin: 0 0 8px; }
+  .pane .hd b { font: 600 12px/1.5 var(--mono); color: var(--fg); font-weight: 600; }
+  .pane .hd span { display: block; font: 400 10.5px/1.5 var(--mono); color: var(--dim2); }
+  /* the crossfade reads as a line between the two panes, so its ends are
+     labelled where they point rather than in the paragraph above */
+  .fade { gap: 10px; align-items: center; }
+  .fade .end { font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); white-space: nowrap; }
 </style>
 
 <script type="module">
@@ -63,7 +76,7 @@
 
   const d = mount({
     name: 'grains',
-    what: 'A Raspberry Pi holds the last sixty seconds of sound and replays it as thousands of short overlapping fragments. The sound going in is Yoshimi; the granulator chewing it is Pappus, a norns engine running on plain SuperCollider. Press Hold and the board stops listening — the fragments then come only from the minute it already has, which is when the sliders start to do something you can hear.',
+    what: 'Two granulators, the same four settings, side by side: one running in this page and one on a Raspberry Pi in another building, with a blend between them so you can hear one become the other. The left picture can show every grain, because the engine that fires them is here; the right one can only show the sound that arrived, because a grain inferred from audio might be a note or a reverb swell. Press Hold and the board stops listening — its fragments then come only from the minute it already has, which is when the settings start to do something you can hear.',
     // ⚠️ FIVE CELLS, MEASURED RATHER THAN GUESSED. It was eight, and five of
     // those ellipsised — `answe…`, `fluid…`, `shatt…`. A readout cell here is
     // 90 px of text whatever the window does (the page's own measure caps it,
@@ -73,8 +86,12 @@
     // rather than numbers — which sound it is, what it is chewing — and they
     // are on the two lines under this row, where they have room and context.
     readout: {
+      // 🔴 TWO CELLS EACH, AND THE WORD SAYS WHICH LANE. This page has two
+      // engines side by side, so a shared row of numbers has to say which one
+      // each belongs to or it is a legend. The per-lane detail lives in each
+      // card's own gutter, beside the ink it describes.
+      'grains a second': '', 'at once': '',
       board: '', sound: '',
-      'grains a second': '', 'moved on its own': '',
     },
     controls: [
       // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
@@ -213,6 +230,40 @@
   const panel = el('div', '');
   d.el.append(panel);
 
+  // ── where it runs ────────────────────────────────────────────────────────
+  //
+  // 🔴 ONE SUBJECT, TWO PLACES, AND THE DIFFERENCE IS WHAT CAN BE DRAWN. This
+  // page and `dust` were two pages about one thing, and splitting them cost the
+  // better half of each: `dust` had the picture — a granulator in the page
+  // reports every grain it fires, so the waveform, the lit band it is reading
+  // from and each grain flickering at the exact point it read are all MEASURED
+  // — and `grains` had the claim, which is that the same thing is happening on
+  // a Raspberry Pi in another building.
+  //
+  // ⚠️ The board can only ever send AUDIO. A grain inferred from audio might be
+  // a note, a delay tap or a reverb swell, so in that lane the picture is the
+  // sound that arrived and the gutter says so. The two lanes are not the same
+  // instrument drawn twice; they are the same instrument seen through two
+  // different amounts of evidence, which is the honest reason to put them side
+  // by side rather than to pick one.
+  // 🔴 A CROSSFADE, NOT A SWITCH, AND BOTH PICTURES ARE ALWAYS UP. A switch
+  // makes the two lanes alternatives and hides the only interesting thing —
+  // that the same four settings, sent to two different engines in two different
+  // buildings, are the same instrument. Blended, you hear one become the other
+  // while both pictures keep drawing, which is the `mirror` shape: two panes of
+  // the same subject, and the difference between them is the subject.
+  //
+  // EQUAL POWER, not a linear pair. Two uncorrelated sources at 0.5 each are
+  // 6 dB down in the middle of a linear fade — an audible dip exactly where a
+  // listener stops to compare.
+  let blend = 0;                       // 0 = all this page, 1 = all the board
+  const here = () => blend < 0.5;      // which lane the page is mostly listening to
+  const fadeGains = () => {
+    const a = Math.cos(blend * Math.PI / 2), b = Math.sin(blend * Math.PI / 2);
+    if (lgain) lgain.gain.value = 0.9 * a;
+    if (boardGain) boardGain.gain.value = b;
+  };
+
   /**
    * The engine's own knobs. `params.set {cmd, args}` takes a command NAME and
    * numbers; the roll table in pappus.mjs is where these ranges come from, so a
@@ -232,12 +283,21 @@
    * needs a non-zero base, so a patch whose half one is 0 keeps the DIFFERENCE
    * instead — `spray` and `strum` are legitimately zero in several patches.
    */
+  // 🔴 FOUR KNOBS THAT EXIST IN BOTH ENGINES, which is what makes the switch
+  // above a switch rather than two pages sharing a URL. `swarm` was here and is
+  // not, because the in-page engine has nothing that means it — a control that
+  // goes dead in half the page is worse than one fewer control. `where` is new
+  // and is the one the board could not take until today: `params.set mscan`
+  // now moves the centre the slow drift circles, so setting it sticks instead
+  // of being overwritten by the next nudge.
   const KNOBS = [
     ['rate',  0.5, 24,  0.1, '/s',  'how often a grain starts'],
     ['size',  0.02, 0.4, 0.01, 's', 'how long each one lasts'],
-    ['spray', 0,   0.5, 0.01, '',   'how far they scatter from the playhead'],
-    ['swarm', 0,   0.9, 0.01, '',   'how much they drift apart from each other'],
+    ['where', 0,   1,   0.01, '',   'how far into the held sound they read from'],
+    ['spray', 0,   0.5, 0.01, '',   'how far they scatter from that point'],
   ];
+  /** the knob's name on the engine — `where` is `scan` on both of them */
+  const cmdOf = (key) => (key === 'where' ? 'scan' : key);
   const sliders = new Map();
   const knobRow = createSliderGroup();
   for (const [key, min, max, step, unit, why] of KNOBS) {
@@ -247,14 +307,20 @@
       // relay whose measured ceiling is 60 msg/s for everything on it — and it
       // drops silently past that, so the last value you let go on would be the
       // one lost. `onChange` sends one message when the hand stops.
-      onChange: (v) => {
-        if (!fxOn) { d.log('switch the granulator on first', 'warn'); return; }
-        const other = partner(key, v);
-        setLive(key, v, other);
-        send({ type: 'params.set', cmd: `m${key}`, args: [v] });
-        send({ type: 'params.set', cmd: `n${key}`, args: [other] });
-        d.log(`${key} ${v} and ${round(other)}${unit ? ' ' + unit : ''} — ${why}`);
-      },
+      // ⚠️ ON EVERY MOVE IN THE PAGE, ON RELEASE FOR THE BOARD, and the split
+      // is the relay. A drag is ~60 events a second into a relay whose measured
+      // ceiling is 60 msg/s for everything on it, and it drops past that
+      // silently — so the last value you let go on would be the one lost. In
+      // the page there is no wire and a change is audible in one render
+      // quantum, and waiting for the hand to stop would throw that away.
+      // BOTH ENGINES GET THE SAME NUMBER, which is the whole point of running
+      // them side by side. The page engine gets it on every move — no wire, and
+      // a change is audible in one render quantum. The board gets it once, on
+      // release: a drag is ~60 events a second into a relay whose measured
+      // ceiling is 60 msg/s for everything on it, and it drops past that
+      // silently, so the value you let go on would be the one lost.
+      onInput: (v) => setKnob(key, v, why, unit, false),
+      onChange: (v) => setKnob(key, v, why, unit, true),
     });
     sliders.set(key, s);
     knobRow.add(s);
@@ -351,7 +417,18 @@
     // page. Drawing the requested grain rate here would put a confident row of
     // ticks under an audio stream that has never been shown to contain a single
     // grain — a page illustrating its own settings and calling it a reading.
-    for (const key of ['rate', 'size', 'spray', 'swarm']) sliders.get(key)?.set(p.m[key], true);
+    // ⚠️ THE PATCH MOVES BOTH ENGINES. It writes the board's two halves above;
+    // these four are the shared knobs, so the page engine and the sliders end
+    // up on the same numbers — otherwise choosing a sound would change one
+    // pane and leave the other on whatever was there before, which is two
+    // instruments wearing one control surface.
+    for (const key of KNOBS.map(([k]) => k)) {
+      const v = p.m[cmdOf(key)];
+      if (v === undefined) continue;
+      K[key] = v;
+      sliders.get(key)?.set(v, true);
+    }
+    applyLocal();
     d.log(`${p.name} — ${p.voice}, ${p.notes.length} notes held`, 'hi');
     render();
   }
@@ -381,42 +458,126 @@
   d.el.insertBefore(patchRow, knobRow.el);
   step.render();
 
-  const scope = createGrainScope(d.el, { seconds: 4, height: 140 });
-  scope.source('the board sends sound and no grain events, so this is what the sound shows');
+  // Two cards, one engine each, side by side — and each one carries its own
+  // heading, because a picture that has to be told apart from its neighbour by
+  // position is a picture with a legend.
+  const panes = el('div', 'panes');
+  d.el.append(panes);
+  const card = (title, sub) => {
+    const box = el('div', 'pane');
+    box.append(el('div', 'hd', null));
+    box.lastChild.append(el('b', '', title), el('span', '', sub));
+    panes.append(box);
+    return box;
+  };
+  const hereCard = card('in this page', 'an AudioWorklet · every grain reported');
+  const boardCard = card('on the Raspberry Pi', 'over the relay · sound only');
+  const scope = createGrainScope(hereCard, { seconds: 4, height: 150 });
+  scope.source('every tick is a grain this page started');
+  const boardScope = createGrainScope(boardCard, { seconds: 4, height: 150 });
+  boardScope.source('the board sends sound and no grain events, so this is what the sound shows');
+
+  // ── the granulator in this page ──────────────────────────────────────────
+  //
+  // ~200 lines of AudioWorklet: a ring buffer, a grain scheduler and a
+  // raised-cosine window. It exists so this page works with the network
+  // unplugged AND so there is one lane where every mark in the picture is a
+  // grain something actually started — see `scope.stats()`, which counts
+  // `measured` against `inferred` and is asserted below.
+  const CHORD = [48, 55, 60, 64, 67, 72];
+  let lctx = null, lnode = null, lsrc = null, lgain = null, losc = [];
+  let lstats = { live: 0, fired: 0, heldSec: 0, overlap: 0 };
+  let lwrite = 0, lfilled = 1;
 
   /**
-   * 🔴 THE SETTINGS, DRAWN ON THE MINUTE THEY ACT ON. The numbers in the panel
-   * below say `reading 0.35 of the way through the sixty seconds`, which is a
-   * number rather than a place; here the same number is a band on the minute,
-   * and the drift walking it along is something you watch rather than a count.
-   *
-   * ⚠️ CENTRES FROM THE BOARD WHERE THERE ARE ANY. `params.state` comes back
-   * with the engine's own current read position for BOTH halves, and those are
-   * drawn solid; the width is `spray`, which the board does not report, so it
-   * is what this page sent. Nothing here is a grain — the board reports none,
-   * and a row of ticks derived from the requested rate is the picture this page
-   * already deleted once.
+   * The lit band, computed the way the WORKLET computes it. The chord is always
+   * arriving, so the read point is a distance BEHIND the write head rather than
+   * an absolute place in a fixed recording — draw it any other way and the
+   * picture is a different claim from the sound.
    */
-  function paintWindows() {
-    const centre = (measured, asked) => (Number.isFinite(measured) ? measured : (asked ?? 0.5));
-    scope.window([
-      { label: 'one', at: centre(drift?.scan, live.m.scan), spray: live.m.spray,
-        rate: live.m.rate, size: live.m.size, measured: Number.isFinite(drift?.scan) },
-      { label: 'two', at: centre(drift?.scanN, live.n.scan), spray: live.n.spray,
-        rate: live.n.rate, size: live.n.size, measured: Number.isFinite(drift?.scanN) },
-    ], { seconds: 60 });
+  function showRange() {
+    const span = Math.max(0.02, lfilled);
+    const centre = ((lwrite - (1 - K.where) * span) % 1 + 1) % 1;
+    const half = K.spray * span;
+    scope.range(((centre - half) % 1 + 1) % 1, ((centre + half) % 1 + 1) % 1, centre);
   }
 
-  // 🔴 NO KEYBOARD. There was one, and pressing it did nothing you could hear:
-  // a patch holds its own chord, `Hold what it has` then stops the board
-  // listening, and from that moment the grains come only from the minute
-  // already in the buffer — so a new note reaches an instrument that is no
-  // longer feeding anything. A control that looks live and is inert is worse
-  // than no control, and this page's whole subject is a granulator reading
-  // material that is already there.
-  //
-  // The note the CHECK holds is sent directly (see `probeSound`), because that
-  // is a measurement rather than an instrument.
+  async function startLocal() {
+    if (lnode) return;
+    lctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
+    // ⚠️ Fire and move on — resume() waits on a gesture and NEVER rejects, so
+    // awaiting it is a hang rather than an error.
+    lctx.resume().catch(() => {});
+    await lctx.audioWorklet.addModule('/shell/granular-worklet.js');
+    lnode = new AudioWorkletNode(lctx, 'granular', {
+      numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      processorOptions: { bufferSeconds: 12 },
+    });
+    lnode.port.onmessage = (e) => {
+      const m = e.data || {};
+      if (m.stats) lstats = m.stats;
+      // EVERY GRAIN, FROM THE THING THAT STARTED IT. This is the whole argument
+      // for having this lane at all.
+      if (m.grains?.length) scope.marks(m.grains);
+      if (m.peaks) {
+        scope.buffer(m.peaks, { write: m.write, filledFrac: m.filled });
+        lfilled = m.filled; lwrite = m.write; showRange();
+      }
+    };
+    lgain = lctx.createGain(); lgain.gain.value = 0.9;
+    lnode.connect(lgain).connect(lctx.destination);
+    fadeGains();
+    // the material: a held saw chord, straight into the worklet's input
+    const mix = lctx.createGain(); mix.gain.value = 0.16;
+    for (const n of CHORD) {
+      const o = lctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = 440 * Math.pow(2, (n - 69) / 12);
+      const g = lctx.createGain(); g.gain.value = 1 / CHORD.length;
+      o.connect(g).connect(mix); o.start(); losc.push(o);
+    }
+    mix.connect(lnode);
+    lsrc = mix;
+    applyLocal();
+  }
+
+  function applyLocal() {
+    lnode?.port.postMessage({
+      cmd: 'set', rate: K.rate, sizeMs: K.size * 1000, scan: K.where, spray: K.spray,
+      pitch: 1, pan: 0.8, level: 0.7, follow: 1,
+    });
+    showRange();
+  }
+
+  // ── one set of knob values, whichever engine is listening ────────────────
+  // The patch below writes into this too, so the two lanes cannot drift apart
+  // into two different sounds wearing one control surface.
+  const K = { rate: 2.2, size: 0.3, where: 0.5, spray: 0.12 };
+
+  function setKnob(key, v, why, unit, toBoard) {
+    K[key] = v;
+    applyLocal();
+    if (!toBoard) return;
+    if (!fxOn) { d.log(`${key} ${v}${unit ? ' ' + unit : ''} — ${why} · the board’s granulator is not on yet`, 'warn'); return; }
+    const other = partner(key, v);
+    setLive(key, v, other);
+    send({ type: 'params.set', cmd: `m${cmdOf(key)}`, args: [v] });
+    send({ type: 'params.set', cmd: `n${cmdOf(key)}`, args: [other] });
+    d.log(`${key} ${v} here and ${round(other)} on the board${unit ? ' ' + unit : ''} — ${why}`);
+  }
+
+  // Both engines are always running; the blend only moves what you HEAR. The
+  // pictures never swap, so nothing has to be cleared and neither lane's
+  // history is thrown away when you compare them.
+  const fade = createSlider({
+    label: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
+    // The slider IS the gesture, so it is also what starts the page engine —
+    // an AudioContext needs one and this is the first thing a hand touches.
+    onInput: (v) => { blend = v / 100; startLocal().then(fadeGains); fadeGains(); render(); },
+  });
+  const fadeBar = el('div', 'pos-controls fade');
+  fadeBar.append(el('span', 'end', 'this page'), fade.el, el('span', 'end', 'the board'));
+  d.el.insertBefore(fadeBar, knobRow.el);
 
   // ── drawing ──────────────────────────────────────────────────────────────
   const secs = (ms) => `${Math.round(ms / 1000)} s`;
@@ -436,22 +597,23 @@
   }
 
   function render() {
-    paintWindows();
     // ── the readout ──
     // `answers` rather than `answering`, and `1.1+2.1` rather than `1.1 + 2.1`:
     // two characters each, and the difference between a cell that reads and a
     // cell that ends in an ellipsis on a phone. Measured at 390 px.
+    // this page's engine, COUNTED rather than asked for: `fired` is what the
+    // worklet reports having started
+    d.set('grains a second', lstats.fired ? Math.round(K.rate) : '');
+    d.set('at once', lstats.live || '');
     d.set('board', answered ? 'answers' : 'silent', answered ? 'ok' : 'bad');
     if (!frames) d.set('sound', 'nothing', answered ? 'bad' : undefined);
     else if (level < 0.002) d.set('sound', 'silent');
     else d.set('sound', `${Math.round(20 * Math.log10(level))} dB`, 'ok');
-    d.set('grains a second', roll ? `${rate(roll.m)}+${rate(roll.n)}` : null);
     // ⚠️ NOT A BARE `drift.nudges`. With nothing for the board to circle that
     // cell is 0 on every frame of every run — a structural constant wearing a
     // measurement's clothes, which is the `missed: 1` bug in 01 (CLAUDE.md:
     // every readout cell must be able to change). The word says which of the
     // three states it is in, and only the state with a real count prints one.
-    d.set('moved on its own', driftState() === 'moving' ? drift.nudges : driftState());
 
     // ── the material row ──
 
@@ -518,7 +680,7 @@
   }
 
   // ── audio out of this page ───────────────────────────────────────────────
-  let ctx = null, playout = null;
+  let ctx = null, playout = null, boardGain = null;
   async function startAudio() {
     if (ctx) return;
     try { await openAudio(); }
@@ -546,7 +708,14 @@
     ctx.resume().catch(() => {});
     await ctx.audioWorklet.addModule('/proto/jam/playout-worklet.js');
     playout = new AudioWorkletNode(ctx, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
-    playout.connect(ctx.destination);
+    // ⚠️ A GAIN, NOT A STOPPED WORKLET. The board keeps sending while this page
+    // is listening to its own engine, and a playout that was torn down and
+    // rebuilt on every switch would re-run its whole cushion-filling start-up —
+    // the part that trims audio when occupancy passes floor + slack (LESSONS
+    // #52). Turning it down leaves the cushion where it was.
+    boardGain = ctx.createGain();
+    playout.connect(boardGain).connect(ctx.destination);
+    fadeGains();
     playout.port.postMessage({ cmd: 'floor', ms: 60, adaptive: false });
   }
 
@@ -576,7 +745,7 @@
     // setting, i.e. the sound is continuous and therefore not a grain cloud. A
     // picture of the envelope says that in one look, in the page, without an
     // ssh session.
-    scope.feed(f32, 48000);
+    boardScope.feed(f32, 48000);
     // ⚠️ THE LEVEL IS THE ONLY THING THAT CAN TELL A WORKING STREAM FROM A
     // STREAM OF DIGITAL SILENCE, and this project has read three numbers wrong
     // for exactly that reason. It decays rather than resetting, so a cloud
@@ -899,6 +1068,11 @@
   // one that CHECKS as well — a page that checks itself only when asked is a
   // page nobody checks.
   d.on('on', async () => {
+    // BOTH ENGINES. The page one is instant and needs only a gesture; the
+    // board one compiles a 2,030-line graph and is why this control owns the
+    // page's `settleMs`. Starting them together is what makes the blend mean
+    // something the moment anybody touches it.
+    startLocal().catch((e) => d.log(`no granulator in this page: ${e.message}`, 'bad'));
     await enable();
     // Wait out an enable that is already in flight — the page starts one the
     // moment the board answers, and the harness can press this before it ends.
@@ -908,6 +1082,24 @@
   });
 
   function checkAll() {
+    // ── the lane that is always reachable ─────────────────────────────────
+    // 🔴 THESE RUN ON EVERY RUN, WITH NO BOARD AND NO NETWORK. That is the
+    // whole reason this lane exists: `grains` used to assert nothing at all
+    // about a granulator when the Pi was down, so a page about granulation
+    // could go green having granulated nothing. And it is the only lane where
+    // the picture can be checked, because it is the only one whose engine
+    // reports the grains it fired.
+    d.assert('a granulator is running in this page, with no network in the path',
+      !!lnode && !!lctx, lctx ? `an AudioWorklet at ${lctx.sampleRate} Hz` : 'no audio context');
+    d.assert('it is holding sound to chew', lstats.heldSec > 0.5, `${lstats.heldSec?.toFixed(1)} s held`);
+    // ⚠️ MEASURED, NOT DRAWN FROM THE SETTINGS. A scope fed parameters would
+    // look identical and mean nothing — which is the picture this page deleted
+    // once already.
+    const sc = scope.stats();
+    d.assert('every tick in this page’s picture is a grain it actually started',
+      sc.measured > 0 && sc.inferred === 0,
+      `${sc.measured} reported by the engine, ${sc.inferred} guessed from audio`);
+
     d.assert('the page reached the relay', wire.state() === 1, `readyState ${wire.state()}`);
     // ⚠️ ONE BRANCH PER NAMED STATE, AND THE COUNT MOVES WITH IT. This board is
     // shared and it keeps running with nobody connected, so "answering" is not
@@ -993,22 +1185,6 @@
           ? `switched on and circling nothing — ${moved ? `${moved.nudges} nudges in ${secs(moved.ms)}` : 'no window yet'}, `
             + 'which is the right count for a board with no roll to circle, not a stalled timer'
           : dstate === 'off' ? 'the movement is switched off on the board' : 'the board said nothing about movement');
-    // 🔴 NOTHING IN THE SUITE LOOKS AT INK, and this picture's whole risk is
-    // being a confident drawing of numbers nobody measured. Two claims in one:
-    // there are pixels in it, and the centre of each band came back FROM the
-    // engine rather than being the value this page sent it.
-    const win = scope.el.querySelector('.pos-scope-w');
-    const lit = (() => {
-      if (!win || !win.width) return 0;
-      const px = win.getContext('2d').getImageData(0, 0, win.width, win.height).data;
-      let n = 0;
-      for (let i = 0; i < px.length; i += 4) if (px[i] > 70 && px[i + 1] > 55) n++;
-      return n;
-    })();
-    d.assert('the picture of where it reads is drawn, and both centres are the board’s own',
-      lit > 200 && Number.isFinite(drift?.scan) && Number.isFinite(drift?.scanN),
-      `${lit} lit pixels · one at ${drift?.scan ?? 'not said'}, two at ${drift?.scanN ?? 'not said'}`);
-
     d.assert('a named patch is on screen, chosen rather than rolled',
       !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,
       `${PATCHES[patch].name} · ${PATCHES[patch].voice} · ${PATCHES[patch].notes.length} notes`);
