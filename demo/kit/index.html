@@ -218,12 +218,22 @@ createSlider({ label: 'damp', min: 1000, max: 12000, step: 100, unit: 'Hz' })`,
     });
 
   // ── readout ─────────────────────────────────────────────────────────────
+  // 🔴 AN EVEN NUMBER OF CELLS, AND A PENDING ONE SHOWS AN EM DASH AND NOTHING
+  // ELSE. The row is `auto-fit minmax(96px, 1fr)`, so a phone gets two columns
+  // and an odd count leaves a hole of a different colour in the last row. The
+  // repair is to CUT the weakest cell, never to pad with a blank: every odd
+  // readout has one, usually a constant or something a neighbour implies.
+  // `mount()` throws on an odd count so the suite catches it. And nothing
+  // unmeasured prints as `0` or as a lone unit — `''`, `null` and `NaN` all
+  // become one em dash with the unit hidden, because a zero reads as a very
+  // confident measurement and a bare `%` reads as a number that went missing.
   section('readout cells',
     '',
-    `d.set('latency', 26.2);  d.set('holes', 0, 'warn')`,
+    `d.set('latency', 26.2);  d.set('holes', 3, 'warn')
+an even number of cells · nothing measured yet is an em dash, never 0`,
     (box) => {
       const r = el('div', 'pos-readout');
-      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'], ['lost', '0', '', ''], ['state', 'live', '', 'ok']]) {
+      for (const [k, v, u, state] of [['latency', '26.2', 'ms', 'ok'], ['holes', '3', '', 'warn'], ['lost', '0', '', ''], ['worst', '—', 'ms', 'pending']]) {
         const c = el('div', 'pos-cell');
         c.append(el('div', 'pos-k', k));
         // ⚠️ THE UNIT GOES INSIDE THE VALUE, which is what shell.mjs does —

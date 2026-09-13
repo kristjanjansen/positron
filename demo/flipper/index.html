@@ -55,7 +55,7 @@
   const d = mount({
     name: 'flipper',
     what: 'Eight live ERR channels in equal cells. One plays at a time; the bar scrubs its 2 h DVR.',
-    readout: { channel: '', behind: 's', window: 'min', blocked: 'min', state: '' },
+    readout: { channel: '', behind: 's', blocked: 'min', state: '' },
     controls: [
       { id: 'start', label: 'Start channels', primary: true },
       { id: 'live', label: 'Jump to live edge' },
@@ -117,7 +117,7 @@
     master?.detach?.();
     master = null;
     const c = chans[sel];
-    if (c.kind !== 'tv' || !c.hls) { d.set('window', 0); return; }
+    if (c.kind !== 'tv' || !c.hls) return;
     master = mediaMaster(deck, c.media, { anchorMs: 0 });
   }
 
@@ -305,11 +305,9 @@
         const start = Math.max(0, edge - DVR_MS / 1000);
         // the window MOVES; range identity is stable so the scrubber follows
         deck.setRange([start * 1000, edge * 1000]);
-        d.set('window', Math.round((edge - start) / 60));
         d.set('behind', Math.max(0, edge - c.media.currentTime));
       }
     } else {
-      d.set('window', 0);
       d.set('behind', 0);
     }
     // radio cells show a cheap level so a playing station is not a dead box

@@ -75,7 +75,7 @@
     // are on the two lines under this row, where they have room and context.
     readout: {
       board: '', sound: '',
-      'grains a second': '', 'moved on its own': '', 'round trip': 'ms',
+      'grains a second': '', 'moved on its own': '',
     },
     controls: [
       // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
@@ -410,7 +410,6 @@
     // two characters each, and the difference between a cell that reads and a
     // cell that ends in an ellipsis on a phone. Measured at 390 px.
     d.set('board', answered ? 'answers' : 'silent', answered ? 'ok' : 'bad');
-    d.set('round trip', rtt ?? null);
     if (!frames) d.set('sound', 'nothing', answered ? 'bad' : undefined);
     else if (level < 0.002) d.set('sound', 'silent');
     else d.set('sound', `${Math.round(20 * Math.log10(level))} dB`, 'ok');

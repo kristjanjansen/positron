@@ -1,8 +1,11 @@
 # positron
 
-Live at **https://positron.studio**. 30 shelled demos of 35 rows,
-**441 asserts** (2026-09-11; `now`'s four are ERR refusing its own live edge,
-verified with a 403 probe, not a regression). `scene` is the first WebXR page;
+Live at **https://positron.studio**. 31 shelled demos of 37 rows,
+**449 asserts, all green** (2026-09-13). ⚠️ A red run is not automatically a
+regression here: `now`'s asserts go red when ERR refuses its own live edge (one
+403 probe separates the two), and a demo that needs something off this machine
+goes red when a leftover Chrome of mine is holding relay sockets — **run the
+failing demos ALONE before believing the suite**. `scene` is the first WebXR page;
 `node demo/verify-quest.mjs` drives it on a real Quest over adb, and
 `--self-test` proves its headset guard discriminates with no device attached. The front page is
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
@@ -513,6 +516,23 @@ to recover.
 - **`candidate-pair` RTT is not media latency.** Quoting WHEP's 25 ms RTT
   beside MoQ's 20 ms glass-to-glass flattered WHEP by ~3x. Measured the same
   way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
+
+- 🔴 **A READOUT HAS AN EVEN NUMBER OF CELLS, AND AN ODD ONE IS CUT, NEVER
+  PADDED.** The row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets two
+  columns and an odd count leaves a HOLE in the last row — a slot of a different
+  colour with nothing in it, which reads as a cell that failed to load rather
+  than one that does not exist. A blank filler is the wrong repair: it adds a
+  thing to look at that says nothing. Trimming is the right one, because an odd
+  readout always has a weakest cell — usually a constant (`llhls`' `target`,
+  `rack`'s 50/s `rate`, `moq`'s `version`) or something a neighbour already
+  implies (`wire`'s `round trip` beside its `delivery`). Twelve pages were odd
+  when this landed and every one got better. `mount()` THROWS on an odd count.
+- **Nothing unmeasured prints as `0`, and never as a lone unit.** `''`, `null`
+  and `NaN` all become one em dash with the unit hidden. An empty string used to
+  empty the cell and leave the unit standing alone — a `%` with no number in
+  front of it, which reads as a value that went missing — and a page that
+  pre-sets a counter to 0 is worse, because a zero reads as a very confident
+  measurement of nothing.
 
 ## Assert both modes, and watch the assert COUNT
 
