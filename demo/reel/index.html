@@ -322,7 +322,7 @@
     ],
   });
   const view = createStripView(d.el, deck, {
-    size: 'auto', follow: false, armWall: false, gutter: 150,
+    size: 'auto', follow: false, gutter: 150,
     // DECLARED, not guessed. The strip's fallback asks `range[0] > 1e12`, which
     // is 2001-09-09 — every date before that, and every negative one, fails it,
     // so 1965 would print as a duration instead of a date.

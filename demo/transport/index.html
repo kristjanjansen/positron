@@ -120,11 +120,6 @@
     // the two disagreeing about where a second is. A bounded piece has nowhere
     // to run to, so it holds the whole range instead.
     follow: false,
-    // armWall:false — the wall-clock cursor measures how far the piece has
-    // fallen behind real time since it first played. That is the number to
-    // watch on a live feed and noise on a 20 s fixture, where after the end it
-    // just counts how long ago you finished.
-    armWall: false,
     lanes: [{
       // NO `latch`. It recolours from the PLAYHEAD, so scrubbing back turned
       // measured marks grey again — as if moving the cursor un-measured them.

@@ -142,7 +142,7 @@
     && points.some(([, m]) => Math.abs(m - points[0][1]) > 1e-9);
 
   const view = createStripView(d.el, parent, {
-    size: 'auto', follow: false, armWall: false, gutter: 150,
+    size: 'auto', follow: false, gutter: 150,
     lanes: [
       { id: 'deck-span', kind: 'deck-span', label: 'part', height: 46, barPad: 7,
         as: 'spans', stack: false, barGap: 3, terse: true, color: INK.on,
