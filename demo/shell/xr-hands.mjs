@@ -33,6 +33,17 @@
 // ⚠️ NOTHING IN `observe` MAY THROW, for the same reason. Every read is inside
 // the one try, and a refusal is remembered rather than retried ninety times a
 // second to be told no.
+//
+// 🔴 AND THIS IS WHERE THE TABLET'S WAY OUT IS ACTUALLY PERFORMED. A control on
+// the tablet that raises `leaves` ends the session from here, and the reason it
+// is here rather than in `xr-tablet.mjs` or in a page is the shape of what each
+// one holds: the tablet must not hold a session at all, and a page holds one
+// but there are two pages, so one of them would be wired and one would not —
+// which is a button that looks live on one page and is inert on the other.
+// `observe` is handed the session every frame, so both pages get it for free.
+// ⚠️ It is a THIRD way out, beside the page's own. It cannot be the only one: a
+// button drawn on a tablet that only exists once a grip pose has resolved has
+// two conditions in front of it, and an exit with conditions is not an exit.
 
 import { pickQuad } from './xr-pick.mjs';
 import { holdM, GRIP_PARTS } from './xr-room.mjs';
@@ -164,7 +175,25 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
     gripRayDeg: null,
     lost: 0,               // frames with a source but no resolvable grip
     frames: 0,
+    // The label of the control that ended the session, or null. A page reads
+    // this to say WHY a session ended rather than only that it did — three
+    // exits that all log "session ended" make a page that cannot tell you which
+    // one fired.
+    left: null,
   };
+
+  // 🔴 AN OPTIONAL CALL IS HOW A WAY OUT BECOMES INERT WITHOUT SAYING SO. The
+  // two drains below are written `tablet.fired?.()` so that a tablet-shaped
+  // stub cannot throw inside a frame callback — and that is exactly the
+  // optional-chaining failure this project paid for on an iPhone's fullscreen
+  // button, where a missing method meant no throw, no log line and no picture.
+  // So the absence is CHECKED once, out loud, rather than chained past ninety
+  // times a second in silence.
+  if (tablet && (typeof tablet.fired !== 'function' || typeof tablet.notes !== 'function')) {
+    say('FAIL hands · this tablet cannot report its own presses (no fired/notes)'
+      + ' — anything drawn on it as a way out would be a picture of a button');
+    log('the screen on your hand cannot report what you press on it', 'bad');
+  }
 
   // ── instrumentation, because the owner gets ONE run ────────────────────
   // 🔴 A NAMED PHASE FOR EVERY STEP, AND A DEADLINE THAT NAMES THE ONE THAT DID
@@ -355,15 +384,35 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       const down = !!pointSrc?.src.gamepad?.buttons?.[BUTTON.trigger]?.pressed;
       if (tablet) {
         tablet.aim(state.hit);
-        if (down && !state.trigger) {
-          if (tablet.press(state.hit)) {
-            say(`hands · pressed the tablet · ${JSON.stringify(tablet.values())}`);
-          }
-        } else if (down) {
-          tablet.drag(state.hit);
-        } else if (state.trigger && tablet.holding()) {
-          tablet.release();
-          say(`hands · let go of the tablet · ${JSON.stringify(tablet.values())}`);
+        if (down && !state.trigger) tablet.press(state.hit);
+        else if (down) tablet.drag(state.hit);
+        else if (state.trigger && tablet.holding()) tablet.release();
+        // ⚠️ THE WORDS ARE THE TABLET'S, NOT THIS FILE'S. These lines used to be
+        // written here — `pressed the tablet · {"grid":75}` — which was fine
+        // while every control was a slider with a value to print, and became a
+        // lie the moment one of them was not: a button press reported the
+        // slider's number, unchanged, as though that were what had happened.
+        // The tablet knows which control it is and what just became of it, so
+        // it says so and this file carries the line to the beacon.
+        for (const line of tablet.notes?.() || []) say(`hands · ${line}`);
+        // 🔴 THE WAY OUT IS PERFORMED HERE, AND THIS IS THE ONLY PLACE IT COULD
+        // BE. `xr-tablet.mjs` must not hold a session — its whole claim is that
+        // it cannot tell one kind from another — and a page cannot be relied on
+        // to wire it, because there are two pages and one of them would forget.
+        // `observe` is handed the session every frame, so a control that raises
+        // `leaves` gets its exit on both pages with no page wiring at all.
+        //
+        // ⚠️ IT ADDS TO THE PAGE'S OWN WAYS OUT AND REPLACES NEITHER. A button
+        // drawn on a tablet that only exists once a grip pose has resolved
+        // cannot be the only exit from a room — that is the black-headset trap
+        // this project has already paid for twice. The page keeps its
+        // any-controller-button exit and its dead-man's switch; this is a third.
+        for (const c of tablet.fired?.() || []) {
+          if (!c.leaves) continue;
+          state.left = c.label;
+          say(`hands · leaving · the tablet's "${c.label}", held the whole ${c.hold} ms`);
+          log(`leaving — you held "${c.label}" on the tablet`, 'ok');
+          try { session.end()?.catch?.(() => {}); } catch { /* it may already be going */ }
         }
       }
       state.trigger = down;
@@ -434,5 +483,7 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
     get pointer() { return state.pointer; },
     get tabletM() { return state.tabletM; },
     get hit() { return state.hit; },
+    /** The tablet control that ended the session, or null. */
+    get left() { return state.left; },
   };
 }
