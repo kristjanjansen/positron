@@ -557,12 +557,37 @@ const GRID_VS = `#version 300 es
     vM = aPos.xy * uSize + uOrigin;
     vec4 w = uModel * vec4(aPos, 1.0); vW = w.xyz;
     gl_Position = uProj * uView * w; }`;
+// ── the fake light off a panel ────────────────────────────────────────────
+//
+// 🔴 THIS IS AN APPROXIMATION AND THE COMMENT IS THE HONEST HALF OF IT. Asked
+// for as "a bit of glow so the video lights the room a bit", and what is
+// affordable is NOT what that sentence describes. So, in as many words:
+//
+//   IT IS      one colour — the AVERAGE of the panel's own pixels, measured
+//              each time it is sampled — poured onto the surfaces the dots are
+//              already drawn on, falling off as a gaussian round the panel's
+//              centre.
+//   IT IS NOT  a light. Nothing is integrated over the panel's area, nothing
+//              falls off as 1/r², nothing is shadowed, nothing bounces, and
+//              NOTHING ELSE IN THE ROOM IS LIT BY IT — not the controllers, not
+//              the things, not the other panel. A bright patch in the corner of
+//              the picture does not move the patch on the floor, because the
+//              only thing crossing from the picture to the floor is one RGB
+//              triple. If the panel goes dark the pool goes out, and that is
+//              the whole of the physics in here.
+//
+// ⚠️ SO IT IS DELIBERATELY WEAK. A convincing fake invites the reader to
+// believe a measurement nobody made; a faint wash that answers to the picture's
+// colour reads as what it is. `uGlowFall.y` is the amplitude and the page keeps
+// it under half.
 const GRID_FS = `#version 300 es
   precision highp float;
   in vec2 vM; in vec3 vW;
   uniform vec3 uCol; uniform float uAlpha;
   uniform float uCell; uniform float uDot;
   uniform vec3 uEye; uniform vec2 uFade;
+  // the fake light: its colour, where it is, and (radius, amplitude)
+  uniform vec3 uGlowCol; uniform vec3 uGlowAt; uniform vec2 uGlowFall;
   out vec4 o;
   float dotsAt(vec2 p, float cell, float rad, float w){
     vec2 f = (fract(p / cell + 0.5) - 0.5) * cell;
@@ -576,11 +601,33 @@ const GRID_FS = `#version 300 es
     // grid is for is the surface, not the measurement. The cell is 0.125 m, so
     // a metre is eight dots for anyone counting.
     float a = dotsAt(vM, uCell, uDot, w);
-    a *= 1.0 - smoothstep(uFade.x, uFade.y, distance(vW, uEye));
+    // ⚠️ ONE DISTANCE FADE, SHARED. The dots and the pool both go out on the
+    // same curve, so nothing this shader draws can survive to the edge of the
+    // quad — which is the whole reason the floor's span is derived from the
+    // fade's far distance rather than typed beside it.
+    float far = 1.0 - smoothstep(uFade.x, uFade.y, distance(vW, uEye));
+    a *= far;
     a *= clamp(uDot * 2.0 / w, 0.0, 1.0);
     a *= uAlpha;
-    if (a < 0.02) discard;
-    o = vec4(uCol, a); }`;
+    float g = 0.0;
+    if (uGlowFall.y > 0.0) {
+      float dg = distance(vW, uGlowAt) / max(uGlowFall.x, 1e-3);
+      g = uGlowFall.y * exp(-dg * dg) * far;
+    }
+    // The dots take the picture's colour where the pool is strongest, and the
+    // pool itself is a wash BETWEEN them.
+    // ⚠️ LINEAR IN g, NOT SQUARED. Squared was the first version and it was
+    // INVISIBLE — measured off a rendered frame: a panel hangs 1.6 m above the
+    // floor, so even directly underneath the falloff has already taken a third
+    // of the strength, and squaring what is left put the brightest point of the
+    // pool at about 7 of 255. A fake nobody can see is not a subtle fake, it is
+    // an absent one, and the comment above it was describing something that was
+    // not happening.
+    vec3 c = mix(uCol, uGlowCol, clamp(g * 2.0, 0.0, 1.0)) * (1.0 + g * 1.2);
+    float pool = g * 0.8 * uAlpha;
+    float aa = max(a, pool);
+    if (aa < 0.02) discard;
+    o = vec4(c, aa); }`;
 
 /**
  * The tablet's face — a dark slab with rounded corners, with the tablet's own
@@ -702,6 +749,13 @@ export const GRID = {
 // your room belongs.
 const GRID_COL = [1, 1, 1];
 
+/**
+ * No glow. A named constant rather than three literals at the call site,
+ * because "amplitude zero" is the only thing that means "this page did not ask
+ * for one" and it must be impossible to get wrong in one of the two places.
+ */
+const GLOW_OFF = { col: [1, 1, 1], at: [0, 0, 0], radius: 1, amp: 0 };
+
 export const FADE_MS = 900;
 
 /**
@@ -748,7 +802,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     p.__u = {};
     for (const n of ['uProj', 'uView', 'uModel', 'uT', 'uHue', 'uCol',
                      'uSize', 'uOrigin', 'uCell', 'uDot', 'uEye', 'uFade', 'uAlpha',
-                     'uAspect', 'uRadius', 'uTex', 'uHas']) {
+                     'uAspect', 'uRadius', 'uTex', 'uHas',
+                     'uGlowCol', 'uGlowAt', 'uGlowFall']) {
       const loc = gl.getUniformLocation(p, n);
       if (loc) p.__u[n.slice(1).toLowerCase()] = loc;
     }
@@ -1208,7 +1263,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   }
 
   let gridBroke = false;
-  function drawGrid(proj, view, eye) {
+  function drawGrid(proj, view, eye, glow) {
     if (!gridProg || gridBroke) return;
     try {
       const U = gridProg.__u;
@@ -1218,6 +1273,14 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.uniform1f(U.cell, GRID.cell);
       gl.uniform1f(U.dot, GRID.dot);
       gl.uniform2f(U.fade, GRID.fadeNear, GRID.fadeFar);
+      // The fake light off a panel — see the note above GRID_FS for what this
+      // is and, more to the point, what it is not. Amplitude 0 is the whole of
+      // "there is no glow", so a page that never asks for one pays one uniform
+      // and the `if` in the shader.
+      gl.uniform3fv(U.glowcol, glow?.col || GLOW_OFF.col);
+      gl.uniform3fv(U.glowat, glow?.at || GLOW_OFF.at);
+      gl.uniform2f(U.glowfall, glow?.radius ?? GLOW_OFF.radius,
+                   glow ? Math.max(0, Math.min(0.5, glow.amp ?? 0)) : 0);
       // 🔴 ONE COLOUR AND ONE STRENGTH, AND NEITHER OF THEM IS A FUNCTION OF THE
       // SESSION. `ar` used to be a parameter of this function purely so the dots
       // could be a different white in passthrough; it is gone, and with it the
@@ -1377,7 +1440,8 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
 
   function drawInner({ proj, view, tSec = 0, doc = null, clear = true, ar = false,
                        aimed = null, held = null, ray: rayIn = null, aimedDist = 0,
-                       eye = null, grid = true, touch = null } = {}) {
+                       eye = null, grid = true, touch = null,
+                       sky = true, bg = null, glow = null } = {}) {
     if (!ok) return;
     // ⚠️ THE POINTER COMES FROM `setInput` UNLESS A PAGE OVERRIDES IT. One
     // source of truth by default, and the override exists only because `scene`
@@ -1391,7 +1455,12 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     if (clear) {
       // Transparent in passthrough: every pixel this page does not draw is a
       // pixel of your actual room.
+      // ⚠️ AND WITH NO SKY, THIS COLOUR *IS* THE ROOM. A page that turns the
+      // walls off has nothing behind its floor but the clear, so it is allowed
+      // to choose it — see `bg` in the parameter list. The default is what
+      // every page that keeps its sky has always had.
       if (ar) gl.clearColor(0, 0, 0, 0);
+      else if (bg) gl.clearColor(bg[0], bg[1], bg[2], 1);
       else gl.clearColor(0.02, 0.03, 0.045, 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     } else {
@@ -1410,9 +1479,20 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // ⚠️ NO WALLS IN PASSTHROUGH. The walls ARE the room in the other two
     // modes; in passthrough your own room is the room, and drawing a box around
     // you would be drawing over the thing you asked to see.
+    //
+    // 🔴 AND A PAGE MAY TURN THEM OFF IN VR TOO — `sky: false`. That is not the
+    // same statement as `ar`: passthrough has your room behind it, and a VR
+    // session with no sky has NOTHING behind it, so the two look alike in the
+    // code and not at all alike through a headset. A page that asks for this is
+    // asking its floor, its panels and whatever it lights them with to carry
+    // the whole room, and it had better have checked that they can.
+    // ⚠️ It also means the two modes CONVERGE here rather than diverging, which
+    // is why a page can offer both out of one draw call — the only remaining
+    // differences are the clear (transparent against `bg`) and whether your
+    // headset hands over any surfaces at all.
     let L;
     const hue = doc ? doc.hue : 0.5;
-    if (!ar) {
+    if (!ar && sky) {
       gl.useProgram(cur.sky);
       L = cur.sky.__u;
       gl.cullFace(gl.FRONT); gl.enable(gl.CULL_FACE);
@@ -1575,7 +1655,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     }
 
     // Last, because these are transparent and have to blend over what is behind.
-    if (grid) drawGrid(proj, view, eye);
+    if (grid) drawGrid(proj, view, eye, glow);
     drawTablet(proj, view);
   }
 

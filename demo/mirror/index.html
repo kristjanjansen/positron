@@ -126,8 +126,9 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createPanel } from '/shell/panel.mjs';
-  import { createXRPanels, beacon } from '/shell/xr-panel.mjs';
+  import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
+  import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
+  import { pickQuad } from '/shell/xr-pick.mjs';
   import { toggle as toggleFull, watch as watchFull, support as fullSupport } from '/shell/fullscreen.mjs';
   import { format, parse, randomId, RELAY_BASE } from '/shell/wire.mjs';
 
@@ -137,7 +138,7 @@
 
   const d = mount({
     name: 'mirror',
-    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and that picture hangs on one panel in a room built from a seed, on a floor marked out in dots, with the frame rate it holds in there printed under it.',
+    what: 'The same picture drawn twice: your own machine on the left, a Raspberry Pi in another building on the right, sending its result over as video. Same shader on both sides — it is a short document, so it runs anywhere. Put a headset on and both hang in front of you on a dotted floor, the left one drawn by the headset itself rather than copied across, and either can be picked up by the bar under it and moved. Under each is what it costs.',
     // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
     // so it goes in that picture's own bar rather than in a row above both —
     // joining a figure to its ink across two elements is exactly what makes a
@@ -158,7 +159,16 @@
     // is never exercised and its asserts never run. This page has already paid
     // for that once: the look stepper sat in the knob row for one revision and
     // the assert count went 9 -> 7 while the page read GREEN.
-    controls: [{ id: 'xr', label: 'Run in VR' }],
+    // 🔴 BOTH KINDS OF SESSION, THE WAY `scene` OFFERS THEM. Passthrough is
+    // not a variant of VR here: it composites over your actual room, it is the
+    // only mode in which a Quest hands over the surfaces it has measured, and
+    // with the walls off it is where this page's floor and panels are doing the
+    // whole job. One entry path, one word different — see `enter` in
+    // shell/xr-panel.mjs.
+    controls: [
+      { id: 'xr', label: 'Run in VR' },
+      { id: 'ar', label: 'Run in XR' },
+    ],
   });
   guard(d);
 
@@ -464,20 +474,45 @@
     }).filter(Boolean).join(' · ');
   }
 
-  // ── the panel that hangs in a headset ────────────────────────────────────
+  // ── the panels that hang in a headset ───────────────────────────────────
   //
-  // `plan-xr-room.md` §4.1: "One panel, one transport, measured." This is that
-  // panel. It is a canvas — a picture with a footer of real numbers under it,
-  // drawn by demo/shell/panel.mjs — and a canvas is the one thing that works in
-  // both places: the page can show it, and an immersive session can hand the
-  // same canvas to the graphics card and hang it in the room.
+  // 🔴 TWO PANELS, BECAUSE THE PAGE'S SUBJECT IS TWO PICTURES. It was one panel
+  // showing whichever end happened to be sending, which is the flat page's
+  // comparison collapsed into a single rectangle — you could not hold the two
+  // against each other, which is the only thing this demo is for.
+  //
+  // 🔴 AND THE LEFT ONE IS RENDERED IN THE HEADSET RATHER THAN COPIED INTO IT.
+  // A page's own WebGL canvas is a DIFFERENT CONTEXT from the one an immersive
+  // session draws with: its programs and textures do not exist there, so the
+  // only way a canvas reaches a headset is as a bitmap copied across every
+  // frame — a photograph of a render taken a frame ago. `liveMirror` below
+  // compiles the SAME shader body into the session's own context and hands back
+  // a texture, so the picture in the headset is the graphics chip in the
+  // headset drawing it. What that costs is measured rather than assumed: see
+  // `liveWhereCost` on `__demo.xr`.
   //
   // 🔴 THE 2-D PAGE IS INVISIBLE ONCE A HEADSET IS ON. The log, the two bars and
   // every number in them are behind your face, so anything worth reading while
-  // wearing it has to be drawn INTO the picture. That is why the numbers are in
-  // the footer rather than left in the bars where they already live.
+  // wearing it has to be drawn INTO the picture. A rendered picture cannot carry
+  // a word, so its numbers arrive as a separate strip — a ninth of the pixels,
+  // handed over only when a number moves.
   const PANEL_W = 640, PANEL_H = 400;          // css units; the canvas is 2x this
-  const panel = createPanel({ width: PANEL_W, height: PANEL_H, title: 'mirror' });
+  const FOOT_FRAC = FOOT / PANEL_H;            // the strip's share of the quad
+  const panelHere = createPanel({ width: PANEL_W, height: PANEL_H, title: 'here' });
+  const panelBox = createPanel({ width: PANEL_W, height: PANEL_H, title: 'the box' });
+  const footHere = createPanelFooter({ width: PANEL_W });
+
+  // 🔴 HOW BIG THE LIVE PICTURE IS RENDERED, AND IT IS DERIVED RATHER THAN
+  // CHOSEN. The panel is 1.28 m across at 1.6 m, which is 43.6 degrees; a Quest
+  // 3 eye is 1680 px over roughly 95 degrees, so the panel covers about 770 of
+  // them. Anything past that is pixels nobody can resolve, and this shader is
+  // ALU-bound (`plan-visuals` §3.4: ~50 Mpix/s on the Pi's GPU at both 720p and
+  // 1080p), so resolution is paid for linearly and buys nothing above the eye.
+  // 960 is a comfortable margin over 770 and the height follows the picture
+  // area's own aspect — the panel minus its footer strip — so the render is
+  // never stretched to fit the quad.
+  const LIVE_W = 960;
+  const LIVE_H = Math.round(LIVE_W * (PANEL_H - FOOT) / PANEL_W);
   // ⚠️ DRAWN ONLY WHEN SOMEBODY IS LOOKING AT IT. Copying the picture into the
   // panel and laying out five numbers costs real time every frame, and this
   // page MEASURES ITS OWN FRAME RATE — a decoration that quietly lowers the
@@ -491,26 +526,40 @@
   // `LOOKS` — and each one was a blank page with no log line saying why.
   let mirrorStep = null, flatRaf = 0, xr = null;
   let startFlat = () => {}, stopFlat = () => {};
+  // The shader body both renderers are running. ⚠️ ONE STRING, because the live
+  // renderer is built when a session starts — long after a look may have been
+  // changed — and a second copy is how the two ends of this page would come to
+  // be drawing different pictures while claiming to draw one.
+  let liveBody = null;
+  let makeKaleidoscope = null;                 // filled in by the renderer block
+  let liveK = null;                            // the session's own instance
+  let lastT = 0;                               // the frame number both render at
 
   /**
-   * Which picture goes on the panel, and what to say when there is none.
+   * The left-hand picture, rendered by whatever graphics context it is given.
    *
-   * ⚠️ THE BOX FIRST, BECAUSE IT IS THE ONE THAT CROSSED A NETWORK. A panel is
-   * only interesting if it is showing something a transport carried; the local
-   * shader is the fallback so that the panel is never empty on a laptop with no
-   * board switched on.
-   *
-   * ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO IN WORDS. A frozen frame reads as a
-   * broken stream — `plan-xr-room.md` §5.6, and the same rule as a blank readout
-   * cell collapsing "we did not look" into "we looked and it was fine".
+   * ⚠️ `attach` IS HANDED THE SESSION'S CONTEXT AND COMPILES INTO IT. Nothing
+   * from the flat page's context can be reused — not the program, not the
+   * feedback targets, not the textures — which is exactly why this is a
+   * measurement worth taking rather than a copy with fewer steps.
    */
-  function panelSource() {
-    // One second is the same silence this page already treats as "the box
-    // stopped sending" when it unlocks the local frame counter.
-    if (farDecoded > 0 && performance.now() - lockedAt < 1000) return { src: far.c, from: 'the box' };
-    if (gl && drewAny > 0) return { src: local.c, from: 'your browser' };
-    return { src: null, from: null };
-  }
+  const liveMirror = {
+    pixels: { w: LIVE_W, h: LIVE_H },
+    attach(g) {
+      if (!makeKaleidoscope) return false;
+      liveK = makeKaleidoscope(g, LIVE_W, LIVE_H);
+      if (liveBody) liveK.apply(liveBody);
+      return !!liveK;
+    },
+    draw() {
+      if (!liveK) return null;
+      liveK.step(lastT, P);
+      return liveK.tex;
+    },
+    // A quarter of the pixels, into a target nobody sees — the second point
+    // that turns "it costs this much" into "and resolution is (not) the lever".
+    probe({ scale }) { liveK?.probe(scale, lastT, P); },
+  };
 
   /**
    * ⚠️ CALLED FROM INSIDE THE RENDER CALLBACK THAT JUST DREW, never on a timer
@@ -518,36 +567,129 @@
    * drawing buffer, so it can only be copied in the same turn as the frame that
    * filled it — read it a task later and you get a cleared surface, which would
    * reach the panel as a black rectangle that looks like a broken stream.
+   *
+   * ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO IN WORDS. A frozen frame reads as a
+   * broken stream — `plan-xr-room.md` §5.6, and the same rule as a blank readout
+   * cell collapsing "we did not look" into "we looked and it was fine".
    */
   function drawPanel() {
-    const { src, from } = panelSource();
-    const live = xr?.state?.presenting === true;
-    const fps = live ? xr.state.fps : (localFps || null);
-    panel.draw({
-      source: src,
-      state: src ? 'live' : 'nothing is drawing here yet',
+    const inXR = xr?.state?.presenting === true;
+    const rendered = inXR && xr.isLive();
+    const fps = inXR ? xr.state.fps : (localFps || null);
+    // ── the left panel: this machine's own picture ───────────────────────
+    const hereFoot = [
+      // 🔴 WHICH PATH DREW WHAT YOU ARE LOOKING AT. The two cost different
+      // things and look identical, so the picture has to say which it is or the
+      // comparison is one nobody can make.
+      ['picture', rendered ? 'drawn here' : (inXR ? 'copied in' : 'this browser')],
+      ['fps', fps == null ? '' : fps.toFixed(1)],
+      // ⚠️ THE CARD'S OWN TIME, AND IT IS BLANK WHERE NO DRIVER WOULD SAY. A
+      // zero here would read as "free", which is a claim nobody measured.
+      ['card', rendered && xr.state.liveGpuMs != null ? `${xr.state.liveGpuMs.toFixed(2)} ms` : ''],
+      // ⚠️ WHOSE FLOOR THE DOTS ARE ON, where it can be read while wearing
+      // the thing. The 2-D page is behind your face, and "the grid is on your
+      // real floor" and "the grid is at a height this page guessed" look
+      // identical from inside — one of them is a measurement of your room and
+      // the other is not, so the panel says which.
+      ['floor', inXR ? (xr.state.room?.floor ?? '') : ''],
+    ];
+    // ⚠️ ONLY WHEN A NUMBER ACTUALLY MOVED. The strip is a texture upload in the
+    // headset, and a version counter that ticks on every draw makes the "only
+    // when it changed" upload rule a lie — the exact shape of an optimisation
+    // that reads as working. Comparing the values is cheap and exact; a clock
+    // would be a second rule to keep in step.
+    const footKey = hereFoot.map(([k, v]) => `${k}=${v}`).join('|');
+    if (footKey !== lastFootKey) { lastFootKey = footKey; footHere.draw(hereFoot); }
+    if (!rendered) {
+      panelHere.draw({
+        source: gl && drewAny > 0 ? local.c : null,
+        state: gl && drewAny > 0 ? 'live' : 'nothing is drawing here yet',
+        footer: hereFoot,
+      });
+    }
+    // ── the right panel: what crossed the network ────────────────────────
+    // One second is the same silence this page already treats as "the box
+    // stopped sending" when it unlocks the local frame counter.
+    const boxLive = farDecoded > 0 && performance.now() - lockedAt < 1000;
+    panelBox.draw({
+      source: boxLive ? far.c : null,
+      state: boxLive ? 'live' : 'the Raspberry Pi is not sending',
       footer: [
-        ['picture', from ?? ''],
-        ['fps', fps == null ? '' : fps.toFixed(1)],
-        // Frames of THIS picture: the ones drawn inside the headset while one
-        // is on, and the ones drawn on this page while it is not.
-        ['frames', String(live ? xr.state.frames : drewAny)],
+        ['picture', boxLive ? (chip.box || 'Raspberry Pi') : ''],
+        ['fps', boxLive && farFps ? farFps.toFixed(1) : ''],
         // ⚠️ THE PROCESSOR'S TIME, NOT THE CARD'S. This is how long it takes to
-        // hand the panel to the graphics card each frame; the card's own time
-        // for the copy cannot be read from here at all, and `fps` beside it is
-        // the number that would actually notice a problem.
-        ['copy', live && xr.state.uploadCpuMs != null ? `${xr.state.uploadCpuMs.toFixed(2)} ms` : ''],
-        ['headset', live && xr.state.fb ? `${xr.state.fb.w}x${xr.state.fb.h}` : ''],
-        // ⚠️ WHOSE FLOOR THE DOTS ARE ON, where it can be read while wearing
-        // the thing. The 2-D page is behind your face, and "the grid is on your
-        // real floor" and "the grid is at a height this page guessed" look
-        // identical from inside — one of them is a measurement of your room and
-        // the other is not, so the panel says which.
-        ['floor', live ? (xr.state.room?.floor ?? '') : ''],
+        // hand this panel to the graphics card each frame; the card's own time
+        // for the copy cannot be read from here at all.
+        ['copy', inXR && xr.state.uploadCpuMs != null ? `${xr.state.uploadCpuMs.toFixed(2)} ms` : ''],
+        ['lost', boxLive ? String(farGaps) : ''],
       ],
     });
     panelDrawn++;
   }
+
+  /**
+   * 🔴 THE FAKE LIGHT THE PICTURES THROW ON THE FLOOR, AND WHERE ITS ONE NUMBER
+   * COMES FROM.
+   *
+   * The whole of it is the AVERAGE COLOUR of the left-hand picture, taken by
+   * drawing that canvas into an 8x8 one and reading it back — so it is a real
+   * measurement of the picture, and it is the only thing that crosses from the
+   * picture to the floor. See GRID_FS in shell/xr-room.mjs for the list of
+   * things it is not: no area, no inverse square, no shadow, nothing else in
+   * the room lit by it.
+   *
+   * ⚠️ FOUR OR FIVE TIMES A SECOND, NOT NINETY. `getImageData` is a readback and
+   * a readback at frame rate on a tile-based part is a stall; light also does
+   * not need to be exact to be convincing, which is the one place a fake has an
+   * easier job than the real thing.
+   *
+   * ⚠️ AND THE AMPLITUDE IS HELD LOW ON PURPOSE. "a bit" was the whole of the
+   * request, and a convincing fake invites somebody to believe a measurement
+   * nobody made.
+   */
+  // ⚠️ 0.34 WAS INVISIBLE, MEASURED OFF A RENDERED FRAME rather than guessed
+  // at: with the pool falling off round a panel 1.6 m above the floor, the
+  // brightest point of the wash came out at about 7 of 255 — a fake nobody can
+  // see, which is not a subtle fake but an absent one. This is still "a bit":
+  // at the picture's usual brightness it lands near 0.22, and the floor under
+  // the panels takes about 4% of the dots' own strength in the picture's hue.
+  const GLOW_MAX = 0.45;
+  const tiny = document.createElement('canvas');
+  tiny.width = 8; tiny.height = 8;
+  const tinyCtx = tiny.getContext('2d', { willReadFrequently: true });
+  let glowAt = 0, glowCol = [0.5, 0.5, 0.6], glowAmp = 0, lastFootKey = '';
+  function sampleGlow() {
+    const now = performance.now();
+    if (now - glowAt < 200) return;
+    glowAt = now;
+    const src = (gl && drewAny > 0) ? local.c : (farDecoded > 0 ? far.c : null);
+    if (!src) { glowAmp = 0; return; }
+    try {
+      tinyCtx.drawImage(src, 0, 0, 8, 8);
+      const d = tinyCtx.getImageData(0, 0, 8, 8).data;
+      let r = 0, g2 = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g2 += d[i + 1]; b += d[i + 2]; }
+      const n = d.length / 4;
+      r /= n * 255; g2 /= n * 255; b /= n * 255;
+      const lum = 0.2126 * r + 0.7152 * g2 + 0.0722 * b;
+      // Normalised so the HUE survives and the BRIGHTNESS drives the amount —
+      // a dark picture lights less, a vivid one lights in its own colour. A raw
+      // mean would wash to grey the moment the picture was pale.
+      const m = Math.max(r, g2, b) || 1;
+      glowCol = [r / m, g2 / m, b / m];
+      // ⚠️ AND IT MUST NOT SIT AT THE CEILING. The first version multiplied by
+      // 1.6 and this picture pinned it at the maximum on every frame — a value
+      // that cannot move is a value that says nothing, whatever it is
+      // measuring. Straight through, so a dark look is a dim room and only a
+      // white picture reaches the top.
+      glowAmp = Math.min(GLOW_MAX, lum * GLOW_MAX);
+    } catch { glowAmp = 0; }
+  }
+  // ⚠️ AND THE RADIUS IS 3 m RATHER THAN 2.4, for the same reason: the nearest
+  // floor is already 1.6 m from a panel hanging at eye height, so a radius near
+  // that distance spends most of the falloff before the light reaches anything.
+  const glowNow = () => (glowAmp > 0 ? { col: glowCol, amp: glowAmp, radius: 3.0 } : null);
+
 
   // ── the picture, here ────────────────────────────────────────────────────
   //
@@ -659,61 +801,50 @@
   // (`lockedFrame` and `lockedAt` are declared with `chip`, above, because
   // `relabel` reads them while the panes are still being built.)
 
-  function compile(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  }
-  function target() {
-    const t = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, t);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    for (const p of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, p, gl.LINEAR);
-    for (const p of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, p, gl.CLAMP_TO_EDGE);
-    const f = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
-    return { t, f };
-  }
-
-  if (!gl) {
-    local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
-    d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
-    chip.here = 'no WebGL2';
-    relabel('here');
-  } else {
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
-    // real visitor, and a page that is quietly slow teaches nothing. It is also
-    // what demo/verify-gl.mjs checks its own answer against.
-    // ⚠️ THE RENDERER, ALWAYS, UNDER THE PICTURE IT DREW. A visitor on a
-    // software rasteriser is a real visitor and a page that is quietly slow
-    // teaches nothing; it is also what demo/verify-gl.mjs checks its own answer
-    // against. It goes in the `here` bar because it is a fact about THAT pane —
-    // the right-hand picture was drawn by a Raspberry Pi and this says nothing
-    // about it.
-    // ⚠️ NAME THE CHIP, NOT THE FIRST COMMA. Splitting
-    // "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)"
-    // on its first comma leaves the word "Apple", which says nothing at all.
-    // The part worth printing is what follows "Renderer:".
-    const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
-      ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
-    chip.here = short.trim().slice(0, 32);
-    relabel('here');
-
+  /**
+   * 🔴 THE WHOLE PICTURE, AS A FUNCTION OF A GRAPHICS CONTEXT.
+   *
+   * It used to be one block of code closed over this page's own `gl`, which
+   * made it unusable anywhere else — and "anywhere else" turned out to be the
+   * one place that mattered: an immersive session draws with a DIFFERENT
+   * WebGL2 context, where none of these programs, targets or textures exist. A
+   * canvas can only reach that context as a bitmap copied across every frame.
+   *
+   * So the shader machinery takes its context as an argument and there are two
+   * instances of it: one on the flat page's canvas, one inside the headset's
+   * session. Same text, same uniforms, same feedback tap, same crossfade — and
+   * that is the page's own claim ("the same shader on two machines") applied to
+   * the two ends of one browser.
+   */
+  makeKaleidoscope = function makeKaleidoscope(g, KW, KH) {
+    const compile = (type, src) => {
+      const s = g.createShader(type);
+      g.shaderSource(s, src); g.compileShader(s);
+      if (!g.getShaderParameter(s, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(s));
+      return s;
+    };
+    const target = (w = KW, h = KH) => {
+      const t = g.createTexture();
+      g.bindTexture(g.TEXTURE_2D, t);
+      g.texImage2D(g.TEXTURE_2D, 0, g.RGBA8, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+      for (const q of [g.TEXTURE_MIN_FILTER, g.TEXTURE_MAG_FILTER]) g.texParameteri(g.TEXTURE_2D, q, g.LINEAR);
+      for (const q of [g.TEXTURE_WRAP_S, g.TEXTURE_WRAP_T]) g.texParameteri(g.TEXTURE_2D, q, g.CLAMP_TO_EDGE);
+      const f = g.createFramebuffer();
+      g.bindFramebuffer(g.FRAMEBUFFER, f);
+      g.framebufferTexture2D(g.FRAMEBUFFER, g.COLOR_ATTACHMENT0, g.TEXTURE_2D, t, 0);
+      return { t, f, w, h };
+    };
     /** One compiled picture, with its uniforms found once. */
-    function makeProg(body) {
-      const p = gl.createProgram();
-      gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
-      gl.attachShader(p, compile(gl.FRAGMENT_SHADER, GLSL300 + body));
-      gl.linkProgram(p);
-      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-      const g = (n) => gl.getUniformLocation(p, n);
-      return { p, uT: g('uT'), uRes: g('uRes'), uPrev: g('uPrev'), uSeg: g('uSeg'),
-               uFb: g('uFb'), uScale: g('uScale'), uWarp: g('uWarp'), uHue: g('uHue') };
-    }
+    const makeProg = (body) => {
+      const p2 = g.createProgram();
+      g.attachShader(p2, compile(g.VERTEX_SHADER, VS));
+      g.attachShader(p2, compile(g.FRAGMENT_SHADER, GLSL300 + body));
+      g.linkProgram(p2);
+      if (!g.getProgramParameter(p2, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(p2));
+      const u = (n) => g.getUniformLocation(p2, n);
+      return { p: p2, uT: u('uT'), uRes: u('uRes'), uPrev: u('uPrev'), uSeg: u('uSeg'),
+               uFb: u('uFb'), uScale: u('uScale'), uWarp: u('uWarp'), uHue: u('uHue') };
+    };
     // ⚠️ MIXING IS A THIRD PROGRAM, NOT A UNIFORM IN THE OTHER TWO. A crossfade
     // done with an `uAlpha` would only work on shaders that agreed to carry
     // one — and the whole point is to accept a body somebody just wrote. Two
@@ -727,47 +858,152 @@
         o = vec4(mix(texture(uA, uv).rgb, texture(uB, uv).rgb, uMix), 1.0); }`;
     let mixP = null;
     const mixProg = () => (mixP ||= (() => {
-      const p = gl.createProgram();
-      gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
-      gl.attachShader(p, compile(gl.FRAGMENT_SHADER, MIX_FS));
-      gl.linkProgram(p);
-      const g = (n) => gl.getUniformLocation(p, n);
-      return { p, uA: g('uA'), uB: g('uB'), uMix: g('uMix'), uRes: g('uRes') };
+      const p2 = g.createProgram();
+      g.attachShader(p2, compile(g.VERTEX_SHADER, VS));
+      g.attachShader(p2, compile(g.FRAGMENT_SHADER, MIX_FS));
+      g.linkProgram(p2);
+      const u = (n) => g.getUniformLocation(p2, n);
+      return { p: p2, uA: u('uA'), uB: u('uB'), uMix: u('uMix'), uRes: u('uRes') };
     })());
 
     let cur = makeProg(FS_BODY), incoming = null, fadeFrom = 0;
-    let tmpA = null, tmpB = null;
+    let tmpA = null, tmpB = null, scratch = null;
     const FADE_MS = 900;
+    // ⚠️ ONE VERTEX ARRAY PER CONTEXT, BOUND ONCE. A vertex array object belongs
+    // to the context that made it; the session's context has none of this
+    // page's, which is the whole reason this function takes `g`.
+    g.bindVertexArray(g.createVertexArray());
+    // The feedback tap needs the same ping-pong the C does: two targets, swapped
+    // every frame, with the previous one bound as the texture.
+    let A = target(), B = target(), last = null;
+
+    const paint = (pr, fbo, tNow, Pv, w, h) => {
+      g.bindFramebuffer(g.FRAMEBUFFER, fbo);
+      g.viewport(0, 0, w, h);
+      g.useProgram(pr.p);
+      g.uniform1f(pr.uT, tNow);
+      g.uniform2f(pr.uRes, w, h);
+      g.uniform1f(pr.uSeg, Pv.mirrors);
+      g.uniform1f(pr.uFb, 0.78);
+      g.uniform1f(pr.uScale, Pv.grain);
+      g.uniform1f(pr.uWarp, 0.08);
+      g.uniform1f(pr.uHue, Pv.hue);
+      g.activeTexture(g.TEXTURE0);
+      g.bindTexture(g.TEXTURE_2D, A.t);
+      g.uniform1i(pr.uPrev, 0);
+      g.drawArrays(g.TRIANGLES, 0, 3);
+    };
+
+    function step(tNow, Pv) {
+      if (!incoming) {
+        paint(cur, B.f, tNow, Pv, KW, KH);
+      } else {
+        // ⚠️ THE MIXED RESULT IS WHAT FEEDS BACK, not either half. This shader
+        // reads its own previous frame; feeding it one arm of a crossfade would
+        // make the trail disagree with the picture and the fade would look like
+        // a glitch rather than a dissolve.
+        const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
+        paint(cur, tmpA.f, tNow, Pv, KW, KH);
+        paint(incoming, tmpB.f, tNow, Pv, KW, KH);
+        const M = mixProg();
+        g.bindFramebuffer(g.FRAMEBUFFER, B.f);
+        g.viewport(0, 0, KW, KH);
+        g.useProgram(M.p);
+        g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, tmpA.t); g.uniform1i(M.uA, 0);
+        g.activeTexture(g.TEXTURE1); g.bindTexture(g.TEXTURE_2D, tmpB.t); g.uniform1i(M.uB, 1);
+        g.uniform1f(M.uMix, k * k * (3 - 2 * k));        // smoothstep, so it eases
+        g.uniform2f(M.uRes, KW, KH);
+        g.drawArrays(g.TRIANGLES, 0, 3);
+        g.activeTexture(g.TEXTURE0);
+        if (k >= 1) { cur = incoming; incoming = null; }
+      }
+      last = B;                        // before the swap: B is what was drawn
+      [A, B] = [B, A];
+      return last;
+    }
 
     /**
-     * ⚠️ DEFINED IN HERE, WHERE `makeProg` LIVES. It sat at module scope
-     * reaching for `makeProg`, `tmpA` and `incoming` — all locals of this
-     * block — so every call threw a ReferenceError that the catch below
-     * dutifully reported as "the new look would not compile". A guard that
-     * turns a scoping mistake into a plausible message about somebody else's
-     * shader is worse than no guard: the harness read `FAIL … rings` and the
-     * shader was fine.
+     * The same pass at a fraction of the size, into a target nobody sees.
+     *
+     * ⚠️ IT DOES NOT TOUCH THE PICTURE. Rendering the probe into the visible
+     * ping-pong would put one soft frame into the feedback tap and leave a
+     * smear that lasts as long as the trail does — a measurement changing the
+     * thing it measures, on the one page where the trail IS the subject.
+     */
+    function probe(scale, tNow, Pv) {
+      const w = Math.max(2, Math.round(KW * scale)), h = Math.max(2, Math.round(KH * scale));
+      if (!scratch || scratch.w !== w || scratch.h !== h) scratch = target(w, h);
+      paint(cur, scratch.f, tNow, Pv, w, h);
+    }
+
+    function apply(body) {
+      const next = makeProg(body);          // throws, and the caller says so
+      tmpA ||= target(); tmpB ||= target();
+      incoming = next; fadeFrom = performance.now();
+      return true;
+    }
+
+    return {
+      apply, step, probe,
+      get tex() { return last?.t ?? null; },
+      get fbo() { return last?.f ?? null; },
+      w: KW, h: KH,
+    };
+  };
+
+  if (!gl) {
+    local.p.append(el('div', 'none', 'this browser gave no WebGL2 context, so the left pane cannot be drawn here'));
+    d.log('no WebGL2 context — the left pane is unavailable on this browser', 'bad');
+    chip.here = 'no WebGL2';
+    relabel('here');
+  } else {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
+    // real visitor, and a page that is quietly slow teaches nothing. It is also
+    // what demo/verify-gl.mjs checks its own answer against.
+    // ⚠️ NAME THE CHIP, NOT THE FIRST COMMA. Splitting
+    // "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)"
+    // on its first comma leaves the word "Apple", which says nothing at all.
+    // The part worth printing is what follows "Renderer:".
+    const short = String(rendererName).match(/Renderer:\s*([^,)]+)/)?.[1]
+      ?? String(rendererName).replace(/^ANGLE \(|\)$/g, '');
+    chip.here = short.trim().slice(0, 32);
+    relabel('here');
+
+    const pageK = makeKaleidoscope(gl, W, H);
+    liveBody = FS_BODY;
+
+    /**
+     * A new look, on BOTH renderers.
+     *
+     * 🔴 AND THE BODY IS REMEMBERED, because the second renderer may not exist
+     * yet. A look chosen on the flat page and then a headset put on would
+     * otherwise start the session on the shader this file happened to ship
+     * with — two ends of one page drawing different pictures while the page's
+     * whole claim is that they draw the same one.
      */
     window.__applyShader = function applyShader(body) {
       try {
-        const next = makeProg(body);
-        tmpA ||= target(); tmpB ||= target();
-        incoming = next; fadeFrom = performance.now();
-        d.log('a new look arrived — fading it in over 0.9 s');
-        return true;
+        pageK.apply(body);
       } catch (e) {
         d.log(`the new look would not compile — keeping this one · ${String(e.message).slice(0, 80)}`, 'warn');
         return false;
       }
+      liveBody = body;
+      if (liveK) {
+        try { liveK.apply(body); }
+        catch (e) {
+          // The headset's context refused what this one took. Said out loud
+          // rather than left to look like a frozen panel.
+          d.log(`the headset's own copy refused the new look — ${String(e.message).slice(0, 60)}`, 'warn');
+          beacon(`FAIL live panel · the new look would not compile in the session's context — ${e.message}`);
+        }
+      }
+      d.log('a new look arrived — fading it in over 0.9 s');
+      return true;
     };
 
-    const prog = cur.p;
-    gl.useProgram(prog);
-    const { uT, uRes, uPrev, uSeg, uFb, uScale, uWarp, uHue } = cur;
-    gl.bindVertexArray(gl.createVertexArray());
-    // The feedback tap needs the same ping-pong the C does: two targets, swapped
-    // every frame, with the previous one bound as the texture.
-    let A = target(), B = target();
     let i = 0, tick = 0, lastAt = performance.now();
     // ⚠️ WHICH FRAMEBUFFER HOLDS THE FRAME THAT WAS JUST DRAWN. Reading pixels
     // without binding one reads whatever happens to be current, and with
@@ -776,16 +1012,19 @@
     // surface and report a flat field on a picture that is fine.
     window.__lastFbo = null;
 
+    // How often the flat picture is still drawn while the headset is drawing
+    // its own. ⚠️ NOT ZERO, and for one reason: the fake light on the floor is
+    // the average colour of that canvas, and a canvas nobody is drawing to has
+    // no colour to average. Five times a second is enough for light and it is
+    // 1 frame in 18 of the headset's, which is named here rather than left for
+    // somebody to find in the A/B.
+    const FLAT_EVERY = 18;
+
     // ⚠️ ONE FRAME, AND A SCHEDULER THAT IS NOT PART OF IT. Inside a headset
     // this page's own requestAnimationFrame stops being the clock — the session
     // has its own, at the headset's rate — so the thing that draws a frame has
-    // to be callable from either. It was one function with its own
-    // `requestAnimationFrame` at the bottom, which meant the left-hand picture
-    // simply froze the moment a session started, and a frozen picture on a
-    // panel reads as a broken stream rather than as a stopped loop.
+    // to be callable from either.
     const step = () => {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
-      gl.viewport(0, 0, W, H);
       // ⚠️ A LOCK WITH NO TIMEOUT FREEZES THE THING IT LOCKED. When the box
       // stops sending — it died, the stream ended, the socket dropped without a
       // `video.stopped` — the counter stops advancing and this pane stops with
@@ -799,112 +1038,135 @@
         d.log('the box stopped sending — this pane is free-running again', 'warn');
         stat('box', { fps: null, kbit: null });
       }
-      const tNow = (lockedFrame ?? i) / 30;
-      const paint = (pr, fbo) => {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-        gl.viewport(0, 0, W, H);
-        gl.useProgram(pr.p);
-        gl.uniform1f(pr.uT, tNow);
-        gl.uniform2f(pr.uRes, W, H);
-        gl.uniform1f(pr.uSeg, P.mirrors);
-        gl.uniform1f(pr.uFb, 0.78);
-        gl.uniform1f(pr.uScale, P.grain);
-        gl.uniform1f(pr.uWarp, 0.08);
-        gl.uniform1f(pr.uHue, P.hue);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, A.t);
-        gl.uniform1i(pr.uPrev, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-      };
-
-      if (!incoming) {
-        paint(cur, B.f);
-      } else {
-        // ⚠️ THE MIXED RESULT IS WHAT FEEDS BACK, not either half. This shader
-        // reads its own previous frame; feeding it one arm of a crossfade would
-        // make the trail disagree with the picture and the fade would look like
-        // a glitch rather than a dissolve.
-        const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
-        paint(cur, tmpA.f);
-        paint(incoming, tmpB.f);
-        const M = mixProg();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
-        gl.viewport(0, 0, W, H);
-        gl.useProgram(M.p);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tmpA.t); gl.uniform1i(M.uA, 0);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tmpB.t); gl.uniform1i(M.uB, 1);
-        gl.uniform1f(M.uMix, k * k * (3 - 2 * k));        // smoothstep, so it eases
-        gl.uniform2f(M.uRes, W, H);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        gl.activeTexture(gl.TEXTURE0);
-        if (k >= 1) { cur = incoming; incoming = null; d.log('the new look is now the look', 'ok'); }
+      // ONE CLOCK FOR BOTH RENDERERS. `uT` is a frame counter, not wall time —
+      // the board drives it as i/30 — so the two ends only match if they are
+      // handed the same number, and the headset's renderer reads it from here.
+      lastT = (lockedFrame ?? i) / 30;
+      const inXR = xr?.state?.presenting === true;
+      const rendered = inXR && xr.isLive();
+      if (!rendered || i % FLAT_EVERY === 0) {
+        pageK.step(lastT, P);
+        // Blit to the canvas so it is visible.
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, pageK.fbo);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+        window.__lastFbo = pageK.fbo;
+        drewAny++;
+        // In the SAME turn as the frame that filled the canvas — a WebGL canvas
+        // with no preserved drawing buffer reads back empty one task later.
+        // ⚠️ AND ONLY WHERE SOMETHING IS LIT BY IT. `getImageData` is a readback;
+        // paying for one on every visitor who will never put a headset on is a
+        // cost with nothing on the other side of it, which is the same argument
+        // that keeps the session's own context unbuilt until it is needed.
+        if (inXR || wantPanel) sampleGlow();
+        if (!rendered) { tick++; }
       }
-      // Blit to the canvas so it is visible, then swap.
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, B.f);
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-      gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-      window.__lastFbo = B.f;          // before the swap: B is what was just drawn
-      [A, B] = [B, A];
-      i++; tick++; drewAny++;
+      i++;
       const now = performance.now();
-      if (now - lastAt >= 1000) { localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now; stat('here', { fps: localFps }); }
-      // The panel, in the same turn as the frame it is copying — see drawPanel.
-      if (wantPanel) drawPanel();
+      if (!rendered && now - lastAt >= 1000) {
+        localFps = tick * 1000 / (now - lastAt); tick = 0; lastAt = now;
+        stat('here', { fps: localFps });
+      }
+      // The panels, in the same turn as the frame they are copying.
+      if (wantPanel || inXR) drawPanel();
     };
     const loop = () => { flatRaf = requestAnimationFrame(loop); step(); };
     mirrorStep = step;
-    startFlat = () => { if (!flatRaf) flatRaf = requestAnimationFrame(loop); };
+    startFlat = () => { if (!flatRaf) { lastAt = performance.now(); tick = 0; flatRaf = requestAnimationFrame(loop); } };
     stopFlat = () => { if (flatRaf) { cancelAnimationFrame(flatRaf); flatRaf = 0; } };
     startFlat();
   }
 
-  // ── the same panel, in a headset ─────────────────────────────────────────
+  // ── the same panels, in a headset ───────────────────────────────────────
   //
   // 🔴 THE SESSION ITSELF IS demo/shell/xr-panel.mjs, NOT THIS PAGE. Getting
   // into an immersive session is the most expensive code in this repo to get
   // right — five separate defects, every one of them found by a real Quest and
   // every one of them silent from outside — so it lives in one module and this
-  // page hands it a canvas and a way to keep that canvas up to date. The rules
-  // it holds are listed at the top of that file.
+  // page hands it pictures and a way to keep them up to date. The rules it
+  // holds are listed at the top of that file.
   xr = createXRPanels({
     // 1.28 m across at 1.6 m in front of you: about 44 degrees, which is wide
     // enough to read without moving and narrow enough to turn away from. Being
     // able to turn away from it is the whole of the gaze-gating in
-    // `plan-xr-room.md` §2, so the panel is placed in the room rather than
-    // pinned to your face.
-    panels: [{ canvas: panel.canvas, w: 1.28, h: 0.80 }],
-    // 🔴 AND IT HANGS IN A ROOM, NOT IN NOTHING. The same seed `scene` opens
-    // with, through the same module, so this is that room rather than one like
-    // it — a floor and walls marked out in dots, and the dots move onto YOUR
-    // floor and YOUR walls where the headset will report them. A panel in a
-    // black void has no scale to be judged against and no floor to stand on,
-    // and it reads as a rectangle rather than as a screen in a place.
-    room: { seed: 424242 },
+    // `plan-xr-room.md` §2, so the panels are placed in the room rather than
+    // pinned to your face — and either can be picked up by the bar under it and
+    // put somewhere else.
+    panels: [
+      // The left one, RENDERED IN THE HEADSET. `canvas` is still here and it is
+      // not redundant: it is the other arm of the A/B, so the thumbstick can
+      // put the copied-in picture back on the same quad and the two can be held
+      // against each other without taking the headset off.
+      { canvas: panelHere.canvas, live: liveMirror,
+        foot: footHere.canvas, footVersion: () => footHere.dirty(), footFrac: FOOT_FRAC,
+        w: 1.28, h: 0.80 },
+      // The right one: what a Raspberry Pi drew and sent, decoded here. There
+      // is nothing to render live about it — it is a video, and a video is a
+      // texture upload however you get it.
+      { canvas: panelBox.canvas, w: 1.28, h: 0.80 },
+    ],
+    // 🔴 A FLOOR AND NOTHING ELSE. The room `scene` rolls has a kaleidoscope
+    // sky cube and a dozen objects in it, and both were asked to go from this
+    // page: what should be in here is the two pictures and something to stand
+    // on. ⚠️ IT IS A PER-PAGE OPTION, NOT A CHANGE TO THE MODULE — `scene` is
+    // a page about a room made of objects and it still gets all of them.
+    // ⚠️ AND THE WALLS WERE CARRYING THE LIGHT. Their brightness was raised
+    // once because without it "the room reads as black"; with them gone that
+    // is now literally what is behind the floor, so `bg` is chosen here rather
+    // than inherited, and the panels and the fake light off them are what is
+    // left to carry the place. It is a dark room on purpose.
+    room: { seed: 424242, sky: false, things: false, bg: [0.030, 0.036, 0.050] },
+    // ⚠️ WIDER THAN THE MODULE'S DEFAULT, AND IT IS ARITHMETIC RATHER THAN
+    // TASTE. A 1.28 m panel at 1.6 m subtends 2·atan(0.64/1.6) = 0.76 rad, so
+    // the default 0.70 rad between centres puts their edges in contact and the
+    // pair reads as one folded screen rather than as two pictures. 0.86 leaves
+    // about six degrees of room between them.
+    fan: 0.86,
+    // The fake light. See `sampleGlow` above for what the number is, and
+    // GRID_FS in shell/xr-room.mjs for the list of things it is not.
+    glow: glowNow,
     log: (m, k) => d.log(m, k),
     // ⚠️ THIS PAGE'S OWN LOOP IS THE THING THAT STOPS. Inside a session the
     // headset owns the clock, so the shader is stepped from here — without it
     // the panel would carry the last frame drawn before the session started,
     // which is a frozen picture and reads as a broken stream.
-    onFrame: () => { mirrorStep?.(); drawPanel(); },
+    // ⚠️ AND `drawPanel` IS NOT CALLED AGAIN HERE. `step` already draws the
+    // panels on any frame where a session is running; calling it twice would
+    // lay out the numbers twice a frame and put that cost into the very
+    // measurement this page is taking.
+    onFrame: () => { mirrorStep?.(); },
     onEnd: () => { startFlat(); },
   });
-  // ⚠️ THE LIVE OBJECT, NOT A SNAPSHOT OF IT. `state` is written in place every
-  // frame, so a harness reading `__demo.xr.fps` gets this frame's number rather
-  // than whatever was true the last time somebody remembered to publish. Two
-  // copies that can disagree is how a readout ends up describing something the
-  // page is not doing.
-  window.__demo.xr = xr.state;
 
-  d.on('xr', async () => {
+  window.__demo.xr = xr.state;
+  // 🔴 THE ONE WAY TO LOOK AT WHAT A HEADSET WOULD SEE, FROM A MACHINE WITH NO
+  // HEADSET. `Page.captureScreenshot` cannot see an immersive view — measured,
+  // research §3.3 — so without this the only reviewer of this page's 3-D is
+  // somebody wearing it. A harness can drive the same per-eye draw off-screen
+  // and get a PNG back.
+  window.__demo.xrPreview = (o) => xr.preview(o);
+
+  /**
+   * One handler, two kinds of session.
+   *
+   * 🔴 BOTH ARE REAL BRANCHES AND BOTH ASSERT, on every run. A page that
+   * branches must grade every branch or the suite is green over a path nobody
+   * reached — this project's oldest and most expensive failure. The labels
+   * carry the mode so two runs can be held side by side rather than merged.
+   */
+  async function enterHeadset(mode) {
+    const ar = mode === 'immersive-ar';
+    const who = ar ? 'passthrough' : 'VR';
     // ⚠️ WAIT FOR THE PROBE, NEVER RE-ASK IT. Whether this browser can show an
     // immersive session is answered once at load, away from any gesture,
     // because asking again here can spend the user activation `requestSession`
     // needs. On a very fast press the answer may not be back yet, and a bounded
     // wait is the difference between "we have not looked" and "there is none".
-    for (let i = 0; i < 20 && xr.supported() === null; i++) await new Promise((r) => setTimeout(r, 50));
+    const can = () => (ar ? xr.supportedAr() : xr.supported());
+    for (let i = 0; i < 20 && can() === null; i++) await new Promise((r) => setTimeout(r, 50));
     let got = false;
     try {
-      got = await xr.enter();
+      got = ar ? await xr.enterAR() : await xr.enter();
       // One clock at a time. Both loops calling `step` would draw this page's
       // picture twice per headset frame and report double the frame rate.
       if (got) stopFlat();
@@ -915,7 +1177,7 @@
       // is silence cannot be trusted to its own internal care. The batched
       // shipper is no use here: entering a session is exactly when timers stop
       // being generous.
-      beacon(`FAIL enter() — ${e.name}: ${e.message}`);
+      beacon(`FAIL enter(${mode}) — ${e.name}: ${e.message}`);
       d.log(`entering failed — ${e.name}: ${e.message}`, 'bad');
       try { await xr.end(); } catch { /* it may never have started */ }
       startFlat();
@@ -924,35 +1186,44 @@
     // Both branches are real and both are asserted. Only a headset can reach
     // the first, which is why nothing on a laptop grades the part of this that
     // matters — see the note in runChecks.
-    d.assert('it knows whether a headset can show this page',
-      xr.supported() === true || xr.supported() === false,
-      `a headset that can show this: ${xr.supported()}`);
+    d.assert(`it knows whether this browser can show ${who}`,
+      can() === true || can() === false,
+      `${mode}: ${can()}`);
 
-    // ⚠️ THE ROOM IS ARITHMETIC, SO A LAPTOP CAN GRADE IT. The panel's frame
-    // rate needs a headset and nothing here can change that — but whether the
-    // room was built at all, and whether the page can SAY where the dotted
-    // floor came from, are answerable on this machine. Leaving both to the
-    // device would mean the only test of the new half runs where nothing is
-    // watching. Both run on every branch, headset or not.
+    // ⚠️ THE ROOM IS ARITHMETIC, SO A LAPTOP CAN GRADE IT. The panels' frame
+    // rate needs a headset and nothing here can change that — but what the room
+    // is made of, and whether the page can SAY where the dotted floor came
+    // from, are answerable on this machine.
     const R = xr.state.room;
-    d.assert('the panel hangs in a room, and the room is a real document',
-      !!R?.on && R.things > 0, R?.on ? `seed ${R.seed}, ${R.things} things` : 'no room — the panel would hang in nothing');
+    // 🔴 THIS ASSERT USED TO READ `things > 0` AND IT WOULD NOW BE FALSE FOR
+    // THE RIGHT REASON, which is the worst kind of red. The objects were turned
+    // off on purpose, so the thing worth grading moved to the floor — and the
+    // property it grades is one that has actually broken here: the dots used to
+    // reach 5 m while the fade did not finish until 11, leaving them at two
+    // thirds strength where the quad simply stopped. A hard edge, five metres
+    // in front of your face, drawn by the fade's own constants disagreeing with
+    // the floor's.
+    d.assert('the panels hang over a floor whose dots fade out before it ends',
+      !!R?.on && !!R.dots && R.dots.span / 2 === R.dots.fadeFar && R.dots.fadeNear < R.dots.fadeFar,
+      R?.dots
+        ? `seed ${R.seed} · ${R.scenery} · ${R.dots.span} m of floor, dots fading from ${R.dots.fadeNear} to ${R.dots.fadeFar} m`
+        : 'no room — the panels would hang in nothing');
     // 🔴 "NO SURFACES" MUST NEVER BE DRAWN AS "NO WALLS". Real room data is
     // optional and it does not gate the grid: with none, the dots go on the
     // page's own floor and the page has to SAY that is what they are. The
     // sentence is the assert, because a grid nobody can attribute is a picture
     // claiming to be a measurement.
-    d.assert('and it says whose floor the dotted grid is on',
+    d.assert(`and it says whose floor the dotted grid is on, in ${who}`,
       typeof R?.note === 'string' && R.note.length > 10
       && ['not asked', 'waiting', 'refused', 'unreadable', 'none', 'yours'].includes(R.surfaces),
       `${R?.surfaces} · ${R?.note}`);
     // 🔴 THE CONTROLLER INTERFACE IS THE ROOM'S, NOT THIS PAGE'S, AND IT HAS NO
     // SESSION MODE IN IT. The same stand-ins, the same beam off the right
-    // hand's target ray, the same tablet on the left with the same slider — out
-    // of the same two modules `scene` uses, so there is no second copy here to
-    // drift. The string is the one both pages beacon on their first headset
-    // frame, which is how two runs in two modes are compared without a third.
-    d.assert('the controllers and the tablet describe themselves without naming a kind of session',
+    // hand's target ray, the same tablet on the left — out of the same two
+    // modules `scene` uses, so there is no second copy here to drift. The
+    // string is the one both pages beacon on their first headset frame, which
+    // is how two runs in two modes are compared without a third.
+    d.assert(`the controllers and the tablet describe themselves without naming a kind of session (${who})`,
       typeof xr.state.ui === 'string' && xr.state.ui.includes('control(s)')
       && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(xr.state.ui),
       xr.state.ui);
@@ -968,14 +1239,30 @@
         await new Promise((r) => setTimeout(r, 100));
       }
       const fps = xr.state.fps == null ? null : xr.state.fps.toFixed(1);
-      d.assert('the panel is in the headset and frames are going into it',
+      d.assert(`the panels are in the headset and frames are going into them (${who})`,
         xr.state.frames > 0 && !!xr.state.fb,
         xr.state.fb
           ? `${xr.state.fb.w}x${xr.state.fb.h}, ${xr.state.eye.w}x${xr.state.eye.h} an eye, ${xr.state.frames} frames`
           : 'nothing drew');
+      // 🔴 PASSTHROUGH IS GRADED ON THE BLEND MODE, NEVER ON THE SESSION'S
+      // NAME. A session can be called `immersive-ar` and still composite
+      // `opaque`, which presents as a drawing bug rather than as a session one
+      // — and in VR `opaque` is the correct answer, so the two modes expect
+      // opposite things from the same field.
+      if (ar) {
+        d.assert('and passthrough really is compositing over your room',
+          xr.state.blendMode === 'alpha-blend' || xr.state.blendMode === 'additive',
+          `environmentBlendMode ${xr.state.blendMode ?? 'not reported'}`);
+      } else {
+        d.assert('and a VR session composites nothing behind it, which is what opaque means',
+          xr.state.blendMode === 'opaque',
+          `environmentBlendMode ${xr.state.blendMode ?? 'not reported'}`);
+      }
       // 🔴 THE NUMBER `plan-xr-room.md` §4.1 EXISTS TO GET: a Quest 3 holds 89.8
-      // frames a second in an empty room, and what one panel's worth of picture
-      // costs against that is the open question the rest of the room depends on.
+      // frames a second in an empty room, and what the pictures cost against
+      // that is the open question the rest of the room depends on. The detail
+      // now carries the whole bill — the copy in, the render here, and the
+      // card's own time for it where a driver will say.
       //
       // ⚠️ GRADED AGAINST WHAT THIS HEADSET PROMISES, NEVER AGAINST A TYPED
       // NUMBER. A fixed floor of 60 was tried and it flapped on the first thing
@@ -986,32 +1273,38 @@
       // whose basis is invisible cannot be argued with.
       const promised = xr.state.frameRate
         ?? (xr.state.supportedFrameRates?.length ? Math.max(...xr.state.supportedFrameRates) : null);
-      d.assert('and it holds the rate this headset promises, with the picture on it',
+      d.assert(`and it holds the rate this headset promises, with the pictures on it (${who})`,
         xr.state.fps != null && xr.state.fps >= (promised ? promised * 0.9 : 55),
         `${fps ?? 'no rate measured'} a second against ${promised ? `${promised} promised` : 'a headset that will not say what it runs at, so 55 is only a stall floor'}`
-        + ` · the copy to the card costs ${xr.state.uploadCpuMs == null ? '—' : xr.state.uploadCpuMs.toFixed(2)} ms of processor time, worst ${xr.state.uploadWorstMs == null ? '—' : xr.state.uploadWorstMs.toFixed(2)} ms`);
+        + ` · picture ${xr.isLive() ? 'rendered here' : 'copied in'}`
+        + ` · copy ${xr.state.uploadCpuMs == null ? '—' : xr.state.uploadCpuMs.toFixed(2)} ms cpu`
+        + ` · render ${xr.state.liveCpuMs == null ? '—' : xr.state.liveCpuMs.toFixed(2)} ms cpu`
+        + ` · ${xr.state.liveWhereCost}`);
       // ⚠️ ASSERT ON THE ERROR FLAG. A page will draw a right-looking picture
       // with an error pending — a Quest did exactly that, for an attribute
       // binding made one call too late, and nobody would have seen it by
       // looking.
-      d.assert('and it drew with no graphics error pending',
+      d.assert(`and it drew with no graphics error pending (${who})`,
         xr.state.glError === 0,
-        xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError}`);
-    } else if (xr.supported() === true) {
+        xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError} · ${xr.state.glWhere}`);
+    } else if (can() === true) {
       // 🔴 A HEADSET THAT REFUSED IS NOT A LAPTOP, and the assert below would
       // have said it was. "There is no headset here" and "there is one and it
       // would not start" are opposite conclusions and they were reading as the
       // same pass — the same collapse as a blank cell meaning both "we did not
       // look" and "we looked and it was fine". The line above says which step
       // did not come back; this says that it is a failure.
-      d.assert('a headset is here, so the session has to start', false,
+      d.assert(`a headset is here, so the ${who} session has to start`, false,
         'it did not — the line above says which step never came back');
     } else {
-      d.assert('with no headset it says so and keeps drawing here',
+      d.assert(`with no headset it says so and keeps drawing here (${who})`,
         !xr.state.presenting && (drewAny > 0 || !gl),
-        `a headset that can show this: ${xr.supported()} · ${drewAny} frames drawn here`);
+        `${mode}: ${can()} · ${drewAny} frames drawn here`);
     }
-  });
+  }
+  d.on('xr', () => enterHeadset('immersive-vr'));
+  d.on('ar', () => enterHeadset('immersive-ar'));
+
 
   // ── the picture, from the board ──────────────────────────────────────────
   //
@@ -1270,51 +1563,188 @@
       d.assert('there is a picture in it, not a flat field', spread > 60,
                `the widest colour channel spans ${spread} of 255`);
 
-      // ── the panel, graded on a laptop ───────────────────────────────────
+      // ── the panels, graded on a laptop ──────────────────────────────────
       //
       // ⚠️ THE HALF THAT DOES NOT NEED A HEADSET IS GRADED WITHOUT ONE. That
       // the picture lands on the panel and that the numbers are under it is
       // ordinary code and can be checked here; what only a Quest can say — the
       // frame rate it holds in a 3360x1760 framebuffer — is asserted by the
-      // control above and by nothing on this machine. Leaving all of it to the
+      // controls above and by nothing on this machine. Leaving all of it to the
       // device would mean the only test of it runs where nobody is watching.
       wantPanel = true;
       await new Promise((r) => setTimeout(r, 300));
-      wantPanel = false;
       // With no local renderer there is no frame callback to ride on, so draw
       // it once directly rather than reporting an absent panel as a broken one.
       if (!panelDrawn) drawPanel();
-      let picSpread = 0, footInk = 0;
-      try {
-        const sc = panel.canvas.width / PANEL_W;          // device pixels per unit
-        // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
-        // mistake this page already made once. panel.mjs writes the title in
-        // near-white at the top left and its "nothing arriving yet" line across
-        // the middle, so a spread taken over the whole picture area would be
-        // measuring the TEXT and would pass just as well with no picture at
-        // all. A statistic that is high by construction over your subject is
-        // blind, not weak.
-        const pic = panel.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
-        const lo = [255, 255, 255], hi = [0, 0, 0];
-        for (let i = 0; i < pic.length; i += 4) {
-          for (let k = 0; k < 3; k++) {
-            const v = pic[i + k];
-            if (v < lo[k]) lo[k] = v;
-            if (v > hi[k]) hi[k] = v;
+      const readPanel = (pan) => {
+        let picSpread = 0, footInk = 0;
+        try {
+          const sc = pan.canvas.width / PANEL_W;          // device pixels per unit
+          // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
+          // mistake this page already made once. panel.mjs writes its "nothing
+          // arriving yet" line across the middle, so a spread taken over the
+          // whole picture area would be measuring the TEXT and would pass just
+          // as well with no picture at all. A statistic that is high by
+          // construction over your subject is blind, not weak.
+          const pic = pan.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
+          const lo = [255, 255, 255], hi = [0, 0, 0];
+          for (let i = 0; i < pic.length; i += 4) {
+            for (let k = 0; k < 3; k++) {
+              const v = pic[i + k];
+              if (v < lo[k]) lo[k] = v;
+              if (v > hi[k]) hi[k] = v;
+            }
           }
+          picSpread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+          // And the footer strip really has ink in it: the numbers are half of
+          // what a panel is for, and a panel with a picture and no numbers is a
+          // decoration.
+          const foot = pan.ctx.getImageData(14 * sc, 346 * sc, (PANEL_W - 28) * sc, 40 * sc).data;
+          for (let i = 0; i < foot.length; i += 4) {
+            if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
+          }
+        } catch (e) { d.log(`a panel could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
+        return { picSpread, footInk };
+      };
+      const here = readPanel(panelHere);
+      d.assert('the left panel carries this picture with its numbers under it',
+        here.picSpread > 30 && here.footInk > 200,
+        `the widest colour channel spans ${here.picSpread} of 255 · ${here.footInk} lit pixels in the footer`);
+      // 🔴 THE STRIP THE RENDERED PANEL WEARS INSTEAD OF A FOOTER, graded on its
+      // own. It is a different canvas from the one above and it is the ONLY
+      // place a number appears when the picture is drawn by the headset — so a
+      // strip that silently stopped being filled would take every number in
+      // there with it and leave a picture that looks perfect.
+      let stripInk = 0;
+      try {
+        const sc = footHere.canvas.width / PANEL_W;
+        const fd = footHere.ctx.getImageData(0, 0, footHere.canvas.width, footHere.canvas.height).data;
+        for (let i = 0; i < fd.length; i += 4) {
+          if (fd[i] > 90 || fd[i + 1] > 90 || fd[i + 2] > 90) stripInk++;
         }
-        picSpread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
-        // And the footer strip really has ink in it: the numbers are half of
-        // what a panel is for, and a panel with a picture and no numbers is a
-        // decoration.
-        const foot = panel.ctx.getImageData(14 * sc, 346 * sc, (PANEL_W - 28) * sc, 40 * sc).data;
-        for (let i = 0; i < foot.length; i += 4) {
-          if (foot[i] > 90 || foot[i + 1] > 90 || foot[i + 2] > 90) footInk++;
-        }
-      } catch (e) { d.log(`the panel could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
-      d.assert('the panel carries this picture with its numbers under it',
-        picSpread > 30 && footInk > 200,
-        `the widest colour channel spans ${picSpread} of 255 · ${footInk} lit pixels in the footer`);
+        void sc;
+      } catch (e) { d.log(`the footer strip could not be read — ${String(e.message).slice(0, 60)}`, 'warn'); }
+      d.assert('and the rendered panel gets the same numbers on a strip of its own',
+        stripInk > 200, `${stripInk} lit pixels in it`);
+
+      // ── the room, drawn on this machine ─────────────────────────────────
+      //
+      // 🔴 EVERY PIXEL OF THE HEADSET'S PICTURE USED TO BE UNREACHABLE FROM
+      // HERE. The floor, the glow, the grab bars, the panel quads and the live
+      // renderer all live behind `requestSession`, so a shader that would not
+      // compile or an error flag left standing cost a headset run to find — and
+      // the owner gets one run. `preview` drives the SAME per-eye draw with a
+      // hand-made projection into an off-screen canvas: no compositor, no frame
+      // rate, nothing said about a device — only "does it draw, and is it
+      // clean", which are the two questions a laptop can answer.
+      let pv = null;
+      try { pv = await xr.preview({ frames: 14 }); }
+      catch (e) { d.log(`the room preview threw — ${String(e.message).slice(0, 70)}`, 'warn'); }
+      wantPanel = false;
+      // 🔴 WHAT ONE LIVE PASS COSTS, ON WHATEVER IS IN FRONT OF YOU. It is NOT
+      // a headset number and this line says so — a laptop's card tells you
+      // nothing about an Adreno, the same refusal demo/verify-gl.mjs makes
+      // about a software rasteriser. What it establishes is that the instrument
+      // works and what shape the cost has, so the one run that has to happen on
+      // the device produces a number somebody can already interpret.
+      if (pv?.ok) {
+        d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
+          + ` · ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'unknown size'}`
+          + ' — this machine, not a headset', 'hi');
+        window.__demo.livePreview = {
+          gpuMs: pv.liveGpuMs, halfGpuMs: pv.liveHalfGpuMs, where: pv.whereCost,
+          timer: pv.gpuTimer, pixels: pv.pixels,
+        };
+      }
+      d.assert('the room, the floor, the glow and the panels all draw on this machine',
+        !!pv?.ok && pv.spread > 40 && pv.litShare > 0.02,
+        pv?.ok
+          ? `the widest colour channel spans ${pv.spread} of 255 · ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
+            + ` · grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'} · picture ${pv.live ? 'rendered here' : 'copied in'}`
+          : `it did not draw — ${pv?.why ?? 'no answer'}`);
+      // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
+      // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
+      // before a device run is by a laptop reading the same flag.
+      d.assert('and it left no graphics error pending',
+        pv?.ok ? pv.glError === 0 : false,
+        pv?.ok ? pv.glWhere : 'nothing drew, so nothing was checked');
+      // 🔴 THE FAKE LIGHT HAS TO ANSWER TO THE PICTURE OR IT IS A DECORATION.
+      // A cell that cannot change teaches the reader to ignore it, and this one
+      // very nearly could not: the colour is three cosines 120° apart, which
+      // SUM TO A CONSTANT, so a mean taken the obvious way is grey whatever the
+      // picture does. The amplitude is read here against the picture that was
+      // actually on screen.
+      // ⚠️ AND STRICTLY INSIDE ITS RANGE, NOT MERELY WITHIN IT. A number pinned
+      // at its ceiling is a constant wearing a measurement's clothes — which is
+      // what this one did on its first run, and only a bound that excludes the
+      // end caught it.
+      d.assert('the light the picture throws on the floor is a measurement of that picture',
+        !!xr.state.glow && xr.state.glow.amp > 0.002 && xr.state.glow.amp < GLOW_MAX,
+        xr.state.glow
+          ? `rgb ${xr.state.glow.col.map((v) => v.toFixed(2)).join(', ')} at ${xr.state.glow.amp.toFixed(3)} of a possible ${GLOW_MAX}`
+          : 'nothing is lighting anything');
+      // ── picking a panel up, graded with no headset in the building ──────
+      //
+      // 🔴 THE ONE THING ON THIS PAGE THAT CANNOT BE TRIED WITHOUT A CONTROLLER,
+      // AND IT HAS NEVER RUN. The trigger arms a drag and the "any button
+      // leaves" scan used to end the session on that same press, so a panel
+      // drag was unreachable in every headset run this page has ever had. The
+      // arithmetic is pure, so it is driven here with a made-up pose — against
+      // the SAME functions the session calls, never a second copy, because a
+      // test against a copy grades the copy.
+      {
+        const W_M = 1.28, H_M = 0.80;
+        const head = { x: 0, y: 1.6, z: 0 };
+        // A panel 1.6 m in front, facing you, with its bar under it.
+        const M0 = facing([0, 1.6, -1.6], head, W_M, H_M);
+        const bar = barOf(M0, H_M, W_M * PLACE.barShare, PLACE.barH, PLACE.barGap);
+        // A controller at chest height aiming at the bar's LEFT END, so the
+        // grab is off-centre and a "snaps to the middle" bug would show.
+        const aimX = -W_M * PLACE.barShare * 0.4;
+        const barY = 1.6 - H_M / 2 - PLACE.barGap - PLACE.barH / 2;
+        const from = { x: 0, y: 1.2, z: 0 };
+        const dir = [aimX - from.x, barY - from.y, -1.6 - from.z];
+        const dl = Math.hypot(...dir);
+        const unit = dir.map((v) => v / dl);
+        const hitBar = pickQuad(bar, [from.x, from.y, from.z], unit);
+        // ...and the SAME ray must not be answered by the picture above it,
+        // which is what keeps the surface free for the tablet's own pointer.
+        const hitFace = pickQuad(M0, [from.x, from.y, from.z], unit);
+        d.assert('the ray finds the bar under a panel, and the picture above it is not a handle',
+          !!hitBar && !hitFace,
+          hitBar
+            ? `the bar answers at ${hitBar.t.toFixed(2)} m, ${(hitBar.u * 100).toFixed(0)}% across it`
+              + ` · the picture ${hitFace ? 'ALSO answered, which would be two things from one press' : 'did not'}`
+            : 'the bar did not answer at all');
+        // Now the grab: keep the offset, move the controller half a metre right
+        // and a quarter up, and the panel must follow by exactly that.
+        const rayM = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, from.x, from.y, from.z, 1]);
+        const L = grabOffset(M0, rayM, from);
+        const moved = { x: from.x + 0.5, y: from.y + 0.25, z: from.z };
+        const rayM2 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, moved.x, moved.y, moved.z, 1]);
+        const c = heldAt(rayM2, moved, L, head, 0);
+        const dx = c[0] - M0[12], dy = c[1] - M0[13];
+        d.assert('a panel grabbed off-centre keeps that offset as the hand moves',
+          Math.abs(dx - 0.5) < 1e-3 && Math.abs(dy - 0.25) < 1e-3,
+          `the hand moved 0.50 m across and 0.25 m up; the panel moved ${dx.toFixed(3)} and ${dy.toFixed(3)}`);
+        // And the bound holds: shove it twenty metres away and into the floor.
+        const far = { x: 0, y: -4, z: -20 };
+        const rayM3 = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, far.x, far.y, far.z, 1]);
+        const c2 = heldAt(rayM3, far, L, head, 0);
+        const reach = Math.hypot(c2[0] - head.x, c2[2] - head.z);
+        d.assert('and it cannot be pushed somewhere you could not walk to it',
+          reach <= PLACE.far + 1e-3 && c2[1] >= PLACE.lowest - 1e-3 && c2[1] <= PLACE.highest + 1e-3,
+          `shoved to 20 m away and 4 m under the floor, it stopped at ${reach.toFixed(2)} m out and ${c2[1].toFixed(2)} m up`);
+        // ⚠️ AND IT FACES YOU, YAW ONLY. A panel that tips to meet a head
+        // looking down from above reads as falling over.
+        const M2 = facing(c2, { x: 0, y: 2.4, z: 0 }, W_M, H_M);
+        d.assert('a panel you put down faces you, and stays upright doing it',
+          Math.abs(M2[4]) < 1e-6 && Math.abs(M2[6]) < 1e-6 && Math.abs(M2[5] - H_M) < 1e-6
+          && Math.abs(M2[9]) < 1e-6,
+          `its up is (${M2[4].toFixed(3)}, ${M2[5].toFixed(3)}, ${M2[6].toFixed(3)}) with the head 0.8 m above it`
+          + ` · its normal tilts ${(Math.asin(Math.abs(M2[9])) * 180 / Math.PI).toFixed(1)}° out of level`);
+      }
+
       // The far pane, only if the board answered. A lane with nothing to say
       // says so in words rather than counting as a failure.
       if (farDecoded > 0) {
@@ -1323,6 +1753,7 @@
       } else {
         d.log('box not sending — right pane has nothing to report', 'warn');
       }
+
       d.ready();
   }
   (async () => {
