@@ -396,6 +396,55 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       ],
     }));
 
+  // ── the fork, which is the case that was not drawable at all ────────────
+  // 🔴 THE SAME SPEC TWICE, AT BOTH WIDTHS, BECAUSE ONE OF THEM USED TO LIE.
+  // Every other block on this page draws its case once; this one cannot, since
+  // a branch was correct left to right and FALSE in one column — a forward
+  // link was a straight vertical at its source's centre and routed around
+  // nothing, so the second branch ran behind the box between its two ends and
+  // came out underneath it with an arrowhead in the next one. A phone read a
+  // path the page does not have, and the name that tells the two branches
+  // apart was drawn at the midpoint, i.e. under that box. Seeing one width
+  // could not have caught it, so the block shows both.
+  section('a branch, and the box it must not be drawn through',
+    'The same four settings go to a copy of the machine in this page and out ' +
+    'to a copy on a board somewhere else — so one box has two arrows leaving ' +
+    'it. An arrow that reaches past the box in its way is routed round the ' +
+    'outside rather than drawn through it: over the row when the picture runs ' +
+    'left to right, and down the right-hand side when it is stacked, which is ' +
+    'the side the return paths do not use. The same description is drawn twice ' +
+    'here, at a laptop width and at a phone width, because this is the one ' +
+    'case where the two disagreed.',
+    '',
+    (box) => {
+      const branch = {
+        title: 'the same settings, in two buildings',
+        caption: 'Two copies of one machine, fed the same four numbers. One arrow ' +
+                 'goes to the copy in this page and one reaches past it, out to the ' +
+                 'board — and the sound of the far one comes back.',
+        // ⚠️ SHORT SUBS, MEASURED RATHER THAN PREFERRED. These were 17 to 19
+        // characters and at 258 px the drawer reported ALL FOUR of them cut —
+        // a picture shortening the names of the things it is about. The
+        // shortening is the signal, not a width to tune around, so the words
+        // went instead: nothing is cut anywhere from 258 px up.
+        nodes: [
+          { id: 'you', label: 'this page', sub: 'one copy here', kind: 'here' },
+          { id: 'near', label: 'a copy here', sub: 'same settings' },
+          { id: 'cf', label: 'Cloudflare', sub: 'passes it on', kind: 'cloud' },
+          { id: 'pi', label: 'Raspberry Pi', sub: 'a copy there', kind: 'device' },
+        ],
+        links: [
+          { from: 'you', to: 'near', label: 'settings' },
+          { from: 'you', to: 'cf', label: 'and out' },
+          { from: 'cf', to: 'pi', label: '' },
+          { from: 'pi', to: 'cf', label: 'the sound', back: true },
+          { from: 'cf', to: 'you', label: '', back: true },
+        ],
+      };
+      diagramCase(box, branch);
+      diagramCase(box, branch, { phone: true });
+    });
+
   section('the same picture at the width of a phone',
     'Below about 560 px the whole thing becomes one column, top to bottom, in ' +
     'the order the signal takes — and the return paths move to the left-hand ' +

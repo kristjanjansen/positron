@@ -56,13 +56,23 @@ const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
 const BOX_MAX_W     = 190;
 const BOX_MAX_W_COL = 300;
 const COL_BREAK     = 560;  // below this, one column top to bottom
-const BACK_FIRST    = 18;   // how far under the row the first return path runs
-const BACK_STEP     = 14;   // and how much deeper each one after it
+// 🔴 A LINK THAT CANNOT RUN STRAIGHT GETS A LANE OUTSIDE THE BOXES, and the
+// two kinds share these two numbers because they are one mechanism seen from
+// two sides: a return path runs UNDER the row (down the LEFT, in one column)
+// and a forward link that reaches past its neighbour runs OVER it (down the
+// RIGHT). One spacing, so the picture reads as one idea and the two kinds of
+// lane can never be assigned widths that disagree.
+const LANE_FIRST    = 18;   // how far off the boxes the first lane runs
+const LANE_STEP     = 14;   // and how much further out each one after it
 const CORNER        = 6;
 const EDGE_OUT      = 2;    // the slight offset into the box's edge
 const ATTACH_OFF    = 12;   // so two return paths never leave from one point
 const LINK_MIN      = 40;   // the narrowest a link's name is allowed to get
 const LINK_MAX      = 120;
+const GUTTER_PAD    = 16;   // a gutter's fixed part: 6 px to the box, 6 to the
+                            // lane, and the 4 the shallowest lane sits in from
+                            // the picture's edge
+const STEP_OFF      = 9;    // a step's name, off to one side of its arrow
 
 /** what the drawer assumes about type, when nothing has measured it yet */
 export const METRICS = {
@@ -169,6 +179,29 @@ export function backLevels(spans) {
 }
 
 /**
+ * Does this forward link have to pass over a box on its way?
+ *
+ * 🔴 THE ANSWER IS WHAT MAKES A FORK DRAWABLE, AND IT IS THE SAME QUESTION IN
+ * BOTH LAYOUTS. A straight arrow is the right drawing for a step to the next
+ * place along and routes around NOTHING; a branch that reaches further is
+ * drawn straight THROUGH whatever stands between, so the arrow vanishes behind
+ * a box it never touches and comes out the far side with its head in the next
+ * one. That is a picture of a path the page does not have, and the name that
+ * would have told the two branches apart is drawn at the midpoint, i.e. under
+ * the box. The second branch of a fork always skips whatever the first one
+ * landed on, so every fork breaks that way until the link is routed outside
+ * the boxes instead.
+ *
+ * @param {object} l          one link
+ * @param {Map<string,number>} pos  where each box sits ALONG the flow: the
+ *        column in the row layout, the row in the one-column layout. One
+ *        predicate, two coordinate systems, because it is one defect.
+ */
+function skipsABox(l, pos) {
+  return !l.back && Math.abs(pos.get(l.to) - pos.get(l.from)) > 1;
+}
+
+/**
  * Break one string into lines that fit, and cut the last one if it cannot.
  *
  * ⚠️ A CUT LABEL IS A REPORT, NOT A FEATURE. CLAUDE.md: anything that
@@ -272,11 +305,24 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
 
   const backs = links.filter((l) => l.back);
   let leftInset = 0;
+  let rightInset = 0;
+  let backBudget = 0, skipBudget = 0;
   let colBoxW = 0;
+  let order = null, rowOf = null;
   if (mode === 'column') {
-    // The return paths run down the LEFT of the column, so that gutter holds
-    // two things SIDE BY SIDE and not one: the lanes the paths run in, and the
-    // names written beside them.
+    // Which box sits on which row is decided here rather than in placeColumn,
+    // because the gutters have to be reserved before a box has a width and
+    // "does this link skip a box" is a question about rows.
+    order = nodes
+      .map((n, i) => ({ n, c: col.get(n.id), i }))
+      .sort((a, b) => a.c - b.c || a.i - b.i)
+      .map((o) => o.n);
+    rowOf = new Map(order.map((n, r) => [n.id, r]));
+
+    // The return paths run down the LEFT of the column and the forward links
+    // that skip a box down the RIGHT, so each gutter holds two things SIDE BY
+    // SIDE and not one: the lanes the paths run in, and the names written
+    // beside them.
     //
     // ⚠️ MEASURED, with the two stacked instead: `the sound` was drawn with a
     // return path running straight through it, because the gutter was sized to
@@ -284,21 +330,64 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     // has a line through it reads as a name in the wrong place, which is what
     // it was.
     //
-    // `backs.length` is the worst case for the number of lanes — every path on
-    // a level of its own — and is used because the real levels need positions
-    // that need this width. It over-reserves when two paths share a lane; the
-    // alternative is laying the whole thing out twice.
-    const budget = Math.max(LINK_MIN, Math.min(LINK_MAX, Math.round(avail * 0.30)));
-    let widest = 0;
-    for (const l of backs) {
-      if (!l.label) continue;
-      const wrapped = wrapLines(l.label, budget, 1, measure.link);
-      widest = Math.max(widest, measure.link(wrapped.lines[0] || ''));
+    // The list's LENGTH is the worst case for the number of lanes — every path
+    // on a level of its own — and is used because the real levels need
+    // positions that need this width. It over-reserves when two paths share a
+    // lane; the alternative is laying the whole thing out twice.
+    //
+    // 🔴 A GUTTER IS SIZED BY WHAT ITS NAMES NEED, NEVER BY A SHARE OF THE
+    // PICTURE. It used to be a flat 30% of the width: the name was wrapped to
+    // that, and the widest RESULT then sized the gutter — so a name that had
+    // been cut made the gutter smaller, which is a cut reinforcing itself.
+    // MEASURED at 258 px: `sound and grains` wanted 92 px, was cut to
+    // `sound and…` at 58, and the gutter then reserved 58 — while the box
+    // beside it held 166 px for text needing 128. The name is measured WHOLE
+    // here, before anything wraps it, so the number cannot be fed by its own
+    // shortening.
+    const want = (list) => {
+      if (!list.length) return 0;
+      let widest = 0;
+      for (const l of list) {
+        if (!l.label) continue;
+        widest = Math.max(widest, measure.link(l.label));
+      }
+      return Math.ceil(Math.min(widest, LINK_MAX)) + GUTTER_PAD + (list.length - 1) * LANE_STEP;
+    };
+    // and the floor, when there is not enough picture for everyone: the lanes
+    // themselves still have to be somewhere, even with no room for a name
+    const lanesOnly = (list) => (list.length ? 8 + (list.length - 1) * LANE_STEP : 0);
+    const skips = links.filter((l) => skipsABox(l, rowOf));
+    leftInset = want(backs);
+    rightInset = want(skips);
+
+    // 🔴 AND WHEN THE PICTURE IS TOO NARROW FOR ALL OF IT, THE BOXES' OWN
+    // WORDS WIN. A diagram that shortens the names of the things it is about
+    // is broken in a way a reader can see; the order is the box's text, then
+    // the arrows' names, then empty space. The binding measurement is the
+    // `sub`, because it gets ONE line and is never wrapped — so the width it
+    // needs is simply its own, with no second layout pass to find out. A
+    // `label` has two lines and gives way gracefully. MEASURED before this
+    // existed: at 258 px /kit/'s fork block cut ALL FOUR box subs while
+    // reserving a gutter nothing had asked for.
+    let boxNeed = 0;
+    for (const n of nodes) boxNeed = Math.max(boxNeed, measure.sub(n.sub || ''));
+    boxNeed = Math.min(Math.ceil(boxNeed) + BOX_PAD_X * 2, BOX_MAX_W_COL);
+    const room = avail - PAD * 2 - boxNeed;
+    if (leftInset + rightInset > room) {
+      const floorL = lanesOnly(backs), floorR = lanesOnly(skips);
+      const spare = Math.max(0, room - floorL - floorR);
+      const over = (leftInset - floorL) + (rightInset - floorR);
+      const k = over > 0 ? spare / over : 0;
+      leftInset = floorL + Math.floor((leftInset - floorL) * k);
+      rightInset = floorR + Math.floor((rightInset - floorR) * k);
     }
-    leftInset = backs.length
-      ? Math.ceil(widest) + 16 + (backs.length - 1) * BACK_STEP
-      : 0;
-    colBoxW = Math.min(avail - leftInset - PAD * 2, BOX_MAX_W_COL);
+    // what is left of each gutter once its lanes have theirs — the width a
+    // name in it actually gets, and the number `cuts` is reported against
+    const nameRoom = (inset, list) => (list.length
+      ? Math.max(0, inset - GUTTER_PAD - (list.length - 1) * LANE_STEP) : 0);
+    backBudget = nameRoom(leftInset, backs);
+    skipBudget = nameRoom(rightInset, skips);
+    colBoxW = Math.min(avail - leftInset - rightInset - PAD * 2, BOX_MAX_W_COL);
   }
 
   const w = mode === 'row'
@@ -329,7 +418,8 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
 
   const out = mode === 'row'
     ? placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, cuts })
-    : placeColumn(nodes, links, { col, avail, w, boxH, leftInset, m, measure, cuts });
+    : placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInset,
+                           backBudget, skipBudget, m, measure, cuts });
 
   for (const n of nodes) { delete n._lab; delete n._sub; }
   return { mode, boxW: w, boxH, cuts, cycle, gapX, ...out };
@@ -347,15 +437,36 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   const colH = inCol.map((list) => list.length * boxH + (list.length - 1) * GAP_Y);
   const tallest = Math.max(...colH);
 
+  // ── a forward link that skips a column runs OVER the row ────────────────
+  // 🔴 THIS IS WHAT MAKES A FORK DRAWABLE HERE, and it is the return path's
+  // rule turned upside down: a link that cannot run straight gets a lane
+  // outside the boxes, over for onward and under for back, so the two never
+  // meet and neither is ever drawn through a box.
+  //
+  // The lanes can be worked out before a single box has a y, because every x
+  // in the row layout is fixed by the column alone. So the depths are assigned
+  // first and the whole row is then pushed down by exactly the room they need
+  // — rather than laying the picture out twice.
+  const cxOf = (id) => left + col.get(id) * (w + gapX) + w / 2;
+  const overs = links.filter((l) => skipsABox(l, col));
+  const overLevel = backLevels(overs.map(
+    (l) => [cxOf(l.from) + ATTACH_OFF, cxOf(l.to) - ATTACH_OFF]));
+  const overNamed = overs.some((l) => l.label);
+  const overStep = LANE_STEP + (overNamed ? Math.round(m.linkLh) : 0);
+  const head = overs.length
+    ? LANE_FIRST + Math.max(...overLevel) * overStep + (overNamed ? 16 : 6)
+    : 0;
+  const top = PAD + head;
+
   const placed = nodes.map((n) => {
     const c = col.get(n.id);
     const r = inCol[c].indexOf(n);
     const x = left + c * (w + gapX);
-    const y = PAD + Math.round((tallest - colH[c]) / 2) + r * (boxH + GAP_Y);
+    const y = top + Math.round((tallest - colH[c]) / 2) + r * (boxH + GAP_Y);
     return box(n, x, y, w, boxH, m);
   });
   const at = new Map(placed.map((p) => [p.id, p]));
-  const bottom = PAD + tallest;
+  const bottom = top + tallest;
 
   // ── the return paths, under the row ───────────────────────────────────
   // 🔴 UNDER, NEVER BETWEEN THE BOXES. A return drawn back through the forward
@@ -374,38 +485,73 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   // has to clear as well — so when any of them is named, the step grows by one
   // line of that type rather than by a number picked to look right.
   const named = backs.some((l) => l.label);
-  const step = BACK_STEP + (named ? Math.round(m.linkLh) : 0);
+  const step = LANE_STEP + (named ? Math.round(m.linkLh) : 0);
   let deepest = bottom;
   let backLabelled = false;
+  // how wide a name beside a lane may get: the lane's own run, less the two
+  // corners, clamped so it is never narrower than a word or wider than a line
+  const laneBudget = (sx, tx) =>
+    Math.max(LINK_MIN, Math.min(LINK_MAX, Math.abs(sx - tx) - 20));
 
   const drawn = [];
   for (const l of links) {
     const f = at.get(l.from), t = at.get(l.to);
     if (!l.back) {
-      const x1 = f.x + w + EDGE_OUT, y1 = f.cy;
-      const x2 = t.x - EDGE_OUT - 1, y2 = t.cy;
-      const lab = wrapLines(l.label, gapX - 6, 2, measure.link);
+      const o = overs.indexOf(l);
+      if (o < 0) {
+        const x1 = f.x + w + EDGE_OUT, y1 = f.cy;
+        const x2 = t.x - EDGE_OUT - 1, y2 = t.cy;
+        const lab = wrapLines(l.label, gapX - 6, 2, measure.link);
+        if (lab.cut) {
+          cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
+                      shown: lab.lines.join(' '), width: gapX - 6 });
+        }
+        // ⚠️ "SIX PIXELS ABOVE THE MIDDLE" IS ONLY CLEAR OF A HORIZONTAL
+        // ARROW. A fork puts two boxes in one column, so its arrows are
+        // DIAGONAL — MEASURED in /kit/ at 655 px, the line for `settings`
+        // climbed 5.4 px through the middle of the word, and `and out` 4.8.
+        // The lift is the height the line itself gains across the name's own
+        // width, so the clearance is the same at any slope, and zero for a
+        // horizontal arrow, which is every picture with no branch in it.
+        //
+        // 🔴 AND EACH NAME GOES ON THE OUTSIDE OF ITS OWN ARROW, which lifting
+        // alone does not give you: the two branches of a fork leave one point
+        // and open a wedge, so putting both names above pushed `and out`
+        // 4.2 px into the branch above it — the same defect one arrow further
+        // on. A name that rises sits above its line and a name that falls sits
+        // below it, so the wedge stays empty and each name is on the side its
+        // own arrow is travelling away from.
+        const half = Math.max(...lab.lines.map((t) => measure.link(t)), 0) / 2;
+        const rise = x2 === x1 ? 0 : Math.abs((y2 - y1) / (x2 - x1)) * half;
+        const falls = y2 > y1;
+        drawn.push({ ...l, d: `M${r1(x1)} ${r1(y1)} L${r1(x2)} ${r1(y2)}`,
+                     lab, lx: (x1 + x2) / 2,
+                     ly: falls ? (y1 + y2) / 2 + rise + 4 + m.linkSize * 0.85
+                               : (y1 + y2) / 2 - rise - 6,
+                     anchor: 'middle', stack: falls ? 'none' : 'up' });
+        continue;
+      }
+      // over the row, out of the source's TOP edge and down into the target's
+      const dy = top - LANE_FIRST - overLevel[o] * overStep;
+      const sx = f.cx + ATTACH_OFF, tx = t.cx - ATTACH_OFF;
+      const budget = laneBudget(sx, tx);
+      const lab = wrapLines(l.label, budget, 1, measure.link);
       if (lab.cut) {
         cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
-                    shown: lab.lines.join(' '), width: gapX - 6 });
+                    shown: lab.lines.join(' '), width: budget });
       }
-      drawn.push({ ...l, d: `M${r1(x1)} ${r1(y1)} L${r1(x2)} ${r1(y2)}`,
-                   lab, lx: (x1 + x2) / 2, ly: (y1 + y2) / 2 - 6,
-                   anchor: 'middle', stack: 'up' });
+      drawn.push({ ...l, d: acrossLane(sx, f.y, tx, t.y - EDGE_OUT - 1, dy, -1),
+                   lab, lx: (sx + tx) / 2, ly: dy - 5, anchor: 'middle',
+                   stack: 'none', level: overLevel[o], depth: dy });
       continue;
     }
     const i = backs.indexOf(l);
-    const dy = bottom + BACK_FIRST + level[i] * step;
+    const dy = bottom + LANE_FIRST + level[i] * step;
     deepest = Math.max(deepest, dy);
     const sx = f.cx - ATTACH_OFF, tx = t.cx + ATTACH_OFF;
     const sy = f.y + boxH, ty = t.y + boxH + EDGE_OUT + 1;
-    const k = sx > tx ? 1 : -1;          // the usual direction: right to left
-    const d = `M${r1(sx)} ${r1(sy)} L${r1(sx)} ${r1(dy - CORNER)}`
-            + ` Q${r1(sx)} ${r1(dy)} ${r1(sx - CORNER * k)} ${r1(dy)}`
-            + ` L${r1(tx + CORNER * k)} ${r1(dy)}`
-            + ` Q${r1(tx)} ${r1(dy)} ${r1(tx)} ${r1(dy - CORNER)}`
-            + ` L${r1(tx)} ${r1(ty)}`;
-    const budget = Math.max(LINK_MIN, Math.min(LINK_MAX, Math.abs(sx - tx) - 20));
+    const d = acrossLane(sx, sy, tx, ty, dy, 1);
+    const budget = laneBudget(sx, tx);
     const lab = wrapLines(l.label, budget, 1, measure.link);
     if (lab.cut) {
       cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
@@ -421,72 +567,166 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, gapX, m, measure, c
   return { width: avail, height, nodes: placed, links: drawn };
 }
 
-function placeColumn(nodes, links, { col, avail, w, boxH, leftInset, m, measure, cuts }) {
+function placeColumn(links, { order, rowOf, avail, w, boxH, leftInset, rightInset,
+                             backBudget, skipBudget, m, measure, cuts }) {
   // ⚠️ ONE COLUMN IS NOT THE ROW LAYOUT ROTATED. A horizontal diagram on a
   // phone is a diagram nobody reads, so below the break the steps stack top to
-  // bottom in the order the signal takes them, and the return paths run down
-  // the left-hand gutter where they have somewhere to go.
-  const order = nodes
-    .map((n, i) => ({ n, c: col.get(n.id), i }))
-    .sort((a, b) => a.c - b.c || a.i - b.i)
-    .map((o) => o.n);
-
+  // bottom in the order the signal takes them, the return paths run down the
+  // left-hand gutter, and a forward link that reaches past the box under it
+  // runs down the right-hand one. Onward on the right, back on the left: two
+  // gutters that cannot collide, and neither line is ever behind a box.
   const x = leftInset + PAD;
   const placed = order.map((n, r) =>
     box(n, x, PAD + r * (boxH + GAP_Y_COL), w, boxH, m));
   const at = new Map(placed.map((p) => [p.id, p]));
-  const rowOf = new Map(placed.map((p, r) => [p.id, r]));
   const bottom = PAD + placed.length * boxH + (placed.length - 1) * GAP_Y_COL;
+  const right = x + w;
 
   const backs = links.filter((l) => l.back);
   const level = backLevels(backs.map((l) => {
     const f = at.get(l.from), t = at.get(l.to);
     return [f.cy - ATTACH_OFF / 2, t.cy + ATTACH_OFF / 2];
   }));
-  const backBudget = Math.max(LINK_MIN, Math.min(LINK_MAX, Math.round(avail * 0.30)));
-  // a forward name sits to the right of the vertical arrow, so it may use the
-  // half of the box it starts over and no more
-  const fwdBudget = Math.max(LINK_MIN, Math.floor(w / 2) - 16);
+  const overs = links.filter((l) => skipsABox(l, rowOf));
+  const overLevel = backLevels(overs.map((l) => {
+    const f = at.get(l.from), t = at.get(l.to);
+    return [f.cy + ATTACH_OFF / 2, t.cy - ATTACH_OFF / 2];
+  }));
+  // 🔴 A STEP'S NAME TAKES THE ROW IT SITS IN, NOT HALF A BOX. Between two
+  // stacked boxes is a gap that is EMPTY right across the picture, and the
+  // only thing in it is one short vertical arrow. The budget used to be "the
+  // half of the box it starts over" — MEASURED at 258 px in /kit/'s fork
+  // block, that handed `settings` 41 px with 106 px of nothing beside it, and
+  // cut it to `settin…`. A name is now measured against the space it is
+  // actually drawn in.
+  //
+  // It goes on the WIDER side of the arrow, and on the same side for every
+  // step, because in one column every box shares an x — so the choice is made
+  // once from real positions and the names line up in a column instead of
+  // alternating. Which side is wider is not a guess: a left gutter pushes the
+  // boxes right, so the room is usually on the left, and with no gutters at
+  // all the two are equal and it stays where it has always been.
+  const laneR = backs.length ? PAD + 4 + (backs.length - 1) * LANE_STEP + 6 : PAD;
+  const laneL = overs.length
+    ? right + rightInset - 4 - (overs.length - 1) * LANE_STEP - 6 : avail - PAD;
+  const cx = placed[0].cx;
+  const roomL = cx - STEP_OFF - laneR, roomR = laneL - (cx + STEP_OFF);
+  const stepLeft = roomL > roomR;
+  const fwdBudget = Math.min(LINK_MAX, Math.floor(Math.max(0, roomL, roomR)));
 
   const drawn = [];
   for (const l of links) {
     const f = at.get(l.from), t = at.get(l.to);
     if (!l.back) {
-      const down = rowOf.get(l.to) > rowOf.get(l.from);
-      const y1 = down ? f.y + boxH + EDGE_OUT : f.y - EDGE_OUT;
-      const y2 = down ? t.y - EDGE_OUT - 1 : t.y + boxH + EDGE_OUT + 1;
-      const lab = wrapLines(l.label, fwdBudget, 1, measure.link);
+      const o = overs.indexOf(l);
+      if (o < 0) {
+        const down = rowOf.get(l.to) > rowOf.get(l.from);
+        const y1 = down ? f.y + boxH + EDGE_OUT : f.y - EDGE_OUT;
+        const y2 = down ? t.y - EDGE_OUT - 1 : t.y + boxH + EDGE_OUT + 1;
+        const lab = wrapLines(l.label, fwdBudget, 1, measure.link);
+        if (lab.cut) {
+          cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
+                      shown: lab.lines.join(' '), width: fwdBudget });
+        }
+        drawn.push({ ...l, d: `M${r1(f.cx)} ${r1(y1)} L${r1(f.cx)} ${r1(y2)}`,
+                     lab, lx: f.cx + (stepLeft ? -STEP_OFF : STEP_OFF),
+                     ly: (y1 + y2) / 2 + m.linkSize * 0.35,
+                     anchor: stepLeft ? 'end' : 'start', stack: 'none' });
+        continue;
+      }
+      // 🔴 OUT OF THE RIGHT EDGE, DOWN THE RIGHT GUTTER, BACK IN AT THE RIGHT
+      // EDGE. The straight vertical this replaces left the source's CENTRE and
+      // ran behind every box between the two, which is the fork bug: the
+      // branch emerges under a box it never visits with its head in the next
+      // one, and its name is drawn at the midpoint, i.e. under that box.
+      // The lanes fill the RIGHT of the gutter and the names the left of it,
+      // so a deeper path moves further right and never under a name — the
+      // left gutter's rule, mirrored.
+      const bx = right + rightInset - 4 - (overs.length - 1 - overLevel[o]) * LANE_STEP;
+      const sy = f.cy + ATTACH_OFF / 2, ty = t.cy - ATTACH_OFF / 2;
+      const sx = f.x + w + EDGE_OUT, tx = t.x + w + EDGE_OUT + 1;
+      const lab = wrapLines(l.label, skipBudget, 1, measure.link);
       if (lab.cut) {
         cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
-                    shown: lab.lines.join(' '), width: fwdBudget });
+                    shown: lab.lines.join(' '), width: skipBudget });
       }
-      drawn.push({ ...l, d: `M${r1(f.cx)} ${r1(y1)} L${r1(f.cx)} ${r1(y2)}`,
-                   lab, lx: f.cx + 9, ly: (y1 + y2) / 2 + m.linkSize * 0.35,
-                   anchor: 'start', stack: 'none' });
+      drawn.push({ ...l, d: sideLane(sx, sy, tx, ty, bx, -1), lab,
+                   lx: right + 6, ly: sy + 4 + m.linkSize * 0.85,
+                   anchor: 'start', stack: 'none', level: overLevel[o], bx });
       continue;
     }
     const i = backs.indexOf(l);
     // the lanes fill the LEFT of the gutter and the names the right of it, so
     // a deeper path moves further left and never under a name
-    const bx = PAD + 4 + (backs.length - 1 - level[i]) * BACK_STEP;
+    const bx = PAD + 4 + (backs.length - 1 - level[i]) * LANE_STEP;
     const sy = f.cy - ATTACH_OFF / 2, ty = t.cy + ATTACH_OFF / 2;
     const sx = f.x - EDGE_OUT, tx = t.x - EDGE_OUT - 1;
-    const k = ty < sy ? 1 : -1;
-    const d = `M${r1(sx)} ${r1(sy)} L${r1(bx + CORNER)} ${r1(sy)}`
-            + ` Q${r1(bx)} ${r1(sy)} ${r1(bx)} ${r1(sy - CORNER * k)}`
-            + ` L${r1(bx)} ${r1(ty + CORNER * k)}`
-            + ` Q${r1(bx)} ${r1(ty)} ${r1(bx + CORNER)} ${r1(ty)}`
-            + ` L${r1(tx)} ${r1(ty)}`;
     const lab = wrapLines(l.label, backBudget, 1, measure.link);
     if (lab.cut) {
       cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                   shown: lab.lines.join(' '), width: backBudget });
     }
-    drawn.push({ ...l, d, lab, lx: t.x - 6, ly: ty - 5,
+    // 🔴 BELOW ITS OWN RUN, NOT BETWEEN THE TWO. A box's two attachment
+    // points are ATTACH_OFF apart — 12 px — and a line of this type is 11 px
+    // tall, so a name placed between them cannot clear both: MEASURED in
+    // /kit/, the run LEAVING a box cut 2 px through the ascenders of the name
+    // belonging to the run ARRIVING at it. Below is also where the row layout
+    // puts a return's name, so the two layouts now agree.
+    drawn.push({ ...l, d: sideLane(sx, sy, tx, ty, bx, 1), lab,
+                 lx: t.x - 6, ly: ty + 4 + m.linkSize * 0.85,
                  anchor: 'end', stack: 'none', level: level[i], bx });
   }
 
   return { width: avail, height: Math.round(bottom + PAD), nodes: placed, links: drawn };
+}
+
+// ── the two lane shapes ───────────────────────────────────────────────────
+// One rounded L out of a box's edge, along a lane that clears every box in the
+// way, and back in at the other end. Both kinds of routed link — a return
+// under the row and a forward link over it — are the SAME shape with one sign
+// flipped, so they are one function each rather than four copies of a path
+// string. A copy is where the two would drift apart.
+
+/** a lane that runs ACROSS the picture: `vs` +1 under the boxes, -1 over them */
+function acrossLane(sx, sy, tx, ty, dy, vs) {
+  const k = sx > tx ? 1 : -1;          // the usual return direction: right to left
+  return `M${r1(sx)} ${r1(sy)} L${r1(sx)} ${r1(dy - CORNER * vs)}`
+       + ` Q${r1(sx)} ${r1(dy)} ${r1(sx - CORNER * k)} ${r1(dy)}`
+       + ` L${r1(tx + CORNER * k)} ${r1(dy)}`
+       + ` Q${r1(tx)} ${r1(dy)} ${r1(tx)} ${r1(dy - CORNER * vs)}`
+       + ` L${r1(tx)} ${r1(ty)}`;
+}
+
+/** a lane that runs DOWN the side: `hs` +1 left of the column, -1 right of it */
+function sideLane(sx, sy, tx, ty, bx, hs) {
+  const k = ty < sy ? 1 : -1;          // the usual return direction: bottom to top
+  return `M${r1(sx)} ${r1(sy)} L${r1(bx + CORNER * hs)} ${r1(sy)}`
+       + ` Q${r1(bx)} ${r1(sy)} ${r1(bx)} ${r1(sy - CORNER * k)}`
+       + ` L${r1(bx)} ${r1(ty + CORNER * k)}`
+       + ` Q${r1(bx)} ${r1(ty)} ${r1(bx + CORNER * hs)} ${r1(ty)}`
+       + ` L${r1(tx)} ${r1(ty)}`;
+}
+
+/**
+ * Every string the line under the picture will ever hold.
+ *
+ * 🔴 THE CAPTION IS ONE OF THEM, AND LEAVING IT OUT IS WHY THE PAGE JUMPED.
+ * That line is the caption until a box is hovered and that box's own sentence
+ * while it is, so its height has to be reserved for the TALLEST of those — or
+ * everything below the picture moves the moment the pointer touches a box. The
+ * reservation used to start from whatever the element happened to be showing,
+ * which is the caption only if nothing is hovered: a re-layout while the
+ * pointer is on a box destroys the `<g>` that would have fired `pointerleave`,
+ * so the element is left holding a five-word sentence and the whole block is
+ * reserved at 19 px under a caption that needs 97. It reads as fixed, because
+ * the next hover in and out repairs it.
+ *
+ * Pure, so the test can check the list rather than the pixels: what went wrong
+ * is WHICH STRINGS were measured, not how.
+ */
+export function captionTexts(spec, nodes) {
+  return [spec?.caption || '']
+    .concat((nodes || []).map((n) => n.title || n.label?.full || ''));
 }
 
 /** one box's geometry, and the baseline of every line of type inside it */
@@ -571,6 +811,12 @@ export function createDiagram(host, spec, { onRender } = {}) {
 
   const api = { el: wrap, svg, cuts: [], mode: 'row', measured: false, render, destroy };
 
+  /** the line under the picture, back to what it says when nothing is hovered */
+  const resetCaption = () => {
+    delete cap.dataset.on;
+    cap.textContent = spec.caption || '';
+  };
+
   // ── measuring ─────────────────────────────────────────────────────────
   const cache = new Map();
   function ruler(cls, fallbackSize) {
@@ -636,6 +882,15 @@ export function createDiagram(host, spec, { onRender } = {}) {
     svg.setAttribute('width', L.width);
     svg.setAttribute('height', L.height);
     svg.setAttribute('viewBox', `0 0 ${L.width} ${L.height}`);
+    // 🔴 THE CAPTION GOES BACK FIRST, BECAUSE THE NEXT LINE DESTROYS THE BOX
+    // THAT WOULD HAVE PUT IT BACK. `pointerleave` fires on an element, and an
+    // element removed from under the pointer never fires it — so a re-layout
+    // while a box is hovered (a resize, an orientation change, the first
+    // ResizeObserver callback) leaves the line holding a sentence about a box
+    // that no longer exists, and the reservation below then measures THAT.
+    // Restoring here is the whole repair: nothing else can know a hover was
+    // interrupted rather than ended.
+    resetCaption();
     field.textContent = '';
 
     // links first, so a box is never drawn under its own arrow
@@ -688,8 +943,7 @@ export function createDiagram(host, spec, { onRender } = {}) {
       };
       const hide = () => {
         delete g.dataset.on;
-        delete cap.dataset.on;
-        cap.textContent = spec.caption || '';
+        resetCaption();
       };
       g.addEventListener('pointerenter', show);
       g.addEventListener('pointerleave', hide);
@@ -705,11 +959,18 @@ export function createDiagram(host, spec, { onRender } = {}) {
     // diagrams that is the whole article twitching under the cursor. The tallest
     // thing the line will ever hold is reserved once per layout, which costs a
     // few reflows here and nothing at all afterwards.
+    //
+    // ⚠️ AND IT RESERVES FOR THE CAPTION EXPLICITLY, never for "whatever the
+    // element is showing". Those are the same string only while nothing is
+    // hovered, and the one moment they differ is the one moment a re-layout
+    // is running — which is when this code is reached. MEASURED at the point
+    // the two came apart: `min-height: 19px` under a 97 px caption, so the
+    // next un-hover grew the block by 78 px. `captionTexts` names the set.
     cap.style.minHeight = '';
-    let capH = cap.offsetHeight;
     const keep = cap.textContent;
-    for (const n of L.nodes) {
-      cap.textContent = n.title || n.label.full;
+    let capH = 0;
+    for (const text of captionTexts(spec, L.nodes)) {
+      cap.textContent = text;
       capH = Math.max(capH, cap.offsetHeight);
     }
     cap.textContent = keep;

@@ -17,11 +17,16 @@
 // every expected number below exact rather than approximate. What it cannot
 // check is the real font — that is /kit/'s job, with real type in a real svg.
 //
-// Four of these are NEGATIVE CONTROLS: a check that cannot fail is a check
-// that is decoration, so each of the three claims above is also run against an
-// input that must break it.
+//   - a branch drawn straight through the box in its way looks like a path
+//     that does not exist, and it is the SECOND branch that breaks, so the
+//     first one still looks right.
+//
+// Six of these are NEGATIVE CONTROLS: a check that cannot fail is a check that
+// is decoration, so each of the four claims above is also run against an input
+// that must break it.
 
-import { assignColumns, backLevels, wrapLines, layout, METRICS } from './diagram.mjs';
+import { assignColumns, backLevels, wrapLines, layout, captionTexts, METRICS }
+  from './diagram.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -48,6 +53,56 @@ const TRIP = {
     { from: 'relay', to: 'you', label: '', back: true },
   ],
 };
+
+// A BRANCH THAT REACHES PAST THE BOX IN ITS WAY, which is the shape every fork
+// takes: the second branch always skips whatever the first one landed on. Here
+// the settings go to Cloudflare AND straight on to the board, so `you -> pi`
+// has `cf` standing between its two ends — in the row layout by a column, in
+// the one-column layout by a row. One spec, both modes, one defect.
+const REACH = {
+  nodes: [
+    { id: 'you', label: 'this page', kind: 'here' },
+    { id: 'cf', label: 'Cloudflare', kind: 'cloud' },
+    { id: 'pi', label: 'Raspberry Pi', kind: 'device' },
+  ],
+  links: [
+    { from: 'you', to: 'cf', label: 'settings' },
+    { from: 'cf', to: 'pi', label: '' },
+    { from: 'you', to: 'pi', label: 'the same' },
+  ],
+};
+
+// The fork that `grains` measured out: two copies of one thing, one here and
+// one on a board, fed the same settings. In a row the two copies share a
+// column and nothing is skipped; stacked in one column, `you -> cf` has the
+// copy in this page between its ends.
+const FORK = {
+  nodes: [
+    { id: 'you', label: 'this page', sub: 'one copy here', kind: 'here' },
+    { id: 'near', label: 'a copy here', sub: 'the same settings' },
+    { id: 'cf', label: 'Cloudflare', sub: 'passes it on', kind: 'cloud' },
+    { id: 'pi', label: 'Raspberry Pi', sub: 'a copy there', kind: 'device' },
+  ],
+  links: [
+    { from: 'you', to: 'near', label: 'settings' },
+    { from: 'you', to: 'cf', label: 'and out' },
+    { from: 'cf', to: 'pi', label: '' },
+    { from: 'pi', to: 'cf', label: 'the sound', back: true },
+    { from: 'cf', to: 'you', label: '', back: true },
+  ],
+};
+
+// every (x, y) in a path string. Every command the drawer emits — M, L, Q —
+// takes coordinate PAIRS and nothing else, so the numbers alternate all the
+// way through and a regular expression is enough.
+const pathPoints = (d) => {
+  const n = d.match(/-?\d+(?:\.\d+)?/g).map(Number);
+  const out = [];
+  for (let i = 0; i + 1 < n.length; i += 2) out.push([n[i], n[i + 1]]);
+  return out;
+};
+const PAD_GUESS = 2 + 4;    // where the outermost return lane starts
+const findLink = (L, from, to) => L.links.find((l) => l.from === from && l.to === to);
 
 console.log('\n== columns: the longest forward path, and nothing else ==');
 
@@ -217,6 +272,258 @@ console.log('\n== the two layouts, and where one becomes the other ==');
   ok('and what it was cut to is carried with the whole original',
      L.cuts.every((c) => c.full.length > c.shown.length && c.shown.endsWith('…')),
      L.cuts.map((c) => c.shown).join(' | '));
+}
+
+console.log('\n== a branch: a link that reaches past the box in its way ==');
+
+{
+  // 🔴 THE ROW LAYOUT. A forward link was a straight line from one box's edge
+  // to the other's and routed around NOTHING, so a branch spanning two columns
+  // was drawn through the box in the middle of it — in and out again, with its
+  // name at the midpoint, i.e. under that box.
+  const L = layout(REACH, { width: 660, measure });
+  const reach = findLink(L, 'you', 'pi');
+  const step = findLink(L, 'you', 'cf');
+  const top = Math.min(...L.nodes.map((n) => n.y));
+  ok('a branch that reaches past a box is drawn OVER the row, never through it',
+     L.mode === 'row' && reach.depth !== undefined && reach.depth < top,
+     `its lane is at y ${reach.depth}, and the boxes start at ${top}`);
+
+  // 🔴 NEGATIVE CONTROL. If everything were routed, the picture would be all
+  // detours and the check above would pass on a drawer that had learnt
+  // nothing. A step to the NEXT box along has nothing in the way and must
+  // still be the straight line it always was.
+  ok('NEGATIVE CONTROL: a step to the next box along is still a straight line',
+     step.depth === undefined && /^M[\d.]+ [\d.]+ L[\d.]+ [\d.]+$/.test(step.d),
+     step.d);
+
+  // the room for the lane is taken out of the picture rather than off it: the
+  // boxes move down, the svg grows, and nothing is drawn where nothing shows
+  const pts = L.links.flatMap((l) => pathPoints(l.d));
+  ok('the room for it comes out of the picture, so no line is drawn off the edge',
+     top > 2 && pts.every(([x, y]) => x >= 0 && y >= 0 && x <= L.width && y <= L.height),
+     `boxes start ${top} px down · ${pts.length} points, y from ` +
+     `${Math.min(...pts.map((q) => q[1]))} to ${Math.max(...pts.map((q) => q[1]))} of ${L.height}`);
+}
+
+{
+  // 🔴 THE ONE-COLUMN LAYOUT, WHICH IS WHERE THIS WAS FOUND. Every box is
+  // stacked, a forward link was a straight vertical at its source's CENTRE,
+  // and a branch reaching past one row therefore ran behind that box and came
+  // out underneath it with an arrowhead into the next one — a phone read a
+  // path the page does not have.
+  const L = layout(FORK, { width: 340, measure });
+  const left = L.nodes[0].x, right = L.nodes[0].x + L.boxW;
+  const branch = findLink(L, 'you', 'cf');
+  const straight = findLink(L, 'you', 'near');
+  const backs = L.links.filter((l) => l.back);
+  ok('in one column a fork\'s second branch runs down the RIGHT, clear of every box',
+     L.mode === 'column' && branch.bx !== undefined && branch.bx >= right,
+     `its lane is at ${branch.bx} and the boxes end at ${right}`);
+
+  // ⚠️ THE RETURN PATHS ALREADY OWN THE LEFT-HAND GUTTER. Two kinds of routed
+  // line in one gutter is the overlap bug this file already has three checks
+  // for, in a new costume — so onward goes right, back goes left, and the
+  // boxes are between them.
+  ok('and it never meets the return paths, which have the left-hand gutter',
+     backs.length > 0 && backs.every((l) => l.bx <= left) && branch.bx > left,
+     `returns at ${backs.map((l) => l.bx).join(', ')} · the branch at ${branch.bx} · boxes ${left}..${right}`);
+
+  ok('a branch never runs through its own name either',
+     branch.lab.lines.length > 0 && branch.lx >= right
+       && branch.lx + ruler(branch.lab.lines[0]) <= branch.bx - 6,
+     `"${branch.lab.lines[0]}" runs ${branch.lx}..${Math.round(branch.lx + ruler(branch.lab.lines[0]))}, its lane is at ${branch.bx}`);
+
+  // 🔴 NEGATIVE CONTROL: the OTHER branch of the same fork goes to the box
+  // directly under it, has nothing in the way, and must still be the straight
+  // vertical at the source's centre. Routing both would be a picture where
+  // nothing goes anywhere directly.
+  ok('NEGATIVE CONTROL: the branch to the box under it is still a straight drop',
+     straight.bx === undefined && /^M([\d.]+) [\d.]+ L\1 [\d.]+$/.test(straight.d),
+     straight.d);
+}
+
+console.log('\n== the line under the picture, and the height reserved for it ==');
+
+{
+  // 🔴 THE RESERVATION USED TO START FROM WHATEVER THE ELEMENT WAS SHOWING.
+  // That is the caption only while nothing is hovered — and a re-layout with
+  // the pointer on a box destroys the box that would have put the caption
+  // back, so the element is left holding a five-word sentence and the block is
+  // reserved for THAT. MEASURED: `min-height: 19px` under a 97 px caption, so
+  // the next un-hover grew the page by 78 px, which is the exact jump the
+  // reservation exists to prevent.
+  const spec = { caption: 'a caption long enough to take three lines on a phone, '
+                        + 'which is the tallest this line will ever be' };
+  const nodes = [{ id: 'a', title: 'this page — one copy here', label: { full: 'this page' } },
+                 { id: 'b', title: '', label: { full: 'a copy here' } }];
+  const t = captionTexts(spec, nodes);
+  ok('the height reserved under the picture counts the CAPTION, not only the boxes',
+     t.includes(spec.caption), `${t.length} strings, the first is ${t[0].length} characters`);
+  ok('and every box\'s own sentence, so hovering one cannot make it grow either',
+     t.includes(nodes[0].title) && t.includes(nodes[1].label.full),
+     t.slice(1).map((x) => `"${x}"`).join(' · '));
+}
+
+console.log('\n== an arrow\'s name gets the room that is actually beside it ==');
+
+// how much horizontal room a drawn name has where it is put: a lane name has
+// the gutter between its lane and the box, a step name has the whole of its
+// side of the picture
+const roomFor = (L, l, lanes) => {
+  if (l.back) return l.lx - (l.bx + 6);
+  if (l.bx !== undefined) return (l.bx - 6) - l.lx;
+  return l.anchor === 'end' ? l.lx - lanes : (L.width - 2) - l.lx;
+};
+
+{
+  // 🔴 A STEP'S NAME USED TO BE MEASURED AGAINST HALF A BOX. Between two
+  // stacked boxes is a gap that is empty right across the picture with one
+  // short arrow in it — MEASURED at 258 px in /kit/, that budget handed
+  // `settings` 41 px with 106 px of nothing beside it, and cut it.
+  const L = layout(FORK, { width: 340, measure });
+  const step = findLink(L, 'you', 'near');
+  const lanes = PAD_GUESS + (L.links.filter((l) => l.back).length - 1) * 14 + 6;
+  const room = roomFor(L, step, lanes);
+  ok('a step\'s name is measured against the row it sits in, not against half a box',
+     L.mode === 'column' && !step.lab.cut && room > L.boxW / 2,
+     `"${step.lab.lines[0]}" has ${Math.round(room)} px beside it; half a box is ${L.boxW / 2}`);
+  ok('and it goes on the WIDER side of its arrow', step.anchor === 'end',
+     `anchored ${step.anchor} at ${step.lx}, the arrow is at ${L.nodes[0].cx}`);
+}
+
+{
+  // 🔴 NEGATIVE CONTROL, and the one that matters most here: a budget that
+  // grew until nothing was ever cut would be indistinguishable from a drawer
+  // that had silently stopped reporting. A name nobody could fit must still be
+  // cut, and must still be COUNTED.
+  const spec = {
+    nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
+    links: [{ from: 'a', to: 'b', label: 'a name for this arrow that will never fit' }],
+  };
+  const L = layout(spec, { width: 300, measure });
+  const link = L.cuts.filter((c) => c.where === 'link');
+  ok('NEGATIVE CONTROL: a name nobody could fit is still cut, and still counted',
+     link.length === 1 && link[0].shown.endsWith('…'),
+     `${link.length} reported — "${link[0] ? link[0].shown : ''}" at ${link[0] ? link[0].width : '-'} px`);
+}
+
+{
+  // 🔴 A GUTTER IS SIZED BY WHAT ITS NAMES NEED, NOT BY A SHARE OF THE
+  // PICTURE. Under the old flat 30% the same two names would move the boxes to
+  // a different place on a wider page, for no reason anybody could point at —
+  // and, worse, the name was WRAPPED to that share and the widest result then
+  // sized the gutter, so a cut made the gutter smaller, which made the cut.
+  //
+  // ⚠️ AND THE TWO WIDTHS ARE CHOSEN SO THE OLD RULE WOULD FAIL IT. A name of
+  // 100 px is under 30% of 420 and over 30% of 300, so a share-of-the-picture
+  // budget cuts it at one width and not the other and the gutter comes out
+  // 60 px apart. Picked at 460 and 540 first, where 30% never bit either way
+  // and the check passed on the broken code — a test that cannot fail.
+  const spec = {
+    nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
+    links: [{ from: 'a', to: 'b', label: '' },
+            { from: 'b', to: 'a', label: 'ten chars!', back: true }],
+  };
+  const a = layout(spec, { width: 300, measure });
+  const b = layout(spec, { width: 420, measure });
+  ok('the same names ask for the same gutter however wide the picture is',
+     a.mode === 'column' && b.mode === 'column' && a.nodes[0].x === b.nodes[0].x
+       && !a.cuts.length,
+     `the column starts ${a.nodes[0].x} px in at 300 and ${b.nodes[0].x} px in at 420, ` +
+     `for a name wanting ${ruler('ten chars!')} px`);
+}
+
+{
+  // 🔴 WHEN IT WILL NOT ALL FIT, THE BOXES' OWN WORDS WIN. A picture that
+  // shortens the names of the things it is about is broken where a reader can
+  // see it; an arrow name that had to give way is reported instead.
+  const spec = {
+    nodes: [
+      { id: 'a', label: 'here', sub: 'a fairly long line here' },
+      { id: 'b', label: 'there', sub: 'short' },
+    ],
+    links: [{ from: 'a', to: 'b', label: '' },
+            { from: 'b', to: 'a', label: 'a long return name', back: true }],
+  };
+  const L = layout(spec, { width: 300, measure });
+  const subCut = L.cuts.filter((c) => c.where === 'sub' || c.where === 'label');
+  const linkCut = L.cuts.filter((c) => c.where === 'link');
+  ok('a box keeps the width its own words need, and the arrow name gives way',
+     subCut.length === 0 && linkCut.length === 1,
+     `box ${L.boxW} px for a line needing ${ruler('a fairly long line here') + 20}; ` +
+     `"${linkCut.length ? linkCut[0].shown : ''}" cut at ${linkCut.length ? linkCut[0].width : '-'} px`);
+}
+
+{
+  // 🔴 NEGATIVE CONTROL: the side is CHOSEN, not swapped. With nothing routed
+  // in either gutter the boxes sit in the middle, the two sides are equal, and
+  // the name stays where it has always been.
+  const spec = {
+    nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
+    links: [{ from: 'a', to: 'b', label: 'onward' }],
+  };
+  const L = layout(spec, { width: 300, measure });
+  const step = L.links[0];
+  ok('NEGATIVE CONTROL: with neither gutter in use a step\'s name does not move',
+     L.nodes[0].x === 2 && step.anchor === 'start' && step.lx > L.nodes[0].cx,
+     `anchored ${step.anchor} at ${step.lx}, the arrow is at ${L.nodes[0].cx}`);
+}
+
+console.log('\n== and no name has its own arrow drawn through it ==');
+
+{
+  // 🔴 "SIX PIXELS ABOVE THE MIDDLE" ONLY CLEARS A HORIZONTAL ARROW. A fork's
+  // arrows are DIAGONAL, and MEASURED in /kit/ the line climbed 5.4 px through
+  // the middle of `settings`. The line here is rebuilt from the path string
+  // rather than from the drawer's own numbers, so this cannot pass by agreeing
+  // with the formula it is checking.
+  //
+  // ⚠️ AND IT IS MEASURED ACROSS THE NAME'S WHOLE WIDTH, NOT AT ITS MIDDLE.
+  // Written against the midpoint first, where a straight line is at the
+  // midpoint's own height whatever its slope — so a flat six pixels up scored
+  // exactly six and the check passed on the broken code. The clearance a
+  // reader sees is at the ENDS of the word, which is where the line reaches
+  // it; positive means the name is above its line and negative below.
+  const L = layout(FORK, { width: 660, measure });
+  const clear = (l) => {
+    const [[x1, y1], [x2, y2]] = pathPoints(l.d);
+    const yAt = (x) => y1 + (y2 - y1) * ((x - x1) / (x2 - x1));
+    const half = ruler(l.lab.lines[0] || '') / 2;
+    const lo = Math.min(yAt(l.lx - half), yAt(l.lx + half));
+    const hi = Math.max(yAt(l.lx - half), yAt(l.lx + half));
+    if (l.ly <= lo) return lo - l.ly;         // clear above
+    if (l.ly >= hi) return hi - l.ly;         // clear below
+    return 0;                                 // the line runs through the word
+  };
+  const up = findLink(L, 'you', 'near'), down = findLink(L, 'you', 'cf');
+  const gapUp = clear(up), gapDown = clear(down);
+  ok('a diagonal arrow\'s name clears the line across the whole of the name',
+     L.mode === 'row' && Math.abs(gapUp) >= 6 && Math.abs(gapDown) >= 6,
+     `"${up.lab.lines[0]}" is ${Math.round(gapUp)} px off its line, ` +
+     `"${down.lab.lines[0]}" is ${Math.round(gapDown)} px off its`);
+
+  // 🔴 AND THE SECOND-ORDER ONE, which lifting alone produced: two branches
+  // leaving one box open a WEDGE, and both names lifted above their own line
+  // put the lower one inside the upper one's path. MEASURED at 4.2 px in.
+  ok('and a fork\'s two names sit on opposite sides, so the wedge stays empty',
+     Math.sign(gapUp) !== Math.sign(gapDown) && gapUp !== 0 && gapDown !== 0,
+     `the rising one is ${gapUp > 0 ? 'above' : 'below'} its line, the falling one is ${gapDown > 0 ? 'above' : 'below'} its`);
+}
+
+{
+  // 🔴 A BOX'S TWO ATTACHMENT POINTS ARE 12 PX APART AND A LINE OF THIS TYPE
+  // IS 11 PX TALL, so a name placed BETWEEN them cannot clear both — MEASURED
+  // in /kit/, the run leaving a box cut 2 px through the ascenders of the name
+  // belonging to the run arriving at it. It goes below both instead, which is
+  // where the row layout has always put a return's name.
+  const L = layout(TRIP, { width: 320, measure });
+  const back = L.links.find((l) => l.back && l.lab.lines.length);
+  const t = L.nodes.find((n) => n.id === back.to);
+  ok('in one column a return\'s name clears BOTH runs at the box it names',
+     L.mode === 'column' && back.ly - t.cy >= 6 + METRICS.linkLh / 2,
+     `"${back.lab.lines[0]}" sits ${Math.round(back.ly - t.cy)} px below the middle of its box; ` +
+     `the two runs are at -6 and +6`);
 }
 
 {
