@@ -1025,6 +1025,7 @@
     return true;
   }
 
+  let raysSaid = false;
   function onXR(now, frame) {
     if (!session) return;
     session.requestAnimationFrame(onXR);
@@ -1035,10 +1036,47 @@
     if (frameViews === 0) frameViews = pose.views.length;
     const layer = session.renderState.baseLayer;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    // 🔴 IS THE FRAMEBUFFER EVEN COMPLETE? MEASURED on a Quest 3 2026-09-13,
+    // three entries into this page: `gl error 1282` twice and `gl error 1286`
+    // once, on the FIRST frame — and 1286 is INVALID_FRAMEBUFFER_OPERATION,
+    // which is not a state bug at all, it is drawing into a framebuffer that is
+    // not ready. `mirror`'s by-phase instrumentation put its own 1282 at
+    // `firstDraw` in the same minute, which is the same instant by another
+    // name. This says WHICH, in words, instead of leaving a number to guess at.
+    if (xrFrames === 1) {
+      const st = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      if (st !== gl.FRAMEBUFFER_COMPLETE) {
+        shipNow(`first frame: the framebuffer is NOT complete — status ${st}`);
+      }
+    }
     const tSec = (now - t0) / 1000;
     // A ray per hand, in room coordinates. `targetRaySpace` is the pointer the
     // runtime draws; using it rather than the grip means what you aim at is
     // what you get.
+    // 🔴 SAY WHAT THE HANDS ARE, ONCE. Reported from a Quest 2026-09-13: "I did
+    // not have box manipulation any more, some ray was where my feet were" —
+    // and the session log carries ZERO `grabbed` lines, where the run before it
+    // carried many. From outside, three different faults look identical: no
+    // input sources at all (so the ray you see is the runtime's own), sources
+    // with no `targetRaySpace`, and a pose resolving against the wrong
+    // reference space (which puts the ray on the floor, because `local` has
+    // its origin at the head and `local-floor` at the feet).
+    //
+    // ⚠️ INSTRUMENT THE ENTRY PATH BEFORE GUESSING AT IT — this page's own
+    // history is three headset runs that were indistinguishable from outside
+    // until a line was shipped before and after every await. One line, once,
+    // naming which of the three it is.
+    if (!raysSaid && session.inputSources.length) {
+      raysSaid = true;
+      const bits = [...session.inputSources].map((src, i) => {
+        if (!src.targetRaySpace) return `${i}:${src.handedness} NO targetRaySpace`;
+        const rp = frame.getPose(src.targetRaySpace, xrSpace);
+        if (!rp) return `${i}:${src.handedness} pose did not resolve`;
+        const m = rp.transform.matrix;
+        return `${i}:${src.handedness} at ${m[12].toFixed(2)},${m[13].toFixed(2)},${m[14].toFixed(2)}`;
+      });
+      shipNow(`hands · ${session.inputSources.length} source(s) · ${bits.join(' · ')} · space local-floor`);
+    }
     for (const src of session.inputSources) {
       if (!src.targetRaySpace) continue;
       const rp = frame.getPose(src.targetRaySpace, xrSpace);
