@@ -85,6 +85,10 @@ body {
 
 /* ── controls ─────────────────────────────────────────────────────────── */
 .pos-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 14px; }
+/* ⚠️ `display:flex` BEATS the UA's `[hidden] { display: none }`, so hiding an
+   empty control row needs saying here — otherwise `cbar.hidden = true` sets the
+   attribute, changes nothing, and leaves the 14 px band it was meant to remove. */
+.pos-controls[hidden] { display: none; }
 button, .pos-btn {
   font: 500 13px/1 var(--mono); color: var(--fg);
   background: var(--card2); border: 1px solid var(--line2);
@@ -379,13 +383,6 @@ button.pos-pri[data-busy="1"] {
 /* The first column is the day the page landed, not a rank: the front page
    sorts by it, and a rank renumbers itself every time the sort changes. */
 .pos-row .n { font: 600 11px/1.4 var(--mono); color: var(--hi); opacity: .8; min-width: 3.4em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* The act still says where a row sits in the sequence, now that the ORDER no
-   longer does. Same shape as a tag, dimmer, always first. */
-.pos-act {
-  font: 500 9.5px/1.5 var(--mono); letter-spacing: .07em; text-transform: uppercase;
-  color: var(--hi); opacity: .7; border: 1px solid color-mix(in oklab, var(--hi) 30%, var(--line));
-  border-radius: 999px; padding: 1px 7px;
-}
 /* A capability this browser HAS but a page only wants — said, never enforced.
    demo/instrument keeps playing from its on-screen keys with no MIDI at all,
    so striking it off would be the index inventing a failure. */
@@ -474,7 +471,7 @@ video[hidden] { display: none; }
 .xr .pos-row .nm { font-size: 20px; }
 .xr .pos-row .n { font-size: 13px; min-width: 4.3em; opacity: 1; }
 .xr .pos-one { font-size: 16px; line-height: 1.5; }
-.xr .pos-tag, .xr .pos-act, .xr .pos-why { font-size: 12px; padding: 3px 10px; }
+.xr .pos-tag, .xr .pos-why { font-size: 12px; padding: 3px 10px; }
 .xr .pos-meta { gap: 8px; margin-top: 6px; }
 .xr .pos-name { font-size: 30px; }
 .xr .pos-act-h { font-size: 13px; margin: 34px 0 8px; }
@@ -684,6 +681,11 @@ video[hidden] { display: none; }
   background: var(--card);
 }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
+/* The second picture — the held seconds with the read window on them — is its
+   own rectangle under the first, because the two have different x-axes: the
+   waveform above is the last few seconds ARRIVING, this is the whole minute
+   being held. Stacked without a gap they read as one picture with two rows. */
+.pos-scope-w { margin-top: 14px; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of
