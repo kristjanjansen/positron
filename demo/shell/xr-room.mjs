@@ -431,6 +431,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
    */
   const planes = {
     asked: false,        // did a session request `plane-detection`
+    opaque: null,        // is this a VR session — see markAsked, and `none` in describe
     // 🔴 SIX ANSWERS, NOT A BOOLEAN. `not asked` (no session yet), `waiting`
     // (asked, no frame has answered), `refused` (the session was never given
     // the feature), `unreadable` (it answered and we could not parse it),
@@ -462,8 +463,31 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       planes.short = `floor: your room\n${planes.count} surfaces, ${walls} walls`;
       planes.from = 'your room';
     } else if (planes.state === 'none') {
-      planes.note = `your headset reported NO surfaces (Space Setup has probably never been run here) — the grid is ${own}`;
-      planes.short = 'floor: this page\nyour room reported none';
+      // 🔴 THIS MESSAGE BLAMED THE WRONG THING AND SENT SOMEBODY LOOKING AT
+      // THEIR HEADSET SETTINGS. MEASURED on a Quest 3, 2026-09-13, minutes
+      // apart on one machine:
+      //
+      //   immersive-ar   11 surface(s) — door 1 · ceiling 1 · wall 4 ·
+      //                  window 1 · bed 1 · shelf 2 · floor 1
+      //   immersive-vr   NO surfaces
+      //
+      // Same room, same grant, same scan. **Planes come in an AR session and
+      // not in a VR one** — which makes sense, since an opaque session has no
+      // room to composite against, but nothing said so and the old wording
+      // asserted "Space Setup has probably never been run here" about a
+      // headset whose Space Setup was fine. A guess presented as a diagnosis
+      // is worse than no diagnosis: it cost a room rescan and a serious
+      // suggestion of reinstalling the headset.
+      //
+      // So the note now says which session it is in, and only mentions Space
+      // Setup where that is still a live possibility.
+      planes.note = planes.opaque
+        ? 'no surfaces, and this is a VR session — a headset composites nothing over your room here, '
+          + `so it does not hand one over either. Try the XR button for passthrough. The grid is ${own}`
+        : `your headset reported NO surfaces in a passthrough session — Space Setup may never have been run here. The grid is ${own}`;
+      planes.short = planes.opaque
+        ? 'floor: this page\nVR gives no surfaces'
+        : 'floor: this page\nyour room reported none';
       planes.from = 'the page';
     } else if (planes.state === 'refused') {
       planes.note = `this session was not given surface detection (${planes.why}) — the grid is ${own}`;
@@ -507,8 +531,16 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
    * opened the session, because only that code knows what it put in
    * `optionalFeatures`.
    */
-  function markAsked() {
+  /**
+   * @param opaque  true when the session composites OPAQUE — i.e. VR. It
+   *   decides what "no surfaces" is allowed to blame, and that distinction
+   *   was measured the expensive way: see the `none` branch in `describe`.
+   *   ⚠️ Read off `environmentBlendMode`, never off the session's NAME — a
+   *   session can be called `immersive-ar` and still composite opaque.
+   */
+  function markAsked(opaque) {
     planes.asked = true;
+    if (opaque !== undefined) planes.opaque = !!opaque;
     if (planes.state === 'not asked') planes.state = 'waiting';
     describe();
   }

@@ -373,7 +373,10 @@ export function createXRPanels({
           requiredFeatures: ['local-floor'],
           ...(theRoom ? { optionalFeatures: [...ROOM_OPTIONAL_FEATURES] } : {}),
         }));
-      theRoom?.markAsked();
+      // ⚠️ The blend mode, not the session name — `markAsked` uses it to decide
+      // what "no surfaces" is allowed to blame. Measured: a VR session returns
+      // none however well the room is scanned.
+      theRoom?.markAsked(session.environmentBlendMode === 'opaque');
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace escaping the
       // handler means the session STARTS and the page then dies with no line —

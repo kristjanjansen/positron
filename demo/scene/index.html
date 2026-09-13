@@ -656,7 +656,15 @@
           // off would be refused a session entirely. Asking costs nothing and
           // the probe below reports what came back — including "nothing",
           // which is an answer.
-          optionalFeatures: [...ROOM_OPTIONAL_FEATURES, 'hand-tracking'],
+          // 🔴 `tracked-sources` OR THE SECOND HAND SILENTLY DOES NOT EXIST.
+          // A non-primary input goes into `session.trackedSources`, not
+          // `inputSources`, and the spec says that array MUST only be
+          // populated if this descriptor is granted — as must the
+          // `trackedsourceschange` event that would otherwise have said so.
+          // Ask for `hand-tracking` alone and one hand is simply absent, with
+          // no error and no event: an array that reads exactly like a headset
+          // holding one controller. Which is what the last run reported.
+          optionalFeatures: [...ROOM_OPTIONAL_FEATURES, 'hand-tracking', 'tracked-sources'],
         });
       let gaveUp = false;
       ask.then((late) => {
@@ -667,7 +675,10 @@
       try {
         session = await step(`requestSession ${mode}`, ask, 90000);
       } catch (e) { gaveUp = true; throw e; }
-      room?.markAsked();
+      // ⚠️ THE BLEND MODE, NOT THE SESSION NAME. A session can be called
+      // `immersive-ar` and still composite opaque, and what "no surfaces"
+      // means depends on which it actually is.
+      room?.markAsked(session.environmentBlendMode === 'opaque');
       // 🔴 DID THE RUNTIME ACTUALLY GRANT IT? `no hand` on an input source is
       // ambiguous in the worst way: it means "hand tracking is off" and "you
       // were holding a controller" equally well, and those have completely
@@ -852,8 +863,25 @@
       // probe. Shipped with `shipNow`, because a 2 s batch does not survive a
       // session.
       try {
-        const seen = [...session.inputSources].map((src, i) => {
-          const bits = [`${i}:${src.handedness}`];
+        // ⚠️ GUARDED, BECAUSE `trackedSources` IS NOT IN UPSTREAM CHROMIUM.
+        // Meta shipped it ahead of Blink, so reading it on a desktop browser
+        // is a TypeError — inside a frame callback, which is the failure that
+        // silently removes everything below it. And WHICH ARRAY a source
+        // arrived in is itself the finding: absent-and-empty,
+        // present-and-empty, and present-with-a-hand are three answers.
+        let tracked = [];
+        let trackedSays = 'attribute ABSENT (this browser has no trackedSources)';
+        try {
+          if (session.trackedSources) {
+            tracked = [...session.trackedSources];
+            trackedSays = `attribute present, ${tracked.length} in it`;
+          }
+        } catch (e) { trackedSays = `attribute threw — ${e.name}`; }
+
+        const all = [...session.inputSources.length ? [...session.inputSources].map((x) => ['I', x]) : [],
+                     ...tracked.map((x) => ['T', x])];
+        const seen = all.map(([where, src], i) => {
+          const bits = [`${where}${i}:${src.handedness}`];
           bits.push(src.profiles?.length ? src.profiles[0] : 'no profile');
           const grip = src.gripSpace && frame.getPose(src.gripSpace, xrSpace);
           if (!src.gripSpace) bits.push('NO gripSpace');
@@ -872,7 +900,8 @@
           bits.push(`axes ${src.gamepad?.axes?.length ?? 0} buttons ${src.gamepad?.buttons?.length ?? 0}`);
           return bits.join(' ');
         });
-        shipNow(`in your hands · ${seen.join(' || ')}`);
+        shipNow(`in your hands · ${session.inputSources.length} input + ${tracked.length} tracked`
+          + ` · trackedSources ${trackedSays} · ${seen.join(' || ')}`);
       } catch (e) {
         shipNow(`in your hands: could not be read — ${e.name}: ${e.message}`);
       }
