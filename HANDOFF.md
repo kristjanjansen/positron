@@ -20,6 +20,34 @@ list, so nothing is carried only in a conversation.
     four sliders should show them moving, or the page changes under you with no
     account of what changed. This is a shell change, so it lands for `/box/`
     and the kit at the same time.
+- ✅ **`workers/pub`'s container image was never stale — the claim was false
+  and cost five sessions of attention.** MEASURED 2026-09-13: the deployed image
+  is `positron-pub-pub:d4c38e9b`, pushed **2026-09-08T09:37:55Z**, 7m59s after
+  `89460a4` — the LAST commit to touch `container/server.mjs`. Wrangler tags an
+  image with the Worker version that pushed it and only pushes when the build
+  context changed (26 versions, 16 images), so the chain is exact: `d4c38e9b`
+  has no `PUB_ROW` binding and its predecessor `dfa5c20f` does, and `PUB_ROW`
+  was removed by that same commit. The container's marked copy of the pattern
+  and `demo/shell/pattern.mjs` produce **byte-identical** filter chains (700 B
+  at hue 0, 710 B at hue 150, zero differing constants).
+  🔴 **AND THE DISPROOF WAS ALREADY IN THE REPO.** `PROGRESS.md` recorded "v18,
+  updated 2026-09-08" and concluded "the image still draws the pre-session-12
+  test pattern" IN THE NEXT SENTENCE. Session 12 ran 09-07 → 09-08. The number
+  was measured and the opposite conclusion written beside it.
+  ⚠️ **DO NOT "fix" it by redeploying.** The Dockerfile pins nothing —
+  `FROM node:22-alpine` and `apk add ffmpeg` — and `node:22-alpine` is now
+  alpine 3.24.1 with **ffmpeg 8.1.2**, while the live image was built against
+  ffmpeg 7, which `server.mjs`'s own comments measured against. A gratuitous
+  deploy silently swaps the encoder major version and restarts the only
+  instance (`max_instances: 1`), dropping a live publish into Cloudflare's
+  45 s stale-publisher lockout. `/logs` is not at risk either way — the ring is
+  in DO storage.
+  **The real stale copies are elsewhere**: `rig/obs-docker/clock.html:18` and
+  `rig/whep/publish.html:23-27` both carry `ROW_X 40, ROW_Y 100, ROW_H 80`
+  against the current `X 80, Y 584, H 56`. Each is a self-contained
+  burner-and-reader pair that agrees with ITSELF, so neither is broken — but
+  neither can be compared against a page or the container. That is probably
+  what this note has been half-remembering for five sessions.
 - 🔴 **MAKE THE TWO GRANULATORS THE SAME INSTRUMENT — `plan-twins.md`.** They
   ship side by side today and sound nothing alike, and every reason is
   structural: different material, `rate` meaning 10–50x more density on the
@@ -63,11 +91,10 @@ list, so nothing is carried only in a conversation.
   claim is the identical 1,451-UGen graph in a browser and on a Pi. What is
   missing is wasm scsynth vendored into the repo.
 - **The defect backlog**, which is the current focus: `keep`'s unexplained 409,
-  `pappus-live.mjs` grading a stochastic engine from single takes (14–16 of 17,
-  failures MOVE between runs), and `workers/pub`'s pre-session-12 container
-  image. ✅ `keep`'s 409 and ✅ the reverb noise are both closed — the reverb
-  does not reproduce in six arms on a path proved live by a held note
-  (`plan-twins.md` §8).
+  and `pappus-live.mjs` grading a stochastic engine from single takes (14–16 of
+  17, failures MOVE between runs). ✅ `keep`'s 409, ✅ the reverb noise and ✅
+  `workers/pub`'s "stale container image" are all closed — the last one by
+  DISPROOF, see below.
 - **`plan-gesture.md`** — P1–P4: the XY pad component, a transport under it,
   the same gesture recorded and played back, then driving the board. §3 is
   decided: one 2-D series, measured.
@@ -213,6 +240,9 @@ it. And nothing unmeasured prints as `0` or as a lone unit — `''`, `null` and
 - The reverb insert adds **-4.1 dBFS of noise with no input** (measured; insert
   removed gives digital silence). Board-side.
 - `keep`'s 409, the unrotated RTMPS key, `workers/pub`'s stale container image.
+  ⚠️ TWO OF THESE THREE WERE WRONG — see the queue at the top of this file:
+  the 409 was a WHEP race and is fixed, and the container image was never
+  stale.
 
 
 Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
@@ -433,7 +463,8 @@ FIXED:**
   (see session 17)
 - a user-level `fluidsynth.service` the box's orphan sweep keeps killing
 - `keep`'s 409, `positron-demo`'s unrotated RTMPS key, `workers/pub`'s
-  pre-session-12 container image
+  pre-session-12 container image *(⚠️ disproved 2026-09-13 — see the queue at
+  the top of this file)*
 
 ---
 
@@ -603,7 +634,8 @@ microcontroller, where no plugin can follow.
   rather than fixed, because the fix would be to a cause nobody has shown.
 - `keep`'s 409 (§0b below), untouched
 - `positron-demo`'s RTMPS stream key is still exposed and unrotated
-- `workers/pub`'s container image is still pre-session-12
+- `workers/pub`'s container image is still pre-session-12 *(⚠️ FALSE —
+  disproved 2026-09-13, see the queue at the top of this file)*
 
 ---
 

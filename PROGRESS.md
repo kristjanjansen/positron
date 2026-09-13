@@ -316,7 +316,10 @@ the LAN), `m1-proxy.mjs` (runs ON the M1), `shot.mjs`, `read-hls.mjs`,
 `stream.mjs` (one driver, three transports), `clear-recordings.mjs`.
 
 **The source is `demo/shell/pattern.mjs` itself, fetched at request time — never
-copied.** A second copy is exactly how `workers/pub`'s container image drifted a
+copied.** ⚠️ THE EXAMPLE BELOW IS WRONG — `workers/pub`'s container did NOT
+drift (disproved 2026-09-13); the copies that did are `rig/obs-docker/clock.html`
+and `rig/whep/publish.html`. The RULE stands; the instance named for it did not.
+A second copy is exactly how a drawing drifts a
 whole session behind, and `rig/obs-docker/clock.html` is a third copy carrying
 the pre-session-12 geometry to this day. `source.html` holds no drawing code and
 must not grow any.
@@ -850,6 +853,9 @@ stays in the worker for the rooms the per-tab default left behind.
 - **§4's comparison** — our DO against a plain site with its own WS server —
   still waits on which site the dictated brief meant.
 - `workers/pub`'s container image is still not deployed (since session 12).
+  ⚠️ **FALSE, disproved 2026-09-13.** The image was pushed 2026-09-08T09:37:55Z,
+  7m59s after the last commit to touch it, and its filter chain is
+  byte-identical to `demo/shell/pattern.mjs`. See HANDOFF.md's queue.
 
 ## Session 12 (2026-09-07 → 09-08) — one test pattern, and finding out it was a claim rather than a fact
 
