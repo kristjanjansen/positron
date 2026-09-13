@@ -69,6 +69,8 @@
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { buildSource, SHAPES, sourceMessage } from '/shell/source.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { openWire } from '/shell/wire.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -484,8 +486,17 @@
   // unplugged AND so there is one lane where every mark in the picture is a
   // grain something actually started — see `scope.stats()`, which counts
   // `measured` against `inferred` and is asserted below.
-  const CHORD = [48, 55, 60, 64, 67, 72];
-  let lctx = null, lnode = null, lsrc = null, lgain = null, losc = [];
+  // 🔴 THE MATERIAL COMES FROM A DESCRIPTION, NOT FROM THIS FILE. `source.mjs`
+  // expands one spec into a table of sine partials, and the board expands the
+  // SAME spec with the SAME function — so when the two panes disagree it is a
+  // disagreement about granulation rather than about what went in. The old
+  // version was six `type: 'sawtooth'` oscillators, which is a wavetable the
+  // WebAudio specification does not pin down and therefore a sound no other
+  // engine can reproduce. See plan-twins §4a.
+  //
+  // C3 G3 C4 E4 G4 C5, which is what the six notes were.
+  const SPEC = { shape: 'saw', count: 12, hz: 130.81, chord: [0, 7, 12, 16, 19, 24], level: 0.16, spread: 0 };
+  let lctx = null, lnode = null, lsrc = null, lgain = null;
   let lstats = { live: 0, fired: 0, heldSec: 0, overlap: 0 };
   let lwrite = 0, lfilled = 1;
 
@@ -527,17 +538,10 @@
     lgain = lctx.createGain(); lgain.gain.value = 0.9;
     lnode.connect(lgain).connect(lctx.destination);
     fadeGains();
-    // the material: a held saw chord, straight into the worklet's input
-    const mix = lctx.createGain(); mix.gain.value = 0.16;
-    for (const n of CHORD) {
-      const o = lctx.createOscillator();
-      o.type = 'sawtooth';
-      o.frequency.value = 440 * Math.pow(2, (n - 69) / 12);
-      const g = lctx.createGain(); g.gain.value = 1 / CHORD.length;
-      o.connect(g).connect(mix); o.start(); losc.push(o);
-    }
-    mix.connect(lnode);
-    lsrc = mix;
+    // the material, straight into the worklet's input
+    lsrc = buildSource(lctx, SPEC, { destination: lnode });
+    d.log(`material: ${SPEC.shape}, ${lsrc.plan.partials.length} sine partials over `
+          + `${SPEC.chord.length} notes${lsrc.plan.dropped ? `, ${lsrc.plan.dropped} dropped above Nyquist` : ''}`);
     applyLocal();
   }
 
@@ -575,6 +579,34 @@
     // an AudioContext needs one and this is the first thing a hand touches.
     onInput: (v) => { blend = v / 100; startLocal().then(fadeGains); fadeGains(); render(); },
   });
+  // ── what they are chewing ────────────────────────────────────────────────
+  // Two controls, and they are the two that are EXACT in any engine: which
+  // table of partials, and how many of it survive. Everything else about a
+  // shape — the rolloff near Nyquist, the phase — is an implementation, which
+  // is why `source.mjs` does not offer it.
+  const shapeRow = createChoice({
+    label: 'material',
+    options: Object.keys(SHAPES).map((k) => [k, k]),
+    at: Object.keys(SHAPES).indexOf(SPEC.shape),
+    onPick: (v) => setSource({ shape: v }),
+  });
+  const brightness = createSlider({
+    label: 'partials', min: 1, max: 24, step: 1, value: SPEC.count, unit: '',
+    onInput: (v) => setSource({ count: v }),
+  });
+  function setSource(next) {
+    Object.assign(SPEC, next);
+    const re = lsrc?.set(next);
+    // The board builds the same spec from the same numbers — one message, on a
+    // change rather than on every move, for the relay's sake.
+    send(sourceMessage(SPEC));
+    d.log(`material: ${SPEC.shape}, ${re ? re.partials.length : '—'} sine partials`
+          + `${re?.dropped ? `, ${re.dropped} dropped above Nyquist` : ''}`);
+  }
+  const srcBar = el('div', 'pos-controls');
+  srcBar.append(shapeRow.el, brightness.el);
+  panes.before(srcBar);
+
   // UNDER the two cards, not above them: it is the line BETWEEN the panes, so
   // it belongs where the eye already is after reading both of them.
   const fadeBar = el('div', 'pos-controls fade');
@@ -1101,6 +1133,18 @@
     d.assert('every tick in this page’s picture is a grain it actually started',
       sc.measured > 0 && sc.inferred === 0,
       `${sc.measured} reported by the engine, ${sc.inferred} guessed from audio`);
+
+    // 🔴 WHAT IT IS CHEWING, CHECKED — because the whole side-by-side rests on
+    // both ends being handed the same material, and this is the end that can
+    // answer for itself. A sine table is the one description two different
+    // engines render identically; a `type: 'sawtooth'` would look the same on
+    // screen and be a different sound on the board (plan-twins §4a).
+    const plan = lsrc?.plan;
+    const top = plan?.partials?.length ? Math.max(...plan.partials.map((p) => p.hz)) : 0;
+    d.assert('the material is the table the spec asked for, and none of it aliases',
+      !!plan && plan.partials.length > 0 && plan.dropped === 0 && top < lctx.sampleRate / 2,
+      plan ? `${plan.partials.length} sine partials of ${SPEC.shape} over ${SPEC.chord.length} notes, `
+        + `top at ${Math.round(top)} Hz against a ${lctx.sampleRate / 2} Hz ceiling` : 'no source built');
 
     d.assert('the page reached the relay', wire.state() === 1, `readyState ${wire.state()}`);
     // ⚠️ ONE BRANCH PER NAMED STATE, AND THE COUNT MOVES WITH IT. This board is
