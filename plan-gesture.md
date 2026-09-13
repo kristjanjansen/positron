@@ -63,8 +63,10 @@ Measured on the XY prototype, 8 s gesture, 5 series:
 
 And measured on `draw` itself, 2026-09-13, 201 samples in and 30 kept:
 holding the last sample is **34.47 px** out, straight lines **2.29**, the
-time-knotted spline **0.348** — the spline is **99x** closer than holding, on a
-line where **96.7%** of what you see was never recorded.
+time-knotted spline **0.15** — the spline is **237x** closer than holding, on a
+line where **96.7%** of what you see was never recorded. The same gesture read
+as two independent 1-D series is **0.31 px** — 2.1x worse, not the 8.6x §3
+inferred; see the correction there.
 
 ---
 
@@ -100,22 +102,81 @@ is dominated by how evenly its knots are spaced in time** — samples chosen by
 spatial deviation ignore time completely, so the spline overshoots between the
 far-apart ones.
 
-Two independent 1-D series is that failure by construction, and worse: each
+~~Two independent 1-D series is that failure by construction, and worse: each
 axis's knots are unevenly spaced in time AND the two axes disagree about which
 instants were worth keeping. So a pad that records two series is choosing the
-arrangement this repo has now measured as 8.6x worse, in exchange for a
-conversion that costs nothing at send time — one 2-D sample becomes two control
-messages carrying the same timestamp.
+arrangement this repo has now measured as 8.6x worse.~~
+
+🔴 **THAT PARAGRAPH WAS INFERENCE AND P3 REFUTED IT (2026-09-13).** `draw` now
+reconstructs the same recorded gesture both ways and grades each against the
+full-rate evidence. The decision survives. **The argument for it does not.**
+
+| sample every | kept per direction | one 2-D record | as two 1-D records |
+|---|---|---|---|
+| 20 ms | 101 | 0.01 px | 6.3x worse |
+| 50 ms | 51 | 0.03 px | 9.0x worse |
+| **100 ms** (default) | **30** | **0.15 px** | **2.3x worse** |
+| 200 ms | 17 | 1.17 px | 2.4x worse |
+| 300 ms (knob's top) | 12 | 4.32 px | 1.9x worse |
+| 500 ms (past the knob) | 8 | 24.63 px | **0.5x — two records WIN** |
+
+⚠️ **One run's column, and the column moves.** Across seven runs of the same
+dispatched gesture the default rung read **1.9x–2.4x** and the 20 ms rung
+**3.3x–10.5x**, because the harness's events carry real `timeStamp` jitter. The
+ORDER never moved; the RATIO moved by a factor of three. Quote it as a band.
+
+Three corrections, in order of how wrong they were:
+
+1. **Two 1-D series are NOT the 8.6x failure.** At the default they cost
+   **2.3x**, and the "where it bends" arrangement — which shares its instants
+   between the axes and is the thing 8.6x was measured on — is **six times
+   worse than they are** (13.8x against 2.3x). The plan's "that failure by
+   construction, and worse" is false in both halves.
+2. **The two defects §3 named are separable, and only one is expensive.** The
+   expensive one is *placing samples without reference to time*: a spline
+   knotted on time overshoots between knots chosen by spatial deviation. A
+   per-axis gate does not have to do that, and the one measured here does not —
+   its criterion is "how wrong would a straight line IN TIME be at this
+   instant", so its knots are uneven but time-aware. **Per-axis-ness costs about
+   2x; time-blindness costs about 14x.** The plan charged the first for the
+   second's crime.
+3. **The order is not universal — it crosses.** Past the knob's top end the two
+   records win. At eight samples, placing them well beats spacing them evenly,
+   and the doubled row budget (see below) stops being a rounding error. Both
+   readings are useless there (24.63 px against a 34 px hold), so it is not a
+   rate anybody picks — but "worse by construction" was the claim, and
+   construction does not hold.
+
+⚠️ **THE COMPARISON HANDS THE ALTERNATIVE THE ADVANTAGE, ON PURPOSE.** Each
+1-D series keeps as many knots as the whole 2-D record, so the split reading
+stores **twice the rows**; and its knots are placed by a pass over the finished
+gesture, which no live gate could run. The one it beats is therefore the best
+case for two series, not a typical one.
+
+⚠️ **AND HERE IS WHAT THIS COMPARISON COULD NOT DETECT.** The gate that
+actually ships for 1-D series — `cc-adapter`'s — is a **per-key wall clock**
+over a value a controller only sends when it changes. That is time-aware by
+construction, so its knots would be *more* evenly spaced than the ones measured
+here, and its cost is somewhere between 1x and 2.3x rather than at the top of
+that band. **Unmeasured.** Nothing above tests it, and the 2.3x should not be
+quoted as if it did.
+
+**So why still one 2-D series?** Not because the error is 8.6x — it is about
+2x, at twice the storage. Because of the first row of the table above, which
+the measurement did not touch and does not need to: **one sample, one instant.**
+x and y that can disagree about when they were true is a record you cannot
+answer "where was the hand at 4.212 s?" from without inventing an answer for at
+least one axis. The error figure is a bonus and a modest one; atomicity is the
+reason.
 
 ⚠️ **The converse is not a choice and stays supported.** Two 1-D series is what
 a hardware controller actually sends, and `demo/shell/cc-adapter.mjs` exists to
 receive exactly that. The decision above is about what OUR pad writes down, not
 about what we can read.
 
-Left to measure, because the argument above is inference from one gesture: the
-same comparison on a real hand at a real corner, and whether re-parameterising
-DP's knots by arc length recovers the shape metric. Neither changes the
-decision; both would sharpen it.
+Left to measure: the per-key wall-clock gate named above, on the same gesture
+and the same page — the one arrangement of two series that this comparison
+deliberately did not build.
 
 ---
 
@@ -161,6 +222,12 @@ Each step ends with something measurable. None of them needs the one after it.
 than cost. ⚠️ §4's signature was incomplete: no host argument (every other kit
 component takes `(host, opts)`), no end-of-gesture signal, and no way for a
 caller to draw a SECOND reading over the pad, which is the whole of `draw`.
+A fifth was missing and landed 2026-09-13: **`upTo`**, which caps the drawn
+capture at a timestamp, so a page replaying its own gesture redraws the line
+under its playhead rather than retracing a finished drawing — where the replay
+and the original are the same pixels and you cannot tell which you are looking
+at. MEASURED on `draw`: 33339 lit pixels paused, 3787 a third of a second into
+playback, 6606 at two thirds, 33288 again once it stops.
 And the reusability test passed for real rather than in principle — the same
 component ran as a sync control (x = offset in ms, y = rate) with NO flag; the
 one rule that makes it work is that an axis maps its NEAR edge to `min`, so an
@@ -193,13 +260,66 @@ thirty samples reaching the lane gave 368 px, and `value: () => null` (every
 number right, nothing drawn) took the ink assert to 0 while every cell stayed
 green.
 
-**P3 — both readings of the same gesture, side by side.** The 2-D path against
+**P3 — both readings of the same gesture, side by side.** ✅ DONE 2026-09-13,
+`draw` 20/20 → **21/21**. The result is below, and it CORRECTED §3 rather than
+confirming it. The 2-D path against
 two 1-D series, drawn together, error of each against the full-rate evidence.
-*Confirms §3 on a real hand rather than on inference.* ⚠️ Assert the ORDER and
+*Was meant to confirm §3 on a real hand rather than on inference; it kept the
+decision and threw the argument away.* ⚠️ Assert the ORDER and
 the RATIO, never a pixel threshold — a threshold gets tuned until it passes,
 which is how `draw`'s "inside a pixel" check had to be replaced the day a real
 gesture met it. And write the check down BEFORE running it: §3's number exists
 because a check was written the wrong way round and the page refused it.
+
+🔴 **THE CHECK, WRITTEN DOWN BEFORE IT WAS RUN (2026-09-13).** Recorded here
+first so the result cannot be back-fitted to it:
+
+> **ORDER.** One 2-D record, its knots on a clock, lands closer to what the
+> hand actually did — IN TIME, the quantity a playback needs — than two 1-D
+> records whose knots each axis chose on its own.
+> **RATIO.** By more than **2x**. Not a pixel count: a threshold gets tuned
+> until it passes. 2x is far below the 8.6x §3 already has for the WEAKER half
+> of the defect (samples placed by shape rather than by clock, but still shared
+> between the two axes), so anything landing between 1x and 2x is a genuine
+> contradiction of §3 and gets reported as one rather than rounded up to
+> agreement.
+> **NOT ASSERTED: the shape metric.** It is measured and printed, and no order
+> is claimed on it. A shape metric throws time away, and time is the whole of
+> the claim; §3's own two shape figures sit within 1.4x of each other.
+> **PRECONDITION.** The two axes must genuinely disagree about which instants
+> were worth keeping — fewer than half their knots in common. Two axes gated
+> together is not the alternative being tested, and a comparison between two
+> identical records would pass while measuring nothing.
+> **THE CHALLENGER GETS THE ADVANTAGE, ON PURPOSE.** Each 1-D series keeps as
+> many knots as the whole 2-D record does, so the split reading stores TWICE
+> the rows; and its knots are placed by an offline pass over the finished
+> gesture, which no live gate could run. If the best case a two-series
+> recording can reach still loses, every real per-series gate loses too.
+
+**RESULT, 2026-09-13 — the order held, the ratio did not survive as written,
+and §3's argument was refuted.** `draw` 20/20 → **21/21**, one new assert.
+
+- **ORDER: confirmed.** ~0.146 px as one record against ~0.32 px as two, on the
+  same gesture with the same number of knots per direction, and confirmed at
+  every rate the knob offers (weakest rung 1.9x–2.0x across runs). Proved by
+  breaking it: gating both axes together takes the two readings to 1.0x and 30
+  of 30 shared instants, and the check goes red.
+- **RATIO: met at the default (1.9x–2.4x across runs, > 2x on the first run
+  and on most) and NOT SHIPPED as written.** The ladder asks the same question at six densities and the
+  answer moves from 9.0x down through 1.9x and across 1.0 — so "> 2x" is a
+  property of one gesture at one knob position, not a relationship that holds
+  for any line, which is the bar every check on this page has to clear.
+  Shipping it would have been a threshold wearing a ratio's clothes. What ships
+  is the order **at every rate the knob offers**, plus "the gap reaches 2x
+  somewhere in that range" so it cannot pass on noise — both ends of the
+  ladder, never its middle.
+- **§3's ARGUMENT: refuted.** See the correction in §3. Two 1-D series cost
+  ~2x, not 8.6x; the 8.6x belongs to time-blind placement, which a per-axis
+  gate need not inherit. The decision stands on atomicity instead.
+- **PRECONDITION: held.** The two directions chose 5–7 of 30 instants in
+  common, so the alternative measured really is two independently gated series.
+- **Shape, reported and not asserted:** 0.667 as one record against 0.728 as
+  two — within 1.1x, as expected of a metric that throws time away.
 
 **P4 — a second actuator, so it is not one page's private machinery.** The
 obvious one is `rack`/`box`: the same recorded gesture, sent as control change
