@@ -130,6 +130,36 @@
 // And `src` is **1 OFF, 2 STEREO, 3 MONO L, 4 MONO R, with no 0** — a value
 // outside that table is silence rather than an error. See `rig/box/norns/CHAIN.md`.
 //
+// ── WHY THE SEEDS AND THE DRIFT ABSTAIN, AND WHAT WOULD ANSWER THEM ──────────
+//
+// ⚠️ TWO THINGS IT IS NOT, BOTH CHECKED RATHER THAN ASSUMED, so neither gets
+// re-litigated. It is NOT the granulator reading the present (LESSONS #61): the
+// setup above holds the buffer with `mlock 1` before any section captures, and
+// the SAME number removes the dry path — `Engine_Pappus.sc:870` crossfades
+// `gsum * sin(sxf·π/2) + [capl,capr] * cos(sxf·π/2)` where
+// `sxf = (msos.max(mlock)/0.6).clip(0,1)`, so at `mlock 1` the cosine term is
+// zero and the instrument's own sound is not in the capture at all. And it is
+// NOT the engine failing to answer the die: the pitch ladder moved 0.83 octaves
+// at p 0.008 on the same board in the same run.
+//
+// WHAT IT IS, from that run's own numbers: everything measured THROUGH THE
+// CHAIN sits at RMS 0.25–0.32 (about −11 dBFS) with a brightness wobble of
+// 0.16–0.22 octaves, while the ladder — the one section that mutes the chain
+// and takes the granulator straight out on `oin1` — sat at RMS 0.006–0.008
+// (−43 dBFS) with rung wobbles of 0.01–0.15. The chain puts ~32 dB into the
+// master `Compander` (`mcomp` 0.2) and `Limiter` (`limceil` 0.98855) and raises
+// the wobble by up to twenty times. Two seeds differ by 0.10 octaves. That is
+// under the noise THE CHAIN ITSELF ADDS, so the question is not answerable at
+// this repeat count no matter how true it is — 19 repeats a condition would be
+// needed, which is eleven minutes of captures.
+//
+// So both checks now say that, with the arithmetic, instead of going red. ⚠️
+// The measurement that WOULD answer them is the ladder's configuration applied
+// to the seeds: mute the chain, hold the buffer, open one gate, capture with no
+// note. It is not done here because it narrows the claim — the die rolls the
+// chain too, and CHAIN.md says the routing "changes the character more than any
+// single knob" — so which question to ask is a decision, not a bug fix.
+//
 // ⚠️ The statistics live here rather than in `measure.mjs` only because this
 // change was scoped to one file. They belong next to `measure()`, and
 // `summarise`/`separated` there are what they replace — nothing else imports
@@ -190,6 +220,22 @@ const AXES = {
 const AXIS_KEYS = Object.keys(AXES);
 const ALPHA = 0.05;
 const PER_AXIS = ALPHA / AXIS_KEYS.length;
+/**
+ * ⚠️ HOW BIG AN EFFECT THIS MANY REPEATS CAN ACTUALLY FIND, so that "we did not
+ * see it" and "we could not have seen it" stop being the same red line.
+ *
+ * From the power table in the header, re-measured by `--self-test`: five
+ * repeats find an effect TWICE the instrument's own wobble about half the time
+ * and three times it nine times in ten. So below two wobbles a run is more
+ * likely to miss a real difference than to find one, and reporting that as
+ * "they sound the same" is a claim the run has no standing to make. Above it,
+ * a non-clearing result IS evidence of no effect.
+ *
+ * `spread` is the median distance between two repeats; for a normal spread that
+ * is 0.954 standard deviations, which is what converts one to the other.
+ */
+const RESOLVES = 2;
+const SPREAD_TO_SD = 0.954;
 const fmtAxis = (k, v) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${AXES[k].show(v)}${AXES[k].unit}`);
 
 /** Average ranks, so a tie cannot invent a difference. */
@@ -306,10 +352,16 @@ function compare(A, B) {
     r.d = hodgesLehmann(xa, xb);
     r.decidable = r.floorP <= PER_AXIS;
     r.clears = r.decidable && r.p <= PER_AXIS;
+    // The wobble these two conditions showed on this axis, and whether the
+    // difference between them is big enough that this many repeats had a real
+    // chance of finding it.
+    r.sigma = Math.max(A.spread?.[k] ?? 0, B.spread?.[k] ?? 0) / SPREAD_TO_SD;
+    r.couldSee = r.sigma > 0 && r.d >= RESOLVES * r.sigma;
     out[k] = r;
   }
   out.any = AXIS_KEYS.some((k) => out[k].clears);
   out.decidable = AXIS_KEYS.some((k) => out[k].decidable);
+  out.couldSee = AXIS_KEYS.some((k) => out[k].couldSee);
   out.floorP = Math.min(...AXIS_KEYS.map((k) => (out[k].usable ? out[k].floorP : Infinity)));
   return out;
 }
@@ -405,7 +457,40 @@ function selfTest() {
   const halfCmp = compare(noOct, condition('b', fake(5)));
   t('an axis with nothing to measure abstains instead of voting', halfCmp.oct.usable === false && halfCmp.env.usable === true, halfCmp.oct.why);
 
-  // 7. AND EVERY CHECK SAYS WHAT IT MEASURED OVER HOW MANY REPEATS — which is a
+  // 7. THE RESOLUTION GUARD, BOTH WAYS. It has to fire when the run could not
+  //    have found the effect, and it has to STAY OUT OF THE WAY when it could —
+  //    a guard that always fires turns every red line into a shrug.
+  const outcome = (cmp) => (!cmp.decidable ? 'undecidable' : cmp.any ? 'separated' : cmp.couldSee ? 'no effect' : 'cannot resolve');
+  const outcomes = (n, shift, trials) => {
+    const tally = {};
+    for (let i = 0; i < trials; i++) {
+      const o = outcome(compare(condition('a', fake(n)), condition('b', fake(n, { shiftOct: shift }))));
+      tally[o] = (tally[o] ?? 0) + 1;
+    }
+    return tally;
+  };
+  const none = outcomes(5, 0, TRIALS), big = outcomes(5, 3, TRIALS);
+  const pct = (t, k) => (t[k] ?? 0) / TRIALS;
+  console.log(`       no effect at all -> ${JSON.stringify(none)}`);
+  console.log(`       a 3 s.d. effect  -> ${JSON.stringify(big)}`);
+  t('with nothing there to find, the run says it could not have found it', pct(none, 'cannot resolve') >= 0.85,
+    `${(pct(none, 'cannot resolve') * 100).toFixed(0)}% of ${TRIALS} abstained rather than claiming "they sound the same"`);
+  t('with a real effect there, it does NOT abstain', pct(big, 'cannot resolve') <= 0.15,
+    `${(pct(big, 'cannot resolve') * 100).toFixed(0)}% of ${TRIALS} at 3 s.d. — the rest separated or reported a genuine negative`);
+  // And the arithmetic, on numbers small enough to check by hand: two
+  // conditions whose repeats sit 1.0 apart, moved 0.5 apart. 0.5 < 2 x (1/0.954).
+  const rungs = (shift) => condition('x', [0, 1, 2, 3, 4].map((v) => ({ peak: 0.1, ratio: 0.4, centroid: 2 ** (10 + shift + v), n: 1 })));
+  const near = compare(rungs(0), rungs(0.5)), far2 = compare(rungs(0), rungs(10));
+  t('half a wobble apart is below what five repeats resolve', near.oct.couldSee === false,
+    `${fmtAxis('oct', near.oct.d)} against a wobble of ${fmtAxis('oct', near.oct.sigma)}`);
+  // ⚠️ AND THE OTHER DIRECTION, or a guard stuck ON reads exactly like a
+  // working one: with couldSee forced false the suite above still went 17/17,
+  // because an abstain and a separation are both "not a failure". This case is
+  // the one that catches it.
+  t('five wobbles apart is well inside what five repeats resolve', far2.oct.couldSee === true,
+    `${fmtAxis('oct', far2.oct.d)} against a wobble of ${fmtAxis('oct', far2.oct.sigma)}`);
+
+  // 8. AND EVERY CHECK SAYS WHAT IT MEASURED OVER HOW MANY REPEATS — which is a
   //    claim about the OUTPUT, so it is checked on the output.
   const shown = evidence(compare(condition('a', fake(5)), condition('b', fake(5, { shiftOct: 4 }))));
   console.log(`       a verdict reads:  ${shown}`);
@@ -435,6 +520,18 @@ const okStat = (n, cmp, extra = '') => {
   if (!cmp.decidable) return cannot(n, Number.isFinite(cmp.floorP)
     ? `${cmp.a.n}+${cmp.b.n} ${cmp.a.unit} can express no p-value below ${cmp.floorP.toFixed(2)}, and the bar is ${PER_AXIS}`
     : `neither axis could be measured on both sides — ${AXIS_KEYS.map((k) => cmp[k].why).filter(Boolean).join('; ')}`);
+  // ⚠️ "WE DID NOT SEE IT" IS NOT "IT IS NOT THERE", and a check that cannot
+  // tell the two apart reports a power limit as a defect. If the difference on
+  // every axis is smaller than twice that axis's own wobble, this repeat count
+  // would have missed a real effect of that size as often as it found one — so
+  // the run has no verdict to give, and says which numbers made it so.
+  if (!cmp.any && !cmp.couldSee) {
+    const sizes = AXIS_KEYS.filter((k) => cmp[k].usable)
+      .map((k) => `${AXES[k].name} ${fmtAxis(k, cmp[k].d)} against a wobble of ${fmtAxis(k, cmp[k].sigma)}`).join(' · ');
+    return cannot(n, `the difference is smaller than ${cmp.a.n}+${cmp.b.n} ${cmp.a.unit} can resolve — ${sizes}`
+      + ` · this count finds about twice the wobble half the time, so a real effect this size would have been missed as often as found`
+      + `. How close it came: ${evidence(cmp)}`);
+  }
   ok(n, cmp.any, `${extra}${extra ? ' · ' : ''}${evidence(cmp)}`);
 };
 const note = (s) => console.log(`       ${s}`);
