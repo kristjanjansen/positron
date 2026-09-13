@@ -60,8 +60,19 @@
   .pane .hd span { display: block; font: 400 10.5px/1.5 var(--mono); color: var(--dim2); }
   /* the crossfade reads as a line between the two panes, so its ends are
      labelled where they point rather than in the paragraph above */
-  .fade { gap: 10px; align-items: center; }
+  /* 🔴 THE SLIDER TAKES THE ROW. A `.sld` is `inline-flex`, so between two
+     `max-content` end labels it sat at its standalone 96 px with the whole
+     content width empty either side — photographed, and it reads as a control
+     that failed to lay out rather than one that is small. `1fr` on the middle
+     item and the lane stretching inside it is what makes the track the width of
+     the thing it is blending. */
+  .fade { display: flex; gap: 14px; align-items: center; }
   .fade .end { font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); white-space: nowrap; }
+  .fade > .sld { flex: 1 1 auto; min-width: 0; }
+  .fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+  /* with no label there is no head to show, and an empty one would still take
+     its gap */
+  .fade > .sld > .sld-head:empty, .fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 
 <script type="module">
@@ -98,8 +109,21 @@
       // engines side by side, so a shared row of numbers has to say which one
       // each belongs to or it is a legend. The per-lane detail lives in each
       // card's own gutter, beside the ink it describes.
-      'grains a second': '', 'at once': '',
+      // 🔴 THE PAGE'S OWN GRAINS ARE NOT IN HERE, and they used to be. `grains
+      // a second` and `at once` are already printed in granulator one's own
+      // card, beside the picture they describe — which is where this project
+      // puts a per-lane figure — so the row was saying them a second time, and
+      // saying them BLANK until you press Switch it on. Two empty cells above
+      // two full ones reads as a readout that failed to load.
       board: '', sound: '',
+      // ⚠️ THESE TWO EXIST BECAUSE TWO PARAGRAPHS WERE DELETED, and they are
+      // the same facts in the form this project uses for a moving figure. The
+      // prose said "53 nudges in the 8 s this page has been watching, none of
+      // them asked for" and "reading at 0.416 of the way through the sixty
+      // seconds"; a cell says it in a fixed box that does not reflow.
+      // 🔴 Deleting a display without rehoming what it said is how a page
+      // quietly stops reporting something, which is worse than saying it badly.
+      nudges: '', 'reading at': '',
     },
     controls: [
       // 🔴 THE ONE CONTROL THAT MAKES IT SOUND LIKE A GRANULATOR. MEASURED on
@@ -158,7 +182,12 @@
   // the notes and the material spec also go out, and they are left off rather
   // than crowding the one arrow that carries the page's subject.
   createDiagram(d.head, {
-    title: 'the same four settings, in two buildings',
+    // 🔴 NO TITLE. It sat directly under the page's own name — two headings
+    // stacked, the second explaining the first — and it drove the diagram hard
+    // against them, which is the vertical-spacing rule broken by a component
+    // that was given a heading it did not need. The diagram is the first thing
+    // on the page and its boxes say what it is; a caption above a picture that
+    // is about to explain itself is a label on a label.
     // The paragraph that was in `what`, cut to the part the drawing cannot
     // say. Hovering a box replaces this line with what that box does, which is
     // why there is no tooltip anywhere on this page.
@@ -273,21 +302,12 @@
     return Number.isFinite(drift.scan) ? 'moving' : 'nothing';
   }
   /** The same three states in words, for the line under the panel. */
-  function driftLine() {
-    const moved = driftMoved();
-    switch (driftState()) {
-      case 'moving':
-        return `moving on its own · ${moved ? `${moved.nudges} nudges in the ${secs(moved.ms)} this page has been watching` : 'no reading yet'}`
-          + `, none of them asked for · the slow one is reading at ${drift.scan} of the way through the sixty seconds`;
-      case 'nothing':
-        return 'switched on at the board and moving nothing yet — it circles the last value anybody set, and this page has not '
-          + 'set one since the board came up; press a sound';
-      case 'off':
-        return 'not moving on its own — the movement is switched off on the board, and it is asked for with every patch';
-      default:
-        return 'the board has not said whether it is moving anything on its own';
-    }
-  }
+  // ⚠️ `driftLine()` IS GONE WITH THE PARAGRAPH IT FED. Its own comment
+  // recorded that it had once printed `moving on its own · 0 nudges … reading
+  // at —` about a board that was moving nothing — a headline claim with its own
+  // contradiction beside it — and the repair was to make the sentence smarter.
+  // The sentence was the problem. The drift count is a readout cell now and the
+  // board's state changes are logged when they CHANGE.
 
   // ── the page ─────────────────────────────────────────────────────────────
   // 🔴 NO SOURCE PICKER, AND NO ARCHIVE. This page makes no request to ERR at
@@ -776,7 +796,14 @@
   // pictures never swap, so nothing has to be cleared and neither lane's
   // history is thrown away when you compare them.
   const fade = createSlider({
-    label: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
+    // 🔴 NO LABEL. Its ENDS are labelled — `this page` on one side, `the board`
+    // on the other — so a third word between them said nothing the row was not
+    // already saying, and printed `THIS PAGE  BLEND 0 %  THE BOARD`: three
+    // labels for one control, the middle one stacked over its own number and
+    // squeezing the track down to a stub. A slider between two named ends does
+    // not need a name; it needs room.
+    // ⚠️ `aria` still gets one, because a screen reader has no ends to read.
+    label: '', aria: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
     // The slider IS the gesture, so it is also what starts the page engine —
     // an AudioContext needs one and this is the first thing a hand touches.
     onInput: (v) => { blend = v / 100; startLocal().then(fadeGains); fadeGains(); render(); },
@@ -839,8 +866,10 @@
     // cell that ends in an ellipsis on a phone. Measured at 390 px.
     // this page's engine, COUNTED rather than asked for: `fired` is what the
     // worklet reports having started
-    d.set('grains a second', lstats.fired ? Math.round(K.rate) : '');
-    d.set('at once', lstats.live || '');
+    // the board moving ON ITS OWN — nobody asked for these, which is the point
+    const mv = driftMoved();
+    d.set('nudges', mv ? mv.nudges : '');
+    d.set('reading at', Number.isFinite(drift?.scan) ? drift.scan.toFixed(2) : '');
     d.set('board', answered ? 'answers' : 'silent', answered ? 'ok' : 'bad');
     if (!frames) d.set('sound', 'nothing', answered ? 'bad' : undefined);
     else if (level < 0.002) d.set('sound', 'silent');
@@ -902,27 +931,37 @@
       // the picker as well — the same two words three times, and the one thing
       // in the block that is identical between the two halves, in a block whose
       // entire job is showing how they differ.
+      // ⚠️ THREE FIGURES, NOT A SENTENCE ABOUT THEM. This ran the three
+      // together with joining words and wrapped to three lines that reflowed as
+      // the numbers changed width. Same facts, one per line, each line a fixed
+      // shape — so a digit changing changes a digit and nothing moves.
       s.append(el('span', 'hd', `granulator ${k}`),
-               el('span', 'nums', `${side.rate} grains a second · each ${Math.round(side.size * 1000)} ms long`
-                  + ` · reading ${side.scan.toFixed(2)} of the way through the sixty seconds`));
+               el('span', 'nums', `${side.rate} grains a second`),
+               el('span', 'nums', `${Math.round(side.size * 1000)} ms long`),
+               el('span', 'nums', `reading at ${side.scan.toFixed(2)}`));
       box.append(s);
     }
     panel.append(box);
-    // 🔴 WHAT BOTH OF THEM ARE CHEWING, which is the claim the side-by-side
-    // rests on and was false until 2026-09-13: the page granulated a table of
-    // sines and the board granulated whichever instrument happened to be
-    // running. One description now, expanded by one function at both ends.
-    panel.append(el('p', 'drift', made?.partials
-      ? `both are chewing the same ${SPEC.shape} — ${made.partials} sine partials over ${SPEC.chord.length} notes,`
-        + ' made separately at each end from one description'
-      : made?.reason
-        ? `the board would not make the material: ${made.reason}`
-        : 'the board has not said what it is chewing yet'));
-    // What the board has done to the sound with nobody asking — or, when it is
-    // doing nothing, that and the reason. ⚠️ This printed `moving on its own ·
-    // 0 nudges … reading at —` about a board that was moving nothing at all: a
-    // headline claim with its own contradiction printed beside it.
-    panel.append(el('p', 'drift', driftLine()));
+    // 🔴 TWO GENERATED PARAGRAPHS REMOVED, AND THEY WERE THE WORST KIND. One
+    // said "both are chewing the same saw — 72 sine partials over 6 notes, made
+    // separately at each end from one description"; the other, "moving on its
+    // own · 53 nudges in the 8 s this page has been watching, none of them asked
+    // for · the slow one is reading at 0.416 of the way through the sixty
+    // seconds". Every number in them is real and both rewrote themselves
+    // continuously, reflowing between two and three lines and shoving the whole
+    // page down each time. Called what it was: slop prose.
+    //
+    // The failure is not the wording, it is the FORM. A page narrating its own
+    // state in sentences has to re-say the unchanging part ("of the way through
+    // the sixty seconds") beside the one number that moved, so the reader
+    // re-reads a paragraph to find a digit — and the line rewraps while they
+    // do it. These are all readout cells and lane gutters, which is where this
+    // project puts a moving figure and why those are fixed-width boxes.
+    //
+    // What they said that is worth keeping is kept: the shared-material claim
+    // is an ASSERT ("both granulators are chewing the same description, and the
+    // board's engine says so"), which is where a claim belongs, and the drift
+    // is logged when it CHANGES rather than narrated every frame.
   }
 
   // ── audio out of this page ───────────────────────────────────────────────

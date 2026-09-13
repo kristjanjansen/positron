@@ -1,7 +1,9 @@
 # positron
 
-Live at **https://positron.studio**. 31 shelled demos of 37 rows,
-**449 asserts, all green** (2026-09-13). ⚠️ A red run is not automatically a
+Live at **https://positron.studio**. 33 shelled demos of 39 rows
+(2026-09-13). ⚠️ The suite total that used to sit here was removed rather than
+updated: it was stale for two sessions, and a count nobody re-measures reads as
+a fact. Run `node demo/verify.mjs` for the current one. ⚠️ A red run is not automatically a
 regression here: `now`'s asserts go red when ERR refuses its own live edge (one
 403 probe separates the two), and a demo that needs something off this machine
 goes red when a leftover Chrome of mine is holding relay sockets — **run the
@@ -708,6 +710,34 @@ counts against the last known total after any change.
   5.0 ms, so the DOCUMENTED BASELINE was amber. Colour and words must come
   from one table, so a green bar can never be described in language that
   sounds like a failure.
+- 🔴 **NOTHING THAT REDRAWS EVERY FRAME MAY CHANGE HOW MUCH ROOM IT TAKES.**
+  A live picture is fine. A live SENTENCE under it is not: `grain-scope` carried
+  a caption that rewrote itself sixty times a second and reflowed between three
+  and four lines, so the picture, the pane and everything below them jumped
+  continuously — reported as *"a horrible jump of content each time it
+  updates"*. The words were accurate and it did not matter. ⚠️ The fix is never
+  to shorten the sentence: any prose that updates live will eventually straddle
+  a line break, and then it is back. **A changing number goes in a READOUT
+  CELL**, which is a fixed box with a reserved width (`tabular-nums`, and the
+  slider reserves its widest value for the same reason) — or in a lane's
+  gutter, which is also fixed. Text that updates at human pace — a log line, a
+  verdict after a check — is fine, because it moves when something happened
+  rather than on a clock. The test is not "is it short", it is **can this change
+  its own height while somebody is looking at it**.
+- 🔴 **A PAGE DOES NOT NARRATE ITS OWN STATE IN SENTENCES.** `grains` generated
+  two paragraphs a frame — *"both are chewing the same saw — 72 sine partials
+  over 6 notes, made separately at each end from one description"* and *"moving
+  on its own · 53 nudges in the 8 s this page has been watching, none of them
+  asked for · the slow one is reading at 0.416 of the way through the sixty
+  seconds"*. Every number in them was real. The reader's word for it was **slop
+  prose**, and the failure is the FORM, not the wording: a sentence has to
+  re-say the unchanging part beside the one figure that moved, so you re-read a
+  paragraph to find a digit — and it rewraps while you do. A figure goes in a
+  **readout cell** or a **lane gutter**, both fixed boxes. A claim goes in an
+  **assert**. A state change goes in the **log**, when it changes. ⚠️ And when
+  you delete such a block, REHOME WHAT IT SAID — deleting the display without
+  the facts is how a page quietly stops reporting something, which is worse
+  than saying it badly.
 - 🔴 **VERTICAL SPACING IS A RULE, NOT A PER-PAGE DECISION.** Elements on a demo
   page do not sit tight against each other. `shell.css` sets ONE rhythm —
   `.pos-body > * + * { margin-top: 22px }` — on the GAP BETWEEN siblings rather

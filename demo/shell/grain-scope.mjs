@@ -40,7 +40,11 @@ import { el } from './shell.mjs';
 export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520 } = {}) {
   const wrap = el('div', 'pos-scope');
   const canvas = el('canvas', 'pos-scope-c');
-  const gut = el('div', 'pos-scope-gut', 'nothing yet');
+  // ⚠️ THE ELEMENT STAYS AND IS NEVER WRITTEN TO. Removing it outright would
+  // change the wrap's height and every page that lays out around this
+  // component; keeping it empty keeps the geometry and makes the absence
+  // deliberate rather than a deletion somebody has to rediscover.
+  const gut = el('div', 'pos-scope-gut', '');
   wrap.append(canvas, gut);
   host.append(wrap);
 
@@ -248,18 +252,18 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
     ctx.restore();
 
-    gut.textContent = peaks
-      ? `${live.length} grains in the air · the lit range is where they are being taken from${sourceName ? ` · ${sourceName}` : ''}`
-      : live.length
-        // NAME WHAT IS MISSING. Every tick here is measured; the sound they
-        // were cut from is the part that has not arrived, and a reader has to
-        // be able to tell that from "there is nothing there".
-        ? `${live.length} grains in the air, each one reported by the engine that started it · `
-          + `the held sound itself has not been sent, so there is nothing drawn under them`
-          + `${sourceName ? ` · ${sourceName}` : ''}`
-        : counts.inferred
-          ? `this is the sound that arrived, and all that can honestly be drawn${sourceName ? ` — ${sourceName}` : ''}`
-          : 'nothing yet';
+    // 🔴 NO PROSE UNDER A PICTURE THAT REDRAWS EVERY FRAME. This carried a
+    // sentence that rewrote itself sixty times a second and REFLOWED — three
+    // lines, then four, then three — so the whole page jumped under the
+    // reader's eye continuously. The words were accurate and it did not matter;
+    // a caption that changes length is a caption that cannot be read, and it
+    // moves everything below it as well. Reported as "a horrible jump of
+    // content each time it updates", which is exactly what it was.
+    //
+    // The count that mattered is a NUMBER, and a number belongs in a cell of
+    // fixed width — `grains` prints it in its readout, where it changes without
+    // moving anything. See `shell.css`'s note on live text and reflow.
+    if (gut && gut.textContent) gut.textContent = '';
 
     raf = requestAnimationFrame(paint);
   }

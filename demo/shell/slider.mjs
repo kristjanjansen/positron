@@ -28,7 +28,21 @@ import { el } from './shell.mjs';
  * for must not move at different speeds — a page that ramps its engine over a
  * quarter second while the knob snaps is two controls wearing one label.
  */
-export const GLIDE_MS = 250;
+// 🔴 SLOW, AND SLOWER THAN FEELS RIGHT WHEN YOU WRITE IT. Asked for: "way
+// slower and humanlike easing". 250 ms is the reflex-fast default every UI
+// library ships and it reads as a SNAP with a blur on it — the knob is at the
+// new value before the eye has found it, so what you perceive is a jump, and
+// the animation has bought nothing. 900 ms is long enough to be FOLLOWED: the
+// eye tracks the knob across the lane, which is the only thing a moving control
+// can tell you that a jumping one cannot — WHERE IT CAME FROM.
+//
+// ⚠️ THIS IS A DRAWING, NOT THE VALUE. The number is committed immediately and
+// everything downstream — the sound, the readout, `aria-valuenow` — already
+// uses it; only the handle is still travelling. So a longer glide cannot make
+// anything late, which is the property that makes 900 ms affordable at all.
+// ⚠️ And `prefers-reduced-motion` skips it entirely, which matters more the
+// longer it gets.
+export const GLIDE_MS = 900;
 
 const reducedMotion = () =>
   globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
@@ -60,7 +74,13 @@ export function glide(onFrame, { ms = GLIDE_MS } = {}) {
   const step = () => {
     if (done) return;
     const t = Math.min(1, (performance.now() - t0) / ms);
-    onFrame(t * t * (3 - 2 * t));
+    // HUMANLIKE, WHICH IS NOT SYMMETRIC. Smoothstep (`t²(3−2t)`) leaves and
+    // arrives at rest with the same shape at both ends, and over 900 ms that
+    // reads as machinery: a hand does not accelerate as gently as it decelerates.
+    // This is the standard ease-out-quint — off quickly, then a long settle —
+    // which is what a thrown-then-caught object does and what every physical
+    // control you have ever used does.
+    onFrame(1 - Math.pow(1 - t, 5));
     if (t >= 1) { stop(); return; }
     raf = requestAnimationFrame(step);
   };
@@ -114,7 +134,7 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  *   set:(v:number, opt?:boolean|{quiet?:boolean, glideMs?:number})=>number,
  *   disabled:(v:boolean)=>void}}
  */
-export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
+export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
                                digits, onInput, onChange } = {}) {
   const span = max - min;
   const stp = step ?? span / 100;
@@ -132,7 +152,12 @@ export function createSlider({ label, min = 0, max = 1, step, value, unit = '',
   const lane = el('span', 'sld-lane', null, {
     // A real slider to anything that asks: a screen reader, and a keyboard.
     role: 'slider', tabindex: '0',
-    'aria-label': label || 'value',
+    // ⚠️ `aria` FOR A SLIDER WITH NO VISIBLE LABEL. `grains`' blend sits
+    // between two labelled ends — `this page` / `the board` — so a third word
+    // between them is noise on screen and the only thing a screen reader has.
+    // The two are different audiences with different needs, and collapsing them
+    // means one of the two always loses.
+    'aria-label': aria || label || 'value',
     'aria-valuemin': String(min), 'aria-valuemax': String(max),
   });
   const knob = el('span', 'sld-knob');
