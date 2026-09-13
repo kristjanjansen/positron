@@ -66,25 +66,60 @@ That accounts for everything that executes. What remains is writing:
    enumerated and shared — promoting a 1.86 MB dependency into the kit invites a
    second page to import it without noticing what it costs.
 
-   ⚠️ **And the containment wall is what priced the SECOND candidate out.** The
-   WebXR input-profiles controller meshes were assessed on 2026-09-13 and
-   **rejected**, with the numbers, so nobody re-derives them:
-   `@webxr-input-profiles/assets@1.0.20` is **MIT (Amazon, 2019)** — the licence
-   is not the obstacle — and `meta-quest-touch-plus` is **217,984 bytes for the
-   left hand, 213,868 for the right**, plus 11,430 for the profile JSON. The
-   `.glb` is glTF 2.0 with 31 nodes, 6 meshes, 23 accessors, one PBR material
-   and one embedded PNG, carrying **TEXCOORD_0** — which the room's flat-colour
-   box program (position at slot 0, normal at slot 1, no texture coordinate) has
-   nowhere to put. So it is a container parser *and* an accessor decoder *and* a
-   node walk *and* a PNG decode *and* a third renderer, for a shape whose whole
-   job is to answer "where is my hand". 🔴 **And the consumer is
-   `demo/shell/xr-room.mjs`, which two pages import** — so a
-   `demo/<slug>/vendor/` path fetched from a shell module is the `moq.mjs`
-   rename bug exactly, and the alternative is a shell-level exception to the
-   wall this item exists to describe. Primitives instead, and the tablet's own
-   footer says it is a stand-in. **The `profile.json`'s gamepad index map was
-   taken WITHOUT the mesh** — ten lines in `demo/shell/xr-hands.mjs`, no fetch,
-   no bytes — which is the half that was actually worth having.
+   🔴 **And the SECOND vendored thing broke this rule on purpose — read this
+   before moving it back.** The WebXR input-profiles controller meshes live at
+   **`demo/shell/vendor/`**, not under a demo. `@webxr-input-profiles/assets@1.0.20`,
+   **MIT (Amazon, 2019)**, `meta-quest-touch-plus` at **217,984 + 213,868 bytes**,
+   read by `demo/shell/xr-glb.mjs`.
+
+   The reason is the consumer: **`demo/shell/xr-room.mjs` is imported by BOTH
+   `scene` and `mirror`**. Under `demo/<slug>/vendor/` one page's controllers
+   would come out of a directory named after the other page — and a shared
+   module holding a per-slug path is precisely the `moq.mjs` failure this file
+   warns about twice.
+
+   ⚠️ So the protection the rule was providing had to be replaced, not dropped.
+   `workers/view/build.mjs` now carries **two new refusals** beside
+   `checkImports`: `checkPresent` refuses the build when any LISTED file is not
+   on disk (a binary is never `import`ed, so no import check can see it), and
+   `checkVendorUrls` refuses it when a `/…/vendor/…` string in the SOURCE has
+   nothing deployed behind it. Both were proved by breaking them. And at runtime
+   a 404 is not fatal: the primitive stand-in draws and the tablet's own face
+   says which one you are looking at — where `moq.mjs`'s 404 was silent.
+
+   ⚠️ **The earlier entry here priced these meshes and rejected them.** That
+   assessment was overruled by the repo owner, who wanted the real controllers,
+   and it deserved to be: one line of its cost — *"a PNG decode"* — was a
+   phantom. The image is a byte range handed to `createImageBitmap`; the browser
+   decodes it. An argument that carries a free item is wrong even when its
+   conclusion is defensible. Re-priced honestly, the reader is **181 lines**.
+
+---
+
+## When to take a library, and when to write it
+
+**A library is right when the thing is a DEPENDENCY of the work. Hand-writing is
+right when the thing is the SUBJECT.**
+
+The timeline, the strip, the diagram engine, the pattern generator: writing
+those is *why* this repo knows that `gl.clear` ignores the viewport, that a
+maximum straddles a change, and that three cosines 120° apart sum to a constant.
+Nobody learns anything from the four-hundredth glTF parser — so controller
+meshes point at a library.
+
+⚠️ **And three.js is still the wrong library, which is a separate question from
+whether to take one.** It is not a loader, it is a whole renderer: adopting it
+means rewriting both XR pages and discarding the per-eye loop, the blend modes
+and the four measured GL defects currently held in their comments. Large price,
+small problem. What it IS good for is being READ — `demo/shell/xr-glb.mjs` was
+written from the specification and then diffed against `GLTFLoader.js` v0.186.0
+(MIT), which is attributed in its header and which **found a real bug**: a
+double chunk padding that both vendored files happened to hide.
+
+🔴 **A hand-rolled reader has to name its own expiry**, or it quietly becomes a
+project. `xr-glb.mjs` names four triggers — animated parts, skinning, real PBR,
+or a model needing Draco or KTX2 — and refuses each of them BY NAME rather than
+approximating it.
 
 ---
 

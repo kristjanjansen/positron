@@ -27,7 +27,8 @@
 // asked once behind a try and never asked again after a refusal.
 
 import { world as world0 } from './seed.mjs';
-import { TABLET, registerStandIn } from './xr-tablet.mjs';
+import { TABLET, registerStandIn, registerDrawnAs } from './xr-tablet.mjs';
+import { readGLB } from './xr-glb.mjs';
 
 // ── nothing sits inside anything else ─────────────────────────────────────
 // 🔴 THE GENERATOR PLACES EACH THING WITHOUT LOOKING AT THE ONES ALREADY
@@ -215,11 +216,90 @@ export function beamM(m, len) {
  * nub where the thumbstick is so the thing has a visible orientation.
  */
 export const GRIP_PARTS = [
-  { name: 'handle', sx: 0.034, sy: 0.034, sz: 0.105, at: 0.000, col: [0.30, 0.33, 0.39] },
-  { name: 'face',   sx: 0.056, sy: 0.056, sz: 0.013, at: 0.055, col: [0.40, 0.44, 0.52] },
-  { name: 'stick',  sx: 0.015, sy: 0.015, sz: 0.014, at: 0.070, col: [0.56, 0.61, 0.71] },
+  // The body: butt, tapering handle, and the wider rounded head the face plate
+  // is on. `sy` flattens the circle into the oval a Touch controller actually
+  // is — the profile is a body of revolution and the squash is one number.
+  { name: 'body', mesh: 'body', sx: 1, sy: 0.88, sz: 1, at: 0, col: [0.26, 0.29, 0.35] },
+  // The thumbstick, which is the only part that says WHICH WAY UP the thing is.
+  { name: 'thumbstick', mesh: 'stick', sx: 1, sy: 1, sz: 1, at: 0.038, col: [0.52, 0.57, 0.67] },
 ];
 registerStandIn(GRIP_PARTS.length);
+
+/**
+ * 🔴 WHERE THE CONTROLLER MODELS LIVE, AND WHY A SHELL MODULE MAY HOLD THE
+ * PATH.
+ *
+ * The hazard is real and it is `LESSONS`' own: `demo/shell/moq.mjs` went on
+ * importing a URL a slug rename had moved, 404ed, killed the module, and made
+ * two demos assert NOTHING while reading red for an unrelated reason. A shared
+ * module holding a path is exactly that shape.
+ *
+ * Three things make it safe here, and all three had to be true:
+ *
+ *   1. **The path is under `/shell/`, which is where this module lives.** These
+ *      assets belong to the ROOM, and the room is shared by two pages — putting
+ *      them under one page's `vendor/` would mean the other page's controllers
+ *      came from a directory named after a demo it is not. `LAYOUT.md` carries
+ *      the reasoning; the wall it describes is still a wall, this is just the
+ *      right side of it.
+ *   2. 🔴 **`workers/view/build.mjs` REFUSES THE BUILD if the file is missing**,
+ *      by name, the same treatment an import with no deployed file already
+ *      gets. That is the check `moq.mjs` did not have. A rename cannot ship.
+ *   3. **A 404 at runtime is not fatal and it SAYS SO.** The primitive stand-in
+ *      draws instead and the tablet's own footer says which one you are looking
+ *      at. `moq.mjs`'s 404 was silent; this one is on the thing in your hand.
+ *
+ * ⚠️ KEYED ON `XRInputSource.profiles`, WHICH IS THE STRING THE HEADSET ITSELF
+ * REPORTS. The filename carries the profile id for that reason — the name and
+ * the lookup are the same string, so there is nothing to keep in step. A
+ * headset reporting anything else gets the stand-in, and is told.
+ */
+export const MODEL_BASE = '/shell/vendor/';
+export const MODEL_PROFILES = { 'meta-quest-touch-plus': true };
+
+/**
+ * The stand-in's outline, as radius against distance along the controller.
+ *
+ * 🔴 THE FIRST VERSION WAS THREE BOXES AND IT CAME BACK FROM THE HEADSET AS
+ * *"butt-ugly boxes"*. That is a fair verdict and it is not an argument for the
+ * 433 KiB of glTF — those reasons are unchanged and they are in `LAYOUT.md`. It
+ * is an argument for a shape somebody chose. A lathe is twelve numbers and one
+ * loop, and a body of revolution round the controller's own axis is very nearly
+ * what a controller is.
+ *
+ * ⚠️ AND IT HAS NO TRACKING RING, WHICH IS CORRECT RATHER THAN MISSING. The
+ * headset reports `meta-quest-touch-plus` — the Quest 3 controller — and that
+ * generation removed the ring. A ring here would be a stand-in for a DIFFERENT
+ * controller, which is worse than an obvious placeholder: it would be a
+ * confident picture of the wrong object.
+ *
+ * ⚠️ AND IT STILL SAYS IT IS A STAND-IN, on the tablet's own footer. A shape
+ * that looks like a real controller and is not is worse than a box.
+ *
+ * Metres, in grip-local coordinates, where -Z is the thumb's direction — so the
+ * butt sits at positive z and the face plate at negative z.
+ */
+export const BODY_PROFILE = [
+  [+0.0735, 0.004],  // the butt, rounded off rather than cut flat
+  [+0.068, 0.012],
+  [+0.052, 0.018],
+  [+0.028, 0.021],
+  [+0.004, 0.023],
+  [-0.014, 0.025],   // the waist, where a fist closes
+  [-0.026, 0.028],
+  [-0.036, 0.031],
+  [-0.043, 0.032],   // the head, widest just under the face plate
+  [-0.047, 0.028],
+  [-0.0492, 0.017],
+  [-0.0498, 0.004],  // the face plate, rounded off at its rim
+];
+export const STICK_PROFILE = [
+  [+0.002, 0.004],
+  [-0.001, 0.0085],
+  [-0.008, 0.0092],
+  [-0.011, 0.0075],
+  [-0.0125, 0.003],
+];
 
 /**
  * One part of the stand-in, at a grip pose.
@@ -228,6 +308,10 @@ registerStandIn(GRIP_PARTS.length);
  * while a part needs the controller's OWN orientation and a different size down
  * each axis. Taking the rotation straight out of the pose matrix is shorter and
  * exact; it is `beamM`'s pattern with different constants.
+ *
+ * ⚠️ THE PROFILES ARE ALREADY IN METRES, so `sz` is 1 and the scales are only
+ * there to squash a circle into an oval. A lathe built at unit size and then
+ * scaled to fit would be two places holding the controller's dimensions.
  */
 export const partM = (m, p) => new Float32Array([
   m[0] * p.sx, m[1] * p.sx, m[2] * p.sx, 0,
@@ -236,50 +320,108 @@ export const partM = (m, p) => new Float32Array([
   // -Z is the thumb's direction, which is the way the top face looks
   m[12] - m[8] * p.at, m[13] - m[9] * p.at, m[14] - m[10] * p.at, 1]);
 
-/** How far above the grip origin the tablet floats, clear of the stick nub. */
-export const TABLET_LIFT = 0.09;
+/**
+ * 🔴 HOW FAR ALONG THE CONTROLLER THE TOP OF IT IS — **MEASURED off the real
+ * model**, not from the stand-in and not typed.
+ *
+ * `readGLB` on the vendored `meta-quest-touch-plus` files puts the geometry at
+ * z -0.0498 .. +0.0735 about the grip origin, both hands, identically. So the
+ * face plate is 4.98 cm along the thumb's direction — and the stand-in's own
+ * profile was 7.1 cm, **2.1 cm too long**, which is not nothing: swapping
+ * between a stand-in and a real model would have moved the tablet's apparent
+ * attachment point by two centimetres the moment the fetch landed, which reads
+ * as the tablet jumping rather than as two shapes disagreeing. `BODY_PROFILE`
+ * is built to these bounds now, so the two occupy the same space.
+ */
+export const CONTROLLER_TOP = 0.0498;
+/** Air between the tablet's lower edge and the top of the controller. */
+export const TABLET_GAP = 0.008;
 
 /**
- * 🔴 THE TABLET, FLAT ON THE CONTROLLER'S SQUARE TOP FACE AND SQUARE TO ITS OWN
- * AXES. It used to be tilted 31 degrees back towards the face and offset up and
- * forward, and the complaint that replaced it was exactly that: *the tablet
- * should be ON the controller, on the square area, PERPENDICULAR to it, not at
- * an angle.* There is no tilt term here any more, and that is the point — the
- * three columns below are the controller's own basis, unrotated.
+ * 🔴 HOW FAR THE FACE LEANS BACK FROM SQUARE-ACROSS-THE-CONTROLLER, in radians.
+ *
+ * 0 would put the screen exactly perpendicular to the handle. 20 degrees leans
+ * its top edge away and its bottom edge towards you, which is how a watch face
+ * sits on a wrist and is what makes it readable at the angle a hand actually
+ * holds a controller at.
+ *
+ * ⚠️ IT IS FIXED TO THE CONTROLLER AND IT DOES NOT FOLLOW YOUR HEAD, and that
+ * is a decision rather than an omission. A face that turns to meet you is a
+ * billboard: it swims whenever you look away and back, the thing it is attached
+ * to appears to rotate under it, and you can never learn where it is because it
+ * is never in the same place twice. `xr-panel.mjs` makes the same argument
+ * about panels ("a panel that follows your face cannot be looked away from").
+ * A fixed offset is learned once, with your wrist.
+ *
+ * This is the first number to change if it still reads wrong in a headset.
+ */
+export const FACE_TILT = 20 * Math.PI / 180;
+
+/**
+ * Where the tablet's centre sits, along the controller's own axis.
+ *
+ * 🔴 DERIVED, NOT TYPED, and it had to become derived. The tablet grew by two
+ * thirds and a hand-typed lift left its lower edge 0.4 mm INSIDE the head — a
+ * two-sided number (too little and it is buried, too much and it floats
+ * detached and reads as a tracking fault) that four constants all move. It is
+ * the top of the controller, plus air, plus however far the slab's own lower
+ * edge reaches once it has leaned back. `xr-pick-test.mjs` measures the gap
+ * that comes out and requires it to be positive and small.
+ */
+export const TABLET_LIFT = CONTROLLER_TOP + TABLET_GAP + (TABLET.h / 2) * Math.cos(FACE_TILT);
+
+/**
+ * 🔴 THE TABLET, STANDING UP FROM THE CONTROLLER'S TOP FACE AND LEANING BACK AT
+ * YOU. Reported from a Quest 3: *"tablet works but looks to sky not to me (x
+ * rot 90 missing)"* — and that diagnosis was exactly right.
  *
  * The grip convention (WebXR CRD via MDN): the origin is the centroid of the
  * closed fist, **-Z runs along the controller in the direction of the thumb**,
- * and X comes out of the back of the hand. So the top face — the plate with the
- * thumbstick and the buttons on it — looks along **-Z**, and a tablet lying on
- * that plate has:
+ * and X comes out of the back of the hand. The first version put the tablet's
+ * NORMAL along -Z — flat on the top plate, facing the way the plate faces,
+ * which with the controller held normally is **straight up at the ceiling**. It
+ * was square to the controller, which is what was asked for, and unreadable,
+ * which was not.
  *
- *   its right   = the grip's +X
- *   its up      = the grip's -Y     ← so it reads the right way up looking down
- *   its normal  = the grip's -Z     ← out of the face, towards whoever is reading
- *   its centre  = the grip origin, `TABLET_LIFT` along -Z
+ * One quarter turn about the controller's own X axis fixes it, and the axes
+ * fall out of that rotation rather than being chosen again:
  *
- * 🔴 AND THAT BASIS IS RIGHT-HANDED, WHICH IS LOAD-BEARING RATHER THAN TIDY.
- * Two of those three columns are negated; negating one alone gives a
- * determinant of -w·h, which flips the winding, and the room draws with
- * `CULL_FACE` on — so a mirrored basis is an INVISIBLE tablet, which reads as
- * "the tablet was never built" rather than as a sign error. `xr-pick-test.mjs`
- * asserts the determinant is positive, on a laptop, for exactly that reason.
+ *   its right   = the grip's +X                    (untouched by its own turn)
+ *   its up      = -Y·cos(t) - Z·sin(t)             at t=90° that is -Z, i.e.
+ *                                                  straight up the controller
+ *   its normal  = +Y·sin(t) - Z·cos(t)             at t=90° that is +Y, i.e.
+ *                                                  across the handle, back at
+ *                                                  whoever is holding it
  *
- * ⚠️ NO `handedness` TERM, AND THAT IS DELIBERATE. MDN's note that the
- * out-of-the-back-of-the-hand direction is +X on the right and -X on the left
- * is about anything hung off the HAND — a clipboard beside the palm is mirrored
- * between the two. This is hung off the PLASTIC: the top face is on the thumb
- * side, which is -Z for both hands, so there is nothing to mirror. A sign flip
- * here would be a correction for a bug this pose does not have.
+ * with `t = 90° - FACE_TILT`, so the face leans back towards the reader.
+ *
+ * 🔴 AND THE DETERMINANT IS STILL THE LOAD-BEARING CHECK. A rotation cannot
+ * change it — it is w·h either way — but a hand-negated column can, and the
+ * room draws with `CULL_FACE` on, so a mirrored basis is an **INVISIBLE**
+ * tablet rather than a wrong-looking one. That is why the fix above is a
+ * rotation of the whole basis and not a sign flipped until the picture looked
+ * right. `xr-pick-test.mjs` asserts the sign, the lean and the old failure's
+ * exact signature, on a laptop.
+ *
+ * ⚠️ STILL NO `handedness` TERM. MDN's mirrored-X warning is about anything
+ * hung off the HAND; this hangs off the PLASTIC, and the top face is on the
+ * thumb side for both hands. A sign flip here would correct a bug this pose
+ * does not have.
  */
 export function holdM(m, o = TABLET) {
   const rx = m[0], ry = m[1], rz = m[2];          // the grip's +X
   const ux = m[4], uy = m[5], uz = m[6];          // its +Y
   const fx = m[8], fy = m[9], fz = m[10];         // its +Z, so -Z is the thumb
+  const t = Math.PI / 2 - FACE_TILT;
+  const c = Math.cos(t), sn = Math.sin(t);
+  // up = -(Y·cos t + Z·sin t)
+  const nux = -(ux * c + fx * sn), nuy = -(uy * c + fy * sn), nuz = -(uz * c + fz * sn);
+  // normal = Y·sin t - Z·cos t
+  const nfx = ux * sn - fx * c, nfy = uy * sn - fy * c, nfz = uz * sn - fz * c;
   return new Float32Array([
     rx * o.w, ry * o.w, rz * o.w, 0,
-    -ux * o.h, -uy * o.h, -uz * o.h, 0,
-    -fx, -fy, -fz, 0,
+    nux * o.h, nuy * o.h, nuz * o.h, 0,
+    nfx, nfy, nfz, 0,
     m[12] - fx * TABLET_LIFT, m[13] - fy * TABLET_LIFT, m[14] - fz * TABLET_LIFT, 1]);
 }
 
@@ -324,6 +466,38 @@ export const SKY_FS = `#version 300 es
     // colour, so the walls are still behind the things and not competing with
     // them.
     o = vec4(c * 0.34, 1.0); }`;
+
+// ── the real controller, when we have its model ───────────────────────────
+// 🔴 A THIRD PROGRAM, AND IT IS THE ONE THING THE MESHES GENUINELY COST. The
+// room's box program has position at slot 0 and normal at slot 1 and no texture
+// coordinate anywhere; a glTF model carries TEXCOORD_0 and a base-colour map,
+// so it needs its own attribute layout and its own fragment shader. That is
+// twenty lines, which is the honest price — and the PNG beside it costs
+// nothing, because `createImageBitmap` hands the decode to the browser.
+//
+// ⚠️ THE LIGHTING IS THE ROOM'S, NOT THE MODEL'S. One lambert from the same
+// direction `BOX_FS` uses, times the base-colour texture. It is deliberately
+// NOT physically-based: a metallic-roughness path needs an environment to
+// reflect and this room does not have one, so it would be a more expensive way
+// to look worse. See the revisit trigger at the top of xr-glb.mjs.
+export const MODEL_VS = `#version 300 es
+  in vec3 aPos; in vec3 aNrm; in vec2 aUv;
+  uniform mat4 uProj, uView, uModel;
+  out vec3 vN; out vec2 vT;
+  void main(){
+    vN = mat3(uModel) * aNrm; vT = aUv;
+    gl_Position = uProj * uView * uModel * vec4(aPos, 1.0); }`;
+export const MODEL_FS = `#version 300 es
+  precision highp float;
+  in vec3 vN; in vec2 vT;
+  uniform sampler2D uTex; uniform float uHas; uniform vec3 uCol;
+  out vec4 o;
+  void main(){
+    vec3 n = normalize(vN);
+    float l = 0.35 + 0.65 * max(0.0, dot(n, normalize(vec3(0.4, 0.9, 0.25))));
+    vec3 c = uCol;
+    if (uHas > 0.5) c *= texture(uTex, vT).rgb;
+    o = vec4(c * l, 1.0); }`;
 
 export const BOX_FS = `#version 300 es
   precision highp float;
@@ -375,8 +549,8 @@ const GRID_FS = `#version 300 es
     // ⚠️ ONE DOT SIZE. Every fourth dot used to be 2.2x as a metre marker, and
     // it went because it was asked for: through a headset the two sizes read as
     // two grids rather than as one grid with a scale on it, and the thing the
-    // grid is for is the surface, not the measurement. The cell is still
-    // 0.25 m, so a metre is still four dots for anyone counting.
+    // grid is for is the surface, not the measurement. The cell is 0.125 m, so
+    // a metre is eight dots for anyone counting.
     float a = dotsAt(vM, uCell, uDot, w);
     a *= 1.0 - smoothstep(uFade.x, uFade.y, distance(vW, uEye));
     a *= clamp(uDot * 2.0 / w, 0.0, 1.0);
@@ -453,7 +627,13 @@ const HOLD_FS = `#version 300 es
  * splitting them across two files is how they come to disagree.
  */
 const HOLD = {
-  radius: 0.055,           // in the shader's own units, not metres
+  // ⚠️ IN THE SHADER'S OWN UNITS, WHERE THE HALF-HEIGHT IS 0.5 — so this is a
+  // corner radius of a quarter of the slab's height. It was 0.055, which is
+  // 11% and reads as a rectangle somebody forgot to round; *"bit rounded rect"*
+  // was the note from the headset. The rounding itself is the signed-distance
+  // one already in HOLD_FS — exact at any size and at any distance from the
+  // eye — so this is a constant moving, not a second way of drawing a corner.
+  radius: 0.125,
   col: [0.09, 0.10, 0.12],
   alpha: TABLET.fillAlpha,
 };
@@ -469,8 +649,16 @@ const HOLD = {
 const FADE_NEAR = 4.5, FADE_FAR = 11;
 export const GRID = {
   span: FADE_FAR * 2,   // the floor square's side — half of it IS the fade's end
-  cell: 0.25,           // dot spacing, so a metre is four dots for anyone counting
-  dot: 0.011,           // dot radius — ONE size, see the note in the shader
+  // 🔴 12.5 cm, HALVED FROM 25. Reported from a Quest 3 as *"xr grids too
+  // big"*: at a quarter of a metre the dots read as a coarse lattice you look
+  // AT rather than as a surface you stand ON, which is the whole job. A metre
+  // is eight dots now rather than four, and 0.125 still divides the 22 m floor
+  // exactly (176 cells a side), so the pattern stays centred on the origin.
+  // ⚠️ The count does not cost anything: the dots are a fragment shader over
+  // ONE quad, so the work is per pixel and not per dot, and the sub-pixel fade
+  // two lines down is what keeps a denser grid from turning into haze.
+  cell: 0.125,
+  dot: 0.007,           // dot radius — ONE size, see the note in the shader
   fadeNear: FADE_NEAR,  // metres from the eye where the dots start to go
   fadeFar: FADE_FAR,
 };
@@ -566,6 +754,56 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // without wondering which slots are live.
     return mesh(P, P.map((_, i) => (i % 3 === 2 ? 1 : 0)));
   }
+  /**
+   * A body of revolution round local Z, from `[[z, radius], ...]`.
+   *
+   * ⚠️ SMOOTH NORMALS, FROM THE PROFILE'S OWN SLOPE. A lathe with face normals
+   * reads as a faceted barrel — which is the box problem again in a rounder
+   * costume. The normal at a profile point is perpendicular to the segment
+   * through its neighbours, swung round with the point: `(dz, -dr)` in the
+   * half-plane, which needs no trigonometry and is exact at the caps where the
+   * slope goes vertical.
+   *
+   * ⚠️ AND THE WINDING HAS TO COME OUT FRONT-FACING, because the room draws
+   * with `CULL_FACE` on and `cullFace(BACK)` — a lathe wound the other way is
+   * an object you see the INSIDE of, which reads as a hole in the controller
+   * rather than as a winding bug. `z` DECREASES down the profile here (the butt
+   * is at +z), so the ring order below is the one that comes out counter-
+   * clockwise seen from outside.
+   */
+  function lathe(profile, seg = 24) {
+    const ring = profile.map(([z, r], i) => {
+      const a = profile[Math.max(0, i - 1)], b = profile[Math.min(profile.length - 1, i + 1)];
+      const dz = b[0] - a[0], dr = b[1] - a[1];
+      const l = Math.hypot(dz, dr) || 1;
+      return { z, r, nr: dz / l, nz: -dr / l };
+    });
+    const P = [], N = [];
+    const put = (k, ang) => {
+      const c = Math.cos(ang), sn = Math.sin(ang);
+      P.push(ring[k].r * c, ring[k].r * sn, ring[k].z);
+      N.push(ring[k].nr * c, ring[k].nr * sn, ring[k].nz);
+    };
+    for (let i = 0; i < ring.length - 1; i++) {
+      for (let sgm = 0; sgm < seg; sgm++) {
+        const a0 = (sgm / seg) * 6.2831853, a1 = ((sgm + 1) / seg) * 6.2831853;
+        put(i, a0); put(i, a1); put(i + 1, a0);
+        put(i, a1); put(i + 1, a1); put(i + 1, a0);
+      }
+    }
+    return mesh(P, N);
+  }
+  /** Positions, normals AND texture coordinates — slots 0, 1, 2. */
+  function mesh3(P, N, T) {
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    for (const [data, loc, size] of [[P, 0, 3], [N, 1, 3], [T, 2, 2]]) {
+      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0);
+    }
+    gl.bindVertexArray(null);
+    return { vao, count: P.length / 3 };
+  }
   function mesh(P, N) {
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
     for (const [data, loc] of [[P, 0], [N, 1]]) {
@@ -594,7 +832,15 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // `applyAll` so the dots start where the control says they are rather than at
   // a default that only agrees with the number by coincidence.
   let gridAlpha = 0.75;
-  let cube = null, quad = null, ok = false;
+  let cube = null, quad = null, standIn = null, ok = false;
+  // ── the real controller models ──────────────────────────────────────────
+  // `null` until asked for, then a promise, then `{ vao, count, tex, col }` or
+  // `false` for "we asked and it would not come". Three states, not two: "we
+  // have not looked" and "we looked and there is none" are different findings
+  // and the footer prints different words for them.
+  let modelProg = null;
+  const models = new Map();            // profile|handedness -> entry
+  let modelSaid = false;
 
   /** Hand the room a context. Idempotent, and it says whether it took. */
   function attach(context) {
@@ -604,11 +850,21 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     try {
       cur = { sky: link(ROOM_VS, SKY_FS), box: link(ROOM_VS, BOX_FS) };
       cube = unitCube(); quad = unitQuad();
+      standIn = { body: lathe(BODY_PROFILE), stick: lathe(STICK_PROFILE, 14) };
       ok = true;
     } catch (e) { log(`the room would not compile — ${e.message}`, 'bad'); return false; }
     // ⚠️ THE GRID IS ALLOWED TO FAIL ON ITS OWN. It is the newest thing here
     // and the only one that needs `fwidth`; a driver that will not compile it
     // must cost the dots, never the room.
+    // ⚠️ THE MODEL PROGRAM IS ALLOWED TO FAIL ON ITS OWN, like the grid. A
+    // driver that will not compile it must cost the real controllers and fall
+    // back to the stand-in, never the room.
+    try { modelProg = link(MODEL_VS, MODEL_FS, ['aPos', 'aNrm', 'aUv']); }
+    catch (e) {
+      modelProg = null;
+      log(`the controller models would not compile — ${e.message}`, 'warn');
+      say(`FAIL controllers · the model shader would not compile — ${e.message}`);
+    }
     try { holdProg = link(HOLD_VS, HOLD_FS, ['aPos']); }
     // ⚠️ `log`, NOT `onLog`. There is no `onLog` in this scope, so a failed
     // compile would have thrown a ReferenceError out of `attach` — a handler
@@ -1225,15 +1481,65 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // for no reason anybody could read off the picture — colour in this project
     // says how something LANDED, and "this is the left one" is not that. Which
     // hand is which is answered by the tablet being on one of them.
+    // 🔴 THE REAL MODEL WHERE THERE IS ONE, THE STAND-IN WHERE THERE IS NOT,
+    // AND THE TABLET'S FOOTER SAYS WHICH. The model is fetched the first time a
+    // controller with a known profile is seen and drawn from the frame it
+    // lands; there is no waiting anywhere, so a session that starts before the
+    // fetch finishes simply shows the stand-in for a moment. A headset
+    // reporting a profile nobody has vendored keeps the stand-in for good, and
+    // that is a supported outcome rather than a failure.
+    const drawnWithModel = [];
     for (const h of hands) {
       if (!h || !h.m) continue;
+      const hand = h.handedness === 'left' ? 'left' : 'right';
+      const key = `${h.profile}|${hand}`;
+      const known = MODEL_PROFILES[h.profile];
+      if (known && !models.has(key)) loadModel(h.profile, hand);   // not awaited
+      const M = known ? models.get(key) : false;
+      if (M) { drawnWithModel.push({ h, M }); continue; }
       for (const p of GRIP_PARTS) {
+        const g = standIn?.[p.mesh];
+        if (!g) continue;
+        gl.bindVertexArray(g.vao);
         gl.uniformMatrix4fv(L.model, false, partM(h.m, p));
         gl.uniform3fv(L.col, p.col);
-        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+        gl.drawArrays(gl.TRIANGLES, 0, g.count);
       }
     }
     gl.bindVertexArray(null);
+
+    // ⚠️ THE MODELS RUN A DIFFERENT PROGRAM, SO THEY GO AFTER THE LOOP. Two
+    // programs alternating once per controller is two `useProgram` calls per
+    // hand for nothing; and the box program's uniforms are still needed below.
+    if (modelProg && drawnWithModel.length) {
+      const MU = modelProg.__u;
+      gl.useProgram(modelProg);
+      gl.uniformMatrix4fv(MU.proj, false, proj);
+      gl.uniformMatrix4fv(MU.view, false, view);
+      for (const { h, M } of drawnWithModel) {
+        // 🔴 THE GRIP POSE, UNSCALED. The model is authored in metres about the
+        // grip origin — that is what the input-profiles registry means by a
+        // controller asset — so the model matrix IS the grip matrix. Scaling it
+        // to "look right" would be correcting a pose that is already correct,
+        // and it would be wrong the moment somebody held it up to a real one.
+        gl.uniformMatrix4fv(MU.model, false, h.m);
+        gl.uniform3fv(MU.col, M.col);
+        gl.uniform1f(MU.has, M.tex ? 1 : 0);
+        if (M.tex) {
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, M.tex);
+          gl.uniform1i(MU.tex, 0);
+        }
+        gl.bindVertexArray(M.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, M.count);
+      }
+      gl.bindVertexArray(null);
+      // back to the program the rest of this function is holding
+      gl.useProgram(cur.box);
+      L = cur.box.__u;
+      gl.uniformMatrix4fv(L.proj, false, proj);
+      gl.uniformMatrix4fv(L.view, false, view);
+    }
 
     // Last, because these are transparent and have to blend over what is behind.
     if (grid) drawGrid(proj, view, eye);
@@ -1277,6 +1583,78 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     gl.deleteProgram(cur.sky); gl.deleteProgram(cur.box);
     cur = incoming; incoming = null;
     return true;
+  }
+
+  /**
+   * Fetch, read and upload one controller model. Never awaited by anything the
+   * picture depends on.
+   *
+   * 🔴 NOT IN THE ENTRY PATH, AND NOT EVEN NEAR IT. This repo has lost three
+   * headset runs to things that take time between `requestSession` and the
+   * first frame, and a 218 KB fetch is exactly that shape. It is started the
+   * first time a controller with a known profile is SEEN — which is already
+   * inside a running session, drawing at 90 fps — and until it lands the
+   * stand-in draws. Nothing waits for it, nothing fails if it never arrives,
+   * and every outcome has its own words.
+   *
+   * ⚠️ AND THE COSTS ARE MEASURED AND SHIPPED, because "it is free" should be a
+   * number somebody can read back. Bytes, parse milliseconds, vertex count and
+   * the texture decode all go into one line.
+   */
+  async function loadModel(profile, handedness) {
+    const key = `${profile}|${handedness}`;
+    if (models.has(key)) return models.get(key);
+    models.set(key, null);                       // asked, not answered
+    const url = `${MODEL_BASE}${profile}-${handedness}.glb`;
+    const t0 = performance.now();
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${res.status} from ${url}`);
+      const buf = await res.arrayBuffer();
+      const tFetch = performance.now() - t0;
+      const t1 = performance.now();
+      const m = readGLB(buf);
+      const tParse = performance.now() - t1;
+      const t2 = performance.now();
+      let tex = null;
+      if (m.image) {
+        // 🔴 THE DECODE IS THE BROWSER'S, WHICH IS WHY IT IS NOT A COST. The
+        // rejection this replaced listed "a PNG decode" among the work; it is
+        // one `await` against a Blob and one upload. Said here because the
+        // estimate was wrong in a way that made a decision look better than it
+        // was — see the top of xr-glb.mjs.
+        const bmp = await createImageBitmap(new Blob([m.image.bytes], { type: m.image.mime }));
+        tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+        gl.generateMipmap(gl.TEXTURE_2D);
+        bmp.close?.();
+      }
+      const entry = {
+        ...mesh3(m.positions, m.normals, m.uvs),
+        tex, col: [m.baseColor[0], m.baseColor[1], m.baseColor[2]], profile,
+      };
+      models.set(key, entry);
+      const tGpu = performance.now() - t2;
+      say(`controllers · ${profile} ${handedness} drawn from its real model`
+        + ` · ${m.stats.bytes} bytes fetched in ${tFetch.toFixed(0)} ms`
+        + ` · read in ${tParse.toFixed(1)} ms into ${m.count} vertices from ${m.stats.primitives} primitives`
+        + ` · texture ${m.stats.imageBytes} bytes, decoded and uploaded in ${tGpu.toFixed(1)} ms`);
+      if (!modelSaid) { modelSaid = true; log('your real controllers are being drawn, from their own models', 'ok'); }
+      registerDrawnAs('the real controller models');
+      return entry;
+    } catch (e) {
+      models.set(key, false);
+      // ⚠️ REFUSED, NOT APPROXIMATED — and it is said in the one place you can
+      // read it while wearing the thing.
+      say(`FAIL controllers · ${profile} ${handedness} — ${e.message} · drawing the stand-in instead`);
+      log(`no model for your controller (${e.message}) — drawing a stand-in`, 'warn');
+      registerDrawnAs('a stand-in shape, not your real controller');
+      return false;
+    }
   }
 
   /**
@@ -1341,6 +1719,21 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // back rather than a belief this file holds about itself.
   Object.defineProperty(room, 'tabletUploadMs', { get: () => tabletUploadMs, enumerable: true });
   Object.defineProperty(room, 'gridAlpha', { get: () => gridAlpha, enumerable: true });
+  // 🔴 WHAT THE CONTROLLERS ARE ACTUALLY DRAWN FROM, as a word. Three answers,
+  // not two: `not asked` (no controller has been seen), `model` (the real one),
+  // `stand-in` (unknown profile, or the fetch failed). A boolean would collapse
+  // "we have not looked" into "there is none", which is the collapse this
+  // project keeps paying for.
+  Object.defineProperty(room, 'controllers', {
+    get: () => {
+      if (!models.size) return 'not asked';
+      const vals = [...models.values()];
+      if (vals.some((v) => v && v !== true)) return 'model';
+      if (vals.every((v) => v === false)) return 'stand-in';
+      return 'loading';
+    },
+    enumerable: true,
+  });
   // ⚠️ "THE FACE COMPILED", NOT "A TABLET IS ON SCREEN". Whether one is hanging
   // needs a hand in a headset; whether this driver would draw it is answerable
   // on a laptop, and it is the half that can silently fail — the shader gained
