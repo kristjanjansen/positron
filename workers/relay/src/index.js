@@ -44,13 +44,43 @@
 // goes to every socket in the room, so N sockets multiply egress by N. So the
 // budget is bytes-per-second, and the per-message cap only has to sit under the
 // platform's 1 MiB WebSocket message limit with room to spare.
-const MAX_BYTES = 256 * 1024;             // per message
-const MAX_SOCKETS = 16;
-const BYTES_PER_SEC = 512 * 1024;         // per socket, steady
-const BYTE_BURST = 2 * 1024 * 1024;       // enough for a fat session in one go
-const MSG_PER_SEC = 60;                   // a separate bucket, for tiny-message floods
-const MSG_BURST = 120;
-const STRIKES = 20;                       // overruns tolerated before the socket is closed
+// 🔴 RAISED 2026-09-13, AND THE OLD NUMBERS WERE GUESSES DEFENDED AS LIMITS.
+//
+// They were picked before any of this had been run in anger, against a
+// production this project does not have and a public it has never had. What
+// they actually produced was a day of hand-serialising work — refusing to run
+// a measurement because a demo was open, treating one relay as a thing to take
+// turns on — and every one of those refusals was enforcing a number somebody
+// made up rather than one anybody measured.
+//
+// What IS measured, and is why the old ceiling was visible at all: at both 120
+// and 300 msg/s the relay delivered exactly 298 messages in three seconds —
+// `MSG_BURST` 120 plus 3 s at 60/s — and THE SENDER WAS TOLD NOTHING. No
+// error, no close, no backpressure. That property is worth keeping and it has
+// nothing to do with the size of the number.
+//
+// So the numbers open up and the honesty stays. The real constraints are the
+// platform's (a 1 MiB WebSocket message) and the device's (one Raspberry Pi,
+// one JACK graph, and no cap here makes that two). When something actually
+// breaks, the break will be a measurement, which is worth more than a guess
+// that prevented it.
+//
+// ⚠️ A LIVE DURABLE OBJECT KEEPS ITS CODE. Deploying does not change a room
+// that has a socket in it — the board holds `studio-1` awake — so these
+// numbers arrive there when the object next restarts, and in a fresh room
+// immediately. `/room/<name>/stats` reports what the OBJECT thinks, which is
+// how to tell the two apart.
+//
+// ⚠️ `demo/wire/` reads these off `/stats` rather than assuming them, so it
+// follows whatever they are — but its recorded 298-in-three-seconds belongs to
+// the old values and is history now.
+const MAX_BYTES = 1000 * 1024;            // per message — just under the platform's 1 MiB
+const MAX_SOCKETS = 128;                  // was 16, which a handful of browser tabs could fill
+const BYTES_PER_SEC = 8 * 1024 * 1024;    // per socket, steady
+const BYTE_BURST = 16 * 1024 * 1024;
+const MSG_PER_SEC = 1000;                 // was 60 — one knob turn is ~60/s on its own
+const MSG_BURST = 2000;
+const STRIKES = 50;                       // overruns tolerated before the socket is closed
 // 🔴 A FULL ROOM IS A SILENT OUTAGE, AND A DEPLOY DOES NOT CLEAR IT. MEASURED
 // 2026-09-12: `studio-1` sat at 16/16 and refused the box for hours — the board
 // dialled every 30 s and logged `closed 1006`, which reads as a network fault
