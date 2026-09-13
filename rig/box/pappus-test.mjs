@@ -6,7 +6,7 @@
 // Two of these are NEGATIVE CONTROLS — they run the OLD formulas and require
 // the check to REJECT them. A check nobody has seen fail is a check you do not
 // know you have.
-import { rollPappus, driftValues, mulberry32, PARAMS, MODES, DRIFT, CHARACTERS, CHARACTER_NAMES,
+import { rollPappus, driftValues, driftTarget, mulberry32, PARAMS, MODES, DRIFT, CHARACTERS, CHARACTER_NAMES,
          errSearch, errExcerpt, errStatus } from './pappus.mjs';
 import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -241,6 +241,54 @@ const base = rollPappus(7).m;
   const mean = sum / n;
   ok('drift is centred on what the roll set, not on the middle of the range',
      Math.abs(mean - base.scan) < 0.05, `roll set scan ${base.scan}, mean over an hour ${mean.toFixed(3)}`);
+}
+
+// ── the centre the drift circles ─────────────────────────────────────────────
+//
+// A page that sets its sound directly instead of rolling a die still needs the
+// slow movement to have something to move AROUND. `driftTarget` is the pure
+// half of that: which raw engine commands name a parameter the drift moves.
+// The socket half is checked on the board, by the nudge count climbing.
+console.log('\n== the centre the drift circles ==');
+
+// 13. Both sides of both spellings, and every drifting name.
+{
+  const hits = DRIFT.map(([name]) => [driftTarget('m' + name), driftTarget('n' + name)]);
+  ok('every drifting parameter is reachable as a command on both halves',
+     hits.every(([a, b], i) => a?.[0] === 'm' && b?.[0] === 'n'
+                            && a?.[1] === DRIFT[i][0] && b?.[1] === DRIFT[i][0]),
+     DRIFT.map(([n]) => 'm' + n + '/n' + n).join(' '));
+}
+
+// 14. ...and the negative control, which is the half that matters. A centre
+//     that accepted anything would carry keys the drift never reads, and
+//     `mrate` would look like it was being moved when integers never drift.
+{
+  const no = ['mrate', 'nrate', 'pitches', 'gates', 'scan', 'mscanmode', 'msrc', 'mlock', 'xscan', ''];
+  const wrong = no.filter((c) => driftTarget(c) !== null);
+  ok('a command the drift does not move is not taken as a centre',
+     wrong.length === 0, wrong.length ? `accepted ${wrong.join(',')}` : no.length + ' rejected, including mrate and a bare scan');
+}
+
+// 15. The centre is what `driftValues` reads, so setting one parameter has to
+//     move that parameter's band and leave the others where the roll left them.
+{
+  const moved = { ...base, scan: 0.10 };
+  const a = driftValues(base, 300, 0), b = driftValues(moved, 300, 0);
+  ok('moving the centre moves that parameter and nothing else',
+     Math.abs(a.scan - b.scan) > 0.05
+       && DRIFT.filter(([n]) => n !== 'scan').every(([n]) => a[n] === b[n]),
+     `scan ${a.scan} -> ${b.scan}, ${DRIFT.length - 1} others unchanged`);
+}
+
+// 16. A centre of one parameter is a legal centre — a page sets `mscan` before
+//     it has set anything else, and the drift must move that and say nothing
+//     about the five it has never been told.
+{
+  const v = driftValues({ scan: 0.5 }, 123.4, 0);
+  ok('a partial centre drifts what it has and invents nothing',
+     Number.isFinite(v.scan) && Object.keys(v).length === 1,
+     `keys: ${Object.keys(v).join(',') || 'none'}`);
 }
 
 // ── being gentle with somebody else's archive ────────────────────────────────

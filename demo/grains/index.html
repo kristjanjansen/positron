@@ -152,24 +152,27 @@
     return { nudges: b.nudges - a.nudges, ms: b.t - a.t };
   }
   /**
-   * 🔴 THE BOARD'S MOVEMENT CIRCLES THE LAST DICE ROLL, AND THIS PAGE STOPPED
-   * ROLLING. `tick()` in pappus.mjs re-sends every moving parameter around the
-   * values the last roll set, and returns having done nothing when there is no
-   * roll to circle — so the timer turns over, `nudges` stays 0 and `scan` comes
-   * back null, for as long as anybody cares to wait. This page sets each
-   * parameter directly (six finished sounds, not a die), so on this page that
-   * is the normal state and not a fault. MEASURED on the live board 2026-09-13:
-   * `params.state` -> `{ok:true, roll:null, drift:{on:true, nudges:0,
-   * sinceMs:null, scan:null}}`.
+   * 🔴 FIXED 2026-09-13, AND IT WAS BOARD-SIDE. The movement used to circle the
+   * last DICE ROLL and nothing else, and this page does not roll — it sets each
+   * parameter directly, six finished sounds. So the timer turned over with
+   * nothing to circle, `nudges` stayed 0 and `scan` came back null for as long
+   * as anybody cared to wait: a readout cell that could not change. MEASURED on
+   * the live board that morning: `params.state` -> `{ok:true, roll:null,
+   * drift:{on:true, nudges:0, sinceMs:null, scan:null}}`. `params.set` now
+   * moves the centre too, so the last thing anybody SET is what the movement
+   * circles, whether a die chose it or a person did.
    *
-   * Three states, answered in ONE place because the readout cell, the sentence
-   * under the panel and the check all have to say the same thing about it — a
+   * The states are still four, because they are still all reachable — the
+   * board can be silent, the movement can be switched off at the board, and
+   * there is a moment after switching on before the first patch has landed.
+   * They are answered in ONE place because the readout cell, the sentence under
+   * the panel and the check all have to say the same thing about it — a
    * description that can disagree with the thing it describes is worse than
    * none.
    *
    *   null       the board has not said
    *   'off'      it is not moving anything at all
-   *   'nothing'  the timer is running with nothing to circle
+   *   'nothing'  the timer is running and has not been given a value yet
    *   'moving'   it has a centre, so the count should be climbing
    */
   function driftState() {
@@ -185,10 +188,10 @@
         return `moving on its own · ${moved ? `${moved.nudges} nudges in the ${secs(moved.ms)} this page has been watching` : 'no reading yet'}`
           + `, none of them asked for · the slow one is reading at ${drift.scan} of the way through the sixty seconds`;
       case 'nothing':
-        return 'switched on at the board and moving nothing — it circles whatever the dice last rolled, and this page sets the '
-          + 'granulator directly instead of rolling it, so there is nothing for it to circle';
+        return 'switched on at the board and moving nothing yet — it circles the last value anybody set, and this page has not '
+          + 'set one since the board came up; press a sound';
       case 'off':
-        return 'not moving on its own — the movement is switched off on the board';
+        return 'not moving on its own — the movement is switched off on the board, and it is asked for with every patch';
       default:
         return 'the board has not said whether it is moving anything on its own';
     }
@@ -334,6 +337,13 @@
     for (const n of p.notes) { send({ type: 'note.on', note: n, vel: 80, channel: 0 }); holding.push(n); }
     for (const [k, v] of Object.entries(p.m)) send({ type: 'params.set', cmd: `m${k}`, args: [v] });
     for (const [k, v] of Object.entries(p.n)) send({ type: 'params.set', cmd: `n${k}`, args: [v] });
+    // ⚠️ ASKED FOR, NOT ASSUMED. Setting a parameter gives the board's slow
+    // movement a centre; it does not switch the movement on, because
+    // `params.set` is also the surface a harness sweeps one parameter through
+    // and a sweep that started the drift under itself would be grading a
+    // moving target. So the page asks, here, where there is finally something
+    // to move. The board answers `changed: false` when it was already running.
+    send({ type: 'params.drift', on: true });
     // A patch is the new truth about both halves, so the panel's source of
     // truth is reset with it.
     live = { m: { ...p.m }, n: { ...p.n } };
@@ -928,13 +938,16 @@
         + (probe.quiet <= 0.002 ? ' — the key started it' : ' — it was already droning')
         : 'no key has been held yet — press “Switch it on”');
     // 🔴 THE MECHANISM AND WHETHER IT HAS ANYTHING TO ACT ON — NOT THE COUNT ON
-    // ITS OWN. This asserted `nudges > 0` and read red for a reason that is
-    // true and is not a timing fault: the board's movement circles the last
-    // dice roll and this page stopped rolling (see `driftState`), so the count
-    // was never going to climb however long anyone waited. Waiting longer was
-    // the wrong fix twice over — the effect is absent by construction, and an
-    // assert that has to wait is an assert that gets written tolerantly, which
-    // is how a page's whole subject goes missing (LESSONS #27).
+    // ITS OWN. This asserted `nudges > 0` and read red for a reason that was
+    // true and was not a timing fault: the movement circled the last dice roll
+    // and this page does not roll, so the count was never going to climb
+    // however long anyone waited. Waiting longer was the wrong fix twice over —
+    // the effect was absent by construction, and an assert that has to wait is
+    // an assert that gets written tolerantly, which is how a page's whole
+    // subject goes missing (LESSONS #27). The board takes a set value as a
+    // centre now, so the count does climb here; the shape of the check is
+    // unchanged, because the reason it is shaped this way has not gone away —
+    // the board can still be silent, or have its movement switched off.
     //
     // WHAT THIS COVERS: the board's movement timer is running, this page
     // watched it for a real window, and the board's own nudge counter agrees
@@ -942,11 +955,9 @@
     // climbing when it has, still when it has not. Every term is read off the
     // wire and none of them has to be waited for.
     //
-    // WHAT IT DOES NOT COVER: that any sound changed. Nothing here listens.
-    // While `roll` is null on the board this page cannot show movement at all,
-    // and it says so above rather than printing a zero; the assert two above,
-    // which holds a key and measures what comes back, is the one that crosses
-    // the whole chain.
+    // WHAT IT DOES NOT COVER: that any sound changed. Nothing here listens. The
+    // assert two above, which holds a key and measures what comes back, is the
+    // one that crosses the whole chain.
     const moved = driftMoved();
     const dstate = driftState();
     // Nudges go out at 8 Hz, so a centre that landed in the last half second

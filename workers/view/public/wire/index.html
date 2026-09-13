@@ -63,7 +63,7 @@
            over ${(LIMITS.maxBytes / 1024) | 0} KiB or past its rate limit without telling the sender. A message
            you store also goes to a small history, which is already on the page when you arrive — the stored
            column says which ones went there.`,
-    readout: { 'round trip': 'ms', delivery: 'ms', sent: '', stored: '', missing: '' },
+    readout: { delivery: 'ms', sent: '', stored: '', missing: '' },
     controls: [
       // ⚠️ NO PRIMARY HERE. A primary is for a page with one main path, and
       // this page's whole subject is the DIFFERENCE between sending and
@@ -248,7 +248,6 @@
   // ── controls ────────────────────────────────────────────────────────────
   d.on('send', async () => {
     const rtt = await wire.ping();
-    if (rtt !== null) d.set('round trip', rtt);
     const out = put({ type: TYPE, value: body.value, store: false });
     const back = out?.sent ? await echoOf(out.line) : null;
     render();

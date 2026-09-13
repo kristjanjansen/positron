@@ -22,7 +22,7 @@
     what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and one sample every tenth of a second — which is what a recording of a gesture normally is. The pale line is everything that happened; the bright one is what a player would reconstruct from the sparse record. The numbers say how far apart they are in pixels, and how much of the bright line was never recorded at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
-    readout: { kept: '', 'every sample': '', invented: '%', 'off by': 'px', worst: 'px' },
+    readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
     controls: [
       // ⚠️ CONTROL 0 DRAWS A KNOWN CURVE, and it is first because the harness
       // CANNOT DRAW. `element.click()` fires no pointer events — measured in
@@ -154,8 +154,9 @@
   function render() {
     paint();
     const err = error();
-    d.set('kept', stored.length);
-    d.set('every sample', evidence.length);
+    // no `0` before there is anything to count — an untouched canvas has not
+    // measured zero samples, it has not measured
+    d.set('kept', stored.length || '');
     d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
     d.set('worst', err ? err.worst.toFixed(2) : '');

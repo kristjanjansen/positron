@@ -68,6 +68,10 @@ body {
   color: var(--fg); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pos-v[data-state="pending"] { color: var(--dim2); }
+/* a pending cell shows an em dash and NOTHING ELSE — a lone `%` or `px` sitting
+   where a number should be reads as a value that went missing rather than one
+   that has not been taken yet */
+.pos-v[data-state="pending"] .pos-u { display: none; }
 .pos-v[data-state="ok"]   { color: var(--ok); }
 .pos-v[data-state="bad"]  { color: var(--bad); }
 .pos-u { font: 500 11px/1 var(--mono); color: var(--dim2); margin-left: 1.5px; }

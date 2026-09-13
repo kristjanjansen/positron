@@ -101,7 +101,7 @@
     // transport bar, the length in the tooltip. A second table saying the same
     // things is a second place to keep in step and one more thing between the
     // reader and the year.
-    readout: { newsreels: '', picked: '', length: 'min' },
+    readout: { picked: '', length: 'min' },
     showReadout: false,
     // NO CONTROLS. The line IS the control — a button that plays "the first
     // film" is a second way to do the one thing the strip already does, and it
@@ -584,7 +584,6 @@
     rebuildDays();
     const known = items.map((i) => i.catalogueMs).filter(Boolean).sort((a, b) => a - b);
     if (known.length) MEDIAN_MS = known[known.length >> 1];
-    d.set('newsreels', items.length);
     gutters();
 
     // SIX HOURS, not a week and certainly not a year. The deck still holds all

@@ -56,7 +56,7 @@
     // No `station` cell: it is a NAME, it never changes, and a constant in a
     // row of measurements teaches the reader to skim the row. It is in the log
     // line and in the station's own `icy-name`.
-    readout: { ttfb: 'ms', kbps: '', burst: 's', gap95: 'ms', loudness: '' },
+    readout: { ttfb: 'ms', kbps: '', gap95: 'ms', loudness: '' },
     // The measurement is 9 s long, so it lives behind control 0 — the only
     // control the harness gives settleMs to, and the only place a wait does not
     // cost the checks their asserts.
@@ -225,7 +225,6 @@
     // burst-on-connect: seconds of audio handed over FASTER THAN REALTIME when
     // you connect, which is what a listener's buffer is made of before playback
     // has caught up with the wire.
-    d.set('burst', Math.round(rec.aheadS * 100) / 100);
     d.set('gap95', Math.round(rec.gap95 ?? 0), rec.underruns ? 'bad' : 'ok');
     d.log(`${Math.round(rec.bytes / 1024)} KiB in ${rec.chunks} chunks · ${Math.round(rec.steadyKbps ?? 0)} kbps steady `
       + `(${Math.round(rec.kbps)} kbps counting the burst) · ttfb ${Math.round(rec.ttfb)} ms `
