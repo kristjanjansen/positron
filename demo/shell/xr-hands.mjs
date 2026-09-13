@@ -66,6 +66,67 @@ import { TABLET } from './xr-tablet.mjs';
 export const BUTTON = { trigger: 0, squeeze: 1, thumbstick: 3, primary: 4, secondary: 5 };
 export const AXIS = { stickX: 2, stickY: 3 };
 
+/**
+ * 🔴 HOW CLOSE TWO GRIP POSES HAVE TO BE TO BE THE SAME PHYSICAL THING, in
+ * metres. Two hands are never 6 cm apart in a way that matters here; one
+ * controller reported twice is 0 cm apart, because it is one controller.
+ */
+export const SAME_THING_M = 0.06;
+
+/**
+ * 🔴 ONE PHYSICAL THING, ONE STAND-IN — AND THE RULE IS WRITTEN DOWN.
+ *
+ * Reported from a Quest 3: *"saw double controller geometry"*. The cause is in
+ * this morning's own log and it is not a bug in the drawing: the SAME hand
+ * arrives in BOTH arrays at once, with the same profile —
+ *
+ *   1 input + 2 tracked · I0:right meta-quest-touch-plus … || T1:right meta-quest-touch-plus …
+ *
+ * — and with hands raised it gets stranger still, the same hand appearing once
+ * as `oculus-hand` and once as `meta-quest-touch-plus`. Nothing about the array
+ * a source came out of tells you whether it is a new object, so a list that
+ * draws one shape per entry draws two shapes for one hand.
+ *
+ * The rule, in priority order, and it is a rule about the OBJECT rather than
+ * about the array:
+ *
+ *   1. **A controller beats a hand.** If one hand reports both, the controller
+ *      is the thing that is physically there — it is what you would see if the
+ *      headset were transparent — and it is the one with a trigger, a
+ *      thumbstick and buttons. A hand skeleton drawn over the controller you
+ *      are holding is a picture of something that is not happening.
+ *   2. **`inputSources` beats `trackedSources`.** A primary input is the one
+ *      that can act; a tracked source is pose only.
+ *   3. Then drop anything that is the SAME THING as one already kept — same
+ *      non-`none` handedness, or a grip within `SAME_THING_M`.
+ *
+ * ⚠️ NEVER BY ARRAY POSITION. An index is a statement about the order an array
+ * happened to be in; handedness and a position in metres are statements about
+ * the world. And `handedness` alone is not enough, because it can be `none` —
+ * which is why the distance test is there as well as, not instead of.
+ *
+ * Returns what was kept AND what was dropped, because "two controllers" and
+ * "one controller reported twice" look identical once one of them is gone, and
+ * the log has to be able to tell them apart on a single run.
+ */
+export function dedupe(list) {
+  const rank = (h) => (h.hasHand ? 2 : 0) + (h.where[0] === 'T' ? 1 : 0);
+  const sorted = [...list].sort((a, b) => rank(a) - rank(b));
+  const kept = [], dropped = [];
+  for (const h of sorted) {
+    const same = kept.find((k) => (
+      (k.handedness !== 'none' && k.handedness === h.handedness)
+      || (k.m && h.m
+        && Math.hypot(k.m[12] - h.m[12], k.m[13] - h.m[13], k.m[14] - h.m[14]) < SAME_THING_M)));
+    if (same) {
+      dropped.push(`${h.where}:${h.handedness}:${h.profile} is the same thing as ${same.where}:${same.handedness}:${same.profile}`);
+      continue;
+    }
+    kept.push(h);
+  }
+  return { kept, dropped };
+}
+
 /** Which hand does what. Declared once, printed in the fingerprint. */
 export const TABLET_HAND = 'left';
 export const POINTER_HAND = 'right';
@@ -85,7 +146,9 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
     sources: 0,            // how many were in inputSources
     tracked: 0,            // how many were in trackedSources
     trackedSays: 'not looked yet',
-    hands: [],             // [{ m, handedness, profile, where, hasHand }]
+    hands: [],             // [{ m, handedness, profile, where, hasHand }] — DEDUPED
+    raw: [],               // every source, before dedupe — the debugging instrument
+    dropped: [],           // what dedupe removed, in words
     pointer: null,         // { m, o, dir, handedness } — the ray that is drawn
     // ⚠️ THE POINTER'S OWN SOURCE, so a page reads the thumbstick and the
     // buttons off THE HAND THAT IS POINTING rather than off whichever source
@@ -154,7 +217,8 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
 
   /** One line that two runs in two modes are compared on, and it has no mode in it. */
   const fingerprint = () =>
-    `${TABLET.fingerprint} · trigger=button ${BUTTON.trigger}, stick=axes ${AXIS.stickX}/${AXIS.stickY}`;
+    `${TABLET.fingerprint} · trigger=button ${BUTTON.trigger}, stick=axes ${AXIS.stickX}/${AXIS.stickY}`
+    + ` · one stand-in per thing within ${SAME_THING_M} m, a controller beating a hand`;
 
   let announced = false, sig = '', failSaid = false;
 
@@ -219,7 +283,13 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
         }
         seen.push(rec);
       }
-      state.hands = seen;
+      // 🔴 ONE PHYSICAL THING, ONE STAND-IN. See `dedupe` above: the same hand
+      // arrives in both arrays at once on this runtime, so a list drawn one
+      // shape per entry drew two controllers for one hand.
+      const { kept, dropped } = dedupe(seen);
+      state.hands = kept;
+      state.raw = seen;
+      state.dropped = dropped;
 
       // ── who gets what ───────────────────────────────────────────────────
       // 🔴 BY HANDEDNESS, WITH A NAMED FALLBACK. The owner's rule is "right has
@@ -228,11 +298,19 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       // source happened to be first: with only one source it carries the tablet
       // AND the ray, which is usable and is reported in words, because a tablet
       // that silently did not attach reads as a broken tablet.
-      const withGrip = seen.filter((h) => h.m);
-      const withRay = seen.filter((h) => h.ray);
+      const withGrip = kept.filter((h) => h.m);
+      const withRay = kept.filter((h) => h.ray);
       const tabletSrc = withGrip.find((h) => h.handedness === TABLET_HAND)
         || (withGrip.length === 1 ? withGrip[0] : null);
-      const pointSrc = withRay.find((h) => h.handedness === POINTER_HAND)
+      // ⚠️ A POINTER WITH NO BUTTONS CANNOT PRESS ANYTHING. Deduplication can
+      // keep a source whose gamepad is empty — a tracked controller, or a hand
+      // — so the choice prefers one that has buttons before it prefers the
+      // right side. A ray that aims perfectly and never fires reads as a broken
+      // slider rather than as the wrong source having been picked.
+      const armed = (h) => !!h.src.gamepad?.buttons?.length;
+      const pointSrc = withRay.find((h) => h.handedness === POINTER_HAND && armed(h))
+        || withRay.find((h) => h.handedness === POINTER_HAND)
+        || withRay.find((h) => h !== tabletSrc && armed(h))
         || withRay.find((h) => h !== tabletSrc)
         || withRay[0] || null;
       state.pointer = pointSrc
@@ -295,8 +373,16 @@ export function createXRHands({ tablet = null, log = () => {}, say = () => {} } 
       if (now !== sig) {
         sig = now;
         say(`hands · ${state.sources} input + ${state.tracked} tracked · trackedSources ${trackedSays}`
+          // 🔴 HOW MANY SHAPES WILL BE DRAWN, AND WHY THAT IS FEWER THAN THE
+          // SOURCES. "Two controllers" and "one controller reported twice" are
+          // identical once the duplicate is gone, so the line says which it was
+          // — otherwise the next person to see one stand-in for two hands has
+          // no way to tell a fix from a new bug.
+          + ` · drawing ${kept.length} stand-in(s)`
+          + (dropped.length ? ` · dropped ${dropped.length}: ${dropped.join(' ; ')}` : ' · nothing was a duplicate')
           + ` · tablet on ${tabletSrc ? `${tabletSrc.where}:${tabletSrc.handedness}` : 'NOTHING'}`
           + ` · pointer on ${pointSrc ? `${pointSrc.where}:${pointSrc.handedness}` : 'NOTHING'}`
+          + (pointSrc && !armed(pointSrc) ? ' (it has NO buttons, so the trigger cannot reach the tablet)' : '')
           + (state.gripRayM !== null
             ? ` · grip-ray offset ${state.gripRayM.toFixed(3)} m, ${state.gripRayDeg.toFixed(1)}°` : '')
           + ` · ${now || '(no sources)'}`);

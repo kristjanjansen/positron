@@ -1,0 +1,43 @@
+MIT License
+
+Copyright (c) 2019 Amazon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is furnished
+to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice (including the next
+paragraph) shall be included in all copies or substantial portions of the
+Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS
+OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+VENDORED INTO THIS REPOSITORY 2026-09-13.
+
+  source    @webxr-input-profiles/assets@1.0.20
+            https://github.com/immersive-web/webxr-input-profiles
+            dist/profiles/meta-quest-touch-plus/{left,right}.glb
+  licence   MIT (above), Copyright (c) 2019 Amazon
+  bytes     meta-quest-touch-plus-left.glb    217,984
+            meta-quest-touch-plus-right.glb   213,868
+  sha256    41a35b80221398d37029cbfaa9e39084ccd43e0206be72a5e8460f52e7882cb4  left
+            5126d638fb1d03e05d16d8eec3b31b9588df88eaa8b42cc21b857fac3bd44916  right
+
+Renamed flat (profile id + handedness) rather than kept in the registry's
+nested layout: `workers/view/build.mjs` lists vendored binaries BY NAME and
+`demoFiles()`/`shellFiles()` enumerate one directory level only, so a nested
+path would need the wall widened. The profile id is in the filename because the
+profile id is what `XRInputSource.profiles` reports and therefore what the
+loader keys on — the name and the lookup are the same string.
+
+Read by demo/shell/xr-glb.mjs, which implements only what these two files use.

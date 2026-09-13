@@ -23,7 +23,8 @@
 
 import { pickQuad, uvToPixels } from './xr-pick.mjs';
 import { controlAt, valueFromU, DEFAULT_CONTROLS, TABLET } from './xr-tablet.mjs';
-import { holdM, GRIP_PARTS } from './xr-room.mjs';
+import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE } from './xr-room.mjs';
+import { dedupe, SAME_THING_M } from './xr-hands.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -123,33 +124,40 @@ const at = (target) => {
 
 // ── the tablet, held on a grip pose ───────────────────────────────────────
 {
-  // 🔴 THE POSE THE OWNER ASKED FOR: flat ON the controller's square top face,
-  // square to the controller's own axes, NOT at an angle. Identity grip — the
-  // hand at the origin, its -Z (the thumb, and the top plate) along world -Z.
+  // 🔴 THE POSE, AFTER THE HEADSET SAID IT WAS WRONG. Reported from a Quest 3:
+  // *"tablet works but looks to sky not to me (x rot 90 missing)"*. Identity
+  // grip — the hand at the origin, its -Z (the thumb, and the top plate) along
+  // world -Z, so the plate faces the way a plate faces and nothing is rotated
+  // into a pose that flatters the answer.
   const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
   const M = holdM(I);
   const n = [M[8], M[9], M[10]];
-  const g = [-I[8], -I[9], -I[10]];              // the grip's own -Z
-  const dotN = n[0] * g[0] + n[1] * g[1] + n[2] * g[2];
-  // The tablet's face looks the way the top plate looks: straight along the
-  // grip's -Z, to within floating point. An angled tablet reads under 1.0 here
-  // and that is the whole of the complaint this replaced.
-  ok('the tablet lies square on the controller\'s top face, not at an angle',
-     near(dotN, 1, 1e-6), `its face against the controller\'s own axis: ${dotN.toFixed(6)}`);
+  const gY = [I[4], I[5], I[6]];                 // across the handle, back at you
+  const gnZ = [-I[8], -I[9], -I[10]];            // up the controller, the thumb
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const hM = Math.hypot(M[4], M[5], M[6]);
+  const up = [M[4] / hM, M[5] / hM, M[6] / hM];
 
-  // And it is perpendicular to the handle: the tablet's own right and up both
-  // lie in the plane the handle is normal to, i.e. neither has any component
-  // along the grip's -Z.
-  const rDot = M[0] * g[0] + M[1] * g[1] + M[2] * g[2];
-  const uDot = M[4] * g[0] + M[5] * g[1] + M[6] * g[2];
-  ok('...and both of its own axes are perpendicular to the controller',
-     near(rDot, 0, 1e-6) && near(uDot, 0, 1e-6),
-     `right ${rDot.toFixed(6)} · up ${uDot.toFixed(6)}`);
+  // 🔴 THE REGRESSION, NAMED BY ITS OWN NUMBER. The bug read EXACTLY 1.0000
+  // here — the face pointing straight along the controller, i.e. at the
+  // ceiling. It must now be sin(FACE_TILT), which is the lean and nothing more.
+  ok('the tablet does not face along the controller — the bug that did read exactly 1.0',
+     Math.abs(dot(n, gnZ)) < 0.5 && near(dot(n, gnZ), Math.sin(FACE_TILT), 1e-6),
+     `its face against the controller's own axis: ${dot(n, gnZ).toFixed(4)} (the lean, sin ${(FACE_TILT * 180 / Math.PI).toFixed(0)}°), and it was 1.0000`);
+
+  ok('...it faces ACROSS the handle, back at whoever is holding it',
+     near(dot(n, gY), Math.cos(FACE_TILT), 1e-6),
+     `${(Math.acos(Math.max(-1, Math.min(1, dot(n, gY)))) * 180 / Math.PI).toFixed(1)}° off square across the handle, which is the lean`);
+
+  ok('...and its own top edge points up the controller, so it reads the right way up',
+     dot(up, gnZ) > 0.9, `up against the thumb's direction: ${dot(up, gnZ).toFixed(4)}`);
 
   // 🔴 RIGHT-HANDED, OR BACKFACE CULLING EATS IT. Three columns with a negative
   // determinant flip the winding, and the room draws with CULL_FACE on — so a
   // mirrored basis is an invisible tablet, which reads as "the tablet was never
-  // built" rather than as a sign error.
+  // built" rather than as a sign error. A ROTATION cannot break this; a column
+  // negated by hand to make the picture look right can, which is the whole
+  // reason the fix above was a rotation.
   const det =
     M[0] * (M[5] * M[10] - M[6] * M[9])
     - M[4] * (M[1] * M[10] - M[2] * M[9])
@@ -161,26 +169,93 @@ const at = (target) => {
   const wOut = Math.hypot(M[0], M[1], M[2]), hOut = Math.hypot(M[4], M[5], M[6]);
   ok('...and it is the size the config declares',
      near(wOut, TABLET.w, 1e-6) && near(hOut, TABLET.h, 1e-6),
-     `${wOut.toFixed(3)} x ${hOut.toFixed(3)} m`);
+     `${wOut.toFixed(3)} x ${hOut.toFixed(3)} m at ${TABLET.px}x${TABLET.py} px`);
 
-  // An eye out along the controller's own axis, looking back down it — which is
-  // where a face is when somebody turns the top face towards themselves. The
-  // tablet's centre must read 0.5, 0.5 from there and its distance must be the
-  // one that was asked for.
+  // An eye out along the tablet's own normal, looking back at it — which is
+  // where a face is once the wrist is turned. The centre must read 0.5, 0.5 and
+  // the distance must be the one that was asked for.
   const C = [M[12], M[13], M[14]];
-  const eye = [C[0] + g[0] * 0.35, C[1] + g[1] * 0.35, C[2] + g[2] * 0.35];
-  const back = [-g[0], -g[1], -g[2]];
+  const eye = [C[0] + n[0] * 0.35, C[1] + n[1] * 0.35, C[2] + n[2] * 0.35];
+  const back = [-n[0], -n[1], -n[2]];
   const hit = pickQuad(M, eye, back);
-  ok('a ray back down the controller\'s own axis lands in the middle of the tablet',
+  ok('a ray back down the tablet\'s own normal lands in the middle of it',
      !!hit && near(hit.u, 0.5, 1e-3) && near(hit.v, 0.5, 1e-3) && near(hit.t, 0.35, 1e-3),
      hit ? `u ${hit.u.toFixed(3)} v ${hit.v.toFixed(3)} at ${hit.t.toFixed(3)} m` : 'no hit');
 
-  // NEGATIVE CONTROL, and it is the one that says the tablet is on the TOP
-  // face rather than under it: the same ray from the other side of the grip —
-  // the butt of the handle — meets the tablet's back and is refused.
-  const under = [C[0] - g[0] * 0.35, C[1] - g[1] * 0.35, C[2] - g[2] * 0.35];
-  ok('...and the same ray from under the controller is refused, so the face is on top',
-     pickQuad(M, under, g) === null);
+  // NEGATIVE CONTROL: the same ray from behind the face is refused, so the
+  // screen has a front and it is the side that leans towards you.
+  const behind = [C[0] - n[0] * 0.35, C[1] - n[1] * 0.35, C[2] - n[2] * 0.35];
+  ok('...and the same ray from behind it is refused, so the screen has a front',
+     pickQuad(M, behind, n) === null);
+
+  // ⚠️ AND IT CLEARS THE CONTROLLER IT IS ON. The tablet grew by two thirds; a
+  // slab whose bottom edge is inside the head of the stand-in reads as a
+  // modelling fault, and the lift is the number that would be wrong.
+  const topOfHead = Math.max(...BODY_PROFILE.map(([z]) => -z));
+  const bottomEdge = Math.hypot(C[0], C[1] - 1, C[2]) - (TABLET.h / 2) * Math.cos(FACE_TILT);
+  const gap = bottomEdge - topOfHead;
+  ok('the tablet sits ON the controller — not buried in its head, not floating above it',
+     gap > 0 && gap < 0.03,
+     `${(gap * 1000).toFixed(1)} mm between its lower edge and the top of the head`
+     + ' (it was -0.4 mm — inside — when the tablet grew by two thirds)');
+}
+
+// ── one physical thing, one stand-in ──────────────────────────────────────
+{
+  // 🔴 THE DOUBLE CONTROLLER, EXACTLY AS THE DEVICE REPORTED IT. Taken from the
+  // log of 2026-09-13: one input source and two tracked ones, with the SAME
+  // hand appearing twice under the same profile. This is the shape that drew
+  // two stand-ins for one hand, and it is pure arithmetic, so it is graded here
+  // rather than on a head.
+  const at = (where, handedness, profile, x, hasHand = false) => ({
+    where, handedness, profile, hasHand,
+    m: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0.8, -0.2, 1]),
+    src: {},
+  });
+  const twice = dedupe([
+    at('I0', 'right', 'meta-quest-touch-plus', 0.13),
+    at('T1', 'right', 'meta-quest-touch-plus', 0.13),
+  ]);
+  ok('the same controller in both arrays is drawn ONCE',
+     twice.kept.length === 1 && twice.kept[0].where === 'I0' && twice.dropped.length === 1,
+     twice.dropped[0] || `kept ${twice.kept.length}`);
+
+  // ⚠️ AND A HAND OVER A CONTROLLER ON THE SAME WRIST: the controller wins,
+  // because it is the object that is physically there and it is the one with
+  // buttons on it.
+  const both = dedupe([
+    at('I0', 'right', 'oculus-hand', 0.13, true),
+    at('T1', 'right', 'meta-quest-touch-plus', 0.13),
+  ]);
+  ok('a hand and a controller on one wrist draw the controller, not both',
+     both.kept.length === 1 && both.kept[0].profile === 'meta-quest-touch-plus',
+     `kept ${both.kept.map((k) => k.where + ':' + k.profile).join(', ')}`);
+
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THAT MATTERS. A rule that collapses
+  // everything would also pass both cases above. Two REAL controllers, one per
+  // hand, must both survive — that is the case a distance-only test breaks if
+  // the threshold grows, and the case a handedness-only test breaks when a
+  // runtime reports `none`.
+  const two = dedupe([
+    at('I0', 'right', 'meta-quest-touch-plus', 0.13),
+    at('I1', 'left', 'meta-quest-touch-plus', -0.26),
+  ]);
+  ok('two real controllers, one per hand, are still two stand-ins',
+     two.kept.length === 2 && two.dropped.length === 0);
+
+  // NEGATIVE CONTROL: `handedness` can be `none`, so the distance test has to
+  // carry the case on its own — and it has to carry it BOTH ways.
+  const anon = dedupe([
+    at('I0', 'none', 'generic-trigger', 0.13),
+    at('T1', 'none', 'generic-trigger', 0.13 + SAME_THING_M / 2),
+  ]);
+  const apart = dedupe([
+    at('I0', 'none', 'generic-trigger', 0.13),
+    at('T1', 'none', 'generic-trigger', 0.13 + SAME_THING_M * 4),
+  ]);
+  ok('with no handedness at all, two poses in one place collapse and two apart do not',
+     anon.kept.length === 1 && apart.kept.length === 2,
+     `${SAME_THING_M} m apart is the line`);
 }
 
 // ── u,v to a control and a value ──────────────────────────────────────────

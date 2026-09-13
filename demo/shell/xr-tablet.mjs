@@ -5,7 +5,7 @@
 // behind your face inside an immersive session — `d.log` and the readout are
 // invisible there — so anything you need to READ or PRESS while wearing the
 // headset has to be drawn in the scene. `panel.mjs` settled that idiom for a
-// wall-sized panel and this is the same idiom at 0.12 m: draw to a canvas,
+// wall-sized panel and this is the same idiom at 0.20 m: draw to a canvas,
 // `texImage2D` it, and point at it.
 //
 // 🔴 A SECOND CONTROL IS ONE LINE OF `DEFAULT_CONTROLS`, NOT A REWRITE. The
@@ -95,23 +95,40 @@ const PAD = 22;
 const TRACK_H = 16;
 const KNOB = 13;
 
-/** The canvas, in pixels, for `n` controls. */
+/** The canvas, in DESIGN pixels, for `n` controls. */
 const pyFor = (n) => PAD + Math.max(1, n) * ROW_H + FOOT + PAD;
+const DESIGN_W = 768;
+const DESIGN_H = pyFor(DEFAULT_CONTROLS.length);
+
+// 🔴 EVERY LAYOUT NUMBER ABOVE IS A **DESIGN** PIXEL, AND THE CANVAS IS BIGGER
+// THAN THAT BY ONE FACTOR. The tablet was reported too small from the headset
+// and the fix is to grow the OBJECT — but growing an object without growing its
+// texture spends the legibility budget rather than the object, so both move
+// together and `SCALE` is the single number that moves them. `draw()` sets one
+// transform and then works in design pixels; `controlAt` and `valueFromU` do
+// the same, so the drawing and the hit test stay the same arithmetic and the
+// scale cannot get into one of them and not the other.
+const SCALE = 5 / 3;
+const PX = Math.round(DESIGN_W * SCALE);
+const PY = Math.round(DESIGN_H * SCALE);
 
 // 🔴 THE TEXTURE SIZE IS AN ANGULAR BUDGET, NOT A SIZE. The instinct for a
 // small object is a small texture and it is BACKWARDS: what a face resolves is
 // pixels per DEGREE, and a tablet is an order of magnitude closer than a wall
 // panel. `mirror`'s shipped panel is 1.28 m at 1.6 m — 43.6 degrees across a
-// 1280 px texture, so 29.4 px per degree. This is 0.12 m at roughly 0.35 m —
-// 19.4 degrees across 768 px, so 39.6. Above the shipped panel rather than
-// merely matching it, because a tablet is read at a glance while holding
-// something else. ⚠️ And matching it would only ever have been a FLOOR: that
-// panel's own legibility has never been graded by a face, so it is the best
-// available anchor and it is an anchor rather than a measurement.
+// 1280 px texture, so **29.4 px per degree**.
+//
+// MEASURED against that, at a reading distance of 0.35 m:
+//
+//   0.12 m across @  768 px   19.4°   39.6 px/deg   ← reported TOO SMALL
+//   0.20 m across @ 1280 px   31.9°   40.1 px/deg   ← this
+//
+// So the object is **67% wider** and the type is very slightly FINER per degree
+// than it was, not coarser — which is the whole reason the canvas grew with it.
+// ⚠️ And 40 px/deg is still only an anchor: `mirror`'s own legibility has never
+// been graded by a face, so matching it is a floor rather than a measurement.
 // `plan-xr-hands` §5.2.
-const PX = 768;
-const PY = pyFor(DEFAULT_CONTROLS.length);
-const W_M = 0.12;
+const W_M = 0.20;
 // ⚠️ THE HEIGHT FOLLOWS THE PIXELS. A width and a height typed separately are
 // two numbers that can disagree about the aspect, and a stretched texture is
 // the one defect nobody photographs because it looks almost right.
@@ -156,7 +173,7 @@ const rrect = (g, x, y, w, h, r) => {
  * under the knob, with nothing on screen to say so.
  */
 const rowsTop = () => PAD;
-const rowsBottom = () => PY - PAD - FOOT;
+const rowsBottom = () => DESIGN_H - PAD - FOOT;
 const rowH = () => ROW_H;
 
 /**
@@ -168,7 +185,7 @@ const rowH = () => ROW_H;
  */
 export function controlAt(u, v) {
   if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1)) return null;
-  const py = v * PY;
+  const py = v * DESIGN_H;          // design pixels, where the layout lives
   if (py < rowsTop() || py >= rowsBottom()) return null;
   const i = Math.floor((py - rowsTop()) / rowH());
   if (i < 0 || i >= DEFAULT_CONTROLS.length) return null;
@@ -186,8 +203,8 @@ export function controlAt(u, v) {
  * past what the control says it can be.
  */
 export function valueFromU(u, control) {
-  const x0 = PAD, x1 = PX - PAD;
-  const f = Math.max(0, Math.min(1, (u * PX - x0) / (x1 - x0)));
+  const x0 = PAD, x1 = DESIGN_W - PAD;
+  const f = Math.max(0, Math.min(1, (u * DESIGN_W - x0) / (x1 - x0)));
   const v = control.min + f * (control.max - control.min);
   return Math.round(v * 1e6) / 1e6;
 }
@@ -195,7 +212,7 @@ export function valueFromU(u, control) {
 /** The inverse, for drawing the knob where the value says it is. */
 const uOfValue = (value, control) => {
   const f = (value - control.min) / ((control.max - control.min) || 1);
-  return (PAD + f * (PX - 2 * PAD)) / PX;
+  return (PAD + f * (DESIGN_W - 2 * PAD)) / DESIGN_W;
 };
 
 /**
@@ -213,7 +230,7 @@ const uOfValue = (value, control) => {
  */
 export const TABLET = {
   w: W_M, h: H_M, px: PX, py: PY,
-  pad: PAD, foot: FOOT, fillAlpha: FILL_ALPHA,
+  pad: PAD, foot: FOOT, fillAlpha: FILL_ALPHA, scale: SCALE,
   controls: DEFAULT_CONTROLS,
 };
 Object.defineProperty(TABLET, 'fingerprint', {
@@ -243,6 +260,29 @@ Object.defineProperty(TABLET, 'fingerprint', {
 export function registerStandIn(parts) { TABLET.standInParts = parts; }
 
 /**
+ * 🔴 WHAT THE SHAPE ON YOUR HAND ACTUALLY IS, IN WORDS, ON THE THING ITSELF.
+ *
+ * `xr-room.mjs` calls this when it learns the answer — the real model landed,
+ * or it did not and a stand-in is being drawn. It matters because the two are
+ * NOT distinguishable by looking once the model loads: a good stand-in and a
+ * real controller are both controller-shaped, and a page that draws one while
+ * you believe it is drawing the other is the same offence as colouring an
+ * unmeasured thing as if it had passed.
+ *
+ * ⚠️ A MODULE-LEVEL VERSION, because the footer belongs to every tablet and the
+ * answer arrives long after any of them were built. A tablet folds this counter
+ * into its own, so the canvas is re-drawn exactly once when the words change
+ * and never again.
+ */
+let drawnAs = 'a stand-in shape, not your real controller';
+let drawnAsV = 0;
+export function registerDrawnAs(words) {
+  if (!words || words === drawnAs) return;
+  drawnAs = words; drawnAsV++;
+}
+export const drawnAsNow = () => drawnAs;
+
+/**
  * The tablet, drawn.
  *
  * ⚠️ `document` IS TOUCHED HERE AND NOWHERE ABOVE. Everything a laptop needs to
@@ -256,7 +296,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   canvas.width = PX; canvas.height = PY;
   const g = canvas.getContext('2d');
   const values = new Map(controls.map((c) => [c.key, c.value]));
-  let version = 0, drawn = -1;
+  let version = 0, drawn = -1, drawnFoot = -1;
   let aimed = null;             // { u, v, i } while the pointer is on it
   let dragging = null;          // the control index the trigger took hold of
 
@@ -333,9 +373,14 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
   const holding = () => dragging !== null;
 
   function draw() {
-    if (drawn === version) return version;
-    drawn = version;
-    g.clearRect(0, 0, PX, PY);
+    if (drawn === version && drawnFoot === drawnAsV) return version;
+    drawn = version; drawnFoot = drawnAsV;
+    // ⚠️ ONE TRANSFORM, SET EVERY TIME. `setTransform` rather than `scale`
+    // because `scale` compounds: called once a frame it would shrink the
+    // picture to nothing over a few seconds, which reads as the tablet fading
+    // out rather than as a transform bug.
+    g.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    g.clearRect(0, 0, DESIGN_W, DESIGN_H);
 
     // The face. The rounded corner is the SHADER's job — see HOLD_FS in
     // xr-room.mjs — so this canvas is the ink on the face and nothing else.
@@ -374,10 +419,10 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
 
       // the track, under the number, the full width between the margins
       const ty = top + rh - TRACK_H - 30;
-      const x0 = PAD, x1 = PX - PAD;
+      const x0 = PAD, x1 = DESIGN_W - PAD;
       g.fillStyle = LINE;
       rrect(g, x0, ty, x1 - x0, TRACK_H, TRACK_H / 2);
-      const kx = uOfValue(v, c) * PX;
+      const kx = uOfValue(v, c) * DESIGN_W;
       g.fillStyle = lit ? HI : '#5b6a80';
       rrect(g, x0, ty, Math.max(TRACK_H, kx - x0), TRACK_H, TRACK_H / 2);
       // ⚠️ THE KNOB GROWS WHEN THE RAY IS ON IT, and it does not change hue.
@@ -395,7 +440,7 @@ export function createXRTablet({ ctx: hostCtx = null } = {}) {
     // this is the only surface in the session where that claim can be read.
     g.fillStyle = DIM;
     g.font = '500 24px ui-monospace, SFMono-Regular, Menlo, monospace';
-    g.fillText('a stand-in shape, not your real controller', PAD, PY - PAD - 8);
+    g.fillText(drawnAs, PAD, DESIGN_H - PAD - 8);
     return version;
   }
 

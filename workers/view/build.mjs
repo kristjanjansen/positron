@@ -22,7 +22,7 @@
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import { dirname, join, extname } from 'node:path';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -143,6 +143,29 @@ const FILES = [
   ['demo/patch/vendor/LICENSE-supersonic-scsynth', 'patch/vendor/LICENSE-supersonic-scsynth'],
   ['demo/patch/vendor/LICENSE-supersonic-scsynth-core', 'patch/vendor/LICENSE-supersonic-scsynth-core'],
   ['demo/patch/vendor/LICENSE-supersonic-scsynth-synthdefs', 'patch/vendor/LICENSE-supersonic-scsynth-synthdefs'],
+
+  // ── the controller models, vendored ───────────────────────────────────────
+  //
+  // ⚠️ LISTED BY NAME for the same reason `patch/vendor/` is: `shellFiles()`
+  // enumerates ONE directory level and filters to web extensions, so it takes
+  // neither a `.glb` nor anything under `shell/vendor/`. The wall is working;
+  // this is a deliberate line through it.
+  //
+  // 🔴 AND THEY ARE UNDER `shell/`, NOT UNDER A DEMO'S `vendor/`, WHICH IS A
+  // DEPARTURE FROM `LAYOUT.md` RULE 6 AND IS ARGUED THERE. The consumer is
+  // `demo/shell/xr-room.mjs`, which BOTH `scene` and `mirror` import — so a
+  // per-slug path would mean one page's controllers came out of a directory
+  // named after the other page. The hazard that rule exists to prevent is
+  // `moq.mjs`'s: a shared module holding a path a rename had moved, 404ing
+  // silently. What replaces it is the existence check below, which refuses the
+  // build rather than shipping the 404.
+  //
+  // LICENCE: MIT, Copyright (c) 2019 Amazon —
+  // `@webxr-input-profiles/assets@1.0.20`, `immersive-web/webxr-input-profiles`.
+  // 217,984 + 213,868 bytes. The text and the provenance ship beside them.
+  ['demo/shell/vendor/meta-quest-touch-plus-left.glb', 'shell/vendor/meta-quest-touch-plus-left.glb'],
+  ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
+  ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
 
   ...extraPages(),
   ...demoFiles(),
@@ -447,6 +470,71 @@ for (const [src, dst] of FILES) {
 // Same spirit as the duplicate-destination guard above, for the other silent
 // break: an import with nothing deployed behind it.
 checkImports(FILES);
+
+/**
+ * 🔴 REFUSE THE BUILD IF A LISTED FILE IS NOT THERE.
+ *
+ * `checkImports` catches a MODULE that imports something undeployed. It cannot
+ * catch a BINARY, because a binary is not imported — it is fetched by URL, and
+ * a URL is just a string to every check in this file. So a vendored asset that
+ * was renamed, or never committed, would copy-fail somewhere in the middle of
+ * the run with a raw ENOENT, or — worse, if the list were edited but the file
+ * left behind — ship a 404 that only a headset would ever meet.
+ *
+ * That is `moq.mjs` again: a module holding a path that moved. The controller
+ * models live under `shell/vendor/` precisely because the module that wants
+ * them is shared, so this check is what makes that safe. It runs BEFORE
+ * anything is copied, so a missing file is a refusal rather than a half-built
+ * output directory.
+ */
+function checkPresent(copied) {
+  const gone = copied.filter(([src]) => !existsSync(join(REPO, src))).map(([src]) => src);
+  if (gone.length) {
+    console.error('\nBUILD REFUSED — listed files that are not on disk:');
+    for (const g of gone) console.error('  ' + g);
+    process.exit(1);
+  }
+}
+checkPresent(FILES);
+
+/**
+ * 🔴 AND REFUSE A `vendor/` URL IN THE SOURCE WITH NOTHING DEPLOYED BEHIND IT.
+ *
+ * The other half of the same hazard, from the other end: `xr-room.mjs` holds
+ * the string `/shell/vendor/` and builds a filename from a profile id. If the
+ * directory were renamed, `checkPresent` above would still pass — the files
+ * exist, they are just somewhere else — and the module would 404 at runtime on
+ * a headset, which is the most expensive place this repo has to find anything.
+ *
+ * So the literal paths in the source are checked too. Only fixed ones can be:
+ * a name built from a runtime value cannot be known here, which is why the
+ * runtime ALSO falls back to a drawn stand-in and says on the tablet's own face
+ * which one you are looking at. Three guards, because this exact class of bug
+ * has already cost two demos a day of reading red for the wrong reason.
+ */
+function checkVendorUrls(copied) {
+  const have = new Set(copied.map(([, dst]) => dst));
+  const bad = [];
+  for (const [src, dst] of copied) {
+    if (!['.html', '.mjs', '.js'].includes(extname(dst))) continue;
+    let text = '';
+    try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
+    for (const m of text.matchAll(/['"`](\/[A-Za-z0-9_-]+\/vendor\/[^'"`${}]*)['"`]/g)) {
+      const rel = m[1].replace(/^\//, '');
+      // a bare directory prefix is a base that gets a filename appended at
+      // runtime — check the DIRECTORY has something in it
+      const isDir = rel.endsWith('/');
+      const ok = isDir ? [...have].some((h) => h.startsWith(rel)) : have.has(rel);
+      if (!ok) bad.push(`${dst} points at ${m[1]}`);
+    }
+  }
+  if (bad.length) {
+    console.error('\nBUILD REFUSED — vendor paths in the source with nothing deployed behind them:');
+    for (const b of bad) console.error('  ' + b);
+    process.exit(1);
+  }
+}
+checkVendorUrls(FILES);
 console.log(`copied ${FILES.length} files`);
 
 // explode the committed JSONL caches into addressable static assets

@@ -557,22 +557,38 @@
     const L = n([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
     const camR = n(X(L, [0, 1, 0]));
     const pos = [
-      eye[0] + L[0] * 0.8 - camR[0] * 0.24,
-      eye[1] + L[1] * 0.8 - camR[1] * 0.24 - 0.26,
-      eye[2] + L[2] * 0.8 - camR[2] * 0.24,
+      eye[0] + L[0] * 0.95 - camR[0] * 0.30,
+      eye[1] + L[1] * 0.95 - camR[1] * 0.30 - 0.30,
+      eye[2] + L[2] * 0.95 - camR[2] * 0.30,
     ];
-    // The grip's +Z runs from the eye into the controller, so its -Z — the
-    // thumb, and the top face the tablet lies on — looks back at whoever is
-    // reading it. Right-handed: X = Z x up, Y = Z x X.
-    const f = n([pos[0] - eye[0], pos[1] - eye[1], pos[2] - eye[2]]);
-    const r = n(X(f, [0, 1, 0]));
-    const u = X(f, r);
+    // ⚠️ BUILT FROM THE TABLET'S POSE BACKWARDS, which is why this changed when
+    // `holdM` did. The tablet's face now looks along the grip's +Y — ACROSS the
+    // handle, back at whoever is holding it — rather than along -Z, so the
+    // frame that points it at this camera is the one whose +Y is toward the
+    // eye. It was the other way round when the tablet faced the sky, and if
+    // this preview ever shows the tablet edge-on again it is saying that
+    // `holdM` moved without this following.
+    //   +Y toward the eye · -Z up the controller · X = Y x Z, so it is
+    //   right-handed by construction rather than by inspection.
+    const gy = n([eye[0] - pos[0], eye[1] - pos[1], eye[2] - pos[2]]);
+    const gx = n(X(gy, [0, -1, 0]));
+    const gz = X(gx, gy);
     const m = new Float32Array([
-      r[0], r[1], r[2], 0,
-      u[0], u[1], u[2], 0,
-      f[0], f[1], f[2], 0,
+      gx[0], gx[1], gx[2], 0,
+      gy[0], gy[1], gy[2], 0,
+      gz[0], gz[1], gz[2], 0,
       pos[0], pos[1], pos[2], 1]);
-    room.setInput({ hands: [{ m, handedness: 'left' }], pointer: null, tabletM: holdM(m), hit: null });
+    // ⚠️ IT CLAIMS THE PROFILE THE HEADSET REPORTS, ON PURPOSE. Without it the
+    // window would draw the stand-in and the REAL model's whole path — the
+    // fetch, the reader, the texture decode, the third shader program — would
+    // first run on the first frame of a headset session, which is where a
+    // pending `gl.getError()` costs the one run somebody was going to do. With
+    // it, `demo/verify-gl.mjs` covers the models on every run of the suite, on
+    // real ANGLE, and a visitor with no headset can see their controller.
+    room.setInput({
+      hands: [{ m, handedness: 'left', profile: 'meta-quest-touch-plus' }],
+      pointer: null, tabletM: holdM(m), hit: null,
+    });
   }
 
   let raf = 0, t0 = performance.now(), lastFrame = 0;
@@ -589,6 +605,14 @@
     drawRoom(perspective(1.05, canvas.width / canvas.height, 0.1, 60),
              lookAt(eye, [0, 1.2, 0]), tSec, true, eye);
     markShown(now);
+    // ⚠️ REPUBLISHED HERE, NOT ONLY AT LOAD. `publishXR` builds a plain object,
+    // so a field written once answers about whichever instant it was written
+    // in — and the load-time call happens before the first frame, so
+    // `tabletUploadMs` and `dots` read `null` forever on a machine that never
+    // enters a session. That is this file's own getter rule, broken by its own
+    // author, and it was caught by reading the published object back rather
+    // than by reading the code.
+    publishXR();
     if (room?.retire()) d.log('the new look is now the look', 'ok');
     if (lastFrame) { const dt = now - lastFrame; if (dt > worst) worst = dt; }
     lastFrame = now;
@@ -1396,15 +1420,23 @@
     // thing about the code it actually loaded.
     const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
     const TM = holdM(I);
-    const axis = [-I[8], -I[9], -I[10]];               // the controller's own -Z
-    const perp = Math.abs(TM[0] * axis[0] + TM[1] * axis[1] + TM[2] * axis[2])
-      + Math.abs(TM[4] * axis[0] + TM[5] * axis[1] + TM[6] * axis[2]);
+    const nrm = [TM[8], TM[9], TM[10]];
+    const axis = [-I[8], -I[9], -I[10]];               // the controller's own axis
+    const across = [I[4], I[5], I[6]];                 // across the handle, back at you
+    const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     const det = TM[0] * (TM[5] * TM[10] - TM[6] * TM[9])
       - TM[4] * (TM[1] * TM[10] - TM[2] * TM[9])
       + TM[8] * (TM[1] * TM[6] - TM[2] * TM[5]);
-    d.assert('the tablet lies flat on the controller\'s top face, square to it rather than at an angle',
-      perp < 1e-6 && det > 0,
-      `off-square by ${perp.toExponential(2)}, and its front face is the one you can see (${det.toExponential(2)})`);
+    // 🔴 THE REGRESSION THIS ASSERT EXISTS FOR, NAMED BY ITS OWN NUMBER.
+    // Reported from a Quest 3: "tablet works but looks to sky not to me (x rot
+    // 90 missing)". The bug read EXACTLY 1.0 for the first number below — the
+    // face pointing straight along the controller, which with the thing held
+    // normally is at the ceiling. It must now be the lean and nothing more.
+    d.assert('the tablet faces across the controller, back at you — not along it at the sky',
+      Math.abs(dot3(nrm, axis)) < 0.5 && dot3(nrm, across) > 0.9 && det > 0,
+      `${(Math.acos(Math.max(-1, Math.min(1, dot3(nrm, across)))) * 180 / Math.PI).toFixed(0)}° of lean back towards you`
+      + ` · along the controller it reads ${dot3(nrm, axis).toFixed(3)}, and the bug read 1.000`
+      + ` · its front face is the one you can see (${det.toExponential(2)})`);
 
     const c0 = TABLET.controls[0];
     d.assert('dragging the slider from end to end reaches both ends of the number it drives',
@@ -1513,6 +1545,25 @@
     d.assert('...and the fade retires the old picture when it finishes',
       !room?.incoming && room?.look !== heldLook,
       room?.incoming ? 'still fading' : 'the new look is the look');
+
+    // 🔴 THE REAL CONTROLLER MODEL, GRADED WITHOUT A HEADSET — and this is the
+    // only place it can be. The fetch, the reader, the texture decode and the
+    // third shader program all run here because the window draws a preview
+    // controller, so a laptop exercises every step that would otherwise first
+    // run on the first frame of somebody's one headset session.
+    //
+    // ⚠️ LAST IN THIS HANDLER, BEHIND A BOUNDED WAIT. `verify.mjs` stops
+    // collecting 400 ms after the last assert, so a pause mid-way silently
+    // loses everything after it — this one has nothing after it. And the wait
+    // is bounded because a model that never arrives has to REPORT that, not
+    // hang here: the page falls back to the stand-in and the assert says which.
+    for (let i = 0; i < 60 && (room?.controllers === 'not asked' || room?.controllers === 'loading'); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    d.assert('your controller is drawn from its real model, not a stand-in',
+      room?.controllers === 'model',
+      `drawn from: ${room?.controllers} · ${TABLET.controls.length && room?.controllers === 'model'
+        ? 'the vendored meta-quest-touch-plus mesh' : 'the primitive stand-in, and the tablet says so'}`);
   });
 
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
