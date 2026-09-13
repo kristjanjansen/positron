@@ -125,7 +125,7 @@
 
   const d = mount({
     name: 'scene',
-    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. Your right hand gets a pointer and your left a small screen — a stand-in shape rather than a picture of your real controller — with a slider on it that fades the dotted floor; the trigger picks a thing up or moves that slider, the thumbstick pushes what you are holding nearer or further, the grip drops you back out, and letting go sends the room to everyone else in it, once, rather than ninety times a second. Nothing is allowed to sit inside anything else or inside arm's reach of your head: the roll spaces the things out before you see them, a thing let go inside another is pushed back out along the line between their centres, and a thing that ends up in your face is moved away from it.`,
+    what: `A room built from one number. Roll it and you get somewhere to stand — how many things are in it, where they sit, how big they are and what colour they run: all of it comes out of a single seed, so the room is four bytes rather than a file, and rolling the same seed again rebuilds it exactly. The request goes out over the same socket every page here uses and the room only changes when it comes back, so the round trip below is the real distance between asking and seeing. One roll each run is deliberately impossible and the room refuses it, which is counted too — a check that has never said no has not been shown to work. Put a headset on and you are inside it, or put it in your own room and the things float in the space you are actually standing in. Your right hand gets a pointer and your left a small screen — a stand-in shape rather than a picture of your real controller — with a slider on it that fades the dotted floor and a Hold to leave button under it; the trigger picks a thing up or moves that slider, the thumbstick pushes what you are holding nearer or further, either the grip or holding that button drops you back out, and letting go sends the room to everyone else in it, once, rather than ninety times a second. Nothing is allowed to sit inside anything else or inside arm's reach of your head: the roll spaces the things out before you see them, a thing let go inside another is pushed back out along the line between their centres, and a thing that ends up in your face is moved away from it.`,
     readout: { seed: '', things: '', moved: '', 'to frame': 'ms', worst: 'ms', 'round trip': 'ms', refused: '', view: '' },
     controls: [
       { id: 'roll', label: 'Roll a room', primary: true },
@@ -207,6 +207,38 @@
     gl.bindVertexArray(null);
     return { vao, count: 6 };
   }
+  /**
+   * 🔴 THREE WAYS OUT OF A ROOM, AND ONE PLACE THAT SAYS WHICH ONE FIRED.
+   *
+   *   · the grip on either controller          — nothing has to be drawn for it
+   *   · a dead-man's switch at 4 s             — nothing has to be held for it
+   *   · "Hold to leave" on the tablet          — the one you can SEE
+   *
+   * The third is new and it ADDS to the other two rather than replacing them.
+   * It cannot replace them: it is drawn on a tablet that only exists once a
+   * grip pose has resolved, so it has two conditions in front of it, and an
+   * exit with conditions is not an exit. What it buys is that the way out stops
+   * being folklore — "any controller button except the trigger" is a thing you
+   * have to be told, and a button with the words on it is not.
+   *
+   * ⚠️ AND THE LOG HAS TO NAME WHICH. Three exits that all print "session
+   * ended" make a page that cannot tell you why it ended, which is the same
+   * defect as the run where "the button was never pressed" and "the button
+   * threw" were one observation. `leftBy` is set by whichever fired and read
+   * once, in the `end` handler — including the case where NOTHING here fired,
+   * which is its own answer rather than a blank.
+   */
+  let leftBy = null;
+  const leaving = (why) => { leftBy = why; shipNow(`leaving · ${why}`); };
+  // ⚠️ THE TABLET'S BUTTON DOES NOT COME THROUGH HERE. `xr-hands.mjs` ends the
+  // session for it, because that module is handed the session every frame and
+  // this page is not the only page with a tablet on it. This is the page's own
+  // two, which the page has always owned.
+  const leaveNow = (why) => {
+    leaving(why);
+    try { session?.end().catch(() => {}); } catch { /* it may already be going */ }
+  };
+
   // 🔴 THE ROOM. Everything this page draws except its own status panel comes
   // out of here — and so does what `mirror` draws behind its video panel, which
   // is the whole reason it is a module. `say` is the BEACON, never the batched
@@ -216,13 +248,26 @@
   if (gl) {
     quad = unitQuad();
     room = createXRRoom(gl, { log: (m, k) => d.log(m, k), say: shipNow });
-    // ── the small screen on your left hand, and the one control on it ──────
+    // ── the small screen on your left hand, and the controls on it ─────────
     // 🔴 THE CONTROLS ARE A LIST IN `xr-tablet.mjs`, NOT A THING THIS PAGE
-    // BUILDS. A second control is one line there and both pages that stand in
-    // this room get it, which is the only way "the same interface in both kinds
-    // of session" survives somebody adding a knob. `ctx` is what a control's
-    // `apply` is handed, so nothing on the tablet reaches into the room itself.
-    tablet = createXRTablet({ ctx: { room } });
+    // BUILDS. Both pages that stand in this room get the same list, which is
+    // the only way "the same interface in both kinds of session" survives
+    // somebody adding a knob. `ctx` is what a control's `apply` is handed, so
+    // nothing on the tablet reaches into the room, the session or this page.
+    // ⚠️ `left` IS A NOTIFICATION, NOT THE ACTION. The way out is performed in
+    // `xr-hands.mjs`; this is only how this page learns it was that one, so the
+    // `end` handler below can say so instead of printing the same line for all
+    // three. The label and the hold are read off the control rather than typed
+    // here — a description that can disagree with its config is worse than none.
+    tablet = createXRTablet({
+      ctx: {
+        room,
+        left: () => {
+          const c = TABLET.controls.find((x) => x.leaves);
+          leaving(`the tablet's "${c?.label ?? 'way out'}", held the whole ${c?.hold ?? '?'} ms`);
+        },
+      },
+    });
     room.setTablet(tablet);
     tablet.applyAll();          // the dots start where the slider says, not at a default
     // 🔴 ONE INPUT PATH, AND IT CANNOT TELL VR FROM AR. Every controller, the
@@ -686,6 +731,13 @@
       ui: xrHands ? xrHands.fingerprint() : 'no controller interface built',
       dots: room ? room.gridAlpha : null,
       tabletUploadMs: room ? room.tabletUploadMs : null,
+      // 🔴 WHICH OF THE THREE WAYS OUT FIRED, IN WORDS, AND `null` WHILE NONE
+      // HAS. The owner gets one run per mode, so "did the button on the tablet
+      // work?" has to be answerable from what the page published rather than
+      // from remembering what was pressed. ⚠️ `null` here is not "no" — it is
+      // "nothing has ended this session", which is the true answer while one is
+      // running and the honest one when the system menu ended it.
+      leftBy,
     };
   };
   async function enter(mode = 'immersive-vr') {
@@ -807,6 +859,10 @@
     // pacing inside a headset. A number that has to be disclaimed every time it
     // is quoted is measured wrong, not explained badly.
     worst = 0; lastFrame = 0; xrFrames = 0;
+    // ⚠️ AND WHY THE LAST SESSION ENDED IS NOT WHY THIS ONE WILL. A reason left
+    // over from the previous session would attribute this one's ending to a
+    // press that happened minutes ago — a line that is wrong and confident.
+    leftBy = null;
     xrOk = true; publishXR();
     // 🔴 `session.renderState.baseLayer` IS NULL HERE, AND READING IT IS WHAT
     // MADE THE ROOM BLACK. `updateRenderState()` does not apply immediately —
@@ -829,6 +885,16 @@
     badge.innerHTML = arMode ? 'passthrough · <b>the room is yours</b>' : 'headset · <b>you are in the room</b>';
     d.set('view', arMode ? 'your room' : 'headset', 'ok');
     session.addEventListener('end', () => {
+      // 🔴 ONE LINE SAYS HOW THE SESSION ENDED, AND IT CAN NAME ALL FOUR CASES.
+      // Three exits belong to this page and the fourth belongs to nobody here —
+      // the system menu, the headset coming off, the runtime taking it. A log
+      // that printed "session ended" for all of them would leave every one of
+      // those to be guessed at from the outside, which is the shape of failure
+      // that has already cost this page three headset runs.
+      const why = leftBy
+        || 'something outside this page — the system menu, the headset coming off, or the runtime taking it';
+      shipNow(`session ended · ${why} · ${xrFrames} frames drawn`);
+      d.log(`the headset session ended — ${why}`);
       xrOk = false; session = null; arMode = false; publishXR(); badge.innerHTML = 'window · <b>session ended</b>';
       d.set('view', 'window'); raf = requestAnimationFrame(flat);
     });
@@ -840,6 +906,9 @@
     // to the grip rather than disappearing. A page that can strand somebody in
     // a room must keep a way out that belongs to the page: grip leaves, and the
     // dead-man's switch below still fires if nothing ever draws.
+    // ⚠️ NEITHER OF THESE MOVED WHEN THE TABLET GREW A BUTTON. The button is a
+    // THIRD way out, and a button drawn on a surface that only exists once a
+    // grip pose resolved cannot be allowed to be the only one.
     // The runtime tells you when a controller wakes, sleeps, or a hand takes
     // over — which is the only moment the hand question can be answered.
     session.addEventListener('inputsourceschange', (e) => {
@@ -855,8 +924,12 @@
       // which is the worst way for a control to be wrong. The tablet's own
       // press is read off the gamepad inside `xr-hands`, so this handler only
       // has to stand aside.
+      // ⚠️ THE WHOLE FACE, NOT JUST A CONTROL ON IT. `over` is the ray meeting
+      // the quad; the tablet decides for itself whether that landed on
+      // anything. A press that misses both controls must still not reach
+      // through the slab and grab a cube on the far side of it.
       if (xrHands?.over) {
-        shipNow('trigger on the tablet — the slider has it, nothing was grabbed');
+        shipNow('trigger on the tablet — the tablet has it, nothing was grabbed');
         return;
       }
       if (!rayNow) return;
@@ -886,7 +959,7 @@
     // from the headset: a gesture that cannot be made is not a gesture, and it
     // was the only way to accept an update. The A/X button carries it now —
     // one hand, one press, and it exists on every Touch controller.
-    session.addEventListener('squeeze', () => { shipNow('grip — leaving'); session?.end().catch(() => {}); });
+    session.addEventListener('squeeze', () => leaveNow('the grip button on a controller'));
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
     // session started, the room is black and staying black; end it and say so
     // rather than leaving somebody standing in it. MEASURED: two runs ended
@@ -895,7 +968,7 @@
       if (session && xrFrames === 0) {
         shipNow('FAIL no frame drawn 4 s after the session started — leaving on my own');
         d.log('the headset session drew nothing — ended it rather than leave you in the dark', 'bad');
-        session.end().catch(() => {});
+        leaveNow('this page\'s dead-man\'s switch — nothing had been drawn 4 s in');
       }
     }, 4000);
     session.requestAnimationFrame(onXR);
@@ -1416,8 +1489,9 @@
     // the device would mean the half most likely to be silently wrong — a press
     // landing in the wrong place — is only ever checked where nothing is
     // watching. `demo/shell/xr-pick-test.mjs` grades the same arithmetic under
-    // node with six negative controls; these three are the page saying the same
-    // thing about the code it actually loaded.
+    // node with its own negative controls; the block below is the page saying
+    // the same thing about the code it actually loaded, against the real canvas
+    // and the real font — which is the half `node` cannot reach.
     const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
     const TM = holdM(I);
     const nrm = [TM[8], TM[9], TM[10]];
@@ -1499,13 +1573,23 @@
       // has to be arithmetic for `node` to grade it — so the page checks that
       // assumption with the font actually loaded. A label wider than its column
       // runs under the lane, which reads as a layout somebody never looked at.
-      tctx.font = `500 ${TABLET.kit.labelPx}px ${getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace'}`;
-      const drawn = Math.max(...TABLET.controls.map((c) =>
+      // ⚠️ AND EACH KIND AGAINST ITS OWN BOX. A slider's label goes in the head
+      // column, uppercase with tracking; a button's goes INSIDE the button, at
+      // the stylesheet's own button size with its own padding either side. One
+      // claim — the real font fits what the arithmetic reserved — measured twice
+      // because there are two boxes, which is not the same as two claims.
+      const MONO_FACE = getComputedStyle(document.documentElement).getPropertyValue('--mono') || 'monospace';
+      tctx.font = `500 ${TABLET.kit.labelPx}px ${MONO_FACE}`;
+      const drawn = Math.max(...TABLET.controls.filter((c) => c.kind !== 'button').map((c) =>
         tctx.measureText(c.label.toUpperCase()).width
         + (c.label.length - 1) * TABLET.kit.labelPx * TABLET.kit.labelTrack));
-      d.assert('...and the real font fits the column the arithmetic reserved for it',
-        drawn <= TABLET.headW,
-        `${drawn.toFixed(1)} px drawn into ${TABLET.headW.toFixed(1)} px reserved`);
+      tctx.font = `500 ${TABLET.kit.btnPx}px ${MONO_FACE}`;
+      const btnDrawn = Math.max(0, ...TABLET.controls.filter((c) => c.kind === 'button').map((c) =>
+        tctx.measureText(c.label).width + TABLET.kit.btnPadX * 2));
+      d.assert('...and the real font fits the boxes the arithmetic reserved for it',
+        drawn <= TABLET.headW && btnDrawn <= TABLET.btn.w,
+        `the head column: ${drawn.toFixed(1)} px drawn into ${TABLET.headW.toFixed(1)} reserved`
+        + ` · the button: ${btnDrawn.toFixed(1)} into ${TABLET.btn.w.toFixed(1)}`);
 
       // 🔴 THE PRESS, THE DRAG AND THE LETTING GO — GRADED WITHOUT A HEADSET.
       // A controller ray needs hands; a hit is `{u, v}` and everything after it
@@ -1537,7 +1621,112 @@
       d.assert('...and the dots are drawn at the number the slider is showing',
         Math.abs(room.gridAlpha - tablet.value(c0.key) / 100) < 1e-6,
         `${c0.label} ${tablet.value(c0.key)}${c0.unit}, dots at ${room.gridAlpha}`);
+
+      // ── the way out on the tablet, graded here because a headset cannot ───
+      //
+      // 🔴 THE ONE CONTROL WHOSE MISTAKE CANNOT BE TAKEN BACK. A slider in the
+      // wrong place moves a number you can move back; a way out that fires when
+      // nobody asked ends the session somebody was in the middle of. All of it
+      // is a clock and a rectangle, so all of it is graded on a laptop —
+      // `demo/shell/xr-pick-test.mjs` does the same arithmetic under `node`
+      // with the layout stubbed, and these are the page saying it about the
+      // code it actually loaded, against the real canvas and the real font.
+      //
+      // ⚠️ EVERY CALL CARRIES ITS OWN TIMESTAMP, so the whole 800 ms hold is
+      // exercised in no time at all. A real pause here would push this handler
+      // past what the harness waits for and silently lose every assert after
+      // it, which is the trap CLAUDE.md names and this file already lives with.
+      const bc = TABLET.controls.find((x) => x.leaves);
+      const bi = TABLET.controls.indexOf(bc);
+      const bTopD = TABLET.rowsTop + bi * TABLET.rowH + (TABLET.rowContent - TABLET.btn.h) / 2;
+      const btnHit = {
+        t: 0.3, front: true,
+        u: (TABLET.btn.x + TABLET.btn.w / 2) / TABLET.designW,
+        v: (bTopD + TABLET.btn.h / 2) / TABLET.designH,
+      };
+      tablet.release(); tablet.fired();
+      leftBy = null;
+      tablet.press(btnHit, 0);
+      const onPress = tablet.fired().length;
+      tablet.drag(btnHit, bc.hold * 0.5);
+      const halfWay = tablet.fired().length;
+      tablet.release(bc.hold * 0.5);
+      const letGo = tablet.fired().length;
+      d.assert('the way out on the tablet takes a hold — a press, or letting go part-way, does nothing',
+        onPress === 0 && halfWay === 0 && letGo === 0 && leftBy === null && !tablet.holding(),
+        `"${bc.label}" pressed and let go at half of ${bc.hold} ms · fired ${onPress + halfWay + letGo} times`);
+
+      // 🔴 AND THE FILL HAS TO SAY HOW FAR THROUGH YOU ARE, OR THE HOLD IS A
+      // BUTTON THAT DOES NOTHING FOR 0.8 s. The quantity is how far the change
+      // reaches ACROSS the button — a fill drawn at a fixed width would pass
+      // "something changed" on its own, which is a statistic constant by
+      // construction over the defect it is meant to catch.
+      // ⚠️ THE THRESHOLD IS ABOVE `button:active`, ON PURPOSE. The ground goes
+      // `--card2` -> `--card` the moment the trigger is down — 19 across the
+      // three channels, over the WHOLE button — so a low threshold would
+      // measure the pressed state and report a full sweep at any progress. The
+      // `--hi` fill is 457 over the same ground, so 90 separates them cleanly.
+      const bx = Math.round(TABLET.btn.x * TABLET.scale);
+      const by = Math.round(bTopD * TABLET.scale);
+      const bw = Math.round(TABLET.btn.w * TABLET.scale);
+      const bh = Math.round(TABLET.btn.h * TABLET.scale);
+      const face = () => { tablet.draw(); return tctx.getImageData(bx, by, bw, bh).data; };
+      const REST = face();
+      tablet.press(btnHit, 0);
+      tablet.drag(btnHit, bc.hold * 0.9);
+      const NINE = face();
+      let fx0 = Infinity, fx1 = -1;
+      for (let i = 0; i < REST.length; i += 4) {
+        const dd = Math.abs(REST[i] - NINE[i]) + Math.abs(REST[i + 1] - NINE[i + 1])
+          + Math.abs(REST[i + 2] - NINE[i + 2]);
+        if (dd <= 90) continue;
+        const x = (i >> 2) % bw;
+        if (x < fx0) fx0 = x; if (x > fx1) fx1 = x;
+      }
+      d.assert('...and while it is held the button fills as far as the hold has got, and no further',
+        fx0 < bw * 0.03 && fx1 > bw * 0.8 && fx1 < bw * 0.97,
+        `nine tenths of the way through, the fill runs ${fx0} to ${fx1} of a ${bw} px button`);
+      tablet.release(bc.hold * 0.9); tablet.fired();
+
+      // ⚠️ AND THE FAR SIDE OF THE BOUNDARY. A button that counts to 800 and
+      // tells nobody is the optional-chained fullscreen call again: a control
+      // that looks live and is inert. What is asserted is that the control
+      // FIRED and that this page was told which way out it was, which is what
+      // the log line on the beacon is built from.
+      // ⚠️ ENDING THE SESSION IS NOT ASSERTED HERE AND CANNOT BE — there is no
+      // session in a window. `xr-hands.mjs` performs that, and one headset run
+      // reads it back off `__demo.xr.leftBy`.
+      tablet.press(btnHit, 0);
+      tablet.drag(btnHit, bc.hold);
+      const went = tablet.fired();
+      d.assert('...and held the whole way it fires once, and says which way out it was',
+        went.length === 1 && went[0] === bc && went[0].leaves === true
+        && typeof leftBy === 'string' && leftBy.includes(bc.label),
+        `${went.length} fired after ${bc.hold} ms · this page was told: ${leftBy || 'NOTHING'}`);
+      // ⚠️ A TEST IS NOT A SESSION. Left set, this would attribute the ending of
+      // whatever session is entered next to a press that happened in a harness.
+      leftBy = null;
+      tablet.release(); tablet.fired();
+
       tablet.set(c0.key, was); tablet.draw();
+
+      // 🔴 AND THE WINDOW HAS TO HAVE PUT THE NEW CONTROL THROUGH THE GRAPHICS
+      // CARD BEFORE ANYBODY'S HEADSET DOES. The tablet's face is a texture the
+      // room re-uploads whenever its version moves, and every press above moved
+      // it — so one frame from here is one upload of a canvas that now carries
+      // a second control, on real ANGLE, in the suite. Without this the first
+      // time those pixels reach the driver is the first frame of somebody's one
+      // headset session, which is exactly where a pending `getError` costs a run.
+      // ⚠️ ONE FRAME, NOT A SLEEP. `flat` re-registers itself at the top of its
+      // own callback, so the next frame runs it before this, and 16 ms is
+      // affordable where 800 would not be.
+      await new Promise((r) => requestAnimationFrame(r));
+      const tabErr = gl.getError();
+      d.assert('drawing a tablet with two controls on it left no WebGL error behind',
+        tabErr === 0 && room.tabletUploadMs !== null,
+        tabErr === 0
+          ? `clean · ${TABLET.px}x${TABLET.py} px uploaded in ${(room.tabletUploadMs ?? 0).toFixed(2)} ms`
+          : `gl.getError() ${tabErr}`);
     }
 
     // 🔴 A FLOOR, AND NO WALLS THIS PAGE MADE UP. In an opaque session the page

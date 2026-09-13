@@ -21,8 +21,14 @@
 // FOUR of the cases below are NEGATIVE CONTROLS: a check that cannot fail is
 // decoration, the convention `diagram-test.mjs` already set here.
 
+import { writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { pickQuad, uvToPixels } from './xr-pick.mjs';
-import { controlAt, valueFromU, DEFAULT_CONTROLS, TABLET, MONO_ADV } from './xr-tablet.mjs';
+import {
+  controlAt, valueFromU, DEFAULT_CONTROLS, TABLET, MONO_ADV,
+  isButton, btnLabelW, createXRTablet,
+} from './xr-tablet.mjs';
 import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE } from './xr-room.mjs';
 import { dedupe, SAME_THING_M } from './xr-hands.mjs';
 
@@ -318,10 +324,210 @@ const at = (target) => {
   // a character count — the one place a monospace advance is assumed — so the
   // assumption is checked against the widest label the list can hold. The PAGE
   // measures the drawn text too; this is the half a laptop can do with no font.
-  const widest = Math.max(...c.map((x) => x.label.length));
+  // ⚠️ SLIDERS ONLY, and that is not a convenience. A button's label lives
+  // INSIDE the button, so folding it into this maximum widens a column it will
+  // never be drawn in — which took the lane from 2.75:1 to 2.16:1 and was
+  // caught by the proportion assert above rather than by this one.
+  const widest = Math.max(...c.filter((x) => !isButton(x)).map((x) => x.label.length));
   ok('the head column is wide enough for the longest label on it',
      TABLET.headW >= widest * TABLET.kit.labelPx * (MONO_ADV + TABLET.kit.labelTrack) - 1e-6,
      `${TABLET.headW.toFixed(0)} design px for ${widest} characters`);
+}
+
+// ── the way out, which is a button and not a slider ───────────────────────
+//
+// 🔴 THE CONTROL THIS FILE EXISTS FOR MOST. A slider that lands in the wrong
+// place moves a number you can move back. A way out that fires when nobody
+// asked ends the session somebody was in the middle of, and a way out that
+// cannot be made to fire is a way out that is not there — both of them are
+// arithmetic on a clock and a rectangle, and both are graded here rather than
+// on a head.
+const BTN_C = DEFAULT_CONTROLS.find(isButton);
+/** The middle of the button's own rectangle, in the tablet's u,v. */
+const btnUV = () => {
+  const i = DEFAULT_CONTROLS.indexOf(BTN_C);
+  const top = TABLET.rowsTop + i * TABLET.rowH + (TABLET.rowContent - TABLET.btn.h) / 2;
+  return { u: (TABLET.btn.x + TABLET.btn.w / 2) / TABLET.designW,
+           v: (top + TABLET.btn.h / 2) / TABLET.designH };
+};
+{
+  const mid = btnUV();
+  const at = controlAt(mid.u, mid.v);
+  ok('the last row of the tablet is the way out, and it is a button rather than a slider',
+     !!at && at.control === BTN_C && isButton(at.control) && at.i === DEFAULT_CONTROLS.length - 1,
+     at ? `${at.control.key} · "${at.control.label}" · held ${at.control.hold} ms` : 'nothing there');
+
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THE WHOLE DESIGN RESTS ON. A slider
+  // owns its whole row on purpose — pressing left of its knob drives it to its
+  // minimum — and a way out that inherited that rule would fire from the band
+  // of air its focus ring sits in, from the gap below it, and from the margins
+  // either side. Four places you never meant to press, on the one control whose
+  // press cannot be taken back.
+  const i = DEFAULT_CONTROLS.indexOf(BTN_C);
+  const top = TABLET.rowsTop + i * TABLET.rowH + (TABLET.rowContent - TABLET.btn.h) / 2;
+  const vAt = (py) => py / TABLET.designH;
+  const above = controlAt(mid.u, vAt(top - TABLET.kit.btnRingOffset));
+  const below = controlAt(mid.u, vAt(top + TABLET.btn.h + TABLET.kit.rowGap / 2));
+  const leftOf = controlAt((TABLET.btn.x / 2) / TABLET.designW, mid.v);
+  const rightOf = controlAt((TABLET.designW - TABLET.btn.x / 2) / TABLET.designW, mid.v);
+  ok('...and only its own rectangle is it — not the ring\'s air, the gap, or the margins',
+     above === null && below === null && leftOf === null && rightOf === null,
+     `above ${above === null} · below ${below === null} · left ${leftOf === null} · right ${rightOf === null}`);
+
+  // The button has to hold its own label at the stylesheet's own type size —
+  // the same monospace assumption `HEAD_W` makes, checked against a different
+  // box. The PAGE measures the real face against this number.
+  ok('the button is wide enough for the words on it',
+     btnLabelW(BTN_C) <= TABLET.btn.w,
+     `"${BTN_C.label}" needs ${btnLabelW(BTN_C).toFixed(0)} of ${TABLET.btn.w} design px`);
+}
+
+// ── the hold, with no clock to wait for ───────────────────────────────────
+//
+// ⚠️ A STUB DOCUMENT, AND WHAT IT DOES NOT PROVE. `createXRTablet` asks for a
+// canvas at construction, so two stubs stand in for one. Nothing below calls
+// `draw()` — the PICTURE is graded by `demo/scene`'s own asserts, against a
+// real 2-D context, on a real font. What is graded here is the half a browser
+// adds nothing to: which control a press took, what a clock does to it, and
+// what fires. Every call takes its timestamp, so none of this waits.
+globalThis.document = {
+  documentElement: {},
+  createElement: () => ({ width: 0, height: 0, getContext: () => ({}) }),
+};
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
+{
+  const hit = (uv) => ({ t: 0.3, u: uv.u, v: uv.v, front: true });
+  const mid = btnUV();
+  const SPAN = BTN_C.hold;
+  const build = () => {
+    let left = 0;
+    const t = createXRTablet({ ctx: { left: () => { left++; } } });
+    return { t, fired: () => t.fired(), leftCount: () => left };
+  };
+
+  // 🔴 A PRESS IS NOT A PRESS-AND-HOLD. The first thing to prove is that the
+  // obvious way to do it by accident does nothing at all.
+  {
+    const { t, fired, leftCount } = build();
+    t.press(hit(mid), 0);
+    const onPress = fired().length;
+    t.drag(hit(mid), SPAN * 0.6);
+    const partWay = fired().length;
+    ok('a press on the way out does nothing, and neither does most of the hold',
+       onPress === 0 && partWay === 0 && leftCount() === 0 && t.hold()?.p > 0.5,
+       `${(t.hold().p * 100).toFixed(0)}% of the way through ${SPAN} ms and nothing has happened`);
+
+    // ...and the far side of the boundary: held to the end it fires, once.
+    t.drag(hit(mid), SPAN);
+    const went = fired();
+    t.drag(hit(mid), SPAN * 3);            // still down, long past the end
+    const again = fired();
+    ok('...and held all the way it fires exactly once, however long you keep holding',
+       went.length === 1 && went[0] === BTN_C && went[0].leaves === true
+       && again.length === 0 && leftCount() === 1 && t.hold() === null,
+       `fired ${went.length} at ${SPAN} ms, ${again.length} more at ${SPAN * 3} ms`);
+  }
+
+  // NEGATIVE CONTROL: letting go early. The abort that costs nothing to find.
+  {
+    const { t, fired, leftCount } = build();
+    t.press(hit(mid), 0);
+    t.drag(hit(mid), SPAN * 0.9);
+    t.release(SPAN * 0.9);
+    t.drag(hit(mid), SPAN * 5);            // the trigger is up; time cannot help
+    ok('letting go at 90% of the hold does nothing at all',
+       fired().length === 0 && leftCount() === 0 && t.hold() === null && t.holding() === false,
+       'released at 90% and five spans later it still has not fired');
+  }
+
+  // 🔴 NEGATIVE CONTROL, AND THE ONE A NAIVE IMPLEMENTATION FAILS. Running the
+  // ray off the button must RESET the hold, not pause it: a hold that resumes
+  // where it stopped can be completed by two passes that neither of them meant
+  // to, and nothing on the face would say so. The grip is kept, so coming back
+  // on starts it again from zero.
+  {
+    const { t, fired, leftCount } = build();
+    t.press(hit(mid), 0);
+    t.drag(hit(mid), SPAN * 0.9);
+    t.drag(null, SPAN * 0.95);             // the ray ran off the tablet
+    const reset = t.hold();
+    t.drag(hit(mid), SPAN * 1.0);          // back on, but only 50 ms in
+    const back = t.hold();
+    ok('running the ray off it resets the hold to zero rather than pausing it',
+       reset?.p === 0 && reset.on === false && fired().length === 0 && leftCount() === 0
+       && back.p < 0.2 && t.holding() === true,
+       `off it: ${(reset.p * 100).toFixed(0)}% · back on, ${SPAN} ms after the press, it reads ${(back.p * 100).toFixed(0)}% and not 100`);
+  }
+
+  // 🔴 NEGATIVE CONTROL, AND IT IS THE WORST DEFECT THIS CHANGE COULD HAVE
+  // SHIPPED. `applyAll` runs once as a session opens, pushing every slider's
+  // value through its `apply`. A loop that did not know a button when it saw
+  // one would have fired the way out on the first frame of every session —
+  // which presents as a headset that refuses to enter, not as a loop with one
+  // too many things in it.
+  {
+    let dots = null, left = 0;
+    const t = createXRTablet({ ctx: { room: { setGrid: ({ alpha }) => { dots = alpha; } }, left: () => { left++; } } });
+    t.applyAll();
+    ok('opening a session pushes the sliders and does NOT fire the way out',
+       dots !== null && left === 0 && t.fired().length === 0,
+       `the dots went to ${dots} and the way out fired ${left} times`);
+  }
+
+  // ⚠️ AND IT HAS TO SAY WHICH OF THE THREE HAPPENED. "I held it and nothing
+  // happened" has three causes — let go early, ray off it, press never landed —
+  // and the owner gets one headset run to tell them apart. The tablet writes a
+  // different line for each; `xr-hands.mjs` carries them to the beacon.
+  {
+    const { t } = build();
+    t.press(hit(mid), 0);
+    const said = t.notes();
+    t.drag(hit(mid), SPAN * 0.4);
+    t.release(SPAN * 0.4);
+    const after = t.notes();
+    ok('the tablet says in words what became of a hold, and drains what it said',
+       said.length === 1 && /holding/.test(said[0]) && /800 ms/.test(said[0])
+       && after.length === 1 && /40%/.test(after[0]) && t.notes().length === 0,
+       `${said[0]} || ${after[0]}`);
+  }
+}
+
+// ── and the claim this file is here to check ──────────────────────────────
+{
+  // 🔴 "A SECOND CONTROL IS ONE LINE" — TESTED BY WRITING THE LINE. The claim
+  // in `xr-tablet.mjs`'s header was made about a second control and turned out
+  // to hold only for a second control OF A KIND THAT ALREADY EXISTS: the button
+  // above cost a branch in the layout, the hit test, the input and the state.
+  // So the surviving half is proved rather than asserted in prose — a copy of
+  // the module with ONE line added to its array, imported and measured. The
+  // canvas grows by exactly one row, the new row hit-tests, and the fingerprint
+  // counts three.
+  const src = readFileSync(new URL('./xr-tablet.mjs', import.meta.url), 'utf8');
+  const line = "  { key: 'probe', label: 'probe', unit: 'x', min: 0, max: 10, value: 5, apply: () => {} },\n";
+  const marked = src.replace('export const DEFAULT_CONTROLS = [\n',
+                             `export const DEFAULT_CONTROLS = [\n${line}`);
+  const tmp = join(tmpdir(), `xr-tablet-one-line-${process.pid}.mjs`);
+  let three = null, why = '';
+  try {
+    writeFileSync(tmp, marked);
+    three = await import(`file://${tmp}`);
+  } catch (e) { why = `${e.name}: ${e.message}`; }
+  finally { try { rmSync(tmp); } catch { /* it may not have been written */ } }
+
+  const grew = three && three.TABLET.designH === TABLET.designH + TABLET.rowH;
+  const rowMid = three
+    ? three.controlAt(0.5, (TABLET.rowsTop + 2 * TABLET.rowH + TABLET.rowContent / 2) / three.TABLET.designH)
+    : null;
+  ok('a second control of a kind that already exists really is ONE LINE',
+     !!three && three.TABLET.controls.length === DEFAULT_CONTROLS.length + 1 && grew
+     && three.TABLET.fingerprint.includes('3 control(s)')
+     && three.TABLET.fingerprint.includes('probe 0..10x')
+     && rowMid?.control?.key === BTN_C.key
+     && Math.abs(three.TABLET.lane.w - TABLET.lane.w) < 1e-9,
+     three
+       ? `${three.TABLET.controls.length} controls · ${TABLET.designH} -> ${three.TABLET.designH} design px`
+         + ` · the lane is still ${three.TABLET.lane.w} · ${three.TABLET.fingerprint.match(/\[[^\]]*\]/)?.[0]}`
+       : `the copy would not load — ${why}`);
 }
 
 {
