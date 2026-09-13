@@ -128,6 +128,45 @@ Left to right, one column per step, computed from the links:
 - **Row** within a column = order of appearance, centred vertically.
 - **Forward links** are straight, with a slight horizontal offset into the
   box's edge.
+  🔴 **"STRAIGHT" IS RIGHT FOR A CHAIN AND MAKES A FORK UNDRAWABLE. CORRECTED.**
+  A straight line from one box's edge to another's routes around NOTHING, and
+  the second branch of a fork always reaches past whatever the first branch
+  landed on — so it was drawn THROUGH the box in between, in one side and out
+  the other with an arrowhead into the next box along, and the name that tells
+  the two branches apart was placed at the midpoint, which is under that box.
+  MEASURED on the branch `grains` withdrew (commit d4fc695): in one column at
+  358 px, **50 of its 104 px ran inside a box it never touches**, and a phone
+  read `this page → a granulator here → Cloudflare`, a path the page does not
+  have. It is not only the stacked case, which is what that commit reported:
+  left to right, a branch spanning two columns ran **191 px of 301 straight
+  through the box between its ends**. No spec can word around it; every fork
+  breaks, which is why this is a gap in this section rather than a page's
+  mistake.
+  **The rule now: a forward link whose two ends are more than one position
+  apart gets a LANE outside the boxes, exactly as `back: true` already does** —
+  OVER the row where the picture runs left to right, and down the RIGHT-hand
+  gutter where it is stacked, because the return paths already own the left.
+  Same interval colouring as the returns, same spacing, so two branches never
+  share a lane either; and the gutter is sized for the lanes AND the names side
+  by side, which is the trap the left one already fell into once. Measured
+  after: **0 px behind a box at both widths.** The cost is the gutter — at
+  358 px the boxes narrow from 272 px to 215 px, and left to right the picture
+  grows from 53 px to 87 px tall to hold the lane. A step to the next box along
+  is untouched and still a straight line; every pre-existing layout comes out
+  byte-identical. Proved by sabotage: putting the straight line back fails five
+  asserts, one of them *"a branch that reaches past a box is drawn OVER the row,
+  never through it"*, and routing EVERY forward link fails the two negative
+  controls that say a short step must stay straight.
+  ⚠️ **AND A BRANCH'S ARROW IS THE FIRST DIAGONAL THIS DRAWER EVER DREW**, which
+  broke a rule nobody had noticed was about horizontal lines: a forward name was
+  put six pixels above the MIDDLE of its arrow, and a straight line is at its
+  own midpoint's height whatever its slope — so the six pixels were correct at
+  the middle and nowhere else. MEASURED at 655 px: the line climbed 5.4 px
+  through the middle of `settings`. Lifting by the height the line gains across
+  the name's own width fixes that one and produces the next, because two
+  branches leaving one box open a WEDGE and both names lifted upward put the
+  lower one 4.2 px inside the upper branch. A name that rises now sits above its
+  line and a name that falls sits below it, so the wedge stays empty.
 - 🔴 **`back: true` links route UNDER the row**, not between the boxes — a
   return path drawn through the forward path is the thing that makes signal
   diagrams unreadable. Under, with the arrow pointing back.
@@ -145,9 +184,10 @@ Left to right, one column per step, computed from the links:
   runs to its cap and returns 14/15/16 — a seventeen-box-wide picture of a
   three-step path. Links pointing at an earlier box in the spec's own node list
   are dropped, with a warning.
-- **Below ~560 px the whole thing becomes one column, top to bottom**, and the
-  loopbacks route to the left. A horizontal diagram on a phone is a diagram
-  nobody reads.
+- **Below ~560 px the whole thing becomes one column, top to bottom**, the
+  loopbacks route to the left and a branch that reaches past a box routes to
+  the right, so the two kinds of routed line are on opposite sides of the boxes
+  and cannot meet. A horizontal diagram on a phone is a diagram nobody reads.
 
 ---
 
@@ -173,6 +213,33 @@ So: measure and break, once, in a shared helper.
 - Two lines for a `label`, one for a `sub`. Past that the box grows rather than
   the text shrinking — a smaller font in one box is a diagram with two type
   sizes and no reason.
+- 🔴 **THIS SECTION NEVER SAID WHAT WIDTH TO BREAK AGAINST, AND THAT IS WHERE
+  IT ACTUALLY WENT WRONG.** "Measure and break" is the easy half; the number you
+  break AT is the hard half, and all three of them were picked rather than
+  measured. Photographed on an iPhone at 258 px: every arrow name in /kit/'s
+  two-loopback block cut to almost nothing — `how far…`, `slow down`, `small…` —
+  beside boxes 171 px wide with room to spare.
+    - A **step's** name was budgeted at *half the box it starts over*, while it
+      is drawn in the gap BETWEEN two stacked boxes, which is empty right across
+      the picture. MEASURED: 41 px of budget beside 106 px of nothing.
+    - A **lane's** name got a flat 30% of the width — and was wrapped to that,
+      with the widest RESULT then sizing the gutter, so a cut made the gutter
+      narrower, which made the cut. `sound and grains` wanted 92 px, was cut to
+      58, and 58 px was then reserved for it.
+    - Nothing asked what the BOXES needed, so a box took whatever was left over:
+      at 258 px /kit/'s own fork block reserved a gutter nothing had asked for
+      and cut all four box `sub`s — the drawer shortening the names of the
+      things the picture is about.
+  **The rule now: a name is measured against the space it is actually drawn in,
+  and when the picture cannot hold everything the order is the box's own words,
+  then the arrows' names, then empty space.** What a box needs is exactly its
+  `sub`'s own width, because a `sub` gets one line and is never wrapped — so the
+  priority costs no second layout pass. Measured after at 258 / 320 / 390 px:
+  every real block cuts nothing at any of them, boxes included.
+  ⚠️ **AND THE CUT REPORT MUST KEEP FIRING.** A budget that grows until nothing
+  is ever cut is indistinguishable from a drawer that has silently stopped
+  reporting, so one of the checks is a name nobody could fit, and /kit/'s
+  deliberately-impossible block still says so at every width.
 
 ---
 
@@ -210,7 +277,10 @@ labels side by side. The kit section should draw:
   Pi → Cloudflare → browser),
 - one with a deliberately over-long label, to show the cut,
 - one with two loopbacks that must not overlap,
-- one at phone width.
+- one at phone width,
+- and a FORK — the same description drawn twice, at a laptop width and a phone
+  width, because that is the one case where the two disagreed and looking at
+  either alone could not have caught it.
 
 **Then one demo page adopts it**, and `grains` is the obvious first: it is two
 granulators in two buildings with a relay between them, and its `what`
@@ -238,6 +308,20 @@ positioning code at all.
 
 `<title>` on each node gives the native browser tooltip for free, which is the
 accessible path and needs no work.
+
+⚠️ **THE LINE HAS TO BE PUT BACK BY THE DRAWER, AND `pointerleave` CANNOT DO
+IT.** A re-layout destroys every box, so a pointer resting on one never gets
+its leave event: the line is left holding a sentence about a box that no longer
+exists. The second half is the one that shows. That line's height is reserved
+so hovering cannot move the page — and the reservation was read off whatever
+the element happened to be showing, which is the caption only while nothing is
+hovered. MEASURED at the moment the two came apart: **`min-height: 19px` under
+a 97 px caption**, so the next un-hover grew the block by 78 px, which is the
+exact jump the reservation exists to prevent. It repairs itself on the next
+hover in and out, which is why it survived being looked at. The caption is
+restored before the boxes are destroyed, and the reservation measures the
+caption and every box's sentence BY NAME (`captionTexts`, pure and tested)
+rather than "what is in the element".
 
 ---
 
