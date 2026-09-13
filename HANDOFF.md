@@ -78,6 +78,34 @@ list, so nothing is carried only in a conversation.
   - Until one of those exists the right card must go on saying what it cannot
     show, in words — inferring grains from audio is the picture this page
     already deleted once.
+- 🔴 **XR: THE BOXES CLIP INTO THE ROOM, AND THERE IS MAPPED WALL DATA TO USE.**
+  Reported from a Quest 2026-09-13: `scene`'s things can sit too close and clip.
+  The page currently knows nothing about the room it is in — it places things in
+  a bubble around the viewer and hopes. Three ways to know better, in order of
+  what they give and what they cost, and **every one of them has to be MEASURED
+  on the device before it is believed** (research/quest-xr: MDN and caniuse
+  Quest data is ~90% fabricated — BCD's `oculus` key ships the literal token
+  `"mirror"` for most entries):
+  - **`XRBoundedReferenceSpace.boundsGeometry`** — the guardian polygon at floor
+    level, as `DOMPointReadOnly`s. Standard, the oldest of the three, and the
+    cheapest thing that stops a box being placed outside the play area. It is a
+    FLOOR OUTLINE, not walls: it says where you can stand, not what you would
+    hit at head height.
+  - **Plane detection** — `plane-detection` as an optional feature, then
+    `XRFrame.detectedPlanes`, each `XRPlane` carrying a polygon, an orientation
+    and — on Meta's runtime — a semantic label (wall / floor / ceiling / desk /
+    couch / door / window / screen). This is the one that actually answers "is
+    there a wall there", and it is what a placement rule wants. ⚠️ It needs the
+    user to have run Space Setup; a room that has never been scanned returns
+    nothing, and "no planes" must not be drawn as "no walls".
+  - **Mesh detection / depth** — `mesh-detection` for the room mesh,
+    `depth-sensing` for per-frame occlusion. The most faithful and the most
+    expensive, and probably not needed for a placement rule.
+  ⚠️ **AND THE CLIPPING IS TWO PROBLEMS, NOT ONE.** A thing intersecting a REAL
+  wall needs room data; a thing intersecting ANOTHER THING needs only a minimum
+  separation, which the page can enforce today with no new API at all. Do the
+  second one first — it is a few lines, it needs no permission, and it works in
+  a room nobody has scanned.
 - **A flow-diagram drawer — `plan-diagram.md`, planned and not started.** To
   replace the `what` paragraph on pages whose subject is a PATH, with a caption
   under it. Decisions already taken there: **SVG with the text inside it** (a
