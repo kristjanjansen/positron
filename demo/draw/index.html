@@ -25,7 +25,7 @@
 
   const d = mount({
     name: 'draw',
-    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player would reconstruct from the sparse record, and the yellow mark is where that record says your hand was at the position the bar is showing — press play and watch it retrace the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
+    what: 'Press record, then draw a line with a finger or a mouse: this page keeps two records of it — every sample the browser gave it, and a thinned-out one, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player would reconstruct from the sparse record, and the yellow mark is where that record says your hand was at the position the bar is showing — press play and watch it retrace the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
@@ -318,6 +318,18 @@
   //
   // The axes are the pad's own pixels, because that is genuinely this page's
   // unit — every number it prints is a distance on this surface.
+  // 🔴 NOTHING IS STORED UNTIL RECORD IS ON. Asked for, and it is the right
+  // shape for this page: drawing and RECORDING a drawing are two different
+  // acts, and a page that records everything you do has no way to show you the
+  // difference. It also gives the line an honest start — the first sample is
+  // the one after you armed it, rather than whatever happened to be first.
+  //
+  // ⚠️ The pad still captures at full rate either way. `recording` gates what
+  // reaches the RECORD, never what the pad draws or what the evidence lane
+  // holds — that separation is rule 2 of the capture discipline and this page
+  // exists to measure it.
+  let recording = false, growing = false;
+
   const pad = createXyPad(d.el, {
     label: 'draw a line',
     x: { label: 'across', min: 0, max: PAD.w, unit: 'px' },
@@ -326,9 +338,24 @@
     // record stale and returns — the picture is redrawn once a frame by the
     // pad, and rebuilding a 900-point spline per sample would be three or four
     // pictures per frame that nobody sees.
-    onInput: () => { dirty = true; },
-    onStart: () => { evidence = pad.trace(); ghost = null; dirty = true; },
-    onDone: () => { render(); publish(); check(); },
+    // Every coalesced sample. While recording, the line and its picture grow
+    // as the hand moves — the timeline is drawn immediately rather than at the
+    // end of the gesture, and the playhead sits on the newest sample, so the
+    // cursor travels along the drawing as you make it.
+    onInput: () => {
+      dirty = true;
+      if (recording) growing = true;
+    },
+    // ⚠️ THE RECORD IS ONLY CLEARED WHEN A RECORDING STARTS. Touching the pad
+    // with record OFF draws, and leaves whatever was recorded before intact —
+    // otherwise arming, drawing, and then idly touching the pad would silently
+    // throw the take away.
+    onStart: () => { if (recording) { evidence = pad.trace(); ghost = null; dirty = true; } },
+    onDone: () => {
+      if (!recording) return;
+      growing = false;
+      render(); publish(); check();
+    },
     value: () => ghost,
     overlay: (ctx, v) => paintSecondReading(ctx, v),
   });
@@ -394,6 +421,35 @@
     recompute();
     pad.paint();
   }
+
+  /**
+   * 🔴 THE TIMELINE IS DRAWN AS THE HAND MOVES, not when it stops. Asked for,
+   * and it changes what the page is: a strip that appears at the end is a
+   * report, and one that grows under your hand is a recording.
+   *
+   * ⚠️ ONCE A FRAME, NOT ONCE A SAMPLE. `getCoalescedEvents` hands over every
+   * sample the browser buffered — a dozen per frame on a 120 Hz digitiser —
+   * and rebuilding the lane and its spline for each one is a dozen pictures
+   * per frame that nobody sees. The pad already coalesces its own painting the
+   * same way, for the same reason.
+   *
+   * The playhead is parked on the newest sample, so the cursor travels along
+   * the line as you draw it rather than sitting at zero until you let go.
+   */
+  let growTick = 0;
+  function growFrame() {
+    requestAnimationFrame(growFrame);
+    if (!growing) return;
+    const now = performance.now();
+    if (now - growTick < 40) return;       // 25 a second is smooth and cheap
+    growTick = now;
+    render();
+    publish();
+    const end = deck.range[1];
+    if (Number.isFinite(end) && end > 0) deck.seek(end);
+    view?.strip?.invalidate();
+  }
+  requestAnimationFrame(growFrame);
 
   /** How far the reconstruction sits from what actually happened. Measured
    *  against EVERY evidence sample, not against a subsample of itself. */
@@ -468,7 +524,35 @@
   // ⚠️ ONE POSITION SURFACE PER PAGE. The strip seeks on press AND on drag,
   // which the bar's slider does not — two horizontal time axes at different
   // scales, both scrubbing, is a contradiction rather than a redundancy.
-  createTransportBar(d.el, deck, { scrub: false });
+  // 🔴 RECORD SITS NEXT TO PLAY, because it is a transport verb. `take` puts
+  // its own record button here for the same reason: a control that starts
+  // writing belongs beside the one that starts reading, not in a row of page
+  // buttons a hand's width away.
+  //
+  // ⚠️ IT IS NOT `--hi`. Every primary control on this site is that yellow, and
+  // a record button that looks like the main path is a page inviting you to
+  // start writing before you have anything to write. `--rec` exists for
+  // exactly this one control.
+  const bar = createTransportBar(d.el, deck, {
+    scrub: false,
+    extras: [{ id: 'rec', title: 'Record', label: '\u25CF',
+               onClick: () => setRecording(!recording) }],
+  });
+
+  function setRecording(on) {
+    recording = on;
+    growing = false;
+    const b = bar.extra('rec');
+    if (b) {
+      b.dataset.on = on ? '1' : '';
+      b.textContent = on ? '\u25A0' : '\u25CF';
+      b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+    }
+    // Arming clears what was there, so the take you are about to make is the
+    // whole of what the numbers describe.
+    if (on) { pad.clear?.(); evidence = []; stored = []; ghost = null; dirty = true; render(); publish(); }
+    d.log(on ? 'recording — draw on the pad' : 'stopped', on ? 'hi' : undefined);
+  }
 
   // UNDER the pad and its transport, because they change the picture above
   // them and a control that sits below what it moves is read in the order it is

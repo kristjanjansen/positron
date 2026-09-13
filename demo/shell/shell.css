@@ -186,8 +186,23 @@ button.pos-pri[data-busy="1"] {
 }
 
 /* ── slot: whatever the demo itself draws ─────────────────────────────── */
-.pos-body { margin: 0 0 14px; }
+/* 🔴 ONE VERTICAL RHYTHM, AND EVERY PAGE GETS IT WITHOUT ASKING.
+   Reported from a screenshot, 2026-09-13: a pad, a strip, a transport bar, a
+   row of knobs and a log stacked with almost nothing between them read as one
+   dense block rather than as five things. Each of those elements had its own
+   idea of its bottom margin — 12, 14, 6, 0 — so the gaps depended on which
+   two things happened to be adjacent.
+   Set it ONCE, on the gap BETWEEN siblings rather than on each element's own
+   margin, because a lone element should not carry a gap to nothing. 22px is
+   a comfortable read at a laptop's distance and scales up in the headset
+   block below. */
+.pos-body { margin: 0 0 22px; }
+.pos-body > * + * { margin-top: 22px; }
 .pos-body:empty { display: none; }
+/* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
+   control bar and the log are siblings of the body, not children of it. */
+.pos-readout { margin-bottom: 22px; }
+.pos-log { margin-top: 22px; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button

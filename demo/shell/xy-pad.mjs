@@ -260,45 +260,25 @@ export function createXyPad(host, {
   /** a unit joins its number with a space, in one place — `330px` reads as a
    *  token and `330 px` as a measurement */
   const u = (a) => (a.unit ? (a.unit.startsWith(' ') ? a.unit : ' ' + a.unit) : '');
+  /**
+   * 🔴 THE PAD DRAWS NO FURNITURE — asked for, and right. It carried its name,
+   * the live pair, and both axes' ranges written down the edges, and on a page
+   * whose whole subject is a LINE that is five pieces of text competing with
+   * the one thing you came to look at. The numbers were already on the page:
+   * `across`/`down` name the axes in the strip's own gutters and the readout
+   * carries the measurements.
+   *
+   * ⚠️ THE LABELS ARE NOT DELETED, ONLY UNDRAWN. `label`, `x.label` and
+   * `y.label` still reach `aria-label` and `data-gesture`, which is what a
+   * screen reader and the harness read — a pad that is silent to a person who
+   * cannot see it is a different and worse thing than an uncluttered one.
+   */
   function furniture() {
-    ctx.fillStyle = C.dim;
-    ctx.font = `500 13px ${SANS}`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    if (label) ctx.fillText(label, PAD_IN, PAD_IN);
-
-    // the live pair — what an XY pad is FOR. `--dim`, like the rest of the
-    // furniture, so the only bright ink on the pad is the line you made.
-    const v = (value && value()) || (trace.length ? trace[trace.length - 1] : null);
-    if (v) {
-      ctx.textAlign = 'right';
-      ctx.font = `500 13px ${MONO}`;
-      ctx.fillText(`${fx(v.x)}${u(ax)} · ${fy(v.y)}${u(ay)}`, W - PAD_IN, PAD_IN);
-    }
-
-    ctx.font = `500 11px ${SANS}`;
-    ctx.textBaseline = 'bottom';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${ax.label} ${fx(ax.min)}`, PAD_IN, H - PAD_IN);
-    ctx.textAlign = 'right';
-    ctx.fillText(`${fx(ax.max)}${u(ax)}`, W - PAD_IN, H - PAD_IN);
-
-    // the y axis reads bottom-up along the left edge, in ITS order: `min` is at
-    // the top, so the label sits at the top too and the far value at the foot.
-    ctx.save();
-    ctx.translate(PAD_IN, PAD_IN);
-    ctx.rotate(Math.PI / 2);
-    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(`${ay.label} ${fy(ay.min)}`, 22, 0);
-    ctx.restore();
-    ctx.save();
-    ctx.translate(PAD_IN, H - PAD_IN);
-    ctx.rotate(Math.PI / 2);
-    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText(`${fy(ay.max)}${u(ay)}`, -22, 0);
-    ctx.restore();
+    // nothing. See the note above; the axes speak through aria and the page.
   }
 
+  /** The playhead's position on the pad — a filled dot inside a ring, so it
+   *  reads over both the pale line and the bright one. */
   function mark(v) {
     const [mx, my] = px(v.x, v.y);
     ctx.fillStyle = C.mark;

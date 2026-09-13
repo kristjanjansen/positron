@@ -436,8 +436,6 @@ for (const t of targets) {
   // are 16 ms apart, so the page sees a gesture at a plausible input rate
   // regardless of how fast the round trips happen to go — a drag paced by the
   // CDP transport would be a measurement of the CDP transport.
-  await gesture();
-
   const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
@@ -452,10 +450,14 @@ for (const t of targets) {
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
-  // AFTER the controls, not before: a page that offers "type your own" has to
-  // be put into that state first, and the control loop is what does it. The
-  // drag runs before them for the opposite reason — `draw`'s only control
-  // CLEARS the canvas.
+  // 🔴 INPUT COMES AFTER THE CONTROLS, BOTH KINDS. A page that has to be ARMED
+  // before it will record has to be armed before it is drawn on — `draw` grew
+  // a record button and immediately reported `page asserted something — 0`,
+  // because the drag was still running first and the page dutifully recorded
+  // nothing. The drag used to go first for the opposite reason (draw's only
+  // control CLEARED the canvas), and that reason is gone.
+  const drawn = await gesture();
+  if (drawn) console.log(`        (drew on ${drawn} surface${drawn > 1 ? 's' : ''})`);
   const typed = await typing();
   if (typed) console.log(`        (typed into ${typed} field${typed > 1 ? 's' : ''})`);
 
