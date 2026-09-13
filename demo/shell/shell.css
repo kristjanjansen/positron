@@ -712,9 +712,16 @@ video[hidden] { display: none; }
    were saying themselves in one colour. A TAG rather than a word in a hue:
    direction owns colour here, and this owns a shape. */
 .pos-msgs-store { width: 52px; flex: none; color: var(--dim2); }
+/* ⚠️ NO BORDER, AND TOP-ALIGNED WITH THE ROW. The chip's box made a row of
+   them read as a column of little buttons, and `align-self: center` floated it
+   against the FIRST LINE of a message that wraps to three — so the one word
+   describing the row sat halfway down it. Every other cell in the row starts at
+   the top; this one has no reason not to. */
 .pos-msgs-store.yes {
-  color: var(--fg); border: 1px solid var(--line2); border-radius: 3px;
-  padding: 0 4px; font-size: 9.5px; letter-spacing: .04em; align-self: center;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: .04em;
+  align-self: flex-start;
 }
 .pos-msgs-txt { flex: 1; min-width: 0; color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; }
 .pos-msgs-txt[data-hi] { color: var(--fg); }
