@@ -329,6 +329,31 @@ export const DRIFT = [
   ['sos',      0.06,       113.7],
 ];
 const DRIFT_RELATIVE = new Set(['size']);   // proportional, because size is log-ish
+const DRIFT_NAMES = new Set(DRIFT.map(([name]) => name));
+
+/**
+ * Which side and which parameter a raw engine command names — `mscan` ->
+ * `['m','scan']` — or null when it is not one the drift moves.
+ *
+ * 🔴 THIS IS WHAT GIVES A PAGE THAT DOES NOT ROLL A CENTRE TO MOVE AROUND.
+ * The drift circles whatever the last DICE ROLL set, and `grains` sets each
+ * parameter directly instead of rolling: six named patches, no die. So the
+ * board's timer turned over with nothing to circle, `nudges` stayed 0 and
+ * `scan` came back null, for as long as anybody cared to wait — a readout
+ * cell that could not change, which is the `missed: 1` fault in CLAUDE.md.
+ * With this, the last thing anybody SET is the centre, whether a die chose it
+ * or a person did.
+ *
+ * ⚠️ It is deliberately narrow. `mrate` is not here because an integer-ish
+ * grain rate is not drifted, and `pitches` is not here because it is a
+ * keyboard's, not a parameter's. A centre is only ever the six continuous
+ * parameters in `DRIFT` — anything else in it would be carried around and
+ * never read.
+ */
+export function driftTarget(cmd) {
+  const m = /^([mn])([a-z]+)$/.exec(String(cmd));
+  return m && DRIFT_NAMES.has(m[2]) ? [m[1], m[2]] : null;
+}
 
 /**
  * What every drifting parameter should be at time `tSec`, given the values the
@@ -365,8 +390,25 @@ export function driftValues(base, tSec, side = 0) {
  */
 export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {}) {
   const udp = createSocket('udp4');
-  let applied = null;           // the last roll, which the drift centres on
-  let timer = null, t0 = Date.now(), moved = 0;
+  /**
+   * TWO THINGS, AND THEY USED TO BE ONE. `rolled` is the last dice roll, which
+   * is what `params.state` reports and what a page draws a character from.
+   * `centre` is what the drift circles, and it is also moved by a plain
+   * `params.set` — so a page that never rolls still has something to move
+   * around. Reporting a set-derived centre AS a roll would put a character and
+   * a seed on screen that no die ever produced.
+   */
+  let rolled = null;
+  let centre = null;
+  /**
+   * Two clocks, for the same reason. `t0` is the drift's PHASE origin and only
+   * a roll resets it; `centredAt` is when the centre last moved. A slider drag
+   * sends a `params.set` every few milliseconds, and resetting the phase on
+   * each one would pin the drift at t=0 — the nudge counter climbing while
+   * nothing in the sound moves, which is the one failure this page's readout
+   * exists to make impossible.
+   */
+  let timer = null, t0 = Date.now(), centredAt = null, moved = 0;
 
   const send = (cmd, ...args) => {
     const m = oscMessage(SCLANG_ADDR, [cmd, ...args]);
@@ -396,24 +438,48 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
       const { root: _r, ...vv } = roll.voices;
       for (const [k, v] of Object.entries(vv)) send(k, ...v);
     }
-    applied = roll;
-    t0 = Date.now();
+    rolled = roll;
+    centre = { m: { ...roll.m }, n: { ...roll.n } };
+    t0 = centredAt = Date.now();
     return roll;
   };
 
+  /**
+   * One named engine command, sent — and taken as the new centre when it names
+   * a parameter the drift moves. Returns what it re-centred, or null.
+   *
+   * ⚠️ NOT `send`. `tick()` sends the drifted values through `send`, so a
+   * `send` that re-centred would feed the drift its own output back and
+   * integrate: the sound would walk away from the character instead of
+   * circling it. This is the one door a person's parameter comes through;
+   * `send` stays the raw one.
+   */
+  const set = (cmd, ...args) => {
+    send(cmd, ...args);
+    const hit = driftTarget(cmd);
+    if (!hit || typeof args[0] !== 'number' || !Number.isFinite(args[0])) return null;
+    centre ??= { m: {}, n: {} };
+    centre[hit[0]][hit[1]] = args[0];
+    centredAt = Date.now();
+    return hit;
+  };
+
   const tick = () => {
-    if (!applied) return;
+    if (!centre) return;
     const t = (Date.now() - t0) / 1000;
-    sendSide('m', driftValues(applied.m, t, 0));
-    sendSide('n', driftValues(applied.n, t, 1));
+    sendSide('m', driftValues(centre.m, t, 0));
+    sendSide('n', driftValues(centre.n, t, 1));
     moved++;
   };
 
   return {
     send,
+    set,
     roll: (seed, opts) => apply(rollPappus(seed), opts),
     apply,
-    current: () => applied,
+    current: () => rolled,
+    /** What the drift is circling — a roll's values, or whatever was set since. */
+    centre: () => centre,
 
     /**
      * 8 Hz. Fast enough that a slow sine is smooth rather than stepped, slow
@@ -429,11 +495,16 @@ export function openPappus({ port = SCLANG_PORT, host = '127.0.0.1', onLog } = {
     },
     stopDrift: () => { if (timer) { clearInterval(timer); timer = null; onLog?.('drift off'); return true; } return false; },
     drifting: () => !!timer,
-    /** A readout cell that moves: how many nudges have gone out, and where scan is now. */
+    /**
+     * A readout cell that moves: how many nudges have gone out, and where scan
+     * is now. `sinceMs` is how long ago the CENTRE landed, not how long the
+     * timer has run — a page uses it to tell "no tick yet" from "not moving",
+     * and at 8 Hz those are 125 ms apart.
+     */
     driftStats: () => ({
       on: !!timer, nudges: moved,
-      sinceMs: applied ? Date.now() - t0 : null,
-      scan: applied ? driftValues(applied.m, (Date.now() - t0) / 1000, 0).scan ?? null : null,
+      sinceMs: centredAt ? Date.now() - centredAt : null,
+      scan: centre ? driftValues(centre.m, (Date.now() - t0) / 1000, 0).scan ?? null : null,
     }),
 
     /**

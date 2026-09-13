@@ -61,7 +61,7 @@
     // the same things is a second place to keep in step and one more thing
     // between the reader and the picture. `showReadout: false` keeps them on
     // `__demo`, where the suite reads them.
-    readout: { takes: '', line: 's', mime: '', kib: 'KiB', handovers: '' },
+    readout: { takes: '', line: 's', kib: 'KiB', handovers: '' },
     showReadout: false,
     controls: [{ id: 'camera', label: 'Use the camera' }],
   });
@@ -605,7 +605,6 @@
     // rendered as `webm;cod…` — an ellipsis, which says the content is wrong
     // for the slot rather than the slot being too small. Safari's
     // `video/mp4;codecs=avc1.42E01E` loses its profile suffix the same way.
-    d.set('mime', parts[0] ? shortMime(parts[0].mime) : null);
     const kib = parts.reduce((a, p) => a + p.bytes, 0);
     d.set('kib', kib ? Math.round(kib / 1024) : null);
     // no `?? 0` anywhere: a number this page has not observed is an em dash

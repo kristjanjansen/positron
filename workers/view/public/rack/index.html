@@ -43,7 +43,7 @@
     // teaches a reader to skip the row — and at 105 px it drew `Ablet…`, which
     // is worse than absent. `frames` was an odometer; `rate` is the same
     // quantity where it can still say something.
-    readout: { sound: '', rate: '/s', 'round trip': 'ms',
+    readout: { sound: '', 'round trip': 'ms',
                bitrate: 'Mb/s', buffer: 'ms', dropouts: '', midi: '' },
     // ⚠️ HIDDEN, NOT REMOVED — LESSONS #41. Pressing a key already starts the
     // sound and the socket dials on load, so this button is dead weight for a
@@ -223,9 +223,10 @@
   setInterval(() => {
     const now = performance.now(), dt = (now - t0) / 1000;
     if (dt >= 1) {
-      // `frames` is still counted — the asserts below read it — it just has no
-      // cell any more: an odometer is not a measurement a reader can act on.
-      d.set('rate', Math.round((frames - f0) / dt));
+      // `frames` and the frame RATE are both still counted — the asserts below
+      // read them — they just have no cell any more. An odometer is not a
+      // measurement a reader can act on, and the rate sits at 50/s from the
+      // first second and never leaves it.
       // ⚠️ ONE DECIMAL AND A SHORT UNIT, MEASURED. `1525` + `kbit/s` is 110 px of
       // text in a 97 px cell, so it drew `1525kbit…` — and an ellipsis in a
       // readout means the number is in the wrong shape, not that the cell is

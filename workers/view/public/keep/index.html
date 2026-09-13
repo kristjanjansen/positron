@@ -66,7 +66,7 @@
       + 'record is the copy that came back. Every frame carries a clock written '
       + 'into the pixels before it left, so dragging the line and watching that '
       + 'clock move by the same amount proves the seek landed.',
-    readout: { leg: 'ms', takes: '', line: 's', clean: '', drift: 'ms' },
+    readout: { leg: 'ms', line: 's', clean: '', drift: 'ms' },
     showReadout: false,
     controls: [
       { id: 'go', label: 'Send and receive', primary: true },
@@ -448,7 +448,6 @@
   });
 
   function paint() {
-    d.set('takes', shown().length || null);
     d.set('line', totalMs ? (totalMs / 1000).toFixed(2) : null);
     view.strip.invalidate();
   }

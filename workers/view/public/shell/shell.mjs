@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '4f7ff46-072800';
+export const BUILD = '0928e52-082529';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -42,6 +42,28 @@ export function mount({
   // row on top duplicating them a second time in a place with no context. The
   // MACHINE contract is unchanged: a CDP script still reads `__demo.readout`,
   // and `verify.mjs` still asserts the page declares one.
+  //
+  // 🔴 AN EVEN NUMBER OF CELLS, AND WHEN IT IS ODD THE ANSWER IS TO CUT ONE.
+  // The row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets two
+  // columns and an odd count leaves a HOLE in the last row — a slot of a
+  // different colour with nothing in it, which reads as a cell that failed to
+  // load rather than as a cell that does not exist. Padding it with a blank is
+  // the wrong repair: it adds a thing to look at that says nothing. Trimming
+  // is the right one, because a readout with an odd cell always has a weakest
+  // cell — usually one that cannot change (a constant read out of a playlist,
+  // a codec name) or one a neighbour already implies. Thirteen pages were odd
+  // when this rule landed and every one of them got BETTER for losing a cell.
+  //
+  // It throws rather than warns so the suite catches it on the next run: every
+  // demo is driven by `verify.mjs`, so a page that breaks this cannot reach a
+  // visitor without going red first.
+  const keys = Object.keys(readout);
+  if (keys.length % 2) {
+    throw new Error(
+      `readout has ${keys.length} cells and wants an even number — ` +
+      `drop the weakest one (${keys.join(', ')}), do not add a filler`);
+  }
+
   const cells = new Map();
   const rb = el('div', 'pos-readout');
   if (!showReadout) rb.hidden = true;
@@ -50,6 +72,11 @@ export function mount({
     const v = el('span', 'pos-v', '—');
     v.dataset.state = 'pending';
     cell.append(el('span', 'pos-k', k), v);
+    // ⚠️ THE UNIT IS PART OF THE VALUE, SO IT IS HIDDEN WHILE THERE IS NONE.
+    // A pending cell reading a lone `%` or `px` is a unit with nothing under
+    // it — it looks like the number went missing, when in truth it has not been
+    // measured yet. CSS hides it on `[data-state="pending"]`; it stays in the
+    // DOM so `set()` can re-append it without rebuilding the cell.
     if (unit) v.append(el('span', 'pos-u', unit));
     cells.set(k, v);
     rb.append(cell);
@@ -116,10 +143,19 @@ export function mount({
     api.readout[k] = value;
     const v = cells.get(k);
     const unit = v.querySelector('.pos-u');
-    v.textContent = value === null || value === undefined ? '—'
+    // 🔴 NOTHING MEASURED PRINTS AS ABSENT, AND THAT INCLUDES `''` AND `NaN`.
+    // `null` always did; the empty string did not, so `d.set('invented', '')`
+    // emptied the cell and left the unit standing alone — a `%` with no number
+    // in front of it. And a page that pre-sets a counter to 0 before anything
+    // has happened is worse: a zero reads as a very confident measurement.
+    // Pages hand over `''`/`null` until they have something; this turns all
+    // three into one pending cell with an em dash and no unit.
+    const blank = value === null || value === undefined || value === ''
+      || (typeof value === 'number' && !Number.isFinite(value));
+    v.textContent = blank ? '—'
       : typeof value === 'number' ? fmtNum(value) : String(value);
     if (unit) v.append(unit);
-    v.dataset.state = state || (value === null ? 'pending' : '');
+    v.dataset.state = state || (blank ? 'pending' : '');
     return value;
   }
 

@@ -828,8 +828,17 @@ async function handle(msg) {
       // 48 because the resonator bank takes 48 frequencies in one message, and
       // nothing here takes more.
       if (!args.length || args.length > 48) return reply('params.set', { ok: false, reason: 'args must be 1..48 finite numbers' });
-      pappus().send(cmd, ...args);
-      return reply('params.set', { ok: true, cmd, args });
+      // ⚠️ `.set`, NOT `.send`. A parameter a person chose becomes the centre
+      // the slow movement circles, so a page that sets its sound directly —
+      // `grains` has six named patches and no die — has something for the
+      // drift to move around. `.send` is the raw door and stays raw, because
+      // the drift's own nudges go out through it.
+      const centred = pappus().set(cmd, ...args);
+      // It does NOT switch the movement on. `params.set` is the MEASUREMENT
+      // surface: a sweep that turned the drift on under itself would be
+      // grading a moving target, and `pappus-live.mjs` opens by turning it off
+      // for exactly that reason. Movement is asked for, by `params.drift`.
+      return reply('params.set', { ok: true, cmd, args, centred: centred ? centred.join(' ') : null });
     }
 
     // ── 1965, as grain material ──────────────────────────────────────────
