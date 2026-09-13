@@ -228,6 +228,13 @@ export const DEMOS = [
   // The same subject as `grains`, on this machine instead of on the Pi — and it
   // exists because the board's granulator could not be shown to respond to any
   // of its own parameters, while this one reports every grain it fires.
+  // Promoted from proto/paths/, which was finished and measured and had never
+  // been given a page — hold 24.19 px against Catmull-Rom 0.036, and 93.4% of
+  // the drawn line invented. The adapter was the asset; its hand-rolled UI is
+  // what the kit replaces.
+  { name: 'draw', act: 0, created: '2026-09-13', built: true,
+    one: 'record a gesture, play it back, and see how much of the line was never recorded',
+    tags: ['pointer', 'timeline', 'canvas'] },
   { name: 'grains', act: 4, created: '2026-09-12', built: true, settleMs: 45000,
     one: 'a granular engine on a Raspberry Pi, rolled from a seed you can get back',
     tags: ['SuperCollider', 'relay', 'PCM', 'live board'] },

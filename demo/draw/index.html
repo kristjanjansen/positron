@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .pad { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px;
+         background: var(--card); touch-action: none; cursor: crosshair; }
+  .gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 12px; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { holdSample, lerpSample, catmullSample } from '/shell/pointer-adapter.mjs';
+
+  const d = mount({
+    name: 'draw',
+    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and one sample every tenth of a second — which is what a recording of a gesture normally is. The pale line is everything that happened; the bright one is what a player would reconstruct from the sparse record. The numbers say how far apart they are in pixels, and how much of the bright line was never recorded at all.',
+    // Every cell moves with the drawing. `invented` is the one to read: it is
+    // the fraction of the drawn line that no sample attests.
+    readout: { kept: '', 'every sample': '', invented: '%', 'off by': 'px', worst: 'px' },
+    controls: [
+      // ⚠️ CONTROL 0 DRAWS A KNOWN CURVE, and it is first because the harness
+      // CANNOT DRAW. `element.click()` fires no pointer events — measured in
+      // this repo's own headless Chrome: two port-to-port drags made two wires,
+      // two clicks on the same ports made zero. A page whose only input is a
+      // drag is a page the suite cannot exercise, so the deterministic path is
+      // the thing it presses, and a human gets the same page by using a finger.
+      { id: 'demo', label: 'Draw one for me', primary: true },
+      { id: 'clear', label: 'Clear' },
+    ],
+  });
+  guard(d);
+
+  // ── the two records ──────────────────────────────────────────────────────
+  // 🔴 TWO APPEND-ONLY LANES, NEVER ONE MUTABLE ARRAY. The 2025 ancestor of
+  // this page decimated by emptying its own buffer (`realTimePoints.length =
+  // 0`), so the comparison it existed to make had already eaten its own ground
+  // truth. `evidence` is every sample and is never touched by the throttle.
+  const STORE_MS = 100;
+  let evidence = [], stored = [], lastStoreAt = -1e9;
+
+  // ⚠️ STAMP AT SOURCE. `event.timeStamp` is the browser's own clock for when
+  // the input happened; `performance.now()` read in the handler is when we got
+  // round to it. The lineage re-stamped in the handler and this project has a
+  // rule about it — the gap is not a constant anybody could subtract later.
+  const stampMs = (ev) => ev.timeStamp;
+
+  function push(at, x, y, pressure) {
+    evidence.push({ at, x, y, pressure });
+    if (at - lastStoreAt >= STORE_MS) { lastStoreAt = at; stored.push({ at, x, y, pressure }); }
+  }
+
+  // ── reconstruction ───────────────────────────────────────────────────────
+  // The adapter's own interpolators, which is the whole reason this page did
+  // not need writing: `holdSample`, `lerpSample` and `catmullSample` are the
+  // measured article (0.036 px mean for the spline against 24.19 for a hold).
+  const MODES = [['every tenth of a second, held', 'hold'],
+                 ['joined by straight lines', 'linear'],
+                 ['smoothed', 'catmull']];
+  let mode = 'catmull';
+
+  /** Where the sparse record says the pen was at time `t`. */
+  function at(t) {
+    const n = stored.length;
+    if (!n) return null;
+    if (t <= stored[0].at) return stored[0];
+    if (t >= stored[n - 1].at) return stored[n - 1];
+    let i = 0;
+    while (i < n - 2 && stored[i + 1].at <= t) i++;
+    const a = stored[i], b = stored[i + 1];
+    if (mode === 'hold') return holdSample(a);
+    const u = (t - a.at) / Math.max(1e-6, b.at - a.at);
+    if (mode === 'linear') return lerpSample(a, b, u);
+    // ⚠️ TIME-KNOTTED, and reflected at the ends. A wall-clock throttle never
+    // produces evenly spaced samples, so uniform knots bend the curve toward
+    // whichever sample happened to arrive late; and without phantom endpoints
+    // the first and last segments have no curve at all.
+    const p0 = stored[i - 1] || { ...a, at: a.at - (b.at - a.at) };
+    const p3 = stored[i + 2] || { ...b, at: b.at + (b.at - a.at) };
+    return catmullSample(p0, a, b, p3, u);
+  }
+
+  // ── the picture ──────────────────────────────────────────────────────────
+  const W = 960, H = 520;
+  const cv = el('canvas', 'pad');
+  cv.width = W * 2; cv.height = H * 2;
+  cv.style.aspectRatio = `${W} / ${H}`;
+  d.el.append(cv);
+  const gut = el('div', 'gut', 'draw on it — or press “Draw one for me”');
+  d.el.append(gut);
+  const ctx = cv.getContext('2d');
+
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
+  const C = { line: tok('--line', '#232c3a'), dim: tok('--dim', '#9aa7bd'),
+              hi: tok('--hi', '#ffd400'), ok: tok('--ok', '#6ee7a8'), card: tok('--card', '#141922') };
+
+  let drawnPoints = 0;
+  function paint() {
+    ctx.save();
+    ctx.scale(2, 2);
+    ctx.fillStyle = C.card; ctx.fillRect(0, 0, W, H);
+
+    // The truth, pale and underneath: every sample the browser gave us.
+    if (evidence.length > 1) {
+      ctx.strokeStyle = C.line; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(evidence[0].x, evidence[0].y);
+      for (const p of evidence) ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+
+    // What a player reconstructs from the sparse record, sampled at the rate a
+    // screen actually draws — which is why most of it is invented.
+    drawnPoints = 0;
+    if (stored.length > 1) {
+      const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
+      const step = Math.max(2, (t1 - t0) / 900);
+      ctx.strokeStyle = C.hi; ctx.lineWidth = 1.6; ctx.beginPath();
+      let first = true;
+      for (let t = t0; t <= t1; t += step) {
+        const s = at(t); if (!s) continue;
+        drawnPoints++;
+        if (first) { ctx.moveTo(s.x, s.y); first = false; } else ctx.lineTo(s.x, s.y);
+      }
+      ctx.stroke();
+      // The samples that are actually attested, so "kept" is a thing you can
+      // count on screen rather than only in a cell.
+      ctx.fillStyle = C.ok;
+      for (const p of stored) { ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.restore();
+  }
+
+  /** How far the reconstruction sits from what actually happened. Measured
+   *  against EVERY evidence sample, not against a subsample of itself. */
+  function error() {
+    if (evidence.length < 2 || stored.length < 2) return null;
+    let sum = 0, worst = 0, n = 0;
+    for (const e of evidence) {
+      const s = at(e.at); if (!s) continue;
+      const dx = s.x - e.x, dy = s.y - e.y;
+      const dist = Math.hypot(dx, dy);
+      sum += dist; if (dist > worst) worst = dist; n++;
+    }
+    return n ? { mean: sum / n, worst, n } : null;
+  }
+
+  function render() {
+    paint();
+    const err = error();
+    d.set('kept', stored.length);
+    d.set('every sample', evidence.length);
+    d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
+    d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
+    d.set('worst', err ? err.worst.toFixed(2) : '');
+    gut.textContent = stored.length
+      ? `${stored.length} samples kept of ${evidence.length} · ${drawnPoints} points drawn from them`
+      : 'draw on it — or press “Draw one for me”';
+  }
+
+  // ── drawing with a finger ────────────────────────────────────────────────
+  let drawing = false;
+  const spot = (ev) => {
+    const r = cv.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) * (W / r.width), y: (ev.clientY - r.top) * (H / r.height) };
+  };
+  cv.addEventListener('pointerdown', (ev) => {
+    reset(); drawing = true; cv.setPointerCapture(ev.pointerId);
+    const p = spot(ev); push(stampMs(ev), p.x, p.y, ev.pressure || 0.5); render();
+  });
+  cv.addEventListener('pointermove', (ev) => {
+    if (!drawing) return;
+    // ⚠️ COALESCED. A browser hands one `pointermove` per frame and hides the
+    // samples between; `getCoalescedEvents` is the difference between a record
+    // of the input and a record of the repaint.
+    const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
+    for (const e of evs) { const p = spot(e); push(stampMs(e), p.x, p.y, e.pressure || 0.5); }
+    render();
+  });
+  for (const t of ['pointerup', 'pointercancel']) cv.addEventListener(t, () => { drawing = false; render(); });
+
+  function reset() { evidence = []; stored = []; lastStoreAt = -1e9; }
+
+  // ── a path the harness can press ─────────────────────────────────────────
+  // The same Lissajous the prototype used, so ground truth is a formula rather
+  // than a recording — the only way to say what an error of 0.036 px is FROM.
+  const CURVE = { A: 380, B: 240, cx: 480, cy: 260, f1: 1, f2: 2, phase: 0.4 };
+  const curveAt = (s) => ({
+    x: CURVE.cx + CURVE.A * Math.sin(2 * Math.PI * CURVE.f1 * s + CURVE.phase),
+    y: CURVE.cy + CURVE.B * Math.sin(2 * Math.PI * CURVE.f2 * s),
+  });
+  function synthesize({ durationMs = 6000, hz = 120, jitterMs = 2, seed = 7 } = {}) {
+    reset();
+    let rnd = seed;
+    const rand = () => ((rnd = (rnd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    const step = 1000 / hz;
+    const n = Math.floor(durationMs / step);
+    for (let k = 0; k <= n; k++) {
+      // Jitter, because a real input clock is not a metronome — and a reader
+      // that only ever sees evenly spaced samples never exercises the knots.
+      const j = k === 0 || k === n ? 0 : (rand() - 0.5) * 2 * jitterMs;
+      const t = k * step + j;
+      const p = curveAt(t / durationMs);
+      push(t, p.x, p.y, 0.5);
+    }
+    const last = evidence[evidence.length - 1];
+    if (stored[stored.length - 1].at < last.at) stored.push({ ...last });
+    render();
+  }
+
+  const pick = createChoice({
+    label: 'the bright line is',
+    options: MODES,
+    at: 2,
+    onPick: (v) => { mode = v; render(); },
+  });
+  const row = el('div', 'pos-controls');
+  row.append(pick.el);
+  d.el.insertBefore(row, cv);
+
+  d.on('clear', () => { reset(); render(); });
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  d.on('demo', async () => {
+    synthesize();
+    await sleep(150);
+
+    d.assert('a gesture was recorded twice, in full and sparsely',
+      evidence.length > 400 && stored.length > 20 && stored.length < evidence.length,
+      `${evidence.length} samples in, ${stored.length} kept`);
+
+    // 🔴 THE ONE THIS PAGE EXISTS FOR. Most of the line you see was never
+    // recorded — say how much, in the same breath as how wrong it is.
+    const invented = 100 * (1 - stored.length / drawnPoints);
+    d.assert('most of the drawn line was never recorded', invented > 80,
+      `${drawnPoints} points drawn from ${stored.length} samples — ${invented.toFixed(1)}% invented`);
+
+    // ⚠️ ASSERT THE ORDER, NOT A THRESHOLD. The three reconstructions are the
+    // subject, and a threshold on any one of them says nothing about whether
+    // interpolating helped. Holding must be worse than joining, and joining
+    // worse than smoothing, on the same recording.
+    const errs = {};
+    for (const m of ['hold', 'linear', 'catmull']) { mode = m; errs[m] = error().mean; }
+    mode = 'catmull'; render();
+    d.assert('smoothing beats straight lines, and straight lines beat holding',
+      errs.catmull < errs.linear && errs.linear < errs.hold,
+      `hold ${errs.hold.toFixed(2)} px · linear ${errs.linear.toFixed(3)} px · smoothed ${errs.catmull.toFixed(3)} px`);
+
+    d.assert('and the smoothed line is inside a pixel of what happened',
+      errs.catmull < 1, `${errs.catmull.toFixed(3)} px from ${evidence.length} samples of truth`);
+
+    // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
+    // in a cell over a blank canvas is the defect this project has hit twice.
+    const lit = (() => {
+      const px = ctx.getImageData(0, 0, cv.width, cv.height).data;
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i] > 60 || px[i + 1] > 60) n++;
+      return n;
+    })();
+    d.assert('there is a line on the canvas, not just numbers in cells', lit > 4000,
+      `${lit} lit pixels`);
+  });
+
+  render();
+  d.ready();
+</script>
+</html>
