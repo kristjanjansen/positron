@@ -597,6 +597,27 @@
       send({ type: 'params.set', cmd: `${h}src`, args: [held ? 1 : 2] });
       send({ type: 'params.set', cmd: `${h}lock`, args: [held ? 1 : 0] });
     }
+    // 🔴 AND EVERY STAGE DOWNSTREAM OF THE GRANULATOR IS PINNED TO OFF, for the
+    // same reason as `src` above and with a sharper consequence. This page's
+    // whole subject is one granulator against another — but only ONE of the two
+    // has a chain behind it. The board's signal runs granulator -> RESONATOR ->
+    // DELAY -> COLOUR -> REVERB; the browser's is a worklet and has none of
+    // them. So any of those stages left on by the last visitor is heard in the
+    // right-hand pane and cannot be heard in the left, and the page reports the
+    // difference as if the granulators had made it.
+    //
+    // ⚠️ THIS IS NOT THEORETICAL AND IT NEARLY WENT THE OTHER WAY. The board was
+    // put back on LITE today, which restores a 24-filter modal bank that TINY
+    // compiles out — MEASURED at `pwet 1`, exactly 0.000000 becomes 0.030-0.041
+    // rms. The obvious next move was to turn `pwet` UP so the page could hear
+    // it. That would have been backwards: it makes the two panes LESS alike, on
+    // a page that exists to make them comparable. The bank is a `/box/` fact,
+    // where you are playing the instrument. Here it is a confound.
+    //
+    // ⚠️ And the board is an OBJECT that keeps what it was left with, so "we
+    // never set it" means "it is whatever the last person wanted". Pinned, not
+    // assumed.
+    for (const [cmd, v] of Object.entries(BYPASS)) send({ type: 'params.set', cmd, args: [v] });
     // ⚠️ ASKED FOR, NOT ASSUMED. Setting a parameter gives the board's slow
     // movement a centre; it does not switch the movement on, because
     // `params.set` is also the surface a harness sweeps one parameter through
@@ -803,6 +824,19 @@
   // The patch below writes into this too, so the two lanes cannot drift apart
   // into two different sounds wearing one control surface.
   const K = { rate: 2.2, size: 0.3, where: 0.5, spray: 0.12 };
+  /**
+   * Every stage BETWEEN the granulator and the master, held at zero.
+   * ⚠️ These names are the engine's, and the numbers are "no contribution" for
+   * each: a wet mix, a feedback, a drive. `pwet` is the modal bank, which the
+   * board regained today and which this page deliberately does not use — see
+   * the note where this is sent.
+   */
+  const BYPASS = {
+    pwet: 0,        // RESONATOR — the 24-filter modal bank
+    swet: 0, sfb: 0,   // DELAY
+    drive: 0, crush: 0, loss: 0, noise: 0,   // COLOUR
+    rverb: 0, rshimmer: 0,                   // REVERB
+  };
   /** stops the patch glide below; `true` sends it to the end rather than freezing it */
   let endLocalGlide = null;
 
