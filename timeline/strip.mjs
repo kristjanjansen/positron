@@ -484,6 +484,7 @@ registerRenderer('ticks', (ctx, L, C) => {
   const y0 = L.y, h = L.height;
   ctx.save();
   ctx.globalAlpha = style.alpha ?? 0.95;
+  const glyphs = [];
   for (const r of C.rows) {
     const px = Math.round(x(r.at)) + 0.5;
     const fired = L.latch && r.at <= C.pos;
@@ -500,7 +501,51 @@ registerRenderer('ticks', (ctx, L, C) => {
     ctx.lineWidth = (L.widthOfRow && L.widthOfRow(r, fired)) || style.width || 1.4;
     if (style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(px, y0 + 2); ctx.lineTo(px, y0 + h - 2); ctx.stroke();
+    if (L.glyphOf) glyphs.push([px, r]);
   }
+  // WHAT THE MARK WAS, DRAWN ON THE MARK — but only where the zoom has made
+  // room for it. `glyphOf(row)` returns a character or two (the letter that was
+  // typed, the key that was pressed); at a zoom where the ticks are 2 px apart
+  // there is nowhere to put it, and drawing it anyway turns a legible comb of
+  // marks into a smear that is neither a picture nor a word.
+  //
+  // 🔴 SO THE ZOOM IS THE CONTROL. Zoom in and the marks become letters; zoom
+  // out and they go back to being marks. Nothing is hidden that was visible,
+  // because the tick is always drawn first and the glyph sits ON it.
+  //
+  // ⚠️ A glyph is skipped on its NEIGHBOUR's spacing, not on its own width
+  // alone, and the test is against BOTH sides — one-sided, a run of letters
+  // would draw the first of every crowded pair and drop the second, which reads
+  // as "these particular keys are special" rather than "there is no room here".
+  // ⚠️ And the count is published (`L.glyphState`) rather than left implicit:
+  // a page that says "12 of 48 letters fit" tells the reader the other 36 exist
+  // and that zooming will find them. Silence there reads as 12 letters typed.
+  if (glyphs.length) {
+    ctx.font = L.glyphFont || '10px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 1;
+    const yc = y0 + h / 2, pad = 2;
+    let drawn = 0;
+    for (let i = 0; i < glyphs.length; i++) {
+      const [px, r] = glyphs[i];
+      const g = L.glyphOf(r);
+      if (!g) continue;
+      const w = ctx.measureText(g).width;
+      const need = w / 2 + 2;
+      const left = i > 0 ? px - glyphs[i - 1][0] : Infinity;
+      const right = i < glyphs.length - 1 ? glyphs[i + 1][0] - px : Infinity;
+      if (Math.min(left, right) < need * 2) continue;
+      // a backing so the tick does not strike through the letter; the tick
+      // stays visible above and below it, so the mark is still a mark
+      ctx.fillStyle = C.theme && C.theme.lane ? C.theme.lane : '#151a24';
+      ctx.fillRect(px - w / 2 - pad, yc - 6, w + pad * 2, 12);
+      ctx.fillStyle = (L.glyphColor || (L.colorOfRow && L.colorOfRow(r, false)) || style.color);
+      ctx.fillText(g, px, yc + 3.5);
+      drawn++;
+    }
+    L.glyphState = { had: glyphs.length, drawn };
+    ctx.textAlign = 'start';
+  } else if (L.glyphOf) L.glyphState = { had: 0, drawn: 0 };
   ctx.restore();
 });
 
@@ -1407,6 +1452,9 @@ export function createStrip(canvas, deck, opts = {}) {
     const C = {
       deck, x, tAt, t0, t1, width: plotW(), pos: S.pos, evidence: ev(), style,
       hover: S.hover, view: S.view,
+      // the palette, so a renderer that needs to paint a backing uses the
+      // lane's OWN background rather than guessing a hex that is right today
+      theme: T,
     };
     const as = L.as || autoKind(L);
     if (as === 'spans') C.spans = spansFor(L).filter((s) => (Number.isFinite(s.to) ? s.to : t1) >= t0 && s.from <= t1);

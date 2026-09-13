@@ -168,9 +168,10 @@
     what: 'Type into the carriage and every change is written down as what it did to the '
       + 'document — where the text changed and what it changed to — never as the key you '
       + 'pressed. Press play to watch a recording type itself back at the speed it was '
-      + 'typed, and drag the line under it to any moment: the text, the cursor and the '
-      + 'highlight come back to exactly what they were then, without a single keystroke '
-      + 'being replayed. "Worked out" counts the deletions where nothing said what had been '
+      + 'typed, drag the line under it to any moment — the text, the cursor and the '
+      + 'highlight all come back to what they were, without a single keystroke being '
+      + 'replayed — and zoom that line in until each mark turns into the letter it '
+      + 'recorded. "Worked out" counts the deletions where nothing said what had been '
       + 'removed, so the text before and after had to be compared — which is what five '
       + 'earlier versions of this got wrong.',
     // Every cell moves. `letters` and `cursor` are the document AT THE PLAYHEAD,
@@ -398,6 +399,24 @@
     return {
       id: type, kind: KIND, label, height, width: 2, as: 'ticks', terse: true,
       color: INK[type],
+      // 🔴 THE MARK BECOMES THE LETTER WHEN YOU ZOOM IN FAR ENOUGH. A comb of
+      // identical ticks says WHEN you typed and never WHAT, which is half of
+      // what this page records — and the other half was only reachable by
+      // pointing at one mark at a time. The strip draws a glyph on a tick only
+      // where the neighbouring marks have left room for it, so zooming is the
+      // control: out is a rhythm, in is a word.
+      // ⚠️ A space and a newline have no visible glyph, and drawing nothing for
+      // them would make the two commonest keys on the page look like marks that
+      // failed to render. They get the printer's symbols instead.
+      glyphOf: (r) => {
+        const op = r.payload?.op;
+        if (!op) return '';
+        if (op.type === OP_SELECT) return '';
+        const t = op.type === OP_DELETE ? (op.removed ?? '') : (op.text ?? '');
+        if (!t) return op.type === OP_DELETE ? '⌫' : '';
+        const c = [...t][0];
+        return c === ' ' ? '␣' : c === '\n' ? '⏎' : c === '\t' ? '⇥' : c;
+      },
       filter: (r) => r.payload?.op?.type === type,
       describeRow: (r) => {
         const op = r.payload.op;
@@ -764,6 +783,30 @@
       rows.length > 0 && keysStored(rows) === 0,
       `${rows.length} edits, ${moves} of them cursor moves; every edit carries `
       + `${[...fields].sort().join(', ')}`);
+
+    // 🔴 THE LETTERS ON THE MARKS, ASSERTED AT TWO ZOOMS — because "it drew
+    // nothing" and "there was no room" are the same picture, and a glyph
+    // feature that had silently stopped working would read as a crowded view.
+    // So the check is a RELATIONSHIP, not a count: zoom in far enough and more
+    // letters appear; zoom out and they go away again. Neither end alone can
+    // say that, and a fixed threshold would just be tuned until it passed.
+    {
+      const st = view.strip;
+      const saved = st.view();
+      const at = (pxPerSecond) => {
+        st.setView({ ...st.view(), pxPerSecond });
+        st.draw();
+        const L = st.lanes().find((l) => l.id === OP_INSERT);
+        return L && L.glyphState ? L.glyphState : { had: 0, drawn: 0 };
+      };
+      const wide = at(20), close = at(400);
+      st.setView(saved); st.draw();
+      d.assert('zoom in far enough and a mark becomes the letter that was typed',
+        close.drawn > wide.drawn && close.drawn > 0 && wide.had > 0,
+        `${wide.drawn} letters legible of ${wide.had} marks at 20 px a second, `
+        + `${close.drawn} of ${close.had} at 400 — a mark carries its letter `
+        + `only where the next mark has left room for it`);
+    }
 
     const dels = rows.filter((r) => r.op.type === OP_DELETE);
     const workedOut = dels.filter(hadToBeWorkedOut);
