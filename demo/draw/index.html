@@ -25,10 +25,17 @@
 
   const d = mount({
     name: 'draw',
-    what: 'Press record, then draw a line with a finger or a mouse: this page keeps two records of it — every sample the browser gave it, and a thinned-out one, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player would reconstruct from the sparse record, and the yellow mark is where that record says your hand was at the position the bar is showing — press play and watch it retrace the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
+    what: 'Press record, then draw a line with a finger or a mouse: this page keeps every sample the browser gave it, and a thinned-out record of the same line, which is what a recording of a gesture normally is. The white line is everything that happened, the blue one is what a player rebuilds from that record, and the pink one is the same gesture written down as two separate records instead — one per direction, each choosing its own moments to save a number. The yellow mark is where the blue record says your hand was at the position the bar is showing, so press play and it retraces the line. The two knobs are how often a sample is written down and how much a player may invent between two of them, and moving either moves the numbers: how far each line sits from what happened, and how much of what you see no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
-    readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
+    //
+    // ⚠️ SIX, WHICH IS EVEN. `as two` and `times worse` arrived together for
+    // that reason as much as any other — an odd readout leaves a hole in the
+    // last row on a phone, and `mount()` throws on one. They pair down the page
+    // as they read: what was kept, what was invented · how far the one record
+    // is off and at worst · how far the same gesture is off when it is written
+    // down as two records instead, and by what factor that is worse.
+    readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px', 'as two': 'px', 'times worse': '\u00d7' },
     // 🔴 NOTHING DRAWS FOR YOU. There was a `Draw one for me` control that
     // synthesised a Lissajous, and it was there because the harness could not
     // draw — `element.click()` fires no pointer events. It is gone, button and
@@ -65,6 +72,10 @@
   // interpolator rescues a fast corner.
   let storeMs = 100;
   let evidence = [], stored = [];
+  // The same gesture written down the OTHER way: two records of one number
+  // each, whose knots are chosen per axis and therefore land at different
+  // instants. See `oneAxisAlone` below for why this is here at all.
+  let splitX = [], splitY = [];
 
   /**
    * The sparse record, DERIVED from the evidence rather than taken instead of
@@ -112,9 +123,6 @@
    * says anything about WHERE samples should go.
    */
   function whereItBends(target) {
-    const n = evidence.length;
-    if (n <= 2 || target >= n) return evidence.slice();
-    const keep = new Set([0, n - 1]);
     // deviation of point i from the chord a..b, in pixels
     const dev = (a, b, i) => {
       const A = evidence[a], B = evidence[b], P = evidence[i];
@@ -123,6 +131,26 @@
       if (L < 1e-6) return Math.hypot(P.x - A.x, P.y - A.y);
       return Math.abs(dy * (P.x - A.x) - dx * (P.y - A.y)) / L;
     };
+    return pickWorstFirst(dev, target).map((i) => evidence[i]);
+  }
+
+  /**
+   * The engine both alternatives below run on, so the comparison between them
+   * is about WHERE they put their samples and nothing else. Keep the two ends,
+   * then repeatedly add whichever sample `dev` says the line already kept is
+   * most wrong about, until `target` are kept. Returns indices into `evidence`.
+   *
+   * `dev(a, b, i)` is "how wrong would the straight line a..b be at i", in
+   * whatever unit the caller measures in — perpendicular pixels for a path,
+   * pixels on one axis for a single series. ⚠️ NEVER A MIXTURE OF THE TWO:
+   * a deviation that adds milliseconds to pixels needs a scale factor between
+   * them, and there is no defensible one, so the number it produces is an
+   * artefact of whoever picked it.
+   */
+  function pickWorstFirst(dev, target) {
+    const n = evidence.length;
+    if (n <= 2 || target >= n) return evidence.map((_, i) => i);
+    const keep = new Set([0, n - 1]);
     // the worst point inside each open segment, kept as a small work list
     const worstIn = (a, b) => {
       let best = -1, bestD = -1;
@@ -138,11 +166,51 @@
       keep.add(i);
       segs.splice(pick, 1, { a, b: i, ...worstIn(a, i) }, { a: i, b, ...worstIn(i, b) });
     }
-    return [...keep].sort((x, y) => x - y).map((i) => evidence[i]);
+    return [...keep].sort((x, y) => x - y);
+  }
+
+  /**
+   * 🔴 THE OTHER READING OF THE SAME GESTURE — ONE DIRECTION, RECORDED ON ITS
+   * OWN. This is the arrangement plan-gesture §3 rejected by inference and P3
+   * measures: a pad that writes down two one-dimensional series rather than one
+   * two-dimensional one, which is what a hardware controller sends and what
+   * `demo/shell/cc-adapter.mjs` receives. The whole of the difference is that
+   * the gate is PER SERIES — across can be written down at an instant down is
+   * not — so nothing here may consult the other axis.
+   *
+   * ⚠️ THE COUNT IS HELD EQUAL PER AXIS, WHICH HANDS THE ALTERNATIVE THE
+   * ADVANTAGE, and that is deliberate. Each series gets as many samples as the
+   * whole 2-D record has, so the split reading stores twice the rows; and its
+   * samples are placed by a pass over the FINISHED gesture, which no live gate
+   * could run. If the best case a two-series recording can reach still loses,
+   * every real per-series gate loses too — and the one that ships (a
+   * per-controller wall-clock throttle over a quantised value) is strictly
+   * worse placed than this.
+   *
+   * ⚠️ THE VALUE RIDES IN `.x`, whichever axis it came from, so the SAME
+   * measured interpolators grade it: `catmullSample` treats x and y
+   * independently over shared time knots, so a one-axis series is exactly a
+   * two-axis one whose other component never moves. No second spline was
+   * written, which is the only way the comparison is about placement.
+   */
+  function oneAxisAlone(get, target) {
+    const dev = (a, b, i) => {
+      const A = evidence[a], B = evidence[b], P = evidence[i];
+      const h = B.at - A.at;
+      const u = h > 0 ? (P.at - A.at) / h : 0;
+      return Math.abs(get(P) - (get(A) + (get(B) - get(A)) * u));
+    };
+    return pickWorstFirst(dev, target)
+      .map((i) => ({ at: evidence[i].at, x: get(evidence[i]), y: 0, pressure: evidence[i].pressure }));
   }
 
   function decimate() {
     stored = evidence.length ? onAClock() : [];
+    // THE SAME GESTURE, WRITTEN DOWN AS TWO. Rebuilt with the record, because
+    // the rate knob changes how many samples there are to place.
+    const n = stored.length;
+    splitX = n >= 2 ? oneAxisAlone((p) => p.x, n) : [];
+    splitY = n >= 2 ? oneAxisAlone((p) => p.y, n) : [];
   }
 
   // ── reconstruction ───────────────────────────────────────────────────────
@@ -208,6 +276,34 @@
     return blend(a, b, u, { prev: stored[i - 1], next: stored[i + 2] }, s);
   }
 
+  /** the same reading pinned at one smoothing, in the shape `error()` takes */
+  const atSm = (sm) => (t) => at(t, sm);
+
+  /** Where ONE independently-recorded direction says it was at `t`. Its rows
+   *  carry their value in `.x` whichever axis they came from — see
+   *  `oneAxisAlone` — so this is `at()` with the second component thrown away,
+   *  through the same `blend` and therefore the same measured interpolators. */
+  function oneAxisAt(rows, t, sm) {
+    const n = rows.length;
+    if (n < 2) return null;
+    if (t <= rows[0].at) return rows[0].x;
+    if (t >= rows[n - 1].at) return rows[n - 1].x;
+    let i = 0;
+    while (i < n - 2 && rows[i + 1].at <= t) i++;
+    const a = rows[i], b = rows[i + 1];
+    const u = (t - a.at) / Math.max(1e-6, b.at - a.at);
+    return blend(a, b, u, { prev: rows[i - 1], next: rows[i + 2] }, sm).x;
+  }
+
+  /** Where the TWO separate records say the hand was at `t`. Each direction is
+   *  read from its own knots, and they are not at the same instants — which is
+   *  the whole of what is being measured. */
+  function atApart(t, sm = smooth) {
+    if (splitX.length < 2 || splitY.length < 2) return null;
+    const x = oneAxisAt(splitX, t, sm), y = oneAxisAt(splitY, t, sm);
+    return x === null || y === null ? null : { x, y, at: t };
+  }
+
   /** The full-rate truth at `t` — what the hand ACTUALLY did, straight-lined
    *  between two samples a few milliseconds apart. */
   function truthAt(t) {
@@ -253,6 +349,24 @@
     },
   });
   pointer.interpolate = (a, b, u, ctx) => blend(a, b, u, ctx);
+  // ⚠️ THE SPEEDS COME FROM THE ADAPTER, AND THE BAR BUILDS THE CONTROL. There
+  // is no speed widget on this page and there must not be: `transport-bar.mjs`
+  // renders one button per rate in the INTERSECTED `caps.rates` of the deck's
+  // adapters, and shows an honest static `1x` when no adapter declares any —
+  // which is what this page showed until now, because `pointer-adapter.mjs`
+  // says `rate: true` and never says which. A capability declared as a boolean
+  // is a capability no UI can offer.
+  //
+  // SET BEFORE `createDeck`, so neither the deck's registration of the kind nor
+  // the bar's first read of the lattice can miss it. (Which of the two caches
+  // is not something this page should have to know.)
+  //
+  // ⚠️ AND IT CHANGES NOTHING THIS PAGE MEASURES. Every number here comes from
+  // the samples' own stamps through `at()` / `atApart()`, and the transport
+  // check seeks to explicit positions — a position is a position at any speed.
+  // The one thing that does read the playhead live is the replay's ink limit
+  // below, and it reads `deck.position()`, which is in the recording's
+  // milliseconds however fast they are being crossed.
 
   const deck = createDeck({
     items: [], adapters: { [KIND]: pointer },
@@ -303,13 +417,25 @@
   // second reading of the same gesture, present and legible without competing.
   // Not `--hi`, which is the playhead's colour here as on every page — and on
   // this page the playhead really is on the pad, as the mark.
-  const C = { guess: '#7aa2f7' };
+  // ⚠️ AND A THIRD LINE THAT IS NEITHER OF THE OTHER TWO'S COLOUR AND NEITHER
+  // OF THE PAGE'S TWO MEANINGS. The split reading is pink: not white (the
+  // capture), not blue (the record this page is about), not `--hi` (the
+  // playhead), and deliberately not `--bad` red or `--ok` green — it is a
+  // second way of writing the gesture down, not a verdict, and painting the
+  // loser red would be the picture asserting the conclusion the numbers are
+  // there to reach. It is dashed, which says "another reading of the same
+  // thing" without competing for weight with the one the page is about.
+  //
+  // It is also outside both pixel buckets the checks at the bottom count:
+  // near-white needs all three channels over 200 (g is 122 here) and the mark
+  // needs blue under 100 (b is 182), so a third line cannot inflate either.
+  const C = { guess: '#7aa2f7', apart: '#ff7ab6' };
 
   // ⚠️ DECLARED BEFORE THE PAD, because the pad PAINTS as it is built and its
   // paint calls this page's overlay — a `let` below it is in its temporal dead
   // zone at exactly that moment, and the page dies before `ready`.
   let dirty = true;          // the derived record is stale
-  let drawnPoints = 0, drawn = [];
+  let drawnPoints = 0, drawn = [], drawnApart = [];
 
   // ── the pad ──────────────────────────────────────────────────────────────
   // The surface is `demo/shell/xy-pad.mjs`: it owns the capture, it draws it,
@@ -329,6 +455,12 @@
   // holds — that separation is rule 2 of the capture discipline and this page
   // exists to measure it.
   let recording = false, growing = false;
+  // Whether the white line on the pad IS the take the transport is playing.
+  // It is not, after you draw on the pad with record off — that leaves the
+  // record alone (see `onStart`) and the two are then different gestures, so
+  // wiping the ink back to the playhead would be wiping something the playhead
+  // knows nothing about.
+  let traceIsTake = false;
 
   const pad = createXyPad(d.el, {
     label: 'draw a line',
@@ -350,13 +482,29 @@
     // with record OFF draws, and leaves whatever was recorded before intact —
     // otherwise arming, drawing, and then idly touching the pad would silently
     // throw the take away.
-    onStart: () => { if (recording) { evidence = pad.trace(); ghost = null; dirty = true; } },
+    onStart: () => {
+      traceIsTake = recording;
+      if (recording) { evidence = pad.trace(); ghost = null; dirty = true; }
+    },
     onDone: () => {
       if (!recording) return;
       growing = false;
       render(); publish(); check();
     },
     value: () => ghost,
+    // 🔴 A REPLAY REDRAWS THE LINE, IT DOES NOT DRAW ON TOP OF IT. Asked for,
+    // and it changes what pressing play means: the ink is wiped back to the
+    // playhead and grows under the mark, so what you watch is the replay. It
+    // used to retrace a finished drawing, where the replay and the original are
+    // the same pixels and you cannot tell which you are looking at.
+    //
+    // Paused, the whole line is back — a still page shows what was recorded,
+    // which is the pad's own rule 3 and not something playing gets to change.
+    //
+    // ⚠️ A TIME, NOT A COUNT. `base + position` is the stamp the capture
+    // carries; a count would need this page to know how the pad coalesced.
+    upTo: () => (traceIsTake && deck.playing() && stored.length > 1
+      ? base + deck.position() : null),
     overlay: (ctx, v) => paintSecondReading(ctx, v),
   });
 
@@ -369,21 +517,27 @@
   function rebuild() {
     drawnPoints = 0;
     drawn = [];
+    drawnApart = [];
     if (stored.length > 1) {
       const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
       const step = Math.max(2, (t1 - t0) / 900);
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
         drawnPoints++; drawn.push(s);
+        // the same instants, read from the two separate records
+        const q = atApart(t); if (q) drawnApart.push(q);
       }
     }
     // no `0` before there is anything to count — an untouched pad has not
     // measured zero samples, it has not measured
     const err = error();
+    const errApart = error(atApart);
     d.set('kept', stored.length || '');
     d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
     d.set('worst', err ? err.worst.toFixed(2) : '');
+    d.set('as two', errApart ? errApart.mean.toFixed(3) : '');
+    d.set('times worse', err && errApart && err.mean > 0 ? (errApart.mean / err.mean).toFixed(1) : '');
     dirty = false;
   }
 
@@ -395,6 +549,21 @@
   function paintSecondReading(ctx, v) {
     if (dirty) recompute();
     if (drawn.length < 2) return;
+    // THE SAME GESTURE AS TWO RECORDS, UNDERNEATH — the alternative, drawn so
+    // it can be looked at rather than only read off a cell.
+    if (drawnApart.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = C.apart; ctx.lineWidth = 1.6;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      let start = true;
+      for (const q of drawnApart) {
+        const [px, py] = v.px(q.x, q.y);
+        if (start) { ctx.moveTo(px, py); start = false; } else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6;
     ctx.beginPath();
     let first = true;
@@ -453,11 +622,16 @@
 
   /** How far the reconstruction sits from what actually happened. Measured
    *  against EVERY evidence sample, not against a subsample of itself. */
-  function error(sm = smooth) {
+  // ⚠️ IT TAKES THE READING, NOT A SMOOTHING NUMBER. It took `sm` until P3 put
+  // a second reading of the same gesture on the page, and a function that can
+  // only grade one of them is a function that decides which one is the subject.
+  // `reading(t)` is anything that answers "where does this record say the hand
+  // was at t" — including the one that reads two separate records.
+  function error(reading = (t) => at(t, smooth)) {
     if (evidence.length < 2 || stored.length < 2) return null;
     let sum = 0, worst = 0, n = 0;
     for (const e of evidence) {
-      const s = at(e.at, sm); if (!s) continue;
+      const s = reading(e.at); if (!s) continue;
       const dx = s.x - e.x, dy = s.y - e.y;
       const dist = Math.hypot(dx, dy);
       sum += dist; if (dist > worst) worst = dist; n++;
@@ -475,19 +649,47 @@
    * a drawing needs. A record can be excellent at one and poor at the other,
    * and this page measured exactly that on its first run.
    */
-  function shapeError() {
-    if (evidence.length < 2 || drawn.length < 2) return null;
+  function shapeError(line = drawn) {
+    if (evidence.length < 2 || line.length < 2) return null;
     let sum = 0, worst = 0, n = 0;
     for (const e of evidence) {
       let best = Infinity;
-      for (const s of drawn) { const dd = (s.x - e.x) ** 2 + (s.y - e.y) ** 2; if (dd < best) best = dd; }
+      for (const s of line) { const dd = (s.x - e.x) ** 2 + (s.y - e.y) ** 2; if (dd < best) best = dd; }
       const dist = Math.sqrt(best);
       sum += dist; if (dist > worst) worst = dist; n++;
     }
     return n ? { mean: sum / n, worst, n } : null;
   }
 
-  function reset() { pad.clear(); evidence = pad.trace(); stored = []; ghost = null; }
+  /**
+   * 🔴 CLEAR REALLY CLEARS, AND IT DID NOT. MEASURED 2026-09-13, pressing it
+   * after a take: the pad went from 33306 lit pixels to 0 and the STRIP BELOW
+   * IT stayed at 1423, still drawing the whole gesture — so the drawing
+   * vanished while the recording of it sat there untouched. The playhead stayed
+   * parked at 1600 ms as well, in a range that had just gone back to empty, so
+   * the bar read `0:01.600 / 0:08.000` for a page with nothing in it. A control
+   * that looks like it reset the page and did not is worse than no control.
+   *
+   * ⚠️ THE READOUT GOES EMPTY, NOT TO ZERO. `rebuild()` writes '' for every
+   * cell with nothing behind it and the shell draws one em dash with the unit
+   * hidden. A zero would read as a very confident measurement of nothing.
+   *
+   * ⚠️ AND `checked` IS DELIBERATELY NOT RESET. `d.assert` appends, so a page
+   * that re-checked after every Clear would grow its own assert count without
+   * end — and diffing that count is this project's cheapest regression test.
+   */
+  function reset() {
+    growing = false;
+    traceIsTake = false;
+    pad.clear();
+    evidence = pad.trace();
+    stored = []; splitX = []; splitY = [];
+    ghost = null; dirty = true;
+    render();
+    publish();
+    deck.seek(0);
+    view.strip.invalidate();
+  }
 
   // While it is PLAYING the mark moves between the attested samples, which fire
   // ten times a second at the default rate — a mark that only moved on a fire
@@ -550,7 +752,11 @@
     }
     // Arming clears what was there, so the take you are about to make is the
     // whole of what the numbers describe.
-    if (on) { pad.clear?.(); evidence = []; stored = []; ghost = null; dirty = true; render(); publish(); }
+    if (on) {
+      pad.clear(); evidence = []; stored = []; splitX = []; splitY = [];
+      ghost = null; dirty = true; traceIsTake = true;
+      render(); publish(); deck.seek(0); view.strip.invalidate();
+    }
     d.log(on ? 'recording — draw on the pad' : 'stopped', on ? 'hi' : undefined);
   }
 
@@ -582,7 +788,7 @@
   // The destructive one, at the far end of the row — deleting what you just
   // made must not sit shoulder to shoulder with the thing that changes it.
   const clear = el('button', '', 'Clear', { type: 'button', 'data-end': '1' });
-  clear.addEventListener('click', () => { reset(); render(); publish(); });
+  clear.addEventListener('click', reset);
 
   const row = el('div', 'pos-controls foot');
   row.append(knobs.el, clear);
@@ -618,7 +824,7 @@
     // subject, and a threshold on any one of them says nothing about whether
     // interpolating helped. Holding must be worse than joining, and joining
     // worse than smoothing, on the same recording.
-    const errs = { hold: error(HOLD).mean, linear: error(LINEAR).mean, catmull: error(SMOOTH).mean };
+    const errs = { hold: error(atSm(HOLD)).mean, linear: error(atSm(LINEAR)).mean, catmull: error(atSm(SMOOTH)).mean };
     d.assert('smoothing beats straight lines, and straight lines beat holding',
       errs.catmull < errs.linear && errs.linear < errs.hold,
       `hold ${errs.hold.toFixed(2)} px · linear ${errs.linear.toFixed(3)} px · smoothed ${errs.catmull.toFixed(3)} px`);
@@ -635,7 +841,7 @@
     // keep more samples, interpolate better, or put the samples somewhere
     // cleverer — and only the third one is free. This grades the third with the
     // COUNT HELD EQUAL, so it cannot win by keeping more.
-    const measure = (pick) => { stored = pick(); rebuild(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
+    const measure = (pick) => { stored = pick(); rebuild(); return { n: stored.length, t: error(atSm(SMOOTH)).mean, s: shapeError().mean }; };
     const evenly = measure(onAClock);
     const bends = measure(() => whereItBends(evenly.n));
     render();
@@ -664,6 +870,89 @@
       evenly.t < bends.t && bends.n <= evenly.n,
       `${evenly.n} samples either way — in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
       + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
+
+    // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
+    // range and nothing on the page said which end of it is worth being at, so
+    // it says so here: the same gesture, thinned at each interval, each one
+    // reconstructed the same way — and beside it what the SAME gesture costs
+    // when the two directions are written down separately, which is the check
+    // below asked at every density instead of only at the default.
+    //
+    // ⚠️ 500 ms IS PAST THE KNOB'S TOP END AND IS IN THE LADDER ON PURPOSE.
+    // It is where the record stops being worth reconstructing at all (24.63 px
+    // against a 34 px hold), and it is also where the two-record reading stops
+    // losing — at eight samples, placing them well beats spacing them evenly.
+    // Both readings are broken there, so it is not a rate anybody picks, and
+    // the check below does not grade it.
+    const keep = storeMs;
+    const RATES = [20, 50, 100, 200, 300, 500];
+    const OFFERED = 300;                       // the top of the knob, in ms
+    const ladder = RATES.map((ms) => {
+      storeMs = ms; recompute();
+      return { ms, n: stored.length, one: error(atSm(SMOOTH)).mean, two: error(atApart).mean };
+    });
+    storeMs = keep;
+    render();
+    publish();
+    d.log(`what the rate buys: ${ladder.map((r) =>
+      `${r.ms}ms ${r.n}n ${r.one.toFixed(2)}px (${(r.two / r.one).toFixed(1)}x as two)`).join(' · ')}`);
+
+    // ── ONE RECORD OF A MOVING POINT, OR TWO RECORDS OF A MOVING NUMBER ────
+    //
+    // 🔴 WRITTEN DOWN BEFORE IT WAS RUN, and it is in plan-gesture §5 P3 in the
+    // same words so it cannot be back-fitted. The last time this page compared
+    // two ways of placing samples, the guess was backwards and the measurement
+    // refused it; that is the whole reason the prediction goes first.
+    //
+    //   ORDER — one 2-D record, knotted on a clock, lands closer to what the
+    //           hand did IN TIME than two 1-D records each gated on its own.
+    //   RATIO — by more than 2x.
+    //
+    // 🔴 THE ORDER HELD AND THE RATIO DID NOT SURVIVE AS A ONE-POINT CHECK.
+    // At the knob's default the prediction passed — 0.15 px as one record
+    // against 0.34 px as two, 2.3x — but the ladder above asks the same
+    // question at six densities and the answer MOVES, all the way across:
+    //
+    //   sample every     one record     as two records
+    //   20 ms  (101n)    0.01 px        6.3x worse
+    //   50 ms   (51n)    0.03 px        9.0x worse
+    //   100 ms  (30n)    0.15 px        2.3x worse
+    //   200 ms  (17n)    1.17 px        2.4x worse
+    //   300 ms  (12n)    4.32 px        1.9x worse
+    //   500 ms   (8n)   24.63 px        0.5x — TWO RECORDS WIN
+    //
+    // So "> 2x" is a property of one gesture at one knob position and not a
+    // relationship that holds for any line, which is the bar every check on
+    // this page has to clear. Shipping it would have been a threshold dressed
+    // as a ratio. What IS true at every rate the knob offers is the ORDER, and
+    // what makes the gap material rather than noise is that it reaches 9x
+    // somewhere in that range — so the check grades both ends of the ladder
+    // and not its middle. plan-gesture §3 has the correction; the short form is
+    // that two 1-D series are NOT the 8.6x failure it inferred (they are ~2x at
+    // the default, and the 13x "where it bends" arrangement is six times worse
+    // than they are), because a per-axis gate can still place its samples by
+    // TIME, and this one does.
+    //
+    // ⚠️ THE SHAPE FIGURES ARE PRINTED AND NOT ASSERTED. A shape metric throws
+    // time away, and time is the whole of the claim.
+    //
+    // ⚠️ AND THE TWO AXES HAVE TO ACTUALLY DISAGREE, or this compares a record
+    // with itself and passes while measuring nothing. Two axes gated together
+    // is not the alternative being tested, so how many instants they share is
+    // part of the check rather than part of the prose.
+    const rungs = ladder.filter((r) => r.ms <= OFFERED);
+    const gaps = rungs.map((r) => r.two / r.one);
+    const together = { t: error().mean, s: shapeError().mean };
+    const apart = { t: error(atApart).mean, s: shapeError(drawnApart).mean };
+    const shared = splitX.filter((a) => splitY.some((b) => b.at === a.at)).length;
+    d.assert('one record of a moving point beats two records of a moving number, at every rate this page offers',
+      gaps.every((g) => g > 1) && Math.max(...gaps) > 2
+        && splitX.length === stored.length && splitY.length === stored.length
+        && shared * 2 < stored.length,
+      `${Math.min(...gaps).toFixed(1)}x to ${Math.max(...gaps).toFixed(1)}x closer across ${rungs.length} rates; `
+      + `at this one ${stored.length} samples per direction either way — in time ${together.t.toFixed(3)} px as one `
+      + `record against ${apart.t.toFixed(3)} px as two, as a shape ${together.s.toFixed(3)} against `
+      + `${apart.s.toFixed(3)}; the two directions chose ${shared} of ${stored.length} instants in common`);
 
     // ── the transport, at twenty positions ─────────────────────────────────
     //
@@ -710,20 +999,6 @@
       fresh === 20 && Math.abs(mk - rc) <= SEEK_TOL && hl > rc * 5,
       `${fresh}/20 seeks answered — the mark lands ${mk.toFixed(3)} px from the hand against the record's own `
       + `${rc.toFixed(3)} px (${Math.abs(mk - rc).toExponential(1)} apart); refusing to interpolate: ${hl.toFixed(2)} px`);
-
-    // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
-    // range and nothing on the page said which end of it is worth being at, so
-    // it says so here: the same gesture, thinned at each interval, each one
-    // reconstructed the same way.
-    const keep = storeMs;
-    const ladder = [20, 50, 100, 200, 300, 500].map((ms) => {
-      storeMs = ms; recompute();
-      return `${ms}ms ${stored.length}n ${error(SMOOTH).mean.toFixed(2)}px`;
-    });
-    storeMs = keep;
-    render();
-    publish();
-    d.log(`what the rate buys: ${ladder.join(' · ')}`);
 
     // Park the playhead in the middle, so the mark below is somewhere with a
     // line under it rather than at an endpoint.

@@ -155,7 +155,16 @@ export function makePointerAdapter({ mode = 'catmull', onActuate = null, source 
       evidence: 'attested-endpoints',
       deviates: true,            // the RENDERER deviates from the log; the log stays faithful
       // --- transport capability declaration (plan-timeline C3) ---
+      // ⚠️ `rate: true` ON ITS OWN IS A CAPABILITY NO UI CAN OFFER. It says the
+      // kind can be played at some speed and never which, and `transport-bar`
+      // builds its buttons from the INTERSECTED `caps.rates` of the deck's
+      // adapters — so a bar over this kind alone resolved its rate set to
+      // `null` and drew no speed control at all, on an adapter that had
+      // declared it supported one. A boolean that promises a feature and
+      // withholds the values it needs is worse than not declaring it: the page
+      // looks capable and the control is absent.
       seek: true, rate: true,
+      rates: [0.25, 0.5, 1, 2],
       seekReduce: 'interpolated', // reduce(prefix <= t) returns the INTERPOLATED position,
                                   // not merely the last sample
       catchUp: 'reduce',          // a pointer never wants a burst of stale moves
