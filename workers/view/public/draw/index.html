@@ -17,12 +17,11 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { holdSample, lerpSample, catmullSample } from '/shell/pointer-adapter.mjs';
 
   const d = mount({
     name: 'draw',
-    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The two knobs under it are how often a sample is written down and how much a player is allowed to invent between two of them, and the two buttons beside them decide where those samples go — evenly in time, or the same number of them placed where the line turns.',
+    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and a thinned-out one — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The two knobs under it are how often a sample is written down and how much a player is allowed to invent between two of them, and moving either one moves the numbers: how far the blue line sits from what happened, and how much of it no sample attests at all.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
@@ -57,10 +56,6 @@
   // interpolation has almost nothing to do, and at half a second no
   // interpolator rescues a fast corner.
   let storeMs = 100;
-  // 'clock' — one sample every `storeMs`. 'bends' — the same NUMBER of samples,
-  // placed where the line actually turns. Two strategies, not two points on one
-  // axis, which is why this is a pair of buttons and the smoothing is a knob.
-  let where = 'clock';
   let evidence = [], stored = [];
 
   /**
@@ -86,7 +81,16 @@
   }
 
   /**
-   * 🔴 THE SAME NUMBER OF SAMPLES, PUT WHERE THE LINE BENDS.
+   * 🔴 THE NEGATIVE CONTROL — THE SAME NUMBER OF SAMPLES, PUT WHERE THE LINE
+   * BENDS. It was a setting on this page for about an hour, and it is not one
+   * any more because it loses every time (the check below says by how much).
+   * A control whose every position is worse than the default is a decision
+   * handed to a visitor who has no way to make it.
+   *
+   * It stays as CODE because the check needs something to be better than: a
+   * plausible alternative, run for real, and rejected by measurement. Delete
+   * it and the page's claim about sample placement becomes an assertion.
+   *
    *
    * A clock spends its budget evenly, which means it spends most of it on the
    * straight parts — where a player could have worked the line out anyway —
@@ -130,10 +134,7 @@
   }
 
   function decimate() {
-    stored = [];
-    if (!evidence.length) return;
-    const clocked = onAClock();
-    stored = where === 'bends' ? whereItBends(clocked.length) : clocked;
+    stored = evidence.length ? onAClock() : [];
   }
 
   // ⚠️ STAMP AT SOURCE. `event.timeStamp` is the browser's own clock for when
@@ -336,28 +337,30 @@
   // longer label cannot push its own lane sideways.
   const knobs = createSliderGroup([
     createSlider({
-      label: 'sample every', min: 10, max: 500, step: 10, value: 100, unit: 'ms',
+      // 10..300, and the top end is MEASURED rather than picked. Thinning the
+      // same gesture at each interval: 20 ms 0.04 px · 50 ms 0.14 · 100 ms 0.35
+      // · 200 ms 1.72 · 300 ms 5.45 · 500 ms 26.35 — and holding the last
+      // sample is 34 px, so by half a second interpolation has stopped
+      // rescuing anything and the rest of the travel would be a region that is
+      // uniformly broken. Under ~50 ms is the other dead end: 0.14 px and
+      // 0.04 px are both invisible, so the knob would be moving a number
+      // nobody can see. The range kept is the one where moving it changes the
+      // picture.
+      label: 'sample every', min: 10, max: 300, step: 10, value: 100, unit: 'ms',
       onInput: (v) => { storeMs = v; render(); },
     }),
     createSlider({
       label: 'smoothing', min: 0, max: 100, step: 1, value: 100, unit: '%',
       onInput: (v) => { smooth = v / 100; render(); },
     }),
-  ]);
-  const put = createChoice({
-    label: 'samples go',
-    options: [['evenly in time', 'clock'], ['where the line bends', 'bends']],
-    at: 0,
-    onPick: (v) => { where = v; render(); },
-  });
-
+  ], { pair: true });
   // The destructive one, at the far end of the row — deleting what you just
   // made must not sit shoulder to shoulder with the thing that changes it.
   const clear = el('button', '', 'Clear', { type: 'button', 'data-end': '1' });
   clear.addEventListener('click', () => { reset(); render(); });
 
   const row = el('div', 'pos-controls foot');
-  row.append(knobs.el, put.el, clear);
+  row.append(knobs.el, clear);
   d.el.append(row);
 
   // ── the page checks itself, once, on the first line you finish ───────────
@@ -407,10 +410,10 @@
     // keep more samples, interpolate better, or put the samples somewhere
     // cleverer — and only the third one is free. This grades the third with the
     // COUNT HELD EQUAL, so it cannot win by keeping more.
-    const measure = (w) => { where = w; decimate(); paint(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
-    const evenly = measure('clock');
-    const bends = measure('bends');
-    where = 'clock'; render();
+    const measure = (pick) => { stored = pick(); paint(); return { n: stored.length, t: error(SMOOTH).mean, s: shapeError().mean }; };
+    const evenly = measure(onAClock);
+    const bends = measure(() => whereItBends(evenly.n));
+    render();
 
     // 🔴 THIS CHECK WAS WRITTEN THE OTHER WAY ROUND AND THE PAGE REFUSED IT.
     // The guess was that the same number of samples, put where the line turns,
@@ -436,6 +439,18 @@
       evenly.t < bends.t && bends.n <= evenly.n,
       `${evenly.n} samples either way — in time ${evenly.t.toFixed(3)} px evenly against ${bends.t.toFixed(3)} px `
       + `where it bends (${(bends.t / evenly.t).toFixed(1)}x worse); as a shape ${evenly.s.toFixed(3)} against ${bends.s.toFixed(3)}`);
+
+    // WHAT THE RATE BUYS YOU, as a ladder rather than a claim. The knob spans a
+    // range and nothing on the page said which end of it is worth being at, so
+    // it says so here: the same gesture, thinned at each interval, each one
+    // reconstructed the same way.
+    const keep = storeMs;
+    const ladder = [20, 50, 100, 200, 300, 500].map((ms) => {
+      storeMs = ms; decimate(); paint();
+      return `${ms}ms ${stored.length}n ${error(SMOOTH).mean.toFixed(2)}px`;
+    });
+    storeMs = keep; render();
+    d.log(`what the rate buys: ${ladder.join(' · ')}`);
 
     // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
     // in a cell over a blank canvas is the defect this project has hit twice.
