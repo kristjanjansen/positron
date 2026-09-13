@@ -27,6 +27,7 @@
 // asked once behind a try and never asked again after a refusal.
 
 import { world as world0 } from './seed.mjs';
+import { TABLET, registerStandIn } from './xr-tablet.mjs';
 
 // ── nothing sits inside anything else ─────────────────────────────────────
 // 🔴 THE GENERATOR PLACES EACH THING WITHOUT LOOKING AT THE ONES ALREADY
@@ -180,48 +181,106 @@ export function beamM(m, len) {
 }
 
 /**
- * A small box at the grip pose — the controller stand-in.
+ * 🔴 THE CONTROLLER STAND-IN, AND WHY IT IS NOT THE REAL MODEL.
  *
- * 🔴 A PRIMITIVE, NOT A MODEL, and that is a decision rather than a shortcut.
- * `profiles` comes back as `meta-quest-touch-plus`, so the WebXR input-profiles
- * registry would hand over a real glTF — at the price of a loader, a second
- * renderer for its material, and a CDN fetch inside the entry path, which is
- * the one place in this page where a slow answer has already cost three
- * headset runs. A stand-in answers the question a model is being asked
- * ("where is my hand, and is it tracking?") completely. `plan-xr-hands` §4.
+ * The headset reports `meta-quest-touch-plus`, so the WebXR input-profiles
+ * registry WOULD hand over a real glTF, and the licence is not the obstacle —
+ * `@webxr-input-profiles/assets` is MIT (Amazon, 2019). The obstacle is what it
+ * costs, MEASURED off the registry on 2026-09-13 rather than guessed at:
+ *
+ *   meta-quest-touch-plus/left.glb    217,984 bytes
+ *   meta-quest-touch-plus/right.glb   213,868 bytes
+ *   profile.json                       11,430 bytes   (taken — see xr-hands.mjs)
+ *
+ * 433 KiB of mesh, and every byte of it needs machinery this repo does not
+ * have. The `.glb` is glTF 2.0 with 31 nodes, 6 meshes, 23 accessors, one PBR
+ * material and one embedded PNG, with POSITION/NORMAL/**TEXCOORD_0** — and the
+ * room's whole shader vocabulary is a flat-colour box program over one VAO with
+ * position at slot 0 and normal at slot 1 and no texture coordinate anywhere.
+ * So it is a container parser AND an accessor decoder AND a node walk AND a PNG
+ * decode AND a third program, to draw a thing whose entire job is to answer
+ * "where is my hand". And `LAYOUT.md` would put the bytes in
+ * `demo/<slug>/vendor/`, listed by name in the build — while this module is
+ * SHARED by two pages, so a per-slug asset path fetched from `demo/shell/` is
+ * the exact shape of the `moq.mjs` rename bug that made two demos assert
+ * nothing.
+ *
+ * ⚠️ So: primitives, and the tablet's footer SAYS it is a stand-in. A proxy
+ * that admits to being a proxy is honest; one that pretends to be a controller
+ * is not. `plan-xr-hands` §4.2 reached the same answer for the same reasons and
+ * this is that decision with the numbers under it.
+ *
+ * The parts, in metres, each one a box offset along the grip's own -Z:
+ * the handle your fist is round, the SQUARE TOP FACE the tablet lies on, and a
+ * nub where the thumbstick is so the thing has a visible orientation.
  */
-export function gripM(m, sx = 0.045, sy = 0.045, sz = 0.10) {
-  return new Float32Array([
-    m[0] * sx, m[1] * sx, m[2] * sx, 0,
-    m[4] * sy, m[5] * sy, m[6] * sy, 0,
-    m[8] * sz, m[9] * sz, m[10] * sz, 0,
-    m[12], m[13], m[14], 1]);
-}
+export const GRIP_PARTS = [
+  { name: 'handle', sx: 0.034, sy: 0.034, sz: 0.105, at: 0.000, col: [0.30, 0.33, 0.39] },
+  { name: 'face',   sx: 0.056, sy: 0.056, sz: 0.013, at: 0.055, col: [0.40, 0.44, 0.52] },
+  { name: 'stick',  sx: 0.015, sy: 0.015, sz: 0.014, at: 0.070, col: [0.56, 0.61, 0.71] },
+];
+registerStandIn(GRIP_PARTS.length);
 
 /**
- * The tablet's model matrix, from a grip pose: lifted above the fist, pushed
- * forward, tilted back towards the face, and scaled to its size in metres.
+ * One part of the stand-in, at a grip pose.
  *
- * ⚠️ THE TILT IS AROUND THE GRIP'S OWN RIGHT AXIS, not the world's. A slab
- * rotated in world space swings away the moment you turn your wrist, which is
- * the difference between something held and something floating near you.
+ * `modelM` cannot do this — it scales uniformly and rotates about two axes,
+ * while a part needs the controller's OWN orientation and a different size down
+ * each axis. Taking the rotation straight out of the pose matrix is shorter and
+ * exact; it is `beamM`'s pattern with different constants.
  */
-export function holdM(m, o = HOLD) {
-  const rx = m[0], ry = m[1], rz = m[2];          // the grip's right
-  const ux = m[4], uy = m[5], uz = m[6];          // its up
-  const fx = m[8], fy = m[9], fz = m[10];         // its forward (+Z, so -Z aims)
-  const c = Math.cos(o.tilt), sn = Math.sin(o.tilt);
-  // up and forward rotated about right; right is untouched by its own rotation
-  const nux = ux * c + fx * sn, nuy = uy * c + fy * sn, nuz = uz * c + fz * sn;
-  const nfx = fx * c - ux * sn, nfy = fy * c - uy * sn, nfz = fz * c - uz * sn;
-  const px = m[12] + ux * o.up + fx * o.fwd;
-  const py = m[13] + uy * o.up + fy * o.fwd;
-  const pz = m[14] + uz * o.up + fz * o.fwd;
+export const partM = (m, p) => new Float32Array([
+  m[0] * p.sx, m[1] * p.sx, m[2] * p.sx, 0,
+  m[4] * p.sy, m[5] * p.sy, m[6] * p.sy, 0,
+  m[8] * p.sz, m[9] * p.sz, m[10] * p.sz, 0,
+  // -Z is the thumb's direction, which is the way the top face looks
+  m[12] - m[8] * p.at, m[13] - m[9] * p.at, m[14] - m[10] * p.at, 1]);
+
+/** How far above the grip origin the tablet floats, clear of the stick nub. */
+export const TABLET_LIFT = 0.09;
+
+/**
+ * 🔴 THE TABLET, FLAT ON THE CONTROLLER'S SQUARE TOP FACE AND SQUARE TO ITS OWN
+ * AXES. It used to be tilted 31 degrees back towards the face and offset up and
+ * forward, and the complaint that replaced it was exactly that: *the tablet
+ * should be ON the controller, on the square area, PERPENDICULAR to it, not at
+ * an angle.* There is no tilt term here any more, and that is the point — the
+ * three columns below are the controller's own basis, unrotated.
+ *
+ * The grip convention (WebXR CRD via MDN): the origin is the centroid of the
+ * closed fist, **-Z runs along the controller in the direction of the thumb**,
+ * and X comes out of the back of the hand. So the top face — the plate with the
+ * thumbstick and the buttons on it — looks along **-Z**, and a tablet lying on
+ * that plate has:
+ *
+ *   its right   = the grip's +X
+ *   its up      = the grip's -Y     ← so it reads the right way up looking down
+ *   its normal  = the grip's -Z     ← out of the face, towards whoever is reading
+ *   its centre  = the grip origin, `TABLET_LIFT` along -Z
+ *
+ * 🔴 AND THAT BASIS IS RIGHT-HANDED, WHICH IS LOAD-BEARING RATHER THAN TIDY.
+ * Two of those three columns are negated; negating one alone gives a
+ * determinant of -w·h, which flips the winding, and the room draws with
+ * `CULL_FACE` on — so a mirrored basis is an INVISIBLE tablet, which reads as
+ * "the tablet was never built" rather than as a sign error. `xr-pick-test.mjs`
+ * asserts the determinant is positive, on a laptop, for exactly that reason.
+ *
+ * ⚠️ NO `handedness` TERM, AND THAT IS DELIBERATE. MDN's note that the
+ * out-of-the-back-of-the-hand direction is +X on the right and -X on the left
+ * is about anything hung off the HAND — a clipboard beside the palm is mirrored
+ * between the two. This is hung off the PLASTIC: the top face is on the thumb
+ * side, which is -Z for both hands, so there is nothing to mirror. A sign flip
+ * here would be a correction for a bug this pose does not have.
+ */
+export function holdM(m, o = TABLET) {
+  const rx = m[0], ry = m[1], rz = m[2];          // the grip's +X
+  const ux = m[4], uy = m[5], uz = m[6];          // its +Y
+  const fx = m[8], fy = m[9], fz = m[10];         // its +Z, so -Z is the thumb
   return new Float32Array([
     rx * o.w, ry * o.w, rz * o.w, 0,
-    nux * o.h, nuy * o.h, nuz * o.h, 0,
-    nfx, nfy, nfz, 0,
-    px, py, pz, 1]);
+    -ux * o.h, -uy * o.h, -uz * o.h, 0,
+    -fx, -fy, -fz, 0,
+    m[12] - fx * TABLET_LIFT, m[13] - fy * TABLET_LIFT, m[14] - fz * TABLET_LIFT, 1]);
 }
 
 /** hue 0..1 -> rgb, the same three-cosines palette the walls use. */
@@ -325,21 +384,32 @@ const GRID_FS = `#version 300 es
     if (a < 0.02) discard;
     o = vec4(uCol, a); }`;
 
-/** The page's own room, in metres, when your real one cannot be had. */
 /**
- * The held tablet — a dark, slightly see-through slab with rounded corners.
+ * The tablet's face — a dark slab with rounded corners, with the tablet's own
+ * canvas drawn onto it.
  *
  * 🔴 A SIGNED-DISTANCE ROUNDED RECTANGLE, NOT A TEXTURE AND NOT GEOMETRY. The
  * corner radius is computed per pixel from the quad's own coordinate, so it is
  * exact at any size and at any distance from the eye — a rounded PNG would be
  * soft the moment you brought it close, and rounded geometry would need
  * tessellation to look like anything. It is the same trick the grid uses one
- * shader up, for the same reason.
+ * shader up, for the same reason. ⚠️ And it is why `xr-tablet.mjs` draws NO
+ * rounded rectangle of its own: two roundings over one another show a seam at
+ * every corner.
  *
- * ⚠️ It is DARK and it is TRANSPARENT, which on a headset are the same
- * decision: a bright opaque panel held at arm's length is a lamp in your
- * vision, and in passthrough it blots out the room it is supposed to be part
- * of. `uAlpha` stays under 0.8 and the fill stays under 0.2 luminance.
+ * 🔴 `uHas` IS WHAT SEPARATES "NO CONTENT" FROM "CONTENT THAT IS BLANK". With
+ * no tablet module wired in, the slab is a slab; with one, its ink is composited
+ * over the fill. A shader that sampled an unbound texture would read black-and-
+ * opaque, which is a tablet whose screen has failed rather than one that has no
+ * screen — and those need different fixes.
+ *
+ * ⚠️ THE FILL IS HELD NEAR-OPAQUE AND THAT IS A CONTRAST DECISION, NOT A MODE
+ * ONE. Over passthrough this composites onto a lit room and in an opaque
+ * session onto a dark one; the tempting fix is to brighten it in the first,
+ * which would put the session mode into the controller interface. Making the
+ * slab its own background instead means what is behind it stops mattering, so
+ * one number serves both and there is nothing to branch on. It is still DARK —
+ * a bright panel at arm's length is a lamp in your vision.
  */
 const HOLD_VS = `#version 300 es
   in vec3 aPos;
@@ -350,6 +420,7 @@ const HOLD_FS = `#version 300 es
   precision highp float;
   in vec2 vP;
   uniform vec3 uCol; uniform float uAlpha; uniform float uAspect; uniform float uRadius;
+  uniform sampler2D uTex; uniform float uHas;
   out vec4 o;
   float roundRect(vec2 p, vec2 half_, float r){
     vec2 q = abs(p) - half_ + r;
@@ -366,49 +437,58 @@ const HOLD_FS = `#version 300 es
     // a hairline edge, so it reads as an object rather than as a smudge
     float edge = 1.0 - smoothstep(0.0, 0.004 + w, abs(d + 0.002));
     vec3 c = mix(uCol, vec3(0.62, 0.68, 0.78), edge * 0.55);
+    // ⚠️ THE SAME WAY ROUND AS EVERY OTHER PANEL HERE. PANEL_VS in
+    // xr-panel.mjs reads vUv = (aPos.x + 0.5, 0.5 - aPos.y), and xr-pick.mjs
+    // hands back a u,v derived from that one line rather than from a second
+    // opinion. Change it in one place and change it in all three.
+    if (uHas > 0.5) {
+      vec4 t = texture(uTex, vec2(vP.x + 0.5, 0.5 - vP.y));
+      c = mix(c, t.rgb, t.a);
+    }
     o = vec4(c, a * uAlpha); }`;
 
-/** The slab, in metres, and where it sits relative to the hand holding it. */
+/**
+ * The slab's look. Its SIZE lives in `xr-tablet.mjs` beside the texture that
+ * has to fill it, because the two are one decision — pixels per degree — and
+ * splitting them across two files is how they come to disagree.
+ */
 const HOLD = {
-  w: 0.17, h: 0.115,       // about a small phone
   radius: 0.055,           // in the shader's own units, not metres
-  col: [0.10, 0.11, 0.13],
-  alpha: 0.72,
-  // ⚠️ ABOVE AND IN FRONT OF THE GRIP, AND TILTED BACK. The grip pose is
-  // roughly where your fist is; a slab drawn AT it is inside your hand. These
-  // three numbers are the difference between holding something and wearing it,
-  // and they are the ones to change first if it reads wrong in a headset.
-  up: 0.055, fwd: -0.045, tilt: -0.55,
+  col: [0.09, 0.10, 0.12],
+  alpha: TABLET.fillAlpha,
 };
 
+// 🔴 THE FLOOR IS BIGGER THAN THE FADE, WHICH IS MOST OF WHAT "DRAW A CORRECT
+// FLOOR" MEANT. The dots fade out with distance so the surface does not end in
+// a hard rectangle — but the square was 10 m across, half-span 5 m, against a
+// fade that does not finish until 11 m. So the dots were still at roughly two
+// thirds strength where the quad simply stopped, which is a hard edge 5 m in
+// front of you: exactly the cage the fade exists to avoid, drawn by the fade's
+// own constants disagreeing with the floor's. The span is DERIVED from the fade
+// now rather than typed beside it, so the two cannot drift again.
+const FADE_NEAR = 4.5, FADE_FAR = 11;
 export const GRID = {
-  span: 10,        // the floor square's side, and the walls' width
-  wallH: 3,        // how far up the walls go from the floor
-  cell: 0.25,      // dot spacing
-  dot: 0.011,      // dot radius — ONE size, see below
-  fadeNear: 4.5,   // metres from the eye where the dots start to go
-  fadeFar: 11,
+  span: FADE_FAR * 2,   // the floor square's side — half of it IS the fade's end
+  cell: 0.25,           // dot spacing, so a metre is four dots for anyone counting
+  dot: 0.011,           // dot radius — ONE size, see the note in the shader
+  fadeNear: FADE_NEAR,  // metres from the eye where the dots start to go
+  fadeFar: FADE_FAR,
 };
-// Over passthrough the grid is competing with a lit room, so it is brighter
-// there; in VR it is behind the things and stays out of their way.
-const GRID_COL_VR = [0.56, 0.64, 0.76], GRID_ALPHA_VR = 0.5;
-const GRID_COL_AR = [0.72, 0.86, 1.0], GRID_ALPHA_AR = 0.9;
-// 🔴 A DIFFERENT COLOUR WHEN THE GRID IS ON **YOUR** SURFACES, and it is there
-// because the claim was challenged: "did you render the grid? make it another
-// colour for me to believe". Quite right. The log said `11 surface(s) from
-// your room` while the picture said nothing, and a page that reports a thing
-// it cannot show is asking to be taken on trust — which this project does not
-// do anywhere else.
+// 🔴 WHITE, AND ONE WHITE. It was blue-white in VR, brighter blue-white in
+// passthrough, and GREEN when the dots were on surfaces the headset had
+// reported — that last one was a proof device, asked for in as many words
+// ("make it another colour for me to believe"), and it has done its job: 11
+// surfaces confirmed on a Quest 3 on 2026-09-13. A proof device that stays
+// after it has proved its point is decoration with a story attached.
 //
-// GREEN means every dot you can see is sitting on a plane your headset
-// reported. Blue means it is the page's own 10 m room. It is the same
-// distinction the gutter prints, in the one channel you cannot miss while
-// wearing the thing.
-//
-// ⚠️ It is not decoration and it must not become decoration: if the grid ever
-// snaps to real walls while still drawing blue, that is a bug in which room it
-// thinks it is on, and the colour is how you would find out.
-const GRID_COL_YOURS = [0.44, 0.92, 0.62];
+// ⚠️ AND ONE COLOUR IS THE POINT, NOT A SIMPLIFICATION OF IT. Two brightnesses
+// chosen per session mode is the session mode reaching into the picture; the
+// dots' strength is now the tablet's slider, which is a thing the person
+// wearing the headset can answer for themselves in either mode. Where the grid
+// IS drawn — your measured surfaces, or the one surface `local-floor`
+// guarantees — is still said in words, in `describe()`, where a claim about
+// your room belongs.
+const GRID_COL = [1, 1, 1];
 
 export const FADE_MS = 900;
 
@@ -456,7 +536,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     p.__u = {};
     for (const n of ['uProj', 'uView', 'uModel', 'uT', 'uHue', 'uCol',
                      'uSize', 'uOrigin', 'uCell', 'uDot', 'uEye', 'uFade', 'uAlpha',
-                     'uAspect', 'uRadius']) {
+                     'uAspect', 'uRadius', 'uTex', 'uHas']) {
       const loc = gl.getUniformLocation(p, n);
       if (loc) p.__u[n.slice(1).toLowerCase()] = loc;
     }
@@ -498,12 +578,22 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   }
 
   let cur = null, incoming = null, fadeFrom = 0, gridProg = null, holdProg = null;
-  // ⚠️ WHICHEVER HAND IS FREE. MEASURED on a Quest 3: two sources appeared and
-  // the LEFT grip did not resolve while the right did, in the same frame. So
-  // preferring left with a fallback to anything is not a style choice — it is
-  // the difference between a tablet and nothing at all.
-  const HOLD_HAND = 'left';
-  let hands = [];
+  // ── what is in your hands, handed over once a frame ──────────────────────
+  // 🔴 THE ROOM DOES NOT DECIDE ANY OF THIS, IT ONLY DRAWS IT. Which hand
+  // carries the tablet and which one points is `xr-hands.mjs`'s single decision,
+  // taken from `handedness`; this file is the picture. Two places choosing a
+  // hand is two places that can choose differently, and only one of them would
+  // be the one somebody reads.
+  let hands = [];          // [{ m, handedness }] — a stand-in per resolved grip
+  let pointer = null;      // { m } — the ray that is drawn, from targetRaySpace
+  let tabletM = null;      // where the tablet is hanging, or null
+  let tablet = null;       // the tablet module, if this page wired one in
+  let tabletHit = null;    // where the pointer meets it, taken from xr-hands
+  let tabletTex = null, tabletUploaded = -1, tabletUploadMs = null;
+  // 0..1, and it is the tablet's slider. Set once at session start through
+  // `applyAll` so the dots start where the control says they are rather than at
+  // a default that only agrees with the number by coincidence.
+  let gridAlpha = 0.75;
   let cube = null, quad = null, ok = false;
 
   /** Hand the room a context. Idempotent, and it says whether it took. */
@@ -523,7 +613,14 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // ⚠️ `log`, NOT `onLog`. There is no `onLog` in this scope, so a failed
     // compile would have thrown a ReferenceError out of `attach` — a handler
     // for a failure that fails.
-    catch (e) { holdProg = null; log(`the held panel would not compile — ${e.message}`, 'warn'); }
+    // ⚠️ AND IT SAYS SO ON THE BEACON TOO. The tablet is the one thing here a
+    // headset run is FOR, so "it would not compile" has to reach the log the
+    // owner reads rather than only the page behind their face.
+    catch (e) {
+      holdProg = null;
+      log(`the tablet would not compile — ${e.message}`, 'warn');
+      say(`FAIL tablet · its shader would not compile — ${e.message}`);
+    }
     try { gridProg = link(GRID_VS, GRID_FS, ['aPos']); }
     catch (e) { log(`the floor grid would not compile — ${e.message}`, 'warn'); }
     return true;
@@ -537,18 +634,35 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // with it.
   let floorY = 0;
   let ownRoom = [];
+  /**
+   * 🔴 A FLOOR, AND NOTHING ELSE. THE PAGE'S OWN WALLS ARE GONE.
+   *
+   * This used to build a 10 m square and four 3 m walls, and the walls were the
+   * page inventing geometry it has no information about. A made-up wall at 5 m
+   * is a CLAIM about where your room ends, and that claim is always wrong —
+   * which is the same offence as colouring an unmeasured thing as if it had
+   * passed. The floor is different in kind: the session is on `local-floor`, so
+   * the origin IS the floor. It is the one surface the page actually knows
+   * about, and knowing it is what the reference space is for.
+   *
+   * ⚠️ AND THERE IS NO SESSION MODE IN HERE, WHICH IS THE POINT. "Walls in
+   * passthrough, none in VR" would have been a branch, and a branch on
+   * `planes.state` would have been worse: `none` only arrives after the grace
+   * period, so a passthrough session would have drawn walls for two and a half
+   * seconds and then taken them away — a flash, caused by a verdict about the
+   * headset's scan being read as a verdict about what to draw. The rule that
+   * removes both is simpler than either: **draw what was measured, and one
+   * floor besides.** Real walls still appear in passthrough the moment the
+   * headset reports them, because those are surfaces somebody's room actually
+   * has; they arrive through `planeQuads`, which replaces this list entirely.
+   */
   function buildOwnRoom() {
-    const { span, wallH } = GRID, half = span / 2, cy = floorY + wallH / 2;
+    const { span } = GRID;
+    // Local +X to world +X, local +Y to world +Z, local +Z to world +Y: a quad
+    // lying flat, its dots counted from the room's own centre. Horizontal by
+    // construction rather than by a rotation somebody has to check.
     const flat = new Float32Array([span, 0, 0, 0, 0, 0, span, 0, 0, 1, 0, 0, 0, floorY, 0, 1]);
     ownRoom = [{ m: flat, size: [span, span], origin: [0, 0] }];
-    for (const [ax, sgn] of [['z', -1], ['z', 1], ['x', -1], ['x', 1]]) {
-      const m = ax === 'z'
-        ? new Float32Array([span, 0, 0, 0, 0, wallH, 0, 0, 0, 0, 1, 0, 0, cy, sgn * half, 1])
-        : new Float32Array([0, 0, span, 0, 0, wallH, 0, 0, 1, 0, 0, 0, sgn * half, cy, 0, 1]);
-      // The wall's dots count from the floor upward and from the room's centre
-      // sideways, which is what makes the metre markers meet the floor's.
-      ownRoom.push({ m, size: [span, wallH], origin: [0, cy] });
-    }
   }
   buildOwnRoom();
 
@@ -595,14 +709,18 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   let saidKey = '', saidTimes = 0, planeFails = 0;
 
   function describe(quiet = false) {
-    const { span, wallH } = GRID;
-    const own = `the page's own room, ${span} m across with ${wallH} m walls and its floor at y=0`;
+    // ⚠️ THE WORDS ARE READ OFF THE SAME CONSTANT THE FLOOR IS BUILT FROM. A
+    // description that can disagree with its config is worse than none, and
+    // this one had exactly that shape: it said "with 3 m walls" for as long as
+    // there were walls to say it about, and it would have gone on saying it.
+    const own = `the page's own floor — a ${GRID.span} m square of dots at y=0, and no walls,`
+      + ' because the floor is the one surface a headset standing on it can be sure of';
     if (planes.state === 'yours') {
       const bits = Object.entries(planes.labels).map(([k, v]) => `${k} ${v}`).join(' · ');
       const walls = planes.labels.wall || 0;
       planes.note = `${planes.count} surface(s) from your room — ${bits} — grid is on them, floor at y=${planes.floorY.toFixed(2)} m`
-        + (walls ? '' : ' · NO wall surfaces came back, so there are no dotted walls')
-        + ' · the dots are GREEN because they are on your surfaces';
+        + (walls ? ` · ${walls} of them are walls, and those are the only walls this page draws`
+                 : ' · NO wall surfaces came back, so there are no dotted walls');
       planes.short = `floor: your room\n${planes.count} surfaces, ${walls} walls`;
       planes.from = 'your room';
     } else if (planes.state === 'none') {
@@ -801,7 +919,7 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   }
 
   let gridBroke = false;
-  function drawGrid(proj, view, ar, eye) {
+  function drawGrid(proj, view, eye) {
     if (!gridProg || gridBroke) return;
     try {
       const U = gridProg.__u;
@@ -811,9 +929,14 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
       gl.uniform1f(U.cell, GRID.cell);
       gl.uniform1f(U.dot, GRID.dot);
       gl.uniform2f(U.fade, GRID.fadeNear, GRID.fadeFar);
-      const yours = planes.state === 'yours';
-      gl.uniform3fv(U.col, yours ? GRID_COL_YOURS : (ar ? GRID_COL_AR : GRID_COL_VR));
-      gl.uniform1f(U.alpha, ar ? GRID_ALPHA_AR : GRID_ALPHA_VR);
+      // 🔴 ONE COLOUR AND ONE STRENGTH, AND NEITHER OF THEM IS A FUNCTION OF THE
+      // SESSION. `ar` used to be a parameter of this function purely so the dots
+      // could be a different white in passthrough; it is gone, and with it the
+      // last place the controller interface could have learned what kind of
+      // session it was in. What the dots are ON is still a real difference and
+      // it is one line below — the surfaces the headset measured, or the floor.
+      gl.uniform3fv(U.col, GRID_COL);
+      gl.uniform1f(U.alpha, gridAlpha);
       gl.uniform3fv(U.eye, eye || [0, 1.6, 0]);
       // ⚠️ SEPARATE ALPHA, because in passthrough the destination starts at
       // zero alpha and the compositor reads that channel to decide how much of
@@ -881,41 +1004,96 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   }
 
   /**
-   * The slab, on whichever hand is holding it.
+   * The tablet, wherever `xr-hands.mjs` says it is hanging.
    *
-   * ⚠️ NOT INSIDE THE OPAQUE PASS. It is transparent, so it is drawn after the
-   * room or it blends against whatever happened to be in the depth buffer.
-   * Depth TEST stays on — a tablet behind a cube should be behind it — but
-   * depth WRITE goes off, or it punches a hole the second eye cannot fill.
+   * ⚠️ NOT INSIDE THE OPAQUE PASS. It is transparent at its edges, so it is
+   * drawn after the room or it blends against whatever happened to be in the
+   * depth buffer. Depth TEST stays on — a tablet behind a cube should be behind
+   * it — but depth WRITE goes off, or it punches a hole the second eye cannot
+   * fill.
+   *
+   * ⚠️ AND CULLING GOES OFF. A screen has no back, and the room turns culling
+   * ON because its own walls are a cube seen from the inside. A tablet you can
+   * see the back of is a one-sided object; a tablet that VANISHES when the
+   * controller is turned over reads as a tracking fault.
    */
-  function drawHeld(proj, view) {
-    if (!holdProg || !hands.length) return;
-    const on = hands.find((h) => h && h.m && h.handedness === HOLD_HAND)
-      || hands.find((h) => h && h.m);
-    if (!on) return;
+  function drawTablet(proj, view) {
+    if (!holdProg || !tabletM) return;
     const U = holdProg.__u;
     gl.useProgram(holdProg);
     gl.uniformMatrix4fv(U.proj, false, proj);
     gl.uniformMatrix4fv(U.view, false, view);
-    gl.uniformMatrix4fv(U.model, false, holdM(on.m));
+    gl.uniformMatrix4fv(U.model, false, tabletM);
     gl.uniform3fv(U.col, HOLD.col);
     gl.uniform1f(U.alpha, HOLD.alpha);
-    if (U.aspect) gl.uniform1f(U.aspect, HOLD.w / HOLD.h);
+    if (U.aspect) gl.uniform1f(U.aspect, TABLET.w / TABLET.h);
     if (U.radius) gl.uniform1f(U.radius, HOLD.radius);
+    if (U.has) gl.uniform1f(U.has, tabletTex ? 1 : 0);
+    if (tabletTex && U.tex) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, tabletTex);
+      gl.uniform1i(U.tex, 0);
+    }
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.depthMask(false);
+    gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(quad.vao);
     gl.drawArrays(gl.TRIANGLES, 0, quad.count);
     gl.bindVertexArray(null);
+    gl.enable(gl.CULL_FACE);
     gl.depthMask(true);
     gl.disable(gl.BLEND);
   }
 
+  /**
+   * The tablet's ink, on the card.
+   *
+   * ⚠️ ONCE PER FRAME AND ONLY WHEN IT CHANGED, which is the difference between
+   * this and the panels in `xr-panel.mjs`. Those re-upload every frame ON
+   * PURPOSE, because measuring that cost is what that page is for. This one is
+   * a slider and a number: it changes when a thumb moves it and not otherwise,
+   * so a version counter is the whole optimisation and the first upload's cost
+   * is reported so that "it is free" stays a measurement rather than a belief.
+   *
+   * 🔴 CALLED ONCE PER FRAME, NEVER PER EYE. `texImage2D` between the left eye
+   * and the right would show the two eyes two different instants.
+   */
+  function uploadTablet() {
+    if (!tablet || !gl || !ok) return;
+    const v = tablet.draw();
+    if (v === tabletUploaded) return;
+    const t0 = performance.now();
+    if (!tabletTex) {
+      tabletTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tabletTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      // A canvas is already the way up a texture wants it; flipping here would
+      // put the footer above the numbers.
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, tabletTex);
+    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tablet.canvas);
+    const cost = performance.now() - t0;
+    if (tabletUploaded < 0) {
+      tabletUploadMs = cost;
+      say(`tablet · first upload ok · ${TABLET.px}x${TABLET.py} px · ${cost.toFixed(2)} ms of processor time`);
+    }
+    tabletUploaded = v;
+  }
+
   function drawInner({ proj, view, tSec = 0, doc = null, clear = true, ar = false,
-                       aimed = null, held = null, ray = null, aimedDist = 0,
+                       aimed = null, held = null, ray: rayIn = null, aimedDist = 0,
                        eye = null, grid = true, touch = null } = {}) {
     if (!ok) return;
+    // ⚠️ THE POINTER COMES FROM `setInput` UNLESS A PAGE OVERRIDES IT. One
+    // source of truth by default, and the override exists only because `scene`
+    // still owns its own grab-and-move and hands the same ray back down.
+    const ray = rayIn || pointer;
     gl.enable(gl.DEPTH_TEST);
     // 🔴 `gl.clear` IGNORES THE VIEWPORT — it clears the whole framebuffer.
     // Both eyes render into ONE framebuffer side by side, so clearing on the
@@ -1013,30 +1191,53 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // between a control and a coincidence. A beam down the ray, and nothing at
     // the end of it: a marker there reads as a fourth object in the room, one
     // that follows you and cannot be picked up.
+    // ⚠️ THE BEAM IS THE POINTER'S, AND IT IS THE SAME BEAM IN BOTH MODES.
+    // `ray` is whatever `xr-hands.mjs` chose — the right hand's target ray
+    // where there is one — and its LENGTH follows the same rule whatever kind
+    // of session this is: to the thing it has hold of, else to the nearest
+    // thing it is on, else to the tablet if it is on that, else a fixed 2.4 m.
+    // 🔴 "IN PASSTHROUGH IT COULD END ON A REAL SURFACE" IS THE TEMPTING
+    // EXCEPTION AND IT IS REFUSED. A beam that behaves one way over your room
+    // and another in the dark is two pointers to learn; and the plane it would
+    // stop on is one the page has only in one of the two modes, so the
+    // behaviour would be a function of what was measured rather than of what
+    // you did. One rule, both modes.
+    // ⚠️ THE HIT IS THE ONE `xr-hands.mjs` ALREADY TOOK, NOT A SECOND ONE.
+    // Computing it again here would be a second answer to "is the ray on the
+    // tablet", and the beam could stop somewhere the slider does not think it
+    // was pressed — two truths about one pointer, which is the shape of bug
+    // nobody can see from inside a working-looking picture.
     if (ray) {
-      const len = held ? held.dist : (aimedDist || 2.4);
+      const len = held ? held.dist : (tabletHit ? tabletHit.t : (aimedDist || 2.4));
       gl.uniformMatrix4fv(L.model, false, beamM(ray.m, len));
       gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
       gl.drawArrays(gl.TRIANGLES, 0, cube.count);
     }
 
-    // 🔴 ONE BOX PER HAND THAT ACTUALLY RESOLVED, and "resolved" is the point.
-    // MEASURED on a Quest 3: two sources appeared and the LEFT grip did not
-    // resolve while the right did, in the same frame. A page that draws a
-    // controller wherever it last saw one would leave a box sitting in the air;
-    // a page that draws only what the runtime answered for shows you exactly
-    // what it knows, which is also the debugging instrument.
+    // 🔴 ONE STAND-IN PER HAND THAT ACTUALLY RESOLVED, and "resolved" is the
+    // point. MEASURED on a Quest 3: two sources appeared and the LEFT grip did
+    // not resolve while the right did, in the same frame. A page that draws a
+    // controller wherever it last saw one would leave a shape sitting in the
+    // air; a page that draws only what the runtime answered for shows you
+    // exactly what it knows, which is also the debugging instrument.
+    //
+    // ⚠️ IDENTICAL ON BOTH HANDS. They used to be two slightly different greys
+    // for no reason anybody could read off the picture — colour in this project
+    // says how something LANDED, and "this is the left one" is not that. Which
+    // hand is which is answered by the tablet being on one of them.
     for (const h of hands) {
       if (!h || !h.m) continue;
-      gl.uniformMatrix4fv(L.model, false, gripM(h.m));
-      gl.uniform3fv(L.col, h.handedness === 'left' ? [0.34, 0.37, 0.44] : [0.30, 0.33, 0.39]);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      for (const p of GRIP_PARTS) {
+        gl.uniformMatrix4fv(L.model, false, partM(h.m, p));
+        gl.uniform3fv(L.col, p.col);
+        gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      }
     }
     gl.bindVertexArray(null);
 
     // Last, because these are transparent and have to blend over what is behind.
-    if (grid) drawGrid(proj, view, ar, eye);
-    drawHeld(proj, view);
+    if (grid) drawGrid(proj, view, eye);
+    drawTablet(proj, view);
   }
 
   /**
@@ -1079,16 +1280,50 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   }
 
   /**
-   * What is in the hands this frame: `[{ m, handedness }]`, where `m` is a GRIP
-   * pose matrix in room coordinates.
+   * Everything about the hands, from `xr-hands.mjs`, once a frame.
    *
-   * ⚠️ GRIP, NOT TARGET RAY. The ray is where you are POINTING and the grip is
-   * where your HAND is; a controller drawn at the ray floats in front of you,
-   * and a tablet drawn there is unreachable. `plan-xr-hands` §1.
+   * ⚠️ GRIP FOR THE STAND-INS, TARGET RAY FOR THE POINTER, and the two are not
+   * interchangeable. The ray is where you are POINTING and the grip is where
+   * your HAND is; a controller drawn at the ray floats in front of you and a
+   * tablet drawn there is unreachable. `plan-xr-hands` §1.4.
+   *
+   * 🔴 IT TAKES, IT DOES NOT DECIDE. Which hand carries the tablet, where the
+   * tablet hangs and whether the ray is on it were all settled by the one
+   * module that owns input. A second opinion here would be a second answer to
+   * the same question, and only one of them would be the one anybody reads.
    */
-  function setHands(list) { hands = Array.isArray(list) ? list : []; }
+  function setInput(h) {
+    hands = Array.isArray(h?.hands) ? h.hands : [];
+    pointer = h?.pointer || null;
+    tabletM = h?.tabletM || null;
+    tabletHit = h?.hit || null;
+    uploadTablet();
+  }
 
-  const room = { attach, draw, applyLook, retire, observePlanes, markAsked, setHands, planes, grid: GRID, HOLD };
+  /**
+   * The tablet module whose canvas goes on the slab. Optional: a page with no
+   * controls still gets the stand-ins, the beam and the floor.
+   */
+  function setTablet(t) {
+    tablet = t || null;
+    tabletUploaded = -1;
+    if (tablet) say(`tablet · wired in · ${TABLET.fingerprint}`);
+  }
+
+  /**
+   * How strongly the dots are drawn, 0..1 — the tablet's own slider, applied
+   * through the control's `apply`. It is a setter rather than a read of the
+   * tablet so that the room keeps working with no tablet at all, and so the
+   * value arrives the same way any future control's would.
+   */
+  function setGrid({ alpha } = {}) {
+    if (Number.isFinite(alpha)) gridAlpha = Math.max(0, Math.min(1, alpha));
+  }
+
+  const room = {
+    attach, draw, applyLook, retire, observePlanes, markAsked,
+    setInput, setTablet, setGrid, planes, grid: GRID, parts: GRIP_PARTS, tabletSize: TABLET,
+  };
   // ⚠️ GETTERS, NOT COPIES. `look` is what a page compares before and after a
   // refused shader, and a field written once would answer about whichever
   // instant it was written in.
@@ -1101,5 +1336,17 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
   // because the snapping is code only a headset can reach, and a list a
   // harness can read is the difference between "it should work" and a number.
   Object.defineProperty(room, 'surfaces', { get: () => (planeQuads.length ? planeQuads : ownRoom), enumerable: true });
+  // What the tablet cost to hand to the card, the FIRST time. Published rather
+  // than logged only, because "it is free" should be a number somebody can read
+  // back rather than a belief this file holds about itself.
+  Object.defineProperty(room, 'tabletUploadMs', { get: () => tabletUploadMs, enumerable: true });
+  Object.defineProperty(room, 'gridAlpha', { get: () => gridAlpha, enumerable: true });
+  // ⚠️ "THE FACE COMPILED", NOT "A TABLET IS ON SCREEN". Whether one is hanging
+  // needs a hand in a headset; whether this driver would draw it is answerable
+  // on a laptop, and it is the half that can silently fail — the shader gained
+  // a sampler and a flag, and a page that cannot compile it loses the only
+  // control it has in there.
+  Object.defineProperty(room, 'hasTablet', { get: () => !!holdProg, enumerable: true });
+  Object.defineProperty(room, 'tabletHanging', { get: () => !!tabletM, enumerable: true });
   return room;
 }

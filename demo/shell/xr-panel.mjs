@@ -79,6 +79,8 @@ export const touchOf = (isHeld, isAimed) => (isHeld ? TOUCH.held : isAimed ? TOU
 // both, so a panel hanging here hangs in the same room `scene` shows.
 
 import { createXRRoom, roomOf, ROOM_OPTIONAL_FEATURES } from './xr-room.mjs';
+import { createXRHands, BUTTON } from './xr-hands.mjs';
+import { createXRTablet } from './xr-tablet.mjs';
 
 const REPORT = new URLSearchParams(location.search).get('report');
 
@@ -194,6 +196,21 @@ export function createXRPanels({
   const roomDoc = room ? roomOf(roomSeed) : null;
   const theRoom = room ? createXRRoom(null, { log, say: beacon }) : null;
 
+  // ── the controllers, the pointer and the tablet ────────────────────────
+  // 🔴 THE SAME ONES `scene` HAS, FROM THE SAME TWO MODULES. A page that stands
+  // in this room gets the room's controller interface too — the stand-ins, the
+  // beam from the right hand's target ray, and the tablet on the left with its
+  // slider on it. Building a second one here is the "fourth copy" mistake with
+  // the most expensive code in the repo, and it would be the copy that drifts.
+  //
+  // ⚠️ BUILT ONLY WHERE THERE IS A ROOM TO PUT IT IN. A page that asked for no
+  // room is a page hanging one rectangle in an empty session, and a tablet in
+  // a void is a thing with nothing to be near.
+  const theTablet = theRoom ? createXRTablet({ ctx: { room: theRoom } }) : null;
+  if (theTablet) { theRoom.setTablet(theTablet); theTablet.applyAll(); }
+  const theHands = theRoom
+    ? createXRHands({ tablet: theTablet, log, say: beacon }) : null;
+
   /**
    * 🔴 WHICH CALL, NOT WHETHER. `gl.getError()` returns the FIRST error since
    * the LAST call and clears the flag — so one read on the first frame covers
@@ -266,6 +283,11 @@ export function createXRPanels({
     room: room
       ? { on: true, seed: roomSeed, things: roomDoc.things.length, surfaces: 'not asked', floor: 'the page', note: '' }
       : { on: false, seed: null, things: 0, surfaces: 'no room', floor: 'nothing', note: 'this page hangs its panels in an empty session' },
+    // 🔴 THE CONTROLLER INTERFACE, DESCRIBING ITSELF, WITH NO SESSION IN IT.
+    // The same string `scene` publishes and beacons, out of the same modules —
+    // so a run of this page and a run of that one, in either mode, are
+    // comparable by eye. A difference here is a branch that should not exist.
+    ui: theHands ? theHands.fingerprint() : 'no controller interface built',
   };
   if (theRoom) {
     // A getter each, because the room writes its own verdict in place as the
@@ -350,10 +372,26 @@ export function createXRPanels({
     // never settles does not, and that is what two headset runs looked like
     // from outside — a session somebody was standing in, with no line saying
     // which await had not come back.
-    const step = async (what, p) => {
+    // 🔴 AND 6 s IS NOT A DEADLINE FOR A STEP THAT CAN ASK A HUMAN A QUESTION.
+    // MEASURED on a Quest 3, 2026-09-13, on the page that shares this room:
+    // `requestSession` did not hang — it was waiting for the owner to answer a
+    // ROOM-DATA PERMISSION PROMPT, which appears because this session asks for
+    // plane detection. The short deadline fired underneath it, the page
+    // declared failure and tore its own entry path down, and THEN the session
+    // started: a headset standing in an immersive session that no code owned,
+    // drawing nothing. Black, and a restart to get out.
+    //
+    // ⚠️ THIS MODULE STILL HAD THE 6 s. `scene` was fixed and this was not, and
+    // the two ask for the same optional feature — so the same black headset was
+    // one permission prompt away on `mirror`. A step that can prompt gets a
+    // human's worth of time and says what it is probably waiting for;
+    // everything after the session is machinery and keeps the short one.
+    const step = async (what, p, ms = 6000) => {
       beacon(`… ${what}`);
       const out = await Promise.race([p,
-        new Promise((_, no) => setTimeout(() => no(new Error(`${what} never returned`)), 6000))]);
+        new Promise((_, no) => setTimeout(() => no(new Error(
+          `${what} did not answer in ${ms / 1000} s`
+          + (ms > 6000 ? ' — is there a permission prompt waiting for you?' : ''))), ms))]);
       beacon(`ok  ${what}`);
       return out;
     };
@@ -368,11 +406,25 @@ export function createXRPanels({
       // a room. In `requiredFeatures` this line would turn "I have not mapped
       // my house" into "this page refuses to start", and the grid would be
       // gated on a thing it is not allowed to be gated on.
-      session = await step('requestSession immersive-vr',
-        navigator.xr.requestSession('immersive-vr', {
-          requiredFeatures: ['local-floor'],
-          ...(theRoom ? { optionalFeatures: [...ROOM_OPTIONAL_FEATURES] } : {}),
-        }));
+      // ⚠️ AND THE PROMISE IS KEPT, NOT ABANDONED. If the deadline wins, the
+      // request is still in flight — and a session that arrives after the page
+      // has given up is a headset in an immersive session nothing is drawing.
+      // It is caught and ENDED, so the worst case is "it did not start" rather
+      // than a black room and a restart.
+      const ask = navigator.xr.requestSession('immersive-vr', {
+        requiredFeatures: ['local-floor'],
+        ...(theRoom ? { optionalFeatures: [...ROOM_OPTIONAL_FEATURES] } : {}),
+      });
+      let gaveUp = false;
+      ask.then((late) => {
+        if (!gaveUp) return;
+        beacon('the session arrived after this page gave up waiting — ending it rather than leaving you in a room nothing is drawing');
+        try { late.end(); } catch { /* already gone */ }
+      }, () => { /* a rejection is reported by the step below */ });
+      // 🔴 90 s, BECAUSE THIS ONE ASKS YOU A QUESTION. See `step`.
+      try {
+        session = await step('requestSession immersive-vr', ask, 90000);
+      } catch (e) { gaveUp = true; throw e; }
       // ⚠️ The blend mode, not the session name — `markAsked` uses it to decide
       // what "no surfaces" is allowed to blame. Measured: a VR session returns
       // none however well the room is scanned.
@@ -441,7 +493,14 @@ export function createXRPanels({
     // on, for the same reason: a page must keep a way out that belongs to it,
     // and dragging needs a button, so the two cannot be the same button. Both
     // used to exit here, which left nothing to drag with.
-    session.addEventListener('selectstart', (e) => { if (armed) grabbing = e.inputSource || true; });
+    // 🔴 A PRESS THAT LANDS ON THE TABLET BELONGS TO THE TABLET. Without this
+    // the same trigger would move a slider AND drag the panel across the room,
+    // two things from one press, one of which you did not ask for.
+    session.addEventListener('selectstart', (e) => {
+      if (!armed) return;
+      if (theHands?.over) { beacon('trigger on the tablet — the slider has it, the panel was not grabbed'); return; }
+      grabbing = e.inputSource || true;
+    });
     session.addEventListener('selectend', () => { grabbing = null; });
     session.addEventListener('squeezestart', () => leave('grip'));
     // ⚠️ AND A DEAD-MAN'S SWITCH. If nothing has been drawn 4 s after the
@@ -478,9 +537,24 @@ export function createXRPanels({
       }
       if (!anyDown || performance.now() - armAt > 3000) armed = true;
     } else {
+      // 🔴 ANY BUTTON LEAVES — EXCEPT THE TRIGGER, AND THAT EXCEPTION IS A BUG
+      // FIX RATHER THAN A LOOSENING. This scan took EVERY button including
+      // index 0, while `selectstart` two screens up sets `grabbing` on that
+      // same press: so the panel drag this module has carried since it was
+      // written could never run for more than one frame — the trigger armed the
+      // drag and then ended the session. A page with a slider on it would have
+      // been worse, because pressing the control would put you back in the
+      // window.
+      //
+      // ⚠️ THE WAY OUT IS UNCHANGED IN SUBSTANCE. Grip leaves, A/B/X/Y leave,
+      // the thumbstick click leaves, menu leaves, and the dead-man's switch
+      // still ends a session that has drawn nothing after 4 s. What went is one
+      // index — the one this module already gave a different job to.
       for (const src of session.inputSources) {
-        for (const b of src.gamepad?.buttons || []) {
-          if (b.pressed) { beacon('a button — leaving'); session.end().catch(() => {}); return; }
+        const bs = src.gamepad?.buttons || [];
+        for (let i = 0; i < bs.length; i++) {
+          if (i === BUTTON.trigger) continue;
+          if (bs[i].pressed) { beacon(`button ${i} — leaving`); session.end().catch(() => {}); return; }
         }
       }
     }
@@ -522,6 +596,12 @@ export function createXRPanels({
     // callback does not stop the loop, it silently deletes everything below it.
     // The module swallows it, marks the session refused and stops asking.
     theRoom?.observePlanes(frame, space);
+
+    // 🔴 ONE INPUT PATH, THE SAME ONE `scene` USES, AND IT HAS NO SESSION MODE
+    // IN IT. Once per frame, never per eye, and it cannot throw — every read
+    // inside it is guarded, because an uncaught error in a frame callback does
+    // not stop the loop, it silently deletes everything below it.
+    if (theHands && theRoom) theRoom.setInput(theHands.observe(frame, space, session));
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     if (state.frames === 0) glCheck('bindFramebuffer');
@@ -641,6 +721,10 @@ export function createXRPanels({
       state.glWhere = glErrors.join(' ') || 'clean';
       beacon(`first headset frame · fb ${state.fb.w}x${state.fb.h} · ${state.views} views · eye0 ${state.eye.w}x${state.eye.h} · gl ${state.glWhere} · panel ${panels[0]?.canvas.width}x${panels[0]?.canvas.height}`
         + (theRoom ? ` · room seed ${roomSeed}, ${roomDoc.things.length} things · grid ${theRoom.hasGrid ? 'drawing' : 'NOT drawing'} on ${theRoom.planes.from}` : ' · no room, the panel hangs in nothing'));
+      // The line to hold beside the other page's, and beside the other mode's.
+      beacon(`controller interface · ${theHands ? theHands.fingerprint() : 'NONE BUILT'}`
+        + ` · its face ${theRoom?.hasTablet ? 'compiled' : 'WOULD NOT COMPILE, so there is no tablet in here'}`
+        + ' · this session is immersive-vr, and nothing before this dot depends on that');
       log(`drawing ${state.fb.w}x${state.fb.h}, ${state.eye.w}x${state.eye.h} an eye`, 'hi');
     }
 

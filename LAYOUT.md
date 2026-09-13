@@ -66,6 +66,26 @@ That accounts for everything that executes. What remains is writing:
    enumerated and shared — promoting a 1.86 MB dependency into the kit invites a
    second page to import it without noticing what it costs.
 
+   ⚠️ **And the containment wall is what priced the SECOND candidate out.** The
+   WebXR input-profiles controller meshes were assessed on 2026-09-13 and
+   **rejected**, with the numbers, so nobody re-derives them:
+   `@webxr-input-profiles/assets@1.0.20` is **MIT (Amazon, 2019)** — the licence
+   is not the obstacle — and `meta-quest-touch-plus` is **217,984 bytes for the
+   left hand, 213,868 for the right**, plus 11,430 for the profile JSON. The
+   `.glb` is glTF 2.0 with 31 nodes, 6 meshes, 23 accessors, one PBR material
+   and one embedded PNG, carrying **TEXCOORD_0** — which the room's flat-colour
+   box program (position at slot 0, normal at slot 1, no texture coordinate) has
+   nowhere to put. So it is a container parser *and* an accessor decoder *and* a
+   node walk *and* a PNG decode *and* a third renderer, for a shape whose whole
+   job is to answer "where is my hand". 🔴 **And the consumer is
+   `demo/shell/xr-room.mjs`, which two pages import** — so a
+   `demo/<slug>/vendor/` path fetched from a shell module is the `moq.mjs`
+   rename bug exactly, and the alternative is a shell-level exception to the
+   wall this item exists to describe. Primitives instead, and the tablet's own
+   footer says it is a stand-in. **The `profile.json`'s gamepad index map was
+   taken WITHOUT the mesh** — ten lines in `demo/shell/xr-hands.mjs`, no fetch,
+   no bytes — which is the half that was actually worth having.
+
 ---
 
 ## ⚠️ Two things that look wrong and are staying

@@ -946,6 +946,16 @@
       typeof R?.note === 'string' && R.note.length > 10
       && ['not asked', 'waiting', 'refused', 'unreadable', 'none', 'yours'].includes(R.surfaces),
       `${R?.surfaces} · ${R?.note}`);
+    // 🔴 THE CONTROLLER INTERFACE IS THE ROOM'S, NOT THIS PAGE'S, AND IT HAS NO
+    // SESSION MODE IN IT. The same stand-ins, the same beam off the right
+    // hand's target ray, the same tablet on the left with the same slider — out
+    // of the same two modules `scene` uses, so there is no second copy here to
+    // drift. The string is the one both pages beacon on their first headset
+    // frame, which is how two runs in two modes are compared without a third.
+    d.assert('the controllers and the tablet describe themselves without naming a kind of session',
+      typeof xr.state.ui === 'string' && xr.state.ui.includes('control(s)')
+      && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(xr.state.ui),
+      xr.state.ui);
 
     if (got) {
       // ⚠️ A BOUNDED WAIT FOR A SECOND OF FRAMES, not for the first one. The

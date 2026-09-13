@@ -897,13 +897,23 @@ Worked through: with the panel straight ahead, `f = (0,0,-1)`, so
 `t = -dist / -1 = +dist`. **The formula in §5.3 is correct as written with a
 negative `den` — the two signs cancel.**
 
-🔴 **The trap is adding a backface test that looks like a tidy-up.** Anyone who
-writes `if (den > 0) return null` — a perfectly ordinary "ignore the back of the
-quad" line, written on the assumption that +Z faces *away* from the viewer —
-rejects every valid hit and nothing else. **The tablet then responds only when
-you point away from it**, which reads as broken tracking rather than a
-one-character sign. It is not worth reasoning about twice. **Assert it instead**,
-on synthetic matrices:
+🔴 **The trap is adding a backface test that looks like a tidy-up**, and it is
+the sign you write it with. ⚠️ **CORRECTED 2026-09-13, and the correction is the
+point of this paragraph.** This section originally said that `if (den > 0)
+return null` "rejects every valid hit and nothing else" — **that is wrong, and
+its own worked example one paragraph above disproves it**: a valid front hit
+derives `den ≈ -1`, which that line KEEPS. The line that rejects every valid hit
+is `if (den < 0) return null`, written by somebody who assumed +Z faces away
+from the viewer. A warning that is confidently wrong about which sign is which
+is worse than no warning, because it is the sentence that gets copied — the same
+failure as `csound.mjs`'s "118 ms early" comment, which was the distance between
+two wrong answers.
+
+**So `demo/shell/xr-pick.mjs` carries no bare sign test at all.** It computes a
+named `front = den < 0`, takes `{ backface }` as an option, and
+`xr-pick-test.mjs` asserts BOTH directions on synthetic matrices — the
+convention is a measurement rather than a recollection. The tablet, whose +Z
+also comes back at the viewer, uses the same function unchanged:
 
 ```
 demo/shell/xr-pick-test.mjs     # node demo/shell/xr-pick-test.mjs
@@ -1348,3 +1358,154 @@ the *pointing* and wrong about the *pressing*: the drag code never needs to know
 **where on the panel** the ray landed, and a button does. §5.3 is the missing
 piece, it is thirty floating-point operations, and it has a backface-test trap
 waiting in it that §5.4 catches on a laptop.
+
+---
+
+## 9. What was built, 2026-09-13 — and what is still UNMEASURED
+
+Written after the work, so §§1–8 stay as they were argued and this section is
+what actually shipped. ⚠️ **Nothing below has been in a headset.** Every number
+here came off a laptop, a registry or a document; the whole device column of §7
+is still open.
+
+### 9.1 The files
+
+| | |
+|---|---|
+| `demo/shell/xr-pick.mjs` | a ray against a rectangle: `{t, u, v, front}`, ~30 flops, no dependencies |
+| `demo/shell/xr-pick-test.mjs` | **20 asserts, 6 of them negative controls**, `node`, no browser |
+| `demo/shell/xr-tablet.mjs` | the screen on the hand — layout, hit test, value arithmetic, canvas. Pure above the one line that touches `document` |
+| `demo/shell/xr-hands.mjs` | 🔴 **the ONE input path.** Both source arrays, the assignment by `handedness`, the tablet's press/drag, the stage instrumentation |
+| `demo/shell/xr-room.mjs` | the picture: floor, stand-ins, beam, tablet |
+
+### 9.2 The controller mesh: REJECTED, with the numbers
+
+§4.2 recommended primitives on an argument. Here is the same conclusion with
+the registry actually read, on 2026-09-13:
+
+- **Licence is not the obstacle.** `@webxr-input-profiles/assets@1.0.20` is
+  **MIT, Copyright 2019 Amazon**.
+- **Bytes.** `meta-quest-touch-plus/left.glb` **217,984**,
+  `right.glb` **213,868**, `profile.json` **11,430** — 433 KiB for the pair.
+  (The whole registry unpacks to 97 MB across 133 files; `-v2` is 4x the size
+  of the plain profile, so "which profile" is a 1.5 MB question, not a
+  rounding one.)
+- **What the `.glb` needs.** Parsed here: glTF 2.0, **no extensions**, 31
+  nodes, 6 meshes, 23 accessors, 1 material with a `baseColorTexture`, 1
+  embedded PNG, attributes `POSITION / NORMAL / **TEXCOORD_0**`. The room's
+  whole shader vocabulary is one flat-colour box program over a VAO with
+  position at slot 0 and normal at slot 1 and **no texture coordinate
+  anywhere** — so it is a container parser, an accessor decoder, a node walk, a
+  PNG decode and a third program.
+- 🔴 **And the consumer is shared.** `xr-room.mjs` is imported by `scene` and
+  `mirror`; `LAYOUT.md` puts a vendored binary in `demo/<slug>/vendor/`, so a
+  shell module fetching a per-slug asset path is the `moq.mjs` rename bug in a
+  new costume. That is the argument §4.1 did not have and it is the decisive
+  one.
+
+**Taken WITHOUT the mesh: the gamepad index map** (§4.2 stage 2), ten lines in
+`xr-hands.mjs`. It **confirms** the indices `scene` had guessed —
+`xr-standard-trigger` 0, `xr-standard-squeeze` 1, thumbstick button 3 /
+xAxis 2 / yAxis 3, `a`/`x` 4, `b`/`y` 5 — which is worth recording precisely
+*because* it is a pass: "it happens to be right" and "it is right" were the same
+observation until somebody looked.
+
+**The stand-in says it is a stand-in**, in a footer on the tablet's own face,
+which is the only surface in the session where that claim can be read.
+
+### 9.3 The tablet's pose — the complaint that was actually made
+
+> *"ma tahaks et tablet oleks kontrolleri 'peal' ruudukujulisel alal, sellega
+> risti mitte nurga all"*
+
+It was tilted 31° back and offset up-and-forward. It is now flat on the
+controller's square top face, square to the controller's own axes, with **no
+tilt term at all**: right = grip **+X**, up = grip **−Y**, normal = grip **−Z**,
+centre = the grip origin lifted 0.09 m along −Z.
+
+Two things that are not obvious and are asserted rather than reasoned about:
+
+- 🔴 **The basis must be right-handed.** Two of the three columns are negated;
+  negating one gives a determinant of −w·h, which flips the winding — and the
+  room draws with `CULL_FACE` on, so a mirrored basis is an **invisible**
+  tablet, which reads as "never built" rather than as a sign error.
+- ⚠️ **No `handedness` flip, deliberately.** §1.5's mirrored-X warning is about
+  anything hung off the **hand**. This hangs off the **plastic**: the top face
+  is on the thumb side, which is −Z for both hands. A sign flip here would
+  correct a bug this pose does not have.
+
+### 9.4 Two rules the room lost, and one it gained
+
+- **The page's own WALLS are gone.** A made-up wall at 5 m is a claim about
+  where your room ends and it is always wrong. `local-floor` means the origin
+  IS the floor, so the floor is the one surface the page can be sure of. Real
+  walls still arrive in passthrough, because those were measured.
+  ⚠️ **And the branch that was tempting is the one that would have flashed:**
+  keying walls off `planes.state` would have drawn them for the 2.5 s grace
+  period of an AR session and then taken them away. There is no branch — there
+  is one floor, always, replaced entirely by `planeQuads` when a headset reports
+  any.
+- **The green "these dots are on YOUR surfaces" colour is gone**, along with the
+  two blues. It was a proof device, asked for in as many words, and it proved
+  its point on 2026-09-13 with 11 surfaces. One white now, at a strength the
+  slider sets. Where the dots are is still said in words.
+- **The floor is now derived from the fade rather than typed beside it.** It was
+  10 m across against a fade that does not finish until 11 m, so the dots were
+  at roughly two thirds strength where the quad simply stopped — a hard edge
+  5 m in front of you, drawn by the fade's constants disagreeing with the
+  floor's. `span = fadeFar * 2`.
+
+### 9.5 🔴 One input path, and how a divergence would be found
+
+> *"make controller uis work same in vr and ar"*
+
+Satisfied **structurally**: `xr-hands.mjs` and `xr-tablet.mjs` contain no
+`immersive-vr`, no `immersive-ar`, no `environmentBlendMode` and no session mode
+of any kind, and `scene`'s input block no longer mentions `arMode`. Two paths
+meant to be the same drift; one path cannot.
+
+Two places where branching was tempting, decided on purpose:
+
+- **Contrast.** The tablet composites onto a lit room in passthrough and a dark
+  one in VR. The fix is to make the slab **its own background** — one near-opaque
+  fill — so what is behind it stops mattering. That is a contrast decision, not
+  a mode one.
+- **The beam's far end.** In passthrough it could stop on a real plane. Refused:
+  the plane exists in only one of the two modes, so the behaviour would be a
+  function of what was *measured* rather than of what you *did*. One rule both
+  ways — to the thing it holds, else the thing it is on, else the tablet, else
+  2.4 m.
+
+**The check that stops this rotting** is a fingerprint built entirely from
+declarations — sizes, counts, ranges, which hand gets what, which gamepad index
+is the trigger — with no session anywhere in it:
+
+```
+tablet 0.16x0.11 m @ 768x528 px · 1 control(s) [grid 0..100%] · stand-in 3 parts
+  · tablet on the left hand, pointer on the right · trigger=button 0, stick=axes 2/3
+```
+
+It is beaconed on the **first frame of every session** by both pages and
+published on `__demo.xr.ui`, so **one pass of VR and one of passthrough are
+compared by putting two log lines side by side** — no third run. `scene` also
+asserts it across both of its session buttons on a laptop, and refuses any
+session word appearing in it.
+
+### 9.6 What a headset still has to answer
+
+Everything in §7 that is marked UNKNOWN, plus four things this work added:
+
+1. **Is the tablet legible at 0.16 m?** 768 px across ~25.5° is 30 px/degree,
+   which MATCHES `mirror`'s shipped panel (29.4) — and that panel's own
+   legibility has never been graded by a face. Matching an ungraded number is
+   not the same as being legible.
+2. **Is 0.09 m the right lift, and is the slab the right size against a real
+   controller?** Both are the first two numbers to change if it reads wrong.
+3. **Does the left grip resolve?** A run in 2026-09 had the left grip fail while
+   the right resolved, in the same frame. The fallback is written down — one
+   source carries both jobs and the log says so — but it has never fired.
+4. 🔴 **Does the `gl error 1282` on the first frame move?** This work did not set
+   out to fix it and does not claim to. It added programs and uniforms to the
+   same context, so the first-frame reading may well change; `mirror`'s by-phase
+   `glCheck` is what would say where, and a run that still says `firstDraw` has
+   learned nothing new.
