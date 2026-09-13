@@ -71,6 +71,7 @@
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { buildSource, SHAPES, sourceMessage } from '/shell/source.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createDiagram } from '/shell/diagram.mjs';
   import { openWire } from '/shell/wire.mjs';
 
   const q = new URLSearchParams(location.search);
@@ -78,7 +79,12 @@
 
   const d = mount({
     name: 'grains',
-    what: 'Two granulators, the same four settings, side by side: one running in this page and one on a Raspberry Pi in another building, with a blend between them so you can hear one become the other. The left picture can show every grain, because the engine that fires them is here; the right one can only show the sound that arrived, because a grain inferred from audio might be a note or a reverb swell. Press Hold and the board stops listening — its fragments then come only from the minute it already has, which is when the settings start to do something you can hear.',
+    // 🔴 NO `what` PARAGRAPH: IT IS THE PICTURE AND ITS CAPTION NOW. The three
+    // sentences that were here were describing a SHAPE — four numbers leave
+    // this browser, cross a rented computer, reach a board in another building
+    // and come back as sound — which is the one job prose is worst at
+    // (plan-diagram §1). The diagram is built under `guard(d)` below, and the
+    // half of the paragraph a picture cannot draw is its caption.
     // ⚠️ FIVE CELLS, MEASURED RATHER THAN GUESSED. It was eight, and five of
     // those ellipsised — `answe…`, `fluid…`, `shatt…`. A readout cell here is
     // 90 px of text whatever the window does (the page's own measure caps it,
@@ -125,6 +131,57 @@
     ],
   });
   guard(d);
+
+  // ── where the signal goes ────────────────────────────────────────────────
+  // The first demo to take the drawer (plan-diagram §7). It goes where the
+  // paragraph was, above the numbers, because it is the thing to read first.
+  //
+  // 🔴 THREE BOXES, AND THE SECOND GRANULATOR IS NAMED INSIDE THE BOX THAT
+  // HOLDS IT — MEASURED, NOT PREFERRED. The true shape here is a fork: the
+  // same four settings go to a granulator in this page AND out to the one on
+  // the board. Drawn as one — `this page` branching to `a granulator here` and
+  // to `Cloudflare`, which is right and legible at 688 px — it is FALSE at
+  // 358 px: below 560 px the drawer stacks every box in one column and draws a
+  // forward link as a straight vertical at its source's centre, so the branch
+  // to Cloudflare runs behind the granulator box and a phone reads
+  // `this page → a granulator here → Cloudflare`. That is a path this page
+  // does not have, has never measured, and is exactly the plausible wrong
+  // story (granulate here, then send it). So each granulator is named in the
+  // box of the machine that runs it, which is plan-diagram §3's own rule for
+  // two programs in one device, and the picture is true at both widths.
+  //
+  // ⚠️ EVERY ARROW IS A THING THIS PAGE ASSERTS. `four settings` is the
+  // `params.set` pair `setKnob` sends, under "the page reached the relay";
+  // `sound and grains` is the PCM that `probeSound` measures with a key down
+  // AND the board's own `grain.marks`, under "the board's grains are reported
+  // by the engine that fired them". Nothing is drawn that no check covers —
+  // the notes and the material spec also go out, and they are left off rather
+  // than crowding the one arrow that carries the page's subject.
+  createDiagram(d.head, {
+    title: 'the same four settings, in two buildings',
+    // The paragraph that was in `what`, cut to the part the drawing cannot
+    // say. Hovering a box replaces this line with what that box does, which is
+    // why there is no tooltip anywhere on this page.
+    caption: 'The blend decides how much of each you hear, so one can become the other while both '
+      + 'keep running. Press Hold and the board stops listening: its grains then come only from the '
+      + 'minute it already has, which is when the settings start to do something you can hear.',
+    nodes: [
+      { id: 'you', label: 'this page', sub: 'a granulator in it', kind: 'here' },
+      { id: 'cf', label: 'Cloudflare', sub: 'passes it all on', kind: 'cloud' },
+      { id: 'pi', label: 'Raspberry Pi', sub: 'another granulator', kind: 'device' },
+    ],
+    links: [
+      // ⚠️ `four settings`, NOT `the four settings` — MEASURED. In one column
+      // an arrow's name gets half a box minus 16 px, so the article costs four
+      // characters the drawer does not have below a 375 px phone: it reported
+      // `the four…` at 343 px, which is a 17-character label in a 93 px slot.
+      // Dropping one word is clean down to a 360 px screen.
+      { from: 'you', to: 'cf', label: 'four settings' },
+      { from: 'cf', to: 'pi', label: '' },
+      { from: 'pi', to: 'cf', label: 'sound and grains', back: true },
+      { from: 'cf', to: 'you', label: '', back: true },
+    ],
+  });
 
   // ── state ────────────────────────────────────────────────────────────────
   let me = null;                       // this connection's id, to drop our own echo
@@ -509,11 +566,16 @@
     return box;
   };
   const hereCard = card('in this page', 'an AudioWorklet · every grain reported');
-  const boardCard = card('on the Raspberry Pi', 'over the relay · sound only');
+  // ⚠️ NOT `sound only` — THAT WENT STALE THE DAY THE BOARD LEARNED TO REPORT
+  // ITS GRAINS, and the diagram at the top of the page is what caught it. The
+  // picture says `sound and grains` come back and the check below asserts
+  // exactly that, so a heading two screens down saying the opposite is the
+  // page disagreeing with itself about its own subject.
+  const boardCard = card('on the Raspberry Pi', 'over the relay · every grain reported');
   const scope = createGrainScope(hereCard, { seconds: 4, height: 150 });
   scope.source('every tick is a grain this page started');
   const boardScope = createGrainScope(boardCard, { seconds: 4, height: 150 });
-  boardScope.source('the board sends sound and no grain events, so this is what the sound shows');
+  boardScope.source('every tick is a grain the board reported firing');
 
   // ── the granulator in this page ──────────────────────────────────────────
   //
