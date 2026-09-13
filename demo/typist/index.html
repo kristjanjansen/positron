@@ -38,12 +38,23 @@
   .keys::-moz-selection { background: transparent; }
   .hint { color: var(--dim2); font-weight: 500; }
 
-  /* The block cursor. Zero net width — `.62em` wide with `-.31em` either side —
-     so putting it in the line cannot move a single character of the layer it is
-     drawn over. */
-  .cur { display: inline-block; width: .62em; margin: 0 -.31em; background: var(--hi);
-         color: var(--bg);          /* inverse video: the letter under it still reads */
-         vertical-align: baseline; animation: typ-blink 1.06s steps(1) infinite; }
+  /* THE CARET IS A CARET, NOT A BLOCK. It was a `.62em` slab of `--hi` with the
+     next character printed inside it in inverse video — one whole character of
+     solid colour, sitting -.31em INTO the character before it. Two things were
+     wrong with that and only one of them was the look: the slab swallowed a
+     character's width out of the flow, so every letter after the caret sat one
+     character to the left of where the <textarea> underneath had it.
+
+     ⚠️ STILL ZERO NET WIDTH — 2px with -2px of right margin — because the two
+     layers must share every metric or they drift apart by a character. The
+     margin-LEFT is the gap the caret keeps from the letter before it; the same
+     amount comes back off the right, so the character after it does not move.
+     .1em lands the bar in the next glyph's own left side bearing, which is
+     where a real editor puts one. */
+  .cur { display: inline-block; width: 2px; height: 1.1em; vertical-align: -.22em;
+         margin-left: .1em; margin-right: calc(-2px - .1em);
+         background: var(--hi); border-radius: 1px;
+         animation: typ-blink 1.06s steps(1) infinite; }
   @keyframes typ-blink { 0%, 54% { opacity: 1 } 55%, 100% { opacity: .12 } }
   /* `--hi` at 22%: a highlight, not a second piece of ink */
   .sel { background: rgba(255, 212, 0, .22); border-radius: 2px; }
@@ -170,31 +181,40 @@
     // the result was four sentences nobody reads. What a visitor needs: what
     // this is, what to press, what the numbers mean.
     what: 'Type, and every change is written down as what it did to the document — where '
-      + 'the text changed and what it changed to — never as the key you pressed. Press '
-      + 'play to watch it type itself back, drag the line to any moment, and zoom in '
-      + 'until each mark becomes the letter it recorded. "Worked out" counts the '
-      + 'deletions where nothing said what had been removed, so the text before and '
-      + 'after had to be compared.',
-    // 🔴 NO READOUT. Asked for, and this is the one page where it was in the
-    // way: the document IS the readout — you can see the letters, the cursor
-    // and the highlight, and a row of cells repeating them in numbers is the
-    // same facts twice. `worked out`, `checked` and `apart` are about the
-    // page's argument rather than about what you are doing, and they are all
-    // stated by the checks, which is where an argument belongs.
+      + 'the text changed and what it changed to — never as the key you pressed. Drag the '
+      + 'line below to any moment to put the box back as it was, and zoom in until each '
+      + 'mark becomes the letter it recorded. "Worked out" counts the deletions where '
+      + 'nothing said what had been removed, so the text before and after had to be '
+      + 'compared.',
+    // 🔴 NO READOUT, AND THE ROW IS NOT DRAWN EITHER. Asked for, and this is
+    // the one page where it was in the way: the document IS the readout — you
+    // can see the letters, the cursor and the highlight, and a row of cells
+    // repeating them in numbers is the same facts twice. `worked out`,
+    // `checked` and `apart` are about the page's argument rather than about
+    // what you are doing, and they are all stated by the checks, which is where
+    // an argument belongs.
+    // ⚠️ `showReadout: false` IS THE SECOND HALF AND IT IS NOT DECORATION.
+    // `readout: null` empties the row; it does not remove it, and an empty
+    // `.pos-readout` still paints its own 1 px border top and bottom. MEASURED
+    // on this page: a 2 px full-width band sitting 24 px above the controls,
+    // with no content between its edges — a horizontal rule nobody asked for,
+    // which is exactly what it was reported as.
     readout: null,
-    // ⚠️ `own` IS BACK AS A CONTROL EVEN THOUGH THE PAGE OPENS THERE, and the
-    // ORDER is load-bearing. `verify.mjs` presses every control in the order
-    // they are declared, so whichever is LAST is the state the page is in when
-    // the harness starts typing — and the live check ("what is being typed
-    // right now rebuilds from its own edits") only has a subject if the box is
-    // writable. Declared the other way round it read 9 of 10 asserts, green,
-    // with the one that grades the half a visitor actually uses simply absent.
-    // It also has to exist for a human: once you have played the recording,
-    // there has to be a way back to your own typing.
-    controls: [
-      { id: 'back', label: 'Play a recording' },
-      { id: 'own', label: 'Type your own', primary: true },
-    ],
+    showReadout: false,
+    // 🔴 NO CONTROLS. Both were removed on request and neither is missed: the
+    // page opens writable, so `Type your own` was a button for the state you
+    // are already in, and `Play a recording` offered somebody else's document
+    // in place of your own.
+    // ⚠️ THE SHIPPED RECORDING IS STILL THE SUBJECT OF EIGHT CHECKS. It is a
+    // fixture, graded at load by `check(loaded)` before `startOwn()` hands the
+    // page over — see the bottom of this file, where the ORDER is load-bearing.
+    // ⚠️ And the reason `own` was added back a few hours before it was removed
+    // — that `verify.mjs` presses every control in order and leaves the page in
+    // the LAST one's state, so ending on the recording left the box read-only
+    // and the live check with no subject — does not apply to a page with no
+    // controls at all: the harness types into a box that is already writable.
+    // MEASURED after removing them: 10 page asserts, the same 10, live check
+    // included.
   });
   guard(d);
 
@@ -250,7 +270,7 @@
   let folded = blank();    // rebuilt from the whole prefix — the reduce side
   let prov = freshProv();
   let deck = null, bar = null, view = null, adapter = null;
-  let capturing = false;   // true between `Type your own` and the first play
+  let capturing = false;   // true while the box is yours to type into — everything except the shipped fixture
   let opPos = [];          // each edit's position on the line, for the skip window
   let lastAssertWall = 0;
   let pre = null;          // the beforeinput snapshot
@@ -298,19 +318,19 @@
     const b = Math.max(a, Math.min(n, st.selection[1]));
     const head = esc(st.text.slice(0, a));
     const tail = esc(st.text.slice(b));
-    const mid = a === b
-      // the cursor stands ON the next character, the way a terminal one does,
-      // and takes the character with it when there is one
-      ? `<span class="cur">${esc(st.text.slice(a, a + 1)) || ' '}</span>`
+    // THE CARET STANDS BETWEEN TWO CHARACTERS AND TAKES NEITHER. It used to
+    // hold the next character inside itself, in inverse video, and print the
+    // rest from a+1 — which drew every character exactly once but gave the one
+    // under the caret no width in the flow, so the line was a character shorter
+    // than the same line in the <textarea> pinned over it.
+    const mid = a === b ? '<span class="cur"></span>'
       : `<span class="sel">${esc(st.text.slice(a, b))}</span>`;
-    const after = a === b && a < n ? esc(st.text.slice(a + 1)) : tail;
-    into.innerHTML = head + mid + after + '​';
+    into.innerHTML = head + mid + tail + '​';
   }
 
   function drawPaper() {
     if (!live.text && !capturing) {
-      paper.innerHTML = '<span class="hint">press play to watch the recording, '
-        + 'or Type your own and start typing</span>';
+      paper.innerHTML = '<span class="hint">start typing</span>';
       return;
     }
     drawDoc(paper, live);
@@ -417,23 +437,26 @@
     return {
       id: type, kind: KIND, label, height, width: 2, as: 'ticks', terse: true,
       color: INK[type],
-      // 🔴 THE MARK BECOMES THE LETTER WHEN YOU ZOOM IN FAR ENOUGH. A comb of
-      // identical ticks says WHEN you typed and never WHAT, which is half of
-      // what this page records — and the other half was only reachable by
-      // pointing at one mark at a time. The strip draws a glyph on a tick only
-      // where the neighbouring marks have left room for it, so zooming is the
-      // control: out is a rhythm, in is a word.
-      // ⚠️ A space and a newline have no visible glyph, and drawing nothing for
-      // them would make the two commonest keys on the page look like marks that
-      // failed to render. They get the printer's symbols instead.
+      // 🔴 THE LETTER IS THE MARK. Not a tick with a letter stuck on it — that
+      // was two marks per edit saying one thing, and it read as busy. `marks:
+      // 'char'` tells the strip to draw no line at all: where there is room the
+      // character stands on its own, and where there is not, a middot stands in
+      // for it. So zooming is still the control — out is a rhythm of dots, in
+      // is a word — and nothing is hidden, because every edit always has a mark.
+      marks: 'char',
+      // ⚠️ ONLY A LETTER OR A DIGIT IS DRAWN AS ITSELF. A space, a line break,
+      // a tab, a backspace and a cursor move have no shape, and the printer's
+      // symbols this used to draw for them (`␣ ⏎ ⇥ ⌫`) were four more things to
+      // learn in a row that is already three rows deep. An empty answer here is
+      // how the strip is told "this edit has no character", and it draws the
+      // middot — at full strength, because that is a property of the edit and
+      // no amount of zooming will turn it into a letter.
       glyphOf: (r) => {
         const op = r.payload?.op;
-        if (!op) return '';
-        if (op.type === OP_SELECT) return '';
+        if (!op || op.type === OP_SELECT) return '';
         const t = op.type === OP_DELETE ? (op.removed ?? '') : (op.text ?? '');
-        if (!t) return op.type === OP_DELETE ? '⌫' : '';
-        const c = [...t][0];
-        return c === ' ' ? '␣' : c === '\n' ? '⏎' : c === '\t' ? '⇥' : c;
+        const c = t ? [...t][0] : '';
+        return /[\p{L}\p{N}]/u.test(c) ? c : '';
       },
       filter: (r) => r.payload?.op?.type === type,
       describeRow: (r) => {
@@ -511,14 +534,16 @@
     view = createStripView(stripHost, deck, {
       size: 'auto', follow: false, gutter: 132,
       // 36 EACH, AND THE NUMBER IS ARITHMETIC, NOT TASTE. The gutter draws a
-      // lane's name at y+12 and its numbers at y+21 and y+31, and refuses any
-      // line that would fall past `height - 2` — so two numbers need 33 px of
+      // lane's name at y+11 and its numbers at y+22 and y+32, and refuses any
+      // line that would fall past `height - 2` — so two numbers need 34 px of
       // lane and this asks for 36. ⚠️ A LANE THAT IS ONE PIXEL SHORT DROPS ITS
       // LAST LINE IN SILENCE, and the last line is where the count lives: the
       // strip is doing the right thing (never spill into the next lane) and the
       // page still loses a number with nothing to say it happened. That is why
       // these three are equal and why the arithmetic is written down. It was
-      // 42/38/38 against a looser spacing.
+      // 42/38/38 against a looser spacing, and 33 px before the name was given
+      // its own step away from the numbers. `strip.gutterFit()` answers this by
+      // measurement now, so nobody has to do the sum again to find out.
       lanes: [laneOf(OP_INSERT, 'typed', 36),
               laneOf(OP_DELETE, 'taken back', 36),
               laneOf(OP_SELECT, 'cursor', 36)],
@@ -688,9 +713,6 @@
       `${cmp.compares} moments compared, ${cmp.divergences} apart, ${log.length} edits so far`);
   }
 
-  d.on('own', startOwn);
-  d.on('back', () => { loadRecording(); d.log('playing the shipped recording — press play'); });
-
   // ── the checks ───────────────────────────────────────────────────────────
   //
   // 🔴 NOTHING TYPES FOR YOU. There is no control that fabricates a session:
@@ -796,12 +818,18 @@
       `${rows.length} edits, ${moves} of them cursor moves; every edit carries `
       + `${[...fields].sort().join(', ')}`);
 
-    // 🔴 THE LETTERS ON THE MARKS, ASSERTED AT TWO ZOOMS — because "it drew
-    // nothing" and "there was no room" are the same picture, and a glyph
-    // feature that had silently stopped working would read as a crowded view.
-    // So the check is a RELATIONSHIP, not a count: zoom in far enough and more
-    // letters appear; zoom out and they go away again. Neither end alone can
-    // say that, and a fixed threshold would just be tuned until it passed.
+    // 🔴 THE LETTERS ARE THE MARKS, ASSERTED AT TWO ZOOMS — because "it drew
+    // nothing" and "there was no room" are the same picture, and a feature that
+    // had silently stopped working would read as a crowded view. So the check
+    // is a RELATIONSHIP, not a count: zoom in far enough and more letters
+    // appear; zoom out and they go back to dots. Neither end alone can say
+    // that, and a fixed threshold would just be tuned until it passed.
+    //
+    // ⚠️ AND EVERY EDIT KEEPS A MARK AT BOTH ENDS. `drawn + dotted === had` is
+    // the half of the claim the old version could not make: a letter that lost
+    // its room used to leave a bare tick, and now it leaves a faded dot, so a
+    // mark that went missing altogether would show up here as a shortfall
+    // rather than as a tidier picture.
     {
       const st = view.strip;
       const saved = st.view();
@@ -809,15 +837,18 @@
         st.setView({ ...st.view(), pxPerSecond });
         st.draw();
         const L = st.lanes().find((l) => l.id === OP_INSERT);
-        return L && L.glyphState ? L.glyphState : { had: 0, drawn: 0 };
+        return L && L.glyphState ? L.glyphState : { had: 0, drawn: 0, dotted: 0 };
       };
       const wide = at(20), close = at(400);
       st.setView(saved); st.draw();
+      const allMarked = (g) => g.drawn + g.dotted === g.had;
       d.assert('zoom in far enough and a mark becomes the letter that was typed',
-        close.drawn > wide.drawn && close.drawn > 0 && wide.had > 0,
+        close.drawn > wide.drawn && close.drawn > 0 && wide.had > 0
+          && allMarked(wide) && allMarked(close),
         `${wide.drawn} letters legible of ${wide.had} marks at 20 px a second, `
-        + `${close.drawn} of ${close.had} at 400 — a mark carries its letter `
-        + `only where the next mark has left room for it`);
+        + `${close.drawn} of ${close.had} at 400 — the rest are middots, `
+        + `${wide.dotted} and ${close.dotted} of them, so every edit has a mark `
+        + `at both zooms and only the zoom decides which ones can be read`);
     }
 
     const dels = rows.filter((r) => r.op.type === OP_DELETE);

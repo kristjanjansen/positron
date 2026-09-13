@@ -107,12 +107,44 @@
   .pane.pos-full .bar .sp { display: none; }
   .pane.pos-full .bar .knobs { justify-self: center; }
   .pane.pos-full .bar button.ico { justify-self: end; }
-  /* ⚠️ THE BAR IS ONE LINE OR IT IS NOT A BAR. Left to itself the flex row
-     wraps, and a footer that becomes two lines in fullscreen pushes the picture
-     up and reads as a layout that has come apart. Nothing in here is long
-     enough to need wrapping — the fix when something IS too long is to shorten
-     the words, which is what happened to the label, not to let it fold. */
+  /* 🔴 TWO ROWS WHERE ONE WILL NOT FIT, and the knobs get the whole width.
+     Below this the three knob groups alone are wider than the screen, so a
+     one-line bar is not a thing that exists here and insisting on it is how the
+     numbers ended up over the buttons. The controls are the REASON this bar is
+     in fullscreen at all — the note above says so: without them "the picture
+     you went fullscreen to look at becomes the one you cannot change" — so they
+     take the row that can hold them, and the numbers sit above with the ⛶.
+     ⚠️ The breakpoint is where the one-line bar actually stops fitting, not a
+     device width. */
+  @media (max-width: 720px) {
+    .pane.pos-full .bar {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: 'stat ico' 'knobs knobs';
+      row-gap: 8px;
+    }
+    .pane.pos-full .bar .left { grid-area: stat; overflow: hidden; }
+    .pane.pos-full .bar button.ico { grid-area: ico; }
+    .pane.pos-full .bar .knobs {
+      grid-area: knobs; justify-self: stretch;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;
+    }
+  }
+  /* ⚠️ THE BAR IS ONE LINE OR IT IS NOT A BAR — ON A SCREEN WIDE ENOUGH FOR
+     ONE. Left to itself the flex row wraps, and a footer that becomes two lines
+     in fullscreen pushes the picture up and reads as a layout that has come
+     apart. The claim that followed — "nothing in here is long enough to need
+     wrapping" — was written on a laptop and is FALSE ON A PHONE, and the way it
+     failed is the worst available: `nowrap` plus a `1fr` column that cannot
+     shrink means the numbers OVERFLOW THEIR OWN COLUMN and paint on top of the
+     knobs. PHOTOGRAPHED in fullscreen on an iPhone: `Apple GPU · coarse ·
+     locked · 29.9 fps` drawn straight through the middle row of buttons, two
+     texts in one place, neither readable.
+     ⚠️ `min-width: 0` is the half that stops the overflow — a grid item's
+     default `min-width: auto` refuses to shrink below its content, which is
+     what turned "too narrow" into "on top of". The narrow layout below is the
+     half that keeps both things readable. */
   .bar, .bar .left, .bar .stat, .bar .knobs, .lab { white-space: nowrap; }
+  .pane.pos-full .bar > * { min-width: 0; }
   .bar .left { display: flex; align-items: center; gap: 12px; min-width: 0; }
   /* The numbers sit a thumb's width from the ⛶, so every long press here is a
      miss rather than a copy — photographed on an iPhone, selection handles
