@@ -1,148 +1,66 @@
-# Queue — open work, newest first
+# Queue — open work, 2026-09-13
 
-Session 21 is in progress; its writeup is not here yet. What is below is the
-list, so nothing is carried only in a conversation.
+Rewritten at the end of session 21. Everything struck from the old list was
+DONE that day; what is below is what is actually left.
 
-- **Smooth the slider changes on a patch change and on randomise.** Choosing a
-  sound jumps every setting at once, in the sound and on screen, and a
-  granulator's parameters are exactly the ones a jump is audible in — a grain
-  rate going 2.2 → 20 in one block is a click, not a change of sound.
-  Two halves, and they are not the same work:
-  - **the value** — the page engine can ramp inside the worklet (one
-    `linearRampToValueAtTime`-shaped glide per parameter, ~250 ms). The board
-    cannot: `params.set` is a step, and sending a ramp of values down a relay
-    that drops silently past 60 msg/s is the wrong answer. ⚠️ **MEASURE FIRST
-    whether Pappus already lags its own parameters** — `Engine_Pappus.sc` has
-    `Lag.kr` on a lot of them, and if the step is already smoothed at the
-    engine there is nothing to build on that side and the two panes would end
-    up gliding differently for no reason.
-  - **the knob** — `slider.mjs`'s `set(v, quiet)` snaps. A patch that moves
-    four sliders should show them moving, or the page changes under you with no
-    account of what changed. This is a shell change, so it lands for `/box/`
-    and the kit at the same time.
-- ✅ **`workers/pub`'s container image was never stale — the claim was false
-  and cost five sessions of attention.** MEASURED 2026-09-13: the deployed image
-  is `positron-pub-pub:d4c38e9b`, pushed **2026-09-08T09:37:55Z**, 7m59s after
-  `89460a4` — the LAST commit to touch `container/server.mjs`. Wrangler tags an
-  image with the Worker version that pushed it and only pushes when the build
-  context changed (26 versions, 16 images), so the chain is exact: `d4c38e9b`
-  has no `PUB_ROW` binding and its predecessor `dfa5c20f` does, and `PUB_ROW`
-  was removed by that same commit. The container's marked copy of the pattern
-  and `demo/shell/pattern.mjs` produce **byte-identical** filter chains (700 B
-  at hue 0, 710 B at hue 150, zero differing constants).
-  🔴 **AND THE DISPROOF WAS ALREADY IN THE REPO.** `PROGRESS.md` recorded "v18,
-  updated 2026-09-08" and concluded "the image still draws the pre-session-12
-  test pattern" IN THE NEXT SENTENCE. Session 12 ran 09-07 → 09-08. The number
-  was measured and the opposite conclusion written beside it.
-  ⚠️ **DO NOT "fix" it by redeploying.** The Dockerfile pins nothing —
-  `FROM node:22-alpine` and `apk add ffmpeg` — and `node:22-alpine` is now
-  alpine 3.24.1 with **ffmpeg 8.1.2**, while the live image was built against
-  ffmpeg 7, which `server.mjs`'s own comments measured against. A gratuitous
-  deploy silently swaps the encoder major version and restarts the only
-  instance (`max_instances: 1`), dropping a live publish into Cloudflare's
-  45 s stale-publisher lockout. `/logs` is not at risk either way — the ring is
-  in DO storage.
-  **The real stale copies are elsewhere**: `rig/obs-docker/clock.html:18` and
-  `rig/whep/publish.html:23-27` both carry `ROW_X 40, ROW_Y 100, ROW_H 80`
-  against the current `X 80, Y 584, H 56`. Each is a self-contained
-  burner-and-reader pair that agrees with ITSELF, so neither is broken — but
-  neither can be compared against a page or the container. That is probably
-  what this note has been half-remembering for five sessions.
-- 🔴 **MAKE THE TWO GRANULATORS THE SAME INSTRUMENT — `plan-twins.md`.** They
-  ship side by side today and sound nothing alike, and every reason is
-  structural: different material, `rate` meaning 10–50x more density on the
-  board (eight voices x `swarm` duplicates), and a whole chain between the
-  board's grains and the ear (RESONATOR > DELAY > COLOUR > REVERB). A page
-  drawing two panes is claiming they are comparable, and right now that is
-  false. ⚠️ **THE FIRST TASK IS `rig/box/norns/CHAIN.md`, NOT THE CUT** — write
-  down what every stage is and what removing it costs the sound, the way
-  `TINY.md` did, so a `PAPPUS_BARE` rung is reversible rather than a stage
-  nobody who did not already know it can find again. A stage with no entry in
-  that file may not be skipped.
-- **Make the Raspberry Pi's picture the same KIND of picture.** Right now the
-  left card draws the held sound with the read band and every grain on it, and
-  the right card draws a scrolling waveform of what arrived — so the two panes
-  are not comparable, which is most of what a side-by-side is for. What the
-  board would have to send, in rough order of cost:
-  - **a peak envelope of the grain buffer** — ~600 floats for sixty seconds,
-    on demand or every second. That alone puts the WAVEFORM and the read band
-    on the right card, since `driftStats` already reports both read centres.
-    ⚠️ Needs reading a scsynth Buffer back (`/b_getn` in chunks) — bounded but
-    real work in `rig/box/`.
-  - **the grains themselves** — a `SendReply.kr` on the grain trigger in
-    `Engine_Pappus.sc`. At 0.5–24 grains a second per granulator this is ~48/s
-    at the top, which fits under the relay's measured 60 msg/s ceiling only if
-    it is BATCHED (one message per 250 ms carrying the positions since the
-    last). ⚠️ The relay drops silently past its cap, so an unbatched version
-    would look like a sparse cloud rather than like a dropped message.
-  - Until one of those exists the right card must go on saying what it cannot
-    show, in words — inferring grains from audio is the picture this page
-    already deleted once.
-- 🔴 **XR: THE BOXES CLIP INTO THE ROOM, AND THERE IS MAPPED WALL DATA TO USE.**
-  Reported from a Quest 2026-09-13: `scene`'s things can sit too close and clip.
-  The page currently knows nothing about the room it is in — it places things in
-  a bubble around the viewer and hopes. Three ways to know better, in order of
-  what they give and what they cost, and **every one of them has to be MEASURED
-  on the device before it is believed** (research/quest-xr: MDN and caniuse
-  Quest data is ~90% fabricated — BCD's `oculus` key ships the literal token
-  `"mirror"` for most entries):
-  - **`XRBoundedReferenceSpace.boundsGeometry`** — the guardian polygon at floor
-    level, as `DOMPointReadOnly`s. Standard, the oldest of the three, and the
-    cheapest thing that stops a box being placed outside the play area. It is a
-    FLOOR OUTLINE, not walls: it says where you can stand, not what you would
-    hit at head height.
-  - **Plane detection** — `plane-detection` as an optional feature, then
-    `XRFrame.detectedPlanes`, each `XRPlane` carrying a polygon, an orientation
-    and — on Meta's runtime — a semantic label (wall / floor / ceiling / desk /
-    couch / door / window / screen). This is the one that actually answers "is
-    there a wall there", and it is what a placement rule wants. ⚠️ It needs the
-    user to have run Space Setup; a room that has never been scanned returns
-    nothing, and "no planes" must not be drawn as "no walls".
-  - **Mesh detection / depth** — `mesh-detection` for the room mesh,
-    `depth-sensing` for per-frame occlusion. The most faithful and the most
-    expensive, and probably not needed for a placement rule.
-  ⚠️ **AND THE CLIPPING IS TWO PROBLEMS, NOT ONE.** A thing intersecting a REAL
-  wall needs room data; a thing intersecting ANOTHER THING needs only a minimum
-  separation, which the page can enforce today with no new API at all. Do the
-  second one first — it is a few lines, it needs no permission, and it works in
-  a room nobody has scanned.
-- **A flow-diagram drawer — `plan-diagram.md`, planned and not started.** To
-  replace the `what` paragraph on pages whose subject is a PATH, with a caption
-  under it. Decisions already taken there: **SVG with the text inside it** (a
-  DOM-text-over-canvas mix needs the layout computed twice in two coordinate
-  systems and puts a label where it can end up beside the wrong box); **a small
-  JSON of our own, not Mermaid** (Mermaid has nodes and edges where this needs
-  devices, software and a network boundary, and its layout is dagre's rather
-  than the left-to-right lanes the brief asks for); **one level of nesting, as
-  a `sub` line** rather than boxes inside boxes; loopbacks routed UNDER the row;
-  and grey with 8–12% of a hue mixed in, ⚠️ never yellow, because `--hi` means
-  "look here" everywhere else in this project. Starts in `/kit/` with six
-  awkward cases, then `grains` adopts it first.
-- **The slider group on a desktop.** Two columns with a generous x gap rather
-  than one tall stack — `draw` got a `pos-pair` modifier for exactly this
-  (`.sld-group.pos-pair`, six columns above 720 px) and `grains` and `/box/`
-  should use the same thing rather than a second spelling of it. ⚠️ Shared
-  columns only matter when sliders are STACKED; side by side there is nothing
-  to line up, which is why the modifier is a media query and not a new class of
-  group.
-- **The two-SuperColliders card.** Not a page — the third card on `grains`,
-  beside the two that are there. `PAPPUS_TINY=1` is on the board and is proven
-  to load in a tab (63,297 B under the silent 64 KiB `/d_recv` cap), so the
-  claim is the identical 1,451-UGen graph in a browser and on a Pi. What is
-  missing is wasm scsynth vendored into the repo.
-- **The defect backlog**, which is the current focus: `keep`'s unexplained 409,
-  and `pappus-live.mjs` grading a stochastic engine from single takes (14–16 of
-  17, failures MOVE between runs). ✅ `keep`'s 409, ✅ the reverb noise and ✅
-  `workers/pub`'s "stale container image" are all closed — the last one by
-  DISPROOF, see below.
-- **`plan-gesture.md`** — P1–P4: the XY pad component, a transport under it,
-  the same gesture recorded and played back, then driving the board. §3 is
-  decided: one 2-D series, measured.
-- **`text`** — the last finished proto with no page, 1,222 lines.
-- 🔴 **`gl 1282` on the Quest** — instrumented by phase, waiting on a headset run.
-- **`positron-demo`'s RTMPS key** is still unrotated; see `SECRETS-ROTATION.md`.
+## Needs a headset — one run answers four questions at once
 
----
+Open `scene`, press **Run in VR**, look around, exit. Then `mirror`. The log at
+`https://pub.positron.studio/logs?format=text` will carry:
+
+- **`room surfaces · …`** — whether Quest Browser grants `plane-detection` at
+  all, how many surfaces come back and what `semanticLabel`s they carry. This
+  decides whether the boxes-clipping-into-walls fix is even available; the
+  thing-against-thing half is already done (2,667 overlapping pairs -> 0).
+- **`hands · N source(s) · … · space local-floor`** — why box manipulation
+  stopped and the ray sat at the feet. `local` has its origin at the HEAD and
+  `local-floor` at the FEET, which is exactly what was described.
+- **`first frame: the framebuffer is NOT complete`**, or its absence. `gl 1282`
+  was traced to `firstDraw` and `scene` also reported **1286** once —
+  INVALID_FRAMEBUFFER_OPERATION, which is drawing before the framebuffer is
+  ready rather than a malformed call.
+- **the dotted grid** — whether it composites over passthrough at all.
+  ⚠️ `blendFuncSeparate(SRC_ALPHA, 1-SRC_ALPHA, ONE, 1-SRC_ALPHA)` is the one
+  line nobody has been able to test; if it is wrong the dots wash out or punch
+  a hole, they do not crash.
+
+## Needs the board — take turns, it is one Raspberry Pi
+
+⚠️ The RELAY is no longer a constraint (128 sockets, 1000 msg/s since
+2026-09-13). The DEVICE is: one JACK graph, one instrument.
+
+- **Re-run `pappus-live` against the board.** Its fixes are committed and
+  self-tested 14/14 but have never met the engine. The last run read 13/17 and
+  found that `params.random` re-arms the drift, so every capture was taken with
+  scan · spray · swarm · tilt · size · sos walking underneath.
+  `node rig/box/pappus-live.mjs --room studio-1 > /tmp/pappus-live.txt 2>&1`
+- **Weigh TINY against the 64 KiB ceiling with `report` in.** `CHAIN.md`
+  records 2,239 bytes of headroom and the sixteen new `SendReply` UGens are
+  unweighed. A `SynthDesc` has no compiled def before the engine allocates, so
+  it needs a running engine.
+- 🔴 **`plan-twins.md` — make the two granulators the same instrument.**
+  `CHAIN.md` is written, so BARE is unblocked. ⚠️ And CHAIN.md found that the
+  chain can ALREADY be skipped at run time (`oin1 1, pin1 0`), that RESONATOR is
+  already a pass-through under TINY, and that the seven per-stage meters would
+  start lying if stages were compiled out.
+
+## Needs nobody — just time
+
+- **`plan-diagram` §7: a page adopts the diagram.** The drawer is built and
+  26/26 with a `/kit/` section; `grains` is the named first adopter, its `what`
+  paragraph becoming a caption.
+- **`plan-gesture` P3 and P4** — both readings of one gesture side by side
+  (which settles §3's 2-D-vs-two-1-D question on a real hand rather than by
+  inference), then the same gesture driving the board.
+- **The two-SuperColliders card** — ⚠️ deliberately AFTER plan-twins, and it may
+  never be worth it: `research/supercollider-browser-2026-09.md` §5 prices it at
+  1.86 MB of AGPL wasm against a 6,659 B worklet for the same audible result.
+  Re-argue it against those numbers, do not assume it.
+- **The session writeup** — PROGRESS.md and a session-21 handoff.
+
+## Needs you, not me
+
+- **`positron-demo`'s RTMPS key is still unrotated.** `SECRETS-ROTATION.md`.
 
 # Handoff — 2026-09-13 (end of session 20)
 
