@@ -238,7 +238,35 @@ Engine_Pappus : CroneEngine {
 		// GRAIN SWARMER args: mrate .. gates
 		// COLOUR args: drive .. amp
 		SynthDef(\pappus, {
-			arg inbusl = 0, inbusr = 1, outbus = 0,
+			// 🔴 `report` — EVERY GRAIN, FROM THE THING THAT STARTED IT.
+			//
+			// Positron draws this engine beside a granulator running in a
+			// browser, and the browser one can draw every grain as a tick at
+			// the exact point in the material it read, because it is the code
+			// that starts them. This engine could not, so its picture was a
+			// scrolling waveform and its card said so — two panes of the same
+			// subject with different amounts of evidence behind them.
+			//
+			// A grain inferred from an output envelope might be a note, a delay
+			// tap or a reverb swell, so inferring was never an option. This
+			// reports the READ POSITION at the instant `GrainBuf` is triggered,
+			// which is the one number the picture needs and the one number
+			// nothing downstream can reconstruct.
+			//
+			// ⚠️ OFF BY DEFAULT, AND GATED ON THE TRIGGER RATHER THAN ON THE
+			// OUTPUT. `SendReply` with a zero trigger sends nothing and costs a
+			// UGen; gating the output instead would leave sixteen of them
+			// firing at the grain rate into a socket nobody reads. That is the
+			// same mistake this file's own `8.do` comment records — "gate the
+			// TRIGGER, not just the output" — which cost 24x the work for the
+			// common case.
+			//
+			// ⚠️ AND IT IS EXACT, NOT SAMPLED AT `trig`. The voices are
+			// TDelay'd apart by `strum`, so a single report at the shared sync
+			// trigger would carry seven positions that are up to one grain
+			// period stale. Per voice is sixteen UGens and is the truth.
+			arg report = 0,
+				inbusl = 0, inbusr = 1, outbus = 0,
 				mrate = 8, msize = 0.12, mcontour = 8,
 				mbuflen = 8, mwinstart = 0, mwinend = 1, mstrum = 0,
 				// RESONATOR, a Rings-style modal/string resonator. MODAL is
@@ -441,7 +469,7 @@ Engine_Pappus : CroneEngine {
 			mkgrain = { arg gbufl, gbufr, gpat, gsrc, mtilt, mrate, msize, mbuflen, mcontour, mstrum,
 				mscan, mscanmode, mdelay, mspray, mspraymode, melen, mephase,
 				mswarm, mswarmmode, mlock, msos, mwinstart, mwinend,
-				pitches, gates, probs;
+				pitches, gates, probs, half;
 				var capl, capr, mtl, frames, sos, sosret, sosin, wlen, loopfrac,
 				wphase, oldl, oldr, wpos, winlo, winhi, winspan, gph, trig, estep,
 				scanstretch, delaypos, scanpos, envsel, nvoices, swarm, dupgain,
@@ -699,6 +727,16 @@ Engine_Pappus : CroneEngine {
 						* ((dur * 0.04).min(0.008) / bufdur);
 					pos = ((winlo + ((scanpos + off + gjit).wrap(0, 1) * winspan))
 						* loopfrac);
+
+					// 🔴 THE GRAIN, REPORTED AT THE INSTANT IT IS TRIGGERED.
+					// `pos` is a fraction of the WHOLE buffer, which is exactly
+					// what a picture of the held sound wants — and it is read
+					// here rather than recomputed anywhere else, so the mark and
+					// the grain cannot disagree about where it read. See the
+					// `report` control at the top of this def for why it is
+					// gated on the trigger.
+					SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half]);
+
 					base = pitches[i];
 					g = Lag.kr(gates[i], 0.02);
 
@@ -845,7 +883,7 @@ Engine_Pappus : CroneEngine {
 			graw = mkgrain.value(buf, bufr, patbuf, msrc, mtilt, mrate, msize,
 				mbuflen, mcontour, mstrum, mscan, mscanmode, mdelay, mspray,
 				mspraymode, melen, mephase, mswarm, mswarmmode, mlock, msos,
-				mwinstart, mwinend, pitches, gates, probs);
+				mwinstart, mwinend, pitches, gates, probs, 0);
 
 			// ...and on LITE there is only one.
 			//
@@ -865,7 +903,7 @@ Engine_Pappus : CroneEngine {
 				mkgrain.value(buf2, buf2r, patbuf2, nsrc, ntilt, nrate, nsize,
 					nbuflen, ncontour, nstrum, nscan, nscanmode, ndelay, nspray,
 					nspraymode, nelen, nephase, nswarm, nswarmmode, nlock, nsos,
-					nwinstart, nwinend, pitches2, gates2, probs2);
+					nwinstart, nwinend, pitches2, gates2, probs2, 1);
 			};
 
 			// The faders LAST, both of them, so neither raw output has to stay
@@ -1905,6 +1943,13 @@ Engine_Pappus : CroneEngine {
 
 		this.addCommand("fade", "f", { arg msg; synth.set(\fade, msg[1]); });
 		this.addCommand("run", "i", { arg msg; synth.set(\run, msg[1]); });
+
+		// 🔴 `report` — switch the per-grain reports on or off. See the `report`
+		// control at the top of the SynthDef for what it is for and why it is
+		// gated on the trigger. It is a command rather than a constant because
+		// a page asks for the picture when it opens and stops asking when it
+		// closes, and the cost should follow the asking.
+		this.addCommand("report", "i", { arg msg; synth.set(\report, msg[1]); });
 
 		// SEVEN POLLS, one per box on SIGNAL's wireframe.
 		//
