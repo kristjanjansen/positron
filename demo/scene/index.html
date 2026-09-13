@@ -668,6 +668,15 @@
         session = await step(`requestSession ${mode}`, ask, 90000);
       } catch (e) { gaveUp = true; throw e; }
       room?.markAsked();
+      // 🔴 DID THE RUNTIME ACTUALLY GRANT IT? `no hand` on an input source is
+      // ambiguous in the worst way: it means "hand tracking is off" and "you
+      // were holding a controller" equally well, and those have completely
+      // different next steps. `enabledFeatures` is the runtime answering for
+      // itself. ⚠️ It is not on every implementation, so its ABSENCE is
+      // reported as absence rather than as a refusal.
+      shipNow(`features granted · ${session.enabledFeatures
+        ? [...session.enabledFeatures].join(' ')
+        : 'this browser does not say (no enabledFeatures)'}`);
       // ⚠️ EVERYTHING AFTER THE SESSION IS INSIDE THE SAME try. A throw from
       // makeXRCompatible, XRWebGLLayer or requestReferenceSpace used to escape
       // the handler entirely — so the session could START and the page then die
@@ -725,6 +734,14 @@
     // to the grip rather than disappearing. A page that can strand somebody in
     // a room must keep a way out that belongs to the page: grip leaves, and the
     // dead-man's switch below still fires if nothing ever draws.
+    // The runtime tells you when a controller wakes, sleeps, or a hand takes
+    // over — which is the only moment the hand question can be answered.
+    session.addEventListener('inputsourceschange', (e) => {
+      handsDirty = true;
+      shipNow(`what is in your hands changed · ${e.added?.length ?? 0} added, ${e.removed?.length ?? 0} gone`
+        + ` · now ${session.inputSources.length}`);
+    });
+
     session.addEventListener('selectstart', () => {
       if (!rayNow) return;
       held = pick(rayNow.o, rayNow.dir);
@@ -770,7 +787,13 @@
     return true;
   }
 
-  let raysSaid = false;
+  // ⚠️ RE-REPORTED WHENEVER WHAT IS IN YOUR HANDS CHANGES, not once. The first
+  // version of this fired on the first frame that had any input source — which
+  // is while you are still holding the controllers, so it could only ever
+  // report `no hand`. Hands appear LATER, when the controllers are put down,
+  // and the runtime says so with `inputsourceschange`. A one-shot probe asked
+  // the question at the one moment it could not be answered.
+  let handsDirty = true;
   function onXR(now, frame) {
     if (!session) return;
     session.requestAnimationFrame(onXR);
@@ -811,8 +834,8 @@
     // history is three headset runs that were indistinguishable from outside
     // until a line was shipped before and after every await. One line, once,
     // naming which of the three it is.
-    if (!raysSaid && session.inputSources.length) {
-      raysSaid = true;
+    if (handsDirty && session.inputSources.length) {
+      handsDirty = false;
       // 🔴 WHAT IS IN YOUR HANDS, ONCE — the measurement `plan-xr-hands` needs
       // and the page can take for free while it is already in a session.
       //
