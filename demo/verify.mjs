@@ -7,14 +7,33 @@
 // window.__demo, never on DOM ids, so it does not care how any page is built.
 // Raw CDP over node's global WebSocket, no deps — house harness style.
 
-import { spawn } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { spawn, execFileSync } from 'node:child_process';
+import { rm, readFile } from 'node:fs/promises';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const CDP_PORT = 9333;
-const PROFILE = '/private/tmp/claude-501/demo-verify-udd';
+// 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
+// them. CLAUDE.md records the same bug in `verify-gl.mjs` — it attached to a
+// Chrome left over from a previous run and reported THAT run's flags, which is
+// how a SwiftShader test reported ANGLE Metal — and the fix ("let the OS choose
+// and read back what you got") was applied to the HTTP port here and never to
+// these two. So two harnesses started at once did not collide loudly: the
+// second found 9333 already answering, attached to the FIRST's browser, and
+// drove someone else's tabs while reporting its own slugs. With agents running
+// in parallel that is not a rare race, it is the normal case — and it is the
+// likeliest explanation for a `cdp timeout` that took a full suite out today on
+// a demo that is 16/16 when run alone.
+//
+// ⚠️ The profile has to become per-run IN THE SAME CHANGE, not as tidiness.
+// Chrome writes the port it actually got into `DevToolsActivePort` inside the
+// profile, so reading it back from a SHARED directory would find whichever
+// browser wrote there last — a per-run port with a shared profile still lands
+// on somebody else's browser. A shared profile is also a shared HTTP cache,
+// which is the opaque-response bug this file already deletes `Default/Cache`
+// to avoid.
+const CDP_PORT = 0;                       // 0 = let the OS pick; read back below
+const PROFILE = `/private/tmp/claude-501/demo-verify-udd-${process.pid}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2);
@@ -32,6 +51,56 @@ if (handedOff.length) {
   console.log(`(${handedOff.map((d) => d.name).join(', ')} ${n === 1 ? 'needs' : 'need'} a GPU — this harness runs --disable-gpu; use node demo/verify-gl.mjs)`);
 }
 if (!targets.length) { console.error('nothing for this harness to verify'); process.exit(handedOff.length ? 0 : 1); }
+
+// 🔴 COUNT THE OTHER BROWSERS BEFORE BLAMING THE CODE. Three runs in one
+// session read broken because of processes of MY OWN: a full suite went
+// 429/429, then 420/429 with nine failures, then 429/429 again with no code in
+// between, and all nine were in the demos that need something off this machine.
+// Today the same thing took the suite out entirely — a `cdp timeout` on
+// `replay`, which is 16/16 when run alone. CLAUDE.md has carried this as a rule
+// to remember since session 18, and a rule to remember is the weakest kind of
+// guard: it only fires if the person reading the red output happens to recall
+// it. This makes the harness SAY IT, at the moment the output is being read.
+//
+// ⚠️ `-f` IS REQUIRED HERE AND IT IS THE TRAP. The flags we are looking for are
+// on the command line, so an exact-name match cannot see them — but a `-f`
+// pattern also matches the process doing the asking, which is LESSONS #39's
+// shape (`pgrep -f h264_v4l2m2m` answering "still held" about itself). So our
+// OWN pid is excluded explicitly, and after launch our own debugging port is
+// too. Informational, NEVER fatal: a harness that refuses to run because
+// something else is open is worse than the problem it is guarding against.
+const peerBrowsers = (excludePort) => {
+  try {
+    return execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' })
+      .split('\n')
+      .filter((l) => /Google Chrome/.test(l) && /--remote-debugging-port=(\d+)/.test(l))
+      // ⚠️ ONE BROWSER IS ABOUT TEN PROCESSES. Chrome's renderer, GPU and
+      // utility helpers inherit the whole command line, `--user-data-dir` and
+      // `--remote-debugging-port` included, so a naive count of matching
+      // processes reported **19 other headless Chromes** for two — and a
+      // warning that overstates by 10x is worse than no warning, because the
+      // next reader learns to ignore it. The browser process is the one with no
+      // `--type=`; every helper has one.
+      .filter((l) => !/--type=/.test(l))
+      .filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid)
+      .filter((l) => !(excludePort && l.includes(`--remote-debugging-port=${excludePort}`)))
+      .map((l) => {
+        const port = (l.match(/--remote-debugging-port=(\d+)/) || [])[1];
+        const udd = (l.match(/--user-data-dir=(\S+)/) || [])[1] || '?';
+        return { port, udd };
+      })
+      // and a browser is its PORT: a relaunch on the same port is still one
+      .filter((p, i, a) => a.findIndex((q) => q.port === p.port) === i);
+  } catch { return []; }            // ps is not the subject; never fail on it
+};
+const peersAtStart = peerBrowsers(null);
+if (peersAtStart.length) {
+  const where = [...new Set(peersAtStart.map((p) => p.udd))];
+  console.log(`⚠️  ${peersAtStart.length} other headless Chrome${peersAtStart.length === 1 ? '' : 's'} `
+    + `already running (${where.slice(0, 3).join(', ')}${where.length > 3 ? ', …' : ''}).`);
+  console.log('   A demo that needs the relay, the board or bandwidth can read RED for that reason alone.');
+  console.log('   Run any failing demo ALONE before believing it: node demo/verify.mjs <slug>');
+}
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
@@ -55,10 +124,15 @@ const chrome = spawn(CHROME, [
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
 
-let wsUrl = null;
+let wsUrl = null, cdpPort = null;
 for (let i = 0; i < 60 && !wsUrl; i++) {
   await sleep(250);
-  try { wsUrl = (await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`)).json()).webSocketDebuggerUrl; } catch {}
+  try {
+    // the port we ACTUALLY got, from our own profile — never guessed
+    if (!cdpPort) cdpPort = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
+    if (!Number.isFinite(cdpPort) || !cdpPort) { cdpPort = null; continue; }
+    wsUrl = (await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()).webSocketDebuggerUrl;
+  } catch {}
 }
 if (!wsUrl) { chrome.kill(); server?.close(); throw new Error('chrome did not come up'); }
 
@@ -526,5 +600,19 @@ for (const t of targets) {
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);
+// ⚠️ ASKED AGAIN AT THE END, not only at the start — a browser that appeared
+// halfway through is the one most likely to have caused the failure being read,
+// and it would not have been in the opening count. Printed only when something
+// FAILED, because on a green run it is noise about a problem that did not
+// happen.
+if (fail) {
+  const peersNow = peerBrowsers(cdpPort);
+  const n = Math.max(peersAtStart.length, peersNow.length);
+  if (n) {
+    console.log(`\n⚠️  ${n} other headless Chrome${n === 1 ? ' was' : 's were'} running alongside this suite`
+      + `${peersAtStart.length !== peersNow.length ? ` (${peersAtStart.length} at the start, ${peersNow.length} now)` : ''}.`);
+    console.log('   THIS RUN IS NOT EVIDENCE OF A REGRESSION until the failing demos are re-run alone.');
+  }
+}
 ws.close(); chrome.kill(); server?.close();
 process.exit(fail ? 1 : 0);
