@@ -575,9 +575,11 @@
     // an AudioContext needs one and this is the first thing a hand touches.
     onInput: (v) => { blend = v / 100; startLocal().then(fadeGains); fadeGains(); render(); },
   });
+  // UNDER the two cards, not above them: it is the line BETWEEN the panes, so
+  // it belongs where the eye already is after reading both of them.
   const fadeBar = el('div', 'pos-controls fade');
   fadeBar.append(el('span', 'end', 'this page'), fade.el, el('span', 'end', 'the board'));
-  d.el.insertBefore(fadeBar, knobRow.el);
+  panes.after(fadeBar);
 
   // ── drawing ──────────────────────────────────────────────────────────────
   const secs = (ms) => `${Math.round(ms / 1000)} s`;
