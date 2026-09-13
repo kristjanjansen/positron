@@ -92,7 +92,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     /** One grain, at the point in the material it read. */
     mark(g) {
       counts.measured++;
-      live.push({ pos: g.pos ?? 0.5, level: g.level ?? 1, born: performance.now() });
+      live.push({ pos: g.pos ?? 0.5, level: g.level ?? 1, half: g.half ?? 0, born: performance.now() });
       if (live.length > 600) live.splice(0, live.length - 600);
     },
     marks(list) { if (list?.length) for (const g of list) api.mark(g); },
@@ -178,6 +178,54 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         ctx.beginPath(); ctx.moveTo(x + 0.5, mid - h); ctx.lineTo(x + 0.5, mid + h); ctx.stroke();
       }
       ctx.globalAlpha = 1;
+    } else if (live.length) {
+      // ── grains, on the buffer's own axis, with nothing drawn under them ──
+      //
+      // 🔴 THE THIRD PICTURE, AND IT EXISTS BECAUSE THE AXES DO NOT MATCH.
+      // A remote engine can report WHERE each grain read — a fraction of the
+      // held seconds — long before it can send the held seconds themselves. Its
+      // arriving audio is a different quantity on a different axis (the last
+      // few seconds of OUTPUT), so drawing ticks over that waveform would put
+      // buffer positions on a time axis and invite the one reading this must
+      // never support.
+      //
+      // So the waveform goes and the ticks stay, on the axis they belong to —
+      // which is also the axis the page's own granulator is drawn on, so the
+      // two are finally comparable. What is missing is named in the gutter
+      // rather than approximated.
+      const bed = H * 0.5;
+      ctx.fillStyle = C.line;
+      ctx.fillRect(0, bed - 0.5, W, 1);
+      // ten marks across, so the axis is a duration rather than a bar
+      for (let i = 1; i < 10; i++) ctx.fillRect((i / 10) * W, bed - 4, 1, 8);
+      if (band) {
+        ctx.fillStyle = 'rgba(255,212,0,.07)';
+        const x1 = band.from * W, x2 = band.to * W;
+        if (x2 >= x1) ctx.fillRect(x1, 0, Math.max(2, x2 - x1), H);
+        else { ctx.fillRect(x1, 0, W - x1, H); ctx.fillRect(0, 0, x2, H); }
+        ctx.strokeStyle = C.hi; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(band.at * W + 0.5, 2); ctx.lineTo(band.at * W + 0.5, H - 2); ctx.stroke();
+      }
+      // ⚠️ THE HALF IS DRAWN AS A SIDE, NOT AS A COLOUR. One meaning for colour
+      // across every demo: a mark's colour says HOW IT LANDED. Which granulator
+      // fired it is identity, and identity is position — granulator one above
+      // the line, two below it.
+      const tnow = performance.now();
+      for (let i = live.length - 1; i >= 0; i--) {
+        const g = live[i];
+        const age = (tnow - g.born) / fadeMs;
+        if (age >= 1) { live.splice(i, 1); continue; }
+        const x = g.pos * W;
+        const h = (H * 0.34) * (0.35 + 0.55 * (1 - age));
+        ctx.strokeStyle = C.grain;
+        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level));
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (g.half) { ctx.moveTo(x + 0.5, bed + 2); ctx.lineTo(x + 0.5, bed + 2 + h); }
+        else { ctx.moveTo(x + 0.5, bed - 2 - h); ctx.lineTo(x + 0.5, bed - 2); }
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
     } else {
       // ── audio only: what arrived, scrolling ────────────────────────────
       if (scroll.length > 1) {
@@ -202,9 +250,16 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
 
     gut.textContent = peaks
       ? `${live.length} grains in the air · the lit range is where they are being taken from${sourceName ? ` · ${sourceName}` : ''}`
-      : counts.inferred
-        ? `this is the sound that arrived, and all that can honestly be drawn${sourceName ? ` — ${sourceName}` : ''}`
-        : 'nothing yet';
+      : live.length
+        // NAME WHAT IS MISSING. Every tick here is measured; the sound they
+        // were cut from is the part that has not arrived, and a reader has to
+        // be able to tell that from "there is nothing there".
+        ? `${live.length} grains in the air, each one reported by the engine that started it · `
+          + `the held sound itself has not been sent, so there is nothing drawn under them`
+          + `${sourceName ? ` · ${sourceName}` : ''}`
+        : counts.inferred
+          ? `this is the sound that arrived, and all that can honestly be drawn${sourceName ? ` — ${sourceName}` : ''}`
+          : 'nothing yet';
 
     raf = requestAnimationFrame(paint);
   }
