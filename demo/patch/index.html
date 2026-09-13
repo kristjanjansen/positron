@@ -43,7 +43,7 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createMessageList } from '/shell/messages.mjs';
   import { openWire } from '/shell/wire.mjs';
-  import { graph, RATE, OP, readSynthDef, toVersion2, kindsOf, hexHead, sameBytes }
+  import { graph, RATE, OP, readSynthDef, toVersion2, kindsOf, hexHead, sameBytes, SIZE_CEILING }
     from '/shell/synthdef.mjs';
   import { playHere, unknownParts, KNOWN } from '/shell/synthdef-audio.mjs';
   import { startEngine, levelOver, engineBytes } from './engine.mjs';
@@ -326,14 +326,18 @@
     if (!sc) { d.log('SuperCollider is not up yet — press Start it up', 'warn'); return false; }
     if (!loadedInSc.has(def.name)) {
       const took = await sc.load(bytes);
-      if (!took) {
-        // No `/fail` exists for this: over 64 KiB the server answers NOTHING
-        // (research §8.2). Silence is the failure, so it is named as one.
-        d.log(`SuperCollider never acknowledged ${def.name} — ${bytes.length} B`, 'bad');
+      if (!took.ok) {
+        // No `/fail` exists for this: over the ceiling the server answers
+        // NOTHING (research §8.2). Silence is the failure, so it is named as
+        // one — and `load` now names the two silences apart: refused before
+        // sending because it could never fit, against sent and never
+        // acknowledged.
+        d.log(`SuperCollider did not take ${def.name} — ${took.why}`, 'bad');
         return false;
       }
       loadedInSc.add(def.name);
-      d.log(`SuperCollider took ${def.name}, ${bytes.length} B, and said so itself`);
+      d.log(`SuperCollider took ${def.name}, ${took.bytes} B, and said so itself `
+        + `— ${took.margin} B under the ${SIZE_CEILING}-byte ceiling both ends keep`);
     }
     if (scNode) sc.free(scNode);
     scNode = sc.play(def.name, { ...defaults, ...(defaults.amp !== undefined ? { amp: loud.get() } : {}) });

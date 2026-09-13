@@ -29,6 +29,8 @@
 // including at 8,585 building blocks (research §2.1). A cell that never changes
 // is not a measurement. `glitchCount` is the counter that moves.
 
+import { SIZE_CEILING, fitsCeiling } from '/shell/synthdef.mjs';
+
 const VENDOR = new URL('./vendor/', import.meta.url).href;
 
 /**
@@ -103,9 +105,24 @@ export async function startEngine({ audioContext, log = () => {} } = {}) {
      * rather than an error.
      */
     async load(bytes) {
+      // 🔴 REFUSE ABOVE THE CEILING RATHER THAN DISCOVER IT AS A TIMEOUT. The
+      // engine's own answer to an oversize definition is NOTHING — no `/fail`,
+      // no late reply — so without this the only signal is a timeout, which is
+      // indistinguishable from a wedged engine, a lost socket, or a definition
+      // that loaded and makes no sound. Naming it costs one comparison.
+      // ⚠️ `SIZE_CEILING` is the number BOTH ends default to, declared once in
+      // `synthdef.mjs`, so the browser and the board cannot disagree about what
+      // will load — and why it is that number is still open
+      // (`research/synthdef-size-limit-2026-09.md`).
+      const room = fitsCeiling(bytes);
+      if (!room.fits) {
+        return { ok: false, why: `${room.bytes} bytes is ${-room.margin} over the `
+          + `${SIZE_CEILING}-byte ceiling both ends keep — it was not sent` };
+      }
       const done = waitFor((m) => m[0] === '/done' && m[1] === '/d_recv');
       sonic.send('/d_recv', bytes);
-      return !!(await done);
+      return (await done) ? { ok: true, bytes: room.bytes, margin: room.margin }
+        : { ok: false, why: 'the engine never said it had received it' };
     },
 
     /** Start one, at the root, and keep its number so it can be stopped. */
