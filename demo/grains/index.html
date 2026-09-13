@@ -137,6 +137,7 @@
   const driftLog = [];                 // {t, nudges} — every reading, so the window is real
   let probe = null;                    // { quiet, held } — peak with nothing pressed, then with a key down
   let frames = 0, gaps = 0, gapWarned = false, lastSeq = -1, firstFrame = 0, level = 0, levelAt = 0;
+  let boardGrains = 0;                 // how many the board has reported to this page
   let collect = null;                  // set while a measurement is open
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -411,6 +412,12 @@
     // moving target. So the page asks, here, where there is finally something
     // to move. The board answers `changed: false` when it was already running.
     send({ type: 'params.drift', on: true });
+    // ⚠️ ASKED FOR, AND RE-ASKED. Reporting costs the board sixteen live
+    // SendReply UGens and the room four messages a second, so the request
+    // EXPIRES — a page that is closed cannot tell anybody to stop. The box
+    // keeps shipping for 30 s after the last ask; this re-asks well inside
+    // that, and stops the moment the page goes away.
+    send({ type: 'grain.report', on: true });
     // A patch is the new truth about both halves, so the panel's source of
     // truth is reset with it.
     live = { m: { ...p.m }, n: { ...p.n } };
@@ -895,7 +902,14 @@
    * which is how `pappus-live.mjs` has always matched replies — and its four
    * unprompted announcements are named here. Nothing else is the board talking.
    */
-  const ANNOUNCED = new Set(['box.hello', 'box.alive', 'audio.stopped', 'video.stopped']);
+  // ⚠️ `grain.marks` IS THE FIFTH, and leaving it out cost a green page with an
+  // empty card. It is BROADCAST — the board ships four a second to whoever is
+  // in the room, so it carries no `re` and this filter dropped every one of
+  // them before the handler below ever saw it. The relay was measured carrying
+  // 13 of them in the same minute the page reported `0 reported by the board`.
+  // A filter whose job is to ignore other people's chatter will ignore an
+  // announcement nobody told it about, silently and for ever.
+  const ANNOUNCED = new Set(['box.hello', 'box.alive', 'audio.stopped', 'video.stopped', 'grain.marks']);
   const fromBox = (m) => typeof m.re === 'string' || ANNOUNCED.has(m.type);
 
   function heard(m) {
@@ -970,6 +984,23 @@
         else markDrift();
       }
     }
+    // 🔴 THE BOARD'S OWN GRAINS, WHICH IS WHAT MAKES THE TWO CARDS
+    // COMPARABLE. Until today this pane could only draw the sound that arrived
+    // — a bump in an envelope might be a note, a delay tap or a reverb swell,
+    // so nothing here could say a grain had fired. The engine reports each one
+    // as it is triggered now (`SendReply` on the grain trigger), and `seen`
+    // comes with the list so a short list reads as few grains rather than as a
+    // dropped message.
+    if (m.type === 'grain.marks' && Array.isArray(m.marks)) {
+      boardGrains += m.seen || m.marks.length;
+      for (const g of m.marks) boardScope.mark({ pos: g.pos, half: g.half, level: 1 });
+      // the read band, from the board's own report of where it is reading
+      if (Number.isFinite(drift?.scan)) {
+        const half = Math.max(0.004, (live.m.spray ?? 0) / 2);
+        const lo = ((drift.scan - half) % 1 + 1) % 1, hi = ((drift.scan + half) % 1 + 1) % 1;
+        boardScope.range(lo, hi, drift.scan);
+      }
+    }
     if (m.type === 'params.drifted') drift = m;
     // The board picks the item; this page only says which. The search cannot be
     // called from a browser at all — its JSON content type forces a preflight
@@ -990,6 +1021,9 @@
   // showing the last numbers it saw is a page lying about the present.
   setInterval(() => {
     if (wire.state() === 1) hello();
+    // Re-ask for the grains well inside the box's 30 s expiry, so the picture
+    // survives as long as the page is open and stops on its own when it is not.
+    if (fxOn && wire.state() === 1) send({ type: 'grain.report', on: true });
     if (answered && Date.now() - lastHeard > 12000) {
       answered = false; rtt = null;
       d.log('the board stopped answering', 'bad');
@@ -1231,6 +1265,21 @@
           ? `switched on and circling nothing — ${moved ? `${moved.nudges} nudges in ${secs(moved.ms)}` : 'no window yet'}, `
             + 'which is the right count for a board with no roll to circle, not a stalled timer'
           : dstate === 'off' ? 'the movement is switched off on the board' : 'the board said nothing about movement');
+    // 🔴 THE CLAIM THIS WHOLE DAY'S BOARD WORK EXISTS FOR. Until today the
+    // right-hand card could draw the sound that arrived and nothing else,
+    // because a bump in an envelope might be a note, a delay tap or a reverb
+    // swell. Now the engine reports each grain as `GrainBuf` is triggered, so
+    // both cards mark real grains and the two are finally comparable.
+    //
+    // ⚠️ IT ASSERTS THE SCOPE'S OWN COUNTERS, not the page's. `measured`
+    // against `inferred` is the scope saying where its ink came from, which is
+    // the only way to tell a picture of grains from a picture of settings —
+    // and this page has drawn the wrong one before.
+    const bs = boardScope.stats();
+    d.assert('the board’s grains are reported by the engine that fired them, not guessed from its audio',
+      boardGrains > 0 && bs.measured > 0,
+      `${boardGrains} reported by the board, ${bs.measured} drawn, ${bs.inferred} guessed from audio`);
+
     d.assert('a named patch is on screen, chosen rather than rolled',
       !!PATCHES[patch] && step.select.options[step.select.selectedIndex]?.text === PATCHES[patch].name,
       `${PATCHES[patch].name} · ${PATCHES[patch].voice} · ${PATCHES[patch].notes.length} notes`);
