@@ -1,5 +1,672 @@
 # Progress log — 2026-08-25 → 09-13  (newest first)
 
+## Session 21 (2026-09-13) — three defects closed without fixing anything; a headset went black because of the instrument built to stop that; the harness learned to drag and to type
+
+**Three things carried as open board/worker defects for weeks were closed by
+MEASURING them rather than by repairing them, and one of the three had its own
+disproof already written in this file.** That is the session's shape: most of
+the day's value was in finding out that a thing we believed was not true.
+
+| carried as | since | what it actually was |
+|---|---|---|
+| `keep`'s unexplained 409 | session 14 | a WHEP race — subscribe issued while the input was not yet publishing |
+| the reverb insert adds **-4.1 dBFS** of noise with no input | 2026-09-12 | does not reproduce; six arms at rest read **0.000000 / -180.0 dBFS** |
+| `workers/pub`'s container image is pre-session-12 | session 12 | **false, and false since 2026-09-08** |
+
+`keep` publishes over WHIP and subscribes over WHEP immediately; Cloudflare
+answers a subscribe with 409 for the ~1 s between the WHIP POST returning and
+ICE/DTLS finishing. `offerSdp` treats 409 as NOT YET and everything else as NO —
+five retries over ~7 s, re-posting the SAME offer because a 409 created nothing
+to leak. 🔴 Proven to fire AND proven not to: `demo/shell/live-test.mjs` 7/7
+against a stubbed fetch, where **404 and 500 fail at once**, since a retry that
+fired on everything would turn a wrong page into a slow one. `keep` 20/20 live,
+round trip 148 ms, 180 clean frames of 180.
+
+🔴 **Six arms of zero is the shape of a deaf instrument, so the reverb report
+needed a positive control.** Six four-second arms over the relay — nothing
+running, an instrument idling with no insert, the same instrument through the
+reverb, four seconds after a release, the reverb at mix 1 / room 1 with nothing
+playing — all read digital silence, and so did yoshimi, hexter and fluidsynth.
+A note held through the SAME path in the SAME run read 0.041883 / peak
+-22.3 dBFS, which is the only thing that makes the zeros mean anything. ⚠️ And
+the first version of that probe **was** deaf: it waited on a reply of type
+`fx.space` while the box answers `fx.space.applied`, so the reverb was never
+switched on and four arms compared four conditions that were the same untouched
+silence. Read the handler; do not guess the name. ⚠️ Not reproduced is not
+explained — the original's own `reverb off` row was already 0.0537 with nothing
+playing, which is an upstream source rather than a tail.
+
+🔴 **The pub container disproof had been sitting in PROGRESS.md for five
+sessions, one sentence from the wrong conclusion.** This file recorded "v18,
+updated 2026-09-08" and then concluded "the image still draws the
+pre-session-12 test pattern" in the very next sentence; session 12 ran 09-07 to
+09-08. Measured now: the deployed image is `positron-pub-pub:d4c38e9b`, pushed
+2026-09-08T09:37:55Z, **7m59s after** the last commit to touch
+`container/server.mjs`. Wrangler tags an image with the Worker version that
+pushed it and only pushes when the build context changed (26 versions, 16
+images), and the chain closes on the binding: d4c38e9b carries no `PUB_ROW`,
+its predecessor dfa5c20f does, and that commit removed it. The container's
+marked copy of the pattern and `demo/shell/pattern.mjs` emit **byte-identical**
+ffmpeg filter chains — 700 B at hue 0, 710 B at hue 150, zero differing
+constants. ⚠️ **DO NOT "fix" it by redeploying.** The Dockerfile pins nothing;
+`node:22-alpine` is now alpine 3.24.1 with ffmpeg 8.1.2 while the live image was
+built against ffmpeg 7, which `server.mjs`'s own comments are measured against,
+and a gratuitous deploy restarts the only instance into Cloudflare's 45 s
+stale-publisher lockout. The genuinely stale copies are
+`rig/obs-docker/clock.html` and `rig/whep/publish.html`, both still on ROW_X 40
+/ ROW_Y 100 / ROW_H 80 against the current 80/584/56 — each agrees with ITSELF,
+so neither is broken and neither can be compared against anything.
+
+### What went wrong, which is most of the day
+
+🔴 **A 6 s deadline on a step that asks a human a question, and it cost a black
+headset.** MEASURED on a Quest 3: `requestSession immersive-vr never returned`,
+twice, headset black, restart required. It had not hung — it was waiting for the
+owner to answer the **room-data permission prompt** that this page causes by
+asking for plane detection and hand tracking. Six seconds is a deadline for a
+machine. What happened next is the part worth keeping: the deadline fired, the
+page declared failure and tore down its own entry path, **and then the session
+started** — a headset standing in an immersive session that no code owned,
+drawing nothing. *The instrument built to turn a hang into a named failure
+caused one.* Two fixes and the second matters more: the step that can prompt
+gets 90 s and asks "is there a permission prompt waiting for you?"; and 🔴
+`Promise.race` does not cancel the loser, so the late session is now caught and
+ENDED rather than abandoned.
+
+🔴 **The hand probe asked at the one moment it could not be answered.** It fired
+once, on the first frame that had any input source — which is while you are
+still holding the controllers. It could only ever report `no hand`, and it did.
+Hands appear LATER, when the controllers are put down, and the runtime says so
+with `inputsourceschange`. ⚠️ And `no hand` was ambiguous in the worst way: it
+means "hand tracking is off" and "you were holding a controller" equally well,
+and those have opposite next steps. `session.enabledFeatures` is the runtime
+answering for itself.
+
+🔴 **The page blamed Space Setup for something that was the session mode, and
+that guess cost a room rescan and a serious suggestion of reinstalling the
+headset.** MEASURED minutes apart on one Quest 3, one room, one grant, one scan:
+
+| session | surfaces |
+|---|---|
+| `immersive-ar` | **11** — door 1 · ceiling 1 · wall 4 · window 1 · bed 1 · shelf 2 · floor 1, floor at y=-0.07 m |
+| `immersive-vr` | **none** |
+
+An opaque session composites nothing over your room, so it does not hand one
+over either. A guess dressed as a finding is worse than no finding; the note now
+names the session it is in, and only mentions Space Setup in passthrough, where
+it is still a live possibility. ⚠️ Read it off `environmentBlendMode`, never off
+the session name — a rule this repo already had and had not applied here.
+
+🔴 **An edit script asserts as it goes and only WRITES AT THE END, so a failed
+assertion silently discarded the edits that had already matched.** `drawHeld`
+was never added at all while the call to it was. The symptom was two unrelated
+asserts going red: `drawInner` threw `drawHeld is not defined` every frame,
+`draw`'s catch set the room not-ok, and `applyLook` refuses when the room is not
+ok — **so a missing function reported itself as "no fade started"**. Found by
+reading the page's own log line, which said exactly what it was.
+
+🔴 **A build from the working tree deployed two agents' unverified in-flight
+work** (`demo/draw/`, `demo/memento/`). It is `git add -A`'s hazard wearing the
+deploy costume: the second time the same situation arose, the commit shipped
+without building and said why. Two other commits held CSS and `/kit/` back for
+the same reason.
+
+🔴 **My hypothesis about LESSONS #61 was wrong, and the engine's own arithmetic
+disproved it.** I said both remaining `pappus-live` failures were a granulator
+reading the present. But `sxf = (msos.max(mlock)/0.6).clip(0,1)` and
+`gsum*sin(sxf·π/2) + cap*cos(sxf·π/2)`, so at `mlock 1` the cosine term is ZERO
+and the instrument is not in the capture at all — the buffer was already held
+and adding a hold would have changed nothing. What it actually is:
+
+| | RMS | brightness wobble |
+|---|---|---|
+| every condition THROUGH the chain | 0.25–0.32 | 0.16–0.22 oct |
+| the ladder, chain muted, `oin1` out | 0.006–0.008 | 0.01–0.15 oct |
+
+~32 dB into the master Compander and Limiter raises the wobble up to twenty
+times, and two seeds differ by 0.10 oct — the effect is under the noise **the
+chain itself adds**. Measured through a compressor the loudness axis is constant
+by construction, which is the blind-statistic failure CLAUDE.md names, and it is
+why the envelope axis is dead in every chain-running section (p 0.310 / 0.841 /
+0.902) while brightness survives only where the MATERIAL changes.
+
+🔴 **The drift was on for every capture and the harness could not see it.**
+`box.mjs` calls `pappus().startDrift()` after every roll, so `params.drift
+{on:false}` followed by a roll is a NO-OP — and the file did exactly that
+everywhere, including on the line above the ladder's own roll. Signature, and it
+is exactly what a drift walking six parameters at 8 Hz under every capture
+predicts: two DIFFERENT seeds — 0.539 against 15.979 grains/s — measured **ten
+times closer together** than one seed measured to itself (0.009 env / 0.04 oct
+between seeds, 0.091 env / 0.18 oct within one). ⚠️ The OLD file could not have
+shown this; its typed `* 2` margin hid it.
+
+🔴 **`push.sh` had been shipping the engine to a path sclang never reads.**
+`Engine_Pappus.sc` and `CroneEngine.sc` are SuperCollider CLASSES, compiled from
+sclang's Extensions directory — `/opt/positron-box` is not on its class path at
+all. MEASURED: the new command answered `CroneEngine: no command 'report'` and
+`PAPPUS READY 106 commands` while the copy in `/opt` had it and matched the md5
+`push.sh` printed. Two copies, two md5s, and the one being verified was the one
+nobody compiles. LESSONS #39 in a third costume — `~/positron` against `/opt`
+was the first. ⚠️ And one bug of my own in that fix, same species: `$HOME`
+inside an ssh string expands on the LOCAL machine, so the first version built
+every path for the Mac and would have copied successfully into somewhere nothing
+reads.
+
+🔴 **`PAPPUS_LITE` had never worked, in either direction, since it was
+written.** `getenv` returned `"1"` and the flag reported FULL:
+
+    e == "1"                                ->  true
+    #["1","lite","true","yes"].includes(e)  ->  FALSE
+
+`Array.includes` compares by IDENTITY and two Strings with the same characters
+are different objects. The check read correctly, tested true under `==`, and was
+always false. Nobody noticed because the fall-through reads the device tree and
+a Pi answers LITE anyway; it took a weighing run asking for LITE on purpose and
+getting FULL. Fixed with `indexOfEqual` and proved both ways.
+
+🔴 **The head-locked panel threw 385 times in one 49-second headset session, and
+that is why the gl instrumentation reported nothing.** `Uncaught ReferenceError:
+proj is not defined @ :970` — the panel block sat AFTER the per-eye loop and
+read a parameter of `drawRoom` and the loop's own `const`, neither of which
+exists out there. So the status panel had **never once been drawn in a
+headset**, and the `xrFrames === 1` check that ships the first frame's
+`getError()` runs after that block, so on every frame the panel was due, the
+throw removed it. The device log from that session carries no `first headset
+frame` line at all: yesterday's by-phase instrumentation, silently deleted by a
+ReferenceError three lines above it. An uncaught error in a render loop does not
+stop the loop, it removes everything below it while 3,840 frames go by.
+
+### gl 1282 is named, and it is not what we thought
+
+Three entries into `scene` on a Quest 3: **1282 twice and 1286 once**, on the
+first frame. 1286 is `INVALID_FRAMEBUFFER_OPERATION` — not a state bug at all,
+but drawing into a framebuffer that is not ready. `mirror`'s by-phase
+instrumentation put its own 1282 at **`firstDraw`** in the same minute, which is
+the same instant under another name. `scene` asks `checkFramebufferStatus` on
+frame one now and says so in words.
+
+### XR: one room, two pages, and things that stop clipping into each other
+
+`demo/shell/xr-room.mjs` — the room `scene` built for itself, extracted so
+`mirror` has it too. ⚠️ The session ENTRY PATH deliberately stayed in the page:
+it is the code a real Quest has graded.
+
+**Nothing in the room is inside anything else.** 🔴 The box cannot be the test
+because the things spin — a box-against-box result is true this frame and false
+the next — so the bound is the circumscribed sphere, `s * 0.87`, from one
+constant rather than typed twice.
+
+| over 2,000 rooms · 41,044 things · 440,186 pairs | before | after |
+|---|---|---|
+| overlapping pairs | 2,667 | **0** |
+| rooms with at least one | 1,301 of 2,000 | **0 of 2,000** |
+| worst overlap | 0.731 m deep | 0 |
+| tightest gap anywhere | -0.731 m | **+0.0398 m** |
+
+🔴 **The sabotage found the real lesson.** With the fix disabled the sweep went
+red and the drop check went red **while the single-room check PASSED** — one
+room in three was clean before the fix, so a check of only the room on screen
+misses this two times in three. 🔴 And it does not fully converge, which is
+written into the file rather than hidden: of 123,027 dead-centre drops, 48
+passes leaves 3, and those do not converge — the thing bounces between two
+neighbours, clearing each by entering the other. The alternative that reaches
+zero moves a dropped thing 2.39 m on average and 4.32 m at worst, and a thing
+that flies across the room when you let go has not been put down. ⚠️ The seed
+still reproduces the room exactly, 2,000 of 2,000 byte-identical across two
+runs; `GAP = 0.04` because at zero, 128 pairs of 46,440 were pushed to exactly
+touching and then ROUNDED BACK into contact by 1.3e-4 m.
+
+**The dotted grid, controllers and a held tablet.** Plane detection is OPTIONAL
+and cannot gate the grid: four outcomes, four sentences, and "no planes" is
+never drawn as "no walls". The grid is **green on surfaces your headset
+reported and blue on the page's own 10 m room** — asked for directly ("make it
+another colour for me to believe"), and quite right, because the log said
+`11 surface(s) from your room` while the picture said nothing. Controllers and
+the tablet hang off `gripSpace` (where your HAND is) rather than
+`targetRaySpace` (where you are POINTING); the page had read the ray every frame
+since it was written and never asked for the grip. 🔴 **Primitives, not a
+model**, and that is a decision: `profiles` reads `meta-quest-touch-plus` so the
+registry would hand over a real glTF, at the price of a loader, a second
+renderer and **a CDN fetch inside the entry path** — the one place in this page
+where a slow answer has already cost three headset runs. ⚠️ One box per hand
+that actually resolved: on a Quest 3 two sources appeared and the **LEFT grip
+did not resolve while the right did, in the same frame**.
+
+🔴 **`hand-tracking` alone does not get you the second input.** A non-primary
+source goes into `session.trackedSources`, not `inputSources`, and the spec says
+that array MUST only be populated if `tracked-sources` is ALSO granted — as must
+the event that would otherwise have said so. Ask for one and not the other and
+the second hand silently does not exist: no error, no event, an array that reads
+exactly like one controller. ⚠️ It is absent from upstream Chromium entirely, so
+the read is wrapped — a TypeError in a frame callback is the failure that
+deletes everything below it. 🔴 And Quest's **hand target ray is synthesised,
+not anatomical** (Meta: it "assumes that the UI is in front of the user"), which
+re-ranks the hand-held-tablet designs; a hand's POSE is real tracking data, only
+the RAY is a fiction. 🔴 The palm pinch is reserved on BOTH hands, the left one
+ENDS the session, and it fires a phantom `select` with no API to detect it —
+filed by Meta's own spec editor in 2022 and still open — so the mitigation is
+design, not detection: nothing destructive on a single press.
+
+⚠️ **`xr` is a FLAG, not a tag.** `mirror` and `scene` sort first on the index
+now, but a `WebXR` tag would reach `caps.mjs`, which turns tags into
+REQUIREMENTS and un-links a row — hiding both pages from everybody without a
+headset, when both work perfectly well in an ordinary browser.
+
+### The harness can drag, and it can type
+
+Two new input verbs, both real CDP events, both keyed off a data attribute:
+`gesture()` on `data-gesture` and `typing()` on `data-typing`. Before them, a
+page whose only input is a drag was a subject the suite could not reach — and
+the old answer to that was `draw`'s **`Draw one for me` button**, a page
+answering its own question with a Lissajous nobody drew. It is gone, mechanism
+and all.
+
+- ⚠️ The drag supplies its TIMESTAMPS explicitly, 16 ms apart, so the recorded
+  gesture's sample rate is not a measurement of the harness's round-trip
+  latency.
+- ⚠️ It must `scrollIntoView` and re-read the rectangle first: headless Chrome's
+  viewport is 800x600 and these pages are taller, and **an event dispatched past
+  the viewport lands on nothing and says nothing**. The first run read `page
+  asserted something — 0` while the identical drag in a 900 px window produced
+  200 moves and 5 asserts.
+- 🔴 **Input runs AFTER the controls now.** `gesture()` ran first, so the drag
+  happened with `draw`'s record button still off and the page reported `page
+  asserted something — 0` again. A page that must be ARMED before it records
+  must be armed before it is drawn on.
+- The typing sequence is not a word — it is the three things five generations of
+  text adapter got wrong: characters, a **BACKSPACE** (which never says what it
+  removed), and **ARROW KEYS** (which move the caret with no input event at
+  all).
+- ⚠️ It reports the number of fields actually typed into, not the number found.
+  The first version said "typed into 1 field" about a read-only box it had
+  skipped — a harness reporting work it did not do.
+- ⚠️ **A threshold above what can reach it is a check that does not exist.**
+  `typist`'s live check wanted 12 edits where the harness types 10, so it
+  silently never ran. Eight now, and it reads `10 moments compared, 0 apart`.
+
+### Every run gets its own relay room, and the relay's caps were guesses
+
+This repo learned that a fixed PORT is a shared mutable global, twice, and never
+applied it to ROOMS. Every demo defaulted to a NAMED room — `cues-demo`,
+`jam-demo`, `scene-demo`, `room-demo`, `instrument-demo` — so two runs of the
+suite, or a run and a visitor, land in the same one and watch each other's
+traffic. A harness run now gets a room per demo per run. ⚠️ Four rooms keep
+their names because the name is the ADDRESS OF A MACHINE (`studio-1` is where
+the Pi is, `m1-1` is the studio Mac) or because the room's SUBJECT is the
+history it holds (`wire` reading its own backlog); renaming those does not
+isolate a run, it points it at nothing.
+
+🔴 **And the two things were conflated, which is why this looked like one
+problem.** A private room does not give a second client its own Raspberry Pi.
+There is one JACK graph and one instrument; rooms were never that constraint,
+the DEVICE is, the same way `/dev/video11` is.
+
+The relay's caps went **16 sockets / 60 msg/s / 512 KiB/s → 128 / 1000 msg/s
+(burst 2000) / 8 MiB/s**, with a per-message cap just under the platform's own
+1 MiB. Every one of the old numbers was picked before any of this had been run
+in anger, against a production this project does not have and a public it has
+never had, and what they produced was a day of hand-serialising work and
+refusing to run a measurement because a demo was open. ⚠️ **The honesty stays,
+because it is the part that was measured**: at both 120 and 300 msg/s the relay
+delivered exactly 298 messages in three seconds and the sender was told NOTHING.
+That property is the finding; the size of the number never was. ⚠️ And a live
+Durable Object keeps its code — deploying changes nothing in a room that has a
+socket in it, so `/stats` reporting what the OBJECT thinks is how to tell a
+failed edit from a sleeping room. I read the old numbers back once and credited
+them to the DO when the edit simply had not landed.
+
+### The board reports every grain it fires
+
+`SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half])` inside the `8.do`
+voice loop, right after `pos` is computed, so the mark and the grain cannot
+disagree about where it read. MEASURED end to end: **19 messages, 57 grains in
+4.6 s → 4.1 messages/s carrying 12 grains/s**; `pos` 0.042 is a fraction of the
+whole buffer, `dur` 0.12 matches `msize`, and across three grains the positions
+climb 0.066 → 0.077 — the scan head walking through the sound, visible in the
+data. ⚠️ Gated on the TRIGGER, not the output (gating the output costs 24x for
+the common case) and PER VOICE, not one report at the shared sync trigger, since
+the voices are TDelay'd apart by `strum`. Batched in sclang at 250 ms, because
+one datagram per grain would arrive as a sparse cloud that reads as a quiet
+granulator rather than as a dropped message. ⚠️ Reporting expires 30 s after the
+last request, because a page that is closed cannot tell anybody to stop.
+
+🔴 **Two silent failures on the way, both of which read as "this granulator
+fires no grains" about one firing hundreds a second**: `SendReply`'s `cmdName`
+IS the OSC address it sends on (`/reply` is only the default), so listening on
+the default gives a handler that never fires; and an unregistered command gives
+a `report` that is never set.
+
+🔴 **Two more were caught by guards this repo had already built.** `send({ …,
+at: g.at })` collided with the envelope's `at` and `format()` THREW — taking the
+whole box down until systemd restarted it. That throw is LESSONS #45, made loud
+in session 18 after `at` once ate a payload field silently and ffmpeg was asked
+to seek to second 1,789,103,743,118; it worked exactly as intended on the first
+person to hit it since. And `grain.marks` is BROADCAST so it carries no `re`,
+and the page's `fromBox` filter accepts only replies and four named
+announcements — it dropped every one before the handler saw it, with the relay
+MEASURED carrying 13 of them in the same minute the page reported `0 reported by
+the board`. **A filter whose job is to ignore other people's chatter will ignore
+an announcement nobody told it about, silently and for ever.**
+
+**`params.set` now moves the drift centre.** The board's slow drift circled the
+last DICE ROLL and nothing else, and `grains` does not roll — six named patches,
+set parameter by parameter — so the timer turned over with nothing to circle and
+`nudges` stayed 0 however long anyone waited. MEASURED live: `params.set mscan
+0.42` → `centred "m scan"`, `mrate` → `centred null`; nudges 0 → 48 in 6 s at
+8 Hz, scan 0.422 → 0.459, roll still null. ⚠️ `.set`, not `.send` — the drift's
+own nudges go out through `send`, so a `send` that re-centred would integrate
+its own output — and a set does NOT switch the movement on, because `params.set`
+is the measurement surface and a sweep that started the drift under itself would
+be grading a moving target.
+
+### The four rungs, weighed in one sitting
+
+| rung | bytes | UGens | |
+|---|---|---|---|
+| FULL | 121,425 | 2,812 | |
+| LITE | 74,733 | 1,722 | |
+| **TINY** | **64,733** | 1,467 | **803 B of headroom** to the silent 64 KiB `/d_recv` ceiling |
+| BARE | 43,551 | 941 | 21,985 B |
+
+⚠️ **`report` and the BARE plumbing cost TINY 1,436 bytes**, taking its headroom
+from 2,239 to 803. It still loads in a browser and is now within one modest
+feature of not doing so — the next thing added to the granulator gets weighed
+BEFORE it ships. BARE is a third of FULL and by more than the sound difference
+suggests: RESONATOR's excitation chain, BRIGHTNESS's filter, two dozen `Lag.kr`
+and two Limiters were all still being BUILT on TINY and run into a DC.
+
+🔴 **The four feed points collapse into one and they SUM.** Honouring only `oin`
+would have compiled a rung that is SILENT out of the box — the defaults are
+`pin 0.7` and everything else 0 — which is LESSONS #62's shape exactly. ⚠️ And
+BARE is **~50 ms EARLIER** than the same settings on TINY, because SC's Limiter
+delays by its lookahead and RESONATOR's output limiter is 50 ms of pure delay in
+the dry path. Level and routing match; alignment does not. Meters report ABSENT
+as **-1** from one shared `DC.kr(-1)`, never 0: a real meter is an Amplitude and
+can never be negative, so the value itself separates "not built" from "broken",
+which zero cannot do.
+
+`rig/box/norns/CHAIN.md` is the prerequisite plan-twins set — a stage with no
+entry in it may not be skipped — and writing it changed the plan in three
+places: 🔴 **the chain can ALREADY be skipped at run time** (`oin1 1, pin1 0`
+sends a granulator straight to the output with no recompile, so what BARE buys
+is that the UGens stop existing and stop costing CPU, a narrower claim);
+RESONATOR is already a pass-through under TINY, so half of what BARE was going
+to remove is already gone on the machine we are comparing against; and 🔴 **the
+seven per-stage meters would start lying** — a meter reading zero because a
+stage was compiled out looks exactly like one reading zero because a stage is
+broken. ⚠️ TINY also leaves ORPHANS — sixteen `Lag.kr` tuning strings that do
+not exist and a stereo Limiter holding down a bank guaranteed silent, the file's
+own headline rule happening to the file. Left alone deliberately: the one-line
+fix changes TINY's size and that cannot be re-taken from here.
+
+### pappus-live became a statistical instrument
+
+HANDOFF carried this as "average N and assert on the spread". Four reasons the
+old file could not express a verdict, all provable with no board:
+
+- 🔴 **Three takes cannot express a verdict at all.** Two groups of three have
+  20 arrangements, so the smallest obtainable p is **0.100** — every "different"
+  verdict at n=3 came from the typed `margin = 2`, not from the data.
+- The spread estimator was degenerate at n=3: it measured each take's distance
+  from the MEDIAN take, whose own distance is exactly 0, so the median of three
+  distances was the smaller of the other two — a floor biased LOW, which makes
+  differences look significant. Gaps 4·1·5 answered 1 where the honest answer
+  is 4.
+- The same-seed floor was itself one die roll, of a quantity already recorded
+  moving 0.045 → 0.126 between runs, and `twoSeeds > sameSeed * 2` compared
+  against it.
+- The 1965-vs-synth arm used a reference captured before the drift section, so
+  "the material changed" was asked across a gap in which the drift ran for two
+  minutes.
+
+Captures are now pooled and re-split every possible way; no typed threshold
+survives. ⚠️ **The first statistic was wrong and the self-test caught it**:
+|median(A) − median(B)| measures **0% power at every effect size for n=5**,
+because swapping the smallest value of each group leaves both medians untouched
+— and that failure looks exactly like a broken engine. Exact Wilcoxon rank sum
+and Hodges-Lehmann now. Five repeats, derived twice rather than picked: 252
+arrangements, smallest p 0.0079 against a 2.5% bar (two axes are looked at);
+four can never reach it, floor 0.029. The drift pair gets seven because its
+effect is ~2 s.d. rather than ~3 and cannot be enlarged — 90 s is half the 181 s
+scan cycle, so waiting longer brings it back.
+
+🔴 **A check with no resolution ABSTAINS, and an abstain still exits 1.** Below
+two wobbles a run misses a real effect as often as it finds one and has no
+standing to say "they sound the same". The pitch ladder abstains too: silence
+and a pitch that will not move are identical in a centroid, and reporting the
+first as the second is exactly what happened. 🔴 **The sabotage nearly passed in
+one direction** — forcing the guard stuck ON initially read 17/17, because an
+abstain and a separation are both "not a failure", so a guard stuck on looks
+exactly like a working one. A deterministic case (five wobbles apart must be
+resolvable) catches it. ⚠️ The self-test also caught the agent's own first draft
+shifting BOTH axes and reporting 75% power where the honest single-axis answer
+is 53% — flattered by exactly the multiplicity the 2.5% bar exists to pay for.
+`--self-test` 14/14 → 18/18, five sabotages each going red; against the board
+**17/18 with one abstain**, exit 1. On the drift, the abstention states its own
+arithmetic instead of going red: 0.17 oct against a 0.23 oct wobble, seven
+repeats resolve ~0.46, resolving 0.17 needs ~19 per condition — eleven minutes
+of captures.
+
+### Two new pages: typist and memento
+
+**`typist`** finishes `proto/text/`, which was measured and had never had a
+page. Five text adapters in this lineage all refused arrow keys, selection and
+IME, and the newest REGRESSED to append-only. Two layers pinned together: an
+invisible textarea takes every keystroke and a `<pre>` under it draws the text,
+the block cursor and the highlight **at the offsets the browser reports**, so
+the cursor you see is the caret the editor really has. Seek RESTORES rather than
+replays — `reduce(prefix ≤ t)` folds to one document. It ships a recording that
+is EVIDENCE: 73 edits over 9.5 s driven into the real proto with real CDP key
+events, carrying `truth` read off the element rather than computed. Driving it
+that way found two bugs **no button press could have surfaced**: the first
+letter of your own recording vanished (building the line ends in `seek(0)` and
+the fold there is an empty document — the overdub-law brace again), and the
+strip fits itself once, so a recording that GROWS drew six of seventy-one edits
+while the clock above read 7.7 s. 21/21.
+
+**`memento`** (plan-gesture P5) is a knob recorded against a clip. The 2025
+experiment it finishes was the demo repo's FINAL commit and it died at one
+missing mapping: absolute epoch ms → a foreign media element's normalised
+position → pixels. 🔴 **The check the prototype could not make**: the clip is
+generated in-page from `burn()`, so every frame carries its own clock and the
+picture can be read back and compared to where the page ASKED the line to go —
+median **-14 to -20 ms** (about half a frame at 25 fps), spread 23–47 ms. ⚠️
+**Grading against the playhead is nearly vacuous, and that is the finding**:
+with `posToMedia` divided by 1150 instead of 1000 — a mapping **15% wrong** —
+the picture still agreed with the playhead to within a frame, because
+`mediaMaster` anchors the playhead to the element's own clock. It grades
+`picture − asked` now: the same sabotage reads 319 ms and goes red, and a 250 ms
+offset injected into `epochToPos` reads 217 ms and goes red. Drawing the clip on
+the frame loop rather than a 40 ms timer took the agreement from -25 ms / 30–81
+ms spread to the numbers above, because `captureStream` samples whatever the
+canvas holds at its OWN instants. 23/23 over six runs, including the overdub law
+measured firing (11 samples landed over 20 ms behind the playhead). ⚠️ Samples
+are dropped at the door when the line is not advancing — two samples taken while
+the playhead is still are two values at one moment, and the first run piled ~40
+of them at the end and read 43% of the knob's travel out. A degenerate input,
+not a bad interpolator.
+
+### draw, rebuilt around the kit
+
+🔴 **A phantom endpoint had been halving the curve all along.** `at()` said
+"reflected at the ends" and built a DUPLICATE instead. Handing the ends to
+`catmullSample` improved every number the page exists to report: smoothed error
+**0.344 → 0.147 px**, hold-against-smoothed 100x → 235x, evenly-against-bends
+8.7x → 13.8x. plan-gesture said "if P1 costs the page anything measurable, P1 is
+wrong" — it paid 2.3x.
+
+🔴 **And the page refused a check I was sure of.** The guess was that the same
+number of samples placed where the line TURNS must beat samples spaced evenly —
+a straight stretch needs almost none, a corner needs them all. Measured, 30
+samples either way:
+
+| placement | error in time | error as a shape |
+|---|---|---|
+| evenly in time | **0.348 px** | **0.672 px** |
+| where it bends | 3.005 px | 0.958 px |
+
+Evenly wins BOTH, by 8.6x on the one that matters for playback. The cause is the
+reconstruction, not the placement: the line is a spline knotted on TIME, and
+picking samples by distance from a chord ignores time entirely. Placing by shape
+is right for a coastline nobody replays and wrong for a gesture that has to
+happen at the right time — and that number DECIDES plan-gesture §3, because two
+independent 1-D series is the 8.6x arrangement by construction, and worse, since
+the axes then disagree about which instants were worth keeping.
+
+The `sample every` range is 10..300 ms and **measured rather than picked** —
+thinning the same gesture reads 20 ms 0.04 px · 50 ms 0.14 · 100 ms 0.35 ·
+200 ms 1.72 · 300 ms 5.45 · 500 ms 26.35, against 34 px for holding the last
+sample. By half a second interpolation has stopped rescuing anything; under
+~50 ms the knob moves a number nobody can see. The page logs that ladder when it
+checks itself, so the range is defended by the page rather than by a comment.
+
+🔴 **The strip's line stops where the data stops.** It ran to both edges because
+`deck.sampleAt` HOLDS the outermost knot outside them, so a two-second gesture
+on an eight-second line drew six seconds of flat blue at each end — the
+interpolator's boundary rule drawn as if it were a signal, on a page whose whole
+subject is how much of a line was never recorded.
+
+⚠️ **A check that cannot fail on its own grades the plumbing.** plan-gesture
+§5's "agrees to within 0.042 px" is not a tolerance — it is proto/paths
+measuring a fold against the ANALYTIC truth of a synthetic Lissajous, and on a
+real gesture it is 0.075–0.15 px, so the check as specified would have failed a
+correct page. Worse, the transport's answer and the page's line come from ONE
+interpolator, so the arithmetic cancels and reads exactly 0.0. Broken three ways
+to give it teeth: an `attested` evidence policy gave 20.6 px, three of thirty
+samples reaching the lane gave 368 px, and `value: () => null` — every number
+right, nothing drawn — took the ink assert to 0 **while every cell stayed
+green**. ⚠️ The old ink assert was satisfied by the pad's own furniture (a dim
+grid line passes `R or G > 60`); tightened to near-white, 58,767 → 34,785 lit
+pixels, a strictly stronger claim.
+
+✅ And the pad really is a sync control, run rather than claimed: the same
+component with x = offset in ms and y = rate, dragged corner to corner, gave
+-160 → +160 ms and 0.65x → 1.85x, monotone over 21 samples, with no flag. The
+one rule that makes it work is that an axis maps its NEAR edge to `min`, so an
+upward axis is `min > max`.
+
+⚠️ **Vertical spacing is a CLAUDE.md rule now, not a per-page decision.** A pad,
+a strip, a transport bar, a knob row and a log each had its own idea of its
+bottom margin — 12, 14, 6, 0 — so the gap depended on which two things happened
+to be adjacent, and the stack read as one dense block. Set once, on the GAP
+BETWEEN siblings rather than on each element's own margin, so a lone element
+carries no gap to nothing. ⚠️ The pad's labels are UNDRAWN, not deleted: they
+still reach `aria-label` and `data-gesture`, because a pad that is silent to
+someone who cannot see it is worse than a cluttered one. ⚠️ And the timeline is
+drawn once a FRAME, not once a sample — `getCoalescedEvents` hands over a dozen
+per frame on a fast digitiser.
+
+### grains: two granulators side by side, one source, and a diagram
+
+`dust` and `grains` were two pages about one subject and the split cost the
+better half of each — `dust` had the PICTURE (a granulator in the page reports
+every grain it fires) and `grains` had the CLAIM (the same thing is happening on
+a Raspberry Pi in another building). One page now, two cards, the `mirror`
+shape. 🔴 **A crossfade rather than a switch**, because a switch makes them
+alternatives and hides the only interesting thing; equal power, not linear,
+since two uncorrelated sources at 0.5 each are 6 dB down exactly where a
+listener stops to compare. ⚠️ The two panes are NOT the same picture drawn
+twice: they are one instrument seen through two different amounts of evidence,
+and the board's gutter says so.
+
+🔴 **The page now checks a granulator with the board down** — three of twelve
+asserts need no network, one being that every tick in the left picture is a
+grain the engine REPORTED (`5 reported, 0 guessed from audio`). A page about
+granulation could previously go green having granulated nothing.
+
+🔴 **One description of a sound, built at both ends, and that forces it to be
+ADDITIVE.** "A sawtooth at 110 Hz" does not survive two engines: WebAudio's
+`sawtooth` is band-limited by a wavetable the spec never pins down,
+SuperCollider's `Saw.ar` by a different method, Csound's `vco2` by a third — all
+three are sawtooths and none is the SAME sawtooth. A SINE is the one waveform
+every engine produces identically, so a shape is a TABLE OF PARTIALS, `saw` is a
+name for 1/n, and truncating at `count` IS the band-limiting — a number both
+ends share rather than somebody's wavetable. The rejected option is recorded
+because it sounds better than it is: sending the audio to both would put the
+relay IN FRONT OF the board's granulator, turning the comparison into clean
+audio against network audio and the board into an effects unit fed from a
+browser. 12/12, four of them negative controls.
+
+**The diagram.** 🔴 **The fork was built first and then measured out.** Drawing
+`this page` branching to its own granulator and to Cloudflare is correct and
+legible at 688 px and FALSE at 358 px: a forward link is a straight vertical
+from the source's centre and routes around nothing, so in one column the
+`you → cf` branch runs BEHIND the granulator box and emerges under it with an
+arrowhead into Cloudflare. A phone reads `this page → a granulator here →
+Cloudflare`, which is a path this page does not have and the exact
+plausible-wrong story, with the disambiguating label drawn at the midpoint, i.e.
+hidden behind the box. Every fork breaks that way, so **`diagram.mjs` needs a
+fix before any page can draw a branch**. ⚠️ And the picture caught two stale
+strings two screens down — the board's card still said `sound only` and its
+gutter said the board sends no grain events, both written before that morning
+and both contradicted by the page's own assert. Drawing the path is what made
+the contradiction visible.
+
+### The diagram drawer itself
+
+`demo/shell/diagram.mjs` renders plan-diagram's JSON as SVG with every piece of
+arithmetic in pure exports that have no document in them, so `diagram-test.mjs`
+drives them with a made-up 10px-per-character ruler and every expected number is
+exact. 26 ok, four negative controls. 🔴 **The plan was wrong about loopbacks**:
+a depth that grows with how far a return travels gives two overlapping returns
+of IDENTICAL length the same depth and draws them as ONE LINE, with the second
+silently absent. Interval colouring instead — strictly stronger, and shallower,
+because two paths sharing no ground can share a depth. ⚠️ §3's own example JSON
+broke §7's no-jargon rule; §6's `--line` is invisible as a box edge (#1f2937 on
+#11151d); and §4 said nothing about a forward cycle, which ran the column
+relaxation to its cap and returned a seventeen-box-wide picture of a three-step
+path. The measurement trap is self-correcting: built inside a `display:none`
+ancestor it reports `measured: false` and every string "fits" the estimate, so
+`/kit/` prints **"TYPE ESTIMATED — nothing was measured"** rather than letting an
+estimate pass as a measurement.
+
+### media-master was carrying a paused element on the wall clock
+
+Found by `memento` and reported rather than patched at the time. L4b carried a
+frame sample as `mediaTime + (wall − expectedDisplayTime) × rate`, and `rate`
+came from `playbackRate` alone — which is **1 on a PAUSED element** — so after a
+seek the playhead crept ~180 ms over 250 ms while `currentTime` sat still,
+failing the shared `keyboard seek lands` check at `2437 ~ 2225`. 🔴 **And
+`ctChangedAt` was COMPUTED AND NEVER READ**, while the file's own comment had
+claimed that guard for months. It catches what the existing rejection cannot: a
+scrub SMALLER than `jumpMs`, which would park the vector on the pre-scrub
+picture up to 250 ms out with no creep to notice it by. ⚠️ **It is applied at
+rate 0 ONLY, which is load-bearing** — the obvious form, apply it always, reads
+as working and silently switches L4b off, because `currentTime` moves nearly
+every tick during playback and is noticed a tick late; sabotaged that way it read
+`used 7, superseded 6`. ⚠️ And a fake whose `currentTime` never changes PASSES
+that test, which is why the new check moves it. ⚠️ **The new blind spot is
+written into the comment so it is not found twice**: a scrub smaller than
+`jumpMs` while PLAYING is caught by neither guard, bounded at 250 ms, ending the
+instant a frame is presented, and undetected.
+
+`timeline/lab/prop-media-sensor.mjs` is the paused half of a sensor `prop-nested`
+only ever tested while playing — 10 checks, no network, 6 red of 10 before the
+fix, reproducing the creep deterministically at **+152.7 ms over 150 ms** of wall
+time, three sabotages each caught.
+
+⚠️ And `.pos-log` could not wrap **on every demo**: it is a `<pre>`, so
+`white-space: pre` inherited into `.pos-m` and made its `overflow-wrap: anywhere`
+inert while the comment above it claimed the opposite — LESSONS #65's shape, in
+a file that records LESSONS #65. Verified by COMPUTED style: 4 lines and no
+sideways scroll, against 1 line and 1608px of overflow when sabotaged.
+
+### Numbers as they stand
+
+**33 built demos of 39 rows** — `typist` and `memento` are new, `dust` folded
+into `grains`. ⚠️ **No full `verify.mjs` run happened this session**, so there is
+no suite total to quote and CLAUDE.md's header still says 31 of 37 and 449
+asserts. Per-demo, all green where run: draw 20/20, typist 21/21, memento 23/23,
+grains 20/20, keep 20/20, scene 28/28, mirror 23/23, diagram 26/26, source
+12/12, live-test 7/7, pappus-test 30/30, box `test.mjs` 66/66, `pappus-live
+--self-test` 18/18, prop-nested 393/393, eleven shell-heavy demos 169/169.
+
+⚠️ **`mirror` was never 44/44** — a number I had been quoting. Measured at 21/21
+alone before anything was touched, and `verify.mjs` hands gl demos off rather
+than grading them, so no run produces 44; the 44 was `verify-gl.mjs`'s own
+total. It is 23/23 now, with the two new asserts running on BOTH branches of the
+headset check.
+
 ## Session 20 (2026-09-13) — the granulator was never broken; SuperCollider in a tab; a Quest at 90 fps
 
 **The day's real finding: a granulator reading the present sounds like the
