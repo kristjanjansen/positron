@@ -48,9 +48,8 @@ each cut removed, what it saved in bytes and UGens, and — the part that matter
   eight; say what the other four were and what they cost (2,894 B, ~28 UGens).
 - **COLOUR** — drive, crush, loss, envelope-following noise, in that order,
   and what each one is for.
-- **REVERB** — and ⚠️ note the open defect while writing it: the insert adds
-  **-4.1 dBFS of noise with no input at all**, measured, against digital
-  silence with the insert removed.
+- **REVERB** — ⚠️ and it is NOT noisy, which was an open defect until
+  2026-09-13. See §8.
 - **The meters** — seven of them on a control bus, which is how SIGNAL draws
   the flow. If BARE skips stages, the meters must still mean something or the
   board's own status starts lying.
@@ -80,7 +79,57 @@ is a free side effect worth measuring rather than assuming.
 
 ---
 
-## 4. Syncing the shape, both directions
+## 4. Decided, 2026-09-13
+
+- **Mono, both ends.** The board sends one channel; the page engine sums to it
+  rather than the board being widened. ⚠️ Declared, never inferred — a channel
+  count cannot be read off a payload, and 960 int16s is a valid 20 ms mono
+  frame AND a valid 10 ms stereo one.
+- **Two granulators, both ends.** Pappus is a pair (`m` and `n`) with
+  deliberately unlike halves, and that pair is what stops one flat wash. The
+  page engine has one and grows a second, rather than the board losing its.
+- **The same input, generated at both ends from one description.** Today the
+  page granulates six sawtooth oscillators and the board granulates whatever
+  instrument is running, and that difference dominates everything else in this
+  document. A simple synthetic waveform with named parameters, made in both
+  places, is what makes every other comparison mean something.
+
+### 4a. The input generator, which is the first piece of work
+
+**The material comes before the granulator.** Nothing below §4 is worth
+measuring until both ends are chewing the same thing.
+
+What it is: a small parameterised source — waveform, fundamental, a chord or
+interval, level, and a movement or two — described once and built twice.
+
+Where the board's copy comes from, in preference order:
+
+1. **SuperCollider.** scsynth is already on the board, and `PAPPUS_TINY` is
+   already proven to load in a browser — so once the wasm lane exists, the
+   SAME SynthDef generates the input at both ends and the question stops being
+   a question. This is the answer that converges with the two-SuperColliders
+   card rather than competing with it.
+2. **Csound.** Already on the board for `space`, an orchestra is TEXT rather
+   than compiled bytes, and its browser build is mature. Cheaper today,
+   and it leaves two generators to keep in step.
+3. A JACK client in node writing a generated buffer. Most control, most code,
+   and a third audio path to maintain.
+
+⚠️ **And the input stage gets its own check, on both ends.** Measure the
+generated source BEFORE the granulator — same fundamental, same rms, same
+spectral shape, within a tolerance taken from a measurement rather than picked.
+Measuring it at the output measures the granulator too, which is the mistake
+this repo keeps paying for: an A/B where both arms share the defect returns
+"identical", and identical reads as fine.
+
+The current source is deliberately dull and that is acknowledged, not defended
+— it is a held saw chord because a granulator wants material that sustains, and
+speech or a 1965 transfer did not work sonically. Making it interesting is a
+separate question and comes after the two ends agree.
+
+---
+
+## 5. Syncing the shape, both directions
 
 Not all of this is the board coming down to the page.
 
@@ -93,17 +142,12 @@ Not all of this is the board coming down to the page.
   rather than inheriting whatever the patch left. ⚠️ It is ONE-based in the
   engine and out-of-range values fail silently — LESSONS #62, where `msrc 0`
   was not a source at all and every probe measured an empty buffer.
-- **The same material.** The cheapest version is the page sending the board a
-  chord it can also make itself; the honest version is both granulating the
-  SAME recorded seconds. Until then the material difference dominates
-  everything else in this document and no other comparison means much.
-- **Mono against stereo.** Sum the page engine to mono for the comparison, or
-  accept it and say so. ⚠️ A channel count cannot be inferred from a payload
-  (CLAUDE.md) — whatever is done here is declared, not guessed.
+- **The same material** — §4a, and it is the first piece of work.
+- **Mono against stereo** — decided above: mono, declared.
 
 ---
 
-## 5. How we will know it worked, and the control that makes it a measurement
+## 6. How we will know it worked, and the control that makes it a measurement
 
 With both engines on the same material and matched settings, the two panes
 should agree: rms within a few percent, and the spectral centroid within a
@@ -120,7 +164,7 @@ Measure the pair, not just the board.
 
 ---
 
-## 6. What this is not
+## 7. What this is not
 
 Not a deletion. FULL stays the default and BARE is off unless asked for, the
 same way TINY is — the board behaves identically until somebody sets the
@@ -130,3 +174,47 @@ than merely absent.
 Not a claim that the simpler one sounds better. It sounds *comparable*, which
 is a different and smaller thing, and it is the only thing the side-by-side
 needs.
+
+---
+
+## 8. The reverb noise, closed — it does not reproduce
+
+Carried as an open board-side defect since 2026-09-12 on this measurement,
+taken with nothing playing:
+
+    reverb off      rms 0.053735   peak  -8.8 dBFS
+    reverb room     rms 0.095467   peak  -7.7 dBFS
+    reverb hall     rms 0.137798   peak  -4.1 dBFS
+    everything out  rms 0.000000   peak -180.0 dBFS
+
+Re-measured 2026-09-13 over the relay, every arm 4 s of frames:
+
+| | rms | peak |
+|---|---|---|
+| nothing running at all | 0.000000 | -180.0 dBFS |
+| yoshimi idling, no insert | 0.000000 | -180.0 dBFS |
+| the same through the reverb | 0.000000 | -180.0 dBFS |
+| **a note held, through the reverb** | **0.041883** | **-22.3 dBFS** |
+| four seconds after the release | 0.000000 | -180.0 dBFS |
+| reverb at mix 1, room 1, nothing playing | 0.000000 | -180.0 dBFS |
+
+and idling with no insert at all: **yoshimi, hexter and fluidsynth are each
+0.000000**.
+
+🔴 **THE HELD NOTE IS THE CONTROL AND IT IS THE WHOLE REPORT.** Six arms of
+`0.000000` is exactly the shape of a deaf instrument — "a partial result that
+is too tidy is a broken collector, not a finding" — and this probe WAS deaf on
+its first run, for a reason worth keeping: it waited on a reply of type
+`fx.space` when the board answers `fx.space.applied`, so the reverb was never
+switched on and all four arms measured the same untouched silence while
+appearing to compare four conditions. The fix was to read the box's own handler
+rather than to guess the name. With the reverb genuinely on and confirmed
+(`ok:true, on:true, mix 1, room 1, instrument yoshimi`), a held note reads
+0.0419 through the same path that reads 0.000000 at rest.
+
+So: not reproduced, on a path proved live in the same run. What changed in
+between is not established — the board has been restarted and redeployed many
+times since, and Pappus now runs TINY. **If it returns, the first arm to take
+is "which instrument was in the graph, and was pappus in it too"**, because the
+original's `reverb off` row was already 0.0537 with nothing playing, and that
+is an upstream source rather than a reverb tail.

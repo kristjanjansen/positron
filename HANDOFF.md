@@ -63,10 +63,11 @@ list, so nothing is carried only in a conversation.
   claim is the identical 1,451-UGen graph in a browser and on a Pi. What is
   missing is wasm scsynth vendored into the repo.
 - **The defect backlog**, which is the current focus: `keep`'s unexplained 409,
-  the reverb insert adding **-4.1 dBFS** of noise with no input (board-side),
   `pappus-live.mjs` grading a stochastic engine from single takes (14–16 of 17,
   failures MOVE between runs), and `workers/pub`'s pre-session-12 container
-  image.
+  image. ✅ `keep`'s 409 and ✅ the reverb noise are both closed — the reverb
+  does not reproduce in six arms on a path proved live by a held note
+  (`plan-twins.md` §8).
 - **`plan-gesture.md`** — P1–P4: the XY pad component, a transport under it,
   the same gesture recorded and played back, then driving the board. §3 is
   decided: one 2-D series, measured.
