@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = 'caecfb4-083005';
+export const BUILD = '9291139-084321';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -69,7 +69,7 @@ export function mount({
   if (!showReadout) rb.hidden = true;
   for (const [k, unit] of Object.entries(readout)) {
     const cell = el('div', 'pos-cell');
-    const v = el('span', 'pos-v', '—');
+    const v = el('span', 'pos-v', '');
     v.dataset.state = 'pending';
     cell.append(el('span', 'pos-k', k), v);
     // ⚠️ THE UNIT IS PART OF THE VALUE, SO IT IS HIDDEN WHILE THERE IS NONE.
@@ -149,10 +149,16 @@ export function mount({
     // in front of it. And a page that pre-sets a counter to 0 before anything
     // has happened is worse: a zero reads as a very confident measurement.
     // Pages hand over `''`/`null` until they have something; this turns all
-    // three into one pending cell with an em dash and no unit.
+    // three into one pending cell: EMPTY, with the unit hidden too.
+    //
+    // ⚠️ EMPTY, NOT AN EM DASH — 2026-09-13. The placeholder used to be `—`,
+    // on the reasoning that a cell has to show it is a cell. It does not: the
+    // key above it and the box around it already say that, and four dashes in
+    // a row read as four failed readings rather than as four cells waiting.
+    // The empty cell is quiet and says the same thing.
     const blank = value === null || value === undefined || value === ''
       || (typeof value === 'number' && !Number.isFinite(value));
-    v.textContent = blank ? '—'
+    v.textContent = blank ? ''
       : typeof value === 'number' ? fmtNum(value) : String(value);
     if (unit) v.append(unit);
     v.dataset.state = state || (blank ? 'pending' : '');
