@@ -585,13 +585,28 @@
       ['fps', fps == null ? '' : fps.toFixed(1)],
       // ⚠️ THE CARD'S OWN TIME, AND IT IS BLANK WHERE NO DRIVER WOULD SAY. A
       // zero here would read as "free", which is a claim nobody measured.
-      ['card', rendered && xr.state.liveGpuMs != null ? `${xr.state.liveGpuMs.toFixed(2)} ms` : ''],
-      // ⚠️ WHOSE FLOOR THE DOTS ARE ON, where it can be read while wearing
-      // the thing. The 2-D page is behind your face, and "the grid is on your
-      // real floor" and "the grid is at a height this page guessed" look
-      // identical from inside — one of them is a measurement of your room and
-      // the other is not, so the panel says which.
-      ['floor', inXR ? (xr.state.room?.floor ?? '') : ''],
+      // 🔴 `card` AND `floor` ARE GONE — reported from the headset as the two
+      // that did not make sense, and both were right to go for the same reason:
+      // a panel's footer carries what THAT PANEL measured, and neither was
+      // about this panel.
+      //
+      // `card` is the graphics card's own time for the live render, and on the
+      // Quest it was permanently blank: that driver exposes no GPU timer, so
+      // the cell could never say anything on the machine it was added for. A
+      // cell that cannot change is a cell that teaches you to stop reading the
+      // row.
+      //
+      // `floor` is whose floor the dots are on — a fact about the ROOM, printed
+      // under a picture of a shader. It was put here because the 2-D page is
+      // behind your face in a headset, which is a real problem and the wrong
+      // solution: it belongs where the room is described, not in a panel whose
+      // subject is one rendering of one shader.
+      //
+      // ⚠️ Neither fact is DELETED. The card's time is still in the
+      // once-a-second beacon (`live Y ms cpu / Z ms gpu`), and the floor's
+      // provenance is on the first-frame line (`grid drawing on the page` /
+      // `on your room`) — so both are readable, in the log, where a fact about
+      // the session belongs.
     ];
     // ⚠️ ONLY WHEN A NUMBER ACTUALLY MOVED. The strip is a texture upload in the
     // headset, and a version counter that ticks on every draw makes the "only
@@ -620,8 +635,11 @@
         // ⚠️ THE PROCESSOR'S TIME, NOT THE CARD'S. This is how long it takes to
         // hand this panel to the graphics card each frame; the card's own time
         // for the copy cannot be read from here at all.
-        ['copy', inXR && xr.state.uploadCpuMs != null ? `${xr.state.uploadCpuMs.toFixed(2)} ms` : ''],
-        ['lost', boxLive ? String(farGaps) : ''],
+        // ⚠️ And the same trim on this side, so the two panels stay a PAIR.
+        // Two footers of different lengths under two pictures being compared
+        // read as two different kinds of thing. `copy` is the processor's time
+        // to hand this panel to the card — a cost of the DISPLAY path, not of
+        // what crossed the network — and `lost` is in the beacon.
       ],
     });
     panelDrawn++;
