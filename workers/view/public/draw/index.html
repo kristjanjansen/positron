@@ -14,23 +14,26 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
-  import { createChoice } from '/shell/choice.mjs';
+  import { createSlider } from '/shell/slider.mjs';
   import { holdSample, lerpSample, catmullSample } from '/shell/pointer-adapter.mjs';
 
   const d = mount({
     name: 'draw',
-    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and one sample every tenth of a second — which is what a recording of a gesture normally is. The pale line is everything that happened; the bright one is what a player would reconstruct from the sparse record. The numbers say how far apart they are in pixels, and how much of the bright line was never recorded at all.',
+    what: 'Draw a line with a finger or a mouse and this page keeps two records of it: every sample the browser gave it, and one sample every tenth of a second — which is what a recording of a gesture normally is. The white line is everything that happened; the blue one is what a player would reconstruct from the sparse record. The knob under it is how much a player is allowed to invent between two samples — at nothing the line is a staircase, at everything it is a curve through the same points — and the numbers say how far that sits from what happened, and how much of the blue line no sample attests.',
     // Every cell moves with the drawing. `invented` is the one to read: it is
     // the fraction of the drawn line that no sample attests.
     readout: { kept: '', invented: '%', 'off by': 'px', worst: 'px' },
+    // 🔴 NOTHING DRAWS FOR YOU. There was a `Draw one for me` control that
+    // synthesised a Lissajous, and it was there because the harness could not
+    // draw — `element.click()` fires no pointer events. It is gone, button and
+    // mechanism: a page about a gesture that offers you a gesture it made
+    // itself is answering its own question, and the line you get is not the
+    // line this page is about.
+    //
+    // The suite reaches it the real way now: `verify.mjs` dispatches actual
+    // pointer events across any element marked `data-gesture`, so what the
+    // checks below grade is a drag, the same as yours.
     controls: [
-      // ⚠️ CONTROL 0 DRAWS A KNOWN CURVE, and it is first because the harness
-      // CANNOT DRAW. `element.click()` fires no pointer events — measured in
-      // this repo's own headless Chrome: two port-to-port drags made two wires,
-      // two clicks on the same ports made zero. A page whose only input is a
-      // drag is a page the suite cannot exercise, so the deterministic path is
-      // the thing it presses, and a human gets the same page by using a finger.
-      { id: 'demo', label: 'Draw one for me', primary: true },
       { id: 'clear', label: 'Clear' },
     ],
   });
@@ -59,13 +62,22 @@
   // The adapter's own interpolators, which is the whole reason this page did
   // not need writing: `holdSample`, `lerpSample` and `catmullSample` are the
   // measured article (0.036 px mean for the spline against 24.19 for a hold).
-  const MODES = [['every tenth of a second, held', 'hold'],
-                 ['joined by straight lines', 'linear'],
-                 ['smoothed', 'catmull']];
-  let mode = 'catmull';
+  // 🔴 ONE KNOB, NOT THREE BUTTONS. The three reconstructions used to be a
+  // radio row, which makes them three unrelated things you pick between; they
+  // are three points on ONE axis — how much a player is willing to invent
+  // between two samples. At 0 nothing is invented and the line is a staircase;
+  // at 1 the line is a spline through the same samples. Dragging it moves
+  // `off by` continuously, which is the page's whole subject turned into
+  // something you can feel rather than three numbers you compare.
+  //
+  // The ends are EXACTLY the named methods, so the checks below still grade
+  // the three real algorithms rather than a blend of them.
+  const HOLD = 0, LINEAR = 0.5, SMOOTH = 1;
+  let smooth = SMOOTH;
+  const mix = (p, q, k) => ({ ...p, x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
 
-  /** Where the sparse record says the pen was at time `t`. */
-  function at(t) {
+  /** Where the sparse record says the pen was at time `t`, at smoothing `s`. */
+  function at(t, s = smooth) {
     const n = stored.length;
     if (!n) return null;
     if (t <= stored[0].at) return stored[0];
@@ -73,32 +85,47 @@
     let i = 0;
     while (i < n - 2 && stored[i + 1].at <= t) i++;
     const a = stored[i], b = stored[i + 1];
-    if (mode === 'hold') return holdSample(a);
+    const held = holdSample(a);
+    if (s <= HOLD) return held;
     const u = (t - a.at) / Math.max(1e-6, b.at - a.at);
-    if (mode === 'linear') return lerpSample(a, b, u);
+    const straight = lerpSample(a, b, u);
+    if (s <= LINEAR) return mix(held, straight, s / LINEAR);
     // ⚠️ TIME-KNOTTED, and reflected at the ends. A wall-clock throttle never
     // produces evenly spaced samples, so uniform knots bend the curve toward
     // whichever sample happened to arrive late; and without phantom endpoints
     // the first and last segments have no curve at all.
     const p0 = stored[i - 1] || { ...a, at: a.at - (b.at - a.at) };
     const p3 = stored[i + 2] || { ...b, at: b.at + (b.at - a.at) };
-    return catmullSample(p0, a, b, p3, u);
+    return mix(straight, catmullSample(p0, a, b, p3, u), (s - LINEAR) / (SMOOTH - LINEAR));
   }
 
   // ── the picture ──────────────────────────────────────────────────────────
   const W = 960, H = 520;
-  const cv = el('canvas', 'pad');
+  // `data-gesture` is how `verify.mjs` knows to DRAG across this element
+  // instead of clicking it. A page whose only input is a drag was a page the
+  // suite could not exercise at all, which is why this page used to carry a
+  // button that drew for you.
+  const cv = el('canvas', 'pad', null, { 'data-gesture': 'draw' });
   cv.width = W * 2; cv.height = H * 2;
   cv.style.aspectRatio = `${W} / ${H}`;
   d.el.append(cv);
-  const gut = el('div', 'gut', 'draw on it — or press “Draw one for me”');
+  const gut = el('div', 'gut', 'draw on it with a finger or a mouse');
   d.el.append(gut);
   const ctx = cv.getContext('2d');
 
   const css = getComputedStyle(document.documentElement);
   const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
-  const C = { line: tok('--line', '#232c3a'), dim: tok('--dim', '#9aa7bd'),
-              hi: tok('--hi', '#ffd400'), ok: tok('--ok', '#6ee7a8'), card: tok('--card', '#141922') };
+  // 🔴 WHAT YOU DREW IS WHITE AND IT IS THE LOUDEST THING HERE. It was the
+  // other way round — your line dark underneath, the reconstruction in the
+  // page's yellow on top — which put the emphasis on the invented line and
+  // made the page look like it was about the reconstruction. It is about the
+  // DIFFERENCE, and the thing that actually happened is the one to see first.
+  // The reconstruction is blue: a second reading of the same gesture, present
+  // and legible without competing. Not `--hi`, which every page uses for the
+  // playhead and the primary button, and which at 1.6 px over a dark field is
+  // the brightest ink on screen.
+  const C = { drawn: tok('--fg', '#e6e6e6'), guess: '#7aa2f7', dim: tok('--dim', '#8b93a1'),
+              card: tok('--card', '#11151d') };
 
   let drawnPoints = 0;
   function paint() {
@@ -106,9 +133,9 @@
     ctx.scale(2, 2);
     ctx.fillStyle = C.card; ctx.fillRect(0, 0, W, H);
 
-    // The truth, pale and underneath: every sample the browser gave us.
+    // The truth, in white and underneath: every sample the browser gave us.
     if (evidence.length > 1) {
-      ctx.strokeStyle = C.line; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.strokeStyle = C.drawn; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(evidence[0].x, evidence[0].y);
       for (const p of evidence) ctx.lineTo(p.x, p.y);
@@ -121,7 +148,7 @@
     if (stored.length > 1) {
       const t0 = stored[0].at, t1 = stored[stored.length - 1].at;
       const step = Math.max(2, (t1 - t0) / 900);
-      ctx.strokeStyle = C.hi; ctx.lineWidth = 1.6; ctx.beginPath();
+      ctx.strokeStyle = C.guess; ctx.lineWidth = 1.6; ctx.beginPath();
       let first = true;
       for (let t = t0; t <= t1; t += step) {
         const s = at(t); if (!s) continue;
@@ -130,20 +157,22 @@
       }
       ctx.stroke();
       // The samples that are actually attested, so "kept" is a thing you can
-      // count on screen rather than only in a cell.
-      ctx.fillStyle = C.ok;
-      for (const p of stored) { ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill(); }
+      // count on screen rather than only in a cell. They belong to the sparse
+      // record, so they are the record's colour — a third hue here would say
+      // they were a third kind of thing.
+      ctx.fillStyle = C.guess;
+      for (const p of stored) { ctx.beginPath(); ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2); ctx.fill(); }
     }
     ctx.restore();
   }
 
   /** How far the reconstruction sits from what actually happened. Measured
    *  against EVERY evidence sample, not against a subsample of itself. */
-  function error() {
+  function error(sm = smooth) {
     if (evidence.length < 2 || stored.length < 2) return null;
     let sum = 0, worst = 0, n = 0;
     for (const e of evidence) {
-      const s = at(e.at); if (!s) continue;
+      const s = at(e.at, sm); if (!s) continue;
       const dx = s.x - e.x, dy = s.y - e.y;
       const dist = Math.hypot(dx, dy);
       sum += dist; if (dist > worst) worst = dist; n++;
@@ -160,9 +189,13 @@
     d.set('invented', drawnPoints ? (100 * (1 - stored.length / drawnPoints)).toFixed(1) : '');
     d.set('off by', err ? err.mean.toFixed(3) : '', err && err.mean < 1 ? 'ok' : err ? 'warn' : '');
     d.set('worst', err ? err.worst.toFixed(2) : '');
+    const how = smooth <= HOLD ? 'held at the last sample'
+      : smooth >= SMOOTH ? 'smoothed through them'
+        : smooth === LINEAR ? 'joined by straight lines'
+          : smooth < LINEAR ? 'between held and straight' : 'between straight and smoothed';
     gut.textContent = stored.length
-      ? `${stored.length} samples kept of ${evidence.length} · ${drawnPoints} points drawn from them`
-      : 'draw on it — or press “Draw one for me”';
+      ? `${stored.length} samples kept of ${evidence.length} · ${drawnPoints} points drawn from them, ${how}`
+      : 'draw on it with a finger or a mouse';
   }
 
   // ── drawing with a finger ────────────────────────────────────────────────
@@ -172,7 +205,11 @@
     return { x: (ev.clientX - r.left) * (W / r.width), y: (ev.clientY - r.top) * (H / r.height) };
   };
   cv.addEventListener('pointerdown', (ev) => {
-    reset(); drawing = true; cv.setPointerCapture(ev.pointerId);
+    reset(); drawing = true;
+    // A synthetic pointer (the harness dispatches real pointer events through
+    // CDP) can refuse capture; losing capture costs nothing here, because the
+    // canvas is the only thing being drawn on.
+    try { cv.setPointerCapture(ev.pointerId); } catch { /* not capturable */ }
     const p = spot(ev); push(stampMs(ev), p.x, p.y, ev.pressure || 0.5); render();
   });
   cv.addEventListener('pointermove', (ev) => {
@@ -184,58 +221,43 @@
     for (const e of evs) { const p = spot(e); push(stampMs(e), p.x, p.y, e.pressure || 0.5); }
     render();
   });
-  for (const t of ['pointerup', 'pointercancel']) cv.addEventListener(t, () => { drawing = false; render(); });
+  for (const t of ['pointerup', 'pointercancel']) {
+    cv.addEventListener(t, () => { drawing = false; render(); check(); });
+  }
 
   function reset() { evidence = []; stored = []; lastStoreAt = -1e9; }
 
-  // ── a path the harness can press ─────────────────────────────────────────
-  // The same Lissajous the prototype used, so ground truth is a formula rather
-  // than a recording — the only way to say what an error of 0.036 px is FROM.
-  const CURVE = { A: 380, B: 240, cx: 480, cy: 260, f1: 1, f2: 2, phase: 0.4 };
-  const curveAt = (s) => ({
-    x: CURVE.cx + CURVE.A * Math.sin(2 * Math.PI * CURVE.f1 * s + CURVE.phase),
-    y: CURVE.cy + CURVE.B * Math.sin(2 * Math.PI * CURVE.f2 * s),
-  });
-  function synthesize({ durationMs = 6000, hz = 120, jitterMs = 2, seed = 7 } = {}) {
-    reset();
-    let rnd = seed;
-    const rand = () => ((rnd = (rnd * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-    const step = 1000 / hz;
-    const n = Math.floor(durationMs / step);
-    for (let k = 0; k <= n; k++) {
-      // Jitter, because a real input clock is not a metronome — and a reader
-      // that only ever sees evenly spaced samples never exercises the knots.
-      const j = k === 0 || k === n ? 0 : (rand() - 0.5) * 2 * jitterMs;
-      const t = k * step + j;
-      const p = curveAt(t / durationMs);
-      push(t, p.x, p.y, 0.5);
-    }
-    const last = evidence[evidence.length - 1];
-    if (stored[stored.length - 1].at < last.at) stored.push({ ...last });
-    render();
-  }
-
-  const pick = createChoice({
-    label: 'the bright line is',
-    options: MODES,
-    at: 2,
-    onPick: (v) => { mode = v; render(); },
+  // UNDER the canvas, because it changes the picture above it and a control
+  // that sits below what it moves is read in the order it is used.
+  const pick = createSlider({
+    label: 'smoothing', min: 0, max: 100, step: 1, value: 100, unit: '%',
+    onInput: (v) => { smooth = v / 100; render(); },
   });
   const row = el('div', 'pos-controls');
   row.append(pick.el);
-  d.el.insertBefore(row, cv);
+  d.el.insertBefore(row, gut);
 
   d.on('clear', () => { reset(); render(); });
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // ── the page checks itself, once, on the first line you finish ───────────
+  // Not on every `pointerup`: `d.assert` appends, so checking on each one would
+  // grow the count without end and make "diff the per-demo assert count" —
+  // this project's cheapest regression test — meaningless.
+  //
+  // ⚠️ AND NOT ON A THRESHOLD OF LINE QUALITY. What is graded below is a real
+  // gesture, so it can be slow, fast, short or scribbled; every check here is
+  // about the RELATIONSHIP between the two records, which holds for any line.
+  let checked = false;
+  function check() {
+    if (checked || evidence.length < 40 || stored.length < 4) return;
+    checked = true;
 
-  d.on('demo', async () => {
-    synthesize();
-    await sleep(150);
-
+    // RELATIVE, because the gesture is now a real one and its length is
+    // whoever drew it. What has to hold for ANY line is that the sparse record
+    // is genuinely sparser than what happened.
     d.assert('a gesture was recorded twice, in full and sparsely',
-      evidence.length > 400 && stored.length > 20 && stored.length < evidence.length,
-      `${evidence.length} samples in, ${stored.length} kept`);
+      stored.length >= 4 && stored.length < evidence.length / 2,
+      `${evidence.length} samples in, ${stored.length} kept — ${(evidence.length / stored.length).toFixed(1)}:1`);
 
     // 🔴 THE ONE THIS PAGE EXISTS FOR. Most of the line you see was never
     // recorded — say how much, in the same breath as how wrong it is.
@@ -247,15 +269,18 @@
     // subject, and a threshold on any one of them says nothing about whether
     // interpolating helped. Holding must be worse than joining, and joining
     // worse than smoothing, on the same recording.
-    const errs = {};
-    for (const m of ['hold', 'linear', 'catmull']) { mode = m; errs[m] = error().mean; }
-    mode = 'catmull'; render();
+    const errs = { hold: error(HOLD).mean, linear: error(LINEAR).mean, catmull: error(SMOOTH).mean };
     d.assert('smoothing beats straight lines, and straight lines beat holding',
       errs.catmull < errs.linear && errs.linear < errs.hold,
       `hold ${errs.hold.toFixed(2)} px · linear ${errs.linear.toFixed(3)} px · smoothed ${errs.catmull.toFixed(3)} px`);
 
-    d.assert('and the smoothed line is inside a pixel of what happened',
-      errs.catmull < 1, `${errs.catmull.toFixed(3)} px from ${evidence.length} samples of truth`);
+    // ⚠️ A RATIO, NOT A DISTANCE. `< 1 px` was calibrated against a smooth
+    // synthetic curve; a person scribbles, and a fast corner is several pixels
+    // wrong however well you interpolate. What is true of every gesture is that
+    // smoothing is worth a lot MORE than holding, and how much is the number.
+    d.assert('smoothing is many times closer than holding the last sample',
+      errs.hold / errs.catmull > 5,
+      `${(errs.hold / errs.catmull).toFixed(0)}x closer — ${errs.catmull.toFixed(3)} px against ${errs.hold.toFixed(2)} px`);
 
     // ⚠️ NOTHING IN THE SUITE LOOKS AT INK, so this page has to. A right answer
     // in a cell over a blank canvas is the defect this project has hit twice.
@@ -267,7 +292,7 @@
     })();
     d.assert('there is a line on the canvas, not just numbers in cells', lit > 4000,
       `${lit} lit pixels`);
-  });
+  }
 
   render();
   d.ready();

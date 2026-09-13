@@ -176,7 +176,7 @@
     // becomes a three-column grid in fullscreen — otherwise the label takes a
     // column of its own and the knobs stop being in the middle.
     const left = el('span', 'left');
-    const nums = el('span', 'stat', '—');
+    const nums = el('span', 'stat', '');
     // Label first, numbers after: what drew it, then how it is going.
     left.append(lab, nums);
     // ⛶ U+26F6 SQUARE FOUR CORNERS — the conventional fullscreen glyph, and it
@@ -459,7 +459,7 @@
     pane.nums.innerHTML = FIELDS[which].map(([key, unit, fmt]) => {
       // `note` is the only field with nothing to hold a place for — it is a
       // name, not a measurement, and an empty one should take no room.
-      const shown = v[key] == null ? '—' : fmt(v[key]);
+      const shown = v[key] == null ? '' : fmt(v[key]);
       return `<span class="n">${shown}</span>${unit ? ' ' + unit : ''}`;
     }).filter(Boolean).join(' · ');
   }

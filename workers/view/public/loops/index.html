@@ -256,7 +256,7 @@
 
   setInterval(() => {
     const it = inLoop() ? nest.iteration?.('loop') : null;
-    d.set('pass', it === null || it === undefined ? '—' : `${it + 1}/2`);
+    d.set('pass', it === null || it === undefined ? '' : `${it + 1}/2`);
     const L = view.strip.lanes().find((l) => l.id === 'deck-span');
     if (L) {
       L.subLabel = [`${nest.spans().length} of them,`,

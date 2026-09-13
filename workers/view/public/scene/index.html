@@ -576,7 +576,7 @@
     if (!send({ type: 'scene.room', doc: world(seed) })) {
       // No relay: still show a room rather than an empty stage, and SAY that
       // the number is missing rather than printing a zero that looks measured.
-      d.set('round trip', '—');
+      d.set('round trip', '');
       apply(world(seed), 0);
     }
     await new Promise((r) => setTimeout(r, 900));
