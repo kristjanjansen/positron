@@ -39,6 +39,15 @@ and otherwise the granulator question is already closed.**
    needs to be better rather than merely present (§4.1: 48,062 B for a
    Pappus-shaped chain).
 
+🔴 **READ §10 FIRST IF YOU CAME HERE FOR THE 64 KiB CEILING (2026-09-13).**
+§8 below concluded that "the pappus SynthDef does not fit through `/d_recv`",
+measured on a LITE build. ✅ **The TINY rung does fit, and it has now been
+loaded, started, sounded and read back for real** — the compiled
+`pappus.scsyndef` off the board, not a generated look-alike. What §8 says stays
+true of LITE and FULL; it is false of TINY and BARE. §10 also finds a **second**
+ceiling nobody had measured — the graph clears the byte one by 787 bytes and the
+interconnect-buffer one by **five buffers**.
+
 ---
 
 ## 0 · Marks used in this file
@@ -649,6 +658,14 @@ or reading the OSC buffer constant out of the wasm build and filing it upstream.
 
 **Superseded: the limit is no longer UNMEASURED inside that range.**
 
+🔴 **AND SUPERSEDED AGAIN, 2026-09-13 — see §10.** ✅ The oracle is no longer
+blocked: the **TINY** rung (64,733 B, 1,467 UGens) loads into this same
+SuperSonic in 11–12 ms, starts, answers all 103 controls, makes a sound against
+a 0.000000 silence control, and delivers its per-grain `SendReply` at the rate
+the board documents. LITE at 74,733 B still gets nothing, and §10.2 proves that
+is bytes rather than the interconnect-buffer cliff the official-build report
+found.
+
 ### 8.2 The limit is 64 KiB, bisected (2026-09-13)
 
 A ladder of generated SynthDefs — `Mix.fill(n, …)` with n from 10 to 440,
@@ -785,3 +802,312 @@ Fixed so the skip fails loudly; re-sabotaged, **14 of 16** with the file named.
 | a definition compiled ON THE BOARD loading here | the Pi was in use; the sclang file used is Sonic Pi's, and is v1 |
 | the same file sounding the same in two places | `synthdef-audio.mjs` already reports that it does not — band-limited sawtooth, no starting phase |
 | anything on iOS | `demo/verify-native.mjs` exists and has not been pointed at `/patch/` |
+
+---
+
+## 10 · The REAL Pappus graph, in the browser — measured at last (2026-09-13)
+
+**Every number in this repo's 64 KiB story had been taken with generated
+look-alikes of the right byte size. This section is the real thing.
+`pappus.scsyndef` was compiled on the board at all four rungs and sent through
+`/d_recv` into the SuperSonic engine `demo/patch/vendor/` already ships.
+🔴 TINY LOADS — 64,733 bytes, `/done /d_recv` in 11–12 ms, `/s_new` answers
+`/n_go`, 1,467 UGens run, all 103 controls answer `/s_get`, it makes a sound
+against a silence control that reads exactly 0.000000, and its SendReply UGens
+reach the page at 8.00, 4.00 and 15.99 reports a second against the board's
+documented 8.0 / 4.0 / 16.0. BARE loads too. LITE and FULL get nothing on any
+channel, and it is BYTES: raising `maxWireBufs` to 128, 256 and 2048 and
+`realTimeMemorySize` 32x changes nothing, while a generated definition of
+LITE's exact 74,733 bytes with MORE UGens than LITE also refuses and one of
+TINY's exact 64,733 bytes with 1,848 UGens — more than LITE's 1,722 — loads.
+🔴 But there is a second ceiling nobody here had measured, and the real graph
+sits much closer to it than to the byte one: TINY needs 59 audio interconnect
+buffers of SuperSonic's default 64, and refuses at 58. Five spare.**
+
+**WHAT THIS MEANS FOR THE RUNG TRADE, in one line: take TINY on the engine we
+already vendor.** It is not a compromise any more — it is a graph that has now
+been proved to load, start, sound and report in the shipped browser engine,
+which is more than can be said for any other combination, and it costs no new
+dependency (§10.9).
+
+### 10.0 The instrument, and the control that makes it trustworthy ✅
+
+The four rungs were compiled **on the board**, by the board's own sclang 3.13.0,
+from `/opt/positron-box`'s own `Engine_Pappus.sc`.
+
+⚠️ **sclang `File.delete`s the definition it sends** (`SynthDef.sc` `doSend`,
+the `/d_load` branch), which is why `~/.local/share/SuperCollider/synthdefs/`
+always reads empty and why the previous capture had to race a recompile. There
+is no need to race it: `.add` calls `asSynthDesc(libname, keepDef: true)`, so
+the SynthDef **object** stays in the library and
+
+```supercollider
+SynthDescLib.global[\pappus].def.asBytes
+```
+
+hands over the same bytes with nothing deleting anything. A 40-line
+`writedef.scd` boots a **second** scsynth on its own UDP port with its own
+buffers and its own JACK client, builds one rung, writes the file and exits.
+
+🔴 **IT DOES NOT TOUCH THE RUNNING SERVICE, and that was checked rather than
+assumed.** It is not `run-pappus.scd` with a line added — that file opens a
+`/pappus/cmd` door and posts `/pgrain` into the live box's own UDP socket. ✅
+Before and after all four compiles: one `sclang`, one `scsynth`, `PAPPUS_LITE=1`
+in `/etc/default/positron-box`, `systemctl is-active` → `active`, and
+`jack_lsp` showing the same single `SuperCollider` client. The board was on LITE
+when this started and is on LITE now.
+
+✅ **The control that says the route is honest: the LITE rung compiled this way
+is byte-identical to the one captured by racing the directory.** 74,733 bytes,
+`md5 8a37f38c33b9829fd8bba815c5c786cb`, both times. A different mechanism
+producing the same bytes is what makes the other three trustworthy.
+
+| rung | bytes | md5 | UGens | constants | controls | UGen kinds |
+|---|---:|---|---:|---:|---:|---:|
+| BARE | 43,551 | `2d262720…` | 941 | 91 | 103 | 37 |
+| **TINY** | **64,733** | `08e8129f…` | **1,467** | 169 | 103 | 51 |
+| LITE | 74,733 | `8a37f38c…` | 1,722 | 173 | 103 | 55 |
+| FULL | 121,425 | `43837b3e…` | 2,812 | 181 | 103 | 63 |
+
+✅ Every byte count and every UGen count matches `rig/box/norns/TINY.md`'s own
+weighing table exactly, which is a second independent agreement.
+
+### 10.1 🔴 Does the real TINY graph load? ✅ YES
+
+SuperSonic 0.81.0 as vendored in `demo/patch/vendor/`, headless Chrome 152,
+`postMessage` transport, 48 kHz, `--autoplay-policy=no-user-gesture-required
+--mute-audio`, **one fresh engine per rung**, boot 730–737 ms.
+
+🔴 **The answer waited for is `/done /d_recv` in the engine's own voice**, and
+`/status.reply`'s `numSynthDefs` is read before and after as a second,
+independent counter on the far side of the wire. Neither `loadSynthDef()`'s
+return value nor SuperSonic's `loadedSynthDefs` is consulted — §8 measured the
+first returning `{name,size}` for a definition the server never got and the
+second going 1→2→3 across three sends of which one loaded.
+
+| rung | bytes | `/d_recv` | `numSynthDefs` | `/s_new` |
+|---|---:|---|---|---|
+| BARE | 43,551 | ✅ `/done` after **12 ms** | 1 → 2 | ✅ `/n_go`, **941 UGens** |
+| **TINY** | **64,733** | ✅ **`/done` after 11–12 ms** | **1 → 2** | ✅ **`/n_go`, 1,467 UGens** |
+| LITE | 74,733 | ❌ nothing, on any channel | 1 → 1 | ❌ `/fail /s_new "SynthDef not found"` |
+| FULL | 121,425 | ❌ nothing, on any channel | 1 → 1 | ❌ `/fail /s_new "SynthDef not found"` |
+
+✅ TINY confirmed loading **six times** at the default `maxWireBufs`, LITE
+refusing **five**, alternating
+TINY/LITE/TINY/LITE in one sitting so the two cannot be separated by drift.
+
+### 10.2 🔴 LITE's refusal is BYTES, and here is the instrument that could have said otherwise ✅
+
+`research/scsynth-wasm-official-2026-09.md` §10 found a limit of a completely
+different kind — `maxWireBufs`, biting at `/d_recv`, silent in the same way, and
+structurally invisible to a byte ladder. ✅ **That cliff is in SuperSonic too and
+the knob reaches it**, proved by breaking it on purpose with N oscillators all
+alive at once into one `Out`:
+
+| oscillators alive | bytes | `maxWireBufs` 64 | 128 | 256 |
+|---:|---:|---|---|---|
+| 63 | 5,634 | ✅ loads | — | — |
+| **65** | **5,810** | ❌ **refused** | ✅ **loads** | — |
+| **200** | **17,690** | — | ❌ **refused** | ✅ **loads** |
+
+So the instrument discriminates. ✅ Pointed at LITE it says the opposite:
+
+| LITE, 74,733 B | `maxWireBufs` | `realTimeMemorySize` | result |
+|---|---:|---:|---|
+| | 64 | 8,192 KB | ❌ nothing |
+| | 128 | 8,192 KB | ❌ nothing |
+| | 256 | 8,192 KB | ❌ nothing |
+| | **2,048** | **262,144 KB** | ❌ **nothing** |
+
+✅ And the byte ladder, regenerated **inside the same engine** from
+`demo/shell/synthdef.mjs`, at the two sizes that matter:
+
+| generated definition | UGens | result |
+|---:|---:|---|
+| **64,733 B** — TINY's weight | **1,848** | ✅ `/done /d_recv` |
+| 65,520 B | 1,870 | ✅ `/done /d_recv` — the largest that does |
+| 65,521 B | 1,871 | ❌ nothing — the smallest that does not |
+| **74,733 B** — LITE's weight | 2,134 | ❌ nothing |
+
+🔴 **1,848 generated UGens in 64,733 bytes load; 1,722 real ones in 74,733 bytes
+do not.** More building blocks, fewer bytes, loads. That is the discrimination
+in one line, and it is bytes.
+
+✅ The 65,520 / 65,521 edge reproduces `research/synthdef-size-limit-2026-09.md`
+§2.1 exactly, on a different day in a different harness. **TINY's headroom is
+787 bytes to the measured edge and 755 to `SIZE_CEILING`'s derived 65,488.**
+
+### 10.3 🔴 The SECOND ceiling, which the real graph is genuinely close to ✅
+
+A byte ladder is blind to this and so was every number written here before
+today. TINY was walked down `maxWireBufs` one at a time, one fresh engine each:
+
+| `maxWireBufs` | 16 | 32 | 48 | 50 | 52 | **53** | 54 | 55 | 56 | 57 | **58** | **59** | 60 | 62 | 63 | **64 (default)** |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **TINY**, 1,467 UGens | ❌ | ❌ | ❌ | — | — | — | — | — | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **BARE**, 941 UGens | ❌ | — | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ |
+
+✅ One fresh engine per rung, and every one of those engines passed its own
+0.000000 silence control and played the 201-byte control definition first, so
+"refused" is never confused with "this engine was not working".
+
+🔴 **TINY needs 59 of SuperSonic's default 64. BARE needs 53.** Five buffers of
+headroom, not eight hundred bytes of it — and the failure is the same silence,
+so anyone who adds one stage and gets "no reply" will read it as the byte
+ceiling and cut bytes that were never the problem.
+
+📄 The board runs `-w 128` (`run-pappus.scd` sets `numWireBufs = 128`, and
+`ps` on the board confirms scsynth was started with `-w 128`), so the two ends
+are NOT at the same setting: the board has 2.2x the pool the browser does.
+⚠️ **LITE's wire-buffer need is unmeasured and cannot be measured here** — it
+never crosses `/d_recv`, so there is nothing to refuse it. It is the obvious
+thing to check before anyone assumes a bigger browser engine would run LITE:
+a graph that clears the byte ceiling can still be over this one.
+
+### 10.4 Does it instantiate, and do the 103 controls survive? ✅ ALL OF THEM
+
+✅ `/s_new pappus 3000 0 0 inbusl 2 inbusr 3 outbus 0` → `/n_go 3000 0`, and
+`/status` then reads **1,467 UGens, 1 synth**, which is the file's own block
+count to the unit.
+
+✅ Every one of the 103 declared controls was asked of the SERVER, one `/s_get`
+at a time, and compared against the value read out of the file:
+
+| | |
+|---|---|
+| declared in the file | 103 |
+| answered by the server | **103** |
+| matching the file's own default | **101** |
+| the two that differ | `inbusl` 0→2 and `inbusr` 1→3 — **set by the harness at `/s_new`** |
+
+🔴 So it is 103 of 103, and the two apparent disagreements are the harness's own
+arguments arriving. ✅ And the wire works in both directions: `/n_set mrate 12.5`
+then `/s_get mrate` reads back **12.5**.
+
+### 10.5 Does it make a sound? ✅ Yes, with the deafness control at exactly zero
+
+A 220 Hz oscillator is connected into `sonic.node.input` — the granulator chews
+its INPUT, so something has to go in. ⚠️ `msos` is not a flavour control
+(CHAIN.md): at 0 the stage hands its input straight back, and 0.6 is the first
+all-grains value.
+
+| | RMS |
+|---|---|
+| 🔴 nothing playing, before anything is loaded | **0.000000** |
+| a 201 B control definition playing (this harness can hear) | 0.141618 |
+| 🔴 the synth running, nothing fed in | **0.000000** |
+| `msos 0` — the input, handed back | 0.099919 |
+| **`msos 0.6` — grains only, still recording** | **0.141219** |
+| **`msos 1` — grains from a frozen buffer** | **0.191767** |
+| 🔴 `amp 0` with everything else still running | **0.000000** |
+| 🔴 after `/n_free` | **0.000000** |
+
+⚠️ **The first grain arm read 0.000000 and it was the harness, not the engine.**
+`mbuflen` defaults to **8 seconds** of a sixty-second ring, so grains were
+reading a part of the buffer nothing had ever been written into. One second of
+window, filled before the blend moves off the input, and it sounds. A test whose
+subject is silent by construction cannot answer a question about sound.
+
+### 10.6 🔴 Do the SendReply UGens reach the page? ✅ YES, and the count is graded
+
+This is the blocker for the whole `grains` rewire, so it is graded against an
+oracle rather than eyeballed. 📄 `CHAIN.md`: `report` fires once per GATED voice
+per trigger, `gates` defaults to `[1,0,0,0,0,0,0,0]` — ✅ confirmed by reading
+the compiled file — so the rate is `mrate` x 1, and the board measures 8.0 a
+second at `mrate` 8, 4.0 at 4 and 16.0 at 16.
+
+| `mrate` | `/pgrain` received | over | per second | the board |
+|---:|---:|---:|---:|---:|
+| 8 | 64 | 8.00 s | **8.00** | 8.0 |
+| 4 | 32 | 8.00 s | **4.00** | 4.0 |
+| 16 | 128 | 8.00 s | **15.99** | 16.0 |
+| `report 0` | **0** | 1.5 s | **0.00** | — |
+
+✅ Reproduced across every TINY run that carried the grain arm and both BARE runs. ✅ The payload is the
+engine's own: `["/pgrain", 3000, -1, 0.1329…, 0.12, 0, 0]` —
+`[nodeID, replyID, pos, dur, voice, half]`, exactly
+`SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half])`.
+
+🔴 **So `demo/patch/engine.mjs`'s existing `sonic.on('in', …)` collector is all
+the plumbing this needs.** Per-grain marks come back from the browser engine at
+the rate the engine promises, and they stop when `report` goes off — which is
+also the control that says the count is the graph's and not the harness's.
+
+### 10.7 Can a browser actually RUN it? ✅ 1,467 UGens, zero dropped audio
+
+⚠️ `/status.reply`'s `avgCPU`/`peakCPU` read 0 in this build at every load (§2.1)
+and must not be displayed. The counter that moves is Chrome's own, which
+SuperSonic surfaces through `sonic.getMetrics()`:
+
+| after ~44 s with the graph running | |
+|---|---|
+| `glitchCount` | **0** |
+| `glitchDurationMs` | **0** |
+| `audioHealthPct` | **100** |
+| `engineProcessCount` | 16,488 blocks (1,574 before the synth started) |
+| `engineWasmErrors` · `oscInCorrupted` · `engineMessagesDropped` | 0 · 0 · 0 |
+| `engineSchedulerDropped` · `engineSchedulerLates` | 0 · 0 |
+
+✅ `getInfo()` also reports this engine's heap: **25,165,824 B**, with
+`crossOriginIsolated: false` and no SharedArrayBuffer — §3.1's finding holds.
+⚠️ `averageLatencyUs` ≈ 28,000 is the headless sink's, not an engine figure
+(§2.1); unusable as stated. ⚠️ And this is headless Chrome with `--mute-audio`
+on a Mac — a fair CPU test and a weak device test. Re-measure on a phone before
+quoting it.
+
+### 10.8 Three traps this cost, all of them the project's own shapes again
+
+**A reply that answers in a different name is a harness that reads wedged.** ✅
+SuperSonic rewrites `/b_alloc` into its own pointer command and answers
+**`/done /b_allocPtr`**, not `/done /b_alloc`. A matcher waiting for the reply
+scsynth documents waits for ever, and the first run looked like an engine that
+had stopped after the positive control passed. 📄 The `/b_alloc` itself is fine
+and fast: a 2,880,000-frame buffer allocates in **101 ms**.
+
+🔴 **BARE's buffer numbering is five shorter than every other rung's, and
+getting it wrong is silent in the worst direction.** BARE reads none of the five
+shipped `.wav` loops (`loopbufs = []` when `bare`), so its grain windows start at
+5 and its euclidean gate is 22/23 rather than 27/28. With the other rungs'
+numbering the gate buffer was never allocated, the gate read 0, and **BARE fired
+no grains and made no sound while passthrough still worked** — which reads as
+"BARE has no grain clock" about a harness that mis-numbered a buffer. Corrected,
+BARE grains and reports exactly like TINY.
+
+**The reply list must be marked before the send.** Carried over from
+`research/synthdef-size-limit-2026-09.md` §8 and worth restating because this
+harness had four `/done`-shaped replies in flight (`/notify`, `/b_allocPtr` x29,
+the control definition, then the rung): a matcher that searches the whole
+history answers the wrong question with an earlier rung's success.
+
+### 10.9 🔴 The rung trade, decided on measurement
+
+| | TINY in the browser, TINY on the board | LITE at both ends |
+|---|---|---|
+| loads in the engine this repo vendors | ✅ **measured, six times** | ❌ measured, five times |
+| starts, sounds, reports per grain | ✅ **measured** | — never got that far |
+| wire-buffer headroom in the browser | ✅ 5 of 64 | ⚠️ unmeasured, and unmeasurable here |
+| cost | none — `demo/patch/vendor/` is already deployed | a second wasm engine, one person's March laptop build, COOP/COEP on a route, and an engine that **dies** rather than declines (`scsynth-wasm-official-2026-09.md` §7) |
+
+**Take TINY, and put it on the board too.** The reason to run it at both ends is
+now the one `synthdef-size-limit-2026-09.md` §6.2 said it should be — *one
+engine in two places is a comparison; a 2,812-UGen graph on a Pi beside a
+1,467-UGen one in a tab is two instruments* — and it no longer needs the
+capacity argument, which was false about the board and is now measured to be
+true about the browser only for LITE and above.
+
+⚠️ **And the sentence in `TINY.md` and `Engine_Pappus.sc` still needs its
+correction, now for a second reason.** "wasm scsynth refuses a `/d_recv` over
+64 KiB" was already wrong about SuperCollider and right about SuperSonic. It is
+now also incomplete about SuperSonic: **the graph that fits has five interconnect
+buffers to spare and 787 bytes**, and only one of those two numbers is in any
+file. A cut made to save bytes that spends a wire buffer buys nothing.
+
+### 10.10 What is still open
+
+| open | why | the check |
+|---|---|---|
+| ⚠️ LITE's **wire-buffer** need | It never crosses `/d_recv`, so nothing refuses it for that reason. | Bisect `numWireBufs` on a native scsynth — the board prints `exceeded number of interconnect buffers` — or on a browser engine with no byte ceiling. Needs the engine restarted per rung, so not on the shared board mid-session. |
+| ⚠️ The **sound** matching the board's | Both ends were driven with different material: a 220 Hz oscillator here, an arpeggio through fluidsynth there. | The differential oracle §5 proposed, now unblocked: same `pfrq`/`pamp`, same `mrate` sweep, `rig/box/measure.mjs` at both ends. |
+| ⚠️ Anything on a **phone** | Measured only in headless Chrome on this Mac. | `demo/verify-native.mjs`; SuperSonic needs no COOP/COEP, so the route is already deployable. |
+| ⚠️ The **buffer contents** are this harness's, not the board's | The 17 grain windows are rebuilt here from the engine's own `Env([0,1,0],[p,1-p],\sine)` formula, and the gate is all 1s. They are not the board's bytes. | `/b_getn` off the board's scsynth and diff, if a sound comparison ever needs it. |
+| ⚠️ `snapwrite` / `snapread` | 📄 §2.3: `/b_write` and `/b_read` are on SuperSonic's unsupported list and typed to `never`. Unchanged by this. | IndexedDB via `/b_getn` and `/b_setn`, when somebody wants snapshots. |
