@@ -1273,7 +1273,20 @@ export function createStrip(canvas, deck, opts = {}) {
     if (S.axisTicks.clamped) note('axis', `tick LOD asked for ${Math.max(nMinor, nMajor)} ticks; drew ${MAX_TICKS}. The ladder does not reach this zoom.`);
   }
 
+  // 🔴 ONE RIGHT-HAND INSET, READ BY BOTH THE SIZER AND THE CLIPPER. They had
+  // two, and the gap was silent: `gutterWidthFor` reserved
+  // `GUT_SUB_X(11) + text + 10` while `drawGutter` clipped every line against
+  // `gutterPx - GUT_LABEL_X(18) - 8` — the NAME's inset, applied to the numbers
+  // as well. So a sub-line was measured against 19 px of chrome and then cut
+  // against 26, and **any sub-line long enough to SET the gutter width was
+  // always one character too long for it**. MEASURED: `usual 12 ms` sizes the
+  // gutter and renders `usual 12 …`. A component that widens itself to fit its
+  // own text and then truncates that text is the worst version of this — it
+  // paid for the room and did not use it.
+  // The clip is per-x now, because a name and a number start at different
+  // places and only their own inset is theirs.
   const GUT_LABEL_X = 18, GUT_SWATCH_X = 8, GUT_SUB_X = 11, GUT_PAD = 10;
+  const gutRoom = (x) => S.gutterPx - x - GUT_PAD;
   // 🔴 THE GUTTER'S LINE SPACING SETS THE MINIMUM LANE HEIGHT, so it is the
   // thing to tighten when the lanes are too tall — not the marks, which are
   // already derived from the lane height and would shrink on their own. A name
@@ -1325,7 +1338,13 @@ export function createStrip(canvas, deck, opts = {}) {
     // narrow canvas a bare fraction would clamp BELOW the base and quietly
     // reintroduce the ellipsis this function exists to remove.
     const cap = Math.max(base, Math.round(cssW * S.gutterMaxFrac));
-    return Math.round(Math.min(cap, Math.max(base, need + GUT_PAD)));
+    // ⚠️ `ceil`, NOT `round`, AND IT IS A WHOLE CHARACTER. `need` is a
+    // measured text width with a fraction on it, so rounding 111.4 down to 111
+    // leaves the very line that SET the width a sub-pixel short of fitting in
+    // it — and the clipper does not do sub-pixels, it drops a character and adds
+    // an ellipsis. MEASURED: `12.3 ms typical` sized the gutter to 111 px and
+    // then rendered cut, in a gutter it had just paid for.
+    return Math.ceil(Math.min(cap, Math.max(base, need + GUT_PAD)));
   }
 
   function drawGutter() {
@@ -1343,8 +1362,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // measured truncation would be computed against a width the text no longer
     // has.
     const LABEL_X = GUT_LABEL_X, SWATCH_X = GUT_SWATCH_X;
-    const avail = S.gutterPx - LABEL_X - 8;
-    const clip = (s) => {
+    const clip = (s, avail) => {
       if (ctx.measureText(s).width <= avail) return s;
       let n = s.length;
       while (n > 1 && ctx.measureText(s.slice(0, n) + '…').width > avail) n--;
@@ -1356,7 +1374,7 @@ export function createStrip(canvas, deck, opts = {}) {
       ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
       ctx.fillRect(SWATCH_X, L.y + 6, 3, Math.min(14, L.height - 12));
       ctx.fillStyle = T.ink;
-      ctx.fillText(clip(String(L.label ?? L.id)), LABEL_X, L.y + GUT_NAME_Y);
+      ctx.fillText(clip(String(L.label ?? L.id), gutRoom(LABEL_X)), LABEL_X, L.y + GUT_NAME_Y);
       // the per-lane label GUTTER states the lane's own clock and whether it is
       // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
       let all = subLabelsOf(L);
@@ -1365,12 +1383,12 @@ export function createStrip(canvas, deck, opts = {}) {
       // `64 ms worst` usually fit side by side — so the same numbers arrive in
       // a shorter lane. Measured against the real width, never assumed: where
       // they do not fit, they stay stacked.
-      if (all.length > 1 && ctx.measureText(all.join(' · ')).width <= S.gutterPx - GUT_SUB_X - 8) all = [all.join(' · ')];
+      if (all.length > 1 && ctx.measureText(all.join(' · ')).width <= gutRoom(GUT_SUB_X)) all = [all.join(' · ')];
       ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
       for (let i = 0; i < all.length; i++) {
         const y = L.y + GUT_SUB_Y + i * GUT_SUB_STEP;
         if (y > L.y + L.height - 2) break;         // never spill into the next lane
-        ctx.fillText(clip(all[i]), GUT_SUB_X, y);
+        ctx.fillText(clip(all[i], gutRoom(GUT_SUB_X)), GUT_SUB_X, y);
       }
       ctx.globalAlpha = 1;
     }
