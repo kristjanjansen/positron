@@ -170,6 +170,26 @@ export function createXRPanels({
   let gl = null, prog = null, quad = null, U = null;
   let session = null, space = null;
   let placed = null, armed = false, armAt = 0;
+
+  /**
+   * 🔴 WHICH CALL, NOT WHETHER. `gl.getError()` returns the FIRST error since
+   * the LAST call and clears the flag — so one read on the first frame covers
+   * everything from context creation onward and can name nothing. A Quest
+   * reported `1282` (GL_INVALID_OPERATION) that way and it stayed unlocated
+   * because the reading was a yes/no about a whole session's worth of calls.
+   *
+   * This checks after each PHASE and keeps the first phase that was dirty, so
+   * the next device run says where. It runs during setup and on the first frame
+   * only — `getError` is a synchronous stall and calling it per frame would be
+   * measuring the instrument.
+   */
+  const glErrors = [];
+  function glCheck(phase) {
+    if (!gl) return;
+    const e = gl.getError();
+    if (e && glErrors.length < 8) glErrors.push(`${phase}:${e}`);
+    return e;
+  }
   // What the trigger has hold of, and how far away it was when it was grabbed.
   let grabbing = null, grabDist = 0;
   let tick = 0, tickAt = 0, lastFrame = 0;
@@ -240,12 +260,14 @@ export function createXRPanels({
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
     U = { proj: gl.getUniformLocation(prog, 'uProj'), view: gl.getUniformLocation(prog, 'uView'),
           model: gl.getUniformLocation(prog, 'uModel'), tex: gl.getUniformLocation(prog, 'uTex') };
+    glCheck('program');
     const P = [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0];
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
     const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(P), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
+    glCheck('quad');
     quad = { vao, count: 6 };
     // Context-wide, set once: a canvas is already the way up a texture wants
     // it, and flipping it here would put the footer above the picture.
@@ -259,6 +281,7 @@ export function createXRPanels({
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       tex.set(p.canvas, t);
     }
+    glCheck('textures');
     return true;
   }
 
@@ -421,6 +444,7 @@ export function createXRPanels({
       if (!t) continue;
       gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, p.canvas);
+      if (state.frames === 0) glCheck('upload');
     }
     const cost = performance.now() - t1;
     uploads.push(cost);
@@ -430,6 +454,7 @@ export function createXRPanels({
     state.uploadWorstMs = Math.max(state.uploadWorstMs ?? 0, cost);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    if (state.frames === 0) glCheck('bindFramebuffer');
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
     if (!placed) {
@@ -515,8 +540,11 @@ export function createXRPanels({
       // ⚠️ ASSERT ON THE ERROR FLAG. A page will render a right-looking picture
       // with an error pending — a Quest did exactly that for a mismatched
       // attribute binding nobody would have seen by looking.
-      state.glError = gl.getError();
-      beacon(`first headset frame · fb ${state.fb.w}x${state.fb.h} · ${state.views} views · eye0 ${state.eye.w}x${state.eye.h} · gl error ${state.glError} · panel ${panels[0]?.canvas.width}x${panels[0]?.canvas.height}`);
+      glCheck('firstDraw');
+      // The first phase that was dirty, not merely that one was.
+      state.glError = glErrors.length ? Number(glErrors[0].split(':')[1]) : 0;
+      state.glWhere = glErrors.join(' ') || 'clean';
+      beacon(`first headset frame · fb ${state.fb.w}x${state.fb.h} · ${state.views} views · eye0 ${state.eye.w}x${state.eye.h} · gl ${state.glWhere} · panel ${panels[0]?.canvas.width}x${panels[0]?.canvas.height}`);
       log(`drawing ${state.fb.w}x${state.fb.h}, ${state.eye.w}x${state.eye.h} an eye`, 'hi');
     }
 
