@@ -441,6 +441,18 @@ hand-written DSP underneath. Skip.
 
 ## 5 · The verdict
 
+🔴 **SCOPE, ADDED 2026-09-13 AFTER THIS SECTION MISLED A DECISION. Everything
+below answers ONE question — "do we need scsynth to make granular sound in a
+browser?" — and answers it correctly. It does NOT answer "can a synth definition
+travel as a message, the way a shader does?", which is a different question with
+a different unit: there the engine is a READER fetched once and the asset is the
+thing that travels, so `1,701,983 B against 6,659 B` is not the comparison.
+A PNG decoder is larger than most PNGs. That second question was put to the
+repo the day after this was written, and the pass that rejected it did so by
+quoting the paragraph below — which is how a right answer to the wrong question
+costs a day. §9 is the second question, measured. `plan-patch.md` is the design.
+Nothing in §5 is withdrawn; it is SCOPED.**
+
 **For Pappus specifically: SuperSonic, and only because the SynthDef is the
 asset.** Somebody designed 2,030 lines of signal flow. That work transfers as a
 **binary**, measured here to work, at a cost of one `/d_recv` and 1.86 MB. A
@@ -679,3 +691,97 @@ the Raspberry Pi instead, which is free: **a `.scsyndef` is a platform-
 independent binary**, and `writeDefFile` needs no server, no audio device and no
 JACK.
 
+---
+
+## 9 · The other question, and it works (2026-09-13)
+
+§5 priced scsynth as a demo's sound engine. This is the question it did not ask:
+**can a synth definition travel as a message?** Built as `/patch/`,
+`node demo/verify.mjs patch`, **20 asserts from the page, all green**, no
+console errors. `plan-patch.md` holds the design and the open ends; the numbers
+are here because this file is where the mechanism was first measured.
+
+### 9.1 What was measured ✅
+
+| file | written by | bytes | building blocks | relay round trip |
+|---|---|---:|---:|---:|
+| `positron-bell` | a writer in `demo/shell/synthdef.mjs` | **339** | 7 | 34–46 ms |
+| `positron-drone` | the same | **384** | 8 | 31–36 ms |
+| `sonic-pi-beep` | **sclang, elsewhere, years ago** | 1,656 → **2,370** | 40 | 37–43 ms |
+
+All three crossed `ws.positron.studio` as binary frames and came back
+**byte-identical**; the copy that came BACK is the one both engines were given.
+Engine boot **626–752 ms**, `postMessage` transport, `crossOriginIsolated:
+false` — §3.1's finding holds unchanged in a real page.
+
+✅ **The v1→v2 converter written for `/patch/` produced exactly 2,370 B from the
+1,656 B shipped file — byte for byte the number §2.1 recorded for the converter
+written independently for this report.** Two implementations, a day apart,
+agreeing on a figure neither could have guessed. That is the strongest evidence
+in either direction that the format is being read correctly.
+
+### 9.2 The controls ✅
+
+| | |
+|---|---|
+| SuperCollider, playing | 0.075000 / 0.049195 / 0.075015 rms |
+| a second reader (Web Audio, in the page), playing | 0.075028 / 0.041645 rms |
+| **both meters, nothing playing** | **0.000000 / 0.000000** |
+| loudness 0.15 → 0, SuperCollider | 0.074984 → **0.000000**, `/s_get` reads back `0` |
+| loudness 0.15 → 0, the browser's reader | 0.075021 → **0.000000** |
+
+🔴 **The loudness assert is the only one that grades the ARITHMETIC in the
+file.** Reading bytes back proves self-consistency; a wrong `BinaryOpUGen`
+special index (2 is `*`, 0 is `+`) writes a well-formed file that ADDS the
+loudness. Only an engine running the graph can catch that.
+
+### 9.3 Two things worth keeping
+
+🔴 **A `.scsyndef` is a SAFER thing to send than a shader, structurally.**
+`plan-visuals.md` §1.2 requires a validator for generated GLSL — "no `while`,
+bounded `for` counts, a compile timeout". A synth definition has **no control
+flow at all**: it is a list of blocks, each naming a class from a fixed table
+compiled into the engine, each wired only to blocks EARLIER in the list. The two
+things a shader validator exists to catch cannot be expressed. Its cost is
+bounded by the block count, which is in the header and can be read before
+loading — `/patch/` reads it and prints it.
+
+⚠️ **The narrow door is 64 KiB, and it is the BROWSER's.** §8.2's bisected
+`/d_recv` ceiling binds here: the relay carries 256 KiB a message and a native
+scsynth has no such cap, so a browser can be sent strictly less instrument than
+a Raspberry Pi can. Pappus LITE is 73,297 B — **11.8% over** — so the one
+instrument this repo cares about still does not fit, which is the finding that
+should decide whether any of this goes further.
+
+⚠️ **A MAXIMUM STRADDLES A CHANGE, and it produced a false negative that looked
+exactly like the board's bug.** The first probe read PEAK loudness over 700 ms
+immediately after setting the loudness to a tenth, and reported that the setting
+did nothing — twice, convincingly. Two causes: the analyser's 2,048-sample
+window still held 42 ms of the loud signal and a maximum keeps it forever; and
+two detuned oscillators beat at 1.1 Hz, so any two windows differ anyway. A MEAN
+taken after the change lands reads 0.000000. **The symptom was identical to "no
+granulator parameter changes the returned audio on the Pi" (§5, the reason the
+oracle was proposed). One of those two was a measurement artefact; it is worth
+asking whether the other is.**
+
+### 9.3b Broken on purpose, twice ✅
+
+`OP.mul` changed from 2 to 0, so the file ADDS the loudness rather than scaling
+by it: **18 of 20**, and only the two "a setting changes the sound" asserts went
+red. *"SuperCollider made a sound"* read **0.914262** instead of 0.075000 and
+PASSED — a wrong opcode writes a well-formed file that loads, plays, and crosses
+the relay unchanged. Five checks are blind to it and one is not.
+
+One count left 16 bits wide in the v1→v2 widening: the reader's exact-byte check
+caught it and the run went red — but the file threw inside the page's own
+`select()` and the loop skipped it, taking **five asserts with it, 20 → 15**.
+Fixed so the skip fails loudly; re-sabotaged, **14 of 16** with the file named.
+
+### 9.4 Still unmeasured
+
+| gap | why |
+|---|---|
+| a definition written HERE loading into a NATIVE scsynth | only wasm scsynth has ever graded this writer |
+| a definition compiled ON THE BOARD loading here | the Pi was in use; the sclang file used is Sonic Pi's, and is v1 |
+| the same file sounding the same in two places | `synthdef-audio.mjs` already reports that it does not — band-limited sawtooth, no starting phase |
+| anything on iOS | `demo/verify-native.mjs` exists and has not been pointed at `/patch/` |

@@ -55,6 +55,16 @@ That accounts for everything that executes. What remains is writing:
 5. **A document** → `plan-<thing>.md` if it argues for something,
    `research/<thing>-<date>.md` if it reports. Then SAY SO in the reply: a path
    in a commit message is not a report.
+6. **Somebody else's binary that one page needs** → `demo/<slug>/vendor/`, and
+   **listed BY NAME in `workers/view/build.mjs`**, licence text beside it.
+   `demoFiles()` enumerates one directory level and only web extensions, so it
+   takes neither a `.wasm` nor anything in a subdirectory — which is the
+   containment wall working, not a gap to widen. `patch` is the first of these:
+   1.86 MB of AGPL WebAssembly, ten lines in the allowlist, and two of those
+   lines are for dynamic imports the page never runs but `checkImports()`
+   rightly refuses to ship without. ⚠️ It does NOT go in `demo/shell/`, which is
+   enumerated and shared — promoting a 1.86 MB dependency into the kit invites a
+   second page to import it without noticing what it costs.
 
 ---
 
