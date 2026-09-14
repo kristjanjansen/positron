@@ -1,3 +1,121 @@
+# Queue — open work, 2026-09-14 (end of session 24)
+
+⚠️ Two agents worked this checkout in parallel all day. The block below is
+**session 24's radio/relay/kit half**; `positron-91` writes the floor, XR and
+protocol half under the same heading. Neither of us edits the other's lines.
+
+## `/radio1965/` — a station a secure page could not otherwise reach
+
+**<https://positron.studio/radio1965/>** · 26/26 · `plan-radio.md` has the
+argument, this is the state.
+
+Their Icecast mount is **plain HTTP on port 8001**, so a page on
+positron.studio cannot load it at all — the browser refuses the mixed-content
+fetch before any CORS question is asked. `workers/shout` carries the mount by
+name (allowlist went from one `ORIGIN` constant to full URLs), and the page
+plays it, measures it, and hands it to a SuperCollider granulator.
+
+Press **Synthesize** and Pappus — the Raspberry Pi's own compiled graph — eats
+the live station in the tab. Five sliders, two columns, under the picture.
+
+### 🔴 Open, and wanted
+
+- **0.25 / 0.5 / 1 / 2 playback. ASKED FOR THREE TIMES AND NOT BUILT.** One
+  attempt was backed out: declaring a `caps.rates` lattice through a bare
+  adapter object (`adapters: { radio: { caps: { rates: [...] } } }`) took the
+  page down at module load — `__demo.ready — failed` and nothing else, because
+  nothing else ran. The transport bar builds its buttons from
+  `latticeFor(deck)`, which calls `deck.caps()` expecting kind→caps, so the
+  adapter has to be whatever `createDeck` really wants; that was not
+  established.
+  ⚠️ **And the element is arguably the wrong place for it.** An Icecast mount
+  has no past: at 0.5x you fall behind real time and STAY behind. That is not a
+  reason to refuse — it is the interesting part, and `behind` already displays
+  the price — but the granulator's held 8 seconds is where a rate can be
+  honest, because reading them slower is time-stretching rather than drifting.
+- **The granulator's output is quiet.** 0.0048–0.0729 peak rms depending on the
+  run. `msos` is 0.6; HANDOFF's older note about *"the 25x insertion loss at
+  `msos 0` is unexplained"* is probably related and is still unexplained.
+
+### What is settled and should not be re-litigated
+
+- **Not a copy of `shout`, and `shout` stays on ERR.** Its default was
+  radio1965 for about an hour and was put back. A shared relay is not a reason
+  to share a page.
+- **No strip, no scrub, no Listen button.** No past to move around in; the
+  transport is the only control.
+- **The wave is MONOCHROME.** It was briefly coloured by spectral centroid and
+  that was asked to be reverted twice. The branch survives, dead, in
+  `grain-scope.mjs` with its reasoning; the honest verdict is the hue moved
+  ~11° on real material, which is a measurement you have to be told is there.
+
+## The kit this needed, all lifted rather than copied
+
+- **`demo/shell/icy.mjs`** — the Icecast in-band text demuxer, out of `shout`'s
+  page. `icy-test.mjs` feeds it a synthetic stream at **14 chunk sizes down to
+  one byte** (the case a title straddles and a naive parser drops silently),
+  plus a no-metaint case and a sabotage control. 14/14.
+- **`demo/shell/scsynth.mjs`** — the SuperCollider boot, out of
+  `demo/grains/engine.mjs`. grains re-verified **23/23 against the live board**
+  after the refactor.
+- **`demo/shell/pappus.mjs`** — buffers, windows, gates, `/s_new`, and
+  `applyAudibleDefaults()`.
+
+### 🔴 Four things about wasm scsynth that cost an afternoon
+
+Full measurements in `research/scsynth-live-input-2026-09.md`.
+
+1. **Live browser audio into scsynth WORKS**, level-preserving, zero added
+   delay (11/11 probes matched the current block, 0/11 the previous). It is the
+   supported upstream API.
+2. **`sonic.node` is a frozen FAÇADE, not an AudioNode.**
+   `Object.freeze({connect, disconnect, get context, get numberOfInputs, …, get
+   input(){return e}})`. Its `connect` forwards, so `sonic.node.connect(x)`
+   works — while `x.connect(sonic.node)` throws `Overload resolution failed`.
+   It passes every duck-type check you would think to write: has `connect`,
+   reports `numberOfInputs: 1`, right `context`. **`sonic.node.input` is the
+   real one**, and grains' comment had named that property all along.
+3. **Pappus without its 31 buffers loads, answers `/n_go`, and is silent.**
+   Unallocated buffers are not an error to scsynth, they are silence.
+4. 🔴 **A GRAIN COUNT IS NOT EVIDENCE A GRANULATOR IS AUDIBLE.** With the input
+   deliberately disconnected the graph still fired **4–5 grains per window
+   while the output bus read exactly 0.00000**. A bare Pappus sits at `mix 0,
+   gain 0, thru 0, dry 0` — asked of the server with `/s_get`, not inferred.
+   Reading "grains are firing and reported" as progress toward sound is what
+   cost the afternoon. The deafness control (`/n_run 0`) is the only assert
+   that separates them.
+
+## `.claude/` and the deploy path — new, committed, travels with the repo
+
+- **`hooks/guard-tree.mjs`** refuses whole-tree git commands (`git add -A`,
+  `commit -a`, `reset --hard`, `clean -fd`, `checkout .`, bare `stash`).
+  **33/33** on its own table, including allowing `grep "git add -A" LESSONS.md`.
+  `git add <path>` and `git commit -m` untouched.
+- **`build.mjs --out <dir>`** — checking a build costs no files in a shared
+  tree. Four refusals, proved.
+- **The BUILD stamp carries a tree digest**: `<sha>-<hhmmss>-<tree4>`.
+  Demonstrated across one added line: `303308a-125056-592f` against
+  `303308a-124835-1374`. With dirty deploys normal rather than exceptional,
+  this is the only thing that can attribute a live page to a tree with no
+  commit.
+- **`workers/view/deploy.mjs`** — build, fingerprint, interlock, deploy,
+  confirm on the edge. It **always enumerates** the uncommitted files it is
+  about to ship and refuses only under `--strict`.
+  🔴 That asymmetry is the design, and it came from the agent who had been on
+  the receiving end: five deploys in ninety minutes, every one at the user's
+  instruction, every one with legitimate work in flight. A gate fires on all
+  five, so the override becomes muscle memory by the third — *"a colour scale
+  whose normal reading is a warning has no warning left."*
+
+## ⚠️ Still open from `plan-agents.md`
+
+`--out`, the hook, the stamp and the harness sweep are **done** (§11). Not done:
+**38 more source files hardcode a dead session's scratchpad path**, `rig/who.mjs`
+(§5) is unbuilt, and `workers/view/verify.mjs` writes screenshots straight into
+the tracked tree.
+
+---
+
 # Queue — open work, 2026-09-14 (end of session 23)
 
 Re-checked against the tree at the end of session 23; the session-22 block below
