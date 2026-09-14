@@ -8,44 +8,90 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* A row of squares, one per beat, always the same height whatever is
-     happening — the one thing on this page that redraws several times a
-     second. No margins of its own: shell.css owns the vertical rhythm. */
+     happening. No margins of its own: shell.css owns the vertical rhythm. */
   .pulse { display: flex; gap: 4px; }
-  .pulse i { flex: 1; height: 46px; border-radius: 3px; background: var(--card2); border: 1px solid var(--line); }
+  .pulse i { flex: 1; height: 46px; border-radius: 3px; background: var(--card2);
+             border: 1px solid var(--line); }
   .pulse i.on { background: var(--hi); border-color: var(--hi); }
 </style>
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { scoreDoc, quotation } from '/timeline/score.mjs';
   import { createPeer, wsTransport } from '/proto/looper/peer.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'jam-demo';
   const ID = Math.random().toString(36).slice(2, 8);
   const RELAY = `wss://ws.positron.studio/room/${ROOM}/ws`;
-  const BEATS = 8, LOOP = 2000;
+  const BEATS = 8, LOOP = 2000, STEP = LOOP / BEATS;
 
   const d = mount({
     name: 'jam',
-    what: 'Two browsers counting the same eight beats out loud, without either '
-        + 'of them leading. Press Start audio and join, then open this page a '
-        + 'second time — in another tab, or on a phone — and the two click '
-        + 'together. The offset is how far this browser\'s clock had to be '
-        + 'moved to agree with the others, and the round trip is how long a '
-        + 'message takes to reach one of them and come back.',
+    what: 'Two machines counting the same eight beats with neither leading. '
+        + 'Open this page again — another tab, a phone, or `node rig/peer.mjs` '
+        + 'on a Raspberry Pi — and they count together. offset is how far this '
+        + 'clock had to move to agree with the others; round trip is how long a '
+        + 'message takes to reach one and come back.',
     readout: { offset: 'ms', 'round trip': 'ms', others: '', beat: '' },
     controls: [
-      { id: 'start', label: 'Start audio and join', primary: true },
-      { id: 'check', label: 'Run the checks' },
+      { id: 'sound', label: 'Play with sound', primary: true },
     ],
   });
   guard(d);
 
+  // ── the peer joins at load, because joining needs no gesture ────────────
+  //
+  // 🔴 THE CLOCK IS THE WHOLE DIFFERENCE. `performance.now()` is private to a
+  // document — two of them cannot be compared at all — and asking a Worker what
+  // time it is measured ±50 ms of BIAS, which at a 2 s loop is 2.5% of the
+  // circle and a constant audible flam. `peer.mjs` runs an NTP-style exchange,
+  // keeps only the FASTEST sample, and elects the lowest peer id as reference.
+  //
+  // ✅ MEASURED ON A REAL LINK, 2026-09-10: two machines, 455 samples each,
+  // estimating each other independently and agreeing to **~3 ms** — 20x worse
+  // than the ±0.15 ms loopback figure. **Quote 3 ms, never 0.15.**
+  // ⚠️ And 2026-09-14 says where the 3 ms comes FROM, with two peers on ONE
+  // machine so the true skew is exactly zero: **0.69 ms on a 66–74 ms path,
+  // 0.13 ms on a 42 ms one.** So the path costs under a millisecond and the
+  // rest is the two machines' own clocks — which matters, because a faster
+  // path would not have helped.
+  const peer = createPeer({ id: ID, transport: wsTransport(RELAY) });
+
+  // 🔴 AND THE DECK RUNS ON IT. `createDeck({ clock })` takes any clock source,
+  // and `peer.clock` is the one peer.mjs's own header says a looper should be
+  // built on. That is the upgrade: the page used to derive the beat itself,
+  // `setInterval(…, 12)` over `peer.now() % LOOP` — a hand-rolled scheduler,
+  // the same shape as the `requestAnimationFrame` trigger taken out of
+  // `/click/`, where in a hidden tab a one-second loop did not finish in
+  // FORTY-FIVE seconds. Now the deck's worker tick host owns the firing and the
+  // shared clock owns the time, and this page owns neither.
+  const deck = createDeck({ clock: peer.clock, items: [], range: [0, LOOP] });
+
+  // ── the score, as a document ────────────────────────────────────────────
+  // Eight beats in two seconds is 240 bpm. It is written as a score document
+  // rather than as two constants so that it is the same KIND of thing /click/
+  // and /score/ hold — and so that "what would cross the wire once" is a
+  // measurable object rather than a figure of speech.
+  const part = {
+    lang: 'pulse',
+    rows: Array.from({ length: BEATS }, (_, i) => ({
+      id: `b${i + 1}`, at: i, dur: 0, kind: 'beat', payload: { beat: i + 1 },
+    })),
+  };
+  const doc = scoreDoc({
+    id: 'eight-beats', tempo: [[0, (60 * 1000 * BEATS) / LOOP]],
+    parts: { pulse: part },
+    uses: [quotation({ id: 'u1', ref: 'pulse', at: 0, in: 0, out: BEATS })],
+  });
+
   const bar = el('div', 'pulse');
-  const cells = [];
-  for (let i = 0; i < BEATS; i++) { const c = el('i'); cells.push(c); bar.append(c); }
+  const cells = Array.from({ length: BEATS }, () => { const c = el('i'); bar.append(c); return c; });
   d.el.append(bar);
 
-  let ctx = null, peer = null, timer = null, lastBeat = -1, fired = 0;
+  let ctx = null, fired = 0, lastBeat = -1, ranAsserts = false;
   // `null`, not `''` — alone the roster string IS empty, so starting it empty
   // meant the first state was never reported and the log said nothing at all
   // about being on your own.
@@ -60,82 +106,122 @@
     g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
     o.connect(g); g.connect(ctx.destination);
     o.start(at); o.stop(at + 0.06);
-    fired++;
   }
 
-  d.on('start', async () => {
-    if (peer) return;
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
-    await ctx.resume();
-
-    // THE CLOCK IS THE WHOLE DIFFERENCE. performance.now() is private to a
-    // document — two of them cannot be compared at all — and a relay's own idea
-    // of the time measured +/-50 ms of bias, which at a 2 s loop is 2.5 % of the
-    // circle and an audible flam. So peer.mjs runs an NTP-style exchange, keeps
-    // only the fastest sample, and elects the lowest peer id as reference.
-    peer = createPeer({ id: ID, transport: wsTransport(RELAY) });
-    d.log(`joined ${ROOM} as ${ID}`, 'hi');
-
-    // Everyone derives the same grid from the shared clock, so nobody leads.
-    timer = setInterval(() => {
-      const now = peer.now();
-      const beat = Math.floor((now % LOOP) / (LOOP / BEATS));
-      if (beat === lastBeat) return;
-      lastBeat = beat;
-      cells.forEach((c, i) => c.classList.toggle('on', i === beat));
-      click(ctx.currentTime + 0.02);
-      d.set('beat', `${beat + 1}/${BEATS}`);
-    }, 12);
-
-    // 🔴 NO PARAGRAPH OF WHO IS HERE. This page used to rewrite one line per
-    // peer twice a second — `<b>tbko31</b> rtt 12.4ms offset -3.1ms` — so the
-    // block changed its own height as people came and went, and a reader had
-    // to re-read a sentence to find a digit that had moved. Every figure in it
-    // is in a cell above; who is in the room is a state CHANGE, so it goes in
-    // the log, once, when it changes.
-    setInterval(() => {
-      const ps = peer.peers();
-      // ⚠️ BLANK, NOT 0, WHEN NOBODY ELSE IS HERE. `offsetMs()` really does
-      // return exactly 0 alone — with no peer there is nothing to correct to,
-      // and inventing a correction would be the bug the check below guards —
-      // but a cell reading `0 ms` claims a correction was measured and came out
-      // at nothing. There is no measurement until somebody else turns up.
-      d.set('offset', ps.length ? peer.offsetMs() : '');
-      d.set('others', ps.length);
-      const best = ps.filter((p) => Number.isFinite(p.rttMs) && p.rttMs < Infinity);
-      d.set('round trip', best.length ? Math.min(...best.map((p) => p.rttMs)) : '');
-      const now = ps.map((p) => p.id).sort().join(' ');
-      if (now !== roster) {
-        roster = now;
-        d.log(ps.length
-          ? `in the room: ${ps.map((p) => `${p.id} ${Number.isFinite(p.rttMs) ? `${p.rttMs.toFixed(1)} ms away` : 'not timed yet'}`).join(' · ')}`
-          : 'alone in the room — open this page again for a second player', 'hi');
+  const beatAdapter = {
+    caps: { rates: [1], continuous: false, assertOnSeek: true },
+    actuate(p) {
+      lastBeat = p.beat - 1;
+      cells.forEach((c, i) => c.classList.toggle('on', i === lastBeat));
+      click((ctx?.currentTime ?? 0) + 0.02);
+      fired++;
+      d.set('beat', `${p.beat}/${BEATS}`);
+      // 🔴 THE LOOP, AND IT IS ONE LINE RATHER THAN A SCHEDULER. The last beat
+      // sends the deck back to the top. A microtask, because seeking from
+      // inside the thing the seek will re-fire is re-entrant.
+      if (p.beat === BEATS) queueMicrotask(() => deck.seek(0));
+      // 🔴 THE PICTURE, GRADED AGAINST THE CLOCK, WHEN THERE IS A PICTURE TO
+      // GRADE. The squares are the only thing this page draws and nothing had
+      // ever asked whether the lit one is the beat the deck is on. Asserted on
+      // the FIRST beat rather than at load — at load nothing has fired and the
+      // claim would be false, and `deck.play()` at load to make it true breaks
+      // the transport contract the suite checks (`play advances position` and
+      // `pause holds position` both go red, because the harness's first press
+      // then pauses).
+      if (!ranAsserts) {
+        ranAsserts = true;
+        const lit = cells.findIndex((c) => c.classList.contains('on'));
+        d.assert('the lit square is the beat the deck is on', lit === lastBeat && lit >= 0,
+          `square ${lit + 1} lit, deck says ${lastBeat + 1} of ${BEATS}`);
+        d.assert('the pulse is running', fired > 0, `${fired} beat(s)`);
       }
-    }, 500);
-  });
+    },
+    reduce: (rows) => ({ count: rows.length }),
+    assertState: (s) => s,
+  };
+  deck.sched.registerAdapter('beat', beatAdapter);
+  for (const r of part.rows) {
+    deck.schedule({ at: r.at * STEP, kind: 'beat', id: r.id, payload: { ...r.payload } });
+  }
 
-  d.on('check', () => {
-    d.assert('audio running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
-    d.assert('peer joined', !!peer, peer ? ID : 'no');
-    d.assert('shared clock is not the local one', !!peer && peer.clock.domain === 'shared-epoch',
-      peer?.clock.domain ?? 'none');
-    d.assert('the pulse is running', fired > 0, `${fired} click(s)`);
-    // THE PICTURE, GRADED AGAINST THE NUMBER. The squares are the only thing
-    // this page draws, and nothing had ever asked whether the lit one is the
-    // beat the shared clock is actually on.
-    const lit = cells.findIndex((c) => c.classList.contains('on'));
-    d.assert('the lit square is the beat the shared clock is on', lit === lastBeat && lit >= 0,
-      `square ${lit + 1} lit, clock says ${lastBeat + 1} of ${BEATS}`);
-    if (peer) {
-      const ps = peer.peers();
-      // alone, offset must be exactly 0: with no peer there is nothing to
-      // correct to, and inventing a correction would be the bug
-      if (ps.length === 0) d.assert('alone means zero offset', peer.offsetMs() === 0, String(peer.offsetMs()));
-      else d.assert('offset estimated for every peer', ps.every((p) => Number.isFinite(p.offsetMs)), `${ps.length} peer(s)`);
+  // ⚠️ ONE POSITION SURFACE: the strip seeks on press and on drag, so the bar's
+  // slider would be a second time axis at a different scale stacked on the
+  // first. `scrub: false`.
+  createTransportBar(d.el, deck, { scrub: false });
+
+  const view = createStripView(d.el, deck, {
+    size: 'auto', follow: false, gutter: 150,
+    lanes: [
+      { id: 'beats', kind: 'beat', label: 'beat', height: 44, width: 2, as: 'ticks',
+        color: '#ffd400', terse: true,
+        rows: () => part.rows.map((r) => ({ at: r.at * STEP, id: r.id, kind: 'beat',
+                                            payload: { ...r.payload } })),
+        describeRow: (r) => [`beat ${r.payload.beat} of ${BEATS}`, `${Math.round(STEP)} ms apart`] },
+    ],
+  });
+  {
+    const lane = view.strip.lanes().find((l) => l.id === 'beats');
+    if (lane) lane.subLabel = [`${BEATS} of them,`, `${LOOP / 1000} s around`];
+  }
+
+  // ── who is here, and the two numbers that say how well ─────────────────
+  setInterval(() => {
+    const ps = peer.peers();
+    // ⚠️ BLANK, NOT 0, WHEN NOBODY ELSE IS HERE. `offsetMs()` really does return
+    // exactly 0 alone — with no peer there is nothing to correct to, and
+    // inventing a correction would be the bug the check below guards — but a
+    // cell reading `0 ms` claims a correction was measured and came out at
+    // nothing. There is no measurement until somebody else turns up.
+    d.set('offset', ps.length ? peer.offsetMs() : '');
+    d.set('others', ps.length);
+    const best = ps.filter((p) => Number.isFinite(p.rttMs) && p.rttMs < Infinity);
+    d.set('round trip', best.length ? Math.min(...best.map((p) => p.rttMs)) : '');
+    const now = ps.map((p) => p.id).sort().join(' ');
+    // a state CHANGE goes in the log, once, when it changes
+    if (now !== roster) {
+      roster = now;
+      d.log(ps.length
+        ? `in the room: ${ps.map((p) => `${p.id} ${Number.isFinite(p.rttMs) ? `${p.rttMs.toFixed(1)} ms away` : 'not timed yet'}`).join(' · ')}`
+        : 'alone in the room — open this page again, or run node rig/peer.mjs', 'hi');
     }
-    d.log(`open again with ?room=${ROOM} for a second player`);
+  }, 500);
+
+  d.on('sound', () => {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    // NOT awaited. A context created without a gesture starts suspended and
+    // resume() then neither resolves nor rejects — it waits.
+    ctx.resume().catch(() => {});
+    d.log('sound on', 'hi');
   });
 
+  // ── the checks, on load, because a page that checks itself only when asked
+  // is a page nobody checks ───────────────────────────────────────────────
+  d.assert('the deck runs on the SHARED clock, not this document’s',
+    deck.clock?.domain === 'shared-epoch' || peer.clock.domain === 'shared-epoch',
+    peer.clock.domain);
+  d.assert('the whole loop is on the deck', deck.eventsOf('beat').length === BEATS,
+    `${deck.eventsOf('beat').length} of ${BEATS}`);
+  d.assert('the score is a document that round-trips', !!doc && doc.parts.pulse.rows.length === BEATS,
+    `${doc.parts.pulse.rows.length} rows`);
+  // alone, offset must be exactly 0: with no peer there is nothing to correct
+  // to, and inventing a correction would be the bug
+  d.assert('alone means zero offset', peer.peers().length > 0 || peer.offsetMs() === 0,
+    `${peer.peers().length} peer(s), offset ${peer.offsetMs()}`);
+  // the fold: what has sounded by a position, which is what makes joining
+  // part-way through answerable
+  {
+    let wrong = 0;
+    for (let i = 0; i < BEATS; i++) {
+      const at = i * STEP;
+      const got = deck.reduceAt('beat', at);
+      if (!got || got.count !== i + 1) wrong++;
+    }
+    d.assert('the count of what has sounded is exact at every beat', wrong === 0,
+      `${BEATS} probed, ${wrong} wrong`);
+  }
+
+
+  d.log(`joined ${ROOM} as ${ID} \u2014 press \u25b6 on the bar to start the pulse`, 'hi');
   d.ready();
 </script>
 </html>

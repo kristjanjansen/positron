@@ -2043,6 +2043,30 @@ one-line fix and the "re-measure everything in the same breath" caveat are in
    click track, with an order of magnitude less headroom than the loopback
    number implied. Quote 3 ms, never 0.15.
 
+   ⚠️ **REFINED 2026-09-14, and the 3 ms is almost all OSCILLATOR rather than
+   PATH.** The method above infers precision from two peers AGREEING, which
+   cannot separate an error they SHARE: a path asymmetric the same way for both
+   biases both estimates identically and reads as agreement. A different arm
+   separates them — two peers on ONE machine, through the real relay, where the
+   true skew is **exactly zero by construction** and every reported millisecond
+   is error:
+
+   | arm | link | true skew | error |
+   |---|---|---|---|
+   | two peers, one Mac | relay, 66–74 ms | 0, exactly | **0.69 ms** |
+   | two peers, one Pi | relay, 42–44 ms | 0, exactly | **0.13 ms** |
+   | Mac ↔ Pi, node | relay, 64–69 ms | ~10.4 ms (NTP) | agreed to **2.7 ms** |
+   | browser ↔ Pi, `/jam/` | relay, 48–51 ms | — | Pi corrected **−9.85 ms** |
+
+   So a real 70 ms internet path costs UNDER A MILLISECOND, and the rest of the
+   3 ms is two machines' clocks. The fixes differ: a faster path buys nothing,
+   longer averaging windows might. ⚠️ Still quote 3 ms for two machines — the
+   sub-millisecond arms share an oscillator and do not include drift.
+
+   ⚠️ And `plan-uuu-local` §4 and `research/uuu-integration-2026-09.md` §2.4
+   BOTH still describe this as unmeasured. They are wrong and were wrong when
+   written; this entry is the record.
+
    **And the clocks really do differ by ~57 ms**, which is what made a MoQ
    transit reading come back at −14.2 ms earlier the same day. A cross-machine
    stamp difference is not a latency, and now there is a number for how much it

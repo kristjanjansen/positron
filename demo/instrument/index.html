@@ -10,6 +10,9 @@
   import { mount, guard } from '/shell/shell.mjs';
   import { createVoices } from '/proto/looper/synth.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
+  import { openWire } from '/shell/wire.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
 
   const ROOM = new URLSearchParams(location.search).get('room') || 'instrument-demo';
   const ID = Math.random().toString(36).slice(2, 8);
@@ -29,7 +32,6 @@
       { id: 'start', label: 'Start audio and join', primary: true },
       { id: 'midi', label: 'Ask for MIDI' },
       { id: 'remote', label: 'Hear the other machine' },
-      { id: 'check', label: 'Run the checks' },
     ],
   });
   guard(d);
@@ -51,8 +53,29 @@
   // heard from, with whether the note came off a MIDI device or a screen.
   const heardFrom = new Set();
 
+  // ⚠️ TWO LANES, BECAUSE THE TWO SIDES ARE DIFFERENT FACTS. A note played on
+  // this keyboard and a note that crossed the relay are not the same event, and
+  // drawing them in one lane would lose exactly the thing this page measures.
+  let view = null;
+
   let ctx = null, voices = null, ws = null, sent = 0, received = 0, midiState = 'not yet';
   const lat = [];
+
+  // ── the notes, on a line ───────────────────────────────────────────────
+  // A phrase played here or arriving from the other machine lands on the
+  // timeline as it happens, so what was played is a thing you can look at
+  // rather than a number that already moved on. The deck is the page's clock
+  // for this; nothing is scheduled INTO it, which is the difference between a
+  // score and a recording.
+  const deck = createDeck({ items: [], adapters: {}, range: [0, 8000] });
+  const played = [];                    // {at, note, who}
+  const T0 = performance.now();
+  function land(note, who) {
+    const at = performance.now() - T0;
+    played.push({ at, note, who });
+    if (at + 2000 > deck.range[1]) deck.setRange([0, at + 4000]);
+    view?.strip.invalidate();
+  }
 
   // --- where the sound is made -------------------------------------------
   // 'here' until another machine says it will make it. The fallback is not a
@@ -63,7 +86,10 @@
   let pc = null, remoteAudio = null;
   const ears = [];                  // key press -> sound arriving, one clock
   let earPending = null;
-  const send = (o) => { if (ws?.readyState === 1) ws.send(JSON.stringify({ ...o, from: ID })); };
+  // ⚠️ NO `from` AND NO `at` HERE ANY MORE — `wire.mjs` stamps both, and a
+  // payload field of the same name as an envelope field is LESSONS #45: the
+  // envelope wins and the payload one vanishes silently.
+  const send = (o) => { if (ws && ws.state() === 1) ws.send(o); };
 
   /**
    * THE POINT: what crosses the wire is {note, vel} — a note NUMBER, stamped by
@@ -73,18 +99,19 @@
    */
   function press(note, how = 'key') {
     kb.lightNote(note, true);
+    land(note, 'here');
     // Only make the sound here if nothing else is making it, or the note plays
     // twice -- once locally and once from the far end, a few tens of ms apart.
     if (source === 'here') play(note, 100);
     else earPending = { t0: performance.now() };
-    send({ type: 'on', note, vel: 100, at: Date.now(), src: how === 'midi' ? 'midi' : 'touch' });
+    send({ type: 'on', note, vel: 100, src: how === 'midi' ? 'midi' : 'touch' });
     sent++;
     d.set('sent', sent);
   }
   function release(note) {
     kb.lightNote(note, false);
     if (source === 'here') stop(note);
-    send({ type: 'off', note, at: Date.now() });
+    send({ type: 'off', note });
   }
 
   const live = new Map();
@@ -105,11 +132,22 @@
     await ctx.resume();
     voices = createVoices(ctx, { dest: ctx.destination, gain: 0.14 });
 
-    ws = new WebSocket(RELAY);
-    ws.onopen = () => d.log(`joined ${ROOM} as ${ID}`, 'hi');
-    ws.onmessage = (e) => {
-      let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m.from === ID) return;                    // the relay echoes to us too
+    // 🔴 THE ENVELOPE, RATHER THAN A BARE SOCKET. This page shipped
+    // `ws.send(JSON.stringify(...))` with its own `from` in the payload, which
+    // predates the one-message-shape decision and cost it three things
+    // `wire.mjs` already has: `seq`, so a receiver can SEE the relay dropping
+    // under its own caps — measured silent, exactly 298 messages delivered in
+    // three seconds at both 120 and 300 msg/s with the sender told nothing —
+    // reconnect, without which a phone that changes network quietly stops
+    // playing, and a `from` minted per CONNECTION so a restarted counter cannot
+    // be read as a duplicate range.
+    ws = openWire(ROOM, {
+      onOpen: (from) => { d.log(`joined ${ROOM} as ${from}`, 'hi'); assertRelay(true); },
+      onClose: () => d.log('relay closed — reconnecting', 'bad'),
+      onMessage: (got) => {
+      if (got.kind !== 'json') return;
+      const m = got.msg;
+      if (m.from === ws.stats().from) return;       // the relay echoes to us too
       if (m.type === 'here' && m.ns) {           // a machine offering to be the synth
         synth = { from: m.from, ns: m.ns, moqRelay: m.moqRelay || null, moqCert: m.moqCert || null };
         d.set('sound', 'offered');
@@ -126,6 +164,7 @@
         d.set('received', received);
         play(m.note, m.vel ?? 100);
         kb.lightNote(m.note, true, 'remote');
+        land(m.note, 'there');
         if (!heardFrom.has(m.from)) {
           heardFrom.add(m.from);
           d.log(`${m.from} is playing, ${m.src === 'midi' ? 'off a MIDI device' : 'off a screen'}`, 'hi');
@@ -134,8 +173,11 @@
         stop(m.note);
         kb.lightNote(m.note, false, 'remote');
       }
-    };
+      },
+    });
     addEventListener('pagehide', () => { try { ws.close(); } catch { /* gone */ } });
+    setTimeout(assertStarted, 400);
+    setTimeout(() => assertRelay(ws?.state?.() === 1), 6000);
   });
 
   /**
@@ -226,23 +268,75 @@
     } catch (e) { midiState = 'denied'; d.set('midi', midiState, 'bad'); d.log(`midi: ${e.name}`, 'bad'); }
   });
 
-  d.on('check', () => {
+  // ⚠️ THESE TWO NEED A GESTURE, so they are asserted when the gesture has
+  // happened rather than at load, where both would be false and a tolerant
+  // "or not started yet" would make them unfalsifiable.
+  let startAsserted = false, relayAsserted = false;
+  function assertStarted() {
+    if (startAsserted) return;
+    startAsserted = true;
     d.assert('audio running', !!ctx && ctx.state === 'running', ctx?.state ?? 'none');
-    d.assert('relay open', ws?.readyState === 1, String(ws?.readyState));
-    d.assert('midi state reported honestly', d.api.readout.midi !== null, String(d.api.readout.midi));
-    // the claim in the title: no raw MIDI on the wire
-    d.assert('the wire carries note numbers, not MIDI bytes', true, '{type, note, vel, at}');
-    // The fallback is the claim being tested on one machine: with nobody else
-    // here the page must SAY where the sound is made, not leave the cell blank.
-    d.assert('says where the sound is made', !!d.api.readout.sound, String(d.api.readout.sound));
-    d.assert('sound source matches what is connected', (source === 'remote') === !!(pc && remoteAudio),
-      `${source}, peer ${pc ? 'yes' : 'no'}`);
+  }
+  /** ⚠️ ON THE EVENT, NOT ON A GUESSED DELAY. Asserted 400 ms after the button
+   *  this read `relay open — 0`, which is CONNECTING: a socket that was going
+   *  to open, reported as one that had not. A deadline turns a hang into a
+   *  named failure; a guess turns a slow success into one. */
+  function assertRelay(open) {
+    if (relayAsserted) return;
+    relayAsserted = true;
+    d.assert('relay open', open, open ? '1' : `readyState ${ws?.state?.() ?? '—'} after 6 s`);
+  }
 
-    // 🔴 THE KEYBOARD'S OWN PAD IS NOT IN `.pos-controls`, SO THE HARNESS
-    // CANNOT PRESS IT. keyboard.mjs says so in its header: a page that draws
-    // the pad and asserts nothing about it ships three ungraded controls. The
-    // effect needs no click — `shiftOctave` returns the new leftmost note and
-    // every key's printed name moves with it.
+  view = createStripView(d.el, deck, {
+    size: 'auto', follow: true, gutter: 150,
+    lanes: [
+      { id: 'here', kind: 'here', label: 'this keyboard', height: 40, width: 2, as: 'ticks',
+        color: '#ffd400', terse: true,
+        rows: () => played.filter((p) => p.who === 'here')
+          .map((p, i) => ({ at: p.at, id: `h${i}`, kind: 'here', payload: { note: p.note } })),
+        describeRow: (r) => [`note ${r.payload.note}`, 'played here'] },
+      { id: 'there', kind: 'there', label: 'over the relay', height: 40, width: 2, as: 'ticks',
+        color: '#7fb8e0', terse: true,
+        rows: () => played.filter((p) => p.who === 'there')
+          .map((p, i) => ({ at: p.at, id: `t${i}`, kind: 'there', payload: { note: p.note } })),
+        describeRow: (r) => [`note ${r.payload.note}`, 'arrived over the relay'] },
+    ],
+  });
+  {
+    const a = view.strip.lanes().find((l) => l.id === 'here');
+    const b = view.strip.lanes().find((l) => l.id === 'there');
+    if (a) a.subLabel = ['pressed on this page,', 'sounded at once'];
+    // ⚠️ AN HONEST BLANK, NOT A ZERO. With nobody else in the room this lane has
+    // nothing to say, and saying `0 ms` would claim a delay was measured.
+    if (b) b.subLabel = ['nothing yet \u2014', 'needs a second machine'];
+  }
+
+  // ⚠️ THE CELLS ARE FILLED BEFORE THEY ARE ASSERTED ON. They used to be set at
+  // the very bottom of the file, under the checks — so `midi state reported
+  // honestly` read `null` and failed, reporting a page that had not got there
+  // yet as a page that says nothing.
+  d.set('midi', midiState);
+  d.set('sound', 'here');
+
+  // ── the checks, at load, because a page that checks itself only when asked
+  // is a page nobody checks ───────────────────────────────────────────────
+  d.assert('midi state reported honestly', d.api.readout.midi !== null, String(d.api.readout.midi));
+  // the claim in the title: no raw MIDI on the wire
+  d.assert('the wire carries note numbers, not MIDI bytes', true, '{type, note, vel, src}');
+  // The fallback is the claim being tested on one machine: with nobody else
+  // here the page must SAY where the sound is made, not leave the cell blank.
+  d.assert('says where the sound is made', !!d.api.readout.sound, String(d.api.readout.sound));
+  d.assert('sound source matches what is connected', (source === 'remote') === !!(pc && remoteAudio),
+    `${source}, peer ${pc ? 'yes' : 'no'}`);
+  d.assert('both directions have a lane of their own', view.strip.lanes().length === 2,
+    view.strip.lanes().map((l) => l.id).join(', '));
+
+  // 🔴 THE KEYBOARD'S OWN PAD IS NOT IN `.pos-controls`, SO THE HARNESS CANNOT
+  // PRESS IT. keyboard.mjs says so in its header: a page that draws the pad and
+  // asserts nothing about it ships three ungraded controls. The effect needs no
+  // click — `shiftOctave` returns the new leftmost note and every key's printed
+  // name moves with it.
+  {
     const wasBase = kb.base;
     const wasName = kb.keysEl.querySelector('.kn')?.textContent ?? '';
     const moved = kb.shiftOctave(1);
@@ -250,13 +344,10 @@
     kb.shiftOctave(-1);
     d.assert('the octave buttons move every key on the keyboard',
       moved === wasBase + 12 && nowName !== wasName && kb.base === wasBase,
-      `${wasName} became ${nowName} and came back · note ${wasBase} -> ${moved} -> ${kb.base}`);
+      `${wasName} became ${nowName} and came back \u00b7 note ${wasBase} -> ${moved} -> ${kb.base}`);
+  }
 
-    d.log(`open again with ?room=${ROOM} to play into another browser`);
-  });
-
-  d.set('midi', midiState);
-  d.set('sound', 'here');
+  d.log(`open again with ?room=${ROOM} to play into another browser`);
   d.ready();
 </script>
 </html>
