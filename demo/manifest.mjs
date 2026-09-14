@@ -71,6 +71,9 @@ export const DEMOS = [
   { name: 'vclick', act: 0, created: '2026-09-07', built: true,
     one: 'a Csound score compiled to a timeline — the tempo map is an integral, the repeat is a quotation',
     tags: ['timeline', 'Csound', 'WebAudio'] },
+  { name: 'click', act: 0, created: '2026-09-14', built: true,
+    one: 'U:’s wireless click track, playing their own score with nothing on the wire',
+    tags: ['timeline', 'Csound'] },
 
   { name: 'llhls', act: 1, created: '2026-09-04', built: true,
     one: 'the tuned v6 player on a live input this page starts and stops',
