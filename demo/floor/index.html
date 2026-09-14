@@ -85,15 +85,24 @@
     // not a measurement. What is left all moves and none of it is said anywhere
     // else on the page.
     readout: { tiles: '', loaded: 'of 192', reach: 'm', fps: '' },
-    // ⚠️ FULLSCREEN IS THE PRIMARY, NOT VR. The floor is a picture, and what
-    // almost everybody wants from it is more of it; a headset is the second
-    // thing, for the few who have one in the room. And there is no Stop: the
-    // film stops when you look away from it, because "I have stopped looking at
-    // this" is the thing a person actually does, and a button for it is a
-    // second way to say what they already said.
+    // ⚠️ THE SAME ⛶ `mirror` USES, AND FOR THE SAME REASONS. U+26F6 SQUARE FOUR
+    // CORNERS is the conventional glyph and renders as TEXT rather than as an
+    // emoji, so it takes the bar's colour and sits on its baseline instead of
+    // arriving as a coloured picture at a size of its own; `title` and
+    // `aria-label` carry the meaning for anyone the glyph does not reach.
+    // ⚠️ SECONDARY AND PUSHED RIGHT (`end: true`). Fullscreen is not the verb
+    // this page is about — it changes how much of the floor you see, not what
+    // the floor does — so it sits apart from the control that starts something.
+    // And there is no Stop: the film stops when you look away, because that is
+    // the thing a person actually does, and a button for it is a second way to
+    // say what they already said.
     controls: [
-      { id: 'full', label: 'Fill the screen', primary: true },
+      // ⚠️ NEITHER IS PRIMARY, and that is right for this page. A primary is
+      // the thing to press to make the demo happen; here the demo happens by
+      // itself and you make it happen MORE by looking at a tile. Both of these
+      // change where you are watching from, not whether anything is running.
       { id: 'vr', label: 'Run in VR' },
+      { id: 'full', label: '⛶', end: true },
     ],
   });
   guard(d);
@@ -744,6 +753,10 @@
     } catch (e) { d.log(`VR did not start: ${e.message}`, 'bad'); }
   });
   d.on('full', async () => {
+    // ⚠️ ASK, DO NOT OPTIONAL-CHAIN. `el.requestFullscreen?.()` on an iPhone is
+    // a control that looks live and is inert — no throw, no catch, no picture.
+    // `fullscreen.mjs` tries the real API, falls back to a `position: fixed`
+    // cover that needs no API, and SAYS which ran.
     if (fullSupport() === 'none') { d.log('this browser has no way to fill the screen', 'bad'); return; }
     const how = await toggleFull(wrap);
     d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
@@ -918,6 +931,16 @@
     // its first frame while drawing correctly.
     const e = gl.getError();
     d.assert('the first frames left no GL error', e === 0, `gl ${e}`);
+  }
+
+  // ⚠️ A GLYPH NEEDS A NAME. `mount()` takes a label and nothing else, so the
+  // accessible name and the tooltip are set on the element after it is built —
+  // a button whose whole content is ⛶ is unreadable to a screen reader and
+  // unguessable on hover without them. `ico` is the shell's square-glyph class,
+  // the same one `mirror`'s ⛶ uses.
+  {
+    const b = d.button('full');
+    if (b) { b.classList.add('ico'); b.title = 'fullscreen'; b.setAttribute('aria-label', 'fullscreen'); }
   }
 
   d.log(`${tiles.length} films on the floor — drag to look, arrows to walk, rest your look to play`, 'hi');
