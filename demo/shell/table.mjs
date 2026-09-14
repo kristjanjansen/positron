@@ -50,10 +50,17 @@ import { el } from './shell.mjs';
  * @param {Column[]} o.columns
  * @param {number} [o.cap]      most rows kept
  * @param {string} [o.empty]    what to say with nothing in it
+ * @param {string} [o.note]     a field whose value becomes the ROW's `title`.
+ *   ⚠️ FOR A SENTENCE THAT HAS NO COLUMN AND SHOULD NOT GET ONE. A record can
+ *   carry a paragraph — *"a page of his diary, photographed"* — that is worth
+ *   having and would ruin the grid: a column wide enough for it starves every
+ *   other, and a narrow one shows four words and an ellipsis, which is the
+ *   signal that a thing is in the wrong place. Hovering is the right weight for
+ *   a fact you want occasionally.
  * @returns {{el:HTMLElement, set:(rows:object[])=>void, add:(row:object)=>void,
  *            clear:(msg?:string)=>void, count:()=>number, columns:Column[]}}
  */
-export function createTable({ columns, cap = 1000, empty = 'nothing yet' } = {}) {
+export function createTable({ columns, cap = 1000, empty = 'nothing yet', note = '' } = {}) {
   if (!Array.isArray(columns) || !columns.length) {
     throw new Error('createTable: columns are the whole point — declare some');
   }
@@ -95,6 +102,7 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet' } = {})
   function add(r) {
     if (!n) body.textContent = '';
     const row = el('div', 'pos-tbl-row');
+    if (note && r[note]) row.title = String(r[note]);
     for (const c of columns) {
       const v = r[c.key];
       const text = v == null || v === '' ? '' : String(v);

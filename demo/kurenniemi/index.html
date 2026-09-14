@@ -13,7 +13,7 @@
      count never changes, so there is nothing for that ceiling to hold back.
      Tall enough for a long look on a laptop, and it still scrolls inside its
      own box on a phone, where a long title wraps to two or three lines. */
-  /* Taller than the component's default: this is a list of 122 records and the
+  /* Taller than the component's default: this is a list of 334 records and the
      page has nothing else on it, so the box is the page. `--tbl-h` is the
      component's own knob rather than an override of its rule. */
   .pos-tbl { --tbl-h: 620px; }
@@ -37,7 +37,7 @@
   // rather than laid out again here.
   import { createTable } from '/shell/table.mjs';
 
-  // Built by `demo/kurenniemi/build-corpus.mjs`, which asks fourteen archives
+  // Built by `demo/kurenniemi/build-corpus.mjs`, which asks seventeen archives
   // and writes down what each one answered. The deck's own shorter list is
   // folded into it, and the check below re-proves that from this end.
   const CORPUS = '/kurenniemi/corpus.json';
@@ -58,7 +58,7 @@
         + 'holder, and one row can stand for a whole set. Places that refused are listed with what '
         + 'they answered.',
     // 🔴 NO READOUT AND NO CONTROLS, AND BOTH WENT ON THE SAME INSTRUCTION.
-    // The page carried four counters and five buttons above a list of 122 rows
+    // The page carried four counters and five buttons above a list of 334 rows
     // — three orderings, two filters — which is more furniture than list before
     // a reader has read a single line. Every number in that row was a count of
     // the thing directly below it, and the orderings answered a question nobody
@@ -96,7 +96,15 @@
    * alignment or link. They are tracks now.
    */
   const table = createTable({
-    cap: 400,
+    // 🔴 THE CAP IS NOT DECORATION AND IT IS CHECKED AT BOTH ENDS. A table that
+    // silently draws fewer rows than the corpus holds is a page reporting a
+    // smaller archive than was found, which is the worst shape a cap can have.
+    // `build-corpus.mjs` now refuses to WRITE a file over this, so the two
+    // cannot disagree, and the assert below counts rows against items anyway.
+    cap: 600,
+    // The sentence a record carries and no column can hold — see `note` in
+    // table.mjs. Several of the diary rows are only legible through it.
+    note: 'note',
     empty: 'nothing in this view',
     columns: [
       { key: 'kind', label: 'kind', width: 46 },
