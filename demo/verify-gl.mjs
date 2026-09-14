@@ -42,7 +42,7 @@
 // noise. So "the picture is right" is asserted STRUCTURALLY by the page (it
 // drew, it moved, it is not a flat field), never by comparing pixels across
 // machines.
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { rm, readFile } from 'node:fs/promises';
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
@@ -58,7 +58,12 @@ const CHROME = process.env.CHROME
 // contaminated governor A/B in plan-visuals §3.4, and the fix is to let Chrome
 // choose the port and read back which one it took.
 const HTTP_PORT = 8892;                     // not verify.mjs's 8890: both may run
-const PROFILE = '/tmp/positron-verify-gl';
+// 🔴 AND THE PROFILE IS PER-PROCESS, FOR THE SAME REASON AS THE PORT ABOVE.
+// A fixed one was the last shared mutable global in this file: two agents
+// running this harness in one checkout got one profile, one lock — and one of
+// them got killed by the other's `pkill`, mid-run, reading as "chrome did not
+// come up". The port lesson and the profile are the same lesson.
+const PROFILE = `/private/tmp/claude-501/positron-verify-gl-${process.pid}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
@@ -79,14 +84,15 @@ await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() 
 // ⚠️ BEFORE the spawn, not after: Chrome writes this file as it starts, and
 // removing it afterwards deletes the very thing being waited for.
 await rm(`${PROFILE}/DevToolsActivePort`, { force: true }).catch(() => {});
-// ⚠️ AND KILL A BROWSER STILL HOLDING THIS PROFILE. Chrome refuses to start on
-// a locked profile and simply exits, so the harness sits out its whole poll and
-// reports "chrome did not come up" — which reads as a Chrome problem and is a
-// leftover process from the previous run. Matched on the profile path, which is
-// unique to this file, so it cannot reach verify.mjs's browser or anyone's
-// ordinary Chrome.
-try { execFileSync('pkill', ['-f', `--user-data-dir=${PROFILE}`], { stdio: 'ignore' }); await sleep(600); }
-catch { /* nothing was holding it, which is the normal case */ }
+// ⚠️ THERE USED TO BE A `pkill` HERE AND IT IS GONE ON PURPOSE. Chrome refuses
+// to start on a LOCKED profile and simply exits, so a leftover browser from the
+// previous run made this harness sit out its whole poll and report "chrome did
+// not come up" — a Chrome problem in appearance, a stale process in fact. The
+// kill fixed that and introduced a worse one: matched on a path that was the
+// same for everybody, it reached the OTHER AGENT'S run as readily as the
+// previous one. A per-process profile cannot be locked by anything but this
+// process, so the problem the kill solved no longer exists and the collision it
+// caused goes with it. A recovery action is not free (CLAUDE.md).
 
 // ⚠️ NO `--disable-gpu`, AND NO SWIFTSHADER FLAG. The point of this file is the
 // real device. `--headless=new` does use the GPU where one is available, which

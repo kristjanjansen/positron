@@ -240,6 +240,17 @@ export const DEMOS = [
     one: 'an icecast stream through Cloudflare — the relay adds the CORS that makes it measurable',
     tags: ['Icecast', 'Workers', 'WebAudio'] },
 
+  // Act 5 with shout, and deliberately NOT a second copy of it: same relay,
+  // different subject. `shout` asks what Cloudflare costs in front of an
+  // Icecast stream; this one is a station somebody actually runs, and it is
+  // here because their mount is plain HTTP on port 8001 — which a page on
+  // positron.studio may not load at all. The relay is the difference between a
+  // page that works and a page that cannot, rather than between a page that
+  // measures and one that does not.
+  { name: 'radio1965', act: 5, created: '2026-09-14', built: true, settleMs: 12000,
+    one: 'a live radio station in Tallinn, reachable from a secure page only through a relay of ours',
+    tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
+
 
   // Act 0 with 04 score: this is library machinery with a picture on it, not a
   // network demo — it touches nothing outside the page.

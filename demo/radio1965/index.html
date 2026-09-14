@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The in-band title. It changes when a track changes — human pace, not a
+     clock — so prose here is allowed. `min-height` reserves the line so the
+     page does not jump the first time the station says something. */
+  .now { font: 600 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { icyDemuxer } from '/shell/icy.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+
+  // Radio 1965 is a real station: one Icecast mount run by the Estonian Centre
+  // of Contemporary Music, on `live.uuu.ee`. It is played here THROUGH OUR OWN
+  // relay, and that is not a convenience.
+  //
+  // 🔴 THEIR MOUNT IS PLAIN HTTP ON PORT 8001. A page served over HTTPS may not
+  // load it at all — the browser refuses the mixed-content fetch before any
+  // CORS question is asked — so without the relay this page would have nothing
+  // to play, not merely nothing to measure. The relay also adds the
+  // `access-control-allow-origin` their Icecast omits, and THAT is what lets
+  // WebAudio see the samples: `createMediaElementSource` on a cross-origin
+  // element with no CORS gives a graph that outputs SILENCE while the speakers
+  // play normally. The `WebAudio can see the samples` check catches exactly that.
+  const BASE = new URLSearchParams(location.search).get('base')
+    || 'https://shout.positron.studio';
+  const STATION = 'radio1965';
+  const SRC = `${BASE}/${STATION}.mp3`;
+  const NOMINAL_KBPS = 128;         // measured direct: 128.076 kbit/s, 44.1k stereo
+  // ⚠️ A CROSS-PAGE URL, AND IT IS CHECKED AT BUILD TIME. The compiled graph
+  // lives with `/grains/`'s PROVENANCE.json, which records the md5 of the `.sc`
+  // it came from and which `build.mjs` REFUSES the build over when they
+  // disagree. A second copy here could go stale silently — the exact failure
+  // that check exists to prevent — so there is ONE definition and it stays
+  // where its provenance is. `checkVendorUrls()` validates `/…/defs/…` strings
+  // in the source, so a rename cannot quietly 404 this the way `moq.mjs` did.
+  const DEFS = '/grains/defs/';
+  const SPAN_MS = 3 * 60 * 1000;    // the opening view
+  const MEASURE_MS = 5000;
+  const RANGE_HZ = 1;
+
+  const d = mount({
+    name: 'radio1965',
+    what: 'A live community radio station in Tallinn, played through a relay of '
+      + 'ours because their stream is plain HTTP and a secure page may not load it '
+      + 'directly. Press Synthesize and the sound goes into a SuperCollider '
+      + 'granulator running in this tab — the same compiled graph a Raspberry Pi in '
+      + 'the studio runs, chewing the radio instead of a test tone, and every tick in '
+      + 'the picture is a grain the engine reported firing rather than one guessed '
+      + 'from the sound. In the picture, height is how loud the moment is and '
+      + 'colour is where its energy sits — dark orange for a rumble, bright '
+      + 'yellow-green for a hiss. HEARD is how long it has played, KBPS the settled rate, GAP '
+      + 'the worst pause, BEHIND the seconds you missed while paused, GRAINS how many '
+      + 'are firing a second, and WET how much of what you hear is the granulator.',
+    readout: { heard: 's', kbps: '', gap: 'ms', behind: 's' },
+    // ⚠️ ONE CONTROL, AND IT IS NOT "PLAY". There was a `Listen` button beside a
+    // transport bar that also has a play button — two controls for one action,
+    // and the reader has to guess which is real. Playing is the transport's job.
+    // This button does the thing the transport cannot: hand the radio to a
+    // SuperCollider granulator.
+    controls: [],
+  });
+  guard(d);
+
+  // ⚠️ THE RELAY URL USED TO BE PRINTED HERE AND IS NOT ANY MORE. A 60-character
+  // absolute URL across the top of a page is noise: it never changes, nobody can
+  // act on it, and it pushed the thing you came for further down. It is in the
+  // log line when the stream starts, where somebody who wants it can copy it.
+  const nowEl = el('div', 'now', '');
+  d.el.append(nowEl);
+
+  // ── the line ───────────────────────────────────────────────────────────────
+  // ⚠️ THERE IS NO STRIP. A strip is a picture of a span you can move around
+  // in, and an Icecast stream has no past to move around in — every mark on it
+  // would have said the same thing the clock says, in more space. `scrub:
+  // false` for the same reason: a scrub here is a control that cannot do what
+  // it looks like it does. `absolute: true` because the clock is the wall
+  // clock, and after a pause it reads BEHIND it, which is the truth about how
+  // far behind live you now are.
+  const t0 = Date.now();
+  const deck = createDeck({ items: [], adapters: {}, range: [t0 - SPAN_MS, t0] });
+  deck.seek(t0);
+
+  let heardFrom = null;                 // when audio actually started arriving
+  let heardSec = 0;                     // seconds actually heard, pauses excluded
+  let started = false;                  // has the stream ever been asked for
+
+  const bar = createTransportBar(d.el, deck, { absolute: true, scrub: false, endStop: false });
+
+  // ── the picture ────────────────────────────────────────────────────────────
+  // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
+  // granulator exists there are no grains to draw, so this is `feed()`: a
+  // scrolling waveform of the audio that arrived, and the gutter says in words
+  // that it is all that can be honestly shown. Once Pappus is running, every
+  // tick is a grain the ENGINE reported firing — `SendReply.ar(… '/pgrain' …)`
+  // from inside the graph — never a grain inferred from an envelope, which
+  // might be a note or a delay tap.
+  // ⚠️ A LOCKED SCALE, because this is a stream and not a held buffer. Left on
+  // the default the picture renormalises to whatever is loudest in the last six
+  // seconds, so it heaves every time a loud passage leaves the right edge and a
+  // quiet stretch draws the same as a loud one. `fullScale: 1` means the height
+  // is an amplitude: 1.0 fills it, and a quiet passage looks quiet.
+  const scope = createGrainScope(d.el, { seconds: 6, height: 140, fullScale: 1 });
+  scope.source('the radio · height is level, colour is pitch');
+
+  // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
+  // `audio.play()` from a timer, so the 1 Hz mirror below can keep the element
+  // in step with the deck but cannot START it — the press on the bar's own
+  // button is the only moment the browser will accept, and it is gone by the
+  // next tick.
+  //
+  // ⚠️ AND IT LISTENS FOR `click`, NOT `pointerdown`. `verify.mjs` drives this
+  // page with `document.querySelector('.tbar-toggle').click()` — no pointer
+  // events at all — so a pointerdown hook would work under a finger and never
+  // once under the harness, which is a page that is only tested by hand.
+  // Capture-phase, so it runs BEFORE the bar's own handler flips the deck:
+  // `deck.playing()` is still the state before this press.
+  bar.el.addEventListener('click', () => {
+    if (deck.playing()) return;                 // this press is a pause
+    startListening();
+  }, { capture: true });
+
+  // BOTH ENDS MOVE, once a second: the right edge is now, and the left trails it.
+  setInterval(() => {
+    const t = Date.now();
+    deck.setRange([t - SPAN_MS, t]);
+    if (heardFrom != null && !audio.paused) {
+      d.set('heard', (heardSec += 1 / RANGE_HZ).toFixed(0));
+    }
+    // 🔴 BEHIND — the one number a live stream with a pause button owes you.
+    // An Icecast mount has no past to seek to, so pausing does not hold your
+    // place: it drops you, and resuming rejoins at the live edge while the
+    // seconds you missed stay missed. This counts them. It sits still while you
+    // listen and grows while you do not, which is exactly when it matters.
+    if (heardFrom != null) {
+      d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - heardSec).toFixed(0));
+    }
+    // 🔴 THE BAR MUST BE ABLE TO STOP THE SOUND, AND IT COULD NOT.
+    // `mediaMaster` runs one way only — its own doc says *"a paused/ended
+    // master pauses the deck, and a running one resumes it"* — so the ELEMENT
+    // drives the deck and nothing drove the element. Pressing pause stopped the
+    // playhead and left the radio playing, which is a transport bar lying about
+    // the one thing it is for. Reported from the page, not from a test.
+    if (started) {
+      if (deck.playing() && audio.paused) audio.play().catch(() => {});
+      else if (!deck.playing() && !audio.paused) audio.pause();
+    }
+  }, 1000 / RANGE_HZ);
+
+  // ── the audio ──────────────────────────────────────────────────────────────
+  const audio = new Audio();
+  // crossOrigin is the whole point — see the note at the top of this file.
+  audio.crossOrigin = 'anonymous';
+  audio.preload = 'none';
+  let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
+  let eng = null;
+  let measured = null, done = false, synthPending = false;
+
+  function graph() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    srcNode = ctx.createMediaElementSource(audio);
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    freq = new Uint8Array(analyser.frequencyBinCount);
+    // ⚠️ THE DRY GAIN EXISTS FROM THE START even though nothing uses it until
+    // Synthesize is pressed. Re-routing a live graph is how a page ends up with
+    // two paths to the destination and twice the level; building the blend
+    // point once means the only thing that ever changes is a number.
+    dry = ctx.createGain();
+    srcNode.connect(analyser);
+    analyser.connect(dry);
+    dry.connect(ctx.destination);
+  }
+
+  let rmsPeak = 0;
+  let freq = null, toneLo = 1, toneHi = 0, toneN = 0;
+  const LO = Math.log2(100), HI = Math.log2(8000);   // the band the colour spans
+  function meterTick() {
+    if (!analyser) return;
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    if (rms > rmsPeak) rmsPeak = rms;
+    // 🔴 WHERE THE ENERGY SITS, measured here because this page owns the audio.
+    // The centroid is taken in LOG frequency, not linear: the bins run to
+    // 24 kHz and almost all music lives under 2 kHz, so a linear centroid pins
+    // every single frame near 0.05 and every column comes out the same colour —
+    // a measurement that cannot vary is a measurement nobody can read. Mapped
+    // across 100 Hz → 8 kHz, about six and a third octaves, it moves.
+    analyser.getByteFrequencyData(freq);
+    let num = 0, den = 0;
+    for (let i = 1; i < freq.length; i++) { num += i * freq[i]; den += freq[i]; }
+    let tone = null;
+    if (den > 0) {
+      const hz = (num / den) * (ctx.sampleRate / 2) / freq.length;
+      tone = Math.min(1, Math.max(0, (Math.log2(Math.max(20, hz)) - LO) / (HI - LO)));
+    }
+    if (tone != null && rms > 0.002) {          // only where there is sound to describe
+      toneLo = Math.min(toneLo, tone); toneHi = Math.max(toneHi, tone); toneN++;
+    }
+    scope.feed(buf, ctx.sampleRate, tone);
+    // ⚠️ THE LEVEL IS MEASURED AND NOT DISPLAYED. It was a `loudness` cell and
+    // it rewrote itself sixty times a second — a number nobody can read, which
+    // is the readout version of the caption that reflowed under `grain-scope`.
+    // `rmsPeak` still feeds the assert that catches a tainted graph; what the
+    // cell shows now is BEHIND, below, which changes when something happens
+    // rather than on a clock.
+    requestAnimationFrame(meterTick);
+  }
+
+  // ── the measurement ────────────────────────────────────────────────────────
+  // A SECOND connection, on purpose: this one is read as BYTES, which is what
+  // the relay's CORS makes possible and is the only way to see the rate, the
+  // gaps and the station's own text channel.
+  const rec = { status: 0, bytes: 0, headers: {}, slots: 0, filled: 0, gaps: [], marks: [] };
+
+  async function measure(signal) {
+    const t = performance.now();
+    const res = await fetch(`${SRC}?bytes=${2 << 20}`,
+      { signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' } });
+    rec.status = res.status;
+    for (const k of ['icy-name', 'icy-metaint', 'content-type', 'x-shout-ttfb']) {
+      const v = res.headers.get(k);
+      if (v) rec.headers[k] = v;
+    }
+    if (rec.headers['icy-name']) {
+      d.log(`icy-name "${rec.headers['icy-name']}" — readable only because the relay exposes it`);
+    }
+    const eat = icyDemuxer(Number(rec.headers['icy-metaint'] || 0), {
+      onSlot: () => { rec.slots++; },
+      onMeta: () => { rec.filled++; },
+      onTitle: (title) => { nowEl.textContent = title; d.log(`now playing: ${title}`, 'hi'); },
+    });
+
+    const reader = res.body.getReader();
+    const start = performance.now();
+    let last = start;
+    while (performance.now() - start < MEASURE_MS) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const nowT = performance.now();
+      rec.gaps.push(nowT - last);
+      last = nowT;
+      rec.bytes += value.length;
+      rec.marks.push([rec.bytes, nowT]);
+      eat(value);
+    }
+    try { await reader.cancel(); } catch { /* the stream never ends; hanging up is normal */ }
+    const secs = (performance.now() - start) / 1000;
+    rec.kbps = (rec.bytes * 8) / 1000 / secs;
+    // 🔴 MEAN BITRATE OVER A SHORT WINDOW IS THE BURST, NOT THE STREAM.
+    // Icecast hands a new listener ~64 KiB faster than realtime to prime their
+    // buffer, so the first reading of a 128 kbps station is comfortably in the
+    // 180s — MEASURED HERE at 185 before this was fixed, and `shout` reads 195
+    // over seven seconds for the identical reason. The rate worth asserting on
+    // is the one after the burst has landed: everything from 40 % of the
+    // window onwards. The whole-window mean stays in `rec.kbps` because the
+    // difference between the two IS the burst.
+    const cut = start + (performance.now() - start) * 0.4;
+    const from = rec.marks.find((mk) => mk[1] >= cut);
+    const end = rec.marks.at(-1);
+    rec.steadyKbps = from && end && end[1] > from[1]
+      ? ((end[0] - from[0]) * 8) / 1000 / ((end[1] - from[1]) / 1000)
+      : null;
+    rec.burstS = rec.bytes / ((NOMINAL_KBPS * 1000) / 8) - secs;
+    rec.ttfbMs = start - t;
+    rec.gapMax = rec.gaps.length ? Math.max(...rec.gaps) : 0;
+    return rec;
+  }
+
+  // ── starting ───────────────────────────────────────────────────────────────
+  // Called from the bar's own click, which is the only moment a browser will
+  // accept `play()` on a fresh element.
+  function startListening() {
+    if (started) return;
+    started = true;
+    d.log(`relay ${SRC}`);
+    graph();
+    // NEVER LET SOUND GATE THE WORK: neither of these rejects when a gesture is
+    // missing, so awaiting them is a hang rather than an error. Fire and move on.
+    ctx.resume?.();
+    audio.src = SRC;
+    audio.play().catch((e) => d.log(`play refused (${e.name}) — the measurement continues`, 'bad'));
+    requestAnimationFrame(meterTick);
+
+    audio.addEventListener('playing', () => {
+      if (heardFrom == null) heardFrom = Date.now();
+      // ⚠️ PUT THE LINE WHERE THE SOUND IS, AND START IT. Without these two the
+      // playhead sits wherever it was last left — and the harness leaves it
+      // paused and seeked backwards, because it exercises the transport before
+      // pressing anything. MEASURED: the line read 95.5 s BEHIND the audio.
+      deck.seek(heardFrom);
+      deck.play();
+      // The element's own clock is the master from here: the deck's position is
+      // where the AUDIO has got to, never where a timer thinks it should be.
+      if (!master) master = mediaMaster(deck, () => ({ el: audio, key: 'radio', pos: heardFrom + audio.currentTime * 1000 }));
+    }, { once: true });
+
+    // ⚠️ THE MEASUREMENT IS KEPT, NOT ASSERTED HERE. Everything this page checks
+    // goes out in ONE burst from `finish()`, because the granulator's checks
+    // arrive several seconds later than the radio's and `verify.mjs` stops
+    // collecting 400 ms after the count last grew. MEASURED: with the radio
+    // asserting on its own, the run read `10` and the five granulator checks
+    // were silently dropped — a page reporting less than it knows, which is the
+    // failure mode this repo minds most.
+    measured = measure().catch((e) => { d.log(`measure failed: ${e.message}`, 'bad'); return null; });
+    // If nobody presses Synthesize, the radio still has to say what it found.
+    // ⚠️ BUT IT MUST NOT RACE THE GRANULATOR. This fallback fires ~6 s after the
+    // listen starts; a Synthesize press takes longer than that to boot an
+    // engine, load a definition and measure a level, so without the flag the
+    // fallback latched `done` first and the five granulator checks were dropped
+    // — the run read 10 asserts twice in a row and looked green both times.
+    measured.then(() => setTimeout(() => { if (!synthPending) finish(); }, 1200));
+  }
+
+  /**
+   * 🔴 EVERY ASSERT IN ONE BURST, AND THAT IS THE HARNESS'S SHAPE RATHER THAN A
+   * PREFERENCE. `verify.mjs` waits for the FIRST assert for as long as
+   * `settleMs` allows (12 s here), then stops 400 ms after the count last GREW,
+   * capped at twelve such windows. So checks spread across a six-second listen
+   * are checks the suite stops collecting at the first quiet gap: the page reads
+   * as asserting four things and nobody is told the rest were dropped. Do the
+   * slow work, then say everything at once.
+   */
+  async function finish() {
+    if (done) return;
+    done = true;
+    const m = await measured;
+    if (!m) { d.assert('the relay answered', false, 'the measurement never completed'); return; }
+
+    // ⚠️ MAKE SURE IT IS ACTUALLY PLAYING BEFORE ASKING WHETHER IT PLAYS.
+    // The page follows the transport now, and `verify.mjs` exercises the
+    // transport before anything else — click to play, click to pause, then a
+    // keyboard seek — so it hands over a deck that is PAUSED, and the mirror
+    // below dutifully keeps the radio paused with it. The first run after the
+    // Listen button was removed read `t=0.00s`, `peak rms 0.0000` and
+    // `heardFrom null`: three failures that were all one fact, and the fact was
+    // correct behaviour. So press play here, and WAIT FOR THE ELEMENT rather
+    // than sleeping a guess at it.
+    deck.play();
+    for (let i = 0; i < 30 && !(audio.currentTime > 0 && !audio.paused); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    // 🔴 THE TRANSPORT MUST BE ABLE TO STOP THE SOUND, AND IT COULD NOT.
+    // Found by pressing pause on the page, not by a check: the bar stopped the
+    // playhead and the radio played on, because `mediaMaster` runs ONE WAY —
+    // its own doc says *"a paused/ended master pauses the deck, and a running
+    // one resumes it"*, so the element drove the deck and nothing drove the
+    // element. Tested here, BEFORE anything is asserted, because the answer
+    // takes 1.4 s and an assert arriving 1.4 s after the others is an assert
+    // the stabiliser has already stopped collecting.
+    const wasPlaying = !audio.paused;
+    deck.pause();
+    await new Promise((r) => setTimeout(r, 1400));
+    const stopped = audio.paused;
+    if (wasPlaying) deck.play();
+
+    d.set('kbps', Math.round(m.steadyKbps ?? m.kbps));
+    d.set('gap', Math.round(m.gapMax));
+    d.log(`${Math.round(m.bytes / 1024)} KiB · ${Math.round(m.steadyKbps ?? 0)} kbps steady `
+      + `(${Math.round(m.kbps)} over the whole window — the difference is Icecast's burst, `
+      + `${m.burstS.toFixed(1)} s handed over faster than realtime)`);
+
+    d.assert('the relay answered', m.status === 200, `HTTP ${m.status || '—'}`);
+    d.assert('the page could read the bytes (CORS)', m.bytes > 0,
+      `${(m.bytes / 1024).toFixed(0)} KiB in ${(MEASURE_MS / 1000).toFixed(0)} s`);
+    d.assert('the station named itself', !!m.headers['icy-name'],
+      m.headers['icy-name'] || 'absent');
+    d.assert('the in-band text channel is alive', m.slots > 0,
+      `${m.slots} slots, ${m.filled} carried text`);
+    d.assert('settled rate is the station\'s', m.steadyKbps != null
+      && Math.abs(m.steadyKbps - NOMINAL_KBPS) < NOMINAL_KBPS * 0.2,
+      `${Math.round(m.steadyKbps ?? 0)} vs ${NOMINAL_KBPS} kbps nominal, after the burst`);
+    d.assert('no gap past a 1 s buffer', m.gapMax < 1000,
+      `worst ${Math.round(m.gapMax)} ms over ${m.gaps.length} reads`);
+    d.assert('the element played', audio.currentTime > 0, `t=${audio.currentTime.toFixed(2)}s`);
+    // 🔴 THE ONE THAT CATCHES THE TAINTED GRAPH. A cross-origin element with no
+    // CORS plays out of the speakers and feeds SILENCE to WebAudio, so every
+    // other assert here passes while the graph is dead.
+    d.assert('WebAudio can see the samples', rmsPeak > 0.0005, `peak rms ${rmsPeak.toFixed(4)}`);
+    // ⚠️ `deck.position` IS A FUNCTION — `position: () => transport.position()`.
+    // Read as a property it is the function object, which compares false against
+    // every number and formats as `Invalid Date`.
+    const head = deck.position();
+    d.assert('the line follows the audio', Number.isFinite(head) && heardFrom != null && head >= heardFrom,
+      Number.isFinite(head) && heardFrom != null
+        ? `playhead ${new Date(head).toTimeString().slice(0, 8)}, ${((head - heardFrom) / 1000).toFixed(1)} s in`
+        : `playhead ${String(head)}, heardFrom ${String(heardFrom)}`);
+    // 🔴 A COLOUR THAT NEVER CHANGES IS NOT A MEASUREMENT, IT IS A TINT. The
+    // first centroid was taken in linear frequency and pinned every frame near
+    // 0.05, which would have drawn one flat wash and read as a picture. This
+    // asserts the thing the picture claims: that the colour moves with the
+    // sound. Bounded below only — a wide spread is the point.
+    d.assert('the colour is measured, not a wash', toneN > 0 && toneHi - toneLo > 0.05,
+      toneN ? `pitch spanned ${toneLo.toFixed(2)}..${toneHi.toFixed(2)} over ${toneN} frames`
+            : 'nothing loud enough to describe');
+    d.assert('the transport can stop the stream', !wasPlaying || stopped,
+      wasPlaying
+        ? (stopped ? 'pause on the bar paused the audio too'
+                   : 'the bar paused the line and the radio played on')
+        : 'nothing was playing to stop');
+
+  }
+
+
+  d.ready();
+</script>

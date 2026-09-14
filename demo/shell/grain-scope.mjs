@@ -37,7 +37,20 @@
 
 import { el } from './shell.mjs';
 
-export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520 } = {}) {
+export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520,
+                                        fullScale = null } = {}) {
+  // 🔴 `fullScale` LOCKS THE VERTICAL SCALE, AND WITHOUT IT THE PICTURE LIES
+  // ABOUT LOUDNESS. The default draws the waveform normalised to the loudest
+  // sample CURRENTLY IN VIEW, which is right for a fixed buffer you are
+  // inspecting and wrong for a stream: as a loud passage scrolls off the right
+  // edge the divisor drops and everything left standing suddenly grows, so a
+  // quiet stretch looks identical to a loud one and the whole picture heaves.
+  // Reported from `/radio1965/` as *"the scale keeps changing"*, which is
+  // exactly what it was doing.
+  //
+  // Set it to an amplitude (1 = full scale) and the height means a level again.
+  // ⚠️ It is opt-in so that `/grains/`, which inspects a held buffer where
+  // relative shape is the subject, keeps the behaviour it was built with.
   const wrap = el('div', 'pos-scope');
   const canvas = el('canvas', 'pos-scope-c');
   // ⚠️ THE ELEMENT STAYS AND IS NEVER WRITTEN TO. Removing it outright would
@@ -106,12 +119,19 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * machine. A scrolling waveform, and no grain ticks, because nothing here
      * knows where a grain started or whether one did.
      */
-    feed(pcm, rate = 48000) {
+    /**
+     * @param {number|null} tone 0..1, where the energy sits — 0 all low, 1 all
+     *   high. OPTIONAL, and the picture is honest either way: given one, each
+     *   column is coloured by it; given none, the wave draws flat as before.
+     *   ⚠️ The SCOPE does not compute it. Whoever owns the audio owns the
+     *   measurement; this file draws what it is handed and nothing else.
+     */
+    feed(pcm, rate = 48000, tone = null) {
       const t = now();
       const win = Math.max(1, Math.round(rate * 0.004));
       for (let i = 0; i < pcm.length; i++) {
         const v = pcm[i]; envAcc = Math.max(envAcc, v < 0 ? -v : v); envN++;
-        if (envN >= win) { scroll.push({ t, v: envAcc }); envAcc = 0; envN = 0; }
+        if (envN >= win) { scroll.push({ t, v: envAcc, tone }); envAcc = 0; envN = 0; }
       }
       counts.inferred++;
       const cut = t - seconds - 0.3;
@@ -135,7 +155,8 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       // Mirrored around the centre, which is how a waveform is read
       // everywhere, so nobody has to learn this picture.
       const n = peaks.length;
-      let mx = 0; for (let i = 0; i < n; i++) if (peaks[i] > mx) mx = peaks[i];
+      let mx = fullScale ?? 0;
+      if (!fullScale) for (let i = 0; i < n; i++) if (peaks[i] > mx) mx = peaks[i];
       const k = mx > 0 ? (H * 0.42) / mx : 0;
       ctx.fillStyle = C.line2;
       const bw = W / n;
@@ -235,14 +256,37 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       if (scroll.length > 1) {
         const t = now(), x0 = t - seconds;
         const X = (tt) => ((tt - x0) / seconds) * W;
-        let mx = 0; for (const s of scroll) if (s.v > mx) mx = s.v;
+        let mx = fullScale ?? 0;
+        if (!fullScale) for (const s of scroll) if (s.v > mx) mx = s.v;
         const k = mx > 0 ? (H * 0.44) / mx : 0;
+        const coloured = scroll.some((s) => s.tone != null);
+        if (coloured) {
+          // 🔴 COLOUR IS A SECOND MEASUREMENT, NOT DECORATION. Height is how
+          // loud; hue is WHERE THE ENERGY SITS. A flat grey wave cannot tell a
+          // cymbal from a bass note at the same level, and on a station playing
+          // improvisation that is most of what is happening.
+          //
+          // ⚠️ INSIDE A BOUNDED BAND ON `--hi`, NEVER A RAINBOW — the same rule
+          // the test picture follows. A full spectrum turns a measurement into
+          // a light show and stops meaning anything; ~95° of one band stays
+          // readable, stays legible to anyone who cannot separate red from
+          // green, and still separates a rumble from a hiss at a glance.
+          for (let i = 0; i < scroll.length; i++) {
+            const s = scroll[i];
+            const x1 = X(s.t), x2 = i + 1 < scroll.length ? X(scroll[i + 1].t) : x1 + 1;
+            const h = Math.max(0.5, s.v * k);
+            const hue = 15 + (s.tone ?? 0.5) * 95;
+            ctx.fillStyle = `hsl(${hue} 78% ${38 + (s.tone ?? 0.5) * 18}%)`;
+            ctx.fillRect(x1, mid - h, Math.max(1, x2 - x1), h * 2);
+          }
+        } else {
         ctx.beginPath();
         ctx.moveTo(X(scroll[0].t), mid);
         for (const s of scroll) ctx.lineTo(X(s.t), mid - s.v * k);
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
+        }
         ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
       }

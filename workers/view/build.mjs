@@ -1,5 +1,9 @@
 // build.mjs — assemble workers/view/public/ from the repo's protos.
 //
+//   node build.mjs                 -> public/, the deploy artefact (committed)
+//   node build.mjs --out /tmp/x    -> anywhere else; public/ untouched. Use this
+//                                     to ask "does the build still pass?".
+//
 // Why a build step instead of pointing wrangler's `assets.directory` at the
 // repo root: the repo root holds `.env` (13 live secrets). An assets directory
 // is uploaded VERBATIM AND PUBLICLY. So we copy an explicit allowlist of files
@@ -21,7 +25,7 @@
 
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
-import { dirname, join, extname } from 'node:path';
+import { dirname, join, extname, resolve, sep } from 'node:path';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -29,7 +33,39 @@ import { createHash } from 'node:crypto';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
-const OUT = join(HERE, 'public');
+const DEPLOY_OUT = join(HERE, 'public');
+
+// ── where the build lands ───────────────────────────────────────────────────
+//
+// 🔴 A FIXED OUTPUT DIRECTORY IS A SHARED MUTABLE GLOBAL. That is this repo's
+// own rule about ports — *"let the OS choose and read back what you got"* — and
+// `public/` is the same shape wearing a directory: it is `rm -rf`'d and
+// rewritten on every run. Two builds at once and one of them empties the
+// directory the other is copying into, with nothing in either output saying so.
+// MEASURED 2026-09-14: one ordinary build left **60 files dirty, none of them
+// written by a person**, which is what every other agent's `git status` then
+// has to be read through.
+//
+// `--out <dir>` (or `BUILD_OUT=<dir>`) builds somewhere else. Use it whenever
+// the question is *"does the build still pass?"* — which is what the four
+// refusals at the bottom of this file exist to answer — because then the answer
+// costs nothing in the shared tree.
+//
+// ⚠️ IT IS DELIBERATELY NOT THE DEFAULT. `public/` is the deploy artefact and
+// it is committed on purpose: `git log --oneline -- workers/view/public` is how
+// anyone answers *"what was actually on the edge when that log was written?"*.
+// A scratch build must never be mistaken for one, so it says so on the way in
+// and on the way out.
+const OUT = (() => {
+  const i = process.argv.indexOf('--out');
+  if (i >= 0 && !process.argv[i + 1]) {
+    console.error('--out needs a directory');
+    process.exit(1);
+  }
+  const v = i >= 0 ? process.argv[i + 1] : process.env.BUILD_OUT;
+  return v ? resolve(v) : DEPLOY_OUT;
+})();
+const SCRATCH = OUT !== DEPLOY_OUT;
 
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
@@ -338,10 +374,39 @@ const APPEND = {
   'proto/megatimeline/index.html': BACK,
   'proto/remixer/index.html': BACK,
 };
-// A build id the browser can report back. git sha + build time; the sha alone
-// is not enough because an uncommitted edit deploys under the previous one.
+/**
+ * A digest of the bytes about to be copied — four hex, enough to tell two
+ * trees apart and short enough to read off a phone.
+ *
+ * ⚠️ TOLERATE AN UNREADABLE FILE RATHER THAN THROWING HERE. `checkPresent()` is
+ * what reports a missing file — by name, with the build refused and nothing
+ * deleted — and it runs a few hundred lines below this. An ENOENT thrown out of
+ * the stamp would pre-empt it with a stack trace, which is exactly the raw
+ * failure that check exists to replace.
+ */
+const treeDigest = () => {
+  const h = createHash('sha256');
+  for (const [src] of FILES) {
+    h.update(src);
+    try { h.update(readFileSync(join(REPO, src))); } catch { h.update('\0absent'); }
+  }
+  return h.digest('hex').slice(0, 4);
+};
+
+// A build id the browser can report back. git sha + build time + the tree.
+//
+// ⚠️ THE SHA AND THE CLOCK ARE EACH INSUFFICIENT, FOR DIFFERENT REASONS. The
+// sha alone is not enough because an uncommitted edit deploys under the
+// previous one — which is why the time was added. But a time says WHEN, never
+// WHOSE: two working trees at one sha, built seconds apart by two agents, then
+// differ by a number that looks like a clock and carries nothing about which
+// tree shipped. `Attribute a run to a build before iterating on it` quietly
+// stops working there, because the stamp DID change and it is the wrong
+// build's. The digest is over the bytes themselves, so two identical trees
+// stamp identically and two different ones cannot.
 const BUILD_STAMP = `${execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim()}`
-  + `-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}`;
+  + `-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}`
+  + `-${treeDigest()}`;
 
 const REWRITES = {
   'demo/shell/shell.mjs': [
@@ -476,6 +541,13 @@ checkImports(FILES);
 checkPresent(FILES);
 checkVendorUrls(FILES);
 checkCompiledDefs();
+checkOut(OUT);
+
+// ⚠️ SAY WHICH BUILD THIS IS, BEFORE IT RUNS AND AGAIN AFTER. A scratch build
+// that is mistaken for a real one is a deploy nobody made; a real one mistaken
+// for a scratch build is sixty files somebody has to explain.
+console.log(SCRATCH ? `SCRATCH BUILD -> ${OUT} (public/ untouched)` : `build -> ${OUT}`);
+console.log(`stamp ${BUILD_STAMP}`);
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
@@ -555,6 +627,41 @@ function checkPresent(copied) {
     console.error('\nBUILD REFUSED — listed files that are not on disk:');
     for (const g of gone) console.error('  ' + g);
     process.exit(1);
+  }
+}
+
+/**
+ * 🔴 REFUSE AN `--out` THAT WOULD DELETE SOMETHING THIS BUILD DID NOT WRITE.
+ *
+ * The run section empties OUT with `rm -rf`. For `public/` that is correct and
+ * has been for a year. For a directory somebody typed on the command line it is
+ * a loaded gun pointed at whatever they mistyped — and the whole point of
+ * `--out` is that it gets typed, often, by people and agents in a hurry.
+ *
+ * So three refusals, in rising order of how bad the mistake would be: never the
+ * repo or anything containing it; never a directory that has files in it which
+ * this build did not put there. A build output is recognisable — it always has
+ * `index.html` and `favicon.ico`, both of which this file authors itself — so
+ * "did we write this?" is answerable without keeping a marker file around.
+ *
+ * ⚠️ An EMPTY or ABSENT directory is fine and is the common case: `--out` into
+ * a fresh temp dir is the whole intended use.
+ */
+function checkOut(out) {
+  const refuse = (why) => {
+    console.error(`\nBUILD REFUSED — --out ${out}:`);
+    console.error('  ' + why);
+    process.exit(1);
+  };
+  if (out === REPO || out === HERE) refuse('that is the repo, not an output directory');
+  if (REPO.startsWith(out + sep)) refuse('that directory contains the repo');
+  let entries = null;
+  try { entries = readdirSync(out); } catch { return; }      // absent is fine
+  if (!entries.length) return;                                // empty is fine
+  if (!entries.includes('index.html') || !entries.includes('favicon.ico')) {
+    refuse(`it holds ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} `
+      + 'and does not look like a build output (no index.html + favicon.ico). '
+      + 'Refusing to empty a directory this build did not write.');
   }
 }
 
@@ -683,3 +790,6 @@ const nItem = await explode('proto/megatimeline/items-cache.jsonl', async (key) 
   return m ? `cache/item/${m[1]}/${m[2]}.json` : null;
 });
 console.log(`cache: ${nSearch} search results, ${nItem} items — served as static assets`);
+console.log(SCRATCH
+  ? `\nSCRATCH BUILD OK — ${OUT}. Nothing in public/ changed and nothing is deployed from here.`
+  : `\nbuild ok — ${OUT}, stamp ${BUILD_STAMP}. Deploy with: node workers/view/deploy.mjs`);
