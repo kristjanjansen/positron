@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>positron-push — receiver</title>
+<!--
+  proto/push/ — does a push from our own Firebase project reach this browser?
+  A PROTOTYPE, not a demo: no shell, no manifest row, no asserts (LAYOUT.md —
+  proto/ is for things that are not shelled and are not in the story).
+
+  It answers three questions in order, and stops at the first that fails:
+    1. will the browser grant notification permission
+    2. does a service worker register at this path
+    3. does Firebase mint a device token for this browser
+
+  The token it prints is the ADDRESS a sender needs. Until there is a sender,
+  that is the whole product: proof the project, the web app and the VAPID key
+  are configured correctly, which is otherwise indistinguishable from a broken
+  sender.
+-->
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 24px; background: #0b0e14; color: #e6edf3;
+    font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  p.sub { color: #9aa7bd; margin: 0 0 20px; }
+  button {
+    font: inherit; padding: 9px 14px; border-radius: 6px; cursor: pointer;
+    background: #ffd400; color: #0b0e14; border: 0; font-weight: 600;
+  }
+  button.ghost { background: #141922; color: #e6edf3; border: 1px solid #32405a; font-weight: 400; }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .box {
+    background: #141922; border: 1px solid #232c3a; border-radius: 6px;
+    padding: 12px 14px; margin-bottom: 14px;
+  }
+  .k { color: #9aa7bd; }
+  #token { word-break: break-all; color: #ffd400; font-size: 12px; }
+  #log { white-space: pre-wrap; word-break: break-word; font-size: 12px; max-height: 44vh; overflow: auto; }
+  .bad { color: #ff7a7a; }
+  .ok { color: #6ee7a8; }
+</style>
+
+<h1>positron-push — receiver</h1>
+<p class="sub">Proves a notification from our own Firebase project reaches this browser, and prints the device token a sender needs.</p>
+
+<div class="row">
+  <button id="start">Enable notifications</button>
+  <button id="copy" class="ghost" disabled>Copy token</button>
+  <button id="clear" class="ghost">Clear log</button>
+</div>
+
+<div class="box"><span class="k">state</span> <span id="state">idle</span></div>
+<div class="box"><span class="k">device token</span><br><span id="token">—</span></div>
+<div class="box" id="log"></div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js';
+  import { getMessaging, getToken, onMessage }
+    from 'https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging.js';
+
+  // Public config — identifies the project, grants nothing. The service account
+  // key is the secret one and never appears in a browser.
+  const CONFIG = {
+    apiKey: 'AIzaSyBrhsydZ5mVttOmSJuXFbaJYnS9EuxGVYI',
+    authDomain: 'positron-push.firebaseapp.com',
+    projectId: 'positron-push',
+    storageBucket: 'positron-push.firebasestorage.app',
+    messagingSenderId: '826711684766',
+    appId: '1:826711684766:web:f6410b53d4aca4ceab2d8f',
+  };
+  // 🔴 THE WEB PUSH CERTIFICATE, AND `getToken` FAILS WITHOUT IT IN A WAY THAT
+  // DOES NOT SAY SO. It is the public half of the project's VAPID pair —
+  // Project settings → Cloud Messaging → Web configuration. Public by design:
+  // it is what the browser's push service checks a sender's signature against.
+  const VAPID = 'BKzmVlAviUBJ0ghEjxG7EcmbyEQcBUxM7_FtP_y4J0pU_w_6CXjYVKg5vfTtujYXbJr96RB9Ozhv22luKL0R0x0';
+
+  const $ = (id) => document.getElementById(id);
+  const log = (msg, cls = '') => {
+    const t = new Date().toTimeString().slice(0, 8);
+    $('log').insertAdjacentHTML('afterbegin',
+      `<div class="${cls}">${t}  ${String(msg).replace(/[<&]/g, (c) => ({ '<': '&lt;', '&': '&amp;' }[c]))}</div>`);
+  };
+  const state = (s) => { $('state').textContent = s; };
+
+  let token = null;
+
+  $('clear').onclick = () => { $('log').textContent = ''; };
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(token); log('token copied', 'ok'); }
+    catch (e) { log(`clipboard refused: ${e.message}`, 'bad'); }
+  };
+
+  // ⚠️ SAY WHAT IS MISSING BEFORE ASKING FOR ANYTHING. Each of these fails in a
+  // way that looks like "push does not work" rather than naming itself.
+  if (!('serviceWorker' in navigator)) log('this browser has no service workers', 'bad');
+  if (!('Notification' in window)) log('this browser has no Notification API', 'bad');
+  if (!window.isSecureContext) {
+    log('NOT a secure context — service workers need https or localhost', 'bad');
+  }
+  // iOS Safari is the one that looks broken and is not: web push only exists
+  // for a page installed to the Home Screen, so a normal tab silently cannot.
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent);
+  const standalone = window.navigator.standalone === true
+    || window.matchMedia('(display-mode: standalone)').matches;
+  if (iOS && !standalone) {
+    log('iOS: web push needs this page ADDED TO THE HOME SCREEN. In a normal '
+      + 'Safari tab it cannot work, and the failure looks identical to a broken setup.', 'bad');
+  }
+
+  $('start').onclick = async () => {
+    $('start').disabled = true;
+    try {
+      state('asking permission');
+      const perm = await Notification.requestPermission();
+      log(`permission: ${perm}`, perm === 'granted' ? 'ok' : 'bad');
+      if (perm !== 'granted') { state('permission refused'); $('start').disabled = false; return; }
+
+      state('registering service worker');
+      // 🔴 REGISTER BY PATH AND HAND THE REGISTRATION OVER. The SDK's default is
+      // to look for `/firebase-messaging-sw.js` at the ORIGIN ROOT; this page is
+      // served from /proto/push/, so the default 404s and `getToken` reports
+      // something that never mentions a path.
+      const reg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' });
+      await navigator.serviceWorker.ready;
+      log(`service worker ready, scope ${reg.scope}`, 'ok');
+
+      state('asking Firebase for a token');
+      const app = initializeApp(CONFIG);
+      const messaging = getMessaging(app);
+      token = await getToken(messaging, { vapidKey: VAPID, serviceWorkerRegistration: reg });
+      if (!token) { state('no token'); log('Firebase returned no token', 'bad'); return; }
+
+      $('token').textContent = token;
+      $('copy').disabled = false;
+      state('listening');
+      log(`token minted (${token.length} chars) — this browser now has an address`, 'ok');
+      log('nothing will arrive until a sender pushes to this token or to a topic it joins');
+
+      // Foreground pushes land here; background ones go to the service worker,
+      // which forwards them so both end up in one log.
+      onMessage(messaging, (payload) => {
+        log('FOREGROUND ' + JSON.stringify(payload, null, 1), 'ok');
+      });
+    } catch (e) {
+      state('failed');
+      log(`${e.name}: ${e.message}`, 'bad');
+      $('start').disabled = false;
+    }
+  };
+
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    log('BACKGROUND ' + JSON.stringify(e.data, null, 1), 'ok');
+  });
+</script>
