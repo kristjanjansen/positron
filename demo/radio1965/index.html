@@ -75,9 +75,7 @@
       + 'granulator running in this tab — the same compiled graph a Raspberry Pi in '
       + 'the studio runs, chewing the radio instead of a test tone, and every tick in '
       + 'the picture is a grain the engine reported firing rather than one guessed '
-      + 'from the sound. In the picture, height is how loud the moment is and '
-      + 'colour is where its energy sits — dark orange for a rumble, bright '
-      + 'yellow-green for a hiss. HEARD is how long it has played, KBPS the settled rate, GAP '
+      + 'from the sound. HEARD is how long it has played, KBPS the settled rate, GAP '
       + 'the worst pause, BEHIND the seconds you missed while paused, GRAINS how many '
       + 'are firing a second, and WET how much of what you hear is the granulator.',
     readout: { heard: 's', kbps: '', gap: 'ms', behind: 's', grains: '/s', wet: '' },
@@ -138,7 +136,7 @@
   // it changes reads as belonging to whatever is above THAT.
   const cbar = d.el.querySelector('.pos-controls');
   if (cbar) d.el.append(cbar);
-  scope.source('the radio · height is level, colour is pitch');
+  scope.source('the radio, as it arrives');
 
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
   // `audio.play()` from a timer, so the 1 Hz mirror below can keep the element
@@ -212,7 +210,6 @@
     srcNode = ctx.createMediaElementSource(audio);
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    freq = new Uint8Array(analyser.frequencyBinCount);
     // ⚠️ THE DRY GAIN EXISTS FROM THE START even though nothing uses it until
     // Synthesize is pressed. Re-routing a live graph is how a page ends up with
     // two paths to the destination and twice the level; building the blend
@@ -224,8 +221,6 @@
   }
 
   let rmsPeak = 0;
-  let freq = null, toneLo = 1, toneHi = 0, toneN = 0;
-  const LO = Math.log2(100), HI = Math.log2(8000);   // the band the colour spans
   function meterTick() {
     if (!analyser) return;
     const buf = new Float32Array(analyser.fftSize);
@@ -234,24 +229,11 @@
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.sqrt(sum / buf.length);
     if (rms > rmsPeak) rmsPeak = rms;
-    // 🔴 WHERE THE ENERGY SITS, measured here because this page owns the audio.
-    // The centroid is taken in LOG frequency, not linear: the bins run to
-    // 24 kHz and almost all music lives under 2 kHz, so a linear centroid pins
-    // every single frame near 0.05 and every column comes out the same colour —
-    // a measurement that cannot vary is a measurement nobody can read. Mapped
-    // across 100 Hz → 8 kHz, about six and a third octaves, it moves.
-    analyser.getByteFrequencyData(freq);
-    let num = 0, den = 0;
-    for (let i = 1; i < freq.length; i++) { num += i * freq[i]; den += freq[i]; }
-    let tone = null;
-    if (den > 0) {
-      const hz = (num / den) * (ctx.sampleRate / 2) / freq.length;
-      tone = Math.min(1, Math.max(0, (Math.log2(Math.max(20, hz)) - LO) / (HI - LO)));
-    }
-    if (tone != null && rms > 0.002) {          // only where there is sound to describe
-      toneLo = Math.min(toneLo, tone); toneHi = Math.max(toneHi, tone); toneN++;
-    }
-    scope.feed(buf, ctx.sampleRate, tone);
+    // ⚠️ NO COLOUR. The wave was briefly tinted by spectral centroid — hue for
+    // where the energy sat — and it was asked to be reverted twice. The
+    // reasoning is kept on the dead branch in `grain-scope.mjs` rather than
+    // here; what this page draws is the plain wave it drew before.
+    scope.feed(buf, ctx.sampleRate);
     // ⚠️ THE LEVEL IS MEASURED AND NOT DISPLAYED. It was a `loudness` cell and
     // it rewrote itself sixty times a second — a number nobody can read, which
     // is the readout version of the caption that reflowed under `grain-scope`.
@@ -440,14 +422,6 @@
       Number.isFinite(head) && heardFrom != null
         ? `playhead ${new Date(head).toTimeString().slice(0, 8)}, ${((head - heardFrom) / 1000).toFixed(1)} s in`
         : `playhead ${String(head)}, heardFrom ${String(heardFrom)}`);
-    // 🔴 A COLOUR THAT NEVER CHANGES IS NOT A MEASUREMENT, IT IS A TINT. The
-    // first centroid was taken in linear frequency and pinned every frame near
-    // 0.05, which would have drawn one flat wash and read as a picture. This
-    // asserts the thing the picture claims: that the colour moves with the
-    // sound. Bounded below only — a wide spread is the point.
-    d.assert('the colour is measured, not a wash', toneN > 0 && toneHi - toneLo > 0.05,
-      toneN ? `pitch spanned ${toneLo.toFixed(2)}..${toneHi.toFixed(2)} over ${toneN} frames`
-            : 'nothing loud enough to describe');
     d.assert('the transport can stop the stream', !wasPlaying || stopped,
       wasPlaying
         ? (stopped ? 'pause on the bar paused the audio too'
@@ -569,7 +543,7 @@
     for (const [k, v] of Object.entries(P)) setBoth(k, v);
     setParam(eng, 'report', 1);
     setWet(wet);
-    scope.source('Pappus, chewing the radio · colour is pitch');
+    scope.source('Pappus, chewing the radio');
 
     const row = sliderRow ?? el('div', 'pos-sliders');
     if (!sliderRow) { sliderRow = row; d.el.append(row); }
