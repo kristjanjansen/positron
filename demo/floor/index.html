@@ -54,7 +54,9 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { mul, modelM, perspective } from '/shell/xr-room.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
-  import { toggle as toggleFull, support as fullSupport } from '/shell/fullscreen.mjs';
+  import { toggle as toggleFull, exit as exitFull, watch as watchFull,
+    support as fullSupport } from '/shell/fullscreen.mjs';
+  import { createProjector } from '/shell/projector.mjs';
 
   // ── the field ───────────────────────────────────────────────────────────
   // 🔴 THE TILE IS 4:3, WHICH IS WHY THERE IS NO GAP. A square quad showing a
@@ -62,7 +64,20 @@
   // a black line between two distortions. Make the quad the picture's own shape
   // and the grid tiles EXACTLY — no gap to choose, nothing stretched, and the
   // floor reads as one surface rather than as a spreadsheet.
-  const TILE_W = 1.12;          // 2x — a newsreel frame you can read, not a contact sheet
+  const TILE_W = 1.68;          // 3x the first pass — a frame you read, not a thumbnail
+  // 🔴 THE FLOOR REPEATS, SO IT HAS NO EDGE AT ALL. 298 films laid once is a
+  // shape with an outside, and walking to the outside of an archive is the one
+  // thing it should not be possible to do. The block below is tiled infinitely:
+  // every frame each tile is moved to the COPY OF ITSELF nearest your gaze, so
+  // you can walk in any direction forever and the grid stays continuous.
+  // ⚠️ A SQUARE PERIOD, and that is not decoration. 15 x 1.68 and 20 x 1.26 are
+  // both 25.2 m, so the repeat distance is the same whichever way you walk — an
+  // oblong period means the floor starts repeating sooner in one direction, and
+  // the first thing anybody does is walk in a straight line.
+  // ⚠️ 300 slots for 298 films, so two of them appear twice. Said out loud
+  // because the alternative is two holes in an infinite floor, which reads as
+  // something failing to load rather than as an archive being the size it is.
+  const COLS = 15, ROWS = 20;
   const TILE_H = TILE_W * 0.75;
   const TEX_W = 256, TEX_H = 192;
   // 🔴 A FIXED NUMBER OF TEXTURE SLOTS, AND IT IS WHY THIS DRAWS IN ONE CALL.
@@ -83,8 +98,11 @@
   // ⚠️ BOTH RADII SCALED WITH THE TILE. They are in METRES, so doubling the
   // tile without doubling these would have quartered how many pictures are in
   // the ring — the floor would look the same size and hold four times less.
-  const LOAD_RADIUS = 22;       // metres — beyond this nothing is even requested
-  const FADE_FROM = 13;         // and from here it is already on its way out
+  // ⚠️ BOTH INSIDE THE REPEAT DISTANCE. The period is 25.2 m; fading to nothing
+  // by 16 m means the far side of what you can see is already gone before the
+  // next copy of a film could arrive next to the first one.
+  const LOAD_RADIUS = 16;       // metres — beyond this nothing is even requested
+  const FADE_FROM = 9;          // and from here it is already on its way out
   const CONCURRENT = 8;         // image fetches in flight
 
   const d = mount({
@@ -237,14 +255,24 @@
     // out through black is two transitions where there should be one, and on a
     // floor of stills the hole reads as a tile that broke.
     vec3 c = mix(still, moving, clamp(vV, 0.0, 1.0));
-    // 🔴 THE FOCUS LIFT, WHICH IS A PROMISE RATHER THAN A HIGHLIGHT. Looking at
-    // a tile darkens it slightly and then brings it UP past its own brightness
-    // as the dwell completes, so the picture tells you something is about to
-    // happen before it happens. A ring or a border would be a second thing
-    // drawn on top; this is the picture itself answering.
-    float dip = 1.0 - 0.22 * sin(clamp(vF, 0.0, 1.0) * 3.14159);
-    float lift = 1.0 + 0.35 * clamp(vF, 0.0, 1.0) * clamp(vF, 0.0, 1.0);
-    c *= dip * lift;
+    // 🔴 THE FOCUS IS A SEQUENCE, NOT A STATE: LIGHTEN, THEN DARKEN, THEN PLAY.
+    // A single brightening says "this one" and nothing else, so the film simply
+    // appears at the end of it and the wait feels like lag. Lighting the tile
+    // quickly and then taking it DOWN reads as a machine getting ready — the
+    // lamp strikes, the shutter closes over the frame, and the film arrives out
+    // of the dark it just made. The whole gesture is the dwell, so the picture
+    // tells you how long you have to hold your look without a bar or a ring
+    // anywhere.
+    //
+    // vF is dwell progress, 0..1. The curve:
+    //   0.00 - 0.18  up FAST to +55%      the lamp
+    //   0.18 - 0.75  down through 1.0 to -55%   the shutter closing
+    //   0.75 - 1.00  held dark            and the film crosses into it
+    float f = clamp(vF, 0.0, 1.0);
+    float shape = f < 0.18
+      ? smoothstep(0.0, 0.18, f) * 0.55
+      : mix(0.55, -0.55, smoothstep(0.18, 0.75, f));
+    c *= 1.0 + shape;
     // 🔴 ONE GREY, AND IT IS NOT A STYLE CHOICE. These are 1965 newsreels: the
     // film is black and white and the scans are not — they carry the colour cast
     // of whatever telecine and JPEG they went through, so a floor of them is a
@@ -370,7 +398,7 @@
       let best = -1, bestD = LOAD_RADIUS;
       for (let i = 0; i < state.length; i++) {
         const s = state[i];
-        if (s.want || s.layer >= 0 || !tiles[i].photo) continue;
+        if (s.want || s.layer >= 0 || !tiles[state[i].film].photo) continue;
         const dd = distOf(i);
         if (dd < bestD) { bestD = dd; best = i; }
       }
@@ -391,7 +419,7 @@
     // — so an `<img>` can DISPLAY them and `texSubImage3D` cannot READ them.
     // Asking our own origin makes the pixels ours to upload.
     img.decoding = 'async';
-    img.src = `/err-img?f=${encodeURIComponent(tiles[i].photo)}&w=${TEX_W}&h=${TEX_H}`;
+    img.src = `/err-img?f=${encodeURIComponent(tiles[state[i].film].photo)}&w=${TEX_W}&h=${TEX_H}`;
     // 🔴 `decode()`, NOT `onload`. THIS IS WHY SOME TILES CAME UP BRIGHT GREEN.
     // `onload` means the BYTES arrived; with `decoding: 'async'` the pixels may
     // not exist yet, and `texSubImage3D` then uploads whatever is in the decode
@@ -420,11 +448,77 @@
     }).catch(() => {
       inflight--;
       // a miss is remembered: `photo` is cleared so the queue stops offering it
-      tiles[i].photo = null;
+      tiles[state[i].film].photo = null;
       state[i].want = false;
       if (state[i].layer === L) { state[i].layer = -1; usedLayers.delete(L); freeLayers.push(L); }
       pump();
     });
+  }
+
+  // ── the projector, where the film is ────────────────────────────────────
+  //
+  // 🔴 IT COMES FROM THE TILE, NOT FROM THE PAGE. A projector sound in stereo
+  // in front of you is a soundtrack; a projector sound coming from the square
+  // of floor that is running is a machine in a room, and the whole point of
+  // putting the archive on a floor is that it is somewhere rather than on a
+  // screen. HRTF panning, a listener that follows the camera, and a source at
+  // the playing tile's own metres.
+  //
+  // ⚠️ A GESTURE BUILDS IT, AND NOT A MOMENT BEFORE. An AudioContext made at
+  // load starts suspended, and `resume()` in a real browser neither resolves
+  // nor rejects until somebody has touched the page — awaiting one is a hang,
+  // not an error. The first pointer down on the floor is the gesture, and it is
+  // one somebody makes anyway.
+  let actx = null, projector = null, panner = null;
+  function audioUp() {
+    if (actx) return;
+    actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+    actx.resume().catch(() => {});          // NOT awaited — see above
+    panner = actx.createPanner();
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    // ⚠️ A REFERENCE DISTANCE IN THE SAME UNITS AS THE FLOOR. The tiles are
+    // laid out in metres, so these are metres; a default of 1 with a rolloff of
+    // 1 makes a projector two tiles away almost inaudible, which is not what a
+    // room sounds like.
+    panner.refDistance = 1.8;
+    panner.rolloffFactor = 0.7;
+    panner.maxDistance = 40;
+    panner.connect(actx.destination);
+    projector = createProjector(actx);
+    projector.node.connect(panner);
+    projector.start();
+    d.log('projector running — it comes from the tile that is playing', 'hi');
+  }
+
+  /** Put the listener where the camera is and the machine where the film is.
+   *  Called every frame, in both the window and the headset. */
+  function placeSound() {
+    if (!actx || !panner) return;
+    const f = look();
+    const L = actx.listener;
+    // ⚠️ TWO APIS, AND THE OLD ONE IS NOT DEAD. `positionX` and friends are
+    // AudioParams and the modern path; Firefox still ships only the deprecated
+    // setter, and a page that uses one and not the other is silent on half the
+    // browsers there are. Both, with the AudioParam preferred.
+    if (L.positionX) {
+      L.positionX.value = eye[0]; L.positionY.value = eye[1]; L.positionZ.value = eye[2];
+      L.forwardX.value = f[0]; L.forwardY.value = f[1]; L.forwardZ.value = f[2];
+      L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    } else if (L.setPosition) {
+      L.setPosition(eye[0], eye[1], eye[2]);
+      L.setOrientation(f[0], f[1], f[2], 0, 1, 0);
+    }
+    const i = playing;
+    if (i >= 0) {
+      const x = state[i].x, z = state[i].z;
+      if (panner.positionX) {
+        panner.positionX.value = x; panner.positionY.value = 0; panner.positionZ.value = z;
+      } else if (panner.setPosition) panner.setPosition(x, 0, z);
+    }
+    // the machine follows the picture: up with the film, down with it, on the
+    // same long ramp everything else on this page uses
+    projector.setGain(playing >= 0 && vidReady ? 0.5 : 0, 1.4);
   }
 
   // ── the one video ───────────────────────────────────────────────────────
@@ -445,13 +539,14 @@
   async function playTile(i) {
     if (i < 0 || i >= tiles.length) return;
     if (playing === i) return;
+    const film = tiles[state[i].film];
     stopVideo(false);
     playing = i;
     try {
-      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(tiles[i].slug)}`);
+      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(film.slug)}`);
       const j = await r.json();
       const raw = (j?.data?.media || j?.media)?.src?.hls;
-      if (!raw) { d.log(`${tiles[i].slug}: the archive offers no stream`, 'bad'); stopVideo(true); return; }
+      if (!raw) { d.log(`${film.slug}: the archive offers no stream`, 'bad'); stopVideo(true); return; }
       // ERR hands back a PROTOCOL-RELATIVE url; on a local http page that would
       // resolve to http and be blocked as mixed content on the deploy. Pin it.
       const src = raw.startsWith('//') ? `https:${raw}` : raw;
@@ -470,7 +565,7 @@
       // NOT awaited: play() waits on a user gesture and does not reject, so
       // awaiting it is a hang rather than an error.
       video.play().catch(() => {});
-      d.log(`playing ${tiles[i].title}`, 'hi');
+      d.log(`playing ${film.title}`, 'hi');
     } catch (e) {
       d.log(`could not ask the archive: ${e.message}`, 'bad');
       stopVideo(true);
@@ -521,7 +616,11 @@
   // settle. Kept together so "slower" is one edit and not six.
   const FADE_RATE = 1.1;        // a still arriving           ~0.9 s
   const VIDEO_RATE = 0.7;       // a film crossing its still  ~1.4 s
-  const FOCUS_RATE = 0.9;       // the lift under your look   ~1.1 s
+  // ⚠️ THE FOCUS TRACKS THE DWELL CLOSELY — this one is FAST where the others
+  // are slow, and that is the point rather than an inconsistency. The shape it
+  // drives is already timed by the dwell (1.8 s); easing it slowly on top would
+  // smear the lamp and the shutter into one another and lose the sequence.
+  const FOCUS_RATE = 7;         // follows the dwell rather than softening it
   const DIM_RATE = 0.4;         // the floor standing down    ~2.5 s
   const GLIDE_RATE = 0.9;       // travelling across the disc
   const DWELL_MS = 1800, AWAY_MS = 4000;
@@ -565,14 +664,15 @@
     hover = i;
     if (i < 0) { nameEl.innerHTML = ''; return; }
     nameEl.innerHTML = '';
-    nameEl.append(el('b', '', tiles[i].date), el('span', '', tiles[i].title),
-      el('i', '', tiles[i].series || ''));
+    const t = tiles[state[i].film];
+    nameEl.append(el('b', '', t.date), el('span', '', t.title), el('i', '', t.series || ''));
   }
 
   // ── the desktop camera ──────────────────────────────────────────────────
   let dragging = false, lastX = 0, lastY = 0, moved = 0;
   const keys = new Set();
   wrap.addEventListener('pointerdown', (e) => {
+    audioUp();                     // the gesture, taken where somebody makes one
     dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
     wrap.setPointerCapture(e.pointerId);
   });
@@ -657,6 +757,8 @@
       if (Math.hypot(panTo[0] - eye[0], panTo[1] - eye[2]) < 0.02) panTo = null;
     }
     gaze = gazePoint();
+    rewrap();
+    placeSound();
     pump();
 
     // ── the dwell ──────────────────────────────────────────────────────
@@ -772,9 +874,16 @@
   }
 
   // ── VR ──────────────────────────────────────────────────────────────────
-  let xrSession = null, xrRefSpace = null, headsetKnown = null;
+  let xrSession = null, xrRefSpace = null, headsetKnown = null, xrFrames = 0;
   navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; },
     () => { headsetKnown = false; });
+
+  // ⚠️ ESCAPE LEAVES FULLSCREEN ON BOTH PATHS. The real API gives Escape for
+  // free; the `position: fixed` FALLBACK — which is what an iPhone gets, having
+  // no element Fullscreen API at all — has no browser behaviour behind it, so
+  // `watch()` wires the key and tells the page when it changed either way.
+  // Without this the fallback is a cover with no way out of it.
+  watchFull(wrap, (on) => d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi'));
 
   d.on('vr', async () => {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'bad'); return; }
@@ -793,10 +902,32 @@
       // gets to give about its own bug.
       session.addEventListener('selectstart', onSelect);
       session.addEventListener('selectend', () => { grab = null; });
+      // 🔴 A WAY OUT THAT THE PAGE OWNS. The trigger is the floor-drag, so the
+      // GRIP is the exit — every controller has one and it is not a button you
+      // press by accident while dragging. "Press the Meta button" is not an
+      // answer a page gets to give about its own bug.
+      session.addEventListener('squeeze', () => {
+        d.log('grip — leaving VR', 'hi');
+        session.end().catch(() => {});
+      });
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
-      d.log('in VR — point at a tile and pull the trigger', 'hi');
+      d.log('in VR — trigger drags the floor, rest your look to play, GRIP to leave', 'hi');
+      // 🔴 A DEAD-MAN'S SWITCH. If nothing has been drawn 6 s after the session
+      // started, something threw where nothing was reporting and the wearer is
+      // standing in a black room with no way out. MEASURED elsewhere in this
+      // repo: reading `renderState.baseLayer` one line after creating a session
+      // throws, the throw escapes the handler, and the render loop, the exit and
+      // the bail-out are then ALL never registered — which is exactly the case
+      // this has to survive, so it is armed BEFORE the first frame is asked for.
+      const entered = xrFrames;
+      setTimeout(() => {
+        if (xrSession === session && xrFrames === entered) {
+          d.log('nothing drew in 6 s — ending the session rather than leaving you in it', 'bad');
+          session.end().catch(() => {});
+        }
+      }, 6000);
       session.requestAnimationFrame(xrFrame);
     } catch (e) { d.log(`VR did not start: ${e.message}`, 'bad'); }
   });
@@ -812,6 +943,7 @@
 
   let dragSource = null;
   function onSelect(ev) {
+    audioUp();                     // a trigger pull is a gesture too
     const pose = xrFramePose && ev.frame?.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
     if (!pose) return;
     grab = rayFloor(pose.transform.matrix);
@@ -847,6 +979,7 @@
     if (!layer) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    xrFrames++;
     dragFloor(xframe);
     const head = pose.transform.matrix;
     // the wearer's own head, less whatever the floor has been dragged by
@@ -913,41 +1046,33 @@
   // ── go ──────────────────────────────────────────────────────────────────
   const doc = await (await fetch('/floor/tiles.json')).json();
   tiles = doc.tiles;
-  // ── a DISC on the grid, not a rectangle ────────────────────────────────
-  //
-  // 🔴 SAME LATTICE, DIFFERENT OUTLINE. The tiles still sit on the regular
-  // 4:3 grid — they have to, or they stop tiling and the gaps come back — but
-  // the field they fill is a circle. A rectangle has four corners that are
-  // further away than anything else on the floor and it has a long edge you
-  // meet head-on; a disc is the same distance away in every direction, which
-  // is what a page that loads outward from where you are looking should stand
-  // on. The corner tiles were also the ones that never loaded.
-  //
-  // ⚠️ THE RADIUS IS IN METRES, NOT IN CELLS. The cell is 0.56 x 0.42, so
-  // counting cells would draw an ellipse and call it a circle — squashed in the
-  // axis with the shorter pitch, and nobody would be able to say why.
-  //
-  // Sorted by distance from the middle, so the catalogue fills outward: the
-  // start of 1965 is at your feet and December is at the rim.
-  {
-    const span = Math.ceil(Math.sqrt(tiles.length)) + 6;
-    const spots = [];
-    for (let c = -span; c <= span; c++) {
-      for (let r = -Math.ceil(span * (TILE_W / TILE_H)); r <= Math.ceil(span * (TILE_W / TILE_H)); r++) {
-        const x = c * TILE_W, z = r * TILE_H;
-        spots.push({ x, z, rad: Math.hypot(x, z) });
-      }
-    }
-    // ⚠️ A STABLE TIE-BREAK. Two spots at the same radius are common on a
-    // lattice — every mirror image of one — and without a second key the order
-    // is whatever the sort happens to do, so the same catalogue lands in a
-    // different arrangement between two runs of the same page.
-    spots.sort((a, b) => a.rad - b.rad || a.x - b.x || a.z - b.z);
-    for (let i = 0; i < tiles.length; i++) {
-      state.push({ x: spots[i].x, z: spots[i].z,
-        layer: -1, a: 0, v: 0, f: 0, want: false, img: false });
+  // ── the block that tiles ────────────────────────────────────────────────
+  const SLOTS = COLS * ROWS;
+  const PERIOD_X = COLS * TILE_W, PERIOD_Z = ROWS * TILE_H;
+  for (let i = 0; i < SLOTS; i++) {
+    const c = i % COLS, r = Math.floor(i / COLS);
+    state.push({
+      // the tile's home square in the block; `x`/`z` are the WRAPPED position
+      // and are rewritten every frame
+      bx: (c - (COLS - 1) / 2) * TILE_W,
+      bz: (r - (ROWS - 1) / 2) * TILE_H,
+      x: 0, z: 0,
+      film: i % tiles.length,
+      layer: -1, a: 0, v: 0, f: 0, want: false, img: false,
+    });
+  }
+  /** Move every tile to the copy of itself nearest the gaze.
+   *  ⚠️ Cheap on purpose — two rounds and two multiplies per tile, 300 of them,
+   *  so it runs every frame rather than only when you cross a boundary. A
+   *  version that only rewraps on a threshold has a frame where the far tiles
+   *  are still in the old copy, which is a row of pictures jumping. */
+  function rewrap() {
+    for (const t of state) {
+      t.x = t.bx + PERIOD_X * Math.round((gaze[0] - t.bx) / PERIOD_X);
+      t.z = t.bz + PERIOD_Z * Math.round((gaze[1] - t.bz) / PERIOD_Z);
     }
   }
+  rewrap();
   d.set('tiles', tiles.length);
   requestAnimationFrame(frame);
 
@@ -990,6 +1115,63 @@
   {
     const b = d.button('full');
     if (b) { b.classList.add('ico'); b.title = 'fullscreen'; b.setAttribute('aria-label', 'fullscreen'); }
+  }
+
+  // 🔴 THE PROJECTOR, GRADED OFFLINE — NO GESTURE, NO SPEAKERS, NO WAITING.
+  // An `OfflineAudioContext` renders faster than real time and needs no user
+  // activation, so the one thing worth asserting about a synthesised machine —
+  // that it runs at the FRAME RATE — is checkable on every run, headless
+  // included. A sample could never be checked this way; it would just be bytes.
+  // ⚠️ 0.24 s, because `start()` schedules one 0.25 s lookahead and its top-up
+  // is a `setInterval` that offline time never reaches. That is fine for the
+  // page and would be a trap for a longer render, so it is said here.
+  // MEASURED 2026-09-14: 5 clatters, gaps 42 · 40 · 40 · 44 ms against 41.7
+  // expected — the rate, with the +/-3.5% jitter visible in the spread.
+  try {
+    const SR = 48000, SECS = 0.24;
+    const oc = new OfflineAudioContext(1, Math.floor(SR * SECS), SR);
+    const pj = createProjector(oc);
+    pj.node.connect(oc.destination);
+    pj.start(); pj.setGain(1, 0.001);
+    const rendered = await oc.startRendering();
+    const ch = rendered.getChannelData(0);
+    const win = Math.floor(SR * 0.002), env = [];
+    for (let i = 0; i < ch.length; i += win) {
+      let mx = 0;
+      for (let j = i; j < Math.min(i + win, ch.length); j++) mx = Math.max(mx, Math.abs(ch[j]));
+      env.push(mx);
+    }
+    // 🔴 AUTOCORRELATION, NOT A THRESHOLD. The first version found onsets by
+    // crossing `peak * 0.4` and reported 8 clatters at 26.6 ms in the harness
+    // against 5 at ~41.7 ms by hand — because the clatter's amplitude is
+    // deliberately random and the noise bed is always there, so a threshold set
+    // from the loudest sample counts bed peaks on a quiet run. A detector whose
+    // answer depends on how loud this particular render happened to be is not
+    // measuring the rate, it is measuring the render.
+    // The envelope's own periodicity needs no threshold at all: subtract the
+    // mean, correlate against itself, and the lag with the strongest agreement
+    // IS the frame period.
+    const mean0 = env.reduce((x, y) => x + y, 0) / env.length;
+    const z = env.map((v) => v - mean0);
+    const lagOf = (ms) => Math.round((ms / 1000) * SR / win);
+    let bestLag = 0, bestScore = -Infinity;
+    for (let lag = lagOf(20); lag <= lagOf(80); lag++) {
+      let acc = 0;
+      for (let i = 0; i + lag < z.length; i++) acc += z[i] * z[i + lag];
+      const score = acc / (z.length - lag);
+      if (score > bestScore) { bestScore = score; bestLag = lag; }
+    }
+    const periodMs = (bestLag * win / SR) * 1000;
+    const top = Math.max(...env);
+    d.assert('the projector makes a sound at all', top > 0.05, `peak ${top.toFixed(3)}`);
+    // ⚠️ 3 ms of tolerance, and the jitter is why: the clatter is deliberately
+    // +/-3.5% off the grid (1.5 ms at this rate) so it does not sound like a
+    // machine playing a hi-hat, and the envelope's resolution here is 2 ms.
+    d.assert('and it runs at the film\u2019s frame rate',
+      Math.abs(periodMs - 1000 / 24) < 3,
+      `strongest period ${periodMs.toFixed(1)} ms against ${(1000 / 24).toFixed(1)}`);
+  } catch (e) {
+    d.assert('the projector makes a sound at all', false, `offline render failed: ${e.message}`);
   }
 
   d.log(`${tiles.length} films on the floor — drag to look, arrows to walk, rest your look to play`, 'hi');
