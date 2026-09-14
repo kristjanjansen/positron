@@ -381,7 +381,22 @@ button.pos-pri[data-busy="1"] {
   flex: none; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--dim); white-space: nowrap;
 }
-.tbar-rates { flex: none; display: flex; gap: 4px; }
+/* ⚠️ NO GAP. The options are a `createChoice` now, which is SEGMENTED — it
+   overlaps the borders by a pixel so a join is one line. A 4 px gap here put
+   space back between them and made four rates read as four separate controls,
+   which is the thing the component exists to stop. */
+.tbar-rates { flex: none; display: flex; }
+/* A live source has no clock worth printing — see the note in transport-bar.mjs.
+   `min-width` so the word changing between LIVE and SLOWED cannot move the row
+   it sits in (CLAUDE.md: nothing that updates may change how much room it
+   takes). */
+.tbar-live {
+  flex: none; min-width: 52px; text-align: center;
+  font: 500 10px/1 var(--mono); letter-spacing: .12em;
+  color: var(--hi); margin-right: auto;
+}
+.tbar-live[data-slow="1"] { color: var(--dim2); }
+.tbar[data-scrub="1"] .tbar-live { margin-right: 0; }
 /* ⚠️ NEVER NARROWER THAN TALL. `0.5x` is four characters and `1x` is two, so
    padding alone gave a row of buttons that stepped from wide to narrow and
    read as three different kinds of control. A square is the floor; anything

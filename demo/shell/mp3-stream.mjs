@@ -102,7 +102,21 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
    */
   let rate = 1;         // what the block being scheduled starts at
   let target = 1;        // where the listener asked to be
-  const GLIDE = 1.10;    // per block, so the climb is a constant RATIO
+  /**
+   * How fast the speed may change, as a RATIO PER SECOND rather than per block.
+   *
+   * 🔴 IT WAS 1.10 PER BLOCK AND THAT IS WHY A RATE CHANGE CRAWLED. Blocks are
+   * a quarter-second, so 1.10 each is 1.46x a second — and 1x down to 0.125x is
+   * a factor of eight, which took **five and a half seconds** of climbing on top
+   * of the cushion still draining at the old speed. REPORTED as *"why rate
+   * change is so slooooooooow"*. At 4x a second the same journey is 1.5 s, still
+   * plainly a glide rather than a cut.
+   *
+   * ⚠️ PER SECOND IS ALSO THE RIGHT UNIT, not a tuned number. Per block, the
+   * speed of the gesture depended on `blockMs` — change the block size for an
+   * unrelated reason and the control changes character with it.
+   */
+  const GLIDE_PER_SEC = 4;
   /**
    * 🔴 SIX MILLISECONDS OF CROSSFADE AT EVERY SEAM, AND IT IS NOT DECORATION.
    * Blocks are separate `AudioBufferSourceNode`s butted end to end, and three
@@ -263,8 +277,10 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
 
     const r0 = rate;
     const want = target * corr;
-    const r1 = want > r0 ? Math.min(want, r0 * GLIDE)
-             : want < r0 ? Math.max(want, r0 / GLIDE)
+    // This block's own wall length at the current rate is the time base.
+    const glide = GLIDE_PER_SEC ** (buf.duration / Math.max(0.05, r0));
+    const r1 = want > r0 ? Math.min(want, r0 * glide)
+             : want < r0 ? Math.max(want, r0 / glide)
              : r0;
     const T = (2 * buf.duration) / (r0 + r1);
     // Media seconds scale into wall seconds by the same average rate.
@@ -538,7 +554,11 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
      * what you hear is a tape coming up to speed rather than a cut.
      */
     setRate(r) {
-      target = Math.max(0.1, Math.min(4, Number(r) || 1));
+      // ⚠️ THE FLOOR WAS 0.1 AND IT SILENTLY ATE 0.0625. A clamp a caller cannot
+      // see turns a rate button into one that plays at a different speed from
+      // the one written on it — the two slowest options would have sounded
+      // nearly identical, which reads as a broken control rather than a clamp.
+      target = Math.max(0.05, Math.min(4, Number(r) || 1));
       st.target = target;
       return target;
     },
