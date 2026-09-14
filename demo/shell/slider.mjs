@@ -135,15 +135,48 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  *   label:(text:string)=>void,
  *   disabled:(v:boolean)=>void}}
  */
+/**
+ * @param [o.warp] `'exp'` for a logarithmic lane. Default linear, unchanged.
+ *
+ * 🔴 WHY A LINEAR LANE HIDES THE INTERESTING HALF OF A RANGE, MEASURED.
+ * `/radio1965/` granulates a radio station and every setting sounded like the
+ * same wash. The upstream norns script this engine came from declares grain
+ * rate `0.1-100 Hz EXPONENTIAL` and grain length `0.002-8 beats EXPONENTIAL`;
+ * this page exposed `0.5-40` and `0.01-1` LINEAR. So the top of the engine was
+ * unreachable, and worse, half the travel sat between 0.5 s and 1 s where
+ * nothing audibly changes — while 2 ms to 50 ms, which is where a granulator
+ * stops being a delay and starts being a texture, was squeezed into the first
+ * two percent of the lane.
+ *
+ * A perceptual quantity wants a perceptual lane: each step of the hand is a
+ * constant RATIO rather than a constant amount, which is how pitch, level and
+ * time are actually heard.
+ *
+ * ⚠️ `min` MUST BE ABOVE ZERO — a ratio lane cannot reach zero, by construction.
+ * It throws rather than quietly producing NaN for every position, because a
+ * lane whose knob is at `NaN%` renders at the far left and looks like a slider
+ * sitting at its minimum.
+ */
 export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
-                               digits, onInput, onChange } = {}) {
+                               digits, warp, onInput, onChange } = {}) {
   const span = max - min;
+  const exp = warp === 'exp';
+  if (exp && !(min > 0)) throw new Error('slider: warp "exp" needs min > 0');
   const stp = step ?? span / 100;
   const dp = digits ?? Math.max(0, Math.min(4, String(stp).split('.')[1]?.length ?? 0));
+  // position 0..1 -> value, and back. The linear pair is what every existing
+  // caller already had; nothing about it changes.
+  const ratio = exp ? Math.log(max / min) : 0;
+  const fromT = (t) => (exp ? min * Math.exp(ratio * t) : min + t * span);
+  const toT = (x) => (exp ? Math.log(x / min) / ratio : (span ? (x - min) / span : 0));
   let v = clamp(value ?? min);
 
   function clamp(x) {
-    const snapped = Math.round((x - min) / stp) * stp + min;
+    // ⚠️ AN EXPONENTIAL LANE IS NOT SNAPPED TO A FIXED STEP. A step of 0.01
+    // across 0.002-4 would make the bottom two thirds of the lane unreachable —
+    // every value below 0.01 snapping to the same place. It rounds to the
+    // slider's decimals instead, so resolution follows the value.
+    const snapped = exp ? Number(x.toFixed(dp)) : Math.round((x - min) / stp) * stp + min;
     return Math.max(min, Math.min(max, Number(snapped.toFixed(6))));
   }
 
@@ -206,7 +239,7 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
    */
   function paint(at = v) {
     shown = at;
-    const t = span ? (at - min) / span : 0;
+    const t = Math.max(0, Math.min(1, toT(at)));
     // Percentage of the TRAVEL, not of the lane: `calc` subtracts the handle's
     // own width so the two ends land flush. See the note at the top.
     knob.style.left = `calc(${(t * 100).toFixed(3)}% - ${(t * 100).toFixed(3)} * var(--sld-knob) / 100)`;
@@ -267,7 +300,7 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
     // by half a handle at each end — otherwise the value only reaches its
     // extremes when the pointer leaves the lane entirely.
     const x = Math.max(0, Math.min(travel, clientX - r.left - kw / 2));
-    return min + (x / travel) * span;
+    return fromT(x / travel);
   };
 
   let dragging = false;
@@ -293,10 +326,19 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
   // ⚠️ A KEYBOARD PATH, and not only for accessibility: it is the one route a
   // harness can drive without synthesising pointer events.
   lane.addEventListener('keydown', (e) => {
+    // ⚠️ ON AN EXPONENTIAL LANE THE KEYS MOVE BY POSITION, NOT BY VALUE. A fixed
+    // `+0.01` is a huge jump at the bottom of 0.002-4 and invisible at the top;
+    // one percent of the LANE is the same gesture everywhere, which is the whole
+    // reason the lane is warped.
     const big = span / 10;
-    const d = { ArrowLeft: -stp, ArrowDown: -stp, ArrowRight: stp, ArrowUp: stp,
-                PageDown: -big, PageUp: big }[e.key];
-    if (d !== undefined) { set(v + d); e.preventDefault(); return; }
+    const step1 = exp ? 0.01 : stp;
+    const stepBig = exp ? 0.1 : big;
+    const d = { ArrowLeft: -step1, ArrowDown: -step1, ArrowRight: step1, ArrowUp: step1,
+                PageDown: -stepBig, PageUp: stepBig }[e.key];
+    if (d !== undefined) {
+      set(exp ? fromT(Math.max(0, Math.min(1, toT(v) + d))) : v + d);
+      e.preventDefault(); return;
+    }
     if (e.key === 'Home') { set(min); e.preventDefault(); }
     if (e.key === 'End') { set(max); e.preventDefault(); }
   });

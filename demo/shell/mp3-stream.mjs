@@ -55,10 +55,25 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   const node = ctx.createGain();
   const splitter = createFrameSplitter();
   const st = {
-    path: 'starting', bytes: 0, frames: 0, decoded: 0, blocks: 0,
+    path: 'starting', rate: 1, bytes: 0, frames: 0, decoded: 0, blocks: 0,
     underruns: 0, skipped: 0, errors: 0, sampleRate: 0, channels: 0, startedAt: 0,
   };
   let stopped = false, decoder = null, ac = null;
+  /**
+   * 🔴 VARISPEED, AND IT IS THE TAPE KIND: PITCH FOLLOWS SPEED. We schedule the
+   * buffers ourselves, so this is one `playbackRate` — which is only true
+   * because the media element is gone. It could not have been done at all while
+   * WebKit owned the playback.
+   *
+   * ⚠️ AND A LIVE STREAM CANNOT SUSTAIN IT, WHICH IS THE INTERESTING PART.
+   * Bytes arrive at exactly 1×. Below 1× the queue GROWS without bound — you
+   * fall behind the station and stay behind, for ever, by construction. Above
+   * 1× you consume faster than the wire delivers and run dry the moment the
+   * cushion is spent; `underruns` is what says so. Neither is a bug to fix,
+   * both are the price of the gesture, and the page shows both numbers rather
+   * than hiding a limit it cannot remove.
+   */
+  let rate = 1;
   let pending = [];                  // Float32Array[channel][] awaiting a block
   let pendingLen = 0;                // frames (samples per channel) in `pending`
   let nextAt = 0;                    // context time the next block starts at
@@ -71,6 +86,7 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(node);
+    src.playbackRate.value = rate;
     // 🔴 THE CUSHION, AND RUNNING DRY IS A COUNTER RATHER THAN A GUESS.
     // If the queue has fallen behind the clock there is nothing to do but
     // restart ahead of it — but that is a DROPOUT, and this repo has already
@@ -80,7 +96,15 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     const now = ctx.currentTime;
     if (nextAt < now + 0.01) {
       if (st.blocks) st.underruns++;
-      nextAt = now + floorMs / 1000;
+      // 🔴 A SMALL CUSHION ON RECOVERY, NOT THE STARTING ONE. This restarted at
+      // `floorMs` (600 ms), so every late block tore a 600 ms hole in the sound
+      // — and this page feeds the audio to a granulator whose ring RECORDS the
+      // hole, which then gets granulated. Reported as "audio has holes,
+      // granulator seems to operate on holes too". The opening cushion is for
+      // building a queue from nothing; recovery just needs to be ahead of the
+      // clock. ⚠️ The hole is not removed, only shortened — it is counted, and
+      // `underruns` is the number to watch.
+      nextAt = now + (st.blocks ? 0.08 : floorMs / 1000);
     }
     // 🔴 A LIVE STREAM MUST NOT ACCUMULATE LATENCY, AND THE BURST MAKES IT.
     // Icecast hands a new listener several seconds faster than realtime to prime
@@ -92,12 +116,21 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     // ⚠️ IT IS COUNTED, because a stage that silently discards audio is exactly
     // the defect LESSONS #52 is about — a stream that measured bit-clean while
     // `pcm-playout` trimmed 15 ms mid-note, with no counter any page displayed.
-    if (nextAt - now > ceilingMs / 1000) {
+    // ⚠️ AND THE LATENCY CAP ONLY APPLIES TO THE OPENING BURST. Icecast hands a
+    // new listener several seconds faster than realtime and then settles to
+    // realtime, so a queue that is too long is a start-up condition, not a
+    // steady state. Trimming it later means DROPPING AUDIO mid-listen — a hole
+    // by construction, for a latency problem that has already stopped growing.
+    // Measured: with the cap running throughout, `skipped` kept incrementing
+    // long after the burst had passed.
+    if (!st.blocks && nextAt - now > ceilingMs / 1000) {
       st.skipped++;
       nextAt = now + floorMs / 1000;
     }
     src.start(nextAt);
-    nextAt += buf.duration;
+    // The buffer OCCUPIES more or less wall time than it holds, so the clock
+    // has to advance by what was actually consumed — not by the duration.
+    nextAt += buf.duration / rate;
     st.blocks++;
     if (st.blocks === 1) { st.startedAt = nextAt; resolveStarted(st.path); }
   }
@@ -245,6 +278,12 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   return {
     node,
     started,
+    /** 0.25 .. 2. Takes effect on the next block, never on one already playing. */
+    setRate(r) {
+      rate = Math.max(0.1, Math.min(4, Number(r) || 1));
+      st.rate = rate;
+      return rate;
+    },
     stats: () => ({
       ...st,
       buffered: Math.max(0, nextAt - ctx.currentTime),

@@ -50,6 +50,21 @@
      declaration and `.sld-group.pos-pair` are both (0,2,0), and the page's
      <style> comes after the stylesheet, so the page wins the tie on order. */
   .wet-fader { max-width: none; }
+
+  /* 🔴 THE CONTROLS ARRIVE LATE AND EVERYTHING BELOW THEM JUMPED. They cannot be
+     built until scsynth is up — about a second — so the fader, the sound picker,
+     the speed row and the four sliders all appeared at once and shoved the log
+     down the page while somebody was reading it. That is the same complaint the
+     grain-scope caption earned ("a horrible jump of content each time it
+     updates"), arriving through TIME instead of through reflow.
+     The space is reserved from the first paint and the controls land INTO it, so
+     nothing below ever moves. ⚠️ No border and no background: an empty box that
+     paints its edges is a horizontal rule nobody wrote (shell.css says so), and
+     this one is empty for the first second of every visit.
+     The height is the sum of what goes in — four rows at 34 px plus the shared
+     22 px rhythm between them — and it is written as that sum rather than as a
+     total, so it can be re-derived when a row is added. */
+  .gran-slot { min-height: calc(4 * 34px + 3 * 22px + 2 * 34px + 22px); }
   .wet-fader, .gran-rows { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
   @media (min-width: 720px) {
     .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
@@ -116,7 +131,12 @@
   // ⚠️ THE ORDER IS THE PREFERENCE. Radio 1965 first because it is what this
   // page is for; the fallback is automatic and says so in the log rather than
   // silently playing something else.
-  const STATIONS = [['Radio 1965', 'radio1965'], ['Klassikaraadio', 'klassikaraadio']];
+  const STATIONS = [
+    ['Radio 1965', 'radio1965'],
+    ['Klassikaraadio', 'klassikaraadio'],
+    ['Vikerraadio', 'vikerraadio'],
+    ['Raadio 2', 'raadio2'],
+  ];
   const srcOf = (id) => `${BASE}/${id}.mp3`;
   let station = STATIONS[0][1];
   const PROBE_MS = 6000;            // long enough for a cold relay, short enough to act on
@@ -281,6 +301,14 @@
 
   scope.source('the radio, as it arrives');
 
+  // The space the granulator's controls will occupy, reserved now so their
+  // arrival a second from now moves nothing. See `.gran-slot` in <style>.
+  // ⚠️ It uses the shell's own vertical rhythm by being an ordinary sibling —
+  // the gap above and below it is the same 22 px every other element gets, so
+  // the reserved block is not a special case that has to be kept in step.
+  const granSlot = el('div', 'gran-slot');
+  scope.el.after(granSlot);
+
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
   // `audio.play()` from a timer, so the 1 Hz mirror below can keep the element
   // in step with the deck but cannot START it — the press on the bar's own
@@ -391,6 +419,10 @@
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
   let stream = null;                 // the decoded mount, when DECODE
+  // ⚠️ THE SPEED SURVIVES A REOPEN. A station switch builds a new stream, and a
+  // control whose setting silently reverts because something behind it was
+  // rebuilt is worse than one that does not exist.
+  let speed = 1;
   // ⚠️ REMEMBERED, because the stream is CLOSED by the time `finish()` asserts —
   // the transport-stop check shuts it deliberately — and reading the path off a
   // null stream printed `via nothing` about a path that had just decoded 16 s.
@@ -405,6 +437,7 @@
       log: (m) => { d.log(m); ship(m); },
     });
     stream.node.connect(srcNode);
+    stream.setRate(speed);
     stream.started.then((path) => {
       decodePath = path;
       ship(`decode path: ${path}`);
@@ -682,7 +715,13 @@
     try {
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(), PROBE_MS);
-      const res = await fetch(`${BASE}/health`, { signal: ac.signal, cache: 'no-store' });
+      // ⚠️ ASK ABOUT THESE FOUR, NOT ALL SIX. `/health` opens one upstream
+      // connection per station it is asked about, so an unnarrowed probe made
+      // every page load and every harness run cost the broadcaster six. That is
+      // how three ERR mounts came to answer this relay 502 in 9 ms while serving
+      // a laptop normally — LESSONS #50, earned a second time.
+      const res = await fetch(`${BASE}/health?only=${STATIONS.map(([, id]) => id).join(',')}`,
+        { signal: ac.signal, cache: 'no-store' });
       clearTimeout(t);
       if (res.ok) {
         const j = await res.json();
@@ -747,12 +786,16 @@
    * errors and no failed requests — which is exactly why that route exists. A
    * poll built on fetching the mount would paint a red line every 30 s.
    */
-  const WATCH_MS = 30000;
+  // ⚠️ SIXTY SECONDS, NOT THIRTY. Each poll is one upstream connection per
+  // station, and the list just went from two to four — halving the rate keeps
+  // the cost where it was rather than doubling it because a feature was added.
+  const WATCH_MS = 60000;
   setInterval(async () => {
     if (document.hidden) return;       // a backgrounded tab is nobody watching
     let answers = null;
     try {
-      const res = await fetch(`${BASE}/health`, { cache: 'no-store' });
+      const res = await fetch(`${BASE}/health?only=${STATIONS.map(([, id]) => id).join(',')}`,
+        { cache: 'no-store' });
       if (!res.ok) return;
       const j = await res.json();
       if (!j?.stations) return;
@@ -992,11 +1035,7 @@
     // element. Tested here, BEFORE anything is asserted, because the answer
     // takes 1.4 s and an assert arriving 1.4 s after the others is an assert
     // the stabiliser has already stopped collecting.
-    const wasPlaying = isPlaying();
-    deck.pause();
-    await new Promise((r) => setTimeout(r, 1400));
-    const stopped = !isPlaying();
-    if (wasPlaying) deck.play();
+    const { wasPlaying, stopped } = T;
 
     d.set('kbps', Math.round(m.steadyKbps ?? m.kbps));
     // ⚠️ `gap` LOST ITS CELL AND KEPT ITS FACTS. It is measured once over one
@@ -1086,15 +1125,19 @@
     // halves have to be true: the next patch's settings must arrive, AND they
     // must differ from this one's, or a picker wired to nothing passes.
     const nextP = G.otherWant;
+    const near = (a, b) => Math.abs(a - b) < Math.max(0.01, Math.abs(b) * 0.02);
     const differs = !!nextP && !!p
-      && (nextP.scanmode !== p.scanmode || nextP.elen !== p.elen);
+      && (nextP.scanmode !== p.scanmode || nextP.elen !== p.elen
+        || !near(nextP.rate, p.rate) || !near(nextP.size, p.size));
     const arrived = !!nextP && G.otherMode === nextP.scanmode && G.otherElen === nextP.elen
+      && near(G.otherRate, nextP.rate) && near(G.otherSize, nextP.size)
       && same(G.otherPattern, patternOf(nextP));
     d.assert('the next sound along reaches the engine, and it differs',
       differs && arrived && G.here === PATCHES.indexOf(p),
       nextP && p
-        ? `${p.name} → ${nextP.name} → ${p.name}; asked ${nextP.scanmode}/${nextP.elen}, `
-          + `the engine held ${G.otherMode}/${G.otherElen}, against ${p.scanmode}/${p.elen} here`
+        ? `${p.name} → ${nextP.name} → ${p.name}; asked mode ${nextP.scanmode} `
+          + `rate ${nextP.rate} size ${nextP.size}, the engine held ${G.otherMode} `
+          + `${G.otherRate} ${G.otherSize}, against ${p.scanmode} ${p.rate} ${p.size} here`
           + `${same(G.otherPattern, patternOf(nextP)) ? '' : ' — and its rhythm did not arrive'}`
         : 'the picker was never exercised');
 
@@ -1180,41 +1223,8 @@
     const here = STATIONS.findIndex(([, id]) => id === station);
     const other = here === 0 ? 1 : 0;
 
-    // 🔴 A DOWN STATION HAS A DISABLED BUTTON, AND CLICKING IT PROVES NOTHING.
-    // REPORTED from a phone: `FAIL the station buttons switch the stream —
-    // stayed on Klassikaraadio`, while radio1965 was answering 502 and the page
-    // was refusing its button exactly as designed. The check clicked a disabled
-    // control and read the absence of an effect as a defect — grading the page
-    // red for being right.
-    //
-    // ⚠️ SO IT ASSERTS THE OTHER HALF INSTEAD, RATHER THAN SKIPPING. One assert
-    // either way, so the count does not flap with a volunteer radio mount, and
-    // neither branch is vacuous: up, the button must switch the stream; down,
-    // the button must be refusing.
-    if (picker.buttons[other].disabled) {
-      d.assert('a station that is not answering has a button that refuses',
-        avail.get(STATIONS[other][1]) === false,
-        `${nameOf(STATIONS[other][1])} is down and its button is disabled`);
-      return;
-    }
-
-    const wasStation = station, wasSrc = DECODE ? station : audio.src;
-    selfCheck = true;
-    // ⚠️ 120 ms, NOT 300. `verify.mjs` stops collecting 400 ms after the assert
-    // count last GREW, so two 300 ms waits here open a 600 ms hole and this
-    // assert is dropped from the run — MEASURED, three runs read 28/28, 29/29,
-    // 28/28 with no code between them. `switchTo` is synchronous, so the state
-    // this reads has already changed; the wait is only for the element.
-    picker.buttons[other].click();
-    await new Promise((r) => setTimeout(r, 120));
-    const moved = station === STATIONS[other][1] && (DECODE ? station !== wasSrc : audio.src !== wasSrc);
-    picker.buttons[here].click();
-    await new Promise((r) => setTimeout(r, 120));
-    selfCheck = false;
-    d.assert('the station buttons switch the stream',
-      moved && station === wasStation,
-      moved ? `${nameOf(wasStation)} -> ${nameOf(STATIONS[other][1])} and back`
-            : `stayed on ${nameOf(station)}`);
+    // The station A/B ran HERE and now runs early — see `checkStationButtons`.
+    d.assert(S.label, S.pass, S.detail);
   }
 
 
@@ -1402,29 +1412,44 @@
       noise: 0.12, noisetype: 2, noisedecay: 0.9, noisetone: 900, noisedyn: 1.4,
       wow: 0.35, rverb: 0.42, rtime: 0.62 },
 
-    // The station itself, four tenths of a second late, cut into 75 ms pieces
-    // that fall on five beats of sixteen — and the three voices enter that
-    // figure three steps apart, so they interlock instead of landing together.
-    // 🔴 THE ONLY PATCH WHERE THE WORDS SURVIVE: the read head moves forward
-    // with the material (`delaypos`, `:717`) instead of sitting on one moment,
-    // which is the whole answer to "speech is just scattered walls".
-    { name: 'stutter',
-      says: 'the station a beat late, chopped into a rhythm it did not have',
-      scanmode: 3, scan: 0.05, rate: 12, size: 0.075, contour: 4,
-      sos: 0.62, lock: 0, tilt: 0.15, ingain: 1, comp: 0.30,
-      spray: 0.09, spraymode: 1, swarm: 0.12, swarmmode: 1, strum: 0,
-      elen: 16, ephase: 3,
-      // E(5,16): onsets at 3, 6, 9, 12, 15.
-      pattern: [0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-      gates: [1, 1, 1, 0, 0, 0, 0, 0],
-      pitches: [0, 12, -12, 0, 0, 0, 0, 0],
+    // 🔴 A SLOW CLIMB. `stutter` was here and was replaced: it was the most
+    // RHYTHMIC patch on a page whose owner's verdict was "just scattering
+    // fragments", so it was more of the complaint rather than an answer to it.
+    // `slow tide` was named the best of the six, so this is built in its family
+    // and made to move in the one direction that one does not.
+    //
+    // The read head crawls FORWARD at a twelfth of life speed — `scanmode 1`,
+    // and `speed = winspan × (3·mscan − 1)` (`Engine_Pappus.sc:715`), so
+    // `mscan 0.36` is +0.08×: one lap of the eight seconds every hundred
+    // seconds. Three-second grains through the widest window (`contour 16`)
+    // have no attack at all, they only swell.
+    //
+    // What makes it climb rather than hang is the DELAY, which is the one
+    // stage TINY keeps four taps of (`:1515`): each tap is pitched up a fifth,
+    // an octave, a twelfth, two octaves (`tappitch`, read-speed repitch at
+    // `:1517`), so every phrase is answered by itself higher, four times, over
+    // six and a half seconds. That is the shimmer the compiled-out `PitchShift`
+    // would have given, built from the taps that survive instead.
+    //
+    // ⚠️ `sos 0.80` STACKS RATHER THAN FREEZES. The buffer keeps recording but
+    // barely replaces, so the last half minute piles up under the climb.
+    // `ingain 0.75` pays for it: every write is clipped to ±1 (`:635`), so a
+    // buffer that accumulates needs to arrive quieter or it flattens.
+    { name: 'updraft',
+      says: 'a slow climb, answered by itself a fifth and an octave up',
+      scanmode: 1, scan: 0.36, rate: 0.9, size: 3.0, contour: 16,
+      sos: 0.80, lock: 0, tilt: -0.15, ingain: 0.75, comp: 0.25,
+      spray: 0.30, spraymode: 3, swarm: 0.55, swarmmode: 4, strum: 0.08,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 1, 1, 0, 0, 0],
+      pitches: [0, 7, 12, 19, 24, 0, 0, 0],      // a rising stack, not a chord
       probs: [1, 1, 1, 1, 1, 1, 1, 1],
-      swet: 0.50, scycle: 1.5, sfb: 0.50, stilt: -0.20, sxover: 650, sdiffuse: 0.20,
-      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.9, 0.9, -0.6, 0.6],
-      tappitch: [0, 0, 7, -5],
-      drive: 0.30, crush: 0.22, crushmode: 3,
-      noise: 0, noisetype: 2, noisedecay: 0.25, noisetone: 1200, noisedyn: 2,
-      wow: 0.15, rverb: 0.20, rtime: 0.35 },
+      swet: 0.55, scycle: 12.0, sfb: 0.50, stilt: -0.20, sxover: 700, sdiffuse: 0.70,
+      taptimes: [2.0, 3.5, 5.0, 6.5], tappans: [-0.7, 0.7, -0.4, 0.4],
+      tappitch: [7, 12, 19, 24],                 // the climb itself
+      drive: 0.15, crush: 0, crushmode: 1,
+      noise: 0.06, noisetype: 2, noisedecay: 0.8, noisetone: 1100, noisedyn: 1.2,
+      wow: 0.28, rverb: 0.55, rtime: 0.80 },
 
     // 🔴 `lock 1` FREEZES THE BUFFER BIT-EXACTLY: `sos = msos.max(mlock) = 1`,
     // so `sosret = 1` and `sosin = 0` (`:638–646`) and nothing more is written.
@@ -1831,6 +1856,66 @@
    * rather than a dead page. `finish()` is called either way and simply reports
    * fewer things.
    */
+
+  /**
+   * Grade the station buttons — EARLY, before anybody is listening.
+   *
+   * 🔴 IT USED TO RUN IN THE ASSERT BURST AND IT TORE A HOLE IN THE SOUND.
+   * Switching station rebuilds the decoder, so the A/B put TWO gaps of about a
+   * second into the audio, several seconds in — and this page feeds a
+   * granulator whose ring records whatever arrives, so the holes were captured
+   * and then granulated. REPORTED from the deployed page as *"audio has holes,
+   * granulator seems to operate on holes too"*, which is exactly right: the
+   * check was manufacturing the silence the instrument then chewed.
+   *
+   * ⚠️ MUTING CANNOT FIX THIS, and that is the difference from the ink probe.
+   * A mute hides what you HEAR; this was a gap in the MATERIAL, upstream of
+   * every gain on the page. The only fix is to do it when a gap costs nothing —
+   * before the ring has filled, which the warm-up then does with continuous
+   * audio afterwards.
+   */
+  const S = { label: 'the station buttons switch the stream', pass: false, detail: 'not run' };
+  /**
+   * 🔴 STOPPING THE TRANSPORT TEARS THE STREAM DOWN, AND THIS RAN MID-LISTEN.
+   * On the element path a pause was a pause. On the decoded path the 1 Hz
+   * mirror CLOSES the stream when the deck stops and OPENS a new one when it
+   * starts, so this check cost a full decoder teardown and rebuild — a hole of
+   * a second and a half, several seconds in, which the granulator's ring then
+   * recorded and chewed. PHOTOGRAPHED: `22.26` the measurement finishes,
+   * `23.11 WebCodecs AudioDecoder` — a second decoder, from this check.
+   * It runs before the ring fills now, with the station A/B, where a gap costs
+   * nothing because nothing is holding it yet.
+   */
+  const T = { wasPlaying: false, stopped: false };
+  async function checkTransportStops() {
+    T.wasPlaying = isPlaying();
+    deck.pause();
+    await new Promise((r) => setTimeout(r, 1400));
+    T.stopped = !isPlaying();
+    if (T.wasPlaying) deck.play();
+  }
+  async function checkStationButtons() {
+    const here = STATIONS.findIndex(([, id]) => id === station);
+    const other = here === 0 ? 1 : 0;
+    if (picker.buttons[other].disabled) {
+      S.label = 'a station that is not answering has a button that refuses';
+      S.pass = avail.get(STATIONS[other][1]) === false;
+      S.detail = `${nameOf(STATIONS[other][1])} is down and its button is disabled`;
+      return;
+    }
+    const wasStation = station;
+    selfCheck = true;
+    picker.buttons[other].click();
+    await new Promise((r) => setTimeout(r, 120));
+    const moved = station === STATIONS[other][1];
+    picker.buttons[here].click();
+    await new Promise((r) => setTimeout(r, 120));
+    selfCheck = false;
+    S.pass = moved && station === wasStation;
+    S.detail = moved ? `${nameOf(wasStation)} -> ${nameOf(STATIONS[other][1])} and back`
+                     : `stayed on ${nameOf(station)}`;
+  }
+
   async function startGranulator() {
     if (eng) return;
     // 🔴 NOTHING HERE MAY TOUCH THE TRANSPORT, AND THE FIRST VERSION DID.
@@ -1944,13 +2029,22 @@
     // above 720 px and stacks them below, where sharing is what matters.
     const group = createSliderGroup([], { pair: true });
     group.el.classList.add('gran-rows');      // one rhythm — see the note in <style>
-    const add = (label, name, min, max, step, value, unit) => {
+    const add = (label, name, min, max, step, value, unit, opts = {}) => {
       const sld = group.add(createSlider({ label, min, max, step, value, unit,
+        warp: opts.warp, digits: opts.digits,
         onInput: (v) => { P[name] = v; setBoth(name, v); } }));
       granControls.push(sld);
       return sld;
     };
-    const sRate = add('grains a second', 'rate', 0.5, 40, 0.5, P.rate, '/s');
+    // 🔴 THE ENGINE'S OWN RANGE, ON THE ENGINE'S OWN CURVE. Upstream declares
+    // grain rate `0.1–100 Hz EXPONENTIAL` (`pappus.lua:2463`); this page offered
+    // 0.5–40 LINEAR, so the top of the instrument was simply unreachable and the
+    // bottom — where grains separate into single events you can count — was
+    // squeezed into the first one percent of the lane. That is most of why
+    // "everything sounds like one wash": the wash is the middle of a linear
+    // range, and a linear range is almost all middle.
+    const sRate = add('grains a second', 'rate', 0.1, 100, null, P.rate, '/s',
+      { warp: 'exp', digits: 2 });
     // ⚠️ THREE SECONDS AT THE TOP, NOT ONE, BECAUSE A PATCH REACHES PAST ONE.
     // `slow tide` holds 1.8 s grains and `piled up` 2.6 s; a slider that stops
     // at 1 would have shown `1.00 s` under a granulator holding 2.6, which is
@@ -1961,7 +2055,18 @@
     // `roof rain`'s 30 ms sits in the first one percent of the travel. The
     // patches carry the values and this nudges them; a warp in the kit is the
     // real fix and is written down in plan-radio-patches §1.2.
-    const sSize = add('grain length', 'size', 0.01, 3, 0.01, P.size, 's');
+    // 🔴 AND THE SAME FOR LENGTH, WHICH IS THE ONE THAT WAS WORST. The engine
+    // takes 2 ms to 8 s (`Engine_Pappus.sc:682`) and upstream's knob is
+    // `0.002–8 beats exponential` (`pappus.lua:2473`); this page offered
+    // 0.01–1 s linear, reaching ONE EIGHTH of the engine's top while spending
+    // half its travel between 0.5 s and 1 s, where nothing audibly changes.
+    // 2 ms to 50 ms — where a granulator stops being a delay and becomes a
+    // texture — had two percent of the lane.
+    // ⚠️ 4 s rather than 8: the ring this page records is eight seconds, so a
+    // grain longer than half of it is reading most of the buffer at once, which
+    // is a drone rather than a grain. The cap is the material's, not the engine's.
+    const sSize = add('grain length', 'size', 0.002, 4, null, P.size, 's',
+      { warp: 'exp', digits: 3 });
     // ⚠️ `scan` has its own setter and its own LABEL — see setScan. The label is
     // set from the patch below, so what is typed here is only what shows in the
     // half-second before the first patch lands.
@@ -2003,11 +2108,34 @@
     patchRow.options(PATCHES.map((p) => p.name), patch);
     patchPick = patchRow;
 
-    scope.el.after(wetRow.el);
-    wetRow.el.after(patchRow.el);
-    patchRow.el.after(group.el);
+    // 🔴 VARISPEED — the tape kind, pitch and all. Only possible because this
+    // page decodes the stream itself; a media element would never have handed
+    // it over. ⚠️ 0.25 and 0.5 fall behind the station PERMANENTLY (bytes
+    // arrive at 1×), and 2 runs the cushion dry — BEHIND and the log say so
+    // rather than the control pretending otherwise.
+    const speedRow = DECODE ? createChoice({
+      label: 'speed',
+      options: [['0.25', 0.25], ['0.5', 0.5], ['1', 1], ['2', 2]],
+      at: 2,
+      onPick: (r) => {
+        speed = r;
+        stream?.setRate(r);
+        d.log(r === 1 ? 'back to the station\u2019s own speed'
+          : r < 1 ? `${r}\u00d7 \u2014 pitched down, and falling further behind live every second`
+                  : `${r}\u00d7 \u2014 pitched up, and it can only last as long as the cushion`);
+      },
+    }) : null;
+
+    // Picture, blend, what the granulator IS, how fast the station runs, and
+    // then the four settings. Speed sits beside the sound rather than in the
+    // transport bar: it changes the material, not the playhead.
+    // Into the slot reserved at first paint, so nothing below moves.
+    granSlot.append(wetRow.el, patchRow.el);
+    if (speedRow) granSlot.append(speedRow.el);
+    granSlot.append(group.el);
     sliderRow = group.el;
     granControls.push({ disabled: (y) => patchRow.disabled(y) });
+    if (speedRow) granControls.push({ disabled: (y) => speedRow.disabled(y) });
 
     /**
      * One label column across both groups — see the note in <style>.
@@ -2050,6 +2178,11 @@
     // page behaving perfectly. Waiting for the ELEMENT rather than sleeping a
     // guess at it.
     await ensurePlaying();
+
+    // Before the ring fills: the two gaps this makes are then recorded over by
+    // the warm-up below, so nothing the granulator holds contains them.
+    await checkStationButtons();
+    await checkTransportStops();
 
     // 🔴 AND THEN WAIT FOR THE RING TO HOLD SOMETHING. A granulator cannot be
     // louder than what it has recorded, and this one records into an eight
@@ -2160,6 +2293,13 @@
       }
       return best;
     };
+    // 🔴 SAVE THE FADER BEFORE THE PROBE MOVES IT. `setWet` ASSIGNS to `wet`,
+    // so after the probe ran it to both ends `wet` held the probe's last value —
+    // and "restore" then restored that. REPORTED twice as the crossfade
+    // dropping to 0 on its own, and it was: the page put it there and called it
+    // putting it back. The slider is moved too, or the knob and the gain
+    // disagree, which is the page showing one thing and playing another.
+    const wasWet = wet;
     muted = true;                      // the self-check is not allowed to be heard
     setWet(0); await new Promise((r) => setTimeout(r, 400)); G.inkDry = await inkOver(1200);
     setWet(1); await new Promise((r) => setTimeout(r, 400)); G.inkWet = await inkOver(1200);
@@ -2232,6 +2372,16 @@
     await new Promise((r) => setTimeout(r, 120));
     G.otherMode = await ask1('mscanmode');
     G.otherElen = await ask1('melen');
+    // 🔴 READ THE GRAIN SETTINGS TOO, OR TWO NEIGHBOURS CAN BE INDISTINGUISHABLE.
+    // This graded `mscanmode`, `melen` and the pattern only — three keys that
+    // two legitimately different sounds can share. MEASURED the moment
+    // `stutter` was replaced by `updraft`: it sits beside `slow tide`, both
+    // crawl the read head (mode 1, no euclid), and the check went red saying
+    // they did not differ — while the engine had in fact taken a different
+    // rate, length, blend and delay. The check was right that IT could not see
+    // a change and wrong that there was none, which is the worse of the two.
+    G.otherRate = await ask1('mrate');
+    G.otherSize = await ask1('msize');
     G.otherPattern = await askPattern();
     patchRow.buttons[0].click();                   // `‹`, and back
     await new Promise((r) => setTimeout(r, 120));
@@ -2246,7 +2396,9 @@
     G.otherWant = PATCHES[otherPatch];
     G.wrong = missing(G.patch, G.scalars);
 
-    muted = false; setWet(wet);        // hand the fader back exactly where it was
+    muted = false;
+    setWet(wasWet);                    // the value the LISTENER left, not the probe's
+    fader.set(wasWet, { quiet: true });
     fader.set(0, true);            // quiet: leave the page as the visitor finds it
     setWet(0);
 
