@@ -551,6 +551,12 @@
     // so the machine is starting while the lamp strikes and the shutter closes
     // — the sound is part of that sequence rather than something that happens
     // after it.
+    // the machine only runs while something is on; anything that turns it off
+    // goes through `silence()`, which does not need a frame to happen
+    if (actx && actx.state === 'suspended' && (playing >= 0 || dwell > 0)) {
+      actx.resume().catch(() => {});
+      projector?.start();
+    }
     const want = (playing >= 0 && vidReady) ? PROJ_GAIN
       : (hover >= 0 && dwell > 0 ? PROJ_GAIN * 0.55 * (dwell / DWELL_MS) : 0);
     // ✅ MEASURED, by running the easing at a fixed 1/60 s rather than by
@@ -619,12 +625,31 @@
     }
   }
 
+  /** Silence the machine NOW, without waiting for a frame.
+   *
+   *  🔴 THE FADE LIVES IN THE RENDER LOOP, AND THE RENDER LOOP IS NOT ALWAYS
+   *  RUNNING. `placeSound()` is called from `step()`, which is called from
+   *  `requestAnimationFrame` — so the moment a tab is hidden the easing stops
+   *  dead and the gain freezes wherever it got to, while the projector's own
+   *  scheduler carries on putting clatters on the audio clock. Reported as
+   *  "sound does not stop when I get out", and that is precisely the mechanism:
+   *  nothing was turning it down because nothing was running.
+   *  ⚠️ So stopping is not allowed to depend on the thing that draws. This sets
+   *  the gain directly, stops the scheduler, and suspends the context — three
+   *  levels, because any one of them alone leaves something running.
+   */
+  function silence() {
+    projGain = 0;
+    if (projector) { projector.setGain(0); projector.stop(); }
+    if (actx && actx.state === 'running') actx.suspend().catch(() => {});
+  }
+
   function stopVideo(clear = true) {
     if (hls) { hls.destroy(); hls = null; }
     try { video.pause(); } catch { /* nothing loaded */ }
     video.removeAttribute('src'); video.load();
     vidReady = false;
-    if (clear) playing = -1;
+    if (clear) { playing = -1; silence(); }
   }
 
   // ── picking ─────────────────────────────────────────────────────────────
@@ -1290,6 +1315,16 @@
   } catch (e) {
     d.assert('the projector makes a sound at all', false, `offline render failed: ${e.message}`);
   }
+
+  // ⚠️ LEAVING IS NOT ONE EVENT, SO IT IS NOT ONE HANDLER. A tab can be hidden,
+  // backgrounded, navigated away from, or put in the back/forward cache, and
+  // they fire different things — `pagehide` covers the last two where `unload`
+  // does not fire at all on mobile Safari. All of them mean the same thing here:
+  // stop making a noise at somebody who is no longer looking.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stopVideo(true); d.log('hidden — stopped', 'hi'); }
+  });
+  addEventListener('pagehide', () => { stopVideo(true); projector?.dispose(); });
 
   d.log(`${tiles.length} films on the floor — drag to look, arrows to walk, rest your look to play`, 'hi');
   d.ready();
