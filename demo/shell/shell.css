@@ -933,6 +933,52 @@ video[hidden] { display: none; }
    directly above it, that means the button you are about to press again is not
    where it was. The floor is the same height a few rows occupy, so arriving
    messages fill the box rather than inflate it. */
+/* ── table: rows in columns the caller declares — shell/table.mjs ───────── */
+/* 🔴 A BOX, BECAUSE A TABLE IS A THING AND NOT A REGION OF THE PAGE. `/wire/`
+   drew one round its traffic in its own <style> and `/kurenniemi/` was about to
+   draw a second copy; it is here so the third page does not draw a third.
+   ⚠️ The border is on the WRAPPER and the rules between rows are `#ffffff08`,
+   the same near-invisible hairline the message list uses — a full-strength line
+   between every row turns a hundred records into a grid of boxes. */
+.pos-tbl {
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  font: 400 11px/1.55 var(--mono);
+  overflow: hidden;
+}
+/* ⚠️ THE BODY SCROLLS, NOT THE WRAPPER, so a header row stays put while the
+   records move under it. */
+.pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; }
+.pos-tbl-row {
+  display: grid; grid-template-columns: var(--tbl-cols);
+  gap: 8px; padding: 4px 10px; align-items: baseline;
+  border-bottom: 1px solid #ffffff08;
+}
+.pos-tbl-body > .pos-tbl-row:last-child { border-bottom: 0; }
+/* The heading is the one row that is not a record, so it says so by weight and
+   by case rather than by a rule under it — which every other row has too. */
+.pos-tbl-head {
+  color: var(--dim2); text-transform: uppercase; letter-spacing: .06em;
+  font-size: 10px; background: var(--card2); position: sticky; top: 0;
+}
+.pos-tbl-c { color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
+.pos-tbl-c.r { text-align: right; }
+.pos-tbl-c.hi { color: var(--fg); }
+/* One line, cut, with the whole value on `title` — see `clip` in table.mjs. */
+.pos-tbl-c.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Underlined on hover only: a hundred underlined names is a page of rules, and
+   the colour already separates a link from the columns either side of it. */
+.pos-tbl-a { color: var(--fg); text-decoration: none; }
+.pos-tbl-a:hover, .pos-tbl-a:focus-visible { text-decoration: underline; }
+.pos-tbl-empty { color: var(--dim2); padding: 8px 10px; }
+/* ⚠️ ON A PHONE THE FIXED TRACKS ARE MOST OF THE WIDTH. Every column keeps its
+   place and the table scrolls sideways as one piece, which keeps the columns
+   aligned — reflowing each row into a stack loses exactly the thing a table is
+   for. */
+@media (max-width: 620px) {
+  .pos-tbl-body { overflow-x: auto; }
+  .pos-tbl-row { min-width: 560px; }
+}
+
 .pos-msgs {
   font: 400 11px/1.55 var(--mono);
   min-height: 132px;

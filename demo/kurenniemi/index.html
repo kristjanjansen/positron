@@ -13,7 +13,20 @@
      count never changes, so there is nothing for that ceiling to hold back.
      Tall enough for a long look on a laptop, and it still scrolls inside its
      own box on a phone, where a long title wraps to two or three lines. */
-  .pos-msgs { max-height: 620px; }
+  /* Taller than the component's default: this is a list of 122 records and the
+     page has nothing else on it, so the box is the page. `--tbl-h` is the
+     component's own knob rather than an override of its rule. */
+  .pos-tbl { --tbl-h: 620px; }
+  /* 🔴 WIDER THAN THE PROSE, AND THE PAGE SAYS WHY RATHER THAN JUST DOING IT.
+     The shell caps a page at 720 px, which is right for a paragraph — 62
+     characters is a readable line and CLAUDE.md's one vertical rhythm assumes
+     it. This page is not a paragraph. Six columns need 510 px of fixed track
+     before the NAME gets a pixel, so inside 720 the titles were cut after about
+     twenty characters — MEASURED on the first render: `Erkki Kurenniemi
+     Archiv…`, `Coveted Beauty, Short F…`. The table breaks out to 1100 px and
+     the prose above it does not, because they are answering different
+     questions. Below that width it simply takes what there is. */
+  .pos-tbl { width: min(1100px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); }
 </style>
 
 <script type="module">
@@ -22,7 +35,7 @@
   // draw their rows with, taken unchanged. It owns three fixed gutters and one
   // fluid column, and everything this page has to say is fitted to that shape
   // rather than laid out again here.
-  import { createMessageList } from '/shell/messages.mjs';
+  import { createTable } from '/shell/table.mjs';
 
   // Built by `demo/kurenniemi/build-corpus.mjs`, which asks fourteen archives
   // and writes down what each one answered. The deck's own shorter list is
@@ -37,34 +50,29 @@
   // below. (The kit HAS a radio group, `choice.mjs`; it is not used here
   // because another session is editing that file today, and a component whose
   // behaviour may change under you is not a component you can assert on.)
-  const ORDERS = [
-    { id: 'bydate', label: 'Oldest first', primary: true },
-    { id: 'bykind', label: 'By what it is' },
-    { id: 'bysource', label: 'By who holds it' },
-  ];
 
   const d = mount({
     name: 'kurenniemi',
-    what: 'Every source and asset of Erkki Kurenniemi\'s work that could be reached, one row each: '
-        + 'when it is from, who holds it, what it is, whether there is a file to open, and the licence '
-        + 'that place states — "may reuse" counts the rows that are Creative Commons or public domain. '
-        + 'Nothing is copied: each row points at the place holding the thing, and one row can stand '
-        + 'for a whole set, like the 3,986 photographs behind a single index. Places that refused, or '
-        + 'that no longer exist, are in the list with what they answered.',
-    // FOUR CELLS, NOT SIX, AND THE ELLIPSIS IS WHY. At six across a laptop each
-    // cell is ~142 px wide and `.pos-v` is 19 px mono with `text-overflow:
-    // ellipsis` — MEASURED, `years` rendered as `1894–2…`, which is the house
-    // signal that something is in the wrong place rather than a width to fight.
-    // The two that went are the two a neighbour already carries: `kinds` is the
-    // first column of every row, and `files` is the third gutter of every row
-    // AND a button. `may reuse` stays because the licence is otherwise only at
-    // the end of a line, where it cannot be counted by eye.
-    readout: { showing: '', sources: '', 'may reuse': '', years: '' },
-    controls: [
-      ...ORDERS,
-      { id: 'files', label: 'Only what has a file' },
-      { id: 'free', label: 'Only what I may reuse' },
-    ],
+    what: 'Every reachable source for Erkki Kurenniemi\'s work, one row each: when it is from, who '
+        + 'holds it, what it is, and the licence they state. Nothing is copied — a row points at its '
+        + 'holder, and one row can stand for a whole set. Places that refused are listed with what '
+        + 'they answered.',
+    // 🔴 NO READOUT AND NO CONTROLS, AND BOTH WENT ON THE SAME INSTRUCTION.
+    // The page carried four counters and five buttons above a list of 122 rows
+    // — three orderings, two filters — which is more furniture than list before
+    // a reader has read a single line. Every number in that row was a count of
+    // the thing directly below it, and the orderings answered a question nobody
+    // had asked yet.
+    //
+    // What the counters said is not lost: the log line under the list gives the
+    // row count and the number of places, once, when the corpus loads. That is
+    // the right shape for a figure that changes when something happens rather
+    // than on a clock.
+    //
+    // ⚠️ THE FILTERS WENT WITH THEIR BUTTONS, AND SO DID THEIR TWO ASSERTS.
+    // Keeping the filtering behind a check nobody can reach would be a test of
+    // dead code, which reads as coverage and is not.
+    readout: null,
   });
   guard(d);
 
@@ -72,52 +80,87 @@
   // default prepends, which would draw this list upside down. The cap is well
   // over the size of the corpus so no row is dropped in silence; the check
   // below counts the rows against the items anyway.
-  const list = createMessageList({
-    cap: 400, newestFirst: false, mark: 'file',
+  /**
+   * 🔴 THE COLUMNS ARE DECLARED, AND THAT IS THE WHOLE CHANGE. This page was
+   * built on `messages.mjs`, whose columns are a relay message's — a direction,
+   * a size, a marker word and wrapped text — and every need here arrived as
+   * another option on it: a fourth column for the licence, a way to remove the
+   * third, a size the caller formats, a switch to stop wrapping. Four options
+   * to describe one table. REPORTED as *"just make reusable component that take
+   * different types of cols"*; `shell/table.mjs` is that, and this is its first
+   * caller.
+   *
+   * ⚠️ AND THE PADDED-MONOSPACE TRICK IS GONE WITH IT. The date and the source
+   * used to be `padEnd()` fields inside one text cell, which lines up only
+   * while every glyph is one width and cannot give a column its own colour,
+   * alignment or link. They are tracks now.
+   */
+  const table = createTable({
+    cap: 400,
     empty: 'nothing in this view',
+    columns: [
+      { key: 'kind', label: 'kind', width: 46 },
+      // A size can only exist if there is something to measure, which is why
+      // this replaced a column that said the word `file` beside the kind.
+      { key: 'size', label: 'size', width: 58, align: 'right' },
+      { key: 'date', label: 'when', width: 84 },
+      { key: 'source', label: 'who holds it', width: 122 },
+      // The name, linked to the record, cut to one line with the whole of it on
+      // `title`. `hi` because it is the thing on the row you are looking for.
+      { key: 'title', label: 'what', grow: true, link: 'url', clip: true, hi: true },
+      // ⚠️ CLIPPED, LIKE THE NAME. `public domain mark` is eighteen characters
+      // and wrapped to a second line on about a third of the rows — MEASURED on
+      // the first render — which made those rows double height and broke the
+      // one thing a table is for, which is scanning down it. The full string is
+      // on `title`, and there is nowhere to widen to: the name column is the
+      // one that should get any spare pixel.
+      { key: 'licence', label: 'licence', width: 132, align: 'right', clip: true },
+    ],
   });
-  d.el.append(list.el);
-  list.clear('reading the list…');
+  d.el.append(table.el);
+  table.clear('reading the list…');
 
-  // ── the columns, and how the source got one ─────────────────────────────
+  // ── what goes in each column ────────────────────────────────────────────
   //
-  // 🔴 THE SOURCE HAS A COLUMN NOW, AND IT IS NOT A GUTTER. The component's
-  // three fixed gutters are 34, 40 and 52 px of 11 px mono — about five, six
-  // and eight characters — and the shortest name in this corpus is `Yle` while
-  // the longest is `Wikimedia Commons` at seventeen. Nothing about that fits,
-  // and the two ways out were both worse than the problem: abbreviating the
-  // institutions invents names nobody can search for, and widening a gutter in
-  // `shell.css` changes the four other pages that draw this list.
-  //
-  // So the source is a PADDED FIELD inside the fluid text column, which is
-  // monospaced and keeps its spaces — the same trick the date has always used
-  // here, applied to the fact that was missing. `date  source  title` lines up
-  // down the page at every width where the row fits on one line, and where it
-  // does not the component wraps rather than ellipsizing, which is the house
-  // rule: an ellipsis means the content is in the wrong place.
-  //
-  // What is in each column: the first gutter says WHAT KIND of thing it is,
-  // the third says whether there is a file to open, and the text column says
-  // WHEN, WHO HOLDS IT, WHAT IT IS CALLED and WHAT YOU MAY DO WITH IT. The
-  // licence rides at the end of the line rather than in a column of its own,
-  // because the only way to fit `CC-BY-NC-SA-4.0` into eight characters is to
-  // cut it into a different licence — and the button beside the readout
-  // filters on it, which is what a column would have been for.
-  const KIND_W = 5;    // the first gutter, in characters
-  const DATE_W = 12;   // `1941-07-10` is the longest date, `1894–2003` the longest span
-  const SRC_W = 18;    // `Wikimedia Commons` plus one space
+  // 🔴 THE SOURCE HAS A COLUMN, AND GETTING ONE IS WHY THIS PAGE CHANGED
+  // COMPONENT. On the message list its three fixed gutters are 34, 40 and 52 px
+  // of 11 px mono — five, six and eight characters — while the names here run
+  // from `Yle` to `Wikimedia Commons`. Neither way out was acceptable:
+  // abbreviating institutions invents names nobody can search for, and widening
+  // a gutter in `shell.css` changes every other page that draws that list. A
+  // declared column costs neither.
 
   // The one kind too long for the first gutter, and the object it names — a
   // DIMI-A in a Stockholm museum — is a synthesiser. The rest are already
   // short words or are cut to one that means the same thing at this width.
   const SHORT = { instrument: 'synth', collection: 'set', recording: 'track',
                   release: 'album', article: 'story' };
-  const kindOf = (it) => (SHORT[it.kind] || it.kind).slice(0, KIND_W);
+  const kindOf = (it) => SHORT[it.kind] || it.kind;
   // Nothing unmeasured prints as a number. A row whose source recorded no date
   // at all — a MusicBrainz track, an archive.org upload, a host that refused —
   // gets one em dash, never a padded guess at a year.
   const dateOf = (it) => it.when.edtf || '—';
   const fileOf = (it) => !!it.file;
+  /**
+   * The size column, and the page does the arithmetic because the page owns the
+   * measurement — `messages.mjs` prints what it is handed.
+   *
+   * ⚠️ NOT RAW BYTES. The largest file here is 990,701,568 of them, which is
+   * eleven characters in a column sized for six, and a byte count is not a
+   * thing anybody reads at that magnitude anyway.
+   * ⚠️ AND A ROW THAT STANDS FOR SEVERAL THINGS SAYS HOW MANY INSTEAD. A set of
+   * 3,986 photographs has no single size; `3986×` is the honest answer and it
+   * is the same question the column asks — how much is behind this row.
+   */
+  const sizeOf = (it) => {
+    if (it.count > 1) return `${it.count}\u00d7`;
+    const b = it.bytes;
+    if (!b) return '';
+    if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`;
+    if (b >= 1e6) return `${Math.round(b / 1e6)} MB`;
+    if (b >= 1e3) return `${Math.round(b / 1e3)} kB`;
+    return `${b} B`;
+  };
   // Public domain or a Creative Commons licence of any flavour. Everything
   // else — all rights reserved, licensed per screening, not stated, unknown —
   // is not something this page will tell you that you may reuse.
@@ -126,9 +169,10 @@
 
   let corpus = null;
   let items = [];
-  let order = 'bydate';
-  let onlyFiles = false;
-  let onlyFree = false;
+  // Oldest first, and only that. The other two orderings were buttons and went
+  // with the rest of the row; the sort table below keeps its shape so a second
+  // ordering is a line rather than a rewrite.
+  const order = 'bydate';
 
   function view() {
     const by = {
@@ -142,65 +186,27 @@
       bysource: (a, b) => a.source.localeCompare(b.source)
         || (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity),
     }[order];
-    return items
-      .filter((it) => (!onlyFiles || fileOf(it)) && (!onlyFree || freeOf(it)))
-      .sort(by);
+    return items.slice().sort(by);
   }
 
   function draw() {
     const rows = view();
-    list.set(rows.map((it) => ({
-      dir: kindOf(it),
-      mark: fileOf(it),
-      // no bytes: the component prints this gutter as a raw byte count, and the
-      // largest file here is 990,701,568 of them — eleven characters in a
-      // six-character box. The sizes are in the corpus file; they are not
-      // something this gutter can say without breaking the row.
-      text: `${dateOf(it).padEnd(DATE_W)}${it.source.padEnd(SRC_W)}${it.title}`
-          // A row that stands for more than one thing says how many — except a
-          // whole collection, whose title already carries the number, because
-          // saying it twice on one line is the same waste as a legend.
-          + (it.count > 1 && it.kind !== 'collection' ? ` · ${it.count} files` : '')
-          + ` · ${it.licence}`,
+    // 🔴 THE NAME IS A LINK TO THE THING. Every row here is a POINTER at
+    // something held somewhere else, and until now there was no way to go there
+    // — REPORTED as *"titles should be links"*. A row with no URL still shows
+    // its name; it just does not lead anywhere, which is the truth about it and
+    // not a reason to hide it.
+    table.set(rows.map((it) => ({
+      kind: kindOf(it),
+      size: sizeOf(it),
+      date: dateOf(it),
+      source: it.source,
+      title: it.title,
+      url: it.url || null,
+      licence: it.licence,
     })));
-    d.set('showing', rows.length);
-    d.set('sources', new Set(rows.map((it) => it.source)).size);
-    d.set('may reuse', rows.filter(freeOf).length);
-    // The end of a span is the first moment the thing is already over, so the
-    // last year it covers is one millisecond before it. Without that, every
-    // span ending in 1973 reads as reaching into 1974.
-    const dated = rows.filter((it) => it.when.earliest != null);
-    d.set('years', dated.length
-      ? `${Math.min(...dated.map((it) => YEAR(it.when.earliest)))}–`
-        + `${Math.max(...dated.map((it) => YEAR(it.when.latest - 1)))}`
-      : '');
     return rows;
   }
-
-  const ORDER_LABELS = new Set(ORDERS.map((o) => o.label));
-  for (const o of ORDERS) {
-    d.on(o.id, (b) => {
-      order = o.id;
-      for (const other of b.parentElement.querySelectorAll('button')) {
-        if (ORDER_LABELS.has(other.textContent)) other.classList.toggle('pos-pri', other === b);
-      }
-      draw();
-    });
-  }
-  const toggle = (b, on, offLabel, onLabel) => {
-    b.textContent = on ? onLabel : offLabel;
-    b.setAttribute('aria-pressed', String(on));
-  };
-  d.on('files', (b) => {
-    onlyFiles = !onlyFiles;
-    toggle(b, onlyFiles, 'Only what has a file', 'Show everything');
-    draw();
-  });
-  d.on('free', (b) => {
-    onlyFree = !onlyFree;
-    toggle(b, onlyFree, 'Only what I may reuse', 'Show everything');
-    draw();
-  });
 
   try {
     const res = await fetch(CORPUS);
@@ -233,26 +239,7 @@
       `${dated.length} of ${items.length} dated, ${lo} to ${hi}`);
 
     d.assert('the table shows one row per item',
-      list.count() === items.length, `${list.count()} rows for ${items.length} items`);
-
-    // BOTH FILTERS, BOTH WAYS, ON EVERY RUN. A filter is a branch, and a branch
-    // entered only when somebody presses a button is a branch the suite can
-    // lose. This enters each one, counts it and puts the page back.
-    const withFile = items.filter(fileOf).length;
-    onlyFiles = true; draw();
-    const filtered = list.count();
-    onlyFiles = false; draw();
-    d.assert('"only what has a file" keeps exactly those rows',
-      filtered === withFile && list.count() === items.length,
-      `${filtered} of ${items.length} have a file`);
-
-    const reusable = items.filter(freeOf).length;
-    onlyFree = true; draw();
-    const filteredFree = list.count();
-    onlyFree = false; draw();
-    d.assert('"only what I may reuse" keeps exactly those rows',
-      filteredFree === reusable && list.count() === items.length,
-      `${reusable} of ${items.length} carry a licence that allows it`);
+      table.count() === items.length, `${table.count()} rows for ${items.length} items`);
 
     // The list says its media is referenced where it lives and never copied.
     // That is a claim about every address in it, so it is checked against every
@@ -260,7 +247,7 @@
     const here = items.flatMap((it) => [it.file, it.url].filter(Boolean))
       .filter((u) => new URL(u).host === location.host);
     d.assert('nothing is served from here', here.length === 0,
-      here.length ? here[0] : `${withFile} files, all somewhere else`);
+      here.length ? here[0] : `${items.filter(fileOf).length} files, all somewhere else`);
 
     // Every place that was asked has a row in the corpus's ledger, and the
     // ledger's counts add up to the list. A source that quietly stopped
@@ -310,7 +297,7 @@
     // No ready() here on purpose: a page that could not read its own list has
     // nothing to show and nothing to check, and the harness reports the reason
     // out of `__demo.failed` rather than a silent row of empty cells.
-    list.clear(`could not read the list: ${e.message}`);
+    table.clear(`could not read the list: ${e.message}`);
     d.fail(e);
   }
 </script>
