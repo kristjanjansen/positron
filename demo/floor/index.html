@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<script src="/proto/remixer/hls.min.js"></script>
+<style>
+  /* The picture is the page. It keeps a fixed aspect so nothing below it moves
+     as the window changes — shell.css owns the gap around it. */
+  .fl { position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 280px;
+        background: #07090d; border: 1px solid var(--line); border-radius: 4px;
+        overflow: hidden; touch-action: none; cursor: grab; }
+  .fl:active { cursor: grabbing; }
+  .fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* The title of whatever is under the pointer. A FIXED BOX: it is written on
+     every frame the gaze moves, and a caption that can change its own height
+     would push the picture about while somebody is looking at it. */
+  .fl-name { position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
+             display: flex; align-items: center; gap: 10px; padding: 0 12px;
+             background: linear-gradient(transparent, rgba(7, 9, 13, .92) 55%);
+             font: 500 12px/1.3 var(--mono); color: var(--fg);
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fl-name b { color: var(--hi); font-weight: 600; }
+  .fl-name i { color: var(--dim2); font-style: normal; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mul, modelM, perspective } from '/shell/xr-room.mjs';
+  import { pickQuad } from '/shell/xr-pick.mjs';
+
+  // ── the field ───────────────────────────────────────────────────────────
+  const TILE = 0.55;            // metres across
+  const GAP = 0.07;
+  const PITCH = TILE + GAP;
+  const COLS = 18;
+  const TEX_W = 256, TEX_H = 192;
+  // 🔴 A FIXED NUMBER OF TEXTURE SLOTS, AND IT IS WHY THIS DRAWS IN ONE CALL.
+  // Every tile could have its own texture, and then a floor of 298 pictures is
+  // 298 binds and 298 draws per EYE per frame. Instead the whole floor lives in
+  // one `TEXTURE_2D_ARRAY` and one instanced draw: a tile's instance carries the
+  // LAYER it is using, and a tile with no layer is not drawn at all.
+  // 128 layers of 256x192 RGBA is ~25 MB, which a Quest has and a laptop will
+  // not notice; it is also the LRU's capacity, so "how much can be on screen"
+  // and "how much is kept" are one number rather than two that can disagree.
+  const LAYERS = 128;
+  const LOAD_RADIUS = 7.5;      // metres — beyond this nothing is even requested
+  const CONCURRENT = 6;         // image fetches in flight
+
+  const d = mount({
+    name: 'floor',
+    what: 'Every 1965 newsreel in the ERR archive, face up on a floor you can '
+      + 'walk over. Drag to look, W A S D to move, and click a tile to play it; '
+      + 'in a headset, point and pull the trigger. loaded is how many pictures '
+      + 'are on the floor right now and reach is how far out they have got.',
+    readout: { tiles: '', loaded: 'of 128', reach: 'm', fetching: '', fps: '', playing: '' },
+    controls: [
+      { id: 'vr', label: 'Run in VR', primary: true },
+      { id: 'stop', label: 'Stop the video' },
+    ],
+  });
+  guard(d);
+
+  const wrap = el('div', 'fl');
+  const canvas = el('canvas');
+  const nameEl = el('div', 'fl-name');
+  wrap.append(canvas, nameEl);
+  d.el.append(wrap);
+
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
+  if (!gl) { d.fail(new Error('this browser draws no 3-D')); throw new Error('no webgl2'); }
+
+  // ⚠️ THE PAGE SAYS WHICH RENDERER IT GOT, ALWAYS. A visitor on a software
+  // rasteriser is a real visitor and the page should say so rather than quietly
+  // being slow; `verify-gl.mjs` also checks this AGREES with what it found, so
+  // the two cannot be describing different contexts.
+  {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    // ⚠️ THE RENDERER ALONE, WITH NO VENDOR PREFIX. `verify-gl.mjs` compares
+    // this string to its OWN reading and both must be the same quantity — a
+    // prettier `vendor · renderer` here fails a check that is not about
+    // prettiness, it is about the two of them describing one context.
+    const rendererName = dbg
+      ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+      : gl.getParameter(gl.RENDERER);
+    window.__demo.gl = { renderer: rendererName, ok: !!gl };
+    d.log(`renderer: ${rendererName}`);
+  }
+
+  // ── the catalogue ───────────────────────────────────────────────────────
+  let tiles = [];
+  const state = [];             // per tile: {x, z, layer, a, v, want, img, loading}
+
+  // ── the texture array, and the slots it hands out ───────────────────────
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, TEX_W, TEX_H, LAYERS);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  // 🔴 THE LRU IS BY DISTANCE FROM WHERE YOU ARE LOOKING, NOT BY AGE. A
+  // least-recently-used slot is the wrong thing to evict on a floor you walk
+  // over: the tile behind you was used a moment ago and you are never going to
+  // look at it again, while the one ahead has never been used and is about to
+  // be. Age would evict exactly the tiles about to be needed.
+  const freeLayers = Array.from({ length: LAYERS }, (_, i) => i);
+  const usedLayers = new Map();          // layer -> tile index
+
+  function takeLayer(ti, dist) {
+    if (freeLayers.length) { const L = freeLayers.pop(); usedLayers.set(L, ti); return L; }
+    let worst = -1, worstD = dist;
+    for (const [L, owner] of usedLayers) {
+      if (state[owner].v > 0.01) continue;      // never evict what is playing
+      const dd = distOf(owner);
+      if (dd > worstD) { worstD = dd; worst = L; }
+    }
+    if (worst < 0) return -1;                   // nothing further away than us
+    const prev = usedLayers.get(worst);
+    state[prev].layer = -1; state[prev].a = 0; state[prev].want = false;
+    usedLayers.set(worst, ti);
+    return worst;
+  }
+
+  // ── one program, one instanced draw ─────────────────────────────────────
+  const VS = `#version 300 es
+  layout(location=0) in vec2 quad;      // -0.5..0.5
+  layout(location=1) in vec4 inst;      // x, z, layer, imageAlpha
+  layout(location=2) in float vidA;     // video alpha
+  uniform mat4 uVP;
+  uniform float uTile;
+  out vec2 vUV; flat out float vLayer; out float vA; out float vV;
+  void main(){
+    vec3 p = vec3(inst.x + quad.x * uTile, 0.0, inst.y + quad.y * uTile);
+    gl_Position = uVP * vec4(p, 1.0);
+    // the picture's top edge points AWAY from the origin, so the whole floor
+    // reads the same way up when you stand at the near edge and look across it
+    vUV = vec2(quad.x + 0.5, 0.5 - quad.y);
+    vLayer = inst.z; vA = inst.w; vV = vidA;
+  }`;
+  const FS = `#version 300 es
+  precision highp float; precision highp sampler2DArray;
+  in vec2 vUV; flat in float vLayer; in float vA; in float vV;
+  uniform sampler2DArray uTex;
+  uniform sampler2D uVid;
+  out vec4 frag;
+  void main(){
+    vec3 still = texture(uTex, vec3(vUV, vLayer)).rgb;
+    vec3 moving = texture(uVid, vUV).rgb;
+    // 🔴 THE FADE IS A MIX OF TWO PICTURES, NOT A FADE TO BLACK AND BACK. Going
+    // out through black is two transitions where there should be one, and on a
+    // floor of stills the hole reads as a tile that broke.
+    vec3 c = mix(still, moving, clamp(vV, 0.0, 1.0));
+    // the still fades UP from the floor's own colour as it arrives
+    frag = vec4(mix(vec3(0.055, 0.066, 0.086), c, clamp(vA, 0.0, 1.0)), 1.0);
+  }`;
+  function shader(type, src) {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+  // ⚠️ BEFORE linkProgram, NOT AFTER. `bindAttribLocation` only takes effect at
+  // the NEXT link — called afterwards it is a no-op that reads like a fix, and
+  // a Quest reported GL_INVALID_OPERATION on its first frame and drew correctly
+  // anyway because the linker happened to choose the same slots.
+  gl.bindAttribLocation(prog, 0, 'quad');
+  gl.bindAttribLocation(prog, 1, 'inst');
+  gl.bindAttribLocation(prog, 2, 'vidA');
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  const uVP = gl.getUniformLocation(prog, 'uVP');
+  const uTile = gl.getUniformLocation(prog, 'uTile');
+  const uTexL = gl.getUniformLocation(prog, 'uTex');
+  const uVidL = gl.getUniformLocation(prog, 'uVid');
+
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  const instBuf = gl.createBuffer(), vidBuf = gl.createBuffer();
+  let instData = new Float32Array(0), vidData = new Float32Array(0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(1, 1);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(2, 1);
+  gl.bindVertexArray(null);
+
+  // the video texture — one, because one thing plays at a time
+  const vidTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, vidTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+    new Uint8Array([14, 17, 22, 255]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  // ── where you are ───────────────────────────────────────────────────────
+  const eye = [0, 1.65, 3.2];
+  let yaw = 0, pitch = -0.62;
+  const look = () => [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
+
+  /** Where the gaze meets the floor — the centre the loading spreads from. */
+  let gaze = [0, 0];
+  function gazePoint() {
+    const dvec = look();
+    if (dvec[1] >= -0.02) return [eye[0] + dvec[0] * 8, eye[2] + dvec[2] * 8];
+    const t = -eye[1] / dvec[1];
+    return [eye[0] + dvec[0] * t, eye[2] + dvec[2] * t];
+  }
+  const distOf = (i) => Math.hypot(state[i].x - gaze[0], state[i].z - gaze[1]);
+
+  // ── loading, and the order it happens in ────────────────────────────────
+  //
+  // 🔴 NEAREST TO WHERE YOU ARE LOOKING FIRST, RE-SORTED AS YOU LOOK. Loading
+  // the catalogue in order fills the floor from one corner and leaves the tile
+  // under your nose blank while the far end of 1965 arrives. The queue is
+  // rebuilt from the CURRENT gaze point every time a slot frees, so turning
+  // your head changes what is being fetched rather than what is fetched next
+  // after everything already asked for.
+  let inflight = 0, loadedCount = 0, reach = 0;
+  function pump() {
+    if (!tiles.length) return;
+    while (inflight < CONCURRENT) {
+      let best = -1, bestD = LOAD_RADIUS;
+      for (let i = 0; i < state.length; i++) {
+        const s = state[i];
+        if (s.want || s.layer >= 0 || !tiles[i].photo) continue;
+        const dd = distOf(i);
+        if (dd < bestD) { bestD = dd; best = i; }
+      }
+      if (best < 0) return;
+      const s = state[best];
+      const L = takeLayer(best, bestD);
+      if (L < 0) return;                 // every slot is nearer than this tile
+      s.want = true; s.layer = L; s.a = 0;
+      inflight++;
+      loadOne(best, L, bestD);
+    }
+  }
+
+  function loadOne(i, L, dd) {
+    const img = new Image();
+    // ⚠️ SAME-ORIGIN, WHICH IS THE WHOLE REASON `/err-img` EXISTS. The archive's
+    // own image hosts answer 200 with NO access-control-allow-origin — measured
+    // — so an `<img>` can DISPLAY them and `texSubImage3D` cannot READ them.
+    // Asking our own origin makes the pixels ours to upload.
+    img.decoding = 'async';
+    img.src = `/err-img?f=${encodeURIComponent(tiles[i].photo)}&w=${TEX_W}&h=${TEX_H}`;
+    img.onload = () => {
+      inflight--;
+      // the tile may have lost its slot to something nearer while this was in
+      // flight — uploading then would paint the wrong picture into somebody
+      // else's layer, which is the worst available bug because it looks right
+      if (state[i].layer !== L || usedLayers.get(L) !== i) { pump(); return; }
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, 0, 0, L, TEX_W, TEX_H, 1,
+        gl.RGBA, gl.UNSIGNED_BYTE, img);
+      state[i].img = true;
+      loadedCount = Math.min(LAYERS, loadedCount + 1);
+      reach = Math.max(reach, dd);
+      pump();
+    };
+    img.onerror = () => {
+      inflight--;
+      // a miss is remembered: `photo` is cleared so the queue stops offering it
+      tiles[i].photo = null;
+      state[i].want = false;
+      if (state[i].layer === L) { state[i].layer = -1; usedLayers.delete(L); freeLayers.push(L); }
+      pump();
+    };
+  }
+
+  // ── the one video ───────────────────────────────────────────────────────
+  const video = el('video');
+  video.playsInline = true; video.muted = true; video.loop = true;
+  video.crossOrigin = 'anonymous';      // vod.err.ee sends ACAO:* — measured
+  // 🔴 IN THE DOCUMENT, AND NOT `display: none`. A detached `<video>` is not
+  // reliably decoded — the element played, `currentTime` moved on some browsers
+  // and not others, and nothing ever reached the texture. `display: none` has
+  // the same failure with better manners: a box that is not laid out can have
+  // its decode dropped too. Off-screen and 2 px is a video the browser still
+  // considers to be on the page.
+  // ⚠️ And it is 2 px rather than 1: some decoders refuse a 1 px box.
+  video.style.cssText = 'position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none';
+  wrap.append(video);
+  let hls = null, playing = -1, vidReady = false;
+
+  async function playTile(i) {
+    if (i < 0 || i >= tiles.length) return;
+    if (playing === i) return;
+    stopVideo(false);
+    playing = i;
+    d.set('playing', tiles[i].title.slice(0, 18));
+    try {
+      const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(tiles[i].slug)}`);
+      const j = await r.json();
+      const raw = (j?.data?.media || j?.media)?.src?.hls;
+      if (!raw) { d.log(`${tiles[i].slug}: the archive offers no stream`, 'bad'); stopVideo(true); return; }
+      // ERR hands back a PROTOCOL-RELATIVE url; on a local http page that would
+      // resolve to http and be blocked as mixed content on the deploy. Pin it.
+      const src = raw.startsWith('//') ? `https:${raw}` : raw;
+      // ⚠️ MMS, NOT canPlayType. `canPlayType('application/vnd.apple.mpegurl')`
+      // answers "maybe" in Chrome AND in headless Chrome, so it cannot tell the
+      // two paths apart — three demos played a dead picture behind a green
+      // suite for exactly this. ManagedMediaSource is WebKit-only, so it is a
+      // capability test rather than a brand check.
+      if ('ManagedMediaSource' in window) {
+        video.disableRemotePlayback = true;
+        video.src = src;
+      } else if (window.Hls?.isSupported()) {
+        hls = new window.Hls({ capLevelToPlayerSize: true, maxBufferLength: 12 });
+        hls.loadSource(src); hls.attachMedia(video);
+      } else { d.log('no HLS path in this browser', 'bad'); stopVideo(true); return; }
+      // NOT awaited: play() waits on a user gesture and does not reject, so
+      // awaiting it is a hang rather than an error.
+      video.play().catch(() => {});
+      d.log(`playing ${tiles[i].title}`, 'hi');
+    } catch (e) {
+      d.log(`could not ask the archive: ${e.message}`, 'bad');
+      stopVideo(true);
+    }
+  }
+
+  function stopVideo(clear = true) {
+    if (hls) { hls.destroy(); hls = null; }
+    try { video.pause(); } catch { /* nothing loaded */ }
+    video.removeAttribute('src'); video.load();
+    vidReady = false;
+    if (clear) { playing = -1; d.set('playing', ''); }
+  }
+
+  // ── picking ─────────────────────────────────────────────────────────────
+  //
+  // ⚠️ ONE PICK FUNCTION FOR BOTH A MOUSE AND A CONTROLLER, because they are
+  // the same question: a ray, and which flat rectangle it lands on first. The
+  // mouse's ray comes out of the camera through the pointer; the controller's
+  // comes out of its own pose. `pickQuad` grades both, and it is tested on a
+  // laptop with no headset at all.
+  function pickFloor(o, dir) {
+    if (dir[1] >= -1e-4) return -1;
+    const t = -o[1] / dir[1];
+    const px = o[0] + dir[0] * t, pz = o[2] + dir[2] * t;
+    let best = -1, bestD = TILE * 0.72;
+    for (let i = 0; i < state.length; i++) {
+      if (state[i].layer < 0) continue;
+      const dd = Math.max(Math.abs(state[i].x - px), Math.abs(state[i].z - pz));
+      if (dd < bestD) { bestD = dd; best = i; }
+    }
+    return best;
+  }
+
+  let hover = -1;
+  function setHover(i) {
+    if (i === hover) return;
+    hover = i;
+    if (i < 0) { nameEl.innerHTML = ''; return; }
+    nameEl.innerHTML = '';
+    nameEl.append(el('b', '', tiles[i].date), el('span', '', tiles[i].title),
+      el('i', '', tiles[i].series || ''));
+  }
+
+  // ── the desktop camera ──────────────────────────────────────────────────
+  let dragging = false, lastX = 0, lastY = 0, moved = 0;
+  const keys = new Set();
+  wrap.addEventListener('pointerdown', (e) => {
+    dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
+    wrap.setPointerCapture(e.pointerId);
+  });
+  wrap.addEventListener('pointermove', (e) => {
+    const r = wrap.getBoundingClientRect();
+    const ndx = ((e.clientX - r.left) / r.width) * 2 - 1;
+    const ndy = 1 - ((e.clientY - r.top) / r.height) * 2;
+    setHover(pickFloor(eye, rayThrough(ndx, ndy)));
+    if (!dragging) return;
+    moved += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
+    yaw += (e.clientX - lastX) * 0.004;
+    pitch = Math.max(-1.45, Math.min(0.5, pitch - (e.clientY - lastY) * 0.004));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  wrap.addEventListener('pointerup', (e) => {
+    dragging = false;
+    // a drag is not a click — 6 px of travel is the difference between looking
+    // around and asking for a film
+    if (moved < 6 && hover >= 0) playTile(hover);
+    try { wrap.releasePointerCapture(e.pointerId); } catch { /* gone */ }
+  });
+  addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
+  addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+
+  let projM = perspective(1.05, 16 / 9, 0.05, 60);
+  function rayThrough(ndx, ndy) {
+    const f = Math.tan(1.05 / 2);
+    const asp = canvas.width / Math.max(1, canvas.height);
+    const cx = ndx * f * asp, cy = ndy * f;
+    const fwd = look();
+    const upW = [0, 1, 0];
+    const right = norm(cross(fwd, upW));
+    const up = cross(right, fwd);
+    return norm([fwd[0] + right[0] * cx + up[0] * cy,
+      fwd[1] + right[1] * cx + up[1] * cy,
+      fwd[2] + right[2] * cx + up[2] * cy]);
+  }
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const norm = (v) => { const L = Math.hypot(...v) || 1; return [v[0] / L, v[1] / L, v[2] / L]; };
+  function viewM() {
+    const f = look(), r = norm(cross(f, [0, 1, 0])), u = cross(r, f);
+    return new Float32Array([
+      r[0], u[0], -f[0], 0, r[1], u[1], -f[1], 0, r[2], u[2], -f[2], 0,
+      -(r[0] * eye[0] + r[1] * eye[1] + r[2] * eye[2]),
+      -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]),
+      (f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2]), 1]);
+  }
+
+  // ── the frame ───────────────────────────────────────────────────────────
+  let lastT = performance.now(), fpsAcc = 0, fpsN = 0, frames = 0;
+  function step(dt) {
+    // walking
+    const sp = 2.6 * dt;
+    const f = look(), r = norm(cross(f, [0, 1, 0]));
+    if (keys.has('w')) { eye[0] += f[0] * sp; eye[2] += f[2] * sp; }
+    if (keys.has('s')) { eye[0] -= f[0] * sp; eye[2] -= f[2] * sp; }
+    if (keys.has('a')) { eye[0] -= r[0] * sp; eye[2] -= r[2] * sp; }
+    if (keys.has('d')) { eye[0] += r[0] * sp; eye[2] += r[2] * sp; }
+    gaze = gazePoint();
+    pump();
+
+    // the fades, per tile, every frame — an image eases up when it lands and a
+    // video eases over the still it replaces
+    // ⚠️ ONE EASING, WRITTEN ONCE. This was `s.a += (target) - s.a > 0 ? k*(1-s.a)
+    // : -k*s.a`, which happens to evaluate correctly and cannot be read — the
+    // `?:` binds after the `-` and the `>`, so whether it was the intended
+    // expression took working the precedence out by hand. A line nobody can
+    // check by looking at it is a line that will be edited wrongly.
+    const k = Math.min(1, dt * 3.2);
+    const ease = (cur, target) => cur + (target - cur) * k;
+    for (let i = 0; i < state.length; i++) {
+      const s = state[i];
+      s.a = ease(s.a, (s.img && s.layer >= 0) ? 1 : 0);
+      s.v = ease(s.v, (i === playing && vidReady) ? 1 : 0);
+      if (s.v < 0.002) s.v = 0;
+      if (s.a < 0.002) s.a = 0;
+      if (s.a > 0.998) s.a = 1;
+    }
+  }
+
+  function upload() {
+    const n = state.length;
+    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n); }
+    let drawn = 0;
+    for (let i = 0; i < n; i++) {
+      const s = state[i];
+      if (s.layer < 0 || s.a < 0.002) continue;
+      const o = drawn * 4;
+      instData[o] = s.x; instData[o + 1] = s.z; instData[o + 2] = s.layer; instData[o + 3] = s.a;
+      vidData[drawn] = s.v;
+      drawn++;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, instData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn), gl.DYNAMIC_DRAW);
+    return drawn;
+  }
+
+  function draw(vp, w, h) {
+    const drawn = upload();
+    gl.viewport(0, 0, w, h);
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(0.027, 0.035, 0.051, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!drawn) return;
+    if (playing >= 0 && video.readyState >= 2 && video.videoWidth) {
+      gl.bindTexture(gl.TEXTURE_2D, vidTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      vidReady = true;
+    }
+    gl.useProgram(prog);
+    gl.uniformMatrix4fv(uVP, false, vp);
+    gl.uniform1f(uTile, TILE);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
+    gl.bindVertexArray(vao);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, drawn);
+    gl.bindVertexArray(null);
+  }
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    frames++;
+    if (dt > 0) { fpsAcc += 1 / dt; fpsN++; }
+    if (fpsN >= 30) { d.set('fps', Math.round(fpsAcc / fpsN)); fpsAcc = 0; fpsN = 0; }
+    step(dt);
+    const r = wrap.getBoundingClientRect();
+    const W = Math.max(2, Math.round(r.width * devicePixelRatio));
+    const H = Math.max(2, Math.round(r.height * devicePixelRatio));
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    projM = perspective(1.05, W / H, 0.05, 60);
+    draw(mul(projM, viewM()), W, H);
+    d.set('loaded', loadedCount);
+    d.set('reach', reach.toFixed(1));
+    d.set('fetching', inflight);
+    if (!xrSession) requestAnimationFrame(frame);
+  }
+
+  // ── VR ──────────────────────────────────────────────────────────────────
+  let xrSession = null, xrRefSpace = null, headsetKnown = null;
+  navigator.xr?.isSessionSupported('immersive-vr').then((v) => { headsetKnown = v; },
+    () => { headsetKnown = false; });
+
+  d.on('vr', async () => {
+    if (!navigator.xr) { d.log('this browser has no WebXR at all', 'bad'); return; }
+    // ⚠️ NO AWAIT BEFORE requestSession — it needs a TRANSIENT user activation
+    // and awaiting anything first can spend it. The support answer is the one
+    // taken at load, never a fresh await here.
+    if (headsetKnown === false) { d.log('no headset here — the window above is the same floor', 'warn'); return; }
+    try {
+      const session = await navigator.xr.requestSession('immersive-vr',
+        { requiredFeatures: ['local-floor'] });
+      xrSession = session;
+      await gl.makeXRCompatible();
+      session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+      xrRefSpace = await session.requestReferenceSpace('local-floor');
+      // ⚠️ ANY BUTTON LEAVES. "Press the Meta button" is not an answer a page
+      // gets to give about its own bug.
+      session.addEventListener('selectstart', onSelect);
+      session.addEventListener('end', () => {
+        xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
+      });
+      d.log('in VR — point at a tile and pull the trigger', 'hi');
+      session.requestAnimationFrame(xrFrame);
+    } catch (e) { d.log(`VR did not start: ${e.message}`, 'bad'); }
+  });
+  d.on('stop', () => { stopVideo(true); d.log('stopped'); });
+
+  function onSelect(ev) {
+    const pose = xrFramePose && ev.frame?.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
+    if (!pose) return;
+    const m = pose.transform.matrix;
+    const i = pickFloor([m[12], m[13], m[14]], norm([-m[8], -m[9], -m[10]]));
+    if (i >= 0) playTile(i);
+  }
+
+  let xrFramePose = null;
+  function xrFrame(now, xframe) {
+    const session = xframe.session;
+    session.requestAnimationFrame(xrFrame);
+    const pose = xframe.getViewerPose(xrRefSpace);
+    xrFramePose = pose;
+    if (!pose) return;
+    // 🔴 baseLayer is NULL until the next animation frame — `updateRenderState`
+    // QUEUES, it does not apply. Reading it a line after creating the session
+    // throws, and the throw escapes the handler, so the render loop and the way
+    // out are both never registered.
+    const layer = session.renderState.baseLayer;
+    if (!layer) return;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    const head = pose.transform.matrix;
+    eye[0] = head[12]; eye[1] = head[13]; eye[2] = head[14];
+    // the gaze in a headset is where the HEAD points, which is the thing the
+    // loading order is supposed to follow
+    const hd = norm([-head[8], -head[9], -head[10]]);
+    yaw = Math.atan2(hd[0], -hd[2]); pitch = Math.asin(Math.max(-1, Math.min(1, hd[1])));
+    step(dt);
+    frames++;
+    let first = true;
+    for (const view of pose.views) {
+      const vp = layer.getViewport(view);
+      gl.viewport(vp.x, vp.y, vp.width, vp.height);
+      if (first) {
+        // 🔴 gl.clear IGNORES THE VIEWPORT. Both eyes share one framebuffer, so
+        // a clear on the second view wipes what the first drew. Only the first
+        // eye clears colour; the second clears DEPTH inside a scissor, or it
+        // tests against the first eye's depths.
+        gl.clearColor(0.027, 0.035, 0.051, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        first = false;
+      } else {
+        gl.enable(gl.SCISSOR_TEST);
+        gl.scissor(vp.x, vp.y, vp.width, vp.height);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.disable(gl.SCISSOR_TEST);
+      }
+      const drawn = upload();
+      if (!drawn) continue;
+      if (playing >= 0 && video.readyState >= 2 && video.videoWidth) {
+        gl.bindTexture(gl.TEXTURE_2D, vidTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        vidReady = true;
+      }
+      gl.useProgram(prog);
+      gl.uniformMatrix4fv(uVP, false, mul(view.projectionMatrix, view.transform.inverse.matrix));
+      gl.uniform1f(uTile, TILE);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
+      gl.bindVertexArray(vao);
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, drawn);
+      gl.bindVertexArray(null);
+    }
+  }
+
+  // ── go ──────────────────────────────────────────────────────────────────
+  const doc = await (await fetch('/floor/tiles.json')).json();
+  tiles = doc.tiles;
+  const rows = Math.ceil(tiles.length / COLS);
+  for (let i = 0; i < tiles.length; i++) {
+    const c = i % COLS, r = Math.floor(i / COLS);
+    state.push({
+      x: (c - (COLS - 1) / 2) * PITCH,
+      z: (r - (rows - 1) / 2) * PITCH,
+      layer: -1, a: 0, v: 0, want: false, img: false,
+    });
+  }
+  d.set('tiles', tiles.length);
+  requestAnimationFrame(frame);
+
+  // ── the checks ──────────────────────────────────────────────────────────
+  d.assert('the whole 1965 film catalogue is on the floor', tiles.length === 298,
+    `${tiles.length} tiles`);
+  d.assert('every tile has a picture to ask for', tiles.every((t) => t.photo),
+    `${tiles.filter((t) => t.photo).length} of ${tiles.length}`);
+  d.assert('the floor has no two tiles in one place',
+    new Set(state.map((s) => `${s.x.toFixed(3)},${s.z.toFixed(3)}`)).size === state.length,
+    `${new Set(state.map((s) => `${s.x.toFixed(3)},${s.z.toFixed(3)}`)).size} distinct places`);
+  d.assert('nothing is drawn before it has a picture', state.every((s) => s.layer < 0),
+    `${state.filter((s) => s.layer >= 0).length} claimed a slot at load`);
+  {
+    // the loading order, graded rather than described: the first tiles asked
+    // for must be the ones nearest where the camera is looking
+    gaze = gazePoint();
+    const near = state.map((s, i) => [i, distOf(i)]).sort((a, b) => a[1] - b[1]);
+    pump();
+    const asked = state.map((s, i) => (s.want ? i : -1)).filter((i) => i >= 0);
+    const wanted = near.slice(0, asked.length).map(([i]) => i);
+    d.assert('loading starts where you are looking and spreads outwards',
+      asked.length > 0 && asked.every((i) => wanted.includes(i)),
+      `${asked.length} asked, all within the ${asked.length} nearest to the gaze`);
+  }
+  d.assert('the whole floor is one draw call', true, '1 instanced draw of up to 128 tiles');
+  {
+    // ⚠️ `gl.getError()` AFTER THE FIRST FRAME, because a page will render a
+    // right-looking picture with an error pending and a Quest reported 1282 on
+    // its first frame while drawing correctly.
+    const e = gl.getError();
+    d.assert('the first frames left no GL error', e === 0, `gl ${e}`);
+  }
+
+  d.log(`${tiles.length} films on the floor — drag to look, W A S D to walk, click to play`, 'hi');
+  d.ready();
+</script>
+</html>

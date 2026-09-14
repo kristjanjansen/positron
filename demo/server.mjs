@@ -41,6 +41,46 @@ export function serve(port = PORT) {
   const s = createServer(async (req, res) => {
     let rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^([/\\])+/, '');
     if (rel.includes('..')) { res.writeHead(400).end('no'); return; }
+    // ── /err-img — the same route the deployed Worker serves ───────────────
+    //
+    // 🔴 LOCAL == DEPLOYED IS A RULE, NOT AN ASPIRATION, and this is where it
+    // bit. `/floor/` asks its OWN ORIGIN for archive thumbnails because the
+    // archive's image hosts send no `access-control-allow-origin` and a texture
+    // upload may not read a cross-origin image. That route lives in
+    // `workers/view/src/index.js` — so on the deploy the floor fills, and here
+    // every request 404'd, every tile marked its picture dead, and the page drew
+    // an empty rectangle while its checks all passed. A page that only works
+    // deployed is a page nobody can develop.
+    //
+    // ⚠️ THE VALIDATION IS THE SAME SHAPE ON PURPOSE. If this one were looser,
+    // a path that works here would be refused in production — which is the same
+    // class of bug as the 404, wearing the opposite costume.
+    if (rel === 'err-img') {
+      const q = new URL(req.url, 'http://localhost').searchParams;
+      const f = q.get('f') || '';
+      if (!/^thumbnails\/\d{4}\/[A-Za-z0-9_.-]{1,160}\.jpg$/.test(f)) {
+        res.writeHead(400).end('bad thumbnail path'); return;
+      }
+      const clamp = (v, lo, hi, dflt) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : dflt;
+      };
+      const w = clamp(q.get('w'), 64, 512, 256);
+      const h = clamp(q.get('h'), 48, 384, 192);
+      try {
+        const up = await fetch('https://arhiiv-img.err.ee/enlarge?type=optimize'
+          + `&width=${w}&height=${h}&file=${encodeURIComponent(f)}`);
+        if (!up.ok) { res.writeHead(up.status).end('upstream'); return; }
+        const buf = Buffer.from(await up.arrayBuffer());
+        res.writeHead(200, {
+          'content-type': up.headers.get('content-type') || 'image/jpeg',
+          'content-length': buf.length,
+          'cache-control': 'public, max-age=604800',
+        }).end(buf);
+      } catch (e) { res.writeHead(502).end(String(e.message)); }
+      return;
+    }
+
     if (rel === '') rel = 'demo/index.html';
     if (rel.endsWith('/')) rel = join(rel, 'index.html');
     // LOCAL == DEPLOYED. On the worker, demo/<x> is served at /<x>, so a page
