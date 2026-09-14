@@ -167,12 +167,11 @@ The asserts cover the arithmetic; the feel is unreviewed.
   under a comment that says it is read from the worker rather than typed twice.
   Reported in the U: research on 09-13 and still not changed. Anything sizing a
   bridge off that constant sizes it for a relay that no longer exists.
-- **LESSONS.md has nothing from session 23**, and there are at least six
-  entries' worth: rAF as a trigger (four instances in one day), a passing check
-  is not a message, a warning about a misleading readout is not a fix, an
-  analyser on a suspended context reads its last buffer forever, a fade that
-  lives in the render loop cannot stop when the loop does, and a threshold
-  detector that measures the render rather than the signal.
+- ~~**LESSONS.md has nothing from session 23.**~~ DONE — **84–89**, written the
+  same day rather than carried: rAF as a trigger, a passing check is not a
+  message, a warning about a misleading readout is not a fix, a fade that lives
+  in the render loop, an analyser on a suspended context, and a threshold set
+  from the data.
 - 🔴 **`LESSONS.md` has entries 39–48 TWICE** — `### 39`–`### 48` from sessions
   14–15 and `## 39`–`## 48` from sessions 17–18 — and that is already producing
   wrong citations in CLAUDE.md, HANDOFF.md and PROGRESS.md. It needs a
