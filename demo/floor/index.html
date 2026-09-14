@@ -26,6 +26,17 @@
      would delete the fallback on exactly the browsers that need it. */
   .fl.pos-full { aspect-ratio: auto; width: 100%; height: 100%;
                  border: 0; border-radius: 0; min-height: 0; }
+  /* ⚠️ A GLYPH BUTTON IS A SQUARE, AND `.ico` DID NOT MAKE IT ONE. shell.css
+     scopes that class to `.step button.ico` — the stepper — so on a control-bar
+     button it matched nothing at all, and the ⛶ kept the row's `0 14px` padding
+     and came out 40.6 x 34: a rectangle pretending to be an icon.
+     MEASURED rather than derived: the control buttons are 34 px tall, so 34 is
+     the square. Re-measure if the bar's type or padding changes — a size
+     computed from four other values looks more rigorous and is one edit away
+     from being quietly wrong. */
+  .pos-controls button.ico { width: 34px; height: 34px; padding: 0;
+                             display: grid; place-items: center;
+                             font-size: 15px; line-height: 1; }
   .fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* The title of whatever is under the pointer. A FIXED BOX: it is written on
      every frame the gaze moves, and a caption that can change its own height
