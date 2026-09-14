@@ -1,89 +1,138 @@
-# Queue — open work, 2026-09-13
+# Queue — open work, 2026-09-14
 
-Rewritten at 15:40 after the session-21 sweep. ⚠️ The previous version of this
-block was STALE THE DAY IT WAS WRITTEN in three places — it said `pappus-live`
-had never met the engine (it had, 17/18), that TINY was unweighed with `report`
-in (803 B headroom), and that `grains` had not adopted the diagram (it had).
-A queue is only useful if striking things off is part of finishing them.
+Rewritten at the end of session 22. ⚠️ The previous two versions of this block
+were each STALE THE DAY THEY WERE WRITTEN — session 21's in three places, all
+finished within four hours of being typed. **Striking an item off is part of
+finishing it, not a sweep at the end** (LESSONS #73). Everything below was
+re-checked against the tree on 09-14; where an item is struck, the numbers that
+closed it are kept, because a decision with its reasoning attached stops the
+question coming back.
 
-## Needs a headset — one run answers four questions at once
+## ~~Closed in session 22~~ — kept so they are not re-opened
 
-Open `scene`, press **Run in VR**, look around, exit. Then `mirror`. Both index
-rows now link with `?xr=1`, which scrolls the Run control under your hand — a
-link cannot start a session, so the press is still yours. The log at
-`https://pub.positron.studio/logs?format=text` will carry:
+- ~~**The headset run that answered four questions at once.**~~ DONE, and then
+  four more runs on top of it. Planes GRANTED and real (11 named surfaces, floor
+  at y=-0.06 m, grid green on them), **hands and controllers AT THE SAME TIME**
+  (`1 input + 2 tracked` — `oculus-hand`, 25 joints, 25 posed, beside two
+  `meta-quest-touch-plus`), VR **90.0 fps over 828 frames**, passthrough
+  `alpha-blend` confirmed with the dotted grid compositing, clean
+  `session ended`, no black and no bail-out.
+- ~~**`plan-twins` — make the two granulators the same instrument.**~~ DONE and
+  then OVERTAKEN: they are not two granulators any more. `/grains/` loads the
+  board's own compiled definition into wasm scsynth in the tab. ⚠️ The plan was
+  wrong in four places and is corrected in place; read the corrections before
+  building on it.
+- ~~**`plan-gesture` P3.**~~ DONE, and it REFUTED §3's argument while confirming
+  its decision — read the correction, not the original.
+- ~~**LESSONS.md untouched since session 20.**~~ DONE — 66–73, plus four
+  instances folded into entries that already covered them.
+- ~~**CLAUDE.md's header is stale.**~~ DONE — **33 of 39**, and the suite total
+  was REMOVED rather than updated, because a count nobody re-measures reads as a
+  fact.
+- ~~**A synth definition that travels as a message.**~~ **ANSWERED, and the page
+  that asked it is off the site.** Yes: three definitions crossed the relay and
+  came back byte-identical (339 / 384 / 2,370 B, 32–37 ms), and the **real
+  Pappus graph** loads into wasm scsynth in 11–12 ms, starts, sounds with a
+  deafness control at exactly 0.000000, and reports **8.00 / 4.00 / 15.99
+  grains a second at `mrate` 8 / 4 / 16** against the board's own oracle. It is
+  a fact in `research/supercollider-browser-2026-09.md` §10 now, not a demo.
+- ~~**`diagram.mjs` cannot draw a fork / the caption jumps on un-hover.**~~ DONE,
+  plus containers, named connectors and a fourth tooltip nobody had noticed.
+  Hovering all five boxes in turn moves the page **0 px**.
+- ~~**`mount()`'s even-count rule only protects the two-column case.**~~ DONE —
+  and the rule's stated REASON was wrong. The row is flex now and fills at every
+  width and every count; the even rule survives as editorial.
 
-- **`room surfaces · …`** — whether Quest Browser grants `plane-detection`, how
-  many surfaces, what `semanticLabel`s. ⚠️ MEASURED: 11 in AR, none in VR, so
-  check the MODE before concluding anything about Space Setup — a page already
-  blamed Space Setup for this once and cost a rescan.
-- **`hands · N source(s) · … · space local-floor`** — why box manipulation
-  stopped and the ray sat at the feet.
-- **`first frame: the framebuffer is NOT complete`**, or its absence. `gl 1282`
-  traced to `firstDraw`; `scene` also reported **1286** once.
-- **the dotted grid over passthrough**, and whether it is on real surfaces (it
-  is drawn in a different colour on purpose, so it can be believed).
-  ⚠️ `blendFuncSeparate(SRC_ALPHA, 1-SRC_ALPHA, ONE, 1-SRC_ALPHA)` is the one
-  line nobody has tested; wrong, the dots wash out or punch a hole, no crash.
+## Needs a headset — one run answers three questions
+
+Open `scene`, then `mirror`. Both index rows link with `?xr=1`, which scrolls
+the Run control under your hand — a link cannot start a session, so the press is
+still yours. `https://pub.positron.studio/logs?format=text`.
+
+- 🔴 **`gl 1282` is LOCATED and NOT FIXED.** Three `glCheck` calls were dead
+  code (guarded on `state.frames === 0` while the counter increments at the top
+  of the callback), and with them revived the headset named **`upload`**. ⚠️ It
+  does not reproduce on this machine — the new off-screen preview reads `clean`
+  — so the fix follows the headset, not the laptop.
+- **The Hold-to-leave button on the tablet, pressed in anger.** 800 ms of
+  continuous hold, letting go cancels, running the ray off it RESETS. Its
+  arithmetic is graded (xr-pick 40/40) and the ENDING is performed in
+  `xr-hands.mjs`, so both pages get it — but nobody has held it in a headset.
+  ⚠️ Any controller button and the 4 s dead-man's switch are still the real ways
+  out; the tablet is not allowed to be the only one.
+- **The re-sized grab bars** (0.28 of the panel width, 32 mm tall, 38 mm clear).
+  The previous sizing measured **9 panel moves** in a headset, every one grabbed
+  by its bar and released facing the viewer, so only the size was wrong.
+- ⚠️ `mirror` gets the tablet's exit and the session ends correctly, but **that
+  page is never told it was the tablet**, so it cannot attribute its own ending.
+  One line, when `xr-panel.mjs` is free.
 
 ## Needs the board — take turns, it is one Raspberry Pi
 
 ⚠️ The RELAY is not the constraint (128 sockets, 1000 msg/s since 2026-09-13).
 The DEVICE is: one JACK graph, one instrument.
 
-- 🔴 **`plan-twins.md` — make the two granulators the same instrument.** IN
-  FLIGHT. `CHAIN.md` is written and BARE is weighed, so it is unblocked.
-- **`plan-gesture` P4 — the same gesture driving the board.** Blocked behind
-  twins only because both want the device. P3 is done and REFUTED §3's
-  argument, so read the correction before building on it.
+- 🔴 **THE BOARD IS ON LITE AND THE TAB RUNS TINY, AND THE PAGE'S HEADLINE IS
+  THAT THEY RUN ONE DEFINITION.** `/grains/` pins all nine `BYPASS` stages off,
+  so the comparison is defensible — but the claim as written is stronger than
+  what is running, and `demo/grains/index.html`'s own comment still says the
+  modal bank is *"what TINY compiles out anyway"*, which stopped being the
+  board's state when it went back to LITE. Decide it explicitly: either put the
+  board on TINY, or say in the page what differs.
+- 🔴 **The 25x insertion loss at `msos 0` is unexplained and is not claimed to
+  be.** It is NOT the nine `BYPASS` stages — the compiled def defaults all nine
+  to 0, so the page was pinning them to what they already were. One thread left
+  open on purpose.
+- ⚠️ **`note.panic` silences `/grains/` for ever after**, because this page's
+  notes go to the INSTRUMENT and the box only routes them to the granulator when
+  an archive is set. The page now sets gates, but the underlying shape — board
+  state a page depends on and never sets — has bitten three times (`msrc 1`,
+  `src`/`lock`, `notes.gate`). A gate audit of everything `box.mjs` keeps is
+  worth an hour.
+- ⚠️ **`PAPPUS READY` prints before the engine's own startup defaults run**, so
+  `run-pappus.scd` overwrites a client's settings one second later, **on a cold
+  board only**.
+- **`plan-gesture` P4 — the same gesture driving the board.** Unblocked now that
+  twins is finished; wants the device.
 
 ## Needs nobody — just time
 
-- **`LESSONS.md` has not been touched since session 20** and there are at least
-  four entries' worth of material from session 21 alone: the deadline that fired
-  during a permission prompt, the edit script that discarded already-matched
-  edits, the measurement that ran at the wrong moment, and the clamp that
-  overrode a value its caller had declared. PROGRESS.md records what happened;
-  LESSONS.md is where the RULE goes, and the rule is the reusable part.
-- **`CLAUDE.md`'s header is stale**: it says 31 shelled demos of 37 rows and 449
-  asserts. The manifest is **33 built of 39**. The assert total needs a full
-  run, which needs the board free.
-- 🔴 **A SYNTH DEFINITION THAT TRAVELS AS A MESSAGE, LIKE A SHADER DOES.** IN
-  FLIGHT. ⚠️ This REPLACES the "two SuperColliders side by side" card, which was
-  struck earlier the same day on reasoning that answered a different question —
-  the strike and its numbers are in commit fd706e1 and the numbers are still
-  correct, they are just not about this.
-
-  What was priced: *"do we need scsynth to make granular sound in a browser?"*
-  Answer, correctly, no — 1,701,983 B against a 6,659 B worklet. What was never
-  asked: *"can a synth definition travel as a message, the way a shader does?"*
-  The payload there is not a demo's sound engine, it is a portable asset format,
-  and the 256x figure does not bear on it. `plan-visuals.md` already makes this
-  exact argument for the graphics half — *"~2 KB of GLSL plus ~200 bytes of
-  parameters reproduces it at any resolution"* — and works through the security
-  seam for generated code crossing the wire. The audio equivalent had never been
-  written down.
-
-  🔴 AND IT FIXES A CLAIM THIS REPO IS ALREADY MAKING. `twins` says the browser
-  worklet and the board's scsynth are "the same instrument". **They are not** —
-  the worklet is a reimplementation that sounds comparable. Two ends run the
-  same instrument only if the SAME DEFINITION runs on both. This takes that
-  claim from approximate to literal, which is the strongest argument for the
-  work and was missed by the pass that rejected it.
-
-  ✅ The hard part is ALREADY PROVED END TO END (`research/…§2.1`): a
-  format-version-2 binary handed to wasm scsynth as raw bytes over `/d_recv`
-  loads and plays — `rms_peak 0.502336`, deafness control `0.000000`. 8,585
-  UGens with zero dropped audio. Pappus's 50 UGens intersect SuperSonic's
-  unsupported list at EMPTY.
-  ⚠️ `avgCPU`/`peakCPU` read `0` at every load including 8,585 UGens — not
-  populated in this build, so never display them. ⚠️ Shipped Sonic Pi files are
-  format 1 and modern sclang writes format 2; testing 1 proves the wrong thing.
-
-  ⚠️ The one real argument the other way is still UGen quality — `GrainBuf`,
-  `DynKlank`, `PitchShift`, `Compander` are decades-tuned. If that bites,
-  **Faust is the escape hatch, not scsynth**: 48 KB.
-
+- 🔴 **`LESSONS.md` has entries 39–48 TWICE** — `### 39`–`### 48` from sessions
+  14–15 and `## 39`–`## 48` from sessions 17–18 — and that is already producing
+  wrong citations in CLAUDE.md, HANDOFF.md and PROGRESS.md. It needs a
+  deliberate renumbering sweep across four files, which is why it was NOT done
+  as a side effect of a writing task.
+- 🔴 **`replay`'s cues never fire, and three more pages have the same bug.**
+  `mediaMaster` is constructed and never `tick()`ed in `replay`, `seek`,
+  `capture` and `show`; the deck moves only because a 400 ms watchdog re-seeks
+  it. ⚠️ **The suite cannot see it** — the `cues land within 250 ms` assert sits
+  behind `if (fires.length)`, so zero fires reads as zero work. This is a
+  transport redesign, not a UI pass, which is why it was left.
+- **The cheapest real work in the repo right now: `timeline/csound.mjs`'s macro
+  pass.** Both real vClick scores throw on `t 0 $REPTEMPO`; a twelve-line
+  `#define`/`$MACRO` expansion makes both compile clean, and **a bracket in p2
+  is silently wrong**. 🔴 Break the bracket warning on purpose once. ⚠️ Then get
+  csound onto a machine that can run it — **not this one**, which is
+  Defender-managed and SIGKILLs locally compiled binaries.
+- **Four kit gaps, reported rather than built** (which is the rule working): a
+  small state token (`record`, `capture`, `show`, `seek` hand-roll four
+  stylesheets for one idea), the publisher badge (`webrtc` and `llhls` carry
+  byte-identical copies), and a labelled video tile grid.
+- **`demo/patch/` leftovers.** The row is off the manifest and SuperSonic has
+  moved to `demo/shell/vendor/`; the directory goes once nothing needs it.
+  🔴 A URL under a slug that is no longer built is the `moq.mjs` trap — check
+  before deleting, and check before adding a reference.
+- **TINY leaves orphans** — sixteen `Lag.kr` tuning strings that do not exist
+  and a stereo Limiter over a bank guaranteed silent. A one-line fix that buys
+  back headroom, left alone because it changes TINY's size and that cannot be
+  re-taken from here. ⚠️ And the byte ceiling is no longer the only one: TINY
+  clears the wire-buffer pool by **five buffers**, so a cut that saves bytes
+  while spending a buffer buys nothing.
+- **`summarise` and `separated` in `rig/box/measure.mjs` are imported by
+  nothing.**
+- ⚠️ **No full `verify.mjs` run in two sessions.** Per-demo counts only. It needs
+  the board free and no other Chrome of mine — and the harness now says when it
+  is being competed with, so believe that line before believing a red run.
 
 ## Plans written and never started — eleven of them
 
@@ -103,12 +152,285 @@ Grouped by what they would make true:
   languages), `plan-glass` (the fourth clock owner), `plan-session` (a show off
   the wire kept for six hours — "no longer blocked, §1b is the build").
 - **Tidying that pays for itself.** `plan-names` (one write path tiered by
-  credential) and `plan-uuu-local` (mostly already true, so mostly a checking
-  job).
+  credential) and `plan-uuu-local` — ⚠️ which calls itself *"not started, and
+  mostly already true"* and whose P1 was **untrue at the first statement of the
+  first file, for a week, at 42/42 green**. Re-read it before trusting it.
+- `plan-patch` is written and ANSWERED; it is a record, not a queue item.
 
 ## Needs you, not me
 
 - **`positron-demo`'s RTMPS key is still unrotated.** `SECRETS-ROTATION.md`.
+
+# Handoff — 2026-09-14 (end of session 22)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 22 — real SuperCollider at both ends, and four rules that were right for the wrong reason
+
+🔴 **THE HEADLINE, AND IT STARTS AS A CONFESSION: `/grains/` had claimed *"the
+same granulator in this page and on a Raspberry Pi"* since it was written, and
+the claim was FALSE.** A browser worklet is a reimplementation that sounds
+comparable; no amount of A/B makes it the same instrument. It is literally true
+now — the board's own compiled graph, **64,733 B / 1,467 UGens / 103 controls**,
+taken by wasm scsynth in the tab in **22 ms**, beside the Pi running that same
+definition. 🔴 The material needed a **SECOND** definition (`PosSource`, 4,508 B
+/ 104 UGens) because `Engine_Pappus.sc:518` granulates a BUS and nothing in a
+browser fills one; node order is asserted from the server's own
+`/g_queryTree.reply`, not assumed. **2.2 grains a second in the page and 2.2 on
+the board against 2.2 asked for**, each graded against the slider and never
+against the other.
+
+### What went wrong, which is the part to read
+
+🔴 **`/grains/` was SILENT FOR HOURS because of one `note.panic`, and the board
+was saying so the whole time.** `Engine_Pappus.sc:804` gates the grain trigger
+on `gates[i] > 0.001`, so with every gate shut no grain fires and no `/pgrain`
+is sent **while passthrough goes on working** — 50 frames/s, every question
+answered, the right material reported, and nothing made. The page's exact
+configuration measured **0.000000 rms / 0.0 grains a second**; adding
+`gates [1,0,0,0,0,0,0,0]` gave 0.016037 / 1.5. Nothing reopens them, because
+this page's notes go to the INSTRUMENT. 🔴 **And `params.state` returns
+`notes.gate`, which read `[0,0,0,0,0,0,0,0]` through every failing run —
+including in the dump handed over to diagnose it. The evidence was on the wire
+and nothing read it.**
+
+🔴 **`strip`'s only lane had NEVER drawn anything while the suite said `strip
+has ink`.** `follow` defaults on and position 0 = 1970 is 93% through a
+year-100→2100 range, so the window scrolled past both spans before the first
+frame. **7 lit columns in the whole lane band, all grid lines** — the assert
+passed because it samples the axis too. Three of its four cells were properties
+of the epoch (`pps` printed `0.000`, `ceiling` was `Math.round(Infinity)`), and
+`major` printed a **DATE**, because `formatTime(x, x)` with no third argument
+sent a 500-year DURATION down the absolute branch.
+
+🔴 **The even-readout rule was right for the WRONG REASON, and its own failure
+had been happening the whole time it was enforced.** The row is not two columns
+on a phone — 96 px + 1 px gap gives **three** from ~353 px up, so a **4-cell**
+readout holed at 353–426 px (iPhone 12–15 is 390) and a 6-cell one at 427–620,
+four slots wide at 560. Flex, not grid; verified at thirteen widths, both
+counts, every one fills. ⚠️ The even rule STAYS as editorial and `mount()` still
+throws — **a rule defended by a false reason is one nobody can correct**, so the
+correction is written where the claim was.
+
+🔴 **A "horizontal rule" that was an EMPTY BORDERED BOX.** `readout: null`
+emptied the row without removing it, so the shell appended a childless div with
+a 1 px border: **height 2.0 px, 0 children**, a full-width band nobody wrote.
+Fixed in the SHELL — `.pos-controls[hidden]` two rules below already existed for
+the identical failure. New rule: **separation is spacing, not lines, and an
+empty box is a line.**
+
+🔴 **Three `glCheck` calls were DEAD CODE — guarded on `state.frames === 0`
+while the counter increments at the top of the callback — which is very likely
+why the Quest's `gl 1282` stayed unlocated.** Three of the four places that
+could have named it were switched off. Revived, and the headset then named it:
+**`upload`**. ⚠️ Not fixed, and it does not reproduce here.
+
+🔴 **`xr-panel`'s exit scan ATE THE TRIGGER**, so `mirror`'s panel drag could
+never have worked and a slider on that panel would have exited the session on
+press. 🔴 **And `xr-panel.mjs` still carried the 6 s deadline on
+`requestSession` while asking for `plane-detection`** — the black-headset trap
+`scene` was fixed for the day before, sitting three files away. LESSONS #66 was
+written from the first instance.
+
+🔴 **`applyAll()` would have FIRED THE WAY OUT ON THE FIRST FRAME OF EVERY
+SESSION**, which presents as a headset that refuses to enter. One of four places
+that had each assumed every tablet control was a slider, which is why **"a
+second control is one line" was reported last round and is false**: one line
+holds for a second control of a KIND that already exists.
+
+🔴 **A GLB chunk-padding bug that EVERY TEST PASSED** — a second rounding on top
+of the one the spec requires, invisible because both vendored files happen to be
+4-aligned. Found by DIFFING the reader against three.js `GLTFLoader.js` v0.186.0
+after writing it from the spec. Reading somebody else's implementation found it;
+running ours never could have.
+
+🔴 **`replay`'s cues NEVER FIRE.** `mediaMaster` is constructed and never
+ticked; `seek`, `capture` and `show` do the same. The deck moves only because a
+400 ms watchdog re-seeks it, which is why `apart` sits at a rock-steady
+~400 ms. ⚠️ **The suite cannot see it**: the assert sits behind
+`if (fires.length)`.
+
+🔴 **The strip's gutter widened itself to fit a line and then CUT THAT SAME
+LINE** — the sizer reserved against a 19 px inset and the clipper cut against
+26 (the NAME's inset applied to the numbers), so any sub-line long enough to set
+the width was always one character too long for it. ⚠️ **And then it was still
+cut by a SUB-PIXEL**: `Math.round` took a measured 111.4 to 111. ⚠️ Third time
+in one day that this component's real behaviour only showed up under a control
+built ON PURPOSE — earlier the same sizer was found **overriding a width the
+page had explicitly declared** (`typist` asks for 132, got `Math.min(132,46)`)
+and **running at a moment when there were no lanes to measure**.
+
+🔴 **An assert that could not fail**: `deck.eventsOf ? true : true`.
+
+🔴 **Two harnesses started at once silently drove each other's browser.**
+`verify.mjs` still had a fixed CDP port and a shared profile — the bug CLAUDE.md
+already records for `verify-gl.mjs`, fixed for the HTTP port and never for these.
+REPRODUCED: the old constants give `cdp timeout: Runtime.evaluate`, which is the
+exact error that took a full suite out twice on `replay` (**16/16 alone**).
+⚠️ The profile had to move in the same change — Chrome writes its real port into
+`DevToolsActivePort` INSIDE the profile. The harness counts other browsers now;
+⚠️ its first version reported **19 for 2**, because one browser is ten processes
+and the helpers inherit the command line.
+
+🔴 **Four changes silently removed asserts while reading green** — `SIZE_CEILING`
+before its import (26 → 9), `typist`'s `startOwn()` before `check()` (22 → 7),
+`typist`'s controls declared the other way round (9 of 10, because `verify.mjs`
+presses in declared order and the LAST one is the state the page is in), and an
+XR constant restructure that deleted two helpers (`scene` 32 → 24) **while
+`verify-gl` still said GREEN**, because the room swallows a `draw()` throw into
+a log line.
+
+🔴 **Three counters reported intent as delivery**: the engine's
+`loadedSynthDefs` went 1 → 2 → 3 across three sends of which one loaded;
+`grains` shipped a panel saying `0 of the board's 8 voices open` beside a board
+making 2.2 grains a second; and `draw`'s `invented` divided by the REBUILD
+resolution (~900 whatever you do), so it read 66.7% at the knob's fine end
+where the honest answer is **0.0%**. ⚠️ The assert had the same bug, so the page
+printed **two different percentages for one gesture under one name**.
+
+⚠️ **A UDP measurement that was entirely the measurer's own socket** — the first
+native `/d_recv` edge read 9,200 B; `net.inet.udp.maxdgram` is 9216 on macOS.
+⚠️ And the official wasm backend's own demo class throws on 8,192 B while the
+identical bytes framed by hand load at 860,000: using it would have produced
+*"the official build refuses FULL"*, a true observation about the wrong
+component.
+
+🔴 **The page blamed Space Setup AGAIN, 200 ms early, and the previous fix to
+that exact message did not catch it.** In ONE passthrough session: 6.30 s *"NO
+surfaces … Space Setup may never have been run"*, 6.50 s **11 surfaces**. The
+earlier fix taught the note to tell VR from AR — correctly — and left the
+assumption underneath: that the FIRST empty answer is the final one. *A
+diagnosis right about the mechanism and wrong about the timing reads exactly
+like one that is right.* 2,500 ms of grace on the CLOCK, a floor on patience
+rather than a timeout.
+
+### The ceilings — four numbers, and the repo had shipped a fifth
+
+| path | largest definition that loads |
+|---|---:|
+| browser (SuperSonic 0.81.0) | **65,520** — silent above |
+| native `/d_recv` over UDP | **65,488** — `EMSGSIZE` at the sender |
+| native `/d_recv` over TCP | none found at 1,000,000 |
+| native `/d_load` from disk | none found at 1,000,000, 44 ms |
+| anything sclang sends | **16,383**, above which it becomes `/d_load` |
+| **what this repo declared** | **65,536 — a value no path has** |
+
+🔴 Wrong in the DANGEROUS DIRECTION: 65,536 passed `fitsCeiling()` and went
+straight into the silent refusal the constant existed to prevent. 🔴 **It binds
+the MESSAGE, not the definition** — a 12-byte completion message moved the edge
+by **exactly 16**. 🔴 **So it does not bind the board, which has never used
+`/d_recv`**: sclang's `.add` routes everything over 16,383 B to `/d_load`, and
+all four rungs are above that. Origin is `SC_ComPort.cpp`'s `kTextBufSize` on
+the **UDP port specifically**. A board default changed on the opposite
+assumption was REVERTED the same evening.
+
+**The official wasm backend takes 860,000 B, 13.1x SuperSonic's**, and LITE and
+FULL both load and play there. 🔴 But 860,000 is not a size limit either —
+880,000 B of CONSTANTS load in the engine that dies on 880,000 B of UGens. **So
+TINY was not cut for nothing and its stated REASON was false**: *"wasm scsynth
+refuses a `/d_recv` over 64 KiB"* is true of SuperSonic alone. ⚠️ **Do not
+vendor the official binary** — one person's laptop build, dated the day its PR
+opened, JS surface that does not match `develop`.
+
+🔴 **And there is a SECOND ceiling nobody had measured.** TINY refuses at
+`maxWireBufs` **58** and loads at **59** against a default of 64 — so it clears
+the byte ceiling by **787 bytes** and the wire-buffer pool by **five buffers**,
+and **both refusals are the same silence**. ⚠️ The board runs `-w 128`; the two
+ends are not at the same setting.
+
+### What shipped
+
+- **`/grains/` runs real SuperCollider at both ends** (above). `PosSource` had
+  existed as a file wired to NOTHING — `push.sh` never installed it,
+  `run-pappus.scd` never loaded it, `box.mjs` had no `source.set`, and the page
+  had been sending `sourceMessage(SPEC)` into the void since it was written.
+  🔴 **`sos 0` means the granulator hands back its input untouched**, which
+  closes the 09-12 investigation: `mrate` 0.5 vs 24 is identical to six digits
+  at `sos 0` and **8.26x apart at 0.6**. 🔴 The instrument's **right channel had
+  been bypassing the insert entirely** (held-note leak 3.19x → 1.00x).
+  🔴 `BYPASS` pins all nine downstream stages, because **the board is an OBJECT
+  that keeps what it was left with** and any stage the last person left on is
+  heard in one pane only.
+- **`PROVENANCE.json` + `checkCompiledDefs()`** refuse the build on a STALE
+  artefact — the failure `checkPresent` cannot see, where the tab runs last
+  week's graph beside the board's and **nothing 404s and every number still
+  agrees**. Two pre-existing build bugs fell out of writing it: all four
+  refusals ran AFTER the copy loop while the comment said before, and
+  `checkImports`' regex crossed line breaks so `importMs` swallowed to the next
+  quoted string.
+- **`/patch/` was built, measured, and taken off the site in one evening.** It
+  asked whether a synth definition can travel as a message; it can, byte-identical
+  both ways, and ✅ a v1→v2 converter written here produced **exactly** the
+  2,370 B a converter written independently a day earlier recorded. 🔴 A
+  definition is structurally SAFER to send than a shader — no control flow at
+  all. ⚠️ The row goes, the FILES stay: SuperSonic has moved to
+  `demo/shell/vendor/`.
+- **XR: real controller meshes** (MIT, Amazon 2019; 217,984 + 213,868 B; parse
+  12.6 / 5.5 ms; first-frame cost ZERO because nothing is awaited), **a tablet
+  on the left grip** with the site's own slider on it (knob sweeps 623 px of a
+  623 px lane) and a **Hold-to-leave button**, **floor-only rooms** (no wall we
+  did not measure, and no branch, so nothing flashes), a **glow** that says in
+  its comment what it is not, **Meta-lobby panel dragging** (9 moves measured in
+  a headset), and **`mirror`'s shader rendered live in-session at 90.1 fps over
+  7,545 frames**. ⚠️ The laptop REFUSES to attribute that cost — a quarter-size
+  probe read 0.24x / 0.72x / 0.73x / 0.82x across four runs with no code
+  between — so the headset is the only grader.
+- **Eleven stale demos brought up to the rules**, in two sweeps: six with
+  **86/86 before and after and every in-page count unchanged**, five where every
+  count went UP (harness 62/62 → **70/70**). Live prose deleted and REHOMED on
+  five pages; the **last hand-rolled keyboard** is gone (its `<style>` had been
+  shadowing the shared component). ⚠️ Four kit gaps REPORTED rather than a fifth
+  copy built.
+- **`typist`'s marks became characters** — the ZOOM is the control, out is a
+  rhythm and in is a word — asserted as a RELATIONSHIP at two zooms (**1 of 52
+  at 20 px/s, 6 of 6 at 400**) because "it drew nothing" and "there was no room"
+  are the same picture. ⚠️ The middot fallback is OPT-IN: `demo/strip`'s own
+  `glyphOf` uses `·` for exact and `?` for unknown, so a blanket fallback would
+  make **a page about uncertainty quietly report certainty**.
+- **The diagram gained containers**, every connector a name, and 🔴 a **FOURTH**
+  tooltip nobody had noticed — one on the `<svg>` ROOT, covering the whole
+  picture. Every arrow name had been measured against something other than the
+  space it is drawn in: three faults, not one. 44 → 64 asserts, 11 sabotages,
+  all caught; ⚠️ two of the new tests were DECORATION until sabotage rewrote
+  them.
+- **Three new CLAUDE.md rules**, all from one reader reaction: nothing that
+  redraws may change its own height; a page does not narrate its own state in
+  sentences; separation is spacing, not lines. ⚠️ Each carries "REHOME what it
+  said" — deleting a display without the facts is how a page quietly stops
+  reporting something.
+- **LESSONS 66–73** (session 21's rules, written here), plus four instances
+  folded into existing entries. 🔴 And a defect in that file: **entries 39–48
+  exist TWICE**. ⚠️ Session 22's own rules, **74–83**, were written into
+  LESSONS.md in parallel with this record — read that file for the rule, this
+  one for what happened.
+- **`research/uuu-integration-2026-09.md`** — 🔴 the premise ("more CV-to-MIDI")
+  pushed back on, two hazards that belong in the first conversation (Chrome
+  disconnects a held CV after 30 s and says nothing; a normal jack lead can
+  damage the interface), CV INTO a browser blocked outright since 2015, and
+  🔴 the cheapest first move is **not a bridge** — it is that
+  `timeline/csound.mjs` throws on both real vClick scores.
+
+### Still open
+
+- 🔴 **`gl 1282` is located at `upload` and not fixed**, and does not reproduce
+  off the headset.
+- 🔴 **The board is on LITE while the tab runs TINY.** The page pins the nine
+  stages that differ, so the comparison holds — but the headline claim is
+  stronger than what is running, and `demo/grains/index.html` still comments
+  that the modal bank is what "TINY compiles out anyway".
+- 🔴 **The 25x insertion loss at `msos 0` is unexplained.**
+- 🔴 **`replay`, `seek`, `capture` and `show` never tick their media master**, and
+  the assert that would notice sits behind `if (fires.length)`.
+- 🔴 **LESSONS.md numbers 39–48 twice**, cited wrongly in three files.
+- ⚠️ **No full `verify.mjs` run for two sessions.** CLAUDE.md's header now says
+  **33 of 39** and carries no suite total on purpose.
+- **TINY's orphans**, and now a second reason to weigh a cut: five wire buffers,
+  not just 787 bytes.
+- **`summarise` and `separated` in `rig/box/measure.mjs` are imported by
+  nothing.**
+- ⚠️ **`now` is red for ERR, not for us** — a 2-byte range GET on the live edge
+  answers **403 with `drm: true`** and no ACAO while the playlists are fine.
 
 # Handoff — 2026-09-13 (end of session 21)
 

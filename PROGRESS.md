@@ -1,4 +1,936 @@
-# Progress log — 2026-08-25 → 09-13  (newest first)
+# Progress log — 2026-08-25 → 09-14  (newest first)
+
+## Session 22 (2026-09-13 → 09-14) — real SuperCollider at both ends; a page silent for hours with the answer on the wire; four rules that were right for the wrong reason
+
+**`/grains/` has said *"the same granulator in this page and on a Raspberry
+Pi"* since the day it was written, and the claim was FALSE.** A browser worklet
+is a reimplementation that sounds comparable, and no amount of side-by-side
+measurement makes it the same instrument. It is literally true now: the board's
+own compiled graph — **64,733 B, 1,467 UGens, 103 controls** — taken by wasm
+scsynth *in the tab* in **22 ms**, beside the Pi running that same definition.
+🔴 **The material needed a SECOND definition**, because `Engine_Pappus.sc:518`
+granulates a BUS and nothing in a browser fills one: `PosSource`, 4,508 B /
+104 UGens, writing into Pappus's own input bus, with node order asserted from
+the server's answer (`/g_queryTree.reply … posSource … pappus`) rather than
+assumed. **2.2 grains a second in the page and 2.2 on the board against 2.2
+asked for** — both graded against the slider, never against each other.
+Deafness at both ends: tab 0.005569 → 0.000000, board 0.1086 → 0.0000.
+
+That took three measurements to become possible, and each one found the
+previous belief wrong rather than incomplete. The session's shape is that
+almost every number it produced corrected a number already written down here.
+
+### What went wrong, which is most of the session
+
+🔴 **`/grains/` was silent for HOURS because of one `note.panic`, and the board
+had been reporting the reason the whole time.** `Engine_Pappus.sc:804` is
+`trig * (gates[i] > 0.001) * …`, so with every gate shut **no grain fires and
+no `/pgrain` is sent while passthrough goes on working** — the board streams
+50 frames/s, answers every question, reports the right material, and makes
+nothing. One probe changing one thing separated it:
+
+| | rms | grains/s |
+|---|---:|---:|
+| the page's exact configuration | **0.000000** | **0.0** |
+| + `gates [1,0,0,0,0,0,0,0]` | 0.016037 | 1.5 |
+
+Nothing ever reopens them: this page's notes go to the INSTRUMENT, and the box
+only routes them to the granulator when an archive is set. **So a single
+`note.panic` from anybody silences this page for ever after.** That is LESSONS
+#46's `msrc 1` in a sharper costume — state the board keeps, that a page
+depends on and never sets — and the earlier sweep enumerated `msrc`, `mlock`,
+`mscanmode`, `msos` and nine `BYPASS` stages and missed the one control that
+decides whether the instrument exists at all. 🔴 **And `params.state` returns
+`notes.gate`, which read `[0,0,0,0,0,0,0,0]` through every failing run,
+including in the dump that was handed over to diagnose it. The evidence was on
+the wire and nothing read it.**
+
+🔴 **`strip`'s only lane had NEVER drawn anything, and the suite said `strip has
+ink`.** `follow` defaults on and the playhead sits at position 0 = 1970, which
+is 93% of the way through a year-100→2100 range, so follow scrolled the window
+forward before the first frame and both spans went off the left edge. MEASURED:
+**7 lit columns in the whole lane band, all of them grid lines.** The assert
+passed because it samples the axis too. Three of its four cells were properties
+of the epoch rather than of anything — `pps` 9.08e-9 printed `0.000`, `ceiling`
+was `Math.round(Infinity)` and printed blank, `ulp` 5e-324 printed `0.000 ms` —
+and ⚠️ **`major` printed a DATE**: `formatTime(lod.major, lod.major)` with no
+third argument, so a 500-year DURATION over 1e12 took the absolute branch and
+the cell read `2469-12-31`, with the transport bar reading
+`-457575120:00.000 / 1051898400:00.000`. The fixture is 22 archive-shaped rows
+now and the **aoristic statistic is DRAWN** — it had been recomputed over 24
+invented bins inside `check` and printed to the log, never to the canvas, on
+the page whose entire headline it is.
+
+🔴 **The even-readout rule was right for the WRONG REASON, and the failure it
+was written to prevent had been happening the whole time it was enforced.**
+CLAUDE.md said the row is `repeat(auto-fit, minmax(96px, 1fr))`, so a phone gets
+two columns and an even count always fills. MEASURED at thirteen widths — 96 px
+plus a 1 px gap gives **three** columns from about 353 px of content upward,
+which is every phone anyone owns:
+
+| cells | holes at |
+|---|---|
+| **4** | 353–426 px — iPhone SE 375, **iPhone 12–15 390**, Pixel 412 |
+| **6** | 427–620 px, and the hole is **four slots wide** at 560 |
+
+So the rule guaranteed nothing above two columns and the commonest readout
+shape in the repo had been holing on the commonest screen there is. ⚠️ The hole
+is not cosmetic — the row is one background showing through 1 px gaps, so a
+missing slot is a patch of a DIFFERENT COLOUR with nothing in it, which reads
+as a cell that failed to load. Flex, not grid: `flex: 1 1 96px` is the same "at
+least 96, share the rest" minus the fixed column count, and the last row's cells
+GROW. Verified at thirteen widths, both counts, every one fills. ⚠️ **The even
+rule STAYS and is now editorial rather than structural** — an odd readout always
+has a weakest cell and being made to find it is the point; `mount()` still
+throws. Only its stated reason was wrong, and **a rule defended by a false
+reason is one nobody can correct**, which is why the correction is written where
+the claim was. Found by an agent doing a UI sweep — the sweep noticing that the
+rule it had been given is wrong.
+
+🔴 **A "horizontal rule" on `/typist/` that was an EMPTY BORDERED BOX.**
+`readout: null` empties the row without removing it, so the shell appended a
+childless div and `shell.css` gives that div a 1 px border. MEASURED: **height
+2.0 px, 0 children** — a full-width band made entirely of a box's own two edges,
+24 px above the controls, reported as "old UI creeping in", which it was, just
+not in the way it looked. Fixed in the SHELL, not on the page: remembering to
+hide your own empty box is not a thing a page should have to do, and
+`.pos-controls[hidden]` two rules below already existed for the same failure
+leaving a 14 px band. 72 px of dead chrome gone. CLAUDE.md gains it:
+**separation is spacing, not lines, and an empty box is a line.**
+
+🔴 **Three `glCheck` calls were DEAD CODE, which is very likely why the Quest's
+`gl 1282` stayed unlocated for three days.** `glCheck('upload')`, `('footer')`
+and `('bindFramebuffer')` were guarded on `state.frames === 0` while the counter
+increments at the TOP of the callback — so only `firstDraw` could ever fire,
+and three of the four places that could have named the error were switched off.
+**Revived, and the headset then named it: `upload`.** ⚠️ It did not reproduce on
+the laptop (the new off-screen preview reads `clean`), so the fix follows the
+headset, not this machine.
+
+🔴 **`xr-panel`'s exit scan ATE THE TRIGGER, so `mirror`'s panel drag could never
+have worked** — `selectstart` armed a drag and the next frame's "any button
+leaves" ended the session on button 0, and a slider on that panel would have
+exited the session on press. Trigger excluded; grip, A/B/X/Y, stick-click, menu
+and the 4 s dead-man's switch unchanged. 🔴 **And `xr-panel.mjs` still carried
+the 6 s deadline on `requestSession` while asking for `plane-detection`** — the
+exact black-headset trap `scene` was fixed for yesterday, still live in the
+other page. LESSONS #66 was written from the first instance while the second sat
+three files away.
+
+🔴 **`applyAll()` WOULD HAVE FIRED THE WAY OUT ON THE FIRST FRAME OF EVERY
+SESSION**, which presents as a headset that refuses to enter. It is one of four
+places that had each silently assumed every tablet control was a slider —
+layout, hit test, input and state — which is why **"a second control is one
+line" was reported last round and is false**: one line holds for a second
+control of a KIND that already exists. Folding `Hold to leave` into the
+widest-label maximum widened the head by 80 design px and took the lane from
+2.75:1 to **2.16:1**, caught by the proportion assert rather than the
+head-width one; a button inheriting a slider's whole-row hit test fires from its
+ring's air, the row gap and both margins.
+
+🔴 **A GLB chunk-padding bug that EVERY TEST PASSED.** `xr-glb.mjs` was written
+from the specification and then diffed against three.js `GLTFLoader.js`
+v0.186.0: it was rounding each chunk length up to the next multiple of four — a
+SECOND padding on top of the one the spec already requires. **Both vendored
+files happen to be 4-aligned, so nothing caught it.** Reading somebody else's
+implementation found it; no amount of running ours could have. Also recovered
+MAT2/MAT3 from the type tables, and the sparse-accessor and `normalized` paths
+were refused BY NAME after checking the bytes: 0 of 23 accessors are either.
+
+🔴 **`replay`'s cues NEVER FIRE, and the suite cannot see it.** `mediaMaster` is
+constructed and **never ticked** — `tick()` is what installs the `timeupdate`
+backstop — so nothing drives it. Measured on the ORIGINAL file and the new one:
+20 s of playback, `transport.playing === false`, `fired` null. The deck moves
+only because the page's own 400 ms watchdog re-seeks it, which is why `apart`
+sits at a rock-steady ~400 ms. `seek`, `capture` and `show` construct a master
+and never tick it either. ⚠️ **The `cues land within 250 ms` assert sits behind
+`if (fires.length)`**, so zero fires reads as zero work. Left unfixed on
+purpose: it is a transport redesign, not a UI pass.
+
+🔴 **The strip's gutter widened itself to fit a line and then CUT THAT SAME
+LINE** — twice over, for two different reasons, both silent. `gutterWidthFor`
+reserved `GUT_SUB_X(11) + text + 10` while `drawGutter` clipped every line
+against `gutterPx − GUT_LABEL_X(18) − 8`, the NAME's inset applied to the
+numbers too: measured against 19 px of chrome, cut against 26, so **any
+sub-line long enough to set the gutter width was always one character too long
+for it**. A component that pays for the room and then does not use it is the
+worst version of this. ⚠️ **And then it was still cut by a SUB-PIXEL** — `need`
+is a measured width with a fraction on it and `Math.round` took 111.4 to 111,
+leaving the line that set the width a fraction short; the clipper does not do
+sub-pixels, it drops a character and adds an ellipsis. `Math.ceil`.
+
+| the number | its width | gutter | room | |
+|---|---:|---:|---:|---|
+| `12.3 ms` | 42 px | 92 | 71 | fits |
+| `12.3 ms typical` | 90 px | 111 → **112** | 90 → **91** | **was cut, now fits** |
+| `12.3 ms typical · 45.6 ms worst` | 187 px | 150 (cap) | 129 | cut, correctly |
+
+⚠️ Both defects arrived with the same morning's measured-gutter work and both
+were invisible to every page that ships — `typist` declares its own width and
+`draw`'s labels are short — which is the **third** time in one day that this
+component's real behaviour only showed up under a control built on purpose.
+Earlier the same component was caught **clamping a width the page had
+explicitly declared**: `typist` passes `gutter: 132` and below `narrowAt` got
+`Math.min(132, 46)`, so three lanes on an iPhone read `ty…`, `52…`, `64…` — a
+lane whose name and both of its numbers were each a single ellipsis. And
+🔴 **sizing it in `resize()` read as working and did nothing**: `setLanes` does
+not resize and a page sets `L.subLabel` long after both have run, so the width
+was decided while the strip had no lanes and never revisited — a lane handed a
+458 px number still got a 92 px gutter.
+
+🔴 **An assert that could not fail**: `d.assert('eight cues in the score',
+deck.eventsOf ? true : true, …)`. Now a real fold query with the first cue's
+time read from `CUES[0]` instead of typed.
+
+🔴 **Two harnesses started at once silently drove each other's browser.**
+`verify.mjs` still had two fixed globals — `CDP_PORT = 9333` and one profile
+directory — while CLAUDE.md records exactly this bug in `verify-gl.mjs` and the
+fix had been applied to the HTTP port and never to these. The second harness
+found 9333 answering, attached to the FIRST's browser, and drove someone else's
+tabs while reporting its own slugs. REPRODUCED by reconstructing the old
+constants:
+
+| | asked for | result |
+|---|---|---|
+| old | strip | **`Error: cdp timeout: Runtime.evaluate`** |
+| old | typist | 22/22 green |
+| new | strip | 20/20 green |
+| new | typist | 22/22 green |
+
+That `cdp timeout` is the exact error that took a full suite out twice the same
+day, on `replay`, which is **16/16 alone**. ⚠️ The profile had to move in the
+same change, not as tidiness: Chrome writes the port it actually got into
+`DevToolsActivePort` INSIDE the profile, so a per-run port with a shared profile
+still lands on someone else's browser. The harness counts other browsers now and
+says so — ⚠️ **its first version reported 19 OTHER HEADLESS CHROMES FOR TWO**,
+because one browser is about ten processes and the helpers inherit the whole
+command line. A warning that overstates by 10x is worse than none; the browser
+is the process with no `--type=`, deduped by port, proved 2 → 1 with a decoy.
+
+🔴 **Three counters that reported intent as delivery.** The browser engine's
+`loadedSynthDefs` went **1 → 2 → 3 across three sends of which ONE loaded**.
+`grains` shipped a panel printing **`0 of the board's 8 voices open`** beside a
+board reporting 2.2 grains a second, because `notes.gate` was the KEYBOARD's
+mirror and `params.set gates` never passed through it — two authorities on one
+number. And `draw`'s `invented` divided by `drawnPoints`, the REBUILD
+RESOLUTION, which is `(t1−t0)/900` steps and therefore ~900 whatever you do:
+
+| sample every | kept | invented | off by |
+|---|---:|---:|---:|
+| **10 ms** | **221** | **0.0%** (was 66.7) | **0.000 px** |
+| 300 ms | 13 | 94.1% | 137.705 px |
+
+⚠️ And the assert had the same bug, so for a few minutes the page reported TWO
+different percentages for one gesture under one name — the cell said 0.0% while
+the check said 96.7%. **Two numbers with one name is worse than either being
+wrong**, because whichever a reader happens to see becomes the fact.
+
+🔴 **Four times this session a change silently removed asserts while reading
+green.** Adding `SIZE_CEILING` to a page before updating the import took it
+**26 → 9**. `typist` calling `startOwn()` before `check()` took it **22 → 7**,
+every remaining one green, because `startOwn` disposes the deck, destroys the
+strip and empties the log. Declaring `typist`'s two controls the other way round
+read **9 of 10** — `verify.mjs` presses in declared order, so whichever is LAST
+is the state the page is in when the harness starts typing, and the missing one
+was the assert grading the half a visitor actually uses. And restructuring the
+XR tablet's constants deleted two helpers; **the room swallows a throw from
+`draw()` into a log line, so `verify-gl` still said GREEN** while `scene` went
+**32 → 24** and the total 59 → 51. Nothing but the assert count would have
+shown any of them.
+
+🔴 **A board default was changed on a constraint that turns out not to exist,
+and reverted 20 minutes later.** `Engine_Pappus.sc`'s code default was made TINY
+on the reasoning that the 64 KiB ceiling bound the board. It does not (below),
+the sclang half was unverified and unpushed, and the change is reverted with the
+reason written in beside it — its own comment had predicted exactly this:
+*"at which point this default is wrong and should go back."* **Leaving a
+constraint in place with a disproved justification is how an undefendable cut
+survives.**
+
+⚠️ **A UDP measurement that was entirely the measurer's own socket.** The first
+native reading of the `/d_recv` edge said 9,200 bytes; `net.inet.udp.maxdgram`
+is **9216 on macOS**. Caught only because sclang put a 16,260-byte datagram on
+the same loopback in the same hour. ⚠️ And the official wasm backend's own demo
+API is a matching trap: `OscMessage().addBlob()` — what its shipped `init.js`
+uses — **throws on an 8,192-byte definition** while the identical bytes framed
+by hand load at 860,000 in the same engine. Using the shipped class would have
+produced *"the official build refuses FULL"*: a true observation about the wrong
+component.
+
+🔴 **The XR page blamed Space Setup again, and the previous fix to that exact
+message did not catch it.** MEASURED on a Quest 3 inside ONE passthrough
+session: at 6.30 s *"your headset reported NO surfaces … Space Setup may never
+have been run here"*, at 6.50 s **11 surfaces**. **200 milliseconds apart.** The
+earlier fix taught the note to tell a VR session from an AR one — correctly —
+and left the assumption underneath untouched: that the FIRST empty answer is the
+final one. *A diagnosis right about the mechanism and wrong about the timing
+reads exactly like a diagnosis that is right.* This message has now sent its
+reader to their headset settings twice; the first cost a room rescan and a
+serious suggestion of reinstalling the headset. An empty set in an AR session
+holds at `waiting` for 2,500 ms on the CLOCK — not a frame count, because what
+is being waited on is the headset's scan, which does not care how fast we
+render — and it is a floor on PATIENCE, not a timeout: the room is accepted
+whenever it arrives.
+
+### The 64 KiB ceiling: four numbers, and the repo had shipped a fifth
+
+CLAUDE.md carried it as one sentence with no source and no mechanism.
+`research/synthdef-size-limit-2026-09.md`, measured with one generator at both
+ends:
+
+| path | largest definition that loads |
+|---|---:|
+| browser (SuperSonic 0.81.0) | **65,520** — silent above |
+| native scsynth, `/d_recv` over UDP | **65,488** — `EMSGSIZE` at the sender |
+| native scsynth, `/d_recv` over TCP | none found at 1,000,000 |
+| native `/d_load` from disk | none found at 1,000,000, **44 ms** |
+| anything sclang sends | **16,383**, above which it silently becomes `/d_load` |
+| **what this repo declared** | **65,536 — a value no path has** |
+
+🔴 **The round number was wrong in the DANGEROUS DIRECTION**: a 65,536-byte
+definition passed `fitsCeiling()` and went straight into the silent refusal the
+constant was added to prevent — the guard said yes and the engine said nothing.
+🔴 **It binds the MESSAGE, not the definition, and that is proved rather than
+argued**: adding a 12-byte completion message moved the definition edge from
+65,520 to 65,504, **exactly 16**, the wire cost; in both framings the largest
+MESSAGE that loads is 65,536. 🔴 **So it does not bind the board at all, and
+the board has never used `/d_recv`** — `.add` → `doSend` → `/d_load` above
+16,383 bytes, and BARE 43,551 / TINY 64,733 / LITE 74,733 / FULL 121,425 are ALL
+above that. Origin: `SC_ComPort.cpp`'s `kTextBufSize = 65536` on the **UDP port
+specifically**; the TCP port reads an int32 length and `malloc`s it, uncapped,
+and `RecvSynthDefCmd::Init` has no size check at all. The format imposes
+nothing — a 1,000,000-byte, 28,570-block definition parses.
+
+**The official wasm backend takes 860,000 bytes — 13.1x SuperSonic's** (`research/scsynth-wasm-official-2026-09.md`, measured with a prebuilt binary,
+no compiler). LITE and FULL both load there and both PLAY; FULL is 14% of its
+ceiling, and 68,892 — the number `Engine_Pappus.sc` cited as "gets no reply at
+all" — loads in 157 ms. 🔴 **And 860,000 is not a size limit**: 880,000 bytes of
+CONSTANTS load in the same engine that dies on 880,000 bytes of UGens, and
+constants reached 1,000,000. It is the fixed 16 MB wasm heap.
+
+🔴 **THE VERDICT: TINY was not cut for nothing, and its stated REASON was
+false.** The engine this repo deploys is the one that binds, and TINY at 64,733
+fits where LITE at 74,733 does not. What is wrong is the sentence — *"wasm
+scsynth refuses a `/d_recv` over 64 KiB"* is false about wasm scsynth and true
+about SuperSonic alone: a reason that reads as a property of the platform when
+it belongs to one port, and that would have outlived the engine it was about.
+⚠️ **Do not vendor the official binary**: `Last-Modified` 2026-03-21, the day
+PR #7428 opened and 2½ months before it merged, `/Users/scheiba/github/…` in
+the string table, a JS surface that does not match `develop`. Evidence about the
+approach, not a pinnable commit. ⚠️ Its failure is also worse: `Aborted(OOM)`,
+`window.onerror`, **and then the engine is dead and never answers again**, where
+SuperSonic says nothing and keeps serving.
+
+### The real Pappus graph in a browser, and a SECOND ceiling nobody had measured
+
+Every number in the 64 KiB story above was taken with GENERATED look-alikes of
+the same byte size; both research documents said so. **The real thing, compiled
+by sclang on the board, was offered to a browser for the first time ever** and
+it loads, starts, sounds and reports: 64,733 B in **11–12 ms**, `/done /d_recv`
+in the engine's own voice, `/status.reply`'s `numSynthDefs` 1 → 2 as an
+independent counter on the far side of the wire, six times, alternated
+TINY/LITE so drift cannot explain it. **103 controls declared, 103 answered,
+101 matching the file** (the two that differ are the ones the harness set).
+Sound with a deafness control at **exactly 0.000000 at four points**; grains
+only at 0.141219 and 0.191767; 0 glitches, 0 ms dropped, 100% audio health over
+16,488 blocks. 🔴 **And `SendReply` reaches the page** — **8.00, 4.00 and 15.99
+`/pgrain` a second at `mrate` 8, 4 and 16**, against CHAIN.md's board oracle of
+8.0 / 4.0 / 16.0, and 0 when `report 0`.
+
+🔴 **The second ceiling is `maxWireBufs`, and the real graph is far closer to it
+than to the byte one.** TINY refuses at **58** wire buffers and loads at **59**;
+SuperSonic's default is 64. So **TINY clears the byte ceiling by 787 bytes and
+the buffer pool by FIVE BUFFERS — and both refusals are the same silence**, so a
+future cut that saves bytes while spending a wire buffer buys nothing. ⚠️ The
+board runs `-w 128`; the two ends are not at the same setting. The instrument
+that could have confused the two was proved first: 63 oscillators load at 64,
+**65 are refused at 64 and load at 128**, 200 need 256 — and pointed at LITE it
+says the opposite (nothing at 64, 128, 256, 2,048, or with `realTimeMemorySize`
+raised 32x), so LITE refuses on BYTES. In the same engine a generated definition
+of **64,733 B with 1,848 UGens loads while one of 74,733 B with 2,134 does
+not**: more building blocks, fewer bytes, loads.
+
+⚠️ Two traps kept: SuperSonic answers `/b_alloc` with **`/done /b_allocPtr`**,
+not `/done /b_alloc`, so waiting for the documented reply reads as a wedged
+engine. And **BARE's buffer numbering is five shorter** than every other rung's,
+which put the gate buffer where nothing was allocated and made BARE fire no
+grains at all while passthrough still worked.
+
+### The two-SuperColliders card: struck, un-struck four minutes later, built, and then taken off the site
+
+The card was struck at 18:50 on numbers that are correct — `research/…§5` prices
+a wasm scsynth at **1,701,983 B against 6,659 B** for the same audible result,
+and 🔴 a wasm scsynth is **as opaque as the Pi**, so grain behaviour would still
+be inferred from output envelopes, which is the measurement that failed and cost
+a session. It was un-struck at 18:54 because **that priced a different
+question**. What was asked: *do we need scsynth to make granular sound in a
+browser?* — no. What was never asked: **can a synth definition travel as a
+message, the way a shader does?** `plan-visuals.md` already makes that argument
+for the graphics half; the audio equivalent had never been written down, which
+is why the analogy was available to be missed. 🔴 **And it repairs a claim this
+repo was already making** — `twins` said the worklet and the board's scsynth are
+"the same instrument"; two ends run the same instrument only when the SAME
+DEFINITION runs on both.
+
+`/patch/` was built to ask it and answered in one evening: three definitions out
+over the relay as binary frames and back, **only the copy that came back** handed
+to two engines.
+
+| file | written by | bytes | parts | round trip |
+|---|---|---:|---:|---:|
+| `positron-bell` | this page, byte by byte | 339 | 7 | 36 ms |
+| `positron-drone` | this page | 384 | 8 | 32 ms |
+| `sonic-pi-beep` | **sclang, elsewhere** | 1,656 → **2,370** | 40 | 37 ms |
+
+✅ **The v1→v2 converter written here produced exactly 2,370 B from 1,656 B —
+byte for byte the figure a converter written independently a day earlier
+recorded.** Two implementations agreeing on a number neither could guess is the
+strongest evidence the format is being read correctly. 🔴 **A synth definition
+is structurally SAFER to send than a shader**: it has no control flow at all — a
+list of blocks naming classes from a table compiled into the engine, each wired
+only to earlier blocks — so the two things a GLSL validator exists to catch
+cannot be expressed, and the cost is bounded by a block count in the header,
+readable before loading. ⚠️ And a guard proved its own blindness: `OP.mul` 2 → 0
+took the page to 18/20 — only the two *"a setting changes the sound"* asserts
+caught it, while *"SuperCollider made a sound"* read 0.914262 and PASSED.
+
+**Then the page came off the site**, because a page demonstrating that two
+engines COULD run one definition is worth less than two engines actually running
+one. ⚠️ **The row goes, the FILES stay, and that is deliberate** —
+`demo/patch/vendor/` held the vendored SuperSonic the rewire runs on (since
+promoted to `demo/shell/vendor/`). 🔴 A URL under a slug that is no longer built
+is the `moq.mjs` trap set up and waiting, so it was checked before anyone was
+told to build on it.
+
+### XR: real controllers, a tablet you can read and use, and a way out on it
+
+- **A tablet flat on the left controller, a ray on the right.** It sits on the
+  grip's square top face; ⚠️ **no handedness flip, deliberately** — MDN's
+  mirrored-X note is about things hung off the HAND and this hangs off the
+  PLASTIC. ⚠️ **Two of three columns are negated so the determinant stays
+  POSITIVE**: one negation flips the winding, the room culls back faces, and the
+  result is an INVISIBLE tablet rather than a wrong-looking one. Then the first
+  headset look said it *"looks to sky not to me (x rot 90 missing)"* and the
+  diagnosis was exact — `normal · (−gripZ)` read **1.0000**, straight along the
+  controller; one quarter turn about the controller's own X reads **0.3420**,
+  which is the lean and nothing else. Rotated rather than negated for the same
+  determinant reason.
+- 🔴 **The controller meshes were rejected with numbers and the rejection was
+  REVERSED.** MIT (Amazon, 2019), `@webxr-input-profiles/assets@1.0.20`,
+  217,984 + 213,868 B, parse **12.6 / 5.5 ms**, PNG decode 9.2 / 7.7 ms, 13,410
+  vertices each, **first-frame cost zero** (nothing is awaited; the stand-in
+  draws until the fetch lands). ⚠️ Two 2048² textures with mipmaps is **~45 MB
+  of GPU memory**. ⚠️ **The cost argument that rejected them carried a
+  phantom**: *"a PNG decode"* is not work — it is a byte range handed to
+  `createImageBitmap` — and the reader is **181 lines**. *An argument with a
+  free item in it is wrong even when its conclusion is defensible.*
+- **Assets live at `demo/shell/vendor/`, a deliberate departure from LAYOUT
+  rule 6**, because `xr-room.mjs` is imported by TWO pages and a per-slug path
+  would give one page controllers from a directory named after the other — the
+  `moq.mjs` failure exactly. The protection was replaced rather than dropped:
+  `checkPresent` refuses the build when a listed file is missing (a binary is
+  never `import`ed, so no import check can see it) and `checkVendorUrls`
+  refuses a `/…/vendor/…` string with nothing deployed behind it. Both proved
+  by breaking them; at runtime a 404 draws the stand-in **and says so on the
+  tablet**, where `moq.mjs`'s 404 was silent.
+- **The tablet's slider IS the site's slider**, read out of `slider.mjs` and
+  `shell.css` into one annotated table at a single design-px scale, with colours
+  read live off `:root` rather than copied. Lane aspect 2.82:1 → **2.75:1**,
+  knob/lane 0.588 in both, corner 11.8% in both. 🔴 **The travel is a share of
+  the TRAVEL, not of the width** — the trap `slider.mjs` already warns about —
+  with half a knob subtracted because the ray grabs the knob's centre: the knob
+  sweeps **623 px of a 623 px lane**, flush at both ends, and `u 0.5` reads 0,
+  not 50.
+- **A Hold-to-leave button**, adding to the ways out rather than replacing them:
+  a button on a surface that only exists if the tablet drew, on a controller
+  that only exists if a grip pose resolved, cannot be the only exit. Four ways
+  an accidental press is closed — it needs the trigger not a hover, 800 ms of
+  continuous hold, letting go cancels, and **running the ray off it RESETS to
+  zero rather than pausing**, because a hold that resumes can be completed by
+  two passes that neither meant to. 🔴 **The ending is performed in
+  `xr-hands.mjs`**, not in the tablet (whose whole claim is that it cannot tell
+  VR from AR) and not in a page (which would be wired on `scene` and forgotten
+  on `mirror`).
+- **`mirror` in VR and XR.** 🔴 *"The shader is already compiled there"* was
+  FALSE — a page's canvas is a DIFFERENT context from the session's — so the
+  shader machinery takes its context as an argument now, one instance on the
+  flat canvas and one in the session. On the card, 0.51 Mpix a frame:
+  **0.48–0.70 ms, 730–1070 Mpix/s**. ⚠️ **And the laptop cannot say where that
+  time goes, so it refuses to**: a quarter-size probe beside the full pass
+  answered **0.24x, 0.72x, 0.73x, 0.82x** across four runs with no code between
+  them, so `verdictOnCost()` declines to attribute cost when the card's own
+  samples disagree by more than 2.5x and prints the dispersion instead.
+  MEASURED IN THE HEADSET: the shader rendered live in-session at **90.1 fps
+  over 7,545 frames** — full rate, and the verdict the laptop declined to give.
+- **The sky goes and the honest answer is that it is a dark room** — behind the
+  floor is a chosen constant ≈8/255 against a floor of 11–16 and a lit pool of
+  34. **The glow is a fake and the comment says what it is not**: the measured
+  average colour of the panel's canvas poured on the floor as a gaussian, no
+  integration over area, no 1/r², no shadowing, no bounce. ⚠️ **The first
+  version was invisible and its comment was wrong** — squared falloff at 2.4 m
+  put the brightest point at **7 of 255**, because a panel hangs 1.6 m up and
+  most of the falloff is spent before the light reaches anything. Linear at
+  3.0 m: **34 against a 12 floor**.
+- **Floor only, and there is no branch** — the page draws no wall it did not
+  measure, in any mode. Keying walls off `planes.state` would have drawn them
+  through the 2.5 s grace and then taken them away; having no branch at all is
+  what avoids that flash. ⚠️ The floor had been 10 m across against a fade
+  ending at 11 m — dots at two-thirds strength where the quad stopped, a hard
+  edge 5 m ahead. Derived now.
+- **Meta-lobby panel dragging**: a grab bar under each panel, grabbed at the
+  ray's hit, facing you continuously while held, holding that facing on release,
+  yaw only, bounded 0.55–6.0 m. First sizing (0.42 of the width, 45 mm tall,
+  22 mm clear) read as a second OBJECT beside the picture; **0.28, 32 mm,
+  38 mm** — ⚠️ the gap GROWS as the bar shrinks, deliberately, because a smaller
+  handle sitting closer reads as part of the frame. MEASURED in the headset on
+  the version that replaced: **9 panel moves**, every one grabbed by its bar and
+  released facing the viewer.
+- **A new off-screen preview drives the same per-eye draw into a canvas nobody
+  sees and reads the error flag and the pixels. It paid for itself on its first
+  run**, catching a framebuffer feedback loop (a live renderer leaves its own
+  FBO bound, so the texture it returns is that FBO's attachment → 1282 and an
+  empty frame) and a backtick inside a shader template literal that killed the
+  module. Both would otherwise have been headset runs.
+- ⚠️ **Two footer cells that were not about their panel.** `card` is the
+  graphics card's own time and on the Quest it was **permanently blank** —
+  that driver exposes no GPU timer, so a cell that cannot change on the machine
+  it was added for teaches you to stop reading the row. `floor` is a fact about
+  the ROOM printed under a picture of a shader. Neither fact is deleted; both
+  are in the beacon, where a fact about the session belongs.
+- ⚠️ **The tablet's padding was already equal and the eye was still right.**
+  `PAD` is one number used all four ways and the canvas aspect matches the
+  object's, so it was equal in millimetres too — but a row's box is
+  `ROW_CONTENT` tall, which is **the button plus its focus ring, not the
+  slider's lane**, so the visible gap to the first thing you can SEE was `PAD`
+  plus half that difference. Equal to the LAYOUT and unequal to the READER.
+- ⚠️ Two more caught by measuring the OUTPUT rather than reading the code: the
+  stand-in was **2.1 cm too long**, so the tablet would have jumped 2 cm the
+  moment the real model landed; and `tabletUploadMs` read `null` forever because
+  the snapshot was built before the first frame — that file's own getter rule,
+  broken by its author. And `loadModel` said its line once per PAGE LOAD while
+  the window preview now loads at page load, so **a headset session would have
+  carried no controller line at all**, leaving "no line" to mean both *it
+  worked* and *nothing asked*.
+
+### Eleven stale demos brought up to the rules, in two sweeps
+
+Six first — `capture`, `record`, `replay`, `seek`, `show`, `webrtc` — with
+**86/86 before and after and the in-page count unchanged on every one**. Then
+five, where every count went UP: `strip` 8→9, `looper` 3→6, `jam` 5→6, `cues`
+4→6, `instrument` 6→7, harness 62/62 → **70/70**.
+
+- **Live prose deleted on five pages and REHOMED every time.** `replay`'s
+  `.fires` paragraph was eight entries of `CUE-03 +12ms` rewritten on every
+  fire, wrapping to two and three lines under a picture — now `fired · late by ·
+  worst` cells. `jam`'s `.who` rewrote a line per peer twice a second; who is in
+  the room is a STATE CHANGE, so it logs once when it changes. `cues`' sentence
+  rewrote ten times in 1.2 s.
+- **Cells that could never move**: `record`'s `held` read 0 and `peak` read 1 on
+  every run the page has ever had. The same quantities in KiB DO move — `worst
+  ~98 KiB` sitting still against `sent 350 KiB` climbing IS the finding.
+  `seek`'s `lateBurst` was a second always-0 verdict beside `wrong`. ⚠️ `jam`'s
+  `offset` read `0 ms` while alone — a confident measurement of a correction
+  that does not exist; blank until somebody else is there.
+- **Jargon on a visitor's screen**: `state` said `playing rs4`; `rtt` became
+  `round trip` with `what` saying in words that it is NOT how far behind the
+  picture is (this repo has that number flattering WHEP ~3x on record already);
+  `fold` appeared in five assert labels and three log lines and is banned.
+  ⚠️ `instrument` printed **`here (…`** and **`denied…`** — readout cells
+  holding sentences, ellipsised; every value is ≤8 characters now.
+- **`looper`'s strip was pointed at a deck that holds no items** — its own
+  header says so — inside a box fitted to that deck's one-hour range, and its
+  `Play a bar` played four notes and never closed a loop, so the suite never
+  produced anything to draw.
+- 🔴 **The last hand-rolled keyboard is gone**, and its `<style>` block had been
+  SHADOWING the shared component's rules. The blocker was real (`onDown` never
+  hands over the event and this page measures stamp skew), so the stamp is
+  caught in the capture phase on `window`; proved by sabotage, 12/12 → 11/12.
+  Real reading **0.20–0.30 ms**.
+- ⚠️ **Four kit gaps REPORTED rather than a fifth copy built**, which is the
+  rule working: a small state token (four hand-rolled stylesheets for one idea),
+  the publisher badge (`webrtc` and `llhls` carry byte-identical copies), and a
+  labelled video tile grid.
+
+### The strip, the slider and the pages that use them
+
+🔴 **The strip's wall-clock cursor armed itself on every page and NOT ONE PAGE
+WANTED IT** — photographed on `draw` as an amber band across half the strip and
+`209.31 s` beside it, which is the age of the browser TAB. **The evidence that
+the default was wrong was already in the repo, in thirteen places**: ten pages
+passed `armWall: false` and the other three call `armWall(anchor)` with an
+anchor of their own, so the seven that never mentioned it were getting a second
+cursor they had not asked for. *Ten authors turning a default off, one at a
+time, is a default reporting its own defect; nobody had read the ten together.*
+⚠️ The ten `armWall: false` are REMOVED rather than left standing — a redundant
+option is a question for the next reader.
+
+🔴 **A slider was three grid columns** — label, lane, number — and the third is
+sized by the widest value that slider can ever show, so the gap before the next
+slider's label was a different width on every row and a row of two sliders read
+as six evenly-spaced things. Photographed on `/draw/`: the same `column-gap`,
+three different-looking gaps. Stacked, a slider is TWO columns and the number
+sits under the word it belongs to, which is this project's rule for every other
+figure it prints. MEASURED at 1280/900/720/390: **12, 12, 12** between parts,
+value 14 px under its label, at every width.
+
+**The gutter had two left edges** — name at x 18, numbers at x 11, with the
+swatch painting x 8–11 and the first number's glyphs overlapping it. One
+`GUT_TEXT_X`; cost measured at 1200 px, four of sixteen pages widen because
+their widest line is a number rather than a name. ⚠️ **The step BETWEEN numbers
+cannot grow**, and that was measured rather than assumed: `reel` puts 3 lines in
+44 px with its last baseline at +42 against a ceiling of 42, and `now` 2 in 34
+at +32 against 32 — both exactly at the limit. ⚠️ **A lane one pixel short drops
+its last line in silence**, and the last line is where the count lives;
+sabotaged to 32 px it reports `DROPPED [["typed",32,"1 of 2"]]`.
+
+### draw and typist
+
+**`draw`** lost its dotted third line — *"what is the dotted line?" is the whole
+verdict on the dotted line*: it answered a question the page already asks in its
+numbers, and with three lines up the picture could not say which one was the
+subject. Still computed, because the check grades it. The white line now stops
+AT the playhead and blue grows with it, both from ONE function — ⚠️ two copies
+would agree today and disagree the first time either is touched, and the
+symptom would be two lines ending in different places, which reads as a
+RECONSTRUCTION error and would be debugged in the wrong file. ⚠️ `!recording`
+was the obvious gate and is the WRONG one: record stays armed after a gesture
+ends, so the line would never follow the cursor; caught because the check read
+three identical pixel counts. Blue is at **half weight**, so white shows through
+wherever the two agree and blue is only visible where it DEPARTS. MEASURED at a
+quarter, three fifths and the end: white 8,028 → 22,822 → 37,088, blue 3,502 →
+9,794 → 16,004.
+
+**plan-gesture §3's decision survives and its ARGUMENT is refuted.** §3 claimed
+two 1-D series are the 8.6x failure BY CONSTRUCTION:
+
+| sample every | kept/direction | one 2-D record | as two 1-D records |
+|---|---:|---|---|
+| 20 ms | 101 | 0.01 px | 6.3x worse |
+| 100 ms (default) | 30 | 0.146 px | 1.9–2.4x worse |
+| 300 ms (knob top) | 12 | 4.32 px | 1.9x worse |
+| 500 ms (past the knob) | 8 | 24.63 px | **0.5x — two records WIN** |
+
+So §3 conflated two defects: per-axis-ness costs ~2x, TIME-BLIND PLACEMENT costs
+~14x. **"Worse by construction" is false — the order crosses.** The real reason
+to keep one 2-D series is the row of §3's own table the measurement never
+touched: one sample, one instant. Atomicity, not error magnitude. ⚠️ **The
+shipped assert is deliberately NOT the pre-registered one**: `> 2x` was
+pre-registered and met on the first run (2.1x), and the ladder shows the ratio
+spans 9.0x → 1.9x → 0.5x, so it is a property of one gesture at one knob
+position. What ships is the ORDER at every rate the knob offers plus "the gap
+reaches 2x somewhere in that range" — both ends of the ladder, never its middle.
+
+**`typist`** opens on YOUR typing now, with no readout and no second copy of the
+document. ⚠️ `readout: null` is a DECLARATION, not an omission — the harness
+asserts "declares that it has no readout, on purpose", so a page that forgot one
+still fails — and the counters behind those cells are kept, because deleting the
+arithmetic with the row would have taken two checks with it silently. **The
+marks ARE the characters**: `glyphOf(row)` returns a character drawn on the tick
+only where the neighbours left room, so 🔴 **the ZOOM is the control — out is a
+rhythm, in is a word**. ⚠️ The room test is against BOTH neighbours: one-sided,
+a run of letters draws the first of every crowded pair and drops the second,
+which reads as "these keys are special" rather than "there is no room here".
+🔴 **Asserted as a RELATIONSHIP at two zooms**, because "it drew nothing" and
+"there was no room" are the same picture: **1 letter legible of 52 marks at
+20 px/s, 6 of 6 at 400**, with opposite sabotages reading 52 of 52 and 0 of 52.
+⚠️ A middot where no character can be shown is **opt-in**, and the reason is
+sharp: `demo/strip`'s own `glyphOf` returns `·` for exact, `?` for unknown and
+`~` for vague, so a blanket middot fallback would redraw its `?` marks as `·` —
+**a page about uncertainty quietly reporting certainty**. The dot's colour means
+nothing new; its STRENGTH says why there is no character (full = this row has
+none, faded = there is one and there was no room). And the cursor was a block
+that held a character and consumed no width, so `paper` rendered exactly one
+character narrower than the `<textarea>` pinned over it — **12.42 px adrift, now
+0.00**.
+
+### The diagram grew containers, and every connector a name
+
+Photographed on a phone: `how far…`, `slow down`, `small…`, and a caption
+admitting `2 shortened to fit`. 🔴 **Every arrow name was measured against
+something other than the space it is drawn in — three faults, not one**: a
+step's budget was "half the box it starts over" (so `settings` wanted 46 px,
+had **106 px of empty row**, and was cut anyway); a lane's budget was a flat 30%
+of the picture and **the cut then fed the gutter that caused the cut**; and
+nobody asked the boxes at all, so all four box `sub`s were cut while a gutter
+nothing wanted was held. ⚠️ The obvious repairs were both rejected on the
+measurement — nothing needs to MOVE and no lane needs WIDENING; the bug was
+arithmetic. Then a rendered-overlap check found two names with a line drawn
+THROUGH them, one of them from the fix: 🔴 **"six pixels above the middle" is
+only clear of a HORIZONTAL line**, and 🔴 **in one column a box's two attachment
+points are 12 px apart while this type is 11 px tall**, so a name between them
+cannot clear both. 22 arrow names across 6 diagrams: **0 on a box, 0 on a line**
+(was 4 on a line).
+
+**Boxes inside boxes.** One rule decides attachment in BOTH layouts: a
+container's name is at the TOP, so the ground between its edge and a box inside
+it is empty sideways and full downwards. Found by screenshot — the first version
+drew an arrow straight through the words `Raspberry Pi`. A link between two
+boxes in ONE container has no route and is **dropped and reported**, never drawn
+through something. ⚠️ **Byte-identity needed two asserts and the obvious one was
+an A/B where both arms share the bug**: "same spec with and without
+`children: []`" stayed GREEN with the container arithmetic forced permanently
+on. 272 of 272 layouts identical (8 specs x 2 rulers x 17 widths), one ruler
+deliberately uneven so an equality holding only for a fixed advance cannot pass.
+
+🔴 **There were FOUR channels saying the same words, not three** — a `<title>` on
+each `<g>` AND one on the `<svg>` root, putting a native tooltip over the whole
+picture, which nobody had spotted. ⚠️ The `title` was carrying the accessible
+name, so it moved to `aria-label`, with `**` markers stripped because a screen
+reader was reading "star star" twice a sentence. 🔴 **It was already
+colour-coded and the tint was below being seen**, which is why recolouring was
+asked for while looking at a picture that had it: `--line2` is already a
+blue-grey, so 11% of #5b9bd5 moved oklab b by **0.0074** — a slightly lighter
+grey, not blue. 8% fill / 26% stroke, chosen by rendering four pairs side by
+side. Dotted `1 3` rather than `5 3`, because an 8 px period on a 40 px box is
+marching ants and every rounded corner loses a whole dash to the curve.
+
+⚠️ **Two of the new tests were DECORATION on the first try and sabotage caught
+them**: the gutter test used widths where the old 30% rule never bit either way,
+and the diagonal test measured clearance at the label's MIDPOINT, which is
+exactly where the broken rule was already correct. Both rewritten, both now fail
+on the old code, both carry a comment saying why. 44 → 64 asserts, 11 sabotages,
+all 11 caught — ⚠️ one of them was green until a second assert was added.
+
+### grains: what the board keeps, and what that does to a comparison
+
+🔴 **`sos 0` means the granulator hands back its input untouched, and that closes
+the 2026-09-12 investigation.** `Engine_Pappus.sc:945` crossfades grains against
+the LIVE INPUT, and `sos 0` — the default everything used — outputs the input
+verbatim with no grains in it:
+
+| `sos` | `mrate` 0.5 vs 24 grains/s |
+|---|---|
+| 0 (the default) | **identical to six digits** |
+| 0.6 | **8.26x apart** |
+
+Its sharpest number — *"the envelope never dropped below a quarter of its
+median"* — reproduces as **0.981 at `sos 0` and 0.000 at 0.6**. The measurement
+was of a granulator that had been asked to pass its input through. `sos` is
+clamped to 0.6 now so every patch actually granulates. 🔴 **And the instrument's
+RIGHT CHANNEL bypassed the insert entirely** — `pappusFx` re-patched only the
+left port while `startJackSynth` connects both — so a page heard
+granulator-left plus instrument-right DRY and the granulator was fed mono-left.
+Read off `jack_lsp -c`; held-note leak **3.19x → 1.00x**.
+
+🔴 **Every stage downstream of the granulator is pinned off, because only one of
+the two panes HAS a chain.** With the board back on LITE, a 24-filter modal bank
+that TINY compiles out is audible again: `pwet 1` measures 0.000000 on TINY
+against **0.030–0.041 · 662–706 Hz** on LITE, with the control that makes it
+mean something being **LITE with the bank silenced measuring as TINY**. ⚠️ And
+the obvious next move would have been BACKWARDS: turning `pwet` up makes the two
+panes LESS alike on a page whose entire subject is comparing them — the board's
+signal runs granulator → RESONATOR → DELAY → COLOUR → REVERB and the browser's
+is a worklet with none of them. **The board is an OBJECT that keeps what it was
+left with**, so "we never set it" means "it is whatever the last person wanted",
+and any stage they left on is heard in one pane only while the page reports the
+difference as if the granulators had made it. `BYPASS` pins all nine.
+
+⚠️ Same species, one level down: the suite **pressed Hold (`src 1`, which
+ERASES) and set `src`/`lock` nowhere else**, so each run handed the next an
+unfillable buffer — visible as the suite going green once then red three times
+with no code between.
+
+⚠️ **`PosSource` existed as a file and was wired to NOTHING** — `push.sh` never
+installed it, `run-pappus.scd` never loaded it, `box.mjs` had no `source.set`,
+and `grains` had been sending `sourceMessage(SPEC)` into the void since it was
+written. With it wired: rms **0.008025 / peak −29.6 dBFS** against 0.000000 /
+−180.0 off, `where` meaning one thing at both ends (at `mscan 0.5`, `mbuflen 8`
+of a 60 s buffer, every grain reports `pos 0.070` = 0.5 × 8/60), and `mrate`
+8 → 8.0, 4 → 4.0, 16 → 16.0 with no division needed. ⚠️ **A node id is not
+evidence a synth exists** — the first version reported `node 1002, engineOn:
+true` about a SynthDef that had failed to load; `/pos/confirm` asks scsynth via
+`/s_get` now, and that guard proved itself on the real failure before anything
+was believed. ⚠️ `PAPPUS READY` printed before the engine's own startup defaults
+ran, so `run-pappus.scd` overwrote the client's one second later — the page
+asked for 2.2 grains/s and got 0.5, **on a cold board only**.
+
+⚠️ **The 25x insertion loss was chased and is NOT the nine `BYPASS` stages** —
+the compiled def defaults all nine to 0, so the page was pinning them to what
+they already were. **The residual loss at `msos 0` is not accounted for and is
+not claimed to be.**
+
+**Two new build refusals, and two pre-existing build bugs fell out of writing
+them.** `PROVENANCE.json` + `checkCompiledDefs()` refuse the build on a STALE
+artefact — the failure `checkPresent` cannot see, where the tab runs last week's
+graph beside the board's and **nothing 404s, nothing throws, and every number on
+the page still agrees** because both ends are measured the same way. The two
+bugs: all four refusals ran AFTER the copy loop while `checkPresent`'s own
+comment said before, so a missing binary gave a raw ENOENT over an emptied
+output; and `checkImports`' regex crossed line breaks, so the identifier
+**`importMs` swallowed to the next quoted string** and it reported
+`grains/engine.mjs imports /status.reply`.
+
+### Two new rules, and a correction to one already written
+
+Asked for in the reader's own words — *"rm all lines under grain visualizers.
+its a horrible jump of content each time it updates"* and *"what is this slop
+prose"*. 🔴 **Three blocks of generated prose, rewritten sixty times a second,
+each of them REFLOWING.** Every number in them was real; **the failure is the
+FORM.** A sentence has to re-say the unchanging part beside the one figure that
+moved, so a reader re-reads a paragraph to find a digit — and the line rewraps
+between three and four lines while they do it, shoving the whole page down.
+
+- **Nothing that redraws every frame may change how much room it takes.** ⚠️ The
+  fix is never to shorten the sentence: any prose that updates live will
+  eventually straddle a line break. The test is not "is it short", it is *can
+  this change its own height while somebody is looking at it*.
+- **A page does not narrate its own state in sentences.** A figure goes in a
+  readout cell or a lane gutter, both fixed boxes. A claim goes in an assert. A
+  state change goes in the log, when it changes. ⚠️ **And REHOME what it said** —
+  deleting a display without the facts is how a page quietly stops reporting
+  something, which is worse than saying it badly.
+- **Separation is spacing, not lines — and an empty box is a line** (the
+  `.pos-readout` band above).
+
+⚠️ **And the readout was saying the same thing twice**: `grains a second` and
+`at once` are already printed in granulator one's own card, and they sat BLANK
+until you press Switch it on — **two empty cells above two full ones read as a
+readout that failed to load**.
+
+**The knob glide is 900 ms with an ease-out-quint**, asked for as *"way slower
+and humanlike easing"*. ⚠️ Smoothstep is symmetric, which over 900 ms reads as
+machinery; a hand does not accelerate as gently as it decelerates. `1−(1−t)^5`
+puts **half the travel in the first 13% of the duration**. ⚠️ Affordable only
+because the glide is a DRAWING — the value, the sound, the readout and
+`aria-valuenow` all commit immediately.
+
+### LESSONS 66–73, and a defect in LESSONS.md itself
+
+The file had not been touched since session 20 while session 21 alone produced
+eight entries' worth. **66** a deadline on a step that asks a HUMAN a question
+(and `Promise.race` does not cancel the loser, so a timeout on an operation that
+ACQUIRES something must dispose of what arrives late). **67** three ways code can
+be present, correct and INERT — it ran at the wrong moment, it was computed and
+never read, it sat below a throw. **68** a clamp that overrides what the caller
+explicitly declared: *a default may be overridden by a caller; a caller's value
+may not be overridden by a default.* **69** an edit script that asserts as it
+goes and writes at the end. **70** sabotage catches DECORATION, not only
+regressions. **71** a ratio met on the first run is a threshold wearing a
+ratio's clothes. **72** a flag whose fall-through gives the same answer is a flag
+nobody tests. **73** a list of open work is stale within hours unless striking
+off is part of finishing. Four more instances were FOLDED into entries that
+already covered them rather than duplicated.
+
+🔴 **And it found a defect in itself: entries 39–48 exist TWICE** — `### 39`
+through `### 48` from sessions 14–15, and `## 39` through `## 48` from sessions
+17–18. That is already producing wrong citations in three files. **Not
+renumbered**, because CLAUDE.md, HANDOFF.md and PROGRESS.md all cite these
+numbers; it needs a deliberate sweep, not a side effect of a writing task.
+
+⚠️ **This session's own rules — 74–83 — were being written into that file while
+this section was being written**, by a second agent: the dump nobody read, an
+ink assert that includes the furniture, a conclusion surviving its reason, a box
+that is not ink, a fixture benign enough to pass a broken test, a default every
+caller overrides, installing a toolchain on a machine you do not own, "the same
+X at both ends" as a claim about one definition, two numbers that cannot
+disagree, and the room measured against the room used. Read LESSONS.md for the
+rule; this file only says what happened.
+
+### U: — what connects, and two ways the CV path can hurt somebody
+
+`research/uuu-integration-2026-09.md`. 🔴 **The premise was the first thing to
+push back on**: *"should there be more CV-to-MIDI"* assumes conversion, and
+conversion is usually the expensive way round. Four jobs get conflated and need
+different hardware — the network HEARS the gear (✅ solved twice, `rig/box` and
+`rig/m1`), the network PLAYS the gear (written, ⚠️ never tested on hardware),
+the network TURNS KNOBS (partly), the network READS the knobs (**nothing**).
+**If the ask is "let people hear the studio", row one is finished and you stop
+there.**
+
+🔴 **Two hazards that belong in the first conversation.** Chrome disconnects a
+held CV after 30 seconds and says nothing — `SilentSinkSuspender` tests
+`AreFramesZero()` and swaps the hardware sink for a fake one, and a gate held
+low or a 0 V pitch is bit-exact zero; `HandleVolumeMultiplier` ducks the whole
+destination bus with **no web-facing way to observe or veto it**, so every pitch
+goes flat at once. And **a normal jack lead can damage the interface** — Expert
+Sleepers' own words: shorting a balanced output is fine for audio, but *"when
+outputting the sustained voltages that are useful as CVs you risk damaging the
+interface hardware."* In somebody else's studio that is said out loud first.
+🔴 **CV INTO a browser is blocked outright** — Chromium issue 40403559,
+multichannel `getUserMedia`, **open since 2015**, input capped at two channels,
+with WebUSB listing `0x01 Audio` as protected.
+
+⚠️ **The document corrected itself twice, which is the part worth keeping.**
+"CV latency = the audio buffer" was too generous — a measured MOTU 828 round trip
+is **3.021 ms at 32 samples / 96 kHz** where the buffer alone is 0.333, so the
+real figure is **~9x the buffer** and the vendor's "~2 ms" understates by 50%.
+And "anything DC-shaped meets a high-pass in the OS mix path" was a guess and is
+**wrong**: the Web Audio spec mandates no DC blocking and Blink's renderer has
+no filter. ⚠️ **DC-coupled is a per-OUTPUT property, not a brand one** — the
+ES-9's balanced main outputs are AC-coupled and only its 3.5 mm jacks are DC.
+*That is the avfoundation-device-index trap in hardware form.* And one measured
+UltraLite AVB swings **2.35 V**, not enough for a useful 1 V/oct span, so "is it
+DC-coupled" is the wrong question alone.
+
+🔴 **What to do first is NOT a bridge.** `timeline/csound.mjs` has never been
+pointed at a real vClick score and **both that exist break it — not with a
+warning, with an uncaught throw**: line 12 of each is `t 0 $REPTEMPO`, `#define`
+is unsupported, the tempo comes back `NaN`, `tempoMap` throws. With a
+twelve-line macro pass both compile clean (56 rows / 2 sections / 1 warning and
+25 rows / 2 sections / 0 warnings) — **and a bracket in p2 is silently wrong**.
+That is a third misreading in a compiler that was 22/22 green for months with
+two real defects, and `plan-uuu-local.md` calls itself *"not started, and mostly
+already true"* while its P1 was untrue at the first statement of the first file,
+for a week, at 42/42 green. 🔴 ✅ **The plan's "single most important unknown" is
+answered and the answer is no** — neither real score contains a single `m` or
+`n` statement, so the quotation win is theoretical until somebody re-notates a
+piece. 🔴 ✅ **Their Icecast is HTTP-only**, which quietly kills "play their
+channels today": 4.09 s behind live at join, ACAO `*`, and port 8001 speaks no
+TLS, so an HTTPS page cannot load it at all. 📄 **Csound already listens on a
+network socket** (`csound --port=N`, documented) and U: have already written the
+client for it, so the shortest bridge is a WebSocket-to-UDP forwarder with
+neither side changing.
+
+### Process failures, which cost more than any of the bugs
+
+🔴 **A build agent downloaded the Emscripten SDK onto a Defender-managed laptop
+and raised security popups on the owner's screen mid-task.** That machine
+SIGKILLs any locally compiled binary — which is recorded in this file twice
+already, under ThreatLocker — so the download could not have produced a usable
+artefact even if it had finished. The measurement that was wanted was taken with
+a **prebuilt** `.wasm` instead and took minutes. *Check what the machine will
+let you run before spending its bandwidth and its owner's attention.*
+
+🔴 **`patch` was asked to be removed and was not, for hours**, until the owner
+noticed the page was still live at `https://positron.studio/patch/`. The request
+was answered in conversation and never reached the manifest.
+
+🔴 **A WHEP failure was reported as "Cloudflare not sending a keyframe under
+load" — a guess dressed as a diagnosis.** `keyframes: 0` was a CONSEQUENCE of
+`decoded: 0`, not a cause: nothing was decoding, so nothing could be a keyframe.
+The real cause was contention — `webrtc` read red inside an eleven-demo sweep
+(176/178) and **14/14 alone**. This project has a rule for exactly this and it
+was not applied: *run the failing demos ALONE before believing the suite.*
+
+⚠️ **An agent asked about a task nobody had given it**, which is the same
+failure in the other direction: work invented at the boundary rather than
+requested across it.
+
+⚠️ **Ninety orphaned Chromes accumulated mid-run before being noticed**, and the
+wasm ceiling had to be re-taken on a clean machine. SIGKILLing a CDP driver
+leaves its Chrome behind, and a queue script waiting on
+`ps aux | grep -q "[s]weep.mjs"` never started because the shell that had just
+written the script still had the string in its own arguments — LESSONS #39 in a
+fourth costume.
+
+### Numbers as they stand
+
+**33 built demos of 39 rows** — unchanged: `patch` was added and removed inside
+the session. CLAUDE.md's header is current now and **the suite total was removed
+from it rather than updated**, because it was stale for two sessions and a count
+nobody re-measures reads as a fact.
+
+⚠️ **No full `verify.mjs` run this session either.** Per-demo and per-group,
+green where run: grains 23/23 (17 page asserts), patch 26/26 (before removal),
+draw 21/21, typist 22/22 then 16/16 after the readout came off, diagram 64/64,
+xr-pick 40/40, xr-glb 21/21, verify-gl 77/77, scene 37, mirror 32, quest
+`--self-test` 3/3, sixteen strip demos 297 asserts before and after, eleven
+demos 176/178 (the two red are `webrtc` under contention, 14/14 alone), ten
+demos 180/180, five demos 94/94, `rig/box/insert-test.mjs` 8/8.
+
+⚠️ **`now` is red and a one-request probe says why**: a 2-byte range GET on
+ETV's live edge answers **403 with `drm: true`** and no ACAO while the playlists
+beside it are fine. Already red for that before any change here.
 
 ## Session 21 (2026-09-13) — three defects closed without fixing anything; a headset went black because of the instrument built to stop that; the harness learned to drag and to type
 
