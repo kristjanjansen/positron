@@ -84,10 +84,12 @@
      ⚠️ It holds a fixed height and scrolls inside itself — a block that grows
      as a longer score is picked would move everything under it, and this one
      sits under a picture that is being watched. */
+  /* ⚠️ NO `margin` HERE. Setting even `margin: 0` overrides the shell's
+     `.pos-body > * + *` on source order and collapses the gap above this
+     block — which is how this page ended up with 0 · 22 · 4 · 22 px down it. */
   .sc { max-height: calc(12 * 1.75em + 22px); overflow: auto;
         font: 400 11px/1.75 var(--mono); background: var(--card);
-        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0;
-        margin: 0; }
+        border: 1px solid var(--line); border-radius: 4px; padding: 10px 0; }
   .sc-l { display: block; white-space: pre; color: var(--dim2);
           border-left: 3px solid transparent; padding: 0 12px 0 9px; }
   .sc-l[data-state="played"] { color: var(--dim); }
