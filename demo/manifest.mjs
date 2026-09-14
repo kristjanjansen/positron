@@ -95,6 +95,21 @@ export const DEMOS = [
   { name: 'cues', act: 2, created: '2026-09-04', built: true,
     one: 'fire one cue; every open copy of the page acts on it, tokenless',
     tags: ['DO', 'WS', 'relay'] },
+  // Act 2 with `cues` and for the same reason — one act reaching everybody —
+  // but on a delay instead of at once, and out to phones rather than to open
+  // tabs. The claim it demonstrates is that a store can wake AT a time from the
+  // same object that holds the state deciding it, with no machine polling in
+  // between, so `settleMs` has to cover the whole demonstration: five seconds
+  // to the publish, four more to the shelving, and the checks that watch both.
+  //
+  // ⚠️ IT IS ALSO THE ONE INSTALLABLE PAGE HERE, AND ONLY THIS ONE. Its
+  // manifest and its service worker are scoped to `/items/`; positron.studio is
+  // deliberately not a progressive web app, because a site-wide worker is a
+  // cache and this project's whole debugging discipline rests on the BUILD
+  // stamp saying which build is live.
+  { name: 'items', act: 2, created: '2026-09-14', built: true, settleMs: 16000,
+    one: 'write an item, and it publishes itself at the moment you named — and tells the phones',
+    tags: ['DO', 'alarms', 'push', 'PWA'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
   // message shape written down, the exact bytes shown both ways, and the
   // history the relay refuses to keep. settleMs covers asking the recorder to

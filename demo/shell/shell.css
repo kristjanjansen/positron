@@ -820,6 +820,41 @@ video[hidden] { display: none; }
   .pos-pick > .pos-pick-die { justify-self: start; }
 }
 
+/* ── text field ───────────────────────────────────────────────────────────
+   demo/shell/field.mjs. The label sits ON TOP of the box at every width, not
+   beside it: a row of five fields with side labels has five different left
+   edges and nothing lines up, which is the same complaint the slider group's
+   shared columns fixed. Stacked, the boxes form a column and the labels form a
+   column.
+
+   ⚠️ 34 px TALL, WHICH IS A BUTTON. A field and a button that share a row and
+   differ by two pixels read as a mistake, and the composer in `items` puts them
+   one above the other.
+
+   ⚠️ NOTHING HERE TURNS OFF SELECTION OR THE CALLOUT. `button` up the page
+   sets `-webkit-touch-callout: none` because a long press on a piano key raised
+   the iOS loupe over the keys — but a text field is the one control where
+   magnifying, selecting and pasting are the whole point, and it is deliberately
+   outside those selectors. */
+.pos-field { display: inline-flex; flex-direction: column; gap: 4px; flex: 0 1 150px; min-width: 0; }
+.pos-field.wide { flex: 1 1 240px; }
+.pos-field-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+.pos-field input {
+  font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 9px; height: 34px; width: 100%; min-width: 0;
+}
+.pos-field input::placeholder { color: var(--dim2); }
+.pos-field input:disabled { opacity: .4; }
+/* On a phone a field takes the whole width rather than sharing a row: a
+   half-width mono box fits about twenty characters, which is less than a title. */
+@media (max-width: 560px) {
+  .pos-field, .pos-field.wide { flex: 1 1 100%; }
+}
+
 /* ── grain scope ──────────────────────────────────────────────────────────
    demo/shell/grain-scope.mjs. Time across, position-in-the-held-seconds up,
    and the colour says HOW a mark landed: filled green was reported by the thing
