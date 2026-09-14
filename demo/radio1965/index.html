@@ -74,6 +74,16 @@
   .gran-slot { display: flex; flex-direction: column; gap: 22px; align-items: stretch;
                min-height: calc(3 * 34px + 2 * 34px + 4 * 22px); }
   .gran-slot > .pos-choice, .gran-slot > .pos-pick { align-self: flex-start; }
+  /* 🔴 SOUND'S LABEL IS IN THE SAME COLUMN AS THE SLIDERS', AND WAS NOT.
+     `.pos-choice` is an inline-flex with an 8 px gap, so its label was as wide
+     as the word SOUND and the stepper started wherever that ended — while every
+     lane below it started at the width of RADIO → GRANULATOR. Two left edges,
+     one above the other, off by about sixty pixels. REPORTED twice with a
+     screenshot. ⚠️ `--lab` is measured on the sliders and handed here, because
+     CSS cannot say "share a track" between siblings (see the note above); the
+     gap goes to 0 or the column is `--lab` PLUS eight. */
+  .gran-slot > .pos-choice { gap: 0; }
+  .gran-slot > .pos-choice > .pos-choice-l { width: var(--lab, max-content); }
   .wet-fader, .gran-rows { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
   @media (min-width: 720px) {
     .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
@@ -190,15 +200,10 @@
     name: 'radio1965',
     what: 'A live community radio station in Tallinn, played through a relay of '
       + 'ours because their stream is plain HTTP and a secure page may not load it '
-      + 'directly. The sound also goes into a SuperCollider granulator running in '
-      + 'this tab — the same compiled graph a Raspberry Pi in the studio runs — the '
-      + 'long fader blends the two, all station at the left and all granulator at '
-      + 'the right, and every tick in the picture is a grain the engine reported '
-      + 'firing rather than one guessed from the sound. SOUND steps through six '
-      + 'finished settings, from a slow reverse drift to a stutter that leaves the '
-      + 'words intelligible, and the four sliders nudge whichever one you are on. '
-      + 'HEARD is how long it has played, KBPS the settled rate, BEHIND the seconds '
-      + 'you missed while paused, GRAINS how many fire a second.',
+      + 'directly. The sound also goes into a granulator running in this tab, and '
+      + 'the long fader blends the two: all station at the left, all granulator at '
+      + 'the right. Every tick in the picture is a grain the engine reported '
+      + 'firing, SOUND picks what kind, and the sliders nudge it.',
     // ⚠️ FOUR CELLS, DOWN FROM SIX, AND THE TWO THAT WENT WERE THE TWO THAT
     // COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
     // measured once and then sits there for the rest of the visit, which is a
@@ -396,7 +401,7 @@
          * pitch kept where it was; the two are different instruments and the page
          * has both.
          */
-        caps: { rates: [0.125, 0.25, 0.5, 1] },
+        caps: { rates: [0.0625, 0.125, 0.25, 0.5, 1] },
       },
     },
     range: [t0 - SPAN_MS, t0],
@@ -413,7 +418,10 @@
   let heardBefore = 0;
   let started = false;                  // has the stream ever been asked for
 
-  const bar = createTransportBar(d.el, deck, { absolute: true, scrub: false, endStop: false });
+  // `live: true` — the clock is replaced by a LIVE chip. `absolute` stays for
+  // the keyboard table's sake and costs nothing now that the time is not drawn.
+  const bar = createTransportBar(d.el, deck,
+    { absolute: true, scrub: false, endStop: false, live: true });
 
   /**
    * The bar's speed, carried to the stream.
@@ -425,6 +433,11 @@
    * zero, so `rate()` reads 0 while paused and would silently stop the station
    * the moment somebody pressed pause and play.
    */
+  // 🔴 120 ms, NOT A SECOND. This polled at 1 Hz, so a press could sit for most
+  // of a second before the stream was even TOLD — on top of the cushion draining
+  // at the old speed and the glide climbing to the new one. REPORTED as *"why
+  // rate change is so slooooooooow"*, and a third of the wait was this line
+  // doing nothing. Reading two numbers eight times a second is free.
   setInterval(() => {
     const r = deck.targetRate?.() ?? deck.rate?.() ?? 1;
     if (DECODE && stream && r > 0 && r !== speed) {
@@ -434,7 +447,7 @@
         : r < 1 ? `${r}\u00d7 — pitched down, and falling further behind live every second`
                 : `${r}\u00d7 — pitched up, and it lasts only as long as the cushion`);
     }
-  }, 1000);
+  }, 120);
 
   // ── the picture ────────────────────────────────────────────────────────────
   // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
@@ -1338,112 +1351,118 @@
     // A level measurement could not tell four voices from one turned up.
     // ⚠️ This is also the check that catches `setParam` sending a scalar: with
     // one wrong message seven voices stay shut and the rate stays at `mrate`.
-    // 🔴 THE WHOLE PATCH, ASKED OF THE ENGINE RATHER THAN READ BACK OFF THIS
-    // PAGE. Every `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves
-    // nothing about what scsynth holds — and a patch is forty messages, any one
-    // of which could name a control this definition does not have and be
-    // discarded in silence. Twelve of them are read back with `/s_get`: they
-    // span the granulator, the euclidean divider and two chain stages that this
-    // page had never sent a value to at all.
-    const p = G.patch;
-    // ⚠️ DECLARED BEFORE THE FIRST ASSERT THAT USES IT. It reads like a helper
-    // that belongs beside the array check below; put there, the patch-differs
-    // assert above reaches it in its temporal dead zone, which is a ReferenceError
-    // mid-burst — every assert after it silently dropped, which is this page's
-    // named failure mode.
-    const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
-      && a.every((x, i) => Math.abs(x - b[i]) < 1e-3);
-    d.assert('the patch that is playing reached the engine',
-      !!p && Array.isArray(G.wrong) && G.wrong.length === 0,
-      p ? (G.wrong?.length ? `${p.name}: ${G.wrong.join('; ')}`
-                           : `${p.name}: all ${G.scalars ? Object.keys(G.scalars).length : 0} settings read back as asked`)
-        : 'no patch was applied');
+    // ⚠️ THESE GRADE THE PROBE ABOVE, SO THEY EXIST ONLY WHEN IT RAN. An assert
+    // whose measurement was skipped must be ABSENT rather than passed on a
+    // default — `G.inkWet` is 0 when nobody moved the fader, which reads exactly
+    // like a picture that never drew.
+    if (SELFCHECK) {
+      // 🔴 THE WHOLE PATCH, ASKED OF THE ENGINE RATHER THAN READ BACK OFF THIS
+      // PAGE. Every `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves
+      // nothing about what scsynth holds — and a patch is forty messages, any one
+      // of which could name a control this definition does not have and be
+      // discarded in silence. Twelve of them are read back with `/s_get`: they
+      // span the granulator, the euclidean divider and two chain stages that this
+      // page had never sent a value to at all.
+      const p = G.patch;
+      // ⚠️ DECLARED BEFORE THE FIRST ASSERT THAT USES IT. It reads like a helper
+      // that belongs beside the array check below; put there, the patch-differs
+      // assert above reaches it in its temporal dead zone, which is a ReferenceError
+      // mid-burst — every assert after it silently dropped, which is this page's
+      // named failure mode.
+      const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
+        && a.every((x, i) => Math.abs(x - b[i]) < 1e-3);
+      d.assert('the patch that is playing reached the engine',
+        !!p && Array.isArray(G.wrong) && G.wrong.length === 0,
+        p ? (G.wrong?.length ? `${p.name}: ${G.wrong.join('; ')}`
+                             : `${p.name}: all ${G.scalars ? Object.keys(G.scalars).length : 0} settings read back as asked`)
+          : 'no patch was applied');
 
-    // 🔴 AND A SECOND PATCH, THROUGH THE REAL `›` BUTTON. A check that only ever
-    // grades the patch the page opens on is a check that would pass with the
-    // other five deleted — and `verify.mjs` cannot press this row itself. Both
-    // halves have to be true: the next patch's settings must arrive, AND they
-    // must differ from this one's, or a picker wired to nothing passes.
-    const nextP = G.otherWant;
-    const near = (a, b) => Math.abs(a - b) < Math.max(0.01, Math.abs(b) * 0.02);
-    const differs = !!nextP && !!p
-      && (nextP.scanmode !== p.scanmode || nextP.elen !== p.elen
-        || !near(nextP.rate, p.rate) || !near(nextP.size, p.size));
-    const arrived = !!nextP && G.otherMode === nextP.scanmode && G.otherElen === nextP.elen
-      && near(G.otherRate, nextP.rate) && near(G.otherSize, nextP.size)
-      && same(G.otherPattern, patternOf(nextP));
-    d.assert('the next sound along reaches the engine, and it differs',
-      differs && arrived && G.here === PATCHES.indexOf(p),
-      nextP && p
-        ? `${p.name} → ${nextP.name} → ${p.name}; asked mode ${nextP.scanmode} `
-          + `rate ${nextP.rate} size ${nextP.size}, the engine held ${G.otherMode} `
-          + `${G.otherRate} ${G.otherSize}, against ${p.scanmode} ${p.rate} ${p.size} here`
-          + `${same(G.otherPattern, patternOf(nextP)) ? '' : ' — and its rhythm did not arrive'}`
-        : 'the picker was never exercised');
+      // 🔴 AND A SECOND PATCH, THROUGH THE REAL `›` BUTTON. A check that only ever
+      // grades the patch the page opens on is a check that would pass with the
+      // other five deleted — and `verify.mjs` cannot press this row itself. Both
+      // halves have to be true: the next patch's settings must arrive, AND they
+      // must differ from this one's, or a picker wired to nothing passes.
+      const nextP = G.otherWant;
+      const near = (a, b) => Math.abs(a - b) < Math.max(0.01, Math.abs(b) * 0.02);
+      const differs = !!nextP && !!p
+        && (nextP.scanmode !== p.scanmode || nextP.elen !== p.elen
+          || !near(nextP.rate, p.rate) || !near(nextP.size, p.size));
+      const arrived = !!nextP && G.otherMode === nextP.scanmode && G.otherElen === nextP.elen
+        && near(G.otherRate, nextP.rate) && near(G.otherSize, nextP.size)
+        && same(G.otherPattern, patternOf(nextP));
+      d.assert('the next sound along reaches the engine, and it differs',
+        differs && arrived && G.here === PATCHES.indexOf(p),
+        nextP && p
+          ? `${p.name} → ${nextP.name} → ${p.name}; asked mode ${nextP.scanmode} `
+            + `rate ${nextP.rate} size ${nextP.size}, the engine held ${G.otherMode} `
+            + `${G.otherRate} ${G.otherSize}, against ${p.scanmode} ${p.rate} ${p.size} here`
+            + `${same(G.otherPattern, patternOf(nextP)) ? '' : ' — and its rhythm did not arrive'}`
+          : 'the picker was never exercised');
 
-    // 🔴 THE THREE MESSAGES THAT CANNOT BE CHECKED BY A SCALAR READ. `gates`,
-    // `pitches` and `probs` are eight-element controls and `setParam` sends
-    // `/n_setn` only for an Array (`pappus.mjs:125`) — one scalar by mistake
-    // writes voice 0 and leaves seven voices holding whatever they held, which
-    // is a page that goes on working and sounds like one note. The sixteen-step
-    // rhythm is not a control at all but a BUFFER the graph indexes (`:802`), so
-    // it takes a third kind of message and fails in a third way: written and
-    // never read, or read and never written.
-    d.assert('the chord and its rhythm reached the engine',
-      !!p && same(G.gates, p.gates) && same(G.pitches, p.pitches)
-        && same(G.probs, p.probs) && same(G.pattern, patternOf(p)),
-      p ? `gates ${G.gates ?? '—'} · notes ${G.pitches ?? '—'} · ${liveSteps(p)} of `
-          + `${p.elen} step(s) open${same(G.pattern, patternOf(p)) ? '' : ` — the buffer holds ${G.pattern ?? 'nothing'}`}`
-        : 'no patch was applied');
+      // 🔴 THE THREE MESSAGES THAT CANNOT BE CHECKED BY A SCALAR READ. `gates`,
+      // `pitches` and `probs` are eight-element controls and `setParam` sends
+      // `/n_setn` only for an Array (`pappus.mjs:125`) — one scalar by mistake
+      // writes voice 0 and leaves seven voices holding whatever they held, which
+      // is a page that goes on working and sounds like one note. The sixteen-step
+      // rhythm is not a control at all but a BUFFER the graph indexes (`:802`), so
+      // it takes a third kind of message and fails in a third way: written and
+      // never read, or read and never written.
+      d.assert('the chord and its rhythm reached the engine',
+        !!p && same(G.gates, p.gates) && same(G.pitches, p.pitches)
+          && same(G.probs, p.probs) && same(G.pattern, patternOf(p)),
+        p ? `gates ${G.gates ?? '—'} · notes ${G.pitches ?? '—'} · ${liveSteps(p)} of `
+            + `${p.elen} step(s) open${same(G.pattern, patternOf(p)) ? '' : ` — the buffer holds ${G.pattern ?? 'nothing'}`}`
+          : 'no patch was applied');
 
-    // 🔴 AND WHAT THAT CHORD AND THAT RHYTHM MUST SOUND LIKE, AS ARITHMETIC
-    // RATHER THAN AS A LEVEL. `report` fires once per GATED voice per trigger —
-    // graded against the board at 8.00 / 4.00 / 15.99 for `mrate` 8 / 4 / 16
-    // (research §10.6) — so the rate is `mrate × Σ(gates·probs) × open steps /
-    // melen`, and nothing else. A level measurement could not tell four voices
-    // from one turned up, and a grain COUNT alone cannot tell a rhythm that is
-    // being read from sixteen numbers sitting in a buffer nothing indexes: at
-    // `melen 1` only slot 0 is ever read, which is the same sound and a
-    // different number here.
-    const want = p ? predictedRate(p, P.rate) : NaN;
-    const got = Number(lastRate);
-    d.assert('every note in the chord is its own grain voice',
-      Number.isFinite(got) && Number.isFinite(want)
-        && Math.abs(got - want) <= Math.max(2, want * 0.3),
-      `${got}/s measured, ${want.toFixed(1)}/s expected — `
-        + `${p ? p.gates.filter((g) => g > 0.001).length : 0} voice(s) at ${P.rate}/s`
-        + (p && p.elen > 1 ? `, ${liveSteps(p)} step(s) of ${p.elen}` : ''));
-    d.log(`${p ? p.name : 'the granulator'} costs ${G.glitchBefore == null ? 'an unreported number of'
-      : G.glitchAfter - G.glitchBefore} dropout(s) over ${G.secs.toFixed(1)} s`);
-    // 🔴 THE ONE THAT MATTERS: the radio is audibly IN the graph. A grain count
-    // cannot say this — measured, a Pappus with its input disconnected fired
-    // 4-5 grains per window while outputting exactly 0.00000 — and a running
-    // synth cannot say it either.
-    d.assert('the radio reaches the granulator and is heard', G.loud > 0.0005 && G.quiet < G.loud / 4,
-      `${G.loud.toFixed(4)} running, ${G.quiet.toFixed(4)} with the node paused`);
+      // 🔴 AND WHAT THAT CHORD AND THAT RHYTHM MUST SOUND LIKE, AS ARITHMETIC
+      // RATHER THAN AS A LEVEL. `report` fires once per GATED voice per trigger —
+      // graded against the board at 8.00 / 4.00 / 15.99 for `mrate` 8 / 4 / 16
+      // (research §10.6) — so the rate is `mrate × Σ(gates·probs) × open steps /
+      // melen`, and nothing else. A level measurement could not tell four voices
+      // from one turned up, and a grain COUNT alone cannot tell a rhythm that is
+      // being read from sixteen numbers sitting in a buffer nothing indexes: at
+      // `melen 1` only slot 0 is ever read, which is the same sound and a
+      // different number here.
+      const want = p ? predictedRate(p, P.rate) : NaN;
+      const got = Number(lastRate);
+      d.assert('every note in the chord is its own grain voice',
+        Number.isFinite(got) && Number.isFinite(want)
+          && Math.abs(got - want) <= Math.max(2, want * 0.3),
+        `${got}/s measured, ${want.toFixed(1)}/s expected — `
+          + `${p ? p.gates.filter((g) => g > 0.001).length : 0} voice(s) at ${P.rate}/s`
+          + (p && p.elen > 1 ? `, ${liveSteps(p)} step(s) of ${p.elen}` : ''));
+      d.log(`${p ? p.name : 'the granulator'} costs ${G.glitchBefore == null ? 'an unreported number of'
+        : G.glitchAfter - G.glitchBefore} dropout(s) over ${G.secs.toFixed(1)} s`);
+      // 🔴 THE ONE THAT MATTERS: the radio is audibly IN the graph. A grain count
+      // cannot say this — measured, a Pappus with its input disconnected fired
+      // 4-5 grains per window while outputting exactly 0.00000 — and a running
+      // synth cannot say it either.
+      d.assert('the radio reaches the granulator and is heard', G.loud > 0.0005 && G.quiet < G.loud / 4,
+        `${G.loud.toFixed(4)} running, ${G.quiet.toFixed(4)} with the node paused`);
 
-    // 🔴 THE TWO THAT WOULD HAVE CAUGHT A PICTURE WITH NOTHING IN IT, and until
-    // this change there were none: every assert on this page graded the relay,
-    // the engine, a level or a COUNT, and not one of them could tell a working
-    // grain picture from one whose every tick was drawn off the canvas. That is
-    // `/floor/`'s lesson arriving here — an instrument that grades everything
-    // beside the thing being claimed.
-    //
-    // FIRST, THE DECODE. A reported position is a fraction of the capture ring,
-    // so it is in 0..1 by construction; anything outside it is this page reading
-    // the wrong field of the message rather than the engine behaving oddly. With
-    // the old `m[2]` both ends of this read exactly −1.
-    d.assert('every grain says where in the sound it read',
-      Number.isFinite(posMin) && posMin >= 0 && posMax <= 1,
-      Number.isFinite(posMin) ? `positions ${posMin.toFixed(4)}..${posMax.toFixed(4)} of the ring`
-                              : 'no grain was ever reported');
-    // SECOND, THE INK AND THE FADER, in one pair of numbers with the negative
-    // control built in. Nothing should be lit at the dry end and something must
-    // be lit at the wet end; a probe that reads the same at both is measuring
-    // neither.
-    d.assert('the grain ticks are drawn, and the fader fades them',
-      G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
-      `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
+      // 🔴 THE TWO THAT WOULD HAVE CAUGHT A PICTURE WITH NOTHING IN IT, and until
+      // this change there were none: every assert on this page graded the relay,
+      // the engine, a level or a COUNT, and not one of them could tell a working
+      // grain picture from one whose every tick was drawn off the canvas. That is
+      // `/floor/`'s lesson arriving here — an instrument that grades everything
+      // beside the thing being claimed.
+      //
+      // FIRST, THE DECODE. A reported position is a fraction of the capture ring,
+      // so it is in 0..1 by construction; anything outside it is this page reading
+      // the wrong field of the message rather than the engine behaving oddly. With
+      // the old `m[2]` both ends of this read exactly −1.
+      d.assert('every grain says where in the sound it read',
+        Number.isFinite(posMin) && posMin >= 0 && posMax <= 1,
+        Number.isFinite(posMin) ? `positions ${posMin.toFixed(4)}..${posMax.toFixed(4)} of the ring`
+                                : 'no grain was ever reported');
+      // SECOND, THE INK AND THE FADER, in one pair of numbers with the negative
+      // control built in. Nothing should be lit at the dry end and something must
+      // be lit at the wet end; a probe that reads the same at both is measuring
+      // neither.
+      d.assert('the grain ticks are drawn, and the fader fades them',
+        G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
+        `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
+    }
 
     // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
     // presses `.pos-controls button, .tbar-x` and this row is neither, so
@@ -2442,7 +2461,12 @@
         .flatMap((g) => [...g.querySelectorAll('.sld-l, .sld-v')])
         .reduce((m, e) => Math.max(m, e.getBoundingClientRect().width), 0);
       if (!wide) return;
-      for (const g of [wetRow.el, group.el]) g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
+      // ⚠️ THE SOUND PICKER IS IN THE LIST TOO. Its label is not a `.sld-l`, so
+      // it was never measured and never set — which is exactly how it ended up
+      // being the one row with a different left edge.
+      for (const g of [wetRow.el, group.el, patchRow.el]) {
+        g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
+      }
     };
     // The patch was applied before any of this existed, so the handles, the
     // name in the picker and the read-head label are all still at their typed
@@ -2521,188 +2545,209 @@
     lastRate = (grains / G.secs).toFixed(1);
     d.set('grains', lastRate);
 
-    // 🔴 DOES A GRAIN ACTUALLY LAND ON THE PICTURE, AND DOES THE FADER MOVE IT?
-    // Both halves are here because either alone is passable by a broken page.
+    // 🔴 EVERYTHING BELOW MOVES CONTROLS AND IS FOR A HARNESS ONLY.
+    // The ink probe runs the fader to both ends, the patch A/B presses the sound
+    // stepper twice, and the deafness control pauses the engine — so a visitor
+    // who was listening to a dry radio station watched the crossfader slide to
+    // full granulator, the grain picture light up, the sliders jump to another
+    // sound and come back. REPORTED as *"when pressed 0.5 it activated granulator
+    // and moved some sliders and showed grain viz"*, which is exactly this,
+    // arriving on its own schedule and looking like whatever was pressed last.
     //
-    // Ink at the fader's two ends, with the ticks' own colour counted and the
-    // FURNITURE excluded — the last four columns hold the live-edge line, which
-    // is drawn in that same colour on every frame whether a grain has ever
-    // arrived or not (LESSONS #75: an assert on ink must exclude the furniture).
-    // Counting it would have passed this check throughout the entire period the
-    // ticks were being drawn off the left edge of the canvas.
+    // ⚠️ `muted = true` WAS NOT ENOUGH AND COULD NEVER BE. It stops the probe
+    // being HEARD; it does nothing about it being SEEN, and the fader knob, the
+    // slider row and the grain picture are all in front of somebody. A check
+    // that takes the instrument away from the person holding it has to not run,
+    // which is the same conclusion the station A/B and the transport stop
+    // reached one defect earlier. `verify.mjs` appends `selfcheck=1`.
     //
-    // ⚠️ THE DRY READING IS THE CONTROL AND IT IS WHAT MAKES THE WET ONE MEAN
-    // ANYTHING. A probe that reads ink everywhere is a probe that cannot see,
-    // and this one is required to read ~nothing with the fader at 0 and
-    // something with it at 1 — which grades the alpha and the tick positions in
-    // one pair of numbers.
-    const inkNow = () => {
-      const c = scope.canvas, g = c.getContext('2d');
-      // ⚠️ EXCLUDE THE LIVE-EDGE LINE GENEROUSLY. It is drawn in the ticks' own
-      // colour on every frame whether a grain ever arrives or not, and the old
-      // 4-CSS-pixel margin was computed from `clientWidth`, which is 0 while the
-      // element is being laid out — so on a dpr-3 phone the margin collapsed to
-      // 4 BACKING pixels and counted the line. REPORTED from an iPhone as
-      // `2834 lit all-radio, 2832 lit all-granulator`: a constant, at both ends
-      // of a fader that is supposed to separate them. LESSONS #75.
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const px = g.getImageData(0, 0, Math.max(1, c.width - Math.ceil(12 * dpr)), c.height).data;
-      let lit = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        if (px[i] > 200 && px[i + 1] > 150 && px[i + 2] < 100) lit++;
-      }
-      return lit;
-    };
-    // ⚠️ AND IT RECORDS HOW MANY TICKS WERE ALIVE WHEN IT LOOKED. Ink alone
-    // cannot separate "the ticks are not being drawn" from "there was nothing to
-    // draw" — MEASURED during an upstream outage, where this read `0 lit` at
-    // both ends and the reason was a station returning 502, not the picture.
-    // Two different faults with one number between them is the shape this repo
-    // keeps paying for; the count makes the failure attributable on sight.
-    // 🔴 SAMPLE ACROSS FRAMES, NOT AT ONE INSTANT, AND THIS IS A RETRY RATHER
-    // THAN A TOLERANCE. A tick lives `fadeMs` — about half a second — so at
-    // eight grains a second only a handful are bright at any moment, and one
-    // `getImageData` can land between them. MEASURED: two runs of this check,
-    // no code between them, read `128 lit` and then `0 lit` on a granulator
-    // measuring 0.0848 both times. That is the same trap `verify.mjs`'s own
-    // strip check carries a note about.
-    //
-    // Taking the MAX over a window cannot rescue a picture that never draws —
-    // every try still reads zero — but it stops a working one reading broken.
-    // ⚠️ The dry end is sampled exactly the same way, or the comparison would be
-    // one number's best against another's worst.
-    const inkOver = async (ms) => {
-      let best = 0;
-      const until = performance.now() + ms;
-      while (performance.now() < until) {
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        best = Math.max(best, inkNow());
-      }
-      return best;
-    };
-    // 🔴 SAVE THE FADER BEFORE THE PROBE MOVES IT. `setWet` ASSIGNS to `wet`,
-    // so after the probe ran it to both ends `wet` held the probe's last value —
-    // and "restore" then restored that. REPORTED twice as the crossfade
-    // dropping to 0 on its own, and it was: the page put it there and called it
-    // putting it back. The slider is moved too, or the knob and the gain
-    // disagree, which is the page showing one thing and playing another.
-    const wasWet = wet;
-    muted = true;                      // the self-check is not allowed to be heard
-    setWet(0); await new Promise((r) => setTimeout(r, 400)); G.inkDry = await inkOver(1200);
-    setWet(1); await new Promise((r) => setTimeout(r, 400)); G.inkWet = await inkOver(1200);
-    // ⚠️ `flickering` is `live.length`, and in THIS branch of the scope old marks
-    // are skipped rather than spliced — so it climbs to the 600 cap and says
-    // only that marks are arriving, never that any were drawn. Kept because it
-    // separates "no grains at all" from "grains but no ink"; it is not evidence
-    // of painting, and an earlier version of this note claimed it was.
-    G.alive = scope.stats().flickering;
-    // 🔴 TWO PATCHES, THROUGH THE REAL BUTTON, WHILE NOTHING CAN BE HEARD.
-    // The asserts in `finish()` can only grade the patch that happens to be
-    // selected, and this row is the page's main control: `verify.mjs` presses
-    // `.pos-controls button, .tbar-x` and a picker is neither, so shipping it
-    // without a check here would be a chooser nobody grades — exactly how
-    // `mirror` lost two asserts while reading green.
-    //
-    // ⚠️ DRIVEN BY CLICKING `›`, NEVER BY CALLING `applyPatch`: the fault this
-    // exists to catch lives in the wiring between the button and the engine, and
-    // calling the handler steps straight over it (`/floor/` spent five rounds on
-    // that). ⚠️ AND IT PUTS THE PATCH BACK, through `‹`, so the restore is
-    // exercised by the same path and the page is not left on a sound nobody
-    // chose — the station buttons below carry the same rule for the same reason.
-    //
-    // 🔴 EVERYTHING IS ASKED OF THE SERVER, NOT READ BACK OFF THIS PAGE. Every
-    // `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves nothing about
-    // what scsynth holds; `/s_get`, `/s_getn` and `/b_getn` are the only things
-    // on the far side of the wire. Three kinds of message carry a patch and they
-    // fail differently, so all three are read back: scalars (`/n_set`), the
-    // eight-element voice arrays (`/n_setn`, which is what a scalar sent by
-    // mistake would silently become), and the sixteen-step pattern, which is a
-    // BUFFER and not a control at all.
-    const ask1 = async (name) => {
-      const r = await eng.sendAndWait(
-        (m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', PAPPUS_NODE, name);
-      return r ? r[3] : null;
-    };
-    const askN = async (name, n) => {
-      const r = await eng.sendAndWait(
-        (m) => m[0] === '/n_setn' && m[2] === name, 3000, '/s_getn', PAPPUS_NODE, name, n);
-      return r ? r.slice(4, 4 + n).map(Number) : null;
-    };
-    const askPattern = async () => {
-      const r = await eng.sendAndWait(
-        (m) => m[0] === '/b_setn' && Number(m[1]) === GATE0, 3000, '/b_getn', GATE0, 0, 16);
-      return r ? r.slice(4, 20).map(Number) : null;
-    };
-    // The scalars that decide what kind of sound this is: how the read head
-    // moves, how fast and how long the grains are, how wide, how scattered, how
-    // the rhythm is divided, and the two chain stages a bare granulator has
-    // never had. One `/s_get` each.
-    const SCALARS = [
-      ['mscanmode', (p) => p.scanmode], ['mrate', (p) => p.rate], ['msize', (p) => p.size],
-      ['mcontour', (p) => p.contour], ['mswarm', (p) => p.swarm], ['mspray', (p) => p.spray],
-      ['mspraymode', (p) => p.spraymode], ['melen', (p) => p.elen], ['msos', (p) => p.sos],
-      ['swet', (p) => p.swet], ['rverb', (p) => p.rverb], ['kwow', (p) => p.wow],
-    ];
-    const readScalars = async () => {
-      const got = {};
-      for (const [name] of SCALARS) got[name] = await ask1(name);
-      return got;
-    };
-    const missing = (p, got) => SCALARS
-      .filter(([name, want]) => !(Math.abs((got[name] ?? NaN) - want(p)) < 1e-3))
-      .map(([name, want]) => `${name} ${got[name]} not ${want(p)}`);
+    // ⚠️ WHAT STAYS OUTSIDE THIS GUARD IS THE PART A VISITOR WANTS: the ring
+    // warm-up, the grain-rate measurement and the `grains` readout are passive
+    // and they are the page reporting on itself, not experimenting on itself.
+    if (SELFCHECK) {
+      // 🔴 DOES A GRAIN ACTUALLY LAND ON THE PICTURE, AND DOES THE FADER MOVE IT?
+      // Both halves are here because either alone is passable by a broken page.
+      //
+      // Ink at the fader's two ends, with the ticks' own colour counted and the
+      // FURNITURE excluded — the last four columns hold the live-edge line, which
+      // is drawn in that same colour on every frame whether a grain has ever
+      // arrived or not (LESSONS #75: an assert on ink must exclude the furniture).
+      // Counting it would have passed this check throughout the entire period the
+      // ticks were being drawn off the left edge of the canvas.
+      //
+      // ⚠️ THE DRY READING IS THE CONTROL AND IT IS WHAT MAKES THE WET ONE MEAN
+      // ANYTHING. A probe that reads ink everywhere is a probe that cannot see,
+      // and this one is required to read ~nothing with the fader at 0 and
+      // something with it at 1 — which grades the alpha and the tick positions in
+      // one pair of numbers.
+      const inkNow = () => {
+        const c = scope.canvas, g = c.getContext('2d');
+        // ⚠️ EXCLUDE THE LIVE-EDGE LINE GENEROUSLY. It is drawn in the ticks' own
+        // colour on every frame whether a grain ever arrives or not, and the old
+        // 4-CSS-pixel margin was computed from `clientWidth`, which is 0 while the
+        // element is being laid out — so on a dpr-3 phone the margin collapsed to
+        // 4 BACKING pixels and counted the line. REPORTED from an iPhone as
+        // `2834 lit all-radio, 2832 lit all-granulator`: a constant, at both ends
+        // of a fader that is supposed to separate them. LESSONS #75.
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const px = g.getImageData(0, 0, Math.max(1, c.width - Math.ceil(12 * dpr)), c.height).data;
+        let lit = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          if (px[i] > 200 && px[i + 1] > 150 && px[i + 2] < 100) lit++;
+        }
+        return lit;
+      };
+      // ⚠️ AND IT RECORDS HOW MANY TICKS WERE ALIVE WHEN IT LOOKED. Ink alone
+      // cannot separate "the ticks are not being drawn" from "there was nothing to
+      // draw" — MEASURED during an upstream outage, where this read `0 lit` at
+      // both ends and the reason was a station returning 502, not the picture.
+      // Two different faults with one number between them is the shape this repo
+      // keeps paying for; the count makes the failure attributable on sight.
+      // 🔴 SAMPLE ACROSS FRAMES, NOT AT ONE INSTANT, AND THIS IS A RETRY RATHER
+      // THAN A TOLERANCE. A tick lives `fadeMs` — about half a second — so at
+      // eight grains a second only a handful are bright at any moment, and one
+      // `getImageData` can land between them. MEASURED: two runs of this check,
+      // no code between them, read `128 lit` and then `0 lit` on a granulator
+      // measuring 0.0848 both times. That is the same trap `verify.mjs`'s own
+      // strip check carries a note about.
+      //
+      // Taking the MAX over a window cannot rescue a picture that never draws —
+      // every try still reads zero — but it stops a working one reading broken.
+      // ⚠️ The dry end is sampled exactly the same way, or the comparison would be
+      // one number's best against another's worst.
+      const inkOver = async (ms) => {
+        let best = 0;
+        const until = performance.now() + ms;
+        while (performance.now() < until) {
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          best = Math.max(best, inkNow());
+        }
+        return best;
+      };
+      // 🔴 SAVE THE FADER BEFORE THE PROBE MOVES IT. `setWet` ASSIGNS to `wet`,
+      // so after the probe ran it to both ends `wet` held the probe's last value —
+      // and "restore" then restored that. REPORTED twice as the crossfade
+      // dropping to 0 on its own, and it was: the page put it there and called it
+      // putting it back. The slider is moved too, or the knob and the gain
+      // disagree, which is the page showing one thing and playing another.
+      const wasWet = wet;
+      muted = true;                      // the self-check is not allowed to be heard
+      setWet(0); await new Promise((r) => setTimeout(r, 400)); G.inkDry = await inkOver(1200);
+      setWet(1); await new Promise((r) => setTimeout(r, 400)); G.inkWet = await inkOver(1200);
+      // ⚠️ `flickering` is `live.length`, and in THIS branch of the scope old marks
+      // are skipped rather than spliced — so it climbs to the 600 cap and says
+      // only that marks are arriving, never that any were drawn. Kept because it
+      // separates "no grains at all" from "grains but no ink"; it is not evidence
+      // of painting, and an earlier version of this note claimed it was.
+      G.alive = scope.stats().flickering;
+      // 🔴 TWO PATCHES, THROUGH THE REAL BUTTON, WHILE NOTHING CAN BE HEARD.
+      // The asserts in `finish()` can only grade the patch that happens to be
+      // selected, and this row is the page's main control: `verify.mjs` presses
+      // `.pos-controls button, .tbar-x` and a picker is neither, so shipping it
+      // without a check here would be a chooser nobody grades — exactly how
+      // `mirror` lost two asserts while reading green.
+      //
+      // ⚠️ DRIVEN BY CLICKING `›`, NEVER BY CALLING `applyPatch`: the fault this
+      // exists to catch lives in the wiring between the button and the engine, and
+      // calling the handler steps straight over it (`/floor/` spent five rounds on
+      // that). ⚠️ AND IT PUTS THE PATCH BACK, through `‹`, so the restore is
+      // exercised by the same path and the page is not left on a sound nobody
+      // chose — the station buttons below carry the same rule for the same reason.
+      //
+      // 🔴 EVERYTHING IS ASKED OF THE SERVER, NOT READ BACK OFF THIS PAGE. Every
+      // `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves nothing about
+      // what scsynth holds; `/s_get`, `/s_getn` and `/b_getn` are the only things
+      // on the far side of the wire. Three kinds of message carry a patch and they
+      // fail differently, so all three are read back: scalars (`/n_set`), the
+      // eight-element voice arrays (`/n_setn`, which is what a scalar sent by
+      // mistake would silently become), and the sixteen-step pattern, which is a
+      // BUFFER and not a control at all.
+      const ask1 = async (name) => {
+        const r = await eng.sendAndWait(
+          (m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', PAPPUS_NODE, name);
+        return r ? r[3] : null;
+      };
+      const askN = async (name, n) => {
+        const r = await eng.sendAndWait(
+          (m) => m[0] === '/n_setn' && m[2] === name, 3000, '/s_getn', PAPPUS_NODE, name, n);
+        return r ? r.slice(4, 4 + n).map(Number) : null;
+      };
+      const askPattern = async () => {
+        const r = await eng.sendAndWait(
+          (m) => m[0] === '/b_setn' && Number(m[1]) === GATE0, 3000, '/b_getn', GATE0, 0, 16);
+        return r ? r.slice(4, 20).map(Number) : null;
+      };
+      // The scalars that decide what kind of sound this is: how the read head
+      // moves, how fast and how long the grains are, how wide, how scattered, how
+      // the rhythm is divided, and the two chain stages a bare granulator has
+      // never had. One `/s_get` each.
+      const SCALARS = [
+        ['mscanmode', (p) => p.scanmode], ['mrate', (p) => p.rate], ['msize', (p) => p.size],
+        ['mcontour', (p) => p.contour], ['mswarm', (p) => p.swarm], ['mspray', (p) => p.spray],
+        ['mspraymode', (p) => p.spraymode], ['melen', (p) => p.elen], ['msos', (p) => p.sos],
+        ['swet', (p) => p.swet], ['rverb', (p) => p.rverb], ['kwow', (p) => p.wow],
+      ];
+      const readScalars = async () => {
+        const got = {};
+        for (const [name] of SCALARS) got[name] = await ask1(name);
+        return got;
+      };
+      const missing = (p, got) => SCALARS
+        .filter(([name, want]) => !(Math.abs((got[name] ?? NaN) - want(p)) < 1e-3))
+        .map(([name, want]) => `${name} ${got[name]} not ${want(p)}`);
 
-    const herePatch = patch;
-    const otherPatch = (patch + 1) % PATCHES.length;
-    selfCheck = true;                  // so the log names a press nobody made
-    patchRow.buttons[1].click();                   // `›`, the next sound
-    await new Promise((r) => setTimeout(r, 120));
-    G.otherMode = await ask1('mscanmode');
-    G.otherElen = await ask1('melen');
-    // 🔴 READ THE GRAIN SETTINGS TOO, OR TWO NEIGHBOURS CAN BE INDISTINGUISHABLE.
-    // This graded `mscanmode`, `melen` and the pattern only — three keys that
-    // two legitimately different sounds can share. MEASURED the moment
-    // `stutter` was replaced by `updraft`: it sits beside `slow tide`, both
-    // crawl the read head (mode 1, no euclid), and the check went red saying
-    // they did not differ — while the engine had in fact taken a different
-    // rate, length, blend and delay. The check was right that IT could not see
-    // a change and wrong that there was none, which is the worse of the two.
-    G.otherRate = await ask1('mrate');
-    G.otherSize = await ask1('msize');
-    G.otherPattern = await askPattern();
-    patchRow.buttons[0].click();                   // `‹`, and back
-    await new Promise((r) => setTimeout(r, 120));
-    selfCheck = false;
-    G.here = patch;
-    G.scalars = await readScalars();
-    G.gates = await askN('gates', 8);
-    G.pitches = await askN('pitches', 8);
-    G.probs = await askN('probs', 8);
-    G.pattern = await askPattern();
-    G.patch = PATCHES[herePatch];
-    G.otherWant = PATCHES[otherPatch];
-    G.wrong = missing(G.patch, G.scalars);
+      const herePatch = patch;
+      const otherPatch = (patch + 1) % PATCHES.length;
+      selfCheck = true;                  // so the log names a press nobody made
+      patchRow.buttons[1].click();                   // `›`, the next sound
+      await new Promise((r) => setTimeout(r, 120));
+      G.otherMode = await ask1('mscanmode');
+      G.otherElen = await ask1('melen');
+      // 🔴 READ THE GRAIN SETTINGS TOO, OR TWO NEIGHBOURS CAN BE INDISTINGUISHABLE.
+      // This graded `mscanmode`, `melen` and the pattern only — three keys that
+      // two legitimately different sounds can share. MEASURED the moment
+      // `stutter` was replaced by `updraft`: it sits beside `slow tide`, both
+      // crawl the read head (mode 1, no euclid), and the check went red saying
+      // they did not differ — while the engine had in fact taken a different
+      // rate, length, blend and delay. The check was right that IT could not see
+      // a change and wrong that there was none, which is the worse of the two.
+      G.otherRate = await ask1('mrate');
+      G.otherSize = await ask1('msize');
+      G.otherPattern = await askPattern();
+      patchRow.buttons[0].click();                   // `‹`, and back
+      await new Promise((r) => setTimeout(r, 120));
+      selfCheck = false;
+      G.here = patch;
+      G.scalars = await readScalars();
+      G.gates = await askN('gates', 8);
+      G.pitches = await askN('pitches', 8);
+      G.probs = await askN('probs', 8);
+      G.pattern = await askPattern();
+      G.patch = PATCHES[herePatch];
+      G.otherWant = PATCHES[otherPatch];
+      G.wrong = missing(G.patch, G.scalars);
 
-    muted = false;
-    setWet(wasWet);                    // the value the LISTENER left, not the probe's
-    fader.set(wasWet, { quiet: true });
-    fader.set(0, true);            // quiet: leave the page as the visitor finds it
-    setWet(0);
+      muted = false;
+      setWet(wasWet);                    // the value the LISTENER left, not the probe's
+      fader.set(wasWet, { quiet: true });
+      fader.set(0, true);            // quiet: leave the page as the visitor finds it
+      setWet(0);
 
-    // 🔴 A DEAFNESS CONTROL. `/n_run 0` pauses the node; if the level does not
-    // follow, what is being heard came from somewhere else. ⚠️ AND A GRAIN
-    // COUNT WOULD NOT HAVE CAUGHT THIS: measured, a Pappus with its input
-    // disconnected fired 4–5 grains per window while outputting exactly 0.
-    // ⚠️ AND IT LETS THE TAIL GO FIRST. `engLevel` holds a PEAK, so a window
-    // opened the instant `/n_run 0` is sent captures the message's own latency
-    // plus the grains already in flight — a grain is `msize` long and is not
-    // cancelled by pausing the node that started it. Measuring through that is
-    // measuring the tail, and it reports a granulator that never stopped. Four
-    // hundred milliseconds is three grain lengths at the default 0.12 s.
-    eng.send('/n_run', PAPPUS_NODE, 0);
-    await new Promise((r) => setTimeout(r, 400));
-    G.quiet = await engLevel(1200);
-    eng.send('/n_run', PAPPUS_NODE, 1);
+      // 🔴 A DEAFNESS CONTROL. `/n_run 0` pauses the node; if the level does not
+      // follow, what is being heard came from somewhere else. ⚠️ AND A GRAIN
+      // COUNT WOULD NOT HAVE CAUGHT THIS: measured, a Pappus with its input
+      // disconnected fired 4–5 grains per window while outputting exactly 0.
+      // ⚠️ AND IT LETS THE TAIL GO FIRST. `engLevel` holds a PEAK, so a window
+      // opened the instant `/n_run 0` is sent captures the message's own latency
+      // plus the grains already in flight — a grain is `msize` long and is not
+      // cancelled by pausing the node that started it. Measuring through that is
+      // measuring the tail, and it reports a granulator that never stopped. Four
+      // hundred milliseconds is three grain lengths at the default 0.12 s.
+      eng.send('/n_run', PAPPUS_NODE, 0);
+      await new Promise((r) => setTimeout(r, 400));
+      G.quiet = await engLevel(1200);
+      eng.send('/n_run', PAPPUS_NODE, 1);
+    }
 
     await finish();
   }

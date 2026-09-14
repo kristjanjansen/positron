@@ -14,6 +14,7 @@
 
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
+import { createChoice } from './choice.mjs';
 
 /**
  * `scrub: false` — ONE POSITION SURFACE PER PAGE.
@@ -27,7 +28,7 @@ import { el } from './shell.mjs';
  * degraded badge — and gives up the slider.
  */
 export function createTransportBar(host, deck, {
-  absolute = false, scrub: wantScrub = true, extras = [], fmt = null,
+  absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false,
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
   // fires, pauses the deck and parks the playhead there — right for a
   // recording, wrong for a window whose right-hand end is the present moment,
@@ -77,7 +78,21 @@ export function createTransportBar(host, deck, {
   const time = el('output', 'tbar-time', '0:00.000');
   const rates = el('div', 'tbar-rates');
   const badge = el('span', 'tbar-badge');
-  bar.append(toggle, ...extraEls.values(), scrub, time, rates, badge);
+  /**
+   * 🔴 A LIVE SOURCE HAS NO CLOCK WORTH PRINTING. On an Icecast mount the left
+   * half of `19:33:46.098 / 3:00.000` is the wall clock, which the machine
+   * already shows, and the right half is a duration a live stream does not
+   * have. REPORTED as *"transport timers are pointless here. what about LIVE
+   * label"*, and they were: two numbers, neither of which anybody can act on.
+   *
+   * ⚠️ IT SAYS `SLOWED` WHEN IT IS SLOWED. A chip reading LIVE while the
+   * listener is half a minute behind the station is the confident-wrong kind of
+   * readout this repo minds most, and the bar already knows the armed rate, so
+   * it costs nothing to tell the truth. How far behind is a number, and a number
+   * belongs in a readout cell — the page's BEHIND — not in a chip.
+   */
+  const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null;
+  bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]), rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -86,17 +101,37 @@ export function createTransportBar(host, deck, {
   // arrangement for another changes the answer again — so a lattice computed
   // once describes a deck that has not been assembled yet.
   let lattice = null, agen = -1;
+  /**
+   * 🔴 THE RATES ARE A RADIO GROUP, FROM `choice.mjs`, LIKE EVERY OTHER SET OF
+   * MUTUALLY EXCLUSIVE OPTIONS IN THIS REPO. This built its own loose buttons
+   * with its own `aria-pressed` bookkeeping and its own CSS block, which is the
+   * fourth hand-rolled copy of a control that has been a component since
+   * `choice.mjs` landed — and CLAUDE.md says to build from the kit and to stop
+   * and ask rather than make another one. REPORTED as *"rate controls should be
+   * radiobuttons everywhere. you keep breaking the rule"*, which is fair: this
+   * page's own speed picker WAS a `createChoice` before it moved in here, and
+   * moving it into the bar is where it lost its component.
+   *
+   * ⚠️ SEGMENTED, NOT SPACED, is part of what the component carries — gaps make
+   * four options look like four unrelated controls. The old `.tbar-rates` block
+   * set `gap: 4px` and did exactly that.
+   */
+  let rateChoice = null;
   function buildRates() {
     agen = deck.adapterGen?.() ?? 0;
     lattice = latticeFor(deck);
     rates.replaceChildren();
+    rateChoice = null;
     if (lattice && lattice.length) {
-      for (const r of lattice) {
-        const b = el('button', '', `${r}x`, { type: 'button', 'aria-pressed': 'false' });
-        b.addEventListener('click', () => applyRate(r));
-        b.dataset.rate = String(r);
-        rates.append(b);
-      }
+      rateChoice = createChoice({
+        options: lattice.map((r) => [`${r}x`, r]),
+        at: Math.max(0, lattice.indexOf(deck.targetRate?.() ?? 1)),
+        onPick: (r) => applyRate(r),
+      });
+      // The harness and `syncRates` both read `data-rate` off the buttons, and
+      // the component does not know about rates — so it is stamped here.
+      rateChoice.buttons.forEach((b, i) => { b.dataset.rate = String(lattice[i]); });
+      rates.append(rateChoice.el);
     } else {
       rates.append(el('span', 'tbar-rate1', '1x'));   // honest: no lattice, no choice
     }
@@ -134,8 +169,18 @@ export function createTransportBar(host, deck, {
   // it wrong: it only ever updated while rolling.
   function syncRates() {
     const armed = deck.targetRate?.() ?? (typeof deck.rate === 'function' ? deck.rate() : deck.rate);
-    for (const b of rates.querySelectorAll('button')) {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === armed));
+    // ⚠️ `set(i, quiet)` — QUIET, or syncing the picture would fire the handler
+    // that changes the rate, which is a control that acts on being told what it
+    // already is.
+    if (rateChoice && lattice) {
+      const i = lattice.indexOf(armed);
+      if (i >= 0) rateChoice.set(i, true);
+      else rateChoice.buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    }
+    if (liveChip) {
+      const slow = Number.isFinite(armed) && armed > 0 && armed !== 1;
+      liveChip.textContent = slow ? 'SLOWED' : 'LIVE';
+      liveChip.dataset.slow = slow ? '1' : '0';
     }
   }
 
