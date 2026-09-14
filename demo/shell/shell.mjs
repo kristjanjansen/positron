@@ -485,8 +485,11 @@ export function createShipper(url = 'https://pub.positron.studio/log') {
  * on screen together, and a readout that scrolls out of view mid-measurement is
  * exactly the thing that gets reported as "the page is broken".
  *
- * ⚠️ The sizes themselves are UNCONFIRMED — nothing in this repo has been read
- * through a headset yet. shell.css says which numbers to move.
+ * ⚠️ The sizes were UNCONFIRMED until 2026-09-14, when /floor/ was photographed
+ * in the Quest browser and the readout came back with a 20 px band of line
+ * colour between every cell — the one `.xr` rule that touched the GAP rather
+ * than the cells. shell.css says which numbers to move, and now says why that
+ * one is not among them.
  *
  * Capability, never a user-agent string: a headset browser is Chromium wearing
  * a Chromium UA, and research/quest-xr §1.7 measured that a Quest 3 and a 3S
