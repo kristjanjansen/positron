@@ -184,10 +184,19 @@
   in vec2 vUV; flat in float vLayer; in float vA; in float vV; in float vF;
   uniform sampler2DArray uTex;
   uniform sampler2D uVid;
+  uniform vec4 uCrop;     // still inset x,y then video inset x,y — 0..0.5
   out vec4 frag;
+  // 🔴 CROP THE BANDS OFF RATHER THAN SHOW THEM. The scans and the masters both
+  // carry black down the sides — real, in the material, and not something a
+  // floor of pictures should be a grid of. Sampling a window of the texture
+  // instead of all of it costs nothing and loses only the black.
+  // ⚠️ Two insets, not one: the still is already a 4:3 thumbnail with a thin
+  // edge, and the video is a WIDE master with a 4:3 picture inside it, so one
+  // number would either leave the master pillarboxed or eat the still.
+  vec2 inset(vec2 uv, vec2 m){ return m + uv * (1.0 - 2.0 * m); }
   void main(){
-    vec3 still = texture(uTex, vec3(vUV, vLayer)).rgb;
-    vec3 moving = texture(uVid, vUV).rgb;
+    vec3 still = texture(uTex, vec3(inset(vUV, uCrop.xy), vLayer)).rgb;
+    vec3 moving = texture(uVid, inset(vUV, uCrop.zw)).rgb;
     // 🔴 THE FADE IS A MIX OF TWO PICTURES, NOT A FADE TO BLACK AND BACK. Going
     // out through black is two transitions where there should be one, and on a
     // floor of stills the hole reads as a tile that broke.
@@ -232,6 +241,7 @@
   const uTile = gl.getUniformLocation(prog, 'uTile');
   const uFocus = gl.getUniformLocation(prog, 'uFocus');
   const uFade = gl.getUniformLocation(prog, 'uFade');
+  const uCrop = gl.getUniformLocation(prog, 'uCrop');
   const uTexL = gl.getUniformLocation(prog, 'uTex');
   const uVidL = gl.getUniformLocation(prog, 'uVid');
 
@@ -253,6 +263,27 @@
   gl.bindVertexArray(null);
 
   // the video texture — one, because one thing plays at a time
+  // The still's own edge — a few per cent, enough to lose a scan border without
+  // eating the picture. MEASURED by eye against the thumbnails, which is the
+  // only instrument there is for "is there a black line at the edge".
+  const STILL_CROP = [0.035, 0.02];
+  // ⚠️ THE VIDEO'S CROP IS COMPUTED, NOT GUESSED. A master that is 16:9 with a
+  // 4:3 picture in it needs (1 - (4/3)/(16/9)) / 2 = 12.5% off each side, and a
+  // master that is already 4:3 needs none — and which one a film is cannot be
+  // known until it loads. Derived from `videoWidth`/`videoHeight` every time a
+  // film starts, so a squarer master is not cropped into.
+  let vidCrop = [0, 0];
+  function measureVideoCrop() {
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) { vidCrop = [0, 0]; return; }
+    const a = w / h, want = 4 / 3;
+    vidCrop = a > want + 0.01
+      ? [(1 - want / a) / 2, 0]        // pillarboxed: take it off the sides
+      : a < want - 0.01
+        ? [0, (1 - a / want) / 2]      // letterboxed: take it off top and bottom
+        : [0, 0];
+  }
+
   const vidTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, vidTex);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -594,6 +625,7 @@
       gl.bindTexture(gl.TEXTURE_2D, vidTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      if (!vidReady) measureVideoCrop();
       vidReady = true;
     }
     gl.useProgram(prog);
@@ -601,6 +633,7 @@
     gl.uniform2f(uTile, TILE_W, TILE_H);
     gl.uniform2f(uFocus, gaze[0], gaze[1]);
     gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
+    gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
     gl.bindVertexArray(vao);
@@ -716,6 +749,7 @@
       if (playing >= 0 && video.readyState >= 2 && video.videoWidth) {
         gl.bindTexture(gl.TEXTURE_2D, vidTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        if (!vidReady) measureVideoCrop();
         vidReady = true;
       }
       gl.useProgram(prog);
@@ -723,6 +757,7 @@
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uFocus, gaze[0], gaze[1]);
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
+      gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
       gl.bindVertexArray(vao);
