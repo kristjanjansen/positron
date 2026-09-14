@@ -597,7 +597,7 @@
     // defensible while the page had one grain rate: `mrate` never moved unless a
     // hand moved it. Six patches span 0.9/s to 26/s and multiply that by their
     // own chord and rhythm, so a cell frozen at the opening patch's 5.6 would
-    // read 5.6 under `roof rain`'s forty-two — a stale measurement, which is
+    // read 9 under `dust`'s hundred and twenty-four — a stale measurement, which is
     // worse than a constant because it looks live (CLAUDE.md: every readout cell
     // must be able to change, and this one had stopped being able to).
     //
@@ -1715,8 +1715,8 @@
    * 🔴 `material` AND `chord` ARE GONE AS SEPARATE ROWS, AND THE SEVENTH IS NOT.
    * The owner asked for the seventh chord by name and liked it, so deleting the
    * row that reached it would have deleted the sound. It is the chord of
-   * `slow tide`, which is the patch this page opens on — `[0, 4, 7, 10]`, the
-   * same four semitones that row sent. Absorbing the two rows is not a tidy-up:
+   * `one note held`, the patch with a chord in it — `[0, 3, 7, 10, 14, 19]`, a
+   * minor eleventh. Absorbing the two rows is not a tidy-up:
    * a chord and a read-head mode are not independent choices. A seventh under
    * 30-millisecond grains is four copies of a click, and the wash that suited
    * music destroyed a sentence. Each patch below states its own chord because
@@ -1754,8 +1754,8 @@
    *   · **speed is unchanged.** `scanstretch` crosses the window in
    *     `mbuflen / (3·mscan − 1)` seconds and covers `winspan × mbuflen`
    *     seconds of audio, so playback speed is `winspan × (3·mscan − 1)` —
-   *     independent of `mbuflen`. What shortens is the LAP: `slow tide`'s
-   *     reverse crawl turns round every 80 s instead of every 600.
+   *     independent of `mbuflen`. What shortens is the LAP: `ground`'s
+   *     reverse crawl at -1x laps every 8 s instead of every 60.
    *   · 🔴 **scatter is seven times finer, in our favour.** `off = … × mspray
    *     × 0.25` (`:814`) is a fraction of the WINDOW, so at 8 s a scatter of
    *     0.09 is ±180 ms and at 60 s it would be ±1.35 s. The plan's `stutter`
@@ -1763,11 +1763,11 @@
    *     window — one pixel of this page's slider. At 8 s the same ±180 ms is
    *     0.09, which is somewhere a hand can go.
    *   · **the freeze window is a fraction, not a duration.** `winspansec =
-   *     winspan × wlen / SR` (`:681`), so `held still`'s 3 seconds is
+   *     winspan × wlen / SR` (`:681`), so `one note held`'s 3 seconds is
    *     `0.30 … 0.70` of eight rather than `0.35 … 0.40` of sixty.
    *
-   * What it costs, stated plainly: `piled up` piles up the last eight seconds
-   * rather than the last minute, and the longest grain is 2.6 s rather than 6.
+   * What it costs, stated plainly: `ground` piles up the last eight seconds
+   * rather than the last minute, and the longest grain is 4 s rather than 6.
    * Raising `BUF_SECONDS` is a four-place change (`:138` declares it;
    * `grainSeconds`, `winPos`, the delay scale in `setScan`, and the fill wait
    * all read it) plus a `settleMs` big enough for the fill, and it is worth
@@ -1804,7 +1804,7 @@
    * ⚠️ `tilt` IS BAKED INTO THE RECORDING (`:617–621`, the shelves are on
    * `capl`/`capr` BEFORE `BufWr`), so a patch's tilt only reaches audio
    * recorded after the press — a full `BUF_SECONDS` before it is all you hear.
-   * And under `lock 1` nothing is written at all, so `held still`'s tilt is
+   * And under `lock 1` nothing is written at all, so `one note held`'s tilt is
    * inert by construction. Both are honest, neither is obvious.
    *
    * ⚠️ `sos` BELOW 0.6 IS NOT A FLAVOUR, IT IS THE GRANULATOR TURNED OFF.
@@ -1812,66 +1812,91 @@
    * LIVE INPUT (`:945`), so 0.6 is the first value that is all grains and 0 is
    * the input handed straight back. Every patch here is at 0.62 or above.
    */
+  /**
+   * 🔴 EIGHT SOUNDS THAT DIFFER IN KIND, AND THE OLD SEVEN DIFFERED IN NUMBERS.
+   * REPORTED for the third time — *"radio granulator patches heard almost
+   * same"* — after a round of widening the ranges and a round of adding
+   * movement, neither of which helped. They could not have. MEASURED off the
+   * old table, which is the part worth keeping:
+   *
+   *   scanmode 1 (STRETCH)            7 of 7   — POSITION and DELAY never used
+   *   read speed between -0.10x/+0.25x  5 of 7   — five of them nearly standing still
+   *   grain overlap (size x rate)     2.0-5.0   — on a scale the engine clamps at 2..40
+   *   euclid inert (elen 1)           6 of 7   — the sixteen-step gate never read
+   *   wet 0.22-0.55                   6 of 7
+   *
+   * Seven variations on ONE architecture, five of them a near-frozen smear at
+   * the same density with the rhythm switched off. Modulating that gives a
+   * wobbling near-frozen smear. The axis that was collapsed was not the amount
+   * of anything, it was the KIND.
+   *
+   * So this set is laid out along the axes the engine actually has, one patch
+   * pushed to each end rather than tuned by ear — because tuning by ear is what
+   * produced the two sets that converged:
+   *
+   *   mode        DELAY · POSITION · STRETCH          (all three, finally)
+   *   read speed  -1.00 · +0.08 · +0.25 · +0.50 · +1.00 · +2.00 · frozen
+   *   overlap     2 (four-second grains) up to 26 (a cloud)
+   *   rhythm      one patch on a real sixteen-step euclid figure
+   *   space       one bone dry, one drowned
+   *   blend       one that is not all grains — `sos 0.45`, so you hear the
+   *               station through them, which no patch has ever done here
+   *
+   * ⚠️ `sos` 0.45 IS DELIBERATE AND IS THE ONE EXCEPTION TO THE NOTE ABOVE.
+   * `sxf = (msos.max(mlock)/0.6).clip(0,1)` (`:980`) crossfades grains against
+   * the LIVE INPUT, so 0.62 upward is all grains and every patch here has been
+   * at 0.62 or above. `burnt` sits at 0.45 on purpose: it is the radio with the
+   * granulator as an effect rather than the granulator with the radio as
+   * material, and that is a different thing to hear.
+   */
   const PATCHES = [
-    // A reverse crawl through the last eight seconds, in long grains that swell
-    // in rather than start, under the seventh chord. On speech it turns a news
-    // bulletin into an organ; on music the harmony survives and the rhythm does
-    // not. −0.10× means one reverse lap of the buffer every eighty seconds.
-    { name: 'slow tide',
-      says: 'a reverse crawl in long grains, under a seventh chord',
-      // MOTION: the station's loud passages pull the grains SHORT and let them
-      //         stretch back out in the quiet — a tide that breathes with the
-      //         programme
+    // 🔴 DELAY MODE, WHICH THIS PAGE HAS NEVER USED. The read point sits a
+    // fixed distance BEHIND the write head instead of crawling through a
+    // window, so what comes out is the station itself, four seconds ago, in
+    // grains long enough that words survive. Not a wash — an echo you can
+    // follow. `mdelay` is the control the read-head slider drives here and the
+    // window must be the whole lap, which `writePatch` enforces.
+    { name: 'four seconds ago',
+      says: 'the station itself, four seconds late, in pieces you can still follow',
+      // MOTION: loud passages shorten the pieces, and a busy programme scatters
+      //         where each one is read from — so speech breaks up and music
+      //         holds together
       mod: [
-        { src: 'env', dest: 'size', amt: 0.55 },
-        // 🔴 A SEVENTY-SECOND WAVE ON THE READ SPEED, AND IT CROSSES ZERO.
-        // `scan` is a SPEED in STRETCH (`speed = 3·mscan − 1`), so a base of
-        // 0.30 is −0.10x and a tenth of the lane either way runs −0.37x to
-        // +0.17x: the crawl slows, stops, turns round and goes back. Nothing
-        // else on this page produces a standstill you can hear arriving.
-        { src: 'lfo', shape: 'sine', hz: 0.014, dest: 'scan', amt: 0.45 },
-        // The chord's detune on a drifting sixteen-step pattern — twelve
-        // seconds a step, so a lap is over three minutes and no two visits hear
-        // the same one.
-        { src: 'lfo', shape: 'glide', hz: 0.08, machine: 0.9, dest: 'swarm', amt: 0.5 },
+        { src: 'env', dest: 'size', amt: 0.50 },
+        { src: 'env.flux', dest: 'spray', amt: 0.35 },
       ],
-      scanmode: 1, scan: 0.30, rate: 1.4, size: 1.8, contour: 14,
-      sos: 0.72, lock: 0, tilt: -0.30, ingain: 1, comp: 0.20,
-      spray: 0.55, spraymode: 3, swarm: 0.45, swarmmode: 3, strum: 0.06,
+      scanmode: 3, scan: 0.5, rate: 9, size: 0.28, contour: 6,
+      sos: 0.75, lock: 0, tilt: 0, ingain: 1, comp: 0.20,
+      spray: 0.06, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
       elen: 1, ephase: 0, pattern: null,
-      gates: [1, 1, 1, 1, 0, 0, 0, 0],
-      pitches: [0, 4, 7, 10, 0, 0, 0, 0],       // ← the seventh, as asked for
+      gates: [1, 0, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
       probs: [1, 1, 1, 1, 1, 1, 1, 1],
-      swet: 0.28, scycle: 6.0, sfb: 0.42, stilt: -0.25, sxover: 650, sdiffuse: 0.55,
-      taptimes: [1.5, 3.0, 4.5, 6.0], tappans: [-0.8, 0.8, -0.5, 0.5],
-      tappitch: [0, 7, 12, -12],
-      drive: 0.18, crush: 0, crushmode: 1,
-      noise: 0.12, noisetype: 2, noisedecay: 0.9, noisetone: 900, noisedyn: 1.4,
-      wow: 0.35, rverb: 0.42, rtime: 0.62 },
+      swet: 0.12, scycle: 2.0, sfb: 0.20, stilt: 0, sxover: 700, sdiffuse: 0.20,
+      taptimes: [0.75, 1.5, 2.25, 3.0], tappans: [-0.6, 0.6, -0.3, 0.3],
+      tappitch: [0, 0, 0, 0],
+      drive: 0.10, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 2, noisedecay: 0.8, noisetone: 800, noisedyn: 1.0,
+      wow: 0.10, rverb: 0.15, rtime: 0.30 },
 
     // 🔴 THE STATION, SLOWED, AND NOTHING ELSE DONE TO IT. Pappus is a
-    // time-stretcher before it is a texture machine, and this patch is the
-    // proof: ONE voice at pitch 0, a dense enough grain rate to read as
-    // continuous, and every colour stage at zero. What you hear is the radio at
-    // a quarter speed with its pitch intact — not a wash, not a chord, the
-    // programme itself, slowed.
+    // time-stretcher before it is a texture machine and this is the proof: one
+    // voice at pitch 0, a dense enough grain rate to read as continuous, every
+    // colour stage at zero. The radio at a quarter speed with its pitch intact.
     //
     // ⚠️ THIS IS THE FEATURE VARISPEED COULD NOT BE. Slowing the STREAM means
-    // falling behind the station for ever or dropping what arrives; slowing the
-    // READ HEAD over a held eight seconds costs neither, because the material
-    // is already in the buffer. `speed = winspan × (3·mscan − 1)`
-    // (`Engine_Pappus.sc:715`), so `mscan 0.4167` is +0.25x.
+    // falling behind the station for ever; slowing the READ HEAD over a held
+    // eight seconds costs nothing, because the material is already in the
+    // buffer. `speed = winspan x (3*mscan - 1)` (`:715`), so 0.4167 is +0.25x.
     //
     // ⚠️ `spray` IS TINY BUT NOT ZERO. Sixteen overlapping grains reading the
-    // SAME point comb against each other — the engine's own note at `:826` — so
-    // a few milliseconds of jitter is what keeps a stretch smooth rather than
-    // hollow. At zero it rings.
+    // SAME point comb against each other (`:826`), so a few milliseconds of
+    // jitter is what keeps a stretch smooth rather than hollow.
     { name: 'slowed',
       says: 'the station at a quarter speed, pitch intact, nothing added',
-      // MOTION: nothing moves it. This patch is the plain time-stretch and its
-      //         whole claim is that it does not colour the programme; a
-      //         follower on it would be the page adding something and calling
-      //         it the station
+      // MOTION: none. The claim is that it does not colour the programme, and a
+      //         follower here would be the page adding something and calling it
+      //         the station
       mod: [],
       scanmode: 1, scan: 0.4167, rate: 28, size: 0.10, contour: 8,
       sos: 0.62, lock: 0, tilt: 0, ingain: 1, comp: 0.15,
@@ -1881,214 +1906,192 @@
       pitches: [0, 0, 0, 0, 0, 0, 0, 0],
       probs: [1, 1, 1, 1, 1, 1, 1, 1],
       swet: 0, scycle: 1, sfb: 0, stilt: 0, sxover: 700, sdiffuse: 0,
-      taptimes: [0.25, 0.5, 0.75, 1], tappans: [0, 0, 0, 0],
-      tappitch: [0, 0, 0, 0],
+      taptimes: [0, 0, 0, 0], tappans: [0, 0, 0, 0], tappitch: [0, 0, 0, 0],
       drive: 0, crush: 0, crushmode: 1,
-      noise: 0, noisetype: 2, noisedecay: 0.25, noisetone: 1200, noisedyn: 2,
+      noise: 0, noisetype: 1, noisedecay: 0.5, noisetone: 700, noisedyn: 1,
       wow: 0, rverb: 0, rtime: 0.3 },
 
-    // 🔴 A SLOW CLIMB. `stutter` was here and was replaced: it was the most
-    // RHYTHMIC patch on a page whose owner's verdict was "just scattering
-    // fragments", so it was more of the complaint rather than an answer to it.
-    // `slow tide` was named the best of the six, so this is built in its family
-    // and made to move in the one direction that one does not.
-    //
-    // The read head crawls FORWARD at a twelfth of life speed — `scanmode 1`,
-    // and `speed = winspan × (3·mscan − 1)` (`Engine_Pappus.sc:715`), so
-    // `mscan 0.36` is +0.08×: one lap of the eight seconds every hundred
-    // seconds. Three-second grains through the widest window (`contour 16`)
-    // have no attack at all, they only swell.
-    //
-    // What makes it climb rather than hang is the DELAY, which is the one
-    // stage TINY keeps four taps of (`:1515`): each tap is pitched up a fifth,
-    // an octave, a twelfth, two octaves (`tappitch`, read-speed repitch at
-    // `:1517`), so every phrase is answered by itself higher, four times, over
-    // six and a half seconds. That is the shimmer the compiled-out `PitchShift`
-    // would have given, built from the taps that survive instead.
-    //
-    // ⚠️ `sos 0.80` STACKS RATHER THAN FREEZES. The buffer keeps recording but
-    // barely replaces, so the last half minute piles up under the climb.
-    // `ingain 0.75` pays for it: every write is clipped to ±1 (`:635`), so a
-    // buffer that accumulates needs to arrive quieter or it flattens.
-    { name: 'updraft',
-      says: 'a slow climb, answered by itself a fifth and an octave up',
-      // MOTION: the grain rate climbs with the level, so a loud passage
-      //         thickens into a wash and a quiet one thins to countable single
-      //         grains
+    // 🔴 POSITION MODE AND A FROZEN BUFFER — the other architecture this page
+    // had never used. `lock 1` stops the ring being written, so the material
+    // can no longer change: what you hear is ONE INSTANT of the broadcast,
+    // held, read from one place, stacked into a minor eleventh and drowned. The
+    // programme stops being a programme and becomes a chord.
+    { name: 'one note held',
+      says: 'one instant of the broadcast, frozen and stacked into a chord',
+      // MOTION: the only things left that CAN move, since the material cannot —
+      //         the blend breathes on a ninety-second wave and the grain shape
+      //         steps between held values
       mod: [
-        { src: 'env', dest: 'rate', amt: 0.60 },
-        // The top of the band alone. Sibilance and cymbals shorten the grains
-        // while the bass leaves them long — a distinction loudness cannot make,
-        // because a loud bass note and a loud hi-hat are the same number to it.
-        { src: 'env.high', dest: 'size', amt: -0.45 },
-        // The grain window itself, stepped. Seventeen shapes from a hard edge
-        // to a slow swell (`:726`), read fresh by every grain.
-        { src: 'lfo', shape: 'glide', hz: 0.15, machine: 0.88, dest: 'contour', amt: 0.8 },
+        { src: 'lfo', shape: 'sine', hz: 0.011, dest: 'sos', amt: 0.50 },
+        { src: 'lfo', shape: 'glide', hz: 0.06, machine: 0.9, dest: 'contour', amt: 0.70 },
+        { src: 'env.tone', dest: 'spray', amt: 0.40 },
       ],
-      scanmode: 1, scan: 0.36, rate: 0.9, size: 3.0, contour: 16,
-      sos: 0.80, lock: 0, tilt: -0.15, ingain: 0.75, comp: 0.25,
-      spray: 0.30, spraymode: 3, swarm: 0.55, swarmmode: 4, strum: 0.08,
-      elen: 1, ephase: 0, pattern: null,
-      gates: [1, 1, 1, 1, 1, 0, 0, 0],
-      pitches: [0, 7, 12, 19, 24, 0, 0, 0],      // a rising stack, not a chord
-      probs: [1, 1, 1, 1, 1, 1, 1, 1],
-      swet: 0.55, scycle: 12.0, sfb: 0.50, stilt: -0.20, sxover: 700, sdiffuse: 0.70,
-      taptimes: [2.0, 3.5, 5.0, 6.5], tappans: [-0.7, 0.7, -0.4, 0.4],
-      tappitch: [7, 12, 19, 24],                 // the climb itself
-      drive: 0.15, crush: 0, crushmode: 1,
-      noise: 0.06, noisetype: 2, noisedecay: 0.8, noisetone: 1100, noisedyn: 1.2,
-      wow: 0.28, rverb: 0.55, rtime: 0.80 },
-
-    // 🔴 `lock 1` FREEZES THE BUFFER BIT-EXACTLY: `sos = msos.max(mlock) = 1`,
-    // so `sosret = 1` and `sosin = 0` (`:638–646`) and nothing more is written.
-    // Three seconds of the caught eight, read at a thirty-first of life speed —
-    // one syllable becomes a sustained vowel, five voices across three octaves,
-    // each doubled a fifth and an octave up. ⚠️ DO NOT REACH FOR `msrc 1` HERE:
-    // it looks like the freeze and it is the ERASE (LESSONS #46).
-    { name: 'held still',
-      says: 'three seconds caught and stretched thirty times, held as a chord',
-      // MOTION: the read head nudges forward on loud material and settles back
-      //         — the freeze stays a freeze, but it stops being a dead
-      //         photograph
-      mod: [
-        { src: 'env', dest: 'scan', amt: 0.28 },
-        // 🔴 ON A FREEZE THE WINDOW SHAPE IS THE INSTRUMENT. `lock 1` stops the
-        // buffer being written, so the material cannot change and every other
-        // source is reading the same eight seconds for ever — the one thing
-        // left that alters the sound is how each grain is shaped on its way
-        // out. Held, not glided: a window is chosen per grain, so stepping is
-        // what it actually does.
-        { src: 'lfo', shape: 'step', hz: 0.5, machine: 0.92, dest: 'contour', amt: 0.75 },
-        { src: 'lfo', shape: 'tri', hz: 0.07, dest: 'strum', amt: 0.7 },
-      ],
-      scanmode: 1, scan: 0.36, rate: 9, size: 0.55, contour: 10,
-      sos: 0.62, lock: 1, tilt: -0.20, ingain: 1, comp: 0.25,
-      winstart: 0.30, winend: 0.70,
-      spray: 0.25, spraymode: 3, swarm: 0.75, swarmmode: 4, strum: 0.10,
-      elen: 1, ephase: 0, pattern: null,
-      gates: [1, 1, 1, 1, 1, 0, 0, 0],
-      pitches: [0, 7, 12, 19, -12, 0, 0, 0],
-      probs: [1, 0.85, 0.7, 0.5, 0.6, 1, 1, 1],
-      swet: 0.30, scycle: 3.2, sfb: 0.50, stilt: -0.30, sxover: 650, sdiffuse: 0.80,
-      taptimes: [0.8, 1.6, 2.4, 3.2], tappans: [-1, 1, -0.7, 0.7],
-      tappitch: [0, 12, -12, 7],
-      drive: 0.25, crush: 0, crushmode: 1,
-      noise: 0.20, noisetype: 2, noisedecay: 1.2, noisetone: 700, noisedyn: 1.0,
-      wow: 0.50, rverb: 0.50, rtime: 0.70 },
-
-    // `mscan 0` is `3·0 − 1 = −1`: reverse at exactly life speed, one lap of the
-    // eight seconds every eight seconds. ⚠️ NOT THE SAME AS A REWOUND TAPE —
-    // `GrainBuf` reads FORWARD inside each grain (`:871`), so the fragments are
-    // forward and their ORDER is reversed, which is the Revolver artefact.
-    { name: 'backwards',
-      says: 'the station running backwards at its own speed, through a sick tape machine',
-      // MOTION: scatter opens with the level, so the backwards tape smears wide
-      //         when the station is loud and pulls back to one line when it is
-      //         not
-      mod: [
-        { src: 'env', dest: 'spray', amt: 0.50 },
-        { src: 'lfo', shape: 'tri', hz: 0.05, dest: 'swarm', amt: 0.55 },
-        // The bottom of the band pulls the grain rate DOWN, so a bass-heavy
-        // passage thins out rather than thickening — the opposite of what
-        // loudness would do to the same material.
-        { src: 'env.low', dest: 'rate', amt: -0.42 },
-      ],
-      scanmode: 1, scan: 0.0, rate: 5, size: 0.9, contour: 16,
-      sos: 0.68, lock: 0, tilt: -0.50, ingain: 1, comp: 0.35,
-      spray: 0.30, spraymode: 1, swarm: 0.40, swarmmode: 2, strum: 0.125,
-      elen: 1, ephase: 0, pattern: null,
-      gates: [1, 1, 1, 0, 0, 0, 0, 0],
-      pitches: [0, -5, -12, 0, 0, 0, 0, 0],
-      probs: [1, 0.75, 0.6, 1, 1, 1, 1, 1],
-      swet: 0.35, scycle: 2.4, sfb: 0.50, stilt: -0.40, sxover: 650, sdiffuse: 0.65,
-      taptimes: [0.6, 1.2, 1.8, 2.4], tappans: [-0.7, 0.7, -0.45, 0.45],
-      tappitch: [0, -12, 7, -7],
-      drive: 0.45, crush: 0.35, crushmode: 2,
-      noise: 0.15, noisetype: 3, noisedecay: 0.06, noisetone: 4500, noisedyn: 3.0,
-      wow: 0.85, rverb: 0.35, rtime: 0.55 },
-
-    // Forty-two thirty-millisecond plucks a second, two octaves upward, on seven
-    // steps of twelve with the four voices five steps apart. 🔴 `spraymode 3`
-    // IS THE WHOLE PATCH: RANDOM gives a fresh number per grain per voice, which
-    // is what "scattered noise" sounds like; WARP shares two slow drifts across
-    // the eight voices, so neighbouring grains read neighbouring places and the
-    // cloud MOVES AS ONE. Same density, same rate, a different thing to hear.
-    { name: 'roof rain',
-      says: 'a fast scatter of tiny plucks that drifts as one cloud',
-      // MOTION: the hardest routing here: louder means MORE drops and SHORTER
-      //         ones, which is the difference between rain and a hiss
-      mod: [
-        { src: 'env', dest: 'rate', amt: 0.75 },
-        { src: 'env', dest: 'size', amt: -0.35 },
-        // 🔴 THE SIXTEEN-STEP PATTERN, ACROSS THE EIGHT VOICES. `probs` is one
-        // firing probability per voice (`:801`), so a stepped source rotated by
-        // a whole slot per voice makes them come and go in turn — a part rather
-        // than a wobble, which is the whole answer to *"patches still too
-        // similar and not too interesting"*. `machine 0.88` keeps the pattern
-        // recognisable while rewriting about two of its sixteen values a lap.
-        { src: 'lfo', shape: 'step', hz: 2, machine: 0.88, dest: 'probs', amt: 0.85 },
-        // How fast the programme is changing, not how loud it is: an announcer
-        // scatters the read point, a sustained chord does not.
-        { src: 'env.flux', dest: 'spray', amt: 0.45 },
-      ],
-      scanmode: 1, scan: 0.75, rate: 26, size: 0.030, contour: 0,
-      sos: 0.62, lock: 0, tilt: 0.40, ingain: 1, comp: 0.20,
-      spray: 0.70, spraymode: 3, swarm: 0.22, swarmmode: 1, strum: 0,
-      elen: 12, ephase: 5,
-      // E(7,12): onsets at 1, 3, 5, 6, 8, 10, 11. The last four slots are never
-      // read (`% melen` with melen 12) and are written anyway — see writePatch.
-      pattern: [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0],
-      gates: [1, 1, 1, 1, 0, 0, 0, 0],
-      pitches: [0, 12, 19, 24, 0, 0, 0, 0],
-      probs: [1, 0.8, 0.6, 0.4, 1, 1, 1, 1],
-      swet: 0.40, scycle: 0.9, sfb: 0.30, stilt: 0.20, sxover: 2500, sdiffuse: 0.15,
-      taptimes: [0.225, 0.45, 0.675, 0.9], tappans: [-1, 1, -0.7, 0.7],
-      tappitch: [0, 12, 19, 24],
-      drive: 0.15, crush: 0.30, crushmode: 1,
-      noise: 0.18, noisetype: 3, noisedecay: 0.04, noisetone: 6000, noisedyn: 3.5,
-      wow: 0.10, rverb: 0.50, rtime: 0.66 },
-
-    // 🔴 `sos 0.90` STOPS THE BUFFER BEING REPLACED AND STARTS IT ACCUMULATING:
-    // `sosret = (sos·1.05).clip(0,1) = 0.945` of the old is kept every lap and
-    // `sosin = ((1−sos)·4).clip(0,1) = 0.40` of the new goes in (`:639`, `:646`),
-    // so what the station said a minute ago is still faintly in there. Six
-    // voices across four octaves, crawling forward at a twenty-eighth of life
-    // speed. ⚠️ THE WRITE CLIPS at ±1 (`:655`) — `ingain 0.7` buys the headroom
-    // the pile-up needs, because the engine's own answer to a saturating layer
-    // is input gain, not less layering.
-    { name: 'piled up',
-      says: 'the buffer stops being replaced and starts stacking up',
-      // MOTION: the pile deepens and spreads together, so a busy passage stacks
-      //         into something wider rather than merely louder
-      mod: [
-        { src: 'env', dest: 'size', amt: 0.45 },
-        { src: 'env', dest: 'spray', amt: 0.35 },
-        // Where the energy sits, rather than how much of it there is — bright
-        // material speeds the grains up and dark material lets them spread.
-        { src: 'env.tone', dest: 'rate', amt: 0.5 },
-        // 🔴 THE WASH BREATHES BETWEEN THE GRAINS AND THE RADIO. `sos` is the
-        // crossfade between them (`:980`), and the lane floors at 0.62 because
-        // below 0.6 the granulator is off — so this opens a little of the plain
-        // station through the palimpsest and closes it again, every fifty
-        // seconds, without ever switching the instrument out.
-        { src: 'lfo', shape: 'sine', hz: 0.02, dest: 'sos', amt: 0.6 },
-      ],
-      scanmode: 1, scan: 0.345, rate: 0.9, size: 2.6, contour: 12,
-      sos: 0.90, lock: 0, tilt: -0.55, ingain: 0.70, comp: 0.15,
-      spray: 0.45, spraymode: 3, swarm: 0.65, swarmmode: 3, strum: 0.08,
+      scanmode: 2, scan: 0.42, rate: 45, size: 0.16, contour: 16,
+      sos: 0.90, lock: 1, tilt: 0.15, ingain: 1, comp: 0.25,
+      spray: 0.25, spraymode: 2, swarm: 0.60, swarmmode: 2, strum: 0.02,
       elen: 1, ephase: 0, pattern: null,
       gates: [1, 1, 1, 1, 1, 1, 0, 0],
-      pitches: [0, -12, 7, -5, 12, -24, 0, 0],
-      probs: [1, 0.9, 0.7, 0.55, 0.4, 0.3, 1, 1],
-      swet: 0.22, scycle: 9.0, sfb: 0.50, stilt: -0.35, sxover: 650, sdiffuse: 0.90,
-      taptimes: [2.25, 4.5, 6.75, 9.0], tappans: [-0.6, 0.6, -0.4, 0.4],
-      tappitch: [0, 7, 12, 19],
+      pitches: [0, 3, 7, 10, 14, 19, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.75, scycle: 7.0, sfb: 0.55, stilt: -0.15, sxover: 600, sdiffuse: 0.80,
+      taptimes: [2.0, 4.0, 6.0, 7.5], tappans: [-0.7, 0.7, -0.4, 0.4],
+      tappitch: [0, 12, 7, 19],
+      drive: 0.12, crush: 0, crushmode: 1,
+      noise: 0.08, noisetype: 2, noisedecay: 1.2, noisetone: 1100, noisedyn: 1.0,
+      wow: 0.25, rverb: 0.72, rtime: 0.85 },
+
+    // 🔴 +2x, WHICH IS THE FASTEST THE ENGINE OFFERS AND HAS NEVER BEEN USED
+    // HERE. `mscan 1.0` is the top of the lane, so the read head runs twice life
+    // speed and the pitch goes with it: eight seconds of radio in four, dry,
+    // one voice, grains too short to hear individually. The opposite end of the
+    // same control `slowed` sits on.
+    { name: 'fast forward',
+      says: 'the last eight seconds at double speed, dry and unadorned',
+      // MOTION: the speed itself wanders down and back on a seventeen-second
+      //         triangle, so it never settles into sounding like a tape fault
+      mod: [
+        { src: 'lfo', shape: 'tri', hz: 0.06, dest: 'scan', amt: 0.35 },
+        { src: 'env', dest: 'rate', amt: 0.30 },
+      ],
+      scanmode: 1, scan: 1.0, rate: 34, size: 0.05, contour: 8,
+      sos: 0.68, lock: 0, tilt: 0.10, ingain: 1, comp: 0.10,
+      spray: 0.03, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 0, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.04, scycle: 0.5, sfb: 0.10, stilt: 0, sxover: 800, sdiffuse: 0.10,
+      taptimes: [0, 0, 0, 0], tappans: [0, 0, 0, 0], tappitch: [0, 0, 0, 0],
+      drive: 0.10, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 1, noisedecay: 0.5, noisetone: 700, noisedyn: 1,
+      wow: 0, rverb: 0.05, rtime: 0.25 },
+
+    // 🔴 THE SIXTEEN-STEP PATTERN, ACTUALLY PLAYING. `egate = Index.ar(gpat,
+    // (estep + mephase*i).floor % melen.max(1))` (`:802`) reads the gate buffer
+    // — and with `elen 1` ONLY SLOT 0 IS EVER READ, which is what six of the
+    // seven old patches did: sixteen numbers written and fifteen of them inert.
+    // `elen 16` makes the figure below a rhythm, and `ephase 0.25` starts each
+    // of the four voices four steps apart, so the same figure plays as a canon.
+    { name: 'the sixteenth',
+      says: 'a sixteen-step figure, four voices playing it four steps apart',
+      // MOTION: which voices are allowed to fire steps on its own sixteen-slot
+      //         pattern at four a second — two rhythms against each other, one
+      //         written and one that rewrites itself
+      mod: [
+        { src: 'lfo', shape: 'step', hz: 4, machine: 0.90, dest: 'probs', amt: 0.80 },
+        { src: 'env', dest: 'rate', amt: 0.30 },
+        { src: 'env.high', dest: 'contour', amt: 0.50 },
+      ],
+      scanmode: 1, scan: 0.5, rate: 16, size: 0.055, contour: 0,
+      sos: 0.70, lock: 0, tilt: 0.20, ingain: 1, comp: 0.20,
+      spray: 0.10, spraymode: 3, swarm: 0.20, swarmmode: 1, strum: 0.05,
+      elen: 16, ephase: 0.25,
+      pattern: [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
+      gates: [1, 1, 1, 1, 0, 0, 0, 0],
+      pitches: [0, 7, 12, 19, 0, 0, 0, 0],
+      probs: [1, 0.9, 0.8, 0.7, 1, 1, 1, 1],
+      swet: 0.22, scycle: 0.75, sfb: 0.30, stilt: 0.20, sxover: 900, sdiffuse: 0.30,
+      taptimes: [0.25, 0.5, 0.75, 1.0], tappans: [-0.8, 0.8, -0.5, 0.5],
+      tappitch: [0, 0, 12, 12],
+      drive: 0.50, crush: 0.40, crushmode: 2,
+      noise: 0.10, noisetype: 3, noisedecay: 0.2, noisetone: 2200, noisedyn: 2.0,
+      wow: 0.05, rverb: 0.25, rtime: 0.40 },
+
+    // 🔴 FOUR-SECOND GRAINS, WHICH IS THE OTHER END OF A SCALE EVERY OLD PATCH
+    // SAT IN THE MIDDLE OF. Half a grain a second, each one four seconds long
+    // and read backwards at life speed, an octave and a fifth below. The
+    // overlap is the engine's own floor of 2, so what you hear is two enormous
+    // reversed swells crossing — the slowest thing this page can make.
+    { name: 'ground',
+      says: 'half a grain a second, four seconds each, reversed and an octave down',
+      // MOTION: bass in the programme THINS it rather than thickening it, which
+      //         is the opposite of what loudness would do, and the detune walks
+      //         on a fifty-second pattern
+      mod: [
+        { src: 'env', dest: 'size', amt: 0.40 },
+        { src: 'lfo', shape: 'glide', hz: 0.02, machine: 0.85, dest: 'swarm', amt: 0.60 },
+        { src: 'env.low', dest: 'rate', amt: -0.40 },
+      ],
+      scanmode: 1, scan: 0.0, rate: 0.45, size: 4.0, contour: 14,
+      sos: 0.80, lock: 0, tilt: -0.55, ingain: 1, comp: 0.30,
+      spray: 0.40, spraymode: 3, swarm: 0.85, swarmmode: 3, strum: 0.10,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 0, 0, 0, 0, 0],
+      pitches: [-12, -7, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.50, scycle: 8.0, sfb: 0.50, stilt: -0.50, sxover: 500, sdiffuse: 0.60,
+      taptimes: [3.0, 5.0, 7.0, 8.0], tappans: [-0.5, 0.5, -0.9, 0.9],
+      tappitch: [-12, -12, 0, 0],
+      drive: 0.30, crush: 0, crushmode: 1,
+      noise: 0.15, noisetype: 2, noisedecay: 1.5, noisetone: 400, noisedyn: 1.2,
+      wow: 0.90, rverb: 0.55, rtime: 0.75 },
+
+    // 🔴 TWENTY-SIX GRAINS OVERLAPPING, AGAINST TWO TO FIVE FOR EVERY OLD
+    // PATCH. `gover = (msize * mrate).clip(2, 40)` (`:943`) is the density the
+    // engine reasons in, and the whole old set lived in the bottom eighth of
+    // it. Sixty-two grains a second of four hundred milliseconds each, read
+    // through WARP so neighbouring grains read neighbouring places and the
+    // cloud moves as one body rather than as scatter.
+    { name: 'dust',
+      says: 'twenty-six grains sounding at once, drifting as one body',
+      // MOTION: the spread breathes on a half-minute wave, and a busy programme
+      //         SHORTENS the grains, which thins the cloud exactly when there is
+      //         most to hear
+      mod: [
+        { src: 'lfo', shape: 'sine', hz: 0.03, dest: 'spray', amt: 0.50 },
+        { src: 'env', dest: 'rate', amt: 0.40 },
+        { src: 'env.flux', dest: 'size', amt: -0.35 },
+      ],
+      scanmode: 1, scan: 0.667, rate: 62, size: 0.42, contour: 10,
+      sos: 0.85, lock: 0, tilt: 0.05, ingain: 1, comp: 0.35,
+      spray: 0.90, spraymode: 2, swarm: 0.35, swarmmode: 1, strum: 0,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 12, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.60, scycle: 4.0, sfb: 0.45, stilt: 0.10, sxover: 700, sdiffuse: 0.90,
+      taptimes: [1.0, 2.0, 3.0, 4.0], tappans: [-0.9, 0.9, -0.6, 0.6],
+      tappitch: [0, 0, 7, 7],
       drive: 0.20, crush: 0, crushmode: 1,
-      noise: 0.10, noisetype: 2, noisedecay: 2.0, noisetone: 500, noisedyn: 1.0,
-      wow: 0.55, rverb: 0.50, rtime: 0.72 },
+      noise: 0.06, noisetype: 2, noisedecay: 0.9, noisetone: 1400, noisedyn: 1.1,
+      wow: 0.15, rverb: 0.50, rtime: 0.65 },
+
+    // 🔴 NOT ALL GRAINS, WHICH NO PATCH HERE HAS EVER BEEN. `sxf =
+    // (msos.max(mlock)/0.6).clip(0,1)` (`:980`) crossfades the grains against
+    // the LIVE INPUT, so 0.6 is the first value that is all grains and every
+    // patch this page has shipped sat at 0.62 or above. At 0.45 you hear the
+    // station AND the granulator, and the loud half of the chain — overdrive,
+    // bit crushing, dust, a badly wound tape — is doing most of the work. The
+    // radio with the granulator as an effect, rather than the other way round.
+    { name: 'burnt',
+      says: 'the station itself, overdriven and crushed, with grains under it',
+      // MOTION: the crushing and the drive step together on a slow pattern, so
+      //         the damage is a part rather than a setting
+      mod: [
+        { src: 'env', dest: 'size', amt: 0.35 },
+        { src: 'lfo', shape: 'step', hz: 0.7, machine: 0.80, dest: 'crush', amt: 0.55 },
+        { src: 'lfo', shape: 'glide', hz: 0.045, machine: 0.9, dest: 'drive', amt: 0.45 },
+      ],
+      scanmode: 1, scan: 0.36, rate: 7, size: 0.70, contour: 12,
+      sos: 0.45, lock: 0, tilt: 0.30, ingain: 1, comp: 0.40,
+      spray: 0.18, spraymode: 3, swarm: 0.15, swarmmode: 1, strum: 0,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.30, scycle: 3.0, sfb: 0.55, stilt: 0.35, sxover: 1100, sdiffuse: 0.35,
+      taptimes: [0.5, 1.0, 1.5, 2.0], tappans: [-0.4, 0.4, -0.7, 0.7],
+      tappitch: [0, 0, 0, 0],
+      drive: 0.80, crush: 0.70, crushmode: 3,
+      noise: 0.45, noisetype: 3, noisedecay: 0.4, noisetone: 1800, noisedyn: 2.2,
+      wow: 0.70, rverb: 0.35, rtime: 0.50 },
   ];
-  // Opens on `slow tide`: it is the gentlest of the six, and it is the one that
-  // holds the seventh chord the old `chord` row existed to reach.
+  // 🔴 OPENS ON `four seconds ago`, AND THE CHOICE IS ABOUT WHAT A VISITOR
+  // HEARS FIRST. It is the one patch where the programme is still recognisable
+  // — the station itself, four seconds late, in pieces long enough that words
+  // survive — so the first thing anybody hears is a granulator doing something
+  // to a radio rather than a wash that could be any material at all. Every
+  // other sound here is one press away.
   let patch = 0;
 
   const ALL_ONES = new Array(16).fill(1);
@@ -2183,8 +2186,8 @@
    * 🔴 THE READ HEAD IS THREE DIFFERENT QUANTITIES AND THE SLIDER SHOWED ONE
    * RAW NUMBER FOR ALL OF THEM. `Engine_Pappus.sc:719` selects between a SPEED
    * (mode 1), a PLACE (mode 2) and a LAG (modes 3/4), and this lane was always
-   * `mscan` 0..1 — so `slow tide`, which crawls backwards at a tenth of life
-   * speed, displayed `0.30`. Not wrong, exactly: meaningless. Relabelling the
+   * `mscan` 0..1 — so `ground`, which reads backwards at life speed,
+   * displayed `0.00`. Not wrong, exactly: meaningless. Relabelling the
    * word alone would have left the units lying, which is why `slider.mjs` grew
    * `setRange`.
    *
@@ -2404,6 +2407,13 @@
         // this page could read back the way it sent it.
         contour: { min: 0, max: 16, quant: 1 },
         wow: { min: 0, max: 1 },                       // tape flutter, `:1590`
+        // The loud half of the chain, all three `Lag.kr(…, lagt)` at `:1586`.
+        // ⚠️ THEY ARE GLOBAL CONTROLS — no `m` prefix — which `MOD_CMD` above
+        // already knew and this table did not, so a routing onto any of them was
+        // refused for a destination that exists.
+        drive: { min: 0, max: 1 },
+        crush: { min: 0, max: 1 },
+        noise: { min: 0, max: 1 },
         // The window ends. ⚠️ ONLY IN STRETCH AND POSITION — `applyPatch` drops
         // a routing onto these in a delay mode, where `writePatch` forces the
         // window to the whole lap and a narrowed one puts the read head nowhere
@@ -2454,7 +2464,7 @@
       }
       // ⚠️ RANGE BEFORE VALUE. `setRange` re-clamps what the slider is holding,
       // so setting the new value first would clamp it against the OLD lane —
-      // `slow tide`'s -0.10x would land at 0 on a 0..1 range and then be
+      // `ground`'s -1.00x would land at 0 on a 0..1 range and then be
       // re-shown on the right one as a speed nobody asked for.
       const r = SCAN_RANGE[p.scanmode] ?? SCAN_RANGE[2];
       sliders.scan?.setRange(r);
@@ -2474,6 +2484,7 @@
       for (const [k, v] of [['rate', p.rate], ['size', p.size], ['scan', p.scan],
                             ['spray', p.spray], ['swarm', p.swarm], ['strum', p.strum],
                             ['sos', p.sos], ['contour', p.contour], ['wow', p.wow],
+                            ['drive', p.drive], ['crush', p.crush], ['noise', p.noise],
                             ['winstart', p.winstart ?? 0], ['winend', p.winend ?? 1],
                             ['probs', p.probs]]) modulator.setBase(k, v);
       // ⚠️ THE WINDOW ENDS ARE REFUSED IN A DELAY MODE, and this is the guard
@@ -2757,13 +2768,13 @@
     const sRate = add('grains a second', 'rate', 0.1, 100, null, P.rate, '/s',
       { warp: 'exp', digits: 2 });
     // ⚠️ THREE SECONDS AT THE TOP, NOT ONE, BECAUSE A PATCH REACHES PAST ONE.
-    // `slow tide` holds 1.8 s grains and `piled up` 2.6 s; a slider that stops
-    // at 1 would have shown `1.00 s` under a granulator holding 2.6, which is
+    // `burnt` holds 0.7 s grains and `ground` four seconds; a slider that stops
+    // at 1 would have shown `1.00 s` under a granulator holding 4, which is
     // the page showing one patch and playing another — the exact failure the
     // glide below exists to prevent, arriving through the range instead.
     // ⚠️ AND IT IS STILL THE WRONG SHAPE. Upstream's own grain-length knob is
     // 0.002–8 EXPONENTIAL (`pappus.lua:2473`) and `slider.mjs` has no warp, so
-    // `roof rain`'s 30 ms sits in the first one percent of the travel. The
+    // `fast forward`'s 50 ms sits in the first one percent of the travel. The
     // patches carry the values and this nudges them; a warp in the kit is the
     // real fix and is written down in plan-radio-patches §1.2.
     // 🔴 AND THE SAME FOR LENGTH, WHICH IS THE ONE THAT WAS WORST. The engine
@@ -3106,8 +3117,8 @@
       // 🔴 READ THE GRAIN SETTINGS TOO, OR TWO NEIGHBOURS CAN BE INDISTINGUISHABLE.
       // This graded `mscanmode`, `melen` and the pattern only — three keys that
       // two legitimately different sounds can share. MEASURED the moment
-      // `stutter` was replaced by `updraft`: it sits beside `slow tide`, both
-      // crawl the read head (mode 1, no euclid), and the check went red saying
+      // `stutter` was replaced by a neighbour that also crawled the read head
+      // (mode 1, no euclid): the check went red saying
       // they did not differ — while the engine had in fact taken a different
       // rate, length, blend and delay. The check was right that IT could not see
       // a change and wrong that there was none, which is the worse of the two.
@@ -3145,8 +3156,8 @@
         }
         return { spread: got ? hi - lo : 0, got };
       };
-      // `slow tide` routes the follower onto grain length, and the radio is
-      // playing, so this is the live instrument being watched rather than a
+      // `four seconds ago` routes the follower onto grain length, and the radio
+      // is playing, so this is the live instrument being watched rather than a
       // synthetic wobble.
       G.modDest = 'msize';
       G.modMoved = await sampleSpread('msize');
@@ -3158,8 +3169,8 @@
 
       /**
        * 🔴 AND A SOURCE THAT IS NOT THE STATION, BECAUSE THE CHECK ABOVE CANNOT
-       * SEE ONE. The follower is the only source `slow tide` can be relied on
-       * to move quickly, so a page whose LFOs, shapes and sixteen-slot memory
+       * SEE ONE. The follower is the only source the opening patch can be
+       * relied on to move quickly, so a page whose LFOs, shapes and memory
        * were all dead would pass every assert above — and those are most of
        * what makes two patches different from each other.
        *
