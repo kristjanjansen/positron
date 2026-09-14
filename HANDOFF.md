@@ -1,12 +1,26 @@
-# Queue — open work, 2026-09-14
+# Queue — open work, 2026-09-14 (end of session 23)
 
-Rewritten at the end of session 22. ⚠️ The previous two versions of this block
+Re-checked against the tree at the end of session 23; the session-22 block below
+is kept struck rather than deleted. Originally rewritten at the end of session 22. ⚠️ The previous two versions of this block
 were each STALE THE DAY THEY WERE WRITTEN — session 21's in three places, all
 finished within four hours of being typed. **Striking an item off is part of
 finishing it, not a sweep at the end** (LESSONS #73). Everything below was
 re-checked against the tree on 09-14; where an item is struck, the numbers that
 closed it are kept, because a decision with its reasoning attached stops the
 question coming back.
+
+## ~~Closed in session 23~~
+
+- ~~**`timeline/csound.mjs` has never met a real vClick score.**~~ DONE. Both
+  compile and are graded against real csound: 81 events, worst beat error
+  0.000000000, worst time 0.000 ms. ⚠️ The premise that this needed "a machine
+  with csound on it" was false — it was on both, 6.18.1, all along.
+- ~~**`plan-uuu-local` P1.**~~ DONE, and P2's offline claim is asserted on
+  `/click/` rather than assumed.
+- ~~**`plan-jam` P1, P2, P4.**~~ DONE — `rig/peer.mjs`, `jam` on a score
+  document and `peer.clock`, `instrument` on `wire.mjs`. ⚠️ **P3 was already
+  done on 2026-09-10** and this plan said otherwise; see §4's correction.
+- ~~**The board is on LITE.**~~ Never true. See below.
 
 ## ~~Closed in session 22~~ — kept so they are not re-opened
 
@@ -72,13 +86,15 @@ still yours. `https://pub.positron.studio/logs?format=text`.
 ⚠️ The RELAY is not the constraint (128 sockets, 1000 msg/s since 2026-09-13).
 The DEVICE is: one JACK graph, one instrument.
 
-- 🔴 **THE BOARD IS ON LITE AND THE TAB RUNS TINY, AND THE PAGE'S HEADLINE IS
-  THAT THEY RUN ONE DEFINITION.** `/grains/` pins all nine `BYPASS` stages off,
-  so the comparison is defensible — but the claim as written is stronger than
-  what is running, and `demo/grains/index.html`'s own comment still says the
-  modal bank is *"what TINY compiles out anyway"*, which stopped being the
-  board's state when it went back to LITE. Decide it explicitly: either put the
-  board on TINY, or say in the page what differs.
+- ~~**THE BOARD IS ON LITE AND THE TAB RUNS TINY.**~~ ✅ **STRUCK 2026-09-14 —
+  IT WAS NEVER TRUE.** Checked on the machine and not in a commit message: the
+  config, the RUNNING process's environment, the engine's own boot line
+  (`Engine_Pappus: TINY graph`, 22:47 on 09-13) and matching md5s across repo →
+  sclang class path → `PROVENANCE.json`. Both ends are TINY. `grains` 23/23
+  against the live board. ⚠️ What was broken is `PAPPUS READY … lite=true`,
+  which prints on a TINY board because `if(tiny) { lite = true }` — fixed to
+  print the rung, and `TINY.md` and `CHAIN.md` had BOTH already warned about
+  that line.
 - 🔴 **The 25x insertion loss at `msos 0` is unexplained and is not claimed to
   be.** It is NOT the nine `BYPASS` stages — the compiled def defaults all nine
   to 0, so the page was pinning them to what they already were. One thread left
@@ -114,8 +130,49 @@ These two are what is left, and both are cheap to state and awkward to act on:
   22. It is a number nobody has a mechanism for, which is the kind this repo
   says to measure rather than reason about.
 
+## Needs a headset — `floor`'s VR half is written and unmeasured
+
+`/floor/` is deployed and its window half is green (15/15 under
+`verify-gl.mjs`). Everything below the entry point is reasoned, not measured,
+because `verify-gl.mjs` grades the GL and the asserts and not a controller:
+
+- **The exits.** Any button but the trigger ends the session, polled from
+  `inputSource.gamepad` — ⚠️ WebXR raises events for `select` and `squeeze` and
+  NOTHING ELSE, so A/B/X/Y and the stick click have no event at all. Nobody has
+  pressed one.
+- **The ray-drag.** Holding the trigger should keep the grabbed floor point
+  under the ray; it accumulates a `shift` subtracted from the head pose, so the
+  world moves and the wearer's head is not written. Untried.
+- **The dead-man's switch** — 6 s with nothing drawn ends the session. Armed
+  before the first frame is requested, which is the case it exists for.
+- **Frame rate.** `mirror` held 90.0 fps with one video panel; this draws up to
+  192 tiles in one instanced call plus a video texture. No number yet.
+
+## Needs somebody at a screen — `floor` at speed
+
+⚠️ Every screenshot taken of `/floor/` this session was a BACKGROUNDED tab,
+where rAF is throttled to nothing. So the fades, the lamp/shutter sequence, the
+dim, the crossfade to video and the frame rate have never been seen running.
+The asserts cover the arithmetic; the feel is unreviewed.
+
 ## Needs nobody — just time
 
+- 🔴 **`rack` fails two asserts — `0 frames of audio in 2.2 s`** — with Ableton
+  Live running and `live-agent.mjs` up, REPRODUCED ALONE so it is not
+  contention. The only red in a 535/537 suite, and not caused by session 23:
+  nothing this session touched is in that path. It is the studio Mac's audio
+  return, i.e. the Core Audio process tap.
+- 🔴 **`demo/shell/wire.mjs:35` still exports the OLD relay limits** — 16
+  sockets / 60 msg/s / 256 KiB against the deployed 128 / 1000 / 1000 KiB —
+  under a comment that says it is read from the worker rather than typed twice.
+  Reported in the U: research on 09-13 and still not changed. Anything sizing a
+  bridge off that constant sizes it for a relay that no longer exists.
+- **LESSONS.md has nothing from session 23**, and there are at least six
+  entries' worth: rAF as a trigger (four instances in one day), a passing check
+  is not a message, a warning about a misleading readout is not a fix, an
+  analyser on a suspended context reads its last buffer forever, a fade that
+  lives in the render loop cannot stop when the loop does, and a threshold
+  detector that measures the render rather than the signal.
 - 🔴 **`LESSONS.md` has entries 39–48 TWICE** — `### 39`–`### 48` from sessions
   14–15 and `## 39`–`## 48` from sessions 17–18 — and that is already producing
   wrong citations in CLAUDE.md, HANDOFF.md and PROGRESS.md. It needs a
@@ -171,14 +228,220 @@ Grouped by what they would make true:
   languages), `plan-glass` (the fourth clock owner), `plan-session` (a show off
   the wire kept for six hours — "no longer blocked, §1b is the build").
 - **Tidying that pays for itself.** `plan-names` (one write path tiered by
-  credential) and `plan-uuu-local` — ⚠️ which calls itself *"not started, and
-  mostly already true"* and whose P1 was **untrue at the first statement of the
-  first file, for a week, at 42/42 green**. Re-read it before trusting it.
+  credential).
 - `plan-patch` is written and ANSWERED; it is a record, not a queue item.
+- ⚠️ **`plan-uuu-local` is no longer in this list.** P1 is done — both real
+  scores compile and are graded against real csound — and P2's offline claim is
+  asserted on `/click/`. P3 (two devices on a LAN with no uplink) is what is
+  left. 🔴 Its §4 and `research/uuu-integration-2026-09.md` §2.4 BOTH still say
+  min-RTT skew over a real link is unmeasured; that is false and was false when
+  written. HANDOFF line ~2023 has had it struck since 2026-09-10.
+- ⚠️ **`plan-jam.md` is new and mostly DONE** — P1, P2 and P4 the day it was
+  written, P3 four days before it. What is left is the A/B it exists for: `jam`
+  (score plus clock) against `instrument` (a message per event), both arms now
+  modern, which is the number to send U:.
 
 ## Needs you, not me
 
 - **`positron-demo`'s RTMPS key is still unrotated.** `SECRETS-ROTATION.md`.
+
+# Handoff — 2026-09-14 (end of session 23)
+
+Read order for a fresh session: this file → `SUMMARY.md` → `PROGRESS.md`
+(newest first) → the plan you're touching.
+
+## Session 23 — U:'s click track compiles and plays, and a floor of 1965
+
+🔴 **THE HEADLINE: this repo's Csound compiler could not read either of the two
+real scores that exist, and had been 42/42 green for a week anyway.** Both
+`tarmoj/vclick` scores open with `t 0 $REPTEMPO`; `#define` was unsupported, the
+tempo came back NaN and `tempoMap` threw at line 12 of line 12. They compile now
+and are graded against real csound: **81 events across the two files, worst beat
+error 0.000000000, worst time error 0.000 ms, every p-field compared.**
+
+⚠️ **And csound was on both machines the whole time** — 6.18.1 on the studio Mac
+via Homebrew, 6.18.1 on the Raspberry Pi via Debian. The blocker recorded as
+"the real cost of this half-day is a machine with csound on it" did not exist.
+
+### What was measured rather than read
+
+Every macro and bracket rule came from probing `scsort`, not from the manual,
+which is why several things `plan-uuu-local` said to REFUSE are supported:
+
+    $NAME · $NAME. · $M(5'99) · redefinition (last wins) · a body over two lines
+    [1+2] 3 · [6-4] 2 · [2*3] 6 · [8/4] 2 · [2^3] 8 · [7%4] 3
+    [[1+1]*[3-1]] 4 · [0-1] -1 · [$N/2] with N 4 → 2
+
+That last one fixes the pass ORDER: a macro can be an operand of a bracket.
+
+🔴 **A BRACKET IN p2 OR p3 WAS SILENTLY BEAT 0.** `Number('[4/2]')` is NaN, the
+p-field fell through to a string and `|| 0` finished the job. In the real scores
+the brackets sit in p4/p5, so nothing was mistimed — that is luck, not a
+property.
+
+🔴 **AN UNDEFINED `$MACRO` EATS THE REST OF ITS LINE.** Measured: `i 1 $NOPE 1
+100` sorts to a bare `i 1`, and csound's p-field carry then refills it from the
+previous note — so a typo presents as a plausible duplicate note in the right
+place, with no gap and no throw. Refused by name rather than reproduced.
+
+⚠️ **THE REFERENCE IS PLAIN `csound -n -t 0`, NOT `scsort`.** `scsort` is the
+obvious tool and Debian ships none, so a check built on it cannot run on the Pi
+— the machine that is always on. `-t 0` writes the same sorted score to
+`score.srt`.
+
+### click — U:'s app, rebuilt, playing their file
+
+`/click/` is vClick: their score, their screen, their colours, no network. The
+p-field meanings came from **their own orchestra file** (`metro_sendosc.orc`),
+which answers the question `research/uuu-integration-2026-09.md` §5.1 says to
+ask them — it was in the repo all along. A negative bar number is not a bar
+before the start: it means "no red on beat 1" for composite meters, and its
+FRACTIONAL part is the beat to count from.
+
+🔴 **AND THEIR OWN `csengine.cpp` IS THE ARGUMENT.** Their README says playback
+can start from any bar *"if the vClick score is done well"*. That qualifier is
+string surgery: find the line whose 8th field is the bar, rewrite a `;ADVANCE`
+comment into a skip statement, hunt backwards for the last tempo line, patch a
+macro — with a hard-coded case for one piece (Murail, *Winter Fragments*) and
+their own comment `// NB! does not work, if 'i2'`. Compiled, it is a search and
+a `deck.seek()`. Bar 5 starts at 20538 ms here; csound puts it at 17.538 s into
+section 2 behind a 3 s section 1.
+
+`bytes` replaced `rows` in the readout: **3714 B, paid once**, beside `pushed`,
+which is what vClick puts on the hall's wifi and which climbs all piece.
+
+### The rules that came out of the interface work
+
+- 🔴 **`requestAnimationFrame` IS A PAINT CALLBACK, NEVER A TRIGGER.** Four
+  instances in one session. `click`'s clock (`late` read **2487.2 ms** of
+  browser throttling; **2.1 ms** on the deck's worker host), its lamp fade
+  twice, and two of my own MEASUREMENTS of the projector. In a hidden tab a
+  one-second rAF loop did not finish in **forty-five seconds**.
+  ⚠️ SVG would not have helped — SMIL is the same class of thing as a CSS
+  transition. The renderer was never the question.
+- 🔴 **A PASSING CHECK IS NOT A MESSAGE.** Every assert wrote a prose line, so a
+  page opened with nine sentences nobody reads. Failures keep their line — that
+  asymmetry is the rule — and `ready()` carries the tally once. Nothing parses
+  those lines, so no count moved.
+- 🔴 **THE SHELL WAS BREAKING ITS OWN VERTICAL RHYTHM**, on every page with a
+  transport bar. `.pos-body > * + *` is at line 226 and `.tbar { margin: 0 0 8px }`
+  at 305 — same specificity, later in the file, so the shorthand's `margin-top:
+  0` won on source order. MEASURED: gaps down `/click/` read **0 · 22 · 4 · 22**.
+  Now 22 · 22 · 22 · 22. ⚠️ The page had the same bug: `margin: 0` overrides it
+  too.
+
+### The board was on TINY the whole time
+
+🔴 Carried as "the top board-side open item" and **it was never true**. The
+config, the running process's environment, the engine's own boot line
+(`Engine_Pappus: TINY graph`) and matching md5s across repo → class path →
+`PROVENANCE.json` all say TINY, since 22:47 on 09-13.
+
+**What was broken is the line everybody reads.** `if(tiny) { lite = true }`, so
+`PAPPUS READY … lite=true` prints on a TINY board — the last line, the one that
+says READY, the one you grep for. ⚠️ `TINY.md` and `CHAIN.md` had BOTH already
+warned it cannot tell the rungs apart, and `writedefs.scd` already printed it
+properly. **A warning about a misleading readout is not a fix; the readout is.**
+
+### jam, instrument, and a number I said was missing
+
+`jam`'s deck runs on `peer.clock` — no more `setInterval(…, 12)` over
+`peer.now() % LOOP`. Eight beats are a score document. ✅ Proved cross-machine,
+not by two tabs: a browser here and the Pi running `rig/peer.mjs`, `others 1`,
+round trip 48.8 ms.
+
+`instrument` is on `wire.mjs` (envelope, `seq`, reconnect) with two lanes —
+played here, arrived over the relay.
+
+🔴 **AND I CLAIMED min-RTT SKEW OVER A REAL LINK WAS UNMEASURED. IT WAS DONE ON
+2026-09-10**, struck at HANDOFF line 2023. `plan-uuu-local` §4 and the U:
+research both still say otherwise and I repeated them without opening this file.
+
+What 09-14 adds is a DECOMPOSITION: the 09-10 method infers precision from two
+peers AGREEING, which cannot separate an error they SHARE. Two peers on ONE
+machine, through the real relay, have a true skew of exactly zero:
+
+| arm | link | true skew | error |
+|---|---|---|---|
+| two peers, one Mac | relay 66–74 ms | 0, exactly | **0.69 ms** |
+| two peers, one Pi | relay 42–44 ms | 0, exactly | **0.13 ms** |
+| Mac ↔ Pi | relay 64–69 ms | ~10.4 ms by NTP | agreed to **2.7 ms** |
+
+**So the ~3 ms is almost all OSCILLATOR, not PATH.** A faster path buys nothing.
+⚠️ Still quote 3 ms for two machines; the sub-millisecond arms share a crystal.
+
+### floor — the ERR archive as a place
+
+`/floor/` is the whole 1965 film catalogue face up on an infinite floor.
+
+🔴 **THE ARCHIVE'S IMAGE HOSTS SEND NO ACAO.** A page can DISPLAY such an image
+and `texSubImage3D` on it throws. Display versus READ, invisible until something
+reads. `/err-img` is a second proxied route on the site worker; VOD is the
+opposite and needs no proxy (`access-control-allow-origin: *`).
+
+Caching is three layers, each covering the one before's miss: browser (a week) →
+colo (`caches.default`) → CF (`cf.cacheEverything`). ⚠️ Nothing is stored in the
+repo — proxied and cached is not the same as held.
+
+One `TEXTURE_2D_ARRAY` and one instanced draw for the whole floor. 🔴 **The LRU
+evicts by DISTANCE FROM THE GAZE, not by age**: the tile behind you was used a
+moment ago and will never be looked at again.
+
+**Bugs only looking found, in order:**
+
+- **`/err-img` is a Worker route, so the dev server 404'd every image** — every
+  tile marked its picture dead and the page drew an empty rectangle with all
+  checks passing. A page that only works deployed is a page nobody can develop.
+- **Bright green tiles were `onload` taken for "decoded".** With
+  `decoding: 'async'` the pixels may not exist at `load`. ⚠️ Measured FIRST that
+  the images really are 256x192, because a size mismatch gives the same symptom.
+  ⚠️ And the monochrome filter would have HIDDEN it — green becomes grey and the
+  tile stops looking broken while staying wrong. Fixed before it was added.
+- **The `<video>` was never in the document.** A detached element is not
+  reliably decoded.
+- **The erratic pan was the floor teleporting.** A tile changes copy at half the
+  period; at 15x20 that is 12.6 m, where the 9–16 m fade still has it at **alpha
+  0.48**. 21x28 puts it at 17.6 m. Now an assert, proved by sabotage.
+- 🔴 **THE PROJECTOR LAGGED AND NEVER STOPPED BECAUSE `setGain` RESTARTED ITS
+  OWN RAMP EVERY FRAME.** A 1.2 s ramp, cancelled and restarted 60 times a
+  second, moved an eightieth of the way each time: **99% after six seconds**.
+  The shape of a fade belongs to the caller now.
+- 🔴 **AND THEN IT WOULD NOT STOP AT ALL, because the fade lived in the render
+  loop.** Hide the tab and rAF stops, the gain freezes, and the projector's own
+  scheduler carries on. Stopping is not allowed to depend on the thing that
+  draws: gain, scheduler and context, plus `visibilitychange` and `pagehide`.
+
+**The projector is synthesised, not sampled** — a licence read off a web page is
+not one anybody verified, a loop is a LOOP under four minutes of newsreel, and
+it is forty lines. Graded offline on every run: **strongest period 42.0 ms
+against 41.7**. ⚠️ The first instrument was threshold-based and read 8 clatters
+at 26.6 ms in the harness against 5 at ~41.7 by hand — a detector whose answer
+depends on how loud the render happened to be measures the render.
+
+### Two measurements that lied, both worth keeping
+
+- **An analyser on a SUSPENDED AudioContext returns its last buffer forever.**
+  RMS read 0.0119 before and 0.0119 after silencing — identical, which looks
+  exactly like a projector that never stopped.
+- **A backgrounded tab clamps `setTimeout` to ~1 s**, so an easing driven by it
+  jumps straight to target and reports a perfect ramp for broken code.
+
+### Still open
+
+- ⚠️ **No full `verify.mjs` run since the one this session.** It read **535/537**
+  with both failures in `rack` (`0 frames of audio in 2.2 s`), reproduced ALONE
+  with Live running and the agent up — a real open defect on the studio Mac's
+  audio return path, not contention and not caused by this session.
+- ⚠️ **`floor`'s VR half is written and not measured.** The grip/any-button
+  exit, the gamepad polling and the ray-drag need a real Quest;
+  `verify-gl.mjs` grades the GL and the asserts, not a controller.
+- ⚠️ **`floor`'s frame rate and fades were never seen at speed** — every
+  screenshot here was a backgrounded tab.
+- **`plan-jam` P2 and P4 are done; P3 was already done on 09-10.** What is left
+  is the A/B itself: `jam` against `instrument`, both arms now modern.
+- ⚠️ **`demo/shell/wire.mjs:35` still exports the OLD relay limits** under a
+  comment saying it does not — 16 sockets / 60 msg/s against the deployed
+  128 / 1000.
 
 # Handoff — 2026-09-14 (end of session 22)
 
