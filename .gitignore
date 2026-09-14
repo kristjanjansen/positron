@@ -33,3 +33,24 @@ studio/logs/
 
 # workers/pub pulls @cloudflare/containers
 workers/pub/node_modules/
+
+# Google service-account keys. A private key, not a config file — anyone holding
+# one can push to every device of the project it belongs to, and there is no
+# password to change afterwards, only a revocation in the console.
+#
+# ⚠️ THESE PATTERNS ARE A SECOND LINE, NOT THE FIRST. The first is: never put one
+# under `demo/`, which `workers/view/build.mjs` ENUMERATES and uploads publicly.
+# The repo root is fenced off from that enumerator on purpose — build.mjs:249,
+# "because the REPO ROOT holds .env" — which is why a key at the root is safe
+# from the deploy and only needs protecting from git.
+*serviceAccount*.json
+*-firebase-adminsdk-*.json
+# 🔴 AND THE NAME SOMEBODY ACTUALLY CHOSE. The two patterns above were written
+# from the name Firebase's console DOWNLOADS, and the key was then saved as
+# `positron-push-sa.json` — which matches neither. MEASURED: `git check-ignore`
+# said nothing and `git status` listed it as untracked, one `git add` from being
+# committed. A pattern that only covers the default name protects the one case
+# nobody was going to get wrong.
+*-sa.json
+*-sa.*.json
+positron-push-sa.json
