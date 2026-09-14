@@ -59,6 +59,18 @@ const EXPOSE = [
   'icy-metaint', 'content-type', 'x-shout-ttfb', 'x-shout-station',
 ].join(',');
 
+/**
+ * Health answers, collapsed.
+ *
+ * ⚠️ PER ISOLATE, WHICH IS ENOUGH AND IS NOT A GUARANTEE. Workers isolates come
+ * and go, so this does not bound the rate globally — what it does is collapse a
+ * BURST, which is the shape the traffic actually had: a harness run and every
+ * open tab asking within the same few seconds. A hard global bound would need a
+ * Durable Object, and that is worth doing if this is not enough.
+ */
+const HEALTH_TTL_MS = 20000;
+const healthCache = new Map();
+
 const cors = (h = {}) => ({
   'access-control-allow-origin': '*',
   'access-control-expose-headers': EXPOSE,
@@ -104,11 +116,39 @@ export default {
      * origin for as long as the runtime keeps this invocation, which turns a
      * health check into a load generator against a volunteer's Icecast.
      *
-     * ⚠️ NEVER CACHED. A cached answer about whether a live stream is live is
-     * worse than no answer, because it is wrong in the confident direction.
+     * ⚠️ IT SAID "NEVER CACHED" AND THAT WAS THE MISTAKE. The reasoning — a
+     * cached answer about a live stream is wrong in the confident direction —
+     * is true and was the wrong thing to optimise for. Twenty seconds of
+     * staleness about a station that has been up for hours costs nothing; six
+     * upstream connections per caller cost the broadcaster, and they stopped
+     * answering. Freshness is a preference; their bandwidth is not ours.
      */
     if (url.pathname === '/health') {
-      const checked = await Promise.all(Object.entries(STATIONS).map(async ([k, upstream]) => {
+      // 🔴 THIS FANS OUT TO EVERY MOUNT, AND THAT MADE IT A LOAD GENERATOR.
+      // One innocuous-looking request opened SIX upstream connections, the page
+      // polled it every 30 s per open tab, and every harness run called it —
+      // forty runs in an afternoon. MEASURED afterwards: three ERR mounts began
+      // answering this Worker **502 in 9 ms** while the same mounts served a
+      // laptop 200, and nine milliseconds is too fast to have reached Estonia.
+      // That is a refusal at the first hop, and it was earned.
+      //
+      // LESSONS #50 is this exact shape — *"the heavy request had no `fetch` in
+      // it"* — and its rule applies: this is a public broadcaster, not a service
+      // we pay for. So: answers are CACHED for `HEALTH_TTL_MS`, a caller may ask
+      // about only the stations it needs, and a refusal is not answered with
+      // another request.
+      const only = (url.searchParams.get('only') || '')
+        .split(',').map((x) => x.trim()).filter(Boolean);
+      const wanted = Object.entries(STATIONS).filter(([k]) => !only.length || only.includes(k));
+      const now = Date.now();
+      const fresh = {};
+      const toProbe = [];
+      for (const [k, upstream] of wanted) {
+        const c = healthCache.get(k);
+        if (c && now - c.at < HEALTH_TTL_MS) fresh[k] = c.value;
+        else toProbe.push([k, upstream]);
+      }
+      const probed = await Promise.all(toProbe.map(async ([k, upstream]) => {
         const t = Date.now();
         try {
           const up = await fetch(upstream, {
@@ -125,7 +165,9 @@ export default {
           return [k, { up: false, status: 0, ms: Date.now() - t, why: String(e).slice(0, 80) }];
         }
       }));
-      return Response.json({ stations: Object.fromEntries(checked) },
+      for (const [k, v] of probed) { healthCache.set(k, { at: Date.now(), value: v }); fresh[k] = v; }
+      return Response.json(
+        { stations: fresh, cached_for_ms: HEALTH_TTL_MS, probed_now: probed.length },
         { headers: cors({ 'cache-control': 'no-store' }) });
     }
 
