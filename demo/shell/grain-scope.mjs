@@ -104,6 +104,22 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   const live = [];                                 // flickering grain ticks
   const scroll = [];                               // {t, v} for the audio-only view
   let sourceName = '', counts = { measured: 0, inferred: 0 };
+  // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
+  // `/radio1965/` blends a live station against the granulator chewing it, and
+  // the fader that does that is the one gesture on the page — so the ticks are
+  // drawn at exactly the share of what you are HEARING that they are: invisible
+  // when the fader is all radio, solid when it is all granulator.
+  //
+  // ⚠️ IT MULTIPLIES THE PER-GRAIN FADE, IT DOES NOT REPLACE IT. Each tick
+  // already fades over `fadeMs` from the instant it fired, which is the thing
+  // that makes the picture a flicker rather than a smear; this scales the whole
+  // layer under that. Two alphas, two meanings — age, and share of the output.
+  //
+  // ⚠️ DEFAULT 1, so `/grains/`, which has no blend to report, is unchanged.
+  // And it is deliberately NOT applied to the waveform: the wave is the
+  // MATERIAL, which is being eaten whatever the fader says, so dimming it would
+  // be the picture claiming the radio had gone away.
+  let grainAlpha = 1;
   const t0 = performance.now() / 1000;
   const now = () => performance.now() / 1000 - t0;
   let envAcc = 0, envN = 0;
@@ -150,6 +166,13 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       const cut = t - seconds - 0.3;
       while (scroll.length && scroll[0].t < cut) scroll.shift();
     },
+
+    /**
+     * 0..1 — how much of what the listener hears is the granulator. See the
+     * note by `grainAlpha` above. Anything outside 0..1 is clamped rather than
+     * refused: this is fed straight off a fader.
+     */
+    grainAlpha(v) { grainAlpha = Math.max(0, Math.min(1, Number(v) || 0)); },
 
     source(name) { sourceName = name; },
     clear() { live.length = 0; scroll.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
@@ -210,7 +233,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         const age = (tnow - g.born) / fadeMs;
         if (age >= 1) { live.splice(i, 1); continue; }
         const x = g.pos * W;
-        const a = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level));
+        const a = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level)) * grainAlpha;
         const h = mid * (0.35 + 0.55 * (1 - age));
         ctx.strokeStyle = C.grain; ctx.globalAlpha = a; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x + 0.5, mid - h); ctx.lineTo(x + 0.5, mid + h); ctx.stroke();
@@ -256,7 +279,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         const x = g.pos * W;
         const h = (H * 0.34) * (0.35 + 0.55 * (1 - age));
         ctx.strokeStyle = C.grain;
-        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level));
+        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level)) * grainAlpha;
         ctx.lineWidth = 1;
         ctx.beginPath();
         if (g.half) { ctx.moveTo(x + 0.5, bed + 2); ctx.lineTo(x + 0.5, bed + 2 + h); }
@@ -294,8 +317,14 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
-        // the grains, on the same seconds the wave is drawn on
-        if (grainSeconds) {
+        // the grains, on the same seconds the wave is drawn on.
+        // ⚠️ SKIPPED OUTRIGHT AT ZERO, not drawn at `globalAlpha = 0`. The two
+        // are identical on screen and they are not identical to read: a loop
+        // that runs and paints nothing invites exactly the report that came in —
+        // *"turn off grain animation if you are at zero"* — from somebody
+        // watching a picture that was still moving for a different reason.
+        // Skipping says in the code what the fader says on screen.
+        if (grainSeconds && grainAlpha > 0) {
           for (let i = live.length - 1; i >= 0; i--) {
             const g = live[i];
             const age = (performance.now() - g.born) / 1000;
@@ -309,7 +338,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
             const at = bornAt - (1 - g.pos) * grainSeconds;
             const x = X(at);
             if (x < 0 || x > W) continue;
-            ctx.globalAlpha = Math.max(0, 1 - age / (fadeMs / 1000));
+            ctx.globalAlpha = Math.max(0, 1 - age / (fadeMs / 1000)) * grainAlpha;
             ctx.fillStyle = C.hi;
             ctx.fillRect(x - 0.5, mid - H * 0.46, 1.5, H * 0.92);
           }

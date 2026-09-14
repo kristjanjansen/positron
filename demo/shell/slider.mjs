@@ -132,6 +132,7 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  * @param {(v:number)=>void} [o.onChange]  on release, and on a keyboard step
  * @returns {{el:HTMLElement, get:()=>number,
  *   set:(v:number, opt?:boolean|{quiet?:boolean, glideMs?:number})=>number,
+ *   label:(text:string)=>void,
  *   disabled:(v:boolean)=>void}}
  */
 export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
@@ -305,6 +306,29 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
     el: wrap,
     get: () => v,
     set,
+    /**
+     * Rename the control.
+     *
+     * 🔴 FOR A CONTROL WHOSE MEANING A PRESET DECIDES, NOT FOR DECORATION.
+     * `/radio1965/`'s read-head slider drives `mscan` in one engine mode and
+     * `mdelay` in another, and in a third `mscan` is a SPEED rather than a
+     * place — so one fixed word is wrong for two of the three, which is this
+     * project's named hazard: a control that looks like it does one thing and
+     * does another. The page had a comment saying exactly that and no way to
+     * act on it.
+     *
+     * ⚠️ IT CHANGES AT HUMAN PACE OR NOT AT ALL. A label that rewrites itself
+     * on a clock is the caption that reflowed under `grain-scope` (CLAUDE.md);
+     * this one moves when somebody chooses a preset, which is a thing that
+     * happened rather than a thing that ticks.
+     *
+     * ⚠️ AND IT CAN CHANGE THE LABEL COLUMN'S WIDTH. `.sld-group` sizes that
+     * column from its widest label, and a page sharing one column across two
+     * groups measures it itself — so a caller that renames must re-measure, or
+     * every lane on the page shifts sideways on a preset press. The `aria`
+     * label is left alone: it was given for a reason when it differs.
+     */
+    label: (text) => { name.textContent = text ?? ''; },
     disabled: (yes) => {
       if (yes) { lane.setAttribute('aria-disabled', 'true'); lane.removeAttribute('tabindex'); }
       else { lane.removeAttribute('aria-disabled'); lane.setAttribute('tabindex', '0'); }

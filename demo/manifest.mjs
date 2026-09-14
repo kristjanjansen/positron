@@ -85,7 +85,7 @@ export const DEMOS = [
     one: 'the same live input over WHEP; same burned-in clock as 06',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000 },
-  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 20000,
+  { name: 'moq', act: 1, created: '2026-09-05', built: true, settleMs: 30000,
     one: 'browser to browser over MoQ, the fast tier',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
 
@@ -247,7 +247,14 @@ export const DEMOS = [
   // positron.studio may not load at all. The relay is the difference between a
   // page that works and a page that cannot, rather than between a page that
   // measures and one that does not.
-  { name: 'radio1965', act: 5, created: '2026-09-14', built: true, settleMs: 12000,
+  // ⚠️ `settleMs` HERE DOES ONE JOB, NOT TWO, AND THAT IS WHY IT WENT UP. The
+  // harness applies it to control 0 and to the first-assert budget; this page
+  // declares no controls at all now (the granulator comes up with the sound
+  // rather than behind a button), so only the second use reaches it — and it has
+  // to cover a wasm scsynth boot, 31 buffer allocations, a definition, a 2.5 s
+  // level, two 700 ms ink samples and a 1.2 s deafness control before the page
+  // says anything at all.
+  { name: 'radio1965', act: 5, created: '2026-09-14', built: true, settleMs: 30000,
     one: 'a live radio station in Tallinn, reachable from a secure page only through a relay of ours',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
 

@@ -163,11 +163,26 @@ export async function startPappus({ audioContext, log = () => {}, onGrain = null
     // 🔴 THE GRAINS, ON THE FAR SIDE OF THE WIRE. `SendReply.ar(vtrig * report,
     // '/pgrain', [pos, dur, i, half])` in the engine — so this count is the
     // GRAPH's, not anything this page asked for, and it stops when `report`
-    // goes off. Payload: [nodeID, replyID, pos, dur, voice, half]. Consumed
-    // here so it never fills the reply ring.
+    // goes off. Consumed here so it never fills the reply ring.
+    //
+    // 🔴 THE ARGUMENTS ARE OFFSET BY THE ADDRESS, AND THIS READ THEM OFF BY ONE
+    // FOR AS LONG AS IT EXISTED. `m` is `[address, ...args]` and `SendReply`
+    // prepends TWO of its own — so the whole message is
+    // `['/pgrain', nodeID, replyID, pos, dur, voice, half]`, recorded verbatim
+    // in `research/supercollider-browser-2026-09.md` §10 as
+    // `["/pgrain", 3000, -1, 0.1329…, 0.12, 0, 0]`. The comment above this call
+    // listed that layout correctly and the indices below started at `m[2]`
+    // anyway, so `pos` was the **replyID, −1, on every grain ever reported**.
+    //
+    // ⚠️ AND IT LOOKED FINE. `winPos()` clamps, so −1 became 0 and this page
+    // drew every tick stacked on the far left edge of the picture — ink in the
+    // right colour at the wrong place, which reads as a granulator reading the
+    // very start of its buffer rather than as a decoding bug. Nothing asserted
+    // on WHERE a tick landed, only on how many arrived, and a count cannot see
+    // this (LESSONS #36: nothing in the suite looks at ink).
     onReply: (m) => {
       if (m[0] !== '/pgrain') return false;
-      onGrain?.({ pos: m[2], dur: m[3], voice: m[4], half: m[5] });
+      onGrain?.({ pos: m[3], dur: m[4], voice: m[5], half: m[6] });
       return true;
     },
   });

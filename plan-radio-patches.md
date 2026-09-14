@@ -1,8 +1,50 @@
 # plan-radio-patches — a patch selector for `/radio1965/`, and where its sound went
 
-> ⚠️ **NOTHING IN THIS FILE IS BUILT.** No page, module, definition or harness
-> has been changed. Every number below is read off a file or a URL that is cited
-> beside it, and **not one of these patches has been heard by anybody.**
+> ✅ **§2 IS BUILT (2026-09-14). §0.3 IS NOT, ON PURPOSE. §3 IS NOT.**
+> Read this before the body, which is still written as a proposal throughout.
+>
+> **Built:** the six patches of §2, as a `createPicker` row in
+> `demo/radio1965/index.html`, replacing both the `material` and the `chord`
+> choice rows. 33/33 green (`node demo/verify.mjs radio1965`), up from 31/31 —
+> the two new checks read the patch back off scsynth with `/s_get`, `/s_getn`
+> and `/b_getn`, and both were proved by sabotage rather than by passing.
+>
+> **Not built, and the decision is recorded rather than deferred:** §0.3's
+> `mbuflen 60`. Its diagnosis is right and is honoured — every patch holds the
+> buffer at the ONE length this page records, so none can open onto a hole — but
+> the value is **8, not 60**. At 60 the ring takes a full minute to fill before
+> the granulator sounds like itself, and this page holds every assert to one
+> burst at the end, so the burst would land outside `verify.mjs`'s 30 s
+> first-assert ceiling and the page would report **nothing** while working. The
+> long comment above `PATCHES` in the page carries the arithmetic and what the
+> shorter buffer costs. §3's measurement gate is untouched.
+>
+> **Corrected while building — the numbers below were never run:**
+> · **The names are shorter**, because a picker cell is 13 characters wide:
+> `slow tide` · `stutter` · `held still` · `backwards` · `roof rain` ·
+> `piled up`.
+> · **`slow tide` carries the seventh chord `[0, 4, 7, 10]`.** Every chord in
+> §2 is root-and-fifth in octaves — not one has a third or a seventh — so
+> absorbing the `chord` row as written would have deleted the one sound the
+> owner named and liked.
+> · **Every scan, spray and size is recomputed for an 8-second buffer.**
+> `stutter`'s `mspray 0.012` becomes **0.09** for the same ±180 ms (spray is a
+> fraction of the WINDOW); `held still`'s window becomes `0.30 … 0.70` of eight
+> rather than `0.35 … 0.40` of sixty, and its `mscan` **0.36** rather than 0.55,
+> since `speed = winspan × (3·mscan − 1)` and the plan's value gave 0.26× where
+> it claimed 0.03×. Grain lengths cap at 2.6 s, not 6.
+> · **`noisetype` DUST is 3.** `Select.ar((noisetype−1).clip(0,2), [white,
+> pink, dust])` (`Engine_Pappus.sc:1784`); the plan named the mode and never the
+> number.
+> · **`mtilt` is baked into the RECORDING** (`:617–621`, the shelves sit on
+> `capl`/`capr` before `BufWr`), so it reaches only audio recorded after the
+> press — and under `mlock 1` it is inert entirely. Nothing in §2 says so.
+> · **`sfb`, `rtime` and `msos` are moderated** (feedback ≤ 0.50, reverb ≤ 0.72,
+> `piled up` at `msos 0.90` with `ingain 0.70` rather than 0.95 at 1.0), because
+> the write clips at ±1 and none of this had been heard.
+> · **Probabilities below 1 make the grain rate stochastic**, so the patch this
+> page OPENS on has `probs` all ones — otherwise its own arithmetic assert
+> flaps. The other five thin freely.
 
 Live page today: <https://positron.studio/radio1965/?decode=1>
 
