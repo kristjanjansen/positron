@@ -382,7 +382,19 @@ button.pos-pri[data-busy="1"] {
   color: var(--dim); white-space: nowrap;
 }
 .tbar-rates { flex: none; display: flex; gap: 4px; }
-.tbar-rates button { padding: 5px 7px; font-size: 11px; }
+/* ⚠️ NEVER NARROWER THAN TALL. `0.5x` is four characters and `1x` is two, so
+   padding alone gave a row of buttons that stepped from wide to narrow and
+   read as three different kinds of control. A square is the floor; anything
+   longer grows past it. MEASURED rather than derived: the buttons are 34 px
+   tall, `0.5x` is 42.5 wide and `1x`/`2x` are 29.3 — so only the short ones
+   move. ⚠️ Re-measure if the bar's type size or padding changes; a floor
+   written as arithmetic over four other values looks more rigorous and is one
+   font change away from being wrong in a way nobody thinks to check. */
+.tbar-rates button {
+  padding: 5px 7px; font-size: 11px;
+  min-width: 34px;          /* = the measured height, so the floor is a square */
+  text-align: center;
+}
 /* the armed rate has to be findable at a glance, so it gets a fill as well as
    an edge — colour alone on a 30 px button in a row of five reads as noise */
 .tbar-rates button[aria-pressed="true"] {
