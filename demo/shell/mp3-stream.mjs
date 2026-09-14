@@ -56,7 +56,7 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   const splitter = createFrameSplitter();
   const st = {
     path: 'starting', rate: 1, bytes: 0, frames: 0, decoded: 0, blocks: 0,
-    underruns: 0, skipped: 0, errors: 0, sampleRate: 0, channels: 0, startedAt: 0,
+    underruns: 0, skipped: 0, dropped: 0, errors: 0, sampleRate: 0, channels: 0, startedAt: 0,
   };
   let stopped = false, decoder = null, ac = null;
   /**
@@ -73,7 +73,34 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
    * both are the price of the gesture, and the page shows both numbers rather
    * than hiding a limit it cannot remove.
    */
-  let rate = 1;
+  let rate = 1;         // what the block being scheduled starts at
+  let target = 1;        // where the listener asked to be
+  const GLIDE = 1.10;    // per block, so the climb is a constant RATIO
+  /**
+   * 🔴 SIX MILLISECONDS OF CROSSFADE AT EVERY SEAM, AND IT IS NOT DECORATION.
+   * Blocks are separate `AudioBufferSourceNode`s butted end to end, and three
+   * things make that join discontinuous: each node resamples 44.1k into a 48k
+   * context with its OWN interpolation phase, `playbackRate` is ramping across
+   * the block, and the catch-up correction changes it per block. REPORTED as
+   * "0.5 has real clicks in sound" — and MEASURED with `underruns: 0` through
+   * the whole run, which is what rules out starvation and leaves the seam.
+   *
+   * ⚠️ A FADE WITHOUT AN OVERLAP WOULD BE WORSE. Fading each block in and out
+   * in place guarantees continuity and digs an amplitude notch at every join —
+   * four per second, heard as flutter. Overlapping means 6 ms where two
+   * consecutive pieces sound together, which is a smear nobody can hear rather
+   * than a click everybody can.
+   */
+  const XFADE = 0.006;
+  /**
+   * How far ahead the queue may run before arriving audio is DROPPED.
+   * At 0.125x the queue grows about seven seconds per second, so without a
+   * ceiling this schedules unbounded nodes and holds unbounded memory. Thirty
+   * seconds is a generous window of slowed radio; past it the stream has to
+   * give something up, and it says so.
+   */
+  const MAX_AHEAD = 30;
+  const live = new Set();
   let pending = [];                  // Float32Array[channel][] awaiting a block
   let pendingLen = 0;                // frames (samples per channel) in `pending`
   let nextAt = 0;                    // context time the next block starts at
@@ -83,10 +110,18 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   /** Schedule one AudioBuffer end to end with whatever is already queued. */
   function schedule(buf) {
     if (stopped) return;
+    // Past the ceiling there is nowhere to put this. Dropping ARRIVING audio
+    // skips forward in the source; it does not leave a silence.
+    if (nextAt - ctx.currentTime > MAX_AHEAD) { st.dropped++; return; }
+
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    src.connect(node);
-    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    src.connect(g); g.connect(node);
+    live.add(src);
+    src.onended = () => { live.delete(src); try { g.disconnect(); } catch { /* gone */ } };
+
+
     // 🔴 THE CUSHION, AND RUNNING DRY IS A COUNTER RATHER THAN A GUESS.
     // If the queue has fallen behind the clock there is nothing to do but
     // restart ahead of it — but that is a DROPOUT, and this repo has already
@@ -116,21 +151,70 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     // ⚠️ IT IS COUNTED, because a stage that silently discards audio is exactly
     // the defect LESSONS #52 is about — a stream that measured bit-clean while
     // `pcm-playout` trimmed 15 ms mid-note, with no counter any page displayed.
-    // ⚠️ AND THE LATENCY CAP ONLY APPLIES TO THE OPENING BURST. Icecast hands a
-    // new listener several seconds faster than realtime and then settles to
-    // realtime, so a queue that is too long is a start-up condition, not a
-    // steady state. Trimming it later means DROPPING AUDIO mid-listen — a hole
-    // by construction, for a latency problem that has already stopped growing.
-    // Measured: with the cap running throughout, `skipped` kept incrementing
-    // long after the burst had passed.
-    if (!st.blocks && nextAt - now > ceilingMs / 1000) {
+    // 🔴 THE BURST IS TRIMMED DURING A START-UP WINDOW, NOT "BEFORE THE FIRST
+    // BLOCK". Restricting it to `!st.blocks` looked right and never fired:
+    // Icecast's several seconds arrive in the second AFTER the first block is
+    // scheduled, so the cap was always asked too early. MEASURED: `buffered`
+    // sat at **4.5 s for the whole run**, with `skipped: 0` — permanently that
+    // far behind the station, and every speed change inaudible until 4.5 s of
+    // already-scheduled audio had played out.
+    //
+    // ⚠️ Trimming LATER is what tears holes mid-listen, so the window is short
+    // and closes for good. Inside it nobody is listening yet; outside it the
+    // drift correction below does the work without dropping anything.
+    const startingUp = !st.blocks || (ctx.currentTime - st.startedAt) < 4;
+    if (startingUp && nextAt - now > ceilingMs / 1000) {
       st.skipped++;
       nextAt = now + floorMs / 1000;
     }
+    // 🔴 THE SPEED CLIMBS, IT DOES NOT JUMP — and the arithmetic for it is
+    // exact rather than approximate. Step this block's end rate a fixed RATIO
+    // toward the target (a constant ratio is what reads as a smooth climb; a
+    // constant increment crawls at the bottom and leaps at the top), then ramp
+    // `playbackRate` linearly across the block.
+    //
+    // ⚠️ A RAMPING RATE BREAKS `duration / rate`, WHICH IS WHY THIS IS WORTH
+    // WRITING DOWN. The wall time T to consume D seconds of media while the
+    // rate goes linearly from r0 to r1 satisfies ∫rate dt = D, so
+    // T·(r0+r1)/2 = D and **T = 2D/(r0+r1)**. That is exact, not a small-change
+    // approximation — get it wrong and the queue drifts against the clock and
+    // starts tearing the holes this file already has a section about.
+    // 🔴 AND A STANDING QUEUE IS CORRECTED BY PLAYING FRACTIONALLY FASTER,
+    // NEVER BY DROPPING. Once the start-up window has closed, any excess
+    // latency is drained with a speed correction of at most 2% — far under the
+    // ~6% where a pitch change becomes noticeable, and it costs no audio at all.
+    // This is what every streaming player does and it is strictly better than a
+    // hole: the listener loses nothing, they just catch up.
+    const excess = (nextAt - now) - floorMs / 1000;
+    const corr = startingUp ? 1
+      : Math.max(0.99, Math.min(1.02, 1 + excess * 0.02));
+
+    const r0 = rate;
+    const want = target * corr;
+    const r1 = want > r0 ? Math.min(want, r0 * GLIDE)
+             : want < r0 ? Math.max(want, r0 / GLIDE)
+             : r0;
+    const T = (2 * buf.duration) / (r0 + r1);
+    rate = r1;
+    // ⚠️ REPORT WHAT WAS ASKED FOR, NOT THE CORRECTION. `rate` carries a
+    // fraction of a percent of catch-up that nobody chose and nobody can hear;
+    // printing it as the speed would make a control that reads 1.004 when the
+    // listener pressed 1.
+    st.rate = target;
+    st.playing = Number(r1.toFixed(3));
+
+    src.playbackRate.setValueAtTime(r0, nextAt);
+    if (r1 !== r0) src.playbackRate.linearRampToValueAtTime(r1, nextAt + T);
+
+    // in, hold, out — and the next block starts XFADE before this one ends
+    const xf = Math.min(XFADE, T / 3);
+    g.gain.setValueAtTime(st.blocks ? 0 : 1, nextAt);
+    if (st.blocks) g.gain.linearRampToValueAtTime(1, nextAt + xf);
+    g.gain.setValueAtTime(1, nextAt + T - xf);
+    g.gain.linearRampToValueAtTime(0, nextAt + T);
+
     src.start(nextAt);
-    // The buffer OCCUPIES more or less wall time than it holds, so the clock
-    // has to advance by what was actually consumed — not by the duration.
-    nextAt += buf.duration / rate;
+    nextAt += T - xf;
     st.blocks++;
     if (st.blocks === 1) { st.startedAt = nextAt; resolveStarted(st.path); }
   }
@@ -278,11 +362,39 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   return {
     node,
     started,
-    /** 0.25 .. 2. Takes effect on the next block, never on one already playing. */
+    /**
+     * 0.25 .. 2, and it takes effect AT ONCE.
+     *
+     * 🔴 SETTING THE RATE ALONE MADE THE CHANGE ARRIVE MINUTES LATER. A new rate
+     * only applies to blocks scheduled AFTER it, and there is always a queue —
+     * worse, at 0.25x every queued block takes four times as long to play, so
+     * the backlog ahead of the change stretches with it. Reported as "changing
+     * speeds taking forever", and it was: seconds of already-scheduled audio had
+     * to drain at the OLD speed first, and at a slow rate that drain got slower.
+     *
+     * So the queue is thrown away and rebuilt. ⚠️ That is a deliberate
+     * discontinuity — a click, and a small gap while the cushion refills — which
+     * is the honest cost of a control that responds. A rate change the listener
+     * cannot hear for ten seconds is not a control.
+     */
+    /**
+     * Ask for a speed. The stream CLIMBS to it over about a second.
+     *
+     * 🔴 AN EARLIER VERSION SET THE RATE AND WAITED, AND THE CHANGE ARRIVED
+     * MINUTES LATER. A new rate only applies to blocks scheduled after it, and
+     * at 0.25x every queued block takes four times as long to drain — so the
+     * backlog ahead of the change stretched with it. Reported as "changing
+     * speeds taking forever", and it was.
+     *
+     * The fix after that threw the queue away, which worked and cost a click and
+     * a gap. This one needs neither: the ramp is applied per block as the queue
+     * is BUILT, so the only delay is the cushion — about half a second — and
+     * what you hear is a tape coming up to speed rather than a cut.
+     */
     setRate(r) {
-      rate = Math.max(0.1, Math.min(4, Number(r) || 1));
-      st.rate = rate;
-      return rate;
+      target = Math.max(0.1, Math.min(4, Number(r) || 1));
+      st.target = target;
+      return target;
     },
     stats: () => ({
       ...st,
