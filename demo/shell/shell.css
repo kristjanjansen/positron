@@ -387,15 +387,14 @@ button.pos-pri[data-busy="1"] {
    which is the thing the component exists to stop. */
 .tbar-rates { flex: none; display: flex; }
 /* A live source has no clock worth printing — see the note in transport-bar.mjs.
-   `min-width` so the word changing between LIVE and SLOWED cannot move the row
-   it sits in (CLAUDE.md: nothing that updates may change how much room it
-   takes). */
+   The word never changes now (it briefly alternated with SLOWED, which said what
+   the rate buttons beside it already say), so `min-width` is only a stable slot
+   where the time readout used to sit rather than a guard against reflow. */
 .tbar-live {
   flex: none; min-width: 52px; text-align: center;
   font: 500 10px/1 var(--mono); letter-spacing: .12em;
   color: var(--hi); margin-right: auto;
 }
-.tbar-live[data-slow="1"] { color: var(--dim2); }
 .tbar[data-scrub="1"] .tbar-live { margin-right: 0; }
 /* ⚠️ NEVER NARROWER THAN TALL. `0.5x` is four characters and `1x` is two, so
    padding alone gave a row of buttons that stepped from wide to narrow and
@@ -796,6 +795,20 @@ video[hidden] { display: none; }
      survived a screenshot. `:hover` already had this; the armed state did not. */
   position: relative;
   z-index: 1;
+}
+/* PRESSED, NOT YET ARRIVED — see `pending()` in choice.mjs. The pulse is on
+   OPACITY ALONE. CLAUDE.md: nothing that redraws may change how much room it
+   takes, so a border width, a font weight or a letter-spacing pulse is out —
+   each of them shuffles the buttons either side. Colour is already spoken for
+   (armed is yellow, focus is grey), which is why this is neither. */
+@keyframes pos-choice-pending { 50% { opacity: .38; } }
+.pos-choice button[data-pending="1"] {
+  animation: pos-choice-pending 640ms ease-in-out infinite;
+}
+/* ⚠️ A PULSE IS MOTION AND SOMEBODY HAS TURNED MOTION OFF. The state still has
+   to be visible, so it holds the dim end rather than vanishing. */
+@media (prefers-reduced-motion: reduce) {
+  .pos-choice button[data-pending="1"] { animation: none; opacity: .55; }
 }
 /* Focus is grey here and nowhere near the armed colour — one colour, one
    meaning, which is the rule this project already applies to marks in a strip. */

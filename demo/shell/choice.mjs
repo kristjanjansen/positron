@@ -53,11 +53,39 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
     if (!quiet) onPick?.(options[chosen][1], options[chosen][0], chosen);
   }
 
+  /**
+   * Mark one option as PRESSED BUT NOT YET ARRIVED, or `null` for none.
+   *
+   * 🔴 A CONTROL WHOSE EFFECT IS SECONDS AWAY LOOKS BROKEN WITHOUT THIS, and
+   * `/radio1965/` is where it was reported: a speed button lights the moment it
+   * is pressed and the sound takes about a second to get there — 600 ms of
+   * already-scheduled audio plus the glide — so the first thing a listener does
+   * is press it again. REPORTED as *"can we track when 0.5 etc happens and
+   * animate the radiobutton until then?"*, which is the right instinct: the
+   * wait is real and cannot be removed, so show the end of it.
+   *
+   * ⚠️ IT IS A SEPARATE CHANNEL FROM `aria-pressed`, deliberately. Chosen and
+   * arrived are two different facts — the button IS the armed one throughout —
+   * and collapsing them would make a pressed button appear unpressed while the
+   * sound catches up, which is a worse lie than the one being fixed.
+   *
+   * ⚠️ THE ANIMATION MOVES OPACITY AND NOTHING ELSE (`shell.css`). CLAUDE.md:
+   * nothing that redraws may change how much room it takes — a pulse on a
+   * border width or a font weight would shuffle the row it sits in.
+   */
+  function pending(i) {
+    buttons.forEach((b, k) => {
+      if (i != null && k === i) b.dataset.pending = '1';
+      else delete b.dataset.pending;
+    });
+  }
+
   return {
     el: wrap, buttons,
     get: () => chosen,
     value: () => options[chosen][1],
     set,
+    pending,
     disabled: (yes) => buttons.forEach((b) => { b.disabled = !!yes; }),
   };
 }

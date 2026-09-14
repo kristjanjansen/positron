@@ -109,14 +109,45 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
    * a quarter-second, so 1.10 each is 1.46x a second — and 1x down to 0.125x is
    * a factor of eight, which took **five and a half seconds** of climbing on top
    * of the cushion still draining at the old speed. REPORTED as *"why rate
-   * change is so slooooooooow"*. At 4x a second the same journey is 1.5 s, still
-   * plainly a glide rather than a cut.
+   * change is so slooooooooow"*, fixed to 4x a second, and REPORTED AGAIN as
+   * *"can we speed change up?"*.
+   *
+   * 🔴 SO HERE IS THE WHOLE BUDGET, BECAUSE THE GLIDE IS NOW THE SMALLER HALF
+   * AND RAISING IT FURTHER BUYS ALMOST NOTHING. A press costs:
+   *
+   *   the cushion   `floorMs` = 600 ms of audio already scheduled at the old
+   *                 speed. A scheduled `AudioBufferSourceNode` has its rate
+   *                 curve written; the only way to shorten this is to throw the
+   *                 queue away, which an earlier version did and paid for in a
+   *                 click and a gap.
+   *   the glide     log(factor) / log(GLIDE_PER_SEC) seconds.
+   *
+   * At 4/s, 1x -> 0.125x was 1.5 s of glide on 0.6 s of cushion. At 16/s it is
+   * **0.75 s**, and 1x -> 0.5x is 0.25 s. Going to 64/s would save another
+   * 0.37 s of a 1.35 s total and stop sounding like a tape coming up to speed,
+   * which is the thing the ramp is for.
+   *
+   * ⚠️ WHAT IS LEFT IS THE CUSHION, AND IT IS SHOWN RATHER THAN SHORTENED —
+   * `arriveAt` below, which the rate button pulses until. A wait somebody can
+   * see the end of is a different experience from the same wait in silence.
    *
    * ⚠️ PER SECOND IS ALSO THE RIGHT UNIT, not a tuned number. Per block, the
    * speed of the gesture depended on `blockMs` — change the block size for an
    * unrelated reason and the control changes character with it.
    */
-  const GLIDE_PER_SEC = 4;
+  const GLIDE_PER_SEC = 16;
+  /**
+   * 🔴 WHEN THE ARMED SPEED WILL BE HEARD, WHICH IS NOT WHEN IT WAS SET. The
+   * context time at which the first block that actually reaches the target
+   * begins to sound. Everything between the press and this instant is the
+   * cushion draining at the old speed — real, unavoidable and, until now,
+   * indistinguishable from a control that did nothing.
+   *
+   * ⚠️ `0` RATHER THAN `Infinity` AT REST. Starting it at `Infinity` would say
+   * "still settling" before a single block had been scheduled, so a page would
+   * open with its rate button already pulsing at a speed nobody asked for.
+   */
+  let arriveAt = 0;
   /**
    * 🔴 SIX MILLISECONDS OF CROSSFADE AT EVERY SEAM, AND IT IS NOT DECORATION.
    * Blocks are separate `AudioBufferSourceNode`s butted end to end, and three
@@ -288,6 +319,11 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     const xfIn = toWall(tailSec);
     const xfOut = toWall(tails ? XFADE : 0);
     rate = r1;
+    // The glide is over the moment the clamp stops biting — `r1 === want` is
+    // exact rather than a tolerance, which matters because `want` carries the
+    // catch-up correction and so is never quite `target`. This block's `nextAt`
+    // is when that speed starts to sound.
+    if (r1 === want && arriveAt === Infinity) arriveAt = nextAt;
     // ⚠️ REPORT WHAT WAS ASKED FOR, NOT THE CORRECTION. `rate` carries a
     // fraction of a percent of catch-up that nobody chose and nobody can hear;
     // printing it as the speed would make a control that reads 1.004 when the
@@ -558,14 +594,25 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
       // see turns a rate button into one that plays at a different speed from
       // the one written on it — the two slowest options would have sounded
       // nearly identical, which reads as a broken control rather than a clamp.
+      const was = target;
       target = Math.max(0.05, Math.min(4, Number(r) || 1));
       st.target = target;
+      // ⚠️ ONLY ON A REAL CHANGE. `setRate` is called from a poll and from the
+      // bar's own handler, so re-arming the arrival on every call would keep a
+      // page permanently "settling" at a speed it reached a minute ago.
+      if (target !== was) arriveAt = Infinity;
       return target;
     },
     stats: () => ({
       ...st,
       buffered: Math.max(0, nextAt - ctx.currentTime),
       pendingBytes: splitter.pending,
+      // Is the armed speed audible yet? See `arriveAt`. `arriveIn` is null
+      // while the glide is still running, because the answer is not known until
+      // the block that reaches the target has been scheduled — and a made-up
+      // countdown is worse than none.
+      settling: ctx.currentTime < arriveAt,
+      arriveIn: Number.isFinite(arriveAt) ? Math.max(0, arriveAt - ctx.currentTime) : null,
     }),
     /**
      * What the connection itself did — status, ICY headers, arrival gaps, and

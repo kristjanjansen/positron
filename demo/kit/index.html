@@ -197,6 +197,34 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
       box.append(c.el, o);
     });
 
+  // ── a choice that has not arrived yet ───────────────────────────────────
+  section('a choice whose effect is a second away — pending()',
+    'Some controls act on something that cannot answer immediately. A speed button on a live '
+    + 'stream is the case this was built for: about six tenths of a second of sound is already '
+    + 'scheduled when you press it, so the old speed goes on playing and the button looks broken. '
+    + 'Marking it pending says the press landed and the wait is real; the option stays chosen '
+    + 'throughout, because chosen and arrived are two different facts.',
+    `c.pending(i)   // and c.pending(null) when it lands`,
+    (box) => {
+      const o = out('at 1x');
+      let timer = null;
+      const c = createChoice({
+        label: 'speed',
+        options: [['0.25x', 0.25], ['0.5x', 0.5], ['1x', 1]],
+        at: 2,
+        onPick: (v, name, i) => {
+          o.textContent = `reaching ${name}\u2026`;
+          c.pending(i);
+          clearTimeout(timer);
+          // A stand-in for the real thing, which is an audio clock: see
+          // `arriveAt` in shell/mp3-stream.mjs, where the moment is known
+          // exactly rather than guessed at.
+          timer = setTimeout(() => { c.pending(null); o.textContent = `at ${name}`; }, 900);
+        },
+      });
+      box.append(c.el, o);
+    });
+
   // ── text field ──────────────────────────────────────────────────────────
   section('a line of text — shell/field.mjs',
     'The label sits on top of the box rather than beside it, so a row of fields has one left edge '
