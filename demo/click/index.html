@@ -84,6 +84,19 @@
      ⚠️ It holds a fixed height and scrolls inside itself — a block that grows
      as a longer score is picked would move everything under it, and this one
      sits under a picture that is being watched. */
+  /* ── THEIRS AND OURS, SIDE BY SIDE ───────────────────────────────────
+     The score a composer typed, and the document this page made out of it.
+     Side by side because the claim is a TRANSLATION — the same moment lights
+     in both columns as it plays, and a reader can see that the p-fields
+     crossed unchanged rather than take it on trust.
+     ⚠️ One column on a narrow screen. Two 11 px monospace columns at 400 px
+     total is four characters each, which is not a comparison, it is a pair of
+     ellipses. */
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  @media (max-width: 720px) { .two { grid-template-columns: 1fr; } }
+  .two > div { min-width: 0; }
+  .two h4 { margin: 0 0 6px; font: 600 10px/1 var(--mono); letter-spacing: .1em;
+            text-transform: uppercase; color: var(--dim2); }
   /* ⚠️ NO `margin` HERE. Setting even `margin: 0` overrides the shell's
      `.pos-body > * + *` on source order and collapses the gap above this
      block — which is how this page ended up with 0 · 22 · 4 · 22 px down it. */
@@ -283,9 +296,15 @@ i	"notification"	0	2	"Start"
     // for as long as the piece lasts. One number is paid once; the other is
     // paid per beat, per player.
     readout: { bar: '', beat: '', tempo: 'bpm', late: 'ms', pushed: '', bytes: 'B' },
-    controls: [
-      { id: 'run', label: 'Start', primary: true },
-    ],
+    // ⚠️ NO PAGE-LEVEL START, BECAUSE THE TRANSPORT BAR ALREADY HAS ONE. A
+    // `Start` button above a bar with a ▶ on it is the same verb twice, and the
+    // one further from the picture wins the eye. The controls that remain are
+    // the ones that CHOOSE something rather than run it.
+    // ⚠️ And it does NOT autoplay: a deck starts paused, the bar's ▶ starts it,
+    // and the suite checks exactly that contract — `play advances position`
+    // and `pause holds position` both went red the moment this page played
+    // itself, because the harness's first press then PAUSED it.
+    controls: [],
   });
   guard(d);
 
@@ -345,15 +364,26 @@ i	"notification"	0	2	"Start"
       beat: ['white', 'red', 'greenyellow', 'lightgreen', 'green', 'darkgreen', 'forestgreen'],
     },
     subtle: {
+      // ⚠️ BRIGHTER THAN THE FIRST TRY, AND THAT WAS THE RIGHT CORRECTION.
+      // Reported as "animated dots bit too subtle · keep them nice still", and
+      // both halves are the brief: a lamp on a click track is a SIGNAL somebody
+      // reads from across a rehearsal room, so restraint that costs legibility
+      // is not restraint, it is a broken instrument. What changed is the LIT
+      // end only — the off colours stay dark so the row still reads as three
+      // unlit dots at rest, and the rim stays an edge. The lit colours now sit
+      // near full chroma while keeping their hue, so they are recognisably the
+      // same three lamps rather than the original's pure red and pure green.
       lamp: [
-        { key: 'red', on: '#e0705c', off: '#2a1a17' },
-        { key: 'green', on: '#6fbf9a', off: '#17241f' },
-        { key: 'blue', on: '#7fb3d5', off: '#141d26' },
+        { key: 'red', on: '#ff5a3c', off: '#2a1a17' },
+        { key: 'green', on: '#3fe39a', off: '#17241f' },
+        { key: 'blue', on: '#5ec8ff', off: '#141d26' },
       ],
       // one warm downbeat, then a ramp that cools and dims together, so the
       // order of the beats survives being read at speed and out of the corner
       // of an eye
-      beat: ['#cfd8e3', '#ffb454', '#9fd8c8', '#82c2b2', '#6aab9d', '#589689', '#4a8177'],
+      // the numerals lift with the lamps, for the same reason — the downbeat
+      // has to be findable at a glance and the ramp still has to read as a ramp
+      beat: ['#cfd8e3', '#ffa733', '#7ff0cd', '#63d8b6', '#4fc0a1', '#42a88c', '#3a9079'],
     },
   };
   let themeName = 'subtle';
@@ -413,9 +443,21 @@ i	"notification"	0	2	"Start"
     // once: no reflow to force, no starting style to commit, and a handle that
     // cancels cleanly when the next beat lands on the same lamp.
     e.getAnimations().forEach((a) => a.cancel());
+    // 🔴 A HOLD BEFORE THE DECAY, AND IT IS WHY THE LAMPS READ AT ALL. Their
+    // QML ramps from bright to dark across one beat, so the PEAK is
+    // instantaneous — at 80 bpm the lamp is under half brightness within 300 ms
+    // and a glance almost never lands on the bright part. Reported as "animated
+    // dots bit too subtle". Holding the lit state for the first eighth of a
+    // beat costs nothing in timing (the flash still starts exactly on the beat,
+    // which is the only thing anyone reads a click track for) and turns a peak
+    // into something with a duration.
+    // ⚠️ The decay still fills the whole beat, so the lamp is always back at
+    // rest before the next one — an overlap would make two lamps look lit and
+    // that is a different beat being claimed.
     e.animate(
-      [{ background: L.on, width: '76px', height: '76px' },
-       { background: L.off, width: '22px', height: '22px' }],
+      [{ background: L.on, width: '76px', height: '76px', offset: 0 },
+       { background: L.on, width: '76px', height: '76px', offset: 0.12 },
+       { background: L.off, width: '22px', height: '22px', offset: 1 }],
       { duration: Math.max(60, beatMs), easing: 'linear', fill: 'forwards' },
     );
   }
@@ -625,40 +667,63 @@ i	"notification"	0	2	"Start"
     ],
   });
 
-  // the document itself, under the line that plays it
+  // ── theirs and ours, under the line that plays them ───────────────────
+  const two = el('div', 'two');
+  const srcCol = el('div'), docCol = el('div');
+  srcCol.append(el('h4', '', 'their score'));
+  docCol.append(el('h4', '', 'our document'));
+  const srcPre = el('pre', 'sc');
   const pre = el('pre', 'sc');
-  d.el.append(pre);
-  let lineOfRow = new Map();     // row id -> line index in the document
+  srcCol.append(srcPre); docCol.append(pre);
+  two.append(srcCol, docCol);
+  d.el.append(two);
+  let lineOfRow = new Map();     // row id -> line index in OUR document
+  let srcOfRow = new Map();      // row id -> line number in THEIR score
 
   /** Draw the document, and remember which line each row is on.
    *  ⚠️ Rebuilt only when the SCORE changes; the per-beat path just flips
    *  `data-state` on one element, because rewriting a block of text on every
    *  beat is a reflow on a clock. */
-  function drawDoc() {
-    const lines = scoreDocToJSONL(doc).split('\n').filter(Boolean);
-    lineOfRow = new Map();
-    pre.textContent = '';
+  function drawInto(box, lines) {
+    box.textContent = '';
     lines.forEach((text, i) => {
       const line = el('span', 'sc-l');
-      line.append(el('span', 'sc-n', String(i).padStart(2, ' ') + '  '));
+      line.append(el('span', 'sc-n', String(i + 1).padStart(3, ' ') + '  '));
       line.append(document.createTextNode(text));
-      pre.append(line);
+      box.append(line);
+    });
+  }
+
+  function drawDoc() {
+    // OURS: one JSON object a line, and which line each row is on
+    const lines = scoreDocToJSONL(doc).split('\n').filter(Boolean);
+    lineOfRow = new Map();
+    drawInto(pre, lines);
+    lines.forEach((text, i) => {
       try {
         const o = JSON.parse(text);
         if (o && o.t === 'row' && o.id) lineOfRow.set(o.id, i);
       } catch { /* a line that is not a row is not addressable, and that is fine */ }
     });
+    // THEIRS: the file as the composer typed it, tabs and comments included.
+    // ✅ `csoundPart` keeps each row's `line`, so the two columns can be joined
+    // without this page re-parsing anything — which would be a second reading
+    // of the format, and this repo has paid for one of those already.
+    drawInto(srcPre, SCORES[scoreName].split('\n'));
+    srcOfRow = new Map();
+    for (const r of cp.part.rows) if (r.line) srcOfRow.set(r.id, r.line - 1);
   }
 
   /** Light the line a beat came from. Several beats belong to ONE bar
    *  statement, so the same line lights again — which is the honest picture:
    *  the document has one line there, not four. */
+  function lightOne(box, i) {
+    for (const e of box.children) if (e.dataset.state === 'now') e.dataset.state = 'played';
+    if (i !== undefined && box.children[i]) box.children[i].dataset.state = 'now';
+  }
   function lightRow(id) {
-    const i = lineOfRow.get(id);
-    if (i === undefined) return;
-    const els = pre.children;
-    for (const e of els) if (e.dataset.state === 'now') e.dataset.state = 'played';
-    if (els[i]) els[i].dataset.state = 'now';
+    lightOne(pre, lineOfRow.get(id));
+    lightOne(srcPre, srcOfRow.get(id));
   }
 
   /** The per-lane numbers, in the lane's own gutter rather than in a table. */
@@ -696,8 +761,12 @@ i	"notification"	0	2	"Start"
     onPick: (id) => { themeName = id; paintTheme(); d.log(`theme: ${id}`); },
   });
   op.append(pick.el, el('label', '', 'Start from'), stepper.el, barLabel, themePick.el);
+  // ⚠️ FIRST IN THE BODY, not last. These pick WHAT you are looking at, so they
+  // belong above the thing rather than under it — a chooser below its own
+  // result is a control you find after you have stopped looking for it.
+  d.el.prepend(op);
   const warn = el('p', 'warn', '');
-  d.el.append(op, warn);
+  d.el.append(warn);
 
   /** Where in the piece a bar number starts.
    *
@@ -723,11 +792,6 @@ i	"notification"	0	2	"Start"
     deck.seek(at);
     d.log(`bar ${startBar} is ${Math.round(at)} ms in`, 'hi');
   }
-
-  d.on('run', () => {
-    deck.play();
-    d.log(`playing ${scoreName} from ${Math.round(deck.position())} ms`, 'hi');
-  });
 
   build();
   seekBar();
@@ -801,7 +865,7 @@ i	"notification"	0	2	"Start"
         || new URL(r.name, location.href).pathname.startsWith('/timeline/')),
     `${performance.getEntriesByType('resource').length} resources, all local code`);
 
-  d.log('press Start — or step the bar, or drag the strip', 'hi');
+  d.log('press \u25b6 on the bar \u2014 or step the bar number to start anywhere', 'hi');
   d.ready();
 </script>
 </html>
