@@ -272,34 +272,28 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         let mx = fullScale ?? 0;
         if (!fullScale) for (const s of scroll) if (s.v > mx) mx = s.v;
         const k = mx > 0 ? (H * 0.44) / mx : 0;
-        const coloured = scroll.some((s) => s.tone != null);
-        if (coloured) {
-          // 🔴 COLOUR IS A SECOND MEASUREMENT, NOT DECORATION. Height is how
-          // loud; hue is WHERE THE ENERGY SITS. A flat grey wave cannot tell a
-          // cymbal from a bass note at the same level, and on a station playing
-          // improvisation that is most of what is happening.
-          //
-          // ⚠️ INSIDE A BOUNDED BAND ON `--hi`, NEVER A RAINBOW — the same rule
-          // the test picture follows. A full spectrum turns a measurement into
-          // a light show and stops meaning anything; ~95° of one band stays
-          // readable, stays legible to anyone who cannot separate red from
-          // green, and still separates a rumble from a hiss at a glance.
-          for (let i = 0; i < scroll.length; i++) {
-            const s = scroll[i];
-            const x1 = X(s.t), x2 = i + 1 < scroll.length ? X(scroll[i + 1].t) : x1 + 1;
-            const h = Math.max(0.5, s.v * k);
-            const hue = 15 + (s.tone ?? 0.5) * 95;
-            ctx.fillStyle = `hsl(${hue} 78% ${38 + (s.tone ?? 0.5) * 18}%)`;
-            ctx.fillRect(x1, mid - h, Math.max(1, x2 - x1), h * 2);
-          }
-        } else {
+        // 🔴 ONE GREY, AND IT IS NOT A STYLE CHOICE — THE SAME RULE `floor`
+        // FOLLOWS AND FOR THE SAME REASON. There was a hue-mapped wave here:
+        // height for loudness, hue for where the energy sits, bounded to ~95
+        // degrees of `--hi` rather than a rainbow. The argument was a good one —
+        // a flat grey wave cannot tell a cymbal from a bass note at the same
+        // level — and it is not the argument that was being had. The repo owner
+        // asked for the original monochrome back, twice, and a second
+        // measurement nobody asked for is a second measurement nobody asked for
+        // however well it is reasoned.
+        //
+        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/radio1965/index.html`
+        // contains no colour at all — one `theme-color` meta and nothing else —
+        // because the hue lived in this shared kit, switched on merely by the
+        // data carrying a `tone` field. Looking at the page that showed it would
+        // never have found it. If colour comes back here it needs a flag the
+        // PAGE sets by name, not a field that turns it on by being present.
         ctx.beginPath();
         ctx.moveTo(X(scroll[0].t), mid);
         for (const s of scroll) ctx.lineTo(X(s.t), mid - s.v * k);
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
-        }
         // the grains, on the same seconds the wave is drawn on
         if (grainSeconds) {
           for (let i = live.length - 1; i >= 0; i--) {
