@@ -88,7 +88,15 @@
   // ⚠️ 300 slots for 298 films, so two of them appear twice. Said out loud
   // because the alternative is two holes in an infinite floor, which reads as
   // something failing to load rather than as an archive being the size it is.
-  const COLS = 15, ROWS = 20;
+  // 🔴 THE PERIOD HAS TO BE BIGGER THAN WHAT YOU CAN SEE, AND IT WAS NOT.
+  // MEASURED: at 15 x 20 the period is 25.2 m, so a tile jumps to its other
+  // copy at 12.6 m from the gaze — where the fade (9 m to 16 m) still has it at
+  // **alpha 0.48**. Half-visible pictures teleporting across the floor as you
+  // turn is exactly "erratic". 21 x 28 puts the jump at 17.6 m, past the 16 m
+  // where a tile is already gone, so no wrap is ever witnessed.
+  // ⚠️ The cost is slots, not work: 588 of them, so each film appears about
+  // twice — and only the ~192 with a texture are ever drawn, which is unchanged.
+  const COLS = 21, ROWS = 28;
   const TILE_H = TILE_W * 0.75;
   const TEX_W = 256, TEX_H = 192;
   // 🔴 A FIXED NUMBER OF TEXTURE SLOTS, AND IT IS WHY THIS DRAWS IN ONE CALL.
@@ -383,6 +391,9 @@
   // ── where you are ───────────────────────────────────────────────────────
   const eye = [0, 1.65, 5.0];   // back a little, because the tiles got bigger
   let yaw = 0, pitch = -0.62;
+  // where the pointer has asked the camera to be; `yaw`/`pitch` follow it
+  let yawT = 0, pitchT = -0.62;
+  const LOOK_RATE = 9;          // ~110 ms to settle — a follow, not a lag
   const look = () => [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 
   /** Where the gaze meets the floor — the centre the loading spreads from. */
@@ -728,8 +739,14 @@
     // follow the hand: drag right and the floor goes right, which turns the
     // view LEFT. Moving the camera with the drag is the opposite of what the
     // cursor promises, and it is the sort of wrong only findable by using it.
-    yaw -= (e.clientX - lastX) * 0.004;
-    pitch = Math.max(-1.45, Math.min(0.5, pitch + (e.clientY - lastY) * 0.004));
+    // ⚠️ HALF THE RATE, AND IT SETS A TARGET RATHER THAN THE ANGLE. At 0.004
+    // rad/px a 250 px drag swung the view 57 degrees, which on a floor of
+    // pictures is a lurch; and writing the angle straight from the pointer puts
+    // every bit of mouse and trackpad noise directly into the camera. The
+    // pointer moves a TARGET and the camera eases toward it, so the floor has
+    // the weight of something being turned rather than something being nudged.
+    yawT -= (e.clientX - lastX) * 0.0021;
+    pitchT = Math.max(-1.45, Math.min(0.5, pitchT + (e.clientY - lastY) * 0.0021));
     lastX = e.clientX; lastY = e.clientY;
   });
   wrap.addEventListener('pointerup', (e) => {
@@ -797,6 +814,12 @@
       if (Math.hypot(panTo[0] - eye[0], panTo[1] - eye[2]) < 0.02) panTo = null;
     }
     lastDt = dt;
+    // the camera follows where the pointer asked it to be
+    {
+      const kk = Math.min(1, dt * LOOK_RATE);
+      yaw += (yawT - yaw) * kk;
+      pitch += (pitchT - pitch) * kk;
+    }
     gaze = gazePoint();
     rewrap();
     placeSound();
@@ -1067,7 +1090,10 @@
     // the gaze in a headset is where the HEAD points, which is the thing the
     // loading order is supposed to follow
     const hd = norm([-head[8], -head[9], -head[10]]);
-    yaw = Math.atan2(hd[0], -hd[2]); pitch = Math.asin(Math.max(-1, Math.min(1, hd[1])));
+    // ⚠️ IN A HEADSET THE HEAD IS THE TRUTH — no easing, no target. Smoothing a
+    // head pose is motion sickness: the world would lag behind the neck.
+    yaw = yawT = Math.atan2(hd[0], -hd[2]);
+    pitch = pitchT = Math.asin(Math.max(-1, Math.min(1, hd[1])));
     // in a headset the gaze IS the input, so the hover is taken from the head
     // every frame rather than from a pointer that does not exist
     setHover(pickFloor([eye[0], eye[1], eye[2]], hd));
@@ -1177,6 +1203,17 @@
     d.assert('loading starts where you are looking and spreads outwards',
       asked.length > 0 && asked.every((i) => wanted.includes(i)),
       `${asked.length} asked, all within the ${asked.length} nearest to the gaze`);
+  }
+  // 🔴 THE WRAP MUST NEVER BE WITNESSED. A tile jumps to its other copy at half
+  // the period from the gaze; if that is inside the fade, half-visible pictures
+  // teleport across the floor as you turn — measured at alpha 0.48 before this
+  // was widened, and reported as "erratic". The invariant is one comparison and
+  // it guards four constants that are edited independently: change the tile
+  // size, the columns, the rows or the radius and this is what notices.
+  {
+    const half = Math.min(PERIOD_X, PERIOD_Z) / 2;
+    d.assert('a tile only changes copy where nothing can see it', half > LOAD_RADIUS,
+      `wraps at ${half.toFixed(1)} m, invisible from ${LOAD_RADIUS} m`);
   }
   d.assert('the whole floor is one draw call', true, '1 instanced draw of up to 128 tiles');
   {
