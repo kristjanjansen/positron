@@ -51,7 +51,7 @@
   // a black line between two distortions. Make the quad the picture's own shape
   // and the grid tiles EXACTLY — no gap to choose, nothing stretched, and the
   // floor reads as one surface rather than as a spreadsheet.
-  const TILE_W = 0.56;
+  const TILE_W = 1.12;          // 2x — a newsreel frame you can read, not a contact sheet
   const TILE_H = TILE_W * 0.75;
   const TEX_W = 256, TEX_H = 192;
   // 🔴 A FIXED NUMBER OF TEXTURE SLOTS, AND IT IS WHY THIS DRAWS IN ONE CALL.
@@ -69,8 +69,11 @@
   // it was: a hard silhouette wherever the loader happened to have got to, which
   // changes shape as you look around. A ragged edge that is fully transparent
   // by the time it is reached has no shape to be ragged.
-  const LOAD_RADIUS = 11;       // metres — beyond this nothing is even requested
-  const FADE_FROM = 6.5;        // and from here it is already on its way out
+  // ⚠️ BOTH RADII SCALED WITH THE TILE. They are in METRES, so doubling the
+  // tile without doubling these would have quartered how many pictures are in
+  // the ring — the floor would look the same size and hold four times less.
+  const LOAD_RADIUS = 22;       // metres — beyond this nothing is even requested
+  const FADE_FROM = 13;         // and from here it is already on its way out
   const CONCURRENT = 8;         // image fetches in flight
 
   const d = mount({
@@ -206,6 +209,7 @@
   uniform sampler2DArray uTex;
   uniform sampler2D uVid;
   uniform vec4 uCrop;     // still inset x,y then video inset x,y — 0..0.5
+  uniform float uDim;     // 0..1 — how much the floor has stood down
   out vec4 frag;
   // 🔴 CROP THE BANDS OFF RATHER THAN SHOW THEM. The scans and the masters both
   // carry black down the sides — real, in the material, and not something a
@@ -238,6 +242,17 @@
     // under. Applied AFTER the video mix, so a film fading in over its own still
     // does not change colour space halfway.
     c = vec3(dot(c, vec3(0.299, 0.587, 0.114)));
+    // 🔴 WHEN ONE FILM IS PLAYING THE REST OF THE FLOOR STANDS DOWN. A moving
+    // picture in a field of 190 still ones loses to the field — there is more
+    // of it, and motion in the corner of an eye is not enough on its own. So
+    // everything that is not playing dims, SLOWLY: fast would read as a flash,
+    // and this is the floor getting out of the way rather than an event.
+    // WARNING: no backticks in this file's shader strings — they are inside a
+    // JS template literal and one ends the shader mid-sentence. Done twice now.
+    // The 1.0 - vV term is what exempts the playing tile, so the exemption is
+    // the same number that fades the video in: there is no second piece of
+    // state that could disagree about which tile is playing.
+    c *= mix(1.0, 0.24, uDim * (1.0 - clamp(vV, 0.0, 1.0)));
     // the still fades UP from the floor's own colour as it arrives
     frag = vec4(mix(vec3(0.055, 0.066, 0.086), c, clamp(vA, 0.0, 1.0)), 1.0);
   }`;
@@ -263,6 +278,7 @@
   const uFocus = gl.getUniformLocation(prog, 'uFocus');
   const uFade = gl.getUniformLocation(prog, 'uFade');
   const uCrop = gl.getUniformLocation(prog, 'uCrop');
+  const uDim = gl.getUniformLocation(prog, 'uDim');
   const uTexL = gl.getUniformLocation(prog, 'uTex');
   const uVidL = gl.getUniformLocation(prog, 'uVid');
 
@@ -314,7 +330,7 @@
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   // ── where you are ───────────────────────────────────────────────────────
-  const eye = [0, 1.65, 3.2];
+  const eye = [0, 1.65, 5.0];   // back a little, because the tiles got bigger
   let yaw = 0, pitch = -0.62;
   const look = () => [Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)];
 
@@ -336,7 +352,7 @@
   // rebuilt from the CURRENT gaze point every time a slot frees, so turning
   // your head changes what is being fetched rather than what is fetched next
   // after everything already asked for.
-  let inflight = 0, loadedCount = 0, reach = 0;
+  let inflight = 0, loadedCount = 0, reach = 0, dimAmt = 0;
   function pump() {
     if (!tiles.length) return;
     while (inflight < CONCURRENT) {
@@ -484,7 +500,20 @@
 
   // ⚠️ 900 ms TO COMMIT, 2.5 s TO LET GO. The asymmetry is the whole design;
   // see the dwell block in `step()`.
-  const DWELL_MS = 900, AWAY_MS = 2500;
+  // 🔴 ONE TEMPO, AND IT IS A PROJECTOR'S. Everything that moves on this page
+  // moves slowly and on the same clock: a still coming up, a film crossing over
+  // it, the floor standing down, the glide across the disc. The first version
+  // ran at interface speed — 300 ms eases, a 900 ms dwell — and it felt like a
+  // file browser with pictures in it. Archive film has a pace of its own and
+  // the page should not argue with it.
+  // ⚠️ These are RATES, not durations: 1 / RATE is roughly the seconds to
+  // settle. Kept together so "slower" is one edit and not six.
+  const FADE_RATE = 1.1;        // a still arriving           ~0.9 s
+  const VIDEO_RATE = 0.7;       // a film crossing its still  ~1.4 s
+  const FOCUS_RATE = 0.9;       // the lift under your look   ~1.1 s
+  const DIM_RATE = 0.4;         // the floor standing down    ~2.5 s
+  const GLIDE_RATE = 0.9;       // travelling across the disc
+  const DWELL_MS = 1800, AWAY_MS = 4000;
   let hover = -1, dwell = 0, away = 0;
 
   // 🔴 A CLICK TRAVELS; RESTING YOUR LOOK PLAYS. Two verbs that were one, and
@@ -611,7 +640,7 @@
     // the glide, before the gaze is taken — so a frame mid-travel loads and
     // hovers for where the camera IS, not where it was
     if (panTo) {
-      const k2 = Math.min(1, dt * 2.4);
+      const k2 = Math.min(1, dt * GLIDE_RATE);
       eye[0] += (panTo[0] - eye[0]) * k2;
       eye[2] += (panTo[1] - eye[2]) * k2;
       if (Math.hypot(panTo[0] - eye[0], panTo[1] - eye[2]) < 0.02) panTo = null;
@@ -631,7 +660,7 @@
     // stops while you are trying to watch it. Slow to commit, much slower to
     // let go.
     if (hover >= 0 && hover !== playing) dwell = Math.min(DWELL_MS, dwell + dt * 1000);
-    else if (hover !== playing) dwell = Math.max(0, dwell - dt * 1400);
+    else if (hover !== playing) dwell = Math.max(0, dwell - dt * 1100);
     if (dwell >= DWELL_MS && hover >= 0 && hover !== playing) { dwell = 0; playTile(hover); }
     if (playing >= 0) {
       away = (hover === playing) ? 0 : away + dt * 1000;
@@ -645,14 +674,21 @@
     // `?:` binds after the `-` and the `>`, so whether it was the intended
     // expression took working the precedence out by hand. A line nobody can
     // check by looking at it is a line that will be edited wrongly.
-    const k = Math.min(1, dt * 3.2);
-    const ease = (cur, target) => cur + (target - cur) * k;
+    const ease = (cur, target, rate) => cur + (target - cur) * Math.min(1, dt * rate);
+    // ⚠️ A MUCH SLOWER EASE FOR THE DIM — about three seconds to settle. It is
+    // the room lights going down, not a cut, and at the page's own 3.2 rate it
+    // read as the floor flinching.
+    dimAmt = ease(dimAmt, (playing >= 0 && vidReady) ? 1 : 0, DIM_RATE);
     for (let i = 0; i < state.length; i++) {
       const s = state[i];
-      s.a = ease(s.a, (s.img && s.layer >= 0) ? 1 : 0);
-      s.v = ease(s.v, (i === playing && vidReady) ? 1 : 0);
+      s.a = ease(s.a, (s.img && s.layer >= 0) ? 1 : 0, FADE_RATE);
+      // ⚠️ THE FILM CROSSES SLOWER THAN THE STILL ARRIVES. They are different
+      // events: one is a picture appearing where there was none, the other a
+      // dissolve between two pictures of the same thing, and a dissolve that
+      // keeps up with a fade-in reads as a cut.
+      s.v = ease(s.v, (i === playing && vidReady) ? 1 : 0, VIDEO_RATE);
       // the focus lift follows the dwell, and drops the moment it plays
-      s.f = ease(s.f, (i === hover && i !== playing) ? dwell / DWELL_MS : 0);
+      s.f = ease(s.f, (i === hover && i !== playing) ? dwell / DWELL_MS : 0, FOCUS_RATE);
       if (s.f < 0.002) s.f = 0;
       if (s.v < 0.002) s.v = 0;
       if (s.a < 0.002) s.a = 0;
@@ -699,6 +735,7 @@
     gl.uniform2f(uFocus, gaze[0], gaze[1]);
     gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
     gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
+    gl.uniform1f(uDim, dimAmt);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
     gl.bindVertexArray(vao);
@@ -853,6 +890,7 @@
       gl.uniform2f(uFocus, gaze[0], gaze[1]);
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
       gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
+      gl.uniform1f(uDim, dimAmt);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
       gl.bindVertexArray(vao);
