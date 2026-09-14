@@ -75,15 +75,36 @@
                min-height: calc(3 * 34px + 2 * 34px + 4 * 22px); }
   .gran-slot > .pos-choice, .gran-slot > .pos-pick { align-self: flex-start; }
   /* 🔴 SOUND'S LABEL IS IN THE SAME COLUMN AS THE SLIDERS', AND WAS NOT.
-     `.pos-choice` is an inline-flex with an 8 px gap, so its label was as wide
-     as the word SOUND and the stepper started wherever that ended — while every
-     lane below it started at the width of RADIO → GRANULATOR. Two left edges,
-     one above the other, off by about sixty pixels. REPORTED twice with a
-     screenshot. ⚠️ `--lab` is measured on the sliders and handed here, because
-     CSS cannot say "share a track" between siblings (see the note above); the
-     gap goes to 0 or the column is `--lab` PLUS eight. */
-  .gran-slot > .pos-choice { gap: 0; }
-  .gran-slot > .pos-choice > .pos-choice-l { width: var(--lab, max-content); }
+     The row is an inline-flex with an 8 px gap, so its label was as wide as the
+     word SOUND and the stepper started wherever that ended — while every lane
+     below it started at the width of RADIO → GRANULATOR. Two left edges, one
+     above the other, off by about a hundred and eighty pixels. ⚠️ `--lab` is
+     measured on the sliders and handed here, because CSS cannot say "share a
+     track" between siblings (see the note above).
+
+     ⚠️ AND THE GAP IS `--sld-col`, NOT ZERO. That was the third report's OTHER
+     half: `.sld-group` is a grid with a 12 px column gap, so a slider's lane
+     begins at `--lab` PLUS TWELVE — while this row, with its gap zeroed,
+     started at `--lab` exactly. MEASURED by the assert that now guards it:
+     `fader 167 · sliders 167 · sound 155`. The twelve is named in `shell.css`
+     and read from there, because a shared measurement typed into two files is
+     a measurement that will disagree.
+
+     🔴 REPORTED THREE TIMES, AND THE THIRD TIME WAS A DIFFERENT BUG WEARING THE
+     FIRST ONE'S CLOTHES. The fix above was written for `.pos-choice`, and then
+     the row was rebuilt with `createPicker` — `.pos-pick`, a different
+     component with a different label class. `shareLabelColumn()` went on
+     setting `--lab` on the element correctly and NOTHING CONSUMED IT, so the
+     JavaScript half looked right, the comment beside it described a fix that
+     was no longer connected to anything, and the row snapped back to the width
+     of the word SOUND. The `align-self` rule on the line above had been updated
+     for the rename; these two had not. A COMPONENT SWAP MOVES EVERY SELECTOR
+     THAT NAMED THE OLD ONE, and only one of the three got moved.
+     ⚠️ Both are listed now rather than one being deleted, because `/kit/` and
+     other pages still use `.pos-choice` in this slot. */
+  .gran-slot > .pos-choice, .gran-slot > .pos-pick { gap: var(--sld-col); }
+  .gran-slot > .pos-choice > .pos-choice-l,
+  .gran-slot > .pos-pick > .pos-pick-l { width: var(--lab, max-content); }
   .wet-fader, .gran-rows { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
   @media (min-width: 720px) {
     .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
@@ -1573,6 +1594,33 @@
         `mswarm spanned ${(G.lfoMoved?.spread ?? 0).toFixed(3)} of 1 over `
         + `${G.lfoMoved?.got ?? 0} reads under a 2 Hz saw, `
         + `${(G.lfoStill?.spread ?? 0).toFixed(3)} over ${G.lfoStill?.got ?? 0} with it held`);
+      /**
+       * 🔴 ONE LEFT EDGE DOWN THE WHOLE GRANULATOR SLOT, AND THIS ASSERT EXISTS
+       * BECAUSE IT WAS REPORTED THREE TIMES. The first two were the same bug;
+       * the third was a COMPONENT SWAP — the sound row went from `createChoice`
+       * to `createPicker`, and the stylesheet rule that puts its label in the
+       * shared column still named `.pos-choice`. `shareLabelColumn()` kept
+       * setting `--lab` on the right element and nothing consumed it, so the
+       * JavaScript read as correct while the row snapped back to the width of
+       * the word SOUND.
+       *
+       * ⚠️ IT MEASURES THE CONTROLS, NOT THE LABELS. A label is `nowrap` and
+       * sits inside the column; its width says what it WANTS, not where the
+       * column ends. Where the lane actually starts is the thing a reader sees,
+       * so that is the number: the fader's lane, the first slider's lane and
+       * the sound stepper must all begin at the same x.
+       */
+      const edges = [
+        ['fader', document.querySelector('.wet-fader .sld-lane')],
+        ['sliders', document.querySelector('.gran-rows .sld-lane')],
+        ['sound', document.querySelector('.gran-slot .pos-pick-seg')],
+      ].map(([n, e]) => [n, e ? Math.round(e.getBoundingClientRect().left) : null]);
+      const xs = edges.map(([, x]) => x);
+      G.edges = edges;
+      d.assert('every control under the picture starts at the same left edge',
+        xs.every((x) => x != null) && Math.max(...xs) - Math.min(...xs) <= 1,
+        edges.map(([n, x]) => `${n} ${x == null ? 'missing' : x}`).join(' · ')
+        + (xs.every((x) => x != null) ? ` — ${Math.max(...xs) - Math.min(...xs)} px apart` : ''));
       d.assert('the grain ticks are drawn, and the fader fades them',
         G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
         `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);

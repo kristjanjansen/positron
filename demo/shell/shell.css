@@ -5,6 +5,8 @@
   --line: #1f2937; --line2: #2b3546;
   --fg: #e6e6e6; --dim: #8b93a1; --dim2: #6a7280;
   --hi: #ffd400;
+  /* the gap between a slider's label column and its lane — see `.sld-group` */
+  --sld-col: 12px;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -687,11 +689,18 @@ video[hidden] { display: none; }
    column is as wide as the wider of its two lines, and there is no
    content-sized column between one slider and the next, which is what made the
    gaps look uneven when they were all the same number. */
+/* 🔴 THE COLUMN GAP IS A NUMBER OTHER THINGS HAVE TO AGREE WITH, so it is named
+   rather than typed. `/radio1965/` puts a picker in the same column as these
+   sliders and has to start its control at the same x — it set its own gap to 0
+   against a grid that has twelve, and the row sat 12 px to the left of every
+   lane under it. REPORTED three times, the last one after a component swap had
+   already broken the fix for the first two. A shared measurement in two files
+   is a measurement that will disagree. */
 .sld-group {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: 10px 12px;
+  gap: 10px var(--sld-col);
   width: 100%; max-width: 560px;
 }
 /* the label and its number, stacked, as ONE grid item */
