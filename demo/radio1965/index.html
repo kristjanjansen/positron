@@ -118,6 +118,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import { createModulator } from '/shell/pappus-mod.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE, RING_SECONDS, GATE0 }
     from '/shell/pappus.mjs';
@@ -1000,6 +1001,10 @@
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.sqrt(sum / buf.length);
     if (rms > rmsPeak) rmsPeak = rms;
+    // The follower's only source. It is fed from here rather than from its own
+    // timer because this is where the samples already are — one analyser read a
+    // frame, which the meter was doing anyway.
+    modulator?.level(rms);
     // ⚠️ NO COLOUR. The wave was briefly tinted by spectral centroid — hue for
     // where the energy sat — and it was asked to be reverted twice. The
     // reasoning is kept on the dead branch in `grain-scope.mjs` rather than
@@ -1459,6 +1464,12 @@
       // control built in. Nothing should be lit at the dry end and something must
       // be lit at the wet end; a probe that reads the same at both is measuring
       // neither.
+      d.assert('the station moves the granulator, and stops when told',
+        G.modMoved.got > 4 && G.modStill.got > 2
+          && G.modMoved.spread > 0.001 && G.modStill.spread <= G.modMoved.spread / 5,
+        `${G.modDest} spanned ${G.modMoved.spread.toFixed(3)} s over ${G.modMoved.got} reads `
+        + `while the follower ran, ${G.modStill.spread.toFixed(3)} s over ${G.modStill.got} `
+        + 'with it held');
       d.assert('the grain ticks are drawn, and the fader fades them',
         G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
         `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
@@ -1657,6 +1668,10 @@
     // not. −0.10× means one reverse lap of the buffer every eighty seconds.
     { name: 'slow tide',
       says: 'a reverse crawl in long grains, under a seventh chord',
+      // MOTION: the station's loud passages pull the grains SHORT and let them
+      //         stretch back out in the quiet — a tide that breathes with the
+      //         programme
+      mod: [{ src: 'env', dest: 'size', amt: 0.55 }],
       scanmode: 1, scan: 0.30, rate: 1.4, size: 1.8, contour: 14,
       sos: 0.72, lock: 0, tilt: -0.30, ingain: 1, comp: 0.20,
       spray: 0.55, spraymode: 3, swarm: 0.45, swarmmode: 3, strum: 0.06,
@@ -1690,6 +1705,11 @@
     // hollow. At zero it rings.
     { name: 'slowed',
       says: 'the station at a quarter speed, pitch intact, nothing added',
+      // MOTION: nothing moves it. This patch is the plain time-stretch and its
+      //         whole claim is that it does not colour the programme; a
+      //         follower on it would be the page adding something and calling
+      //         it the station
+      mod: [],
       scanmode: 1, scan: 0.4167, rate: 28, size: 0.10, contour: 8,
       sos: 0.62, lock: 0, tilt: 0, ingain: 1, comp: 0.15,
       spray: 0.02, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
@@ -1729,6 +1749,10 @@
     // buffer that accumulates needs to arrive quieter or it flattens.
     { name: 'updraft',
       says: 'a slow climb, answered by itself a fifth and an octave up',
+      // MOTION: the grain rate climbs with the level, so a loud passage
+      //         thickens into a wash and a quiet one thins to countable single
+      //         grains
+      mod: [{ src: 'env', dest: 'rate', amt: 0.60 }],
       scanmode: 1, scan: 0.36, rate: 0.9, size: 3.0, contour: 16,
       sos: 0.80, lock: 0, tilt: -0.15, ingain: 0.75, comp: 0.25,
       spray: 0.30, spraymode: 3, swarm: 0.55, swarmmode: 4, strum: 0.08,
@@ -1751,6 +1775,10 @@
     // it looks like the freeze and it is the ERASE (LESSONS #46).
     { name: 'held still',
       says: 'three seconds caught and stretched thirty times, held as a chord',
+      // MOTION: the read head nudges forward on loud material and settles back
+      //         — the freeze stays a freeze, but it stops being a dead
+      //         photograph
+      mod: [{ src: 'env', dest: 'scan', amt: 0.28 }],
       scanmode: 1, scan: 0.36, rate: 9, size: 0.55, contour: 10,
       sos: 0.62, lock: 1, tilt: -0.20, ingain: 1, comp: 0.25,
       winstart: 0.30, winend: 0.70,
@@ -1772,6 +1800,10 @@
     // forward and their ORDER is reversed, which is the Revolver artefact.
     { name: 'backwards',
       says: 'the station running backwards at its own speed, through a sick tape machine',
+      // MOTION: scatter opens with the level, so the backwards tape smears wide
+      //         when the station is loud and pulls back to one line when it is
+      //         not
+      mod: [{ src: 'env', dest: 'spray', amt: 0.50 }],
       scanmode: 1, scan: 0.0, rate: 5, size: 0.9, contour: 16,
       sos: 0.68, lock: 0, tilt: -0.50, ingain: 1, comp: 0.35,
       spray: 0.30, spraymode: 1, swarm: 0.40, swarmmode: 2, strum: 0.125,
@@ -1794,6 +1826,9 @@
     // cloud MOVES AS ONE. Same density, same rate, a different thing to hear.
     { name: 'roof rain',
       says: 'a fast scatter of tiny plucks that drifts as one cloud',
+      // MOTION: the hardest routing here: louder means MORE drops and SHORTER
+      //         ones, which is the difference between rain and a hiss
+      mod: [{ src: 'env', dest: 'rate', amt: 0.75 }, { src: 'env', dest: 'size', amt: -0.35 }],
       scanmode: 1, scan: 0.75, rate: 26, size: 0.030, contour: 0,
       sos: 0.62, lock: 0, tilt: 0.40, ingain: 1, comp: 0.20,
       spray: 0.70, spraymode: 3, swarm: 0.22, swarmmode: 1, strum: 0,
@@ -1821,6 +1856,9 @@
     // is input gain, not less layering.
     { name: 'piled up',
       says: 'the buffer stops being replaced and starts stacking up',
+      // MOTION: the pile deepens and spreads together, so a busy passage stacks
+      //         into something wider rather than merely louder
+      mod: [{ src: 'env', dest: 'size', amt: 0.45 }, { src: 'env', dest: 'spray', amt: 0.35 }],
       scanmode: 1, scan: 0.345, rate: 0.9, size: 2.6, contour: 12,
       sos: 0.90, lock: 0, tilt: -0.55, ingain: 0.70, comp: 0.15,
       spray: 0.45, spraymode: 3, swarm: 0.65, swarmmode: 3, strum: 0.08,
@@ -2083,6 +2121,43 @@
    * in practice `radio → granulator` is wider than all three names and nothing
    * shifts, which is checked rather than assumed.
    */
+  /**
+   * 🔴 THE ONLY THING ON THIS PAGE THAT MOVES BY ITSELF, AND IT IS THE STATION.
+   * See the header of `pappus-mod.mjs` for why nothing else does: the graph we
+   * load is the SynthDef, and every LFO Pappus has lives in the Lua half we do
+   * not run. The follower listens to the radio the granulator is already eating
+   * and walks the grain settings with it.
+   *
+   * ⚠️ IT WRITES THE ENGINE, NOT THE SLIDERS, and that is deliberate rather
+   * than lazy. A knob redrawn twenty-five times a second is the `grain-scope`
+   * caption again in another costume; a slider shows where the patch SITS and
+   * where you left it, and the modulation moves around that. Every synth ever
+   * built does it this way and it is the reason a modulated knob has a ring
+   * rather than a jumping handle.
+   *
+   * ⚠️ THE RANGES ARE THE SLIDERS' OWN, read from the same numbers the lanes
+   * are built with — so a modulation lands where the LANE is. On `rate` and
+   * `size`, which are exponential, that makes a routing multiply and divide
+   * rather than add and subtract.
+   */
+  let modulator = null;
+  const MOD_HZ = 25;          // 20 ms of Lag.kr upstream; faster is thrown away
+  function startModulator() {
+    if (modulator) return modulator;
+    modulator = createModulator({
+      now: () => ctx.currentTime,
+      send: (name, v) => setBoth(name, v),
+      specs: {
+        rate: { min: 0.1, max: 100, warp: 'exp' },
+        size: { min: 0.002, max: 4, warp: 'exp' },
+        scan: { min: 0, max: 1 },
+        spray: { min: 0, max: 1 },
+      },
+    });
+    setInterval(() => { if (eng) modulator.tick(); }, 1000 / MOD_HZ);
+    return modulator;
+  }
+
   function applyPatch(i, { silent = false } = {}) {
     patch = ((i % PATCHES.length) + PATCHES.length) % PATCHES.length;
     const p = PATCHES[patch];
@@ -2102,6 +2177,15 @@
       sliders.scan?.label(r.label);
       sliders.scan?.set(r.toUi(p.scan), { quiet: true });
       shareLabelColumn?.();
+    }
+    // 🔴 A PATCH IS NOW A PLACE AND A MOTION. The base is where each control
+    // sits with nothing moving it; the routes are what moves it. Two patches
+    // with the same numbers and different routes are two different instruments,
+    // which is the whole answer to "they all sound the same".
+    if (modulator) {
+      for (const [k, v] of [['rate', p.rate], ['size', p.size],
+                            ['scan', p.scan], ['spray', p.spray]]) modulator.setBase(k, v);
+      modulator.setRoutes(p.mod || []);
     }
     patchPick?.show(p.name, patch);
     if (silent) return p;
@@ -2473,6 +2557,9 @@
     // defaults. One re-apply puts the picture in step with the sound — and this
     // one speaks, because it is the first moment the page can say what it has
     // loaded to somebody looking at the row it loaded into.
+    // Before the first patch lands, so `applyPatch` has somewhere to hand its
+    // bases and its routes.
+    startModulator();
     applyPatch(patch);
     shareLabelColumn();
     // A late webfont changes every one of those widths, and `document.fonts` is
@@ -2718,6 +2805,43 @@
       await new Promise((r) => setTimeout(r, 120));
       selfCheck = false;
       G.here = patch;
+      /**
+       * 🔴 DOES THE MOVEMENT ACTUALLY REACH THE ENGINE, AND DOES IT STOP?
+       * Both halves, because either alone passes on a broken page. A control
+       * that drifts for any reason would satisfy the first; a page that never
+       * modulates anything satisfies the second. The pair is the measurement.
+       *
+       * ⚠️ IT IS SAMPLED THROUGH `/s_get`, so it is read from INSIDE the graph
+       * rather than from the page's own idea of what it sent — the same reason
+       * every other check here asks the engine instead of reading a variable
+       * back. A count of messages posted would have proved nothing: LESSONS
+       * says a count is only evidence on the far side of the wire.
+       */
+      // ⚠️ IT COUNTS ITS OWN READINGS. A spread of exactly 0.000 is what a
+      // perfectly held control reads AND what a sampler that got nothing back
+      // reads — and this repo's rule is that a partial result which is too tidy
+      // is a broken collector rather than a finding. So the count comes back
+      // with the number and the assert requires both.
+      const sampleSpread = async (name, n = 10, ms = 160) => {
+        let lo = Infinity, hi = -Infinity, got = 0;
+        for (let k = 0; k < n; k++) {
+          const v = await ask1(name);
+          if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); got++; }
+          await new Promise((r) => setTimeout(r, ms));
+        }
+        return { spread: got ? hi - lo : 0, got };
+      };
+      // `slow tide` routes the follower onto grain length, and the radio is
+      // playing, so this is the live instrument being watched rather than a
+      // synthetic wobble.
+      G.modDest = 'msize';
+      G.modMoved = await sampleSpread('msize');
+      // The negative control: hold it, and the SAME sampling must read a flat
+      // line. Prove a guard fires.
+      modulator?.hold(true);
+      await new Promise((r) => setTimeout(r, 250));
+      G.modStill = await sampleSpread('msize', 6);
+
       G.scalars = await readScalars();
       G.gates = await askN('gates', 8);
       G.pitches = await askN('pitches', 8);
@@ -2727,6 +2851,10 @@
       G.otherWant = PATCHES[otherPatch];
       G.wrong = missing(G.patch, G.scalars);
 
+      // 🔴 HAND THE INSTRUMENT BACK MOVING. Leaving the hold on would end the
+      // self-check with a granulator that is correct and dead — the page
+      // quietly switching off the feature it just proved.
+      modulator?.hold(false);
       muted = false;
       setWet(wasWet);                    // the value the LISTENER left, not the probe's
       fader.set(wasWet, { quiet: true });
