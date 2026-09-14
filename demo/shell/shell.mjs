@@ -209,9 +209,19 @@ export function mount({
     logEl.scrollTop = logEl.scrollHeight;
   }
 
+  // 🔴 A PASSING CHECK IS NOT A MESSAGE. Every assert used to write a prose
+  // line into the log, so a page with nine checks opened with nine sentences
+  // nobody reads — `ok their real score compiles — 25 rows` — and a real event
+  // afterwards had to be found among them. Reported as "slop log", and the
+  // word is right: the log is for things that HAPPENED, at the moment they
+  // happened. A check that passed did not happen, it held.
+  // ⚠️ A FAILURE IS a message, and keeps its line — that is the asymmetry, and
+  // it is the whole rule. The tally goes out once, from `ready()`.
+  // ⚠️ Nothing parses these lines: the harness reads `__demo.asserts`, which is
+  // unchanged, so per-demo counts are unaffected by this.
   function assert(label, pass, detail) {
     api.asserts.push({ label, pass: !!pass, detail: detail ?? null });
-    log(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail !== undefined ? ` — ${detail}` : ''}`, pass ? 'info' : 'bad');
+    if (!pass) log(`FAIL ${label}${detail !== undefined ? ` — ${detail}` : ''}`, 'bad');
     return !!pass;
   }
 
@@ -228,7 +238,14 @@ export function mount({
      *  a page HOLDS should clear what the page SAID about it too, or the lines
      *  left behind describe a state that no longer exists. */
     clearLog: () => { api.logs.length = 0; logEl.textContent = ''; },
-    ready: () => { api.ready = true; log('ready', 'hi'); },
+    ready: () => {
+      api.ready = true;
+      const n = api.asserts.length;
+      const bad = api.asserts.filter((a) => !a.pass).length;
+      // one line, and it is a real message: how many checks this page ran on
+      // itself and whether any of them are worth scrolling up for
+      log(n ? `ready · ${n - bad}/${n} checks` : 'ready', bad ? 'bad' : 'hi');
+    },
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,
   };
