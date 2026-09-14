@@ -46,6 +46,7 @@ import { spawn } from 'node:child_process';
 import { rm, readFile } from 'node:fs/promises';
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
+import { claimProfile } from './harness-profile.mjs';
 
 const CHROME = process.env.CHROME
   || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -63,7 +64,7 @@ const HTTP_PORT = 8892;                     // not verify.mjs's 8890: both may r
 // running this harness in one checkout got one profile, one lock — and one of
 // them got killed by the other's `pkill`, mid-run, reading as "chrome did not
 // come up". The port lesson and the profile are the same lesson.
-const PROFILE = `/private/tmp/claude-501/positron-verify-gl-${process.pid}`;
+const { dir: PROFILE } = claimProfile('positron-verify-gl');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);

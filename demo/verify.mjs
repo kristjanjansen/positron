@@ -11,6 +11,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { rm, readFile } from 'node:fs/promises';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
+import { claimProfile } from './harness-profile.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
@@ -33,7 +34,10 @@ const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 // which is the opaque-response bug this file already deletes `Default/Cache`
 // to avoid.
 const CDP_PORT = 0;                       // 0 = let the OS pick; read back below
-const PROFILE = `/private/tmp/claude-501/demo-verify-udd-${process.pid}`;
+// The profile is claimed rather than named: `claimProfile` removes it when this
+// run ends however it ends, and SWEEPS the ones left by runs that were killed.
+// See demo/harness-profile.mjs — 229 of these had accumulated to ~20 GB.
+const { dir: PROFILE, swept: SWEPT } = claimProfile('demo-verify-udd');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2);
@@ -109,6 +113,7 @@ const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
 // (`server` is null only when DEMO_BASE is set, and then it is not read.)
 console.log(`base ${BASE}`);
+if (SWEPT) console.log(`(swept ${SWEPT} profile dir(s) left by killed runs)`);
 
 // EMPTY CACHE EVERY RUN. A media element loading `video.src = <m3u8>` stores a
 // no-cors (opaque) entry for that URL; when a demo later switches to hls.js,
@@ -622,5 +627,17 @@ if (fail) {
     console.log('   THIS RUN IS NOT EVIDENCE OF A REGRESSION until the failing demos are re-run alone.');
   }
 }
-ws.close(); chrome.kill(); server?.close();
+ws.close(); server?.close();
+// 🔴 WAIT FOR CHROME TO ACTUALLY BE GONE BEFORE THE PROFILE IS REMOVED.
+// `kill()` asks; it does not stop. MEASURED: with a plain `kill()` the exit
+// handler deleted the directory and a still-shutting-down Chrome recreated it
+// on the way out, so a run that cleaned up correctly still left 250 MB behind
+// — a cleanup that runs, reports nothing, and does nothing. SIGKILL and await
+// the process's own `exit`, capped so a wedged browser cannot hang the suite
+// (the startup sweep collects it next time either way).
+chrome.kill('SIGKILL');
+await Promise.race([
+  new Promise((r) => chrome.once('exit', r)),
+  new Promise((r) => setTimeout(r, 3000)),
+]);
 process.exit(fail ? 1 : 0);

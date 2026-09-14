@@ -32,6 +32,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
 import { serve } from './server.mjs';
+import { claimProfile } from './harness-profile.mjs';
 
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
@@ -51,7 +52,7 @@ const CDP_PORT = 0;
 // third surviving artifact of elektron→positron, on the one harness that
 // reaches the iPhone code path. Two agents running this at once shared one
 // profile and one lock, and that is the same rule as the port above.
-const PROFILE = `/private/tmp/claude-501/demo-verify-native-udd-${process.pid}`;
+const { dir: PROFILE } = claimProfile('demo-verify-native-udd');
 
 // Its own server, on whatever port the OS gives, read back from the socket.
 const server = process.env.DEMO_BASE ? null : await serve(8890);
