@@ -115,6 +115,7 @@
   // of the suite cannot count each other's rows. Passed straight through: a
   // visitor with no query lands in the shared one.
   const ROOM = q.get('room') || 'items';
+  let pushJoined = false;   // did the store put this browser on the list
   const API = q.get('api') || 'https://items.positron.studio';
 
   // The seven kinds the store accepts, in its own order.
@@ -489,6 +490,35 @@
       reg?.scope === here && reg.scope !== `${location.origin}/`,
       reg ? reg.scope : 'never registered');
 
+    /**
+     * 🔴 THE STORE WILL PUT A DEVICE ON THE ANNOUNCEMENT LIST, WHICH IS THE
+     * HALF WITH NO SYMPTOM. A browser can mint its own address from public
+     * configuration, and joining that address to the named group needs the
+     * SENDING key — which no browser has, and must not. If the store refuses,
+     * this page grants permission, registers a worker, prints an address, and
+     * then receives nothing for ever: there is no error, no console line and
+     * no missing control. Exactly the shape that needs a check.
+     *
+     * ⚠️ IT IS ASKED OF THE STORE, NOT OF THE PAGE. `pushJoined` would only say
+     * that a reply arrived; what matters is that the far side accepted an
+     * address, so the assert round-trips a real one. A refusal returns
+     * `results: [{ error: ... }]` while success returns an EMPTY object per
+     * address — reading "empty" as "nothing happened" would report a working
+     * subscription as a broken one.
+     */
+    const probe = await write('/subscribe', { token: `probe-${Math.random().toString(36).slice(2)}` })
+      .catch((e) => ({ ok: false, error: e.message }));
+    // ⚠️ AND THE LABEL SAYS ONLY WHAT IS CHECKED. A made-up address cannot
+    // actually be joined — FCM answers `results: [{ error: … }]` — so what this
+    // proves is that the ROUTE exists and the store still holds a usable
+    // sending key, which is the part that silently rots. Whether a real device
+    // was added is proved above, by the join that just ran with a real address.
+    d.assert('the store still holds a key that can reach the announcement list',
+      !!probe && (probe.ok === true || Array.isArray(probe.results)),
+      probe?.ok ? `joined ${probe.topic}`
+        : Array.isArray(probe?.results) ? 'the list refused a made-up address, which is correct'
+        : `the store said ${probe?.error || 'nothing'}`);
+
     // The two files that make it installable, asked for the way a phone asks —
     // which is also the only thing that proves the build put them on the deploy.
     let says = '';
@@ -551,14 +581,31 @@
       const line = el('div', 'tok', token);
       d.el.append(line);
       d.log(`this browser now has an address, printed under the list — ${token.length} characters`, 'hi');
-      // ⚠️ AND IT IS NOT ON THE LIST YET. The store announces to a named group,
-      // and joining a browser to that group takes the sending key, which is not
-      // here and must not be. Until somebody runs
-      // `node proto/push/send.mjs subscribe <address> positron-test`, nothing
-      // published on this page will arrive on this device — and that looks
-      // exactly like a broken notification.
-      d.log('it is not on the announcement list yet: joining it takes the sending key, which no browser has. '
-        + 'Until it is joined, nothing published here will arrive on this device.', 'bad');
+      /**
+       * 🔴 AND NOW JOIN THE ANNOUNCEMENT LIST, WHICH THE BROWSER CANNOT DO
+       * ITSELF. A page can mint its own address from public configuration
+       * alone, but putting that address on a named group is an administrative
+       * call that needs the SENDING key — which must never reach a browser. So
+       * the store does it: the key already lives there, beside the thing that
+       * announces.
+       *
+       * ⚠️ WITHOUT THIS THE PAGE LOOKS ENTIRELY CORRECT AND RECEIVES NOTHING.
+       * Permission granted, worker registered, address minted, and every
+       * announcement sails past it — the failure has no symptom at all, which
+       * is why it is the half worth asserting on.
+       */
+      // ⚠️ `write` THROWS ON A NON-OK STATUS, so this cannot be bare: a store
+      // that refuses the join would skip the `onMessage` wiring below it and
+      // take the foreground notifications down with it. Failing to join is
+      // worth saying and is not worth losing the rest of the page over.
+      const joined = await write('/subscribe', { token })
+        .catch((e) => ({ ok: false, error: e.message }));
+      if (joined && joined.ok) {
+        pushJoined = true;
+        d.log(`this device is on the announcement list — anything published here now reaches it`, 'hi');
+      } else {
+        d.log(`the store would not add this device to the list: ${joined?.error || 'no answer'}`, 'bad');
+      }
       onMessage(messaging, (payload) => {
         d.log(`notification while the page is open: ${payload.notification?.title || ''}`, 'hi');
         pull().catch(() => {});

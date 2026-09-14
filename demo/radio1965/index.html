@@ -255,7 +255,23 @@
    * Replacing a measured path with an unmeasured one because the mechanism is
    * convincing is how this page has already been "fixed" twice today.
    */
-  const DECODE = new URLSearchParams(location.search).get('decode') === '1';
+  /**
+   * 🔴 DECODING IS THE DEFAULT NOW, AND `?decode=0` IS THE WAY BACK.
+   *
+   * It was opt-in while it was unproven, and that was right — but it has been
+   * the only path that works on iOS since the day it was written (WebKit hands
+   * `createMediaElementSource` silence: MEASURED, analyser 0.0000 for a whole
+   * run while a 440 Hz tone through the SAME analyser read 0.33-0.80), and
+   * every fix since — the crossfaded seams, the latency drain, the burst
+   * trimming, the speed work — has landed on it and not on the element.
+   *
+   * ⚠️ LEAVING IT OPT-IN MEANT THE DEFAULT PAGE WAS THE UNFIXED ONE. Reported
+   * from `positron.studio/radio1965/` with no flag: a blurb, then a hole, then
+   * audio — the element path's holes, on a page whose decoded path had been
+   * green for hours. A flag that has to be remembered is a flag that will be
+   * forgotten, and the person who forgets it sees the old defect.
+   */
+  const DECODE = new URLSearchParams(location.search).get('decode') !== '0';
   const REPORTING = new URLSearchParams(location.search).get('report') === '1';
   const ship = REPORTING ? createShipper() : () => {};
   if (REPORTING) {
