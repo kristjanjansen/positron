@@ -1,4 +1,4 @@
-// proto/kurenniemi/ingest.mjs — THE ARCHIVAL INGEST ADAPTER, pointed at a
+// proto/aikajana/ingest.mjs — THE ARCHIVAL INGEST ADAPTER, pointed at a
 // SECOND institution set (plan-timeline §−1).
 //
 // ERR taught the adapter one shape: ONE institution, describing ITS OWN
@@ -26,7 +26,7 @@
 // media stays at its origin and the corpus stores a REFERENCE plus the rights
 // status and who asserted it.
 //
-// Run:  node proto/kurenniemi/ingest.mjs   -> proto/kurenniemi/corpus.json
+// Run:  node proto/aikajana/ingest.mjs   -> proto/aikajana/corpus.json
 
 import { writeFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -436,7 +436,7 @@ function rewhen() {
   const before = corpus.items.map((i) => [i.id, i.at, i.bandMs, i.precision]);
   corpus.items = corpus.items.map(withWhen);
   corpus.generated = new Date().toISOString();
-  corpus.generator = 'proto/kurenniemi/ingest.mjs --rewhen';
+  corpus.generator = 'proto/aikajana/ingest.mjs --rewhen';
   corpus.positionRule = {
     anchor: 'at = when.earliest (timeline/transport.mjs v0.6 U2) — the bracket\'s lower bound, never a midpoint',
     bracket: 'CLOSED-OPEN [earliest, latest)',
@@ -468,7 +468,7 @@ const main = async () => {
   const corpus = {
     subject: 'Erkki Kurenniemi (1941–2017)',
     generated: new Date().toISOString(),
-    generator: 'proto/kurenniemi/ingest.mjs',
+    generator: 'proto/aikajana/ingest.mjs',
     note: 'Media is REFERENCED at its origin, never copied. Rights status and its ASSERTER travel per item.',
     corpusRange: CORPUS_RANGE,
     positionRule: {

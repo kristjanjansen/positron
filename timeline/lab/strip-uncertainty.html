@@ -93,7 +93,7 @@ const YR = 365.2425 * 24 * 3600 * 1000;
 // ---------------------------------------------------------------------------
 // 1 — the real corpus
 // ---------------------------------------------------------------------------
-const corpus = await (await fetch('/proto/kurenniemi/corpus.json')).json();
+const corpus = await (await fetch('/proto/aikajana/corpus.json')).json();
 const items = corpus.items;
 const KIND = (it) => (it.kind === 'life' ? 'life' : 'tape');
 const realItems = items.map((it) => ({ kind: KIND(it), id: it.id, payload: it, when: it.when }));

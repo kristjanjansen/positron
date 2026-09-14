@@ -99,15 +99,19 @@ export const DEMOS = [
   // but on a delay instead of at once, and out to phones rather than to open
   // tabs. The claim it demonstrates is that a store can wake AT a time from the
   // same object that holds the state deciding it, with no machine polling in
-  // between, so `settleMs` has to cover the whole demonstration: five seconds
-  // to the publish, four more to the shelving, and the checks that watch both.
+  // between, so `settleMs` has to cover the whole demonstration. It is carried
+  // by `Publish now`, which is control 0 and the only control the harness gives
+  // this budget to: it publishes at once and hands its item a moment four
+  // seconds out to put itself away at, which is the unattended wake. About five
+  // seconds of work, and the ten-second button asserts only what is true
+  // immediately, because an assert made behind that wait would never be read.
   //
   // ⚠️ IT IS ALSO THE ONE INSTALLABLE PAGE HERE, AND ONLY THIS ONE. Its
   // manifest and its service worker are scoped to `/items/`; positron.studio is
   // deliberately not a progressive web app, because a site-wide worker is a
   // cache and this project's whole debugging discipline rests on the BUILD
   // stamp saying which build is live.
-  { name: 'items', act: 2, created: '2026-09-14', built: true, settleMs: 16000,
+  { name: 'items', act: 2, created: '2026-09-14', built: true, settleMs: 11000,
     one: 'write an item, and it publishes itself at the moment you named — and tells the phones',
     tags: ['DO', 'alarms', 'push', 'PWA'] },
   // The demo ABOUT the socket, rather than one that happens to use it: the
@@ -225,8 +229,17 @@ export const DEMOS = [
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
-  { name: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/kurenniemi/',
-    one: "Erkki Kurenniemi's corpus, media from archive.org",
+  // What has been gathered about one artist, before anything is played: a row
+  // per item saying when it is from, what it is, what it is called and who is
+  // holding it. It reads the same file `aikajana` plays from, so the two can
+  // never disagree about what exists.
+  { name: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
+    one: 'what has been gathered about Erkki Kurenniemi: the date, the kind, the name and who holds it',
+    tags: ['archive', 'provenance'] },
+  // The deck that gathered it, under its own name since 2026-09-14 — it was
+  // called `kurenniemi` until the row above took that slug.
+  { name: 'aikajana', act: 5, created: '2026-08-28', built: false, page: '/proto/aikajana/',
+    one: "Erkki Kurenniemi's corpus on one deck, media from archive.org",
     tags: ['timeline', 'not shelled'] },
   { name: 'megatimeline', act: 5, created: '2026-08-27', built: false, page: '/proto/megatimeline/',
     one: 'the ERR archive as one zoomable century, 1908 to 2026',

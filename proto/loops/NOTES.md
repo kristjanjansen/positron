@@ -179,7 +179,7 @@ else, and `strip.inkOf('tone~erode-1')` paints **294 px under 'all' and 0 px
 under 'attested'** while the attested lane keeps its 624 px — the tratteggio
 proof, measured in pixels.
 
-**Source material: a synthetic tone row, not `proto/kurenniemi`'s corpus.** The
+**Source material: a synthetic tone row, not `proto/aikajana`'s corpus.** The
 corpus is metadata-only; its 13 playable items are `media: {url}` references to
 archive.org MP3s streamed cross-origin, so a Kurenniemi disintegration would
 measure the network, could not run headless, and would make the evidence

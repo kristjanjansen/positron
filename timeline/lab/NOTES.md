@@ -797,7 +797,7 @@ Guards, all measured into existence rather than guessed:
 - **`useRvfc:false` / `variableFps:true`** register no callback at all (Remotion
   excludes VFR sources; a VFR `mediaTime` is not on a frame grid).
 - **no rVFC ⇒ nothing changes.** Firefox < 132, Safari < ~15.4 and every
-  `<audio>` element take the identical `currentTime` path. `proto/kurenniemi`
+  `<audio>` element take the identical `currentTime` path. `proto/aikajana`
   masters an `<audio>` element and is bit-for-bit unaffected by construction.
 
 ### 1c. The numbers
@@ -837,7 +837,7 @@ Residual tracking error left in the vector:
 | 60 fps, tol 5 | 4.38 ms | **0.50 ms** |
 
 **Read this honestly.** At the dead bands our clients actually ship (40 ms in
-`replay.html`, `replay-grid.html` and `kurenniemi`) the correction count is
+`replay.html`, `replay-grid.html` and `aikajana`) the correction count is
 already ~0 and **the sensor is invisible there** — 8→8, 4→4. The steal does not
 improve the shipped configuration. What it does is **make a tighter one
 possible**: at a 5 ms band — lip-sync class, 5× tighter than timingsrc's 25 ms
@@ -1220,7 +1220,7 @@ Not built, deliberately. The reasoning, so the next session does not re-derive i
 - **Nothing in the current clients scrubs heavy video hard enough to need it.**
   `proto/replay` masters one `<video>`; `proto/selfrec/replay-grid` slaves N tiles
   and its measured inter-tile skew is 34 ms = one 30 fps frame, the physical
-  floor; `proto/kurenniemi` masters an `<audio>` tape. The scrub cost we actually
+  floor; `proto/aikajana` masters an `<audio>` tape. The scrub cost we actually
   have is `currentTime` seek imprecision, which a proxy does not fix.
 - **So the ordering is: keyframe index first, proxy tier second.** Kapwing's
   `stss` read would let `seek()` report the *achievable* target position instead
@@ -1552,7 +1552,7 @@ one: `seekBarrier() === null`, and the roll is untouched.
 
 ### 10.8 The Kurenniemi client — the delta, and no number moved
 
-`proto/kurenniemi` was chosen as the day-one client because it had independently
+`proto/aikajana` was chosen as the day-one client because it had independently
 arrived at the same rule from data ("a midpoint is indistinguishable from an
 attested 15 July; a start is at least a LOWER BOUND that is true"). What changed:
 

@@ -68,7 +68,7 @@ const SURFACES = {
   replay:      { port: 8885, static: REPO, path: replayPath(), settle: 22000 },
   megatimeline:{ port: 8892, server: 'proto/megatimeline/server.mjs',path: '/?trickle=0',            settle: 2600 },
   remixer:     { port: 8891, server: 'proto/remixer/server.mjs',    path: '/?trickle=0',             settle: 2200 },
-  kurenniemi:  { port: 8894, static: REPO,                          path: '/proto/kurenniemi/index.html', settle: 2000 },
+  aikajana:    { port: 8894, static: REPO,                          path: '/proto/aikajana/index.html', settle: 2000 },
   console:     { port: 8899, static: REPO,                          path: '/studio/console.html',    settle: 1200 },
 };
 

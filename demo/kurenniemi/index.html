@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The list IS this page, where in `wire` it is a side channel. The shared
+     component caps itself at 300 px so a feed that keeps arriving cannot push
+     the rest of the page down the screen; these rows arrive once and their
+     count never changes, so there is nothing for that ceiling to hold back.
+     Tall enough for the whole list on a laptop, and it still scrolls inside
+     its own box on a phone, where every row wraps to two or three lines. */
+  .pos-msgs { max-height: 560px; }
+</style>
+
+<script type="module">
+  import { mount, guard } from '/shell/shell.mjs';
+  // The shared list from the kit — the same renderer `wire`, `cues` and `patch`
+  // draw their rows with, taken unchanged. It owns three fixed gutters and one
+  // fluid column, so the four things this page has to say are fitted to that
+  // shape rather than laid out again here: the kind goes in the first gutter as
+  // ONE SHORT WORD (that gutter is about five characters of mono wide), the
+  // third says whether the row has a file behind it, and the date, the name and
+  // the site share the fluid column — the date padded, because that column is
+  // monospaced and keeps its spaces, so the dates line up down the page.
+  import { createMessageList } from '/shell/messages.mjs';
+
+  // The list itself lives with the deck that gathered it. ONE COPY: a second
+  // one here would go stale the first time the gathering is re-run, and both
+  // pages would carry on working while disagreeing about what exists.
+  const CORPUS = '/proto/aikajana/corpus.json';
+
+  const d = mount({
+    name: 'kurenniemi',
+    what: 'Everything gathered about Erkki Kurenniemi so far, a row each: what kind of thing it is, whether '
+        + 'there is a file you can open, when it is from, what it is called, and which site holds it. '
+        + 'The dates are written the way each site wrote them — a full day where one was recorded, a bare '
+        + 'year where only a year survives, a span of years where nothing narrower is known. Nothing is '
+        + 'copied here: every file stays where it is held, and the row names the place.',
+    readout: { showing: '', kinds: '', sites: '', years: '' },
+    controls: [
+      { id: 'bydate', label: 'Oldest first', primary: true },
+      { id: 'bykind', label: 'By what it is' },
+      { id: 'bysite', label: 'By who holds it' },
+      { id: 'files', label: 'Only what has a file' },
+    ],
+  });
+  guard(d);
+
+  // `newestFirst: false` — `set()` hands the rows over one at a time and the
+  // default prepends, which would draw this list upside down. The cap is well
+  // over the size of the corpus so no row is dropped in silence; the check
+  // below counts the rows against the items anyway.
+  const list = createMessageList({
+    cap: 200, newestFirst: false, mark: 'file',
+    empty: 'nothing in this view',
+  });
+  d.el.append(list.el);
+  list.clear('reading the list…');
+
+  // ── what a row says ─────────────────────────────────────────────────────
+  // `instrument` is the one kind too long for the first gutter, and the object
+  // it names — DIMI-A, in a Stockholm museum — is a synthesiser. The other four
+  // kinds are already short words and are left alone.
+  const SHORT = { instrument: 'synth' };
+  const kindOf = (it) => SHORT[it.kind] || it.kind;
+  // A span of years is written with a slash where these dates come from. A dash
+  // is the same fact in a form nobody has to be taught.
+  const dateOf = (it) => it.when.edtf.replace('/', '–');
+  const siteOf = (it) => new URL(it.prov.sourceUrl).host.replace(/^www\./, '');
+  const fileOf = (it) => !!it.media?.url;
+  const YEAR = (ms) => new Date(ms).getUTCFullYear();
+
+  let items = [];
+  let order = 'bydate';
+  let onlyFiles = false;
+
+  function view() {
+    const by = {
+      bydate: (a, b) => a.when.earliest - b.when.earliest || a.title.localeCompare(b.title),
+      bykind: (a, b) => kindOf(a).localeCompare(kindOf(b)) || a.when.earliest - b.when.earliest,
+      bysite: (a, b) => siteOf(a).localeCompare(siteOf(b)) || a.when.earliest - b.when.earliest,
+    }[order];
+    return items.filter((it) => !onlyFiles || fileOf(it)).sort(by);
+  }
+
+  function draw() {
+    const rows = view();
+    list.set(rows.map((it) => ({
+      dir: kindOf(it),
+      mark: fileOf(it),
+      // no bytes: nothing on one of these rows is measured in bytes, and the
+      // component leaves that gutter blank rather than filling it with a lie
+      text: `${dateOf(it).padEnd(12)}${it.title} · ${siteOf(it)}`,
+    })));
+    d.set('showing', rows.length);
+    d.set('kinds', new Set(rows.map(kindOf)).size);
+    d.set('sites', new Set(rows.map(siteOf)).size);
+    // The end of a span is the first moment the thing is already over, so the
+    // last year it covers is one millisecond before it. Without that, every
+    // span ending in 1973 reads as reaching into 1974.
+    d.set('years', rows.length
+      ? `${Math.min(...rows.map((it) => YEAR(it.when.earliest)))}–`
+        + `${Math.max(...rows.map((it) => YEAR(it.when.latest - 1)))}`
+      : '');
+    return rows;
+  }
+
+  for (const id of ['bydate', 'bykind', 'bysite']) d.on(id, () => { order = id; draw(); });
+  d.on('files', (b) => {
+    onlyFiles = !onlyFiles;
+    b.textContent = onlyFiles ? 'Show everything' : 'Only what has a file';
+    b.setAttribute('aria-pressed', String(onlyFiles));
+    draw();
+  });
+
+  try {
+    const res = await fetch(CORPUS);
+    if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
+    const corpus = await res.json();
+    items = corpus.items || [];
+    d.log(`${items.length} items, gathered ${String(corpus.generated).slice(0, 10)}`, 'hi');
+    draw();
+
+    d.assert('the list loaded', items.length > 0, `${items.length} items`);
+
+    // The question this page exists to answer: is there something to put in all
+    // four columns? A column blank on most rows is a column to drop, and the
+    // only way to know is to COUNT the blanks rather than read a few rows.
+    const blank = items.filter((it) => !it.when?.edtf || !it.kind || !it.title || !it.prov?.sourceUrl);
+    d.assert('every row has a date, a kind, a name and a site',
+      blank.length === 0, `${items.length - blank.length} of ${items.length} complete`);
+
+    const lo = Math.min(...items.map((it) => YEAR(it.when.earliest)));
+    const hi = Math.max(...items.map((it) => YEAR(it.when.latest - 1)));
+    // Deliberately wider than his lifetime: this catches a date that failed to
+    // parse and landed on 1970, or one padded into the future, which is what a
+    // broken read of these files looks like. The label says what it checks.
+    d.assert('every date sits between 1900 and today',
+      lo >= 1900 && hi <= new Date().getUTCFullYear(), `${lo} to ${hi}`);
+
+    d.assert('the table shows one row per item',
+      list.count() === items.length, `${list.count()} rows for ${items.length} items`);
+
+    // BOTH VIEWS, ON EVERY RUN. The filter is a branch, and a branch entered
+    // only when somebody presses a button is a branch the suite can lose. This
+    // enters it, counts it and puts the page back the way it was.
+    const withFile = items.filter(fileOf).length;
+    onlyFiles = true; draw();
+    const filtered = list.count();
+    onlyFiles = false; draw();
+    d.assert('"only what has a file" keeps exactly those rows',
+      filtered === withFile && list.count() === items.length,
+      `${filtered} of ${items.length} have a file`);
+
+    // The list says its media is referenced where it lives and never copied.
+    // That is a claim about every address in it, so it is checked against every
+    // address in it rather than believed.
+    const here = items.flatMap((it) => [it.media?.url, it.thumb].filter(Boolean))
+      .filter((u) => new URL(u).host === location.host);
+    d.assert('no file is served from here', here.length === 0,
+      here.length ? here[0] : `${withFile} files, all somewhere else`);
+
+    d.ready();
+  } catch (e) {
+    // No ready() here on purpose: a page that could not read its own list has
+    // nothing to show and nothing to check, and the harness reports the reason
+    // out of `__demo.failed` rather than a silent row of empty cells.
+    list.clear(`could not read the list: ${e.message}`);
+    d.fail(e);
+  }
+</script>
+</html>

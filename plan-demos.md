@@ -157,7 +157,7 @@ of prior experiments left open — it deserves its own page and currently has no
 | # | name | shows |
 |---|---|---|
 | 19 | `flipper` | live ERR channels, CORS-clear, no proxy |
-| 20 | `kurenniemi` | one corpus, one artist |
+| 20 | `aikajana` | one corpus, one artist |
 | 21 | `megatimeline` | 1908→2026 as one zoomable century |
 | 22 | `remixer` | compose *from* the archive |
 
