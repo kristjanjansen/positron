@@ -1,6 +1,6 @@
 {
   "name": "positron items",
-  "short_name": "items",
+  "short_name": "positron",
   "description": "Write an item, say when it should appear, and it publishes itself at that moment.",
   "start_url": "./",
   "scope": "./",

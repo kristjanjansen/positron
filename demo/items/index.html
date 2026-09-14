@@ -23,7 +23,16 @@
 <link rel="apple-touch-icon" href="./icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="items">
+<!-- 🔴 THE NAME IN SETTINGS IS THIS ONE, AND IT USED TO BE UNFINDABLE. iOS
+     names a Home Screen web app from `apple-mobile-web-app-title` (falling back
+     to the manifest's `short_name`), and that SAME name is its row in
+     Settings -> Notifications. Both said "items", so somebody looking for
+     "positron" in that list found nothing and concluded the app was not
+     registered at all — REPORTED in exactly those words. A generic noun is a
+     bad name for a row in a list of every app on a phone.
+     ⚠️ iOS CACHES THE NAME AT INSTALL: an icon already on the Home Screen keeps
+     the old one until it is removed and added again. -->
+<meta name="apple-mobile-web-app-title" content="positron">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
@@ -155,10 +164,10 @@
 
   const d = mount({
     name: 'items',
-    what: `Write a title and a body, then publish now or in ten seconds. The first press asks this browser for
-           notifications: allowed, an item reaches this device with the page shut; refused, it still publishes.
-           Each row says what became of an item, and the numbers count down to the next moment and say how late
-           the clock has been.`,
+    what: `Write a title and a body, then publish now or in ten seconds. Press TELL ME to let this device hear
+           about new items with the page shut — on an iPhone that works only once the page has been added to the
+           Home Screen, and the log says so when it cannot. Each row says what became of an item, and the numbers
+           count down to the next moment and say how late the clock has been.`,
     // ⚠️ FOUR CELLS, AND ALL FOUR ARE ABOUT THE CLOCK — which is what this page
     // is about. It had six, three of which counted the room (items, waiting,
     // sent) and are now said better by the rows themselves: every row carries
@@ -181,6 +190,17 @@
     controls: [
       { id: 'now', label: 'Publish now', primary: true },
       { id: 'schedule', label: `Publish in ${LEAD / 1000} seconds` },
+      // 🔴 A CONTROL A READER CAN PRESS, AND THE REASON IT HAD TO EXIST.
+      // The prompt used to be raised from the publish handler, on the theory
+      // that a browser only shows it inside a user gesture and a press is a
+      // press. Both halves of that are true and the conclusion was still wrong:
+      // it makes SUBSCRIBING A SIDE EFFECT OF AUTHORING. Somebody who only ever
+      // READS is never asked, so never subscribes, and every announcement sails
+      // past them — REPORTED as *"how to make it work for others?"*.
+      // ⚠️ AND IT WAS ALSO A SURPRISE TO THE AUTHOR: a permission dialog
+      // appearing on Publish is a dialog nobody asked for, which is the thing
+      // browsers penalise. So the publish handlers no longer ask at all.
+      { id: 'notices', label: 'Tell me about new items' },
       { id: 'clear', label: 'Clear all', end: true },
     ],
   });
@@ -422,11 +442,33 @@
   // published exactly the same, and the only thing lost is this device hearing
   // about it. Which of those happened is said in the log, in words, because it
   // is the one thing here with no other symptom.
-  let asked = false;
-  function askOnFirstPublish() {
-    if (asked) return;
-    asked = true;
-    setUpNotices().catch((e) => d.log(`${e.name}: ${e.message}`, 'bad'));
+  /**
+   * What this browser will say, before anything is asked of it.
+   *
+   * ⚠️ A CAPABILITY TEST, NOT A BROWSER CHECK — the same rule `caps.mjs`
+   * follows. iOS hides `Notification` and `PushManager` entirely until the page
+   * is on the Home Screen, so the question "are notifications offered here" is
+   * the same question on every platform and the answer is either present or it
+   * is not.
+   */
+  const noticesState = () => ({
+    offered: 'Notification' in window && 'PushManager' in window,
+    permission: 'Notification' in window ? Notification.permission : 'unavailable',
+  });
+
+  /**
+   * Say on the button what this device will do, so the control is never a thing
+   * that looks live and does nothing — this repo's named hazard.
+   */
+  function paintNotices() {
+    const b = d.button('notices');
+    if (!b) return;
+    const { offered, permission } = noticesState();
+    if (!offered) { b.textContent = 'Notifications need the Home Screen'; b.disabled = true; return; }
+    if (permission === 'granted') { b.textContent = 'This device will be told'; b.disabled = true; return; }
+    if (permission === 'denied') { b.textContent = 'Notifications are blocked'; b.disabled = true; return; }
+    b.textContent = 'Tell me about new items';
+    b.disabled = false;
   }
 
   async function setUpNotices() {
@@ -453,6 +495,8 @@
     // browser calls a user gesture. Everything below — registering the worker,
     // reading the manifest — happens while the dialog is up.
     const answer = offered ? Notification.requestPermission() : null;
+    // Whatever it says, the button stops offering something already decided.
+    answer?.then?.(paintNotices).catch?.(() => {});
     if (!offered) {
       d.log('this browser is not offering notifications at all. On iPhone and iPad they appear only '
         + 'once the page is added to the Home Screen (Share, then Add to Home Screen) — in an ordinary '
@@ -596,7 +640,43 @@
   });
 
   // ── controls ────────────────────────────────────────────────────────────
-  //
+
+  /**
+   * Ask this device to be told, and say at once what it answered.
+   *
+   * ⚠️ THE ASSERT IS MADE ON THE SPOT AND THE SETUP IS NOT AWAITED, which is a
+   * rule about the harness rather than about notifications. `verify.mjs` gives
+   * `settleMs` to control 0 and to nothing else, and stops collecting 400 ms
+   * after the assert count last grew — so a control further down the row that
+   * waits for a service worker, a CDN import and a round trip to the store
+   * loses every assert behind the wait. What this control CLAIMS is that the
+   * page can put the question to this browser; the rest is logged as it lands.
+   *
+   * ⚠️ AND `requestPermission` IS REACHED WITH NOTHING AWAITED IN FRONT OF IT.
+   * A browser raises the dialog only from inside a short user-generated
+   * handler, so one `await` above it and the prompt never appears — silently,
+   * and on the one path where silence is the bug being fixed.
+   */
+  d.on('notices', () => {
+    const { offered, permission } = noticesState();
+    if (offered && permission === 'default') {
+      setUpNotices().catch((e) => d.log(`${e.name}: ${e.message}`, 'bad'));
+    } else if (!offered) {
+      d.log('this browser is not offering notifications. On iPhone and iPad they appear only once the '
+        + 'page has been added to the Home Screen (Share, then Add to Home Screen) — in an ordinary tab '
+        + 'nothing here can work, and it looks exactly like a broken setup.', 'bad');
+    } else {
+      d.log(permission === 'granted'
+        ? 'this device is already on the list — it will be told with the page shut'
+        : 'this device has refused notifications. Settings, Notifications, positron — that is the row, '
+          + 'and it is named after the Home Screen icon rather than after the page.', permission === 'granted' ? 'hi' : 'bad');
+    }
+    paintNotices();
+    d.assert('this page can put the question to this browser',
+      offered, offered ? `permission is ${noticesState().permission}`
+        : 'no Notification or PushManager here — on iOS that means an ordinary tab, not a broken page');
+  });
+
   // 🔴 CONTROL 0, AND THE ONE THAT CARRIES THE CLOCK. It publishes at once —
   // the reason the store has `publish_now` at all is a hook that fires when a
   // broadcast starts and has no future time to give — and it hands its item a
@@ -604,7 +684,6 @@
   // unattended wake: named when the item was written, kept by the store, and
   // arriving with nothing here polling for it.
   d.on('now', () => {
-    askOnFirstPublish();
     return watch((async () => {
       const sent = draft();
       const t0 = performance.now();
@@ -692,7 +771,6 @@
   // has set its clock — because the harness moves on 650 ms after this press
   // and an assert made ten seconds later would never be read.
   d.on('schedule', () => {
-    askOnFirstPublish();
     return watch((async () => {
       const sent = draft();
       const due = Date.now() + LEAD;
@@ -726,6 +804,10 @@
   d.assert('the store answers, and says what this room already holds',
     reached, reached ? `${all.length} item(s) · room ${ROOM}` : `no answer from ${API}`);
   d.log(`room ${ROOM}`, 'hi');
+  // The button says what this device will do before anybody presses it, so a
+  // reader who is already on the list is not invited to join it a second time
+  // and one who cannot be asked at all is told why on the control itself.
+  paintNotices();
   d.ready();
 </script>
 </html>
