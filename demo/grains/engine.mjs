@@ -77,7 +77,7 @@ import { sourceArgs, SOURCE_TABLE } from '/shell/source-args.mjs';
 // ⚠️ TWO LITERAL PREFIXES, EACH IN ONE PLACE. `build.mjs` reads these exact
 // strings out of this file and refuses the build if nothing is deployed behind
 // them, so they are written out rather than assembled.
-const VENDOR = '/shell/vendor/';
+import { bootScsynth } from '/shell/scsynth.mjs';
 const DEFS = '/grains/defs/';
 
 /**
@@ -144,91 +144,37 @@ export const PAPPUS_NODE = 3000, SOURCE_NODE = 3001;
  * control 0, which is the only control `verify.mjs` gives a settle budget.
  */
 export async function startPappus({ audioContext, log = () => {}, onGrain = null } = {}) {
-  const t0 = performance.now();
-  const { SuperSonic } = await import(`${VENDOR}supersonic.js`);
-  const moduleMs = performance.now() - t0;
-
-  // ⚠️ `coreBaseURL` ALONE DOES NOT WORK (research §7): the engine fetches
-  // `baseURL + 'wasm/scsynth-nrt.wasm'` and 404s. Every URL explicitly.
-  const sonic = new SuperSonic({
-    baseURL: VENDOR,
-    wasmBaseURL: VENDOR,
-    workletUrl: `${VENDOR}clockwork_audio_worklet.js`,
-    ...(audioContext ? { audioContext } : {}),
-  });
-
-  const replies = [];
-  sonic.on('in', (m) => {
+  // 🔴 THE BOOT IS `/shell/scsynth.mjs` NOW, NOT THIS FILE. It was here while
+  // `/grains/` was the only page running SuperCollider; `/radio1965/` granulates
+  // a live radio stream with the same engine, and two copies of a boot this
+  // full of measured gotchas is the `rowHTML`/`moq.mjs` mistake a third time.
+  // Every detail that was proved here moved with it, verbatim — the explicit
+  // URLs, the chain reaching the destination before `/b_alloc`, the reply list
+  // marked before the send, `/done /d_recv` in the engine's own voice.
+  //
+  // ⚠️ NO LIVE INPUT HERE, ON PURPOSE. `bootScsynth` takes an `input` node and
+  // this page passes none: anything routed in would SUM with what `PosSource`
+  // writes to the same bus — two materials in one buffer, a third thing
+  // neither end can describe. `sourceFeed()` in `jacksynth.mjs` disconnects one
+  // JACK link on the board for exactly this reason.
+  const eng = await bootScsynth({
+    audioContext,
+    log,
     // 🔴 THE GRAINS, ON THE FAR SIDE OF THE WIRE. `SendReply.ar(vtrig * report,
     // '/pgrain', [pos, dur, i, half])` in the engine — so this count is the
     // GRAPH's, not anything this page asked for, and it stops when `report`
-    // goes off. Payload: [nodeID, replyID, pos, dur, voice, half].
-    if (m[0] === '/pgrain') { onGrain?.({ pos: m[2], dur: m[3], voice: m[4], half: m[5] }); return; }
-    replies.push(m);
-    if (replies.length > 400) replies.shift();
+    // goes off. Payload: [nodeID, replyID, pos, dur, voice, half]. Consumed
+    // here so it never fills the reply ring.
+    onReply: (m) => {
+      if (m[0] !== '/pgrain') return false;
+      onGrain?.({ pos: m[2], dur: m[3], voice: m[4], half: m[5] });
+      return true;
+    },
   });
-
-  const t1 = performance.now();
-  await sonic.init();
-  const bootMs = performance.now() - t1;
-  const ctx = sonic.audioContext;
-
-  // The meter is IN the path, not a tap off a branch that might be muted — the
-  // deafness control has to measure what the speakers would get.
-  //
-  // 🔴 AND THE WHOLE CHAIN REACHES THE DESTINATION BEFORE ANYTHING ELSE
-  // HAPPENS, WHICH COST A RUN. Web Audio PULLS: a node with no path to the
-  // destination is never asked to process, and this engine's worklet is where
-  // `/b_alloc` is serviced — so with the output left dangling for the caller to
-  // connect later, the first buffer answered
-  // `[OSCRewriter] /b_alloc 0 allocation failed: Buffer 0 allocation timeout
-  // (5000ms)` and every allocation after it. It reads exactly like a wedged
-  // engine and it is a disconnected graph. The caller gets `out`'s GAIN to
-  // blend with, never the connection.
-  const meter = ctx.createAnalyser();
-  meter.fftSize = 2048;
-  const out = ctx.createGain();
-  out.gain.value = 0.9;
-  sonic.node.disconnect();
-  sonic.node.connect(meter);
-  meter.connect(out);
-  out.connect(ctx.destination);
+  const { sonic, ctx, out, meter, replies, sendAndWait, status, sleep } = eng;
+  const recv = eng.recvDef;
+  const bootMs = eng.bootMs, moduleMs = eng.moduleMs;
   const frame = new Float32Array(meter.fftSize);
-
-  // 🔴 NOTHING IS CONNECTED TO `sonic.node.input`, AND THAT IS THE BROWSER'S
-  // VERSION OF UNPLUGGING THE INSTRUMENT. scsynth fills its input busses from
-  // the host before any node runs, so anything routed in here would SUM with
-  // what `PosSource` writes — two materials in one buffer, which is a third
-  // thing neither end can describe. `sourceFeed()` in `jacksynth.mjs`
-  // disconnects one JACK link on the board for exactly this reason.
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  /**
-   * ⚠️ MARK THE REPLY LIST BEFORE THE SEND. research §8's own trap: a matcher
-   * that searches the whole history answers with an EARLIER send's `/done`, and
-   * this boot has thirty-odd `/done`-shaped replies in flight.
-   */
-  const waitFor = (match, ms) => new Promise((resolve) => {
-    const mark = replies.length;
-    const iv = setInterval(() => {
-      for (let i = mark; i < replies.length; i++) {
-        if (match(replies[i])) { clearInterval(iv); clearTimeout(t); resolve(replies[i]); return; }
-      }
-    }, 10);
-    const t = setTimeout(() => { clearInterval(iv); resolve(null); }, ms);
-  });
-  const sendAndWait = (match, ms, ...msg) => { const w = waitFor(match, ms); sonic.send(...msg); return w; };
-
-  log(`SuperCollider up in ${Math.round(bootMs)} ms · ${sonic.mode} · ${ctx.sampleRate} Hz`
-    + ` · module ${Math.round(moduleMs)} ms`);
-
-  const status = async () => {
-    const r = await sendAndWait((m) => m[0] === '/status.reply', 4000, '/status');
-    return r ? { ugens: r[2], synths: r[3], groups: r[4], defs: r[5] } : null;
-  };
-
-  sonic.send('/notify', 1);
-  await sleep(250);
 
   // ── the buffers ────────────────────────────────────────────────────────
   // ⚠️ `/done /b_allocPtr`, NOT `/done /b_alloc`. SuperSonic rewrites the
@@ -255,29 +201,7 @@ export async function startPappus({ audioContext, log = () => {}, onGrain = null
   log(`${allocated} of ${plan.length} buffers${allocFailed.length ? ` — ${allocFailed.join(',')} refused` : ''}`);
 
   // ── the two definitions ────────────────────────────────────────────────
-  /**
-   * 🔴 THE ANSWER IS `/done /d_recv` IN THE ENGINE'S OWN VOICE. Not
-   * `loadSynthDef()`'s return value — research §8 measured it returning
-   * `{name, size}` for a definition the server never received — and not
-   * `loadedSynthDefs`, measured going 1→2→3 across three sends of which one
-   * loaded. Over the engine's ceiling the server says NOTHING AT ALL, so the
-   * timeout is the answer rather than an error.
-   */
-  async function recv(url) {
-    const res = await fetch(url);
-    if (!res.ok) return { ok: false, why: `${url} answered ${res.status}` };
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const before = await status();
-    const t = performance.now();
-    const done = await sendAndWait((m) => m[0] === '/done' && m[1] === '/d_recv', 20000, '/d_recv', bytes);
-    const after = await status();
-    return {
-      ok: !!done, bytes: bytes.length, ms: Math.round(performance.now() - t),
-      defs: [before?.defs ?? null, after?.defs ?? null],
-      why: done ? null : 'the engine never said it had received it',
-    };
-  }
-
+  // `recv` is `bootScsynth`'s `recvDef` — see /shell/scsynth.mjs.
   const loadedSource = await recv(`${DEFS}possource.scsyndef`);
   const loadedGraph = await recv(`${DEFS}pappus-tiny.scsyndef`);
   log(`Pappus TINY: ${loadedGraph.bytes} B, ${loadedGraph.ok ? `taken in ${loadedGraph.ms} ms` : loadedGraph.why}`

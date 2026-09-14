@@ -8,7 +8,7 @@
 // claim.
 
 import { spawn } from 'node:child_process';
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,8 +21,13 @@ const { DEMOS, NOTES } = await import(new URL('../../demo/manifest.mjs', import.
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.VIEW_BASE || 'https://positron.studio';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 9412;
-const PROFILE = '/private/tmp/claude-501/-Users-s32863-personal-positron/596385e3-9b74-4f17-837f-b4eb2eb5a254/scratchpad/view-chrome-profile';
+// ⚠️ BOTH OF THESE WERE FIXED AND BOTH ARE THE SAME RULE. A constant CDP port
+// attaches to whatever browser is already on it — another agent's, or the
+// previous run's — and a constant profile is a lock two runs fight over. The
+// path this PROFILE held was a dead session's scratchpad that no longer exists
+// on disk; Chrome creates whatever it is handed, so nothing ever said so.
+const PORT = 0;                       // pick one, read it back from the profile
+const PROFILE = `/private/tmp/claude-501/view-chrome-profile-${process.pid}`;
 const SHOTS = join(HERE, 'shots');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -46,10 +51,15 @@ const chrome = spawn(CHROME, [
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
 
-let wsUrl = null;
+// The port Chrome ACTUALLY took, read out of our own profile — never guessed.
+let wsUrl = null, cdpPort = null;
 for (let i = 0; i < 60 && !wsUrl; i++) {
   await sleep(250);
-  try { wsUrl = (await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json()).webSocketDebuggerUrl; } catch {}
+  try {
+    if (!cdpPort) cdpPort = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
+    if (!Number.isFinite(cdpPort) || !cdpPort) { cdpPort = null; continue; }
+    wsUrl = (await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()).webSocketDebuggerUrl;
+  } catch {}
 }
 if (!wsUrl) { chrome.kill(); throw new Error('chrome did not come up'); }
 
@@ -189,9 +199,24 @@ const links = await evaluate(`[...document.querySelectorAll('li.pos-row a[href]'
 // is exactly the kind of detail a typed-in number gets wrong the first time.
 ok('index', 'lists every demo and note row', rows === DEMOS.length + NOTES.length,
    `${rows} rows, manifest has ${DEMOS.length} demos + ${NOTES.length} notes`);
+// 🔴 THE SLUG HAS NO NUMBER IN IT, AND THIS CHECK DEMANDED ONE. It tested
+// `/^\/\d\d-[a-z]+\/$/` — the PRE-RENAME url shape. CLAUDE.md: *"A demo's
+// identity is its slug and its ORDER is its position in `DEMOS` — there is no
+// number in the directory, the URL, or the page."* So this assert could not
+// pass and had not been passing: MEASURED 2026-09-14, **0 of 44 linked targets
+// matched it while all 44 answered 200**. A permanently red assert is worse
+// than no assert — it is the thing that teaches a reader a red run means
+// nothing. Another rename that moved a URL living in a harness, which is the
+// one place nothing type-checks.
+//
+// A demo row links `/<slug>/`, optionally carrying the `?xr=1` the index adds
+// to scroll a headset page's Run control under your hand.
+const linkOk = (h) => /^\/[a-z][a-z0-9-]*\/(?:\?[a-z0-9=&-]*)?$/.test(h)
+  || h.startsWith('/proto/') || h.startsWith('/notes/');
 ok('index', 'linked rows point at a demo, a proto or a note',
-   links.length > 0 && links.every((h) => /^\/\d\d-[a-z]+\/$/.test(h) || h.startsWith('/proto/') || h.startsWith('/notes/')),
-   `${links.length} linked: ${links.slice(0, 6).join(' ')}…`);
+   links.length > 0 && links.every(linkOk),
+   `${links.length} linked, ${links.filter((h) => !linkOk(h)).length} bad`
+   + `${links.filter((h) => !linkOk(h)).length ? ': ' + links.filter((h) => !linkOk(h)).join(' ') : ''}`);
 const tap = await evaluate(`(() => { const r = document.querySelector('li.pos-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');

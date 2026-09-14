@@ -557,6 +557,19 @@ counts against the last known total after any change.
 
 ## Conventions
 
+- 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
+  `demo/radio1965/index.html` is not an answer to *"where is it"* — it is the
+  answer to *"which file did you edit"*, and the reply to a working demo that
+  gives one was **"useless to me"**. Say where to OPEN it:
+  **a deployed `https://positron.studio/<slug>/` if it is deployed, otherwise a
+  live local URL with every query parameter it needs to work** — and the server
+  behind it still RUNNING, not one killed three commands ago. ⚠️ A page that
+  needs a local worker as well needs BOTH up and both named, in one line that
+  can be clicked: `http://127.0.0.1:8890/radio1965/?base=http://localhost:8899`.
+  If it cannot be reached at all yet, say that in those words and say what is
+  missing — an unreachable page reported as done is worse than one reported as
+  blocked, because only one of them gets fixed.
+
 - Demos are `demo/<slug>/index.html`, deployed at `/<slug>/`. **A demo's identity
   is its slug and its ORDER is its position in `DEMOS`** — there is no number in
   the directory, the URL, or the page. There used to be, in five places at once,

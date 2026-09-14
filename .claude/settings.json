@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard-tree.mjs\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git branch:*)",
+      "Bash(git blame:*)",
+      "Bash(node demo/verify.mjs:*)",
+      "Bash(node demo/verify-gl.mjs:*)",
+      "Bash(node demo/verify-native.mjs:*)",
+      "Bash(node demo/verify-safari.mjs:*)",
+      "Bash(node demo/verify-quest.mjs:*)",
+      "Bash(node workers/view/build.mjs --out:*)",
+      "Bash(node --check:*)",
+      "Bash(curl -s https://positron.studio/*)",
+      "Bash(curl -sI https://positron.studio/*)",
+      "Bash(curl -s https://pub.positron.studio/logs*)"
+    ]
+  }
+}

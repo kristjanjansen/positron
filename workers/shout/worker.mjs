@@ -17,15 +17,38 @@
 // metadata, say) would add a hop of latency to every byte for no gain — the
 // metadata is already in the frames the client parses.
 
-const ORIGIN = 'https://icecast.err.ee';
+const ERR = 'https://icecast.err.ee';
 
-/** id -> upstream path. ERR's five public radio streams, 128 kbps MP3. */
+/**
+ * id -> the FULL upstream URL, allowlisted.
+ *
+ * ⚠️ THIS WAS `id -> path` AGAINST ONE `ORIGIN` CONSTANT, and that held exactly
+ * as long as every station was ERR's. A single origin is a shared mutable
+ * global of the same family as a fixed port: it is a property of the first
+ * caller that gets silently imposed on the second. Full URLs cost one repeated
+ * hostname and let a station live anywhere.
+ *
+ * 🔴 `radio1965` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE.
+ * Their Icecast sends no `access-control-allow-origin` AND terminates no TLS,
+ * so an HTTPS page cannot play it at all — not "cannot measure it", cannot
+ * play it: the browser refuses the mixed-content load before any CORS question
+ * is asked. This relay is the only way that stream reaches a browser on
+ * positron.studio. MEASURED DIRECT 2026-09-14: Icecast 2.4.4, `audio/mpeg`,
+ * 128 kbit/s 44.1 kHz stereo, `icy-name: Radio 1965`, `icy-metaint: 16000`,
+ * mean volume -20.4 dB against a synthesised-silence control at -91.0 dB.
+ *
+ * ⚠️ It is somebody else's stream on this account's egress, which is the thing
+ * the allowlist above exists to bound. One named mount, added on purpose.
+ */
 const STATIONS = {
-  vikerraadio: '/vikerraadio.mp3',
-  raadio2: '/raadio2.mp3',
-  klassikaraadio: '/klassikaraadio.mp3',
-  raadio4: '/raadio4.mp3',
-  raadiotallinn: '/raadiotallinn.mp3',
+  // Estonian Centre of Contemporary Music's community station (uuu.ee).
+  radio1965: 'http://live.uuu.ee:8001/radio1965',
+  // ERR's five public radio streams, 128 kbps MP3.
+  vikerraadio: `${ERR}/vikerraadio.mp3`,
+  raadio2: `${ERR}/raadio2.mp3`,
+  klassikaraadio: `${ERR}/klassikaraadio.mp3`,
+  raadio4: `${ERR}/raadio4.mp3`,
+  raadiotallinn: `${ERR}/raadiotallinn.mp3`,
 };
 
 // Everything a client needs to read about the stream, including the ICY fields
@@ -58,13 +81,17 @@ export default {
     }
 
     if (url.pathname === '/' || url.pathname === '/stations') {
-      return Response.json({ stations: Object.keys(STATIONS), origin: ORIGIN },
-        { headers: cors() });
+      // The upstream HOST per station, not one `origin` — there is no longer a
+      // single one, and reporting a stale constant is worse than reporting none.
+      return Response.json({
+        stations: Object.fromEntries(
+          Object.entries(STATIONS).map(([k, v]) => [k, new URL(v).host])),
+      }, { headers: cors() });
     }
 
     const id = url.pathname.replace(/^\/+/, '').replace(/\.mp3$/, '');
-    const path = STATIONS[id];
-    if (!path) return new Response('no such station', { status: 404, headers: cors() });
+    const upstream = STATIONS[id];
+    if (!upstream) return new Response('no such station', { status: 404, headers: cors() });
 
     // `?bytes=N` closes the connection after N bytes. A radio stream never
     // ends, so without a bound every probe — the demo's, the harness's — has to
@@ -79,7 +106,7 @@ export default {
     // every uptime checker that HEADs a URL would have believed it. The relay
     // does the GET, keeps the headers, and cancels the body before a frame of
     // audio is paid for.
-    const up = await fetch(ORIGIN + path, {
+    const up = await fetch(upstream, {
       method: 'GET',
       headers: {
         // ICY metadata is opt-in and the client's choice, not ours: asking for

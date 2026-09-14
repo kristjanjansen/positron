@@ -1,7 +1,6 @@
 // demo/verify-safari.mjs — drive DESKTOP SAFARI over WebDriver.
 //
-//   node demo/server.mjs &                    # or use DEMO_BASE
-//   node demo/verify-safari.mjs               # both engines
+//   node demo/verify-safari.mjs               # both engines (starts its own server)
 //   node demo/verify-safari.mjs native        # just one
 //   DEMO_BASE=https://positron.studio node demo/verify-safari.mjs
 //
@@ -17,11 +16,32 @@
 //
 // No dependencies: WebDriver is plain HTTP+JSON.
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import { serve } from './server.mjs';
 
-const PORT = 4577;
-const BASE = process.env.DEMO_BASE
-  ? `${process.env.DEMO_BASE}`
-  : 'http://127.0.0.1:8890/demo';
+/** A port the OS picked, released immediately — lifted from verify-quest.mjs,
+ *  where its comment is also the honest one: there is a race between the close
+ *  and safaridriver's bind, and it is still better than a constant. */
+const freePort = () => new Promise((resolve, reject) => {
+  const s = createServer();
+  s.on('error', reject);
+  s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
+});
+
+// ⚠️ THE PORT WAS 4577 AND THE SERVER WAS ASSUMED TO BE ON 8890. Both are the
+// shared-mutable-global rule this repo already applies three files over: a
+// second run of this harness died on the bind, and the base URL pointed at
+// whatever happened to be on 8890 once `serve()` learned to move.
+//
+// 🔴 BUT THE PORT WAS NEVER THE REAL LIMIT HERE, AND FIXING IT DOES NOT MAKE
+// THIS CONCURRENT. `safaridriver` drives the one Safari on this machine, and
+// Remote Automation is a single global switch, so two of these at once is still
+// two harnesses fighting over one browser — it will just now fail somewhere
+// honest instead of on a port collision that looked like a code fault.
+const PORT = await freePort();
+const server = process.env.DEMO_BASE ? null : await serve(8895);
+const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
+console.log(`base ${BASE} · safaridriver on ${PORT}`);
 const only = process.argv[2];
 const ENGINES = only ? [only] : ['hlsjs', 'native'];
 const SETTLE_MS = Number(process.env.SAFARI_SETTLE_MS || 45000);
@@ -29,7 +49,7 @@ const SETTLE_MS = Number(process.env.SAFARI_SETTLE_MS || 45000);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const driver = spawn('safaridriver', ['--port', String(PORT)], { stdio: 'ignore' });
-process.on('exit', () => { try { driver.kill(); } catch {} });
+process.on('exit', () => { try { driver.kill(); } catch {} try { server?.close(); } catch {} });
 
 async function wd(method, path, body) {
   const r = await fetch(`http://127.0.0.1:${PORT}${path}`, {

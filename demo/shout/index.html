@@ -19,6 +19,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { icyDemuxer } from '/shell/icy.mjs';
 
   // SHOUTcast/Icecast is the oldest live protocol still in daily use: one HTTP
   // response that never ends, MP3 frames as fast as the wall clock, no
@@ -40,6 +41,13 @@
 
   const q = new URLSearchParams(location.search);
   const BASE = q.get('base') || 'https://shout.positron.studio';
+  // ⚠️ THIS PAGE IS ERR'S RADIO AND STAYS THAT WAY. The default was briefly
+  // `radio1965` — the relay carries that mount too — and it was the wrong page
+  // for it: this demo's subject is what Cloudflare costs in front of an Icecast
+  // stream, measured on the national broadcaster's output, and `/radio1965/` is
+  // its own demo about its own station. A shared relay is not a reason to share
+  // a page. Any mount the relay knows is still one query away:
+  // /shout/?station=vikerraadio
   const STATION = q.get('station') || 'raadiotallinn';
   const NOMINAL_KBPS = 128;
   const MEASURE_MS = 7000;
@@ -148,38 +156,17 @@
         if (v) rec.headers[k] = v;
       }
       // ── the in-band text channel ───────────────────────────────────────
-      // After every `icy-metaint` bytes of audio comes one length byte (x16)
-      // and that many bytes of text — `StreamTitle='…';StreamUrl='…'`. Almost
-      // every slot is EMPTY: the station only writes when something changes.
-      // Measured on Raadio Tallinn: metaint 16000 at 128 kbps, so one slot per
-      // second exactly, and 1 of 29 carried text over 25 s.
+      // The demuxer is `/shell/icy.mjs` and is no longer written here. It was
+      // lifted out of this page when `radio1965` needed the same forty lines;
+      // `icy-test.mjs` feeds it a synthetic stream at fourteen chunk sizes down
+      // to ONE BYTE, which is the case a title straddles and a naive parser
+      // drops silently.
       const metaint = Number(rec.headers['icy-metaint'] || 0);
-      let need = metaint, mode = 'audio', metaLen = 0, spare = new Uint8Array(0);
-      const eat = (chunk) => {
-        if (!metaint) return;
-        let b = spare.length ? concat(spare, chunk) : chunk;
-        for (;;) {
-          if (mode === 'audio') {
-            if (b.length < need) break;
-            b = b.subarray(need); mode = 'len';
-          } else if (mode === 'len') {
-            if (b.length < 1) break;
-            metaLen = b[0] * 16; b = b.subarray(1);
-            rec.slots++;
-            mode = metaLen ? 'meta' : 'audio'; if (!metaLen) need = metaint;
-          } else {
-            if (b.length < metaLen) break;
-            const txt = new TextDecoder('utf-8', { fatal: false })
-              .decode(b.subarray(0, metaLen)).replace(/\0+$/, '');
-            rec.filled++;
-            const t = /StreamTitle='([^']*)'/.exec(txt);
-            if (t && t[1] && t[1] !== title) { title = t[1]; onTitle(title); }
-            b = b.subarray(metaLen); mode = 'audio'; need = metaint;
-          }
-        }
-        spare = b;
-      };
-      const concat = (a, c) => { const o = new Uint8Array(a.length + c.length); o.set(a); o.set(c, a.length); return o; };
+      const eat = icyDemuxer(metaint, {
+        onSlot: () => { rec.slots++; },      // every slot, including the empty ones
+        onMeta: () => { rec.filled++; },     // only the ones carrying text
+        onTitle: (t) => { title = t; onTitle(t); },
+      });
 
       const reader = res.body.getReader();
       let last = performance.now();

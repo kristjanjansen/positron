@@ -1,10 +1,22 @@
 // perf-wire.mjs — what the relay costs and how it scales. Writes to a file:
 // `node x.mjs | tail` buffers until exit and looks hung.
 import { appendFileSync, writeFileSync } from 'node:fs';
-const OUT = '/private/tmp/claude-501/-Users-s32863-personal-positron/399cfe11-fd1a-4f7b-a13d-7b3417043e12//tmp/perf-wire.txt';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// ⚠️ THIS PATH USED TO BE A DEAD SESSION'S SCRATCHPAD — a hardcoded UUID under
+// `/private/tmp/claude-501/…/399cfe11-…//tmp/`, double slash and all. It still
+// "worked", because a write creates what it needs, so nothing ever said the
+// results were landing somewhere nobody would look. Second one of these in the
+// harnesses; `verify-native.mjs` had the other.
+const OUT = process.env.PERF_OUT || join(tmpdir(), `perf-wire-${process.pid}.txt`);
 const RELAY = 'wss://ws.positron.studio';
-const BACKLOG = 'http://localhost:8788';
+// A fixed port for somebody else's dev server: overridable, so a second
+// `wrangler dev` on another port is reachable rather than silently missed.
+// 127.0.0.1 rather than `localhost`, which can resolve to ::1 and refuse.
+const BACKLOG = process.env.BACKLOG || 'http://127.0.0.1:8788';
 writeFileSync(OUT, `perf-wire ${new Date().toISOString()}\n\n`);
+console.log(`writing to ${OUT}`);
 const say = (s) => { appendFileSync(OUT, s + '\n'); console.log(s); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pct = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
