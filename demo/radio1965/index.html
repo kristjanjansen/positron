@@ -10,24 +10,82 @@
   /* The in-band title. It changes when a track changes — human pace, not a
      clock — so prose here is allowed. `min-height` reserves the line so the
      page does not jump the first time the station says something. */
-  /* ⚠️ TWO COLUMNS, because five sliders in one wrapping row is what the
-     screenshot showed: labels colliding with the track beside them and a set of
-     controls nobody can scan. A fixed pair of columns keeps every label above
-     its own track at every width that has room for two, and drops to one when
-     it does not. */
-  .pos-sliders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; }
-  @media (max-width: 560px) { .pos-sliders { grid-template-columns: 1fr; } }
+  /* 🔴 THE TWO-COLUMN GRID THAT USED TO BE HERE WAS THE WRONG FIX, AND THE
+     RIGHT ONE ALREADY EXISTED IN THE KIT. It put each slider in its own cell of
+     a `repeat(2, 1fr)` grid, so every slider still laid ITSELF out inside that
+     cell — and a slider's label column is as wide as its own label. PHOTOGRAPHED
+     here: `GRAINS A SECOND` and `READ POSITION` are different widths, so their
+     two lanes started at different x and were different lengths, in a control
+     whose entire job is comparing four values at a glance.
+
+     `createSliderGroup()` is what shares ONE set of columns across all of them —
+     `max-content` for the labels, `minmax(0, 1fr)` for the lanes so they take
+     the width that is actually there — by making each slider `display: contents`
+     so its parts land in the group's columns rather than in a box of its own.
+     `{ pair: true }` gives two across above 720 px and stacks below it. This is
+     the same defect `/grains/` had on a phone and the reason that component was
+     written; this page had not been moved onto it. */
+
+  /* ⚠️ FULL WIDTH, WHICH `.sld-group` DELIBERATELY IS NOT — it caps at 560 px so
+     a stacked column of four does not become a metre long on a desktop. This one
+     slider is the whole page in one gesture: how much of what you hear is the
+     station and how much is the granulator chewing it. It is the widest thing
+     here on purpose, and it sits directly under the picture whose grain ticks it
+     fades, so the hand and the thing it changes are never more than a line
+     apart. A page making a claim about one relationship says so — CLAUDE.md. */
+  /* 🔴 TWO GROUPS CANNOT SHARE A COLUMN, AND THAT IS THE WHOLE DEFECT.
+     `.sld-group`'s first column is `max-content`, which is exactly right inside
+     one group and says nothing across two: the fader's column is sized by
+     `RADIO → GRANULATOR` and the four settings' column by `GRAINS A SECOND`,
+     so the two grids resolve to different widths and every lane below the fader
+     starts at a different x from the fader's. PHOTOGRAPHED on an iPhone, where
+     the pair layout is off and all five are stacked in one column — which is
+     precisely where a shared column is the entire point.
+
+     CSS has no way to say "these two grids share a track" (subgrid inherits
+     from a PARENT grid, and these are siblings). So the width is measured once
+     from the widest label and handed to both as `--lab`; `max-content` stays as
+     the fallback, so the layout is never worse than it was if the script does
+     not run. ⚠️ The pair rule has to be restated here or it is lost: this
+     declaration and `.sld-group.pos-pair` are both (0,2,0), and the page's
+     <style> comes after the stylesheet, so the page wins the tie on order. */
+  .wet-fader { max-width: none; }
+  .wet-fader, .gran-rows { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
+  @media (min-width: 720px) {
+    .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
+  }
+
+  /* ⚠️ ONE VERTICAL RHYTHM, INCLUDING INSIDE THE GROUP. MEASURED down this page
+     at 1100 px: scope → fader **22**, fader → first row **22**, first row →
+     second row **10**. The first two are `shell.css`'s `.pos-body > * + *`; the
+     last is `.sld-group`'s own `row-gap`, which is tuned for a tall stack of
+     related sliders and is the odd one out here, where there are two rows under
+     a fader that is spaced at 22. Three gaps down one column, one of them
+     different, reads as the bottom pair being a subgroup of something — which
+     they are not. (0,2,0), so it beats the kit's rule on weight rather than on
+     source order: the day that becomes a tie is the day it silently stops. */
+  .gran-rows { row-gap: 22px; }
+
+  /* The in-band title, and the slot that says when there is nothing to play.
+     ⚠️ ONE ELEMENT FOR BOTH, because they answer the same question — what am I
+     hearing — and two lines stacked here would leave one of them empty and
+     reserving space for nothing. `min-height` holds the line so the page does
+     not jump the first time the station names a track. */
   .now { font: 600 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
+  .now.down { color: var(--bad, #ff7a7a); }
 </style>
 
 <script type="module">
-  import { mount, guard, el } from '/shell/shell.mjs';
+  import { mount, guard, el, createShipper, BUILD } from '/shell/shell.mjs';
   import { icyDemuxer } from '/shell/icy.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
-  import { createSlider } from '/shell/slider.mjs';
+  import { createSlider, createSliderGroup } from '/shell/slider.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
-  import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE }
+  import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE, RING_SECONDS, GATE0 }
     from '/shell/pappus.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
@@ -46,9 +104,23 @@
   // play normally. The `WebAudio can see the samples` check catches exactly that.
   const BASE = new URLSearchParams(location.search).get('base')
     || 'https://shout.positron.studio';
-  const STATION = 'radio1965';
-  const SRC = `${BASE}/${STATION}.mp3`;
-  const NOMINAL_KBPS = 128;         // measured direct: 128.076 kbit/s, 44.1k stereo
+  // 🔴 TWO STATIONS, AND THE SECOND IS NOT A FEATURE — IT IS WHAT MAKES THIS
+  // PAGE SURVIVE ITS OWN SUBJECT. Radio 1965 is one volunteer-run Icecast mount
+  // and it goes down: MEASURED 2026-09-14, `live.uuu.ee:8001` accepted the TCP
+  // connection and then sent zero bytes on every path, so the relay answered
+  // `origin 520` and this page had nothing at all to show — no sound, no
+  // granulator, and nine red asserts about a defect that was not ours.
+  // Klassikaraadio is ERR's, on the same relay and the same 128 kbps MP3, and it
+  // was up in the same second. A page about a live stream needs a live stream.
+  //
+  // ⚠️ THE ORDER IS THE PREFERENCE. Radio 1965 first because it is what this
+  // page is for; the fallback is automatic and says so in the log rather than
+  // silently playing something else.
+  const STATIONS = [['Radio 1965', 'radio1965'], ['Klassikaraadio', 'klassikaraadio']];
+  const srcOf = (id) => `${BASE}/${id}.mp3`;
+  let station = STATIONS[0][1];
+  const PROBE_MS = 6000;            // long enough for a cold relay, short enough to act on
+  const NOMINAL_KBPS = 128;         // both mounts: measured direct 128.076 kbit/s
   // ⚠️ A CROSS-PAGE URL, AND IT IS CHECKED AT BUILD TIME. The compiled graph
   // lives with `/grains/`'s PROVENANCE.json, which records the md5 of the `.sc`
   // it came from and which `build.mjs` REFUSES the build over when they
@@ -71,27 +143,97 @@
     name: 'radio1965',
     what: 'A live community radio station in Tallinn, played through a relay of '
       + 'ours because their stream is plain HTTP and a secure page may not load it '
-      + 'directly. Press Synthesize and the sound goes into a SuperCollider '
-      + 'granulator running in this tab — the same compiled graph a Raspberry Pi in '
-      + 'the studio runs, chewing the radio instead of a test tone, and every tick in '
-      + 'the picture is a grain the engine reported firing rather than one guessed '
-      + 'from the sound. HEARD is how long it has played, KBPS the settled rate, GAP '
-      + 'the worst pause, BEHIND the seconds you missed while paused, GRAINS how many '
-      + 'are firing a second, and WET how much of what you hear is the granulator.',
-    readout: { heard: 's', kbps: '', gap: 'ms', behind: 's', grains: '/s', wet: '' },
-    // ⚠️ ONE CONTROL, AND IT IS NOT "PLAY". There was a `Listen` button beside a
-    // transport bar that also has a play button — two controls for one action,
-    // and the reader has to guess which is real. Playing is the transport's job.
-    // This button does the thing the transport cannot: hand the radio to a
-    // SuperCollider granulator.
-    controls: [{ id: 'synth', label: 'Synthesize', primary: true }],
+      + 'directly. The sound also goes into a SuperCollider granulator running in '
+      + 'this tab — the same compiled graph a Raspberry Pi in the studio runs — the '
+      + 'long fader blends the two, all station at the left and all granulator at '
+      + 'the right, and every tick in the picture is a grain the engine reported '
+      + 'firing rather than one guessed from the sound. SOUND steps through six '
+      + 'finished settings, from a slow reverse drift to a stutter that leaves the '
+      + 'words intelligible, and the four sliders nudge whichever one you are on. '
+      + 'HEARD is how long it has played, KBPS the settled rate, BEHIND the seconds '
+      + 'you missed while paused, GRAINS how many fire a second.',
+    // ⚠️ FOUR CELLS, DOWN FROM SIX, AND THE TWO THAT WENT WERE THE TWO THAT
+    // COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
+    // measured once and then sits there for the rest of the visit, which is a
+    // constant wearing a measurement's clothes (CLAUDE.md: every readout cell
+    // must be able to change). It is still asserted and still in the log line —
+    // REHOMED, not deleted. `wet` went because the fader now prints its own
+    // value an inch below, and a second copy of a number is a number that can
+    // disagree with itself — the same argument `keyboard.mjs` makes for keeping
+    // the octave off the pad.
+    readout: { heard: 's', kbps: '', behind: 's', grains: '/s' },
+    // 🔴 NO CONTROLS AT ALL, AND THE GRANULATOR IS ALWAYS ON. There was a
+    // `Synthesize` button, and before that a `Listen` button beside a transport
+    // bar that already has a play button. Both were the same mistake one step
+    // apart: a second control for something the page is already doing. The
+    // granulator is not a mode this page can be in or out of — it is what the
+    // page IS — so it comes up with the sound and the fader decides how much of
+    // it reaches you. `mount()` hides an empty `.pos-controls` (shell.mjs:111),
+    // so the row leaves no band behind it.
+    controls: [],
   });
   guard(d);
+
+  /**
+   * 🔴 `?report=1` — THE ONLY WAY TO SEE WHAT A PHONE IS DOING. iOS Safari
+   * cannot be attached to a debugger from here, and this page fails on it in the
+   * worst available shape: sound out of the speakers, an empty picture, and
+   * every visible step apparently succeeding. Guessing has already cost two
+   * wrong hypotheses — `createMediaElementSource` before `src` (a real defect,
+   * not this one) and CORS (the relay's streaming 200 carries
+   * `access-control-allow-origin: *`).
+   *
+   * So the page reports instead. `createShipper` batches at 2 s, collapses
+   * repeats and swallows its own failures, because a diagnostic is never allowed
+   * to make the page worse than the thing being diagnosed. Read it back at
+   * `https://pub.positron.studio/logs?format=text`.
+   *
+   * ⚠️ OFF UNLESS ASKED. Every visitor posting their session to a shared ring
+   * buffer would push the one report somebody is waiting for straight out of it.
+   * ⚠️ AND IT OPENS WITH THE BUILD AND THE USER AGENT, or a report cannot be
+   * attributed to a build and "still broken" and "the fix never loaded" are the
+   * same line.
+   */
+  /**
+   * 🔴 `?decode=1` — THE STREAM WITHOUT A MEDIA ELEMENT.
+   *
+   * MEASURED on an iPhone: `<audio>` plays and `createMediaElementSource` hands
+   * the graph 0.0000 for ever, while an oscillator through the same analyser
+   * reads 0.33-0.80. `mp3-stream.mjs` fetches, demuxes the ICY text out, splits
+   * MP3 frames and decodes them itself — so nothing depends on WebKit routing an
+   * element into WebAudio.
+   *
+   * ⚠️ BEHIND A FLAG UNTIL IT HAS EARNED THE DEFAULT. The element path is 30/30
+   * on this machine and this one has never run on the device it was written for.
+   * Replacing a measured path with an unmeasured one because the mechanism is
+   * convincing is how this page has already been "fixed" twice today.
+   */
+  const DECODE = new URLSearchParams(location.search).get('decode') === '1';
+  const REPORTING = new URLSearchParams(location.search).get('report') === '1';
+  const ship = REPORTING ? createShipper() : () => {};
+  if (REPORTING) {
+    ship(`--- radio1965 BUILD ${BUILD} ---`);
+    ship(`UA ${navigator.userAgent}`);
+    d.log('reporting to pub.positron.studio — this session is being posted');
+  }
 
   // ⚠️ THE RELAY URL USED TO BE PRINTED HERE AND IS NOT ANY MORE. A 60-character
   // absolute URL across the top of a page is noise: it never changes, nobody can
   // act on it, and it pushed the thing you came for further down. It is in the
   // log line when the stream starts, where somebody who wants it can copy it.
+  // ⚠️ THE CHOOSER IS ABOVE THE TRANSPORT because it decides what the transport
+  // plays, and `createChoice` rather than two hand-rolled buttons because this
+  // repo has already shipped three different radio rows and paid for all of them.
+  const picker = createChoice({
+    label: 'station',
+    options: STATIONS,
+    at: 0,
+    onPick: (id) => {
+      if (id !== station) switchTo(id, selfCheck ? 'checking the buttons' : 'you chose it');
+    },
+  });
+  d.el.append(picker.el);
+
   const nowEl = el('div', 'now', '');
   d.el.append(nowEl);
 
@@ -108,6 +250,13 @@
   deck.seek(t0);
 
   let heardFrom = null;                 // when audio actually started arriving
+  // 🔴 SECONDS PLAYED BEFORE THE CURRENT `src`, BECAUSE `currentTime` RESTARTS
+  // AT ZERO ON EVERY SWITCH. HEARD says how long you have been listening, and a
+  // station change — including the one `finish()` makes and undoes to check the
+  // buttons — was setting it back to `0s` on a page that had been playing for
+  // half a minute. PHOTOGRAPHED reading `HEARD 0s` beside `BEHIND 4s`, which
+  // cannot both be true.
+  let heardBefore = 0;
   let started = false;                  // has the stream ever been asked for
 
   const bar = createTransportBar(d.el, deck, { absolute: true, scrub: false, endStop: false });
@@ -130,12 +279,6 @@
     // this axis are the same seconds — see the note in grain-scope.mjs
     grainSeconds: BUF_SECONDS });
 
-  // ⚠️ THE CONTROL ROW MOVES UNDER THE PICTURE. `mount()` puts it above, which
-  // is right for a page whose control starts something abstract; here the
-  // button acts ON the waveform right beneath it, and a control above a picture
-  // it changes reads as belonging to whatever is above THAT.
-  const cbar = d.el.querySelector('.pos-controls');
-  if (cbar) d.el.append(cbar);
   scope.source('the radio, as it arrives');
 
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
@@ -172,7 +315,7 @@
     // minutes of "you missed this" for somebody who missed nothing. The
     // element's own clock has no such problem.
     if (heardFrom != null) {
-      d.set('heard', audio.currentTime.toFixed(0));
+      d.set('heard', played().toFixed(0));
     }
     // 🔴 BEHIND — the one number a live stream with a pause button owes you.
     // An Icecast mount has no past to seek to, so pausing does not hold your
@@ -180,7 +323,7 @@
     // seconds you missed stay missed. This counts them. It sits still while you
     // listen and grows while you do not, which is exactly when it matters.
     if (heardFrom != null) {
-      d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - audio.currentTime).toFixed(0));
+      d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - played()).toFixed(0));
     }
     // 🔴 THE BAR MUST BE ABLE TO STOP THE SOUND, AND IT COULD NOT.
     // `mediaMaster` runs one way only — its own doc says *"a paused/ended
@@ -189,8 +332,55 @@
     // playhead and left the radio playing, which is a transport bar lying about
     // the one thing it is for. Reported from the page, not from a test.
     if (started) {
-      if (deck.playing() && audio.paused) audio.play().catch(() => {});
+      if (DECODE) {
+        // An Icecast mount has no pause: stopping drops you and playing rejoins
+        // at the live edge, which is exactly what BEHIND already reports.
+        if (deck.playing() && !stream) openStream();
+        else if (!deck.playing() && stream) closeStream();
+      } else if (deck.playing() && audio.paused) audio.play().catch(() => {});
       else if (!deck.playing() && !audio.paused) audio.pause();
+    }
+    // 🔴 GRAINS FOLLOWS THE PATCH, AND BEFORE THE PATCHES IT DID NOT HAVE TO.
+    // This cell used to be written ONCE, from the boot measurement, and that was
+    // defensible while the page had one grain rate: `mrate` never moved unless a
+    // hand moved it. Six patches span 0.9/s to 26/s and multiply that by their
+    // own chord and rhythm, so a cell frozen at the opening patch's 5.6 would
+    // read 5.6 under `roof rain`'s forty-two — a stale measurement, which is
+    // worse than a constant because it looks live (CLAUDE.md: every readout cell
+    // must be able to change, and this one had stopped being able to).
+    //
+    // ⚠️ A NUMBER IN A CELL, AT ONE HERTZ, WHICH IS WHERE A CHANGING NUMBER GOES.
+    // The cell is a fixed box with `tabular-nums`, so it cannot reflow the page
+    // under somebody reading it — unlike a sentence, which is the thing that
+    // rule exists about.
+    // ⚠️ AND THE ASSERT DOES NOT READ THIS. It grades `lastRate`, the boot
+    // measurement taken over a known window with a known patch loaded; a cell
+    // that anybody can change by pressing `›` is not evidence about anything.
+    // ⚠️ `Math.max(0, …)` BECAUSE THE COUNTER IS RESET ONCE, in `startGranulator`
+    // just before the boot window — without it the first tick after that reset
+    // reports a negative rate.
+    if (eng && G.running) {
+      const now = performance.now();
+      const dt = (now - grainsAt) / 1000;
+      if (dt > 0.25) {
+        d.set('grains', (Math.max(0, grains - grainsSeen) / dt).toFixed(1));
+        grainsSeen = grains; grainsAt = now;
+      }
+    }
+    // 🔴 THE ONE LINE THAT SEPARATES EVERY CANDIDATE, once a second.
+    // `ctx` running vs suspended; the ELEMENT playing vs not; `rms`, which is
+    // whether WebAudio can hear the element AT ALL and is the whole question on
+    // iOS; `eng`, which answers "is it a loading problem" outright; and whether
+    // the graph is firing grains. Any two of these disagreeing names the fault.
+    if (REPORTING && started) {
+      ship(`ctx=${ctx ? ctx.state : 'none'} sr=${ctx ? ctx.sampleRate : '-'}`
+        + ` session=${navigator.audioSession ? `${navigator.audioSession.type}/${navigator.audioSession.state}` : 'unsupported'}`
+        + (DECODE
+          ? ` decode=${JSON.stringify(stream ? stream.stats() : null)}`
+          : ` el={paused:${audio.paused},t:${audio.currentTime.toFixed(1)},ready:${audio.readyState},net:${audio.networkState},err:${audio.error ? audio.error.code : '-'}}`)
+        + ` rms=${rmsPeak.toFixed(4)} fed=${scope.stats().inferred}`
+        + ` eng=${eng ? Math.round(eng.bootMs) + 'ms' : 'not booted'} grains=${grains}`
+        + ` station=${station} wet=${wet.toFixed(2)}`);
     }
   }, 1000 / RANGE_HZ);
 
@@ -200,14 +390,104 @@
   audio.crossOrigin = 'anonymous';
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
-  let eng = null, grains = 0, wet = 0.85, synthOn = false, sliderRow = null, lastRate = '';
-  const P = { rate: 8, size: 0.12, scan: 0.666, spray: 0 };
+  let stream = null;                 // the decoded mount, when DECODE
+  // ⚠️ REMEMBERED, because the stream is CLOSED by the time `finish()` asserts —
+  // the transport-stop check shuts it deliberately — and reading the path off a
+  // null stream printed `via nothing` about a path that had just decoded 16 s.
+  let decodePath = '';
+
+  /** Point the decoded path at the current station. Safe to call again. */
+  function openStream() {
+    closeStream();
+    stream = createMp3Stream(ctx, {
+      url: srcOf(station),
+      onTitle: (t) => { nowEl.textContent = t; d.log(`now playing: ${t}`, 'hi'); },
+      log: (m) => { d.log(m); ship(m); },
+    });
+    stream.node.connect(srcNode);
+    stream.started.then((path) => {
+      decodePath = path;
+      ship(`decode path: ${path}`);
+      if (heardFrom == null) heardFrom = Date.now();
+      deck.seek(Date.now());
+      deck.play();
+      if (!master) master = mediaMaster(deck, () => ({ el: null, key: 'radio', pos: heardFrom + played() * 1000 }));
+    }).catch(() => {});
+  }
+  function closeStream() {
+    if (!stream) return;
+    heardBefore += playedNow();
+    try { stream.stop(); } catch { /* already stopped */ }
+    stream = null;
+  }
+
+  // 🔴 ONE CLOCK FOR BOTH PATHS. An element counts in `currentTime`; a decoded
+  // stream counts in context seconds since its first block was scheduled.
+  // Every number this page prints about listening — HEARD, BEHIND, the ring
+  // warm-up, "did it play" — has to come from ONE of these or the page reports
+  // two different answers to one question depending on a query parameter.
+  const playedNow = () => (DECODE
+    ? (stream && stream.stats().startedAt ? Math.max(0, ctx.currentTime - stream.stats().startedAt) : 0)
+    : audio.currentTime);
+  const played = () => heardBefore + playedNow();
+  const isPlaying = () => (DECODE ? !!(stream && stream.stats().blocks > 0) : !audio.paused);
+  // 🔴 IT STARTS DRY. The granulator is running from the moment there is sound,
+  // but none of it reaches you until you move the fader — so the first thing
+  // this page does is play a radio station, and the instrument is something you
+  // bring in. At 0.85, which is where it used to land the instant the button was
+  // pressed, the station was gone before anybody had heard it arrive.
+  //
+  // ⚠️ AND THE ASSERTS ARE UNAFFECTED BY THIS, WHICH IS WHY IT IS SAFE.
+  // `bootScsynth` wires `sonic.node → meter → out`, so the engine's own meter is
+  // UPSTREAM of the wet gain: `engLevel()` reads what the granulator is making
+  // whatever the fader is set to. A deafness control that went quiet merely
+  // because the blend was dry would be measuring the fader.
+  let eng = null, grains = 0, wet = 0, sliderRow = null, lastRate = '';
+  // The rolling window the GRAINS cell is computed over — see the 1 Hz tick.
+  let grainsSeen = 0, grainsAt = performance.now();
+  // ⚠️ DECLARED HERE, BUILT IN `startGranulator`. `applyPatch` moves the sliders
+  // and renames one of them, and it is called from the boot — before the row
+  // exists — so every reference to them is optional. A patch applied with no
+  // sliders on screen still reaches the engine; it is only the picture of it
+  // that waits.
+  let sliders = null, patchPick = null, shareLabelColumn = null;
+  // Has the granulator's ring been through one full lap of live radio? Until it
+  // has, the engine is quiet for a reason and nothing may report that as a fault.
+  let ringFilled = false;
+  // What the four sliders currently hold. Seeded from the patch this page opens
+  // on, never from the engine's own defaults — see PATCHES.
+  const P = { rate: 1.4, size: 1.8, scan: 0.30, spray: 0.55 };
   let measured = null, done = false, synthPending = false;
 
   function graph() {
     if (ctx) return;
+    // 🔴 iOS SENDS WEBAUDIO THROUGH THE SILENT SWITCH AND A MEDIA ELEMENT PAST
+    // IT, AND THAT IS WHY REMOVING THE ELEMENT MADE THE PAGE GO QUIET.
+    // MEASURED on an iPhone the moment the decode path started working: the
+    // decoder ran clean — `WebCodecs AudioDecoder`, 44100 Hz, 0 errors, 0
+    // underruns — and the analyser read **rms 0.16 -> 0.23**, so the graph
+    // plainly had the audio, while the phone made no sound at all. A page whose
+    // only output is WebAudio gets the `ambient` session by default, which the
+    // ring/silent switch mutes; `<audio>` gets `playback`, which it does not.
+    // That difference is invisible on a laptop and is the entire experience on
+    // a phone.
+    //
+    // ⚠️ SET IT BEFORE THE FIRST SOUND, INSIDE THE GESTURE. WebKit's Audio
+    // Session API is the only way to ask, and asking late leaves the first
+    // seconds on the wrong session. It is absent everywhere else, so this is a
+    // capability test and never a platform check (CLAUDE.md).
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch (e) { d.log(`could not claim a playback audio session: ${e.message}`); }
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    srcNode = ctx.createMediaElementSource(audio);
+    // ⚠️ A STABLE GAIN IS THE INPUT, NOT WHATEVER IS FEEDING IT. scsynth is
+    // wired to this node ONCE at boot; a station switch replaces the decoded
+    // stream behind it, and if the page handed out the stream's own node the
+    // granulator would keep reading the old, stopped one — silence that looks
+    // like a broken engine.
+    srcNode = ctx.createGain();
+    if (DECODE) openStream();
+    else ctx.createMediaElementSource(audio).connect(srcNode);
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     // ⚠️ THE DRY GAIN EXISTS FROM THE START even though nothing uses it until
@@ -218,7 +498,282 @@
     srcNode.connect(analyser);
     analyser.connect(dry);
     dry.connect(ctx.destination);
+
+    // 🔴 iOS HAS A FOURTH AudioContext STATE — `interrupted` — AND IT DOES NOT
+    // COME BACK ON ITS OWN. MEASURED on an iPhone (iOS 18.7, Safari 26.6.1):
+    // the context ran for forty seconds and then went `interrupted`, at which
+    // point `fed` froze at 2141 and `grains` froze at 780 and never moved again
+    // for the remaining eleven seconds of the run. The page looked alive — the
+    // element kept playing, `currentTime` kept climbing — while everything
+    // downstream of the graph had stopped. That is the silent-stall shape this
+    // repo keeps paying for, and nothing in the spec's three states describes
+    // it, so nothing was watching for it.
+    ctx.addEventListener?.('statechange', () => {
+      ship(`ctx -> ${ctx.state}`);
+      if (ctx.state === 'running') return;
+      d.log(`the browser ${ctx.state} the audio; asking for it back`);
+      ctx.resume?.().catch(() => {});
+    });
+    // ⚠️ AND A GESTURE IS THE ONLY THING THAT RELIABLY GETS IT BACK. `resume()`
+    // from a timer is refused on iOS exactly when it is most needed, so the next
+    // touch anywhere on the page tries again. Cheap, passive, and it costs a
+    // working page nothing because it returns immediately when already running.
+    addEventListener('pointerdown', () => {
+      if (ctx && ctx.state !== 'running') ctx.resume?.().catch(() => {});
+    }, { passive: true });
   }
+
+  /**
+   * 🔴 A DEAFNESS CONTROL FOR THE INSTRUMENT ITSELF — `?report=1` only.
+   *
+   * The iPhone reports `rms=0.0000` on every line while the element plays
+   * happily. Two things produce that reading and they have opposite fixes: the
+   * media element is not reaching WebAudio, or this page's analyser is not
+   * measuring anything at all. An oscillator through the SAME analyser
+   * separates them in 400 ms — *"six arms of zero is the shape of a deaf
+   * instrument"*.
+   *
+   * ⚠️ `dry` is muted for the duration so the test tone cannot reach a speaker.
+   */
+  let proved = false;
+  async function proveAnalyser() {
+    // 🔴 ONCE, AND THE GUARD IS ON THE FUNCTION RATHER THAN ON ITS CALLER.
+    // MEASURED: the call was placed one line inside `meterTick`, which re-enters
+    // on every animation frame — so it armed a fresh oscillator sixty times a
+    // second, each living 400 ms. Dozens summed, the analyser read 0.80 instead
+    // of a lone tone's 0.18, and the picture filled its full height with MY TEST
+    // TONE while the page reported it as the radio. A diagnostic that changes
+    // the thing it is measuring is worse than none — so the invariant lives
+    // where it cannot be re-broken by the next caller.
+    if (proved || !ctx || !analyser) return;
+    proved = true;
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.frequency.value = 440; g.gain.value = 0.25;
+    osc.connect(g); g.connect(analyser);
+    const wasDry = dry.gain.value;
+    dry.gain.value = 0;
+    osc.start();
+    const buf = new Float32Array(analyser.fftSize);
+    let peak = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 400) {
+      await new Promise((r) => setTimeout(r, 50));
+      analyser.getFloatTimeDomainData(buf);
+      let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+      peak = Math.max(peak, Math.sqrt(s / buf.length));
+    }
+    try { osc.stop(); } catch { /* already stopped */ }
+    osc.disconnect(); g.disconnect();
+    dry.gain.value = wasDry;
+    const verdict = peak > 0.01 ? 'the graph CAN hear — so the element is what is silent'
+                                : 'the graph hears NOTHING — the analyser path is the fault';
+    ship(`analyser control: a 440 Hz tone through the same analyser reads ${peak.toFixed(4)} — ${verdict}`);
+    d.log(`analyser control: ${peak.toFixed(4)} — ${verdict}`);
+  }
+
+  // ── which station, and whether there is one at all ─────────────────────────
+  // 🔴 EVERY STATE BELOW COMES FROM AN ANSWER, NEVER FROM A GUESS. "The stream
+  // is down" and "we have not asked yet" are different facts with opposite
+  // consequences — one disables the page, the other must not — so `avail` holds
+  // three values and `undefined` never disables anything. That is `caps.mjs`'s
+  // rule about `unknown` never blocking, one page over.
+  const avail = new Map();          // id -> true | false | undefined (not asked)
+  const granControls = [];          // every slider, so a dead stream can grey them
+  let dead = false;
+  // True only while `finish()` is exercising the station buttons, so the log can
+  // name a press nobody made for what it is rather than claiming you chose it.
+  let selfCheck = false;
+
+  /** Ask the relay for a station, then hang up. */
+  async function probeStation(id) {
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), PROBE_MS);
+    try {
+      const res = await fetch(srcOf(id), { signal: ac.signal, cache: 'no-store' });
+      // ⚠️ CANCEL THE BODY. This is an ENDLESS stream and the relay counts
+      // listeners: a probe that reads the status line and walks away holds a
+      // connection open for the life of the page, and two of those per load is
+      // a page quietly using the station as a load generator.
+      try { await res.body?.cancel(); } catch { /* already gone */ }
+      return res.ok;
+    } catch { return false; } finally { clearTimeout(t); }
+  }
+
+  /**
+   * Paint whatever the answers currently say.
+   *
+   * ⚠️ THE PLAY BUTTON IS REACHED FOR BY CLASS, AND THAT IS A KIT GAP RATHER
+   * THAN A SHORTCUT. `createTransportBar` returns `extra(id)` for the buttons a
+   * page adds and nothing at all for its own toggle, so a page that must refuse
+   * to play has no way to say so through the component. Reported rather than
+   * worked around a second time: the bar wants a `disabled()`.
+   */
+  function paintStations() {
+    const toggle = bar.el.querySelector('.tbar-toggle');
+    if (toggle) toggle.disabled = dead;
+    if (dead) {
+      picker.disabled(true);
+      for (const s of granControls) s.disabled(true);
+      nowEl.textContent = 'no streams';
+      nowEl.classList.add('down');
+      return;
+    }
+    nowEl.classList.remove('down');
+    for (const s of granControls) s.disabled(false);
+    // A station known to be down is greyed; one nobody has asked about is not.
+    STATIONS.forEach(([, id], i) => { picker.buttons[i].disabled = avail.get(id) === false; });
+  }
+
+  const nameOf = (id) => (STATIONS.find(([, s]) => s === id) || [id])[0];
+
+  /**
+   * Point everything at another station.
+   *
+   * ⚠️ THE GRANULATOR NEEDS NO REBUILD AND THAT IS NOT LUCK.
+   * `createMediaElementSource` binds to the ELEMENT, not to the URL, so
+   * scsynth's input follows a change of `src` without a wire being touched.
+   * ⚠️ `picker.set(i, true)` is QUIET, or choosing a station from the buttons
+   * would call back into this function and switch again.
+   */
+  function switchTo(id, why) {
+    if (id === station || dead) return;
+    station = id;
+    picker.set(STATIONS.findIndex(([, s]) => s === id), true);
+    d.log(`${nameOf(id)} — ${why}`);
+    nowEl.textContent = '';
+    paintStations();
+    if (!started) return;
+    // The element has already been played once inside a real gesture, so the
+    // browser allows this one; `currentTime` restarts, which is what `heard`
+    // should say about a station you have just switched to.
+    // ⚠️ `heardFrom` IS NOT TOUCHED. It means "when this page first heard
+    // anything", and `behind` — the seconds you missed — is measured against it.
+    // Moving it on a switch makes BEHIND report the whole session as missed.
+    // Only the PLAYHEAD wants "now", because an Icecast mount has no past and a
+    // switch rejoins at the live edge.
+    if (DECODE) { openStream(); }      // `closeStream` banks the seconds played
+    else {
+      heardBefore += audio.currentTime; // keep what this page has already played
+      audio.src = srcOf(id);
+      audio.play().catch(() => {});
+    }
+    deck.seek(Date.now());
+    deck.play();
+  }
+
+  /**
+   * Ask the relay which stations are up, and act on the answer.
+   *
+   * 🔴 ONE REQUEST THAT ALWAYS ANSWERS 200, AND THAT IS THE ENTIRE POINT.
+   * Probing a mount directly means fetching a dead one, which answers 502 — and
+   * **the browser logs that to the console with no way to suppress it**, so the
+   * page tripped its own `no console errors` check and a visitor watching a
+   * phone saw a red line about a station being down instead of the page quietly
+   * handling it. `/health` moves the question to the thing that knows and
+   * reports "down" as data rather than as an error status.
+   *
+   * ⚠️ THE PER-STATION PROBE IS KEPT AS THE FALLBACK, for a `?base=` pointed at
+   * a relay without the route. It is worse — it is the thing that logs — but a
+   * page that assumes a route exists is a page that breaks against an older
+   * deploy, which is the `moq.mjs` trap in a new costume.
+   */
+  async function resolveStations() {
+    let answers = null;
+    try {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(), PROBE_MS);
+      const res = await fetch(`${BASE}/health`, { signal: ac.signal, cache: 'no-store' });
+      clearTimeout(t);
+      if (res.ok) {
+        const j = await res.json();
+        // ⚠️ `=== true`, not truthy. A missing station must read as "we did not
+        // get an answer about it", never as up.
+        if (j && j.stations) answers = STATIONS.map(([, id]) => j.stations[id]?.up === true);
+      }
+    } catch { /* fall through to the probes */ }
+    if (!answers) {
+      d.log('the relay has no health route — probing the mounts directly');
+      answers = await Promise.all(STATIONS.map(([, id]) => probeStation(id)));
+    }
+    STATIONS.forEach(([, id], i) => avail.set(id, answers[i]));
+    const up = STATIONS.filter(([, id]) => avail.get(id));
+    dead = up.length === 0;
+    if (dead) {
+      d.log('neither station is answering — there is nothing to play', 'bad');
+    } else if (!avail.get(station)) {
+      switchTo(up[0][1], `${nameOf(station)} is not answering`);
+    } else {
+      d.log(`${nameOf(station)} is up${up.length > 1 ? ', and so is the other' : ''}`);
+    }
+    paintStations();
+    return !dead;
+  }
+
+  // 🔴 AND AN OUTCOME-GATED FALLBACK BESIDE THE PROBE, because a probe is a
+  // statement about one moment. A station that answers at load and stops two
+  // minutes later is the ordinary case for a volunteer mount, and the element
+  // failing IS the evidence — no polling, no second opinion needed. The probe
+  // prevents a dead start; this catches a death in progress.
+  audio.addEventListener('error', () => {
+    ship(`element error code=${audio.error ? audio.error.code : '?'} on ${station}`);
+    if (!started || dead) return;
+    avail.set(station, false);
+    const alt = STATIONS.find(([, id]) => id !== station && avail.get(id) !== false);
+    if (alt) { switchTo(alt[1], 'it stopped answering'); return; }
+    dead = true;
+    d.log(`${nameOf(station)} stopped and there is nowhere to fall back to`, 'bad');
+    paintStations();
+  });
+
+  // Asked once, at load, so the page is already telling the truth about what it
+  // can play before anybody reaches for the transport.
+  const resolved = resolveStations();
+
+  /**
+   * 🔴 AND THEN KEPT UNDER WATCH, BECAUSE THIS STATION COMES AND GOES.
+   * Radio 1965 is one volunteer-run Icecast mount and it drops out for minutes
+   * at a time — MEASURED four times in one afternoon, `origin 520` and back
+   * again with nothing in between. A page that asks once at load is right for
+   * about a minute and then confidently wrong: the button stays greyed after the
+   * station returns, and the only way to find out is to reload.
+   *
+   * ⚠️ IT DOES NOT SWITCH YOU. Asked for in as many words — *"do not switch
+   * channels if I do not"* — so a station coming back UNGREYS its button and
+   * says so in the log, and that is all. The one automatic switch this page
+   * makes is the fallback at load, when the preferred station has nothing to
+   * play; moving somebody mid-listen is a different thing entirely.
+   *
+   * ⚠️ `/health` ANSWERS 200 WHATEVER IT FINDS, so polling it costs no console
+   * errors and no failed requests — which is exactly why that route exists. A
+   * poll built on fetching the mount would paint a red line every 30 s.
+   */
+  const WATCH_MS = 30000;
+  setInterval(async () => {
+    if (document.hidden) return;       // a backgrounded tab is nobody watching
+    let answers = null;
+    try {
+      const res = await fetch(`${BASE}/health`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const j = await res.json();
+      if (!j?.stations) return;
+      answers = STATIONS.map(([, id]) => j.stations[id]?.up === true);
+    } catch { return; }
+    STATIONS.forEach(([, id], i) => {
+      const was = avail.get(id);
+      avail.set(id, answers[i]);
+      if (was === answers[i]) return;
+      d.log(answers[i]
+        ? `${nameOf(id)} is back — its button works again`
+        : `${nameOf(id)} stopped answering`, answers[i] ? 'hi' : 'bad');
+      ship(`${id} ${was} -> ${answers[i]}`);
+    });
+    // Everything down while we were listening is the one case that DOES change
+    // what the page can do, rather than merely what a button offers.
+    const anyUp = STATIONS.some(([, id]) => avail.get(id));
+    if (!anyUp && !dead) { dead = true; d.log('every station stopped answering', 'bad'); }
+    else if (anyUp && dead) { dead = false; d.log('a station is answering again'); }
+    paintStations();
+  }, WATCH_MS);
 
   let rmsPeak = 0;
   function meterTick() {
@@ -251,7 +806,7 @@
 
   async function measure(signal) {
     const t = performance.now();
-    const res = await fetch(`${SRC}?bytes=${2 << 20}`,
+    const res = await fetch(`${srcOf(station)}?bytes=${2 << 20}`,
       { signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' } });
     rec.status = res.status;
     for (const k of ['icy-name', 'icy-metaint', 'content-type', 'x-shout-ttfb']) {
@@ -309,13 +864,32 @@
   function startListening() {
     if (started) return;
     started = true;
-    d.log(`relay ${SRC}`);
+    d.log(`relay ${srcOf(station)}`);
+    // 🔴 THE SOURCE MUST EXIST BEFORE THE GRAPH CAPTURES IT — WEBKIT.
+    // `graph()` calls `createMediaElementSource(audio)`, and this line used to
+    // run TWO LINES AFTER it, so the capture was made against an element with no
+    // `src` at all. Chrome does not care and binds later. WebKit binds at
+    // creation: the element then plays STRAIGHT TO THE SPEAKERS and the graph
+    // gets silence for ever.
+    //
+    // ⚠️ AND THAT FAILS IN THE SHAPE THIS REPO MINDS MOST — it sounds like it is
+    // working. REPORTED from Safari: *"I hear sound but no granulator, also no
+    // waveform"*, and on an iPhone `WebAudio can see the samples — peak rms
+    // 0.0000` beside grain ticks still drawing, because scsynth's worklet was
+    // running perfectly on a bus nothing fed. Sound out of the speakers is not
+    // evidence that the page can hear it: if the capture had worked, the only
+    // route to the speakers would be `dry`, which is inside the graph.
+    // ⚠️ It also silently breaks the fader, since `dry.gain` then controls
+    // nothing and the station stays at full volume at every setting.
     graph();
+    if (!DECODE) audio.src = srcOf(station);
     // NEVER LET SOUND GATE THE WORK: neither of these rejects when a gesture is
     // missing, so awaiting them is a hang rather than an error. Fire and move on.
     ctx.resume?.();
-    audio.src = SRC;
-    audio.play().catch((e) => d.log(`play refused (${e.name}) — the measurement continues`, 'bad'));
+    if (!DECODE) audio.play().catch((e) => d.log(`play refused (${e.name}) — the measurement continues`, 'bad'));
+    // ?report=1 only, and exactly once — the deafness control for this page's own
+    // analyser. See the guard inside it for what happened when it was not once.
+    if (REPORTING) setTimeout(() => { proveAnalyser(); }, 3000);
     requestAnimationFrame(meterTick);
 
     audio.addEventListener('playing', () => {
@@ -338,6 +912,29 @@
     // asserting on its own, the run read `10` and the five granulator checks
     // were silently dropped — a page reporting less than it knows, which is the
     // failure mode this repo minds most.
+    // 🔴 THE GRANULATOR COMES UP WITH THE SOUND, DRY. There is no button to
+    // press because there is nothing to decide: this page is a radio station
+    // going into a SuperCollider graph, and the fader is how much of that
+    // reaches you. `synthPending` is set SYNCHRONOUSLY, before any await, or the
+    // 6 s fallback below latches `done` first and the granulator's five asserts
+    // are dropped from the run — which is how this page twice reported ten
+    // checks and looked green both times.
+    //
+    // ⚠️ NOT AWAITED, AND THE CATCH IS THE POINT. An engine that refuses has to
+    // leave a working radio behind; `finish()` then runs from the fallback and
+    // reports the radio's half alone rather than nothing at all.
+    // ⚠️ AND IT WAITS FOR THE STATIONS TO ANSWER FIRST. Booting 1.7 MB of wasm
+    // to granulate a stream that is not there is work nobody asked for, and the
+    // sliders it would raise are controls over nothing.
+    synthPending = true;
+    resolved.then((any) => {
+      if (!any) { synthPending = false; finish(); return null; }
+      return startGranulator();
+    }).catch((e) => {
+      synthPending = false;
+      d.log(`the granulator did not start: ${e.message} — the radio plays on`, 'bad');
+    });
+
     measured = measure().catch((e) => { d.log(`measure failed: ${e.message}`, 'bad'); return null; });
     // If nobody presses Synthesize, the radio still has to say what it found.
     // ⚠️ BUT IT MUST NOT RACE THE GRANULATOR. This fallback fires ~6 s after the
@@ -360,6 +957,16 @@
   async function finish() {
     if (done) return;
     done = true;
+    // Report the whole verdict list when this burst is over — the same array
+    // `verify.mjs` reads, so a phone and a laptop are answering one question.
+    if (REPORTING) {
+      queueMicrotask(() => setTimeout(() => {
+        for (const a of (d.asserts || window.__demo?.asserts || [])) {
+          ship(`${a.pass ? 'ok  ' : 'FAIL'} ${a.label} — ${a.detail}`);
+        }
+        ship('--- end of run ---');
+      }, 1500));
+    }
     const m = await measured;
     if (!m) { d.assert('the relay answered', false, 'the measurement never completed'); return; }
 
@@ -373,7 +980,7 @@
     // correct behaviour. So press play here, and WAIT FOR THE ELEMENT rather
     // than sleeping a guess at it.
     deck.play();
-    for (let i = 0; i < 30 && !(audio.currentTime > 0 && !audio.paused); i++) {
+    for (let i = 0; i < 30 && !(played() > 0 && isPlaying()); i++) {
       await new Promise((r) => setTimeout(r, 100));
     }
 
@@ -385,14 +992,17 @@
     // element. Tested here, BEFORE anything is asserted, because the answer
     // takes 1.4 s and an assert arriving 1.4 s after the others is an assert
     // the stabiliser has already stopped collecting.
-    const wasPlaying = !audio.paused;
+    const wasPlaying = isPlaying();
     deck.pause();
     await new Promise((r) => setTimeout(r, 1400));
-    const stopped = audio.paused;
+    const stopped = !isPlaying();
     if (wasPlaying) deck.play();
 
     d.set('kbps', Math.round(m.steadyKbps ?? m.kbps));
-    d.set('gap', Math.round(m.gapMax));
+    // ⚠️ `gap` LOST ITS CELL AND KEPT ITS FACTS. It is measured once over one
+    // five-second read and never moves again, so as a readout it was a constant
+    // teaching the reader to ignore the row. It is still asserted below and it
+    // is still in the log line, where a one-off measurement belongs.
     d.log(`${Math.round(m.bytes / 1024)} KiB · ${Math.round(m.steadyKbps ?? 0)} kbps steady `
       + `(${Math.round(m.kbps)} over the whole window — the difference is Icecast's burst, `
       + `${m.burstS.toFixed(1)} s handed over faster than realtime)`);
@@ -409,7 +1019,10 @@
       `${Math.round(m.steadyKbps ?? 0)} vs ${NOMINAL_KBPS} kbps nominal, after the burst`);
     d.assert('no gap past a 1 s buffer', m.gapMax < 1000,
       `worst ${Math.round(m.gapMax)} ms over ${m.gaps.length} reads`);
-    d.assert('the element played', audio.currentTime > 0, `t=${audio.currentTime.toFixed(2)}s`);
+    d.assert(DECODE ? 'the page decoded the stream itself' : 'the element played',
+      played() > 0,
+      DECODE ? `${played().toFixed(1)} s via ${decodePath || 'nothing'}`
+             : `t=${played().toFixed(2)}s`);
     // 🔴 THE ONE THAT CATCHES THE TAINTED GRAPH. A cross-origin element with no
     // CORS plays out of the speakers and feeds SILENCE to WebAudio, so every
     // other assert here passes while the graph is dead.
@@ -439,12 +1052,169 @@
       G.running ? `node ${PAPPUS_NODE}, reading busses 2 and 3` : 'the engine refused /s_new');
     d.assert('the engine reports the grains it fires', G.grains > 0,
       `${G.grains} reported in ${G.secs.toFixed(1)} s`);
+    // 🔴 THE CHORD'S OWN WITNESS, AND IT IS AN ARITHMETIC PREDICTION RATHER THAN
+    // A LEVEL. `report` fires once per GATED voice per trigger — graded against
+    // the board at 8.00 / 4.00 / 15.99 for `mrate` 8 / 4 / 16 (research §10.6) —
+    // so opening four voices at `mrate` 8 MUST read about 32 a second, not 8.
+    // A level measurement could not tell four voices from one turned up.
+    // ⚠️ This is also the check that catches `setParam` sending a scalar: with
+    // one wrong message seven voices stay shut and the rate stays at `mrate`.
+    // 🔴 THE WHOLE PATCH, ASKED OF THE ENGINE RATHER THAN READ BACK OFF THIS
+    // PAGE. Every `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves
+    // nothing about what scsynth holds — and a patch is forty messages, any one
+    // of which could name a control this definition does not have and be
+    // discarded in silence. Twelve of them are read back with `/s_get`: they
+    // span the granulator, the euclidean divider and two chain stages that this
+    // page had never sent a value to at all.
+    const p = G.patch;
+    // ⚠️ DECLARED BEFORE THE FIRST ASSERT THAT USES IT. It reads like a helper
+    // that belongs beside the array check below; put there, the patch-differs
+    // assert above reaches it in its temporal dead zone, which is a ReferenceError
+    // mid-burst — every assert after it silently dropped, which is this page's
+    // named failure mode.
+    const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length
+      && a.every((x, i) => Math.abs(x - b[i]) < 1e-3);
+    d.assert('the patch that is playing reached the engine',
+      !!p && Array.isArray(G.wrong) && G.wrong.length === 0,
+      p ? (G.wrong?.length ? `${p.name}: ${G.wrong.join('; ')}`
+                           : `${p.name}: all ${G.scalars ? Object.keys(G.scalars).length : 0} settings read back as asked`)
+        : 'no patch was applied');
+
+    // 🔴 AND A SECOND PATCH, THROUGH THE REAL `›` BUTTON. A check that only ever
+    // grades the patch the page opens on is a check that would pass with the
+    // other five deleted — and `verify.mjs` cannot press this row itself. Both
+    // halves have to be true: the next patch's settings must arrive, AND they
+    // must differ from this one's, or a picker wired to nothing passes.
+    const nextP = G.otherWant;
+    const differs = !!nextP && !!p
+      && (nextP.scanmode !== p.scanmode || nextP.elen !== p.elen);
+    const arrived = !!nextP && G.otherMode === nextP.scanmode && G.otherElen === nextP.elen
+      && same(G.otherPattern, patternOf(nextP));
+    d.assert('the next sound along reaches the engine, and it differs',
+      differs && arrived && G.here === PATCHES.indexOf(p),
+      nextP && p
+        ? `${p.name} → ${nextP.name} → ${p.name}; asked ${nextP.scanmode}/${nextP.elen}, `
+          + `the engine held ${G.otherMode}/${G.otherElen}, against ${p.scanmode}/${p.elen} here`
+          + `${same(G.otherPattern, patternOf(nextP)) ? '' : ' — and its rhythm did not arrive'}`
+        : 'the picker was never exercised');
+
+    // 🔴 THE THREE MESSAGES THAT CANNOT BE CHECKED BY A SCALAR READ. `gates`,
+    // `pitches` and `probs` are eight-element controls and `setParam` sends
+    // `/n_setn` only for an Array (`pappus.mjs:125`) — one scalar by mistake
+    // writes voice 0 and leaves seven voices holding whatever they held, which
+    // is a page that goes on working and sounds like one note. The sixteen-step
+    // rhythm is not a control at all but a BUFFER the graph indexes (`:802`), so
+    // it takes a third kind of message and fails in a third way: written and
+    // never read, or read and never written.
+    d.assert('the chord and its rhythm reached the engine',
+      !!p && same(G.gates, p.gates) && same(G.pitches, p.pitches)
+        && same(G.probs, p.probs) && same(G.pattern, patternOf(p)),
+      p ? `gates ${G.gates ?? '—'} · notes ${G.pitches ?? '—'} · ${liveSteps(p)} of `
+          + `${p.elen} step(s) open${same(G.pattern, patternOf(p)) ? '' : ` — the buffer holds ${G.pattern ?? 'nothing'}`}`
+        : 'no patch was applied');
+
+    // 🔴 AND WHAT THAT CHORD AND THAT RHYTHM MUST SOUND LIKE, AS ARITHMETIC
+    // RATHER THAN AS A LEVEL. `report` fires once per GATED voice per trigger —
+    // graded against the board at 8.00 / 4.00 / 15.99 for `mrate` 8 / 4 / 16
+    // (research §10.6) — so the rate is `mrate × Σ(gates·probs) × open steps /
+    // melen`, and nothing else. A level measurement could not tell four voices
+    // from one turned up, and a grain COUNT alone cannot tell a rhythm that is
+    // being read from sixteen numbers sitting in a buffer nothing indexes: at
+    // `melen 1` only slot 0 is ever read, which is the same sound and a
+    // different number here.
+    const want = p ? predictedRate(p, P.rate) : NaN;
+    const got = Number(lastRate);
+    d.assert('every note in the chord is its own grain voice',
+      Number.isFinite(got) && Number.isFinite(want)
+        && Math.abs(got - want) <= Math.max(2, want * 0.3),
+      `${got}/s measured, ${want.toFixed(1)}/s expected — `
+        + `${p ? p.gates.filter((g) => g > 0.001).length : 0} voice(s) at ${P.rate}/s`
+        + (p && p.elen > 1 ? `, ${liveSteps(p)} step(s) of ${p.elen}` : ''));
+    d.log(`${p ? p.name : 'the granulator'} costs ${G.glitchBefore == null ? 'an unreported number of'
+      : G.glitchAfter - G.glitchBefore} dropout(s) over ${G.secs.toFixed(1)} s`);
     // 🔴 THE ONE THAT MATTERS: the radio is audibly IN the graph. A grain count
     // cannot say this — measured, a Pappus with its input disconnected fired
     // 4-5 grains per window while outputting exactly 0.00000 — and a running
     // synth cannot say it either.
     d.assert('the radio reaches the granulator and is heard', G.loud > 0.0005 && G.quiet < G.loud / 4,
       `${G.loud.toFixed(4)} running, ${G.quiet.toFixed(4)} with the node paused`);
+
+    // 🔴 THE TWO THAT WOULD HAVE CAUGHT A PICTURE WITH NOTHING IN IT, and until
+    // this change there were none: every assert on this page graded the relay,
+    // the engine, a level or a COUNT, and not one of them could tell a working
+    // grain picture from one whose every tick was drawn off the canvas. That is
+    // `/floor/`'s lesson arriving here — an instrument that grades everything
+    // beside the thing being claimed.
+    //
+    // FIRST, THE DECODE. A reported position is a fraction of the capture ring,
+    // so it is in 0..1 by construction; anything outside it is this page reading
+    // the wrong field of the message rather than the engine behaving oddly. With
+    // the old `m[2]` both ends of this read exactly −1.
+    d.assert('every grain says where in the sound it read',
+      Number.isFinite(posMin) && posMin >= 0 && posMax <= 1,
+      Number.isFinite(posMin) ? `positions ${posMin.toFixed(4)}..${posMax.toFixed(4)} of the ring`
+                              : 'no grain was ever reported');
+    // SECOND, THE INK AND THE FADER, in one pair of numbers with the negative
+    // control built in. Nothing should be lit at the dry end and something must
+    // be lit at the wet end; a probe that reads the same at both is measuring
+    // neither.
+    d.assert('the grain ticks are drawn, and the fader fades them',
+      G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
+      `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
+
+    // 🔴 AND THE STATION BUTTONS, WHICH NOTHING ELSE CAN REACH. `verify.mjs`
+    // presses `.pos-controls button, .tbar-x` and this row is neither, so
+    // shipping it without a check here would be two controls nobody grades —
+    // exactly how `mirror` lost two asserts while reading green.
+    //
+    // ⚠️ A REAL CLICK ON THE ELEMENT, NEVER `picker.set()`. The fault this kind
+    // of check exists to catch lives in the wiring between the button and the
+    // handler, and calling the handler steps straight over it (`/floor/` spent
+    // five rounds on that). Last of all, because it restarts the audio.
+    // 🔴 AND IT PUTS THE STATION BACK. The first version clicked the other
+    // button and stopped there, so a page that checks itself ENDED ON A STATION
+    // NOBODY CHOSE — reported from a phone, where the log read `Klassikaraadio
+    // — you chose it` and the reader had chosen nothing. A self-check is not
+    // allowed to leave the instrument somewhere else; it restores through
+    // another real click, so the restore is exercised by the same path.
+    const here = STATIONS.findIndex(([, id]) => id === station);
+    const other = here === 0 ? 1 : 0;
+
+    // 🔴 A DOWN STATION HAS A DISABLED BUTTON, AND CLICKING IT PROVES NOTHING.
+    // REPORTED from a phone: `FAIL the station buttons switch the stream —
+    // stayed on Klassikaraadio`, while radio1965 was answering 502 and the page
+    // was refusing its button exactly as designed. The check clicked a disabled
+    // control and read the absence of an effect as a defect — grading the page
+    // red for being right.
+    //
+    // ⚠️ SO IT ASSERTS THE OTHER HALF INSTEAD, RATHER THAN SKIPPING. One assert
+    // either way, so the count does not flap with a volunteer radio mount, and
+    // neither branch is vacuous: up, the button must switch the stream; down,
+    // the button must be refusing.
+    if (picker.buttons[other].disabled) {
+      d.assert('a station that is not answering has a button that refuses',
+        avail.get(STATIONS[other][1]) === false,
+        `${nameOf(STATIONS[other][1])} is down and its button is disabled`);
+      return;
+    }
+
+    const wasStation = station, wasSrc = DECODE ? station : audio.src;
+    selfCheck = true;
+    // ⚠️ 120 ms, NOT 300. `verify.mjs` stops collecting 400 ms after the assert
+    // count last GREW, so two 300 ms waits here open a 600 ms hole and this
+    // assert is dropped from the run — MEASURED, three runs read 28/28, 29/29,
+    // 28/28 with no code between them. `switchTo` is synchronous, so the state
+    // this reads has already changed; the wait is only for the element.
+    picker.buttons[other].click();
+    await new Promise((r) => setTimeout(r, 120));
+    const moved = station === STATIONS[other][1] && (DECODE ? station !== wasSrc : audio.src !== wasSrc);
+    picker.buttons[here].click();
+    await new Promise((r) => setTimeout(r, 120));
+    selfCheck = false;
+    d.assert('the station buttons switch the stream',
+      moved && station === wasStation,
+      moved ? `${nameOf(wasStation)} -> ${nameOf(STATIONS[other][1])} and back`
+            : `stayed on ${nameOf(station)}`);
   }
 
 
@@ -458,7 +1228,332 @@
   // scsynth's hardware input busses, 2 and 3, which is exactly the `inbusl 2
   // inbusr 3` the board uses. MEASURED level-preserving and with zero engine
   // delay — research/scsynth-live-input-2026-09.md.
-  const G = { def: null, bufs: null, running: false, grains: 0, secs: 0, loud: 0, quiet: 0 };
+  /**
+   * A reported grain position, moved onto the axis the picture is drawn on.
+   *
+   * Pappus records into a `RING_SECONDS` ring and reads grains out of a window
+   * `mbuflen` seconds long, and `/pgrain`'s `pos` is a fraction of the RING —
+   * see the note on `RING_SECONDS` in `pappus.mjs` for the line in the engine
+   * that makes it so. This is the same rescale `/grains/` calls `winPos`, and it
+   * is written from the two constants rather than from the 7.5 they currently
+   * multiply out to: a number typed once can be read, a number typed twice can
+   * disagree with the buffer it describes.
+   */
+  const winPos = (p) => Math.min(1, Math.max(0, (p ?? 0) * RING_SECONDS / BUF_SECONDS));
+
+  // The raw reported extremes, kept for the assert that catches a decode that
+  // has slipped — a position outside 0..1 is not a granulator reading oddly, it
+  // is this page reading the wrong field.
+  let posMin = Infinity, posMax = -Infinity;
+
+  /**
+   * 🔴 A CHORD OUT OF THE STATION — `plan-radio-sound.md` ①.
+   *
+   * Pappus has EIGHT grain voices, each with its own gate and its own pitch in
+   * semitones (`Engine_Pappus.sc:403-404`). `base = pitches[i]` at `:851` goes
+   * straight into `2 ** (base/12)` as the read speed of that voice's `GrainBuf`
+   * at `:871`, so every open voice reads the same held second of radio at a
+   * different speed: the station arrives as a chord of itself.
+   *
+   * ⚠️ ALL INSIDE `mkgrain`, WHICH EVERY RUNG BUILDS — so unlike most of that
+   * plan this survives TINY, where the resonator, the shimmer and the second
+   * granulator are compiled out and their controls are inert.
+   *
+   * ⚠️ ONLY `gates`/`pitches`, NOT `gates2`/`pitches2`. The second granulator is
+   * `DC.ar([0,0])` on LITE and below (`:1013`), and TINY implies LITE — writing
+   * to it is addressing a granulator that does not exist.
+   */
+  /**
+   * 🔴 SIX FINISHED SOUNDS, NOT A ROW OF MODES. The page used to carry two
+   * choice rows — `material` (speech / music) and `chord` (one voice / fifth /
+   * seventh) — and between them they set seven numbers out of the hundred and
+   * seven this graph takes. REPORTED after listening to talk: *"I tried human
+   * speech, it wasn't that interesting, just scattered walls"*, and of a
+   * neighbouring page, *"mambo jumbo"*. Both complaints are the same fact:
+   * whichever way the two rows were set, what came out was bare grains through
+   * a compressor, because **every stage after the granulator was sitting at
+   * zero and had never been sent a value** — no delay, no saturation, no
+   * reverb, no wow, one read-head behaviour out of four.
+   *
+   * A patch here is the WHOLE sound, the way `/grains/`'s six are: which way
+   * the read head moves, how long a grain is, which notes are open, and every
+   * setting of the chain underneath. `plan-radio-patches.md` derives all six
+   * from `rig/box/norns/Engine_Pappus.sc`; the numbers below are that file's,
+   * corrected where building them showed the plan was wrong (see §the buffer).
+   *
+   * 🔴 `material` AND `chord` ARE GONE AS SEPARATE ROWS, AND THE SEVENTH IS NOT.
+   * The owner asked for the seventh chord by name and liked it, so deleting the
+   * row that reached it would have deleted the sound. It is the chord of
+   * `slow tide`, which is the patch this page opens on — `[0, 4, 7, 10]`, the
+   * same four semitones that row sent. Absorbing the two rows is not a tidy-up:
+   * a chord and a read-head mode are not independent choices. A seventh under
+   * 30-millisecond grains is four copies of a click, and the wash that suited
+   * music destroyed a sentence. Each patch below states its own chord because
+   * a patch that inherits one is a patch that sounds like the last one.
+   *
+   * ⚠️ WHAT IS LOST BY DROPPING THE ROWS: you can no longer hear one patch's
+   * settings under another patch's chord. Nobody asked to, and the four sliders
+   * still nudge whichever patch you are on.
+   */
+  /**
+   * 🔴 THE BUFFER STAYS AT EIGHT SECONDS, AND THE PLAN SAID SIXTY. Read this
+   * before raising it.
+   *
+   * `plan-radio-patches.md §0.3` argues for holding `mbuflen` at 60 — the ring
+   * is allocated at 60 s (`pappus.mjs:33`) — and moving `mwinstart`/`mwinend`
+   * instead, because `wlen` is both the RECORD length and the lap length
+   * (`Engine_Pappus.sc:650`), so **switching a patch from 8 s to 45 hands the
+   * granulator 37 seconds of zeros**. That half is right and it is honoured
+   * here the strict way: every patch holds `mbuflen` at the ONE value this page
+   * has always recorded, so no patch can ever open onto a hole.
+   *
+   * What the plan did not price is the harness and the visitor. The ring has to
+   * be FILLED before the granulator sounds like itself, and this page already
+   * waits for exactly that (`played() - ringFrom < BUF_SECONDS`, below) — at 60
+   * that wait becomes a minute, on a page whose every assert is held to one
+   * burst at the end. `verify.mjs` gives the first assert `settleMs` (30 s) and
+   * then stops; a 60-second fill puts the whole burst outside that window, so
+   * the page would report **nothing** and read as broken while working. A
+   * visitor pays the same minute before the instrument does anything.
+   *
+   * So: 8 seconds, and every number below is recomputed for eight rather than
+   * copied off a table written for sixty. Three places that matters, all of
+   * which the plan flagged and none of which it had run:
+   *
+   *   · **speed is unchanged.** `scanstretch` crosses the window in
+   *     `mbuflen / (3·mscan − 1)` seconds and covers `winspan × mbuflen`
+   *     seconds of audio, so playback speed is `winspan × (3·mscan − 1)` —
+   *     independent of `mbuflen`. What shortens is the LAP: `slow tide`'s
+   *     reverse crawl turns round every 80 s instead of every 600.
+   *   · 🔴 **scatter is seven times finer, in our favour.** `off = … × mspray
+   *     × 0.25` (`:814`) is a fraction of the WINDOW, so at 8 s a scatter of
+   *     0.09 is ±180 ms and at 60 s it would be ±1.35 s. The plan's `stutter`
+   *     carried `mspray 0.012` to get word-scale scatter out of a 60-second
+   *     window — one pixel of this page's slider. At 8 s the same ±180 ms is
+   *     0.09, which is somewhere a hand can go.
+   *   · **the freeze window is a fraction, not a duration.** `winspansec =
+   *     winspan × wlen / SR` (`:681`), so `held still`'s 3 seconds is
+   *     `0.30 … 0.70` of eight rather than `0.35 … 0.40` of sixty.
+   *
+   * What it costs, stated plainly: `piled up` piles up the last eight seconds
+   * rather than the last minute, and the longest grain is 2.6 s rather than 6.
+   * Raising `BUF_SECONDS` is a four-place change (`:138` declares it;
+   * `grainSeconds`, `winPos`, the delay scale in `setScan`, and the fill wait
+   * all read it) plus a `settleMs` big enough for the fill, and it is worth
+   * doing the day somebody wants a minute-long patch.
+   */
+  /**
+   * 🔴 A PATCH WRITES EVERY FIELD, EVERY TIME — `/grains/`'s `writePatch` rule
+   * and this repo has paid for it three times (`msrc 1`, `src`/`lock`,
+   * `notes.gate`). Every message here is fire-and-forget, so a patch that sets
+   * only what it changes inherits whatever the last one left behind, silently.
+   *
+   * Column notes, each a line of the engine rather than a taste:
+   *   `scanmode`  1 STRETCH (`mscan` is a SPEED, mapped −1…+2), 2 POSITION
+   *               (a fixed place), 3 DELAY SYNC (behind the write head).
+   *   `scan`      what the read-head slider holds. STRETCH/POSITION → `mscan`;
+   *               DELAY → `mdelay = scan × BUF_SECONDS` seconds behind.
+   *   `spraymode` 1 RANDOM (fresh per grain, and it pans), 3 WARP (two shared
+   *               drifts at `0.3+spray·3` and `0.2+spray·2` Hz, rotated per
+   *               voice, `:783`). ⚠️ 2 and 4 set `pan = DC.ar(0)` (`:816`) —
+   *               choosing a MONO variant silently narrows the picture.
+   *   `swarmmode` `Select.kr(mswarmmode-1, [0,-7,-12,7])` / `[0,7,12,12]`
+   *               (`:745`): 1 DETUNE, 2 ±5th, 3 ±octave, 4 +5th/+octave.
+   *   `noisetype` `Select.ar((noisetype-1).clip(0,2), [white, pink, dust])`
+   *               (`:1784`): 1 white, 2 pink, 3 dust. ⚠️ 4 and up select the
+   *               loop buffers, which `pappus.mjs:54` allocates and nothing
+   *               ever fills — silent, and it looks like a broken patch.
+   *   `crushmode` `Select.ar(crushmode-1, [bits, rate, both])` (`:1666`).
+   *   `pattern`   sixteen steps into buffer `GATE0`, read `% melen` (`:802`).
+   *               ⚠️ WITH `elen 1` ONLY SLOT 0 IS EVER READ, so a pattern
+   *               written without raising `elen` is fifteen inert numbers and
+   *               an identical sound. The grain-rate cell separates the two
+   *               arithmetically — see the assert in `finish()`.
+   *
+   * ⚠️ `tilt` IS BAKED INTO THE RECORDING (`:617–621`, the shelves are on
+   * `capl`/`capr` BEFORE `BufWr`), so a patch's tilt only reaches audio
+   * recorded after the press — a full `BUF_SECONDS` before it is all you hear.
+   * And under `lock 1` nothing is written at all, so `held still`'s tilt is
+   * inert by construction. Both are honest, neither is obvious.
+   *
+   * ⚠️ `sos` BELOW 0.6 IS NOT A FLAVOUR, IT IS THE GRANULATOR TURNED OFF.
+   * `sxf = (msos.max(mlock)/0.6).clip(0,1)` then crossfades grains against the
+   * LIVE INPUT (`:945`), so 0.6 is the first value that is all grains and 0 is
+   * the input handed straight back. Every patch here is at 0.62 or above.
+   */
+  const PATCHES = [
+    // A reverse crawl through the last eight seconds, in long grains that swell
+    // in rather than start, under the seventh chord. On speech it turns a news
+    // bulletin into an organ; on music the harmony survives and the rhythm does
+    // not. −0.10× means one reverse lap of the buffer every eighty seconds.
+    { name: 'slow tide',
+      says: 'a reverse crawl in long grains, under a seventh chord',
+      scanmode: 1, scan: 0.30, rate: 1.4, size: 1.8, contour: 14,
+      sos: 0.72, lock: 0, tilt: -0.30, ingain: 1, comp: 0.20,
+      spray: 0.55, spraymode: 3, swarm: 0.45, swarmmode: 3, strum: 0.06,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 1, 0, 0, 0, 0],
+      pitches: [0, 4, 7, 10, 0, 0, 0, 0],       // ← the seventh, as asked for
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.28, scycle: 6.0, sfb: 0.42, stilt: -0.25, sxover: 650, sdiffuse: 0.55,
+      taptimes: [1.5, 3.0, 4.5, 6.0], tappans: [-0.8, 0.8, -0.5, 0.5],
+      tappitch: [0, 7, 12, -12],
+      drive: 0.18, crush: 0, crushmode: 1,
+      noise: 0.12, noisetype: 2, noisedecay: 0.9, noisetone: 900, noisedyn: 1.4,
+      wow: 0.35, rverb: 0.42, rtime: 0.62 },
+
+    // The station itself, four tenths of a second late, cut into 75 ms pieces
+    // that fall on five beats of sixteen — and the three voices enter that
+    // figure three steps apart, so they interlock instead of landing together.
+    // 🔴 THE ONLY PATCH WHERE THE WORDS SURVIVE: the read head moves forward
+    // with the material (`delaypos`, `:717`) instead of sitting on one moment,
+    // which is the whole answer to "speech is just scattered walls".
+    { name: 'stutter',
+      says: 'the station a beat late, chopped into a rhythm it did not have',
+      scanmode: 3, scan: 0.05, rate: 12, size: 0.075, contour: 4,
+      sos: 0.62, lock: 0, tilt: 0.15, ingain: 1, comp: 0.30,
+      spray: 0.09, spraymode: 1, swarm: 0.12, swarmmode: 1, strum: 0,
+      elen: 16, ephase: 3,
+      // E(5,16): onsets at 3, 6, 9, 12, 15.
+      pattern: [0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      gates: [1, 1, 1, 0, 0, 0, 0, 0],
+      pitches: [0, 12, -12, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0.50, scycle: 1.5, sfb: 0.50, stilt: -0.20, sxover: 650, sdiffuse: 0.20,
+      taptimes: [0.375, 0.75, 1.125, 1.5], tappans: [-0.9, 0.9, -0.6, 0.6],
+      tappitch: [0, 0, 7, -5],
+      drive: 0.30, crush: 0.22, crushmode: 3,
+      noise: 0, noisetype: 2, noisedecay: 0.25, noisetone: 1200, noisedyn: 2,
+      wow: 0.15, rverb: 0.20, rtime: 0.35 },
+
+    // 🔴 `lock 1` FREEZES THE BUFFER BIT-EXACTLY: `sos = msos.max(mlock) = 1`,
+    // so `sosret = 1` and `sosin = 0` (`:638–646`) and nothing more is written.
+    // Three seconds of the caught eight, read at a thirty-first of life speed —
+    // one syllable becomes a sustained vowel, five voices across three octaves,
+    // each doubled a fifth and an octave up. ⚠️ DO NOT REACH FOR `msrc 1` HERE:
+    // it looks like the freeze and it is the ERASE (LESSONS #46).
+    { name: 'held still',
+      says: 'three seconds caught and stretched thirty times, held as a chord',
+      scanmode: 1, scan: 0.36, rate: 9, size: 0.55, contour: 10,
+      sos: 0.62, lock: 1, tilt: -0.20, ingain: 1, comp: 0.25,
+      winstart: 0.30, winend: 0.70,
+      spray: 0.25, spraymode: 3, swarm: 0.75, swarmmode: 4, strum: 0.10,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 1, 1, 0, 0, 0],
+      pitches: [0, 7, 12, 19, -12, 0, 0, 0],
+      probs: [1, 0.85, 0.7, 0.5, 0.6, 1, 1, 1],
+      swet: 0.30, scycle: 3.2, sfb: 0.50, stilt: -0.30, sxover: 650, sdiffuse: 0.80,
+      taptimes: [0.8, 1.6, 2.4, 3.2], tappans: [-1, 1, -0.7, 0.7],
+      tappitch: [0, 12, -12, 7],
+      drive: 0.25, crush: 0, crushmode: 1,
+      noise: 0.20, noisetype: 2, noisedecay: 1.2, noisetone: 700, noisedyn: 1.0,
+      wow: 0.50, rverb: 0.50, rtime: 0.70 },
+
+    // `mscan 0` is `3·0 − 1 = −1`: reverse at exactly life speed, one lap of the
+    // eight seconds every eight seconds. ⚠️ NOT THE SAME AS A REWOUND TAPE —
+    // `GrainBuf` reads FORWARD inside each grain (`:871`), so the fragments are
+    // forward and their ORDER is reversed, which is the Revolver artefact.
+    { name: 'backwards',
+      says: 'the station running backwards at its own speed, through a sick tape machine',
+      scanmode: 1, scan: 0.0, rate: 5, size: 0.9, contour: 16,
+      sos: 0.68, lock: 0, tilt: -0.50, ingain: 1, comp: 0.35,
+      spray: 0.30, spraymode: 1, swarm: 0.40, swarmmode: 2, strum: 0.125,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 0, 0, 0, 0, 0],
+      pitches: [0, -5, -12, 0, 0, 0, 0, 0],
+      probs: [1, 0.75, 0.6, 1, 1, 1, 1, 1],
+      swet: 0.35, scycle: 2.4, sfb: 0.50, stilt: -0.40, sxover: 650, sdiffuse: 0.65,
+      taptimes: [0.6, 1.2, 1.8, 2.4], tappans: [-0.7, 0.7, -0.45, 0.45],
+      tappitch: [0, -12, 7, -7],
+      drive: 0.45, crush: 0.35, crushmode: 2,
+      noise: 0.15, noisetype: 3, noisedecay: 0.06, noisetone: 4500, noisedyn: 3.0,
+      wow: 0.85, rverb: 0.35, rtime: 0.55 },
+
+    // Forty-two thirty-millisecond plucks a second, two octaves upward, on seven
+    // steps of twelve with the four voices five steps apart. 🔴 `spraymode 3`
+    // IS THE WHOLE PATCH: RANDOM gives a fresh number per grain per voice, which
+    // is what "scattered noise" sounds like; WARP shares two slow drifts across
+    // the eight voices, so neighbouring grains read neighbouring places and the
+    // cloud MOVES AS ONE. Same density, same rate, a different thing to hear.
+    { name: 'roof rain',
+      says: 'a fast scatter of tiny plucks that drifts as one cloud',
+      scanmode: 1, scan: 0.75, rate: 26, size: 0.030, contour: 0,
+      sos: 0.62, lock: 0, tilt: 0.40, ingain: 1, comp: 0.20,
+      spray: 0.70, spraymode: 3, swarm: 0.22, swarmmode: 1, strum: 0,
+      elen: 12, ephase: 5,
+      // E(7,12): onsets at 1, 3, 5, 6, 8, 10, 11. The last four slots are never
+      // read (`% melen` with melen 12) and are written anyway — see writePatch.
+      pattern: [0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0],
+      gates: [1, 1, 1, 1, 0, 0, 0, 0],
+      pitches: [0, 12, 19, 24, 0, 0, 0, 0],
+      probs: [1, 0.8, 0.6, 0.4, 1, 1, 1, 1],
+      swet: 0.40, scycle: 0.9, sfb: 0.30, stilt: 0.20, sxover: 2500, sdiffuse: 0.15,
+      taptimes: [0.225, 0.45, 0.675, 0.9], tappans: [-1, 1, -0.7, 0.7],
+      tappitch: [0, 12, 19, 24],
+      drive: 0.15, crush: 0.30, crushmode: 1,
+      noise: 0.18, noisetype: 3, noisedecay: 0.04, noisetone: 6000, noisedyn: 3.5,
+      wow: 0.10, rverb: 0.50, rtime: 0.66 },
+
+    // 🔴 `sos 0.90` STOPS THE BUFFER BEING REPLACED AND STARTS IT ACCUMULATING:
+    // `sosret = (sos·1.05).clip(0,1) = 0.945` of the old is kept every lap and
+    // `sosin = ((1−sos)·4).clip(0,1) = 0.40` of the new goes in (`:639`, `:646`),
+    // so what the station said a minute ago is still faintly in there. Six
+    // voices across four octaves, crawling forward at a twenty-eighth of life
+    // speed. ⚠️ THE WRITE CLIPS at ±1 (`:655`) — `ingain 0.7` buys the headroom
+    // the pile-up needs, because the engine's own answer to a saturating layer
+    // is input gain, not less layering.
+    { name: 'piled up',
+      says: 'the buffer stops being replaced and starts stacking up',
+      scanmode: 1, scan: 0.345, rate: 0.9, size: 2.6, contour: 12,
+      sos: 0.90, lock: 0, tilt: -0.55, ingain: 0.70, comp: 0.15,
+      spray: 0.45, spraymode: 3, swarm: 0.65, swarmmode: 3, strum: 0.08,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 1, 1, 1, 1, 1, 0, 0],
+      pitches: [0, -12, 7, -5, 12, -24, 0, 0],
+      probs: [1, 0.9, 0.7, 0.55, 0.4, 0.3, 1, 1],
+      swet: 0.22, scycle: 9.0, sfb: 0.50, stilt: -0.35, sxover: 650, sdiffuse: 0.90,
+      taptimes: [2.25, 4.5, 6.75, 9.0], tappans: [-0.6, 0.6, -0.4, 0.4],
+      tappitch: [0, 7, 12, 19],
+      drive: 0.20, crush: 0, crushmode: 1,
+      noise: 0.10, noisetype: 2, noisedecay: 2.0, noisetone: 500, noisedyn: 1.0,
+      wow: 0.55, rverb: 0.50, rtime: 0.72 },
+  ];
+  // Opens on `slow tide`: it is the gentlest of the six, and it is the one that
+  // holds the seventh chord the old `chord` row existed to reach.
+  let patch = 0;
+
+  const ALL_ONES = new Array(16).fill(1);
+  /** The sixteen steps this patch wants in the gate buffer. */
+  const patternOf = (p) => p.pattern ?? ALL_ONES;
+  /** How many of the steps the engine will actually read are open. */
+  const liveSteps = (p) => patternOf(p).slice(0, Math.max(1, p.elen))
+    .reduce((n, x) => n + (x > 0.001 ? 1 : 0), 0);
+  /**
+   * What this patch's own numbers say its grain rate must be.
+   *
+   * `report` fires once per GATED voice per trigger and the trigger is
+   * `trig × (gates[i] > 0.001) × coin × egate` (`Engine_Pappus.sc:804`), where
+   * `coin` is that voice's probability and `egate` its step of the pattern. So
+   * the rate is the grain clock times the open voices' probabilities times the
+   * share of steps that are open — which is an arithmetic prediction the cell
+   * already on this page can be checked against, rather than a level.
+   */
+  const predictedRate = (p, rate = p.rate) => rate
+    * p.gates.reduce((sum, g, i) => sum + (g > 0.001 ? p.probs[i] : 0), 0)
+    * (liveSteps(p) / Math.max(1, p.elen));
+
+  // What the checks in `finish()` have to say, filled in by `startGranulator`.
+  // ⚠️ EVERY FIELD DECLARED HERE EVEN THOUGH JAVASCRIPT DOES NOT NEED IT: a
+  // burst of asserts reading properties that appear from nowhere cannot be
+  // reviewed, and a typo in one of them reads as `undefined`, which most of
+  // these checks would treat as a failure of the ENGINE rather than of the page.
+  const G = { def: null, bufs: null, running: false, grains: 0, secs: 0, loud: 0, quiet: 0,
+    inkDry: 0, inkWet: 0, alive: 0, glitchBefore: null, glitchAfter: null,
+    // the patch that is playing, asked of the server
+    patch: null, scalars: null, wrong: null,
+    gates: null, pitches: null, probs: null, pattern: null,
+    // and the one along from it, through the picker's own `›`
+    otherWant: null, otherMode: null, otherElen: null, otherPattern: null, here: -1 };
 
   /** Peak RMS at the engine's own meter over `ms`. The meter is IN the path. */
   function engLevel(ms) {
@@ -478,45 +1573,281 @@
   async function ensurePlaying() {
     if (!started) startListening();
     deck.play();
-    for (let i = 0; i < 40 && !(audio.currentTime > 0 && !audio.paused); i++) {
+    for (let i = 0; i < 40 && !(played() > 0 && isPlaying()); i++) {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
 
+  /**
+   * One setting into both granulators.
+   *
+   * ⚠️ THE SECOND ONE DOES NOT EXIST ON THIS RUNG and is written anyway, which
+   * is cheap and keeps one function for both: `graw2 = DC.ar([0,0])` on LITE,
+   * and TINY implies LITE (`Engine_Pappus.sc:1013`, `:218`).
+   *
+   * 🔴 WHAT A PATCH COSTS IS DSP, NOT MESSAGES. The eight voices are COMPILED
+   * IN whichever way the gates are set — the engine gates the TRIGGER, not the
+   * output, and `:796` says a GrainBuf with no triggers "costs essentially
+   * nothing" — so what changes with a patch is how many grains are reading at
+   * once, which is `msize × mrate` per open voice, doubled again wherever
+   * `mswarm` is up. Measured rather than argued: `glitchCount` is read either
+   * side of the level window in `startGranulator` and printed in the log.
+   */
   const setBoth = (name, v) => { setParam(eng, `m${name}`, v); setParam(eng, `n${name}`, v); };
-  const setWet = (v) => {
-    wet = v;
-    if (eng) eng.out.gain.value = v;
-    if (dry) dry.gain.value = 1 - v;
-    d.set('wet', v.toFixed(2));
-  };
-
-  const label = (t) => { const b = d.el.querySelector('.pos-controls button'); if (b) b.textContent = t; };
 
   /**
-   * 🔴 ONE BUILD, THEN ON AND OFF. Pressing this twice used to boot a second
-   * engine and append a SECOND set of five sliders under the first — both live,
-   * both claiming to be the controls. Reported from a screenshot, and the page
-   * could not say which was real because both were.
+   * The read-head slider, which drives whichever control the current patch's
+   * mode actually reads.
    *
-   * ⚠️ AND THE BUTTON IS THE STATE. "is the granulator on or off?" had no answer
-   * on screen: the word `Synthesize` said the same thing whether it was running
-   * or not. It names what the next press DOES, which is the only thing a button
-   * can honestly say about itself.
+   * ⚠️ ONE SLIDER, THREE MEANINGS, AND THE LABEL SAYS WHICH. In POSITION the
+   * engine reads `mscan` as an absolute place in the held seconds; in STRETCH
+   * it reads the SAME control as a SPEED, mapped −1…+2 (`:715`, and the note on
+   * `PATCHES` has the arithmetic); in DELAY it ignores `mscan` entirely and
+   * `mdelay` decides how far behind the write head the read point sits. All
+   * three answer *where in the held sound am I reading* — but they are not the
+   * same quantity, and a control fixed at "read position" would have been
+   * telling the truth about one patch of six. Wiring it to `mscan` alone would
+   * be worse still: INERT in the one patch that uses DELAY, which is this
+   * repo's named hazard, a control that looks live and does nothing.
    */
-  d.on('synth', async () => {
-    if (eng) {                                  // built already — this is a toggle
-      synthOn = !synthOn;
-      eng.send('/n_run', PAPPUS_NODE, synthOn ? 1 : 0);
-      setWet(synthOn ? (wet || 0.85) : 0);
-      d.set('grains', synthOn ? lastRate : '');   // '' prints an em dash, never a confident 0
-      label(synthOn ? 'Stop granulating' : 'Synthesize');
-      d.log(synthOn ? 'granulator on' : 'granulator off — the radio plays straight through');
-      return;
-    }
-    synthPending = true;
-    await ensurePlaying();
+  const SCAN_LABEL = { 1: 'read speed', 2: 'read position', 3: 'time behind', 4: 'time behind' };
+  function setScan(v) {
+    P.scan = v;
+    const mode = PATCHES[patch].scanmode;
+    if (mode >= 3) setBoth('delay', v * BUF_SECONDS);
+    else setBoth('scan', v);
+  }
 
+  /**
+   * A whole patch onto the engine — every field, whether it changed or not.
+   *
+   * 🔴 `setParam` SENDS `/n_setn` ONLY FOR AN ARRAY (`pappus.mjs:125`), which is
+   * why `gates`, `pitches` and `probs` are always eight long here: one scalar by
+   * mistake writes voice 0 and leaves seven voices holding whatever they held,
+   * and the page goes on looking and sounding almost right. The assert
+   * `the chord and its rhythm reached the engine` reads all three back off the
+   * server for exactly that reason.
+   *
+   * 🔴 IN A DELAY MODE THE WINDOW MUST BE THE WHOLE LAP, AND THAT IS ENFORCED
+   * HERE RATHER THAN TRUSTED TO THE TABLE. `delaypos = (wpos − mdelay/mbuflen)
+   * .wrap(0,1)` (`:717`) is a position in the WHOLE lap, which `:838` then folds
+   * into `[winlo, winlo+winspan]` — while `BufWr` writes at the un-windowed
+   * `wphase` (`:655`). Narrow the window in a delay mode and the read head is
+   * nowhere near the write head: "four tenths of a second behind" quietly
+   * becomes something else, with nothing on screen saying so. Only STRETCH and
+   * POSITION may carry a window.
+   *
+   * ⚠️ THE SECOND GRANULATOR IS NOT WRITTEN TO. `graw2 = DC.ar([0,0])` on LITE
+   * and TINY implies LITE (`:1013`, `:218`), so every `n…` control and
+   * `gates2`/`pitches2`/`probs2` addresses a granulator that does not exist.
+   * `nsrc 1` and `nlock 0` are set once by `applyAudibleDefaults` and left.
+   *
+   * ⚠️ THE FOUR DELAY TAPS ABOVE THE FIRST FOUR ARE ZEROED, not left. TINY
+   * builds four (`:1515`), so taps 4–7 are inert — but `taplevels` is an
+   * eight-element control and a patch that writes only four leaves the other
+   * four wherever the last one put them, which is the inheritance this function
+   * exists to prevent even where it happens to be silent.
+   */
+  function writePatch(p) {
+    const delayMode = p.scanmode >= 3;
+    // the granulator
+    setBoth('scanmode', p.scanmode);
+    setBoth('rate', p.rate);
+    setBoth('size', p.size);
+    setBoth('contour', p.contour);
+    setBoth('buflen', BUF_SECONDS);
+    setBoth('winstart', delayMode ? 0 : (p.winstart ?? 0));
+    setBoth('winend', delayMode ? 1 : (p.winend ?? 1));
+    setBoth('sos', p.sos);
+    setBoth('lock', p.lock);
+    setBoth('tilt', p.tilt);
+    setBoth('src', 2);                       // STEREO. 1 is OFF and OFF ERASES.
+    setBoth('spray', p.spray);
+    setBoth('spraymode', p.spraymode);
+    setBoth('swarm', p.swarm);
+    setBoth('swarmmode', p.swarmmode);
+    setBoth('strum', p.strum);
+    setBoth('elen', p.elen);
+    setBoth('ephase', p.ephase);
+    // ⚠️ `scan` LAST OF THE READ-HEAD SETTINGS, because `setScan` asks
+    // `PATCHES[patch].scanmode` which command to write — so `patch` must
+    // already be this patch. `applyPatch` sets it before calling here.
+    setScan(p.scan);
+    setParam(eng, 'gates', p.gates);
+    setParam(eng, 'pitches', p.pitches);
+    setParam(eng, 'probs', p.probs);
+    // 🔴 THE SIXTEEN-STEP PATTERN IS A BUFFER, NOT A CONTROL. `egate =
+    // Index.ar(gpat.bufnum, (estep + mephase·i).floor % melen.max(1))` (`:802`)
+    // reads buffer `GATE0`, which `allocBuffers` fills with ones — so a patch
+    // that wants a rhythm has to write it, and one that does not has to write
+    // the ones BACK or it inherits the last patch's rhythm silently.
+    eng.send('/b_setn', GATE0, 0, 16, ...patternOf(p));
+
+    // the chain under it — every stage, every time
+    setParam(eng, 'pwet', 0);                // RESONATOR: compiled out on TINY
+    setParam(eng, 'pin1', 0.7); setParam(eng, 'pin2', 0);
+    setParam(eng, 'sin1', 0); setParam(eng, 'sin2', 0);
+    setParam(eng, 'kin1', 0); setParam(eng, 'kin2', 0);
+    setParam(eng, 'oin1', 0); setParam(eng, 'oin2', 0);
+    setParam(eng, 'swet', p.swet);
+    setParam(eng, 'scycle', p.scycle);
+    setParam(eng, 'sfb', p.sfb);
+    setParam(eng, 'stilt', p.stilt);
+    setParam(eng, 'stiltxover', p.sxover);
+    setParam(eng, 'sdiffuse', p.sdiffuse);
+    setParam(eng, 'shold', 0);
+    // Upstream's own tap level law — `(1/√active) × (1 − 0.35·step/n)`, with
+    // four taps lit. It normalises for how many are on and pushes later taps
+    // back, which reads as depth rather than as a row (plan §1.3).
+    setParam(eng, 'taptimes', [...p.taptimes, 0, 0, 0, 0]);
+    setParam(eng, 'taplevels', [0.467, 0.423, 0.380, 0.336, 0, 0, 0, 0]);
+    setParam(eng, 'tappans', [...p.tappans, 0, 0, 0, 0]);
+    setParam(eng, 'tappitch', [...p.tappitch, 0, 0, 0, 0]);
+    setParam(eng, 'drive', p.drive);
+    setParam(eng, 'crush', p.crush);
+    setParam(eng, 'crushmode', p.crushmode);
+    setParam(eng, 'loss', 0);                // two lowpasses on this rung, not codec damage
+    setParam(eng, 'noise', p.noise);
+    setParam(eng, 'noisetype', p.noisetype);
+    setParam(eng, 'noisedecay', p.noisedecay);
+    setParam(eng, 'noisetone', p.noisetone);
+    setParam(eng, 'noisedyn', p.noisedyn);
+    setParam(eng, 'kwow', p.wow);
+    setParam(eng, 'rverb', p.rverb);
+    setParam(eng, 'rtime', p.rtime);
+    setParam(eng, 'rshimmer', 0);            // compiled out on TINY
+    setParam(eng, 'mcomp', p.comp);
+    setParam(eng, 'limceil', 0.98855);
+    setParam(eng, 'ingain', p.ingain);
+    setParam(eng, 'amp', 1);
+    setParam(eng, 'fade', 1);
+    setParam(eng, 'bypass', 0);
+    setParam(eng, 'run', 1);
+    setParam(eng, 'report', 1);
+  }
+
+  /**
+   * Choose a patch: write it, move the sliders to it, say what it is.
+   *
+   * 🔴 THE SLIDERS MUST MOVE OR THE PAGE SHOWS ONE PATCH AND PLAYS ANOTHER.
+   * They glide rather than jump because `Engine_Pappus.sc` puts `Lag.kr(…,
+   * 0.02)` on these controls — 20 ms, enough not to click and nowhere near a
+   * change of sound — so the engine jumps and the handle has to be a picture of
+   * what the engine did, not a second animation that happens to look similar.
+   * ⚠️ `quiet: true`, or moving a handle would call `onInput` and send the
+   * value a second time, from the slider, after the patch has already sent it.
+   *
+   * ⚠️ AND THE READ-HEAD SLIDER'S LABEL MOVES WITH IT, because in five of these
+   * six patches it is a speed and in one it is a lag — see `setScan`. A rename
+   * can change the shared label column's width, so the column is re-measured;
+   * in practice `radio → granulator` is wider than all three names and nothing
+   * shifts, which is checked rather than assumed.
+   */
+  function applyPatch(i, { silent = false } = {}) {
+    patch = ((i % PATCHES.length) + PATCHES.length) % PATCHES.length;
+    const p = PATCHES[patch];
+    P.rate = p.rate; P.size = p.size; P.spray = p.spray; P.scan = p.scan;
+    writePatch(p);
+    if (sliders) {
+      for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
+                              [sliders.scan, p.scan], [sliders.spray, p.spray]]) {
+        sld?.set(v, { quiet: true, glideMs: 900 });
+      }
+      sliders.scan?.label(SCAN_LABEL[p.scanmode] ?? 'read position');
+      shareLabelColumn?.();
+    }
+    patchPick?.show(p.name, patch);
+    if (silent) return p;
+    // ⚠️ SAY WHEN IT WAS NOT YOU. `finish()` presses `›` and `‹` to grade a
+    // second patch, and without this the log read `stutter — the station a beat
+    // late` on a page nobody had touched — the same complaint the station row
+    // already answers with `checking the buttons`. One flag, one meaning: the
+    // page is exercising its own controls.
+    d.log(`${p.name} — ${selfCheck ? 'checking the sounds' : p.says}`, 'hi');
+    // 🔴 A FREEZE CAN CATCH A SILENCE, AND A CAUGHT SILENCE IS INDISTINGUISHABLE
+    // FROM A BROKEN ENGINE. `lock 1` holds whatever the ring happens to contain
+    // at the instant it is pressed — including the dead air between two
+    // programmes. So the page reads its own meter for a moment afterwards and
+    // says which it got, in the log, where a one-off measurement belongs. Not
+    // awaited: sound is allowed to be late.
+    // ⚠️ NOT BEFORE THE RING HAS FILLED. Until then it is empty BY DESIGN, and a
+    // warning about an engine behaving correctly is worse than no warning —
+    // the next reader learns to ignore the line.
+    if (p.lock && eng && ringFilled && !selfCheck) {
+      engLevel(400).then((peak) => d.log(peak > 0.002
+        ? `held: the eight seconds in the buffer are now frozen (${peak.toFixed(4)} at the engine)`
+        : `held: the buffer was nearly silent when it froze (${peak.toFixed(4)}) — step away and back to catch something else`,
+      peak > 0.002 ? undefined : 'warn'));
+    }
+    return p;
+  }
+  /**
+   * The blend, and the picture follows it.
+   *
+   * 🔴 THE TICKS ARE DRAWN AT THE SHARE OF THE OUTPUT THEY ACTUALLY ARE. A
+   * picture of grains beside a fader set to all-radio was the page asserting
+   * something nothing was making: the marks were real, the sound they stood for
+   * was not reaching anybody. Now the layer's alpha IS the blend — at the left
+   * end the wave is the whole picture, at the right end the grains are solid.
+   *
+   * ⚠️ THE WAVEFORM IS NOT FADED WITH IT, on purpose. The wave is the MATERIAL,
+   * which is being chewed whatever the fader says; dimming it as the grains come
+   * up would draw the radio going away, which is the one thing that does not
+   * happen here.
+   *
+   * ⚠️ NO READOUT CELL. The fader prints its own value, in a fixed-width box, an
+   * inch from where your hand is — a second copy in the row above is a number
+   * that can disagree with itself.
+   */
+  // 🔴 A MASTER MUTE THAT `setWet` RESPECTS. This page checks itself by running
+  // the fader to both ends and reading ink off the canvas, and on the deployed
+  // page that was AUDIBLE — a second and a half of granulator nobody asked for,
+  // in the middle of listening. The check still drives the real control down the
+  // real path; it just cannot be heard doing it.
+  let muted = false;
+  const setWet = (v) => {
+    wet = v;
+    if (eng) eng.out.gain.value = muted ? 0 : v;
+    if (dry) dry.gain.value = muted ? 0 : 1 - v;
+    scope.grainAlpha(v);
+  };
+
+  /**
+   * Bring the granulator up. Called once, from the moment there is sound.
+   *
+   * 🔴 IT IS NOT BEHIND A BUTTON ANY MORE AND THAT CHANGED WHAT IT HAS TO
+   * SURVIVE. `verify.mjs` presses `.pos-controls button, .tbar-x` and applies
+   * the manifest's `settleMs` to control 0 ONLY — with no controls declared,
+   * neither applies to this page at all. What carries it now is the harness's
+   * OTHER use of `settleMs`: the first-assert budget, which waits while
+   * `__demo.asserts` is still empty. This page already holds every assert to one
+   * burst in `finish()`, so that budget covers the whole boot — but it is the
+   * only thing that does, which is why the manifest figure went up with this
+   * change rather than being left where a button had been doing half the job.
+   *
+   * ⚠️ AND A FAILURE HERE MUST NOT TAKE THE RADIO DOWN. Booting 1.7 MB of wasm
+   * used to be something a visitor opted into; now everyone who presses play
+   * gets it, so an engine that refuses has to leave a working radio behind
+   * rather than a dead page. `finish()` is called either way and simply reports
+   * fewer things.
+   */
+  async function startGranulator() {
+    if (eng) return;
+    // 🔴 NOTHING HERE MAY TOUCH THE TRANSPORT, AND THE FIRST VERSION DID.
+    // This is started from inside the transport bar's own click, in the CAPTURE
+    // phase — so anything it does synchronously happens BEFORE the bar's handler
+    // runs. It opened with `await ensurePlaying()`, whose body calls
+    // `deck.play()` before its first await, so the bar then saw an
+    // already-playing deck and dutifully toggled it to PAUSE. MEASURED: `play
+    // advances position` went 1 ms in 500, and `pause holds position` advanced
+    // 302 ms in 300 — both harness checks inverted, by a page that had made the
+    // first press do the opposite of what it says.
+    //
+    // The boot needs no transport at all: it needs `ctx` and `srcNode`, which
+    // `graph()` has already built. Only the LEVEL measurement needs the radio
+    // audibly playing, and that is seconds away — so the wait moved down to it.
+    // `bootScsynth` yields on its first line (a dynamic import), so from the
+    // click's point of view this function does nothing at all.
     eng = await bootScsynth({
       audioContext: ctx,
       input: srcNode,                      // ← the radio, onto scsynth's input busses
@@ -524,12 +1855,53 @@
       onReply: (m) => {
         // Every tick is a grain the ENGINE reported firing, from the code that
         // started it — never one inferred from an output envelope.
+        //
+        // 🔴 TWO SEPARATE BUGS LIVED ON THIS LINE AND BETWEEN THEM NOT ONE TICK
+        // HAD EVER BEEN DRAWN ON THIS PAGE.
+        //
+        // FIRST, THE INDICES WERE OFF BY ONE. `m` is `[address, ...args]` and
+        // `SendReply` prepends two of its own, so the message is
+        // `['/pgrain', nodeID, replyID, pos, dur, voice, half]` — recorded
+        // verbatim as `["/pgrain", 3000, -1, 0.1329…, 0.12, 0, 0]` in
+        // `research/supercollider-browser-2026-09.md` §10, in this repo, written
+        // the day before this page was. Reading `pos` at `m[2]` took the
+        // **replyID, which is −1 on every grain there has ever been**.
+        //
+        // SECOND, AND IT WOULD HAVE SURVIVED FIXING THE FIRST: `pos` is a
+        // fraction of the sixty-second capture RING, not of the eight seconds
+        // being read. `scope`'s axis is the eight. Unrescaled, every mark lands
+        // in the left 13% — about fifteen seconds ago on a six-second picture,
+        // which is off the left edge, which is nothing.
+        //
+        // ⚠️ SO THE COUNT WAS RIGHT THE WHOLE TIME AND THE PLACE WAS NOT, AND
+        // NOTHING COULD SEE IT: `grains` reported a rate, the rate was correct,
+        // it was asserted, and it went green. A count cannot tell you where a
+        // grain read (LESSONS #36 — nothing in the suite looks at ink). The two
+        // asserts at the bottom of `finish()` exist so this cannot come back.
         if (m[0] !== '/pgrain') return false;
         grains++;
-        scope.mark({ pos: m[2], dur: m[3], voice: m[4] });
+        const pos = m[3];
+        if (pos < posMin) posMin = pos;
+        if (pos > posMax) posMax = pos;
+        scope.mark({ pos: winPos(pos), dur: m[4], voice: m[5], half: m[6] });
         return true;
       },
     });
+
+    // 🔴 SILENCE THE ENGINE BEFORE IT CAN BE HEARD, AND THIS IS THE FIRST LINE
+    // AFTER THE BOOT FOR A REASON. `bootScsynth` wires its output to the
+    // destination at **gain 0.9** — it has to, because Web Audio PULLS and a
+    // graph with no path to the speakers is never asked to process, which is
+    // what made buffer allocation time out once. But this page starts DRY, so
+    // between `/s_new` answering and `setWet` running there were a few hundred
+    // milliseconds of granulator at nearly full volume. REPORTED as a burst on
+    // page load that "kicks off and then goes away", which is exactly what it
+    // was. `wet` is 0 here, so this leaves the engine silent until asked.
+    eng.out.gain.value = wet;
+
+    // The engine's input is connected by now, so this is the instant the
+    // granulator's capture ring starts filling — see the wait further down.
+    const ringFrom = played();
 
     // 🔴 BUFFERS BEFORE THE SYNTH. A Pappus with no envelope windows and no
     // gate buffers loads, answers `/n_go`, and fires nothing in silence.
@@ -539,44 +1911,362 @@
     G.running = await startPappusSynth(eng);
 
     // 🔴 AND THE SETTINGS, WITHOUT WHICH IT IS SILENT AT `mix 0, gain 0`.
-    applyAudibleDefaults(eng, { live: true });
-    for (const [k, v] of Object.entries(P)) setBoth(k, v);
-    setParam(eng, 'report', 1);
+    // ⚠️ `bufSeconds` PASSED RATHER THAN LEFT ON ITS DEFAULT, which happens to
+    // be the same 8. A default that agrees with this page's constant by
+    // coincidence is a default that can stop agreeing with it in a commit about
+    // something else, and the disagreement would be silent: the ring would lap
+    // at one length while `winPos` and the fill wait assumed another.
+    applyAudibleDefaults(eng, { live: true, bufSeconds: BUF_SECONDS });
+    // ⚠️ AFTER `applyAudibleDefaults`, WHICH ALSO WRITES `gates`, `mscanmode`,
+    // `msos` AND `mbuflen`. A patch applied before the defaults is a patch the
+    // defaults overwrite — silently, since every message is fire-and-forget.
+    // `applyPatch` writes all four again, and everything else besides.
+    applyPatch(patch, { silent: true });
     setWet(wet);
     scope.source('Pappus, chewing the radio');
 
-    const row = sliderRow ?? el('div', 'pos-sliders');
-    if (!sliderRow) { sliderRow = row; d.el.append(row); }
-    const add = (label, name, min, max, step, value, unit) =>
-      row.append(createSlider({ label, min, max, step, value, unit,
-        onInput: (v) => { P[name] = v; setBoth(name, v); } }).el);
-    add('grains a second', 'rate', 0.5, 40, 0.5, P.rate, '/s');
-    add('grain length', 'size', 0.01, 1, 0.01, P.size, 's');
-    add('read position', 'scan', 0, 1, 0.01, P.scan, '');
-    add('scatter', 'spray', 0, 1, 0.01, P.spray, '');
-    row.append(createSlider({ label: 'radio → granulator', min: 0, max: 1, step: 0.01,
-      value: wet, onInput: setWet }).el);
+    // ── the controls, and the ORDER is the argument ─────────────────────────
+    // Picture, then the blend, then what the granulator is doing. The fader sits
+    // directly under the canvas whose grain ticks it fades, and above the four
+    // settings that decide what those ticks ARE. Placed with `after()` rather
+    // than `append()` so it is anchored to the picture instead of to whatever
+    // happens to be last in the body.
+    const fader = createSlider({ label: 'radio → granulator', min: 0, max: 1, step: 0.01,
+      value: wet, onInput: setWet });
+    const wetRow = createSliderGroup([fader]);
+    wetRow.el.classList.add('wet-fader');
+    granControls.push(fader);
 
-    synthOn = true;
-    label('Stop granulating');
+    // 🔴 ONE GROUP, ONE SET OF COLUMNS. Four bare sliders in a div each lay
+    // themselves out, so a wider label pushes its own lane right and the four
+    // lanes start at four different x — which is exactly what was photographed
+    // here. `createSliderGroup` shares the columns; `pair: true` puts two across
+    // above 720 px and stacks them below, where sharing is what matters.
+    const group = createSliderGroup([], { pair: true });
+    group.el.classList.add('gran-rows');      // one rhythm — see the note in <style>
+    const add = (label, name, min, max, step, value, unit) => {
+      const sld = group.add(createSlider({ label, min, max, step, value, unit,
+        onInput: (v) => { P[name] = v; setBoth(name, v); } }));
+      granControls.push(sld);
+      return sld;
+    };
+    const sRate = add('grains a second', 'rate', 0.5, 40, 0.5, P.rate, '/s');
+    // ⚠️ THREE SECONDS AT THE TOP, NOT ONE, BECAUSE A PATCH REACHES PAST ONE.
+    // `slow tide` holds 1.8 s grains and `piled up` 2.6 s; a slider that stops
+    // at 1 would have shown `1.00 s` under a granulator holding 2.6, which is
+    // the page showing one patch and playing another — the exact failure the
+    // glide below exists to prevent, arriving through the range instead.
+    // ⚠️ AND IT IS STILL THE WRONG SHAPE. Upstream's own grain-length knob is
+    // 0.002–8 EXPONENTIAL (`pappus.lua:2473`) and `slider.mjs` has no warp, so
+    // `roof rain`'s 30 ms sits in the first one percent of the travel. The
+    // patches carry the values and this nudges them; a warp in the kit is the
+    // real fix and is written down in plan-radio-patches §1.2.
+    const sSize = add('grain length', 'size', 0.01, 3, 0.01, P.size, 's');
+    // ⚠️ `scan` has its own setter and its own LABEL — see setScan. The label is
+    // set from the patch below, so what is typed here is only what shows in the
+    // half-second before the first patch lands.
+    const sScan = group.add(createSlider({
+      label: 'read speed', min: 0, max: 1, step: 0.01, value: P.scan, unit: '',
+      onInput: setScan,
+    }));
+    granControls.push(sScan);
+    const sSpray = add('scatter', 'spray', 0, 1, 0.01, P.spray, '');
+    sliders = { rate: sRate, size: sSize, scan: sScan, spray: sSpray };
+
+    /**
+     * 🔴 A PICKER, NOT TWO CHOICE ROWS. `material` (speech / music) and `chord`
+     * (one voice / fifth / seventh) are gone; see the note on `PATCHES` for why
+     * the chord is not a separate axis and where the seventh went.
+     *
+     * ⚠️ `createPicker`, NOT `createChoice`, AND THE REASON IS THE PHONE. Six
+     * segmented buttons do not fit 390 px, and `choice.mjs` would wrap them into
+     * a block whose height depends on the names. A picker's cell is fixed width
+     * by design — *"a control that resizes is a control that moves"* — so the
+     * two arrows and the die stay where your thumb last found them however long
+     * the name is. `/grains/` steps its six the same way, which is the third
+     * reason: this page is not going to grow a fourth kind of chooser.
+     *
+     * ⚠️ THE DIE JUMPS BETWEEN PATCHES, NEVER BETWEEN SLIDER POSITIONS. A random
+     * point in four ranges lands in the middle of all four almost every time,
+     * which is the one wash wearing different digits that `/grains/` was fixed
+     * for. `+ patch + 1` so a roll can never land on the patch you are already
+     * on, which reads as a dead button.
+     */
+    const patchRow = createPicker({
+      label: 'sound',
+      what: 'sound',
+      prev: () => applyPatch(patch - 1),
+      next: () => applyPatch(patch + 1),
+      random: () => applyPatch(Math.floor(Math.random() * (PATCHES.length - 1)) + patch + 1),
+      onPick: (i) => applyPatch(i),
+    });
+    patchRow.options(PATCHES.map((p) => p.name), patch);
+    patchPick = patchRow;
+
+    scope.el.after(wetRow.el);
+    wetRow.el.after(patchRow.el);
+    patchRow.el.after(group.el);
+    sliderRow = group.el;
+    granControls.push({ disabled: (y) => patchRow.disabled(y) });
+
+    /**
+     * One label column across both groups — see the note in <style>.
+     *
+     * ⚠️ IT MEASURES THE LABEL AND THE VALUE, NOT THE HEAD THAT HOLDS THEM. A
+     * head sits in the very column being set, so reading its width after `--lab`
+     * is applied reads back the answer rather than the question, and the number
+     * can only grow. `.sld-l` and `.sld-v` are `nowrap` and their parent is
+     * `align-items: flex-start`, so neither stretches — they measure the same
+     * whatever the column does.
+     *
+     * ⚠️ AND IT IS RE-RUN WHEN A PATCH RENAMES THE READ-HEAD SLIDER. `read
+     * speed`, `read position` and `time behind` are all narrower than `radio →
+     * granulator`, so in practice the column does not move — but "it happens to
+     * be right" is not a reason to depend on it, and the day somebody adds a
+     * longer label the lanes would shift sideways on a patch press.
+     */
+    shareLabelColumn = () => {
+      const wide = [wetRow.el, group.el]
+        .flatMap((g) => [...g.querySelectorAll('.sld-l, .sld-v')])
+        .reduce((m, e) => Math.max(m, e.getBoundingClientRect().width), 0);
+      if (!wide) return;
+      for (const g of [wetRow.el, group.el]) g.style.setProperty('--lab', `${Math.ceil(wide)}px`);
+    };
+    // The patch was applied before any of this existed, so the handles, the
+    // name in the picker and the read-head label are all still at their typed
+    // defaults. One re-apply puts the picture in step with the sound — and this
+    // one speaks, because it is the first moment the page can say what it has
+    // loaded to somebody looking at the row it loaded into.
+    applyPatch(patch);
+    shareLabelColumn();
+    // A late webfont changes every one of those widths, and `document.fonts` is
+    // the event for it rather than a guess at how long loading takes.
+    document.fonts?.ready?.then(shareLabelColumn).catch(() => {});
+    new ResizeObserver(shareLabelColumn).observe(d.el);
+
+    // ⚠️ AND HERE IS WHERE THE RADIO HAS TO BE PLAYING — not at the top. The
+    // harness exercises the transport before anything else and leaves the deck
+    // paused and seeked backwards, so `G.loud` would read a confident zero for a
+    // page behaving perfectly. Waiting for the ELEMENT rather than sleeping a
+    // guess at it.
+    await ensurePlaying();
+
+    // 🔴 AND THEN WAIT FOR THE RING TO HOLD SOMETHING. A granulator cannot be
+    // louder than what it has recorded, and this one records into an eight
+    // second ring that `mscan 0.666` reads two thirds of the way back into.
+    //
+    // MEASURED, and it is the harness that makes it visible: `verify.mjs`
+    // exercises the transport first and leaves the radio PAUSED, so the ring
+    // fills with silence for the whole boot — and the deafness control then read
+    // **0.0061 running against 0.0067 with the node paused**, a level that does
+    // not fall when the synth stops because there was never any signal, only
+    // noise. Against a ring that had been recording it reads 0.0554 and 0.0000.
+    //
+    // 🔴 IT WAITS ON PLAYED SECONDS, NOT ON A LEVEL THRESHOLD, AND THE FIRST
+    // VERSION DID THE SECOND. Polling the meter until it passed 0.002 looks like
+    // measuring the thing in question and is a threshold picked out of the air:
+    // PHOTOGRAPHED, a run left the loop at `warm 0.0021` — over the line, a ring
+    // still nearly empty — and the deafness control downstream then read
+    // **0.0363 running against 0.0315 paused**, a ratio of 1.15 that failed on a
+    // page behaving correctly. A threshold taken from nothing measures nothing
+    // (LESSONS #89 in a new costume).
+    //
+    // The condition is exact and needs no constant of its own: the ring holds
+    // `BUF_SECONDS`, so it has been filled once when the ELEMENT has played that
+    // much since the engine's input was connected. `audio.currentTime` counts
+    // only while sound is actually playing, so a pause — which is exactly what
+    // the harness does here — falls out for free rather than being counted as
+    // recording time.
+    for (let i = 0; i < 150 && (played() - ringFrom) < BUF_SECONDS; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    ringFilled = true;
+    d.log(`the granulator's ${BUF_SECONDS} s ring has been filled once `
+      + `(${(played() - ringFrom).toFixed(1)} s of radio recorded into it)`);
+
+    // 🔴 WHAT THE CHORD COSTS, MEASURED RATHER THAN REASONED ABOUT. `glitchCount`
+    // is the only counter that moves in this engine build — `avgCPU` reads 0
+    // always (research §10.7) — so it is the one thing that can say whether four
+    // voices are more than this machine can do. Read either side of the window
+    // the chord is actually sounding in.
+    const glitches = () => { try { return eng.sonic.getMetrics?.()?.glitchCount ?? null; } catch { return null; } };
+    G.glitchBefore = glitches();
+
     const t0g = performance.now();
     grains = 0;
     G.loud = await engLevel(2500);
+    G.glitchAfter = glitches();
     G.secs = (performance.now() - t0g) / 1000;
     G.grains = grains;
     lastRate = (grains / G.secs).toFixed(1);
     d.set('grains', lastRate);
 
+    // 🔴 DOES A GRAIN ACTUALLY LAND ON THE PICTURE, AND DOES THE FADER MOVE IT?
+    // Both halves are here because either alone is passable by a broken page.
+    //
+    // Ink at the fader's two ends, with the ticks' own colour counted and the
+    // FURNITURE excluded — the last four columns hold the live-edge line, which
+    // is drawn in that same colour on every frame whether a grain has ever
+    // arrived or not (LESSONS #75: an assert on ink must exclude the furniture).
+    // Counting it would have passed this check throughout the entire period the
+    // ticks were being drawn off the left edge of the canvas.
+    //
+    // ⚠️ THE DRY READING IS THE CONTROL AND IT IS WHAT MAKES THE WET ONE MEAN
+    // ANYTHING. A probe that reads ink everywhere is a probe that cannot see,
+    // and this one is required to read ~nothing with the fader at 0 and
+    // something with it at 1 — which grades the alpha and the tick positions in
+    // one pair of numbers.
+    const inkNow = () => {
+      const c = scope.canvas, g = c.getContext('2d');
+      // ⚠️ EXCLUDE THE LIVE-EDGE LINE GENEROUSLY. It is drawn in the ticks' own
+      // colour on every frame whether a grain ever arrives or not, and the old
+      // 4-CSS-pixel margin was computed from `clientWidth`, which is 0 while the
+      // element is being laid out — so on a dpr-3 phone the margin collapsed to
+      // 4 BACKING pixels and counted the line. REPORTED from an iPhone as
+      // `2834 lit all-radio, 2832 lit all-granulator`: a constant, at both ends
+      // of a fader that is supposed to separate them. LESSONS #75.
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const px = g.getImageData(0, 0, Math.max(1, c.width - Math.ceil(12 * dpr)), c.height).data;
+      let lit = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i] > 200 && px[i + 1] > 150 && px[i + 2] < 100) lit++;
+      }
+      return lit;
+    };
+    // ⚠️ AND IT RECORDS HOW MANY TICKS WERE ALIVE WHEN IT LOOKED. Ink alone
+    // cannot separate "the ticks are not being drawn" from "there was nothing to
+    // draw" — MEASURED during an upstream outage, where this read `0 lit` at
+    // both ends and the reason was a station returning 502, not the picture.
+    // Two different faults with one number between them is the shape this repo
+    // keeps paying for; the count makes the failure attributable on sight.
+    // 🔴 SAMPLE ACROSS FRAMES, NOT AT ONE INSTANT, AND THIS IS A RETRY RATHER
+    // THAN A TOLERANCE. A tick lives `fadeMs` — about half a second — so at
+    // eight grains a second only a handful are bright at any moment, and one
+    // `getImageData` can land between them. MEASURED: two runs of this check,
+    // no code between them, read `128 lit` and then `0 lit` on a granulator
+    // measuring 0.0848 both times. That is the same trap `verify.mjs`'s own
+    // strip check carries a note about.
+    //
+    // Taking the MAX over a window cannot rescue a picture that never draws —
+    // every try still reads zero — but it stops a working one reading broken.
+    // ⚠️ The dry end is sampled exactly the same way, or the comparison would be
+    // one number's best against another's worst.
+    const inkOver = async (ms) => {
+      let best = 0;
+      const until = performance.now() + ms;
+      while (performance.now() < until) {
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        best = Math.max(best, inkNow());
+      }
+      return best;
+    };
+    muted = true;                      // the self-check is not allowed to be heard
+    setWet(0); await new Promise((r) => setTimeout(r, 400)); G.inkDry = await inkOver(1200);
+    setWet(1); await new Promise((r) => setTimeout(r, 400)); G.inkWet = await inkOver(1200);
+    // ⚠️ `flickering` is `live.length`, and in THIS branch of the scope old marks
+    // are skipped rather than spliced — so it climbs to the 600 cap and says
+    // only that marks are arriving, never that any were drawn. Kept because it
+    // separates "no grains at all" from "grains but no ink"; it is not evidence
+    // of painting, and an earlier version of this note claimed it was.
+    G.alive = scope.stats().flickering;
+    // 🔴 TWO PATCHES, THROUGH THE REAL BUTTON, WHILE NOTHING CAN BE HEARD.
+    // The asserts in `finish()` can only grade the patch that happens to be
+    // selected, and this row is the page's main control: `verify.mjs` presses
+    // `.pos-controls button, .tbar-x` and a picker is neither, so shipping it
+    // without a check here would be a chooser nobody grades — exactly how
+    // `mirror` lost two asserts while reading green.
+    //
+    // ⚠️ DRIVEN BY CLICKING `›`, NEVER BY CALLING `applyPatch`: the fault this
+    // exists to catch lives in the wiring between the button and the engine, and
+    // calling the handler steps straight over it (`/floor/` spent five rounds on
+    // that). ⚠️ AND IT PUTS THE PATCH BACK, through `‹`, so the restore is
+    // exercised by the same path and the page is not left on a sound nobody
+    // chose — the station buttons below carry the same rule for the same reason.
+    //
+    // 🔴 EVERYTHING IS ASKED OF THE SERVER, NOT READ BACK OFF THIS PAGE. Every
+    // `/n_set` here is fire-and-forget, so `PATCHES[patch]` proves nothing about
+    // what scsynth holds; `/s_get`, `/s_getn` and `/b_getn` are the only things
+    // on the far side of the wire. Three kinds of message carry a patch and they
+    // fail differently, so all three are read back: scalars (`/n_set`), the
+    // eight-element voice arrays (`/n_setn`, which is what a scalar sent by
+    // mistake would silently become), and the sixteen-step pattern, which is a
+    // BUFFER and not a control at all.
+    const ask1 = async (name) => {
+      const r = await eng.sendAndWait(
+        (m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', PAPPUS_NODE, name);
+      return r ? r[3] : null;
+    };
+    const askN = async (name, n) => {
+      const r = await eng.sendAndWait(
+        (m) => m[0] === '/n_setn' && m[2] === name, 3000, '/s_getn', PAPPUS_NODE, name, n);
+      return r ? r.slice(4, 4 + n).map(Number) : null;
+    };
+    const askPattern = async () => {
+      const r = await eng.sendAndWait(
+        (m) => m[0] === '/b_setn' && Number(m[1]) === GATE0, 3000, '/b_getn', GATE0, 0, 16);
+      return r ? r.slice(4, 20).map(Number) : null;
+    };
+    // The scalars that decide what kind of sound this is: how the read head
+    // moves, how fast and how long the grains are, how wide, how scattered, how
+    // the rhythm is divided, and the two chain stages a bare granulator has
+    // never had. One `/s_get` each.
+    const SCALARS = [
+      ['mscanmode', (p) => p.scanmode], ['mrate', (p) => p.rate], ['msize', (p) => p.size],
+      ['mcontour', (p) => p.contour], ['mswarm', (p) => p.swarm], ['mspray', (p) => p.spray],
+      ['mspraymode', (p) => p.spraymode], ['melen', (p) => p.elen], ['msos', (p) => p.sos],
+      ['swet', (p) => p.swet], ['rverb', (p) => p.rverb], ['kwow', (p) => p.wow],
+    ];
+    const readScalars = async () => {
+      const got = {};
+      for (const [name] of SCALARS) got[name] = await ask1(name);
+      return got;
+    };
+    const missing = (p, got) => SCALARS
+      .filter(([name, want]) => !(Math.abs((got[name] ?? NaN) - want(p)) < 1e-3))
+      .map(([name, want]) => `${name} ${got[name]} not ${want(p)}`);
+
+    const herePatch = patch;
+    const otherPatch = (patch + 1) % PATCHES.length;
+    selfCheck = true;                  // so the log names a press nobody made
+    patchRow.buttons[1].click();                   // `›`, the next sound
+    await new Promise((r) => setTimeout(r, 120));
+    G.otherMode = await ask1('mscanmode');
+    G.otherElen = await ask1('melen');
+    G.otherPattern = await askPattern();
+    patchRow.buttons[0].click();                   // `‹`, and back
+    await new Promise((r) => setTimeout(r, 120));
+    selfCheck = false;
+    G.here = patch;
+    G.scalars = await readScalars();
+    G.gates = await askN('gates', 8);
+    G.pitches = await askN('pitches', 8);
+    G.probs = await askN('probs', 8);
+    G.pattern = await askPattern();
+    G.patch = PATCHES[herePatch];
+    G.otherWant = PATCHES[otherPatch];
+    G.wrong = missing(G.patch, G.scalars);
+
+    muted = false; setWet(wet);        // hand the fader back exactly where it was
+    fader.set(0, true);            // quiet: leave the page as the visitor finds it
+    setWet(0);
+
     // 🔴 A DEAFNESS CONTROL. `/n_run 0` pauses the node; if the level does not
     // follow, what is being heard came from somewhere else. ⚠️ AND A GRAIN
     // COUNT WOULD NOT HAVE CAUGHT THIS: measured, a Pappus with its input
     // disconnected fired 4–5 grains per window while outputting exactly 0.
+    // ⚠️ AND IT LETS THE TAIL GO FIRST. `engLevel` holds a PEAK, so a window
+    // opened the instant `/n_run 0` is sent captures the message's own latency
+    // plus the grains already in flight — a grain is `msize` long and is not
+    // cancelled by pausing the node that started it. Measuring through that is
+    // measuring the tail, and it reports a granulator that never stopped. Four
+    // hundred milliseconds is three grain lengths at the default 0.12 s.
     eng.send('/n_run', PAPPUS_NODE, 0);
+    await new Promise((r) => setTimeout(r, 400));
     G.quiet = await engLevel(1200);
     eng.send('/n_run', PAPPUS_NODE, 1);
 
     await finish();
-  });
+  }
 
   d.ready();
 </script>

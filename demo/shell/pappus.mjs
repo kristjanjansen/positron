@@ -18,6 +18,20 @@
 // exists to refuse for the definition itself.
 
 const SR = 48000;
+/**
+ * 🔴 THE CAPTURE RING IS SIXTY SECONDS, AND A REPORTED GRAIN POSITION IS A
+ * FRACTION OF ALL OF IT — never of the `mbuflen` seconds actually being read.
+ * `Engine_Pappus.sc` computes `pos = (winlo + …) * loopfrac` where
+ * `loopfrac = mbuflen*SR / BufFrames`, so at `mbuflen` 8 every mark this graph
+ * reports lands in the left **13%** of an axis drawn as the ring.
+ *
+ * A page drawing those marks on a picture of the LIVE WINDOW has to rescale by
+ * `RING_SECONDS / mbuflen`. It is exported rather than written down twice
+ * because both pages that draw grains need it and a disagreement between two
+ * copies is silent — the picture stays plausible and is wrong by a constant,
+ * which is the hardest kind to notice.
+ */
+export const RING_SECONDS = 60;
 export const ENV0 = 10;                  // 17 grain windows, ENV0 … ENV0+16
 export const GATE0 = 27;                 // two gate buffers
 export const WAVE0 = 29;                 // the two PosSource wavetables
@@ -33,7 +47,7 @@ export const PAPPUS_NODE = 3000, SOURCE_NODE = 3001;
  */
 export function bufferPlan(sourceTable = 4096) {
   const plan = [
-    [0, Math.round(60.0 * SR), 1], [1, Math.round(60.0 * SR), 1],
+    [0, Math.round(RING_SECONDS * SR), 1], [1, Math.round(RING_SECONDS * SR), 1],
     [2, Math.round(0.1 * SR), 1], [3, Math.round(0.1 * SR), 1],
     [4, Math.round(11.0 * SR), 1],
   ];
