@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* ── THE PLAYER'S SCREEN ────────────────────────────────────────────────
+     Every colour and proportion here is read off `client/main.qml` in
+     tarmoj/vclick, not invented: the light blue ground, the dark blue tempo
+     line, the ghost-white bar number on the left and the beat number on the
+     right coloured by WHICH beat it is, and three round lamps that light and
+     fade over exactly one beat. It is meant to be recognisable to somebody who
+     has held the real one in a rehearsal.
+
+     🔴 ONE DELIBERATE DIFFERENCE, AND IT IS A RULE HERE. Theirs sizes the two
+     numerals with `fontSizeMode: Text.Fit`, so the glyphs grow and shrink as
+     the number gains a digit. Nothing that redraws on a clock may change how
+     much room it takes — a bar counter going 9 → 10 would shove the lamps
+     down. Fixed boxes, one reserved width, `tabular-nums`. */
+  /* 🔴 THEIR GROUND IS NOT LIGHT BLUE, IT IS A GRADIENT THROUGH BLACK, and I
+     had it wrong until I looked: stops at 0.00 #a5c9db, 0.26 black, 0.84
+     black, 1.00 #a5c9db. That is WHY a ghost-white bar number and a white
+     beat number are legible — they sit on the black band, not on the blue.
+     Copied at the same four positions. */
+  .cl { background: linear-gradient(#a5c9db 0%, #000 26%, #000 84%, #a5c9db 100%);
+        border-radius: 6px; padding: 18px 16px 22px;
+        display: grid; gap: 10px; justify-items: center; position: relative;
+        overflow: hidden; }
+  .cl-tempo { color: #00008b; font: 600 13px/1 var(--mono); letter-spacing: .04em; }
+  .cl-nums { display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+             width: 100%; max-width: 420px; }
+  /* the reserved width IS the design: 3 characters of the widest digit */
+  .cl-bar, .cl-beat { font: 700 clamp(54px, 17vw, 96px)/1 var(--mono);
+                      font-variant-numeric: tabular-nums; min-width: 3ch;
+                      text-align: right; padding-right: 14px; }
+  .cl-beat { text-align: left; padding: 0 0 0 14px; }
+  .cl-bar { color: ghostwhite; }
+  .cl-lamps { display: flex; gap: 10px; justify-content: center;
+              align-items: center; height: 92px; width: 100%; }
+  /* Their lamp animates colour AND diameter together over one beat. A box that
+     changes size inside a fixed-height flex row moves nothing around it. */
+  .cl-lamp { border-radius: 50%; border: 1px solid #ffea44; width: 22px;
+             height: 22px; transition: none; }
+  .cl-note { position: absolute; left: 0; right: 0; bottom: 0;
+             background: #00008b; color: #fff; text-align: center;
+             font: 600 15px/1.5 var(--sans); padding: 7px 10px; }
+  .cl-note:empty { display: none; }
+  /* the operator's half — a plain row, because it is not the subject */
+  .op { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .op label { font: 500 11px/1 var(--mono); color: var(--dim); }
+  .warn { font: 500 10.5px/1.7 var(--mono); color: var(--warn); margin: 0; }
+  .warn:empty { display: none; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { compileCsound } from '/timeline/csound.mjs';
+
+  // ── THEIR SCORES, CARRIED RATHER THAN FETCHED ──────────────────────────
+  //
+  // `server/test.sco` and `server/simple-4-4.sco` from tarmoj/vclick, GPL-3.0,
+  // (c) Tarmo Johannes — copied verbatim, tabs and comments included, because a
+  // score edited to suit the compiler would prove nothing about the compiler.
+  //
+  // ⚠️ EMBEDDED, NOT FETCHED, AND THAT IS THE POINT OF THE PAGE. A click track
+  // that needs the network to tell it where the beat is has put the network
+  // back in the per-beat path. This page makes NO request of any kind — no
+  // fetch, no socket — and the two scores are here so that stays true.
+  const SCORES = {
+    'test.sco': `; vClick score - for test and demo
+#define TUTTI #0#
+#define TEMPO1 #80#
+#define TEMPO2 #52#
+#define BEGIN #9#
+#define REPTEMPO #$TEMPO1#
+
+t 0 $TEMPO1
+i 1 0 0 $TEMPO1 0
+i "countdown" 0 4 4 $TUTTI
+i "notification" 3 1 "READY"
+s
+
+;ADVANCE
+t 0 $TEMPO1 4 $TEMPO1 12 $TEMPO2
+i1 4 8 $TEMPO1 $TEMPO2 8
+i1 12 0 $TEMPO2 0
+
+i	2	0	4	4	4	0	1	$TUTTI
+i	2	4	4	4	4	0	2	$TUTTI
+i	2	8	4	4	4	0	3	$TUTTI
+i	2	12	4	4	4	0	4	$TUTTI
+
+i	2	18	1	1	4	0	5	$TUTTI
+i	2	19	1.5	1	[8/3]	0	-5.2	$TUTTI
+i	2	20.5	1	1	4	0	-5.3	$TUTTI
+
+i	2	21.5	0.5	1	[16/3]	0	6	$TUTTI
+i	2	22	0.75	1	4	0	-6.2	$TUTTI
+i	2	22.75	0.5	1	4	0	7	$TUTTI
+i	2	23.25	0.75	1	[16/3]	0	-7.2	$TUTTI
+
+i	2	24	0.75	[16/3]	4	0	8	$TUTTI
+i	2	24.75	0.5	1	4	0	-8.2	$TUTTI
+
+i	2	25.25	0.75	[16/3]	4	0	9	$TUTTI
+i	2	26	0.5	1	4	0	-9.2	$TUTTI
+
+i	"notification"	0	2	"Go!"
+i	"notification"	4	8	"Ritenuto"
+i	"notification"	16	2	"Complex"
+i	"notification"	18	3	"2+3+2/8"
+i	"notification"	21.5	3	"5/16"
+`,
+    'simple-4-4.sco': `; vClick score template							
+							
+;count-down 								
+								
+								
+#define TUTTI  #0#								
+#define TEMPO1 #60#								
+#define REPTEMPO #$TEMPO1# ; REPTEMPO for setting tempo for countdown (if starts from section in another tempo)								
+#define BEGIN #5#								
+								
+								
+t 0 $REPTEMPO								
+i 1 0 0 $REPTEMPO 0								
+i "countdown" 0 4 4 $TUTTI			; four click in four beats					
+i "notification" 3 0.9 "READY"			; notification					
+f 0 4 	; workaround – not to leave early – FIX IT							
+s								
+								
+								
+t	0	$TEMPO1						
+								
+i 	1	0	0	$TEMPO1	0	0	; set the tempo	
+								
+								
+								
+								
+								
+;ADVANCE		; do not change by hand!						
+; a 0 0.01 < beats>								
+
+							
+; times bar by bar								
+;i	instrnr	start	duration	number of beats	part of the whole note	subdivision	bar number	instruments
+i	2	0	4	4	4	0	1	$TUTTI
+i	2	4	4	4	4	0	2	$TUTTI
+i	2	8	4	4	4	0	3	$TUTTI
+i	2	12	4	4	4	0	4	$TUTTI
+i	2	16	4	4	4	0	5	$TUTTI
+i	2	20	4	4	4	0	6	$TUTTI
+i	2	24	4	4	4	0	7	$TUTTI
+i	2	28	4	4	4	0	8	$TUTTI
+i	2	32	4	4	4	0	9	$TUTTI
+i	2	36	4	4	4	0	10	$TUTTI
+i	2	40	4	4	4	0	11	$TUTTI
+i	2	44	4	4	4	0	12	$TUTTI
+i	2	48	4	4	4	0	13	
+i	2	52	4	4	4	0	14	
+i	2	56	4	4	4	0	15	
+i	2	60	4	4	4	0	16	
+i	2	64	4	4	4	0	17	
+i	2	68	4	4	4	0	18	
+i	2	72	4	4	4	0	19	
+i	2	76	4	4	4	0	20	
+i	2	80	4	4	4	0	21	
+i	2	84	4	4	4	0	22	
+i	2	88	4	4	4	0	23	
+i	2	92	4	4	4	0	24	
+i	2	96	4	4	4	0	25	
+i	2	100	4	4	4	0	26	
+i	2	104	4	4	4	0	27	
+i	2	108	4	4	4	0	28	
+i	2	112	4	4	4	0	29	
+i	2	116	4	4	4	0	30	
+i	2	120	4	4	4	0	31	
+i	2	124	4	4	4	0	32	
+i	2	128	4	4	4	0	33	
+i	2	132	4	4	4	0	34	
+i	2	136	4	4	4	0	35	
+i	2	140	4	4	4	0	36	
+i	2	144	4	4	4	0	37	
+i	2	148	4	4	4	0	38	
+i	2	152	4	4	4	0	39	
+i	2	156	4	4	4	0	40	
+i	2	160	4	4	4	0	41	
+i	2	164	4	4	4	0	42	
+i	2	168	4	4	4	0	43	
+i	2	172	4	4	4	0	44	
+i	2	176	4	4	4	0	45	
+i	2	180	4	4	4	0	46	
+i	2	184	4	4	4	0	47	
+i	2	188	4	4	4	0	48	
+i	2	192	4	4	4	0	49	
+i	2	196	4	4	4	0	50	
+								
+								
+								
+; CUES								
+								
+i	"playfile"	0	999	"test.wav"	0	; t1		
+								
+								
+								
+								
+; NOTIFICATIONS								
+								
+i	"notification"	0	2	"Start"				
+`,
+  };
+
+  const d = mount({
+    name: 'click',
+    what: 'This is U:\u2019s vClick — a click track with no cables and no '
+      + 'earpieces, where the conductor\u2019s score plays and every player '
+      + 'watches a screen for the bar, the beat and a flashing lamp. Theirs '
+      + 'sends two messages a beat over the hall\u2019s wifi to every player; '
+      + 'this one works the whole piece out once from the same score file and '
+      + 'then each screen reads its own clock, so pushed counts what theirs '
+      + 'would have sent while this page sends nothing. late is how far each '
+      + 'flash landed from the moment the score asks for.',
+    readout: { bar: '', beat: '', tempo: 'bpm', late: 'ms', pushed: '', rows: '' },
+    controls: [
+      { id: 'run', label: 'Start', primary: true },
+      { id: 'stop', label: 'Stop' },
+    ],
+  });
+  guard(d);
+
+  // ── the player's screen ────────────────────────────────────────────────
+  const screen = el('div', 'cl');
+  const tempoLine = el('div', 'cl-tempo', 'Tempo: 0');
+  const nums = el('div', 'cl-nums');
+  const barEl = el('div', 'cl-bar', '0');
+  const beatEl = el('div', 'cl-beat', '0');
+  nums.append(barEl, beatEl);
+  const lamps = el('div', 'cl-lamps');
+  // their three lamps, in their order, with their exact off-colours
+  const LAMP = [
+    { key: 'red', on: '#ff0000', off: '#5c0303' },
+    { key: 'green', on: '#008000', off: '#092d23' },
+    { key: 'blue', on: '#add8e6', off: '#01192b' },
+  ];
+  const lampEl = LAMP.map((L) => {
+    const e = el('div', 'cl-lamp');
+    e.style.background = L.off;
+    lamps.append(e);
+    return e;
+  });
+  const noteEl = el('div', 'cl-note', '');
+  screen.append(tempoLine, nums, lamps, noteEl);
+
+  // ── the operator's half ────────────────────────────────────────────────
+  const op = el('div', 'op');
+  let scoreName = 'test.sco';
+  const pick = createChoice({
+    label: 'Score',
+    options: Object.keys(SCORES).map((k) => [k, k]),
+    onPick: (id) => { scoreName = id; build(); },
+  });
+  let startBar = 1;
+  const barLabel = el('span', '', 'bar 1');
+  const stepper = createStepper({
+    what: 'the starting bar',
+    prev: () => { startBar = Math.max(1, startBar - 1); barLabel.textContent = `bar ${startBar}`; },
+    next: () => { startBar = startBar + 1; barLabel.textContent = `bar ${startBar}`; },
+  });
+  op.append(pick.el, el('label', '', 'Start from'), stepper.el, barLabel);
+  const warn = el('p', 'warn', '');
+  d.el.append(screen, op, warn);
+
+  // ── compiling, which is all the work there is ──────────────────────────
+  //
+  // Their server runs Csound over the score and pushes bar/beat/tempo to every
+  // player as it goes. This does it once: every flash the piece will ever ask
+  // for is worked out up front, and playing is reading a list against a clock.
+  let compiled = null;
+  let events = [];        // {ms, bar, beat, lamp, text}
+  let wouldSend = 0;      // messages their server would have pushed by now
+
+  /** A bar statement expands into its own beats.
+   *
+   *  From THEIR orchestra (`server/metro_sendosc.orc`, instr 2), not guessed:
+   *  p4 is how many beats the bar has, p5 is the note value as a fraction of a
+   *  whole note, p6 the subdivision, p7 the bar number. Their metronome runs at
+   *  `tempo/60 * p5/4`, so beat k sits 4/p5 score-beats after the one before.
+   *
+   *  ⚠️ A NEGATIVE BAR NUMBER IS NOT A BAR BEFORE THE START. It means "do not
+   *  flash red on the first beat", for a bar built out of unequal groups —
+   *  2+3+2/8 is written as three statements, one per group, and only the first
+   *  gets the red. The FRACTIONAL part carries the beat number to start
+   *  counting from, so -5.2 is bar 5 counting from beat 2. Reading it as a
+   *  number would put four bars of the piece before bar 1.
+   */
+  function barBeats(it) {
+    const p = it.payload.p;
+    const count = Math.max(1, Math.round(Number(p[3]) || 1));
+    const value = Number(p[4]) || 4;
+    const barNo = Number(p[6]) || 0;
+    const shown = Math.abs(Math.trunc(barNo));
+    const frac = Math.abs(barNo % 1);
+    const first = frac === 0 ? 1 : Math.round(frac * 10);
+    const step = 4 / value;
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      const beat = first + k;
+      out.push({
+        ms: compiled.tempo.msAt(it.payload.beat + k * step),
+        bar: shown,
+        beat,
+        // red on a bar's own first beat; green otherwise. A negative bar number
+        // suppresses the red, which is the whole reason it is written that way.
+        lamp: (k === 0 && barNo >= 0) ? 0 : 1,
+      });
+    }
+    return out;
+  }
+
+  function build() {
+    warn.textContent = '';
+    let c;
+    try { c = compileCsound(SCORES[scoreName]); }
+    catch (e) { warn.textContent = `${scoreName} did not compile: ${e.message}`; return; }
+    compiled = c;
+    const ev = [];
+    for (const it of c.items) {
+      const instr = String(it.payload.instr).replace(/"/g, '');
+      if (instr === '2') ev.push(...barBeats(it));
+      else if (instr === 'countdown') {
+        // a count-in: p4 clicks spread over p3, shown as negative numbers, and
+        // the last one green rather than blue — their instr 18, exactly
+        const clicks = Math.max(1, Math.round(Number(it.payload.p[3]) || 1));
+        for (let k = 0; k < clicks; k++) {
+          ev.push({
+            ms: it.at + (it.payload.durMs * k) / clicks,
+            bar: 0, beat: -(clicks - k),
+            lamp: k === clicks - 1 ? 1 : 2,
+          });
+        }
+      } else if (instr === 'notification') {
+        const text = String(it.payload.p[3] ?? '').replace(/"/g, '');
+        ev.push({ ms: it.at, text, untilMs: it.at + it.payload.durMs });
+      }
+    }
+    ev.sort((a, b) => a.ms - b.ms);
+    events = ev;
+    d.set('rows', c.items.length);
+    // ⚠️ NOT 0 — nothing has been pushed because nothing has been played, and
+    // a zero here would read as a measurement rather than as an empty cell.
+    d.set('pushed', '');
+    if (c.warnings.length) warn.textContent = c.warnings.join(' · ');
+    d.log(`${scoreName}: ${c.items.length} rows, ${c.sections.length} sections, `
+      + `${ev.length} things to show`, 'hi');
+  }
+
+  // ── playing, which is reading the list against a clock ─────────────────
+  let t0 = null, raf = 0, nextIdx = 0, worstLate = 0;
+
+  /** Where in the piece a bar number starts.
+   *
+   *  🔴 THIS IS THE WHOLE ARGUMENT, IN ONE FUNCTION. Their server does it by
+   *  rewriting the score text: find the line whose eighth field is the bar,
+   *  replace a comment reading `;ADVANCE` with a skip statement, hunt backwards
+   *  for the last tempo line and re-insert it with a patched time. Their README
+   *  says playback can start from any bar "if the vClick score is done well",
+   *  and that qualifier is this machinery — the score has to contain the magic
+   *  comment, write `i 2` with a space, and carry enough fields.
+   *  Compiled, it is a search through a list, and the tempo needs no repair
+   *  because the tempo is a map over the whole piece rather than a thing the
+   *  score is currently in the middle of doing.
+   */
+  function msOfBar(n) {
+    const hit = events.find((e) => e.bar === n && e.beat === 1);
+    return hit ? hit.ms : null;
+  }
+
+  function frame() {
+    const now = performance.now() - t0;
+    while (nextIdx < events.length && events[nextIdx].ms <= now) {
+      const e = events[nextIdx++];
+      if (e.text !== undefined) { noteEl.textContent = e.text; noteEl.dataset.until = e.untilMs; }
+      else {
+        barEl.textContent = String(e.bar);
+        beatEl.textContent = String(e.beat);
+        // their beat colours, in their order — beat 1 red, then progressively
+        // deeper greens, and everything past the sixth stays forest green
+        const BEAT = ['white', 'red', 'greenyellow', 'lightgreen', 'green', 'darkgreen', 'forestgreen'];
+        beatEl.style.color = BEAT[Math.min(Math.abs(e.beat), 6)];
+        lampEl.forEach((x, i) => {
+          x.style.background = i === e.lamp ? LAMP[i].on : LAMP[i].off;
+          x.style.width = x.style.height = i === e.lamp ? '76px' : '22px';
+        });
+        lit = { at: now, lamp: e.lamp, beatMs: beatLen(e.ms) };
+        // 🔴 THE NUMBER THE PAGE EXISTS TO REPORT. How late this flash was
+        // against the millisecond the score asks for — not against the previous
+        // flash, which would only measure the timer against itself.
+        worstLate = Math.max(worstLate, now - e.ms);
+        // 🔴 AND IT IS NOT A MEASUREMENT IF THE PAGE WAS ASLEEP FOR PART OF IT.
+        // MEASURED while building this: in a background tab Chrome stops
+        // `requestAnimationFrame` altogether — a one-second rAF loop did not
+        // finish in FORTY-FIVE seconds — and the flashes then arrive in clumps
+        // when the tab is painted again. `late` read 2487.2 ms and every
+        // millisecond of it was the browser's decision rather than this page's
+        // arithmetic. A number that reports somebody else's throttling as if it
+        // were our lateness is worse than an empty cell, so the cell goes empty
+        // and the log says which.
+        d.set('late', slept ? '' : worstLate.toFixed(1));
+        // what vClick would have put on the wire to reach one player: the
+        // beat/bar pair and the lamp are two separate OSC messages in their
+        // `instr send`, and there is one of each per beat, per player.
+        wouldSend += 2;
+      }
+    }
+    if (noteEl.dataset.until && now > Number(noteEl.dataset.until)) {
+      noteEl.textContent = ''; delete noteEl.dataset.until;
+    }
+    // the lamp fades over one beat, as theirs does
+    if (lit) {
+      const k = Math.min(1, (now - lit.at) / Math.max(1, lit.beatMs));
+      const e = lampEl[lit.lamp];
+      e.style.width = e.style.height = `${76 - 54 * k}px`;
+      e.style.background = k >= 1 ? LAMP[lit.lamp].off
+        : `color-mix(in oklab, ${LAMP[lit.lamp].on} ${Math.round((1 - k) * 100)}%, ${LAMP[lit.lamp].off})`;
+    }
+    tempoLine.textContent = `Tempo: ${Math.round(bpmAt(now))}`;
+    d.set('tempo', Math.round(bpmAt(now)));
+    d.set('bar', barEl.textContent);
+    d.set('beat', beatEl.textContent);
+    // 🔴 `pushed` IS THEIR NUMBER, NOT OURS, AND THAT IS WHY IT IS ON THE PAGE.
+    // A cell that could only ever read 0 is a cell that teaches a reader to
+    // ignore the row. This counts what vClick's server WOULD have put on the
+    // hall's wifi to reach one player by now — two OSC messages a beat, from
+    // their own `instr send`. What this page sent is in the line the log
+    // writes when the piece ends, because it is a fact that happens once.
+    d.set('pushed', wouldSend);
+    if (nextIdx < events.length) raf = requestAnimationFrame(frame);
+    else d.log(`finished · their server would have pushed ${wouldSend} messages `
+      + 'to one player; this page sent none', 'hi');
+  }
+
+  let lit = null;
+
+  // ⚠️ THE REAL LIMIT, STATED RATHER THAN HIDDEN. Their client is a native app
+  // that keeps counting with the phone in a pocket. A page driven by
+  // `requestAnimationFrame` stops dead the moment its tab is hidden or the
+  // screen locks, and no amount of care about the tempo map changes that — a
+  // click track on a locked phone is not a click track. The honest fixes are a
+  // clock that survives backgrounding (an AudioContext, or a worker) and a
+  // wake lock; neither is in this page, and pretending otherwise by quietly
+  // absorbing the gap is how a demo makes a promise the thing cannot keep.
+  let slept = document.hidden;
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || !raf) return;
+    if (!slept) d.log('this tab was hidden — the browser stops the frame clock '
+      + 'there, so late is no longer measuring this page', 'bad');
+    slept = true;
+  });
+
+  /** One beat, in milliseconds, at a given moment — for the lamp's fade.
+   *  Read off the tempo map rather than off the gap to the next flash, because
+   *  the last flash of a bar has no next one. */
+  function beatLen(ms) {
+    const b = bpmAt(ms);
+    return b > 0 ? 60000 / b : 500;
+  }
+  /** The tempo at a moment, from the compiled map.
+   *  ⚠️ A real vClick score declares its tempo TWICE — once as a `t` statement
+   *  for the score's own clock, and again as `i 1` rows carrying a start
+   *  tempo, an end tempo and a ramp length, which is what their players' screens
+   *  read. This takes the map, and checks the two agree below. */
+  function bpmAt(ms) {
+    if (!compiled) return 0;
+    const A = 20;
+    const b0 = beatAtMs(ms), b1 = beatAtMs(ms + A);
+    return (b1 - b0) > 0 ? ((b1 - b0) / A) * 60000 : 0;
+  }
+  function beatAtMs(ms) {
+    // the map is beat -> ms and monotonic, so invert it by bisection
+    let lo = 0, hi = 1;
+    while (compiled.tempo.msAt(hi) < ms && hi < 1e6) hi *= 2;
+    for (let k = 0; k < 40; k++) {
+      const mid = (lo + hi) / 2;
+      if (compiled.tempo.msAt(mid) < ms) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  function stop() {
+    cancelAnimationFrame(raf); raf = 0; lit = null;
+    lampEl.forEach((x, i) => { x.style.background = LAMP[i].off; x.style.width = x.style.height = '22px'; });
+  }
+
+  d.on('run', () => {
+    if (!compiled) build();
+    stop();
+    const from = msOfBar(startBar);
+    if (from === null && startBar !== 1) {
+      d.log(`bar ${startBar} is not in ${scoreName}`, 'bad');
+      return;
+    }
+    const at = from ?? 0;
+    nextIdx = events.findIndex((e) => e.ms >= at);
+    if (nextIdx < 0) nextIdx = events.length;
+    t0 = performance.now() - at;
+    worstLate = 0; wouldSend = 0; slept = document.hidden;
+    d.log(`playing ${scoreName} from bar ${startBar} (${Math.round(at)} ms in)`, 'hi');
+    raf = requestAnimationFrame(frame);
+  });
+  d.on('stop', () => { stop(); d.log('stopped'); });
+
+  build();
+
+  // ── what the page checks about itself ──────────────────────────────────
+  d.assert('their real score compiles', !!compiled && compiled.items.length === 25,
+    compiled ? `${compiled.items.length} rows` : 'did not compile');
+  d.assert('it compiles with nothing to warn about', !!compiled && compiled.warnings.length === 0,
+    (compiled?.warnings || []).join(' · ') || 'no warnings');
+  d.assert('every bar statement expanded into its own beats', events.length > compiled.items.length,
+    `${compiled.items.length} rows became ${events.length} things to show`);
+
+  // A bar's first beat must land on the row's own millisecond — the expansion
+  // walks the tempo map by hand, so this is the one place it could disagree
+  // with the compiler that produced the row.
+  {
+    let worst = 0;
+    for (const it of compiled.items) {
+      if (String(it.payload.instr).replace(/"/g, '') !== '2') continue;
+      const first = barBeats(it)[0];
+      worst = Math.max(worst, Math.abs(first.ms - it.at));
+    }
+    d.assert('each bar\u2019s first beat lands on the row\u2019s own time', worst < 1e-6,
+      `worst ${worst.toExponential(2)} ms over ${compiled.items.length} rows`);
+  }
+
+  // 🔴 The claim the page makes about starting anywhere, checked rather than
+  // stated: every bar the score names can be found and started from, and the
+  // tempo there is whatever the map says — no text to rewrite, no comment to
+  // find. Their server can only do this where the score carries `;ADVANCE`.
+  {
+    const bars = [...new Set(events.filter((e) => e.beat === 1 && e.bar > 0).map((e) => e.bar))];
+    const found = bars.filter((b) => msOfBar(b) !== null);
+    d.assert('every bar in the score can be started from', bars.length > 0 && found.length === bars.length,
+      `${found.length} of ${bars.length} bars — ${bars.join(', ')}`);
+    const late = bars.map((b) => msOfBar(b)).filter((m) => m !== null);
+    d.assert('and each one lands at a different moment', new Set(late).size === late.length,
+      `${new Set(late).size} distinct times for ${late.length} bars`);
+  }
+
+  // The score declares its tempo twice and the two must agree, or the number on
+  // a player's screen is not the number the beats are spaced by.
+  {
+    const rows = compiled.items.filter((it) => String(it.payload.instr) === '1'
+      && Number(it.payload.p[3]) > 0);
+    let worst = 0;
+    for (const r of rows) worst = Math.max(worst, Math.abs(bpmAt(r.at) - Number(r.payload.p[3])));
+    d.assert('the two ways the score states its tempo agree', rows.length > 0 && worst < 1.5,
+      `${rows.length} tempo rows, worst ${worst.toFixed(2)} bpm apart`);
+  }
+
+  // The offline claim, asserted rather than assumed — plan-uuu-local P2.
+  d.assert('the page asked the network for nothing',
+    performance.getEntriesByType('resource')
+      .every((r) => new URL(r.name, location.href).pathname.startsWith('/shell/')
+        || new URL(r.name, location.href).pathname.startsWith('/timeline/')),
+    `${performance.getEntriesByType('resource').length} resources, all local code`);
+
+  d.log('press Start — or step the bar and start from there', 'hi');
+  d.ready();
+</script>
+</html>
