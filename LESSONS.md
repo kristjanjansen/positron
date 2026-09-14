@@ -394,6 +394,12 @@ failure can actually happen. And a first assert on it — `'seq' in bytes` —
 was itself unfalsifiable and had to be replaced by one that could fail (the
 counter did NOT advance across a binary frame).
 
+Third instance, session 22, and the most literal one available:
+`d.assert('eight cues in the score', deck.eventsOf ? true : true, …)` — both
+arms of the conditional are `true`. It is now a real fold query with the first
+cue's time read from `CUES[0]` instead of typed. Like #24's `?? 0`, the defect
+has a SHAPE and the shape is greppable: `? true : true`.
+
 ### 40. `map(fn)` passes the INDEX, and a defaulted second parameter will take it
 
 `rows.map(short)` where `short = (s, n = 96) => …` renders row *i* truncated to
@@ -420,6 +426,12 @@ and reorder every press besides, since the harness walks them in document
 order. Moving the BOX above the bar puts the same pixels on screen at no cost.
 **When a layout request would move an element out of the harness's reach, move
 the other element.**
+
+⚠️ **The same harness fact from a third side (session 22): the order controls
+are DECLARED in decides which branch gets graded.** `verify.mjs` presses them in
+document order, so whichever is last is the state the page is in when the checks
+run. `typist` declared its two the other way round and read **9 of 10, green**,
+with the one assert grading the half a visitor actually uses simply absent.
 
 ### 42. A control's blast radius must not exceed its label
 
@@ -586,6 +598,14 @@ Later, asked the same question again, I measured the actual quantity: when each
 2 ms and stayed in exact lockstep (`v-a = 0.00 s` over 12 samples). *That*
 exonerated the publisher, and it is the only version of the answer worth having.
 
+⚠️ **Session 22, the same A/B in a layout.** `diagram`'s byte-identity check
+compared the same spec with and without `children: []` — and stayed GREEN with
+the container arithmetic forced permanently ON, because both arms run it. The
+assert that works says something the bug cannot satisfy: a box with nothing in
+it leaves no trace at all, no empty list and no key. 272 of 272 layouts
+identical, 8 specs x 2 rulers x 17 widths, one ruler deliberately uneven so that
+an equality holding only for a fixed advance cannot pass.
+
 ### 2. A green suite can mean zero coverage, not correctness
 
 `demo/verify.mjs` reported **261/261 green** while demo 06 was fatally broken on
@@ -723,6 +743,17 @@ it from 11 asserts to 10 — the other branch silently stopped being tested whil
 the suite still read green. Same failure shape as #2, one layer down. Compare
 per-demo counts against the last known total after any change.
 
+⚠️ **Four silent drops in one session (22), and not one of them turned anything
+red.** `typist` went **22 asserts to 7** because a control that disposes the
+deck ran before the check rather than after it; `patch` went **26 to 9** on an
+import it had not updated yet, and **20 to 15** on a file it could no longer
+read; and `scene` went **32 to 24** when restructuring its
+constants deleted two helpers — that last one caught ONLY by the count, because
+the room swallows a throw from `draw()` into a log line and `verify-gl` still
+said GREEN. **A green suite with a smaller denominator is the normal
+presentation of this bug**, so diffing the count is not tidiness; it is the only
+instrument that sees it.
+
 ---
 
 ## Platform facts worth keeping
@@ -806,6 +837,13 @@ audio stream controller starting behind the main one). The rest:
 A seek is not free. A watchdog that fires on the wrong signal is worse than no
 watchdog. Rate-limit every recovery action, require it to have somewhere to land,
 and make it yield rather than retry forever.
+
+⚠️ **NUMBERING DEFECT, AND IT IS NOT TO BE REPAIRED IN PASSING: entries 39–48
+EXIST TWICE.** `### 39`–`### 48` above are sessions 14–15; `## 39`–`## 48` below
+are sessions 17–18. Every citation of those numbers is therefore ambiguous, and
+CLAUDE.md, HANDOFF.md and PROGRESS.md all cite them — so renumbering is a
+deliberate sweep with a grep of those three files behind it, never a side effect
+of a writing task. Until somebody does that sweep, cite these ten by TITLE.
 
 ## 39. `pkill -f <pattern>` matches its own command line (session 17)
 
@@ -1171,6 +1209,31 @@ The relay now reclaims. Two things were needed and neither is obvious:
 Eviction runs **only when the room is full**. An idle socket in a room with
 space costs nothing, and closing it would be a policy nobody asked for.
 
+⚠️ **Session 22 closed the other half of this, and the general rule is about
+guards rather than about browsers.** CLAUDE.md had carried *run the failing
+demos ALONE before believing the suite* since session 18 — and **a rule to
+remember is the weakest guard there is**, because it fires only if whoever reads
+the red output happens to recall it. `verify.mjs` counts other headless Chromes
+now and says so, at the start and again at the end when something failed (a
+browser that appeared halfway through is the one most likely to have caused the
+failure and would not be in the opening count). ⚠️ Its first version reported
+**19 other browsers for two**: one browser is about ten processes and the
+helpers inherit the whole command line. **A warning that overstates by 10x is
+worse than no warning**, because the next reader learns to ignore it — counted
+by the process with no `--type=` now, deduped by port, proved by standing a
+decoy up and taking it down (**2 → 1**).
+
+And the cause was in the same file the whole time: `CDP_PORT = 9333` and one
+shared profile directory, in a harness whose HTTP port had already been fixed
+for exactly this. So two harnesses started at once did not collide loudly — the
+second found 9333 answering, attached to the FIRST's browser, and drove someone
+else's tabs while reporting its own slugs. Reproduced from the old constants:
+`Error: cdp timeout: Runtime.evaluate`, which is the error that had taken a full
+suite out twice that day. **A rule applied to one instance of a shape in a file
+is not applied**, and the profile had to move in the same change rather than as
+tidiness, since Chrome writes the port it actually got into `DevToolsActivePort`
+INSIDE the profile.
+
 ## 57. A class only the script knows about is not a component
 
 Twice in one day, from the same shape. `choice.mjs` shipped emitting
@@ -1342,6 +1405,20 @@ own reply, never the wrapper's return.
 
 The bracket is what turned this from "impossible" into arithmetic — LITE was
 11.8% over, and four compile-time cuts made it fit.
+
+⚠️ **CORRECTED, session 22: that ceiling is SuperSonic's, not wasm scsynth's,
+and it binds the MESSAGE.** Against the official wasm backend, LITE (74,733) and
+FULL (121,425) both load and both play, and the largest definition it takes is
+**860,000 bytes** — so the first sentence of this entry names a platform for a
+limit that belongs to one port. Native scsynth refuses at **65,488** over UDP
+(`EMSGSIZE` at the sender, from `SC_ComPort.cpp`'s `kTextBufSize` on the UDP
+port alone), nothing was found at 1,000,000 over TCP or via `/d_load`, and
+**anything sclang sends becomes `/d_load` above 16,383 bytes** — so the board,
+which uses `.add`, has never been bound by any of it. That it binds the message
+rather than the definition is proved rather than argued: adding a 12-byte
+completion message moved the definition edge 65,520 → 65,504, exactly the 16
+bytes it costs on the wire. The bracket in this entry is still true of the
+engine this repo ships. See #76.
 
 ## 64. SuperCollider does not strip an unconnected UGen
 
@@ -1625,3 +1702,272 @@ session 20 to session 21 untouched** while one day produced eight entries' worth
 of material. `PROGRESS.md` records what HAPPENED; this file records the RULE.
 Only the second transfers to a different file on a different day, so a session
 that writes the story and not the rule has kept the half that cannot be reused.
+
+## 74. The evidence was on the wire, and in the dump nobody read (session 22)
+
+`grains` made no sound for hours. The board streamed 50 frames a second
+throughout, answered every question, reported the right material and the right
+parameters, and produced nothing — because `Engine_Pappus.sc:804` gates every
+grain on `trig * (gates[i] > 0.001)` and one `note.panic` from anybody had shut
+all eight. Nothing ever reopens them: this page's notes go to the INSTRUMENT,
+and the box only routes them to the granulator when an archive is set. One probe
+changing one thing separated it:
+
+| | rms | grains/s |
+|---|---:|---:|
+| the page's exact configuration | **0.000000** | **0.0** |
+| + `gates [1,0,0,0,0,0,0,0]` | 0.016037 | 1.5 |
+
+🔴 **And the board had been saying so the whole time.** `params.state` returns
+`notes.gate`; it read `[0,0,0,0,0,0,0,0]` through every failing run, including
+in the dump handed over to diagnose it. #52 says a statistic nobody displays is
+not instrumentation — this is the harder version, because it WAS displayed, to a
+reader looking for exactly this, and **a field that is reported and not read
+costs the same as one that was never sent.** When a dump arrives, read every
+field in it against what the page assumes before forming a hypothesis: the one
+that is wrong looks as ordinary as the rest.
+
+⚠️ **The other half is that a shared instrument is an OBJECT, not a function.**
+It keeps whatever the last person left it with, so "this page never sets it"
+means "it is whatever somebody else wanted". Twice in one session: the note
+gates, and the nine stages downstream of the granulator — a resonator bank, two
+delay controls, four colour controls and two reverb controls — any of which is
+heard in the board's pane, cannot be heard in the browser's, and is reported by
+the page as a difference the granulators made. Both are #46 and #62 in a new
+costume, and an earlier sweep for exactly this state enumerated `msrc`, `mlock`,
+`mscanmode`, `msos` and the nine bypasses **from memory** and missed the one
+control that decides whether the instrument exists at all. Enumerate from the
+graph, not from recollection.
+
+## 75. An assert on ink must exclude the furniture (session 22)
+
+`strip has ink` was green for the life of the page and its only lane **had never
+drawn anything.** `follow` defaults on and the playhead sits at position 0 =
+1970, which is 93% of the way through a year-100 → 2100 range, so the window
+scrolled forward before the first frame and both spans went off the left edge.
+MEASURED: **7 lit columns in the whole lane band, and all seven were grid
+lines.** The assert sampled the axis, which the page draws unconditionally, so
+the only way to make it red was to stop drawing the grid.
+
+**An ink check samples the region only its subject can draw in, and reports a
+COUNT rather than a yes.** "7 lit columns, and every one of them is a grid line"
+is a sentence somebody can look at and disbelieve; "has ink" is not. Same family
+as #36 and #40 — a page has a
+class of defect its own checks structurally cannot see — with the twist that
+here a check existed, ran every time, and was pointed at the furniture.
+
+⚠️ And the fixture was doing the same thing to the readout beneath it. Three
+cells were properties of the epoch rather than of anything: `pps` 9.08e-9
+printed `0.000`, `ceiling` was `Math.round(Infinity)` and printed blank, `ulp`
+5e-324 printed `0.000 ms`. The fourth printed a DATE — `formatTime(lod.major,
+lod.major)` with no third argument, so a 500-year DURATION over 1e12 took the
+absolute branch and the cell read `2469-12-31`. **A fixture chosen to exercise
+the extremes of a range makes every derived cell a fact about the fixture.**
+
+## 76. A conclusion can survive its reason, and the reason is what gets inherited (session 22)
+
+Three in one day, each a decision that stood while the sentence defending it was
+false:
+
+- **The even-readout rule.** It said the row is `repeat(auto-fit, minmax(96px,
+  1fr))`, so a phone gets two columns and an odd count holes the last row.
+  MEASURED at thirteen widths: 96 px plus a 1 px gap gives **three** columns from
+  about 353 px up, so a **4-cell** readout — the commonest shape in the repo —
+  holed from 353 to 426 px, which is iPhone SE 375, iPhone 12–15 **390** and
+  Pixel 412, and a 6-cell one holed four slots wide at 560. The rule was being
+  enforced all day, by an agent doing a UI sweep, while the exact failure it
+  names happened on every phone anyone owns.
+- **The 64 KiB ceiling.** TINY is the right rung and its stated reason was wrong:
+  "wasm scsynth refuses a `/d_recv` over 64 KiB" is true of **SuperSonic**
+  (65,520, which is what this repo deploys) and false of wasm scsynth — the
+  official backend takes **860,000 bytes**, where LITE at 74,733 and FULL at
+  121,425 both load and both play. A limit belonging to one port, written down as
+  a property of the platform, would have outlived the port it was about.
+- **The controller meshes.** Rejected on an itemised cost — a container parser,
+  an accessor decoder, a node walk, **a PNG decode** and a third renderer. The
+  PNG decode is `createImageBitmap` on a Blob and one `texImage2D`: it is not
+  work. The reader came to **181 lines**, the meshes shipped, and **an argument
+  with a free item in it is wrong even when its conclusion is defensible.**
+
+**A rule defended by a false reason is one nobody can correct**, because the next
+person who measures the reason concludes the rule is wrong too, and cannot tell
+the two apart from outside. Two things follow. Correct it **where the claim
+lives** — in the rule, in the constant's comment — not in a commit message
+nobody re-reads. And name the trigger that would re-price it, because a
+rejection is only as durable as the cheapest item on its list.
+
+#48 is the same shape from the other end: there the premise had MOVED (a Linux
+build became a signed macOS download), here the premise was never true.
+
+## 77. A reader sees ink, and a box is not ink (session 22)
+
+Two of these in one session, and neither was a spacing bug:
+
+- 🔴 **An empty container paints its own edges.** The "horizontal rule nobody
+  wrote" above `typist`'s controls was a `.pos-readout` div with **0 children and
+  a height of 2.0 px** — a full-width band made entirely of `shell.css`'s 1 px
+  border on each side. `readout: null` empties the row without removing it.
+  Repaired in the SHELL (`!showReadout || !keys.length`), not on the page,
+  because remembering to hide your own empty box is not something a page should
+  have to do: `.pos-controls[hidden]`, two rules below, already exists for the
+  same failure leaving a 14 px band.
+- **A padding equal to the layout and unequal to the reader.** The XR tablet's
+  `PAD` is one number used all four ways — 48 design px, on a canvas whose aspect
+  matches the object's, so it was equal in MILLIMETRES too — and it was reported
+  from the headset as unequal, correctly. A row's box is as tall as the tallest
+  KIND of control, which is a button plus its focus ring; a slider's lane sits
+  centred in that box, so the gap from the canvas edge to the first thing you can
+  SEE is `48 + (ROW_CONTENT − laneH)/2` vertically against 48 across. The ring is
+  invisible until something has the pointer on it, which is most of the time.
+
+⚠️ **The fix is to pad to the INK, not to shrink the ring** — the ring needs its
+room or it is clipped by the canvas edge, which reads as a drawing fault. It
+comes OUT of the outer pad rather than being added to it.
+
+The rule: spacing is measured to what is visible. A box with nothing in it is a
+line; a box taller than its content is air nobody asked for; and both are
+invisible to anyone who reads the constants instead of the screen, because in
+the constants they are perfectly symmetrical.
+
+## 78. A test can pass because the FIXTURE is benign (session 22)
+
+The GLB reader rounded every chunk length up to the next multiple of four — a
+SECOND padding on top of the one the spec already requires — so it would have
+walked past the binary chunk of any file whose JSON chunk was not aligned. It
+never did: **both vendored files happen to be aligned** (a 10,768-byte JSON
+chunk), so every check passed straight over it — including the **six negative
+controls built by corrupting the real file**, because a fixture corrupted from
+an aligned file is still aligned. Sabotage (#70) cannot reach a defect the
+fixtures cannot express.
+
+What found it was reading `GLTFLoader.js` v0.186.0 against the file line by
+line. The same pass recovered MAT2/MAT3, missing from the type tables, and
+refused the sparse-accessor path and `normalized` **by name** rather than
+ignoring them — checked against the bytes, 0 of 23 accessors are either.
+
+**When you implement somebody else's format, your fixtures are a sample of that
+format's accidents, not of its rules.** #43 by a different route: there the
+reference implementation graded us by running, here by being read. The cheap
+defensive half is the part that generalises — **refuse by name what your
+fixtures never contain**, so the first file that is not like yours says what is
+wrong with it instead of parsing into garbage.
+
+## 79. A default that every caller overrides is a default reporting its own defect (session 22)
+
+*"I do not understand what that 209.31 s and dark yellow area is"* — a
+wall-clock cursor, armed on first play, photographed on `draw` as an amber band
+across half the strip. What it measures is how far the piece has fallen behind
+real time since it first played: the number to watch on a live feed, and noise
+on a fixture, where once the playhead stops it just counts how long ago you
+finished.
+
+🔴 **The evidence that the default was wrong was already in the repo, in
+thirteen places.** Of the thirteen pages that use a strip, **TEN passed
+`armWall: false`** and the other three call `armWall(anchor)` with an anchor of
+their own. Not one wanted the auto-arm, and the seven that never mentioned it
+were getting a second cursor they had not asked for. **Ten authors turning a
+thing off one at a time is a default announcing its own defect** — and nobody
+had read the ten together, which is a `grep` and #30's move: look for the
+READER, not the declaration.
+
+⚠️ The ten `armWall: false` are REMOVED rather than left standing. A redundant
+option is a question for the next reader — *why does this page turn off
+something that is already off?* — and the reasoning, which had been written down
+in one page's comment, moves to the default itself, where it is read by whoever
+is deciding rather than by whoever is copying a page.
+
+## 80. Installing a toolchain on a machine you do not own is an outward-facing act (session 22)
+
+This machine is Defender-managed and **SIGKILLs locally compiled binaries**. It
+is written down twice in this repo's own research:
+`research/uuu-integration-2026-09.md` says to get csound onto a different
+machine for exactly this reason, and `research/scsynth-wasm-official-2026-09.md`
+records it as why that entire measurement was taken with a PREBUILT `.wasm` and
+no compiler. A background agent went at it anyway, and the result was not a
+failed build — it was security prompts on the owner's screen, in the middle of
+something else.
+
+**A background agent's footprint is on somebody's real computer.** A build, an
+install, a downloaded binary and a permission dialog are not local, not silent
+and not reversible, and the dialog lands in front of a person who did not ask
+for it and cannot tell which of several running agents raised it. So the order
+is: a prebuilt artefact; or a machine that already has the tool
+(`timeline/lab/csound-ssh.mjs`); or a check that **skips cleanly** where the
+reference is absent (#43). If none of those work, say so and stop — asking costs
+a sentence, and a security event on somebody's laptop costs their attention at a
+moment they were not thinking about this at all.
+
+#10 with the stakes raised: the constraint was in this repo, in two files, in
+plain words, and was re-learned anyway.
+
+## 81. "The same X at both ends" is a claim about one definition (session 22)
+
+`grains` said *"the same granulator in this page and on a Raspberry Pi"* and it
+was false. The page ran a Web Audio worklet — a reimplementation that sounds
+similar, which is a different sentence — and **no amount of A/B can promote
+"similar" to "same"**, because every comparison an imitation is built to pass is
+a comparison it passes.
+
+It is literally true now. The left pane is real scsynth running the board's own
+compiled graph: **64,733 B of SynthDef taken in 22 ms, 1,571 building blocks**
+(1,467 Pappus + 104 `PosSource`) at 48 kHz, with node order asserted from the
+server's own `/g_queryTree.reply` rather than assumed. 🔴 And the caveat ships
+beside the claim instead of quietly: **the material is still a SECOND
+definition**, because `Engine_Pappus.sc:518` granulates a bus and nothing in a
+browser fills one.
+
+⚠️ **Both ends are graded against what was ASKED, never against each other** —
+2.2 grains a second in the page and 2.2 on the board, against 2.2 on the slider,
+with a deafness control at each end (tab 0.005569 → 0.000000, board 0.1086 →
+0.0000). Two implementations compared only with one another cannot say which of
+them is wrong; when they disagree it names no culprit, and when they agree it is
+not clear what has been learned.
+
+## 82. Two numbers that cannot disagree are one number (session 22)
+
+A red `webrtc` was explained as *"Cloudflare is not sending a keyframe"*, on the
+strength of `keyframes 0` in the page's own failure detail. That cell is
+`s.keyFramesDecoded` — keyframes **this machine decoded**, a subset of
+`framesDecoded`, which was also 0. It could not have read anything else. It is
+one observation wearing the far end's name, and it moved the diagnosis onto
+somebody else's server.
+
+The page already ships the counters that DO separate the cases, and says why in
+a comment directly above the line they are read in: `received`, `decoded`,
+presented, because *"videoWidth is 0 alone cannot tell apart 'no video RTP
+arrived at all' from 'packets arrived and the decoder produced nothing' from
+'frames decoded but never presented' … three different bugs"*. The diagnosis
+reached past all three for the one that cannot discriminate. (The real cause was
+another browser of mine — 14/14 when run alone, #56.)
+
+**Before quoting a second number as corroboration, ask whether it could have
+come out differently from the first.** A subset counter, a derived rate and a
+ratio with a zero denominator all agree with their parent by construction, and
+two numbers that agree by construction read exactly like two witnesses.
+
+## 83. The room measured and the room used must come from one function (session 22)
+
+`gutterWidthFor` reserved `11 + text + 10`, and `drawGutter` clipped every line
+against `gutterPx − 18 − 8` — the NAME's inset, applied to the numbers as well.
+So a sub-line was measured against 19 px of chrome and cut against 26, and **any
+sub-line long enough to SET the gutter width was always one character too long
+for it**: `usual 12 ms` sized the gutter and rendered `usual 12 …`. A component
+that widens itself to fit its own text and then truncates that text is the worst
+version of this, because it paid for the room and then did not use it.
+
+⚠️ **And then it was still cut, by a sub-pixel.** The requirement is a measured
+text width with a fraction on it, and `Math.round` took 111.4 to 111 — leaving
+the line that set the width a fraction short. The clipper does not do
+sub-pixels; it drops a character and adds an ellipsis. `Math.ceil`. **A
+requirement is rounded UP, or it is not a requirement.**
+
+Wherever one piece of code decides how much room a thing needs and another
+decides how much it gets, they are one function or they drift — silently, and
+into a symptom (an ellipsis) that reads as a text problem rather than as two
+constants disagreeing.
+
+⚠️ Neither defect could appear on any page that ships: `typist` declares its own
+gutter width and `draw`'s labels are short. **Third time in one day that this
+component's real behaviour only showed under a control built on purpose**, which
+is #67's closing rule — a capability no caller exercises is covered by none of
+them, however many callers there are.
