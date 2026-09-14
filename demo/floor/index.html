@@ -481,7 +481,10 @@
   // nor rejects until somebody has touched the page — awaiting one is a hang,
   // not an error. The first pointer down on the floor is the gesture, and it is
   // one somebody makes anyway.
-  let actx = null, projector = null, panner = null;
+  // ⚠️ HALVED, TWICE OVER. It is a room a film is playing in, not a film about
+  // a projector — it should be the thing you notice when it stops.
+  const PROJ_GAIN = 0.25;
+  let actx = null, projector = null, panner = null, projGain = 0, lastDt = 0.016;
   function audioUp() {
     if (actx) return;
     actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
@@ -528,9 +531,30 @@
         panner.positionX.value = x; panner.positionY.value = 0; panner.positionZ.value = z;
       } else if (panner.setPosition) panner.setPosition(x, 0, z);
     }
-    // the machine follows the picture: up with the film, down with it, on the
-    // same long ramp everything else on this page uses
-    projector.setGain(playing >= 0 && vidReady ? 0.5 : 0, 1.4);
+    // ── how loud the machine is, eased HERE rather than in the node ────────
+    //
+    // 🔴 SLOW UP, FAST DOWN, and the asymmetry is the whole complaint. A
+    // projector spinning up is a thing you want to hear arrive; a projector
+    // still running after you looked away is a thing that will not shut up.
+    // ⚠️ IT ALSO COMES UP DURING THE DWELL, not only once the film is running,
+    // so the machine is starting while the lamp strikes and the shutter closes
+    // — the sound is part of that sequence rather than something that happens
+    // after it.
+    const want = (playing >= 0 && vidReady) ? PROJ_GAIN
+      : (hover >= 0 && dwell > 0 ? PROJ_GAIN * 0.55 * (dwell / DWELL_MS) : 0);
+    // ✅ MEASURED, by running the easing at a fixed 1/60 s rather than by
+    // guessing — the shape is arithmetic, so it needs no browser and no ear:
+    //   up    1.6   50% in 0.42 s, 90% in 1.42 s
+    //   down  5.0   50% in 0.12 s, 10% in 0.43 s, SILENT in 0.87 s
+    // ⚠️ And the thing being compared against: the old code reached 99% after
+    // SIX SECONDS and came down just as slowly, which is precisely "seems to
+    // lag and never stops".
+    projGain += (want - projGain) * Math.min(1, lastDt * (want > projGain ? 1.6 : 5.0));
+    // a floor, so it actually reaches silence rather than approaching it — an
+    // exponential never arrives, and -66 dB that never stops is still a thing
+    // the graph says is running
+    if (projGain < PROJ_GAIN * 0.01) projGain = want > 0 ? projGain : 0;
+    projector.setGain(projGain);
   }
 
   // ── the one video ───────────────────────────────────────────────────────
@@ -635,7 +659,11 @@
   const FOCUS_RATE = 7;         // follows the dwell rather than softening it
   const DIM_RATE = 0.4;         // the floor standing down    ~2.5 s
   const GLIDE_RATE = 0.9;       // travelling across the disc
-  const DWELL_MS = 1800, AWAY_MS = 4000;
+  // ⚠️ 2 s TO LET GO, DOWN FROM 4. Still twice as patient as the dwell is quick,
+  // which is the asymmetry that stops a wandering gaze cutting a film off — but
+  // four seconds of a projector running at something you have already turned
+  // away from is a machine that will not take the hint.
+  const DWELL_MS = 1800, AWAY_MS = 2000;
   let hover = -1, dwell = 0, away = 0;
 
   // 🔴 A CLICK TRAVELS; RESTING YOUR LOOK PLAYS. Two verbs that were one, and
@@ -768,6 +796,7 @@
       eye[2] += (panTo[1] - eye[2]) * k2;
       if (Math.hypot(panTo[0] - eye[0], panTo[1] - eye[2]) < 0.02) panTo = null;
     }
+    lastDt = dt;
     gaze = gazePoint();
     rewrap();
     placeSound();

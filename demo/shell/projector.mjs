@@ -148,13 +148,24 @@ export function createProjector(ctx, { frameHz = FRAME_HZ, mainsHz = MAINS_HZ } 
       running = false;
       if (timer) { clearInterval(timer); timer = null; }
     },
-    /** Ease the whole machine up or down. `sec` is the ramp, and it is long by
-     *  default because a projector that snaps on is a sound effect. */
-    setGain(v, sec = 1.2) {
+    /** Set the level, with a SHORT ramp, and expect to be called every frame.
+     *
+     *  🔴 THE LONG RAMP USED TO LIVE HERE AND IT WAS THE BUG. A caller that
+     *  called this once per frame — which is the natural thing to do from a
+     *  render loop — cancelled the previous ramp and started a fresh 1.2 s one
+     *  sixty times a second, so the gain moved about a eightieth of the way and
+     *  then restarted. It crawled up, never arrived, and crawled down: reported
+     *  as "seems to lag and never stops", and that is exactly what it does.
+     *  ⚠️ So the SHAPE of a fade belongs to the caller, which knows whether it
+     *  is coming up slowly or going away quickly, and this only carries the
+     *  value from one frame to the next without a click. 30 ms is short enough
+     *  to be a follow and long enough not to step.
+     */
+    setGain(v) {
       const t = ctx.currentTime;
       out.gain.cancelScheduledValues(t);
-      out.gain.setValueAtTime(Math.max(0.0001, out.gain.value), t);
-      out.gain.linearRampToValueAtTime(Math.max(0, v), t + sec);
+      out.gain.setValueAtTime(out.gain.value, t);
+      out.gain.linearRampToValueAtTime(Math.max(0, v), t + 0.03);
     },
     dispose() {
       this.stop();
