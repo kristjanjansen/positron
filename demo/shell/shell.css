@@ -302,10 +302,16 @@ button.pos-pri[data-busy="1"] {
    lattice did not exist. The scrub was the only flexible child, so it collapsed
    to its 40 px minimum: a seek control you cannot seek with. Wrapping needs no
    media query — the scrub's flex-basis decides when there is no longer room. */
+/* ⚠️ NO MARGIN OF ITS OWN — the rhythm at `.pos-body > * + *` owns the gap.
+   This carried `margin: 0 0 8px`, and the shorthand's `margin-top: 0` BEAT the
+   rhythm rule: same specificity (0,1,0), later in the file, so source order
+   decided it. MEASURED on /click/, the four gaps down the page read
+   0 · 22 · 4 · 22 px — reported as "you are not respecting vertical spacing.
+   again", and it was the shell doing it, on every page with a transport bar. */
 .tbar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
-  border-radius: 4px; padding: 8px 10px; margin: 0 0 8px;
+  border-radius: 4px; padding: 8px 10px;
 }
 .tbar-toggle {
   flex: none; width: 38px; height: 38px; padding: 0;
@@ -409,7 +415,8 @@ button.pos-pri[data-busy="1"] {
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
-.pos-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+/* ⚠️ and no margin here either, for the same reason — see .tbar above */
+.pos-strip { display: block; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
