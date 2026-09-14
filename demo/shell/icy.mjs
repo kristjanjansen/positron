@@ -25,15 +25,29 @@
  *   deliberately, because a stream without the header is not broken, it is
  *   just not talking.
  * @param {{onTitle?: (t: string) => void, onSlot?: () => void,
- *          onMeta?: (text: string) => void}} handlers
+ *          onMeta?: (text: string) => void,
+ *          onAudio?: (bytes: Uint8Array) => void}} handlers
  *   onSlot fires once per slot INCLUDING the empty ones — which is the only
  *   way to know the channel is alive rather than merely quiet. onMeta fires
  *   only for slots that carried bytes. onTitle fires only when the title
  *   actually CHANGED, so a station that repeats itself does not look like a
  *   station that is doing something.
+ *
+ *   🔴 onAudio HANDS BACK THE AUDIO WITH THE TEXT TAKEN OUT, and it was added
+ *   the day a caller needed the samples rather than the titles. Until then both
+ *   callers fed this demuxer purely to read the station's text and let an
+ *   `<audio>` element fetch the SAME STREAM A SECOND TIME for the sound — so
+ *   the audio bytes arriving here were simply dropped on the floor. When
+ *   `/radio1965/` had to decode for itself (WebKit does not route a media
+ *   element into WebAudio — see mp3-stream.mjs), there was nowhere for the bytes
+ *   to come out. ⚠️ A demuxer that throws away half of what it demuxes reads as
+ *   complete right up until somebody wants the other half.
+ *
+ *   It fires one or more times per chunk, in order, never across a metadata
+ *   slot — so concatenating everything it emits is the pure MP3 stream.
  * @returns {(chunk: Uint8Array) => void}
  */
-export function icyDemuxer(metaint, { onTitle, onSlot, onMeta } = {}) {
+export function icyDemuxer(metaint, { onTitle, onSlot, onMeta, onAudio } = {}) {
   const step = Number(metaint) || 0;
   let need = step, mode = 'audio', metaLen = 0;
   let spare = new Uint8Array(0);
@@ -46,7 +60,10 @@ export function icyDemuxer(metaint, { onTitle, onSlot, onMeta } = {}) {
   };
 
   return function eat(chunk) {
-    if (!step) return;
+    // ⚠️ NO `icy-metaint` MEANS EVERY BYTE IS AUDIO, not that there is nothing
+    // to do. This returned early before `onAudio` existed, which was harmless
+    // while the only product was titles and is a silent no-sound bug now.
+    if (!step) { if (chunk.length) onAudio?.(chunk); return; }
     // ⚠️ THE LEFTOVER IS THE WHOLE TRICK. A slot's length byte and its text can
     // land in different network chunks, so state has to survive a chunk
     // boundary — parsing each chunk independently loses a title roughly
@@ -54,7 +71,11 @@ export function icyDemuxer(metaint, { onTitle, onSlot, onMeta } = {}) {
     let b = spare.length ? concat(spare, chunk) : chunk;
     for (;;) {
       if (mode === 'audio') {
-        if (b.length < need) { need -= b.length; b = b.subarray(b.length); break; }
+        if (b.length < need) {
+          if (b.length) onAudio?.(b);
+          need -= b.length; b = b.subarray(b.length); break;
+        }
+        if (need) onAudio?.(b.subarray(0, need));
         b = b.subarray(need);
         mode = 'len';
       } else if (mode === 'len') {
