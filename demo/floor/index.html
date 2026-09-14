@@ -47,6 +47,17 @@
              font: 500 12px/1.3 var(--mono); color: var(--fg);
              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fl-name b { color: var(--hi); font-weight: 600; }
+  /* 🔴 THE WAY OUT, WHERE YOU CAN SEE IT. Asked twice: "how do I get out?" — and
+     the answer had been going into the LOG, which is outside the cover and so
+     invisible at exactly the moment somebody needs it. A page that fills the
+     screen has to carry its own exit on the screen it filled. It fades after a
+     few seconds because it is an instruction, not a status. */
+  .fl-out { position: absolute; top: 12px; right: 14px; padding: 6px 10px;
+            background: rgba(7, 9, 13, .82); border: 1px solid var(--line);
+            border-radius: 4px; color: var(--fg);
+            font: 500 11px/1 var(--mono); letter-spacing: .04em;
+            opacity: 0; transition: opacity .6s linear; pointer-events: none; }
+  .fl-out[data-on="1"] { opacity: 1; }
   .fl-name i { color: var(--dim2); font-style: normal; }
 </style>
 
@@ -142,7 +153,8 @@
   const wrap = el('div', 'fl');
   const canvas = el('canvas');
   const nameEl = el('div', 'fl-name');
-  wrap.append(canvas, nameEl);
+  const outEl = el('div', 'fl-out', 'Esc to leave');
+  wrap.append(canvas, nameEl, outEl);
   d.el.append(wrap);
 
   const gl = canvas.getContext('webgl2', { antialias: true, alpha: true, xrCompatible: true });
@@ -883,7 +895,24 @@
   // no element Fullscreen API at all — has no browser behaviour behind it, so
   // `watch()` wires the key and tells the page when it changed either way.
   // Without this the fallback is a cover with no way out of it.
-  watchFull(wrap, (on) => d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi'));
+  let outTimer = null;
+  function sayTheWayOut(text) {
+    outEl.textContent = text;
+    outEl.dataset.on = '1';
+    clearTimeout(outTimer);
+    // long enough to read twice, short enough not to sit on the picture
+    outTimer = setTimeout(() => { outEl.dataset.on = '0'; }, 4500);
+  }
+  // ⚠️ `watch()` FIRES ON `fullscreenchange`, WHICH THE FALLBACK NEVER RAISES.
+  // MEASURED: entering by the `position: fixed` path left the hint's opacity at
+  // 0 — so the one path with NO browser chrome saying "press Esc" was also the
+  // one that said nothing itself. The hint is therefore raised where the page
+  // KNOWS it entered, from the control's own handler, and `watch()` is kept for
+  // the exit and for the real API's own changes.
+  watchFull(wrap, (on) => {
+    if (!on) outEl.dataset.on = '0';
+    d.log(on ? 'filling the screen — Escape to come back' : 'back to the page', 'hi');
+  });
 
   d.on('vr', async () => {
     if (!navigator.xr) { d.log('this browser has no WebXR at all', 'bad'); return; }
@@ -902,14 +931,13 @@
       // gets to give about its own bug.
       session.addEventListener('selectstart', onSelect);
       session.addEventListener('selectend', () => { grab = null; });
-      // 🔴 A WAY OUT THAT THE PAGE OWNS. The trigger is the floor-drag, so the
-      // GRIP is the exit — every controller has one and it is not a button you
-      // press by accident while dragging. "Press the Meta button" is not an
-      // answer a page gets to give about its own bug.
-      session.addEventListener('squeeze', () => {
-        d.log('grip — leaving VR', 'hi');
-        session.end().catch(() => {});
-      });
+      // 🔴 ANY BUTTON BUT THE TRIGGER LEAVES. The trigger is the floor-drag, so
+      // it is the one thing that cannot also be the exit; everything else is.
+      // Grip, thumbstick, A, B, X, Y — whichever a person finds first is the
+      // right one, which is the whole point of "any". "Press the Meta button"
+      // is not an answer a page gets to give about its own bug, and neither is
+      // "press the specific button we chose and did not tell you about".
+      session.addEventListener('squeeze', () => endVR('grip', session));
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
@@ -938,8 +966,30 @@
     // cover that needs no API, and SAYS which ran.
     if (fullSupport() === 'none') { d.log('this browser has no way to fill the screen', 'bad'); return; }
     const how = await toggleFull(wrap);
+    if (how === 'exit') outEl.dataset.on = '0'; else sayTheWayOut('Esc to leave');
     d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
   });
+
+  /** End the session and say which thing ended it. */
+  function endVR(why, session) {
+    d.log(`${why} — leaving VR`, 'hi');
+    session.end().catch(() => {});
+  }
+
+  /** Any button but the trigger, polled from the gamepad each frame.
+   *  ⚠️ POLLED, because WebXR only raises events for select and squeeze — A, B,
+   *  X, Y and the thumbstick click have no event at all and are readable only
+   *  from `inputSource.gamepad`. A page that listens for events alone has three
+   *  or four buttons on every controller that silently do nothing. */
+  function checkExitButtons(session) {
+    for (const src of session.inputSources) {
+      const pad = src.gamepad;
+      if (!pad) continue;
+      for (let b = 1; b < pad.buttons.length; b++) {      // 0 is the trigger
+        if (pad.buttons[b]?.pressed) { endVR(`button ${b}`, session); return; }
+      }
+    }
+  }
 
   let dragSource = null;
   function onSelect(ev) {
@@ -980,6 +1030,7 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     xrFrames++;
+    checkExitButtons(session);
     dragFloor(xframe);
     const head = pose.transform.matrix;
     // the wearer's own head, less whatever the floor has been dragged by
