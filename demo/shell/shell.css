@@ -1155,3 +1155,24 @@ video[hidden] { display: none; }
   fill: color-mix(in oklab, var(--fg) 7%, var(--card2));
 }
 .pos-dg-n[data-on] .pos-dg-sub { fill: var(--dim); }
+
+/* ── in a headset, the rows that cannot use it recede ─────────────────────────
+ *
+ * `caps.mjs` puts `.xr` on <html> when `immersive-vr` is supported — a
+ * CAPABILITY test, never a user-agent one, and its own note says the flag is
+ * about LAYOUT, which is why the Immersive Web Emulator answering true is
+ * correct here.
+ *
+ * 🔴 DIMMED, NEVER DISABLED. Opacity only: every row still links, still takes
+ * focus, still reads to a screen reader, still works if you press it. A
+ * `pointer-events: none` here would turn "this one is less interesting right
+ * now" into "this one is broken", which is a different and false statement —
+ * the same reason `caps.mjs` un-links a row WITH THE REASON IN WORDS rather
+ * than hiding it.
+ *
+ * ⚠️ And it comes back on hover and focus, so a row you have actually reached
+ * for is never the faint one. A dimmed thing you cannot un-dim by looking at it
+ * is a trap rather than a hint. */
+html.xr .pos-acts .pos-row:not([data-xr]) { opacity: .45; transition: opacity 120ms ease; }
+html.xr .pos-acts .pos-row:not([data-xr]):hover,
+html.xr .pos-acts .pos-row:not([data-xr]):focus-within { opacity: 1; }

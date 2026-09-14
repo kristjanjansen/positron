@@ -112,3 +112,56 @@ export async function startPappusSynth(eng, { node = PAPPUS_NODE, inbusl = 2, in
     '/s_new', 'pappus', node, addAction, 0, 'inbusl', inbusl, 'inbusr', inbusr, 'outbus', outbus);
   return !!(go && go[0] === '/n_go');
 }
+
+/**
+ * One setting on the granulator.
+ *
+ * ⚠️ AN ARRAY IS A DIFFERENT MESSAGE, AND GUESSING WHICH FROM THE ARITY IS HOW
+ * A ONE-ELEMENT ARRAY BECOMES A SCALAR. `gates` and `probs` are eight-element
+ * control arrays in this definition, and `/n_set` would write only the first,
+ * leaving seven voices at whatever they held.
+ */
+export function setParam(eng, cmd, value, node = PAPPUS_NODE) {
+  if (Array.isArray(value)) eng.send('/n_setn', node, cmd, value.length, ...value);
+  else eng.send('/n_set', node, cmd, value);
+}
+
+/**
+ * 🔴 THE SETTINGS THAT MAKE A PAPPUS AUDIBLE AT ALL. A synth started by
+ * `startPappusSynth()` alone sits at `mix 0, gain 0, thru 0, dry 0` — ASKED OF
+ * THE SERVER with `/s_get`, not inferred — so it granulates correctly and
+ * outputs silence.
+ *
+ * 🔴 AND A GRAIN COUNT IS NOT EVIDENCE IT IS AUDIBLE. MEASURED: with the input
+ * deliberately disconnected, the graph still fired 4–5 grains per window while
+ * the output bus read exactly **0.00000**. "Grains are firing and reported" and
+ * "sound is coming out" are different claims about different quantities, and
+ * reading the first as progress toward the second cost a full debugging round
+ * on `/radio1965/`.
+ *
+ * ⚠️ `gates` IS THE ONE THAT DECIDES WHETHER THE INSTRUMENT EXISTS. The
+ * engine's trigger is `trig * (gates[i] > 0.001) * coin * egate`, so all-zeros
+ * is a granulator that never fires — while PASSTHROUGH STILL WORKS, so it goes
+ * on answering every question and making no grains.
+ *
+ * `live: true` points the granulator at its input bus (`src 2`, unlocked) —
+ * the case where something outside scsynth is filling it. `false` is the held
+ * buffer, which is what `/grains/` uses.
+ */
+export function applyAudibleDefaults(eng, { node = PAPPUS_NODE, live = true, sos = 0.6, bufSeconds = 8 } = {}) {
+  const set = (c, v) => setParam(eng, c, v, node);
+  for (const h of ['m', 'n']) {
+    set(`${h}scanmode`, 2);
+    set(`${h}src`, live ? 2 : 1);
+    set(`${h}lock`, live ? 0 : 1);
+    set(`${h}sos`, sos);
+    set(`${h}buflen`, bufSeconds);
+  }
+  set('amp', 1);
+  set('ingain', 1);
+  set('run', 1);
+  set('gates', [1, 0, 0, 0, 0, 0, 0, 0]);
+  set('gates2', [1, 0, 0, 0, 0, 0, 0, 0]);
+  set('probs', [1, 1, 1, 1, 1, 1, 1, 1]);
+  set('probs2', [1, 1, 1, 1, 1, 1, 1, 1]);
+}
