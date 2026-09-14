@@ -419,7 +419,18 @@ for (const t of targets) {
   // board-bound demos still have to take turns. Rooms were never that problem;
   // conflating the two is what made them look like one.
   const own = t.room === 'fixed' ? '' : `room=v-${t.name}-${Math.random().toString(36).slice(2, 8)}`;
-  const q = [process.env.DEMO_QUERY, own].filter(Boolean).join('&');
+  // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A
+  // VISIT. `radio1965` proves a station button works by pressing another station
+  // and pressing back, and proves the transport stops by stopping it — on the
+  // decoded path both are a decoder teardown and rebuild, so both are a hole in
+  // the sound. They ran for every listener, three times, in the first seconds of
+  // a visit, and were REPORTED as such twice. A page that can only check itself
+  // by breaking itself needs to know whether anybody is collecting the answer.
+  //
+  // ⚠️ EVERY DEMO GETS IT AND ALMOST NONE READ IT, which is the point — the flag
+  // is a fact about the run, not a per-demo setting to keep in step. A page that
+  // needs it opts in by reading it.
+  const q = [process.env.DEMO_QUERY, own, 'selfcheck=1'].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);

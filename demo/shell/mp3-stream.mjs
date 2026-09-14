@@ -58,6 +58,33 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     path: 'starting', rate: 1, bytes: 0, frames: 0, decoded: 0, blocks: 0,
     underruns: 0, skipped: 0, dropped: 0, errors: 0, sampleRate: 0, channels: 0, startedAt: 0,
   };
+  /**
+   * 🔴 WHAT THE WIRE DID, RECORDED HERE SO NOBODY OPENS A SECOND CONNECTION FOR
+   * IT. `/radio1965/` used to fetch the mount TWICE on every visit — once to
+   * listen and once, for five seconds, to measure the bitrate, the arrival gaps
+   * and the ICY headers. Two listeners per visitor on somebody else's Icecast,
+   * for numbers this loop already had in front of it.
+   *
+   * ⚠️ AND THAT MATTERS BEYOND TIDINESS. This project has already made a public
+   * broadcaster stop answering by treating their origin as free (`workers/shout`
+   * `/health` fanned out to six mounts per call and three ERR streams began
+   * refusing our Worker in 9 ms). `live.uuu.ee:8001` is a volunteer's machine.
+   * The cheapest request is the one not made.
+   *
+   * ⚠️ `marks` IS BOUNDED. It is a growing array on an endless stream, so it
+   * holds only the first minute — long enough for any window a caller wants to
+   * average over, and it stops growing rather than leaking for the length of a
+   * visit.
+   */
+  const MARK_SECONDS = 60;
+  const wire = {
+    status: 0, headers: {}, slots: 0, filled: 0,
+    marks: [],            // [bytesSoFar, performance.now()] while marks are kept
+    gaps: [],             // ms between consecutive reads
+    gapMax: 0,
+    openedAt: 0,          // performance.now() when the fetch was asked for
+    firstByteAt: 0,       // and when the first byte landed
+  };
   let stopped = false, decoder = null, ac = null;
   /**
    * 🔴 VARISPEED, AND IT IS THE TAPE KIND: PITCH FOLLOWS SPEED. We schedule the
@@ -101,19 +128,24 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
    */
   const MAX_AHEAD = 30;
   const live = new Set();
+  // Are we currently throwing arriving audio away to drain the start-up burst?
+  // A latch rather than a bare comparison: without it the queue hovers AT the
+  // ceiling for ever, because one drop puts it back under and the next block
+  // puts it over again.
+  let trimming = false;
   let pending = [];                  // Float32Array[channel][] awaiting a block
   let pendingLen = 0;                // frames (samples per channel) in `pending`
   let nextAt = 0;                    // context time the next block starts at
   let resolveStarted;
   const started = new Promise((r) => { resolveStarted = r; });
 
-  /** Schedule one AudioBuffer end to end with whatever is already queued. */
-  function schedule(buf) {
+  /**
+   * Schedule one AudioBuffer end to end with whatever is already queued.
+   * `tailSec` is how much of the FRONT of this buffer is a repeat of the last
+   * block's ending — see `flush`.
+   */
+  function schedule(buf, tailSec = 0) {
     if (stopped) return;
-    // Past the ceiling there is nowhere to put this. Dropping ARRIVING audio
-    // skips forward in the source; it does not leave a silence.
-    if (nextAt - ctx.currentTime > MAX_AHEAD) { st.dropped++; return; }
-
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const g = ctx.createGain();
@@ -163,10 +195,50 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     // and closes for good. Inside it nobody is listening yet; outside it the
     // drift correction below does the work without dropping anything.
     const startingUp = !st.blocks || (ctx.currentTime - st.startedAt) < 4;
-    if (startingUp && nextAt - now > ceilingMs / 1000) {
-      st.skipped++;
-      nextAt = now + floorMs / 1000;
+    // 🔴 TRIM BY DROPPING WHAT ARRIVES, NEVER BY MOVING `nextAt` BACKWARDS.
+    // This used to say `nextAt = now + floorMs/1000`, which is a REWIND of
+    // nearly two seconds into audio that is already scheduled and already
+    // sounding — so the burst played ON TOP OF ITSELF. MEASURED by recording
+    // every `AudioBufferSourceNode` the page starts: **63 overlaps in the first
+    // 5.4 s**, with 27.95 s of audio crammed into a 21 s span, and `underruns:
+    // 0` throughout — which is what rules out starvation and leaves this.
+    // REPORTED as a *"broken blurb"* at the start, and that is exactly what
+    // several copies of the same second sounding together is.
+    //
+    // ⚠️ AND THE COMMENT ABOVE HAD BEEN RIGHT ALL ALONG: it says the oldest
+    // audio is dropped and the clock moves up. Nothing was dropped and the
+    // clock moved DOWN. Dropping is the version that works — the queue drains
+    // against the wall clock at one second per second, the already-scheduled
+    // cushion plays out continuously underneath, and what is lost is a slice of
+    // the station's past, which is the direction a live stream wants to go.
+    //
+    // 🔴 THE SAME MACHINERY BOUNDS SLOW PLAYBACK, AND THAT IS WHY 0.25x USED TO
+    // SOUND SPED UP. Below 1x the queue grows for ever by construction — bytes
+    // arrive at exactly 1x — so something has to give at the far end. It used to
+    // drop ONE buffer whenever the queue touched 30 s, which pins it there and
+    // makes a forward jump in the content every few hundred milliseconds: a
+    // stutter that reads as the station being fast, on a page playing it slow.
+    // REPORTED in exactly those words.
+    //
+    // Now it drains to the floor in one go. You drift away from the station for
+    // as long as the ceiling allows, hear every slowed second of it, and then
+    // there is ONE cut back to live, once, with a line in the log saying so.
+    const ahead = nextAt - now;
+    const ceiling = startingUp ? ceilingMs / 1000 : MAX_AHEAD;
+    if (ahead > ceiling) {
+      if (!trimming && !startingUp) {
+        log(`${ahead.toFixed(0)} s behind the station — rejoining live`);
+      }
+      trimming = true;
     }
+    // Drain all the way back to the floor, not merely under the ceiling —
+    // stopping at the ceiling parks the listener that far behind for the rest of
+    // the visit, which is the latency this block exists to remove.
+    if (trimming && ahead > floorMs / 1000) {
+      if (startingUp) st.skipped++; else st.dropped++;
+      return;
+    }
+    trimming = false;
     // 🔴 THE SPEED CLIMBS, IT DOES NOT JUMP — and the arithmetic for it is
     // exact rather than approximate. Step this block's end rate a fixed RATIO
     // toward the target (a constant ratio is what reads as a smooth climb; a
@@ -195,6 +267,10 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
              : want < r0 ? Math.max(want, r0 / GLIDE)
              : r0;
     const T = (2 * buf.duration) / (r0 + r1);
+    // Media seconds scale into wall seconds by the same average rate.
+    const toWall = (sec) => (2 * sec) / (r0 + r1);
+    const xfIn = toWall(tailSec);
+    const xfOut = toWall(tails ? XFADE : 0);
     rate = r1;
     // ⚠️ REPORT WHAT WAS ASKED FOR, NOT THE CORRECTION. `rate` carries a
     // fraction of a percent of catch-up that nobody chose and nobody can hear;
@@ -206,31 +282,73 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     src.playbackRate.setValueAtTime(r0, nextAt);
     if (r1 !== r0) src.playbackRate.linearRampToValueAtTime(r1, nextAt + T);
 
-    // in, hold, out — and the next block starts XFADE before this one ends
-    const xf = Math.min(XFADE, T / 3);
-    g.gain.setValueAtTime(st.blocks ? 0 : 1, nextAt);
-    if (st.blocks) g.gain.linearRampToValueAtTime(1, nextAt + xf);
-    g.gain.setValueAtTime(1, nextAt + T - xf);
-    g.gain.linearRampToValueAtTime(0, nextAt + T);
+    // in over the repeated head, hold, out over the part the NEXT block repeats
+    g.gain.setValueAtTime(xfIn ? 0 : 1, nextAt);
+    if (xfIn) g.gain.linearRampToValueAtTime(1, nextAt + xfIn);
+    if (xfOut) {
+      g.gain.setValueAtTime(1, nextAt + T - xfOut);
+      g.gain.linearRampToValueAtTime(0, nextAt + T);
+    }
 
     src.start(nextAt);
-    nextAt += T - xf;
+    // ⚠️ THE FIRST BLOCK'S START, NOT ITS END. `startedAt` is read as "when did
+    // sound begin" — `playedNow()` on the page subtracts it from the clock to
+    // say how long you have been listening — and taking it after the advance
+    // below put it a block into the future, so HEARD ran a quarter of a second
+    // short and the start-up window closed a quarter of a second late.
+    if (!st.blocks) st.startedAt = nextAt;
+    // 🔴 THE CLOCK ADVANCES BY THE NEW MEDIA ONLY, WHICH IS THE WHOLE POINT OF
+    // REPEATING THE TAIL. `nextAt += T - xf` against blocks that did NOT repeat
+    // anything spent six milliseconds of the station per block on the seam — at
+    // four blocks a second that is playback running **2.4 % fast**, for ever.
+    // MEASURED: the cushion drained 600 ms -> 90 ms across a twenty-second
+    // listen, then underran, then drained again — **nine holes of 65-76 ms, one
+    // every 1.2 s**, which is the "hole 1-2 sec later" that was reported, and
+    // which no amount of catch-up correction could fix because the correction
+    // caps at 2 % and the leak was bigger than the cap. The queue was being
+    // eaten by the thing meant to smooth it.
+    nextAt += T - xfOut;
     st.blocks++;
-    if (st.blocks === 1) { st.startedAt = nextAt; resolveStarted(st.path); }
+    if (st.blocks === 1) resolveStarted(st.path);
   }
 
-  /** Turn accumulated per-channel PCM into a block, at the STREAM's rate. */
+  /**
+   * Turn accumulated per-channel PCM into a block, at the STREAM's rate.
+   *
+   * 🔴 EACH BLOCK OPENS WITH A COPY OF THE LAST ONE'S ENDING, so the six
+   * milliseconds where two blocks sound together contain THE SAME AUDIO twice
+   * rather than two different moments of the station. That is what makes the
+   * crossfade free: an equal-power-ish linear fade between identical material
+   * reconstructs it, and the stream's clock advances by the new samples alone.
+   *
+   * ⚠️ THE OLD VERSION OVERLAPPED DIFFERENT MATERIAL AND PAID FOR IT IN TIME.
+   * It started each block six milliseconds before the previous one ended and
+   * never gave those milliseconds back, which is a 2.4 % leak in the cushion —
+   * see the note beside `nextAt` in `schedule`. A smear nobody can hear is
+   * still a smear that has to come from somewhere.
+   */
+  let tails = false;                 // does this path repeat block endings?
+  let tail = null;                   // Float32Array[channel], the last XFADE
   function flush(sampleRate) {
     if (!pendingLen || !pending.length) return;
+    tails = true;
     const channels = pending.length;
-    const buf = ctx.createBuffer(channels, pendingLen, sampleRate);
+    const xfS = Math.min(Math.round(XFADE * sampleRate), pendingLen);
+    const head = tail && tail.length === channels ? tail[0].length : 0;
+    const buf = ctx.createBuffer(channels, head + pendingLen, sampleRate);
     for (let c = 0; c < channels; c++) {
       const out = buf.getChannelData(c);
       let at = 0;
+      if (head) { out.set(tail[c], 0); at = head; }
       for (const part of pending[c]) { out.set(part, at); at += part.length; }
     }
+    // Keep this block's last xfS samples for the next one to open with.
+    tail = [];
+    for (let c = 0; c < channels; c++) {
+      tail.push(buf.getChannelData(c).slice(buf.length - xfS));
+    }
     pending = []; pendingLen = 0;
-    schedule(buf);
+    schedule(buf, head / sampleRate);
   }
 
   function pushPcm(planes, sampleRate) {
@@ -296,11 +414,21 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   (async () => {
     ac = new AbortController();
     let res;
+    wire.openedAt = performance.now();
     try {
       res = await fetch(url, {
         signal: ac.signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' },
       });
     } catch (e) { st.errors++; log(`stream fetch failed: ${e.message}`); return; }
+    wire.status = res.status;
+    // The ICY fields exist only because the relay puts `access-control-expose-headers`
+    // on them; read straight from Icecast a browser sees the response and not one
+    // header of it.
+    for (const k of ['icy-name', 'icy-description', 'icy-genre', 'icy-br',
+                     'icy-metaint', 'content-type', 'x-shout-ttfb']) {
+      const v = res.headers.get(k);
+      if (v) wire.headers[k] = v;
+    }
     if (!res.ok || !res.body) { st.errors++; log(`stream answered HTTP ${res.status}`); return; }
 
     const metaint = Number(res.headers.get('icy-metaint') || 0);
@@ -311,14 +439,32 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
     // before it was added — 473,293 bytes read, the title decoded correctly, and
     // `frames: 0`, because `eat()` handed nothing back to decode.
     const audioParts = [];
-    const eat = icyDemuxer(metaint, { onTitle, onAudio: (b) => audioParts.push(b) });
+    const eat = icyDemuxer(metaint, {
+      onTitle,
+      onAudio: (b) => audioParts.push(b),
+      // How many metadata slots went by and how many carried text. A stream that
+      // never changes its title fills almost none of them, which is a fact about
+      // the station rather than about the reader.
+      onSlot: () => { wire.slots++; },
+      onMeta: () => { wire.filled++; },
+    });
     const reader = res.body.getReader();
+    let lastRead = 0;
 
     while (!stopped) {
       let chunk;
       try { ({ value: chunk } = await reader.read()); } catch { break; }
       if (!chunk) break;
+      const at = performance.now();
+      if (!wire.firstByteAt) { wire.firstByteAt = at; lastRead = at; }
+      else {
+        const gap = at - lastRead;
+        lastRead = at;
+        if (gap > wire.gapMax) wire.gapMax = gap;
+        if (wire.gaps.length < 4096) wire.gaps.push(gap);
+      }
       st.bytes += chunk.length;
+      if (at - wire.firstByteAt <= MARK_SECONDS * 1000) wire.marks.push([st.bytes, at]);
       // ⚠️ THE METADATA COMES OUT FIRST. `icy.mjs` splices 16-byte-aligned text
       // blocks INTO the audio, so feeding raw bytes to the frame splitter would
       // hand the decoder a title as if it were audio — a click every few
@@ -401,6 +547,18 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
       buffered: Math.max(0, nextAt - ctx.currentTime),
       pendingBytes: splitter.pending,
     }),
+    /**
+     * What the connection itself did — status, ICY headers, arrival gaps, and
+     * the byte marks a caller needs to work out a rate over any window.
+     *
+     * 🔴 THE RATE IS NOT COMPUTED HERE ON PURPOSE. A mean over "so far" is the
+     * BURST, not the stream: Icecast hands a new listener ~64 KiB faster than
+     * realtime, so an early reading of a 128 kbps mount lands comfortably in the
+     * 180s — MEASURED at 185 on this mount, and `shout` reads 195 over seven
+     * seconds for the identical reason. Which window is the honest one is the
+     * caller's question, so this hands over the marks and lets them answer it.
+     */
+    wire: () => ({ ...wire, marks: wire.marks.slice(), gaps: wire.gaps.slice() }),
     stop() {
       stopped = true;
       try { ac?.abort(); } catch { /* already gone */ }

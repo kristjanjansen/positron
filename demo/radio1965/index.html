@@ -273,6 +273,30 @@
    */
   const DECODE = new URLSearchParams(location.search).get('decode') !== '0';
   const REPORTING = new URLSearchParams(location.search).get('report') === '1';
+  /**
+   * 🔴 THE CHECKS THAT DAMAGE THE SOUND RUN ONLY WHEN SOMEBODY IS COLLECTING
+   * THEM, AND UNTIL NOW THEY RAN FOR EVERY LISTENER.
+   *
+   * Two of this page's checks are destructive by construction. `checkStationButtons`
+   * presses another station and presses back — two full decoder teardowns.
+   * `checkTransportStops` pauses the deck for 1.4 s, and on the decoded path the
+   * 1 Hz mirror CLOSES the stream when the deck stops and OPENS a new one when it
+   * starts, so a pause is a teardown and a rebuild. That is between one and two
+   * seconds of silence, three times, in the first few seconds of a visit.
+   *
+   * MEASURED by recording every source the page starts: overlaps for the first
+   * 5.4 s and then holes. REPORTED twice with a screenshot — *"still start broken
+   * blurb and hole in 1-2 sec later"* — and the second half of that sentence is
+   * this, arriving on schedule, on a page nobody was testing.
+   *
+   * ⚠️ MOVING THEM EARLIER WAS THE PREVIOUS FIX AND IT WAS THE WRONG AXIS. They
+   * were moved ahead of the ring warm-up so the granulator would not RECORD the
+   * gaps, which worked and left the gaps exactly where the listener hears them.
+   * A self-check that breaks the product cannot be scheduled into being harmless;
+   * it has to not run. `verify.mjs` appends `selfcheck=1`, so the suite still
+   * gets every assert and a visitor gets an unbroken stream.
+   */
+  const SELFCHECK = new URLSearchParams(location.search).get('selfcheck') === '1';
   const ship = REPORTING ? createShipper() : () => {};
   if (REPORTING) {
     ship(`--- radio1965 BUILD ${BUILD} ---`);
@@ -347,27 +371,32 @@
         // adapter is here for is the one claim it can truthfully make: which
         // speeds this stream can be played at.
         actuate() {},
-        // 🔴 SLOW ONLY, AND 2x IS GONE BECAUSE IT CANNOT WORK. Bytes arrive at
-        // exactly 1x, so anything faster eats the cushion and then starves —
-        // MEASURED: from a 1 s cushion, 2x drains it in about a second and
-        // every block after that underruns, which is the regular gating that
-        // was photographed. Below 1x there is no such limit: you simply fall
-        // further behind, which BEHIND already reports and which is the
-        // interesting half anyway.
-        // 🔴 NO RATES. Varispeed on a LIVE EDGE cannot work and the numbers
-        // say so: bytes arrive at exactly 1x, so faster starves (MEASURED: a
-        // 1 s cushion gone in a second, then every block underrunning — the
-        // regular gating that was photographed) and slower falls behind for
-        // ever (MEASURED: `buffered` 3.6 -> 17.0 s in twenty seconds at 0.5x,
-        // then 168 blocks DROPPED to stay inside a 30 s ceiling, each drop a
-        // jump forward in the content — which is why 0.25x was reported as
-        // sounding "sped up"). There is no third option at a live edge.
-        //
-        // Slowing down belongs to the granulator, which reads a HELD eight
-        // seconds: there the read head can crawl with no queue, no drops and no
-        // falling behind, and the pitch stays where it was. See the `slowed`
-        // sound below — that is this feature, done where it works.
-        caps: {},
+        /**
+         * 🔴 SLOW ONLY. 2x CANNOT WORK AND IS NOT OFFERED: bytes arrive at
+         * exactly 1x, so anything faster eats the cushion and then starves —
+         * MEASURED, a 1 s cushion gone in a second and every block after it
+         * underrunning, which is the regular gating that was photographed.
+         *
+         * Below 1x there is no such limit, only a consequence: you fall behind
+         * the station, which BEHIND already reports, and you keep falling until
+         * the stream rejoins live in one cut and says so in the log. That is the
+         * honest price of playing a live thing slowly and it is the interesting
+         * half of the gesture — a tape running away from the broadcast.
+         *
+         * ⚠️ THESE WERE REMOVED ONCE AND ASKED FOR BACK. The removal was right
+         * about the mechanism (varispeed at a live edge cannot be SUSTAINED) and
+         * wrong about what to do with it, because "cannot be sustained" is not
+         * "does not work" — it is a bounded effect with a known end, which is a
+         * different thing from a broken control. What actually made 0.25x
+         * unusable was the ceiling dropping one buffer at a time and stuttering
+         * the content forward; that is fixed in `mp3-stream.mjs`, not here.
+         *
+         * ⚠️ AND IT IS THE TAPE KIND — PITCH FOLLOWS SPEED. For slow WITHOUT the
+         * pitch dropping, the `slowed` sound reads a held eight seconds with the
+         * pitch kept where it was; the two are different instruments and the page
+         * has both.
+         */
+        caps: { rates: [0.125, 0.25, 0.5, 1] },
       },
     },
     range: [t0 - SPAN_MS, t0],
@@ -973,12 +1002,105 @@
   }
 
   // ── the measurement ────────────────────────────────────────────────────────
-  // A SECOND connection, on purpose: this one is read as BYTES, which is what
-  // the relay's CORS makes possible and is the only way to see the rate, the
-  // gaps and the station's own text channel.
+  /**
+   * 🔴 IT USED TO BE A SECOND CONNECTION AND IT DOES NOT NEED TO BE.
+   * The comment here said "a SECOND connection, on purpose: this one is read as
+   * BYTES" — which was true when an `<audio>` element owned the sound and a page
+   * could not see a byte of it. The decoded path reads the bytes itself, demuxes
+   * the same ICY channel and holds the same response headers, so the second
+   * fetch was asking a volunteer's Icecast for numbers already on this side of
+   * the wire. Two listeners per visitor, for nothing.
+   *
+   * ⚠️ THE ELEMENT PATH STILL NEEDS ITS OWN FETCH, and that is not a leftover:
+   * under `?decode=0` there is genuinely no other way to see the bitrate. So the
+   * two arms below are two different situations, not one with a stale branch.
+   */
   const rec = { status: 0, bytes: 0, headers: {}, slots: 0, filled: 0, gaps: [], marks: [] };
 
+  /** Work a rate and a burst out of byte marks — shared by both arms. */
+  function summarise(startMs, endMs) {
+    const secs = (endMs - startMs) / 1000;
+    rec.kbps = secs > 0 ? (rec.bytes * 8) / 1000 / secs : 0;
+    // 🔴 MEAN BITRATE OVER A SHORT WINDOW IS THE BURST, NOT THE STREAM.
+    // Icecast hands a new listener ~64 KiB faster than realtime to prime their
+    // buffer, so the first reading of a 128 kbps station is comfortably in the
+    // 180s — MEASURED HERE at 185 before this was fixed, and `shout` reads 195
+    // over seven seconds for the identical reason. The rate worth asserting on
+    // is the one after the burst has landed: everything from 40 % of the
+    // window onwards. The whole-window mean stays in `rec.kbps` because the
+    // difference between the two IS the burst.
+    const cut = startMs + (endMs - startMs) * 0.4;
+    const from = rec.marks.find((mk) => mk[1] >= cut);
+    const end = rec.marks.at(-1);
+    rec.steadyKbps = from && end && end[1] > from[1]
+      ? ((end[0] - from[0]) * 8) / 1000 / ((end[1] - from[1]) / 1000)
+      : null;
+    rec.burstS = rec.bytes / ((NOMINAL_KBPS * 1000) / 8) - secs;
+    rec.gapMax = rec.gaps.length ? Math.max(...rec.gaps) : 0;
+    return rec;
+  }
+
+  /**
+   * The decoded arm: watch the connection that is already playing.
+   * It waits for MEASURE_MS of ACTUAL READING rather than of wall clock, so a
+   * slow start does not get averaged in as a slow station.
+   */
+  async function measureDecoded() {
+    /**
+     * 🔴 ONE CONNECTION FROM END TO END, OR THE NUMBERS ARE FROM TWO OF THEM.
+     * A station switch or a transport stop builds a NEW stream with its own byte
+     * counter and its own first byte, and the first version of this held the old
+     * one's start time against the new one's marks. MEASURED: `10427 vs 128 kbps
+     * nominal` — a reading eighty times the truth, arrived at by dividing one
+     * connection's burst by fifty milliseconds of another's clock. It failed
+     * loudly, which was luck; the same mistake a little smaller would have read
+     * like a fast station.
+     *
+     * So the instance is held, and if it is replaced the window starts again.
+     */
+    const settle = () => new Promise((r) => setTimeout(r, 100));
+    for (let attempt = 0; attempt < 8; attempt++) {
+      for (let i = 0; i < 200 && !stream?.wire?.().firstByteAt; i++) await settle();
+      const mine = stream;
+      const w0 = mine?.wire?.();
+      if (!w0?.firstByteAt) break;
+      let swapped = false;
+      while (!swapped) {
+        const w = mine.wire();
+        if ((w.marks.at(-1)?.[1] ?? 0) - w0.firstByteAt >= MEASURE_MS) break;
+        await new Promise((r) => setTimeout(r, 200));
+        swapped = stream !== mine;
+      }
+      if (swapped) continue;                        // that one went away; watch the next
+      return report(mine.wire());
+    }
+    rec.status = stream?.wire?.().status ?? 0;
+    return rec;
+  }
+
+  /** Fold one connection's wire report into `rec` and summarise it. */
+  function report(w) {
+    rec.status = w.status;
+    rec.headers = w.headers;
+    rec.slots = w.slots;
+    rec.filled = w.filled;
+    rec.gaps = w.gaps;
+    rec.marks = w.marks;
+    // The window starts at this connection's first byte, so its running total IS
+    // the bytes inside the window. `summarise` below is given both ends anyway,
+    // so a window that ever starts later stays correct.
+    rec.bytes = w.marks.at(-1)?.[0] ?? 0;
+    rec.ttfbMs = w.firstByteAt - w.openedAt;
+    if (rec.headers['icy-name']) {
+      d.log(`icy-name "${rec.headers['icy-name']}" — readable only because the relay exposes it`);
+    }
+    d.log('the bitrate is read off the connection you are listening to — '
+      + 'this page opens one socket, not two');
+    return summarise(w.firstByteAt, w.marks.at(-1)?.[1] ?? w.firstByteAt);
+  }
+
   async function measure(signal) {
+    if (DECODE) return measureDecoded();
     const t = performance.now();
     const res = await fetch(`${srcOf(station)}?bytes=${2 << 20}`,
       { signal, cache: 'no-store', headers: { 'Icy-MetaData': '1' } });
@@ -1010,26 +1132,8 @@
       eat(value);
     }
     try { await reader.cancel(); } catch { /* the stream never ends; hanging up is normal */ }
-    const secs = (performance.now() - start) / 1000;
-    rec.kbps = (rec.bytes * 8) / 1000 / secs;
-    // 🔴 MEAN BITRATE OVER A SHORT WINDOW IS THE BURST, NOT THE STREAM.
-    // Icecast hands a new listener ~64 KiB faster than realtime to prime their
-    // buffer, so the first reading of a 128 kbps station is comfortably in the
-    // 180s — MEASURED HERE at 185 before this was fixed, and `shout` reads 195
-    // over seven seconds for the identical reason. The rate worth asserting on
-    // is the one after the burst has landed: everything from 40 % of the
-    // window onwards. The whole-window mean stays in `rec.kbps` because the
-    // difference between the two IS the burst.
-    const cut = start + (performance.now() - start) * 0.4;
-    const from = rec.marks.find((mk) => mk[1] >= cut);
-    const end = rec.marks.at(-1);
-    rec.steadyKbps = from && end && end[1] > from[1]
-      ? ((end[0] - from[0]) * 8) / 1000 / ((end[1] - from[1]) / 1000)
-      : null;
-    rec.burstS = rec.bytes / ((NOMINAL_KBPS * 1000) / 8) - secs;
     rec.ttfbMs = start - t;
-    rec.gapMax = rec.gaps.length ? Math.max(...rec.gaps) : 0;
-    return rec;
+    return summarise(start, performance.now());
   }
 
   // ── starting ───────────────────────────────────────────────────────────────
@@ -1205,11 +1309,16 @@
       Number.isFinite(head) && heardFrom != null
         ? `playhead ${new Date(head).toTimeString().slice(0, 8)}, ${((head - heardFrom) / 1000).toFixed(1)} s in`
         : `playhead ${String(head)}, heardFrom ${String(heardFrom)}`);
-    d.assert('the transport can stop the stream', !wasPlaying || stopped,
-      wasPlaying
-        ? (stopped ? 'pause on the bar paused the audio too'
-                   : 'the bar paused the line and the radio played on')
-        : 'nothing was playing to stop');
+    // ⚠️ ONLY WHEN THE CHECK RAN. An assert whose measurement was skipped must be
+    // ABSENT, not passed on a default — `T.stopped` is `false` when nothing ever
+    // paused the deck, which reads identically to a transport that cannot stop.
+    if (SELFCHECK) {
+      d.assert('the transport can stop the stream', !wasPlaying || stopped,
+        wasPlaying
+          ? (stopped ? 'pause on the bar paused the audio too'
+                     : 'the bar paused the line and the radio played on')
+          : 'nothing was playing to stop');
+    }
 
 
     // ── and the granulator, in the SAME burst, when it was asked for ────────
@@ -1355,7 +1464,7 @@
     const other = here === 0 ? 1 : 0;
 
     // The station A/B ran HERE and now runs early — see `checkStationButtons`.
-    d.assert(S.label, S.pass, S.detail);
+    if (SELFCHECK) d.assert(S.label, S.pass, S.detail);
   }
 
 
@@ -2354,10 +2463,13 @@
     // guess at it.
     await ensurePlaying();
 
-    // Before the ring fills: the two gaps this makes are then recorded over by
-    // the warm-up below, so nothing the granulator holds contains them.
-    await checkStationButtons();
-    await checkTransportStops();
+    // ⚠️ HARNESS ONLY — see SELFCHECK at the top. These two tear the stream down
+    // and rebuild it, which is a hole a listener hears. They still run before the
+    // ring fills, so when they DO run the granulator does not record the gaps.
+    if (SELFCHECK) {
+      await checkStationButtons();
+      await checkTransportStops();
+    }
 
     // 🔴 AND THEN WAIT FOR THE RING TO HOLD SOMETHING. A granulator cannot be
     // louder than what it has recorded, and this one records into an eight
