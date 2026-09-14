@@ -41,6 +41,29 @@ export function createTransportBar(host, deck, {
   // follows as it always does. Defaults to the deck's own methods, so every
   // existing caller behaves exactly as before.
   command = null,
+  /**
+   * Called with the new rate the instant a rate button is pressed.
+   *
+   * 🔴 IT REPLACES A POLL, AND THE POLL WAS A THIRD OF A REPORTED DELAY.
+   * `/radio1965/` owns the thing the rate actually acts on (an Icecast playout,
+   * not this deck's playhead), and the only way it could learn about a press
+   * was to read `deck.targetRate()` on a timer. That timer was 1 Hz — *"why
+   * rate change is so slooooooooow"* — then 120 ms, which is better and is
+   * still up to 120 ms of a control doing nothing before anything is even TOLD.
+   * `applyRate` is the single funnel for every rate change in this bar (the
+   * keyboard table has no rate keys), so a callback here is complete.
+   */
+  onRate = null,
+  /**
+   * `() => boolean` — is the armed rate not yet audible?
+   *
+   * ⚠️ THE BAR CANNOT KNOW THIS AND MUST NOT GUESS. Whether a speed has
+   * arrived is a fact about whatever is making the sound: a media element is
+   * there the same frame, and a stream with 600 ms of audio already scheduled
+   * is not. A deck that says nothing gets no pulse, which is the honest
+   * default — a bar that animated on a timer would be inventing a wait.
+   */
+  settling = null,
 } = {}) {
   const cmd = {
     play: () => (command?.play ? command.play() : deck.play()),
@@ -85,11 +108,12 @@ export function createTransportBar(host, deck, {
    * have. REPORTED as *"transport timers are pointless here. what about LIVE
    * label"*, and they were: two numbers, neither of which anybody can act on.
    *
-   * ⚠️ IT SAYS `SLOWED` WHEN IT IS SLOWED. A chip reading LIVE while the
-   * listener is half a minute behind the station is the confident-wrong kind of
-   * readout this repo minds most, and the bar already knows the armed rate, so
-   * it costs nothing to tell the truth. How far behind is a number, and a number
-   * belongs in a readout cell — the page's BEHIND — not in a chip.
+   * ⚠️ IT SAYS `LIVE` AND NOTHING ELSE. It briefly read `SLOWED` at any armed
+   * rate other than 1, and that is a second channel saying what the rate radio
+   * group already says an inch to its right — the armed button IS the statement
+   * that you are not at 1x. How far behind is a number and belongs in a readout
+   * cell, which is the page's BEHIND. A chip carries one fact: this source has
+   * no end.
    */
   const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null;
   bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]), rates, badge);
@@ -117,6 +141,13 @@ export function createTransportBar(host, deck, {
    * set `gap: 4px` and did exactly that.
    */
   let rateChoice = null;
+  // ⚠️ DECLARED UP HERE BECAUSE `buildRates()` RUNS AT CONSTRUCTION. It calls
+  // `syncRates()`, which clears this — and a `let` further down the file is in
+  // its temporal dead zone at that moment, so the constructor would throw
+  // `Cannot access 'wasSettling' before initialization` and take the whole page
+  // with it. That is exactly the failure HANDOFF records for the first attempt
+  // at a rate lattice here: `__demo.ready — failed` and nothing else to go on.
+  let wasSettling = null;
   function buildRates() {
     agen = deck.adapterGen?.() ?? 0;
     lattice = latticeFor(deck);
@@ -155,6 +186,11 @@ export function createTransportBar(host, deck, {
     const res = deck.setRate(r);
     if (res && res.degraded) note(res.reason);
     else clearNote();
+    // ⚠️ BEFORE `syncRates`, so the page has already armed whatever it owns by
+    // the time the pulse is decided. The other order asks `settling()` about a
+    // rate the page has not been told about yet, which reads as "arrived" for
+    // one frame and then starts pulsing — a flicker on every press.
+    onRate?.(r);
     syncRates();
   }
 
@@ -176,11 +212,9 @@ export function createTransportBar(host, deck, {
       const i = lattice.indexOf(armed);
       if (i >= 0) rateChoice.set(i, true);
       else rateChoice.buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
-    }
-    if (liveChip) {
-      const slow = Number.isFinite(armed) && armed > 0 && armed !== 1;
-      liveChip.textContent = slow ? 'SLOWED' : 'LIVE';
-      liveChip.dataset.slow = slow ? '1' : '0';
+      // A rebuilt group is a fresh set of buttons with no pulse on any of them,
+      // so the remembered answer no longer describes the DOM.
+      wasSettling = null;
     }
   }
 
@@ -214,6 +248,23 @@ export function createTransportBar(host, deck, {
       : clock(pos, absolute);
     const playing = deck.playing?.() ?? false;
     toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
+    syncPending();
+  }
+
+  /**
+   * The armed rate button pulses until the speed is actually audible.
+   *
+   * ⚠️ ON THE PAINT LOOP, AND THE DOM IS TOUCHED ONLY WHEN THE ANSWER CHANGES.
+   * `observePosition` already runs this at 60 Hz; writing a dataset attribute
+   * sixty times a second would restart the CSS animation on every frame, which
+   * is an animation that renders as a still.
+   */
+  function syncPending() {
+    if (!rateChoice) return;
+    const now = settling ? !!settling() : false;
+    if (now === wasSettling) return;
+    wasSettling = now;
+    rateChoice.pending(now ? rateChoice.get() : null);
   }
 
   // ── the end of a bounded piece ──────────────────────────────────────────
