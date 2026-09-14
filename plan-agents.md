@@ -1,5 +1,12 @@
 # plan-agents — what makes this repo hard for two agents at once
 
+🔴 **P1, P2 and P6 ARE BUILT — READ §11 BEFORE ACTING ON ANYTHING BELOW.** The
+argument sections still read in the present tense because the reasoning is worth
+keeping; the state of the tree is in §11. A plan that has been executed and goes
+on arguing for itself misleads a reader in good faith, and it has already done so
+twice: another agent read `--out` as unbuilt and the tree digest as a proposal,
+when both had been shipping for hours.
+
 Written 2026-09-14, session 24, after reading `CLAUDE.md`, `LAYOUT.md`,
 `HANDOFF.md`, `LESSONS.md` and the harnesses they describe. It proposes; it
 changes nothing yet.
@@ -34,7 +41,7 @@ being paid, every turn, by every agent, before any work starts.
 
 ---
 
-## 1. `workers/view/public/` is a shared mutable global (P1)
+## 1. ~~`workers/view/public/` is a shared mutable global~~ — **DONE**, see §11
 
 `build.mjs` line 32: `const OUT = join(HERE, 'public')`. Line 480:
 `await rm(OUT, { recursive: true, force: true })`.
@@ -86,7 +93,7 @@ repo has paid for exactly that question before.
 
 ---
 
-## 2. `git add -A` has cost this repo twice and is still only a sentence (P2)
+## 2. ~~`git add -A` is still only a sentence~~ — **DONE**, see §11
 
 CLAUDE.md, in full:
 
@@ -238,7 +245,7 @@ the `studio-1` outage with a new owner.
 
 ---
 
-## 6. Four harnesses still hold a fixed port, and one is worse than that (P6)
+## 6. ~~Four harnesses still hold a fixed port~~ — **DONE for six of them**, see §11
 
 CLAUDE.md carries the rule twice and `verify.mjs`, `verify-gl.mjs` and
 `verify-quest.mjs` now apply it — port 0, read back `server.address().port`,
