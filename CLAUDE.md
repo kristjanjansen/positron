@@ -160,6 +160,26 @@ just those three gave 57/57. So **before calling a red run a regression, run the
 failing demos ALONE** — it costs a minute and it separates "my change broke it"
 from "I was competing with myself", which look identical in the output.
 
+🔴 **A HARNESS THAT DOES NOT DELETE ITS OWN PROFILE FILLS THE DISK, AND THE
+DISK FAILING LOOKS LIKE EVERYTHING FAILING.** Every harness here launches Chrome
+with a per-run `--user-data-dir`, for reasons that are correct and written down
+(a shared profile is a shared HTTP cache, and Chrome writes its real CDP port
+inside it). None of them ever removed one. MEASURED 2026-09-14: **229 leftover
+profiles, ~20 GB, and the volume down to 119 MB free** — at which point `find`
+itself died with ENOSPC and no shell command would run. A profile is ~250 MB and
+the suite gets run dozens of times a day, so this leaks about a gigabyte an
+hour of ordinary use. ⚠️ **Cleaning up on the way out is not enough**: a run
+that is Ctrl-C'd or killed executes no handler, and those are exactly the runs
+that happen when something is already wrong. `demo/harness-profile.mjs` does
+both halves — `claimProfile()` removes this run's directory on `exit` and on a
+signal, and **sweeps directories whose pid is dead**, which is the half that
+actually recovers a machine. It is safe because the pid is in the name, so a run
+in another terminal keeps its own. ⚠️ And `kill()` ASKS; it does not stop —
+with a plain `kill()` the handler deleted the directory and a still-shutting-down
+Chrome recreated it, which is a cleanup that runs, reports nothing and does
+nothing. SIGKILL and await the child's `exit` before removing. **Say how many
+were swept**: a cleanup nobody is told about cannot be told apart from a leak.
+
 **A harness and a dev server that share a port is a harness that reads broken.**
 `node demo/verify.mjs` died with an unhandled `EADDRINUSE` three separate times
 in one session because `node demo/server.mjs` was still holding 8890 — each
