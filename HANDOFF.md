@@ -4,6 +4,179 @@
 **session 24's radio/relay/kit half**; `positron-91` writes the floor, XR and
 protocol half under the same heading. Neither of us edits the other's lines.
 
+## `/floor/` — the 1965 catalogue, and five rounds of fixing the wrong thing
+
+**<https://positron.studio/floor/>** · 31 asserts, `node demo/verify-gl.mjs floor`.
+Every 1965 newsreel face up on a floor you walk over.
+
+🔴 **THE HEADLINE IS A CONFESSION: "no playback" was reported FIVE TIMES and got
+five fixes to things next to the fault.** Each one was a real defect and none of
+them was it. The reason it could go on that long is one sentence: **every assert
+on this page graded a shader, a matrix, a filter or a dwell, and not one of them
+could tell a working page from one that never shows a frame of film.**
+
+The actual bug: `playTile(i)` guarded a SLOT number against `tiles.length`. A
+slot is a place on the floor, `tiles` is the catalogue, and they are different
+lengths on purpose — 588 slots hold 298 films so each appears about twice. Every
+slot numbered 298+ returned without a word: **290 of 588 dead**, and since slots
+are laid out from the middle outwards the ones nearest the camera are numbered
+around 294. The floor worked at its far corners and never where you stood.
+
+⚠️ **And I created the severity without touching that line.** It was written
+when the block was 15x20 = 300 slots for 298 films, where it killed exactly two.
+Widening the grid to 21x28 — so the wrap could not be witnessed — turned a
+two-slot edge case into 290. *A constant changed in one place silently changing
+the meaning of a bound in another, with no test between them.*
+
+### The instrument that ended it, and why the others could not
+
+An assert that dispatches a real `pointerdown`/`pointerup` at the canvas and
+waits for `video.currentTime` to move. **Calling `playTile` directly passed the
+whole time** — the fault was in the index the click hands over, not in the
+playing. If a page has a control path worth trusting, drive the DOM event, never
+the handler.
+
+⚠️ **A browser tab is not an instrument for this page.** `Runtime.evaluate`
+times out the moment it awaits `requestAnimationFrame`, because the tab is
+backgrounded and rAF stops dead — and in a hidden tab no tile ever reaches a
+visible alpha, so nothing can even be clicked. `step()` takes `dt` as an
+argument precisely so the state machine can be driven at a fixed 1/60 with no
+browser in the loop; two checks do that now.
+
+### Four more, each with the guard that catches it
+
+- 🔴 **An `AWAY_MS` timer tore down the playing film whenever the pointer stopped
+  being on it.** Right when resting your look was the only verb; after the move
+  to a click it means *a film dies if your hand moves* — and I had shortened it
+  to 700 ms on request, which made it lethal, because the tiles meet with no gap
+  so the smallest twitch lands on a neighbour. Removed. A film runs until you
+  start another or stop that one.
+- 🔴 **One per-tile number did two jobs** — "the ray is on this" and "do not dim
+  this". They agree until you click, at which point the aim falls in 140 ms and
+  the video alpha does not rise for a second, so **the tile you had just chosen
+  dimmed with the floor and lit again when its film arrived**. Split into `f`
+  and `c`. *The hole is exactly the interval where the two facts disagree.*
+- 🔴 **The pan/choose decision was measured on the RAW ray hit** — the signal the
+  filter exists to reject. 0.15 m of tremor reads **211 mm** against a 150 mm
+  threshold, so every hold latched as a pan and nothing ever focused or played.
+  On the filtered floor it is **9 mm**.
+- 🔴 **The texture pool held a disc of 11.4 m while the fade drew to 16**, so the
+  LRU took layers back off tiles still 73% visible. Not a fade, a disappearance
+  — the "edge tiles popping" this was reported for. The pool now covers the
+  radius and an assert holds the two together. ⚠️ Tiles also faded to one colour
+  while the background cleared to another, nearly 2x apart, drawing a bright
+  disc on a darker void at exactly the radius the fade existed to hide.
+
+### 🔴 The rule this page bought, and it is the one to keep
+
+**FEEDBACK GATED ON INTENT RATHER THAN ON OUTCOME IS WORSE THAN NO FEEDBACK.**
+The projector came up during the DWELL — on somebody ASKING for a film — so it
+sounded identical whether one ever played. For five rounds this page *made the
+noise of a working page while showing no film at all.* The owner's own question
+closed it: *"how did the projector sound when you did not know if video was
+playing?"* It is gated on a decoded frame now. Applies to every meter, lamp and
+readout in the repo: gate on the thing you are claiming, not on the request for
+it.
+
+### Where it stands
+
+Screen: click or tap a tile to play, click it again to stop, drag to look,
+arrows to walk. ⚠️ A finger has no hover, so `pointerdown` picks the tile — a
+phone could previously play nothing at all. Headset: **either trigger clicks**
+(no holding), press-and-drag pans, and a press that moved the floor more than
+15 cm is a pan and not a choice, latched. The tile under the ray lifts 18%; a
+film takes the rest of the floor down; an aimed tile comes 18% back OUT of the
+dim rather than being brightened, because 18% of a quarter-brightness tile is
+**+2 of 255**, a rounding error. Projector: eight voices, timbre only, **chosen
+by the film's own index** so a film keeps its machine; one frame rate, and the
+check sweeps all eight (worst 1.7 ms from 41.7).
+
+### 🔴 Open on floor
+
+- **NOTHING IN THE HEADSET HALF IS MACHINE-GRADED.** `verify-gl` reaches shaders,
+  matrices, the state machine and the audio graph; it cannot pull a trigger. The
+  click-to-toggle, the controller models, the ray and the 0.125 gain are all
+  reasoned, not measured.
+- **The rising screen was built and REVERTED** (`1ef8f05`, then removed). Tried
+  in a headset, did not work. What is worth keeping is in the revert's message:
+  the hole needs no drawing because the tiles meet exactly; the screen's up axis
+  must be world DOWN or the picture stands on its head; and corner interpolation
+  beats building a basis, because `normalize(mix(a,b))` is NaN exactly when the
+  tile is behind you.
+- **`fps` has never displayed.** Every observation of it was in a backgrounded
+  tab, so this is unattributed rather than broken. Look at it on a foreground
+  screen before believing either.
+- **Memory: 320 layers x 256x192 RGBA is 63 MB**, up from 38, unmeasured on a
+  headset alongside the video texture.
+
+## The XR kit gained two shared components
+
+- **`demo/shell/xr-ray.mjs`** — the pointer as a fading ribbon, replacing
+  `beamM`'s 4 mm stretched cube, so `scene` and `mirror` get it too. 🔴
+  **Billboarded IN THE VERTEX SHADER**, because a headset draws two views 64 mm
+  apart and orienting on the CPU picks one eye's answer for both — the error is
+  not a smear but a DISPARITY, which reads as the pointer sitting at a depth it
+  is not at. `eyeFromView()` takes the position out of the view matrix that is
+  doing the projecting, so the two cannot disagree.
+  ⚠️ **Its check wants the picture to get WORSE**: the same ray drawn with an eye
+  moved 90° round its own axis must come out edge-on (350334 of ink against 0).
+  A stretched box would score the same both ways and pass a test asking for
+  sameness.
+- **`demo/shell/xr-controller.mjs`** — the real `meta-quest-touch-plus` glTF at
+  the GRIP pose (not the target ray; they differ by the forward tilt and a model
+  at the ray sits visibly wrong in the fist), greyed through the same Rec. 601
+  luma as the newsreels, opaque. No stand-in: real controllers or nothing,
+  because a shape that is nearly a controller is a confident picture of the
+  wrong object. It is a new module rather than a call into `xr-room.mjs` because
+  that draws controllers as one step inside a whole renderer, and `floor` has its
+  own instanced shader.
+
+⚠️ **`.xr` IS ON THE QUEST'S ORDINARY 2-D BROWSER**, because `markHeadset()`
+tests `isSessionSupported('immersive-vr')`. So `.xr` styling is what a headset
+reads on a FLAT page, not only inside a session. That is how
+`.xr .pos-readout { gap: 10px 20px }` came to draw a **20 px slab of line
+colour** between every readout cell — photographed in the Quest browser. The
+row's gap is not spacing: it is 1 px of `--line` showing between `--card` cells,
+so the gap IS the hairline and widening it widens the RULE. Room comes from
+`.xr .pos-cell` padding now. **Any rule keyed on `.xr` needs the same check.**
+
+## Two agents, one checkout — the protocol that fixed it
+
+⚠️ **Read this before assuming the day was mostly code.** Five deploys of mine
+shipped session 24's uncommitted work; one of theirs shipped my floor
+mid-diagnosis; 7 of the 9 failures in a full `verify.mjs` run were their
+in-progress demo and took two re-runs to attribute; and `demo/shell/projector.mjs`
+spent one commit **untracked while deployed** — every build passed, every deploy
+shipped it, and a fresh clone would have failed.
+
+What actually fixed it was not tooling:
+
+1. **Commit by path name, early.** Never `git add -A` — `.claude/hooks/guard-tree.mjs`
+   refuses it now.
+2. **Announce every deploy to the other session**, naming which of THEIR files
+   went out. `deploy.mjs` enumerates them now; ⚠️ it **prints and proceeds**,
+   refusing only under `--strict`, because a gate that fires on the normal case
+   is a keystroke by the third time — *a colour scale whose normal reading is a
+   warning has no warning left.*
+3. **Worktrees were proposed and rejected by the owner.** Measured on the way:
+   the build has **zero untracked inputs**, so a worktree would work, and `.env`
+   being absent there is a benefit. What killed it is that worktrees trade
+   "your work ships unannounced" for "your work disappears unannounced" on one
+   live site, and the second is harder to notice.
+
+🔴 **AND THE FAILURE THAT SURVIVED ALL OF IT.** A commit deliberately kept to ONE
+FILE so it would be ONE REVERT still conflicted, because the other session's work
+had landed in the same regions of that file in between. **Isolating a change in
+files does not isolate it in TIME.** And `c368d11` carries a `git note`: its
+subject says the coloured branch was "left with its reasoning" while its diff
+DELETES it, because `git add` on a shared path swept an edit whose author had not
+committed yet. The code is right and the history is wrong about it, which is
+worse than either alone.
+
+⚠️ **`research/vr-sound-visual-2026-09.md` (26 KB, 15:53) is untracked and is
+NEITHER session's.** Session 24 disclaims it; I did not write it. Do not commit
+it as yours — find out where it came from first.
+
 ## `/radio1965/` — a station a secure page could not otherwise reach
 
 **<https://positron.studio/radio1965/>** · 26/26 · `plan-radio.md` has the
