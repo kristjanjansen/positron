@@ -69,14 +69,18 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
    * and collapsing them would make a pressed button appear unpressed while the
    * sound catches up, which is a worse lie than the one being fixed.
    *
-   * ⚠️ THE ANIMATION MOVES OPACITY AND NOTHING ELSE (`shell.css`). CLAUDE.md:
-   * nothing that redraws may change how much room it takes — a pulse on a
-   * border width or a font weight would shuffle the row it sits in.
+   * ⚠️ IT SETS `data-busy`, WHICH IS THE SHELL'S OWN ATTRIBUTE, on purpose. Every
+   * other button in this project says "working on it" with one sweep across its
+   * face; this had its own opacity pulse for about an hour and was REPORTED as a
+   * flicker. One idea, one picture — and reusing it means the reduced-motion
+   * fallback, the `cursor: progress` and the colours all come along without a
+   * second copy to drift. `shell.mjs` only ever sets `data-busy` on
+   * `.pos-controls` buttons, so nothing collides.
    */
   function pending(i) {
     buttons.forEach((b, k) => {
-      if (i != null && k === i) b.dataset.pending = '1';
-      else delete b.dataset.pending;
+      if (i != null && k === i) b.dataset.busy = '1';
+      else delete b.dataset.busy;
     });
   }
 
