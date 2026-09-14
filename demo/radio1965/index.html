@@ -10,6 +10,13 @@
   /* The in-band title. It changes when a track changes — human pace, not a
      clock — so prose here is allowed. `min-height` reserves the line so the
      page does not jump the first time the station says something. */
+  /* ⚠️ TWO COLUMNS, because five sliders in one wrapping row is what the
+     screenshot showed: labels colliding with the track beside them and a set of
+     controls nobody can scan. A fixed pair of columns keeps every label above
+     its own track at every width that has room for two, and drops to one when
+     it does not. */
+  .pos-sliders { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; }
+  @media (max-width: 560px) { .pos-sliders { grid-template-columns: 1fr; } }
   .now { font: 600 13px/1.5 var(--mono); color: var(--hi); min-height: 20px; }
 </style>
 
@@ -52,6 +59,12 @@
   const DEFS = '/grains/defs/';
   const SPAN_MS = 3 * 60 * 1000;    // the opening view
   const MEASURE_MS = 5000;
+  // ⚠️ DECLARED UP HERE BECAUSE THE SCOPE READS IT. It sat beside `let eng` for
+  // one run, below the `createGrainScope` call that uses it — a `const` in its
+  // temporal dead zone, which is a ReferenceError at module load, which is a
+  // page that never calls `d.ready()`. The suite said `__demo.ready — failed`
+  // and nothing else, because nothing else had run.
+  const BUF_SECONDS = 8;                 // Pappus `mbuflen`, the held seconds
   const RANGE_HZ = 1;
 
   const d = mount({
@@ -114,7 +127,17 @@
   // seconds, so it heaves every time a loud passage leaves the right edge and a
   // quiet stretch draws the same as a loud one. `fullScale: 1` means the height
   // is an amplitude: 1.0 fills it, and a quiet passage looks quiet.
-  const scope = createGrainScope(d.el, { seconds: 6, height: 140, fullScale: 1 });
+  const scope = createGrainScope(d.el, { seconds: 6, height: 140, fullScale: 1,
+    // the granulator's buffer is filled from THIS audio, so grain positions and
+    // this axis are the same seconds — see the note in grain-scope.mjs
+    grainSeconds: BUF_SECONDS });
+
+  // ⚠️ THE CONTROL ROW MOVES UNDER THE PICTURE. `mount()` puts it above, which
+  // is right for a page whose control starts something abstract; here the
+  // button acts ON the waveform right beneath it, and a control above a picture
+  // it changes reads as belonging to whatever is above THAT.
+  const cbar = d.el.querySelector('.pos-controls');
+  if (cbar) d.el.append(cbar);
   scope.source('the radio · height is level, colour is pitch');
 
   // ⚠️ THE FIRST PLAY MUST HAPPEN INSIDE THE GESTURE. A browser refuses
@@ -179,7 +202,7 @@
   audio.crossOrigin = 'anonymous';
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
-  let eng = null, grains = 0, wet = 0.85;
+  let eng = null, grains = 0, wet = 0.85, synthOn = false, sliderRow = null, lastRate = '';
   const P = { rate: 8, size: 0.12, scan: 0.666, spray: 0 };
   let measured = null, done = false, synthPending = false;
 
@@ -494,7 +517,29 @@
     d.set('wet', v.toFixed(2));
   };
 
+  const label = (t) => { const b = d.el.querySelector('.pos-controls button'); if (b) b.textContent = t; };
+
+  /**
+   * 🔴 ONE BUILD, THEN ON AND OFF. Pressing this twice used to boot a second
+   * engine and append a SECOND set of five sliders under the first — both live,
+   * both claiming to be the controls. Reported from a screenshot, and the page
+   * could not say which was real because both were.
+   *
+   * ⚠️ AND THE BUTTON IS THE STATE. "is the granulator on or off?" had no answer
+   * on screen: the word `Synthesize` said the same thing whether it was running
+   * or not. It names what the next press DOES, which is the only thing a button
+   * can honestly say about itself.
+   */
   d.on('synth', async () => {
+    if (eng) {                                  // built already — this is a toggle
+      synthOn = !synthOn;
+      eng.send('/n_run', PAPPUS_NODE, synthOn ? 1 : 0);
+      setWet(synthOn ? (wet || 0.85) : 0);
+      d.set('grains', synthOn ? lastRate : '');   // '' prints an em dash, never a confident 0
+      label(synthOn ? 'Stop granulating' : 'Synthesize');
+      d.log(synthOn ? 'granulator on' : 'granulator off — the radio plays straight through');
+      return;
+    }
     synthPending = true;
     await ensurePlaying();
 
@@ -526,8 +571,8 @@
     setWet(wet);
     scope.source('Pappus, chewing the radio · colour is pitch');
 
-    const row = el('div', 'pos-sliders');
-    d.el.append(row);
+    const row = sliderRow ?? el('div', 'pos-sliders');
+    if (!sliderRow) { sliderRow = row; d.el.append(row); }
     const add = (label, name, min, max, step, value, unit) =>
       row.append(createSlider({ label, min, max, step, value, unit,
         onInput: (v) => { P[name] = v; setBoth(name, v); } }).el);
@@ -538,12 +583,15 @@
     row.append(createSlider({ label: 'radio → granulator', min: 0, max: 1, step: 0.01,
       value: wet, onInput: setWet }).el);
 
+    synthOn = true;
+    label('Stop granulating');
     const t0g = performance.now();
     grains = 0;
     G.loud = await engLevel(2500);
     G.secs = (performance.now() - t0g) / 1000;
     G.grains = grains;
-    d.set('grains', (grains / G.secs).toFixed(1));
+    lastRate = (grains / G.secs).toFixed(1);
+    d.set('grains', lastRate);
 
     // 🔴 A DEAFNESS CONTROL. `/n_run 0` pauses the node; if the level does not
     // follow, what is being heard came from somewhere else. ⚠️ AND A GRAIN
