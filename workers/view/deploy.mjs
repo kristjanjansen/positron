@@ -68,6 +68,62 @@ export function drift(before, after) {
 // building or deploying anything — which is how their refusal was proved)
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const DRY = process.argv.includes('--dry-run');
+  const STRICT = process.argv.includes('--strict');
+
+  // ── what this deploy is about to ship that nobody has committed ───────────
+  //
+  // 🔴 IT ALWAYS LISTS AND IT NEVER REFUSES, and that asymmetry is the whole
+  // design. This started as a hard gate — refuse when the tree is dirty — and
+  // the agent who had been on the receiving end of it all day priced it: they
+  // had deployed five times in ninety minutes, every one at the user's explicit
+  // instruction, every one with legitimate half-finished work in the tree. A
+  // gate would have fired on all five, so the override would have been typed
+  // five times and been muscle memory by the third.
+  //
+  // That is this repo's own rule arriving somewhere new: *"a colour scale whose
+  // normal reading is a warning has no warning left."* A refusal that fires on
+  // the normal case is not a guard, it is a keystroke — and it is worse than no
+  // guard, because it trains you straight past the once it would have mattered.
+  //
+  // ⚠️ AND THE HARM WAS NEVER THE DEPLOYING. Every one of those deploys was the
+  // right call. The harm was that the OTHER agent did not know — and what fixed
+  // that was the announcements, not anything that could have refused. So the
+  // part worth automating is the part a person cannot forget to do: enumerate,
+  // out of git rather than out of somebody's memory, exactly what is going out
+  // uncommitted. It was done by hand five times and nearly missed a file.
+  //
+  // `--strict` is for when the tree SHOULD be clean — a release, a bisect — and
+  // there the refusal means something precisely because it is not the normal
+  // answer.
+  const REPO = join(HERE, '..', '..');
+  const gitLines = (args) => {
+    const r = spawnSync('git', args, { cwd: REPO, encoding: 'utf8' });
+    return r.status === 0 ? r.stdout.split('\n').filter(Boolean) : [];
+  };
+  // Only what the BUILD reads. `workers/view/public/` is the build's own
+  // output and is always dirty after a build; listing it would bury the signal
+  // under 150 lines of the thing we just generated.
+  const SHIPPED_FROM = /^(demo|proto|timeline)\//;
+  const dirty = [
+    ...gitLines(['diff', '--name-only']),
+    ...gitLines(['diff', '--cached', '--name-only']),
+    ...gitLines(['ls-files', '--others', '--exclude-standard']),
+  ].filter((f) => SHIPPED_FROM.test(f))
+   .filter((f, i, a) => a.indexOf(f) === i)
+   .sort();
+
+  if (dirty.length) {
+    console.log(`\n⚠️  ${dirty.length} uncommitted file(s) in the tree this deploy is built from:`);
+    for (const f of dirty) console.log(`     ${f}`);
+    console.log('   They will go live. Say so to anyone else working in this checkout.');
+    if (STRICT) {
+      console.error('\nDEPLOY REFUSED — --strict, and the tree is not clean.');
+      process.exit(1);
+    }
+  } else {
+    console.log('\nworking tree clean of build inputs — this deploy is committed work only.');
+  }
+
 
   const build = spawnSync(process.execPath, [join(HERE, 'build.mjs')], { stdio: 'inherit' });
   if (build.status !== 0) {
