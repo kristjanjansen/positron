@@ -31,12 +31,16 @@
   import { mount, guard, el } from '/shell/shell.mjs';
   import { mul, modelM, perspective } from '/shell/xr-room.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
+  import { toggle as toggleFull, support as fullSupport } from '/shell/fullscreen.mjs';
 
   // ── the field ───────────────────────────────────────────────────────────
-  const TILE = 0.55;            // metres across
-  const GAP = 0.07;
-  const PITCH = TILE + GAP;
-  const COLS = 18;
+  // 🔴 THE TILE IS 4:3, WHICH IS WHY THERE IS NO GAP. A square quad showing a
+  // 4:3 thumbnail squashes every picture, and a gap was hiding that by putting
+  // a black line between two distortions. Make the quad the picture's own shape
+  // and the grid tiles EXACTLY — no gap to choose, nothing stretched, and the
+  // floor reads as one surface rather than as a spreadsheet.
+  const TILE_W = 0.56;
+  const TILE_H = TILE_W * 0.75;
   const TEX_W = 256, TEX_H = 192;
   // 🔴 A FIXED NUMBER OF TEXTURE SLOTS, AND IT IS WHY THIS DRAWS IN ONE CALL.
   // Every tile could have its own texture, and then a floor of 298 pictures is
@@ -46,20 +50,38 @@
   // 128 layers of 256x192 RGBA is ~25 MB, which a Quest has and a laptop will
   // not notice; it is also the LRU's capacity, so "how much can be on screen"
   // and "how much is kept" are one number rather than two that can disagree.
-  const LAYERS = 128;
-  const LOAD_RADIUS = 7.5;      // metres — beyond this nothing is even requested
-  const CONCURRENT = 6;         // image fetches in flight
+  const LAYERS = 192;
+  // ⚠️ TWO RADII, AND THE GAP BETWEEN THEM IS THE POINT. Tiles are REQUESTED out
+  // to LOAD_RADIUS and FADED OUT from FADE_FROM, so the edge of what has arrived
+  // is never a boundary anybody can see — reported as "edge feels jagged", and
+  // it was: a hard silhouette wherever the loader happened to have got to, which
+  // changes shape as you look around. A ragged edge that is fully transparent
+  // by the time it is reached has no shape to be ragged.
+  const LOAD_RADIUS = 11;       // metres — beyond this nothing is even requested
+  const FADE_FROM = 6.5;        // and from here it is already on its way out
+  const CONCURRENT = 8;         // image fetches in flight
 
   const d = mount({
     name: 'floor',
-    what: 'Every 1965 newsreel in the ERR archive, face up on a floor you can '
-      + 'walk over. Drag to look, W A S D to move, and click a tile to play it; '
-      + 'in a headset, point and pull the trigger. loaded is how many pictures '
-      + 'are on the floor right now and reach is how far out they have got.',
-    readout: { tiles: '', loaded: 'of 128', reach: 'm', fetching: '', fps: '', playing: '' },
+    what: 'Every 1965 newsreel in the ERR archive, face up on a disc of floor '
+      + 'you can walk over. Drag to look, arrow keys to move, and REST YOUR LOOK on '
+      + 'a tile to play it — look away and it stops. loaded is how many pictures '
+      + 'are on the floor now and reach is how far out they have got.',
+    // ⚠️ FOUR CELLS. `playing` repeated the caption under the picture, which is
+    // right there and has room for the whole title; `fetching` is a number that
+    // is 8 whenever anything is happening and 0 otherwise, which is a state and
+    // not a measurement. What is left all moves and none of it is said anywhere
+    // else on the page.
+    readout: { tiles: '', loaded: 'of 192', reach: 'm', fps: '' },
+    // ⚠️ FULLSCREEN IS THE PRIMARY, NOT VR. The floor is a picture, and what
+    // almost everybody wants from it is more of it; a headset is the second
+    // thing, for the few who have one in the room. And there is no Stop: the
+    // film stops when you look away from it, because "I have stopped looking at
+    // this" is the thing a person actually does, and a button for it is a
+    // second way to say what they already said.
     controls: [
-      { id: 'vr', label: 'Run in VR', primary: true },
-      { id: 'stop', label: 'Stop the video' },
+      { id: 'full', label: 'Fill the screen', primary: true },
+      { id: 'vr', label: 'Run in VR' },
     ],
   });
   guard(d);
@@ -130,21 +152,36 @@
   const VS = `#version 300 es
   layout(location=0) in vec2 quad;      // -0.5..0.5
   layout(location=1) in vec4 inst;      // x, z, layer, imageAlpha
-  layout(location=2) in float vidA;     // video alpha
+  layout(location=2) in vec2 aVF;       // video alpha, focus 0..1
   uniform mat4 uVP;
-  uniform float uTile;
-  out vec2 vUV; flat out float vLayer; out float vA; out float vV;
+  uniform vec2 uTile;     // width, depth — the picture's own shape, in metres
+  uniform vec2 uFocus;    // where the gaze meets the floor
+  uniform vec2 uFade;     // from, to — metres
+  out vec2 vUV; flat out float vLayer; out float vA; out float vV; out float vF;
   void main(){
-    vec3 p = vec3(inst.x + quad.x * uTile, 0.0, inst.y + quad.y * uTile);
+    vec3 p = vec3(inst.x + quad.x * uTile.x, 0.0, inst.y + quad.y * uTile.y);
     gl_Position = uVP * vec4(p, 1.0);
-    // the picture's top edge points AWAY from the origin, so the whole floor
-    // reads the same way up when you stand at the near edge and look across it
-    vUV = vec2(quad.x + 0.5, 0.5 - quad.y);
-    vLayer = inst.z; vA = inst.w; vV = vidA;
+    // 🔴 THE TOP OF THE PICTURE IS THE FAR EDGE, AND THE SIGN HERE WAS WRONG.
+    // \`quad.y\` runs along +Z, which is TOWARD a viewer looking down the floor,
+    // so \`quad.y = +0.5\` is the NEAR edge. With \`UNPACK_FLIP_Y_WEBGL\` false,
+    // texture V=0 is the first row of the JPEG — the top of the image. Mapping
+    // the near edge to V=0 therefore put the top of every picture nearest the
+    // viewer, which reads as upside down when you look ACROSS the floor, which
+    // is the only way anyone looks at it. The near edge takes V=1 instead.
+    vUV = vec2(quad.x + 0.5, quad.y + 0.5);
+    // the wide fade: 1 inside uFade.x, 0 by uFade.y, smooth between, so the
+    // outer ring dissolves into the floor instead of stopping.
+    // WARNING: no backticks in here — this is inside a JS template literal and
+    // one of them ends the shader mid-sentence. It did, and the page threw
+    // before a single assert ran.
+    float far = distance(vec2(inst.x, inst.y), uFocus);
+    vLayer = inst.z;
+    vA = inst.w * (1.0 - smoothstep(uFade.x, uFade.y, far));
+    vV = aVF.x; vF = aVF.y;
   }`;
   const FS = `#version 300 es
   precision highp float; precision highp sampler2DArray;
-  in vec2 vUV; flat in float vLayer; in float vA; in float vV;
+  in vec2 vUV; flat in float vLayer; in float vA; in float vV; in float vF;
   uniform sampler2DArray uTex;
   uniform sampler2D uVid;
   out vec4 frag;
@@ -155,6 +192,22 @@
     // out through black is two transitions where there should be one, and on a
     // floor of stills the hole reads as a tile that broke.
     vec3 c = mix(still, moving, clamp(vV, 0.0, 1.0));
+    // 🔴 THE FOCUS LIFT, WHICH IS A PROMISE RATHER THAN A HIGHLIGHT. Looking at
+    // a tile darkens it slightly and then brings it UP past its own brightness
+    // as the dwell completes, so the picture tells you something is about to
+    // happen before it happens. A ring or a border would be a second thing
+    // drawn on top; this is the picture itself answering.
+    float dip = 1.0 - 0.22 * sin(clamp(vF, 0.0, 1.0) * 3.14159);
+    float lift = 1.0 + 0.35 * clamp(vF, 0.0, 1.0) * clamp(vF, 0.0, 1.0);
+    c *= dip * lift;
+    // 🔴 ONE GREY, AND IT IS NOT A STYLE CHOICE. These are 1965 newsreels: the
+    // film is black and white and the scans are not — they carry the colour cast
+    // of whatever telecine and JPEG they went through, so a floor of them is a
+    // patchwork of slightly different browns and blues that reads as damage.
+    // Rec. 601 luma, because it is the coefficients the material was broadcast
+    // under. Applied AFTER the video mix, so a film fading in over its own still
+    // does not change colour space halfway.
+    c = vec3(dot(c, vec3(0.299, 0.587, 0.114)));
     // the still fades UP from the floor's own colour as it arrives
     frag = vec4(mix(vec3(0.055, 0.066, 0.086), c, clamp(vA, 0.0, 1.0)), 1.0);
   }`;
@@ -172,11 +225,13 @@
   // anyway because the linker happened to choose the same slots.
   gl.bindAttribLocation(prog, 0, 'quad');
   gl.bindAttribLocation(prog, 1, 'inst');
-  gl.bindAttribLocation(prog, 2, 'vidA');
+  gl.bindAttribLocation(prog, 2, 'aVF');
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
   const uVP = gl.getUniformLocation(prog, 'uVP');
   const uTile = gl.getUniformLocation(prog, 'uTile');
+  const uFocus = gl.getUniformLocation(prog, 'uFocus');
+  const uFade = gl.getUniformLocation(prog, 'uFade');
   const uTexL = gl.getUniformLocation(prog, 'uTex');
   const uVidL = gl.getUniformLocation(prog, 'uVid');
 
@@ -193,7 +248,7 @@
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(1, 1);
   gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(2, 1);
   gl.bindVertexArray(null);
 
@@ -258,7 +313,18 @@
     // Asking our own origin makes the pixels ours to upload.
     img.decoding = 'async';
     img.src = `/err-img?f=${encodeURIComponent(tiles[i].photo)}&w=${TEX_W}&h=${TEX_H}`;
-    img.onload = () => {
+    // 🔴 `decode()`, NOT `onload`. THIS IS WHY SOME TILES CAME UP BRIGHT GREEN.
+    // `onload` means the BYTES arrived; with `decoding: 'async'` the pixels may
+    // not exist yet, and `texSubImage3D` then uploads whatever is in the decode
+    // buffer — which on this machine was a flat green and, on the tile below it,
+    // half an image in scanline bands. MEASURED first that the images really are
+    // 256x192, because a size mismatch produces the same symptom and would have
+    // been the obvious suspect: they are exactly the size asked for, so the size
+    // was not it.
+    // ⚠️ AND THE MONOCHROME FILTER WOULD HAVE HIDDEN THIS. Green becomes grey,
+    // the tile stops looking broken and stays wrong. Fixed before it was added,
+    // deliberately, and in that order.
+    img.decode().then(() => {
       inflight--;
       // the tile may have lost its slot to something nearer while this was in
       // flight — uploading then would paint the wrong picture into somebody
@@ -272,15 +338,14 @@
       loadedCount = Math.min(LAYERS, loadedCount + 1);
       reach = Math.max(reach, dd);
       pump();
-    };
-    img.onerror = () => {
+    }).catch(() => {
       inflight--;
       // a miss is remembered: `photo` is cleared so the queue stops offering it
       tiles[i].photo = null;
       state[i].want = false;
       if (state[i].layer === L) { state[i].layer = -1; usedLayers.delete(L); freeLayers.push(L); }
       pump();
-    };
+    });
   }
 
   // ── the one video ───────────────────────────────────────────────────────
@@ -303,7 +368,6 @@
     if (playing === i) return;
     stopVideo(false);
     playing = i;
-    d.set('playing', tiles[i].title.slice(0, 18));
     try {
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(tiles[i].slug)}`);
       const j = await r.json();
@@ -339,7 +403,7 @@
     try { video.pause(); } catch { /* nothing loaded */ }
     video.removeAttribute('src'); video.load();
     vidReady = false;
-    if (clear) { playing = -1; d.set('playing', ''); }
+    if (clear) playing = -1;
   }
 
   // ── picking ─────────────────────────────────────────────────────────────
@@ -353,16 +417,23 @@
     if (dir[1] >= -1e-4) return -1;
     const t = -o[1] / dir[1];
     const px = o[0] + dir[0] * t, pz = o[2] + dir[2] * t;
-    let best = -1, bestD = TILE * 0.72;
+    // ⚠️ THE TILE IS NOT SQUARE ANY MORE, so a single half-extent would pick a
+    // tile you are not over on one axis and miss one you are on the other.
+    let best = -1, bestD = Infinity;
     for (let i = 0; i < state.length; i++) {
-      if (state[i].layer < 0) continue;
-      const dd = Math.max(Math.abs(state[i].x - px), Math.abs(state[i].z - pz));
-      if (dd < bestD) { bestD = dd; best = i; }
+      if (state[i].layer < 0 || state[i].a < 0.05) continue;   // nothing invisible
+      const dx = Math.abs(state[i].x - px) / (TILE_W / 2);
+      const dz = Math.abs(state[i].z - pz) / (TILE_H / 2);
+      const dd = Math.max(dx, dz);
+      if (dd <= 1 && dd < bestD) { bestD = dd; best = i; }
     }
     return best;
   }
 
-  let hover = -1;
+  // ⚠️ 900 ms TO COMMIT, 2.5 s TO LET GO. The asymmetry is the whole design;
+  // see the dwell block in `step()`.
+  const DWELL_MS = 900, AWAY_MS = 2500;
+  let hover = -1, dwell = 0, away = 0;
   function setHover(i) {
     if (i === hover) return;
     hover = i;
@@ -386,8 +457,13 @@
     setHover(pickFloor(eye, rayThrough(ndx, ndy)));
     if (!dragging) return;
     moved += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
-    yaw += (e.clientX - lastX) * 0.004;
-    pitch = Math.max(-1.45, Math.min(0.5, pitch - (e.clientY - lastY) * 0.004));
+    // ⚠️ DRAG THE FLOOR, NOT THE CAMERA — both signs inverted from the first
+    // version. The cursor is a grabbing hand, so the thing under it should
+    // follow the hand: drag right and the floor goes right, which turns the
+    // view LEFT. Moving the camera with the drag is the opposite of what the
+    // cursor promises, and it is the sort of wrong only findable by using it.
+    yaw -= (e.clientX - lastX) * 0.004;
+    pitch = Math.max(-1.45, Math.min(0.5, pitch + (e.clientY - lastY) * 0.004));
     lastX = e.clientX; lastY = e.clientY;
   });
   wrap.addEventListener('pointerup', (e) => {
@@ -397,7 +473,14 @@
     if (moved < 6 && hover >= 0) playTile(hover);
     try { wrap.releasePointerCapture(e.pointerId); } catch { /* gone */ }
   });
-  addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
+  // ⚠️ AND THE ARROWS STOP SCROLLING THE PAGE. A floor you walk with the arrow
+  // keys, inside a document that scrolls with the arrow keys, means every step
+  // forward also scrolls the picture off the screen.
+  addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k.startsWith('arrow')) e.preventDefault();
+    keys.add(k);
+  }, { passive: false });
   addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
   let projM = perspective(1.05, 16 / 9, 0.05, 60);
@@ -428,14 +511,36 @@
   let lastT = performance.now(), fpsAcc = 0, fpsN = 0, frames = 0;
   function step(dt) {
     // walking
+    // ⚠️ ARROW KEYS, AND ONLY ARROW KEYS. W A S D is a convention you have to
+    // already know; arrows are on the key caps. This page is a floor of archive
+    // film, not a game, and its visitor is somebody who wanted to look at 1965.
     const sp = 2.6 * dt;
     const f = look(), r = norm(cross(f, [0, 1, 0]));
-    if (keys.has('w')) { eye[0] += f[0] * sp; eye[2] += f[2] * sp; }
-    if (keys.has('s')) { eye[0] -= f[0] * sp; eye[2] -= f[2] * sp; }
-    if (keys.has('a')) { eye[0] -= r[0] * sp; eye[2] -= r[2] * sp; }
-    if (keys.has('d')) { eye[0] += r[0] * sp; eye[2] += r[2] * sp; }
+    if (keys.has('arrowup')) { eye[0] += f[0] * sp; eye[2] += f[2] * sp; }
+    if (keys.has('arrowdown')) { eye[0] -= f[0] * sp; eye[2] -= f[2] * sp; }
+    if (keys.has('arrowleft')) { eye[0] -= r[0] * sp; eye[2] -= r[2] * sp; }
+    if (keys.has('arrowright')) { eye[0] += r[0] * sp; eye[2] += r[2] * sp; }
     gaze = gazePoint();
     pump();
+
+    // ── the dwell ──────────────────────────────────────────────────────
+    //
+    // 🔴 LOOKING AT SOMETHING IS THE ONLY INPUT A HEADSET ALWAYS HAS, so it is
+    // the one this page is built on and the mouse borrows it. Hold your look on
+    // a tile and it plays; look away and it stops. A click still works and is
+    // just an impatient dwell.
+    // ⚠️ THE LOOK-AWAY IS SLOWER THAN THE LOOK-AT, deliberately and by a lot.
+    // Gaze wanders — a tracker jitters, a head drifts, a pointer crosses a tile
+    // on its way somewhere — and a symmetric timer makes a film that starts and
+    // stops while you are trying to watch it. Slow to commit, much slower to
+    // let go.
+    if (hover >= 0 && hover !== playing) dwell = Math.min(DWELL_MS, dwell + dt * 1000);
+    else if (hover !== playing) dwell = Math.max(0, dwell - dt * 1400);
+    if (dwell >= DWELL_MS && hover >= 0 && hover !== playing) { dwell = 0; playTile(hover); }
+    if (playing >= 0) {
+      away = (hover === playing) ? 0 : away + dt * 1000;
+      if (away > AWAY_MS) { d.log('looked away — stopped', 'hi'); stopVideo(true); away = 0; }
+    } else away = 0;
 
     // the fades, per tile, every frame — an image eases up when it lands and a
     // video eases over the still it replaces
@@ -450,6 +555,9 @@
       const s = state[i];
       s.a = ease(s.a, (s.img && s.layer >= 0) ? 1 : 0);
       s.v = ease(s.v, (i === playing && vidReady) ? 1 : 0);
+      // the focus lift follows the dwell, and drops the moment it plays
+      s.f = ease(s.f, (i === hover && i !== playing) ? dwell / DWELL_MS : 0);
+      if (s.f < 0.002) s.f = 0;
       if (s.v < 0.002) s.v = 0;
       if (s.a < 0.002) s.a = 0;
       if (s.a > 0.998) s.a = 1;
@@ -458,20 +566,20 @@
 
   function upload() {
     const n = state.length;
-    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n); }
+    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n * 2); }
     let drawn = 0;
     for (let i = 0; i < n; i++) {
       const s = state[i];
       if (s.layer < 0 || s.a < 0.002) continue;
       const o = drawn * 4;
       instData[o] = s.x; instData[o + 1] = s.z; instData[o + 2] = s.layer; instData[o + 3] = s.a;
-      vidData[drawn] = s.v;
+      vidData[drawn * 2] = s.v; vidData[drawn * 2 + 1] = s.f;
       drawn++;
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
     gl.bufferData(gl.ARRAY_BUFFER, instData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn), gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn * 2), gl.DYNAMIC_DRAW);
     return drawn;
   }
 
@@ -490,7 +598,9 @@
     }
     gl.useProgram(prog);
     gl.uniformMatrix4fv(uVP, false, vp);
-    gl.uniform1f(uTile, TILE);
+    gl.uniform2f(uTile, TILE_W, TILE_H);
+    gl.uniform2f(uFocus, gaze[0], gaze[1]);
+    gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
     gl.bindVertexArray(vao);
@@ -510,10 +620,9 @@
     if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
     projM = perspective(1.05, W / H, 0.05, 60);
     draw(mul(projM, viewM()), W, H);
-    d.set('loaded', loadedCount);
+    d.set('loaded', usedLayers.size);
     d.set('reach', reach.toFixed(1));
-    d.set('fetching', inflight);
-    if (!xrSession) requestAnimationFrame(frame);
+      if (!xrSession) requestAnimationFrame(frame);
   }
 
   // ── VR ──────────────────────────────────────────────────────────────────
@@ -544,7 +653,11 @@
       session.requestAnimationFrame(xrFrame);
     } catch (e) { d.log(`VR did not start: ${e.message}`, 'bad'); }
   });
-  d.on('stop', () => { stopVideo(true); d.log('stopped'); });
+  d.on('full', async () => {
+    if (fullSupport() === 'none') { d.log('this browser has no way to fill the screen', 'bad'); return; }
+    const how = await toggleFull(wrap);
+    d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
+  });
 
   function onSelect(ev) {
     const pose = xrFramePose && ev.frame?.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
@@ -575,6 +688,9 @@
     // loading order is supposed to follow
     const hd = norm([-head[8], -head[9], -head[10]]);
     yaw = Math.atan2(hd[0], -hd[2]); pitch = Math.asin(Math.max(-1, Math.min(1, hd[1])));
+    // in a headset the gaze IS the input, so the hover is taken from the head
+    // every frame rather than from a pointer that does not exist
+    setHover(pickFloor([eye[0], eye[1], eye[2]], hd));
     step(dt);
     frames++;
     let first = true;
@@ -604,7 +720,9 @@
       }
       gl.useProgram(prog);
       gl.uniformMatrix4fv(uVP, false, mul(view.projectionMatrix, view.transform.inverse.matrix));
-      gl.uniform1f(uTile, TILE);
+      gl.uniform2f(uTile, TILE_W, TILE_H);
+      gl.uniform2f(uFocus, gaze[0], gaze[1]);
+      gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex); gl.uniform1i(uTexL, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, vidTex); gl.uniform1i(uVidL, 1);
       gl.bindVertexArray(vao);
@@ -616,14 +734,40 @@
   // ── go ──────────────────────────────────────────────────────────────────
   const doc = await (await fetch('/floor/tiles.json')).json();
   tiles = doc.tiles;
-  const rows = Math.ceil(tiles.length / COLS);
-  for (let i = 0; i < tiles.length; i++) {
-    const c = i % COLS, r = Math.floor(i / COLS);
-    state.push({
-      x: (c - (COLS - 1) / 2) * PITCH,
-      z: (r - (rows - 1) / 2) * PITCH,
-      layer: -1, a: 0, v: 0, want: false, img: false,
-    });
+  // ── a DISC on the grid, not a rectangle ────────────────────────────────
+  //
+  // 🔴 SAME LATTICE, DIFFERENT OUTLINE. The tiles still sit on the regular
+  // 4:3 grid — they have to, or they stop tiling and the gaps come back — but
+  // the field they fill is a circle. A rectangle has four corners that are
+  // further away than anything else on the floor and it has a long edge you
+  // meet head-on; a disc is the same distance away in every direction, which
+  // is what a page that loads outward from where you are looking should stand
+  // on. The corner tiles were also the ones that never loaded.
+  //
+  // ⚠️ THE RADIUS IS IN METRES, NOT IN CELLS. The cell is 0.56 x 0.42, so
+  // counting cells would draw an ellipse and call it a circle — squashed in the
+  // axis with the shorter pitch, and nobody would be able to say why.
+  //
+  // Sorted by distance from the middle, so the catalogue fills outward: the
+  // start of 1965 is at your feet and December is at the rim.
+  {
+    const span = Math.ceil(Math.sqrt(tiles.length)) + 6;
+    const spots = [];
+    for (let c = -span; c <= span; c++) {
+      for (let r = -Math.ceil(span * (TILE_W / TILE_H)); r <= Math.ceil(span * (TILE_W / TILE_H)); r++) {
+        const x = c * TILE_W, z = r * TILE_H;
+        spots.push({ x, z, rad: Math.hypot(x, z) });
+      }
+    }
+    // ⚠️ A STABLE TIE-BREAK. Two spots at the same radius are common on a
+    // lattice — every mirror image of one — and without a second key the order
+    // is whatever the sort happens to do, so the same catalogue lands in a
+    // different arrangement between two runs of the same page.
+    spots.sort((a, b) => a.rad - b.rad || a.x - b.x || a.z - b.z);
+    for (let i = 0; i < tiles.length; i++) {
+      state.push({ x: spots[i].x, z: spots[i].z,
+        layer: -1, a: 0, v: 0, f: 0, want: false, img: false });
+    }
   }
   d.set('tiles', tiles.length);
   requestAnimationFrame(frame);
@@ -659,7 +803,7 @@
     d.assert('the first frames left no GL error', e === 0, `gl ${e}`);
   }
 
-  d.log(`${tiles.length} films on the floor — drag to look, W A S D to walk, click to play`, 'hi');
+  d.log(`${tiles.length} films on the floor — drag to look, arrows to walk, rest your look to play`, 'hi');
   d.ready();
 </script>
 </html>
