@@ -66,6 +66,7 @@
   import { mul, perspective } from '/shell/xr-room.mjs';
   import { createXRRay, rayCheck, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
+  import { createProjector } from '/shell/projector.mjs';
   import { toggle as toggleFull, exit as exitFull, watch as watchFull,
     support as fullSupport } from '/shell/fullscreen.mjs';
 
@@ -286,14 +287,35 @@
   const VS = `#version 300 es
   layout(location=0) in vec2 quad;      // -0.5..0.5
   layout(location=1) in vec4 inst;      // x, z, layer, imageAlpha
-  layout(location=2) in vec3 aVF;       // video alpha, aim, chosen — all 0..1
+  layout(location=2) in vec4 aVF;       // video alpha, aim, chosen, risen — 0..1
   uniform mat4 uVP;
   uniform vec2 uTile;     // width, depth — the picture's own shape, in metres
   uniform vec2 uEye;      // where YOU are on the floor — see the LRU, above
   uniform vec2 uFade;     // from, to — metres
+  uniform vec3 uScreenC;  // where a risen tile stands, in metres
+  uniform vec3 uScreenR;  // its right axis — the viewer's right, so it faces you
+  uniform vec2 uScreenSize;
   out vec2 vUV; flat out float vLayer; out float vA; out float vV; out float vF; out float vC;
   void main(){
-    vec3 p = vec3(inst.x + quad.x * uTile.x, 0.0, inst.y + quad.y * uTile.y);
+    vec3 onFloor = vec3(inst.x + quad.x * uTile.x, 0.0, inst.y + quad.y * uTile.y);
+    // 🔴 THE SCREEN'S UP AXIS IS WORLD *DOWN*, AND THAT IS NOT A TYPO. On the
+    // floor quad.y runs along +Z and the picture's TOP sits at quad.y = -0.5 —
+    // the far edge — because V=0 is the first row of the JPEG. Standing the same
+    // quad up with an up axis of +Y would put quad.y = +0.5 at the top of the
+    // screen, which is the BOTTOM of the picture: upside down. Pointing the up
+    // axis at world down maps the picture's top to the screen's top and needs no
+    // second set of texture coordinates and no branch.
+    vec3 asScreen = uScreenC
+      + uScreenR * (quad.x * uScreenSize.x)
+      + vec3(0.0, -1.0, 0.0) * (quad.y * uScreenSize.y);
+    // ⚠️ CORNER INTERPOLATION, NOT A ROTATION MATRIX. Lerping the four corners
+    // never has a degenerate frame; building a basis with normalize(mix(a, b))
+    // is NaN the moment the two directions are opposite, which here is simply
+    // "the tile is behind you", i.e. half the floor.
+    float r = smoothstep(0.0, 1.0, clamp(aVF.w, 0.0, 1.0));
+    vec3 p = mix(onFloor, asScreen, r);
+    // it lifts before it flies: a straight line between the two reads as sliding
+    p.y += 0.55 * r * (1.0 - r);
     gl_Position = uVP * vec4(p, 1.0);
     // 🔴 THE TOP OF THE PICTURE IS THE FAR EDGE, AND THE SIGN HERE WAS WRONG.
     // \`quad.y\` runs along +Z, which is TOWARD a viewer looking down the floor,
@@ -305,6 +327,10 @@
     vUV = vec2(quad.x + 0.5, quad.y + 0.5);
     // the wide fade: 1 inside uFade.x, 0 by uFade.y, smooth between, so the
     // outer ring dissolves into the floor instead of stopping.
+    // ⚠️ MEASURED FROM WHERE IT LIES, NOT FROM WHERE IT IS DRAWN. A risen tile is
+    // a few metres in front of your face; its distance from the eye is what says
+    // how visible the FLOOR is there, and a screen must not fade because the
+    // patch of floor it came from is far away.
     // WARNING: no backticks in here — this is inside a JS template literal and
     // one of them ends the shader mid-sentence. It did, and the page threw
     // before a single assert ran.
@@ -312,6 +338,8 @@
     vLayer = inst.z;
     vA = inst.w * (1.0 - smoothstep(uFade.x, uFade.y, far));
     vV = aVF.x; vF = aVF.y; vC = aVF.z;
+    // a tile on its way up is never faded out by distance — see above
+    vA = max(vA, r);
   }`;
   const FS = `#version 300 es
   precision highp float; precision highp sampler2DArray;
@@ -425,6 +453,9 @@
   const uTile = gl.getUniformLocation(prog, 'uTile');
   const uEye = gl.getUniformLocation(prog, 'uEye');
   const uFade = gl.getUniformLocation(prog, 'uFade');
+  const uScreenC = gl.getUniformLocation(prog, 'uScreenC');
+  const uScreenR = gl.getUniformLocation(prog, 'uScreenR');
+  const uScreenSize = gl.getUniformLocation(prog, 'uScreenSize');
   const uCrop = gl.getUniformLocation(prog, 'uCrop');
   const uDim = gl.getUniformLocation(prog, 'uDim');
   const uFloor = gl.getUniformLocation(prog, 'uFloor');
@@ -444,7 +475,7 @@
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(1, 1);
   gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(2, 1);
   gl.bindVertexArray(null);
 
@@ -586,67 +617,138 @@
     });
   }
 
-  // ── a hum, while a film is actually running ─────────────────────────────
+  // ── a tile that stands up and becomes a screen ─────────────────────────
   //
-  // 🔴 GATED ON THE PICTURE, NOT ON THE INTENT — WHICH IS THE WHOLE POINT AND IS
-  // WHY THE LAST ONE WAS WORSE THAN NOTHING. The projector that used to live
-  // here came up during the DWELL, on somebody ASKING for a film, so it sounded
-  // exactly the same whether or not one ever played. For five rounds of "no
-  // playback" this page made a noise like a working page while showing no film
-  // at all — feedback wired to the input instead of to the outcome. This starts
-  // when a frame has decoded and stops when the film does, so if you hear it
-  // there is a picture, and if there is a picture you hear it.
+  // 🔴 THE HOLE IS NOT DRAWN, IT IS WHAT IS LEFT. The tiles meet exactly, so a
+  // tile that has gone somewhere else simply is not there and the floor's own
+  // colour shows through the gap. Nothing draws a hole, nothing has to know the
+  // shape of one, and it can never disagree with where the tile actually went.
   //
-  // ⚠️ AND THE FADE IS SCHEDULED ON THE AUDIO CLOCK, NOT EASED IN THE RENDER
-  // LOOP. The old one moved its gain a frame at a time: hide the tab, rAF stops,
-  // the gain freezes wherever it got to and the sound goes on for ever. A ramp
-  // handed to an AudioParam finishes whether or not anything is drawing.
-  //
-  // ⚠️ NO PANNER, NO POSITION. Asked for as a test, and a plain hum is the
-  // smaller claim: the last one said it came "from the tile that is playing",
-  // which is a thing to get right on top of a thing that did not work yet.
-  const HUM_GAIN = 0.06;
-  /** The graph, on any context — a real one here, an offline one in the check. */
-  function buildHum(ctx) {
-    const out = ctx.createGain();
-    out.gain.value = 0;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 260;
-    // 50 Hz because this is Estonian mains under Estonian film, and two partials
-    // a little off the exact harmonics so they beat slowly instead of fusing
-    // into one flat tone — which is what a machine with a belt on it does
-    for (const [f, g] of [[50, 1], [100.7, 0.45], [151.3, 0.16]]) {
-      const o = ctx.createOscillator();
-      o.type = 'sine'; o.frequency.value = f;
-      const gg = ctx.createGain(); gg.gain.value = g;
-      o.connect(gg).connect(lp); o.start();
-    }
-    lp.connect(out);
-    return out;
+  // ⚠️ THE ANCHOR IS TAKEN ONCE, WHEN IT STARTS TO RISE, AND THEN HELD. A screen
+  // that follows your head is the reason people take headsets off; a screen that
+  // stands somewhere is a thing in a room you can walk round and look away from.
+  // What DOES follow you is which way it faces — it turns about its own vertical
+  // axis so the picture is always square to you, which is what a screen is for.
+  const SCREEN_DIST = 3.4;      // metres in front of where you were looking
+  const SCREEN_Y = 1.45;        // its middle, a little below standing eye height
+  const SCREEN_W = 3.6, SCREEN_H = SCREEN_W * 0.75;   // the picture's own 4:3
+  const RISE_RATE = 1.3;        // about three quarters of a second, both ways
+  let screenAt = [0, SCREEN_Y, 0], screenRight = [1, 0, 0];
+  /** Where a screen should stand for somebody at `e` looking along `f`.
+   *  Pure, so the placement can be graded without a browser. */
+  function screenSpot(e, f) {
+    const h = Math.hypot(f[0], f[2]) || 1;           // the horizontal of the look
+    return [e[0] + (f[0] / h) * SCREEN_DIST, SCREEN_Y, e[2] + (f[2] / h) * SCREEN_DIST];
   }
-  let actx = null, humGain = null, humOn = false;
+  /** ...and which way it must face to be square to somebody at `e`.
+   *  ⚠️ HORIZONTAL ONLY. Tilting a screen toward a viewer who is looking down at
+   *  a floor would stand it at an angle that reads as a dropped picture. */
+  function screenFacing(c, e) {
+    const dx = e[0] - c[0], dz = e[2] - c[2];
+    const L = Math.hypot(dx, dz) || 1;
+    // right = up x toEye, which puts the picture's left on the viewer's left
+    return [-dz / L, 0, dx / L];
+  }
+
+  // ── the projector, where the film is ───────────────────────────────────
+  //
+  // 🔴 GATED ON THE PICTURE, NOT ON THE INTENT — AND THAT IS THE ONE THING THAT
+  // CHANGED SINCE THIS PAGE LAST HAD ONE. The first projector came up during the
+  // DWELL, on somebody ASKING for a film, so it sounded exactly the same whether
+  // one ever played. For five rounds of "no playback" this page made the noise
+  // of a working page while showing no film at all — feedback wired to the input
+  // instead of to the outcome, which is the most expensive kind because it
+  // actively argues that the broken thing works. It starts on a DECODED FRAME
+  // now. If you hear it there is a picture.
+  //
+  // 🔴 IT COMES FROM THE TILE. A projector in stereo in front of you is a
+  // soundtrack; one coming from the square of floor that is running is a machine
+  // in a room, and the whole point of putting an archive on a floor is that it is
+  // somewhere rather than on a screen. HRTF, a listener that follows the camera,
+  // and a source at the playing tile's own metres — which works unchanged in a
+  // headset, where the camera is your head.
+  //
+  // ⚠️ HALVED AGAIN — 0.125, from 0.25. It is a room a film is playing in, not a
+  // film about a projector: the thing you should notice is when it STOPS.
+  //
+  // ⚠️ AND THE RAMP IS SET ONCE PER STATE CHANGE, ON THE AUDIO CLOCK. The old one
+  // eased its gain a frame at a time; hide the tab, rAF stops, the gain freezes
+  // wherever it got to and the scheduler carries on putting clatters out for
+  // ever. A ramp handed to an AudioParam finishes whether or not anything draws.
+  // Slow up and quick down, because a projector spinning up is a thing you want
+  // to hear arrive and one still running after you stopped it is a thing that
+  // will not take the hint.
+  const PROJ_GAIN = 0.125, PROJ_UP = 1.2, PROJ_DOWN = 0.25;
+  let actx = null, projector = null, panner = null, soundOn = false;
   /** Built on a real gesture. An AudioContext made at load starts suspended and
-   *  `resume()` in a real browser neither resolves NOR rejects until somebody
-   *  has touched the page — awaiting one is a hang, not an error. */
-  function humWake() {
+   *  `resume()` in a real browser neither resolves NOR rejects until somebody has
+   *  touched the page — awaiting one is a hang, not an error. */
+  function soundWake() {
     if (actx) return;
     try {
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-      humGain = buildHum(actx);
-      humGain.connect(actx.destination);
+      actx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      panner = actx.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      // ⚠️ A REFERENCE DISTANCE IN THE SAME UNITS AS THE FLOOR. The tiles are laid
+      // out in metres, so these are metres; a default of 1 with a rolloff of 1
+      // makes a projector two tiles away almost inaudible, which is not what a
+      // room sounds like.
+      panner.refDistance = 1.8;
+      panner.rolloffFactor = 0.7;
+      panner.maxDistance = 40;
+      panner.connect(actx.destination);
+      projector = createProjector(actx);
+      projector.node.connect(panner);
     } catch { actx = null; return; }
     actx.resume().catch(() => {});         // NOT awaited — see above
   }
-  function hum(on) {
-    if (on === humOn) return;
-    humOn = on;
-    if (!actx) { if (!on) return; humWake(); }
-    if (!actx) return;
-    if (on && actx.state === 'suspended') actx.resume().catch(() => {});
-    const t = actx.currentTime;
-    humGain.gain.cancelScheduledValues(t);
-    humGain.gain.setValueAtTime(humGain.gain.value, t);
-    humGain.gain.linearRampToValueAtTime(on ? HUM_GAIN : 0, t + (on ? 0.5 : 0.15));
+  /** On when a frame has decoded, off when the film stops. Nothing else. */
+  function sound(on) {
+    if (on === soundOn) return;
+    soundOn = on;
+    if (!actx) { if (!on) return; soundWake(); }
+    if (!actx || !projector) return;
+    if (on) {
+      if (actx.state === 'suspended') actx.resume().catch(() => {});
+      projector.start();
+      projector.setGain(PROJ_GAIN, PROJ_UP);
+    } else {
+      // ⚠️ THREE LEVELS, because any one of them alone leaves something running:
+      // the gain, the clatter scheduler, and the context itself.
+      projector.setGain(0, PROJ_DOWN);
+      setTimeout(() => {
+        if (soundOn) return;                 // it started again while we were waiting
+        projector.stop();
+        if (actx.state === 'running') actx.suspend().catch(() => {});
+      }, PROJ_DOWN * 1000 + 60);
+    }
+  }
+  /** Put the listener where the camera is and the machine where the film is.
+   *  Called every frame in both the window and the headset — a POSITION may be
+   *  driven from the render loop, because a frozen position is silent about
+   *  nothing; it is a FADE that must never depend on drawing. */
+  function placeSound() {
+    if (!actx || !panner) return;
+    const f = look();
+    const L = actx.listener;
+    // ⚠️ TWO APIS, AND THE OLD ONE IS NOT DEAD. `positionX` and friends are
+    // AudioParams and the modern path; Firefox still ships only the deprecated
+    // setter, and a page that uses one and not the other is silent on half the
+    // browsers there are. Both, with the AudioParam preferred.
+    if (L.positionX) {
+      L.positionX.value = eye[0]; L.positionY.value = eye[1]; L.positionZ.value = eye[2];
+      L.forwardX.value = f[0]; L.forwardY.value = f[1]; L.forwardZ.value = f[2];
+      L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0;
+    } else if (L.setPosition) {
+      L.setPosition(eye[0], eye[1], eye[2]);
+      L.setOrientation(f[0], f[1], f[2], 0, 1, 0);
+    }
+    if (playing < 0) return;
+    const x = state[playing].x, z = state[playing].z;
+    if (panner.positionX) {
+      panner.positionX.value = x; panner.positionY.value = 0; panner.positionZ.value = z;
+    } else if (panner.setPosition) panner.setPosition(x, 0, z);
   }
 
   // ── the one video ───────────────────────────────────────────────────────
@@ -703,6 +805,7 @@
     leaveTile(state, playing, i);
     stopVideo(false);
     playing = i;
+    screenAt = screenSpot(eye, look());
     try {
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(film.slug)}`);
       const j = await r.json();
@@ -745,7 +848,7 @@
     try { video.pause(); } catch { /* nothing loaded */ }
     video.removeAttribute('src'); video.load();
     vidReady = false;
-    hum(false);
+    sound(false);
     if (clear) playing = -1;
   }
 
@@ -963,7 +1066,7 @@
   let dragging = false, lastX = 0, lastY = 0, moved = 0;
   const keys = new Set();
   wrap.addEventListener('pointerdown', (e) => {
-    humWake();                     // a gesture, taken where somebody makes one
+    soundWake();                     // a gesture, taken where somebody makes one
     dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
     // 🔴 A FINGER HAS NO HOVER, AND WITHOUT THIS A PHONE COULD NEVER PLAY
     // ANYTHING. `pointermove` is where the tile under the pointer is chosen,
@@ -1068,6 +1171,8 @@
     }
     gaze = gazePoint();
     rewrap();
+    screenRight = screenFacing(screenAt, eye);
+    placeSound();
     pump();
 
     // ── the dwell ──────────────────────────────────────────────────────
@@ -1137,6 +1242,11 @@
       s.f = ease(s.f, (i === hover) ? 1 : 0, FOCUS_RATE);
       s.c = ease(s.c, (i === playing) ? 1 : 0, FOCUS_RATE);
       if (s.c < 0.002) s.c = 0;
+      // ⚠️ ITS OWN RATE, MUCH SLOWER THAN THE OTHERS. `c` is a lighting decision
+      // and wants to be immediate; this is a three-metre journey and at
+      // FOCUS_RATE it would be a teleport with two frames of blur in it.
+      s.r = ease(s.r, (i === playing) ? 1 : 0, RISE_RATE);
+      if (s.r < 0.002) s.r = 0;
       if (s.f < 0.002) s.f = 0;
       if (s.v < 0.002) s.v = 0;
       if (s.a < 0.002) s.a = 0;
@@ -1146,20 +1256,21 @@
 
   function upload() {
     const n = state.length;
-    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n * 3); }
+    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n * 4); }
     let drawn = 0;
     for (let i = 0; i < n; i++) {
       const s = state[i];
       if (s.layer < 0 || s.a < 0.002) continue;
       const o = drawn * 4;
       instData[o] = s.x; instData[o + 1] = s.z; instData[o + 2] = s.layer; instData[o + 3] = s.a;
-      vidData[drawn * 3] = s.v; vidData[drawn * 3 + 1] = s.f; vidData[drawn * 3 + 2] = s.c;
+      const o2 = drawn * 4;
+      vidData[o2] = s.v; vidData[o2 + 1] = s.f; vidData[o2 + 2] = s.c; vidData[o2 + 3] = s.r;
       drawn++;
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
     gl.bufferData(gl.ARRAY_BUFFER, instData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn * 3), gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
     return drawn;
   }
 
@@ -1174,7 +1285,7 @@
       gl.bindTexture(gl.TEXTURE_2D, vidTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-      if (!vidReady) { measureVideoCrop(); hum(true); }
+      if (!vidReady) { measureVideoCrop(); sound(true); }
       vidReady = true;
     }
     gl.useProgram(prog);
@@ -1182,6 +1293,9 @@
     gl.uniform2f(uTile, TILE_W, TILE_H);
     gl.uniform2f(uEye, eye[0], eye[2]);
     gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
+      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
+      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
+      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
     gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
     gl.uniform1f(uDim, dimAmt);
     gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1344,7 +1458,7 @@
   function onSelect(ev) {
     const pose = xrFramePose && ev.frame?.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
     if (!pose) return;
-    humWake();                     // a trigger pull is a gesture too
+    soundWake();                     // a trigger pull is a gesture too
     const m = pose.transform.matrix;
     const hit = rayWorld(m);
     if (!hit) return;
@@ -1497,7 +1611,7 @@
       if (playing >= 0 && video.readyState >= 2 && video.videoWidth) {
         gl.bindTexture(gl.TEXTURE_2D, vidTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-        if (!vidReady) { measureVideoCrop(); hum(true); }
+        if (!vidReady) { measureVideoCrop(); sound(true); }
         vidReady = true;
       }
       gl.useProgram(prog);
@@ -1515,6 +1629,9 @@
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uEye, eye[0], eye[2]);
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
+      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
+      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
+      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
       gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
       gl.uniform1f(uDim, dimAmt);
       gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1575,7 +1692,7 @@
       bz: (r - (ROWS - 1) / 2) * TILE_H,
       x: 0, z: 0,
       film: i % tiles.length,
-      layer: -1, a: 0, v: 0, f: 0, c: 0, want: false, img: false,
+      layer: -1, a: 0, v: 0, f: 0, c: 0, r: 0, want: false, img: false,
     });
   }
   /** Move every tile to the copy of itself nearest YOU.
@@ -1695,6 +1812,9 @@
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uEye, 0, 0);             // on top of it, so the far fade is 1
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
+      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
+      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
+      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
       gl.uniform4f(uCrop, 0, 0, 0, 0);      // the whole grey, uncropped
       gl.uniform1f(uDim, dim);
       gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1703,7 +1823,7 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1]), gl.DYNAMIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, aim, chosen]), gl.DYNAMIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, aim, chosen, 0]), gl.DYNAMIC_DRAW);
       gl.bindVertexArray(vao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, 1);
       gl.bindVertexArray(null);
@@ -1903,6 +2023,36 @@
       `down in ${down} ms, back up in ${up} ms`);
   }
 
+  // 🔴 WHERE A SCREEN STANDS, AS ARITHMETIC. The rise itself is a vertex shader
+  // interpolating four corners and there is no honest way to grade how it LOOKS
+  // from here — but where it ends up and which way it faces are two pure
+  // functions, and those are the parts that can be wrong in a way nobody
+  // notices: a screen four metres behind you is still a screen.
+  {
+    const e = [2, 1.65, -3];
+    const f = [0.6, -0.5, -0.62];                 // looking down and off-axis
+    const c = screenSpot(e, f);
+    const flat = Math.hypot(c[0] - e[0], c[2] - e[2]);
+    // in FRONT: the horizontal of the look and the horizontal of the offset agree
+    const ahead = (c[0] - e[0]) * f[0] + (c[2] - e[2]) * f[2];
+    d.assert('a screen stands in front of you, upright, at arm-and-a-bit',
+      Math.abs(flat - SCREEN_DIST) < 1e-6 && Math.abs(c[1] - SCREEN_Y) < 1e-6 && ahead > 0,
+      `${flat.toFixed(2)} m away at ${c[1].toFixed(2)} m, and in front`);
+
+    // ⚠️ THE FACING IS CHECKED AS PERPENDICULARITY, not by comparing it to a
+    // second formula. A right axis that is unit, level, and square to the line
+    // from the screen to your eye is the whole of "the picture faces you"; a
+    // sign error would leave all three true and mirror the film, which is why
+    // the shader's V flip is argued out in a comment there rather than here.
+    const r = screenFacing(c, e);
+    const toEye = [e[0] - c[0], 0, e[2] - c[2]];
+    const L = Math.hypot(toEye[0], toEye[2]);
+    const dot = (r[0] * toEye[0] + r[2] * toEye[2]) / L;
+    d.assert('...and it turns to face you, level',
+      Math.abs(Math.hypot(r[0], r[1], r[2]) - 1) < 1e-6 && r[1] === 0 && Math.abs(dot) < 1e-6,
+      `right axis unit, y ${r[1]}, square to your eye to ${Math.abs(dot).toExponential(0)}`);
+  }
+
   // 🔴 A CLICK PLAYS A FILM, DRIVEN THROUGH THE PAGE'S OWN HANDLERS, END TO END.
   // "No playback" was reported FIVE TIMES and every assert on this page was
   // about a shader, a matrix, a filter or a dwell — so five rounds of fixes went
@@ -1935,7 +2085,7 @@
       await new Promise((res) => setTimeout(res, 100));
     }
     const t = video.currentTime;
-    const humWhilePlaying = humOn;
+    const soundWhilePlaying = soundOn;
     d.assert('...and the picture advances', video.readyState >= 2 && t > 0.5,
       `readyState ${video.readyState}, ${t.toFixed(2)} s in, ${video.videoWidth} px wide`
       + (video.error ? `, error ${video.error.code}` : ''));
@@ -1947,45 +2097,60 @@
     // A noise that can be on while nothing is playing is not feedback, it is
     // decoration that lies. Both directions, because only one of them is the
     // failure that already happened.
-    d.assert('the hum is on while a film runs and off when it stops',
-      humWhilePlaying === true && humOn === false,
-      `${humWhilePlaying ? 'on' : 'off'} with a picture, `
-      + `${humOn ? 'on' : 'off'} without one`);
+    d.assert('the projector is on while a film runs and off when it stops',
+      soundWhilePlaying === true && soundOn === false,
+      `${soundWhilePlaying ? 'on' : 'off'} with a picture, `
+      + `${soundOn ? 'on' : 'off'} without one`);
   }
 
-  // 🔴 THE HUM, GRADED OFFLINE — NO GESTURE, NO SPEAKERS, NO WAITING. An
+  // 🔴 THE PROJECTOR, GRADED OFFLINE — NO GESTURE, NO SPEAKERS, NO WAITING. An
   // OfflineAudioContext renders faster than real time and needs no user
-  // activation, so "does it make a sound, and is it the sound it claims" is
-  // checkable on every run, headless included. `buildHum` takes a context for
-  // exactly this reason: the thing graded here is the graph the page plays, not
-  // a second copy of it written for the test.
+  // activation, so the one thing worth asserting about a synthesised machine —
+  // that it runs at the FILM'S FRAME RATE — is checkable on every run, headless
+  // included. A sample could never be checked this way; it would just be bytes.
+  // ⚠️ 0.24 s, because `start()` schedules one 0.25 s lookahead and its top-up is
+  // a `setInterval` that offline time never reaches. Fine here, a trap for a
+  // longer render, so it is said rather than discovered.
   try {
-    const SR = 48000, SECS = 0.2;
+    const SR = 48000, SECS = 0.24;
     const oc = new OfflineAudioContext(1, Math.floor(SR * SECS), SR);
-    const g = buildHum(oc);
-    g.gain.value = 1;
-    g.connect(oc.destination);
+    const pj = createProjector(oc);
+    pj.node.connect(oc.destination);
+    pj.start(); pj.setGain(1, 0.001);
     const ch = (await oc.startRendering()).getChannelData(0);
-    // ⚠️ MEASURED FROM HALFWAY IN. A filter starts from silence and takes a few
-    // cycles to settle, and at 50 Hz a few cycles is most of a fifth of a second
-    // — so a correlation over the whole render is mostly measuring the attack.
-    const from = Math.floor(ch.length / 2);
-    let peak = 0;
-    for (let i = from; i < ch.length; i++) peak = Math.max(peak, Math.abs(ch[i]));
-    // the strongest lag between 15 and 25 ms IS the fundamental's period; no
-    // threshold anywhere, so the answer cannot depend on how loud it came out
-    let bestLag = 0, best = -Infinity;
-    for (let lag = Math.round(SR * 0.015); lag <= Math.round(SR * 0.025); lag++) {
-      let acc = 0, n = 0;
-      for (let i = from; i + lag < ch.length; i++) { acc += ch[i] * ch[i + lag]; n++; }
-      if (n && acc / n > best) { best = acc / n; bestLag = lag; }
+    const win = Math.floor(SR * 0.002), env = [];
+    for (let i = 0; i < ch.length; i += win) {
+      let mx = 0;
+      for (let j = i; j < Math.min(i + win, ch.length); j++) mx = Math.max(mx, Math.abs(ch[j]));
+      env.push(mx);
     }
-    const hz = SR / bestLag;
-    d.assert('the hum makes a sound at all', peak > 0.05, `peak ${peak.toFixed(3)}`);
-    d.assert('...and it hums at the mains frequency the film was shot under',
-      Math.abs(hz - 50) < 2, `${hz.toFixed(1)} Hz against 50`);
+    // 🔴 AUTOCORRELATION, NOT A THRESHOLD. The first version found onsets by
+    // crossing `peak * 0.4` and reported 8 clatters at 26.6 ms against 5 at
+    // ~41.7 by hand — because the clatter's amplitude is deliberately random and
+    // the noise bed is always there, so a threshold taken from the loudest
+    // sample counts bed peaks on a quiet run. A detector whose answer depends on
+    // how loud this particular render happened to be is measuring the render.
+    const mean0 = env.reduce((x, y) => x + y, 0) / env.length;
+    const z = env.map((v) => v - mean0);
+    const lagOf = (ms) => Math.round((ms / 1000) * SR / win);
+    let bestLag = 0, best = -Infinity;
+    for (let lag = lagOf(20); lag <= lagOf(80); lag++) {
+      let acc = 0;
+      for (let i = 0; i + lag < z.length; i++) acc += z[i] * z[i + lag];
+      const sc = acc / (z.length - lag);
+      if (sc > best) { best = sc; bestLag = lag; }
+    }
+    const periodMs = (bestLag * win / SR) * 1000;
+    d.assert('the projector makes a sound at all', Math.max(...env) > 0.05,
+      `peak ${Math.max(...env).toFixed(3)}`);
+    // ⚠️ 3 ms of tolerance, and the jitter is why: the clatter is deliberately
+    // +/-3.5% off the grid so it does not sound like a machine playing a hi-hat,
+    // and the envelope's own resolution here is 2 ms.
+    d.assert('...and it runs at the film\u2019s frame rate',
+      Math.abs(periodMs - 1000 / 24) < 3,
+      `strongest period ${periodMs.toFixed(1)} ms against ${(1000 / 24).toFixed(1)}`);
   } catch (e) {
-    d.assert('the hum makes a sound at all', false, `offline render failed: ${e.message}`);
+    d.assert('the projector makes a sound at all', false, `offline render failed: ${e.message}`);
   }
 
   // ⚠️ LEAVING IS NOT ONE EVENT, SO IT IS NOT ONE HANDLER. A tab can be hidden,
