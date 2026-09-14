@@ -27,6 +27,7 @@
 // asked once behind a try and never asked again after a refusal.
 
 import { world as world0 } from './seed.mjs';
+import { createXRRay } from './xr-ray.mjs';
 import { TABLET, registerStandIn } from './xr-tablet.mjs';
 import { readGLB } from './xr-glb.mjs';
 
@@ -786,6 +787,9 @@ export const ROOM_OPTIONAL_FEATURES = ['plane-detection'];
  *        session — `shipNow`/`beacon`, never a batched shipper
  */
 export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {}) {
+  // the pointer ribbon, built the first time a ray is actually drawn. Lazy on
+  // purpose: a page that never enters a session never compiles it.
+  let beam = null;
   const compile = (t, src) => {
     const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
@@ -1576,11 +1580,32 @@ export function createXRRoom(gl = null, { log = () => {}, say = () => {} } = {})
     // tablet", and the beam could stop somewhere the slider does not think it
     // was pressed — two truths about one pointer, which is the shape of bug
     // nobody can see from inside a working-looking picture.
+    // 🔴 A RIBBON, NOT A BOX — AND IT IS `demo/shell/xr-ray.mjs`, SHARED. This
+    // used to be `beamM`: a cube scaled to 4 mm x 4 mm x however far. A box has
+    // a fixed cross-section in the WORLD, so it is a square seen end-on, its
+    // lit face changes as the controller rolls, and at 12 m it is four
+    // millimetres of shaded geometry trying to be a line. The ribbon has a
+    // fixed cross-section in the VIEW and fades out at both ends instead of
+    // stopping at an edge in mid-air.
+    // ⚠️ IT TAKES THE `view` MATRIX, NOT `eye`. The ribbon is billboarded in
+    // the vertex shader against the position it is given, and the two eyes are
+    // 64 mm apart — one position used for both is a stereo disparity, which the
+    // visual system reads as the pointer being at a depth it is not at. `eye`
+    // beside it is the HEAD, once a frame, which is right for the grid's
+    // distance fade and wrong for this; handing over the matrix that is ALSO
+    // doing the projecting means the two cannot disagree.
     if (ray) {
       const len = held ? held.dist : (tabletHit ? tabletHit.t : (aimedDist || 2.4));
-      gl.uniformMatrix4fv(L.model, false, beamM(ray.m, len));
-      gl.uniform3fv(L.col, held ? [1.0, 0.83, 0.0] : [0.42, 0.78, 0.76]);
-      gl.drawArrays(gl.TRIANGLES, 0, cube.count);
+      beam = beam || createXRRay(gl);
+      beam.draw({
+        vp: mul(proj, view), view,
+        pose: ray.m, len, held: !!held,
+      });
+      // ⚠️ AND THE BOX PROGRAM HAS TO BE PUT BACK. The ribbon has its own
+      // program and VAO, and everything below here — the controllers, the
+      // tablet's frame — is still drawing boxes.
+      gl.useProgram(cur.box);
+      gl.bindVertexArray(cube.vao);
     }
 
     // 🔴 ONE STAND-IN PER HAND THAT ACTUALLY RESOLVED, and "resolved" is the

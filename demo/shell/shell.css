@@ -578,7 +578,18 @@ video[hidden] { display: none; }
    which are read WHILE something is changing, get bigger. Everything else
    gives up its margins. */
 .xr .pos-what { font-size: 14px; line-height: 1.55; max-height: 8.5em; overflow-y: auto; }
-.xr .pos-readout { gap: 10px 20px; }
+/* 🔴 ROOM COMES FROM THE CELLS, NEVER FROM THE GAP. This said
+   `gap: 10px 20px` and it was drawing a 20 px SLAB of line colour between every
+   pair of cells — PHOTOGRAPHED in the Quest browser, reported as "so wide vert
+   separators on readout in vr browser". The row's gap is not spacing: it is 1 px
+   of `--line` showing through between `--card` cells, so the gap IS the
+   hairline, and widening it widens the RULE rather than the air around it.
+   ⚠️ The rule dates from when this row was a grid and the gap really was
+   spacing; the row became flex over a line background and this was left behind.
+   ⚠️ And the Quest's 2-D browser gets this class because it answers
+   immersive-vr, so `.xr` styling is what a headset reads on an ORDINARY page,
+   not only inside a session. */
+.xr .pos-cell { padding: 14px 16px; }
 .xr .pos-v { font-size: 22px; }
 .xr .pos-k { font-size: 11px; }
 .xr .pos-controls { gap: 10px; margin-bottom: 10px; }
