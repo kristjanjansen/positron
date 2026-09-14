@@ -66,7 +66,7 @@
   import { mul, perspective } from '/shell/xr-room.mjs';
   import { createXRRay, rayCheck, MONO_AIM, MONO_HELD } from '/shell/xr-ray.mjs';
   import { createXRControllers } from '/shell/xr-controller.mjs';
-  import { createProjector } from '/shell/projector.mjs';
+  import { createProjector, VOICES } from '/shell/projector.mjs';
   import { toggle as toggleFull, exit as exitFull, watch as watchFull,
     support as fullSupport } from '/shell/fullscreen.mjs';
 
@@ -711,6 +711,13 @@
     if (!actx || !projector) return;
     if (on) {
       if (actx.state === 'suspended') actx.resume().catch(() => {});
+      // 🔴 THE MACHINE IS A PROPERTY OF THE FILM, NOT OF THE ORDER YOU PRESSED
+      // THINGS IN. Cycling 0,1,2… would mean the same newsreel sounded different
+      // every time you came back to it, and the floor would report your history
+      // rather than itself. Taken from the film's own index, so a given film has
+      // a given projector for ever — and because 298 films share 8 machines, two
+      // tiles of the SAME film also sound the same, which is the honest answer.
+      projector.setVoice(tiles[state[playing].film] ? state[playing].film : 0);
       projector.start();
       projector.setGain(PROJ_GAIN, PROJ_UP);
     } else {
@@ -2105,52 +2112,82 @@
 
   // 🔴 THE PROJECTOR, GRADED OFFLINE — NO GESTURE, NO SPEAKERS, NO WAITING. An
   // OfflineAudioContext renders faster than real time and needs no user
-  // activation, so the one thing worth asserting about a synthesised machine —
-  // that it runs at the FILM'S FRAME RATE — is checkable on every run, headless
-  // included. A sample could never be checked this way; it would just be bytes.
-  // ⚠️ 0.24 s, because `start()` schedules one 0.25 s lookahead and its top-up is
-  // a `setInterval` that offline time never reaches. Fine here, a trap for a
-  // longer render, so it is said rather than discovered.
+  // activation, so the two things worth asserting about a synthesised machine
+  // are checkable on every run, headless included: that it runs at the FILM'S
+  // frame rate, and that the eight machines are actually eight. A sample could
+  // never be checked this way; it would just be bytes.
+  // ⚠️ ALL EIGHT VOICES, not the default one. A preset is a place for a typo to
+  // sit unheard — seven of these are only reached by films nobody clicked today.
   try {
     const SR = 48000, SECS = 0.24;
-    const oc = new OfflineAudioContext(1, Math.floor(SR * SECS), SR);
-    const pj = createProjector(oc);
-    pj.node.connect(oc.destination);
-    pj.start(); pj.setGain(1, 0.001);
-    const ch = (await oc.startRendering()).getChannelData(0);
-    const win = Math.floor(SR * 0.002), env = [];
-    for (let i = 0; i < ch.length; i += win) {
-      let mx = 0;
-      for (let j = i; j < Math.min(i + win, ch.length); j++) mx = Math.max(mx, Math.abs(ch[j]));
-      env.push(mx);
+    const renders = [];
+    for (let v = 0; v < VOICES.length; v++) {
+      const oc = new OfflineAudioContext(1, Math.floor(SR * SECS), SR);
+      const pj = createProjector(oc, { voice: v });
+      pj.node.connect(oc.destination);
+      pj.start(); pj.setGain(1, 0.001);
+      renders.push((await oc.startRendering()).getChannelData(0));
     }
     // 🔴 AUTOCORRELATION, NOT A THRESHOLD. The first version found onsets by
     // crossing `peak * 0.4` and reported 8 clatters at 26.6 ms against 5 at
     // ~41.7 by hand — because the clatter's amplitude is deliberately random and
     // the noise bed is always there, so a threshold taken from the loudest
     // sample counts bed peaks on a quiet run. A detector whose answer depends on
-    // how loud this particular render happened to be is measuring the render.
-    const mean0 = env.reduce((x, y) => x + y, 0) / env.length;
-    const z = env.map((v) => v - mean0);
-    const lagOf = (ms) => Math.round((ms / 1000) * SR / win);
-    let bestLag = 0, best = -Infinity;
-    for (let lag = lagOf(20); lag <= lagOf(80); lag++) {
-      let acc = 0;
-      for (let i = 0; i + lag < z.length; i++) acc += z[i] * z[i + lag];
-      const sc = acc / (z.length - lag);
-      if (sc > best) { best = sc; bestLag = lag; }
-    }
-    const periodMs = (bestLag * win / SR) * 1000;
-    d.assert('the projector makes a sound at all', Math.max(...env) > 0.05,
-      `peak ${Math.max(...env).toFixed(3)}`);
-    // ⚠️ 3 ms of tolerance, and the jitter is why: the clatter is deliberately
-    // +/-3.5% off the grid so it does not sound like a machine playing a hi-hat,
-    // and the envelope's own resolution here is 2 ms.
-    d.assert('...and it runs at the film\u2019s frame rate',
-      Math.abs(periodMs - 1000 / 24) < 3,
-      `strongest period ${periodMs.toFixed(1)} ms against ${(1000 / 24).toFixed(1)}`);
+    // how loud a particular render happened to be is measuring the render.
+    const periodOf = (ch) => {
+      const win = Math.floor(SR * 0.002), env = [];
+      for (let i = 0; i < ch.length; i += win) {
+        let mx = 0;
+        for (let j = i; j < Math.min(i + win, ch.length); j++) mx = Math.max(mx, Math.abs(ch[j]));
+        env.push(mx);
+      }
+      const mean0 = env.reduce((x, y) => x + y, 0) / env.length;
+      const z = env.map((v) => v - mean0);
+      const lagOf = (ms) => Math.round((ms / 1000) * SR / win);
+      let bestLag = 0, best = -Infinity;
+      for (let lag = lagOf(20); lag <= lagOf(80); lag++) {
+        let acc = 0;
+        for (let i = 0; i + lag < z.length; i++) acc += z[i] * z[i + lag];
+        const sc = acc / (z.length - lag);
+        if (sc > best) { best = sc; bestLag = lag; }
+      }
+      return (bestLag * win / SR) * 1000;
+    };
+    const periods = renders.map(periodOf);
+    const worst = Math.max(...periods.map((ms) => Math.abs(ms - 1000 / 24)));
+    d.assert('every projector makes a sound', renders.every((ch) => {
+      let p = 0; for (let i = 0; i < ch.length; i++) p = Math.max(p, Math.abs(ch[i]));
+      return p > 0.05;
+    }), `${VOICES.length} voices, all audible`);
+    // ⚠️ 3 ms of tolerance, and the jitter is why: each clatter is deliberately
+    // a few per cent off the grid so it does not sound like a machine playing a
+    // hi-hat, and the envelope's own resolution here is 2 ms.
+    d.assert('...and every one of them runs at the film\u2019s frame rate',
+      worst < 3, `worst of ${VOICES.length} is ${worst.toFixed(1)} ms from ${(1000 / 24).toFixed(1)}`);
+
+    // 🔴 AND THEY ARE ACTUALLY DIFFERENT, WHICH THE TABLE ALONE CANNOT SHOW. A
+    // preset list is eight rows of numbers whether or not anything reads them.
+    // Zero crossings are a crude spectral centroid and cost one loop: a higher
+    // resonance crosses zero more often, and the randomness averages out over a
+    // fifth of a second.
+    // ⚠️ AND IT IS WEAKER THAN IT LOOKS — MEASURED, NOT ASSUMED. Sabotaged by
+    // putting the clatter back on the old wide random band (1900 + 900 Hz, a
+    // spread wider than the gap between two voices), this still PASSED at 533
+    // against 1067, because the bed filter and the hum level vary per voice too
+    // and either alone moves the centroid. So it proves the voices differ; it
+    // does NOT prove the clatter is what differs them. Said here rather than
+    // left as a claim, because a check believed to cover more than it does is
+    // how the last five rounds of this page went.
+    const zx = (ch) => {
+      let n = 0;
+      for (let i = 1; i < ch.length; i++) if ((ch[i - 1] < 0) !== (ch[i] < 0)) n++;
+      return Math.round(n / (ch.length / SR));
+    };
+    const lo = zx(renders[0]), hi = zx(renders[VOICES.length - 1]);
+    d.assert('...and the smallest machine is brighter than the biggest',
+      hi > lo * 1.15, `${lo} zero crossings a second against ${hi}`);
   } catch (e) {
-    d.assert('the projector makes a sound at all', false, `offline render failed: ${e.message}`);
+    d.assert('every projector makes a sound', false, `offline render failed: ${e.message}`);
   }
 
   // ⚠️ LEAVING IS NOT ONE EVENT, SO IT IS NOT ONE HANDLER. A tab can be hidden,
