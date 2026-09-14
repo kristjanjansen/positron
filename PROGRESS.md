@@ -1,5 +1,192 @@
 # Progress log — 2026-08-25 → 09-14  (newest first)
 
+## Session 23 (2026-09-14) — U:'s click track compiles, plays and has a page; the ERR archive becomes a floor; and two things carried as open were never true
+
+**Twenty commits.** The shape: a compiler that had never met its subject, a
+demo rebuilt twice because the first version was mine rather than theirs, and a
+long interface session where almost every defect was the same one wearing a
+different costume.
+
+### The compiler could not read either real score, at 42/42 green
+
+🔴 Both scores in `tarmoj/vclick` open with `t 0 $REPTEMPO`. `#define` was
+unsupported, the tempo came back NaN and `tempoMap` threw at **line 12 of line
+12** — while `csound-test.mjs` read 42/42, because every fixture in it was
+written to please the compiler.
+
+⚠️ **And the recorded blocker did not exist.** `research/uuu-integration-2026-09.md`
+says *"the real cost of this half-day is a machine with csound on it"*. Checked:
+**6.18.1 on the studio Mac** (Homebrew) and **6.18.1 on the Pi** (Debian), both
+answering, and `timeline/lab/csound-ssh.mjs` already pointed at the first.
+
+Every rule in the new passes was probed against the reference rather than read:
+
+    $NAME · $NAME. · $M(5'99) · redefinition (last wins) · a body over two lines
+    [1+2] 3 · [6-4] 2 · [2*3] 6 · [8/4] 2 · [2^3] 8 · [7%4] 3
+    [[1+1]*[3-1]] 4 · [0-1] -1 · [$N/2] with N 4 → 2
+
+so several things the plan said to REFUSE are supported, and the last one fixes
+the pass ORDER: a macro can be an operand of a bracket.
+
+🔴 **A bracket in p2 or p3 was silently beat 0** — `Number('[4/2]')` is NaN, the
+p-field fell through to a string and `|| 0` finished it. In the real scores the
+brackets sit in p4/p5, so nothing was mistimed: luck, not a property.
+
+🔴 **An undefined `$MACRO` eats the rest of its line.** MEASURED: `i 1 $NOPE 1
+100` sorts to a bare `i 1`, and csound's p-field carry refills it from the
+previous note — a typo presents as a plausible duplicate note in the right
+place, no gap, no throw. Refused by name rather than reproduced.
+
+**`timeline/lab/csound-real.mjs`** grades our compiler against the reference on
+scores nobody wrote for us: **81 events, worst beat error 0.000000000, worst
+time error 0.000 ms, every p-field compared.**
+
+⚠️ The reference is plain `csound -n -t 0`, not `scsort` — Debian ships no
+`scsort`, so a check built on it cannot run on the Pi. Three traps on the way:
+`scsort <file>` with stdin closed prints an EMPTY SCORE rather than an error; a
+remote `sh -s` reads its script from stdin so a `cat > a.sco` inside it eats the
+script; and the availability probe accepted empty output, so a wrong binary path
+reported "0 events" for both scores and read as a broken compiler.
+
+🔴 **And the check was blind where it mattered until the last edit.** The real
+scores put their brackets in p4/p5 and NOWHERE in p2/p3, so a timing-only
+comparison read 2/2 green with bracket evaluation switched off.
+
+### click — their app, and their own file answering our open question
+
+`/click/` is vClick: their score, their screen, their colours, no network.
+
+🔴 **`server/metro_sendosc.orc` answers §5.1's "what do p4–p8 mean?"** — the
+question the research says to ask them. It was in their repo all along. `i 1` is
+a tempo change with a ramp in beats; `i 2` is a bar; a NEGATIVE bar number means
+"no red on beat 1" for composite meters and its FRACTIONAL part is the beat to
+count from. Read as a number it would put four bars before bar 1.
+
+🔴 **Their `csengine.cpp` is the argument for compiling, better than the one the
+plan makes.** "If the vClick score is done well" is string surgery: find the
+line whose 8th field is the bar, rewrite a `;ADVANCE` comment into a skip
+statement, hunt backwards for the last tempo line, patch a macro — with a
+hard-coded case for one piece (Murail, *Winter Fragments*) and their own comment
+`// NB! does not work, if 'i2'`. Compiled it is a search and a `deck.seek()`.
+Bar 5 starts at **20538 ms** here; csound puts it at 17.538 s into section 2
+behind a 3 s section 1.
+
+The page was then rebuilt onto the score container, the transport bar and the
+strip — `bytes` replaced `rows` in the readout: **3714 B, paid once**, beside
+`pushed`, what vClick puts on the hall's wifi and which climbs all piece.
+
+### The board was on TINY the whole time
+
+🔴 Carried as **the top board-side open item** and it was never true. The
+config, the RUNNING process's environment, the flag's code path (a presence
+check, so not the identity-`includes` bug), the engine's boot line
+(`Engine_Pappus: TINY graph`, 22:47 on 09-13) and matching md5s across repo →
+sclang class path → `PROVENANCE.json`.
+
+What was broken is `PAPPUS READY … lite=true`. LESSONS #86.
+
+`grains` 23/23 against the live board, with the asserts saying the two ends
+agree rather than assuming it: *"72 sine partials here, 72 on the board"*,
+*"2.2 a second in this page and 2.3 on the board"*, deafness control 0.0000.
+
+### The shell was breaking its own vertical rhythm
+
+🔴 On EVERY page with a transport bar. `.pos-body > * + *` is at line 226,
+`.tbar { margin: 0 0 8px }` at 305 — same specificity, later in the file, so the
+shorthand's `margin-top: 0` won on source order. MEASURED down `/click/`:
+**0 · 22 · 4 · 22 px**. Now 22 · 22 · 22 · 22. ⚠️ The page had it too: `margin:
+0` overrides the rhythm just as well as any other value.
+
+### jam, instrument, and a number I said was missing
+
+`jam`'s deck runs on `peer.clock` — `createDeck({ clock })` takes any clock
+source, and peer.mjs's own header says it is the one a looper should be built
+on. No more `setInterval(…, 12)` over `peer.now() % LOOP`. ✅ Proved
+cross-machine, not by two tabs: a browser here and the Pi running
+`rig/peer.mjs`, `others 1`, round trip 48.8 ms.
+
+`instrument` is on `wire.mjs` — `seq`, reconnect, per-connection `from` — with
+two lanes, because a note played here and a note that crossed the relay are
+different facts.
+
+🔴 **I claimed min-RTT skew over a real link was unmeasured. It was done on
+2026-09-10** and struck in HANDOFF. `plan-uuu-local` §4 and the U: research both
+still say otherwise and I repeated them without opening the file.
+
+What 09-14 adds is a DECOMPOSITION, and it needed a different instrument — the
+09-10 method infers precision from two peers AGREEING, which cannot separate an
+error they SHARE. Two peers on ONE machine have a true skew of exactly zero:
+
+| arm | link | true skew | error |
+|---|---|---|---|
+| two peers, one Mac | relay 66–74 ms | 0, exactly | **0.69 ms** |
+| two peers, one Pi | relay 42–44 ms | 0, exactly | **0.13 ms** |
+| Mac ↔ Pi | relay 64–69 ms | ~10.4 ms by NTP | agreed to **2.7 ms** |
+
+**So the ~3 ms is almost all OSCILLATOR, not PATH** — a faster path buys
+nothing, longer windows might. ⚠️ Still quote 3 ms for two machines.
+
+⚠️ And the reference must beat what it grades: `sntp` reports ±14.7 ms on one
+sample, so it bounds a gross error and can never confirm a sub-millisecond one.
+
+### floor — the ERR archive as a place
+
+The whole 1965 film catalogue face up on an infinite floor, loading outward from
+where you look, any tile playing where it lies.
+
+🔴 **The archive's image hosts send no `access-control-allow-origin`.** A page
+can DISPLAY such an image and `texSubImage3D` on it throws — display versus
+READ, invisible until something reads. `/err-img` is a second proxied route on
+the site worker. ✅ VOD is the opposite: `access-control-allow-origin: *`, so the
+film goes browser-direct.
+
+Caching in three layers, each covering the one before's miss: browser (a week) →
+colo (`caches.default`) → CF (`cf.cacheEverything`). ⚠️ Nothing media-shaped is
+stored in the repo; proxied and cached is not the same as held.
+
+One `TEXTURE_2D_ARRAY`, one instanced draw. 🔴 **The LRU evicts by DISTANCE FROM
+THE GAZE, not by age** — the tile behind you was used a moment ago and will
+never be looked at again, while the one ahead has never been used and is about
+to be.
+
+**Found by looking, in the order they appeared:**
+
+- **`/err-img` is a Worker route, so the dev server 404'd every image.** Every
+  tile marked its picture dead and the page drew an empty rectangle with all
+  checks passing. A page that only works deployed is a page nobody can develop.
+- **Bright green tiles were `onload` taken for "decoded."** With
+  `decoding: 'async'` the pixels need not exist at `load`. ⚠️ Measured FIRST
+  that the images really are 256x192, because a size mismatch gives the same
+  symptom. ⚠️ And the monochrome filter would have HIDDEN it — green becomes
+  grey and the tile stops looking broken while staying wrong. Fixed before it
+  was added, deliberately, in that order.
+- **The `<video>` was never in the document.** A detached element is not
+  reliably decoded.
+- **The erratic pan was the floor teleporting.** A tile changes copy at half the
+  repeat period; at 15x20 that is 12.6 m, where the 9–16 m fade still has it at
+  **alpha 0.48**. 21x28 puts it at 17.6 m, past where a tile is gone. Now an
+  invariant guarding four independently-edited constants, proved by sabotage.
+- **The projector lagged and never stopped** — twice, for two different reasons.
+  LESSONS #87.
+
+The projector is synthesised rather than sampled: a licence read off a web page
+is not one anybody verified, a loop is a LOOP under four minutes of newsreel,
+and it is forty lines. Graded offline every run — **42.0 ms against 41.7** —
+after the first detector turned out to be measuring the render. LESSONS #89.
+
+### Numbers as they stand
+
+**35 built demos of 41 rows** — `click` and `floor` are new. The full suite ran
+once: **535/537**, both failures `rack` and reproduced ALONE with Live running,
+so a real open defect on the studio Mac's audio return and not contention.
+Per-demo since: click 22/22, floor 15/15 (under `verify-gl.mjs`), jam 19/19,
+instrument 15/15, grains 23/23 live, 244/244 across every demo with a transport
+bar or a strip.
+
+⚠️ **`floor`'s VR half is written and unmeasured**, and its window half has
+never been seen at speed — every screenshot this session was a backgrounded tab,
+where rAF is throttled to nothing.
+
 ## Session 22 (2026-09-13 → 09-14) — real SuperCollider at both ends; a page silent for hours with the answer on the wire; four rules that were right for the wrong reason
 
 **`/grains/` has said *"the same granulator in this page and on a Raspberry

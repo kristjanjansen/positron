@@ -1971,3 +1971,146 @@ gutter width and `draw`'s labels are short. **Third time in one day that this
 component's real behaviour only showed under a control built on purpose**, which
 is #67's closing rule — a capability no caller exercises is covered by none of
 them, however many callers there are.
+
+## 84. `requestAnimationFrame` is a paint callback, never a trigger (session 23)
+
+FOUR INSTANCES IN ONE DAY, three of them mine and one of them in a measurement
+I was using to check the others.
+
+Two jobs get conflated. **When does this happen** is a schedule. **What does the
+screen show this frame** is a paint. rAF answers the second: the browser calls
+you just before it composites, and it makes no promise to call you at all.
+
+✅ MEASURED: in a background tab a one-second rAF loop **did not finish in
+forty-five seconds**.
+
+Where it bit:
+
+- `/click/`'s play loop fired beats inside `frame()`, so a beat's TIME was
+  whenever rAF happened to call. `late` read **2487.2 ms** — every millisecond
+  of it the browser's throttling, none of it the page's arithmetic. On
+  `createDeck`'s worker tick host, same tab, same conditions: **2.1 ms**.
+- The lamp fade redrew itself every frame.
+- Then the lamp fade only ARMED a CSS transition one frame later, to get a
+  committed starting style — so in a hidden tab every lamp lit and none faded,
+  and two sat at full size at once. The trigger had moved, not gone.
+- And twice more in my own instruments: a rAF-driven ramp measurement never
+  ticked at all, and the `setTimeout(16)` version was clamped to ~1 s so every
+  step jumped straight to target. **Both would have reported a perfect ramp for
+  code that was broken.**
+
+**The rule: rAF may decide how something LOOKS this frame. It must never decide
+whether or when something HAPPENS.**
+
+⚠️ AND THE RENDERER IS NEVER THE QUESTION. Asked whether SVG would fix it: no.
+SMIL is the same class of thing as a CSS transition — declarative, on the
+browser's own timeline. DOM, SVG and canvas would all have had this bug,
+because the bug was in the trigger. What removes it is asking for the whole
+animation at once (`el.animate()`), or putting the clock somewhere that is not
+the compositor (a worker, an AudioContext).
+
+## 85. A passing check is not a message (session 23)
+
+Every `d.assert` wrote a prose line into the page's log, so a page opened with
+nine sentences nobody reads — `ok their real score compiles — 25 rows` — and a
+real event afterwards had to be found among them. Reported as **"slop log"**,
+and the word is right.
+
+**A check that passed did not HAPPEN, it held.** The log is for things that
+occurred, at the moment they occurred.
+
+⚠️ THE ASYMMETRY IS THE WHOLE RULE. A FAILURE is a message and keeps its line.
+The tally goes out once, from `ready()` — `ready · 10/10 checks`.
+
+⚠️ And it was safe to change because nothing parses those lines: the harness
+reads `__demo.asserts`. Check that before touching any output that looks
+decorative; the reason this repo has the rule about assert COUNTS is that they
+are read by a machine.
+
+## 86. A warning about a misleading readout is not a fix (session 23)
+
+`PAPPUS READY … lite=true` prints on a board running TINY, because the engine
+does `if(tiny) { lite = true }` — so `lite` is true on three rungs of four and
+NAMES none of them. It is the last line, the one that says READY, the one a
+person greps for. `Engine_Pappus: TINY graph` prints seven seconds earlier and
+scrolls away.
+
+🔴 **AND BOTH `TINY.md` AND `CHAIN.md` ALREADY SAID SO**, in as many words —
+*"not `PAPPUS READY`, which prints `lite=true` on TINY as well and cannot tell
+the two rungs apart"* — while `writedefs.scd` already printed it correctly.
+
+A session record, a handoff queue and a commit message all stated the wrong rung
+anyway, and it was carried as "the top board-side open item" for a day.
+
+**If a readout can be misread, fix the readout.** A comment warning about it
+protects only the people who read the comment, which is not the set of people
+who read the readout.
+
+## 87. A fade that lives in the render loop cannot stop when the loop does (session 23)
+
+`/floor/`'s projector would not stop. Two separate bugs, and the second is the
+general one.
+
+**First: `setGain` carried a 1.2 s ramp and the page called it every frame.** So
+sixty times a second it cancelled the ramp in progress and started a fresh one,
+moving about an eightieth of the way each time. ✅ COMPUTED: 99% after **six
+seconds**, and the same crawl coming down. Reported as *"seems to lag and never
+stops"*, which is exactly what it does.
+
+**The shape of a fade belongs to the CALLER**, which knows whether it is coming
+up slowly or going away quickly. A node-level ramp plus a per-frame caller is
+two things that each think they own the timing.
+
+**Second, and worse: the easing ran inside `step()`, which runs inside rAF.**
+Hide the tab and rAF stops — the gain freezes wherever it got to while the
+projector's own scheduler carries on putting clatters on the audio clock. There
+was no `visibilitychange` and no `pagehide`.
+
+🔴 **STOPPING MUST NOT DEPEND ON THE THING THAT DRAWS.** Three levels, because
+any one alone leaves something running: set the gain, stop the scheduler,
+suspend the context.
+
+⚠️ **AND LEAVING IS NOT ONE EVENT.** A tab can be hidden, backgrounded,
+navigated away from, or put in the back/forward cache. `unload` does not fire at
+all on mobile Safari. Wire `visibilitychange` AND `pagehide`, and make the
+ordinary stop path go through the same function.
+
+## 88. An analyser on a suspended AudioContext reads its last buffer forever (session 23)
+
+Checking that the projector had gone silent: RMS **0.0119 before, 0.0119
+after** — identical, which looks exactly like a machine that never stopped.
+
+It had stopped. A suspended context does not advance, so `getFloatTimeDomainData`
+returns the last buffer it filled, indefinitely. **The instrument could not tell
+silence from frozen**, and it failed in the same direction as the bug it was
+pointed at — the most expensive direction there is.
+
+Measured again with the context left RUNNING and the output muted downstream:
+`0.011136 → 0 → 0`.
+
+⚠️ The general form: a meter reading a thing you have just switched off is
+reading a corpse. Measure the quantity through a path that is still alive, or
+measure something else.
+
+## 89. A threshold set from the data measures the data, not the signal (session 23)
+
+`/floor/`'s projector is checked for running at the film's frame rate. The first
+detector found onsets by crossing `peak * 0.4` and reported **8 clatters at
+26.6 ms** in the harness against **5 at ~41.7 ms** by hand.
+
+Neither number was the rate. The clatter's amplitude is deliberately random and
+there is a noise bed under it, so a threshold taken from the loudest sample in
+THIS render counts bed peaks on a quiet one. **A detector whose answer depends
+on how loud the render happened to be is measuring the render.**
+
+Autocorrelation of the envelope needs no threshold at all: subtract the mean,
+correlate against itself, and the lag with the strongest agreement IS the
+period. **42.0 ms against 41.7 expected**, stable across runs.
+
+🔴 Proved by sabotage: at 18 fps it reads 58.0 ms and goes red.
+
+⚠️ Note what the first detector had in common with an earlier failure in the
+same session — a peak-counting instrument whose window was 46 ms looking for
+events 41.7 ms apart, which can never see a gap. Both are the same mistake:
+**an instrument whose resolution or calibration is derived from the subject
+cannot be used to measure the subject.**
