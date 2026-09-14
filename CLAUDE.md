@@ -570,6 +570,17 @@ counts against the last known total after any change.
   missing — an unreachable page reported as done is worse than one reported as
   blocked, because only one of them gets fixed.
 
+  🔴 **AND THE RULE HAS TO SURVIVE BEING RELAYED — THIS IS HOW IT BROKE, TWO
+  HOURS AFTER IT WAS WRITTEN, BY ITS OWN AUTHOR.** Neither agent was careless
+  about its OWN page: both handed over full URLs for those. Both wrote a bare
+  `/radio1965/` for the OTHER one's, because between two agents a slug is
+  unambiguous and it never occurred to either that the message would be read by
+  a person who then has nothing to click. The user's reply was *"what it WENT
+  OUT? urls! how many times i am asking"*.
+  **Resolve every slug to a URL before it leaves, including one you are quoting
+  from somebody else.** A relayed path is still a path, and the reader at the
+  end of the chain is the one who cannot use it.
+
 - Demos are `demo/<slug>/index.html`, deployed at `/<slug>/`. **A demo's identity
   is its slug and its ORDER is its position in `DEMOS`** — there is no number in
   the directory, the URL, or the page. There used to be, in five places at once,
