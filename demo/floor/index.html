@@ -287,35 +287,14 @@
   const VS = `#version 300 es
   layout(location=0) in vec2 quad;      // -0.5..0.5
   layout(location=1) in vec4 inst;      // x, z, layer, imageAlpha
-  layout(location=2) in vec4 aVF;       // video alpha, aim, chosen, risen — 0..1
+  layout(location=2) in vec3 aVF;       // video alpha, aim, chosen — all 0..1
   uniform mat4 uVP;
   uniform vec2 uTile;     // width, depth — the picture's own shape, in metres
   uniform vec2 uEye;      // where YOU are on the floor — see the LRU, above
   uniform vec2 uFade;     // from, to — metres
-  uniform vec3 uScreenC;  // where a risen tile stands, in metres
-  uniform vec3 uScreenR;  // its right axis — the viewer's right, so it faces you
-  uniform vec2 uScreenSize;
   out vec2 vUV; flat out float vLayer; out float vA; out float vV; out float vF; out float vC;
   void main(){
-    vec3 onFloor = vec3(inst.x + quad.x * uTile.x, 0.0, inst.y + quad.y * uTile.y);
-    // 🔴 THE SCREEN'S UP AXIS IS WORLD *DOWN*, AND THAT IS NOT A TYPO. On the
-    // floor quad.y runs along +Z and the picture's TOP sits at quad.y = -0.5 —
-    // the far edge — because V=0 is the first row of the JPEG. Standing the same
-    // quad up with an up axis of +Y would put quad.y = +0.5 at the top of the
-    // screen, which is the BOTTOM of the picture: upside down. Pointing the up
-    // axis at world down maps the picture's top to the screen's top and needs no
-    // second set of texture coordinates and no branch.
-    vec3 asScreen = uScreenC
-      + uScreenR * (quad.x * uScreenSize.x)
-      + vec3(0.0, -1.0, 0.0) * (quad.y * uScreenSize.y);
-    // ⚠️ CORNER INTERPOLATION, NOT A ROTATION MATRIX. Lerping the four corners
-    // never has a degenerate frame; building a basis with normalize(mix(a, b))
-    // is NaN the moment the two directions are opposite, which here is simply
-    // "the tile is behind you", i.e. half the floor.
-    float r = smoothstep(0.0, 1.0, clamp(aVF.w, 0.0, 1.0));
-    vec3 p = mix(onFloor, asScreen, r);
-    // it lifts before it flies: a straight line between the two reads as sliding
-    p.y += 0.55 * r * (1.0 - r);
+    vec3 p = vec3(inst.x + quad.x * uTile.x, 0.0, inst.y + quad.y * uTile.y);
     gl_Position = uVP * vec4(p, 1.0);
     // 🔴 THE TOP OF THE PICTURE IS THE FAR EDGE, AND THE SIGN HERE WAS WRONG.
     // \`quad.y\` runs along +Z, which is TOWARD a viewer looking down the floor,
@@ -327,10 +306,6 @@
     vUV = vec2(quad.x + 0.5, quad.y + 0.5);
     // the wide fade: 1 inside uFade.x, 0 by uFade.y, smooth between, so the
     // outer ring dissolves into the floor instead of stopping.
-    // ⚠️ MEASURED FROM WHERE IT LIES, NOT FROM WHERE IT IS DRAWN. A risen tile is
-    // a few metres in front of your face; its distance from the eye is what says
-    // how visible the FLOOR is there, and a screen must not fade because the
-    // patch of floor it came from is far away.
     // WARNING: no backticks in here — this is inside a JS template literal and
     // one of them ends the shader mid-sentence. It did, and the page threw
     // before a single assert ran.
@@ -338,8 +313,6 @@
     vLayer = inst.z;
     vA = inst.w * (1.0 - smoothstep(uFade.x, uFade.y, far));
     vV = aVF.x; vF = aVF.y; vC = aVF.z;
-    // a tile on its way up is never faded out by distance — see above
-    vA = max(vA, r);
   }`;
   const FS = `#version 300 es
   precision highp float; precision highp sampler2DArray;
@@ -453,9 +426,6 @@
   const uTile = gl.getUniformLocation(prog, 'uTile');
   const uEye = gl.getUniformLocation(prog, 'uEye');
   const uFade = gl.getUniformLocation(prog, 'uFade');
-  const uScreenC = gl.getUniformLocation(prog, 'uScreenC');
-  const uScreenR = gl.getUniformLocation(prog, 'uScreenR');
-  const uScreenSize = gl.getUniformLocation(prog, 'uScreenSize');
   const uCrop = gl.getUniformLocation(prog, 'uCrop');
   const uDim = gl.getUniformLocation(prog, 'uDim');
   const uFloor = gl.getUniformLocation(prog, 'uFloor');
@@ -475,7 +445,7 @@
   gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(1, 1);
   gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(2, 1);
   gl.bindVertexArray(null);
 
@@ -615,39 +585,6 @@
       if (state[i].layer === L) { state[i].layer = -1; usedLayers.delete(L); freeLayers.push(L); }
       pump();
     });
-  }
-
-  // ── a tile that stands up and becomes a screen ─────────────────────────
-  //
-  // 🔴 THE HOLE IS NOT DRAWN, IT IS WHAT IS LEFT. The tiles meet exactly, so a
-  // tile that has gone somewhere else simply is not there and the floor's own
-  // colour shows through the gap. Nothing draws a hole, nothing has to know the
-  // shape of one, and it can never disagree with where the tile actually went.
-  //
-  // ⚠️ THE ANCHOR IS TAKEN ONCE, WHEN IT STARTS TO RISE, AND THEN HELD. A screen
-  // that follows your head is the reason people take headsets off; a screen that
-  // stands somewhere is a thing in a room you can walk round and look away from.
-  // What DOES follow you is which way it faces — it turns about its own vertical
-  // axis so the picture is always square to you, which is what a screen is for.
-  const SCREEN_DIST = 3.4;      // metres in front of where you were looking
-  const SCREEN_Y = 1.45;        // its middle, a little below standing eye height
-  const SCREEN_W = 3.6, SCREEN_H = SCREEN_W * 0.75;   // the picture's own 4:3
-  const RISE_RATE = 1.3;        // about three quarters of a second, both ways
-  let screenAt = [0, SCREEN_Y, 0], screenRight = [1, 0, 0];
-  /** Where a screen should stand for somebody at `e` looking along `f`.
-   *  Pure, so the placement can be graded without a browser. */
-  function screenSpot(e, f) {
-    const h = Math.hypot(f[0], f[2]) || 1;           // the horizontal of the look
-    return [e[0] + (f[0] / h) * SCREEN_DIST, SCREEN_Y, e[2] + (f[2] / h) * SCREEN_DIST];
-  }
-  /** ...and which way it must face to be square to somebody at `e`.
-   *  ⚠️ HORIZONTAL ONLY. Tilting a screen toward a viewer who is looking down at
-   *  a floor would stand it at an angle that reads as a dropped picture. */
-  function screenFacing(c, e) {
-    const dx = e[0] - c[0], dz = e[2] - c[2];
-    const L = Math.hypot(dx, dz) || 1;
-    // right = up x toEye, which puts the picture's left on the viewer's left
-    return [-dz / L, 0, dx / L];
   }
 
   // ── the projector, where the film is ───────────────────────────────────
@@ -812,7 +749,6 @@
     leaveTile(state, playing, i);
     stopVideo(false);
     playing = i;
-    screenAt = screenSpot(eye, look());
     try {
       const r = await fetch(`https://arhiiv.err.ee/api/v1/content/video/${encodeURIComponent(film.slug)}`);
       const j = await r.json();
@@ -1178,7 +1114,6 @@
     }
     gaze = gazePoint();
     rewrap();
-    screenRight = screenFacing(screenAt, eye);
     placeSound();
     pump();
 
@@ -1249,11 +1184,6 @@
       s.f = ease(s.f, (i === hover) ? 1 : 0, FOCUS_RATE);
       s.c = ease(s.c, (i === playing) ? 1 : 0, FOCUS_RATE);
       if (s.c < 0.002) s.c = 0;
-      // ⚠️ ITS OWN RATE, MUCH SLOWER THAN THE OTHERS. `c` is a lighting decision
-      // and wants to be immediate; this is a three-metre journey and at
-      // FOCUS_RATE it would be a teleport with two frames of blur in it.
-      s.r = ease(s.r, (i === playing) ? 1 : 0, RISE_RATE);
-      if (s.r < 0.002) s.r = 0;
       if (s.f < 0.002) s.f = 0;
       if (s.v < 0.002) s.v = 0;
       if (s.a < 0.002) s.a = 0;
@@ -1263,21 +1193,20 @@
 
   function upload() {
     const n = state.length;
-    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n * 4); }
+    if (instData.length !== n * 4) { instData = new Float32Array(n * 4); vidData = new Float32Array(n * 3); }
     let drawn = 0;
     for (let i = 0; i < n; i++) {
       const s = state[i];
       if (s.layer < 0 || s.a < 0.002) continue;
       const o = drawn * 4;
       instData[o] = s.x; instData[o + 1] = s.z; instData[o + 2] = s.layer; instData[o + 3] = s.a;
-      const o2 = drawn * 4;
-      vidData[o2] = s.v; vidData[o2 + 1] = s.f; vidData[o2 + 2] = s.c; vidData[o2 + 3] = s.r;
+      vidData[drawn * 3] = s.v; vidData[drawn * 3 + 1] = s.f; vidData[drawn * 3 + 2] = s.c;
       drawn++;
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
     gl.bufferData(gl.ARRAY_BUFFER, instData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn * 4), gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, vidData.subarray(0, drawn * 3), gl.DYNAMIC_DRAW);
     return drawn;
   }
 
@@ -1300,9 +1229,6 @@
     gl.uniform2f(uTile, TILE_W, TILE_H);
     gl.uniform2f(uEye, eye[0], eye[2]);
     gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
-      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
-      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
-      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
     gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
     gl.uniform1f(uDim, dimAmt);
     gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1636,9 +1562,6 @@
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uEye, eye[0], eye[2]);
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
-      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
-      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
-      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
       gl.uniform4f(uCrop, STILL_CROP[0], STILL_CROP[1], vidCrop[0], vidCrop[1]);
       gl.uniform1f(uDim, dimAmt);
       gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1699,7 +1622,7 @@
       bz: (r - (ROWS - 1) / 2) * TILE_H,
       x: 0, z: 0,
       film: i % tiles.length,
-      layer: -1, a: 0, v: 0, f: 0, c: 0, r: 0, want: false, img: false,
+      layer: -1, a: 0, v: 0, f: 0, c: 0, want: false, img: false,
     });
   }
   /** Move every tile to the copy of itself nearest YOU.
@@ -1819,9 +1742,6 @@
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uEye, 0, 0);             // on top of it, so the far fade is 1
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
-      gl.uniform3f(uScreenC, screenAt[0], screenAt[1], screenAt[2]);
-      gl.uniform3f(uScreenR, screenRight[0], screenRight[1], screenRight[2]);
-      gl.uniform2f(uScreenSize, SCREEN_W, SCREEN_H);
       gl.uniform4f(uCrop, 0, 0, 0, 0);      // the whole grey, uncropped
       gl.uniform1f(uDim, dim);
       gl.uniform3f(uFloor, FLOOR_RGB[0], FLOOR_RGB[1], FLOOR_RGB[2]);
@@ -1830,7 +1750,7 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 0, 1]), gl.DYNAMIC_DRAW);
       gl.bindBuffer(gl.ARRAY_BUFFER, vidBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, aim, chosen, 0]), gl.DYNAMIC_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, aim, chosen]), gl.DYNAMIC_DRAW);
       gl.bindVertexArray(vao);
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, 1);
       gl.bindVertexArray(null);
@@ -2028,36 +1948,6 @@
     const down = ms(0, 1, DIM_IN), up = ms(1, 0, DIM_OUT);
     d.assert('the floor stands back up faster than it stood down', up < down,
       `down in ${down} ms, back up in ${up} ms`);
-  }
-
-  // 🔴 WHERE A SCREEN STANDS, AS ARITHMETIC. The rise itself is a vertex shader
-  // interpolating four corners and there is no honest way to grade how it LOOKS
-  // from here — but where it ends up and which way it faces are two pure
-  // functions, and those are the parts that can be wrong in a way nobody
-  // notices: a screen four metres behind you is still a screen.
-  {
-    const e = [2, 1.65, -3];
-    const f = [0.6, -0.5, -0.62];                 // looking down and off-axis
-    const c = screenSpot(e, f);
-    const flat = Math.hypot(c[0] - e[0], c[2] - e[2]);
-    // in FRONT: the horizontal of the look and the horizontal of the offset agree
-    const ahead = (c[0] - e[0]) * f[0] + (c[2] - e[2]) * f[2];
-    d.assert('a screen stands in front of you, upright, at arm-and-a-bit',
-      Math.abs(flat - SCREEN_DIST) < 1e-6 && Math.abs(c[1] - SCREEN_Y) < 1e-6 && ahead > 0,
-      `${flat.toFixed(2)} m away at ${c[1].toFixed(2)} m, and in front`);
-
-    // ⚠️ THE FACING IS CHECKED AS PERPENDICULARITY, not by comparing it to a
-    // second formula. A right axis that is unit, level, and square to the line
-    // from the screen to your eye is the whole of "the picture faces you"; a
-    // sign error would leave all three true and mirror the film, which is why
-    // the shader's V flip is argued out in a comment there rather than here.
-    const r = screenFacing(c, e);
-    const toEye = [e[0] - c[0], 0, e[2] - c[2]];
-    const L = Math.hypot(toEye[0], toEye[2]);
-    const dot = (r[0] * toEye[0] + r[2] * toEye[2]) / L;
-    d.assert('...and it turns to face you, level',
-      Math.abs(Math.hypot(r[0], r[1], r[2]) - 1) < 1e-6 && r[1] === 0 && Math.abs(dot) < 1e-6,
-      `right axis unit, y ${r[1]}, square to your eye to ${Math.abs(dot).toExponential(0)}`);
   }
 
   // 🔴 A CLICK PLAYS A FILM, DRIVEN THROUGH THE PAGE'S OWN HANDLERS, END TO END.
