@@ -36,7 +36,7 @@ enabled** (`workers_dev: true`), so every pre-move link still resolves.
 | — | menu | `https://positron.studio/` |
 | 1 | megatimeline | `…/proto/megatimeline/` |
 | 2 | remixer | `…/proto/remixer/` |
-| 3 | kurenniemi | `…/proto/kurenniemi/` |
+| 3 | aikajana | `…/proto/aikajana/` |
 | 4 | flipper | `…/proto/flipper/` |
 | 5 | **looper** | `…/proto/looper/` |
 
@@ -95,7 +95,7 @@ resolve untouched, exactly as under its own dev server:
 
 | page's import | resolves to | why it works |
 |---|---|---|
-| kurenniemi `../../timeline/transport.mjs` | `/timeline/transport.mjs` | served at `/proto/kurenniemi/`, `..` clamps at root |
+| aikajana `../../timeline/transport.mjs` | `/timeline/transport.mjs` | served at `/proto/aikajana/`, `..` clamps at root |
 | remixer `/timeline/transport.mjs` | `/timeline/transport.mjs` | absolute, same file |
 | megatimeline `./viewport.mjs` | `/proto/megatimeline/viewport.mjs` | relative |
 | megatimeline `/census.json` | `/census.json` | absolute → a **root copy** of the same file |
@@ -123,12 +123,12 @@ pass; nobody else's page can use or read this proxy.
 | traffic | path | why |
 |---|---|---|
 | all four pages, modules, `hls.min.js` | **static asset** | — |
-| `census.json` (megatimeline), `corpus.json` (kurenniemi) | **static asset** | committed in the repo; the pages boot with real data and **zero** upstream calls |
+| `census.json` (megatimeline), `corpus.json` (aikajana) | **static asset** | committed in the repo; the pages boot with real data and **zero** upstream calls |
 | 9 archive search results + 1 content record | **static asset** under `/cache/` | megatimeline's committed JSONL caches, exploded one-file-per-query at build time |
 | `POST /api/v1/search` | **proxied** | the only endpoint that *must* be. Its OPTIONS preflight answers 204 **without** `access-control-allow-origin`, so a browser can never call it directly (`research/err-archives-2026-08.md`) |
 | content `GET`s from remixer | **direct from the browser** | already `ACAO: *`; a simple request needs no preflight and no proxy |
 | HLS media (`vod.err.ee`, `live.err.ee`) | **direct** | CORS-clear |
-| kurenniemi media | **direct from archive.org** | nothing re-hosted |
+| aikajana media | **direct from archive.org** | nothing re-hosted |
 | thumbnails (`arhiiv-images.err.ee`) | **direct**, plain `<img>` | no ACAO upstream; fine in an `<img>`, taints canvas |
 
 **Nothing media-shaped is ever proxied or stored by this Worker.**
@@ -203,7 +203,7 @@ untouched; these live in the build so the deployed copy works from a phone.
 2. **`proto/flipper/index.html`** — inserts the viewport meta.
    **flipper has none.** `research/mobile-2026-08.md` §3 names exactly this bug
    — "the single biggest bug on three of the four public surfaces" — and fixed
-   it in megatimeline, remixer, kurenniemi and replay. **flipper was not in that
+   it in megatimeline, remixer, aikajana and replay. **flipper was not in that
    pass.** Without it a phone lays the page out at 980 px and shrinks it to
    ~40 %. Measured at a true 390 px layout it is already fluid (0 px overflow,
    tiles and HUD intact, live streams playing), so the deployed copy gets the
@@ -230,7 +230,7 @@ errors on all five pages.**
 | menu | 4 links, 127 px tap targets, 390/390 |
 | megatimeline | `__mt.ready`, census **119 years**, totals audio **133 718** / video **79 422** / photo **234 478**, canvas **63 distinct colours, 1927 lit samples** (bars really drawn), touch help branch shown, no `localhost` in the DOM, **0** upstream calls on load; dive into 1965 → tier `years`, **765 items**, **9/9 searches from cache** |
 | remixer | shared `/timeline/` lib loaded, hls.js loaded, `dialYear(1965)` search **round-tripped through the proxy 200 `cache=durable upstream=0`**, 6 layers, 0 page errors |
-| kurenniemi | corpus **22 items**, **5 lanes / 22 item blocks** rendered, deck constructed (`../../timeline` resolved) |
+| aikajana | corpus **22 items**, **5 lanes / 22 item blocks** rendered, deck constructed (`../../timeline` resolved) |
 | flipper | tiles rendered, 3 `<video>`, live streams reached `readyState>0`, 390/390 after the viewport fix |
 
 **Upstream ERR archive-API calls for the whole final run: 0** — the committed

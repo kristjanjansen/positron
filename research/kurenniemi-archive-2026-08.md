@@ -1,7 +1,7 @@
 # Kurenniemi — what is publicly reachable, and what a SECOND institution taught (2026-08-28)
 
 Availability probe for the §−1 PhD case study, and the Tier-A demo it supported
-(`proto/kurenniemi/`). Every endpoint below was exercised live from this machine
+(`proto/aikajana/`). Every endpoint below was exercised live from this machine
 at ≤1 req/s. Marks: ✅ measured here, 📄 from the source's own docs/terms,
 ⚠️ inferred or untested.
 
@@ -13,7 +13,7 @@ audio tracks with `access-control-allow-origin: *` and Range 206** ✅, enough
 for a working transport-driven client. The dated spine (life, works, films)
 comes from **Wikidata**, which is the first source we have met that **declares
 precision as a field** instead of leaking it. The surviving **DIMI-A**
-instrument is an image object in **Europeana/MIMO**. `proto/kurenniemi/` is
+instrument is an image object in **Europeana/MIMO**. `proto/aikajana/` is
 built on those three and verifies **8/8**.
 
 **The institution that actually holds the archive is closed to us.** The
@@ -155,13 +155,13 @@ Narrow, concrete, in priority order:
    status of the tapes themselves (Love Records 1968; Numminen collaborations)
    is unresolved and would need the rightsholders for any public performance.
 
-## The demo — `proto/kurenniemi/` (Tier A)
+## The demo — `proto/aikajana/` (Tier A)
 
 ```
-proto/kurenniemi/ingest.mjs    live fetch -> corpus.json  (~16 requests, 1/s)
-proto/kurenniemi/index.html    the deck; imports timeline/{transport,media-master}.mjs
-proto/kurenniemi/verify.mjs    one headless Chrome on :8894, 8 asserts + shot.png
-proto/kurenniemi/corpus.json   22 items, 3 sources, provenance per item
+proto/aikajana/ingest.mjs    live fetch -> corpus.json  (~16 requests, 1/s)
+proto/aikajana/index.html    the deck; imports timeline/{transport,media-master}.mjs
+proto/aikajana/verify.mjs    one headless Chrome on :8894, 8 asserts + shot.png
+proto/aikajana/corpus.json   22 items, 3 sources, provenance per item
 ```
 
 Position domain **is calendar time** (1941-01-01 → 2018-01-01, epoch ms) — no

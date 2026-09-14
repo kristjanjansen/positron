@@ -258,7 +258,7 @@ year-precise catalogue field is one significant digit at year resolution; the
 `07-15` pads it to three at day resolution. It is not a midpoint estimate, it is
 a rendering artefact of a database column that had no null representation, and
 it arrives at us indistinguishable from an attested 15 July. Our own
-`proto/kurenniemi/ingest.mjs:59-71` reached the same conclusion empirically —
+`proto/aikajana/ingest.mjs:59-71` reached the same conclusion empirically —
 "ERR's `YYYY-07-15` proved that a midpoint is indistinguishable from an attested
 15 July. A start is at least a LOWER BOUND that is true" — which is the spatial
 rule (truncate, never pad) rediscovered from first principles. ⚠️ EDTF's
@@ -763,7 +763,7 @@ Rejected alternatives and why:
 - **Representative point / midpoint — rejected.** This is the `07-15` disease
   with our name on it. A midpoint is indistinguishable from an attestation on
   inspection (§5.1), it is not a bound so it supports no inference, and it makes
-  `ev.at <= pos` mean nothing in particular. `proto/kurenniemi/ingest.mjs:59-71`
+  `ev.at <= pos` mean nothing in particular. `proto/aikajana/ingest.mjs:59-71`
   already found this by measurement: "a midpoint is indistinguishable from an
   attested 15 July. A start is at least a LOWER BOUND that is true."
 - **Inner-bracket start (`P81a`) — rejected.** It is frequently `null` (CRM Issue

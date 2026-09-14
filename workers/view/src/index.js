@@ -3,7 +3,7 @@
 // Static assets (public/, built by build.mjs) serve every page and every
 // committed cache entry directly from the edge; this Worker only runs for the
 // handful of paths below. Four pages ship: /proto/megatimeline/,
-// /proto/remixer/, /proto/kurenniemi/, /proto/flipper/, plus a menu at /.
+// /proto/remixer/, /proto/aikajana/, /proto/flipper/, plus a menu at /.
 //
 // ── the only reason this Worker exists: ONE proxied upstream, politely ──────
 // arhiiv.err.ee's search is POST + JSON, so the browser forces an OPTIONS

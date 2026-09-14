@@ -285,15 +285,15 @@ ok('remixer', 'search produced state', remixState.apiCalls > 0, JSON.stringify(r
 await common('remixer');
 await shot('2-remixer');
 
-// ── 3. kurenniemi ───────────────────────────────────────────────────────────
-console.log('\n[3] kurenniemi');
-await goto('/proto/kurenniemi/', { settle: 2500 });
+// ── 3. aikajana ─────────────────────────────────────────────────────────────
+console.log('\n[3] aikajana');
+await goto('/proto/aikajana/', { settle: 2500 });
 const corpus = await evaluate(`(() => ({ items: (window.__corpus && window.__corpus.items || []).length, deck: !!window.__deck, lanes: document.querySelectorAll('.lane').length, rows: document.querySelectorAll('.it').length }))()`);
-ok('kurenniemi', 'corpus.json loaded', corpus.items > 0, `${corpus.items} items`);
-ok('kurenniemi', 'corpus rows rendered', corpus.lanes > 0 && corpus.rows > 0, `${corpus.lanes} lanes, ${corpus.rows} item blocks`);
-ok('kurenniemi', 'timeline deck constructed (../../timeline resolved)', corpus.deck);
-await common('kurenniemi');
-await shot('3-kurenniemi');
+ok('aikajana', 'corpus.json loaded', corpus.items > 0, `${corpus.items} items`);
+ok('aikajana', 'corpus rows rendered', corpus.lanes > 0 && corpus.rows > 0, `${corpus.lanes} lanes, ${corpus.rows} item blocks`);
+ok('aikajana', 'timeline deck constructed (../../timeline resolved)', corpus.deck);
+await common('aikajana');
+await shot('3-aikajana');
 
 // ── 4. flipper ──────────────────────────────────────────────────────────────
 console.log('\n[4] flipper');

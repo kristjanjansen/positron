@@ -11,7 +11,7 @@
 //
 // The layout MIRRORS THE REPO on purpose. Every page's imports then resolve
 // untouched, exactly as they do under its own dev server:
-//   proto/kurenniemi  `../../timeline/transport.mjs` → /timeline/transport.mjs
+//   proto/aikajana  `../../timeline/transport.mjs` → /timeline/transport.mjs
 //   proto/remixer     `/timeline/transport.mjs`      → /timeline/transport.mjs
 //   proto/megatimeline `./viewport.mjs`              → /proto/megatimeline/…
 //   proto/megatimeline `/census.json`                → ROOT copy (hence two)
@@ -76,7 +76,7 @@ const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byNewest, rowHTML, noteHTML
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
 const FILES = [
-  // shared timeline library — loaded by remixer and kurenniemi, never copied
+  // shared timeline library — loaded by remixer and aikajana, never copied
   // into either proto. One canonical copy, same as the dev servers alias.
   ['timeline/transport.mjs', 'timeline/transport.mjs'],
   ['timeline/media-master.mjs', 'timeline/media-master.mjs'],
@@ -91,9 +91,9 @@ const FILES = [
   ['proto/remixer/index.html', 'proto/remixer/index.html'],
   ['proto/remixer/hls.min.js', 'proto/remixer/hls.min.js'],
 
-  // 3. kurenniemi (corpus + archive.org media; nothing proxied)
-  ['proto/kurenniemi/index.html', 'proto/kurenniemi/index.html'],
-  ['proto/kurenniemi/corpus.json', 'proto/kurenniemi/corpus.json'],
+  // 3. aikajana (corpus + archive.org media; nothing proxied)
+  ['proto/aikajana/index.html', 'proto/aikajana/index.html'],
+  ['proto/aikajana/corpus.json', 'proto/aikajana/corpus.json'],
 
   // 4. flipper (live ERR channels; streams are CORS-clear, no proxy)
   ['proto/flipper/index.html', 'proto/flipper/index.html'],
@@ -370,7 +370,7 @@ const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:9999
   + 'padding:7px 10px;text-decoration:none">\u2190 demos</a>';
 
 const APPEND = {
-  'proto/kurenniemi/index.html': BACK,
+  'proto/aikajana/index.html': BACK,
   'proto/megatimeline/index.html': BACK,
   'proto/remixer/index.html': BACK,
 };
@@ -422,7 +422,7 @@ const REWRITES = {
   'proto/flipper/index.html': [
     // flipper has NO viewport meta. research/mobile-2026-08.md §3 lists exactly
     // this bug — "the single biggest bug on three of the four public surfaces"
-    // — and fixed it in megatimeline, remixer, kurenniemi and replay. flipper
+    // — and fixed it in megatimeline, remixer, aikajana and replay. flipper
     // was not in that pass, so it still lays out at 980 px and a phone renders
     // it shrunk to ~40%. Measured at a true 390 px layout it is already fluid:
     // 0 px horizontal overflow, tiles and HUD intact, three live streams

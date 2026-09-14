@@ -1,7 +1,9 @@
 # positron
 
-Live at **https://positron.studio**. 35 shelled demos of 41 rows
-(2026-09-14) — `click` and `floor` are the new ones. ⚠️ The suite total that
+Live at **https://positron.studio**. 38 shelled demos of 44 rows
+(2026-09-14, counted from `DEMOS` rather than remembered) — `click`, `floor`,
+`items` and `kurenniemi` are the new ones, and `kurenniemi` the SLUG is now a
+fresh shelled page: the old prototype that held it moved to `aikajana`. ⚠️ The suite total that
 used to sit here was removed rather than updated: it was stale for two sessions, and a count nobody re-measures reads as
 a fact. Run `node demo/verify.mjs` for the current one. ⚠️ A red run is not automatically a
 regression here: `now`'s asserts go red when ERR refuses its own live edge (one

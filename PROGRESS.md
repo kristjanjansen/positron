@@ -4485,7 +4485,7 @@ absence of `provenance` means attested. Two absences, two axes.**
   already occurred by pos", the *possible* half of Allen, computed free by code
   that already exists; a midpoint makes that comparison mean nothing; (2) it is
   **one-sided sound** (`earliest ≤ true position` is a theorem) — and
-  proto/kurenniemi's ingest had already reached this empirically from data:
+  proto/aikajana's ingest had already reached this empirically from data:
   "a midpoint is indistinguishable from an attested 15 July; a start is at
   least a LOWER BOUND that is true"; (3) **nothing in the transport moves**
   (insertInto, afterIdx, bsearch, and scan's early exit all keep the scalar and
@@ -4524,7 +4524,7 @@ absence of `provenance` means attested. Two absences, two axes.**
   **Identity does not depend on the quality of the coordinates — which is
   exactly why an uncertain ATTESTED row must survive an attested-only query.**
 
-### KURENNIEMI CORPUS (session 6aa) — ✅ Tier A, 8/8 (proto/kurenniemi) — the SECOND institution
+### KURENNIEMI CORPUS (session 6aa) — ✅ Tier A, 8/8 (proto/aikajana) — the SECOND institution
 The PhD case study at the project's origin, now a real client: position domain
 IS calendar time (1941→2018), 22 items / 3 sources / **12 playable** MP3s.
 Three adapters: `record` (discrete), `tape` (`caps.rates:[1]` — a tape only
