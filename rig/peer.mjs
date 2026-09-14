@@ -5,6 +5,15 @@
 //   node rig/peer.mjs --room jam-demo --id pi --seconds 60
 //   node rig/peer.mjs --self-test          # no network, no room, proves the math
 //
+// ⚠️ `rig/m1/skew.mjs` GOT HERE FIRST, on 2026-09-10, with the same insight
+// that peer.mjs runs in node — and it is what produced HANDOFF item 0's ~3 ms
+// real-link figure. Keep both, and know which is which: THAT one is a
+// measurement run, two machines for 180 s, and its numbers are cited. THIS one
+// is the demo-facing peer — it joins and stays, names itself after the machine
+// so a roster reads `raspberrypi 3.1 ms away`, and carries a `--self-test` with
+// an injected skew so the estimator can be graded with no network at all.
+// ⚠️ If they start to disagree about anything, the measurement tool wins.
+//
 // WHY THIS EXISTS. `jam` says "open this page a second time — in another tab,
 // or on a phone". Two tabs on one machine share a clock by construction, so the
 // thing the page exists to measure cannot be wrong there: the skew estimator

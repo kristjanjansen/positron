@@ -1,9 +1,13 @@
-# plan-jam — two machines on one pulse, and the number nobody has measured
+# plan-jam — two machines on one pulse
 
-Status: **written 2026-09-14, P1 in flight.** Proposed after reading `jam` and
-`instrument` beside `click`, and finding that the three are the same page with
-different scores — and that the one measurement this repo still owes itself
-falls out of making them so.
+Status: **written 2026-09-14. P1, P2 and P4 DONE the same day; P3 was already
+done on 2026-09-10 and this file said otherwise — see §4.** Proposed after
+reading `jam` and `instrument` beside `click` and finding the three are the
+same page with different scores.
+
+⚠️ **Read §4 P3's correction before quoting any skew number from here.** The
+premise "nobody has measured it" was false when it was written, and the
+disproof was in `HANDOFF.md` line 2023 the whole time.
 
 Read `plan-uuu-local.md` §4 and `research/uuu-integration-2026-09.md` §2.4
 first: this is the build that answers their open question, and the reason to
@@ -77,7 +81,7 @@ Raspberry Pi in another building on one pulse* is the thing being claimed.
 
 ## 4. Phases, in the order that unblocks the most
 
-### P1 — `rig/peer.mjs`, a node peer  ← the piece that does not exist
+### ~~P1 — `rig/peer.mjs`, a node peer~~ ✅ DONE 2026-09-14
 
 Joins a room, runs the same clock as the page, prints its own offset and RTT.
 Nothing else waits on anything else; everything waits on this.
@@ -85,7 +89,7 @@ Nothing else waits on anything else; everything waits on this.
 **Done when** it runs on the Pi and on the studio Mac, and a browser on this
 LAN sees it in `others`.
 
-### P2 — `jam` onto a score document and a deck
+### ~~P2 — `jam` onto a score document and a deck~~ ✅ DONE 2026-09-14 — 19/19
 
 Its eight beats become a `scoreDoc` exactly as `click` builds one; the deck's
 worker host fires them; a transport bar and a strip put the pulse on a line.
@@ -95,11 +99,41 @@ honest relationship between them.
 **Done when** `jam` has no scheduler of its own, its score is a document, and
 its assert count is not lower than it is today.
 
-### P3 — the number nobody has: min-RTT skew over a real link
+### ~~P3 — the number nobody has~~ — ⚠️ CORRECTED: IT WAS MEASURED ON 2026-09-10
 
-`HANDOFF` still lists it, and the note is careful to call its fastest chain
-(20.6 / 52.1 / 57.9 / 67.0 ms p50/p90/p95/p99) a **floor**, not a LAN figure —
-everything so far is loopback.
+🔴 **This phase was written on a false premise and the disproof was in
+`HANDOFF.md` the whole time.** Line 2023 strikes *"Measure min-RTT clock skew
+over a REAL LINK"* as DONE — `rig/m1/skew.mjs`, two real machines, 455 samples
+each over 180 s through the deployed relay, the two estimating each other
+independently and agreeing to **~3 ms**, which that entry correctly calls **20x
+worse than the ±0.15 ms loopback figure** and ends *"Quote 3 ms, never 0.15"*.
+`plan-uuu-local` §4 and `research/uuu-integration-2026-09.md` §2.4 both still
+say it is unmeasured, and I repeated them without opening HANDOFF.
+
+**What 2026-09-14 actually adds is a DECOMPOSITION, and it needed a different
+instrument.** The 09-10 method infers precision from two peers AGREEING, which
+cannot separate an error both of them share — a path asymmetric in the same way
+for both biases both estimates identically and reads as agreement. So: two
+peers on ONE machine, through the real relay, where the true skew is **exactly
+zero by construction** and every reported millisecond is error.
+
+| arm | link | true skew | error |
+|---|---|---|---|
+| two peers, one Mac | relay, 66–74 ms RTT | 0, exactly | **0.69 ms** |
+| two peers, one Pi | relay, 42–44 ms RTT | 0, exactly | **0.13 ms** |
+| Mac ↔ Pi, node | relay, 64–69 ms RTT | ~10.4 ms (NTP) | agreed to **2.7 ms** |
+| browser ↔ Pi, `/jam/` | relay, 48–51 ms RTT | — | Pi corrected **−9.85 ms** |
+
+🔴 **So the ~3 ms is almost all OSCILLATOR, not PATH.** Two processes sharing a
+clock crystal, across a real 70 ms internet path, disagree by under a
+millisecond — the relay's asymmetry is not what costs the 3 ms. Two different
+machines' clocks are. That matters because the fixes are different: a better
+path does nothing, and more samples over longer windows might.
+
+⚠️ And the reference has to be better than the thing it grades. `sntp` reports
+**±14.7 ms** on a single sample, so it can confirm no gross error and cannot
+confirm a sub-millisecond one — which is why the exact-zero arms carry the
+result and the NTP cross-check is only a sanity bound.
 
 🔴 **The trap decides the instrument, so it is chosen BEFORE the rig.**
 Measuring the shared clock's agreement *with* the shared clock is circular — it
@@ -113,10 +147,10 @@ repo already owns:
   never across two `performance.now()`s, which are private to a document and
   cannot be compared.
 
-**Done when** there is a skew figure that says which link it was taken over,
-and the method is one of the two above rather than the clock grading itself.
+✅ **Done.** The figure says which link, and the method is the exact-zero arm
+rather than the clock grading itself.
 
-### P4 — `instrument` onto `wire.mjs`, and its notes onto a deck
+### ~~P4 — `instrument` onto `wire.mjs`, and its notes onto a deck~~ ✅ DONE — 15/15
 
 Its two latency cells are the best numbers either page has; they stay. What
 changes is the envelope underneath them and that a played phrase lands on the
