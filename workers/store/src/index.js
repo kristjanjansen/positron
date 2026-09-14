@@ -1,5 +1,5 @@
 /**
- * positron-backlog — the history the relay refuses to keep. plan-ws §3.
+ * positron-store — the history the relay refuses to keep. plan-ws §3.
  *
  * The relay's whole value is that it does not parse: no envelope, no storage,
  * text or binary relayed as-is, and a `ping` answered by the runtime's
@@ -43,7 +43,7 @@ const KEEP_MS = 24 * 60 * 60 * 1000;      // the newer of cap rows or 24 h
 const IDLE_STOP_MS = 30 * 60 * 1000;      // stop recording a room nobody uses
 const ALARM_MS = 30 * 1000;
 
-export class Backlog {
+export class Store {
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -252,10 +252,10 @@ export class Backlog {
         headers: {
           'content-type': 'application/x-ndjson; charset=utf-8',
           'access-control-allow-origin': '*',
-          'access-control-expose-headers': 'X-Backlog',
+          'access-control-expose-headers': 'X-Store',
           // what the reader is looking at, so the page never has to imply
           // completeness it cannot check
-          'X-Backlog': `kept=${counts.held};seen=${meta.seen};stored=${meta.kept};cap=${meta.cap};oldest=${counts.oldest}`,
+          'X-Store': `kept=${counts.held};seen=${meta.seen};stored=${meta.kept};cap=${meta.cap};oldest=${counts.oldest}`,
         },
       });
     }
@@ -278,7 +278,7 @@ const json = (o, status = 200) => new Response(JSON.stringify(o), {
   headers: {
     'content-type': 'application/json',
     'access-control-allow-origin': '*',
-    'access-control-expose-headers': 'X-Backlog',
+    'access-control-expose-headers': 'X-Store',
   },
 });
 
@@ -298,7 +298,7 @@ export default {
 
     if (url.pathname === '/' || url.pathname === '') {
       return json({
-        worker: 'positron-backlog',
+        worker: 'positron-store',
         what: 'the history the verbatim relay refuses to keep — a recorder joins the room as a socket',
         usage: [
           'POST /room/<name>/record  {cap}',
@@ -314,7 +314,7 @@ export default {
       });
     }
 
-    const index = () => env.BACKLOG.get(env.BACKLOG.idFromName('__index'));
+    const index = () => env.STORE.get(env.STORE.idFromName('__index'));
 
     // Blunt on purpose, and the button says so: this is demo history, and a
     // page that keeps a room per visitor leaves rooms nobody will ever name
@@ -323,7 +323,7 @@ export default {
       const { rooms } = await (await index().fetch('https://x/index/list')).json();
       let cleared = 0;
       for (const r of rooms) {
-        const res = await env.BACKLOG.get(env.BACKLOG.idFromName(r))
+        const res = await env.STORE.get(env.STORE.idFromName(r))
           .fetch(new Request(`https://x/room/${r}/clear`, { method: 'POST' }));
         if (res.ok) cleared++;
       }
@@ -341,7 +341,7 @@ export default {
     // be one we keep anything for
     if (m[2] === 'record') await index().fetch(`https://x/index/add?room=${m[1]}`, { method: 'POST' });
 
-    const id = env.BACKLOG.idFromName(m[1]);
-    return env.BACKLOG.get(id).fetch(request);
+    const id = env.STORE.idFromName(m[1]);
+    return env.STORE.get(id).fetch(request);
   },
 };

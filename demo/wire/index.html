@@ -45,7 +45,7 @@
   // loading the history on arrival meaningless — a fresh room has no past.
   // Sharing it means what you find on load is what other people left.
   const ROOM = q.get('room') || 'wire';
-  const BACKLOG = q.get('backlog') || 'https://backlog.positron.studio';
+  const STORE = q.get('store') || 'https://store.positron.studio';
   // Small on purpose: the retention rule is 1,000 messages or 24 hours, and a
   // page cannot show a cap it would take seventeen seconds to reach.
   const CAP = 8;
@@ -197,7 +197,7 @@
   // say so, not hang.
   async function startRecording() {
     try {
-      const res = await fetch(`${BACKLOG}/room/${ROOM}/record`, {
+      const res = await fetch(`${STORE}/room/${ROOM}/record`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ cap: CAP }),
@@ -214,9 +214,15 @@
   }
 
   async function readHistory(query = `last=${CAP * 4}`) {
-    const res = await fetch(`${BACKLOG}/room/${ROOM}/history?${query}`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${STORE}/room/${ROOM}/history?${query}`, { signal: AbortSignal.timeout(4000) });
     const text = await res.text();
-    const header = res.headers.get('X-Backlog') || '';
+    // ⚠️ THE HEADER NAME IS A CROSS-WIRE RENAME AND NOTHING TYPE-CHECKS IT.
+    // When the worker went from `positron-backlog` to `positron-store` this read
+    // `X-Backlog` for one deploy while the worker sent `X-Store`, so `held`
+    // parsed to 0 and `the cap holds` failed against a store that was working
+    // perfectly. Four other spellings of the old name were grepped and this one
+    // was not, because it only exists as a STRING at each end.
+    const header = res.headers.get('X-Store') || '';
     const num = (k) => Number(new RegExp(`${k}=(\\d+)`).exec(header)?.[1] ?? 0);
     const held = num('kept'); const seen = num('seen'); const oldest = num('oldest');
     const rows = text.split('\n').filter(Boolean);
@@ -346,7 +352,7 @@
     d.clearLog();
     let wiped = null;
     try {
-      const res = await fetch(`${BACKLOG}/room/${ROOM}/clear`, { method: 'POST', signal: AbortSignal.timeout(8000) });
+      const res = await fetch(`${STORE}/room/${ROOM}/clear`, { method: 'POST', signal: AbortSignal.timeout(8000) });
       wiped = await res.json();
     } catch (e) { d.log(`clear failed — ${String(e.name || e)}`, 'bad'); }
     stored.length = 0;

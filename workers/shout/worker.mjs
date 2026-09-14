@@ -89,6 +89,46 @@ export default {
       }, { headers: cors() });
     }
 
+    /**
+     * 🔴 IS EACH STATION UP — ANSWERED WITH A 200 WHATEVER THE ANSWER IS.
+     *
+     * A page cannot ask this by fetching the mount, because a dead mount answers
+     * 502 and **the browser logs that to the console**. There is no way to
+     * suppress it from script, so a page that probes before it plays trips its
+     * own "no console errors" check, and a visitor watching a phone sees a red
+     * line about a station being down rather than the page handling it. The
+     * question belongs here anyway: this is the thing that knows.
+     *
+     * ⚠️ CANCEL EVERY BODY. These are ENDLESS streams — a probe that reads the
+     * status line and walks away leaves one socket per station open on the
+     * origin for as long as the runtime keeps this invocation, which turns a
+     * health check into a load generator against a volunteer's Icecast.
+     *
+     * ⚠️ NEVER CACHED. A cached answer about whether a live stream is live is
+     * worse than no answer, because it is wrong in the confident direction.
+     */
+    if (url.pathname === '/health') {
+      const checked = await Promise.all(Object.entries(STATIONS).map(async ([k, upstream]) => {
+        const t = Date.now();
+        try {
+          const up = await fetch(upstream, {
+            method: 'GET',
+            headers: { 'user-agent': 'positron-shout/1 (+https://positron.studio)' },
+            cf: { cacheEverything: false, cacheTtl: 0 },
+          });
+          const live = up.ok && !!up.body;
+          try { await up.body?.cancel(); } catch { /* already gone */ }
+          return [k, { up: live, status: up.status, ms: Date.now() - t }];
+        } catch (e) {
+          // A throw here is the origin refusing or timing out, which is a
+          // station that is down — reported as such, not as an error page.
+          return [k, { up: false, status: 0, ms: Date.now() - t, why: String(e).slice(0, 80) }];
+        }
+      }));
+      return Response.json({ stations: Object.fromEntries(checked) },
+        { headers: cors({ 'cache-control': 'no-store' }) });
+    }
+
     const id = url.pathname.replace(/^\/+/, '').replace(/\.mp3$/, '');
     const upstream = STATIONS[id];
     if (!upstream) return new Response('no such station', { status: 404, headers: cors() });

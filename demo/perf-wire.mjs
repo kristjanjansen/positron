@@ -14,7 +14,7 @@ const RELAY = 'wss://ws.positron.studio';
 // A fixed port for somebody else's dev server: overridable, so a second
 // `wrangler dev` on another port is reachable rather than silently missed.
 // 127.0.0.1 rather than `localhost`, which can resolve to ::1 and refuse.
-const BACKLOG = process.env.BACKLOG || 'http://127.0.0.1:8788';
+const STORE = process.env.STORE || process.env.BACKLOG || 'http://127.0.0.1:8788';
 writeFileSync(OUT, `perf-wire ${new Date().toISOString()}\n\n`);
 console.log(`writing to ${OUT}`);
 const say = (s) => { appendFileSync(OUT, s + '\n'); console.log(s); };
@@ -119,7 +119,7 @@ for (const RATE of [30, 60, 120, 300]) {
 say('\n5. backlog, local wrangler dev — write path and read path');
 {
   const R = room();
-  await fetch(`${BACKLOG}/room/${R}/record`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cap: 1000 }) });
+  await fetch(`${STORE}/room/${R}/record`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cap: 1000 }) });
   const ws = await open(R);
   const N = 300, t0 = Date.now();
   for (let i = 0; i < N; i++) { ws.send(JSON.stringify({ type: 'w', from: 'a', at: Date.now(), seq: i, store: true, value: 'x'.repeat(120) })); await sleep(16); }
@@ -128,11 +128,11 @@ say('\n5. backlog, local wrangler dev — write path and read path');
   const reads = [];
   for (const last of [8, 50, 200]) {
     const r0 = performance.now();
-    const res = await fetch(`${BACKLOG}/room/${R}/history?last=${last}`);
+    const res = await fetch(`${STORE}/room/${R}/history?last=${last}`);
     const text = await res.text();
     reads.push(`last=${String(last).padStart(3)} ${text.split('\n').filter(Boolean).length} rows in ${(performance.now() - r0).toFixed(0)} ms`);
   }
-  const st = await (await fetch(`${BACKLOG}/room/${R}/stats`)).json();
+  const st = await (await fetch(`${STORE}/room/${R}/stats`)).json();
   say(`   wrote ${st.kept} of ${st.seen} seen in ${wrote} ms  (${(st.kept / (wrote / 1000)).toFixed(0)} kept/s at a 60/s send)`);
   for (const r of reads) say(`   read  ${r}`);
   ws.close();
