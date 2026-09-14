@@ -14,6 +14,18 @@
         background: #07090d; border: 1px solid var(--line); border-radius: 4px;
         overflow: hidden; touch-action: none; cursor: grab; }
   .fl:active { cursor: grabbing; }
+  /* 🔴 FULLSCREEN NEEDS THE PAGE TO GIVE UP ITS OWN BOX, AND THIS PAGE DID NOT.
+     `.fl` sets `aspect-ratio: 16/9` and `position: relative`, and both survive
+     being made fullscreen — so the cover applied and the floor stayed a 16:9
+     rectangle in the middle of a black screen, which reads as a button that did
+     nothing. `.fl.pos-full` is (0,2,0) and beats `.fl` on specificity rather
+     than on source order, which is the repair shell.css records for `.pos-faux`
+     losing to a page's own `.pane { position: relative }`.
+     ⚠️ `.fl.pos-full`, never `.fl:fullscreen, .fl.pos-full` — a browser that
+     does not know that pseudo-class DISCARDS THE WHOLE SELECTOR LIST, which
+     would delete the fallback on exactly the browsers that need it. */
+  .fl.pos-full { aspect-ratio: auto; width: 100%; height: 100%;
+                 border: 0; border-radius: 0; min-height: 0; }
   .fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   /* The title of whatever is under the pointer. A FIXED BOX: it is written on
      every frame the gaze moves, and a caption that can change its own height
@@ -65,7 +77,7 @@
     name: 'floor',
     what: 'Every 1965 newsreel in the ERR archive, face up on a disc of floor '
       + 'you can walk over. Drag to look, arrow keys to move, and REST YOUR LOOK on '
-      + 'a tile to play it — look away and it stops. loaded is how many pictures '
+      + 'a tile to play it, or click one to glide over to it. loaded is how many pictures '
       + 'are on the floor now and reach is how far out they have got.',
     // ⚠️ FOUR CELLS. `playing` repeated the caption under the picture, which is
     // right there and has room for the whole title; `fetching` is a number that
@@ -465,6 +477,40 @@
   // see the dwell block in `step()`.
   const DWELL_MS = 900, AWAY_MS = 2500;
   let hover = -1, dwell = 0, away = 0;
+
+  // 🔴 A CLICK TRAVELS; RESTING YOUR LOOK PLAYS. Two verbs that were one, and
+  // separating them is what makes a floor this size usable: the far side of the
+  // disc is somewhere you want to GO, and arriving is not the same as asking to
+  // watch. So a click — or a trigger pull on the ray — glides the camera until
+  // the tile is under your gaze, and the dwell then fires on its own when you
+  // get there. Nothing new has to be pressed.
+  // ⚠️ IT MOVES THE EYE AND NOT THE AIM. Turning to face a tile would swing the
+  // whole floor past you and lose the place you were looking at; a translation
+  // keeps the view square to the grid, which is the thing that makes a floor
+  // readable at all.
+  let panTo = null;
+  function panToTile(i) {
+    if (i < 0) return;
+    panTo = [eye[0] + (state[i].x - gaze[0]), eye[2] + (state[i].z - gaze[1])];
+  }
+
+  // 🔴 IN A HEADSET THE TRIGGER IS A HAND ON THE FLOOR, NOT A CLICK. Hold it and
+  // drag, and the point you grabbed stays under the ray — the same verb the
+  // mouse has, with the hand doing what the hand is for. A teleport-on-click
+  // would be a different gesture for the same intention, and the one that needs
+  // explaining.
+  // ⚠️ IT MOVES THE WORLD, NOT THE HEAD. A headset's eye position comes from the
+  // wearer's actual head and is not ours to write; the floor is ours. So the
+  // drag accumulates a `shift` that is subtracted from the head pose, which is
+  // the same picture and does not lie about where anybody is standing.
+  const shift = [0, 0];
+  let grab = null;                 // {x, z} — the floor point under the ray
+  const rayFloor = (m) => {
+    const o = [m[12], m[13], m[14]], dir = norm([-m[8], -m[9], -m[10]]);
+    if (dir[1] >= -1e-4) return null;
+    const t = -o[1] / dir[1];
+    return { x: o[0] + dir[0] * t - shift[0], z: o[2] + dir[2] * t - shift[1] };
+  };
   function setHover(i) {
     if (i === hover) return;
     hover = i;
@@ -501,7 +547,7 @@
     dragging = false;
     // a drag is not a click — 6 px of travel is the difference between looking
     // around and asking for a film
-    if (moved < 6 && hover >= 0) playTile(hover);
+    if (moved < 6 && hover >= 0) panToTile(hover);
     try { wrap.releasePointerCapture(e.pointerId); } catch { /* gone */ }
   });
   // ⚠️ AND THE ARROWS STOP SCROLLING THE PAGE. A floor you walk with the arrow
@@ -547,10 +593,20 @@
     // film, not a game, and its visitor is somebody who wanted to look at 1965.
     const sp = 2.6 * dt;
     const f = look(), r = norm(cross(f, [0, 1, 0]));
+    if (keys.has('arrowup') || keys.has('arrowdown')
+      || keys.has('arrowleft') || keys.has('arrowright')) panTo = null;
     if (keys.has('arrowup')) { eye[0] += f[0] * sp; eye[2] += f[2] * sp; }
     if (keys.has('arrowdown')) { eye[0] -= f[0] * sp; eye[2] -= f[2] * sp; }
     if (keys.has('arrowleft')) { eye[0] -= r[0] * sp; eye[2] -= r[2] * sp; }
     if (keys.has('arrowright')) { eye[0] += r[0] * sp; eye[2] += r[2] * sp; }
+    // the glide, before the gaze is taken — so a frame mid-travel loads and
+    // hovers for where the camera IS, not where it was
+    if (panTo) {
+      const k2 = Math.min(1, dt * 2.4);
+      eye[0] += (panTo[0] - eye[0]) * k2;
+      eye[2] += (panTo[1] - eye[2]) * k2;
+      if (Math.hypot(panTo[0] - eye[0], panTo[1] - eye[2]) < 0.02) panTo = null;
+    }
     gaze = gazePoint();
     pump();
 
@@ -679,6 +735,7 @@
       // ⚠️ ANY BUTTON LEAVES. "Press the Meta button" is not an answer a page
       // gets to give about its own bug.
       session.addEventListener('selectstart', onSelect);
+      session.addEventListener('selectend', () => { grab = null; });
       session.addEventListener('end', () => {
         xrSession = null; d.log('left VR', 'hi'); requestAnimationFrame(frame);
       });
@@ -692,12 +749,26 @@
     d.log(how === 'exit' ? 'back to the page' : `filling the screen (${how})`, 'hi');
   });
 
+  let dragSource = null;
   function onSelect(ev) {
     const pose = xrFramePose && ev.frame?.getPose(ev.inputSource.targetRaySpace, xrRefSpace);
     if (!pose) return;
-    const m = pose.transform.matrix;
-    const i = pickFloor([m[12], m[13], m[14]], norm([-m[8], -m[9], -m[10]]));
-    if (i >= 0) playTile(i);
+    grab = rayFloor(pose.transform.matrix);
+    dragSource = ev.inputSource;
+  }
+
+  /** Keep the grabbed floor point under the ray. Called every XR frame the
+   *  trigger is held. */
+  function dragFloor(xframe) {
+    if (!grab || !dragSource) return;
+    const pose = xframe.getPose(dragSource.targetRaySpace, xrRefSpace);
+    if (!pose) return;
+    const now = rayFloor(pose.transform.matrix);
+    if (!now) return;
+    // the ray is hitting `now` and should still be hitting `grab`, so the world
+    // moves by the difference
+    shift[0] += now.x - grab.x;
+    shift[1] += now.z - grab.z;
   }
 
   let xrFramePose = null;
@@ -715,8 +786,10 @@
     if (!layer) return;
     gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+    dragFloor(xframe);
     const head = pose.transform.matrix;
-    eye[0] = head[12]; eye[1] = head[13]; eye[2] = head[14];
+    // the wearer's own head, less whatever the floor has been dragged by
+    eye[0] = head[12] - shift[0]; eye[1] = head[13]; eye[2] = head[14] - shift[1];
     // the gaze in a headset is where the HEAD points, which is the thing the
     // loading order is supposed to follow
     const hd = norm([-head[8], -head[9], -head[10]]);
@@ -753,7 +826,16 @@
         vidReady = true;
       }
       gl.useProgram(prog);
-      gl.uniformMatrix4fv(uVP, false, mul(view.projectionMatrix, view.transform.inverse.matrix));
+      // ⚠️ THE SHIFT GOES INTO THE VIEW, not into every tile's position — the
+      // instance data is rebuilt each frame and adding it there would be 298
+      // additions a frame to say what one translation says once. `inst.x/y`
+      // stay the floor's own coordinates, so picking and the gaze distance keep
+      // working in the same space the layout was authored in.
+      const vm = new Float32Array(view.transform.inverse.matrix);
+      vm[12] += vm[0] * shift[0] + vm[8] * shift[1];
+      vm[13] += vm[1] * shift[0] + vm[9] * shift[1];
+      vm[14] += vm[2] * shift[0] + vm[10] * shift[1];
+      gl.uniformMatrix4fv(uVP, false, mul(view.projectionMatrix, vm));
       gl.uniform2f(uTile, TILE_W, TILE_H);
       gl.uniform2f(uFocus, gaze[0], gaze[1]);
       gl.uniform2f(uFade, FADE_FROM, LOAD_RADIUS);
