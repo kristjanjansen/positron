@@ -11,41 +11,59 @@
      component caps itself at 300 px so a feed that keeps arriving cannot push
      the rest of the page down the screen; these rows arrive once and their
      count never changes, so there is nothing for that ceiling to hold back.
-     Tall enough for the whole list on a laptop, and it still scrolls inside
-     its own box on a phone, where every row wraps to two or three lines. */
-  .pos-msgs { max-height: 560px; }
+     Tall enough for a long look on a laptop, and it still scrolls inside its
+     own box on a phone, where a long title wraps to two or three lines. */
+  .pos-msgs { max-height: 620px; }
 </style>
 
 <script type="module">
   import { mount, guard } from '/shell/shell.mjs';
   // The shared list from the kit — the same renderer `wire`, `cues` and `patch`
   // draw their rows with, taken unchanged. It owns three fixed gutters and one
-  // fluid column, so the four things this page has to say are fitted to that
-  // shape rather than laid out again here: the kind goes in the first gutter as
-  // ONE SHORT WORD (that gutter is about five characters of mono wide), the
-  // third says whether the row has a file behind it, and the date, the name and
-  // the site share the fluid column — the date padded, because that column is
-  // monospaced and keeps its spaces, so the dates line up down the page.
+  // fluid column, and everything this page has to say is fitted to that shape
+  // rather than laid out again here.
   import { createMessageList } from '/shell/messages.mjs';
 
-  // The list itself lives with the deck that gathered it. ONE COPY: a second
-  // one here would go stale the first time the gathering is re-run, and both
-  // pages would carry on working while disagreeing about what exists.
-  const CORPUS = '/proto/aikajana/corpus.json';
+  // Built by `demo/kurenniemi/build-corpus.mjs`, which asks fourteen archives
+  // and writes down what each one answered. The deck's own shorter list is
+  // folded into it, and the check below re-proves that from this end.
+  const CORPUS = '/kurenniemi/corpus.json';
+  const DECK = '/proto/aikajana/corpus.json';
+
+  // ⚠️ THREE BUTTONS THAT ARE REALLY ONE CHOICE. Only one ordering can be in
+  // force, so only one of these may look chosen — and the shell paints the
+  // `primary` one yellow once, at mount, which left `Oldest first` lit while
+  // the list was sorted by something else. The class moves with the press
+  // below. (The kit HAS a radio group, `choice.mjs`; it is not used here
+  // because another session is editing that file today, and a component whose
+  // behaviour may change under you is not a component you can assert on.)
+  const ORDERS = [
+    { id: 'bydate', label: 'Oldest first', primary: true },
+    { id: 'bykind', label: 'By what it is' },
+    { id: 'bysource', label: 'By who holds it' },
+  ];
 
   const d = mount({
     name: 'kurenniemi',
-    what: 'Everything gathered about Erkki Kurenniemi so far, a row each: what kind of thing it is, whether '
-        + 'there is a file you can open, when it is from, what it is called, and which site holds it. '
-        + 'The dates are written the way each site wrote them — a full day where one was recorded, a bare '
-        + 'year where only a year survives, a span of years where nothing narrower is known. Nothing is '
-        + 'copied here: every file stays where it is held, and the row names the place.',
-    readout: { showing: '', kinds: '', sites: '', years: '' },
+    what: 'Every source and asset of Erkki Kurenniemi\'s work that could be reached, one row each: '
+        + 'when it is from, who holds it, what it is, whether there is a file to open, and the licence '
+        + 'that place states — "may reuse" counts the rows that are Creative Commons or public domain. '
+        + 'Nothing is copied: each row points at the place holding the thing, and one row can stand '
+        + 'for a whole set, like the 3,986 photographs behind a single index. Places that refused, or '
+        + 'that no longer exist, are in the list with what they answered.',
+    // FOUR CELLS, NOT SIX, AND THE ELLIPSIS IS WHY. At six across a laptop each
+    // cell is ~142 px wide and `.pos-v` is 19 px mono with `text-overflow:
+    // ellipsis` — MEASURED, `years` rendered as `1894–2…`, which is the house
+    // signal that something is in the wrong place rather than a width to fight.
+    // The two that went are the two a neighbour already carries: `kinds` is the
+    // first column of every row, and `files` is the third gutter of every row
+    // AND a button. `may reuse` stays because the licence is otherwise only at
+    // the end of a line, where it cannot be counted by eye.
+    readout: { showing: '', sources: '', 'may reuse': '', years: '' },
     controls: [
-      { id: 'bydate', label: 'Oldest first', primary: true },
-      { id: 'bykind', label: 'By what it is' },
-      { id: 'bysite', label: 'By who holds it' },
+      ...ORDERS,
       { id: 'files', label: 'Only what has a file' },
+      { id: 'free', label: 'Only what I may reuse' },
     ],
   });
   guard(d);
@@ -55,36 +73,78 @@
   // over the size of the corpus so no row is dropped in silence; the check
   // below counts the rows against the items anyway.
   const list = createMessageList({
-    cap: 200, newestFirst: false, mark: 'file',
+    cap: 400, newestFirst: false, mark: 'file',
     empty: 'nothing in this view',
   });
   d.el.append(list.el);
   list.clear('reading the list…');
 
-  // ── what a row says ─────────────────────────────────────────────────────
-  // `instrument` is the one kind too long for the first gutter, and the object
-  // it names — DIMI-A, in a Stockholm museum — is a synthesiser. The other four
-  // kinds are already short words and are left alone.
-  const SHORT = { instrument: 'synth' };
-  const kindOf = (it) => SHORT[it.kind] || it.kind;
-  // A span of years is written with a slash where these dates come from. A dash
-  // is the same fact in a form nobody has to be taught.
-  const dateOf = (it) => it.when.edtf.replace('/', '–');
-  const siteOf = (it) => new URL(it.prov.sourceUrl).host.replace(/^www\./, '');
-  const fileOf = (it) => !!it.media?.url;
+  // ── the columns, and how the source got one ─────────────────────────────
+  //
+  // 🔴 THE SOURCE HAS A COLUMN NOW, AND IT IS NOT A GUTTER. The component's
+  // three fixed gutters are 34, 40 and 52 px of 11 px mono — about five, six
+  // and eight characters — and the shortest name in this corpus is `Yle` while
+  // the longest is `Wikimedia Commons` at seventeen. Nothing about that fits,
+  // and the two ways out were both worse than the problem: abbreviating the
+  // institutions invents names nobody can search for, and widening a gutter in
+  // `shell.css` changes the four other pages that draw this list.
+  //
+  // So the source is a PADDED FIELD inside the fluid text column, which is
+  // monospaced and keeps its spaces — the same trick the date has always used
+  // here, applied to the fact that was missing. `date  source  title` lines up
+  // down the page at every width where the row fits on one line, and where it
+  // does not the component wraps rather than ellipsizing, which is the house
+  // rule: an ellipsis means the content is in the wrong place.
+  //
+  // What is in each column: the first gutter says WHAT KIND of thing it is,
+  // the third says whether there is a file to open, and the text column says
+  // WHEN, WHO HOLDS IT, WHAT IT IS CALLED and WHAT YOU MAY DO WITH IT. The
+  // licence rides at the end of the line rather than in a column of its own,
+  // because the only way to fit `CC-BY-NC-SA-4.0` into eight characters is to
+  // cut it into a different licence — and the button beside the readout
+  // filters on it, which is what a column would have been for.
+  const KIND_W = 5;    // the first gutter, in characters
+  const DATE_W = 12;   // `1941-07-10` is the longest date, `1894–2003` the longest span
+  const SRC_W = 18;    // `Wikimedia Commons` plus one space
+
+  // The one kind too long for the first gutter, and the object it names — a
+  // DIMI-A in a Stockholm museum — is a synthesiser. The rest are already
+  // short words or are cut to one that means the same thing at this width.
+  const SHORT = { instrument: 'synth', collection: 'set', recording: 'track',
+                  release: 'album', article: 'story' };
+  const kindOf = (it) => (SHORT[it.kind] || it.kind).slice(0, KIND_W);
+  // Nothing unmeasured prints as a number. A row whose source recorded no date
+  // at all — a MusicBrainz track, an archive.org upload, a host that refused —
+  // gets one em dash, never a padded guess at a year.
+  const dateOf = (it) => it.when.edtf || '—';
+  const fileOf = (it) => !!it.file;
+  // Public domain or a Creative Commons licence of any flavour. Everything
+  // else — all rights reserved, licensed per screening, not stated, unknown —
+  // is not something this page will tell you that you may reuse.
+  const freeOf = (it) => /creativecommons\.org|^cc-?(by|0)|public domain/i.test(it.licence || '');
   const YEAR = (ms) => new Date(ms).getUTCFullYear();
 
+  let corpus = null;
   let items = [];
   let order = 'bydate';
   let onlyFiles = false;
+  let onlyFree = false;
 
   function view() {
     const by = {
-      bydate: (a, b) => a.when.earliest - b.when.earliest || a.title.localeCompare(b.title),
-      bykind: (a, b) => kindOf(a).localeCompare(kindOf(b)) || a.when.earliest - b.when.earliest,
-      bysite: (a, b) => siteOf(a).localeCompare(siteOf(b)) || a.when.earliest - b.when.earliest,
+      // Undated rows go last rather than at 1970: a row with no date is not a
+      // row from the start of time, and sorting it there would put the loudest
+      // unknowns at the top of a list whose default order is chronological.
+      bydate: (a, b) => (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity)
+        || a.title.localeCompare(b.title),
+      bykind: (a, b) => kindOf(a).localeCompare(kindOf(b))
+        || (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity),
+      bysource: (a, b) => a.source.localeCompare(b.source)
+        || (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity),
     }[order];
-    return items.filter((it) => !onlyFiles || fileOf(it)).sort(by);
+    return items
+      .filter((it) => (!onlyFiles || fileOf(it)) && (!onlyFree || freeOf(it)))
+      .sort(by);
   }
 
   function draw() {
@@ -92,62 +152,92 @@
     list.set(rows.map((it) => ({
       dir: kindOf(it),
       mark: fileOf(it),
-      // no bytes: nothing on one of these rows is measured in bytes, and the
-      // component leaves that gutter blank rather than filling it with a lie
-      text: `${dateOf(it).padEnd(12)}${it.title} · ${siteOf(it)}`,
+      // no bytes: the component prints this gutter as a raw byte count, and the
+      // largest file here is 990,701,568 of them — eleven characters in a
+      // six-character box. The sizes are in the corpus file; they are not
+      // something this gutter can say without breaking the row.
+      text: `${dateOf(it).padEnd(DATE_W)}${it.source.padEnd(SRC_W)}${it.title}`
+          // A row that stands for more than one thing says how many — except a
+          // whole collection, whose title already carries the number, because
+          // saying it twice on one line is the same waste as a legend.
+          + (it.count > 1 && it.kind !== 'collection' ? ` · ${it.count} files` : '')
+          + ` · ${it.licence}`,
     })));
     d.set('showing', rows.length);
-    d.set('kinds', new Set(rows.map(kindOf)).size);
-    d.set('sites', new Set(rows.map(siteOf)).size);
+    d.set('sources', new Set(rows.map((it) => it.source)).size);
+    d.set('may reuse', rows.filter(freeOf).length);
     // The end of a span is the first moment the thing is already over, so the
     // last year it covers is one millisecond before it. Without that, every
     // span ending in 1973 reads as reaching into 1974.
-    d.set('years', rows.length
-      ? `${Math.min(...rows.map((it) => YEAR(it.when.earliest)))}–`
-        + `${Math.max(...rows.map((it) => YEAR(it.when.latest - 1)))}`
+    const dated = rows.filter((it) => it.when.earliest != null);
+    d.set('years', dated.length
+      ? `${Math.min(...dated.map((it) => YEAR(it.when.earliest)))}–`
+        + `${Math.max(...dated.map((it) => YEAR(it.when.latest - 1)))}`
       : '');
     return rows;
   }
 
-  for (const id of ['bydate', 'bykind', 'bysite']) d.on(id, () => { order = id; draw(); });
+  const ORDER_LABELS = new Set(ORDERS.map((o) => o.label));
+  for (const o of ORDERS) {
+    d.on(o.id, (b) => {
+      order = o.id;
+      for (const other of b.parentElement.querySelectorAll('button')) {
+        if (ORDER_LABELS.has(other.textContent)) other.classList.toggle('pos-pri', other === b);
+      }
+      draw();
+    });
+  }
+  const toggle = (b, on, offLabel, onLabel) => {
+    b.textContent = on ? onLabel : offLabel;
+    b.setAttribute('aria-pressed', String(on));
+  };
   d.on('files', (b) => {
     onlyFiles = !onlyFiles;
-    b.textContent = onlyFiles ? 'Show everything' : 'Only what has a file';
-    b.setAttribute('aria-pressed', String(onlyFiles));
+    toggle(b, onlyFiles, 'Only what has a file', 'Show everything');
+    draw();
+  });
+  d.on('free', (b) => {
+    onlyFree = !onlyFree;
+    toggle(b, onlyFree, 'Only what I may reuse', 'Show everything');
     draw();
   });
 
   try {
     const res = await fetch(CORPUS);
     if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
-    const corpus = await res.json();
+    corpus = await res.json();
     items = corpus.items || [];
-    d.log(`${items.length} items, gathered ${String(corpus.generated).slice(0, 10)}`, 'hi');
+    d.log(`${items.length} rows from ${corpus.sources.length} places, `
+      + `gathered ${String(corpus.generated).slice(0, 10)}`, 'hi');
     draw();
 
-    d.assert('the list loaded', items.length > 0, `${items.length} items`);
+    d.assert('the list loaded', items.length > 0, `${items.length} rows`);
 
-    // The question this page exists to answer: is there something to put in all
-    // four columns? A column blank on most rows is a column to drop, and the
+    // The question this page exists to answer: is there something to put in
+    // every column? A column blank on most rows is a column to drop, and the
     // only way to know is to COUNT the blanks rather than read a few rows.
-    const blank = items.filter((it) => !it.when?.edtf || !it.kind || !it.title || !it.prov?.sourceUrl);
-    d.assert('every row has a date, a kind, a name and a site',
+    // The DATE is deliberately not in this list — 33 of these rows have no
+    // date anywhere and saying so is the honest outcome, not a failure.
+    const blank = items.filter((it) => !it.kind || !it.title || !it.source || !it.url);
+    d.assert('every row says what it is, what it is called and who holds it',
       blank.length === 0, `${items.length - blank.length} of ${items.length} complete`);
 
-    const lo = Math.min(...items.map((it) => YEAR(it.when.earliest)));
-    const hi = Math.max(...items.map((it) => YEAR(it.when.latest - 1)));
+    const dated = items.filter((it) => it.when.earliest != null);
+    const lo = Math.min(...dated.map((it) => YEAR(it.when.earliest)));
+    const hi = Math.max(...dated.map((it) => YEAR(it.when.latest - 1)));
     // Deliberately wider than his lifetime: this catches a date that failed to
     // parse and landed on 1970, or one padded into the future, which is what a
     // broken read of these files looks like. The label says what it checks.
-    d.assert('every date sits between 1900 and today',
-      lo >= 1900 && hi <= new Date().getUTCFullYear(), `${lo} to ${hi}`);
+    d.assert('every date that is given sits between 1800 and today',
+      lo >= 1800 && hi <= new Date().getUTCFullYear(),
+      `${dated.length} of ${items.length} dated, ${lo} to ${hi}`);
 
     d.assert('the table shows one row per item',
       list.count() === items.length, `${list.count()} rows for ${items.length} items`);
 
-    // BOTH VIEWS, ON EVERY RUN. The filter is a branch, and a branch entered
-    // only when somebody presses a button is a branch the suite can lose. This
-    // enters it, counts it and puts the page back the way it was.
+    // BOTH FILTERS, BOTH WAYS, ON EVERY RUN. A filter is a branch, and a branch
+    // entered only when somebody presses a button is a branch the suite can
+    // lose. This enters each one, counts it and puts the page back.
     const withFile = items.filter(fileOf).length;
     onlyFiles = true; draw();
     const filtered = list.count();
@@ -156,13 +246,64 @@
       filtered === withFile && list.count() === items.length,
       `${filtered} of ${items.length} have a file`);
 
+    const reusable = items.filter(freeOf).length;
+    onlyFree = true; draw();
+    const filteredFree = list.count();
+    onlyFree = false; draw();
+    d.assert('"only what I may reuse" keeps exactly those rows',
+      filteredFree === reusable && list.count() === items.length,
+      `${reusable} of ${items.length} carry a licence that allows it`);
+
     // The list says its media is referenced where it lives and never copied.
     // That is a claim about every address in it, so it is checked against every
     // address in it rather than believed.
-    const here = items.flatMap((it) => [it.media?.url, it.thumb].filter(Boolean))
+    const here = items.flatMap((it) => [it.file, it.url].filter(Boolean))
       .filter((u) => new URL(u).host === location.host);
-    d.assert('no file is served from here', here.length === 0,
+    d.assert('nothing is served from here', here.length === 0,
       here.length ? here[0] : `${withFile} files, all somewhere else`);
+
+    // Every place that was asked has a row in the corpus's ledger, and the
+    // ledger's counts add up to the list. A source that quietly stopped
+    // returning anything would leave a ledger row reading 0 rather than
+    // vanishing, which is the difference between a finding and a silent drop.
+    const named = new Set(corpus.sources.map((s) => s.name));
+    const orphan = items.filter((it) => !named.has(it.source));
+    const summed = corpus.sources.reduce((n, s) => n + s.items, 0);
+    d.assert('every row belongs to a place that was asked, and the counts add up',
+      orphan.length === 0 && summed === items.length,
+      `${corpus.sources.length} places, ${summed} rows counted`);
+
+    // A place that refused is in the list WITH ITS REASON. This is the check
+    // that keeps "we could not reach it" from decaying into "it does not
+    // exist": every row whose source did not answer 200 has to say what it did
+    // answer, in words a reader can act on.
+    const refused = items.filter((it) => it.http !== 200);
+    const mute = refused.filter((it) => !it.note);
+    // ⚠️ THE DETAIL IS WRITTEN FOR THE FAILING CASE FIRST. Proved by breaking
+    // it: with the pass-case string in both slots this read "4 refused:
+    // lahteilla.fi DNS ENOTFOUND, …" beside a red FAIL — true, and no help at
+    // all in finding the row that had gone quiet.
+    d.assert('every place that refused says what it answered',
+      refused.length > 0 && mute.length === 0,
+      mute.length ? `${mute.length} of ${refused.length} say nothing — first ${mute[0].id}`
+        : `${refused.length} refused: ${[...new Set(refused.map((it) => `${it.source} ${it.http}`))].join(', ')}`);
+
+    // 🔴 ONE GATHERING, NOT TWO. The deck at `/proto/aikajana/` plays from its
+    // own shorter list, and this corpus folds that list in rather than
+    // re-researching it. That fold happens when the corpus is built, so it can
+    // go stale in exactly the way nobody notices — both pages keep working and
+    // quietly disagree about what exists. Checking it from this end costs one
+    // fetch of a file that is already deployed, and turns a silent drift into
+    // a red run.
+    const deckRes = await fetch(DECK);
+    const deck = deckRes.ok ? await deckRes.json() : null;
+    const have = new Set(items.map((it) => it.id));
+    const lost = (deck?.items || []).filter((it) => !have.has(it.id));
+    d.assert('everything the deck plays is in this list',
+      deck !== null && lost.length === 0,
+      deck === null ? `${DECK} answered ${deckRes.status}`
+        : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
+        : `all ${deck.items.length} of the deck's rows are here`);
 
     d.ready();
   } catch (e) {

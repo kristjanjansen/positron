@@ -229,12 +229,14 @@ export const DEMOS = [
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],
     settleMs: 14000 },
-  // What has been gathered about one artist, before anything is played: a row
-  // per item saying when it is from, what it is, what it is called and who is
-  // holding it. It reads the same file `aikajana` plays from, so the two can
-  // never disagree about what exists.
+  // Everything that could be reached about one artist, before anything is
+  // played: 122 rows out of fourteen archives, saying when it is from, who
+  // holds it, what it is, whether there is a file and what its licence allows.
+  // Refs only — nothing is copied here. `demo/kurenniemi/build-corpus.mjs`
+  // gathers it and folds in the shorter list `aikajana` plays from, and the
+  // page re-checks that fold from the other end so the two cannot disagree.
   { name: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
-    one: 'what has been gathered about Erkki Kurenniemi: the date, the kind, the name and who holds it',
+    one: 'every reachable source and asset of Erkki Kurenniemi: who holds it, when, and what it allows',
     tags: ['archive', 'provenance'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
