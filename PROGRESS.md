@@ -725,6 +725,19 @@ left with**, so "we never set it" means "it is whatever the last person wanted",
 and any stage they left on is heard in one pane only while the page reports the
 difference as if the granulators had made it. `BYPASS` pins all nine.
 
+⚠️ **CORRECTED 2026-09-14: "with the board back on LITE" describes a state that
+lasted part of one evening, and this file then carried it as the board's standing
+state.** `/etc/default/positron-box` was put back to `PAPPUS_TINY=1` the same
+night; the running service has had it in its environment since 22:47 on 09-13,
+the engine's own boot line says `Engine_Pappus: TINY graph`, and
+`Engine_Pappus.sc` is md5-identical in the repo, on the board's sclang class
+path, and in `demo/grains/defs/PROVENANCE.json`. **The A/B above is still exactly
+right — it is what the two rungs sound like — and `BYPASS` is still the right
+fix, for the reason given: the board keeps what it was left with.** What is wrong
+is only the present tense, and it propagated into the handoff queue and a commit
+message as "the top board-side open item". A measurement can outlive the
+condition it was taken under; the fix is to date the condition, not the number.
+
 ⚠️ Same species, one level down: the suite **pressed Hold (`src 1`, which
 ERASES) and set `src`/`lock` nowhere else**, so each run handed the next an
 unfillable buffer — visible as the suite going green once then red three times

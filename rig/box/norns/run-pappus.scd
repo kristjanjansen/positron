@@ -255,7 +255,23 @@ s.waitForBoot({
             // ⚠️ LAST, AND THAT IS THE POINT. Nothing this file sets can land on
             // top of a client's settings any more, because no client has been
             // told it may start yet.
-            ("PAPPUS READY " ++ e.listCommands.size ++ " commands, lite=" ++ e.lite).postln;
+            // 🔴 THIS LINE SAID `lite=true` ON A TINY BOARD, AND IT COST A DAY.
+            // `if(tiny) { lite = true }` in the engine, so `lite` is true on
+            // three of the four rungs and NAMES none of them — while this is the
+            // line anybody actually reads, because it is the last one and the
+            // one that says READY. `Engine_Pappus: TINY graph` prints 7 seconds
+            // earlier and scrolls away. MEASURED consequence, 2026-09-14: the
+            // board had been on TINY since 22:47 the night before and the
+            // session record, the handoff queue and a commit message all said it
+            // was on LITE — carried as "the top board-side open item".
+            // ⚠️ `TINY.md` and `CHAIN.md` had both already WARNED that this line
+            // cannot tell the rungs apart, and `writedefs.scd` already printed
+            // it correctly. A warning about a misleading readout is not a fix;
+            // the readout is the fix. All three flags, like writedefs does,
+            // because a rung name alone cannot show a flag that failed to take.
+            ("PAPPUS READY " ++ e.listCommands.size ++ " commands, rung="
+                ++ if(e.bare) { "BARE" } { if(e.tiny) { "TINY" } { if(e.lite) { "LITE" } { "FULL" } } }
+                ++ " lite=" ++ e.lite ++ " tiny=" ++ e.tiny ++ " bare=" ++ e.bare).postln;
         }).play;
     });
 });

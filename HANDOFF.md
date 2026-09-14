@@ -415,10 +415,32 @@ ends are not at the same setting.
 
 - 🔴 **`gl 1282` is located at `upload` and not fixed**, and does not reproduce
   off the headset.
-- 🔴 **The board is on LITE while the tab runs TINY.** The page pins the nine
-  stages that differ, so the comparison holds — but the headline claim is
-  stronger than what is running, and `demo/grains/index.html` still comments
-  that the modal bank is what "TINY compiles out anyway".
+- ~~**The board is on LITE while the tab runs TINY.**~~ ✅ **STRUCK 2026-09-14 —
+  IT WAS NEVER TRUE, AND THE BOARD WAS NOT THE THING THAT WAS WRONG.** Checked
+  on the machine rather than in a commit message: `/etc/default/positron-box`
+  reads `PAPPUS_TINY=1`, the RUNNING process has it in `/proc/<pid>/environ`,
+  the engine reads it by presence (`"PAPPUS_TINY".getenv.notNil`, so not the
+  `includes` bug that killed `PAPPUS_LITE`), and its own boot line at 22:47 on
+  09-13 says **`Engine_Pappus: TINY graph`**. The sources close the chain:
+  `Engine_Pappus.sc` and `PosSource.sc` are md5-identical in the repo, on the
+  board's sclang class path, and in `demo/grains/defs/PROVENANCE.json`. **Both
+  ends run TINY and have since before the claim was written.**
+
+  🔴 **What was actually broken is the line everybody reads.** `PAPPUS READY
+  … lite=true` — because the engine does `if(tiny) { lite = true }`, so `lite`
+  is true on three rungs of four and names none of them, while
+  `Engine_Pappus: TINY graph` prints seven seconds earlier and scrolls away.
+  ⚠️ `TINY.md` and `CHAIN.md` had BOTH already warned that this line cannot
+  tell the rungs apart, and `writedefs.scd` already printed it properly — the
+  warning existed, was not read, and a session record, this queue and a commit
+  message all carried the wrong state anyway. **A warning about a misleading
+  readout is not a fix; the readout is the fix.** `run-pappus.scd` prints
+  `rung=` plus all three flags now. ⚠️ Changed in the repo and pushed; it takes
+  effect at the board's NEXT restart, which has not been done — the board is a
+  live instrument and this is a log line.
+  ⚠️ And `demo/grains/index.html:901` — "the modal bank, which TINY compiles
+  out anyway" — is **correct**, not stale. It was called stale on the strength
+  of the same wrong premise.
 - 🔴 **The 25x insertion loss at `msos 0` is unexplained.**
 - 🔴 **`replay`, `seek`, `capture` and `show` never tick their media master**, and
   the assert that would notice sits behind `if (fires.length)`.
