@@ -796,19 +796,32 @@ video[hidden] { display: none; }
   position: relative;
   z-index: 1;
 }
-/* PRESSED, NOT YET ARRIVED — see `pending()` in choice.mjs. The pulse is on
-   OPACITY ALONE. CLAUDE.md: nothing that redraws may change how much room it
-   takes, so a border width, a font weight or a letter-spacing pulse is out —
-   each of them shuffles the buttons either side. Colour is already spoken for
-   (armed is yellow, focus is grey), which is why this is neither. */
-@keyframes pos-choice-pending { 50% { opacity: .38; } }
-.pos-choice button[data-pending="1"] {
-  animation: pos-choice-pending 640ms ease-in-out infinite;
+/* PRESSED, NOT YET ARRIVED — see `pending()` in choice.mjs.
+   🔴 IT IS THE SAME `data-busy` SWEEP EVERY OTHER BUTTON IN THIS PROJECT USES,
+   and it briefly was not. The first version pulsed opacity, which flickers —
+   REPORTED as *"do no flicker radiobutton - use the animation the regular
+   button uses"*. Fair: "this control is working on it" is one idea and it
+   already had one picture, so a second picture for it in a second place is the
+   drift `/kit/` exists to catch. `pending()` sets `data-busy` and the whole
+   look comes from the block above for free, reduced-motion fallback included.
+
+   ⚠️ THIS RULE EXISTS ONLY TO SURVIVE THE ARMED STATE. `.pos-choice
+   button[aria-pressed="true"]` sets `background` — the SHORTHAND, which resets
+   `background-image` to none — and at (0,2,1) it outranks the generic
+   `button[data-busy="1"]` at (0,1,1). So the sweep would be wiped on the one
+   button that ever needs it: the armed one. Same specificity, later in source,
+   and `background-image` alone so the armed tint underneath is untouched. */
+.pos-choice button[data-busy="1"] {
+  background-image: linear-gradient(100deg,
+    transparent 0%, transparent 35%,
+    color-mix(in oklab, var(--hi) 30%, transparent) 50%,
+    transparent 65%, transparent 100%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: pos-sweep 1.1s linear infinite;
 }
-/* ⚠️ A PULSE IS MOTION AND SOMEBODY HAS TURNED MOTION OFF. The state still has
-   to be visible, so it holds the dim end rather than vanishing. */
 @media (prefers-reduced-motion: reduce) {
-  .pos-choice button[data-pending="1"] { animation: none; opacity: .55; }
+  .pos-choice button[data-busy="1"] { animation: none; opacity: .62; }
 }
 /* Focus is grey here and nowhere near the armed colour — one colour, one
    meaning, which is the rule this project already applies to marks in a strip. */
