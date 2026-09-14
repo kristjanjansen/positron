@@ -74,6 +74,263 @@
 export const DEFAULT_BPM = 60;
 
 // ---------------------------------------------------------------------------
+// 1a. MACROS — `#define` / `$NAME`, because real scores do not start without it
+// ---------------------------------------------------------------------------
+//
+// 🔴 EVERY REAL vCLICK SCORE THREW HERE UNTIL 2026-09-14, AT LINE 12 OF LINE 12.
+// Both scores published in `tarmoj/vclick` open with `t 0 $REPTEMPO`, so the
+// tempo came back NaN and `tempoMap` threw before a single note was read. The
+// compiler had been 42/42 green for a week against fixtures written to please
+// it, and could not compile the only two real files in existence.
+//
+// ⚠️ EVERY RULE BELOW WAS MEASURED AGAINST `scsort` (csound 6.18.1), NOT READ
+// OFF THE MANUAL — that is this repo's rule about implementing somebody else's
+// format, and it is why several things the plan said to REFUSE are supported
+// here instead. `scsort` reads a score on stdin and prints it sorted and
+// tempo-warped, with p2 and p3 each as a (beats, seconds) pair, which makes it
+// a far better oracle than an orchestra that has to `prints` its own p-fields.
+//
+//   $NAME            ✅ 3          plain substitution
+//   $NAME.           ✅ 3          the dot TERMINATES the name and is consumed
+//   $M(5'99)         ✅ 5 … 99     arguments, separated by an apostrophe
+//   #define A #3# twice            ✅ the LAST definition wins
+//   a body over two lines          ✅ works, so the body is not line-bounded
+//   [$N/2] with N 4  ✅ 2          macros expand BEFORE brackets are evaluated
+//
+// 🔴 AND THE ONE THAT DECIDES THE ERROR HANDLING. An undefined `$NOPE` does not
+// leave itself in place and does not stop the score: MEASURED, `i 1 $NOPE 1 100`
+// sorts to a bare `i 1` — the macro AND THE REST OF THE LINE are gone — and
+// then csound's p-field carry refills p2/p3/p4 from the previous note. So a
+// mistyped macro name presents as a DUPLICATE NOTE, which is the worst
+// available shape: no gap, no throw, a plausible row in the right place. We
+// refuse it by name instead, because a compiler that reproduces that bug
+// faithfully is not being faithful to anything anyone wants.
+//
+// `#include` is recognised and NOT supported: it needs a filesystem, this runs
+// in a browser, and inventing a search path would be inventing semantics.
+
+const MACRO_PASS_LIMIT = 50;
+
+/**
+ * Expand `#define` macros. Returns the expanded text and any warnings.
+ *
+ * Expansion REPEATS TO A FIXED POINT because a macro body may name another
+ * macro — `#define REPTEMPO #$TEMPO1#` is in both real scores, and a
+ * single-pass substituter leaves `$TEMPO1` standing, which is exactly the
+ * NaN that started this. The pass limit turns a cyclic definition into a named
+ * failure rather than a hang.
+ */
+export function expandMacros(text) {
+  const warnings = [];
+  const macros = new Map();                 // NAME -> { params, body }
+  let src = String(text);
+
+  // `#define` bodies are delimited by `#`, so they have to come off the text
+  // before anything else looks at it. Walk rather than regex: a body may span
+  // lines, and a regex that spans lines cannot also respect line numbers.
+  let out = '';
+  let i = 0;
+  let line = 1;
+  const lineAt = (idx) => {
+    let n = 1;
+    for (let k = 0; k < idx; k++) if (src[k] === '\n') n++;
+    return n;
+  };
+  while (i < src.length) {
+    if (src.startsWith('#define', i) && /\s/.test(src[i + 7] || ' ')) {
+      const at = lineAt(i);
+      let j = i + 7;
+      while (j < src.length && /[ \t]/.test(src[j])) j++;
+      let name = '';
+      while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) name += src[j++];
+      let params = null;
+      if (src[j] === '(') {
+        j++;
+        let raw = '';
+        while (j < src.length && src[j] !== ')') raw += src[j++];
+        j++;                                     // the ')'
+        params = raw.split("'").map((s) => s.trim()).filter(Boolean);
+      }
+      while (j < src.length && /[ \t]/.test(src[j])) j++;
+      if (src[j] !== '#') {
+        warnings.push(`line ${at}: '#define ${name}' has no # body, ignored`);
+        i = j;
+        continue;
+      }
+      j++;                                       // the opening '#'
+      let body = '';
+      while (j < src.length && src[j] !== '#') body += src[j++];
+      if (src[j] !== '#') {
+        warnings.push(`line ${at}: '#define ${name}' body is never closed with #`);
+        i = src.length;
+        break;
+      }
+      j++;                                       // the closing '#'
+      // ⚠️ A REDEFINITION IS NOT AN ERROR AND THE LAST ONE WINS — measured, and
+      // it matters because vClick's server REWRITES `#define REPTEMPO` by hand
+      // to start from a bar, which would otherwise collide with the original.
+      macros.set(name, { params, body });
+      // keep the newlines the definition spanned, so every later line number
+      // still names the line the musician typed
+      out += src.slice(i, j).replace(/[^\n]/g, '');
+      i = j;
+      continue;
+    }
+    if (src.startsWith('#undef', i) && /\s/.test(src[i + 6] || ' ')) {
+      let j = i + 6;
+      while (j < src.length && /[ \t]/.test(src[j])) j++;
+      let name = '';
+      while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) name += src[j++];
+      macros.delete(name);
+      i = j;
+      continue;
+    }
+    if (src.startsWith('#include', i)) {
+      const at = lineAt(i);
+      let j = i;
+      while (j < src.length && src[j] !== '\n') j++;
+      warnings.push(`line ${at}: '#include' is recognised and NOT supported — `
+        + 'this compiler has no filesystem, so the file cannot be read');
+      out += src.slice(i, j).replace(/[^\n]/g, '');
+      i = j;
+      continue;
+    }
+    out += src[i++];
+  }
+  src = out;
+
+  // Now substitute, to a fixed point.
+  const USE = /\$([A-Za-z0-9_]+)(\.)?(\()?/;
+  for (let pass = 0; ; pass++) {
+    const m = USE.exec(src);
+    if (!m) break;
+    if (pass >= MACRO_PASS_LIMIT * 20) {
+      warnings.push(`macro expansion did not settle after ${pass} substitutions `
+        + '— a macro almost certainly names itself');
+      break;
+    }
+    const at = lineAt(m.index);
+    const name = m[1];
+    const def = macros.get(name);
+    if (!def) {
+      // 🔴 Refused BY NAME rather than reproduced. See the block above: csound
+      // drops the rest of the line and the carry refills it, so the score plays
+      // a convincing wrong note instead of failing.
+      warnings.push(`line ${at}: '${name}' is not defined — csound would drop `
+        + 'the rest of this line and carry the previous note into it');
+      src = src.slice(0, m.index) + src.slice(m.index + m[0].length - (m[3] ? 1 : 0));
+      continue;
+    }
+    let end = m.index + 1 + name.length + (m[2] ? 1 : 0);
+    let body = def.body;
+    if (def.params && m[3]) {
+      // arguments: `$M(5'99)`, apostrophe-separated, positional
+      let j = m.index + m[0].length;
+      let depth = 1;
+      let raw = '';
+      while (j < src.length && depth > 0) {
+        if (src[j] === '(') depth++;
+        else if (src[j] === ')') { depth--; if (!depth) break; }
+        raw += src[j++];
+      }
+      end = j + 1;
+      const args = raw.split("'");
+      if (args.length !== def.params.length) {
+        warnings.push(`line ${at}: '${name}' takes ${def.params.length} `
+          + `argument(s) and was given ${args.length}`);
+      }
+      def.params.forEach((p, k) => {
+        body = body.split(`${p}`).join(args[k] ?? '');
+      });
+    } else if (def.params) {
+      warnings.push(`line ${at}: '${name}' is defined with arguments and used without them`);
+    }
+    src = src.slice(0, m.index) + body + src.slice(end);
+  }
+
+  return { text: src, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// 1b. SCORE EXPRESSIONS — `[8/3]`, and the silent zero they used to become
+// ---------------------------------------------------------------------------
+//
+// 🔴 A BRACKET IN p2 OR p3 WAS SILENTLY WRONG, WITH ZERO WARNINGS. `Number('[4/2]')`
+// is NaN, the p-field fell through to a string, and `Number(p[1]) || 0` made it
+// beat 0 — so a note landed at the top of the section and the run stayed green.
+// In the two real scores the brackets sit in p4 and p5, where they were carried
+// through verbatim and nothing was mistimed. That is LUCK, not a property:
+// `test.sco` writes `[16/3]` as a NUMBER OF BEATS (p4) in two bars, and one
+// edit moving that idea into p3 would have been a silent retime.
+//
+// ✅ MEASURED against scsort, all of them: `[1+2]` 3 · `[6-4]` 2 · `[2*3]` 6 ·
+// `[8/4]` 2 · `[2^3]` 8 · `[7%4]` 3 · `[[1+1]*[3-1]]` 4 · `[0-1]` -1 ·
+// `[-2+3]` 1. So nesting, both unary and binary minus, power and modulo are all
+// real, and `^` is POWER here even though it means something else entirely in
+// p2 outside brackets.
+//
+// ⚠️ `~` (a random number) is recognised and REFUSED: it is deliberately not
+// reproducible, and a compiler whose output changes between two runs of the
+// same score cannot be graded against anything, including itself.
+
+/**
+ * Evaluate a Csound score expression. Returns a number, or `null` when the
+ * expression is not one we will stand behind — the caller warns and keeps the
+ * raw text, so nothing becomes a confident zero.
+ */
+export function evalScoreExpr(raw) {
+  const s = String(raw);
+  if (!s.startsWith('[') || !s.endsWith(']')) return null;
+  if (s.includes('~')) return null;                // random: refused, see above
+  if (!/^[\[\]0-9.+\-*/^%\s]+$/.test(s)) return null;
+  let i = 0;
+  const src = s;
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  let expr;                                        // forward declaration
+  const primary = () => {
+    ws();
+    if (src[i] === '[') { i++; const v = expr(); ws(); if (src[i] !== ']') return NaN; i++; return v; }
+    if (src[i] === '-') { i++; return -primary(); }
+    if (src[i] === '+') { i++; return primary(); }
+    let n = '';
+    while (i < src.length && /[0-9.]/.test(src[i])) n += src[i++];
+    return n === '' ? NaN : Number(n);
+  };
+  // `^` binds tighter than `*`, and right to left, as everywhere else it exists
+  const power = () => {
+    let a = primary();
+    ws();
+    if (src[i] === '^') { i++; return a ** power(); }
+    return a;
+  };
+  const term = () => {
+    let a = power();
+    for (;;) {
+      ws();
+      const op = src[i];
+      if (op !== '*' && op !== '/' && op !== '%') return a;
+      i++;
+      const b = power();
+      a = op === '*' ? a * b : op === '/' ? a / b : a % b;
+    }
+  };
+  expr = () => {
+    let a = term();
+    for (;;) {
+      ws();
+      const op = src[i];
+      if (op !== '+' && op !== '-') return a;
+      i++;
+      const b = term();
+      a = op === '+' ? a + b : a - b;
+    }
+  };
+  const v = expr();
+  ws();
+  return (i === src.length && Number.isFinite(v)) ? v : null;
+}
+
+// ---------------------------------------------------------------------------
 // 1. PARSE — statements, in order, with their line numbers kept for messages.
 // ---------------------------------------------------------------------------
 
@@ -284,8 +541,12 @@ function sectionTempo(sts, warnings) {
  *   restarts at every `s`.
  */
 export function compileCsound(text, { kind = 'note', expand = true } = {}) {
-  const sts = parseCsoundScore(text);
-  const warnings = [];
+  // ⚠️ MACROS FIRST, AND THE ORDER IS MEASURED, NOT CHOSEN: `[$N/2]` with N 4
+  // evaluates to 2, so a macro can be an OPERAND of a bracket and expansion has
+  // to have finished before any expression is looked at.
+  const expanded = expandMacros(text);
+  const sts = parseCsoundScore(expanded.text);
+  const warnings = [...expanded.warnings];
 
   // ── Pass 1: cut into SECTIONS. This has to happen before any p2 becomes a
   // time, because a `t` governs its whole section from wherever it appears in
@@ -394,6 +655,19 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
                 const delta = Number(rel[2]) * (rel[1] === '-' ? -1 : 1);
                 return (prevAny?.[1] ?? 0) + delta;
               }
+            }
+            // A SCORE EXPRESSION, `[8/3]`. Until 2026-09-14 this fell straight
+            // through to the string below and `Number(p[1]) || 0` turned it into
+            // beat 0 with no warning — see §1b. Evaluated here so p2 and p3 are
+            // right; a form we will not stand behind returns null and is warned
+            // about rather than guessed at.
+            if (raw.startsWith('[')) {
+              const v = evalScoreExpr(raw);
+              if (v !== null) return v;
+              warnings.push(`line ${s.line}: '${raw}' is a score expression this `
+                + 'compiler will not evaluate, so it is carried through as text '
+                + (idx <= 2 ? '— AND IT IS IN p2 OR p3, SO THIS ROW IS MISTIMED' : ''));
+              return raw;
             }
             const n = Number(raw);
             return Number.isFinite(n) ? n : raw;      // named instruments stay strings
