@@ -196,6 +196,24 @@
   // and nothing else, because nothing else had run.
   const BUF_SECONDS = 8;                 // Pappus `mbuflen`, the held seconds
   const RANGE_HZ = 1;
+  /**
+   * 🔴 UP HERE FOR THE SAME REASON `BUF_SECONDS` IS, AND IT COST A RUN TO
+   * RE-LEARN. The transport bar's `settling` option is a closure over `stream`,
+   * and `createTransportBar` PAINTS ONCE at construction — so with these
+   * declared where they used to be, three hundred lines further down, the very
+   * first paint reached a `let` in its temporal dead zone:
+   * `ReferenceError: Cannot access 'stream' before initialization`, thrown
+   * inside the constructor, so `d.ready()` was never called and the suite said
+   * `__demo.ready — failed` with nothing else. Same shape, third time in this
+   * file. A closure handed to a component may be called before the next line of
+   * this page runs.
+   *
+   * ⚠️ THE SPEED SURVIVES A REOPEN. A station switch builds a new stream, and a
+   * control whose setting silently reverts because something behind it was
+   * rebuilt is worse than one that does not exist.
+   */
+  let stream = null;                 // the decoded mount, when DECODE
+  let speed = 1;
 
   const d = mount({
     name: 'radio1965',
@@ -204,7 +222,10 @@
       + 'directly. The sound also goes into a granulator running in this tab, and '
       + 'the long fader blends the two: all station at the left, all granulator at '
       + 'the right. Every tick in the picture is a grain the engine reported '
-      + 'firing, SOUND picks what kind, and the sliders nudge it.',
+      + 'firing, SOUND picks what kind, and the sliders nudge it. It also moves '
+      + 'by itself: MOVING counts how many grain settings are being walked right '
+      + 'now, some by the station\u2019s own loudness and colour, some on slow '
+      + 'waves this page makes.',
     // ⚠️ FOUR CELLS, DOWN FROM SIX, AND THE TWO THAT WENT WERE THE TWO THAT
     // COULD NOT MOVE. `gap` is the worst pause over one five-second read: it is
     // measured once and then sits there for the rest of the visit, which is a
@@ -214,7 +235,21 @@
     // value an inch below, and a second copy of a number is a number that can
     // disagree with itself — the same argument `keyboard.mjs` makes for keeping
     // the octave off the pad.
-    readout: { heard: 's', kbps: '', behind: 's', grains: '/s' },
+    // 🔴 `heard` IS GONE AND `moving` TOOK ITS PLACE, WHICH IS NOT THE SAME AS
+    // DELETING A CELL. `mount()` throws on an odd count (CLAUDE.md), so a
+    // four-cell row cannot simply become three — and the rule behind that is
+    // editorial: an odd readout always has a weakest cell and being made to
+    // find it is the point. `heard 889s` was the weakest here. It counted how
+    // long this tab had been open, which is a fact about the visitor rather
+    // than about the station or the instrument, and it grew for ever whatever
+    // anything else did.
+    //
+    // `moving` is how many granulator settings are being walked right now. It
+    // answers the question this page kept being asked — *"patches still too
+    // similar and not too interesting"* — from the row rather than from the
+    // prose: `slowed` reads `—` because nothing modulates it and that is its
+    // whole claim, and the other six read 3 or 4.
+    readout: { kbps: '', behind: 's', grains: '/s', moving: '' },
     // 🔴 NO CONTROLS AT ALL, AND THE GRANULATOR IS ALWAYS ON. There was a
     // `Synthesize` button, and before that a `Listen` button beside a transport
     // bar that already has a play button. Both were the same mistake one step
@@ -421,34 +456,38 @@
 
   // `live: true` — the clock is replaced by a LIVE chip. `absolute` stays for
   // the keyboard table's sake and costs nothing now that the time is not drawn.
-  const bar = createTransportBar(d.el, deck,
-    { absolute: true, scrub: false, endStop: false, live: true });
-
-  /**
-   * The bar's speed, carried to the stream.
-   *
-   * ⚠️ POLLED, NOT HOOKED, because the bar exposes no rate event and reaching
-   * into its buttons would be the page owning a control it does not own. One
-   * read a second is free, and `setRate` is a no-op when nothing changed.
-   * ⚠️ `targetRate` rather than `rate()`: a paused deck genuinely advances at
-   * zero, so `rate()` reads 0 while paused and would silently stop the station
-   * the moment somebody pressed pause and play.
-   */
-  // 🔴 120 ms, NOT A SECOND. This polled at 1 Hz, so a press could sit for most
-  // of a second before the stream was even TOLD — on top of the cushion draining
-  // at the old speed and the glide climbing to the new one. REPORTED as *"why
-  // rate change is so slooooooooow"*, and a third of the wait was this line
-  // doing nothing. Reading two numbers eight times a second is free.
-  setInterval(() => {
-    const r = deck.targetRate?.() ?? deck.rate?.() ?? 1;
-    if (DECODE && stream && r > 0 && r !== speed) {
+  const bar = createTransportBar(d.el, deck, {
+    absolute: true, scrub: false, endStop: false, live: true,
+    // 🔴 THE SPEED, THE INSTANT IT IS PRESSED — see `onRate` in transport-bar.mjs.
+    // This replaces a 120 ms poll of `deck.targetRate()`, which replaced a 1 Hz
+    // one. Both were the page reading a control it does not own on a timer
+    // because the bar offered no event; up to 120 ms of a press doing nothing,
+    // on top of a wait this page is now at pains to shorten.
+    onRate: (r) => {
+      // ⚠️ `DECODE` STAYS IN THE GUARD. Under `?decode=0` the sound is a media
+      // element this page does not rate-control, so without it the log would
+      // announce a speed change that nothing performed — a page saying it did
+      // something it did not is worse than a control that visibly refuses.
+      if (!DECODE || !(r > 0) || r === speed) return;
       speed = r;
-      stream.setRate(r);
+      // ⚠️ `stream` CAN BE NULL HERE and that is not a lost press. The decoded
+      // path is torn down and rebuilt on a station change and on a transport
+      // stop, and `openStream()` applies `speed` when it builds — so arming it
+      // on the variable is what makes the press survive a rebuild.
+      stream?.setRate(r);
       d.log(r === 1 ? 'back to the station\u2019s own speed'
         : r < 1 ? `${r}\u00d7 — pitched down, and falling further behind live every second`
                 : `${r}\u00d7 — pitched up, and it lasts only as long as the cushion`);
-    }
-  }, 120);
+    },
+    // 🔴 THE BUTTON PULSES UNTIL THE SPEED IS AUDIBLE, WHICH IS NOT WHEN IT WAS
+    // PRESSED. `mp3-stream.mjs` schedules `floorMs` of audio ahead, so the old
+    // speed goes on sounding for about 600 ms after the press however fast the
+    // glide is — the half of the wait no amount of tuning removes. REPORTED as
+    // *"can we track when 0.5 etc happens and animate the radiobutton until
+    // then?"*, and the stream knows the answer exactly: the context time of the
+    // first block that actually reaches the target.
+    settling: () => !!stream?.stats().settling,
+  });
 
   // ── the picture ────────────────────────────────────────────────────────────
   // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
@@ -499,21 +538,16 @@
   setInterval(() => {
     const t = Date.now();
     deck.setRange([t - SPAN_MS, t]);
-    // 🔴 BOTH NUMBERS COME FROM THE ELEMENT, NOT FROM THIS TIMER. `heard` used
-    // to be a counter this interval incremented — a measurement driven by a
-    // clock, of a quantity the audio object already knows exactly.
-    // `audio.currentTime` counts only while sound is actually playing, so
-    // pauses fall out for free and no counter can drift from them.
+    // 🔴 `played()` COMES FROM THE ELEMENT, NOT FROM THIS TIMER, and that is
+    // what makes the number below survivable. `audio.currentTime` counts only
+    // while sound is actually playing, so pauses fall out for free and no
+    // counter can drift from them.
     //
-    // ⚠️ AND A HIDDEN TAB IS WHERE THE OLD ONE WOULD HAVE LIED. Chrome clamps a
-    // background `setInterval` to 1 s and, after a few minutes, throttles it
-    // far harder — so `heard` would have stalled while the radio kept playing,
-    // and `behind`, computed against the wall clock, would have climbed to
-    // minutes of "you missed this" for somebody who missed nothing. The
-    // element's own clock has no such problem.
-    if (heardFrom != null) {
-      d.set('heard', played().toFixed(0));
-    }
+    // ⚠️ AND A HIDDEN TAB IS WHERE A COUNTER WOULD LIE. Chrome clamps a
+    // background `setInterval` to 1 s and, after a few minutes, throttles it far
+    // harder — so a self-incremented "seconds listened" would stall while the
+    // radio kept playing, while `behind`, computed against the wall clock, would
+    // climb to minutes of "you missed this" for somebody who missed nothing.
     // 🔴 BEHIND — the one number a live stream with a pause button owes you.
     // An Icecast mount has no past to seek to, so pausing does not hold your
     // place: it drops you, and resuming rejoins at the live edge while the
@@ -587,11 +621,6 @@
   audio.crossOrigin = 'anonymous';
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
-  let stream = null;                 // the decoded mount, when DECODE
-  // ⚠️ THE SPEED SURVIVES A REOPEN. A station switch builds a new stream, and a
-  // control whose setting silently reverts because something behind it was
-  // rebuilt is worse than one that does not exist.
-  let speed = 1;
   // ⚠️ REMEMBERED, because the stream is CLOSED by the time `finish()` asserts —
   // the transport-stop check shuts it deliberately — and reading the path off a
   // null stream printed `via nothing` about a path that had just decoded 16 s.
@@ -693,6 +722,14 @@
     else ctx.createMediaElementSource(audio).connect(srcNode);
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
+    // 🔴 NO SMOOTHING, BECAUSE ONE OF THE THINGS READ OFF THIS IS A RATE OF
+    // CHANGE. `getFloatFrequencyData` applies `smoothingTimeConstant` — 0.8 by
+    // default — which blends each frame with the last, so a spectral-flux
+    // follower would be measuring the blend rather than the programme and would
+    // read almost flat on material that is all onsets. The time-domain read the
+    // scope and the meter use is unaffected either way, so this costs them
+    // nothing.
+    analyser.smoothingTimeConstant = 0;
     // ⚠️ THE DRY GAIN EXISTS FROM THE START even though nothing uses it until
     // Synthesize is pressed. Re-routing a live graph is how a page ends up with
     // two paths to the destination and twice the level; building the blend
@@ -993,18 +1030,78 @@
   }, WATCH_MS);
 
   let rmsPeak = 0;
+  /**
+   * 🔴 SIX NUMBERS OFF THE READ THE METER WAS DOING ANYWAY, AND THEY ARE WHAT
+   * MAKES THE PATCHES DIFFERENT FROM EACH OTHER.
+   *
+   * Loudness alone is one gesture: everything it drives moves together, so six
+   * patches routing it to six destinations are six views of one wave. Split the
+   * same audio into bands and the sources stop agreeing — on speech `mid` moves
+   * and `low` sits still; on music they part company; `high` follows sibilance
+   * and cymbals; `tone` says where the energy IS rather than how much of it
+   * there is; `flux` says how fast the programme is changing, which is the only
+   * one of the six that is near zero on a sustained chord and high on a
+   * announcer.
+   *
+   * ⚠️ THE PAGE MEASURES AND THE MODULATOR FOLLOWS, which is the same division
+   * `grain-scope.mjs` already states: whoever owns the audio owns the
+   * measurement. None of this is in `pappus-mod.mjs`.
+   *
+   * ⚠️ THE BUFFERS ARE HOISTED. Three typed arrays a frame at 60 Hz is 1.4 MB a
+   * second of garbage for numbers that are overwritten immediately.
+   */
+  const timeBuf = new Float32Array(2048);
+  let freqBuf = null, prevMag = null, magBuf = null;
+  /** Bin edges, computed once from the real sample rate rather than assumed. */
+  function bandEdges() {
+    const binHz = ctx.sampleRate / (analyser?.fftSize || 2048);
+    return { binHz,
+      lo: Math.max(1, Math.round(20 / binHz)),
+      a: Math.round(300 / binHz), b: Math.round(2000 / binHz),
+      hi: Math.min((analyser?.frequencyBinCount || 1024) - 1, Math.round(10000 / binHz)) };
+  }
   function meterTick() {
     if (!analyser) return;
-    const buf = new Float32Array(analyser.fftSize);
+    const buf = timeBuf.length === analyser.fftSize ? timeBuf : new Float32Array(analyser.fftSize);
     analyser.getFloatTimeDomainData(buf);
     let sum = 0;
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.sqrt(sum / buf.length);
     if (rms > rmsPeak) rmsPeak = rms;
-    // The follower's only source. It is fed from here rather than from its own
-    // timer because this is where the samples already are — one analyser read a
-    // frame, which the meter was doing anyway.
-    modulator?.level(rms);
+
+    const bins = analyser.frequencyBinCount;
+    if (!freqBuf || freqBuf.length !== bins) {
+      freqBuf = new Float32Array(bins); magBuf = new Float32Array(bins); prevMag = new Float32Array(bins);
+    }
+    analyser.getFloatFrequencyData(freqBuf);
+    const { binHz, lo, a, b, hi } = bandEdges();
+    let sLow = 0, sMid = 0, sHigh = 0, sAll = 0, sFreq = 0, sFlux = 0;
+    for (let i = lo; i <= hi; i++) {
+      // dBFS -> linear. ⚠️ `-Infinity` IS A REAL VALUE HERE — an empty bin
+      // reports it, and `10 ** (-Infinity/20)` is 0, which is correct; but a
+      // NaN anywhere in the sum poisons every follower at once, so guard.
+      const m = Number.isFinite(freqBuf[i]) ? 10 ** (freqBuf[i] / 20) : 0;
+      magBuf[i] = m;
+      sAll += m; sFreq += m * i * binHz;
+      const d2 = m - prevMag[i];
+      if (d2 > 0) sFlux += d2;            // ONSETS ONLY: a decay is not an event
+      if (i < a) sLow += m; else if (i < b) sMid += m; else sHigh += m;
+    }
+    prevMag.set(magBuf);
+    const n = hi - lo + 1;
+    // Where the energy sits, 100 Hz..8 kHz on a log axis — the same measurement
+    // that was briefly a hue on the waveform and was reverted twice. As a
+    // COLOUR it moved about 11 degrees on real material, which nobody can see.
+    // As a modulation on an exponential lane, 11% of the lane is a factor of
+    // 1.3 in grain length, which everybody can hear.
+    const centroid = sAll > 0 ? sFreq / sAll : 0;
+    const tone = centroid > 0
+      ? Math.max(0, Math.min(1, Math.log(centroid / 100) / Math.log(80))) : 0;
+    modulator?.sense({
+      rms,
+      low: sLow / Math.max(1, a - lo), mid: sMid / Math.max(1, b - a), high: sHigh / Math.max(1, hi - b + 1),
+      tone, flux: sFlux / n,
+    });
     // ⚠️ NO COLOUR. The wave was briefly tinted by spectral centroid — hue for
     // where the energy sat — and it was asked to be reverted twice. The
     // reasoning is kept on the dead branch in `grain-scope.mjs` rather than
@@ -1470,6 +1567,12 @@
         `${G.modDest} spanned ${G.modMoved.spread.toFixed(3)} s over ${G.modMoved.got} reads `
         + `while the follower ran, ${G.modStill.spread.toFixed(3)} s over ${G.modStill.got} `
         + 'with it held');
+      d.assert('a shape this page generates moves it too, and stops when told',
+        G.lfoMoved?.got > 5 && G.lfoStill?.got > 2
+          && G.lfoMoved.spread > 0.2 && G.lfoStill.spread <= G.lfoMoved.spread / 5,
+        `mswarm spanned ${(G.lfoMoved?.spread ?? 0).toFixed(3)} of 1 over `
+        + `${G.lfoMoved?.got ?? 0} reads under a 2 Hz saw, `
+        + `${(G.lfoStill?.spread ?? 0).toFixed(3)} over ${G.lfoStill?.got ?? 0} with it held`);
       d.assert('the grain ticks are drawn, and the fader fades them',
         G.inkWet > 20 && G.inkDry * 4 < G.inkWet,
         `${G.inkDry} lit all-radio, ${G.inkWet} lit all-granulator, ${G.alive} ticks alive`);
@@ -1671,7 +1774,19 @@
       // MOTION: the station's loud passages pull the grains SHORT and let them
       //         stretch back out in the quiet — a tide that breathes with the
       //         programme
-      mod: [{ src: 'env', dest: 'size', amt: 0.55 }],
+      mod: [
+        { src: 'env', dest: 'size', amt: 0.55 },
+        // 🔴 A SEVENTY-SECOND WAVE ON THE READ SPEED, AND IT CROSSES ZERO.
+        // `scan` is a SPEED in STRETCH (`speed = 3·mscan − 1`), so a base of
+        // 0.30 is −0.10x and a tenth of the lane either way runs −0.37x to
+        // +0.17x: the crawl slows, stops, turns round and goes back. Nothing
+        // else on this page produces a standstill you can hear arriving.
+        { src: 'lfo', shape: 'sine', hz: 0.014, dest: 'scan', amt: 0.45 },
+        // The chord's detune on a drifting sixteen-step pattern — twelve
+        // seconds a step, so a lap is over three minutes and no two visits hear
+        // the same one.
+        { src: 'lfo', shape: 'glide', hz: 0.08, machine: 0.9, dest: 'swarm', amt: 0.5 },
+      ],
       scanmode: 1, scan: 0.30, rate: 1.4, size: 1.8, contour: 14,
       sos: 0.72, lock: 0, tilt: -0.30, ingain: 1, comp: 0.20,
       spray: 0.55, spraymode: 3, swarm: 0.45, swarmmode: 3, strum: 0.06,
@@ -1752,7 +1867,16 @@
       // MOTION: the grain rate climbs with the level, so a loud passage
       //         thickens into a wash and a quiet one thins to countable single
       //         grains
-      mod: [{ src: 'env', dest: 'rate', amt: 0.60 }],
+      mod: [
+        { src: 'env', dest: 'rate', amt: 0.60 },
+        // The top of the band alone. Sibilance and cymbals shorten the grains
+        // while the bass leaves them long — a distinction loudness cannot make,
+        // because a loud bass note and a loud hi-hat are the same number to it.
+        { src: 'env.high', dest: 'size', amt: -0.45 },
+        // The grain window itself, stepped. Seventeen shapes from a hard edge
+        // to a slow swell (`:726`), read fresh by every grain.
+        { src: 'lfo', shape: 'glide', hz: 0.15, machine: 0.88, dest: 'contour', amt: 0.8 },
+      ],
       scanmode: 1, scan: 0.36, rate: 0.9, size: 3.0, contour: 16,
       sos: 0.80, lock: 0, tilt: -0.15, ingain: 0.75, comp: 0.25,
       spray: 0.30, spraymode: 3, swarm: 0.55, swarmmode: 4, strum: 0.08,
@@ -1778,7 +1902,17 @@
       // MOTION: the read head nudges forward on loud material and settles back
       //         — the freeze stays a freeze, but it stops being a dead
       //         photograph
-      mod: [{ src: 'env', dest: 'scan', amt: 0.28 }],
+      mod: [
+        { src: 'env', dest: 'scan', amt: 0.28 },
+        // 🔴 ON A FREEZE THE WINDOW SHAPE IS THE INSTRUMENT. `lock 1` stops the
+        // buffer being written, so the material cannot change and every other
+        // source is reading the same eight seconds for ever — the one thing
+        // left that alters the sound is how each grain is shaped on its way
+        // out. Held, not glided: a window is chosen per grain, so stepping is
+        // what it actually does.
+        { src: 'lfo', shape: 'step', hz: 0.5, machine: 0.92, dest: 'contour', amt: 0.75 },
+        { src: 'lfo', shape: 'tri', hz: 0.07, dest: 'strum', amt: 0.7 },
+      ],
       scanmode: 1, scan: 0.36, rate: 9, size: 0.55, contour: 10,
       sos: 0.62, lock: 1, tilt: -0.20, ingain: 1, comp: 0.25,
       winstart: 0.30, winend: 0.70,
@@ -1803,7 +1937,14 @@
       // MOTION: scatter opens with the level, so the backwards tape smears wide
       //         when the station is loud and pulls back to one line when it is
       //         not
-      mod: [{ src: 'env', dest: 'spray', amt: 0.50 }],
+      mod: [
+        { src: 'env', dest: 'spray', amt: 0.50 },
+        { src: 'lfo', shape: 'tri', hz: 0.05, dest: 'swarm', amt: 0.55 },
+        // The bottom of the band pulls the grain rate DOWN, so a bass-heavy
+        // passage thins out rather than thickening — the opposite of what
+        // loudness would do to the same material.
+        { src: 'env.low', dest: 'rate', amt: -0.42 },
+      ],
       scanmode: 1, scan: 0.0, rate: 5, size: 0.9, contour: 16,
       sos: 0.68, lock: 0, tilt: -0.50, ingain: 1, comp: 0.35,
       spray: 0.30, spraymode: 1, swarm: 0.40, swarmmode: 2, strum: 0.125,
@@ -1828,7 +1969,20 @@
       says: 'a fast scatter of tiny plucks that drifts as one cloud',
       // MOTION: the hardest routing here: louder means MORE drops and SHORTER
       //         ones, which is the difference between rain and a hiss
-      mod: [{ src: 'env', dest: 'rate', amt: 0.75 }, { src: 'env', dest: 'size', amt: -0.35 }],
+      mod: [
+        { src: 'env', dest: 'rate', amt: 0.75 },
+        { src: 'env', dest: 'size', amt: -0.35 },
+        // 🔴 THE SIXTEEN-STEP PATTERN, ACROSS THE EIGHT VOICES. `probs` is one
+        // firing probability per voice (`:801`), so a stepped source rotated by
+        // a whole slot per voice makes them come and go in turn — a part rather
+        // than a wobble, which is the whole answer to *"patches still too
+        // similar and not too interesting"*. `machine 0.88` keeps the pattern
+        // recognisable while rewriting about two of its sixteen values a lap.
+        { src: 'lfo', shape: 'step', hz: 2, machine: 0.88, dest: 'probs', amt: 0.85 },
+        // How fast the programme is changing, not how loud it is: an announcer
+        // scatters the read point, a sustained chord does not.
+        { src: 'env.flux', dest: 'spray', amt: 0.45 },
+      ],
       scanmode: 1, scan: 0.75, rate: 26, size: 0.030, contour: 0,
       sos: 0.62, lock: 0, tilt: 0.40, ingain: 1, comp: 0.20,
       spray: 0.70, spraymode: 3, swarm: 0.22, swarmmode: 1, strum: 0,
@@ -1858,7 +2012,19 @@
       says: 'the buffer stops being replaced and starts stacking up',
       // MOTION: the pile deepens and spreads together, so a busy passage stacks
       //         into something wider rather than merely louder
-      mod: [{ src: 'env', dest: 'size', amt: 0.45 }, { src: 'env', dest: 'spray', amt: 0.35 }],
+      mod: [
+        { src: 'env', dest: 'size', amt: 0.45 },
+        { src: 'env', dest: 'spray', amt: 0.35 },
+        // Where the energy sits, rather than how much of it there is — bright
+        // material speeds the grains up and dark material lets them spread.
+        { src: 'env.tone', dest: 'rate', amt: 0.5 },
+        // 🔴 THE WASH BREATHES BETWEEN THE GRAINS AND THE RADIO. `sos` is the
+        // crossfade between them (`:980`), and the lane floors at 0.62 because
+        // below 0.6 the granulator is off — so this opens a little of the plain
+        // station through the palimpsest and closes it again, every fifty
+        // seconds, without ever switching the instrument out.
+        { src: 'lfo', shape: 'sine', hz: 0.02, dest: 'sos', amt: 0.6 },
+      ],
       scanmode: 1, scan: 0.345, rate: 0.9, size: 2.6, contour: 12,
       sos: 0.90, lock: 0, tilt: -0.55, ingain: 0.70, comp: 0.15,
       spray: 0.45, spraymode: 3, swarm: 0.65, swarmmode: 3, strum: 0.08,
@@ -2142,17 +2308,87 @@
    */
   let modulator = null;
   const MOD_HZ = 25;          // 20 ms of Lag.kr upstream; faster is thrown away
+  /**
+   * Where a modulated control is actually written.
+   *
+   * 🔴 `setBoth` IS THE WRONG WRITER AT 25 Hz. It sends `m…` and `n…` for one
+   * setting, which is right for a patch — one shot, and the board may be on a
+   * rung where the second granulator exists — and wrong for a modulator, where
+   * it is exactly double the OSC traffic into a granulator that is
+   * `DC.ar([0,0])` in this tab (`Engine_Pappus.sc:1013`, `:218`). The
+   * modulator writes the head that makes the sound and nothing else.
+   *
+   * ⚠️ AND NOT EVERY CONTROL WEARS THE `m`. `kwow`, `drive`, `crush`, `noise`
+   * and the eight-element arrays are global — one stage for both granulators —
+   * so the prefix would name a control this definition does not have, and
+   * scsynth discards an unknown control IN SILENCE. That is the failure this
+   * table exists to stop: a routing that runs, reports, and never reaches a
+   * single sample.
+   */
+  const MOD_CMD = { wow: 'kwow', drive: 'drive', crush: 'crush', noise: 'noise',
+                    probs: 'probs', gates: 'gates' };
   function startModulator() {
     if (modulator) return modulator;
     modulator = createModulator({
       now: () => ctx.currentTime,
-      send: (name, v) => setBoth(name, v),
+      send: (name, v) => setParam(eng, MOD_CMD[name] ?? `m${name}`, v),
+      /**
+       * 🔴 THE LANES, AND EVERY ONE OF THEM IS THE ENGINE'S OWN. A modulation
+       * is applied in the control's warped space, so these ranges decide what a
+       * routing MEANS — get one wrong and a musical amount becomes a slam.
+       * Citations are `Engine_Pappus.sc`.
+       */
       specs: {
-        rate: { min: 0.1, max: 100, warp: 'exp' },
-        size: { min: 0.002, max: 4, warp: 'exp' },
-        scan: { min: 0, max: 1 },
-        spray: { min: 0, max: 1 },
+        rate: { min: 0.1, max: 100, warp: 'exp' },     // grains per second
+        size: { min: 0.002, max: 4, warp: 'exp' },     // grain length, `:682` clips at 8
+        scan: { min: 0, max: 1 },                      // read head; a SPEED in STRETCH (`:715`)
+        spray: { min: 0, max: 1 },                     // read-point jitter, `:815`
+        swarm: { min: 0, max: 1 },                     // detuned duplicates, `:743`
+        strum: { min: 0, max: 0.125 },                 // grain-period subdivision, `:756`
+        // 🔴 THE FLOOR IS 0.62, NOT 0. `sxf = (msos.max(mlock)/0.6).clip(0,1)`
+        // (`:980`) crossfades the grains against the LIVE INPUT, so anything
+        // below 0.6 is not a darker flavour — it is the granulator being turned
+        // off and the radio handed back. A lane that reaches zero would make a
+        // slow sine on this control switch the instrument off twice a minute.
+        sos: { min: 0.62, max: 1 },
+        // A `Select.kr` index over seventeen windows (`:726`), read per grain —
+        // so it wants a stepped source, and a fractional index is not a value
+        // this page could read back the way it sent it.
+        contour: { min: 0, max: 16, quant: 1 },
+        wow: { min: 0, max: 1 },                       // tape flutter, `:1590`
+        // The window ends. ⚠️ ONLY IN STRETCH AND POSITION — `applyPatch` drops
+        // a routing onto these in a delay mode, where `writePatch` forces the
+        // window to the whole lap and a narrowed one puts the read head nowhere
+        // near the write head.
+        winstart: { min: 0, max: 0.6 },
+        winend: { min: 0.4, max: 1 },
+        // ⚠️ AN ARRAY, so it is written with `/n_setn` and one shape is rotated
+        // across the eight voices. `probs` is per-voice firing probability
+        // (`:801`), which is the difference between a texture that is always on
+        // and one that breathes.
+        probs: { min: 0, max: 1, n: 8 },
       },
+      /**
+       * 🔴 SIX FOLLOWERS OFF ONE ANALYSER READ, AND THE POINT IS THAT THEY ARE
+       * ALL THE STATION. Upstream's follower has a source switch across its own
+       * jacks and calls the input *"the most musical source in the box"*; here
+       * the input is a radio programme, so speech, music and silence each move
+       * the granulator differently. `meterTick` computes them.
+       *
+       * ⚠️ SENSITIVITY IS PER SOURCE AND HAS TO BE. `tone` is already 0..1, so
+       * upstream's sens 6 would pin it at the ceiling where it stops following
+       * anything — measured in `pappus-mod-test.mjs`, where exactly that made a
+       * working follower read as a stuck control.
+       */
+      followers: {
+        rms: { attack: 0.01, release: 0.35, sens: 6 },
+        low: { attack: 0.02, release: 0.40, sens: 9 },
+        mid: { attack: 0.01, release: 0.30, sens: 11 },
+        high: { attack: 0.006, release: 0.25, sens: 14 },
+        tone: { attack: 0.05, release: 0.50, sens: 1 },
+        flux: { attack: 0.004, release: 0.22, sens: 2.5 },
+      },
+      warn: (m) => d.log(`modulation refused: ${m}`, 'bad'),
     });
     setInterval(() => { if (eng) modulator.tick(); }, 1000 / MOD_HZ);
     return modulator;
@@ -2183,9 +2419,29 @@
     // with the same numbers and different routes are two different instruments,
     // which is the whole answer to "they all sound the same".
     if (modulator) {
-      for (const [k, v] of [['rate', p.rate], ['size', p.size],
-                            ['scan', p.scan], ['spray', p.spray]]) modulator.setBase(k, v);
-      modulator.setRoutes(p.mod || []);
+      // Every destination a routing can name needs somewhere to return to, and
+      // it is the patch's own number — so this list has to grow with the spec
+      // table above. A base that is missing makes its routing INERT, silently:
+      // `tick()` skips a destination whose base is null.
+      for (const [k, v] of [['rate', p.rate], ['size', p.size], ['scan', p.scan],
+                            ['spray', p.spray], ['swarm', p.swarm], ['strum', p.strum],
+                            ['sos', p.sos], ['contour', p.contour], ['wow', p.wow],
+                            ['winstart', p.winstart ?? 0], ['winend', p.winend ?? 1],
+                            ['probs', p.probs]]) modulator.setBase(k, v);
+      // ⚠️ THE WINDOW ENDS ARE REFUSED IN A DELAY MODE, and this is the guard
+      // rather than a note in the table. `writePatch` forces the window to the
+      // whole lap there because `delaypos` is a position in the WHOLE lap
+      // (`:717`, folded at `:838`) while `BufWr` writes at the un-windowed
+      // phase (`:655`) — so a narrowed window puts the read head nowhere near
+      // the write head and "four tenths of a second behind" quietly becomes
+      // something else. A routing that fights `writePatch` would do that four
+      // times a second with nothing on screen saying so.
+      const routes = (p.mod || []).filter((r) =>
+        !(p.scanmode >= 3 && (r.dest === 'winstart' || r.dest === 'winend')));
+      modulator.setRoutes(routes);
+      // How many settings the station is walking. `—` when nothing is, which is
+      // `slowed`'s whole claim: the programme, slowed, with nothing added.
+      d.set('moving', modulator.moving().length || '');
     }
     patchPick?.show(p.name, patch);
     if (silent) return p;
@@ -2785,6 +3041,15 @@
 
       const herePatch = patch;
       const otherPatch = (patch + 1) % PATCHES.length;
+      // 🔴 HELD FOR THE WHOLE A/B, AND THIS IS NOT BELT AND BRACES. Every read
+      // below compares a control against a number typed in the patch table, and
+      // a modulated control legitimately differs from that number — MEASURED
+      // the first time any of this ran: `msize 2.44 not 1.8`. It passes today
+      // only because the patch next door happens to be `slowed`, the one patch
+      // with no routes; reorder the table and this check goes red for a reason
+      // that has nothing to do with what it is checking.
+      modulator?.hold(true);
+      await new Promise((r) => setTimeout(r, 200));
       selfCheck = true;                  // so the log names a press nobody made
       patchRow.buttons[1].click();                   // `›`, the next sound
       await new Promise((r) => setTimeout(r, 120));
@@ -2805,6 +3070,7 @@
       await new Promise((r) => setTimeout(r, 120));
       selfCheck = false;
       G.here = patch;
+      modulator?.hold(false);
       /**
        * 🔴 DOES THE MOVEMENT ACTUALLY REACH THE ENGINE, AND DOES IT STOP?
        * Both halves, because either alone passes on a broken page. A control
@@ -2841,6 +3107,33 @@
       modulator?.hold(true);
       await new Promise((r) => setTimeout(r, 250));
       G.modStill = await sampleSpread('msize', 6);
+
+      /**
+       * 🔴 AND A SOURCE THAT IS NOT THE STATION, BECAUSE THE CHECK ABOVE CANNOT
+       * SEE ONE. The follower is the only source `slow tide` can be relied on
+       * to move quickly, so a page whose LFOs, shapes and sixteen-slot memory
+       * were all dead would pass every assert above — and those are most of
+       * what makes two patches different from each other.
+       *
+       * ⚠️ IT DRIVES A KNOWN INPUT RATHER THAN WATCHING A SLOW ONE. The real
+       * routings here run at 0.014 to 0.08 Hz, which is the point of them, and
+       * a 70-second wave sampled for 1.1 s can legitimately be flat — an assert
+       * that is only PROBABLY true is worse than none. So the probe installs a
+       * 2 Hz saw, which cannot be stationary, exercises the whole path
+       * (`setRoutes` → `tick` → `/n_set` → the graph), reads it back with
+       * `/s_get`, and puts the patch's own routes back.
+       */
+      modulator?.setRoutes([{ src: 'lfo', shape: 'saw', hz: 2, dest: 'swarm', amt: 0.9 }]);
+      modulator?.hold(false);
+      await new Promise((r) => setTimeout(r, 150));
+      G.lfoMoved = await sampleSpread('mswarm', 8, 140);
+      modulator?.hold(true);
+      await new Promise((r) => setTimeout(r, 250));
+      G.lfoStill = await sampleSpread('mswarm', 4, 120);
+      // 🔴 THE PATCH'S OWN ROUTES BACK, OR THE PAGE IS LEFT PLAYING THE PROBE.
+      // The same rule the station A/B already follows: a self-check is not
+      // allowed to leave the instrument somewhere nobody chose.
+      modulator?.setRoutes(PATCHES[patch].mod || []);
 
       G.scalars = await readScalars();
       G.gates = await askN('gates', 8);
