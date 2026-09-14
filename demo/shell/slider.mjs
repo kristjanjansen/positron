@@ -159,14 +159,14 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  */
 export function createSlider({ label, aria, min = 0, max = 1, step, value, unit = '',
                                digits, warp, onInput, onChange } = {}) {
-  const span = max - min;
-  const exp = warp === 'exp';
+  let span = max - min;
+  let exp = warp === 'exp';
   if (exp && !(min > 0)) throw new Error('slider: warp "exp" needs min > 0');
   const stp = step ?? span / 100;
-  const dp = digits ?? Math.max(0, Math.min(4, String(stp).split('.')[1]?.length ?? 0));
+  let dp = digits ?? Math.max(0, Math.min(4, String(stp).split('.')[1]?.length ?? 0));
   // position 0..1 -> value, and back. The linear pair is what every existing
   // caller already had; nothing about it changes.
-  const ratio = exp ? Math.log(max / min) : 0;
+  let ratio = exp ? Math.log(max / min) : 0;
   const fromT = (t) => (exp ? min * Math.exp(ratio * t) : min + t * span);
   const toT = (x) => (exp ? Math.log(x / min) / ratio : (span ? (x - min) / span : 0));
   let v = clamp(value ?? min);
@@ -348,6 +348,33 @@ export function createSlider({ label, aria, min = 0, max = 1, step, value, unit 
     el: wrap,
     get: () => v,
     set,
+    /**
+     * Re-scale this slider in place.
+     *
+     * 🔴 A CONTROL WHOSE MEANING CHANGES NEEDS ITS UNITS TO CHANGE WITH IT, and
+     * without this the page could only relabel the word. `/radio1965/`'s read
+     * head is a PLACE in one mode, a SPEED in another and a LAG in a third —
+     * `Engine_Pappus.sc:719` selects between them — so one 0..1 lane showed
+     * `0.30` for what was actually **-0.10x**, a number that is not wrong so
+     * much as meaningless. Relabelling alone would have left the units lying.
+     *
+     * ⚠️ The VALUE is re-derived by the caller, not converted here: only the
+     * caller knows what the old number meant.
+     */
+    setRange({ min: lo, max: hi, unit: u, digits: dg, warp: w } = {}) {
+      if (lo !== undefined) min = lo;
+      if (hi !== undefined) max = hi;
+      if (u !== undefined) unit = u;
+      if (dg !== undefined) dp = dg;
+      if (w !== undefined) { exp = w === 'exp'; ratio = exp ? Math.log(max / min) : 0; }
+      span = max - min;
+      lane.setAttribute('aria-valuemin', String(min));
+      lane.setAttribute('aria-valuemax', String(max));
+      read.style.minWidth = `${Math.max(...[min, max]
+        .map((x) => `${x.toFixed(dp)}${unit ? ' ' + unit : ''}`.length))}ch`;
+      v = clamp(v);
+      paint();
+    },
     /**
      * Rename the control.
      *

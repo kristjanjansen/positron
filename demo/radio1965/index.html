@@ -64,7 +64,16 @@
      The height is the sum of what goes in — four rows at 34 px plus the shared
      22 px rhythm between them — and it is written as that sum rather than as a
      total, so it can be re-derived when a row is added. */
-  .gran-slot { min-height: calc(4 * 34px + 3 * 22px + 2 * 34px + 22px); }
+  /* 🔴 AND IT MUST LAY ITS CHILDREN OUT, WHICH THE FIRST VERSION DID NOT.
+     `.pos-choice` is a SPAN, and the shell's vertical rhythm lives on
+     `.pos-body > * + *` — direct children only. Moving these rows into a
+     wrapper took both away at once, so two inline spans flowed onto ONE line
+     and landed on top of the fader above them. PHOTOGRAPHED. A flex column
+     restores both: block layout, and the same 22 px gap every other element
+     gets, from one declaration rather than from the parent's rule. */
+  .gran-slot { display: flex; flex-direction: column; gap: 22px; align-items: stretch;
+               min-height: calc(3 * 34px + 2 * 34px + 4 * 22px); }
+  .gran-slot > .pos-choice, .gran-slot > .pos-pick { align-self: flex-start; }
   .wet-fader, .gran-rows { grid-template-columns: var(--lab, max-content) minmax(0, 1fr); }
   @media (min-width: 720px) {
     .gran-rows.pos-pair { grid-template-columns: repeat(2, var(--lab, max-content) minmax(0, 1fr)); }
@@ -138,7 +147,25 @@
     ['Raadio 2', 'raadio2'],
   ];
   const srcOf = (id) => `${BASE}/${id}.mp3`;
-  let station = STATIONS[0][1];
+  /**
+   * 🔴 IT STARTS ON THE RELIABLE ONE AND UPGRADES TO THE ONE IT IS NAMED AFTER.
+   *
+   * Radio 1965 is a volunteer-run mount that has been up and down all day —
+   * `520`, then `403`, then unreachable entirely — while Klassikaraadio has been
+   * answering throughout. Opening on the preferred station means every visit
+   * begins with a failed load, a fallback and a second decoder; opening on the
+   * reliable one means sound starts immediately and the page moves up to Radio
+   * 1965 within a second when it is actually there.
+   *
+   * ⚠️ THE UPGRADE HAPPENS ONCE, AT LOAD, AND NEVER AGAIN. The background watch
+   * ungreys a station that comes back and does not move you — asked for in as
+   * many words, *"do not switch channels if I do not"*. Choosing what to open
+   * with is not the same as changing it under somebody's hand.
+   */
+  const DEFAULT_ID = 'klassikaraadio';
+  const PREFERRED_ID = 'radio1965';
+  const indexOfId = (id) => STATIONS.findIndex(([, s]) => s === id);
+  let station = DEFAULT_ID;
   const PROBE_MS = 6000;            // long enough for a cold relay, short enough to act on
   const NOMINAL_KBPS = 128;         // both mounts: measured direct 128.076 kbit/s
   // ⚠️ A CROSS-PAGE URL, AND IT IS CHECKED AT BUILD TIME. The compiled graph
@@ -247,7 +274,7 @@
   const picker = createChoice({
     label: 'station',
     options: STATIONS,
-    at: 0,
+    at: Math.max(0, indexOfId(DEFAULT_ID)),
     onPick: (id) => {
       if (id !== station) switchTo(id, selfCheck ? 'checking the buttons' : 'you chose it');
     },
@@ -266,7 +293,69 @@
   // clock, and after a pause it reads BEHIND it, which is the truth about how
   // far behind live you now are.
   const t0 = Date.now();
-  const deck = createDeck({ items: [], adapters: {}, range: [t0 - SPAN_MS, t0] });
+  /**
+   * 🔴 THE SPEEDS BELONG TO THE TRANSPORT BAR, NOT TO A ROW OF MY OWN.
+   * CLAUDE.md: *"Transport UI is `demo/shell/transport-bar.mjs` and nothing
+   * else … rates from intersected `caps.rates`."* A speed picker beside the
+   * sound picker was a second transport, and it collided with the first.
+   *
+   * The bar builds its buttons from `latticeFor(deck)`, which reads
+   * `deck.caps()` — `{kind: caps}` over the registered adapters — so declaring
+   * a lattice is declaring an adapter that HAS one. ⚠️ HANDOFF records an
+   * earlier attempt at exactly this taking the page down at module load, with
+   * `__demo.ready — failed` and nothing else; the shape below is the one
+   * `adapterCaps()` actually reads (`timeline/transport.mjs:1960`), verified by
+   * running the page rather than by reasoning about it.
+   *
+   * ⚠️ AND THE RATES ARE THE STREAM'S, NOT THE PLAYHEAD'S. This deck's position
+   * is wall-clock — it follows the audio, it does not drive it — so what a rate
+   * button changes is how fast the STATION is played, which is the thing a
+   * listener means by speed here.
+   */
+  const deck = createDeck({
+    items: [],
+    adapters: {
+      radio: {
+        // 🔴 `actuate()` IS REQUIRED AND ITS ABSENCE IS WHAT KILLED THE EARLIER
+        // ATTEMPT. `registerAdapter` throws `adapter radio: actuate() required`
+        // at construction (`timeline/transport.mjs:1907`), inside `createDeck`,
+        // at module load — so the page never reached `d.ready()` and the suite
+        // reported `__demo.ready — failed` with nothing else to go on. HANDOFF
+        // recorded the symptom and said the shape "was not established"; this is
+        // the shape, read off the validator.
+        //
+        // ⚠️ IT IS EMPTY, AND HONESTLY SO. This deck holds no items — its
+        // position is wall-clock and it FOLLOWS the audio rather than driving
+        // it. There is nothing to actuate because the sound is not on the
+        // timeline; it is the live thing the timeline is watching. What the
+        // adapter is here for is the one claim it can truthfully make: which
+        // speeds this stream can be played at.
+        actuate() {},
+        // 🔴 SLOW ONLY, AND 2x IS GONE BECAUSE IT CANNOT WORK. Bytes arrive at
+        // exactly 1x, so anything faster eats the cushion and then starves —
+        // MEASURED: from a 1 s cushion, 2x drains it in about a second and
+        // every block after that underruns, which is the regular gating that
+        // was photographed. Below 1x there is no such limit: you simply fall
+        // further behind, which BEHIND already reports and which is the
+        // interesting half anyway.
+        // 🔴 NO RATES. Varispeed on a LIVE EDGE cannot work and the numbers
+        // say so: bytes arrive at exactly 1x, so faster starves (MEASURED: a
+        // 1 s cushion gone in a second, then every block underrunning — the
+        // regular gating that was photographed) and slower falls behind for
+        // ever (MEASURED: `buffered` 3.6 -> 17.0 s in twenty seconds at 0.5x,
+        // then 168 blocks DROPPED to stay inside a 30 s ceiling, each drop a
+        // jump forward in the content — which is why 0.25x was reported as
+        // sounding "sped up"). There is no third option at a live edge.
+        //
+        // Slowing down belongs to the granulator, which reads a HELD eight
+        // seconds: there the read head can crawl with no queue, no drops and no
+        // falling behind, and the pitch stays where it was. See the `slowed`
+        // sound below — that is this feature, done where it works.
+        caps: {},
+      },
+    },
+    range: [t0 - SPAN_MS, t0],
+  });
   deck.seek(t0);
 
   let heardFrom = null;                 // when audio actually started arriving
@@ -280,6 +369,27 @@
   let started = false;                  // has the stream ever been asked for
 
   const bar = createTransportBar(d.el, deck, { absolute: true, scrub: false, endStop: false });
+
+  /**
+   * The bar's speed, carried to the stream.
+   *
+   * ⚠️ POLLED, NOT HOOKED, because the bar exposes no rate event and reaching
+   * into its buttons would be the page owning a control it does not own. One
+   * read a second is free, and `setRate` is a no-op when nothing changed.
+   * ⚠️ `targetRate` rather than `rate()`: a paused deck genuinely advances at
+   * zero, so `rate()` reads 0 while paused and would silently stop the station
+   * the moment somebody pressed pause and play.
+   */
+  setInterval(() => {
+    const r = deck.targetRate?.() ?? deck.rate?.() ?? 1;
+    if (DECODE && stream && r > 0 && r !== speed) {
+      speed = r;
+      stream.setRate(r);
+      d.log(r === 1 ? 'back to the station\u2019s own speed'
+        : r < 1 ? `${r}\u00d7 — pitched down, and falling further behind live every second`
+                : `${r}\u00d7 — pitched up, and it lasts only as long as the cushion`);
+    }
+  }, 1000);
 
   // ── the picture ────────────────────────────────────────────────────────────
   // 🔴 TWO PICTURES, AND THE COMPONENT CHOOSES BY WHAT IT IS GIVEN. Before the
@@ -437,6 +547,7 @@
       log: (m) => { d.log(m); ship(m); },
     });
     stream.node.connect(srcNode);
+    window.__stream = stream;   // a handle for the lab probe; harmless in a page
     stream.setRate(speed);
     stream.started.then((path) => {
       decodePath = path;
@@ -739,6 +850,10 @@
     dead = up.length === 0;
     if (dead) {
       d.log('neither station is answering — there is nothing to play', 'bad');
+    } else if (station !== PREFERRED_ID && avail.get(PREFERRED_ID)) {
+      // The upgrade: the page is named after this station, so if it is there,
+      // that is what it should be playing.
+      switchTo(PREFERRED_ID, 'it is on air');
     } else if (!avail.get(station)) {
       switchTo(up[0][1], `${nameOf(station)} is not answering`);
     } else {
@@ -1412,6 +1527,39 @@
       noise: 0.12, noisetype: 2, noisedecay: 0.9, noisetone: 900, noisedyn: 1.4,
       wow: 0.35, rverb: 0.42, rtime: 0.62 },
 
+    // 🔴 THE STATION, SLOWED, AND NOTHING ELSE DONE TO IT. Pappus is a
+    // time-stretcher before it is a texture machine, and this patch is the
+    // proof: ONE voice at pitch 0, a dense enough grain rate to read as
+    // continuous, and every colour stage at zero. What you hear is the radio at
+    // a quarter speed with its pitch intact — not a wash, not a chord, the
+    // programme itself, slowed.
+    //
+    // ⚠️ THIS IS THE FEATURE VARISPEED COULD NOT BE. Slowing the STREAM means
+    // falling behind the station for ever or dropping what arrives; slowing the
+    // READ HEAD over a held eight seconds costs neither, because the material
+    // is already in the buffer. `speed = winspan × (3·mscan − 1)`
+    // (`Engine_Pappus.sc:715`), so `mscan 0.4167` is +0.25x.
+    //
+    // ⚠️ `spray` IS TINY BUT NOT ZERO. Sixteen overlapping grains reading the
+    // SAME point comb against each other — the engine's own note at `:826` — so
+    // a few milliseconds of jitter is what keeps a stretch smooth rather than
+    // hollow. At zero it rings.
+    { name: 'slowed',
+      says: 'the station at a quarter speed, pitch intact, nothing added',
+      scanmode: 1, scan: 0.4167, rate: 28, size: 0.10, contour: 8,
+      sos: 0.62, lock: 0, tilt: 0, ingain: 1, comp: 0.15,
+      spray: 0.02, spraymode: 1, swarm: 0, swarmmode: 1, strum: 0,
+      elen: 1, ephase: 0, pattern: null,
+      gates: [1, 0, 0, 0, 0, 0, 0, 0],
+      pitches: [0, 0, 0, 0, 0, 0, 0, 0],
+      probs: [1, 1, 1, 1, 1, 1, 1, 1],
+      swet: 0, scycle: 1, sfb: 0, stilt: 0, sxover: 700, sdiffuse: 0,
+      taptimes: [0.25, 0.5, 0.75, 1], tappans: [0, 0, 0, 0],
+      tappitch: [0, 0, 0, 0],
+      drive: 0, crush: 0, crushmode: 1,
+      noise: 0, noisetype: 2, noisedecay: 0.25, noisetone: 1200, noisedyn: 2,
+      wow: 0, rverb: 0, rtime: 0.3 },
+
     // 🔴 A SLOW CLIMB. `stutter` was here and was replaced: it was the most
     // RHYTHMIC patch on a page whose owner's verdict was "just scattering
     // fragments", so it was more of the complaint rather than an answer to it.
@@ -1635,12 +1783,35 @@
    * be worse still: INERT in the one patch that uses DELAY, which is this
    * repo's named hazard, a control that looks live and does nothing.
    */
-  const SCAN_LABEL = { 1: 'read speed', 2: 'read position', 3: 'time behind', 4: 'time behind' };
+  /**
+   * 🔴 THE READ HEAD IS THREE DIFFERENT QUANTITIES AND THE SLIDER SHOWED ONE
+   * RAW NUMBER FOR ALL OF THEM. `Engine_Pappus.sc:719` selects between a SPEED
+   * (mode 1), a PLACE (mode 2) and a LAG (modes 3/4), and this lane was always
+   * `mscan` 0..1 — so `slow tide`, which crawls backwards at a tenth of life
+   * speed, displayed `0.30`. Not wrong, exactly: meaningless. Relabelling the
+   * word alone would have left the units lying, which is why `slider.mjs` grew
+   * `setRange`.
+   *
+   * In STRETCH the lane IS the speed, in the engine's own terms —
+   * `speed = winspan × (3·mscan − 1)`, so -1x to +2x with a standstill at 0.
+   */
+  const SCAN_RANGE = {
+    1: { label: 'read speed', min: -1, max: 2, unit: '\u00d7', digits: 2,
+         toUi: (mscan) => 3 * mscan - 1, toEngine: (x) => (x + 1) / 3 },
+    2: { label: 'read position', min: 0, max: 1, unit: '', digits: 2,
+         toUi: (x) => x, toEngine: (x) => x },
+    3: { label: 'time behind', min: 0, max: BUF_SECONDS, unit: 's', digits: 2,
+         toUi: (x) => x * BUF_SECONDS, toEngine: (x) => x / BUF_SECONDS },
+  };
+  const scanRange = () => SCAN_RANGE[PATCHES[patch].scanmode] ?? SCAN_RANGE[2];
+
+  /** `v` is what the SLIDER shows; the engine gets whatever that means here. */
   function setScan(v) {
-    P.scan = v;
-    const mode = PATCHES[patch].scanmode;
-    if (mode >= 3) setBoth('delay', v * BUF_SECONDS);
-    else setBoth('scan', v);
+    const r = scanRange();
+    const raw = r.toEngine(v);
+    P.scan = raw;
+    if (PATCHES[patch].scanmode >= 3) setBoth('delay', raw * BUF_SECONDS);
+    else setBoth('scan', raw);
   }
 
   /**
@@ -1775,10 +1946,17 @@
     writePatch(p);
     if (sliders) {
       for (const [sld, v] of [[sliders.rate, p.rate], [sliders.size, p.size],
-                              [sliders.scan, p.scan], [sliders.spray, p.spray]]) {
+                              [sliders.spray, p.spray]]) {
         sld?.set(v, { quiet: true, glideMs: 900 });
       }
-      sliders.scan?.label(SCAN_LABEL[p.scanmode] ?? 'read position');
+      // ⚠️ RANGE BEFORE VALUE. `setRange` re-clamps what the slider is holding,
+      // so setting the new value first would clamp it against the OLD lane —
+      // `slow tide`'s -0.10x would land at 0 on a 0..1 range and then be
+      // re-shown on the right one as a speed nobody asked for.
+      const r = SCAN_RANGE[p.scanmode] ?? SCAN_RANGE[2];
+      sliders.scan?.setRange(r);
+      sliders.scan?.label(r.label);
+      sliders.scan?.set(r.toUi(p.scan), { quiet: true });
       shareLabelColumn?.();
     }
     patchPick?.show(p.name, patch);
@@ -1983,6 +2161,7 @@
     // page load that "kicks off and then goes away", which is exactly what it
     // was. `wet` is 0 here, so this leaves the engine silent until asked.
     eng.out.gain.value = wet;
+    window.__eng = eng;   // lab handle
 
     // The engine's input is connected by now, so this is the instant the
     // granulator's capture ring starts filling — see the wait further down.
@@ -2108,34 +2287,14 @@
     patchRow.options(PATCHES.map((p) => p.name), patch);
     patchPick = patchRow;
 
-    // 🔴 VARISPEED — the tape kind, pitch and all. Only possible because this
-    // page decodes the stream itself; a media element would never have handed
-    // it over. ⚠️ 0.25 and 0.5 fall behind the station PERMANENTLY (bytes
-    // arrive at 1×), and 2 runs the cushion dry — BEHIND and the log say so
-    // rather than the control pretending otherwise.
-    const speedRow = DECODE ? createChoice({
-      label: 'speed',
-      options: [['0.25', 0.25], ['0.5', 0.5], ['1', 1], ['2', 2]],
-      at: 2,
-      onPick: (r) => {
-        speed = r;
-        stream?.setRate(r);
-        d.log(r === 1 ? 'back to the station\u2019s own speed'
-          : r < 1 ? `${r}\u00d7 \u2014 pitched down, and falling further behind live every second`
-                  : `${r}\u00d7 \u2014 pitched up, and it can only last as long as the cushion`);
-      },
-    }) : null;
-
     // Picture, blend, what the granulator IS, how fast the station runs, and
     // then the four settings. Speed sits beside the sound rather than in the
     // transport bar: it changes the material, not the playhead.
     // Into the slot reserved at first paint, so nothing below moves.
     granSlot.append(wetRow.el, patchRow.el);
-    if (speedRow) granSlot.append(speedRow.el);
     granSlot.append(group.el);
     sliderRow = group.el;
     granControls.push({ disabled: (y) => patchRow.disabled(y) });
-    if (speedRow) granControls.push({ disabled: (y) => speedRow.disabled(y) });
 
     /**
      * One label column across both groups — see the note in <style>.
