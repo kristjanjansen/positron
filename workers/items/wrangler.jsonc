@@ -1,0 +1,34 @@
+{
+  "name": "positron-items",
+  // An editorial item, scheduled and announced — the clean-room half of
+  // plan-radio-messages.md, built to be measured rather than argued about.
+  //
+  // 🔴 ONE OBJECT OWNS THE SCHEDULE AND THE SEND, and that is the whole
+  // architectural claim. The system this replaces polls MySQL every minute from
+  // a cron on a VM, asks "is anything due?", and is almost always told no —
+  // so publication is rounded up to the next minute and the query costs
+  // something whether or not there is work. A Durable Object alarm fires AT the
+  // time, from the same object that holds the state deciding it, with no VM and
+  // no poll.
+  //
+  // ⚠️ "Fires at the time" is the claim under test, not an assumption.
+  // Cloudflare documents millisecond granularity and up to a minute of delay
+  // during failover, so this records scheduled-against-actual on EVERY fire and
+  // reports the distribution. A design that is merely tolerant of a late alarm
+  // is not the same as one that is correct with one.
+  "main": "src/index.js",
+  // items.positron.studio. A `*.workers.dev` name comes free with
+  // `workers_dev: true` and is what you get when nobody says otherwise; a real
+  // hostname is this line, and wrangler provisions the DNS and the certificate
+  // itself. Same arrangement as store/shout/backlog.
+  "routes": [{ "pattern": "items.positron.studio", "custom_domain": true }],
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "durable_objects": {
+    "bindings": [{ "name": "ITEMS", "class_name": "Items" }]
+  },
+  // SQLite-backed: items are rows with a lifecycle, queried by status and by
+  // due time. Same shape `workers/store` already proved.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Items"] }],
+  "observability": { "enabled": true }
+}

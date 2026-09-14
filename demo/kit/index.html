@@ -60,6 +60,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createField } from '/shell/field.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
   import { createDeck } from '/timeline/transport.mjs';
@@ -194,6 +195,27 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         onPick: (_v, name) => { o.textContent = name; },
       });
       box.append(c.el, o);
+    });
+
+  // ── text field ──────────────────────────────────────────────────────────
+  section('a line of text — shell/field.mjs',
+    'The label sits on top of the box rather than beside it, so a row of fields has one left edge '
+    + 'and the labels form a column of their own. A field asks for the width of a sentence or the '
+    + 'width of a word; on a phone every one of them takes the whole row, because half of a mono '
+    + 'line is about twenty characters and a title is longer than that. This is the one control '
+    + 'that keeps the iOS magnifier and the selection handles — everything else here turns them '
+    + 'off, and in a text box they are the point.',
+    `createField({ label: 'title', value: 'Rehearsal moved', grow: 'wide' })
+createField({ label: 'tags', placeholder: 'comma separated' })`,
+    (box) => {
+      const o = out('');
+      const a = createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide',
+        onInput: (v) => { o.textContent = `title — ${v.length} characters`; } });
+      const b = createField({ label: 'tags', placeholder: 'comma separated',
+        onInput: (v) => { o.textContent = `tags — ${v.split(',').filter((s) => s.trim()).length}`; } });
+      const c = createField({ label: 'off', value: 'not now' });
+      c.disabled(true);
+      box.append(a.el, b.el, c.el, o);
     });
 
   // ── keyboard ────────────────────────────────────────────────────────────

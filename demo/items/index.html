@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<!--
+  🔴 INSTALLABLE, AND ONLY THIS DIRECTORY. The manifest below is scoped to
+  `/items/` and the service worker is served from here, so a worker's scope —
+  which is the path it is served from — cannot reach the rest of the site.
+  positron.studio is deliberately NOT a progressive web app: a site-wide worker
+  is a cache, and every deployed page here carries a BUILD stamp precisely so
+  that "still broken" and "the fix never loaded" can be told apart. A cache that
+  serves a returning visitor the previous build destroys that. `push-sw.js` has
+  no `fetch` handler at all and its header says why.
+
+  The icons are the same `e+` mark as the favicon — same centre, same radii,
+  same 11°-38° aperture — rendered square rather than rounded, because iOS masks
+  a Home Screen icon itself and a rounded source is rounded twice.
+-->
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="items">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* 🔴 THE COMPOSER SITS ABOVE THE CONTROL ROW, AND THE LIST BELOW IT.
+     Three reasons, in order of weight. The buttons that publish have to be
+     under the thing they publish, or Publish is a verb with no visible object.
+     The buttons themselves must stay INSIDE `.pos-controls`, because that is
+     the only place `demo/verify.mjs` looks — a control outside it is a subject
+     the suite silently stops testing — so the form moves up rather than the
+     buttons moving down, which is the arrangement `wire` arrived at for the
+     same reason. And the result belongs below the press: you write at the top,
+     the row appears underneath, and you watch its state change without
+     scrolling. One page, because a composer you cannot see the result in is a
+     form rather than an editor. */
+  .compose {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    padding: 12px;
+    /* The one gap on this page with an opinion of its own: 14 px is what
+       `.pos-controls` already carries under itself, so the form and the row of
+       buttons under it read as one block rather than two. */
+    margin: 0 0 14px;
+  }
+
+  /* ── the list ──────────────────────────────────────────────────────────
+     A floor and a ceiling, for the reason `messages.mjs` has one: a box that
+     grows as rows arrive moves the log and everything under it every time
+     something is published, and the button you are about to press again ends
+     up somewhere else. */
+  .items {
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    padding: 2px 12px; min-height: 150px; max-height: 340px; overflow-y: auto;
+  }
+  /* ⚠️ TWO COLUMNS AND A WRAPPER, NOT FOUR CHILDREN IN A GRID. The first
+     version put the state, the title, the summary and the meta line straight
+     into a two-column grid and let auto-placement sort it out — and with no
+     explicit rows declared, `grid-row: 1 / -1` on the state resolves to a
+     single row, so the SUMMARY was auto-placed into the state's column and
+     wrapped to its 5.8em. Photographed before it shipped. A wrapper says what
+     was meant, and cannot be re-interpreted by the placement algorithm. */
+  .item {
+    display: grid; grid-template-columns: 5.8em 1fr; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid #ffffff08;
+  }
+  .item:last-child { border-bottom: 0; }
+  .item-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  /* ⚠️ THE COLOUR SAYS HOW FAR ALONG IT IS, AND NOTHING ELSE SAYS THAT. The
+     word says which state; the colour says whether the moment has happened —
+     dim for a thing that has not occurred, the page's one bright colour for the
+     item that is live right now, dim again once it has been put away. A second
+     fact rides in the `sent` mark on the line below, which is the only thing
+     that reports what crossed to the phones. */
+  .item-st {
+    font: 600 10.5px/1.7 var(--mono);
+    letter-spacing: .06em; color: var(--dim2); overflow-wrap: anywhere;
+  }
+  .item-st[data-s="new"] { color: var(--hi); }
+  .item-st[data-s="shelved"] { color: var(--dim); }
+  .item-t { font: 500 13px/1.45 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
+  .item-s { font: 400 12px/1.5 var(--mono); color: var(--dim); overflow-wrap: anywhere; }
+  .item-m { display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+            font: 400 11px/1.6 var(--mono); color: var(--dim2); margin-top: 2px; }
+  .item-sent { color: var(--ok); }
+  .items-empty { font: 400 12px/1.6 var(--mono); color: var(--dim2); padding: 12px 0; }
+  /* ⚠️ THE FILTER NEEDS ITS OWN ROW ON A PHONE, and this is a fact about
+     `choice.mjs` rather than about this page. Under 560 px the component turns
+     itself into a full-width grid whose options share the row evenly — which is
+     right when it owns the row and wrong when something else is beside it: at
+     390 px, sharing with Clear all, `waiting` was clipped to `waitin`. Given
+     the whole row it gets the width that rule already assumes. */
+  @media (max-width: 560px) {
+    .pos-controls .pos-choice { flex: 1 1 100%; }
+  }
+  /* The token is the one thing on this page that is 160 characters of nothing
+     you can read — it exists to be copied, so it wraps and it stays selectable. */
+  .tok { font: 400 10.5px/1.5 var(--mono); color: var(--hi); overflow-wrap: anywhere;
+         -webkit-user-select: text; user-select: text; }
+</style>
+
+<script type="module">
+  import { mount, guard, el } from '/shell/shell.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+
+  const q = new URLSearchParams(location.search);
+  // The store takes `?room=<name>` to choose which set of items it is talking
+  // about, and `demo/verify.mjs` hands every demo a room of its own so two runs
+  // of the suite cannot count each other's rows. Passed straight through: a
+  // visitor with no query lands in the shared one.
+  const ROOM = q.get('room') || 'items';
+  const API = q.get('api') || 'https://items.positron.studio';
+
+  // The seven kinds the store accepts, in its own order.
+  const KINDS = ['text', 'audio', 'video', 'audiostream', 'videostream', 'article', 'webcontent'];
+  // ⚠️ READ FROM THE CONSTANT, NEVER TYPED TWICE. The button says five seconds
+  // because this is five seconds; a label that can disagree with the number it
+  // describes is worse than no label.
+  const LEAD = 5000;        // how far ahead `Publish in 5 seconds` schedules
+  const SHELF_AFTER = 4000; // and how long after that the same item puts itself away
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clock = (ms) => new Date(ms).toTimeString().slice(0, 8);
+
+  const d = mount({
+    name: 'items',
+    what: `Write an item, say when it should appear, and it publishes itself at that moment — a clock inside the
+           store wakes at the time, and nothing checks in between. The moment it goes live a notification goes out
+           to every phone that has this page on its Home Screen, so press Notifications to put this browser on that
+           list. The numbers say how much is here, how long until the next thing is due, and how late the clock has
+           been when it wakes — measured on every wake rather than assumed.`,
+    // ⚠️ SIX CELLS, ALL OF WHICH MOVE. Three about the list and three about the
+    // clock. `worst` sits beside `late` on purpose: a median hides the one bad
+    // wake, and the one bad wake is the reason to look at all.
+    readout: { items: '', waiting: '', sent: '', next: 's', late: 'ms', worst: 'ms' },
+    controls: [
+      { id: 'schedule', label: `Publish in ${LEAD / 1000} seconds`, primary: true },
+      { id: 'now', label: 'Publish now' },
+      { id: 'shelve', label: 'Shelve the live one' },
+      { id: 'push', label: 'Notifications' },
+      // The filter is inserted between these and Clear, further down — it has
+      // to come BEFORE the button that empties the room, or the suite presses
+      // every filter against an empty list.
+      { id: 'clear', label: 'Clear all', end: true },
+    ],
+  });
+  guard(d);
+
+  // ── the composer ────────────────────────────────────────────────────────
+  const compose = el('div', 'compose');
+  const fields = {
+    title: createField({ label: 'title', value: 'Rehearsal moved to Thursday', grow: 'wide',
+                         placeholder: 'what the notification will say' }),
+    summary: createField({ label: 'summary', value: 'The room is booked from seven.', grow: 'wide',
+                           placeholder: 'the line under the title' }),
+    link: createField({ label: 'link', value: 'https://positron.studio/', type: 'url', grow: 'wide' }),
+    tags: createField({ label: 'tags', value: 'notice, room', placeholder: 'comma separated' }),
+    // `payload` is the store's pocket for a field with no column of its own —
+    // its own note says an existing client reads `payload.author`, so that is
+    // what this carries, and it makes the round trip a visible thing rather
+    // than a synthetic blob.
+    author: createField({ label: 'author', value: 'the desk' }),
+  };
+  let kindAt = 0;
+  const kind = createPicker({
+    label: 'kind', what: 'kind',
+    prev: () => setKind(kindAt - 1),
+    next: () => setKind(kindAt + 1),
+    onPick: (i) => setKind(i),
+  });
+  kind.options(KINDS, 0);
+  function setKind(i) {
+    kindAt = (i + KINDS.length) % KINDS.length;
+    kind.show(KINDS[kindAt], kindAt);
+  }
+  setKind(0);
+  compose.append(fields.title.el, fields.summary.el, fields.link.el,
+                 fields.tags.el, fields.author.el, kind.el);
+  const cbar = d.button('schedule').parentElement;
+  cbar.parentNode.insertBefore(compose, cbar);
+
+  // ── the status filter, in the control row and before Clear ──────────────
+  // ⚠️ IT ASKS THE STORE, it does not sieve what is already on the page. The
+  // filter is an endpoint (`GET /items?status=…`) and pressing a button here is
+  // the only thing that ever exercises it — a filter done locally would look
+  // identical and prove nothing about the half that runs on the other side.
+  //
+  // `archived` is deliberately missing: nothing on this page can produce one,
+  // and a filter that is empty for ever is a control that says nothing.
+  let filter = 'all';
+  const filterPick = createChoice({
+    label: 'showing',
+    options: [['all', 'all'], ['waiting', 'unpublished'], ['live', 'new'], ['shelved', 'shelved']],
+    onPick: (value) => { filter = value; pull().catch(bad); },
+  });
+  cbar.insertBefore(filterPick.el, d.button('clear'));
+
+  // ── the list ────────────────────────────────────────────────────────────
+  const list = el('div', 'items');
+  d.el.append(list);
+
+  // ── talking to the store ────────────────────────────────────────────────
+  const at = (path, params = {}) => {
+    const u = new URL(API + path);
+    u.searchParams.set('room', ROOM);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    return u.href;
+  };
+  async function ask(path, params, init) {
+    // Never awaited without a ceiling: a page that cannot reach the store has
+    // to say so rather than hang.
+    const res = await fetch(at(path, params), { ...init, signal: AbortSignal.timeout(9000) });
+    if (!res.ok) throw new Error(`${path} answered ${res.status}`);
+    return res.json();
+  }
+  const write = (path, body) => ask(path, {}, {
+    method: 'POST',
+    ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+  const bad = (e) => d.log(String(e?.message || e), 'bad');
+
+  // ── state ───────────────────────────────────────────────────────────────
+  let all = [];             // everything in this room, whatever the filter says
+  let shown = [];           // what the filter asked the store for
+  let nextDue = null;       // ms, the next moment anything is due
+  let punct = null;         // the store's record of its own lateness
+  let dueSeen = null;
+
+  async function pull() {
+    const r = await ask('/items');
+    all = r.items; nextDue = r.next_due;
+    shown = filter === 'all' ? all : (await ask('/items', { status: filter })).items;
+    paint();
+  }
+  async function pullPunct() {
+    punct = await ask('/punctuality');
+    paint();
+  }
+
+  function paint() {
+    d.set('items', all.length);
+    d.set('waiting', all.filter((i) => i.status === 'unpublished').length);
+    d.set('sent', all.filter((i) => i.announced_at != null).length);
+    d.set('late', punct?.late_ms?.p50 ?? '');
+    d.set('worst', punct?.late_ms?.max ?? '');
+
+    list.textContent = '';
+    if (!shown.length) {
+      list.append(el('div', 'items-empty',
+        all.length ? 'nothing in this state — try another one under showing'
+                   : `nothing here yet — write a title and press Publish in ${LEAD / 1000} seconds`));
+      return;
+    }
+    for (const it of shown) {
+      const row = el('div', 'item');
+      const st = el('span', 'item-st', it.status);
+      st.dataset.s = it.status;
+      row.append(st);
+      const b = el('div', 'item-b');
+      row.append(b);
+      b.append(el('div', 'item-t', it.title));
+      if (it.summary) b.append(el('div', 'item-s', it.summary));
+      const meta = el('div', 'item-m');
+      meta.append(el('span', 'pos-tag', it.type));
+      for (const t of it.tags) meta.append(el('span', 'pos-tag', t));
+      meta.append(el('span', '', clock(it.publish_at)));
+      // The one fact nothing else on the row carries: whether an announcement
+      // actually left, and how long after the moment it was due.
+      if (it.announced_at != null) {
+        meta.append(el('span', 'item-sent',
+          `sent +${((it.announced_at - it.publish_at) / 1000).toFixed(2)} s`));
+      }
+      b.append(meta);
+      list.append(row);
+    }
+  }
+
+  // A number that moves on a clock rather than on an event, which is why it is
+  // in a readout cell: a fixed box in tabular figures, where a digit changing
+  // moves nothing. Whole seconds, so it ticks once a second rather than four
+  // times. When the moment passes, the page asks the store once — it watches
+  // its own schedule instead of polling on a timer.
+  setInterval(() => {
+    if (nextDue == null) { d.set('next', ''); return; }
+    const left = (nextDue - Date.now()) / 1000;
+    d.set('next', Math.max(0, Math.ceil(left)));
+    if (left < -1 && dueSeen !== nextDue) { dueSeen = nextDue; pull().catch(() => {}); }
+  }, 250);
+
+  // ── what a press composes ───────────────────────────────────────────────
+  function draft() {
+    const author = fields.author.value().trim();
+    return {
+      type: KINDS[kindAt],
+      title: fields.title.value().trim() || 'untitled',
+      summary: fields.summary.value().trim(),
+      url: fields.link.value().trim(),
+      tags: fields.tags.value().split(',').map((s) => s.trim()).filter(Boolean),
+      payload: author ? { author } : {},
+    };
+  }
+
+  /** Did it come back the way it went out? Key order is not the subject, so
+   *  both sides are compared through the same canonical form. */
+  const canon = (v) => JSON.stringify(v, (k, x) =>
+    (x && typeof x === 'object' && !Array.isArray(x))
+      ? Object.fromEntries(Object.keys(x).sort().map((n) => [n, x[n]])) : x);
+  const sameAsSent = (sent, got) => !!got
+    && got.type === sent.type && got.title === sent.title && got.summary === sent.summary
+    && got.url === sent.url && canon(got.tags) === canon(sent.tags)
+    && canon(got.payload) === canon(sent.payload);
+
+  /**
+   * Watch one item until something is true of it, redrawing as it goes.
+   *
+   * 🔴 A PREDICATE, NOT A STATUS, AND THE REASON IS A RACE THIS PAGE MEASURED.
+   * The store writes the new status, THEN sends the notification, THEN stamps
+   * when it went — and the middle step is a network call, which is not a
+   * storage operation, so a read arriving during it is not held back. Three
+   * checks here failed on the first run for exactly that: they saw `new` with
+   * nothing announced yet and did arithmetic on a missing stamp, printing
+   * `-1789410281.79 s`. The order is deliberate on the store's side (what is
+   * published must not depend on the announcement succeeding), so the page has
+   * to wait for the fact it is actually asking about rather than for a state
+   * that arrives first.
+   */
+  async function until(id, is, ms) {
+    const t0 = performance.now();
+    for (;;) {
+      await pull().catch(() => {});
+      const it = all.find((x) => x.id === id);
+      if (it && is(it)) return it;
+      if (performance.now() - t0 > ms) return null;
+      await sleep(700);
+    }
+  }
+  const isLive = (it) => it.status === 'new';
+  const wasTold = (it) => it.announced_at != null;
+
+  /** The store's lateness record, which is written at the END of a wake — so a
+   *  page that read it the moment an item went live would find nothing. */
+  async function punctAfter(wakes, ms) {
+    const t0 = performance.now();
+    for (;;) {
+      await pullPunct().catch(() => {});
+      if ((punct?.fires || 0) >= wakes || performance.now() - t0 > ms) return punct;
+      await sleep(600);
+    }
+  }
+
+  // ── controls ────────────────────────────────────────────────────────────
+  //
+  // 🔴 THE SLOW ONE IS FIRST BECAUSE IT HAS TO BE. `demo/verify.mjs` gives its
+  // `settleMs` to control 0 and to nothing else, and the whole claim of this
+  // page — that an item publishes itself, unattended, at a time named earlier —
+  // takes ten seconds to demonstrate. Demonstrating it is the point; describing
+  // it is what the old system's documentation did.
+  d.on('schedule', async () => {
+    const sent = draft();
+    const due = Date.now() + LEAD;
+    // Only the scheduled one gets a shelf time. Its second half is the part
+    // nothing else here shows: a shelving is SILENT, so the store must wake
+    // twice and announce once.
+    const made = await write('/items', { ...sent, publish_at: due, shelf_at: due + SHELF_AFTER });
+    const id = made.item.id;
+    d.log(`written · due at ${clock(due)}, armed for ${clock(made.armed_for)}`, 'hi');
+    await pull();
+
+    // 1 — it came back the way it went out, read from the store rather than
+    // from the reply to the write.
+    d.assert('an item comes back out of the store exactly as it was written, tags and author and all',
+      sameAsSent(sent, all.find((x) => x.id === id)),
+      `${sent.tags.length} tags · ${Object.keys(sent.payload).length} field(s) in the pocket`);
+
+    // 2 — and it WAITS. The whole difference between this and a thing that
+    // publishes on save.
+    await sleep(1200);
+    await pull();
+    const early = all.find((x) => x.id === id);
+    d.assert('nothing is published before its moment',
+      early?.status === 'unpublished' && Date.now() < due - 500,
+      `${early?.status} with ${((due - Date.now()) / 1000).toFixed(1)} s still to go`);
+
+    // 3 — the moment arrives and it publishes itself, with nothing asking.
+    const live = await until(id, isLive, 15000);
+    const told = live ? await until(id, wasTold, 9000) : null;
+    d.assert('it publishes itself at the moment it was given, with nothing polling for it',
+      !!live,
+      !live ? 'still unpublished after 15 s'
+        : told ? `live, and the notification left ${((told.announced_at - due) / 1000).toFixed(2)} s after its moment`
+               : 'live, but no notification was recorded within 9 s');
+
+    // 4 — the store's own record of how close that was. Read across the
+    // boundary, never computed here: a number this page worked out from its own
+    // clock would be measuring the network.
+    const p = await punctAfter(1, 9000);
+    const l = p?.late_ms || {};
+    d.assert('the clock records how late each wake was, and this one was neither early nor a minute out',
+      (p?.fires || 0) > 0 && l.min >= 0 && l.max < 5000,
+      `${p?.fires} wake(s) · ${l.min}–${l.max} ms late, ${l.p50} typical`);
+
+    // 5 — the silent half. Not "it is shelved", which a page could see without
+    // anything having gone out: the stamp has to be the SAME one the publish
+    // left, so a second announcement would show up as a different number.
+    const put = await until(id, (it) => it.status === 'shelved', 15000);
+    d.assert('it shelves itself as well, and that one goes out to nobody',
+      !!put && !!told && put.announced_at === told.announced_at,
+      put ? `shelved at ${clock(put.publish_at + SHELF_AFTER)} · still the one notification, not two`
+          : 'never shelved');
+    await punctAfter(2, 6000);
+  });
+
+  d.on('now', async () => {
+    // The other way of naming a moment, and the reason the store has it: a hook
+    // that fires when a broadcast starts has no future time to give.
+    // ⚠️ NO SHELF TIME HERE, so this one stays live for the Shelve control to
+    // find. Two items putting themselves away on a timer would leave that
+    // button with nothing to act on.
+    const sent = draft();
+    const t0 = performance.now();
+    const made = await write('/items', { ...sent, publish_now: true });
+    const live = await until(made.item.id, isLive, 12000);
+    const told = live ? await until(made.item.id, wasTold, 9000) : null;
+    d.assert('publishing now needs no time to be named, and still goes out the same way',
+      !!told,
+      !live ? 'never went live'
+        : told ? `live ${(performance.now() - t0).toFixed(0)} ms after the press, notification and all`
+               : 'live, but nothing was announced within 9 s of it');
+    await pullPunct();
+  });
+
+  d.on('shelve', async () => {
+    // Wait for something to be live rather than failing on the order the
+    // buttons happened to be pressed in — the suite presses this one while the
+    // control before it is still watching its own item go out.
+    let target = null;
+    for (let i = 0; i < 12 && !target; i++) {
+      await pull().catch(() => {});
+      target = all.find((x) => x.status === 'new');
+      if (!target) await sleep(700);
+    }
+    if (!target) { d.assert('shelving takes it out of the live list and puts it in the shelved one', false, 'nothing is live to shelve'); return; }
+    await write(`/items/${target.id}/shelve`);
+    // Asked of the store, on both sides of the move — the page's own copy of
+    // the list cannot answer a question about the store's filter.
+    const live = (await ask('/items', { status: 'new' })).items.map((x) => x.id);
+    const put = (await ask('/items', { status: 'shelved' })).items.map((x) => x.id);
+    await pull();
+    d.assert('shelving takes it out of the live list and puts it in the shelved one',
+      !live.includes(target.id) && put.includes(target.id),
+      `${live.length} live, ${put.length} shelved`);
+  });
+
+  // ── the installable half ────────────────────────────────────────────────
+  d.on('push', async () => {
+    // ⚠️ SAY WHAT IS MISSING BEFORE ASKING FOR ANYTHING. Each of these fails in
+    // a way that looks like "notifications are broken here" rather than naming
+    // itself.
+    if (!('serviceWorker' in navigator)) {
+      d.log('this browser has no service workers, so nothing can arrive while the page is closed', 'bad');
+      return;
+    }
+    if (!window.isSecureContext) {
+      d.log('this page is not being served securely — notifications need https, or localhost', 'bad');
+    }
+    const installed = window.navigator.standalone === true
+      || matchMedia('(display-mode: standalone)').matches;
+    d.log(installed ? 'running from the Home Screen' : 'running in an ordinary browser tab');
+
+    // The worker, registered BY PATH.
+    // 🔴 THE SDK LOOKS FOR ITS WORKER AT THE ORIGIN ROOT unless it is handed a
+    // registration, and this page is not at the root — so the default 404s and
+    // `getToken` then reports something that never mentions a path. That trap
+    // cost `proto/push` a session and it is the reason for both the explicit
+    // path here and for handing the registration over below.
+    const here = new URL('./', location.href).href;
+    let reg = null;
+    try {
+      reg = await navigator.serviceWorker.register('./push-sw.js', { scope: './' });
+      await Promise.race([navigator.serviceWorker.ready, sleep(6000)]);
+    } catch (e) { d.log(`the worker would not register — ${e.name}: ${e.message}`, 'bad'); }
+    d.assert('the part that waits for a notification takes this page\'s directory and nothing else',
+      reg?.scope === here && reg.scope !== `${location.origin}/`,
+      reg ? reg.scope : 'never registered');
+
+    // The two files that make it installable, asked for the way a phone asks —
+    // which is also the only thing that proves the build put them on the deploy.
+    let says = '';
+    let okManifest = false;
+    try {
+      const base = new URL('./manifest.json', location.href);
+      const mres = await fetch(base, { signal: AbortSignal.timeout(8000) });
+      const m = await mres.json();
+      const icon = new URL(m.icons[0].src, base);
+      const ires = await fetch(icon, { signal: AbortSignal.timeout(8000) });
+      const bytes = (await ires.blob()).size;
+      okManifest = mres.ok && ires.ok && m.display === 'standalone'
+        && new URL(m.scope, base).href === here && bytes > 500;
+      says = `${m.display} · scope ${new URL(m.scope, base).pathname} · ${bytes} B of icon`;
+    } catch (e) { says = `${e.name}: ${e.message}`; }
+    d.assert('the description a phone installs from, and the icon it names, are both really there',
+      okManifest, says);
+
+    // 🔴 iOS HIDES THE NOTIFICATION APIS UNTIL THE PAGE IS ON THE HOME SCREEN,
+    // and the failure is silent. A capability test, not a check on what browser
+    // this is: the API is either exposed or it is not, and that is the same
+    // question on every platform.
+    if (!('Notification' in window) || !('PushManager' in window)) {
+      d.log('this browser is not offering notifications at all. On iPhone and iPad they appear only '
+        + 'once the page is added to the Home Screen (Share, then Add to Home Screen) — in an ordinary '
+        + 'tab nothing here can work, and it looks exactly like a broken setup.', 'bad');
+      return;
+    }
+
+    const perm = await Notification.requestPermission();
+    d.log(`notifications: ${perm}`, perm === 'granted' ? 'hi' : 'bad');
+    if (perm !== 'granted' || !reg) return;
+
+    // Loaded HERE rather than at the top of the page, and only once somebody
+    // has said yes: the compose-and-schedule half of this page must not depend
+    // on a content delivery network being reachable.
+    try {
+      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js');
+      const { getMessaging, getToken, onMessage } =
+        await import('https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging.js');
+      // Public configuration: it identifies the project and grants nothing. The
+      // key that can SEND is a service account, which never comes near a
+      // browser — it is a secret on the store's own worker.
+      const app = initializeApp({
+        apiKey: 'AIzaSyBrhsydZ5mVttOmSJuXFbaJYnS9EuxGVYI',
+        authDomain: 'positron-push.firebaseapp.com',
+        projectId: 'positron-push',
+        storageBucket: 'positron-push.firebasestorage.app',
+        messagingSenderId: '826711684766',
+        appId: '1:826711684766:web:f6410b53d4aca4ceab2d8f',
+      });
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, {
+        // The public half of the project's key pair, which is what the
+        // browser's own push service checks a sender's signature against.
+        vapidKey: 'BKzmVlAviUBJ0ghEjxG7EcmbyEQcBUxM7_FtP_y4J0pU_w_6CXjYVKg5vfTtujYXbJr96RB9Ozhv22luKL0R0x0',
+        serviceWorkerRegistration: reg,
+      });
+      if (!token) { d.log('no address came back for this browser', 'bad'); return; }
+      const line = el('div', 'tok', token);
+      d.el.append(line);
+      d.log(`this browser now has an address, printed under the list — ${token.length} characters`, 'hi');
+      // ⚠️ AND IT IS NOT ON THE LIST YET. The store announces to a named group,
+      // and joining a browser to that group takes the sending key, which is not
+      // here and must not be. Until somebody runs
+      // `node proto/push/send.mjs subscribe <address> positron-test`, nothing
+      // published on this page will arrive on this device — and that looks
+      // exactly like a broken notification.
+      d.log('it is not on the announcement list yet: joining it takes the sending key, which no browser has. '
+        + 'Until it is joined, nothing published here will arrive on this device.', 'bad');
+      onMessage(messaging, (payload) => {
+        d.log(`notification while the page is open: ${payload.notification?.title || ''}`, 'hi');
+        pull().catch(() => {});
+      });
+    } catch (e) { d.log(`${e.name}: ${e.message}`, 'bad'); }
+  });
+
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    d.log(`notification while the page was in the background: ${e.data?.payload?.notification?.title || ''}`, 'hi');
+    pull().catch(() => {});
+  });
+
+  d.on('clear', async () => {
+    const r = await write('/clear');
+    await pull();
+    await pullPunct();
+    d.assert('clearing empties this room, and the next moment goes back to nothing',
+      r.cleared === true && all.length === 0 && nextDue === null,
+      `${all.length} left · room ${ROOM}`);
+  });
+
+  // ── go ──────────────────────────────────────────────────────────────────
+  let reached = true;
+  try { await pull(); await pullPunct(); } catch (e) { reached = false; bad(e); }
+  d.assert('the store answers, and says what this room already holds',
+    reached, reached ? `${all.length} item(s) · room ${ROOM}` : `no answer from ${API}`);
+  d.log(`room ${ROOM}`, 'hi');
+  d.ready();
+</script>
+</html>
