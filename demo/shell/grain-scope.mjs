@@ -38,7 +38,20 @@
 import { el } from './shell.mjs';
 
 export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520,
-                                        fullScale = null } = {}) {
+                                        fullScale = null, grainSeconds = 0 } = {}) {
+  // 🔴 `grainSeconds` PUTS GRAIN TICKS ON THE SCROLLING WAVE, and the branch
+  // below explains at length why that is normally forbidden: a remote engine's
+  // grain positions are fractions of ITS held buffer, while its arriving audio
+  // is the last few seconds of OUTPUT — two quantities on two axes, and
+  // overlaying them invites a reading nothing supports.
+  //
+  // ⚠️ THAT ARGUMENT DOES NOT HOLD WHEN THE MATERIAL IS THE SAME AUDIO. On
+  // `/radio1965/` the granulator's buffer is filled from the very stream this
+  // scope is drawing, on one clock in one process — so a grain that read at
+  // fraction `pos` of an N-second buffer read the audio that arrived
+  // `(1 - pos) * N` seconds ago, and that lands on this axis exactly. Passing
+  // the buffer length is how a page says "these are the same seconds"; leaving
+  // it at 0 keeps the refusal.
   // 🔴 `fullScale` LOCKS THE VERTICAL SCALE, AND WITHOUT IT THE PICTURE LIES
   // ABOUT LOUDNESS. The default draws the waveform normalised to the loudest
   // sample CURRENTLY IN VIEW, which is right for a fixed buffer you are
@@ -203,7 +216,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         ctx.beginPath(); ctx.moveTo(x + 0.5, mid - h); ctx.lineTo(x + 0.5, mid + h); ctx.stroke();
       }
       ctx.globalAlpha = 1;
-    } else if (live.length) {
+    } else if (live.length && !grainSeconds) {
       // ── grains, on the buffer's own axis, with nothing drawn under them ──
       //
       // 🔴 THE THIRD PICTURE, AND IT EXISTS BECAUSE THE AXES DO NOT MATCH.
@@ -286,6 +299,27 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
+        }
+        // the grains, on the same seconds the wave is drawn on
+        if (grainSeconds) {
+          for (let i = live.length - 1; i >= 0; i--) {
+            const g = live[i];
+            const age = (performance.now() - g.born) / 1000;
+            if (age > fadeMs / 1000) continue;
+            // ⚠️ ON THIS FILE'S OWN CLOCK. `now()` is `performance.now()/1000 - t0`
+            // and `g.born` is a raw `performance.now()` in MILLISECONDS, so the
+            // two must be reconciled before either touches `X()`. Mixing them
+            // puts every tick t0 seconds out — a picture that looks plausible
+            // and is wrong by a constant, which is the hardest kind to notice.
+            const bornAt = g.born / 1000 - t0;
+            const at = bornAt - (1 - g.pos) * grainSeconds;
+            const x = X(at);
+            if (x < 0 || x > W) continue;
+            ctx.globalAlpha = Math.max(0, 1 - age / (fadeMs / 1000));
+            ctx.fillStyle = C.hi;
+            ctx.fillRect(x - 0.5, mid - H * 0.46, 1.5, H * 0.92);
+          }
+          ctx.globalAlpha = 1;
         }
         ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
