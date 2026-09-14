@@ -95,6 +95,25 @@ The DEVICE is: one JACK graph, one instrument.
 - **`plan-gesture` P4 — the same gesture driving the board.** Unblocked now that
   twins is finished; wants the device.
 
+## Needs the board — grains' two open items, neither a correctness problem
+
+`grains` is DONE and green — **23/23 against the live board, 2026-09-14**, with
+both ends running real scsynth on one definition and the asserts saying so
+rather than assuming it (*"72 sine partials here, 72 on the board"*, *"2.2 a
+second in this page and 2.3 on the board"*, and a deafness control at 0.0000).
+These two are what is left, and both are cheap to state and awkward to act on:
+
+- **TINY's orphans.** Sixteen `Lag.kr` tuning strings that do not exist and a
+  stereo Limiter over a bank guaranteed silent. A one-line cut that buys back
+  headroom against the 65,488 B ceiling. ⚠️ **It cannot be taken from here**:
+  cutting changes TINY's byte count, and `demo/grains/defs/pappus-tiny.scsyndef`
+  is compiled ON THE BOARD and hash-guarded in `PROVENANCE.json`, so the tab's
+  definition would immediately disagree with the board's and `build.mjs` would
+  refuse the build. The cut and the recompile are one job, on the board.
+- **The 25x insertion loss at `msos 0` is unexplained.** Carried since session
+  22. It is a number nobody has a mechanism for, which is the kind this repo
+  says to measure rather than reason about.
+
 ## Needs nobody — just time
 
 - 🔴 **`LESSONS.md` has entries 39–48 TWICE** — `### 39`–`### 48` from sessions

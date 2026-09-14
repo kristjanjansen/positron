@@ -196,6 +196,16 @@ export const DEMOS = [
     // master + a 218 KB media playlist + first fragments + first PDT + one EPG
     // fetch + a 13-point two-byte sweep, all behind control 0
     settleMs: 26000 },
+  // `gl: true` and `xr: true` for the same reason mirror and scene carry them:
+  // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
+  // a GPU page graded there reports a defect that belongs to the harness.
+  // `node demo/verify-gl.mjs` is the grader.
+  { name: 'floor', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+    one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
+    tags: ['WebGL2', 'WebXR', 'ERR', 'archive', 'HLS'],
+    // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
+    // of fetching before there is much to see
+    settleMs: 4000 },
   { name: 'flipper', act: 5, created: '2026-09-04', built: true,
     one: 'eight live ERR channels in equal cells; the bar scrubs the 2 h DVR',
     tags: ['HLS', 'icecast', 'DVR'],

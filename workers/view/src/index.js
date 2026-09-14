@@ -15,6 +15,15 @@
 // archive.org media, arhiiv-images thumbnails. Nothing media-shaped is ever
 // proxied or stored here.
 //
+// ⚠️ CORRECTED 2026-09-14: "arhiiv-images thumbnails are CORS-clear" is true for
+// an `<img>` and FALSE for a texture. MEASURED with an Origin header, both
+// `arhiiv-images.err.ee` and the `arhiiv-img.err.ee` resizer answer 200 with NO
+// `access-control-allow-origin` at all. A page can DISPLAY such an image; it
+// cannot read its pixels, and `texImage2D` on one throws a SecurityError. So
+// `/floor/` — a WebGL grid of archive thumbnails — needs them same-origin, which
+// is the second proxied route below. The distinction is display versus READ,
+// and it is invisible until something tries to read.
+//
 // This now runs on Cloudflare's network rather than one laptop, so the
 // politeness that was a local `await sleep(1000)` has to become a real global
 // gate. See the Gate Durable Object at the bottom, and DEPLOYED.md for the
@@ -200,6 +209,81 @@ export default {
           headers: { 'user-agent': UA, accept: 'application/json' },
         }),
       });
+    }
+
+    // ── GET /err-img — a thumbnail, same-origin, so WebGL can READ it ──────
+    //
+    // 🔴 THE ONLY REASON THIS EXISTS IS THE CORS DISTINCTION IN THE HEADER.
+    // These images are already public and already fetched direct by `reel` and
+    // `remixer`; nothing here is being unlocked. What changes is that the bytes
+    // arrive same-origin, so a texture upload is allowed to read them.
+    //
+    // Not an open proxy, same two parts as the search route: the upstream HOST
+    // is a constant, and the only thing a caller controls is a path that must
+    // match the archive's own thumbnail shape — a four-digit year folder and a
+    // plain filename. No `..`, no slashes beyond the one, no other extension.
+    // Size is clamped to a tile-sized range, because the point is a floor of
+    // small pictures and an unbounded `width` is somebody else's bandwidth.
+    if (p === '/err-img' && request.method === 'GET') {
+      const f = url.searchParams.get('f') || '';
+      if (!/^thumbnails\/\d{4}\/[A-Za-z0-9_.-]{1,160}\.jpg$/.test(f)) {
+        return json({ error: 'bad thumbnail path' }, 400);
+      }
+      const clamp = (v, lo, hi, dflt) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : dflt;
+      };
+      const w = clamp(url.searchParams.get('w'), 64, 512, 256);
+      const h = clamp(url.searchParams.get('h'), 48, 384, 192);
+
+      // ⚠️ A CACHE KEY THAT IS NOT THE REQUEST URL. The browser may send this
+      // with any order of query parameters and any casing; the edge entry is
+      // keyed on the three things that decide the bytes, so two spellings of
+      // one picture are one entry rather than two upstream fetches.
+      const key = new Request(`${url.origin}/err-img?f=${encodeURIComponent(f)}&w=${w}&h=${h}`,
+        { method: 'GET' });
+      const cache = caches.default;
+      const hit = await cache.match(key);
+      if (hit) return hit;
+
+      const upstream = `https://arhiiv-img.err.ee/enlarge?type=optimize`
+        + `&width=${w}&height=${h}&file=${encodeURIComponent(f)}`;
+      let r;
+      try {
+        // ⚠️ `cf.cacheEverything` CACHES THE UPSTREAM FETCH, WHICH IS A DIFFERENT
+        // CACHE FROM THE ONE ABOVE AND THAT IS THE POINT. `caches.default` is
+        // per-COLO: a visitor in another region misses it and would go to the
+        // archive. This makes the SUBREQUEST cacheable too, so a colo miss
+        // still lands in Cloudflare's own cache rather than on somebody else's
+        // server. Three layers, each covering the one before's miss:
+        //   browser (cache-control below) → colo (caches.default) → CF (here)
+        // and the archive is asked roughly once per picture, ever.
+        r = await fetch(upstream, {
+          headers: { 'user-agent': UA, accept: 'image/jpeg,image/*' },
+          cf: { cacheEverything: true, cacheTtl: 31536000 },
+        });
+      } catch (e) {
+        return json({ error: `thumbnail upstream unreachable: ${e.message}` }, 502);
+      }
+      if (!r.ok) return json({ error: `thumbnail upstream ${r.status}` }, r.status === 404 ? 404 : 502);
+
+      // ⚠️ A THUMBNAIL OF A 1965 FILM DOES NOT CHANGE, so this is cached hard.
+      // The BROWSER layer is the one that matters most for this page: a floor
+      // re-asks for the same tiles every time you walk back over them, and a
+      // week in the local cache means walking back costs nothing at all.
+      // ⚠️ NOT stored in the repo, deliberately — 298 thumbnails is ~2 MB of
+      // somebody else's images, and this file's own header says nothing
+      // media-shaped is kept here. Proxied and cached is not the same as held.
+      const out = new Response(r.body, {
+        status: 200,
+        headers: {
+          'content-type': r.headers.get('content-type') || 'image/jpeg',
+          'cache-control': 'public, max-age=604800, s-maxage=31536000, immutable',
+          'x-content-type-options': 'nosniff',
+        },
+      });
+      ctx.waitUntil(cache.put(key, out.clone()));
+      return out;
     }
 
     // ── /icy/{mount}.mp3 — DELIBERATELY NOT PROXIED ────────────────────────
