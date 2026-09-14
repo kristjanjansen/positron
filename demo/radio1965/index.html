@@ -18,6 +18,10 @@
   import { icyDemuxer } from '/shell/icy.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { allocBuffers, startPappusSynth, applyAudibleDefaults, setParam, PAPPUS_NODE }
+    from '/shell/pappus.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
 
@@ -63,13 +67,13 @@
       + 'yellow-green for a hiss. HEARD is how long it has played, KBPS the settled rate, GAP '
       + 'the worst pause, BEHIND the seconds you missed while paused, GRAINS how many '
       + 'are firing a second, and WET how much of what you hear is the granulator.',
-    readout: { heard: 's', kbps: '', gap: 'ms', behind: 's' },
+    readout: { heard: 's', kbps: '', gap: 'ms', behind: 's', grains: '/s', wet: '' },
     // ⚠️ ONE CONTROL, AND IT IS NOT "PLAY". There was a `Listen` button beside a
     // transport bar that also has a play button — two controls for one action,
     // and the reader has to guess which is real. Playing is the transport's job.
     // This button does the thing the transport cannot: hand the radio to a
     // SuperCollider granulator.
-    controls: [],
+    controls: [{ id: 'synth', label: 'Synthesize', primary: true }],
   });
   guard(d);
 
@@ -93,7 +97,6 @@
   deck.seek(t0);
 
   let heardFrom = null;                 // when audio actually started arriving
-  let heardSec = 0;                     // seconds actually heard, pauses excluded
   let started = false;                  // has the stream ever been asked for
 
   const bar = createTransportBar(d.el, deck, { absolute: true, scrub: false, endStop: false });
@@ -135,8 +138,20 @@
   setInterval(() => {
     const t = Date.now();
     deck.setRange([t - SPAN_MS, t]);
-    if (heardFrom != null && !audio.paused) {
-      d.set('heard', (heardSec += 1 / RANGE_HZ).toFixed(0));
+    // 🔴 BOTH NUMBERS COME FROM THE ELEMENT, NOT FROM THIS TIMER. `heard` used
+    // to be a counter this interval incremented — a measurement driven by a
+    // clock, of a quantity the audio object already knows exactly.
+    // `audio.currentTime` counts only while sound is actually playing, so
+    // pauses fall out for free and no counter can drift from them.
+    //
+    // ⚠️ AND A HIDDEN TAB IS WHERE THE OLD ONE WOULD HAVE LIED. Chrome clamps a
+    // background `setInterval` to 1 s and, after a few minutes, throttles it
+    // far harder — so `heard` would have stalled while the radio kept playing,
+    // and `behind`, computed against the wall clock, would have climbed to
+    // minutes of "you missed this" for somebody who missed nothing. The
+    // element's own clock has no such problem.
+    if (heardFrom != null) {
+      d.set('heard', audio.currentTime.toFixed(0));
     }
     // 🔴 BEHIND — the one number a live stream with a pause button owes you.
     // An Icecast mount has no past to seek to, so pausing does not hold your
@@ -144,7 +159,7 @@
     // seconds you missed stay missed. This counts them. It sits still while you
     // listen and grows while you do not, which is exactly when it matters.
     if (heardFrom != null) {
-      d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - heardSec).toFixed(0));
+      d.set('behind', Math.max(0, (Date.now() - heardFrom) / 1000 - audio.currentTime).toFixed(0));
     }
     // 🔴 THE BAR MUST BE ABLE TO STOP THE SOUND, AND IT COULD NOT.
     // `mediaMaster` runs one way only — its own doc says *"a paused/ended
@@ -164,7 +179,8 @@
   audio.crossOrigin = 'anonymous';
   audio.preload = 'none';
   let ctx = null, srcNode = null, analyser = null, master = null, dry = null;
-  let eng = null;
+  let eng = null, grains = 0, wet = 0.85;
+  const P = { rate: 8, size: 0.12, scan: 0.666, spray: 0 };
   let measured = null, done = false, synthPending = false;
 
   function graph() {
@@ -415,8 +431,130 @@
                    : 'the bar paused the line and the radio played on')
         : 'nothing was playing to stop');
 
+
+    // ── and the granulator, in the SAME burst, when it was asked for ────────
+    if (!eng) return;
+    d.assert('SuperCollider is running in this tab', eng.bootMs > 0,
+      `up in ${Math.round(eng.bootMs)} ms, ${eng.ctx.sampleRate} Hz`);
+    d.assert('the board\'s own compiled graph loaded', !!G.def?.ok,
+      G.def?.ok ? `${G.def.bytes} B of SynthDef taken in ${G.def.ms} ms` : (G.def?.why ?? 'never fetched'));
+    d.assert('the granulator is running', G.running,
+      G.running ? `node ${PAPPUS_NODE}, reading busses 2 and 3` : 'the engine refused /s_new');
+    d.assert('the engine reports the grains it fires', G.grains > 0,
+      `${G.grains} reported in ${G.secs.toFixed(1)} s`);
+    // 🔴 THE ONE THAT MATTERS: the radio is audibly IN the graph. A grain count
+    // cannot say this — measured, a Pappus with its input disconnected fired
+    // 4-5 grains per window while outputting exactly 0.00000 — and a running
+    // synth cannot say it either.
+    d.assert('the radio reaches the granulator and is heard', G.loud > 0.0005 && G.quiet < G.loud / 4,
+      `${G.loud.toFixed(4)} running, ${G.quiet.toFixed(4)} with the node paused`);
   }
 
+
+  // ── the granulator ─────────────────────────────────────────────────────────
+  // 🔴 REAL SUPERCOLLIDER, EATING A REAL RADIO STATION. `Engine_Pappus.sc:518`
+  // is `in = LeakDC.ar([In.ar(inbusl, 1), In.ar(inbusr, 1)])` — Pappus does not
+  // generate, it granulates whatever is ON A BUS. On the Raspberry Pi that bus
+  // is filled by JACK; `/grains/` fills it from inside scsynth with a second
+  // definition, because nothing in a browser filled it. This page fills it with
+  // a radio station: `bootScsynth`'s `input` connects the page's audio to
+  // scsynth's hardware input busses, 2 and 3, which is exactly the `inbusl 2
+  // inbusr 3` the board uses. MEASURED level-preserving and with zero engine
+  // delay — research/scsynth-live-input-2026-09.md.
+  const G = { def: null, bufs: null, running: false, grains: 0, secs: 0, loud: 0, quiet: 0 };
+
+  /** Peak RMS at the engine's own meter over `ms`. The meter is IN the path. */
+  function engLevel(ms) {
+    return new Promise((resolve) => {
+      if (!eng) { resolve(0); return; }
+      const b = new Float32Array(eng.meter.fftSize);
+      let peak = 0; const t0 = performance.now();
+      (function tick() {
+        eng.meter.getFloatTimeDomainData(b);
+        let sum = 0; for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
+        peak = Math.max(peak, Math.sqrt(sum / b.length));
+        if (performance.now() - t0 < ms) requestAnimationFrame(tick); else resolve(peak);
+      })();
+    });
+  }
+
+  async function ensurePlaying() {
+    if (!started) startListening();
+    deck.play();
+    for (let i = 0; i < 40 && !(audio.currentTime > 0 && !audio.paused); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  const setBoth = (name, v) => { setParam(eng, `m${name}`, v); setParam(eng, `n${name}`, v); };
+  const setWet = (v) => {
+    wet = v;
+    if (eng) eng.out.gain.value = v;
+    if (dry) dry.gain.value = 1 - v;
+    d.set('wet', v.toFixed(2));
+  };
+
+  d.on('synth', async () => {
+    synthPending = true;
+    await ensurePlaying();
+
+    eng = await bootScsynth({
+      audioContext: ctx,
+      input: srcNode,                      // ← the radio, onto scsynth's input busses
+      log: (m) => d.log(m),
+      onReply: (m) => {
+        // Every tick is a grain the ENGINE reported firing, from the code that
+        // started it — never one inferred from an output envelope.
+        if (m[0] !== '/pgrain') return false;
+        grains++;
+        scope.mark({ pos: m[2], dur: m[3], voice: m[4] });
+        return true;
+      },
+    });
+
+    // 🔴 BUFFERS BEFORE THE SYNTH. A Pappus with no envelope windows and no
+    // gate buffers loads, answers `/n_go`, and fires nothing in silence.
+    G.bufs = await allocBuffers(eng, { log: (m) => d.log(m) });
+    G.def = await eng.recvDef(`${DEFS}pappus-tiny.scsyndef`);
+    d.log(`Pappus TINY: ${G.def.bytes} B, ${G.def.ok ? `taken in ${G.def.ms} ms` : G.def.why}`);
+    G.running = await startPappusSynth(eng);
+
+    // 🔴 AND THE SETTINGS, WITHOUT WHICH IT IS SILENT AT `mix 0, gain 0`.
+    applyAudibleDefaults(eng, { live: true });
+    for (const [k, v] of Object.entries(P)) setBoth(k, v);
+    setParam(eng, 'report', 1);
+    setWet(wet);
+    scope.source('Pappus, chewing the radio · colour is pitch');
+
+    const row = el('div', 'pos-sliders');
+    d.el.append(row);
+    const add = (label, name, min, max, step, value, unit) =>
+      row.append(createSlider({ label, min, max, step, value, unit,
+        onInput: (v) => { P[name] = v; setBoth(name, v); } }).el);
+    add('grains a second', 'rate', 0.5, 40, 0.5, P.rate, '/s');
+    add('grain length', 'size', 0.01, 1, 0.01, P.size, 's');
+    add('read position', 'scan', 0, 1, 0.01, P.scan, '');
+    add('scatter', 'spray', 0, 1, 0.01, P.spray, '');
+    row.append(createSlider({ label: 'radio → granulator', min: 0, max: 1, step: 0.01,
+      value: wet, onInput: setWet }).el);
+
+    const t0g = performance.now();
+    grains = 0;
+    G.loud = await engLevel(2500);
+    G.secs = (performance.now() - t0g) / 1000;
+    G.grains = grains;
+    d.set('grains', (grains / G.secs).toFixed(1));
+
+    // 🔴 A DEAFNESS CONTROL. `/n_run 0` pauses the node; if the level does not
+    // follow, what is being heard came from somewhere else. ⚠️ AND A GRAIN
+    // COUNT WOULD NOT HAVE CAUGHT THIS: measured, a Pappus with its input
+    // disconnected fired 4–5 grains per window while outputting exactly 0.
+    eng.send('/n_run', PAPPUS_NODE, 0);
+    G.quiet = await engLevel(1200);
+    eng.send('/n_run', PAPPUS_NODE, 1);
+
+    await finish();
+  });
 
   d.ready();
 </script>
