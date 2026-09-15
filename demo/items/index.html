@@ -458,6 +458,24 @@
    * the same question on every platform and the answer is either present or it
    * is not.
    */
+  /**
+   * 🔴 THERE IS AN INSTALL API AND SAFARI HAS NEITHER HALF OF IT. Chrome and
+   * Edge fire `beforeinstallprompt`, which can be held and fired later from a
+   * press, and are trialling `navigator.install()`. Safari implements NEITHER —
+   * no event, no method — so on iPhone and iPad EVERY install is a person
+   * finding Share and then Add to Home Screen, and the page's only move is to
+   * say so. Asked directly: *"There is no api to trigger add to home screen?"*
+   *
+   * ⚠️ HELD RATHER THAN USED ON THE SPOT. The event arrives whenever the
+   * browser decides the page is installable, which is not a moment anybody
+   * pressed anything — showing a dialog then is the interruption every browser
+   * added this event to stop. `preventDefault()` keeps it for a press.
+   * ⚠️ AND IT IS A FEATURE TEST, NOT A BROWSER CHECK: either the event fired or
+   * it did not, which is the same question everywhere.
+   */
+  let installPrompt = null;
+  addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; paintNotices(); });
+
   const noticesState = () => ({
     offered: 'Notification' in window && 'PushManager' in window,
     permission: 'Notification' in window ? Notification.permission : 'unavailable',
@@ -480,10 +498,19 @@
     // `settleMs` to control 0 and to nothing else, so the ten-second publish
     // has to stay first — CLAUDE.md records that this order cost a redesign
     // rather than a swap.
+    // 🔴 NOT INSTALLED IS A DIFFERENT PROBLEM WITH A DIFFERENT ANSWER, and it
+    // comes first: a browser that is not offering notifications is usually a
+    // browser that has not been given the app yet. The button becomes the
+    // install step — a real prompt where there is an API for one, and the
+    // gesture in words where there is not.
+    const standalone = window.navigator.standalone === true
+      || matchMedia('(display-mode: standalone)').matches;
     const wants = offered && permission === 'default';
-    b.classList.toggle('pos-pri', wants);
-    d.button('now')?.classList.toggle('pos-pri', !wants);
-    if (!offered) { b.textContent = 'Notifications need the Home Screen'; b.disabled = true; return; }
+    const needsInstall = !offered && !standalone;
+    b.classList.toggle('pos-pri', wants || needsInstall);
+    d.button('now')?.classList.toggle('pos-pri', !(wants || needsInstall));
+    if (needsInstall) { b.textContent = 'Add positron to the Home Screen'; b.disabled = false; return; }
+    if (!offered) { b.textContent = 'This browser has no notifications'; b.disabled = true; return; }
     if (permission === 'granted') { b.textContent = 'This device will be told'; b.disabled = true; return; }
     if (permission === 'denied') { b.textContent = 'Notifications are blocked'; b.disabled = true; return; }
     b.textContent = 'Tell me about new items';
@@ -678,12 +705,31 @@
    */
   d.on('notices', () => {
     const { offered, permission } = noticesState();
+    const standalone = window.navigator.standalone === true
+      || matchMedia('(display-mode: standalone)').matches;
     if (offered && permission === 'default') {
       setUpNotices().catch((e) => d.log(`${e.name}: ${e.message}`, 'bad'));
+    } else if (!offered && !standalone) {
+      // Where there IS an install API, use it — this is a press, which is the
+      // only moment a browser will let the prompt be shown.
+      if (installPrompt) {
+        installPrompt.prompt();
+        installPrompt.userChoice
+          .then((c) => d.log(`install ${c.outcome}`, c.outcome === 'accepted' ? 'hi' : ''))
+          .catch(() => {})
+          .finally(() => { installPrompt = null; paintNotices(); });
+      } else {
+        // 🔴 AND WHERE THERE IS NOT, SAY THE GESTURE. Safari implements neither
+        // `beforeinstallprompt` nor `navigator.install()`, so on an iPhone this
+        // sentence IS the install button — there is nothing else a page can do.
+        d.log('this browser will not let a page offer that. On iPhone and iPad: the Share button — '
+          + 'the square with an arrow out of it — then Add to Home Screen. Open it from the new icon '
+          + 'and notifications appear. In an ordinary tab nothing here can work, and it looks exactly '
+          + 'like a broken setup.', 'bad');
+      }
     } else if (!offered) {
-      d.log('this browser is not offering notifications. On iPhone and iPad they appear only once the '
-        + 'page has been added to the Home Screen (Share, then Add to Home Screen) — in an ordinary tab '
-        + 'nothing here can work, and it looks exactly like a broken setup.', 'bad');
+      d.log('this browser has no Notification or PushManager at all, even installed — nothing here '
+        + 'can reach it.', 'bad');
     } else {
       d.log(permission === 'granted'
         ? 'this device is already on the list — it will be told with the page shut'
@@ -691,9 +737,10 @@
           + 'and it is named after the Home Screen icon rather than after the page.', permission === 'granted' ? 'hi' : 'bad');
     }
     paintNotices();
-    d.assert('this page can put the question to this browser',
-      offered, offered ? `permission is ${noticesState().permission}`
-        : 'no Notification or PushManager here — on iOS that means an ordinary tab, not a broken page');
+    d.assert('this page can put the question to this browser, or say how to make it possible',
+      offered || !standalone,
+      offered ? `permission is ${noticesState().permission}`
+        : 'not installed — the control offers the install instead, by API where there is one');
   });
 
   // 🔴 CONTROL 0, AND THE ONE THAT CARRIES THE CLOCK. It publishes at once —
