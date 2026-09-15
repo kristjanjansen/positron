@@ -1,3 +1,217 @@
+# Queue — open work, 2026-09-15 (end of session 26)
+
+**Twenty-two commits.** Live at `217a948-055838-8fd9`. 40 built demos of 45 rows
+(counted from `DEMOS`, not remembered — `tapes` is the new one). Every page named
+below is deployed and green.
+
+## 🔴 THE ONE THAT MATTERS MOST — the suite was texting a real phone
+
+REPORTED from the only end it was visible from: *"why do I get notifications
+from positron? Is it your testing rig or what?"* It was.
+
+Rooms in `workers/items` are separate Durable Objects, so two runs cannot see
+each other's rows and neither can see the real page's. **The one thing that was
+not per room was `env.FCM_TOPIC`.** `demo/verify.mjs` gives every run its own
+room and publishes two items into it on every pass, so **every run of the suite
+sent two real notifications to every real subscriber** — dozens of times in an
+afternoon.
+
+Nothing was broken. The harness was right, the page was right, the worker was
+right, and nobody owned the sentence *"a side room shares one loudspeaker with
+the real one."* That is the class of bug worth naming: **a fact true of every
+part and of no part's author.**
+
+Fixed: `workers/items` announces only from the room named `items`.
+- ⚠️ **An allowlist of one, not a prefix test.** Refusing rooms that LOOK like
+  test rooms lets the next non-real room through by default, and the default has
+  to be silence.
+- 🔴 **The object had to learn its own name.** The alarm fires with no request,
+  and `idFromName(room)` tells the object nothing about its own name — so the
+  one place deciding whether an item may reach a phone had no access to the
+  answer. Written once on the first request, read back through
+  `blockConcurrencyWhile` on a cold wake, never re-written.
+- ⚠️ **`announced_at` is only stamped when something went out.** Stamping it
+  regardless would make it mean "the announce step ran", a quieter and worse lie
+  than null.
+
+And harness rooms are `items-test-<hash>`, not `v-items-<hash>` — asked, *"What
+is v- prefix?"*, and it stood for verify and was obvious to nobody.
+
+## `/tapes/` — Kurenniemi in time, and the ones you can play
+
+**<https://positron.studio/tapes/>** · 20/20. The same 334 records
+`/kurenniemi/` tabulates, on an axis. One corpus, two pictures of it.
+
+🔴 **The mark is as wide as the date is vague, and that is the whole claim.**
+85 records know their day (a tick), 112 only their year (a year-wide bar), 48
+only a decade, 25 span longer, **59 have no date at all** and are counted in each
+lane's gutter rather than dropped. Drawn as points, a third of this archive would
+have been asserted to have happened on the 1st of January.
+
+⚠️ **None of that is code on the page.** The corpus's `when` — `{earliest,
+latest, edtf}` — is already exactly what the strip's `whenOf()` reads, so `195X`
+arrives as a decade-wide bar by itself. `research/spatiotemporal-uncertainty-2026-08.md`
+finally has real data.
+
+Two decks, deliberately: the map runs 1890–2027 and says where in HISTORY you
+are, the tape runs nought to its own length. ⚠️ `absolute: true` is DECLARED —
+the strip infers it from `range[0] > 1e12` and 1890 is a negative number of
+milliseconds, so the guess would label the axis in hours before the epoch.
+
+### 🔴 Four things it cost, each measured rather than guessed
+
+1. **`mediaMaster` does not run itself.** Its header shows the caller's rAF loop
+   on line 17. Without it the object is built, holds a deck, and the deck never
+   moves. A CDP probe after the harness pressed play: `paused false ·
+   currentTime 2.395 · deck 0`. The sound was fine; nothing had asked the master
+   to look.
+2. **`fileType` is the host's header and archive.org serves a `.avi` as
+   `video/mp4`.** `canPlayType` believes it and the browser then decodes nothing.
+   The extension is the better evidence — not a thing one expects to write down.
+3. **The corpus's `cors` was probed per SOURCE, not per file** — one Range
+   request per host. That same `.avi` answered `No access-control-allow-origin`.
+   The page drops `crossOrigin` and reloads on error.
+4. **A seek into a remote file is a Range request, not an assignment.** The
+   harness asked for 117 538 ms and read 1 296 back — a seek in flight, not a
+   seek that missed.
+
+### 🔴 Open on tapes
+
+- **`/kurenniemi/build-corpus.mjs` should learn 2 and 3 above**: probe CORS on
+  the file you are recording, and trust the extension over the content-type.
+  Not done; it is a builder change, not a page one.
+- The 2010s hump is RECEPTION, not work — Discogs, Zenodo, Crossref, OpenAlex,
+  none of which existed while he was working. One undivided strip draws a man
+  who peaked in 2013. Splitting the axis or folding that lane away is unbuilt.
+- The audio lane plays; nothing else does. 16 of 17 audio rows serve `ACAO: *`.
+
+## `/kurenniemi/` — 122 rows became 334, and the diaries are not online
+
+**<https://positron.studio/kurenniemi/>** · 14/14 · 334 records, 17 sources.
+
+🔴 **THE DIARIES EXIST AND ARE NOT ONLINE.** Twelve rows say so with what each
+holder answered. Five photographed pages survive ONLY in the Internet Archive —
+1975-01-09, 1975-06-30 twice (the original and the version he typed into a
+computer), two from 1986 — published by the National Gallery on `lahteilla.fi`,
+which is DNS-dead. One is a 2.6 MB full page you can read. ⚠️ **No licence is
+stated anywhere**: the site declared none and the institution took it down. The
+paper volumes (early 1970s to 2005), 100 digitised cassettes of his spoken
+diary, and an Apple Newton diary are all described and none published. The
+item-level finding aid is behind the API key — `GET /objects/{id}` answers 403
+for every id, including ones the open dump contains.
+
+🔴 **`lahteilla.fi`'s 545 Wayback URLs were recorded on the first pass and never
+opened.** Inside them: 105 item records, 16 chapter PDFs and the diaries. **A
+list of addresses is not a list of what is at them.**
+
+🔴 **A cache key that does not move when the question moves answers the old
+question for ever.** Adding a property to the Wikidata query re-ran nothing —
+byte-identical output, read as "Wikidata has no such statement", while the same
+query by hand returned dOCUMENTA (13) first time.
+
+⚠️ **Kurenniemi is also a place** — a Karelian headland, which is where the
+surname comes from. Topic filtering cannot separate them; the punctuation can (a
+place is quoted, a person is not).
+
+Five corrections to `research/kurenniemi-sources-2026-09.md` are in the commit
+message of `2e31636`; the largest is that **the National Library's 1279 was a
+sample, not a measurement** — the index answers 7,549, of which 2,640 are
+readable, and all but 18 of those PREDATE HIS BIRTH. It is a surname search over
+OCR.
+
+## `/radio1965/` — eight sounds that differ in KIND
+
+**<https://positron.studio/radio1965/>** · 36/36.
+
+REPORTED a third time — *"patches heard almost same"* — after a round of
+widening ranges and a round of adding movement, neither of which could have
+helped. MEASURED off the old set: **scanmode 1 on 7 of 7** (POSITION and DELAY
+never used), **read speed within −0.10x..+0.25x on 5 of 7**, grain overlap
+2.0–5.0 on a scale the engine clamps at 2..40, euclid inert on 6 of 7. Seven
+variations on ONE architecture. The collapsed axis was never the amount of
+anything, it was the KIND.
+
+The new eight span mode (DELAY · POSITION · STRETCH), speed (−1.00 to +2.00 and
+frozen), overlap (2.0 to 26.0) and blend. ⚠️ `burnt` sits at `sos 0.45` — **not
+all grains**, which no patch here had ever been.
+
+⚠️ **AND THE RENAME TO `vain` WAS DONE AND FULLY REVERTED** on instruction. Do
+not re-litigate it: `radio1965` keeps its slug, and the STATION keeps its name
+either way (a proper noun, CLAUDE.md).
+
+## Two new kit components
+
+- **`demo/shell/table.mjs`** — rows in columns the caller declares:
+  `{ key, label, width | grow, align, link, hi, clip, hover }`. 🔴 It THROWS
+  unless exactly one column grows. It exists because `/kurenniemi/` was built on
+  `messages.mjs`, whose columns are a relay message's, and every need arrived as
+  another option on a component four other pages use — four options to describe
+  one table. `messages.mjs` is untouched and `wire` is green.
+- **`demo/shell/tabs.mjs`** — uppercase, x-scrollable, no borders, `#links` not
+  subpages (a subpage is a navigation: audio stops, the worker hands over, an
+  installed app flashes white). 🔴 **It is in `/kit/` and in no page.** It was
+  on `/items/` for one commit and taken out again — three names on a page that
+  has one list and one form is furniture.
+  🔴 **`min-width: 0` or a tab row DRAGS THE PAGE SIDEWAYS instead of
+  scrolling.** `overflow-x` cannot shrink a flex item below its content.
+  MEASURED at 390 px: bar 500, scrollW 500, scrolls false, **141 px of page
+  overflow**. It was already live on `/items/` and invisible there, because
+  three short tabs fit — the defect needs a row that does not, which is exactly
+  what `/kit/` puts in front of you.
+
+## Rules this session bought
+
+- 🔴 **A FACT TRUE OF EVERY PART AND OF NO PART'S AUTHOR.** The notification bug
+  above. When a resource is shared and everything around it is partitioned, ask
+  who owns the sharing.
+- 🔴 **`/kit/` IS NOT MACHINE-GRADED.** `node demo/verify.mjs kit` answers
+  "nothing for this harness to verify" — the page carries no `mount()` and no
+  asserts. The one page whose whole job is to make component drift visible is
+  the one page the suite cannot see. Everything about the tabs there was
+  measured with CDP device emulation instead.
+- 🔴 **A COMPONENT SWAP MOVES EVERY SELECTOR THAT NAMED THE OLD ONE.**
+  `/radio1965/`'s sound row went `createChoice` → `createPicker` and one of
+  three rules was updated. `shareLabelColumn()` kept setting `--lab` on the right
+  element and NOTHING CONSUMED IT — the JavaScript and its comment both read as
+  correct while the row snapped back. Reported three times. There is an assert
+  on the left edges now, and it fired at `12 px apart` before it passed.
+- ⚠️ **A shared measurement typed into two files will disagree.** The other half
+  of that bug was a `12` in `shell.css` and a `0` in the page. It is `--sld-col`
+  now.
+- 🔴 **`prompt()` REFUSES A PRESS THAT WAS NOT A HAND, AND IT REJECTS RATHER
+  THAN THROWS.** `verify.mjs` presses with a scripted `.click()`, so
+  `BeforeInstallPromptEvent.prompt()` answers `NotAllowedError` on a page whose
+  button is perfect for a person. A `try` around it catches nothing; it arrives
+  as an unhandled rejection. Measured twice.
+- ⚠️ **An allowlist fails silently by design.** Renaming `manifest.json` to
+  `manifest.webmanifest` shipped a **404** to production because `build.mjs`'s
+  extension list did not include it — on the one page whose problem is that it
+  will not install. Caught by curling the URL after deploying, not by the build.
+  What is missing is a check that every local URL a page names has a file behind
+  it; `checkImports()` does that for modules only.
+- ⚠️ **A number nobody re-measures reads as a fact**, one level down from
+  CLAUDE.md's own rule about it: session 25's PROGRESS header said "Five
+  commits" and named a build that was not the one that went out. It was sixteen,
+  and `303b734`.
+
+## Needs you, not me
+
+- 🔴 **`research/vr-sound-visual-2026-09.md` is STILL untracked and STILL
+  unattributed.** Session 24 disclaimed it, session 25 did not write it, and
+  session 26 did not either. Three sessions have now declined to commit it. Find
+  out where it came from or delete it; committing it under a session that did
+  not write it is the history-that-lies this repo has a `git note` repair for.
+- **Push works end to end on the iPhone** — permission granted, address minted,
+  on the topic, `positron` in Settings with banners on. The silence that cost an
+  evening was **Sleep Focus**, which was in the status bar of every screenshot
+  and which I did not read. There is no API to detect a Focus, so `/items/` names
+  it as a cause instead.
+- **`/kit/` has no asserts.** Giving it a `mount()` would make the sandbox
+  gradeable; it is the only page where a component regression is visible and
+  invisible at the same time.
+
+---
+
 # Queue — open work, 2026-09-14 (end of session 24)
 
 ⚠️ Two agents worked this checkout in parallel all day. The block below is

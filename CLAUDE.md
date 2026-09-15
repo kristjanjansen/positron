@@ -1,9 +1,11 @@
 # positron
 
-Live at **https://positron.studio**. 38 shelled demos of 44 rows
-(2026-09-14, counted from `DEMOS` rather than remembered) — `click`, `floor`,
-`items` and `kurenniemi` are the new ones, and `kurenniemi` the SLUG is now a
-fresh shelled page: the old prototype that held it moved to `aikajana`. ⚠️ The suite total that
+Live at **https://positron.studio**. 40 shelled demos of 45 rows
+(2026-09-15, counted from `DEMOS` rather than remembered) — `tapes` is the newest:
+the `kurenniemi` corpus on a time axis, where a mark is as wide as its date is
+vague and 24 of the records play. ⚠️ `radio1965` was renamed to `vain` on
+2026-09-15 and the rename was FULLY REVERTED the same hour, on instruction. It
+keeps its slug; do not re-open it. ⚠️ The suite total that
 used to sit here was removed rather than updated: it was stale for two sessions, and a count nobody re-measures reads as
 a fact. Run `node demo/verify.mjs` for the current one. ⚠️ A red run is not automatically a
 regression here: `now`'s asserts go red when ERR refuses its own live edge (one
@@ -577,6 +579,28 @@ at check time, so only 6 of that page's 8 asserts ever ran in the suite.
 (grid no longer branches: one grid, one quality, 8/8 run.) Diff per-demo
 counts against the last known total after any change.
 
+## Two shared things that are not per-page, and bit
+
+🔴 **ONE FCM TOPIC MEANS ONE ROOM MAY USE IT.** `workers/items` gives every room
+its own Durable Object — `idFromName(room)` — and `verify.mjs` gives every run
+its own room, so runs cannot see each other's rows. The one thing that was NOT
+partitioned was `env.FCM_TOPIC`, so **every run of the suite sent two real
+notifications to every real subscriber**, for a day, before anyone outside said
+so. Announcing is an allowlist of ONE room now (`items`) — ⚠️ not a prefix test,
+because refusing rooms that LOOK like test rooms lets the next non-real room
+through by default and the default has to be silence. ⚠️ The object has to be
+TOLD its own room and remember it: the alarm fires with no request, and
+`idFromName` tells an object nothing about its own name. **When a resource is
+shared and everything around it is partitioned, ask who owns the sharing** — the
+bug was a fact true of every part and of no part's author.
+
+🔴 **`/kit/` IS NOT MACHINE-GRADED.** `node demo/verify.mjs kit` answers
+"nothing for this harness to verify": the page carries no `mount()` and no
+asserts. So the one page whose whole job is to make component drift visible is
+the one page the suite cannot see, and anything demonstrated there has to be
+measured another way (CDP device emulation was used for the tabs). Giving it a
+`mount()` is open work.
+
 ## Conventions
 
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
@@ -693,6 +717,27 @@ counts against the last known total after any change.
   LESSONS.md, or in a commit message, all of which are read by somebody who
   asked. If a sentence exists to defend the page rather than to use it, delete
   it.
+- 🔴 **A COMPONENT SWAP MOVES EVERY SELECTOR THAT NAMED THE OLD ONE.**
+  `/radio1965/`'s sound row went `createChoice` -> `createPicker` and one of the
+  three rules keyed on the old class was updated. `shareLabelColumn()` went on
+  setting `--lab` on exactly the right element and **nothing consumed it**, so
+  the JavaScript and the comment beside it both read as correct while the row
+  snapped back to the width of one word. REPORTED THREE TIMES, and the third
+  report was a different bug wearing the first one's clothes. There is an assert
+  on the left edges now and it fired at `12 px apart` before it passed.
+  ⚠️ Its other half: a `12` typed in `shell.css` and a `0` typed in the page —
+  **a shared measurement in two files is a measurement that will disagree**. It
+  is `--sld-col` now.
+- **Two more kit components, both 2026-09-15.** `table.mjs` — rows in columns
+  the caller declares (`key`, `label`, `width | grow`, `align`, `link`, `hi`,
+  `clip`, `hover`); it THROWS unless exactly one column grows. `tabs.mjs` —
+  uppercase, x-scrollable, no borders, `#links` rather than subpages (a subpage
+  is a navigation: the audio stops, the service worker hands over, an installed
+  web app flashes white). ⚠️ `tabs.mjs` is in `/kit/` and in NO page — it was on
+  `/items/` for one commit and removed, because three names on a page holding
+  one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
+  drags the PAGE sideways instead of scrolling**: `overflow-x` cannot shrink a
+  flex item below its content, and 390 px measured 141 px of page overflow.
 - 🔴 **BUILD FROM `/kit/`, AND SAY SO WHEN YOU CANNOT.** Before writing any new
   interface, look at what `demo/shell/` already has — slider, slider group,
   stepper, choice, keyboard, MIDI, transport bar, logger — and use it. Hand-
