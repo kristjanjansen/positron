@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The list IS this page, where in `wire` it is a side channel. The shared
+     component caps itself at 300 px so a feed that keeps arriving cannot push
+     the rest of the page down the screen; these rows arrive once and their
+     count never changes, so there is nothing for that ceiling to hold back.
+     Tall enough for a long look on a laptop, and it still scrolls inside its
+     own box on a phone, where a long title wraps to two or three lines. */
+  /* Taller than the component's default: this is a list of 334 records and the
+     page has nothing else on it, so the box is the page. `--tbl-h` is the
+     component's own knob rather than an override of its rule. */
+  /* 🔴 AS TALL AS THE SCREEN, NOT A NUMBER I PICKED. 620 px showed
+     twenty-three of 334 records on a laptop and rather fewer on anything
+     smaller — REPORTED as *"page should fit more"*. What is above the table is
+     the back link, the name and four lines of prose; `dvh` rather than `vh`
+     because a phone's address bar comes and goes and `vh` measures the taller
+     state, which puts the last rows under it. The floor keeps it a table rather
+     than a slot on a short window. */
+  .pos-tbl { --tbl-h: max(420px, calc(100dvh - 250px)); }
+  /* 🔴 WIDER THAN THE PROSE, AND THE PAGE SAYS WHY RATHER THAN JUST DOING IT.
+     The shell caps a page at 720 px, which is right for a paragraph — 62
+     characters is a readable line and CLAUDE.md's one vertical rhythm assumes
+     it. This page is not a paragraph. Six columns need 510 px of fixed track
+     before the NAME gets a pixel, so inside 720 the titles were cut after about
+     twenty characters — MEASURED on the first render: `Erkki Kurenniemi
+     Archiv…`, `Coveted Beauty, Short F…`. The table breaks out to 1100 px and
+     the prose above it does not, because they are answering different
+     questions. Below that width it simply takes what there is. */
+  .pos-tbl { width: min(1100px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); }
+</style>
+
+<script type="module">
+  import { mount, guard } from '/shell/shell.mjs';
+  // The shared list from the kit — the same renderer `wire`, `cues` and `patch`
+  // draw their rows with, taken unchanged. It owns three fixed gutters and one
+  // fluid column, and everything this page has to say is fitted to that shape
+  // rather than laid out again here.
+  import { createTable } from '/shell/table.mjs';
+
+  // Built by `demo/kurenniemi/build-corpus.mjs`, which asks seventeen archives
+  // and writes down what each one answered. The deck's own shorter list is
+  // folded into it, and the check below re-proves that from this end.
+  const CORPUS = '/kurenniemi/corpus.json';
+  const DECK = '/proto/aikajana/corpus.json';
+
+  // ⚠️ THREE BUTTONS THAT ARE REALLY ONE CHOICE. Only one ordering can be in
+  // force, so only one of these may look chosen — and the shell paints the
+  // `primary` one yellow once, at mount, which left `Oldest first` lit while
+  // the list was sorted by something else. The class moves with the press
+  // below. (The kit HAS a radio group, `choice.mjs`; it is not used here
+  // because another session is editing that file today, and a component whose
+  // behaviour may change under you is not a component you can assert on.)
+
+  const d = mount({
+    name: 'kurenniemi',
+    what: 'Every reachable source for Erkki Kurenniemi\'s work, one row each: when it is from, who '
+        + 'holds it, what it is, and the licence they state. Nothing is copied — a row points at its '
+        + 'holder, and one row can stand for a whole set. Places that refused are listed with what '
+        + 'they answered.',
+    // 🔴 NO READOUT AND NO CONTROLS, AND BOTH WENT ON THE SAME INSTRUCTION.
+    // The page carried four counters and five buttons above a list of 334 rows
+    // — three orderings, two filters — which is more furniture than list before
+    // a reader has read a single line. Every number in that row was a count of
+    // the thing directly below it, and the orderings answered a question nobody
+    // had asked yet.
+    //
+    // What the counters said is not lost: the log line under the list gives the
+    // row count and the number of places, once, when the corpus loads. That is
+    // the right shape for a figure that changes when something happens rather
+    // than on a clock.
+    //
+    // ⚠️ THE FILTERS WENT WITH THEIR BUTTONS, AND SO DID THEIR TWO ASSERTS.
+    // Keeping the filtering behind a check nobody can reach would be a test of
+    // dead code, which reads as coverage and is not.
+    readout: null,
+  });
+  guard(d);
+
+  // `newestFirst: false` — `set()` hands the rows over one at a time and the
+  // default prepends, which would draw this list upside down. The cap is well
+  // over the size of the corpus so no row is dropped in silence; the check
+  // below counts the rows against the items anyway.
+  /**
+   * 🔴 THE COLUMNS ARE DECLARED, AND THAT IS THE WHOLE CHANGE. This page was
+   * built on `messages.mjs`, whose columns are a relay message's — a direction,
+   * a size, a marker word and wrapped text — and every need here arrived as
+   * another option on it: a fourth column for the licence, a way to remove the
+   * third, a size the caller formats, a switch to stop wrapping. Four options
+   * to describe one table. REPORTED as *"just make reusable component that take
+   * different types of cols"*; `shell/table.mjs` is that, and this is its first
+   * caller.
+   *
+   * ⚠️ AND THE PADDED-MONOSPACE TRICK IS GONE WITH IT. The date and the source
+   * used to be `padEnd()` fields inside one text cell, which lines up only
+   * while every glyph is one width and cannot give a column its own colour,
+   * alignment or link. They are tracks now.
+   */
+  const table = createTable({
+    // 🔴 THE CAP IS NOT DECORATION AND IT IS CHECKED AT BOTH ENDS. A table that
+    // silently draws fewer rows than the corpus holds is a page reporting a
+    // smaller archive than was found, which is the worst shape a cap can have.
+    // `build-corpus.mjs` now refuses to WRITE a file over this, so the two
+    // cannot disagree, and the assert below counts rows against items anyway.
+    cap: 600,
+    // The sentence a record carries and no column can hold — see `note` in
+    // table.mjs. Several of the diary rows are only legible through it.
+    note: 'note',
+    empty: 'nothing in this view',
+    columns: [
+      { key: 'kind', label: 'kind', width: 46 },
+      // A size can only exist if there is something to measure, which is why
+      // this replaced a column that said the word `file` beside the kind.
+      { key: 'size', label: 'size', width: 58, align: 'right' },
+      { key: 'date', label: 'when', width: 84 },
+      { key: 'source', label: 'who holds it', width: 122 },
+      // The name, linked to the record, cut to one line with the whole of it on
+      // `title`. `hi` because it is the thing on the row you are looking for.
+      { key: 'title', label: 'what', grow: true, link: 'url', clip: true, hi: true },
+      // ⚠️ CLIPPED, LIKE THE NAME. `public domain mark` is eighteen characters
+      // and wrapped to a second line on about a third of the rows — MEASURED on
+      // the first render — which made those rows double height and broke the
+      // one thing a table is for, which is scanning down it. The full string is
+      // on `title`, and there is nowhere to widen to: the name column is the
+      // one that should get any spare pixel.
+      // `licence` is the short form; `licenceFull` is what the holder actually
+      // said, on hover. Narrow, because four characters is the point.
+      { key: 'licence', label: 'licence', width: 76, align: 'right',
+        clip: true, hover: 'licenceFull' },
+    ],
+  });
+  d.el.append(table.el);
+  table.clear('reading the list…');
+
+  // ── what goes in each column ────────────────────────────────────────────
+  //
+  // 🔴 THE SOURCE HAS A COLUMN, AND GETTING ONE IS WHY THIS PAGE CHANGED
+  // COMPONENT. On the message list its three fixed gutters are 34, 40 and 52 px
+  // of 11 px mono — five, six and eight characters — while the names here run
+  // from `Yle` to `Wikimedia Commons`. Neither way out was acceptable:
+  // abbreviating institutions invents names nobody can search for, and widening
+  // a gutter in `shell.css` changes every other page that draws that list. A
+  // declared column costs neither.
+
+  // The one kind too long for the first gutter, and the object it names — a
+  // DIMI-A in a Stockholm museum — is a synthesiser. The rest are already
+  // short words or are cut to one that means the same thing at this width.
+  const SHORT = { instrument: 'synth', collection: 'set', recording: 'track',
+                  release: 'album', article: 'story' };
+  const kindOf = (it) => SHORT[it.kind] || it.kind;
+  // Nothing unmeasured prints as a number. A row whose source recorded no date
+  // at all — a MusicBrainz track, an archive.org upload, a host that refused —
+  // gets one em dash, never a padded guess at a year.
+  const dateOf = (it) => it.when.edtf || '—';
+  const fileOf = (it) => !!it.file;
+  /**
+   * The size column, and the page does the arithmetic because the page owns the
+   * measurement — `messages.mjs` prints what it is handed.
+   *
+   * ⚠️ NOT RAW BYTES. The largest file here is 990,701,568 of them, which is
+   * eleven characters in a column sized for six, and a byte count is not a
+   * thing anybody reads at that magnitude anyway.
+   * ⚠️ AND A ROW THAT STANDS FOR SEVERAL THINGS SAYS HOW MANY INSTEAD. A set of
+   * 3,986 photographs has no single size; `3986×` is the honest answer and it
+   * is the same question the column asks — how much is behind this row.
+   */
+  const sizeOf = (it) => {
+    if (it.count > 1) return `${it.count}\u00d7`;
+    const b = it.bytes;
+    if (!b) return '';
+    if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`;
+    if (b >= 1e6) return `${Math.round(b / 1e6)} MB`;
+    if (b >= 1e3) return `${Math.round(b / 1e3)} kB`;
+    return `${b} B`;
+  };
+  // Public domain or a Creative Commons licence of any flavour. Everything
+  // else — all rights reserved, licensed per screening, not stated, unknown —
+  // is not something this page will tell you that you may reuse.
+  /**
+   * The licence, short enough to be a column you can read DOWN.
+   *
+   * 🔴 THE POINT IS THE COLUMN, NOT THE SAVING. `CC BY-NC-SA 4.0` is fifteen
+   * characters and `public domain mark` is eighteen, so the column was as wide
+   * as the holder's name and still wrapped or clipped — and a licence you have
+   * to read word by word on every row is a licence nobody reads at all.
+   * Shortened, the whole column is scanned in one movement and the odd ones out
+   * are the ones that are not four characters.
+   *
+   * ⚠️ THE FULL STRING IS ON HOVER AND THE EXACT ONE THE SOURCE GAVE IS IN THE
+   * FILE. An abbreviation nobody can expand is worse than a long word, so the
+   * cell carries `licenceFull` as its `title` and `corpus.json` keeps
+   * `licenceRef` verbatim — this is a display, never the record.
+   *
+   * ⚠️ AND `not stated` / `unknown` PRINT NOTHING. 173 of 334 rows say one or
+   * the other, which is a third of the table shouting a non-answer; nothing
+   * unmeasured prints as a value here, the same rule the readout cells follow.
+   * The blank IS the fact, and the column heading says what the blank means.
+   * ⚠️ CC0 STAYS CC0 RATHER THAN BECOMING PD. A dedication and a statement of
+   * fact are different claims about who could be wrong — collapsing them would
+   * make this page say something the holder did not.
+   */
+  const SHORT_LIC = [
+    [/^cc0/i, 'CC0'],
+    [/public domain/i, 'PD'],
+    [/^cc[- ]by[- ]nc[- ]nd/i, 'BY-NC-ND'],
+    [/^cc[- ]by[- ]nc[- ]sa/i, 'BY-NC-SA'],
+    [/^cc[- ]by/i, 'CC BY'],
+    [/^other-oa/i, 'open'],
+    [/all rights reserved/i, '\u00a9'],
+    [/per screening/i, '\u00a9'],
+    [/not reproducible|legal deposit/i, 'no copy'],
+  ];
+  const licOf = (it) => {
+    const l = it.licence || '';
+    for (const [re, short] of SHORT_LIC) if (re.test(l)) return short;
+    return '';                       // not stated, unknown — the blank is the fact
+  };
+
+  const freeOf = (it) => /creativecommons\.org|^cc-?(by|0)|public domain/i.test(it.licence || '');
+  const YEAR = (ms) => new Date(ms).getUTCFullYear();
+
+  let corpus = null;
+  let items = [];
+  // Oldest first, and only that. The other two orderings were buttons and went
+  // with the rest of the row; the sort table below keeps its shape so a second
+  // ordering is a line rather than a rewrite.
+  const order = 'bydate';
+
+  function view() {
+    const by = {
+      // Undated rows go last rather than at 1970: a row with no date is not a
+      // row from the start of time, and sorting it there would put the loudest
+      // unknowns at the top of a list whose default order is chronological.
+      bydate: (a, b) => (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity)
+        || a.title.localeCompare(b.title),
+      bykind: (a, b) => kindOf(a).localeCompare(kindOf(b))
+        || (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity),
+      bysource: (a, b) => a.source.localeCompare(b.source)
+        || (a.when.earliest ?? Infinity) - (b.when.earliest ?? Infinity),
+    }[order];
+    return items.slice().sort(by);
+  }
+
+  function draw() {
+    const rows = view();
+    // 🔴 THE NAME IS A LINK TO THE THING. Every row here is a POINTER at
+    // something held somewhere else, and until now there was no way to go there
+    // — REPORTED as *"titles should be links"*. A row with no URL still shows
+    // its name; it just does not lead anywhere, which is the truth about it and
+    // not a reason to hide it.
+    table.set(rows.map((it) => ({
+      kind: kindOf(it),
+      size: sizeOf(it),
+      date: dateOf(it),
+      source: it.source,
+      title: it.title,
+      url: it.url || null,
+      licence: licOf(it),
+      licenceFull: it.licence || 'no licence is stated anywhere for this row',
+    })));
+    return rows;
+  }
+
+  try {
+    const res = await fetch(CORPUS);
+    if (!res.ok) throw new Error(`${CORPUS} answered ${res.status}`);
+    corpus = await res.json();
+    items = corpus.items || [];
+    d.log(`${items.length} rows from ${corpus.sources.length} places, `
+      + `gathered ${String(corpus.generated).slice(0, 10)}`, 'hi');
+    draw();
+
+    d.assert('the list loaded', items.length > 0, `${items.length} rows`);
+
+    // The question this page exists to answer: is there something to put in
+    // every column? A column blank on most rows is a column to drop, and the
+    // only way to know is to COUNT the blanks rather than read a few rows.
+    // The DATE is deliberately not in this list — 33 of these rows have no
+    // date anywhere and saying so is the honest outcome, not a failure.
+    const blank = items.filter((it) => !it.kind || !it.title || !it.source || !it.url);
+    d.assert('every row says what it is, what it is called and who holds it',
+      blank.length === 0, `${items.length - blank.length} of ${items.length} complete`);
+
+    const dated = items.filter((it) => it.when.earliest != null);
+    const lo = Math.min(...dated.map((it) => YEAR(it.when.earliest)));
+    const hi = Math.max(...dated.map((it) => YEAR(it.when.latest - 1)));
+    // Deliberately wider than his lifetime: this catches a date that failed to
+    // parse and landed on 1970, or one padded into the future, which is what a
+    // broken read of these files looks like. The label says what it checks.
+    d.assert('every date that is given sits between 1800 and today',
+      lo >= 1800 && hi <= new Date().getUTCFullYear(),
+      `${dated.length} of ${items.length} dated, ${lo} to ${hi}`);
+
+    d.assert('the table shows one row per item',
+      table.count() === items.length, `${table.count()} rows for ${items.length} items`);
+
+    // The list says its media is referenced where it lives and never copied.
+    // That is a claim about every address in it, so it is checked against every
+    // address in it rather than believed.
+    const here = items.flatMap((it) => [it.file, it.url].filter(Boolean))
+      .filter((u) => new URL(u).host === location.host);
+    d.assert('nothing is served from here', here.length === 0,
+      here.length ? here[0] : `${items.filter(fileOf).length} files, all somewhere else`);
+
+    // Every place that was asked has a row in the corpus's ledger, and the
+    // ledger's counts add up to the list. A source that quietly stopped
+    // returning anything would leave a ledger row reading 0 rather than
+    // vanishing, which is the difference between a finding and a silent drop.
+    const named = new Set(corpus.sources.map((s) => s.name));
+    const orphan = items.filter((it) => !named.has(it.source));
+    const summed = corpus.sources.reduce((n, s) => n + s.items, 0);
+    d.assert('every row belongs to a place that was asked, and the counts add up',
+      orphan.length === 0 && summed === items.length,
+      `${corpus.sources.length} places, ${summed} rows counted`);
+
+    // A place that refused is in the list WITH ITS REASON. This is the check
+    // that keeps "we could not reach it" from decaying into "it does not
+    // exist": every row whose source did not answer 200 has to say what it did
+    // answer, in words a reader can act on.
+    const refused = items.filter((it) => it.http !== 200);
+    const mute = refused.filter((it) => !it.note);
+    // ⚠️ THE DETAIL IS WRITTEN FOR THE FAILING CASE FIRST. Proved by breaking
+    // it: with the pass-case string in both slots this read "4 refused:
+    // lahteilla.fi DNS ENOTFOUND, …" beside a red FAIL — true, and no help at
+    // all in finding the row that had gone quiet.
+    d.assert('every place that refused says what it answered',
+      refused.length > 0 && mute.length === 0,
+      mute.length ? `${mute.length} of ${refused.length} say nothing — first ${mute[0].id}`
+        : `${refused.length} refused: ${[...new Set(refused.map((it) => `${it.source} ${it.http}`))].join(', ')}`);
+
+    // 🔴 ONE GATHERING, NOT TWO. The deck at `/proto/aikajana/` plays from its
+    // own shorter list, and this corpus folds that list in rather than
+    // re-researching it. That fold happens when the corpus is built, so it can
+    // go stale in exactly the way nobody notices — both pages keep working and
+    // quietly disagree about what exists. Checking it from this end costs one
+    // fetch of a file that is already deployed, and turns a silent drift into
+    // a red run.
+    const deckRes = await fetch(DECK);
+    const deck = deckRes.ok ? await deckRes.json() : null;
+    const have = new Set(items.map((it) => it.id));
+    const lost = (deck?.items || []).filter((it) => !have.has(it.id));
+    d.assert('everything the deck plays is in this list',
+      deck !== null && lost.length === 0,
+      deck === null ? `${DECK} answered ${deckRes.status}`
+        : lost.length ? `${lost.length} of ${deck.items.length} missing — first ${lost[0].id}`
+        : `all ${deck.items.length} of the deck's rows are here`);
+
+    d.ready();
+  } catch (e) {
+    // No ready() here on purpose: a page that could not read its own list has
+    // nothing to show and nothing to check, and the harness reports the reason
+    // out of `__demo.failed` rather than a silent row of empty cells.
+    table.clear(`could not read the list: ${e.message}`);
+    d.fail(e);
+  }
+</script>
+</html>

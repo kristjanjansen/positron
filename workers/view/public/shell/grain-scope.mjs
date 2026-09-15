@@ -37,10 +37,40 @@
 
 import { el } from './shell.mjs';
 
-export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520 } = {}) {
+export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520,
+                                        fullScale = null, grainSeconds = 0 } = {}) {
+  // 🔴 `grainSeconds` PUTS GRAIN TICKS ON THE SCROLLING WAVE, and the branch
+  // below explains at length why that is normally forbidden: a remote engine's
+  // grain positions are fractions of ITS held buffer, while its arriving audio
+  // is the last few seconds of OUTPUT — two quantities on two axes, and
+  // overlaying them invites a reading nothing supports.
+  //
+  // ⚠️ THAT ARGUMENT DOES NOT HOLD WHEN THE MATERIAL IS THE SAME AUDIO. On
+  // `/radio1965/` the granulator's buffer is filled from the very stream this
+  // scope is drawing, on one clock in one process — so a grain that read at
+  // fraction `pos` of an N-second buffer read the audio that arrived
+  // `(1 - pos) * N` seconds ago, and that lands on this axis exactly. Passing
+  // the buffer length is how a page says "these are the same seconds"; leaving
+  // it at 0 keeps the refusal.
+  // 🔴 `fullScale` LOCKS THE VERTICAL SCALE, AND WITHOUT IT THE PICTURE LIES
+  // ABOUT LOUDNESS. The default draws the waveform normalised to the loudest
+  // sample CURRENTLY IN VIEW, which is right for a fixed buffer you are
+  // inspecting and wrong for a stream: as a loud passage scrolls off the right
+  // edge the divisor drops and everything left standing suddenly grows, so a
+  // quiet stretch looks identical to a loud one and the whole picture heaves.
+  // Reported from `/radio1965/` as *"the scale keeps changing"*, which is
+  // exactly what it was doing.
+  //
+  // Set it to an amplitude (1 = full scale) and the height means a level again.
+  // ⚠️ It is opt-in so that `/grains/`, which inspects a held buffer where
+  // relative shape is the subject, keeps the behaviour it was built with.
   const wrap = el('div', 'pos-scope');
   const canvas = el('canvas', 'pos-scope-c');
-  const gut = el('div', 'pos-scope-gut', 'nothing yet');
+  // ⚠️ THE ELEMENT STAYS AND IS NEVER WRITTEN TO. Removing it outright would
+  // change the wrap's height and every page that lays out around this
+  // component; keeping it empty keeps the geometry and makes the absence
+  // deliberate rather than a deletion somebody has to rediscover.
+  const gut = el('div', 'pos-scope-gut', '');
   wrap.append(canvas, gut);
   host.append(wrap);
 
@@ -74,6 +104,22 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   const live = [];                                 // flickering grain ticks
   const scroll = [];                               // {t, v} for the audio-only view
   let sourceName = '', counts = { measured: 0, inferred: 0 };
+  // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
+  // `/radio1965/` blends a live station against the granulator chewing it, and
+  // the fader that does that is the one gesture on the page — so the ticks are
+  // drawn at exactly the share of what you are HEARING that they are: invisible
+  // when the fader is all radio, solid when it is all granulator.
+  //
+  // ⚠️ IT MULTIPLIES THE PER-GRAIN FADE, IT DOES NOT REPLACE IT. Each tick
+  // already fades over `fadeMs` from the instant it fired, which is the thing
+  // that makes the picture a flicker rather than a smear; this scales the whole
+  // layer under that. Two alphas, two meanings — age, and share of the output.
+  //
+  // ⚠️ DEFAULT 1, so `/grains/`, which has no blend to report, is unchanged.
+  // And it is deliberately NOT applied to the waveform: the wave is the
+  // MATERIAL, which is being eaten whatever the fader says, so dimming it would
+  // be the picture claiming the radio had gone away.
+  let grainAlpha = 1;
   const t0 = performance.now() / 1000;
   const now = () => performance.now() / 1000 - t0;
   let envAcc = 0, envN = 0;
@@ -102,17 +148,31 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * machine. A scrolling waveform, and no grain ticks, because nothing here
      * knows where a grain started or whether one did.
      */
-    feed(pcm, rate = 48000) {
+    /**
+     * @param {number|null} tone 0..1, where the energy sits — 0 all low, 1 all
+     *   high. OPTIONAL, and the picture is honest either way: given one, each
+     *   column is coloured by it; given none, the wave draws flat as before.
+     *   ⚠️ The SCOPE does not compute it. Whoever owns the audio owns the
+     *   measurement; this file draws what it is handed and nothing else.
+     */
+    feed(pcm, rate = 48000, tone = null) {
       const t = now();
       const win = Math.max(1, Math.round(rate * 0.004));
       for (let i = 0; i < pcm.length; i++) {
         const v = pcm[i]; envAcc = Math.max(envAcc, v < 0 ? -v : v); envN++;
-        if (envN >= win) { scroll.push({ t, v: envAcc }); envAcc = 0; envN = 0; }
+        if (envN >= win) { scroll.push({ t, v: envAcc, tone }); envAcc = 0; envN = 0; }
       }
       counts.inferred++;
       const cut = t - seconds - 0.3;
       while (scroll.length && scroll[0].t < cut) scroll.shift();
     },
+
+    /**
+     * 0..1 — how much of what the listener hears is the granulator. See the
+     * note by `grainAlpha` above. Anything outside 0..1 is clamped rather than
+     * refused: this is fed straight off a fader.
+     */
+    grainAlpha(v) { grainAlpha = Math.max(0, Math.min(1, Number(v) || 0)); },
 
     source(name) { sourceName = name; },
     clear() { live.length = 0; scroll.length = 0; peaks = null; counts = { measured: 0, inferred: 0 }; },
@@ -131,7 +191,8 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       // Mirrored around the centre, which is how a waveform is read
       // everywhere, so nobody has to learn this picture.
       const n = peaks.length;
-      let mx = 0; for (let i = 0; i < n; i++) if (peaks[i] > mx) mx = peaks[i];
+      let mx = fullScale ?? 0;
+      if (!fullScale) for (let i = 0; i < n; i++) if (peaks[i] > mx) mx = peaks[i];
       const k = mx > 0 ? (H * 0.42) / mx : 0;
       ctx.fillStyle = C.line2;
       const bw = W / n;
@@ -172,13 +233,13 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         const age = (tnow - g.born) / fadeMs;
         if (age >= 1) { live.splice(i, 1); continue; }
         const x = g.pos * W;
-        const a = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level));
+        const a = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level)) * grainAlpha;
         const h = mid * (0.35 + 0.55 * (1 - age));
         ctx.strokeStyle = C.grain; ctx.globalAlpha = a; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(x + 0.5, mid - h); ctx.lineTo(x + 0.5, mid + h); ctx.stroke();
       }
       ctx.globalAlpha = 1;
-    } else if (live.length) {
+    } else if (live.length && !grainSeconds) {
       // ── grains, on the buffer's own axis, with nothing drawn under them ──
       //
       // 🔴 THE THIRD PICTURE, AND IT EXISTS BECAUSE THE AXES DO NOT MATCH.
@@ -218,7 +279,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         const x = g.pos * W;
         const h = (H * 0.34) * (0.35 + 0.55 * (1 - age));
         ctx.strokeStyle = C.grain;
-        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level));
+        ctx.globalAlpha = (1 - age) * (0.25 + 0.75 * Math.min(1, g.level)) * grainAlpha;
         ctx.lineWidth = 1;
         ctx.beginPath();
         if (g.half) { ctx.moveTo(x + 0.5, bed + 2); ctx.lineTo(x + 0.5, bed + 2 + h); }
@@ -231,14 +292,58 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       if (scroll.length > 1) {
         const t = now(), x0 = t - seconds;
         const X = (tt) => ((tt - x0) / seconds) * W;
-        let mx = 0; for (const s of scroll) if (s.v > mx) mx = s.v;
+        let mx = fullScale ?? 0;
+        if (!fullScale) for (const s of scroll) if (s.v > mx) mx = s.v;
         const k = mx > 0 ? (H * 0.44) / mx : 0;
+        // 🔴 ONE GREY, AND IT IS NOT A STYLE CHOICE — THE SAME RULE `floor`
+        // FOLLOWS AND FOR THE SAME REASON. There was a hue-mapped wave here:
+        // height for loudness, hue for where the energy sits, bounded to ~95
+        // degrees of `--hi` rather than a rainbow. The argument was a good one —
+        // a flat grey wave cannot tell a cymbal from a bass note at the same
+        // level — and it is not the argument that was being had. The repo owner
+        // asked for the original monochrome back, twice, and a second
+        // measurement nobody asked for is a second measurement nobody asked for
+        // however well it is reasoned.
+        //
+        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/radio1965/index.html`
+        // contains no colour at all — one `theme-color` meta and nothing else —
+        // because the hue lived in this shared kit, switched on merely by the
+        // data carrying a `tone` field. Looking at the page that showed it would
+        // never have found it. If colour comes back here it needs a flag the
+        // PAGE sets by name, not a field that turns it on by being present.
         ctx.beginPath();
         ctx.moveTo(X(scroll[0].t), mid);
         for (const s of scroll) ctx.lineTo(X(s.t), mid - s.v * k);
         for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
+        // the grains, on the same seconds the wave is drawn on.
+        // ⚠️ SKIPPED OUTRIGHT AT ZERO, not drawn at `globalAlpha = 0`. The two
+        // are identical on screen and they are not identical to read: a loop
+        // that runs and paints nothing invites exactly the report that came in —
+        // *"turn off grain animation if you are at zero"* — from somebody
+        // watching a picture that was still moving for a different reason.
+        // Skipping says in the code what the fader says on screen.
+        if (grainSeconds && grainAlpha > 0) {
+          for (let i = live.length - 1; i >= 0; i--) {
+            const g = live[i];
+            const age = (performance.now() - g.born) / 1000;
+            if (age > fadeMs / 1000) continue;
+            // ⚠️ ON THIS FILE'S OWN CLOCK. `now()` is `performance.now()/1000 - t0`
+            // and `g.born` is a raw `performance.now()` in MILLISECONDS, so the
+            // two must be reconciled before either touches `X()`. Mixing them
+            // puts every tick t0 seconds out — a picture that looks plausible
+            // and is wrong by a constant, which is the hardest kind to notice.
+            const bornAt = g.born / 1000 - t0;
+            const at = bornAt - (1 - g.pos) * grainSeconds;
+            const x = X(at);
+            if (x < 0 || x > W) continue;
+            ctx.globalAlpha = Math.max(0, 1 - age / (fadeMs / 1000)) * grainAlpha;
+            ctx.fillStyle = C.hi;
+            ctx.fillRect(x - 0.5, mid - H * 0.46, 1.5, H * 0.92);
+          }
+          ctx.globalAlpha = 1;
+        }
         ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
       }
@@ -248,18 +353,18 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
     ctx.restore();
 
-    gut.textContent = peaks
-      ? `${live.length} grains in the air · the lit range is where they are being taken from${sourceName ? ` · ${sourceName}` : ''}`
-      : live.length
-        // NAME WHAT IS MISSING. Every tick here is measured; the sound they
-        // were cut from is the part that has not arrived, and a reader has to
-        // be able to tell that from "there is nothing there".
-        ? `${live.length} grains in the air, each one reported by the engine that started it · `
-          + `the held sound itself has not been sent, so there is nothing drawn under them`
-          + `${sourceName ? ` · ${sourceName}` : ''}`
-        : counts.inferred
-          ? `this is the sound that arrived, and all that can honestly be drawn${sourceName ? ` — ${sourceName}` : ''}`
-          : 'nothing yet';
+    // 🔴 NO PROSE UNDER A PICTURE THAT REDRAWS EVERY FRAME. This carried a
+    // sentence that rewrote itself sixty times a second and REFLOWED — three
+    // lines, then four, then three — so the whole page jumped under the
+    // reader's eye continuously. The words were accurate and it did not matter;
+    // a caption that changes length is a caption that cannot be read, and it
+    // moves everything below it as well. Reported as "a horrible jump of
+    // content each time it updates", which is exactly what it was.
+    //
+    // The count that mattered is a NUMBER, and a number belongs in a cell of
+    // fixed width — `grains` prints it in its readout, where it changes without
+    // moving anything. See `shell.css`'s note on live text and reflow.
+    if (gut && gut.textContent) gut.textContent = '';
 
     raf = requestAnimationFrame(paint);
   }

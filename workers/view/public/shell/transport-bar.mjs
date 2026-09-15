@@ -14,6 +14,7 @@
 
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
+import { createChoice } from './choice.mjs';
 
 /**
  * `scrub: false` — ONE POSITION SURFACE PER PAGE.
@@ -27,7 +28,7 @@ import { el } from './shell.mjs';
  * degraded badge — and gives up the slider.
  */
 export function createTransportBar(host, deck, {
-  absolute = false, scrub: wantScrub = true, extras = [], fmt = null,
+  absolute = false, scrub: wantScrub = true, extras = [], fmt = null, live = false,
   // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
   // fires, pauses the deck and parks the playhead there — right for a
   // recording, wrong for a window whose right-hand end is the present moment,
@@ -40,6 +41,29 @@ export function createTransportBar(host, deck, {
   // follows as it always does. Defaults to the deck's own methods, so every
   // existing caller behaves exactly as before.
   command = null,
+  /**
+   * Called with the new rate the instant a rate button is pressed.
+   *
+   * 🔴 IT REPLACES A POLL, AND THE POLL WAS A THIRD OF A REPORTED DELAY.
+   * `/radio1965/` owns the thing the rate actually acts on (an Icecast playout,
+   * not this deck's playhead), and the only way it could learn about a press
+   * was to read `deck.targetRate()` on a timer. That timer was 1 Hz — *"why
+   * rate change is so slooooooooow"* — then 120 ms, which is better and is
+   * still up to 120 ms of a control doing nothing before anything is even TOLD.
+   * `applyRate` is the single funnel for every rate change in this bar (the
+   * keyboard table has no rate keys), so a callback here is complete.
+   */
+  onRate = null,
+  /**
+   * `() => boolean` — is the armed rate not yet audible?
+   *
+   * ⚠️ THE BAR CANNOT KNOW THIS AND MUST NOT GUESS. Whether a speed has
+   * arrived is a fact about whatever is making the sound: a media element is
+   * there the same frame, and a stream with 600 ms of audio already scheduled
+   * is not. A deck that says nothing gets no pulse, which is the honest
+   * default — a bar that animated on a timer would be inventing a wait.
+   */
+  settling = null,
 } = {}) {
   const cmd = {
     play: () => (command?.play ? command.play() : deck.play()),
@@ -77,7 +101,22 @@ export function createTransportBar(host, deck, {
   const time = el('output', 'tbar-time', '0:00.000');
   const rates = el('div', 'tbar-rates');
   const badge = el('span', 'tbar-badge');
-  bar.append(toggle, ...extraEls.values(), scrub, time, rates, badge);
+  /**
+   * 🔴 A LIVE SOURCE HAS NO CLOCK WORTH PRINTING. On an Icecast mount the left
+   * half of `19:33:46.098 / 3:00.000` is the wall clock, which the machine
+   * already shows, and the right half is a duration a live stream does not
+   * have. REPORTED as *"transport timers are pointless here. what about LIVE
+   * label"*, and they were: two numbers, neither of which anybody can act on.
+   *
+   * ⚠️ IT SAYS `LIVE` AND NOTHING ELSE. It briefly read `SLOWED` at any armed
+   * rate other than 1, and that is a second channel saying what the rate radio
+   * group already says an inch to its right — the armed button IS the statement
+   * that you are not at 1x. How far behind is a number and belongs in a readout
+   * cell, which is the page's BEHIND. A chip carries one fact: this source has
+   * no end.
+   */
+  const liveChip = live ? el('span', 'tbar-live', 'LIVE') : null;
+  bar.append(toggle, ...extraEls.values(), scrub, ...(live ? [liveChip] : [time]), rates, badge);
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
@@ -86,17 +125,44 @@ export function createTransportBar(host, deck, {
   // arrangement for another changes the answer again — so a lattice computed
   // once describes a deck that has not been assembled yet.
   let lattice = null, agen = -1;
+  /**
+   * 🔴 THE RATES ARE A RADIO GROUP, FROM `choice.mjs`, LIKE EVERY OTHER SET OF
+   * MUTUALLY EXCLUSIVE OPTIONS IN THIS REPO. This built its own loose buttons
+   * with its own `aria-pressed` bookkeeping and its own CSS block, which is the
+   * fourth hand-rolled copy of a control that has been a component since
+   * `choice.mjs` landed — and CLAUDE.md says to build from the kit and to stop
+   * and ask rather than make another one. REPORTED as *"rate controls should be
+   * radiobuttons everywhere. you keep breaking the rule"*, which is fair: this
+   * page's own speed picker WAS a `createChoice` before it moved in here, and
+   * moving it into the bar is where it lost its component.
+   *
+   * ⚠️ SEGMENTED, NOT SPACED, is part of what the component carries — gaps make
+   * four options look like four unrelated controls. The old `.tbar-rates` block
+   * set `gap: 4px` and did exactly that.
+   */
+  let rateChoice = null;
+  // ⚠️ DECLARED UP HERE BECAUSE `buildRates()` RUNS AT CONSTRUCTION. It calls
+  // `syncRates()`, which clears this — and a `let` further down the file is in
+  // its temporal dead zone at that moment, so the constructor would throw
+  // `Cannot access 'wasSettling' before initialization` and take the whole page
+  // with it. That is exactly the failure HANDOFF records for the first attempt
+  // at a rate lattice here: `__demo.ready — failed` and nothing else to go on.
+  let wasSettling = null;
   function buildRates() {
     agen = deck.adapterGen?.() ?? 0;
     lattice = latticeFor(deck);
     rates.replaceChildren();
+    rateChoice = null;
     if (lattice && lattice.length) {
-      for (const r of lattice) {
-        const b = el('button', '', `${r}x`, { type: 'button', 'aria-pressed': 'false' });
-        b.addEventListener('click', () => applyRate(r));
-        b.dataset.rate = String(r);
-        rates.append(b);
-      }
+      rateChoice = createChoice({
+        options: lattice.map((r) => [`${r}x`, r]),
+        at: Math.max(0, lattice.indexOf(deck.targetRate?.() ?? 1)),
+        onPick: (r) => applyRate(r),
+      });
+      // The harness and `syncRates` both read `data-rate` off the buttons, and
+      // the component does not know about rates — so it is stamped here.
+      rateChoice.buttons.forEach((b, i) => { b.dataset.rate = String(lattice[i]); });
+      rates.append(rateChoice.el);
     } else {
       rates.append(el('span', 'tbar-rate1', '1x'));   // honest: no lattice, no choice
     }
@@ -120,6 +186,11 @@ export function createTransportBar(host, deck, {
     const res = deck.setRate(r);
     if (res && res.degraded) note(res.reason);
     else clearNote();
+    // ⚠️ BEFORE `syncRates`, so the page has already armed whatever it owns by
+    // the time the pulse is decided. The other order asks `settling()` about a
+    // rate the page has not been told about yet, which reads as "arrived" for
+    // one frame and then starts pulsing — a flicker on every press.
+    onRate?.(r);
     syncRates();
   }
 
@@ -134,8 +205,16 @@ export function createTransportBar(host, deck, {
   // it wrong: it only ever updated while rolling.
   function syncRates() {
     const armed = deck.targetRate?.() ?? (typeof deck.rate === 'function' ? deck.rate() : deck.rate);
-    for (const b of rates.querySelectorAll('button')) {
-      b.setAttribute('aria-pressed', String(Number(b.dataset.rate) === armed));
+    // ⚠️ `set(i, quiet)` — QUIET, or syncing the picture would fire the handler
+    // that changes the rate, which is a control that acts on being told what it
+    // already is.
+    if (rateChoice && lattice) {
+      const i = lattice.indexOf(armed);
+      if (i >= 0) rateChoice.set(i, true);
+      else rateChoice.buttons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      // A rebuilt group is a fresh set of buttons with no pulse on any of them,
+      // so the remembered answer no longer describes the DOM.
+      wasSettling = null;
     }
   }
 
@@ -169,6 +248,23 @@ export function createTransportBar(host, deck, {
       : clock(pos, absolute);
     const playing = deck.playing?.() ?? false;
     toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
+    syncPending();
+  }
+
+  /**
+   * The armed rate button pulses until the speed is actually audible.
+   *
+   * ⚠️ ON THE PAINT LOOP, AND THE DOM IS TOUCHED ONLY WHEN THE ANSWER CHANGES.
+   * `observePosition` already runs this at 60 Hz; writing a dataset attribute
+   * sixty times a second would restart the CSS animation on every frame, which
+   * is an animation that renders as a still.
+   */
+  function syncPending() {
+    if (!rateChoice) return;
+    const now = settling ? !!settling() : false;
+    if (now === wasSettling) return;
+    wasSettling = now;
+    rateChoice.pending(now ? rateChoice.get() : null);
   }
 
   // ── the end of a bounded piece ──────────────────────────────────────────

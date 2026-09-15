@@ -5,6 +5,8 @@
   --line: #1f2937; --line2: #2b3546;
   --fg: #e6e6e6; --dim: #8b93a1; --dim2: #6a7280;
   --hi: #ffd400;
+  /* the gap between a slider's label column and its lane — see `.sld-group` */
+  --sld-col: 12px;
   --ok: #8fd6a8; --warn: #e0b060; --bad: #e0908a;
   --rec: #e5484d;        /* record: the one control that starts writing */
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -49,11 +51,37 @@ body {
 /* how it works — one plain paragraph */
 
 /* ── readout ──────────────────────────────────────────────────────────── */
+/* 🔴 FLEX, NOT GRID, AND THE EVEN-COUNT RULE WAS NOT ENOUGH. This was
+   `repeat(auto-fit, minmax(96px, 1fr))`, and CLAUDE.md's rule — a readout has
+   an EVEN number of cells — was written on the belief that a phone gets two
+   columns, so an even count always fills its last row. MEASURED, on a real
+   page, and the belief is wrong: 96 px plus a 1 px gap gives **three** columns
+   from about 353 px of content upward, which is every phone anyone owns.
+
+     4 cells   HOLE of 2 from 353 to 426 px   iPhone SE 375 · iPhone 12-15 390 · Pixel 412
+     6 cells   HOLE of 2 from 427 to 620 px, and a hole of 4 at 560
+
+   So the rule held only below 353 px, and four-cell readouts have been holing
+   on the commonest screen there is. ⚠️ The hole is not cosmetic: the row is one
+   background showing through 1 px gaps, so a missing slot is a patch of a
+   DIFFERENT COLOUR with nothing in it, which reads as a cell that failed to
+   load rather than one that does not exist.
+
+   Flex fixes it for every count at every width, because the last row's items
+   GROW to fill what is left — `flex: 1 1 96px` is the same "at least 96, share
+   the rest" the grid was asking for, minus the fixed column count that was
+   causing the hole. A last row with wider cells is not a hole; it is the same
+   row, shared differently.
+
+   ⚠️ THE EVEN-COUNT RULE STAYS ANYWAY, and it is now editorial rather than
+   structural: an odd readout always has a weakest cell, and being made to find
+   it is the point. `mount()` still throws. */
 .pos-readout {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  display: flex; flex-wrap: wrap;
   gap: 1px; background: var(--line); border: 1px solid var(--line);
   border-radius: 4px; margin: 0 0 14px; overflow: hidden;
 }
+.pos-readout > * { flex: 1 1 96px; min-width: 0; }
 /* an explicit `display` beats the UA's [hidden] rule, so showReadout:false did
    nothing until this existed — the row stayed on screen while the page said it
    was hidden */
@@ -186,8 +214,23 @@ button.pos-pri[data-busy="1"] {
 }
 
 /* ── slot: whatever the demo itself draws ─────────────────────────────── */
-.pos-body { margin: 0 0 14px; }
+/* 🔴 ONE VERTICAL RHYTHM, AND EVERY PAGE GETS IT WITHOUT ASKING.
+   Reported from a screenshot, 2026-09-13: a pad, a strip, a transport bar, a
+   row of knobs and a log stacked with almost nothing between them read as one
+   dense block rather than as five things. Each of those elements had its own
+   idea of its bottom margin — 12, 14, 6, 0 — so the gaps depended on which
+   two things happened to be adjacent.
+   Set it ONCE, on the gap BETWEEN siblings rather than on each element's own
+   margin, because a lone element should not carry a gap to nothing. 22px is
+   a comfortable read at a laptop's distance and scales up in the headset
+   block below. */
+.pos-body { margin: 0 0 22px; }
+.pos-body > * + * { margin-top: 22px; }
 .pos-body:empty { display: none; }
+/* ⚠️ And the things the SHELL stacks, for the same reason: the readout, the
+   control bar and the log are siblings of the body, not children of it. */
+.pos-readout { margin-bottom: 22px; }
+.pos-log { margin-top: 22px; }
 
 /* a refused play() must be visible, not a black rectangle */
 /* Outlined, not filled: this is a fallback, and a second solid yellow button
@@ -217,9 +260,21 @@ button.pos-pri[data-busy="1"] {
 /* ⚠️ A GRID, SO A LONG LINE WRAPS INSIDE ITS OWN COLUMN. As one padded string
    a message longer than the box wrapped back to column zero — the continuation
    sat under the TIMESTAMP and read as a new entry that had lost its time.
-   `auto 1fr` keeps every continuation under the message it belongs to. */
+   `auto 1fr` keeps every continuation under the message it belongs to.
+
+   🔴 AND UNTIL 2026-09-13 IT DID NOT WRAP AT ALL, WHILE THIS COMMENT SAID IT
+   DID — on every demo. The box is a `<pre>`, so the UA's `white-space: pre`
+   inherited into `.pos-m` and left its `overflow-wrap: anywhere` INERT: with no
+   wrap opportunity anywhere in the line there is nothing for `overflow-wrap` to
+   take, and `overflow-y: auto` computes `overflow-x` to `auto` beside it, so a
+   long line scrolled SIDEWAYS out of the column instead. `pre-wrap` and not
+   `normal`: the log aligns itself with spaces (`ok  ` against `FAIL `) and
+   `normal` collapses them. A rule that is present and inert is worse than one
+   that is missing, and a comment that claims it works is worse again — the only
+   proof is the COMPUTED style of `.pos-m`, never this file. */
 .pos-log {
   font: 400 11.5px/1.65 var(--mono); color: var(--dim);
+  white-space: pre-wrap;                /* ← a <pre> is `pre`; see above */
   background: var(--card); border: 1px solid var(--line); border-radius: 4px;
   /* ⚠️ A HEIGHT EVEN WITH NOTHING IN IT. The log collapsed to zero until the
      first line arrived and then shoved the whole page down — and on a page
@@ -233,6 +288,9 @@ button.pos-pri[data-busy="1"] {
 .pos-log:empty::before { content: 'nothing logged yet'; color: var(--dim2); }
 .pos-line { display: contents; }
 .pos-t { color: var(--dim2); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+/* `min-width: 0` lets the 1fr column shrink; `overflow-wrap: anywhere` breaks a
+   long unbroken token (a URL, a base64 id). Both need the `pre-wrap` above to
+   do anything at all. */
 .pos-m { min-width: 0; overflow-wrap: anywhere; }
 .pos-line.hi .pos-m, .pos-log b { color: var(--fg); font-weight: 500; }
 .pos-line.bad .pos-m, .pos-log i { color: var(--bad); font-style: normal; }
@@ -246,10 +304,16 @@ button.pos-pri[data-busy="1"] {
    lattice did not exist. The scrub was the only flexible child, so it collapsed
    to its 40 px minimum: a seek control you cannot seek with. Wrapping needs no
    media query — the scrub's flex-basis decides when there is no longer room. */
+/* ⚠️ NO MARGIN OF ITS OWN — the rhythm at `.pos-body > * + *` owns the gap.
+   This carried `margin: 0 0 8px`, and the shorthand's `margin-top: 0` BEAT the
+   rhythm rule: same specificity (0,1,0), later in the file, so source order
+   decided it. MEASURED on /click/, the four gaps down the page read
+   0 · 22 · 4 · 22 px — reported as "you are not respecting vertical spacing.
+   again", and it was the shell doing it, on every page with a transport bar. */
 .tbar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
-  border-radius: 4px; padding: 8px 10px; margin: 0 0 8px;
+  border-radius: 4px; padding: 8px 10px;
 }
 .tbar-toggle {
   flex: none; width: 38px; height: 38px; padding: 0;
@@ -319,8 +383,44 @@ button.pos-pri[data-busy="1"] {
   flex: none; font: 500 12px/1 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--dim); white-space: nowrap;
 }
-.tbar-rates { flex: none; display: flex; gap: 4px; }
-.tbar-rates button { padding: 5px 7px; font-size: 11px; }
+/* ⚠️ NO GAP. The options are a `createChoice` now, which is SEGMENTED — it
+   overlaps the borders by a pixel so a join is one line. A 4 px gap here put
+   space back between them and made four rates read as four separate controls,
+   which is the thing the component exists to stop. */
+.tbar-rates { flex: none; display: flex; }
+/* 🔴 ON A PHONE THE RATES GET THE WHOLE ROW. The bar wraps there, so the group
+   sat on a line of its own at its natural width with the rest of the box empty
+   beside it — REPORTED as *"in transport rate should take full w inside box"*.
+   `flex: 1 1 100%` makes it its own row and fills it; the options then share
+   that width through the `flex: 1 0 auto` above, which is the same rule that
+   lets a row of long names scroll instead. */
+@media (max-width: 560px) {
+  .tbar-rates { flex: 1 1 100%; }
+  .tbar-rates .pos-choice, .tbar-rates .pos-choice .step { width: 100%; }
+}
+/* A live source has no clock worth printing — see the note in transport-bar.mjs.
+   The word never changes now (it briefly alternated with SLOWED, which said what
+   the rate buttons beside it already say), so `min-width` is only a stable slot
+   where the time readout used to sit rather than a guard against reflow. */
+.tbar-live {
+  flex: none; min-width: 52px; text-align: center;
+  font: 500 10px/1 var(--mono); letter-spacing: .12em;
+  color: var(--hi); margin-right: auto;
+}
+.tbar[data-scrub="1"] .tbar-live { margin-right: 0; }
+/* ⚠️ NEVER NARROWER THAN TALL. `0.5x` is four characters and `1x` is two, so
+   padding alone gave a row of buttons that stepped from wide to narrow and
+   read as three different kinds of control. A square is the floor; anything
+   longer grows past it. MEASURED rather than derived: the buttons are 34 px
+   tall, `0.5x` is 42.5 wide and `1x`/`2x` are 29.3 — so only the short ones
+   move. ⚠️ Re-measure if the bar's type size or padding changes; a floor
+   written as arithmetic over four other values looks more rigorous and is one
+   font change away from being wrong in a way nobody thinks to check. */
+.tbar-rates button {
+  padding: 5px 7px; font-size: 11px;
+  min-width: 34px;          /* = the measured height, so the floor is a square */
+  text-align: center;
+}
 /* the armed rate has to be findable at a glance, so it gets a fill as well as
    an edge — colour alone on a 30 px button in a row of five reads as noise */
 .tbar-rates button[aria-pressed="true"] {
@@ -353,7 +453,8 @@ button.pos-pri[data-busy="1"] {
   -webkit-user-select: none; user-select: none;
   -webkit-touch-callout: none;
 }
-.pos-strip { display: block; width: 100%; margin-bottom: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+/* ⚠️ and no margin here either, for the same reason — see .tbar above */
+.pos-strip { display: block; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
 .strip-mini { height: 44px; }
 .strip { height: 120px; }
 .strip-deep { height: min(58vh, 520px); }
@@ -503,7 +604,18 @@ video[hidden] { display: none; }
    which are read WHILE something is changing, get bigger. Everything else
    gives up its margins. */
 .xr .pos-what { font-size: 14px; line-height: 1.55; max-height: 8.5em; overflow-y: auto; }
-.xr .pos-readout { gap: 10px 20px; }
+/* 🔴 ROOM COMES FROM THE CELLS, NEVER FROM THE GAP. This said
+   `gap: 10px 20px` and it was drawing a 20 px SLAB of line colour between every
+   pair of cells — PHOTOGRAPHED in the Quest browser, reported as "so wide vert
+   separators on readout in vr browser". The row's gap is not spacing: it is 1 px
+   of `--line` showing through between `--card` cells, so the gap IS the
+   hairline, and widening it widens the RULE rather than the air around it.
+   ⚠️ The rule dates from when this row was a grid and the gap really was
+   spacing; the row became flex over a line background and this was left behind.
+   ⚠️ And the Quest's 2-D browser gets this class because it answers
+   immersive-vr, so `.xr` styling is what a headset reads on an ORDINARY page,
+   not only inside a session. */
+.xr .pos-cell { padding: 14px 16px; }
 .xr .pos-v { font-size: 22px; }
 .xr .pos-k { font-size: 11px; }
 .xr .pos-controls { gap: 10px; margin-bottom: 10px; }
@@ -583,13 +695,26 @@ video[hidden] { display: none; }
    ⚠️ `display: contents` is what puts each slider's three parts into those
    columns. It removes the wrapper's own box, NOT its custom properties —
    `--sld-knob` still inherits, which is the one thing that would have broken. */
+/* TWO columns per slider, not three — see the note in slider.mjs. The label
+   column is as wide as the wider of its two lines, and there is no
+   content-sized column between one slider and the next, which is what made the
+   gaps look uneven when they were all the same number. */
+/* 🔴 THE COLUMN GAP IS A NUMBER OTHER THINGS HAVE TO AGREE WITH, so it is named
+   rather than typed. `/radio1965/` puts a picker in the same column as these
+   sliders and has to start its control at the same x — it set its own gap to 0
+   against a grid that has twelve, and the row sat 12 px to the left of every
+   lane under it. REPORTED three times, the last one after a component swap had
+   already broken the fix for the first two. A shared measurement in two files
+   is a measurement that will disagree. */
 .sld-group {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: 10px 12px;
+  gap: 10px var(--sld-col);
   width: 100%; max-width: 560px;
 }
+/* the label and its number, stacked, as ONE grid item */
+.sld-head { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .sld-group .sld { display: contents; }
 /* TWO SLIDERS ACROSS, on a screen wide enough for it — six columns rather than
    three, so the pair shares one grid instead of stacking. Below the breakpoint
@@ -619,11 +744,15 @@ video[hidden] { display: none; }
    4–6 when n is even. Nothing here may span a column or that stops being true. */
 @media (min-width: 720px) {
   .sld-group.pos-pair {
-    grid-template-columns: repeat(2, max-content minmax(0, 1fr) max-content);
+    grid-template-columns: repeat(2, max-content minmax(0, 1fr));
     max-width: none;
     column-gap: 12px;
   }
-  .sld-group.pos-pair > .sld:nth-child(even) > .sld-l { padding-left: var(--sld-seam, 32px); }
+  /* ⚠️ FOUR columns now, so slider n takes 1-2 when odd and 3-4 when even —
+     `:nth-child(even)` is still the right column, and still only because
+     nothing here spans. The seam padding moves to the HEAD, which is the grid
+     item the label now lives inside. */
+  .sld-group.pos-pair > .sld:nth-child(even) > .sld-head { padding-left: var(--sld-seam, 32px); }
 }
 /* the standalone 96 px is for a slider sitting in a row of buttons; in a group
    the column decides */
@@ -631,10 +760,14 @@ video[hidden] { display: none; }
 
 .sld-v {
   font: 500 12px/1 var(--mono); color: var(--fg);
+  /* ⚠️ LEFT, not right. Under its label it lines up with the first letter of
+     the word it belongs to; right-aligned it would drift away from the word as
+     the number narrows, which is the shift this reserved width exists to stop. */
+  text-align: left;
   /* `min-width` is set per slider from its own widest possible value — see
      slider.mjs. `tabular-nums` is what makes that width exact: without it a 1
      is narrower than a 0 and the number still shifts inside its reserved box. */
-  font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
 /* ── stepper (demo/shell/stepper.mjs) ────────────────────────────────────
@@ -682,6 +815,33 @@ video[hidden] { display: none; }
   position: relative;
   z-index: 1;
 }
+/* PRESSED, NOT YET ARRIVED — see `pending()` in choice.mjs.
+   🔴 IT IS THE SAME `data-busy` SWEEP EVERY OTHER BUTTON IN THIS PROJECT USES,
+   and it briefly was not. The first version pulsed opacity, which flickers —
+   REPORTED as *"do no flicker radiobutton - use the animation the regular
+   button uses"*. Fair: "this control is working on it" is one idea and it
+   already had one picture, so a second picture for it in a second place is the
+   drift `/kit/` exists to catch. `pending()` sets `data-busy` and the whole
+   look comes from the block above for free, reduced-motion fallback included.
+
+   ⚠️ THIS RULE EXISTS ONLY TO SURVIVE THE ARMED STATE. `.pos-choice
+   button[aria-pressed="true"]` sets `background` — the SHORTHAND, which resets
+   `background-image` to none — and at (0,2,1) it outranks the generic
+   `button[data-busy="1"]` at (0,1,1). So the sweep would be wiped on the one
+   button that ever needs it: the armed one. Same specificity, later in source,
+   and `background-image` alone so the armed tint underneath is untouched. */
+.pos-choice button[data-busy="1"] {
+  background-image: linear-gradient(100deg,
+    transparent 0%, transparent 35%,
+    color-mix(in oklab, var(--hi) 30%, transparent) 50%,
+    transparent 65%, transparent 100%);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: pos-sweep 1.1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pos-choice button[data-busy="1"] { animation: none; opacity: .62; }
+}
 /* Focus is grey here and nowhere near the armed colour — one colour, one
    meaning, which is the rule this project already applies to marks in a strip. */
 .pos-choice button:focus:not(:focus-visible),
@@ -703,10 +863,26 @@ video[hidden] { display: none; }
 @media (max-width: 560px) {
   .pos-choice { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; align-items: stretch; }
   .pos-choice-l { display: block; }
-  .pos-choice .step { display: flex; width: 100%; }
-  /* `flex: 1 1 0` rather than `auto`, so `light` and `wide` are the same width
-     as `off` instead of each option sizing to its own word. */
-  .pos-choice .step button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+  /* 🔴 IT SCROLLS, IT DOES NOT SHRINK. This was `flex: 1 1 0` — every option the
+     same width, on the argument that equal thumb targets are worth more than
+     equal words. MEASURED on a real iPhone and the argument loses: four station
+     names in 390 px gave `Radio 1965` wrapped onto two lines and
+     `Klassikara`, `Vikerraadi` CUT MID-WORD, which is not a target anybody can
+     choose between. REPORTED as *"radiobuttons should not wrap text but
+     scroll"*.
+
+     `flex: 1 0 auto` does both jobs in one line: GROW to share the row when the
+     words fit — which is what the transport's `0.25x` `0.5x` `1x` want — and
+     never shrink below the word, so a row that does not fit overflows and the
+     group scrolls sideways instead of mangling itself. A part-visible option at
+     the edge is its own affordance; the scrollbar is hidden because on a touch
+     screen it is chrome over a control. */
+  .pos-choice .step {
+    display: flex; width: 100%;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .pos-choice .step::-webkit-scrollbar { display: none; }
+  .pos-choice .step button { flex: 1 0 auto; min-width: 0; padding: 0 8px; white-space: nowrap; }
 
   /* The picker gets the same treatment, and the NAME is what stretches — the
      arrows and the die are fixed targets and the name is the readout, so it is
@@ -718,6 +894,41 @@ video[hidden] { display: none; }
   /* ⚠️ The die stays OUT of the group and stays SQUARE. It is a different kind
      of move from the arrows, and stretching it would say it was a third one. */
   .pos-pick > .pos-pick-die { justify-self: start; }
+}
+
+/* ── text field ───────────────────────────────────────────────────────────
+   demo/shell/field.mjs. The label sits ON TOP of the box at every width, not
+   beside it: a row of five fields with side labels has five different left
+   edges and nothing lines up, which is the same complaint the slider group's
+   shared columns fixed. Stacked, the boxes form a column and the labels form a
+   column.
+
+   ⚠️ 34 px TALL, WHICH IS A BUTTON. A field and a button that share a row and
+   differ by two pixels read as a mistake, and the composer in `items` puts them
+   one above the other.
+
+   ⚠️ NOTHING HERE TURNS OFF SELECTION OR THE CALLOUT. `button` up the page
+   sets `-webkit-touch-callout: none` because a long press on a piano key raised
+   the iOS loupe over the keys — but a text field is the one control where
+   magnifying, selecting and pasting are the whole point, and it is deliberately
+   outside those selectors. */
+.pos-field { display: inline-flex; flex-direction: column; gap: 4px; flex: 0 1 150px; min-width: 0; }
+.pos-field.wide { flex: 1 1 240px; }
+.pos-field-l {
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap;
+}
+.pos-field input {
+  font: 400 12.5px/1.4 var(--mono); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line2); border-radius: 4px;
+  padding: 0 9px; height: 34px; width: 100%; min-width: 0;
+}
+.pos-field input::placeholder { color: var(--dim2); }
+.pos-field input:disabled { opacity: .4; }
+/* On a phone a field takes the whole width rather than sharing a row: a
+   half-width mono box fits about twenty characters, which is less than a title. */
+@media (max-width: 560px) {
+  .pos-field, .pos-field.wide { flex: 1 1 100%; }
 }
 
 /* ── grain scope ──────────────────────────────────────────────────────────
@@ -748,6 +959,98 @@ video[hidden] { display: none; }
    directly above it, that means the button you are about to press again is not
    where it was. The floor is the same height a few rows occupy, so arriving
    messages fill the box rather than inflate it. */
+/* ── tabs: the parts of one page — shell/tabs.mjs ───────────────────────── */
+/* 🔴 NO BORDERS AND NO BOX, ASKED FOR IN THOSE WORDS. A tab is a place you go,
+   not a setting you arm, and `choice.mjs` already owns the boxed, segmented look
+   for the second of those — two acts drawn the same way is the drift `/kit/`
+   exists to catch. What marks the open one here is COLOUR plus a bar under the
+   word, which is the one convention every reader already has for a tab.
+   ⚠️ The bar is `box-shadow`, not `border-bottom`: a border would change the
+   button's height when it appeared and shunt the row by 2 px on every press —
+   CLAUDE.md, nothing that redraws may change how much room it takes. */
+/* 🔴 `min-width: 0` OR IT PUSHES THE PAGE INSTEAD OF SCROLLING. `overflow-x`
+   cannot shrink a flex item below its content: the default `min-width: auto`
+   makes the bar as wide as its widest row of tabs, the scroll container is
+   therefore never smaller than its contents, and nothing scrolls — the DOCUMENT
+   does. MEASURED on a 390 px phone before this line: bar 500 px, `scrollW` 500,
+   `scrolls false`, and 141 px of horizontal PAGE overflow. The whole row of
+   tabs was dragging the page sideways. */
+.pos-tabs, .pos-tabs-bar { min-width: 0; max-width: 100%; }
+.pos-tabs-bar {
+  display: flex; gap: 20px; overflow-x: auto;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.pos-tabs-bar::-webkit-scrollbar { display: none; }
+.pos-tabs-t {
+  flex: 0 0 auto; white-space: nowrap;
+  background: none; border: 0; border-radius: 0; height: 30px; padding: 0 0 6px;
+  font: 500 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); cursor: pointer;
+}
+.pos-tabs-t:hover:not(:disabled) { color: var(--fg); }
+.pos-tabs-t[aria-selected="true"] { color: var(--hi); box-shadow: inset 0 -2px 0 0 var(--hi); }
+/* A part that is coming and a part that does not exist are different facts, so
+   the unbuilt one stays in the row, named, and says so by weight alone. */
+.pos-tabs-t:disabled { color: var(--line2); cursor: default; }
+.pos-tabs-t:focus:not(:focus-visible) { outline: none; }
+.pos-tabs-t:focus-visible { outline: 2px solid var(--dim2); outline-offset: 3px; }
+/* ⚠️ The panels carry the shell's own vertical rhythm INSIDE them, because a
+   panel is a `.pos-body` child's child and the `* + *` rule does not reach it. */
+.pos-tabs-p > * + * { margin-top: 22px; }
+
+/* ── table: rows in columns the caller declares — shell/table.mjs ───────── */
+/* 🔴 A BOX, BECAUSE A TABLE IS A THING AND NOT A REGION OF THE PAGE. `/wire/`
+   drew one round its traffic in its own <style> and `/kurenniemi/` was about to
+   draw a second copy; it is here so the third page does not draw a third.
+   ⚠️ The border is on the WRAPPER and the rules between rows are `#ffffff08`,
+   the same near-invisible hairline the message list uses — a full-strength line
+   between every row turns a hundred records into a grid of boxes. */
+.pos-tbl {
+  border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+  font: 400 11px/1.55 var(--mono);
+  overflow: hidden;
+}
+/* ⚠️ THE BODY SCROLLS, NOT THE WRAPPER, so a header row stays put while the
+   records move under it. */
+.pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; }
+/* 🔴 THE ROW IS AS SHORT AS ITS TEXT ALLOWS, BECAUSE THE BOX IS THE PAGE.
+   REPORTED as *"page should fit more"* against a table of 334 records showing
+   about twenty-three of them. `line-height` and the vertical padding are the
+   only two numbers that decide this — 1.55 and 4 px gave a 26 px row; 1.4 and
+   2 px give 21 px, which is a fifth more of the archive on one screen and is
+   still two clear pixels of air either side of an 11 px glyph. Below this the
+   rules between rows start touching the text. */
+.pos-tbl-row {
+  display: grid; grid-template-columns: var(--tbl-cols);
+  gap: 8px; padding: 2px 10px; line-height: 1.4; align-items: baseline;
+  border-bottom: 1px solid #ffffff08;
+}
+.pos-tbl-body > .pos-tbl-row:last-child { border-bottom: 0; }
+/* The heading is the one row that is not a record, so it says so by weight and
+   by case rather than by a rule under it — which every other row has too. */
+.pos-tbl-head {
+  color: var(--dim2); text-transform: uppercase; letter-spacing: .06em;
+  font-size: 10px; background: var(--card2); position: sticky; top: 0;
+}
+.pos-tbl-c { color: var(--dim); min-width: 0; overflow-wrap: anywhere; }
+.pos-tbl-c.r { text-align: right; }
+.pos-tbl-c.hi { color: var(--fg); }
+/* One line, cut, with the whole value on `title` — see `clip` in table.mjs. */
+.pos-tbl-c.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Underlined on hover only: a hundred underlined names is a page of rules, and
+   the colour already separates a link from the columns either side of it. */
+.pos-tbl-a { color: var(--fg); text-decoration: none; }
+.pos-tbl-a:hover, .pos-tbl-a:focus-visible { text-decoration: underline; }
+.pos-tbl-empty { color: var(--dim2); padding: 8px 10px; }
+/* ⚠️ ON A PHONE THE FIXED TRACKS ARE MOST OF THE WIDTH. Every column keeps its
+   place and the table scrolls sideways as one piece, which keeps the columns
+   aligned — reflowing each row into a stack loses exactly the thing a table is
+   for. */
+@media (max-width: 620px) {
+  .pos-tbl-body { overflow-x: auto; }
+  .pos-tbl-row { min-width: 560px; }
+}
+
 .pos-msgs {
   font: 400 11px/1.55 var(--mono);
   min-height: 132px;
@@ -923,9 +1226,19 @@ video[hidden] { display: none; }
    drawer decides every coordinate; this decides only what the ink looks like,
    which is the one half that belongs in a stylesheet.
 
-   🔴 GREY, WITH A TINT THAT IS ALMOST NOT THERE. 11% of a hue in a box's
-   stroke and 4% in its fill — enough to say "these two are the same sort of
-   thing", not enough to read as a legend that needs explaining.
+   🔴 GREY, WITH A TINT THAT SAYS WHICH MACHINE A BOX IS. 26% of a hue in a
+   box's stroke and 8% in its fill — this page, a computer somebody rents, a
+   machine in a room. Colour says WHERE something runs and nothing else, so a
+   box drawn inside another takes its container's hue; it is never a place in
+   a sequence, which is CLAUDE.md's one-meaning-for-colour rule.
+
+   ⚠️ IT WAS 11% AND 4%, WHICH IS BELOW BEING SEEN, and the repair is measured
+   rather than tasted. `--line2` is ALREADY a blue-grey (oklab b ≈ -0.033), so
+   11% of #5b9bd5 moves b by 0.0074 and LIGHTNESS by 0.038 — the tinted box
+   reads as a slightly lighter grey rather than as blue, which is why the
+   person it was drawn for asked for colour coding while looking at a picture
+   that already had it. 26% moves b by 0.0176, about 2.4x, and is legible at a
+   glance while still obviously grey-family.
 
    🔴 AND NEVER YELLOW, for a structural reason rather than a taste one. `--hi`
    is the playhead, the primary control, the one thing on a page you are meant
@@ -935,7 +1248,7 @@ video[hidden] { display: none; }
    control on the site already shares.
 
    🔴 COLOUR IS NEVER THE ONLY CHANNEL. `kind` also moves the stroke: a device
-   is heavy, a rented computer is dashed, `here` is the one box with a filled
+   is heavy, a rented computer is dotted, `here` is the one box with a filled
    back. Photocopy the picture or take the colour out of it and the four still
    read as four. That is also why the hover rules at the bottom change only
    colours — overriding the weight or the dash there would delete the channel
@@ -960,6 +1273,10 @@ video[hidden] { display: none; }
   margin: 8px 0 0; min-height: 1.55em; max-width: 62ch;
 }
 .pos-dg-cap[data-on] { color: var(--fg); }
+/* a box's sentence takes `**bold**` and nothing else; the heavier face alone is
+   the emphasis, and it gets the foreground colour so the emphasised half is not
+   also the dimmest thing on the line. */
+.pos-dg-cap strong { font-weight: 600; color: var(--fg); }
 
 .pos-dg-n { cursor: default; }
 .pos-dg-n:focus-visible { outline-offset: 3px; }
@@ -992,19 +1309,43 @@ video[hidden] { display: none; }
 .pos-dg-n[data-kind="here"] .pos-dg-box {
   fill: var(--line); stroke: var(--dim2); stroke-width: 1.2;
 }
-/* somebody else's computer, rented by the hour — dashed, because its edge is
-   the one thing in the picture that is not ours */
+/* somebody else's computer, rented by the hour — DOTTED, because its edge is
+   the one thing in the picture that is not ours.
+   ⚠️ DOTTED RATHER THAN DASHED, LOOKED AT RATHER THAN ARGUED ABOUT. It was
+   `5 3`: an 8 px period around a box 40 px tall, which reads as a marching-ants
+   selection, and every rounded corner loses a whole dash to the curve. `1 3`
+   is a 4 px period, even round the corners, and still unmistakably not solid.
+   Round caps were tried and are nearly solid at this weight, so the default
+   butt caps stay. */
 .pos-dg-n[data-kind="cloud"] .pos-dg-box {
-  fill: color-mix(in oklab, #5b9bd5 4%, var(--card2));
-  stroke: color-mix(in oklab, #5b9bd5 11%, var(--line2));
-  stroke-width: 1.2; stroke-dasharray: 5 3;
+  fill: color-mix(in oklab, #5b9bd5 8%, var(--card2));
+  stroke: color-mix(in oklab, #5b9bd5 26%, var(--line2));
+  stroke-width: 1.2; stroke-dasharray: 1 3;
 }
 /* a machine in a room somewhere — heavy, because it is a physical thing */
 .pos-dg-n[data-kind="device"] .pos-dg-box {
-  fill: color-mix(in oklab, #a98ad6 4%, var(--card2));
-  stroke: color-mix(in oklab, #a98ad6 11%, var(--line2));
+  fill: color-mix(in oklab, #a98ad6 8%, var(--card2));
+  stroke: color-mix(in oklab, #a98ad6 26%, var(--line2));
   stroke-width: 2;
 }
+
+/* A CONTAINER — a machine with the programs on it drawn as boxes inside it.
+   Its back is whatever the picture sits on, not a panel of its own: a
+   container that painted its own fill would put a flat sheet behind the boxes
+   it holds and delete the one thing nesting is for, which is that they are ON
+   it. The hue still arrives through the stroke.
+
+   ⚠️ `transparent`, NOT `none`. `fill: none` is not PAINTED, so the default
+   `pointer-events: visiblePainted` falls straight through the middle of the
+   box and hovering a container does nothing except on its 1 px edge.
+
+   ⚠️ AND IT NEEDS (0,3,0), WRITTEN AFTER THE KINDS. `.pos-dg-n[data-kind="…"]
+   .pos-dg-box` is (0,3,0) and also matches this rect, so a plainer selector
+   loses and the rule reads as absent rather than as beaten — the same
+   specificity tie the `[data-on]` rules below this already carry a warning
+   about. The `[data-on]` rules come after and DO win, which is wanted: a
+   hovered container gets a back for as long as the pointer is on it. */
+.pos-dg-n[data-kind] .pos-dg-cbox { fill: transparent; }
 
 /* ⚠️ THESE GO LAST AND THAT IS LOAD-BEARING, NOT TIDINESS. `.pos-dg-n[data-on]
    .pos-dg-box` and `.pos-dg-n[data-kind="cloud"] .pos-dg-box` are both (0,3,0)
@@ -1017,3 +1358,24 @@ video[hidden] { display: none; }
   fill: color-mix(in oklab, var(--fg) 7%, var(--card2));
 }
 .pos-dg-n[data-on] .pos-dg-sub { fill: var(--dim); }
+
+/* ── in a headset, the rows that cannot use it recede ─────────────────────────
+ *
+ * `caps.mjs` puts `.xr` on <html> when `immersive-vr` is supported — a
+ * CAPABILITY test, never a user-agent one, and its own note says the flag is
+ * about LAYOUT, which is why the Immersive Web Emulator answering true is
+ * correct here.
+ *
+ * 🔴 DIMMED, NEVER DISABLED. Opacity only: every row still links, still takes
+ * focus, still reads to a screen reader, still works if you press it. A
+ * `pointer-events: none` here would turn "this one is less interesting right
+ * now" into "this one is broken", which is a different and false statement —
+ * the same reason `caps.mjs` un-links a row WITH THE REASON IN WORDS rather
+ * than hiding it.
+ *
+ * ⚠️ And it comes back on hover and focus, so a row you have actually reached
+ * for is never the faint one. A dimmed thing you cannot un-dim by looking at it
+ * is a trap rather than a hint. */
+html.xr .pos-acts .pos-row:not([data-xr]) { opacity: .45; transition: opacity 120ms ease; }
+html.xr .pos-acts .pos-row:not([data-xr]):hover,
+html.xr .pos-acts .pos-row:not([data-xr]):focus-within { opacity: 1; }

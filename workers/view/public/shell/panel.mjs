@@ -31,8 +31,77 @@
 // goes edge to edge and the only inset is the footer's own text. Reported from
 // the device, and it is the same instinct that took the border off a television.
 const PAD = 10;                 // text inset inside the footer ONLY
-const FOOT = 44;                // the footer strip's height at 1x
+export const FOOT = 44;         // the footer strip's height at 1x
 const ROUND = 18;               // the corner radius, at 1x
+
+/**
+ * 🔴 THE FOOTER, ONCE, FOR THE PANELS THAT HAVE A PICTURE ABOVE IT AND FOR THE
+ * ONES THAT DO NOT.
+ *
+ * A panel whose picture is RENDERED by the graphics card rather than drawn on a
+ * canvas cannot carry a word — a framebuffer has no text in it — so its numbers
+ * have to arrive as a second, much smaller texture. That strip has to look
+ * exactly like the footer under every other panel here, and the only way two
+ * surfaces look exactly alike is if they are one function.
+ *
+ * ⚠️ FIXED COLUMNS, so two panels side by side can be read across. A column
+ * that sizes to its content is the alignment bug the slider group had.
+ */
+function footerInto(ctx, footer, w, fy, tone) {
+  ctx.strokeStyle = tone.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, fy - 8); ctx.lineTo(w - PAD, fy - 8); ctx.stroke();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const cols = Math.max(1, footer.length);
+  const colW = (w - PAD * 2) / cols;
+  footer.forEach(([k, v], i) => {
+    const x = PAD + i * colW;
+    ctx.fillStyle = tone.dim;
+    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText(String(k).toUpperCase(), x, fy);
+    ctx.fillStyle = v == null || v === '' ? tone.dim : tone.fg;
+    ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
+    // ⚠️ NOTHING, NOT A ZERO. A missing measurement prints as ABSENT — a
+    // zero reads as a very impressive measurement of nothing. It drew an em
+    // dash until 2026-09-13; the label above the slot already says the slot
+    // is there, and a column of dashes reads as failed readings.
+    if (v != null && v !== '') ctx.fillText(String(v), x, fy + 12);
+  });
+}
+
+/**
+ * A footer strip on its own — the bottom of a panel, with no picture over it.
+ *
+ * For a panel whose picture is a framebuffer in a headset session's own
+ * context. It is a NINTH of a full panel's pixels and it is handed to the card
+ * only when a number moves rather than every frame, which is most of why a
+ * live-rendered panel costs no copy worth measuring. `dirty()` is the version
+ * an XR render loop compares against its last upload.
+ */
+export function createPanelFooter({ width = 640, scale = 2 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(FOOT * scale);
+  const ctx = canvas.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
+  const tone = { fg: tok('--fg', '#e8edf5'), dim: tok('--dim2', '#7a879c'),
+                 field: '#0b0e14', line: '#232c3a' };
+  let version = 0;
+  function draw(footer = []) {
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.clearRect(0, 0, width, FOOT);
+    ctx.fillStyle = tone.field;
+    ctx.fillRect(0, 0, width, FOOT);
+    footerInto(ctx, footer, width, 8, tone);
+    ctx.restore();
+    version++;
+    return version;
+  }
+  draw([]);
+  return { canvas, ctx, draw, dirty: () => version, height: FOOT };
+}
 
 /**
  * @param {object} o
@@ -119,28 +188,10 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
       ctx.textAlign = 'left';
     }
 
-    // ── the footer ───────────────────────────────────────────────────────
-    const fy = h - FOOT + 8;
-    ctx.strokeStyle = LINE; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PAD, fy - 8); ctx.lineTo(w - PAD, fy - 8); ctx.stroke();
-
-    // Fixed columns, so two panels side by side can be read across. A column
-    // that sizes to its content is the alignment bug the slider group had.
-    const cols = Math.max(1, footer.length);
-    const colW = (w - PAD * 2) / cols;
-    footer.forEach(([k, v], i) => {
-      const x = PAD + i * colW;
-      ctx.fillStyle = DIM;
-      ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.fillText(String(k).toUpperCase(), x, fy);
-      ctx.fillStyle = v == null || v === '' ? DIM : FG;
-      ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
-      // ⚠️ NOTHING, NOT A ZERO. A missing measurement prints as ABSENT — a
-      // zero reads as a very impressive measurement of nothing. It drew an em
-      // dash until 2026-09-13; the label above the slot already says the slot
-      // is there, and a column of dashes reads as failed readings.
-      if (v != null && v !== '') ctx.fillText(String(v), x, fy + 12);
-    });
+    // ── the footer ─────────────────────────────────────────
+    // One routine, shared with `createPanelFooter` — see the note above it.
+    footerInto(ctx, footer, w, h - FOOT + 8,
+               { fg: FG, dim: DIM, field: FIELD, line: LINE });
 
     ctx.restore();
     // The one you are looking at. An edge rather than a wash: a tint over the

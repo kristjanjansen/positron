@@ -8,20 +8,37 @@
 <link rel="stylesheet" href="/shell/shell.css">
 
 <script type="module">
-  import { mount, guard } from '/shell/shell.mjs';
+  // This page is the SANDBOX for timeline/strip.mjs — the one place every
+  // thing that component can do is pointed at a fixture small enough to read.
+  // So when the component grows, this grows with it, and when it goes a week
+  // without doing so the page quietly stops being a sandbox: three of the four
+  // numbers read 0 or blank, the only lane drew NOTHING at all (follow mode
+  // scrolled both brackets off the left before the first frame), and 440 px of
+  // the 520 px canvas was empty. An empty component in its own sandbox reads
+  // as the component being broken.
+  import { mount, guard, fmtNum } from '/shell/shell.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { zoomCeilingPps, ulpMs, DATE_WALL_MS, tickLOD, formatTime, aoristic } from '/timeline/strip.mjs';
+  import { zoomCeilingPps, ulpMs, DATE_WALL_MS, tickLOD } from '/timeline/strip.mjs';
   import { markAdapter } from '/shell/fixture.mjs';
 
   const YEAR = 365.2425 * 24 * 3600 * 1000;
   const SPAN = 2000 * YEAR;                 // two millennia, so the ladder has work to do
+  const t0 = Date.UTC(100, 0, 1);
+  const yr = (year) => t0 + (year - 100) * YEAR;
 
   const d = mount({
     name: 'strip',
-    what: 'Deep time, and dates that are not certain. Zoom until the float runs out.',
-    readout: { pps: '', ceiling: '', ulp: 'ms', major: '' },
+    what: 'Two thousand years on one line, where many of the dates are a bracket '
+        + 'rather than a day. Zoom in and each mark picks up a character saying '
+        + 'how sure its date is — · written down, ? a gap somebody bracketed, '
+        + '~ never sharp to begin with — and the grey silhouette is how much of '
+        + 'the bracketed ones falls in each column of pixels. Step is the '
+        + 'smallest difference two dates that far from now can still be given, '
+        + 'and more zoom is how much further you could go before that '
+        + 'difference is wider than a pixel.',
+    readout: { year: '', ticks: '', step: 'ms', 'more zoom': '×' },
     controls: [
       { id: 'zin', label: 'Zoom in' },
       { id: 'zout', label: 'Zoom out' },
@@ -31,78 +48,243 @@
   });
   guard(d);
 
-  // spans with declared uncertainty — `when.kind` is the whole point of Act 0's end
-  const t0 = Date.UTC(100, 0, 1);
-  const items = [
-    { at: t0 + 300 * YEAR, kind: 'era', id: 'e1', payload: { label: 'attested' } },
-    { at: t0 + 900 * YEAR, kind: 'era', id: 'e2',
-      payload: { label: 'ignorance' }, when: { kind: 'ignorance', earliest: t0 + 800 * YEAR, latest: t0 + 1000 * YEAR,
-              rule: 'positron-demo-bracket@1' } },
-    { at: t0 + 1500 * YEAR, kind: 'era', id: 'e3',
-      payload: { label: 'vagueness' }, when: { kind: 'vagueness', earliest: t0 + 1400 * YEAR, latest: t0 + 1600 * YEAR,
-              rule: 'positron-demo-bracket@1' } },
-    { at: t0 + 1900 * YEAR, kind: 'era', id: 'e4', payload: { label: 'attested' } },
-  ];
+  // ── the fixture ──────────────────────────────────────────────────────────
+  // SHAPED LIKE AN ARCHIVE, NOT LIKE A TEST. It was four rows, two of them
+  // points — which cannot show a statistic (two spans make two steps) and
+  // cannot show the glyphs either, because four marks across a screen always
+  // have room for four letters. Dates cluster towards the present and get
+  // vaguer the further back they sit, so that is what this generates: the gaps
+  // fall from 170 years to four, and everything before 1400 carries a bracket
+  // that widens with its age. The crowd at the recent end is the point — it is
+  // what makes zooming change which marks can carry their character.
+  //
+  // Deterministic, with no Math.random anywhere: a fixture that draws a
+  // different picture on every load cannot be compared with the last one.
+  const items = [];
+  for (let i = 0; i < 22; i++) {
+    const u = i / 21;
+    const year = Math.round(1990 - 1840 * (1 - u) * (1 - u));
+    const half = year < 1400 ? Math.max(6, Math.round((1400 - year) / 14)) : 0;
+    // `when.kind` is the distinction Act 0 ends on: IGNORANCE is a date that
+    // exists and is not known, VAGUENESS is one that was never sharp. They are
+    // drawn the same way and they are not the same claim, which is why the
+    // library keeps them apart rather than calling both "fuzzy".
+    const kind = !half ? null : (i % 2 ? 'vagueness' : 'ignorance');
+    // §uncertainty-as-position: a bracketed row sits at its EARLIEST bound, so
+    // `at` never claims a precision the row does not have.
+    const row = { id: `d${i}`, kind: 'era', at: yr(year - half),
+                  payload: { label: String(year), sure: kind || 'exact' } };
+    if (kind) {
+      row.when = { kind, earliest: yr(year - half), latest: yr(year + half),
+                   rule: 'positron-demo-bracket@1' };
+    }
+    items.push(row);
+  }
+  const bracketed = items.filter((r) => r.when).length;
 
   const { adapter } = markAdapter({ rates: [0.25, 0.5, 1, 2] });
-  const deck = createDeck({
-    items,
-    adapters: { era: adapter },
-    range: [t0, t0 + SPAN],
+  const deck = createDeck({ items, adapters: { era: adapter }, range: [t0, t0 + SPAN] });
+
+  // 🔴 OPEN ON A REAL DATE. The deck's position domain here is absolute ms, so
+  // it starts at 0 — which is 1970, and 1970 is where the floating-point
+  // questions this page asks have no answer: `ulpMs(0)` is the smallest
+  // denormal, so the smallest tellable step printed `0.000 ms` and the zoom
+  // ceiling was Infinity, i.e. an empty cell. Three of the four numbers were a
+  // measurement of the origin rather than of deep time. The midpoint of the
+  // range is year 1100, which is a date this fixture is actually about.
+  deck.seek(t0 + SPAN / 2);
+
+  // ⚠️ ONE POSITION SURFACE PER PAGE. The strip seeks on press and on drag; the
+  // bar's slider is a second horizontal time axis at a different scale, and two
+  // of those stacked is a contradiction rather than a redundancy.
+  // The clock is given a formatter because the default one counts hours: on a
+  // deck two millennia wide it read `-457575120:00.000 / 1051898400:00.000`,
+  // which is a true number of minutes and tells nobody anything.
+  createTransportBar(d.el, deck, {
+    scrub: false,
+    fmt: (pos, range) => `${new Date(pos).toISOString().slice(0, 10)}`
+      + ` / ${fmtNum((range[1] - range[0]) / YEAR)} y`,
   });
 
-  createTransportBar(d.el, deck, {});
+  const HI = getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400';
+  const GLYPH = { exact: '·', ignorance: '?', vagueness: '~' };
+
   const { strip } = createStripView(d.el, deck, {
-    size: 'deep',
-    lanes: [{ id: 'era', kind: 'era', height: 60, as: 'spans' }],
+    // 'auto' takes exactly the height the lanes need. `deep` is min(58vh,520px)
+    // and this page put ONE 60 px lane in it — 440 px of empty canvas under a
+    // picture, which reads as a strip that failed to draw.
+    size: 'auto',
+    // 🔴 FOLLOW OFF, AND THIS IS THE BUG THAT MADE THE PAGE LOOK BROKEN. Follow
+    // keeps the playhead on screen by scrolling the window, which is right for
+    // a recording and wrong for a fixture: the playhead sat at 1970, follow
+    // shoved the window forward to put it at 28% of the width, and every dated
+    // thing before 1830 went off the left edge. Nothing drew, no error, no
+    // warning — the lane was a tall empty box.
+    follow: false,
+    // The axis prints DATES rather than a distance from 1970. The component
+    // guesses `absolute` from `range[0] > 1e12`, and every date before the
+    // epoch is negative — so a page whose whole subject is calendar years got
+    // an axis reading `-1500y` next to a readout cell reading `1100`. Two
+    // labels for one place, disagreeing.
+    absolute: true,
+    lanes: [
+      // 26 px: the gutter draws a lane's name at y+12 and its first number at
+      // y+21, and refuses any line that would fall past `height - 2`. One
+      // number therefore needs 23 px of lane and this asks for 26.
+      { id: 'sure', kind: 'era', label: 'how sure', height: 26, as: 'ticks',
+        color: HI, width: 2,
+        // THE MARK BECOMES ITS CHARACTER WHERE THE ZOOM HAS MADE ROOM. The
+        // strip draws a glyph on a tick only where BOTH neighbours have left
+        // space, so zooming is the control: out is a rhythm of marks, in is a
+        // row of little claims about how each date was arrived at.
+        glyphOf: (r) => GLYPH[r.payload?.sure] || '' },
+      { id: 'span', kind: 'era', label: 'brackets', height: 30, as: 'spans',
+        color: HI, stack: false, labels: false },
+      // 46 px, because this lane carries a name, two numbers and a legend the
+      // component draws on the canvas above the silhouette.
+      // `bars: false` gives the aggregate ITS OWN LANE rather than drawing the
+      // statistic behind the ten bands it is a statistic OF.
+      //
+      // 🔴 THE BRACKETED ROWS ONLY, AND THE FILTER IS THE READABLE CHOICE
+      // RATHER THAN THE TIDY ONE. A date somebody wrote down is a POINT, and
+      // the method gives a point mass 1 in its single column while a 90-year
+      // bracket deposits about 0.02 per column — correct arithmetic and an
+      // unreadable picture, because the height is normalised to the peak and
+      // the smear then draws half a pixel tall. Twelve hairlines and a flat
+      // floor is what that looked like. The lane says what it counted in its
+      // own gutter, so nothing is dropped silently.
+      { id: 'spread', kind: 'era', label: 'spread out', height: 46, as: 'spans',
+        filter: (r) => !!r.when, bars: false, aggregate: true },
+    ],
   });
-  strip.fit?.();
+  strip.fit();
+
+  /** Per-lane numbers beside their own ink, never in a table somewhere else.
+   *
+   *  ⚠️ ONE SHORT LINE EACH, MEASURED ON A PHONE. The gutter is sized by the
+   *  widest thing in it and capped at 42% of the canvas, so a second line
+   *  reading `3 unknown · 4 vague` took 164 px of a 390 px strip and left the
+   *  picture 222 px wide. The split between the two kinds of bracket is in the
+   *  log line the check writes, which is where a number you read once belongs.
+   *  The column width is not here either: the component already prints it on
+   *  the canvas beside the silhouette, and the same figure twice can disagree. */
+  function gutters() {
+    const by = {};
+    const g = strip.lanes().find((L) => L.id === 'sure')?.glyphState;
+    if (g) by.sure = [`${g.drawn} of ${g.had} legible`];
+    const st = strip.spanStates('span');
+    if (st) by.span = [`${st.smeared} bracketed`];
+    const a = strip.aggregateStat('spread');
+    if (a) by.spread = [`${a.counted} of ${a.items} counted`];
+    for (const L of strip.lanes()) if (by[L.id]) L.subLabel = by[L.id];
+  }
+
+  // A duration WITH ITS UNIT at any magnitude. formatTime() drops to a bare
+  // clock string under a second — `0.100` in a cell headed `across` reads as a
+  // time of day rather than as a width — and this page spans ms to millennia.
+  const spanWords = (ms) =>
+    ms >= YEAR ? `${fmtNum(ms / YEAR)} y`
+    : ms >= 864e5 ? `${fmtNum(ms / 864e5)} d`
+    : ms >= 36e5 ? `${fmtNum(ms / 36e5)} h`
+    : ms >= 6e4 ? `${fmtNum(ms / 6e4)} min`
+    : ms >= 1000 ? `${fmtNum(ms / 1000)} s`
+    : `${fmtNum(ms)} ms`;
+
+  // How many times further you could still zoom. Written out at the top of the
+  // range it would be fourteen digits, which is a cell nobody reads.
+  const times = (x) => (!Number.isFinite(x) || x <= 0 ? ''
+    : x >= 1e5 ? x.toExponential(1).replace('e+', 'e') : fmtNum(x));
 
   function refresh() {
     const v = strip.view();
-    d.set('pps', v.pxPerSecond);
     const t = deck.position();
-    d.set('ceiling', Math.round(zoomCeilingPps(t)));
-    d.set('ulp', ulpMs(t));
     const lod = tickLOD(v.pxPerSecond);
-    d.set('major', formatTime(lod.major ?? 1000, lod.major ?? 1000).trim() || String(lod.major));
+    d.set('year', Math.abs(t) <= DATE_WALL_MS ? new Date(t).getUTCFullYear() : '');
+    d.set('ticks', spanWords(lod.major));
+    // ⚠️ NO `across` CELL, AND THE COMPONENT IS WHY. The strip draws its own
+    // window-width readout in the top-left corner, and a cell repeating it
+    // read `1,923 y` beside the strip's `1930 y` — the same quantity in two
+    // places, disagreeing, because one of them priced the canvas border and
+    // the other did not. The figure belongs beside its own ink.
+    //
+    // The step is BLANK, never 0, at the origin: `ulpMs(0)` is the smallest
+    // denormal, and `0.000 ms` there would be a very confident measurement of
+    // a number the page cannot make.
+    const step = ulpMs(t);
+    const ceiling = Math.min(1e7, zoomCeilingPps(t));
+    d.set('step', Math.abs(t) > 0 ? step : '');
+    d.set('more zoom', Math.abs(t) > 0 ? times(ceiling / v.pxPerSecond) : '');
+    gutters();
+    strip.invalidate();
   }
   d.on('zin', () => { strip.zoomIn(); refresh(); });
   d.on('zout', () => { strip.zoomOut(); refresh(); });
-  d.on('fit', () => { strip.fit?.(); refresh(); });
+  d.on('fit', () => { strip.fit(); refresh(); });
   setInterval(refresh, 250);
 
   d.on('check', () => {
     const t = deck.position();
-    d.assert('zoom ceiling is finite', Number.isFinite(zoomCeilingPps(t)), String(zoomCeilingPps(t)));
-    d.assert('ulp grows with magnitude', ulpMs(DATE_WALL_MS) > ulpMs(t),
-      `${ulpMs(t)} -> ${ulpMs(DATE_WALL_MS)}`);
-    d.assert('date wall is 8.64e15', DATE_WALL_MS === 8.64e15, String(DATE_WALL_MS));
+    d.assert('the zoom stops at a number, not at infinity', Number.isFinite(zoomCeilingPps(t)),
+      `${fmtNum(zoomCeilingPps(t))} px a second at ${new Date(t).getUTCFullYear()}`);
+    d.assert('the further from now, the coarser the smallest step',
+      ulpMs(DATE_WALL_MS) > ulpMs(t), `${ulpMs(t)} ms here, ${ulpMs(DATE_WALL_MS)} ms at the wall`);
+    d.assert('past 8.64e15 ms a date is no longer a date', DATE_WALL_MS === 8.64e15, String(DATE_WALL_MS));
 
-    // aoristic: uncertain spans spread weight instead of pretending to a date
-    // aoristic reads {from, to} (a point is to:null, mass 1 in its own column)
-    const spans = items.filter((i) => i.when).map((i) => ({
-      from: i.when.earliest, to: i.when.latest, weight: 1,
-    }));
-    const st = aoristic(spans, t0, t0 + SPAN, 24);
-    const lit = [...st.mass].filter((x) => x > 0).length;
-    const total = [...st.mass].reduce((a, b) => a + b, 0);
-    d.assert('aoristic spreads, not spikes', lit > 1, `${lit}/24 bins`);
-    d.assert('aoristic conserves weight', total > 0, total.toFixed(3));
+    // THE STATISTIC IS READ OFF THE PICTURE, not computed a second time. It
+    // used to run `aoristic()` again in here over 24 invented bins — a number
+    // with no relationship to the silhouette on screen, so the asserts could
+    // have stayed green with the lane drawing nothing, which is exactly what
+    // was happening. `aggregateStat` is what the last frame actually drew.
+    strip.draw();
+    const a = strip.aggregateStat('spread');
+    d.assert('uncertain dates spread out, they do not spike', !!a && a.max > 0 && a.cols > 1,
+      a ? `${a.cols} columns, tallest ${a.max.toFixed(4)}` : 'the lane drew nothing');
+    d.assert('the spread keeps the weight it was given', !!a && a.total > 0, a ? a.total.toFixed(3) : 'none');
     // the ledger is the point: a statistic that does not say what it dropped
     // implies a density nobody has
-    d.assert('ledger accounts for every span', st.items === spans.length,
-      `items ${st.items} counted ${st.counted} clipped ${st.clipped} open ${st.open}`);
-    d.assert('names its method', typeof st.method === 'string' && st.method.length > 0, st.method);
+    // THE LEDGER BALANCES AT EVERY ZOOM, which is the claim — not a fixed
+    // count. `items` is what reached the statistic in THIS window, and every
+    // one of them is either counted or reported as having added nothing; a
+    // span that went missing in between would break this and nothing else.
+    d.assert('the spread accounts for every bracket it was handed',
+      !!a && a.items === a.counted + a.open && a.items <= bracketed,
+      a ? `${a.items} of ${bracketed} brackets in this window · counted ${a.counted}`
+        + ` · added nothing ${a.open} · cut by the edge ${a.clipped}` : 'none');
+    d.assert('it names the method it used', !!a && typeof a.method === 'string' && a.method.length > 0,
+      a ? a.method : 'none');
 
     const lod = tickLOD(strip.view().pxPerSecond);
-    d.assert('tick ladder picks a major', lod && Number.isFinite(lod.major), JSON.stringify(lod));
-    d.log(`mass ${[...st.mass].map((x) => x.toFixed(1)).join(' ')}`);
-    d.log(`method ${st.method} · peakCol ${st.peakCol} · colMs ${Math.round(st.colMs)}`);
+    d.assert('the ticks pick a labelled step off the ladder', lod && Number.isFinite(lod.major),
+      spanWords(lod.major));
+
+    // A RELATIONSHIP, NOT A COUNT. "nothing to draw" and "no room to draw it"
+    // are the same picture, so a glyph feature that had stopped working would
+    // read as a crowded view. Zoom in far enough and more characters appear;
+    // zoom out and they go again. Neither end alone can say that.
+    {
+      const saved = strip.view();
+      const glyphs = () => {
+        strip.draw();
+        return strip.lanes().find((L) => L.id === 'sure')?.glyphState || { had: 0, drawn: 0 };
+      };
+      strip.fit();                       // the whole two millennia
+      const wide = glyphs();
+      strip.fit(yr(1900), yr(2000));     // the century the dates pile up in
+      const close = glyphs();
+      strip.setView(saved); strip.draw();
+      d.assert('zoom in far enough and a mark says how sure its date is',
+        wide.had > wide.drawn && close.drawn === close.had && close.drawn > 0,
+        `${wide.drawn} of ${wide.had} legible across 2000 years, `
+        + `${close.drawn} of ${close.had} across the last hundred`);
+    }
+
+    const st = strip.spanStates('span');
+    d.log(`${st.smeared} of ${items.length} dates are a bracket · ${st.ignorance} unknown, ${st.vagueness} vague`);
+    if (a) d.log(`${a.method} · tallest column ${a.max.toFixed(4)} · ${fmtNum(a.colMs / YEAR)} y a column`);
   });
 
   refresh();
-  d.log(`${(SPAN / YEAR).toFixed(0)} years, 2 of 4 spans carry when.kind`);
+  d.log(`${(SPAN / YEAR).toFixed(0)} years, ${bracketed} of ${items.length} dates carry a bracket`);
   d.ready();
 </script>
 </html>

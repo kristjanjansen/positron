@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '4fe883a-130714';
+export const BUILD = '217a948-055838-8fd9';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -17,7 +17,13 @@ const LOG_CAP = 400;
 export function mount({
   name = 'demo',
   what = '',
-  readout = {},          // key -> unit string ('ms', 's', '' …)
+  // key -> unit string ('ms', 's', '' …). ⚠️ `null` is DIFFERENT from `{}` and
+  // from leaving it out: it says this page has deliberately no readout because
+  // its subject is visible rather than numeric, and the harness checks for that
+  // declaration rather than accepting an empty one. `typist` is the case — the
+  // document IS the readout, and cells repeating the letters and the cursor
+  // position were the same facts twice.
+  readout = {},
   showReadout = true,    // false: published on __demo, not drawn — see below
   controls = [],         // [{id, label, primary?}]
   index = '/',
@@ -57,6 +63,8 @@ export function mount({
   // It throws rather than warns so the suite catches it on the next run: every
   // demo is driven by `verify.mjs`, so a page that breaks this cannot reach a
   // visitor without going red first.
+  const readoutOptOut = readout === null;
+  if (readoutOptOut) readout = {};
   const keys = Object.keys(readout);
   if (keys.length % 2) {
     throw new Error(
@@ -66,7 +74,19 @@ export function mount({
 
   const cells = new Map();
   const rb = el('div', 'pos-readout');
-  if (!showReadout) rb.hidden = true;
+  // 🔴 AND HIDDEN WHEN IT HAS NOTHING IN IT, WHICH IS A DIFFERENT CASE AND WAS
+  // NOT HANDLED. `readout: null` empties the row without removing it, so the
+  // shell appended a childless `<div class="pos-readout">` — and shell.css
+  // gives that div `border: 1px solid var(--line)`. MEASURED on `/typist/`:
+  // height **2.0 px, 0 children**, a full-width band made entirely of a box's
+  // own two borders, sitting 24 px above the controls. **A horizontal rule
+  // nobody wrote**, reported as "old UI creeping in" — which it was, just not
+  // in the way it looked.
+  // ⚠️ A page that opts out of a surface has to opt out of its BOX too, and
+  // that cannot be the page's job to remember: it is the same shape as
+  // `.pos-controls[hidden]` two rules below, where an empty control row left a
+  // 14 px band behind. A container with nothing in it must not paint its edges.
+  if (!showReadout || !keys.length) rb.hidden = true;
   for (const [k, unit] of Object.entries(readout)) {
     const cell = el('div', 'pos-cell');
     const v = el('span', 'pos-v', '');
@@ -137,6 +157,8 @@ export function mount({
     ready: false,
     failed: null,
     readout: Object.fromEntries(Object.keys(readout).map((k) => [k, null])),
+    // the DECLARATION, so a harness can tell "no cells on purpose" from "none yet"
+    readoutOptOut,
     how: null,
     logs: [],
     asserts: [],
@@ -187,9 +209,19 @@ export function mount({
     logEl.scrollTop = logEl.scrollHeight;
   }
 
+  // 🔴 A PASSING CHECK IS NOT A MESSAGE. Every assert used to write a prose
+  // line into the log, so a page with nine checks opened with nine sentences
+  // nobody reads — `ok their real score compiles — 25 rows` — and a real event
+  // afterwards had to be found among them. Reported as "slop log", and the
+  // word is right: the log is for things that HAPPENED, at the moment they
+  // happened. A check that passed did not happen, it held.
+  // ⚠️ A FAILURE IS a message, and keeps its line — that is the asymmetry, and
+  // it is the whole rule. The tally goes out once, from `ready()`.
+  // ⚠️ Nothing parses these lines: the harness reads `__demo.asserts`, which is
+  // unchanged, so per-demo counts are unaffected by this.
   function assert(label, pass, detail) {
     api.asserts.push({ label, pass: !!pass, detail: detail ?? null });
-    log(`${pass ? 'ok  ' : 'FAIL'} ${label}${detail !== undefined ? ` — ${detail}` : ''}`, pass ? 'info' : 'bad');
+    if (!pass) log(`FAIL ${label}${detail !== undefined ? ` — ${detail}` : ''}`, 'bad');
     return !!pass;
   }
 
@@ -206,7 +238,14 @@ export function mount({
      *  a page HOLDS should clear what the page SAID about it too, or the lines
      *  left behind describe a state that no longer exists. */
     clearLog: () => { api.logs.length = 0; logEl.textContent = ''; },
-    ready: () => { api.ready = true; log('ready', 'hi'); },
+    ready: () => {
+      api.ready = true;
+      const n = api.asserts.length;
+      const bad = api.asserts.filter((a) => !a.pass).length;
+      // one line, and it is a real message: how many checks this page ran on
+      // itself and whether any of them are worth scrolling up for
+      log(n ? `ready · ${n - bad}/${n} checks` : 'ready', bad ? 'bad' : 'hi');
+    },
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,
   };
@@ -446,8 +485,11 @@ export function createShipper(url = 'https://pub.positron.studio/log') {
  * on screen together, and a readout that scrolls out of view mid-measurement is
  * exactly the thing that gets reported as "the page is broken".
  *
- * ⚠️ The sizes themselves are UNCONFIRMED — nothing in this repo has been read
- * through a headset yet. shell.css says which numbers to move.
+ * ⚠️ The sizes were UNCONFIRMED until 2026-09-14, when /floor/ was photographed
+ * in the Quest browser and the readout came back with a 20 px band of line
+ * colour between every cell — the one `.xr` rule that touched the GAP rather
+ * than the cells. shell.css says which numbers to move, and now says why that
+ * one is not among them.
  *
  * Capability, never a user-agent string: a headset browser is Chromium wearing
  * a Chromium UA, and research/quest-xr §1.7 measured that a Quest 3 and a 3S
