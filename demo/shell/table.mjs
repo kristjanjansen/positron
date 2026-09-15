@@ -37,6 +37,11 @@ import { el } from './shell.mjs';
  *   because "no address" is a fact about the record and not a reason to hide
  *   its name.
  * @property {boolean} [hi]      full-strength text rather than dim
+ * @property {string} [hover]   a field whose value becomes this cell's `title`,
+ *   for when the cell SHORTENS what it shows. A column of licences reads down
+ *   only if `CC BY-NC-SA 4.0` is three or four characters wide, and an
+ *   abbreviation nobody can expand is worse than a long word. Defaults to the
+ *   cell's own text when `clip` is set.
  * @property {boolean} [clip]    ONE LINE, cut with an ellipsis, full value on
  *   `title`. ⚠️ CLAUDE.md says an ellipsis means the content is in the wrong
  *   place, and that rule is about a MEASUREMENT or a label being squeezed. A
@@ -109,13 +114,14 @@ export function createTable({ columns, cap = 1000, empty = 'nothing yet', note =
       const cell = el('span', `pos-tbl-c${c.align === 'right' ? ' r' : ''}`
         + `${c.hi ? ' hi' : ''}${c.clip ? ' clip' : ''}`);
       const href = c.link ? r[c.link] : null;
+      const hover = c.hover ? (r[c.hover] || '') : (c.clip ? text : '');
       if (href && text) {
         const a = el('a', 'pos-tbl-a', text, { href, target: '_blank', rel: 'noreferrer noopener' });
-        if (c.clip) a.title = text;
+        if (hover) a.title = hover;
         cell.append(a);
       } else {
         cell.textContent = text;
-        if (c.clip && text) cell.title = text;
+        if (hover && text) cell.title = hover;
       }
       row.append(cell);
     }

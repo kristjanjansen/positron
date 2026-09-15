@@ -388,6 +388,16 @@ button.pos-pri[data-busy="1"] {
    space back between them and made four rates read as four separate controls,
    which is the thing the component exists to stop. */
 .tbar-rates { flex: none; display: flex; }
+/* 🔴 ON A PHONE THE RATES GET THE WHOLE ROW. The bar wraps there, so the group
+   sat on a line of its own at its natural width with the rest of the box empty
+   beside it — REPORTED as *"in transport rate should take full w inside box"*.
+   `flex: 1 1 100%` makes it its own row and fills it; the options then share
+   that width through the `flex: 1 0 auto` above, which is the same rule that
+   lets a row of long names scroll instead. */
+@media (max-width: 560px) {
+  .tbar-rates { flex: 1 1 100%; }
+  .tbar-rates .pos-choice, .tbar-rates .pos-choice .step { width: 100%; }
+}
 /* A live source has no clock worth printing — see the note in transport-bar.mjs.
    The word never changes now (it briefly alternated with SLOWED, which said what
    the rate buttons beside it already say), so `min-width` is only a stable slot
@@ -853,10 +863,26 @@ video[hidden] { display: none; }
 @media (max-width: 560px) {
   .pos-choice { display: grid; grid-template-columns: 1fr; gap: 4px; height: auto; align-items: stretch; }
   .pos-choice-l { display: block; }
-  .pos-choice .step { display: flex; width: 100%; }
-  /* `flex: 1 1 0` rather than `auto`, so `light` and `wide` are the same width
-     as `off` instead of each option sizing to its own word. */
-  .pos-choice .step button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+  /* 🔴 IT SCROLLS, IT DOES NOT SHRINK. This was `flex: 1 1 0` — every option the
+     same width, on the argument that equal thumb targets are worth more than
+     equal words. MEASURED on a real iPhone and the argument loses: four station
+     names in 390 px gave `Radio 1965` wrapped onto two lines and
+     `Klassikara`, `Vikerraadi` CUT MID-WORD, which is not a target anybody can
+     choose between. REPORTED as *"radiobuttons should not wrap text but
+     scroll"*.
+
+     `flex: 1 0 auto` does both jobs in one line: GROW to share the row when the
+     words fit — which is what the transport's `0.25x` `0.5x` `1x` want — and
+     never shrink below the word, so a row that does not fit overflows and the
+     group scrolls sideways instead of mangling itself. A part-visible option at
+     the edge is its own affordance; the scrollbar is hidden because on a touch
+     screen it is chrome over a control. */
+  .pos-choice .step {
+    display: flex; width: 100%;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .pos-choice .step::-webkit-scrollbar { display: none; }
+  .pos-choice .step button { flex: 1 0 auto; min-width: 0; padding: 0 8px; white-space: nowrap; }
 
   /* The picker gets the same treatment, and the NAME is what stretches — the
      arrows and the die are fixed targets and the name is the readout, so it is

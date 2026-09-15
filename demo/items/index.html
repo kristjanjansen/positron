@@ -471,6 +471,18 @@
     const b = d.button('notices');
     if (!b) return;
     const { offered, permission } = noticesState();
+    // 🔴 THE YELLOW MOVES TO THE THING THAT NEEDS DOING. On a device that has
+    // never been asked, ONE press stands between it and every announcement, and
+    // it was the third plain button in a row headed by a yellow `Publish now` —
+    // MEASURED on a real iPhone, freshly installed: `permission default ·
+    // worker not registered yet`, which is that press never having happened.
+    // ⚠️ THE ORDER DOES NOT MOVE, only the paint. `verify.mjs` gives its
+    // `settleMs` to control 0 and to nothing else, so the ten-second publish
+    // has to stay first — CLAUDE.md records that this order cost a redesign
+    // rather than a swap.
+    const wants = offered && permission === 'default';
+    b.classList.toggle('pos-pri', wants);
+    d.button('now')?.classList.toggle('pos-pri', !wants);
     if (!offered) { b.textContent = 'Notifications need the Home Screen'; b.disabled = true; return; }
     if (permission === 'granted') { b.textContent = 'This device will be told'; b.disabled = true; return; }
     if (permission === 'denied') { b.textContent = 'Notifications are blocked'; b.disabled = true; return; }
@@ -840,6 +852,27 @@
       + ` · notifications ${offered ? `offered, permission ${permission}` : 'not offered here'}`
       + ` · worker ${reg ? reg.scope.replace(location.origin, '') : 'not registered yet'}`,
       offered && permission === 'granted' ? 'hi' : '');
+    // ⚠️ AND SAY WHAT TO DO, at the one moment there is one thing to do. The
+    // line above is a measurement and `permission default` is only actionable
+    // to somebody who knows the word means "never asked". This is the same
+    // argument `/wire/`'s empty state makes: at the moment a visitor has
+    // arrived and nothing has happened, saying what is missing beats saying
+    // that something is.
+    if (offered && permission === 'default') {
+      d.log('this device has never been asked — press TELL ME ABOUT NEW ITEMS, '
+        + 'and it will appear in Settings, Notifications, positron once you allow it', 'hi');
+    }
+    // 🔴 A FOCUS MODE SWALLOWS THE BANNER AND NOTHING CAN TELL YOU SO. This cost
+    // an evening: permission granted, address minted, device on the list, FCM
+    // accepting every send — and no banner, because the phone was in Sleep
+    // Focus. There is no API for it; a page cannot ask whether a Focus is on,
+    // so the only thing it can do is name the one cause that looks exactly like
+    // a broken subscription. ⚠️ AND IT IS SAID WHERE THE GOOD NEWS IS SAID,
+    // because that is the moment somebody is about to conclude it is broken.
+    if (offered && permission === 'granted') {
+      d.log('⚠️ a Focus mode — Sleep, Do Not Disturb — holds the banner back even '
+        + 'when everything here is right. Notification Centre still has it.');
+    }
   }
   d.ready();
 </script>
