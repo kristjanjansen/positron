@@ -948,9 +948,16 @@ video[hidden] { display: none; }
 /* ⚠️ THE BODY SCROLLS, NOT THE WRAPPER, so a header row stays put while the
    records move under it. */
 .pos-tbl-body { max-height: var(--tbl-h, 420px); overflow-y: auto; }
+/* 🔴 THE ROW IS AS SHORT AS ITS TEXT ALLOWS, BECAUSE THE BOX IS THE PAGE.
+   REPORTED as *"page should fit more"* against a table of 334 records showing
+   about twenty-three of them. `line-height` and the vertical padding are the
+   only two numbers that decide this — 1.55 and 4 px gave a 26 px row; 1.4 and
+   2 px give 21 px, which is a fifth more of the archive on one screen and is
+   still two clear pixels of air either side of an 11 px glyph. Below this the
+   rules between rows start touching the text. */
 .pos-tbl-row {
   display: grid; grid-template-columns: var(--tbl-cols);
-  gap: 8px; padding: 4px 10px; align-items: baseline;
+  gap: 8px; padding: 2px 10px; line-height: 1.4; align-items: baseline;
   border-bottom: 1px solid #ffffff08;
 }
 .pos-tbl-body > .pos-tbl-row:last-child { border-bottom: 0; }
