@@ -58,6 +58,7 @@
   import { createStepper } from '/shell/stepper.mjs';
   import { createSlider, createSliderGroup, GLIDE_MS } from '/shell/slider.mjs';
   import { createChoice } from '/shell/choice.mjs';
+  import { createTabs } from '/shell/tabs.mjs';
   import { createKeyboard } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createField } from '/shell/field.mjs';
@@ -195,6 +196,38 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
         onPick: (_v, name) => { o.textContent = name; },
       });
       box.append(c.el, o);
+    });
+
+  // ── tabs ────────────────────────────────────────────────────────────────
+  section('the parts of one page — shell/tabs.mjs',
+    'Not a choice. That one is a segmented box for options you arm; these are places you go, and '
+    + 'drawing two different acts the same way is what this page exists to catch. The open one is '
+    + 'marked by colour and a bar under the word — no box, no borders. A part that exists and is not '
+    + 'built stays in the row, named and unpressable, because hiding it would say it does not exist. '
+    + 'The row scrolls sideways rather than wrapping, and each tab is a #link, so switching keeps the '
+    + 'page — and whatever it is playing — alive.',
+    `createTabs({ tabs: [{id:'air',label:'On air'}, {id:'past',label:'Archive',disabled:true}, …] })`,
+    (box) => {
+      const o = out('air');
+      // ⚠️ `hash: false` HERE AND ONLY HERE. Every other caller wants the
+      // address bar; a sandbox that writes `#air` while you scroll past six
+      // other components is one component reaching outside its own box.
+      const t = createTabs({
+        hash: false,
+        tabs: [
+          { id: 'air', label: 'On air' },
+          { id: 'past', label: 'Archive', disabled: true, note: 'not built yet' },
+          { id: 'write', label: 'Contribute' },
+          { id: 'long', label: 'A name long enough to push the row' },
+        ],
+        onPick: (id) => { o.textContent = id; },
+      });
+      for (const [id, text] of [['air', 'what is happening now'],
+                                ['write', 'the form you write in'],
+                                ['long', 'proof that the row scrolls rather than wrapping']]) {
+        t.panel(id).append(el('div', 'kit-n', text));
+      }
+      box.append(t.el, o);
     });
 
   // ── a choice that has not arrived yet ───────────────────────────────────

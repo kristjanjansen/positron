@@ -968,6 +968,14 @@ video[hidden] { display: none; }
    ⚠️ The bar is `box-shadow`, not `border-bottom`: a border would change the
    button's height when it appeared and shunt the row by 2 px on every press —
    CLAUDE.md, nothing that redraws may change how much room it takes. */
+/* 🔴 `min-width: 0` OR IT PUSHES THE PAGE INSTEAD OF SCROLLING. `overflow-x`
+   cannot shrink a flex item below its content: the default `min-width: auto`
+   makes the bar as wide as its widest row of tabs, the scroll container is
+   therefore never smaller than its contents, and nothing scrolls — the DOCUMENT
+   does. MEASURED on a 390 px phone before this line: bar 500 px, `scrollW` 500,
+   `scrolls false`, and 141 px of horizontal PAGE overflow. The whole row of
+   tabs was dragging the page sideways. */
+.pos-tabs, .pos-tabs-bar { min-width: 0; max-width: 100%; }
 .pos-tabs-bar {
   display: flex; gap: 20px; overflow-x: auto;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
