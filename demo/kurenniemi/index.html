@@ -129,7 +129,10 @@
       // one thing a table is for, which is scanning down it. The full string is
       // on `title`, and there is nowhere to widen to: the name column is the
       // one that should get any spare pixel.
-      { key: 'licence', label: 'licence', width: 132, align: 'right', clip: true },
+      // `licence` is the short form; `licenceFull` is what the holder actually
+      // said, on hover. Narrow, because four characters is the point.
+      { key: 'licence', label: 'licence', width: 76, align: 'right',
+        clip: true, hover: 'licenceFull' },
     ],
   });
   d.el.append(table.el);
@@ -179,6 +182,46 @@
   // Public domain or a Creative Commons licence of any flavour. Everything
   // else — all rights reserved, licensed per screening, not stated, unknown —
   // is not something this page will tell you that you may reuse.
+  /**
+   * The licence, short enough to be a column you can read DOWN.
+   *
+   * 🔴 THE POINT IS THE COLUMN, NOT THE SAVING. `CC BY-NC-SA 4.0` is fifteen
+   * characters and `public domain mark` is eighteen, so the column was as wide
+   * as the holder's name and still wrapped or clipped — and a licence you have
+   * to read word by word on every row is a licence nobody reads at all.
+   * Shortened, the whole column is scanned in one movement and the odd ones out
+   * are the ones that are not four characters.
+   *
+   * ⚠️ THE FULL STRING IS ON HOVER AND THE EXACT ONE THE SOURCE GAVE IS IN THE
+   * FILE. An abbreviation nobody can expand is worse than a long word, so the
+   * cell carries `licenceFull` as its `title` and `corpus.json` keeps
+   * `licenceRef` verbatim — this is a display, never the record.
+   *
+   * ⚠️ AND `not stated` / `unknown` PRINT NOTHING. 173 of 334 rows say one or
+   * the other, which is a third of the table shouting a non-answer; nothing
+   * unmeasured prints as a value here, the same rule the readout cells follow.
+   * The blank IS the fact, and the column heading says what the blank means.
+   * ⚠️ CC0 STAYS CC0 RATHER THAN BECOMING PD. A dedication and a statement of
+   * fact are different claims about who could be wrong — collapsing them would
+   * make this page say something the holder did not.
+   */
+  const SHORT_LIC = [
+    [/^cc0/i, 'CC0'],
+    [/public domain/i, 'PD'],
+    [/^cc[- ]by[- ]nc[- ]nd/i, 'BY-NC-ND'],
+    [/^cc[- ]by[- ]nc[- ]sa/i, 'BY-NC-SA'],
+    [/^cc[- ]by/i, 'CC BY'],
+    [/^other-oa/i, 'open'],
+    [/all rights reserved/i, '\u00a9'],
+    [/per screening/i, '\u00a9'],
+    [/not reproducible|legal deposit/i, 'no copy'],
+  ];
+  const licOf = (it) => {
+    const l = it.licence || '';
+    for (const [re, short] of SHORT_LIC) if (re.test(l)) return short;
+    return '';                       // not stated, unknown — the blank is the fact
+  };
+
   const freeOf = (it) => /creativecommons\.org|^cc-?(by|0)|public domain/i.test(it.licence || '');
   const YEAR = (ms) => new Date(ms).getUTCFullYear();
 
@@ -218,7 +261,8 @@
       source: it.source,
       title: it.title,
       url: it.url || null,
-      licence: it.licence,
+      licence: licOf(it),
+      licenceFull: it.licence || 'no licence is stated anywhere for this row',
     })));
     return rows;
   }
