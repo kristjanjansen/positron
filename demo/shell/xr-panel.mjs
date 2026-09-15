@@ -498,6 +498,17 @@ export function createXRPanels({
   const roomOpt = (room && typeof room === 'object') ? room : {};
   const wantSky = roomOpt.sky !== false;
   const wantThings = roomOpt.things !== false;
+  /**
+   * 🔴 `grid: false` HIDES THE DOTTED FLOOR AND KEEPS THE ROOM.
+   *
+   * A page that draws its OWN ground has two floors: reported on
+   * `/videoradio/`, whose sea is 46 wave fronts standing on a plane that the
+   * room was also dotting. `room: null` is the wrong answer and CLAUDE.md says
+   * why: the tablet, the hands and therefore the quit badge's grips are built
+   * only when there is a room, so a page with none has no visible way out.
+   * This takes the dots to zero alpha and leaves everything that gets you home.
+   */
+  const wantGrid = roomOpt.grid !== false;
   const roomBg = Array.isArray(roomOpt.bg) ? roomOpt.bg : null;
   const roomDoc = room ? roomOf(roomSeed) : null;
   // ⚠️ THE DOCUMENT IS STILL ROLLED FROM THE SEED EVEN WHEN NOTHING IS DRAWN
@@ -506,6 +517,8 @@ export function createXRPanels({
   // asked to SEE is a separate question and it is answered here.
   const drawnDoc = room ? (wantThings ? roomDoc : { ...roomDoc, things: [] }) : null;
   const theRoom = room ? createXRRoom(null, { log, say: beacon }) : null;
+  // The dots go to nothing when the page draws its own ground. See `wantGrid`.
+  if (theRoom && !wantGrid) theRoom.setGrid({ alpha: 0 });
 
   // ── the controllers, the pointer and the tablet ────────────────────────
   // 🔴 THE SAME ONES `scene` HAS, FROM THE SAME TWO MODULES. A page that stands
@@ -1259,7 +1272,15 @@ export function createXRPanels({
       // is a feedback loop, which WebGL answers with GL_INVALID_OPERATION and a
       // frame with nothing in it. In a session the layer's framebuffer is the
       // one that must be bound, and it is bound long before this line.
-      const fbWas = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+      // 🔴 THE LAYER'S FRAMEBUFFER BY NAME, NEVER `getParameter`. MEASURED on a
+      // Quest the first time a page used this: `gl bindFramebuffer:1282` on the
+      // first headset frame. An `XRWebGLLayer`'s framebuffer is OPAQUE — the
+      // spec forbids inspecting it — so reading it back and binding what comes
+      // out is asking the driver a question it is entitled to refuse. The
+      // session already knows which framebuffer this frame is drawing into.
+      // ⚠️ `?? null` IS THE WINDOW CASE. `preview()` runs `drawEye` with no
+      // session at all, where the default framebuffer is the right answer.
+      const fbWas = session?.renderState?.baseLayer?.framebuffer ?? null;
       try {
         theSurface.draw({ proj, view: viewM, eye: [hp.x, hp.y, hp.z], tSec,
           // ONE triple: what this frame was actually cleared to. See `surface`.
@@ -1842,11 +1863,23 @@ export function createXRPanels({
     const profile = [];
     {
       const eyeW = width >> 1;
-      const row = Math.round(height * 0.25);
+      // 🔴 A BAND, NOT A ROW, AND THE REASON IS THIN GEOMETRY. One pixel per
+      // sample is right for a textured plane and useless for a mesh of
+      // hairlines: most samples land between two lines and read as the ground,
+      // so a picture that is drawing perfectly reports a flat field. Taking the
+      // brightest pixel in a vertical strip catches a line wherever in the
+      // strip it happens to be, and still answers the only question this is
+      // for — is the middle of the view brighter than its edge.
+      const y0 = Math.round(height * 0.12), y1 = Math.round(height * 0.46);
       for (let i = 0; i < PROFILE_N; i++) {
         const x = Math.min(eyeW - 1, Math.round(((i + 0.5) / PROFILE_N) * eyeW));
-        const o = (row * width + x) * 4;
-        profile.push(Math.max(px[o], px[o + 1], px[o + 2]));
+        let best = 0;
+        for (let y = y0; y < y1; y++) {
+          const o = (y * width + x) * 4;
+          const v = Math.max(px[o], px[o + 1], px[o + 2]);
+          if (v > best) best = v;
+        }
+        profile.push(best);
       }
     }
     // The clear colour, read off the top row of the same eye: what the fade has

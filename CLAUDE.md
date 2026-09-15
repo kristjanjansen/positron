@@ -848,6 +848,15 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
     prose and take articles normally.
   - **The `sub` is what KIND of thing it is**, in three or four words:
     `port 8001`, `SuperCollider`, `25 Hz, OSC`. Never a second sentence.
+  - 🔴 **A QUANTITY IN A `sub` OR A LABEL IS WRITTEN SHORT: `10s`, NOT `ten
+    seconds`.** Reported 2026-09-16 on `/station/`, which read `R2, ten
+    seconds`. A sub has about fourteen characters of room and a number spelled
+    out spends nine of them on a value a digit carries: it is the one place on
+    a page where a figure has to be read at a glance, in a box, next to another
+    box. `10s`, `2h`, `128k`, `16ms`, `500KB`, `90fps`. ⚠️ THE `note` IS
+    DIFFERENT and takes ordinary prose, because it is a sentence read on hover
+    with room for one. And this is about DIAGRAMS: a readout cell already has
+    its own rule, and a `what` paragraph is prose.
   - 🔴 **THE `note` IS TWO SENTENCES. NOT THREE, AND NEVER SIX.** It is read
     once, on hover, under the picture, and it should say what a reader CANNOT
     see: why this box is here, what it does that the name does not imply, the

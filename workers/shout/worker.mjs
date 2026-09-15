@@ -140,7 +140,11 @@ const cors = (h = {}) => ({
 });
 
 export default {
-  async fetch(req) {
+  // ⚠️ `env` IS TAKEN NOW, FOR THE DURABLE OBJECT BINDING. It was omitted while
+  // this worker had no state at all, and a handler that silently reads
+  // `undefined.MOUNT` is a 500 on every listen with nothing in the log saying
+  // which line.
+  async fetch(req, env) {
     const url = new URL(req.url);
 
     if (req.method === 'OPTIONS') {
@@ -271,6 +275,19 @@ export default {
       return new Response(req.method === 'HEAD' ? null : up.body, { status: up.status, headers: h });
     }
 
+    /**
+     * `GET /tee/<id>` — what the tee is doing for one mount: how many listeners
+     * it is serving and how many connections it is holding upstream. The second
+     * number is the one that matters and it must be 1.
+     */
+    if (url.pathname.startsWith('/tee/')) {
+      const who = url.pathname.slice(5).replace(/\.mp3$/, '');
+      if (!STATIONS[who]) return new Response('no such station', { status: 404, headers: cors() });
+      const room = env.MOUNT.get(env.MOUNT.idFromName(who));
+      const r = await room.fetch('https://mount/stats');
+      return new Response(r.body, { headers: cors({ 'content-type': 'application/json' }) });
+    }
+
     const id = url.pathname.replace(/^\/+/, '').replace(/\.mp3$/, '');
     const upstream = STATIONS[id];
     if (!upstream) return new Response('no such station', { status: 404, headers: cors() });
@@ -280,6 +297,34 @@ export default {
     // decide when to hang up, and a harness that forgets leaves a socket
     // holding the origin open for the length of the run.
     const bytes = Math.min(Number(url.searchParams.get('bytes')) || 0, 4 << 20);
+
+    /**
+     * 🔴 THROUGH THE TEE, WHICH IS ONE CONNECTION TO THE BROADCASTER FOR ALL OF
+     * US. `idFromName(id)` is the whole mechanism: a Durable Object addressed
+     * by name is the same object everywhere, so every listener on every machine
+     * arrives at one place and that place holds one socket open. See `Mount`.
+     *
+     * ⚠️ A HEAD STILL GOES DIRECT. It is a health question, it wants the
+     * origin's own answer, and it hangs up before a frame of audio is paid for;
+     * putting it through the object would open a broadcast to answer a
+     * question about whether there is one. The `/rec/` recordings are files and
+     * were never in this path at all.
+     * ⚠️ AND `?direct=1` IS DELIBERATELY NOT OFFERED. An escape hatch back to a
+     * connection per client is the defect with a flag on it, and the one thing
+     * this object exists to make impossible is that somebody re-enables it in a
+     * hurry.
+     */
+    if (req.method !== 'HEAD') {
+      const room = env.MOUNT.get(env.MOUNT.idFromName(id));
+      const q = new URLSearchParams({ u: upstream });
+      if (req.headers.get('icy-metadata') === '1') q.set('icy', '1');
+      if (bytes) q.set('bytes', String(bytes));
+      const r = await room.fetch(`https://mount/listen?${q}`);
+      if (!r.ok) return new Response(`origin ${r.status}`, { status: 502, headers: cors() });
+      const h = cors({ 'x-shout-station': id });
+      for (const [k, v] of r.headers) h[k] = v;
+      return new Response(r.body, { headers: h });
+    }
 
     const t0 = Date.now();
     // ALWAYS GET UPSTREAM, even for a HEAD. Icecast 2.4.4 answers HEAD with
@@ -346,4 +391,259 @@ function cap(body, limit) {
       ctrl.terminate();
     },
   }));
+}
+
+/**
+ * 🔴 ONE UPSTREAM CONNECTION PER MOUNT, FANNED OUT TO EVERY LISTENER.
+ *
+ * THIS IS THE FIX FOR THE THING ERR REPORTED. Until 2026-09-16 this relay was a
+ * pass-through: every request did its own `fetch(upstream)` and handed the body
+ * straight back, so **N browsers were N listeners at the broadcaster**, plus one
+ * per harness tab and one per orphaned Chrome. On 2026-09-15 that reached about
+ * a hundred concurrent clients against one operator's limit, and on 2026-09-16
+ * ERR said the same traffic was corrupting their public listener statistics,
+ * which is a fact about their funding rather than about their bandwidth.
+ *
+ * A Durable Object is addressed by NAME, and `idFromName(station)` gives every
+ * mount exactly one object in the world. That object opens the origin once and
+ * copies the bytes to everybody. Ten listeners, a hundred listeners and a
+ * harness are one listener upstream.
+ *
+ * ⚠️ THE ICY METADATA IS STRIPPED AND RE-INSERTED PER SUBSCRIBER, AND THAT IS
+ * NOT A FLOURISH. Icecast interleaves a metadata block every `icy-metaint`
+ * bytes COUNTED FROM THE FIRST BYTE THE CLIENT RECEIVED. A tee hands a late
+ * joiner bytes from the middle of the origin's stream, so its byte 0 is not the
+ * origin's byte 0 and every block it expects lands in the wrong place: it would
+ * read audio as a length byte and then delete that many bytes of sound. So the
+ * object parses the blocks out once, keeps the title, and writes fresh blocks
+ * into each subscriber's own stream at that subscriber's own offset. Every
+ * listener gets a well-formed ICY stream that begins where they began.
+ *
+ * ⚠️ A LATE JOINER STARTS MID-FRAME AND THAT IS FINE. An MP3 decoder scans for
+ * the next sync word, which is what `demo/shell/mp3-frames.mjs` already does and
+ * what every media element does. The first few milliseconds are discarded.
+ */
+const METAINT = 16000;
+/** How long the origin is held after the last listener leaves. A reload is two
+ *  seconds of nobody; hanging up and dialling again on every one of those is
+ *  more connections to the broadcaster, not fewer. */
+const LINGER_MS = 20000;
+/** A listener whose socket has stopped draining. Radio has no rewind, so the
+ *  honest thing is to drop the listener rather than buffer the broadcast for
+ *  them and let the queue grow without bound. */
+const MAX_BEHIND = 512 * 1024;
+
+export class Mount {
+  constructor(state) {
+    this.state = state;
+    this.subs = new Set();
+    this.reader = null;
+    this.head = null;          // the origin's own headers, for every joiner
+    this.title = '';
+    this.startedAt = 0;
+    this.served = 0;           // bytes copied out, across every listener
+    this.pulled = 0;           // bytes taken from the origin, once
+    this.peak = 0;             // most listeners at one time
+    this.dropped = 0;
+    this.linger = null;
+  }
+
+  async fetch(req) {
+    const url = new URL(req.url);
+    if (url.pathname === '/stats') {
+      return new Response(JSON.stringify({
+        listeners: this.subs.size, peak: this.peak, upstream: !!this.reader,
+        title: this.title, pulled: this.pulled, served: this.served,
+        dropped: this.dropped,
+        // 🔴 THE NUMBER THE WHOLE OBJECT EXISTS TO MAKE TRUE. One connection
+        // upstream however many are downstream; anything but 1 here with
+        // listeners on is the tee not working.
+        upstreamConnections: this.reader ? 1 : 0,
+        openFor: this.startedAt ? Date.now() - this.startedAt : 0,
+      }), { headers: { 'content-type': 'application/json' } });
+    }
+
+    const origin = url.searchParams.get('u');
+    const wantIcy = url.searchParams.get('icy') === '1';
+    const cap = Math.min(Number(url.searchParams.get('bytes')) || 0, 4 << 20);
+    if (!origin) return new Response('no origin', { status: 400 });
+
+    const opened = await this.open(origin);
+    if (!opened) return new Response('origin refused', { status: 502 });
+
+    // ⚠️ EACH SUBSCRIBER COUNTS ITS OWN BYTES, because the metadata blocks are
+    // written at ITS offset and not at the origin's. `sent` is why a listener
+    // who joined a minute late still gets a block exactly 16000 bytes in.
+    const sub = { ctrl: null, sent: 0, behind: 0, cap, icy: wantIcy, said: '' };
+    const self = this;
+    const body = new ReadableStream({
+      start(ctrl) { sub.ctrl = ctrl; self.subs.add(sub); self.peak = Math.max(self.peak, self.subs.size); },
+      cancel() { self.drop(sub); },
+    });
+
+    const h = new Headers(this.head);
+    h.set('x-shout-listeners', String(this.subs.size));
+    h.set('x-shout-tee', '1');
+    if (wantIcy) h.set('icy-metaint', String(METAINT)); else h.delete('icy-metaint');
+    if (this.title) h.set('x-shout-title', this.title);
+    return new Response(body, { headers: h });
+  }
+
+  /** Open the origin, once. Safe to call on every subscribe. */
+  async open(origin) {
+    if (this.linger) { clearTimeout(this.linger); this.linger = null; }
+    if (this.reader) return true;
+    const up = await fetch(origin, {
+      method: 'GET',
+      headers: {
+        // 🔴 ALWAYS ASKED FOR, WHATEVER THE CLIENT WANTED. There is one
+        // upstream for everybody now, so it cannot be tailored to the first
+        // caller: it is parsed out here and written back per subscriber. The
+        // old pass-through forwarded the client's own preference, which was
+        // correct exactly while each client had its own connection.
+        'Icy-MetaData': '1',
+        'user-agent': 'positron-shout/2 (+https://positron.studio)',
+      },
+      cf: { cacheEverything: false, cacheTtl: 0 },
+    }).catch(() => null);
+    if (!up || !up.ok || !up.body) return false;
+
+    const keep = new Headers();
+    const type = up.headers.get('content-type');
+    if (type) keep.set('content-type', type);
+    for (const k of ['icy-name', 'icy-description', 'icy-genre', 'icy-br', 'icy-url', 'icy-pub']) {
+      const v = up.headers.get(k);
+      if (v) keep.set(k, v);
+    }
+    this.head = keep;
+    this.metaint = Number(up.headers.get('icy-metaint')) || 0;
+    this.startedAt = Date.now();
+    this.reader = up.body.getReader();
+    this.pump();
+    return true;
+  }
+
+  /**
+   * Read the origin forever and copy to everyone.
+   *
+   * ⚠️ NOT AWAITED BY `fetch`. A pump that the request awaited would hold the
+   * response open until the radio station ends, which it never does.
+   */
+  async pump() {
+    const reader = this.reader;
+    let toMeta = this.metaint;          // bytes of audio until the next block
+    let need = 0;                       // bytes of a metadata block still owed
+    let meta = [];
+    try {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        this.pulled += value.byteLength;
+        let i = 0;
+        while (i < value.byteLength) {
+          if (need > 0) {
+            const take = Math.min(need, value.byteLength - i);
+            meta.push(value.subarray(i, i + take));
+            i += take; need -= take;
+            if (need === 0) this.readTitle(meta), meta = [];
+            continue;
+          }
+          if (this.metaint && toMeta === 0) {
+            // the length byte: blocks are 16 bytes each
+            need = value[i] * 16;
+            i += 1;
+            toMeta = this.metaint;
+            if (need === 0) meta = [];
+            continue;
+          }
+          const room = this.metaint ? Math.min(toMeta, value.byteLength - i) : value.byteLength - i;
+          this.send(value.subarray(i, i + room));
+          i += room;
+          if (this.metaint) toMeta -= room;
+        }
+      }
+    } catch { /* the origin hung up; fall through and close */ }
+    this.reader = null;
+    for (const s of [...this.subs]) this.drop(s);
+  }
+
+  /** `StreamTitle='...'` out of one metadata block. */
+  readTitle(parts) {
+    let n = 0;
+    for (const p of parts) n += p.byteLength;
+    const buf = new Uint8Array(n);
+    let o = 0;
+    for (const p of parts) { buf.set(p, o); o += p.byteLength; }
+    const s = new TextDecoder().decode(buf);
+    const m = /StreamTitle='([^']*)'/.exec(s);
+    // ⚠️ AN EMPTY TITLE IS A TITLE THAT WENT AWAY, so it is recorded rather
+    // than ignored: a page that keeps showing the last song of the last
+    // programme is worse than one showing nothing.
+    if (m) this.title = m[1];
+  }
+
+  /** One chunk of clean audio, to every listener, with their own metadata. */
+  send(chunk) {
+    if (!chunk.byteLength) return;
+    for (const sub of [...this.subs]) {
+      try {
+        let rest = chunk;
+        while (rest.byteLength) {
+          if (sub.icy) {
+            const room = METAINT - (sub.sent % METAINT);
+            const take = Math.min(room, rest.byteLength);
+            sub.ctrl.enqueue(rest.subarray(0, take));
+            sub.sent += take; this.served += take;
+            rest = rest.subarray(take);
+            if (sub.sent % METAINT === 0) sub.ctrl.enqueue(this.block(sub));
+          } else {
+            sub.ctrl.enqueue(rest);
+            sub.sent += rest.byteLength; this.served += rest.byteLength;
+            rest = rest.subarray(rest.byteLength);
+          }
+        }
+        // ⚠️ `desiredSize` GOES NEGATIVE WHEN A SOCKET IS NOT DRAINING, and it
+        // is the only backpressure signal there is here. Radio has no rewind,
+        // so a listener this far behind is dropped rather than buffered for.
+        if (sub.ctrl.desiredSize !== null && sub.ctrl.desiredSize < -MAX_BEHIND) {
+          this.dropped++; this.drop(sub);
+        }
+        if (sub.cap && sub.sent >= sub.cap) this.drop(sub);
+      } catch { this.drop(sub); }
+    }
+  }
+
+  /** One ICY metadata block for this subscriber: the title when it changed,
+   *  a single zero byte when it did not. */
+  block(sub) {
+    if (sub.said === this.title) return new Uint8Array([0]);
+    sub.said = this.title;
+    const body = new TextEncoder().encode(`StreamTitle='${this.title.replace(/'/g, '')}';`);
+    const n = Math.ceil(body.byteLength / 16);
+    const out = new Uint8Array(1 + n * 16);
+    out[0] = n;
+    out.set(body, 1);
+    return out;
+  }
+
+  drop(sub) {
+    if (!this.subs.delete(sub)) return;
+    try { sub.ctrl.close(); } catch { /* already gone */ }
+    // 🔴 THE LAST LISTENER LEAVING MUST EVENTUALLY CLOSE THE ORIGIN, or the tee
+    // becomes a permanent listener nobody is hearing, which is WORSE than the
+    // pass-through it replaced: one connection held for ever against N held
+    // only while somebody was listening. The linger is because a page reload is
+    // two seconds of nobody, and hanging up on every one of those is more
+    // connections to the broadcaster rather than fewer.
+    if (this.subs.size === 0 && this.reader && !this.linger) {
+      this.linger = setTimeout(() => {
+        this.linger = null;
+        if (this.subs.size === 0 && this.reader) {
+          try { this.reader.cancel(); } catch { /* already gone */ }
+          this.reader = null;
+          this.startedAt = 0;
+        }
+      }, LINGER_MS);
+    }
+  }
 }

@@ -1158,7 +1158,7 @@ void main() {
       // and lets the badge speak for itself. A log line is behind your face in
       // an immersive session; it is the one place an instruction cannot be read.
       xrQuit = createXRQuit(gl, {
-        label: 'HOLD TO QUIT',
+        label: 'Quit',
         onQuit: () => { d.log('held to quit, leaving', 'hi'); session.end().catch(() => {}); },
       });
       d.log('left stick glides, right stick turns in steps, and the trigger '

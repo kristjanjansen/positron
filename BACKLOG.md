@@ -15,6 +15,34 @@ file by being finished or by being refused in writing, never by being forgotten.
 
 ## Open
 
+- **A diagram assert AT LOAD can silently cost a slow page its whole run.**
+  Found 2026-09-16 while giving `/crate/` a diagram: `verify.mjs`'s first-assert
+  budget only runs while the count is still at the shell's own two, so an assert
+  fired at load pushes the page straight into the growth loop, which allows
+  4.8 s in total. `/crate/`'s upload, sidecar and 60 s seek take longer than
+  that, so its diagram asserts went into the end-of-run burst instead.
+  `/station/` asserts its two at load and is short enough today. Nothing in the
+  harness says which pages are near the edge, and a page that crosses it reports
+  FEWER asserts while still reading green.
+
+- **A container that mixes declared arrows with ties reads as a head that fell
+  off, and `/kit/` currently teaches that as correct.** Found 2026-09-16 while
+  fixing `/station/`: `diagram.mjs` ties every adjacent pair of children that no
+  declared sibling link covers, so a container with three gaps and two declared
+  arrows draws arrow, plain line, arrow down one column, in one weight of ink.
+  That is exactly what was reported as a missing arrowhead. The renderer fix
+  (drop every tie from a container that holds any declared link) was BUILT AND
+  REVERTED: it turns `/kit/`'s `3 arrows, 1 ties` assert red and makes its
+  caption false in words, and that behaviour is deliberate, demonstrated and
+  graded. `/station/` was fixed by reordering its children instead, which is
+  right for that page and leaves the trap for the next one. Decide whether
+  `/kit/` should keep demonstrating the mixed form.
+
+- 🔴 **SWEEP EVERY DIAGRAM FOR SPELLED-OUT QUANTITIES.** CLAUDE.md now says a
+  number in a `sub` or a label is written short (`10s`, not `ten seconds`),
+  reported 2026-09-16 on `/station/`. Only that page has been looked at. Every
+  other page with a diagram needs the same read.
+
 - **`/earshot/` reported `null view(s)` on a real Quest.** MEASURED 2026-09-16:
   the session line reads `session drawing · blend opaque · null view(s)` on a
   run that then drew 3322 frames in stereo at 90 fps, so the count is being read

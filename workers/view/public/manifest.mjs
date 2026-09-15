@@ -176,15 +176,32 @@ export const DEMOS = [
   // never be the same observation.
   // `settleMs` covers control 0: a watch window, the gate shut on purpose for
   // half a second, and a second watch window after it reopens.
-  // ⚠️ `report=1` IN THE LINK ITSELF. The page holds its beacons back unless it
-  // is in a headset, which is right for a visitor and wrong for the one job it
-  // exists to do: somebody is going to open this in a Quest and then read
-  // `https://pub.positron.studio/logs?format=text` on a laptop, and a run that
-  // reported nothing is indistinguishable from a run that never happened.
-  { name: 'earshot', group: 'xr', act: 0, created: '2026-09-16', built: true, xr: true,
-    query: 'report=1', settleMs: 8000,
-    one: 'the four unmeasured questions about sound in a headset, asked in the window first so a zero inside the session means something',
-    tags: ['WebXR', 'WebAudio', 'AudioDecoder', 'R2'] },
+  /**
+   * 🔴 `earshot` WAS A DEMO FOR ONE EVENING AND IT IS ARCHIVED AT
+   * `archive/demos/earshot-index.html`. IT ASKED FOUR QUESTIONS AND GOT FOUR
+   * ANSWERS, WHICH IS WHY IT IS GONE RATHER THAN IN SPITE OF IT.
+   *
+   * An instrument built to settle one thing is furniture once that thing is
+   * settled: nobody opens it twice, and a row on the front page is a promise
+   * that there is something to look at. What it MEASURED is in CLAUDE.md under
+   * WebXR, on a Quest, 2026-09-16, 68 s and 3322 frames:
+   *
+   *   the AudioContext survives an immersive session and is never suspended;
+   *   48000 Hz, base 4.00 ms, out 24.00 ms in the window and IDENTICAL inside;
+   *   AudioDecoder decodes mp3 in there with 0 errors, 140 ms against 998;
+   *   a main-thread ScriptProcessorNode holds 11.9/s of 11.72 nominal;
+   *   90.0 fps throughout with all of it running at once.
+   *
+   * ⚠️ AND THE LEVEL METER WAS PROVED TO BE A METER INSIDE THE SESSION, which
+   * is what makes the rest of those numbers mean anything: shutting the gate
+   * took the far side to 0.0000 while the near side held at 0.7050. Without
+   * that, a zero in there is indistinguishable from a page that had stopped
+   * measuring.
+   *
+   * So: nothing about audio is a reason not to build a headset page here. If
+   * the question ever reopens, the page is in `archive/demos/` and it touched
+   * no third-party mount: it decoded from our own station Worker.
+   */
 
   { name: 'wire', group: 'transports', act: 2, created: '2026-09-10', built: true, settleMs: 6000, room: 'fixed',
     one: 'compose a message, watch the exact bytes go and come back, and read the history',
@@ -361,10 +378,20 @@ export const DEMOS = [
   // control 0, and behind it sit a relay health call, a decoder, a wasm scsynth,
   // 31 buffer allocations, a definition, an eight-second ring fill and then a
   // burst of checks that drives a morph, a loop and a station change.
-  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
-    gl: true, settleMs: 45000,
+  // ⚠️ `xr: true` AND THE `WebXR` TAG ARE NOT A CLAIM THAT IT NEEDS A HEADSET.
+  // `xr` puts `?xr=1` on the link, which scrolls the Run in VR control under
+  // the visitor's thumb and focuses it; the tag says what the page uses. `xr`
+  // is not in `caps.mjs`'s HARD set, so neither of them un-links the row on a
+  // laptop, which is right: the page is a picture in a window first and a floor
+  // you stand on second.
+  // 🔴 IN THE HEADSET GROUP, ON INSTRUCTION 2026-09-16: *"move videoradio to
+  // vr"*. It was under `väin` with the radio it is made of, which is where it
+  // came from; what it IS now is a sea you stand in, and the group a visitor
+  // finds it in should say what they will get rather than what it grew out of.
+  { name: 'videoradio', group: 'xr', act: 5, created: '2026-09-15', built: true,
+    gl: true, xr: true, settleMs: 45000,
     one: 'the same radio and granulator, playing itself, drawn as the instrument rather than as the sound',
-    tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
+    tags: ['WebGL2', 'WebXR', 'Icecast', 'WebAudio', 'live'] },
   // The other end of the same station: what it broadcast, kept. A broadcast at
   // the bitrate their own server records is 57.6 MB an hour, which does not fit
   // through a Worker in one request on this zone, so it goes in pieces of
