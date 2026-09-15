@@ -96,9 +96,9 @@ Radio 1965's server started recording broadcasts this week. Icecast's on-connect
 hook runs `ffmpeg -c copy` against the mount when a broadcaster sets a
 `save_stream` flag, on-disconnect stops it and rsyncs the mp3 to `eccm.ee`, and
 a `streamrecording` event replaces the `livestream` one with an https URL. Read
-from `tarmoj/radio1965` at `7366bfe`.
+from `tarmoj/radio` at `7366bfe`.
 
-MEASURED 2026-09-15 against `https://eccm.ee/radio1965/streams/`:
+MEASURED 2026-09-15 against `https://eccm.ee/radio/streams/`:
 
 | | |
 |---|---|
@@ -137,7 +137,7 @@ Radio 1965 and were quietly being treated as true of Icecast in general.
 ⚠️ **IT WAS MEASURED, REFUSED, AND THEN ADDED ANYWAY, ON INSTRUCTION.** The
 measurement below has not changed and neither has what it implies: this relay
 adds nothing to these two mounts, and carrying them costs 144 MB per
-listener-hour of the account's egress. What changed is that `/radio1965/` now
+listener-hour of the account's egress. What changed is that `/radio/` now
 plays six stations, and one code path through the relay for all six is worth
 more to that page than the bytes are worth here. ⚠️ **The two entries are
 `ida-tallinn` and `ida-helsinki` and they are the first thing to drop if egress

@@ -371,7 +371,7 @@
     // component that has not been noticed yet. The picker already puts the
     // current name INSIDE the row, already carries the die, and already sits on
     // the shared segmented join, so the separate span and the CSS rule for it go
-    // with it. REPORTED, after the same swap had been made on `/radio1965/`.
+    // with it. REPORTED, after the same swap had been made on `/radio/`.
     const jump = (to) => {
       lookAt_ = (to + LOOKS.length) % LOOKS.length;
       const { name, body } = LOOKS[lookAt_];
@@ -1565,6 +1565,25 @@
       // which is the claim the page exists to make. Tying its asserts to a
       // Raspberry Pi being switched on would make the page read red for a
       // reason that is not about the page.
+      /**
+       * 🔴 THE LOOK PICKER NAMES THE SHADER THAT IS RUNNING, BEFORE ANYBODY
+       * TOUCHES IT. PHOTOGRAPHED reading a long em dash with ten looks loaded
+       * and one of them drawing: `createPicker`'s `options()` filled the hidden
+       * select and set its index and never told the visible cell, so the
+       * placeholder stood until somebody pressed ‹ or ›. Every other check on
+       * this page grades the PICTURE, and none of them could see a control that
+       * had gone blank about it.
+       *
+       * ⚠️ IT READS THE CELL, NOT THE SELECT. The select was right the whole
+       * time; the half that was wrong is the half a reader looks at.
+       */
+      {
+        const cell = document.querySelector('.pos-pick-n');
+        const shown = cell ? cell.textContent.trim() : '';
+        d.assert('the look picker says which shader is running',
+          !!shown && shown !== '—' && LOOKS.some((l) => l.name === shown),
+          cell ? `it reads “${shown}” of ${LOOKS.length} looks` : 'there is no picker on the page');
+      }
       d.assert('a real WebGL2 context, not a fallback', !!gl, rendererName ?? 'none');
       d.assert('the shader compiled and linked', drewAny > 0, `${drewAny} frames drawn`);
       await new Promise((r) => setTimeout(r, 1200));

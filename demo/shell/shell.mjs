@@ -276,7 +276,7 @@ export function mount({
    * `asserts.length === 0`. These two land at t+0 on EVERY shelled page, so
    * that test became false immediately and the wait never engaged again.
    *
-   * MEASURED the day they landed: `/radio1965/` makes 34 asserts, the suite
+   * MEASURED the day they landed: `/radio/` makes 34 asserts, the suite
    * collected **2**, and reported **13/13 green**. A green suite with no
    * coverage, across the 28 demos that declare `settleMs`, and nothing about it
    * looked wrong from the outside.

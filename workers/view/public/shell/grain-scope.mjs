@@ -59,7 +59,7 @@ const HEAD_PX = 1;
  * `1 - seconds/grainSeconds` of the buffer lands left of x=0 and is skipped by
  * the bounds test.
  *
- * MEASURED on `/radio1965/`, which asked for a 6 s window over an 8 s buffer:
+ * MEASURED on `/radio/`, which asked for a 6 s window over an 8 s buffer:
  * the oldest QUARTER of the granulator's range could not be drawn at all, so
  * whenever its read head sat there the picture showed no grains and the page's
  * own check read `0 lit`. That was taken for the station being off air more
@@ -84,7 +84,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // overlaying them invites a reading nothing supports.
   //
   // ⚠️ THAT ARGUMENT DOES NOT HOLD WHEN THE MATERIAL IS THE SAME AUDIO. On
-  // `/radio1965/` the granulator's buffer is filled from the very stream this
+  // `/radio/` the granulator's buffer is filled from the very stream this
   // scope is drawing, on one clock in one process — so a grain that read at
   // fraction `pos` of an N-second buffer read the audio that arrived
   // `(1 - pos) * N` seconds ago, and that lands on this axis exactly. Passing
@@ -96,7 +96,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // inspecting and wrong for a stream: as a loud passage scrolls off the right
   // edge the divisor drops and everything left standing suddenly grows, so a
   // quiet stretch looks identical to a loud one and the whole picture heaves.
-  // Reported from `/radio1965/` as *"the scale keeps changing"*, which is
+  // Reported from `/radio/` as *"the scale keeps changing"*, which is
   // exactly what it was doing.
   //
   // Set it to an amplitude (1 = full scale) and the height means a level again.
@@ -122,6 +122,19 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     wave: tok('--dim2', '#7a879c'),
     grain: tok('--ok', '#6ee7a8'),
     hi: tok('--hi', '#ffd400'),
+    /**
+     * 🔴 A LOOP IS DRAWN IN GREY AND THE THING THAT MOVES IS NOT. ASKED FOR:
+     * *"loop info viz colors: just grayscale?"*. The band, the two ends, the
+     * wraps and the live edge were all `--hi`, the same yellow as the grain
+     * ticks, so a picture of a granulator chewing a loop was one colour saying
+     * five things. `mark` is the furniture: where the loop is and where it came
+     * round. `head` is the playhead, which is the only mark here that is
+     * somewhere different every frame, and it is the brightest grey there is
+     * rather than a second hue. What keeps `--hi` is the grains, because they
+     * are the measurement the picture exists to show.
+     */
+    mark: tok('--dim2', '#6a7280'),
+    head: tok('--fg', '#e6e6e6'),
     dim: tok('--dim', '#9aa7bd'),
   };
 
@@ -144,7 +157,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // ⚠️ `wraps`, NOT `marks`. This object already had `mark(g)` — one grain, at
   // the point in the material it read — and a second `mark()` defined lower in
   // the SAME object literal silently replaced it. Every grain tick on
-  // `/radio1965/` stopped being drawn, the page's own assert read `0 ticks
+  // `/radio/` stopped being drawn, the page's own assert read `0 ticks
   // alive`, and it was put down to the station being off air, which it also
   // was. Two names, two jobs, and the collision was invisible because a later
   // key in an object literal simply wins.
@@ -153,6 +166,23 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // scrolling picture was stopped at. They are one state in two variables: a
   // playhead is only meaningful on a picture that is not moving under it.
   let head = null, frozenAt = null;
+  /**
+   * 🔴 THE COLUMNS THE FROZEN PICTURE IS DRAWN FROM, COPIED AT THE INSTANT IT
+   * FROZE. REPORTED as the waveform being *"chipped away"* while a loop ran,
+   * and the mechanism is two clocks: the picture is drawn against `frozenAt`,
+   * which does not move, while `feed()` goes on trimming `scroll` against
+   * `now()`, which does. So every second of loop dropped a second off the LEFT
+   * of a window that was not sliding, and after `seconds` of looping the whole
+   * wave had been eaten from the left edge inward while the marks stood still.
+   *
+   * ⚠️ IT IS A SNAPSHOT AND NOT A LONGER RETENTION. Holding `scroll` back to
+   * `frozenAt - seconds` instead would work and would grow without bound: a
+   * loop left running for ten minutes is 150,000 columns nobody is drawing.
+   * A copy is the window being read, `scroll` goes on being the last few
+   * seconds of real audio, and letting go of the copy is what makes the picture
+   * live again — with the loop's own seconds already in it rather than a hole.
+   */
+  let held = null;
   /**
    * 🔴 A LOOP IS THREE MARKS, NOT ONE, AND THEY ARRIVE AT DIFFERENT TIMES.
    * Specified from the page rather than invented here:
@@ -176,7 +206,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   let loopA = null, loopB = null;
   let sourceName = '', counts = { measured: 0, inferred: 0 };
   // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
-  // `/radio1965/` blends a live station against the granulator chewing it, and
+  // `/radio/` blends a live station against the granulator chewing it, and
   // the fader that does that is the one gesture on the page — so the ticks are
   // drawn at exactly the share of what you are HEARING that they are: invisible
   // when the fader is all radio, solid when it is all granulator.
@@ -194,6 +224,20 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   const t0 = performance.now() / 1000;
   const now = () => performance.now() / 1000 - t0;
   let envAcc = 0, envN = 0;
+
+  /**
+   * Stop the picture at `t`, and keep the columns it is standing on.
+   *
+   * ⚠️ ONE `now()`, READ BY THE CALLER AND PASSED IN. `loopTo` needs the same
+   * instant for the freeze and for the end mark, and taking the clock twice a
+   * microsecond apart drew the wave held at one moment and the band that marks
+   * the loop against another. That was already a written rule here and the
+   * snapshot is a third reader of the same instant.
+   */
+  function freeze(t) {
+    frozenAt = t;
+    held = scroll.slice();
+  }
 
   const api = {
     el: wrap, canvas,
@@ -308,7 +352,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * 🔴 FREEZING IS RIGHT WHERE SOMETHING KEEPS LANDING ON THE FROZEN PICTURE,
      * AND WRONG WHERE NOTHING DOES.
      *
-     * On `/radio1965/` the wave stops and the GRAINS carry on being drawn
+     * On `/radio/` the wave stops and the GRAINS carry on being drawn
      * across the held span, so a stopped picture is still a live one: the thing
      * that moves is the instrument reading the seconds again and again. On
      * `/tapes/` there is no granulator, so the same freeze is a picture that
@@ -325,7 +369,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     // marks the loop is drawn against another. What that looks like is the wave
     // vanishing and the loop region sitting alone on an empty scope, reported
     // as the loop eating the waveform.
-    loopTo() { const t = now(); if (freezeOnLoop) frozenAt = t; loopB = t; },
+    loopTo() { const t = now(); if (freezeOnLoop) freeze(t); loopB = t; },
     /**
      * Press three: the wave catches up with live again.
      *
@@ -340,25 +384,18 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * belong to, exactly as a wrap does, so the loop you just heard is still
      * visible in the picture's past instead of vanishing the moment it stops.
      */
-    loopOff() { head = null; frozenAt = null; },
+    loopOff() { head = null; frozenAt = null; held = null; },
     playhead(frac) {
       if (!Number.isFinite(frac)) {
-        // 🔴 THE HELD COLUMNS GO WITH IT, AND THIS IS NOT TIDYING UP.
-        // PHOTOGRAPHED: leaving them there drew a FLAT LINE AT ZERO across the
-        // seconds the loop ran, because the wave is one polygon and the gap
-        // between the last old column and the first new one is filled in by the
-        // straight edge that joins them. That is a picture of silence, over
-        // audio that was playing the whole time and simply was not measured.
-        // Dropping them leaves the field empty there instead, and the picture
-        // refills from the right over the next few seconds. Nothing drawn where
-        // nothing is known is this file's whole argument.
-        //
-        // ⚠️ ONLY IF IT WAS ACTUALLY STOPPED. A page that clears a playhead it
-        // never set would otherwise wipe several seconds of perfectly good
-        // picture, which is the kind of defensive call that costs nothing to
-        // make and everything to answer.
-        if (frozenAt != null) scroll.length = 0;
-        head = null; frozenAt = null;
+        // 🔴 THE SNAPSHOT GOES AND `scroll` STAYS, AND THAT IS THE OPPOSITE OF
+        // WHAT THIS DID. It used to empty `scroll`, because back when a frozen
+        // picture dropped every sample the held columns were followed by a hole,
+        // and the wave is one polygon so the hole was drawn as a flat line at
+        // zero: a picture of silence over audio that had been playing.
+        // `feed()` records right through a freeze now, so `scroll` holds the
+        // loop's own last seconds, unbroken, and wiping it blanked a picture
+        // that had exactly the right thing in it.
+        head = null; frozenAt = null; held = null;
         return;
       }
       head = Math.max(0, Math.min(1, frac));
@@ -367,13 +404,13 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       // moving. A `playhead` that also froze meant the first position pushed
       // after the loop closed decided where the wave stopped, which is a frame
       // or two late and is the wrong event to hang it on.
-      if (loopA == null && frozenAt == null) frozenAt = now();
+      if (loopA == null && frozenAt == null) freeze(now());
     },
 
     source(name) { sourceName = name; },
     clear() {
       live.length = 0; scroll.length = 0; wraps.length = 0; peaks = null;
-      head = null; frozenAt = null; loopA = null; loopB = null;
+      head = null; frozenAt = null; held = null; loopA = null; loopB = null;
       counts = { measured: 0, inferred: 0 };
     },
     /** Which of the two pictures is being drawn. ⚠️ READ OFF THE SAME STATE THE
@@ -385,8 +422,12 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
     // is, the other is whether any new audio is reaching the picture at all.
     // A check that a loop stopped the wave needs the second and cannot get it
     // from the first.
+    // ⚠️ `frozenCols` IS HOW A CHECK SEES THE WAVE BEING EATEN. A frozen
+    // picture whose column count FALLS is the chipping-away bug; `frozen: true`
+    // cannot see it, because the wave was stopped either way.
     stats: () => ({ ...counts, flickering: live.length, wraps: wraps.length,
       playhead: head, frozen: frozenAt != null,
+      frozenCols: held ? held.length : null,
       loopFrom: loopA, loopTo: loopB, marks: (loopA != null) + (loopB != null) }),
   };
 
@@ -500,7 +541,11 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
       ctx.globalAlpha = 1;
     } else {
       // ── audio only: what arrived, scrolling ────────────────────────────
-      if (scroll.length > 1) {
+      // ⚠️ THE SNAPSHOT WHILE FROZEN, `scroll` OTHERWISE. See `held` above: the
+      // live array goes on being trimmed against a clock this picture is no
+      // longer drawn on, so reading it here is what ate the wave from the left.
+      const cols = held ?? scroll;
+      if (cols.length > 1) {
         // ⚠️ THE CLOCK IS THE FROZEN ONE WHILE A LOOP RUNS, and that single
         // substitution is what holds the x scale. `seconds` never changes, so
         // stopping the right edge stops the whole mapping with it: every column
@@ -509,7 +554,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         const t = frozenAt ?? now(), x0 = t - seconds;
         const X = (tt) => ((tt - x0) / seconds) * W;
         let mx = fullScale ?? 0;
-        if (!fullScale) for (const s of scroll) if (s.v > mx) mx = s.v;
+        if (!fullScale) for (const s of cols) if (s.v > mx) mx = s.v;
         const k = mx > 0 ? (H * 0.44) / mx : 0;
         // 🔴 ONE GREY, AND IT IS NOT A STYLE CHOICE — THE SAME RULE `floor`
         // FOLLOWS AND FOR THE SAME REASON. There was a hue-mapped wave here:
@@ -521,7 +566,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         // measurement nobody asked for is a second measurement nobody asked for
         // however well it is reasoned.
         //
-        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/radio1965/index.html`
+        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/radio/index.html`
         // contains no colour at all — one `theme-color` meta and nothing else —
         // because the hue lived in this shared kit, switched on merely by the
         // data carrying a `tone` field. Looking at the page that showed it would
@@ -539,15 +584,15 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
           const ax = Math.max(0, X(loopA));
           const bx = loopB != null ? X(loopB) : W;
           if (bx > ax) {
-            ctx.globalAlpha = 0.10; ctx.fillStyle = C.hi;
+            ctx.globalAlpha = 0.12; ctx.fillStyle = C.mark;
             ctx.fillRect(ax, 1, bx - ax, H - 2);
             ctx.globalAlpha = 1;
           }
         }
         ctx.beginPath();
-        ctx.moveTo(X(scroll[0].t), mid);
-        for (const s of scroll) ctx.lineTo(X(s.t), mid - s.v * k);
-        for (let i = scroll.length - 1; i >= 0; i--) ctx.lineTo(X(scroll[i].t), mid + scroll[i].v * k);
+        ctx.moveTo(X(cols[0].t), mid);
+        for (const s of cols) ctx.lineTo(X(s.t), mid - s.v * k);
+        for (let i = cols.length - 1; i >= 0; i--) ctx.lineTo(X(cols[i].t), mid + cols[i].v * k);
         ctx.closePath();
         ctx.fillStyle = C.line2; ctx.fill();
         // ── the loop coming round ──────────────────────────────────────────
@@ -557,17 +602,17 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         while (wraps.length && wraps[0].t < x0) wraps.shift();
         if (wraps.length) {
           ctx.save();
-          // 🔴 ONE PIXEL, SOLID, IN `--hi`, THE SAME AS EVERY OTHER LOOP EDGE.
-          // These used to fade from 0.25 to 0.80 with age, on the argument that
-          // the fade says which wrap is the recent one without spending a second
-          // channel. The argument is fine and the consistency is worth more: the
-          // transport bar draws a loop's ends as a 1 px solid `--hi` border, and
-          // the playhead below is 1 px solid `--hi`, so a loop boundary that is
-          // sometimes a quarter-strength hairline is the same mark in three
-          // strengths across two surfaces. Age is already said by position, which
-          // is the channel a scrolling wave has for free: the leftmost is the
-          // oldest, and it leaves the picture when the audio it belongs to does.
-          ctx.strokeStyle = C.hi; ctx.lineWidth = 1; ctx.globalAlpha = 1;
+          // 🔴 ONE PIXEL, SOLID, IN THE LOOP'S OWN GREY, THE SAME AS EVERY
+          // OTHER LOOP EDGE. These used to fade from 0.25 to 0.80 with age, on
+          // the argument that the fade says which wrap is the recent one without
+          // spending a second channel. The argument is fine and the consistency
+          // is worth more: the transport bar draws a loop's ends as a 1 px solid
+          // border in the same grey, so a loop boundary that is sometimes a
+          // quarter-strength hairline is the same mark in three strengths across
+          // two surfaces. Age is already said by position, which is the channel a
+          // scrolling wave has for free: the leftmost is the oldest, and it
+          // leaves the picture when the audio it belongs to does.
+          ctx.strokeStyle = C.mark; ctx.lineWidth = 1; ctx.globalAlpha = 1;
           for (const m of wraps) {
             const x = X(m.t);
             ctx.beginPath(); ctx.moveTo(x + 0.5, 2); ctx.lineTo(x + 0.5, H - 2); ctx.stroke();
@@ -575,8 +620,11 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
           ctx.restore();
         }
         // ── the loop's ends ────────────────────────────────────────────────
-        // One pixel, solid, in `--hi`: the same mark the transport bar draws
-        // round a loop and the same the playhead below is drawn in. The first
+        // One pixel, solid, in the loop's grey: the same mark the transport bar
+        // draws round a loop. ⚠️ NOT the same as the playhead any more — those
+        // were one colour and the playhead crosses both of them, so at the top
+        // and the bottom of a lap the moving mark and the fixed one it had
+        // reached were indistinguishable. The first
         // appears on the first press and travels left with the audio it belongs
         // to while the picture is still moving; the second lands when the
         // picture stops, and after that neither can move because nothing under
@@ -590,7 +638,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
           if (t == null) continue;
           const x = X(t);
           if (x < -1 || x > W + 1) continue;
-          ctx.strokeStyle = C.hi; ctx.lineWidth = 1; ctx.globalAlpha = 1;
+          ctx.strokeStyle = C.mark; ctx.lineWidth = 1; ctx.globalAlpha = 1;
           ctx.beginPath();
           ctx.moveTo(Math.round(x) + 0.5, 1);
           ctx.lineTo(Math.round(x) + 0.5, H - 1);
@@ -630,7 +678,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         // the playhead, claiming to be the live edge of a wave that is not
         // advancing.
         if (frozenAt == null) {
-          ctx.strokeStyle = C.hi; ctx.lineWidth = 1;
+          ctx.strokeStyle = C.mark; ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(W - 0.5, 0); ctx.lineTo(W - 0.5, H); ctx.stroke();
         }
       }
@@ -678,7 +726,9 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
 
     if (head != null) {
       ctx.globalAlpha = 1;             // whatever the branch above left behind
-      ctx.fillStyle = C.hi;
+      // ⚠️ THE ONE MARK HERE THAT IS SOMEWHERE ELSE EVERY FRAME, so it is the
+      // one that is not drawn in the furniture's grey. See `C.head`.
+      ctx.fillStyle = C.head;
       // 🔴 BETWEEN THE TWO ENDS, NOT ACROSS THE BOX. It used to run the whole
       // width, which is only right when the loop happens to be the entire
       // window: any shorter loop had its playhead outside its own ends, over

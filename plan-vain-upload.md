@@ -4,8 +4,8 @@ Status: **not started.** Written 2026-09-15, session 28, at the owner's request.
 Nothing here is built. Proposed worker **`workers/vain`**, proposed bucket
 **`vain-archive`**, proposed read host **`vain.positron.studio`**.
 
-Companions: `research/radio1965-app-2026-09.md` (their app, end to end),
-`research/radio1965-server-2026-09-15.md` (what their server does today), and
+Companions: `research/radio-app-2026-09.md` (their app, end to end),
+`research/radio-server-2026-09-15.md` (what their server does today), and
 `workers/shout/NOTES.md` (the relay that already carries their live mount and
 their first recording).
 
@@ -29,7 +29,7 @@ second copy of the truth.
 ## 1. The size of the thing, which decides almost everything else
 
 READ, `workers/shout/NOTES.md:158`: a 128 kbit/s stream is about **57.6 MB per
-listener-hour**. READ, `research/radio1965-server-2026-09-15.md` §3: their
+listener-hour**. READ, `research/radio-server-2026-09-15.md` §3: their
 recording pipeline is `ffmpeg -c copy` against that mount, so a recording is
 that bitrate exactly. INFERRED from those two:
 
@@ -647,7 +647,7 @@ reversed for newest first, which is the ordering the front page already uses
 no *everything recorded in 1998*, no *everything by this contributor*, no
 *everything over an hour*, without fetching every `meta.json` and filtering in
 the page. At the scale of this material, which is currently **one 7-second test
-recording** (MEASURED 2026-09-15, `research/radio1965-server-2026-09-15.md` §3),
+recording** (MEASURED 2026-09-15, `research/radio-server-2026-09-15.md` §3),
 that is fine and will be fine for years. At a few thousand it is not.
 
 The repair, when it is needed and not before, is **an index that is a cache and
@@ -811,7 +811,7 @@ the moment a read worker earns its place, and it will look a great deal like
 ## 12. The risks, in order
 
 🔴 **1. The material does not exist yet.** MEASURED 2026-09-15
-(`research/radio1965-server-2026-09-15.md` §3): **one recording exists and it is
+(`research/radio-server-2026-09-15.md` §3): **one recording exists and it is
 seven seconds of a test**, and their Icecast was answering zero bytes on both
 mounts that morning. Every real assumption in this plan (a body over 100 MB, a
 uniform part size at the end of a long upload, a seek an hour into a file, a date

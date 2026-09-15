@@ -387,7 +387,7 @@ Two facts this repo already owns point the same way, both READ:
   into the graph on iPhone.** So a design that mixes the schedule in WebAudio is
   not merely fragile on a backgrounded phone, it is silent on a foregrounded
   one.
-- `demo/radio1965/index.html:1446-1467`: iOS has a fourth `AudioContext` state,
+- `demo/radio/index.html:1446-1467`: iOS has a fourth `AudioContext` state,
   `interrupted`, it does not come back on its own, and `resume()` from a timer
   is refused exactly when it is needed.
 
@@ -508,7 +508,7 @@ Four things, and only four. Everything else in this document is settled.
 3. **Does an iPhone enforce the ID3 PRIV rule that macOS ignores?** §2. One page
    with three playlists and `?report=1` answers it in a minute.
 
-4. **Does the silent switch mute it?** READ, `demo/radio1965/index.html:1288-1305`:
+4. **Does the silent switch mute it?** READ, `demo/radio/index.html:1288-1305`:
    a page whose only output is WebAudio gets the `ambient` session, which the
    ring switch mutes, and `<audio>` gets `playback`, which it does not. MEASURED
    today: `navigator.audioSession` exists in desktop Safari and reports type

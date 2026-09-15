@@ -109,7 +109,7 @@ that does not move when the question moves answers the old question for ever** �
 adding a property to the Wikidata query re-ran nothing and read as "there is no
 such statement".
 
-### radio1965's patches differed in numbers, not in kind
+### radio's patches differed in numbers, not in kind
 
 Reported a third time. MEASURED off the old set: scanmode 1 on 7 of 7, read
 speed within −0.10x..+0.25x on 5 of 7, overlap 2.0–5.0 on a scale clamped at
@@ -147,7 +147,7 @@ will not install. ⚠️ The iPhone push silence was **Sleep Focus**, in the sta
 bar of every screenshot sent to me and not read by me; there is no API for it,
 so the page names it as a cause.
 
-The `vain` rename was done and fully reverted on instruction; `radio1965` keeps
+The `vain` rename was done and fully reverted on instruction; `radio` keeps
 its slug.
 
 ## Session 25 (2026-09-14) — a page that broke its own sound to check itself; the granulator learns to move; Kurenniemi restarted
@@ -4342,7 +4342,7 @@ measured or quoted from a doc, not assumed.
   test that separates parameter mismatch from CPU starvation.
 
 ### THE OTHER TEAM (tarmoj / U: / ECCM), read from the code
-- `radio1965` is a **live community-radio app**, not the archival platform. Every
+- `radio` is a **live community-radio app**, not the archival platform. Every
   occurrence of "1965" is a NAME: an Icecast mount, an API path, a window title,
   the FastAPI service title, cron log names, and the literal test password
   `"1965"`. No 1965 material, no historical metadata, no date model before now;
@@ -4360,7 +4360,7 @@ measured or quoted from a doc, not assumed.
   mounts, so a config constant not network variance (ttfb 262–315 ms). No
   catch-up: Icecast has no live edge to chase. It is a knob U: already owns.
 - `uuu.ee` is NOT in version control: it appears only as a `deploy.sh` target,
-  and the sole infra code anywhere is radio1965's two Icecast hooks plus an nginx
+  and the sole infra code anywhere is radio's two Icecast hooks plus an nginx
   snippet pasted into markdown.
 - Written up in `demo/notes/uuu-positron.md` (live at positron.studio/notes/),
   including what positron can offer a LAN setup: `wsTransport` does not care that
@@ -6535,7 +6535,7 @@ translator lineage and carries a cultural link the audience actually has.
 **The three failures worth the space.** A `[^}]*` regex ate three CSS rules above
 its target and I called the resulting blank canvas an ERR outage while 294 of 298
 tiles were loading at 60 fps. A second `mark()` added to the same object literal
-silently overwrote the first, killed radio1965's grain ticks, and I called that
+silently overwrote the first, killed radio's grain ticks, and I called that
 the station being down. And `roomToEye` shipped an inverted rotation sign with a
 PASSING assert, because the assert recomputed the matrix from the same wrong
 derivation — caught only by rendering and finding zero pixels at 70°.

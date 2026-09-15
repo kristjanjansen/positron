@@ -491,7 +491,7 @@ for (const t of targets) {
    */
   const own = t.room === 'fixed' ? '' : `room=${t.name}-test-${Math.random().toString(36).slice(2, 8)}`;
   // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A
-  // VISIT. `radio1965` proves a station button works by pressing another station
+  // VISIT. `radio` proves a station button works by pressing another station
   // and pressing back, and proves the transport stops by stopping it — on the
   // decoded path both are a decoder teardown and rebuild, so both are a hole in
   // the sound. They ran for every listener, three times, in the first seconds of
@@ -685,7 +685,7 @@ for (const t of targets) {
    * fell through on its first test, and a page was left with 12 tries at 400 ms
    * to produce everything it had.
    *
-   * MEASURED the day it landed: `/radio1965/` makes 34 asserts and the suite
+   * MEASURED the day it landed: `/radio/` makes 34 asserts and the suite
    * collected **2**, then reported **13/13 green**. That is this project's worst
    * failure shape, a green suite with no coverage, and it hit 28 demos at once
    * because 28 declare `settleMs`.
@@ -704,7 +704,7 @@ for (const t of targets) {
   // existed, so two asserts from the shell at t+0 handed every page straight to
   // a loop that allows 4.8 s in total. A page is done when it says it is ready
   // AND its count has stopped moving. Both conditions, or a page that calls
-  // `ready()` before driving its own checks (`/radio1965/` does, from inside
+  // `ready()` before driving its own checks (`/radio/` does, from inside
   // the granulator's boot) is cut off at the moment it starts working.
   // ⚠️ "THE PAGE HAS NOT ASSERTED YET" IS NOT "THE COUNT IS ZERO". The shell
   // makes two of its own at t+0 on every shelled page, so a zero test answered

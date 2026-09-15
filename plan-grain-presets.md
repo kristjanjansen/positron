@@ -1,9 +1,9 @@
-# Grain presets for `/radio1965/`, and whether it can keep time
+# Grain presets for `/radio/`, and whether it can keep time
 
 Session 27, 2026-09-15. Everything below was measured on the page itself unless
 it says otherwise. The page is at
-**<https://positron.studio/radio1965/>** when it is deployed; locally, with the
-dev server up, **<http://127.0.0.1:8890/radio1965/>**.
+**<https://positron.studio/radio/>** when it is deployed; locally, with the
+dev server up, **<http://127.0.0.1:8890/radio/>**.
 
 ⚠️ The real relay answered `502` in under 20 ms for the whole of this work
 (`workers/shout` is being changed by somebody else), so every measurement here
@@ -334,7 +334,7 @@ station is a stream patch, one naming the loop is a loop patch, and one naming
 ## 3. What is open
 
 - 🔴 **Two of the page's asserts are never collected by the suite.** MEASURED: the
-  page makes **32** and `node demo/verify.mjs radio1965` reads **30**. The end of
+  page makes **32** and `node demo/verify.mjs radio` reads **30**. The end of
   run loop test sits about a second behind the burst and `verify.mjs` stops
   collecting 400 ms after the count last grew, so `the grain clock is tuned to the
   loop, so the two cannot drift` and `pressing LOOP keeps the station and plays it
@@ -354,7 +354,7 @@ station is a stream patch, one naming the loop is a loop patch, and one naming
 - **A loop shorter than half a patch's figure cannot be locked** and says so in the
   log rather than halving the grain rate to make one bar fit. That affects `cut up`
   (a four second bar) and `ground` (two seconds) on a hand closed window.
-- **The station was down throughout.** Re-run `node demo/verify.mjs radio1965`
+- **The station was down throughout.** Re-run `node demo/verify.mjs radio`
   against the real relay once `workers/shout` is healthy; the only assert that
   depended on the stand-in was `the in-band text channel is alive`, which needed
   ICY metadata interleaved into the stand-in before it went green.

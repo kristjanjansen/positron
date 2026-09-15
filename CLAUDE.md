@@ -3,9 +3,13 @@
 Live at **https://positron.studio**. 40 shelled demos of 45 rows
 (2026-09-15, counted from `DEMOS` rather than remembered) — `tapes` is the newest:
 the `kurenniemi` corpus on a time axis, where a mark is as wide as its date is
-vague and 24 of the records play. ⚠️ `radio1965` was renamed to `vain` on
-2026-09-15 and the rename was FULLY REVERTED the same hour, on instruction. It
-keeps its slug; do not re-open it. ⚠️ The suite total that
+vague and 24 of the records play. ⚠️ **`radio1965` IS NOW `radio`, RENAMED 2026-09-16 ON INSTRUCTION.**
+The slug, the directory and every reference moved together; the deployed
+`/radio1965/` is GONE, so any link anybody has kept 404s and a redirect has not
+been written. The line that stood here before said the slug was fixed and not to
+re-open it, and that was about an unasked-for rename to `vain` on 2026-09-15
+which was reverted within the hour. An instruction supersedes it. ⚠️ Only
+`archive/` still says `radio1965`, on purpose: an archive records what was there. ⚠️ The suite total that
 used to sit here was removed rather than updated: it was stale for two sessions, and a count nobody re-measures reads as
 a fact. Run `node demo/verify.mjs` for the current one. ⚠️ A red run is not automatically a
 regression here: `now`'s asserts go red when ERR refuses its own live edge (one
@@ -79,16 +83,36 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
 
 ## Rules that cost real time to learn
 
-🔴 **DO NOT RE-VERIFY `/radio1965/` OR PROBE STATION HEALTH. ASKED TWICE.**
+🔴 **DO NOT RE-VERIFY `/radio/` OR PROBE STATION HEALTH. ASKED TWICE.**
 *"stop messing around with live stream assertions, you're wasting everybody's
 time"*, then *"can we please stop assessing the radio, its killing me and my
 budget"*. A run of that page costs minutes and a lot of tokens, it needs a
 relay and eight mounts nobody here controls, and what it returns is a fact
 about somebody else's server rather than about our code. Four of eight were
 down the last time it was run, which is the normal state of it.
-**Change the page, syntax-check it, ship it.** Verify it ONLY when asked to, or
+**Change the page, syntax-check it, ship it** (`node demo/check-html.mjs
+demo/<slug>/index.html` parses every module block without opening a browser).
+Verify it ONLY when asked to, or
 when a change is to the decode path itself and nothing else can grade it. A red
 run on that page is not information until somebody asks for it.
+
+🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
+KRISTJAN:** *"ERRil oli ka probleem, et nende kuulajastatistika läheb sassi"* —
+their LISTENER STATISTICS were being corrupted by us. That is a different and
+worse kind of damage from load: a broadcaster's audience figures are what it
+reports to its board and its funders, and a few dozen headless Chromes holding
+mounts open for hours are counted as listeners who never leave. It cannot be
+undone by stopping, only by not adding to it. So the rule is not *"a red run is
+a fact about somebody else's server"* any more, which was an argument about the
+VALUE of the check. It is: **every connection this repo opens to an ERR mount
+appears in a public broadcaster's audience measurement, so open one only when a
+person is going to listen to it.** `/radio/` and `/videoradio/` both rotate
+four ERR mounts; that covers every harness run, every `verify-gl.mjs videoradio`,
+every reload in a development loop, and every tab left open on a second monitor.
+⚠️ Two stations were REMOVED over this and ERR was not: `idaidaida.net` and
+`live.uuu.ee` are gone from the code and the relay 404s them. ERR is still in the
+rotation, which means the exposure is still live and the only thing holding it
+down is nobody running the page.
 ⚠️ The same goes for `curl .../health`, for re-running a demo to attribute a
 flake, and for A/B'ing a failure that the rules already say is external. The
 answer to "is it red because of me or because of them" is: SAY BOTH ARE
@@ -342,6 +366,36 @@ to recover.
   `immersive-ar` reports `environmentBlendMode: alpha-blend` and holds
   **90.0 fps** — the same as VR's 89.8, so compositing over the room costs
   nothing measurable here.
+- 🔴 **AUDIO SURVIVES AN IMMERSIVE SESSION ON A QUEST, AND COSTS NOTHING.
+  MEASURED 2026-09-16 by `/earshot/`, 68 s, 3322 frames, and every number here
+  is off the device log rather than reasoned about.** The four questions
+  `plan-videoradio-xr.md` §11 refused to answer without a headset are answered:
+  - **The `AudioContext` survives.** `running` before `requestSession`, through
+    the whole session, and after it ends. It is never suspended by entering.
+  - **The latencies do not move.** Window **48000 Hz, base 4.00 ms, out
+    24.00 ms**; in session **48000 Hz, base 4.00 ms, out 24.00 ms**, identical
+    to the digit. ⚠️ AND THE HEADSET IS NOT THE LAPTOP: the same page on an M2
+    Mac reads base 5.33 / out 16.00, so the Quest has the lower processing
+    latency and the higher output latency, about 28 ms of total against 21.
+  - **`AudioDecoder` configures and decodes in there.** `mpeg` -> mp3, 470
+    frames in, 120 out, 44100 Hz, 2 ch, **0 errors**, in 140 ms against 998 ms
+    for the same work in the window (the window's number includes a cold fetch;
+    the range read was 155 ms there and 4 ms in session).
+  - **A main-thread `ScriptProcessorNode` keeps up at 90 Hz.** 11.87 to 12.01
+    callbacks a second against 11.72 nominal, for the whole session, never once
+    starved. The window on the same device read 11.65.
+  - **And 90.0 fps held throughout** with the audio graph, the decoder and a
+    panel upload all running. Worst frame gap 70.6 ms, once.
+  ⚠️ **The level meter was proved to be a meter INSIDE the session**, not just
+  in the window: shutting the gate took the far side `0.0354 -> 0.0000 ->
+  0.0355` while the near side held at 0.7050. Without that, a zero in there
+  would have been indistinguishable from a page that had stopped measuring.
+  ⚠️ **A doff is reported about ten seconds late.** `visibilitychange` fired
+  9.5 s after the session ended, which is the lag the page warns about in its
+  own log and is now measured rather than assumed.
+  🔴 So an immersive page on this device may decode, granulate and play exactly
+  as the window does. **Nothing about audio is a reason not to build `/videoradio/`
+  into a headset.**
 - 🔴 **`alpha: false` on the WebGL context makes passthrough impossible.** The
   compositor puts the real room behind the page and can only do that through
   transparent pixels; with no alpha there is nothing to clear to zero and the
@@ -632,14 +686,14 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
 ## Conventions
 
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
-  `demo/radio1965/index.html` is not an answer to *"where is it"* — it is the
+  `demo/radio/index.html` is not an answer to *"where is it"* — it is the
   answer to *"which file did you edit"*, and the reply to a working demo that
   gives one was **"useless to me"**. Say where to OPEN it:
   **a deployed `https://positron.studio/<slug>/` if it is deployed, otherwise a
   live local URL with every query parameter it needs to work** — and the server
   behind it still RUNNING, not one killed three commands ago. ⚠️ A page that
   needs a local worker as well needs BOTH up and both named, in one line that
-  can be clicked: `http://127.0.0.1:8890/radio1965/?base=http://localhost:8899`.
+  can be clicked: `http://127.0.0.1:8890/radio/?base=http://localhost:8899`.
   If it cannot be reached at all yet, say that in those words and say what is
   missing — an unreachable page reported as done is worse than one reported as
   blocked, because only one of them gets fixed.
@@ -647,7 +701,7 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
   🔴 **AND THE RULE HAS TO SURVIVE BEING RELAYED — THIS IS HOW IT BROKE, TWO
   HOURS AFTER IT WAS WRITTEN, BY ITS OWN AUTHOR.** Neither agent was careless
   about its OWN page: both handed over full URLs for those. Both wrote a bare
-  `/radio1965/` for the OTHER one's, because between two agents a slug is
+  `/radio/` for the OTHER one's, because between two agents a slug is
   unambiguous and it never occurred to either that the message would be read by
   a person who then has nothing to click. The user's reply was *"what it WENT
   OUT? urls! how many times i am asking"*.
@@ -891,7 +945,7 @@ measured another way (CDP device emulation was used for the tabs). Giving it a
   asked. If a sentence exists to defend the page rather than to use it, delete
   it.
 - 🔴 **A COMPONENT SWAP MOVES EVERY SELECTOR THAT NAMED THE OLD ONE.**
-  `/radio1965/`'s sound row went `createChoice` -> `createPicker` and one of the
+  `/radio/`'s sound row went `createChoice` -> `createPicker` and one of the
   three rules keyed on the old class was updated. `shareLabelColumn()` went on
   setting `--lab` on exactly the right element and **nothing consumed it**, so
   the JavaScript and the comment beside it both read as correct while the row

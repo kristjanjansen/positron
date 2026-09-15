@@ -69,7 +69,7 @@ bad at one of them and the two are named separately.
 
 ### 1.1 The Tarmo repo, found
 
-✅ **`tarmoj/radio1965` is cloned at `/Users/s32863/personal/radio1965`**, last
+✅ **`tarmoj/radio` is cloned at `/Users/s32863/personal/radio`**, last
 commit `0ff5e8a`, 2026-08-29. It is the only U: repo on this machine. Everything
 else here about their code was read over the GitHub API today (📄) — including
 the two vClick score files, which were fetched to a scratchpad and run through
@@ -80,7 +80,7 @@ matter for this:
 
 | repo | language | last push | what it is |
 |---|---|---|---|
-| `radio1965` | QML | 2026-09-12 | the community-radio app; Icecast + FastAPI + Qt |
+| `radio` | QML | 2026-09-12 | the community-radio app; Icecast + FastAPI + Qt |
 | `vclick` | QML | 2026-03-11 | the wireless click track; Csound score, OSC + WebSocket |
 | `VideoSync` | C++ | 2026-05-29 | video in sync across devices on a LAN |
 | `qosc` | C++ | 2025-06-18 | their Qt OSC client/server library |
@@ -101,7 +101,7 @@ performance.
 **One thing, and it is smaller than the note claims.**
 
 ✅ **Their events API is browser-reachable.** `GET
-https://live.uuu.ee/radio1965/api/events` answers `200` from uvicorn, 3,083
+https://live.uuu.ee/radio/api/events` answers `200` from uvicorn, 3,083
 bytes of JSON, and **with an `Origin` header present it returns
 `access-control-allow-origin: *`** (measured 2026-09-13 21:00 UTC). ⚠️ Note the
 trap that cost me a wrong conclusion ten minutes earlier: probed *without* an
@@ -110,12 +110,12 @@ middleware only adds it when asked. **A CORS check with no `Origin` header
 measures nothing.**
 
 ✅ **Their Icecast is up, open, and unusable from an HTTPS page.** Measured
-2026-09-13 21:00 UTC against `http://live.uuu.ee:8001/radio1965`:
+2026-09-13 21:00 UTC against `http://live.uuu.ee:8001/radio`:
 
 | | |
 |---|---|
 | server | Icecast 2.4.4, up since 2026-09-11 06:43 +0300 |
-| live mounts | **one** — `/radio1965`, "Improvisations by EMA", on air since 2026-09-11 19:19 |
+| live mounts | **one** — `/radio`, "Improvisations by EMA", on air since 2026-09-11 19:19 |
 | listeners | 0 (peak 2) |
 | CORS | `Access-Control-Allow-Origin: *` ✅ |
 | ttfb | 444 ms |
@@ -366,7 +366,7 @@ about where the bytes live that `demo/notes/uuu-positron.md` already flags:
 ### 2.6 A shared score container — a project, and possibly the wrong shape
 
 📄 U:'s material is four unlike things: Csound scores (vClick), video files
-(VideoSync), Icecast mounts (radio1965), and musician positions
+(VideoSync), Icecast mounts (radio), and musician positions
 (`location-music` + BLE RSSI from `MeeBlueReader`). 🔴 `plan-score.md` §1's rule
 applies with force: **a common vocabulary across unlike things is a lie about
 all of them.** Only the first is score material. The rest belong in the
@@ -812,7 +812,7 @@ top of assumptions.
 ### 5.4 About the infrastructure
 
 13. 🔴 **Their Icecast source password is a literal in two public files** — in
-    `radio1965`'s `app/icecastbroadcaster.cpp` and again in
+    `radio`'s `app/icecastbroadcaster.cpp` and again in
     `project-description.md` §8.1. ✅ Confirmed present in both by reading the
     clone; not reproduced here and not tested against their server. **Ask
     whether it is still live, and if so rotate it.**

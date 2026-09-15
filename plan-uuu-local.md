@@ -96,7 +96,7 @@ From the note, and not generalised past it:
 |---|---|---|
 | **vClick** | Csound scores — `i` lines, `t` tempo map | notation, precomputed, absolutely timed |
 | VideoSync | video files + a Host device | media, plus LAN discovery and drift correction |
-| radio1965 | Icecast mounts, a Qt source client | live audio, no seek, no DVR |
+| radio | Icecast mounts, a Qt source client | live audio, no seek, no DVR |
 | location-music | musicians' positions in a hall | sensor, continuous |
 | u-vary-player | 1.46 GB of recordings, carried in git | media |
 

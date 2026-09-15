@@ -28,7 +28,7 @@ const ERR = 'https://icecast.err.ee';
  * caller that gets silently imposed on the second. Full URLs cost one repeated
  * hostname and let a station live anywhere.
  *
- * 🔴 `radio1965` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE.
+ * 🔴 `radio` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE.
  * Their Icecast sends no `access-control-allow-origin` AND terminates no TLS,
  * so an HTTPS page cannot play it at all — not "cannot measure it", cannot
  * play it: the browser refuses the mixed-content load before any CORS question
@@ -44,11 +44,11 @@ const IDA = 'https://broadcast.idaidaida.net/listen';
 
 const STATIONS = {
   /**
-   * 🔴 `radio1965` IS REMOVED, ON REQUEST, 2026-09-15. Same report as IDA: the
+   * 🔴 `radio` IS REMOVED, ON REQUEST, 2026-09-15. Same report as IDA: the
    * operator of the uuu.ee server found roughly 100 concurrent clients against
    * their limit, traced to positron.studio. Ours.
    *
-   * ⚠️ THE LOAD WAS THE CHECKS, NOT THE VISITORS. Every `verify.mjs radio1965`
+   * ⚠️ THE LOAD WAS THE CHECKS, NOT THE VISITORS. Every `verify.mjs radio`
    * and every `verify-gl.mjs videoradio` opens a live mount, and those were run
    * dozens of times in one evening. A relay entry is a standing claim on
    * somebody else's bandwidth and a harness that opens it is a claim made
@@ -114,7 +114,7 @@ const EXPOSE = [
  * answers 200 and honours a Range with a 206, and sends NO
  * `access-control-allow-origin`. A page can put one in an <audio> element and
  * read nothing about it, which is the whole reason this worker exists. Their
- * events API is fine on its own (`live.uuu.ee/radio1965/api/events` answers
+ * events API is fine on its own (`live.uuu.ee/radio/api/events` answers
  * with `allow-origin: *`), so only the audio needs carrying.
  *
  * 🔴 A PATTERN, NOT A PATH PARAMETER, and for the same reason `STATIONS` is an
@@ -123,7 +123,7 @@ const EXPOSE = [
  * and a datestamp, so that is exactly what is accepted and nothing else. No
  * slashes, no dots beyond the one, no traversal to reason about.
  */
-const REC_BASE = 'https://eccm.ee/radio1965/streams/';
+const REC_BASE = 'https://eccm.ee/radio/streams/';
 const REC_NAME = /^[a-z0-9-]{1,20}-\d{8}-\d{6}\.mp3$/;
 // A recording never changes once it is written, which is the opposite of the
 // streams above. It is worth caching at the edge and worth a client keeping.

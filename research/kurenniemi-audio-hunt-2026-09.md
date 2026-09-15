@@ -24,7 +24,7 @@ reads is <https://positron.studio/resources/corpus.json>.
    is exhausted, exactly as `research/kurenniemi-sources-2026-09.md` already
    said.
 3. **A proxy, not a copy.** Those 23 files are served over plain HTTP with no
-   TLS and no CORS, which is the `radio1965` case `workers/shout` already exists
+   TLS and no CORS, which is the `radio` case `workers/shout` already exists
    to solve. A proxy is technically sufficient and nothing needs storing. It is
    also the smaller act to take against material whose terms nobody has stated,
    and nobody has stated terms for these.
@@ -433,7 +433,7 @@ the mixed-content load first.
 
 This is the exact case already written into `workers/shout/worker.mjs`, **READ**:
 
-> *"🔴 `radio1965` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE. Their
+> *"🔴 `radio` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE. Their
 > Icecast sends no `access-control-allow-origin` AND terminates no TLS, so an
 > HTTPS page cannot play it at all, not 'cannot measure it', cannot play it."*
 

@@ -101,7 +101,10 @@
            PAPPUS_NODE, RING_SECONDS } from '/shell/pappus.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import * as FS from '/shell/fullscreen.mjs';
-  import { createChoice } from '/shell/choice.mjs';
+  // ⚠️ STATIC, NEVER A DYNAMIC IMPORT IN THE PRESS HANDLER. See the note on the
+  // `vr` control: an await before `requestSession` spends the user activation
+  // the session needs, so the module has to be here before the finger lands.
+  import { createXRPanels } from '/shell/xr-panel.mjs';
   import {
     BUF_SECONDS, STATIONS, RELAY, srcOf, nameOf, indexOfId, askHealth,
     PATCHES, LANES, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ, MOD_DESTS,
@@ -109,7 +112,7 @@
     writeDiscrete, writeContinuous, lockRate, createFeatures, voicesOf, winPos,
   } from '/shell/radio-gran.mjs';
 
-  // 🔴 WHAT THIS PAGE IS, AND WHY IT IS NOT `/radio1965/` WITH THE CONTROLS
+  // 🔴 WHAT THIS PAGE IS, AND WHY IT IS NOT `/radio/` WITH THE CONTROLS
   // HIDDEN. The instrument over there is a thing you play: a fader, four
   // settings, a sound picker, a station row and a LOOP row, with a waveform
   // above them. Take the hands off it and nothing moves, because every one of
@@ -121,14 +124,14 @@
   // 🔴 AND THE MACHINE IS IMPORTED, NOT COPIED. `demo/shell/radio-gran.mjs`
   // holds the station list, the twelve sounds, the modulator's lanes, the two
   // halves of a patch write, the loop's grain-clock arithmetic and the six
-  // numbers the instrument listens to. ⚠️ `/radio1965/` HAS NOT BEEN MOVED ONTO
+  // numbers the instrument listens to. ⚠️ `/radio/` HAS NOT BEEN MOVED ONTO
   // IT YET, so those things exist twice today. Read that module's header before
   // editing either.
 
   const BASE = new URLSearchParams(location.search).get('base') || RELAY;
   /**
    * 🔴 THE CHECKS ARE ON BY DEFAULT HERE AND THEY ARE OFF BY DEFAULT ON
-   * `/radio1965/`, AND THE DIFFERENCE IS WHO IS HOLDING THE INSTRUMENT. Over
+   * `/radio/`, AND THE DIFFERENCE IS WHO IS HOLDING THE INSTRUMENT. Over
    * there a self-check moves a fader and a slider row in front of somebody who
    * was using them, which was reported as the page taking itself away from its
    * own listener. Nobody holds this one: it moves the blend, changes station
@@ -234,6 +237,13 @@
       // reading the picture.
       { id: 'play', label: '▶', aria: 'play' },
       { id: 'full', label: '⛶', aria: 'full screen' },
+      // 🔴 THE SAME PICTURE, ON THE GROUND, AT ARM'S LENGTH IN EVERY DIRECTION.
+      // Asked 2026-09-16: *"can we iplenent videoradio on vr? just on the
+      // floor? as 'i am on a sea' fading out on all dirs?"*. A WORD rather than
+      // a glyph because there is no glyph for it and every other headset page
+      // here says `Run in VR` in words; `caps.mjs` un-links it where the
+      // browser has no `immersive-vr`, with the reason said out loud.
+      { id: 'vr', label: 'Run in VR', aria: 'run in VR', word: true },
     ],
   });
   guard(d);
@@ -267,6 +277,31 @@
   d.el.append(pane);
 
   /**
+   * 🔴 RUN IN VR IS NOT A PICTURE CONTROL, SO IT DOES NOT LIVE OVER THE
+   * PICTURE. Asked 2026-09-16: *"move 'run in vr' below desc"*.
+   *
+   * The row above was moved into the pane and AUTO-HIDES after three seconds of
+   * no pointer, which is right for play and full screen: those act on the thing
+   * you are looking at, and they should get out of its way. Entering a headset
+   * is not that. It is a way of opening the page, it is pressed once, and a
+   * control that fades out over a picture is the worst place to put something
+   * somebody has to find. Under the sentence that says what the page is, which
+   * is where every other headset page on this site keeps it.
+   *
+   * ⚠️ MOVED, NOT REBUILT, for the same reason the row below was: `mount()`
+   * made this button, `d.button('vr')` finds it, and `.pos-controls button` is
+   * what the harness presses. A second copy is a second thing to keep in step.
+   */
+  {
+    const b = d.button('vr');
+    if (b) {
+      const row = el('div', 'pos-controls vr-enter');
+      row.append(b);
+      d.el.prepend(row);
+    }
+  }
+
+  /**
    * The idle timer for the row above. Three seconds of no pointer and no key,
    * and the chrome gets out of the way.
    *
@@ -294,7 +329,7 @@
   //
   // 🔴 DRAW THE INSTRUMENT, NOT THE SOUND. `plan-audio-shader.md §0` argues it
   // and the argument is stronger here than it was there, because over on
-  // `/radio1965/` this would be a SECOND surface beside a waveform and a
+  // `/radio/` this would be a SECOND surface beside a waveform and a
   // readout, while here it is the only one. A spectrum turned into moving
   // shapes says nothing specific about the sound: the same picture appears for
   // any input, and this project has already answered two of those with *"this
@@ -602,28 +637,24 @@
   const LOOK = LOOKS[LOOK_NAME];
 
   /**
-   * 🔴 THE LOOK PICKER, BACK, AND THE REASON IT LEFT WAS WRONG.
+   * 🔴 THE LOOK PICKER IS GONE AND `?look=` STAYS. Asked 2026-09-16: *"rm preset
+   * selctor, default to quarts"*.
    *
-   * It was removed on the argument that a control for a decision already made
-   * is furniture. The decision was not made: nine pictures exist, the right one
-   * has not been found, and without this row the only way to compare two of
-   * them is to type a query parameter. A chooser is furniture AFTER a choice
-   * and it is the whole job before one.
-   * ⚠️ IT RELOADS. The differences compile into the shader body, which is what
-   * keeps the determinism check exact and costs no per-pixel branch; swapping
-   * one live means recompiling three programs and rebuilding every target.
+   * The row came back once on the argument that the decision had not been made
+   * and a chooser is the whole job before one. It has been made: `quartz` is
+   * the look, and the ten in `LOOKS` are now a record of how it was arrived at
+   * rather than ten offers to a visitor. A page whose first control asks a
+   * stranger to pick between ten names they cannot tell apart is asking them to
+   * do the author's work.
+   *
+   * ⚠️ NOTHING ELSE MOVED. `LOOKS` is untouched, `?look=<name>` still selects
+   * one, and `demo/videoradio/looks/compare.html` still puts them side by side.
+   * What went is the row, which is the only part a visitor saw.
+   * ⚠️ AND IT RELOADED THE PAGE, which `verify.mjs` presses on every run: a
+   * control in `.pos-controls` that calls `location.replace` is a harness that
+   * navigates in the middle of its own checks. That is a second reason it is
+   * better gone than kept.
    */
-  const lookRow = createChoice({
-    label: 'look',
-    options: Object.keys(LOOKS).map((k) => [k, k]),
-    at: Object.keys(LOOKS).indexOf(LOOK_NAME),
-    onPick: (name) => {
-      const u = new URL(location.href);
-      u.searchParams.set('look', name);
-      location.replace(u);
-    },
-  });
-  lookRow.el.title = 'the same instrument drawn nine ways. Picking one reloads the page.';
 
   /**
    * 🔴 WHY FULL SCREEN ENDED, SAID OUT LOUD. It has dropped out on its own and
@@ -694,7 +725,6 @@
     const cover = pane.classList.contains('pos-faux');
     if (cover !== wasCover) { wasCover = cover; fsSay(cover ? 'full screen, by the cover' : 'the cover was taken off', cover ? undefined : 'warn'); }
   }).observe(pane, { attributes: true, attributeFilter: ['class'] });
-  d.controls.append(lookRow.el);
 
 
   /**
@@ -1336,7 +1366,15 @@
    * target works by accident on some machines and errors in a browser. Two
    * targets, swapped every frame, which is what ping-pong is for.
    */
-  function makeField(g) {
+  /**
+   * @param {WebGL2RenderingContext} g
+   * @param {{present?: boolean}} [o] `present: false` builds the chain WITHOUT
+   *   the final copy to the page's canvas. A headset session renders into the
+   *   layer's framebuffer and takes `finalTex()` as a texture, so a copy to a
+   *   16x16 canvas nobody presents would be a wasted pass and a bound
+   *   framebuffer the caller has to undo.
+   */
+  function makeField(g, { present = true } = {}) {
     const compile = (type, src) => {
       const s = g.createShader(type);
       g.shaderSource(s, src); g.compileShader(s);
@@ -1368,7 +1406,13 @@
 
     // ⚠️ ONE VERTEX ARRAY, BOUND ONCE. A vertex array object belongs to the
     // context that made it, and WebGL2 draws nothing at all without one bound.
-    g.bindVertexArray(g.createVertexArray());
+    // 🔴 AND IT IS KEPT AND RE-BOUND IN `step`, because this chain is no longer
+    // the only thing drawing in its context. In a session `xr-panel.mjs` binds
+    // its own quad's array every eye, so a chain that bound its own once at
+    // construction would draw the panels' two triangles through its own shaders
+    // from the second frame onward. Bound once was right while it was alone.
+    const vao = g.createVertexArray();
+    g.bindVertexArray(vao);
 
     const acc = prog(ACC_FS, ['uRes', 'uData', 'uPrev']);
     const pre = prog(PRESENT_FS, ['uRes', 'uData', 'uField']);
@@ -1425,6 +1469,7 @@
       shown,
       /** One live frame: accumulate, present, copy to the canvas. */
       step(bytes) {
+        g.bindVertexArray(vao);
         upload(bytes);
         pass(acc, B.f, FIELD_W, FIELD_H, A.t, 'uPrev');
         field = B;                       // before the swap: B is what was just written
@@ -1446,17 +1491,26 @@
         g.activeTexture(g.TEXTURE3); g.bindTexture(g.TEXTURE_2D, P.t); g.uniform1i(out.u.uPrevOut, 3);
         g.drawArrays(g.TRIANGLES, 0, 3);
         finalT = Q;
-        // the canvas, last, so what a person sees is what the composite holds
-        g.bindFramebuffer(g.FRAMEBUFFER, null);
-        g.viewport(0, 0, canvas.width, canvas.height);
-        g.useProgram(cpy.p);
-        g.uniform2f(cpy.u.uRes, canvas.width, canvas.height);
-        g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, Q.t); g.uniform1i(cpy.u.uSrc, 0);
-        g.drawArrays(g.TRIANGLES, 0, 3);
+        // the canvas, last, so what a person sees is what the composite holds.
+        // ⚠️ SKIPPED IN A SESSION. See `present` on this function: there is no
+        // canvas being shown, the headset takes `finalTex()` instead, and
+        // binding the default framebuffer here would leave the layer's one
+        // unbound for whatever draws next.
+        if (present) {
+          g.bindFramebuffer(g.FRAMEBUFFER, null);
+          g.viewport(0, 0, canvas.width, canvas.height);
+          g.useProgram(cpy.p);
+          g.uniform2f(cpy.u.uRes, canvas.width, canvas.height);
+          g.activeTexture(g.TEXTURE0); g.bindTexture(g.TEXTURE_2D, Q.t); g.uniform1i(cpy.u.uSrc, 0);
+          g.drawArrays(g.TRIANGLES, 0, 3);
+        }
         [A, B] = [B, A];
         [P, Q] = [Q, P];
         frames++;
       },
+      /** The composite as a TEXTURE, for something that wants to draw with it
+       *  rather than read it back. Null until one frame has been stepped. */
+      finalTex() { return finalT ? finalT.t : null; },
       /** Whatever is on screen now, as bytes. */
       readShown() { return this.readTarget(shown); },
       /**
@@ -1532,7 +1586,7 @@
   let loopRing = null, loopTap = null, loopOut = null;
   let stream = null, feats = null, modulator = null, eng = null;
   // ⚠️ THERE IS NO FAVOURITE, AND THE ONE THAT WAS HERE COST TWO RUNS. It
-  // opened on klassikaraadio because /radio1965/ does, and that page has a
+  // opened on klassikaraadio because /radio/ does, and that page has a
   // reason: it upgrades to the station it is named after. This one changes
   // station on its own every minute, so it has nothing to prefer, and a
   // hard-coded first choice is a mount that can be down all afternoon while the
@@ -2258,6 +2312,10 @@
   const idle = new Uint8Array(DATA_W * DATA_H * 4);
   const buckets = Array.from({ length: DATA_W }, () => ({ n: 0, dsum: 0, v: new Array(8).fill(0), drop: 0 }));
   let everDropped = 0, lastFrame = 0, fpsFrom = 0, fpsCount = 0;
+  // The bytes the window's chain was last stepped with. The headset's chain is
+  // handed THE SAME ARRAY rather than a second computation of it: see the note
+  // where it is set, at the bottom of `frame`.
+  let lastBytes = null;
   const sizeLane = LANES.size;
   const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
 
@@ -2341,6 +2399,7 @@
       idle[at(21, 3)] = u8(driftPhase);
       idle[at(63, 3)] = LAYOUT_VERSION;
       pic.step(idle);
+      lastBytes = idle;
       return;
     }
     const dt = lastFrame ? Math.min(0.25, (now - lastFrame) / 1000) : 1 / 60;
@@ -2452,6 +2511,13 @@
     data[at(63, 3)] = LAYOUT_VERSION;
 
     pic.step(data);
+    // 🔴 THE SAME BYTES GO TO THE HEADSET'S CHAIN, AND THEY ARE NOT RE-DERIVED.
+    // The session runs a SECOND `makeField` in a second context, and the whole
+    // reason the picture is a pure function of this texture is so the two ends
+    // can be made identical by handing them one array rather than by running
+    // the arithmetic twice. Running it twice is how two ends of one description
+    // drift, which is the defect `/grains/` exists to show.
+    lastBytes = data;
     if (!glErr) glErr = gl.getError();
 
     // The picture is worth showing the moment the engine has reported a grain:
@@ -2515,6 +2581,226 @@
    * The glide is 12 ms because a gain stepped mid-sample is a click.
    */
   let quiet = false;
+
+  // ── the sea: this picture as a floor you stand on ─────────────────────────
+  //
+  // 🔴 STAGE A OF `plan-videoradio-xr.md`. A flat plane on the ground carrying
+  // the composite, fading to nothing in every direction so there is no edge to
+  // find. The displaced mesh that makes it a sea rather than a photograph of
+  // one is stage B and is deliberately not here yet: what this stage has to
+  // prove is that a session opens, the plane draws, the fade is a ramp and not
+  // a disc, and there is a way out.
+  //
+  // ⚠️ A SECOND `makeField`, IN THE SESSION'S OWN CONTEXT. A texture belongs to
+  // the context that made it, so the window's chain cannot be sampled here at
+  // all; and uploading the window's canvas would be a copy across the bus of a
+  // frame taken a frame ago, which is the A/B `mirror` has already measured.
+  // Both chains are handed the SAME `lastBytes`, which is what makes them the
+  // same picture rather than two pictures computed alike.
+  //
+  // ⚠️ AND IT OPENS NEARLY BLACK. `quartz` keeps 99.5% of each frame, so the
+  // trail takes about half a minute to build and the session's targets start
+  // empty. That is said in the log rather than hidden, because a dark floor for
+  // twenty seconds and a floor that is not drawing look identical from inside a
+  // headset.
+  const SEA = {
+    // Both radii in metres, and the plane is bigger than the outer one so its
+    // own edge is already gone before it is reached. 11 and 16 are the band
+    // `/floor/` settled on for the same problem.
+    fadeFrom: 11, fadeTo: 16, half: 18, y: 0.02,
+    // 🔴 THE FADE TARGET AND THE CLEAR COLOUR ARE ONE TRIPLE, AND THIS IS THE
+    // ONE. `/floor/` paid for typing them twice with a visibly brighter disc on
+    // a darker void, a rim nobody drew, at exactly the radius the fade was
+    // meant to hide. `xr-panel.mjs` hands `bg` to `draw()` so the surface never
+    // has to know this number; it is here only to be handed to the room.
+    bg: [0.018, 0.022, 0.030],
+  };
+  const SEA_VS = `#version 300 es
+  precision highp float;
+  uniform mat4 uProj, uView;
+  uniform vec2 uCentre;
+  uniform float uHalf, uY;
+  out vec2 vWorld;
+  void main() {
+    // Two triangles from gl_VertexID, so the plane needs no buffer at all and
+    // cannot fight anybody else's vertex array for attribute state.
+    vec2 c[6] = vec2[6](vec2(-1.,-1.), vec2(1.,-1.), vec2(1.,1.),
+                        vec2(-1.,-1.), vec2(1.,1.), vec2(-1.,1.));
+    vec2 q = c[gl_VertexID];
+    vWorld = uCentre + q * uHalf;
+    gl_Position = uProj * uView * vec4(vWorld.x, uY, vWorld.y, 1.0);
+  }`;
+  const SEA_FS = `#version 300 es
+  precision highp float;
+  uniform sampler2D uSrc;
+  uniform vec2 uCentre;
+  uniform vec3 uBg;
+  uniform vec2 uFade;
+  in vec2 vWorld;
+  out vec4 o;
+  void main() {
+    // The picture spans the VISIBLE disc, not the whole plane: mapped over the
+    // plane most of it would be drawn where the fade has already taken it away.
+    vec2 uv = (vWorld - uCentre) / (2.0 * uFade.y) + 0.5;
+    vec3 c = texture(uSrc, uv).rgb;
+    float far = distance(vWorld, uCentre);
+    float a = 1.0 - smoothstep(uFade.x, uFade.y, far);
+    // MIXED INTO THE GROUND, NOT BLENDED. The lines and their skirts will
+    // overlap in depth in stage B: a transparent fringe that writes depth
+    // punches a hole the second eye cannot fill, and one that does not write
+    // depth needs sorting. Mixing into a known colour needs neither.
+    o = vec4(mix(uBg, c, a), 1.0);
+  }`;
+  let sea = null, seaProg = null, seaU = null, seaVao = null, seaFrames = 0;
+  let xr = null;
+
+  /** What `createXRPanels` draws on the ground. See `surface` in xr-panel.mjs. */
+  let seaGl = null;
+  const theSea = {
+    attach(g) {
+      const sh = (t, src) => {
+        const o = g.createShader(t); g.shaderSource(o, src); g.compileShader(o);
+        if (!g.getShaderParameter(o, g.COMPILE_STATUS)) throw new Error(g.getShaderInfoLog(o));
+        return o;
+      };
+      seaProg = g.createProgram();
+      g.attachShader(seaProg, sh(g.VERTEX_SHADER, SEA_VS));
+      g.attachShader(seaProg, sh(g.FRAGMENT_SHADER, SEA_FS));
+      g.linkProgram(seaProg);
+      if (!g.getProgramParameter(seaProg, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(seaProg));
+      seaU = {};
+      for (const n of ['uProj', 'uView', 'uCentre', 'uHalf', 'uY', 'uSrc', 'uBg', 'uFade']) {
+        seaU[n] = g.getUniformLocation(seaProg, n);
+      }
+      // ⚠️ AN EMPTY VERTEX ARRAY IS STILL REQUIRED. WebGL2 draws nothing at all
+      // with none bound, even from a shader that reads only `gl_VertexID`.
+      seaVao = g.createVertexArray();
+      seaGl = g;
+      sea = makeField(g, { present: false });
+      seaFrames = 0;
+      d.log(`the sea has its own copy of the picture, ${FIELD_W}x${FIELD_H}, `
+        + 'and it opens dark while the trail builds');
+      return true;
+    },
+    /** One frame of the chain, from the bytes the window was last given. */
+    step() {
+      if (sea && lastBytes) { sea.step(lastBytes); seaFrames++; }
+    },
+    draw({ proj, view, eye, bg }) {
+      if (!seaProg || !seaGl) return;
+      const g = seaGl;
+      const t = sea && sea.finalTex();
+      // Nothing has been stepped yet. Draw NOTHING rather than a plane of
+      // whatever an uninitialised texture holds: an empty floor is honest and a
+      // floor of garbage is a bug that looks like a look.
+      if (!t) return;
+      g.useProgram(seaProg);
+      g.bindVertexArray(seaVao);
+      g.uniformMatrix4fv(seaU.uProj, false, proj);
+      g.uniformMatrix4fv(seaU.uView, false, view);
+      // 🔴 CENTRED ON THE EYE, NOT ON THE WORLD. A fade centred anywhere else
+      // moves under you as you walk and reaches full opacity behind your back,
+      // and a plane centred anywhere else has an edge you can walk to.
+      g.uniform2f(seaU.uCentre, eye[0], eye[2]);
+      g.uniform1f(seaU.uHalf, SEA.half);
+      g.uniform1f(seaU.uY, SEA.y);
+      g.uniform2f(seaU.uFade, SEA.fadeFrom, SEA.fadeTo);
+      g.uniform3fv(seaU.uBg, bg);
+      g.activeTexture(g.TEXTURE0);
+      g.bindTexture(g.TEXTURE_2D, t);
+      g.uniform1i(seaU.uSrc, 0);
+      // A floor has no back you can get under, but the room turns culling on
+      // and this is drawn straight after it.
+      g.disable(g.CULL_FACE);
+      g.drawArrays(g.TRIANGLES, 0, 6);
+      g.bindVertexArray(null);
+    },
+    /** For the checks: how many frames the session chain has taken. */
+    frames: () => seaFrames,
+  };
+
+  /**
+   * Build the session's context in the window and draw both eyes into it.
+   *
+   * ⚠️ IT MAKES `xr` IF THERE IS NONE, because the checks run whether or not
+   * anybody pressed Run in VR, and the point of this preview is that it needs
+   * no headset and no press. It uses the same options the button does, so what
+   * is graded is what a wearer would get rather than a second arrangement built
+   * for the check.
+   */
+  async function xrPreview() {
+    try {
+      if (!xr) xr = makeXR();
+      // Enough frames that the chain has stepped, the plane has been drawn, and
+      // the readback is of a presented frame rather than a cleared one.
+      return await xr.preview({ frames: 6, width: 512, height: 320 });
+    } catch (e) {
+      return { ok: false, why: e.message };
+    }
+  }
+
+  /**
+   * Is the floor a RAMP or a PLATE? Read off `preview`'s own profile: the
+   * middle of the eye against its edge, with the ground colour for scale.
+   *
+   * ⚠️ THE MIDDLE IS AVERAGED OVER A FEW SAMPLES, NOT TAKEN AT ONE POINT. The
+   * picture on the floor is a landscape with gaps in it, so a single sample can
+   * land between two lines and read as dark on a picture that is fine. That is
+   * `mirror`'s four-point mistake, which this repo has already paid for twice.
+   */
+  function fadeRamp(pv) {
+    const p = pv && pv.profile;
+    if (!p || p.length < 8) return null;
+    const n = p.length;
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    const mid = avg(p.slice(Math.round(n * 0.40), Math.round(n * 0.60)));
+    const rim = avg(p.slice(0, Math.max(2, Math.round(n * 0.10))));
+    return { mid, rim, bg: pv.ground ?? 0 };
+  }
+
+  /**
+   * 🔴 THE WAY IN, AND EVERY RULE THIS REPO HAS ALREADY PAID FOR IS IN
+   * `xr-panel.mjs` RATHER THAN HERE. That module owns the session, both eyes,
+   * the clears, the controllers and the two ways out; this page owns a floor.
+   * A page that writes its own `requestSession` inherits none of the fixes.
+   *
+   * ⚠️ THE ROOM STAYS, WITH NOTHING IN IT. `room: null` reads like the right
+   * answer for a page that wants no furniture and is not: the tablet, the hands
+   * and therefore the quit badge's grips are built only when there is a room,
+   * so a page with none has no visible way out. `sky: false, things: false`
+   * leaves the dotted grid, which is the ground the sea sits on.
+   */
+  const makeXR = () => createXRPanels({
+    panels: [],
+    surface: theSea,
+    room: { seed: 424242, sky: false, things: false, bg: SEA.bg },
+    clear: [...SEA.bg, 1],
+    // The chain steps once per headset frame, not once per eye: it is one
+    // picture and both eyes look at the same one.
+    onFrame: () => theSea.step(),
+    onEnd: () => d.log('back out of the headset'),
+    log: (m, k) => d.log(m, k),
+  });
+
+  d.on('vr', () => {
+    if (!xr) xr = makeXR();
+    // 🔴 NOT ONE `await` BEFORE `enter()`, AND THAT IS WHY THE IMPORT IS AT THE
+    // TOP OF THIS FILE RATHER THAN HERE. `requestSession` needs a TRANSIENT
+    // USER ACTIVATION, and an activation is spent by the first await in the
+    // handler: a dynamic import of the module would be exactly that, so the
+    // press would be consumed loading the thing it was meant to start.
+    // `xr-panel.mjs` carries the same rule about its own support answer, which
+    // is why `supported()` reads a value taken at load and is not a promise.
+    if (xr.supported() === false) {
+      d.log('no headset here, so there is nothing to enter', 'warn');
+      return null;
+    }
+    // `enter` reports into the page's log by itself and returns whether a
+    // session started. It is returned so the shell marks the control busy
+    // until the headset has it.
+    return xr.enter();
+  });
+
   d.on('play', () => {
     const b = d.button('play');
     if (!started) {
@@ -2673,7 +2959,7 @@
           // SendReply prepends two of its own arguments, so pos is at index
           // 3, and reading it at 2 takes the replyID, which is -1 on every grain
           // there has ever been. This page has that bug's whole history in
-          // /radio1965/'s comments; it is not going to be repeated here.
+          // /radio/'s comments; it is not going to be repeated here.
           if (m[0] !== '/pgrain') return false;
           grains++;
           bucket(m[3], m[4], m[5]);
@@ -2933,7 +3219,7 @@
 
     // 🔴 THE POSITIONAL PAIR, WITH TWO GRAINS AND NOT ONE. One grain proves a
     // deposit; two prove the AXIS, in the right order and the right distance
-    // apart. /radio1965/ shipped a wrong answer to exactly this question
+    // apart. /radio/ shipped a wrong answer to exactly this question
     // twice in one line, and the count was right the whole time while the place
     // was not, with nothing able to see it.
     //
@@ -3476,6 +3762,49 @@
     d.assert('the full screen control says which mechanism it used',
       (by === 'element' || by === 'faux') && wasFull,
       `${by}${by === 'faux' ? ', the cover that needs no API' : ', the browser’s own API'}`);
+
+    /**
+     * 🔴 THE SEA, GRADED IN THE WINDOW, WHICH IS THE ONLY PLACE IT CAN BE.
+     *
+     * `preview()` builds the session's own context, draws BOTH eyes into one
+     * off-screen framebuffer through the same `drawEye` a headset uses, and
+     * reads every pixel back. It cannot say anything about a frame rate, about
+     * the compositor, or about what a 3360x1760 framebuffer costs, and it says
+     * so in its own note. What it CAN say is: the programs linked, the surface
+     * was reached, there is no graphics error pending, and the ink is a RAMP
+     * rather than a disc.
+     *
+     * ⚠️ THIS OPENS NOTHING OF ANYBODY ELSE'S. It is a shader, a plane and a
+     * readback. That is the whole reason the XR half of this page is graded
+     * here rather than by pointing a harness at the slug, which would connect
+     * to five live mounts.
+     */
+    {
+      // ⚠️ THE CHAIN NEEDS ONE STEP BEFORE THERE IS A TEXTURE TO DRAW WITH, and
+      // `preview` calls `onFrame` itself every frame, which is what does it. So
+      // this asks for enough frames to have stepped, drawn and settled.
+      const pv = await xrPreview();
+      const cover = pv && pv.surface;
+      d.assert('the sea builds in the headset’s own context and is reached every frame',
+        !!pv?.ok && !!cover?.attached && cover.draws >= 2 && pv.glError === 0,
+        !pv?.ok ? `no preview: ${pv?.why || 'unknown'}`
+          : `${cover?.attached ? 'attached' : `refused: ${cover?.why}`}`
+            + ` · drawn ${cover?.draws ?? 0} times · ${pv.glWhere}`
+            + ` · the chain stepped ${theSea.frames()} frames`);
+      /**
+       * 🔴 A RAMP, NOT A DISC, AND THE DIFFERENCE IS THE WHOLE FEATURE.
+       * Read along the middle row of one eye: the fade is measured from the
+       * VIEWER, so ink near the centre of the eye must be brighter than ink at
+       * its edge. A plane drawn at one flat alpha passes every other check on
+       * this page and fails only this one.
+       */
+      const ramp = pv?.ok ? fadeRamp(pv) : null;
+      d.assert('the sea fades out in every direction rather than ending at an edge',
+        !!ramp && ramp.mid > ramp.rim * 1.35 && ramp.rim < 40,
+        ramp ? `the middle of the view reads ${ramp.mid.toFixed(1)} and its edge `
+          + `${ramp.rim.toFixed(1)} of 255, against a ground of ${ramp.bg.toFixed(1)}`
+          : 'the preview gave no pixels to read');
+    }
 
     // The tour was moved about; put it back at the start so a visitor arrives at
     // the beginning of a sound rather than in the middle of a crossover.

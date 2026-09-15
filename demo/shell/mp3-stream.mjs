@@ -8,7 +8,7 @@
 // twice over: `canPlayType` answers "maybe" in two browsers that cannot both
 // play the thing, and an `.mp3` suffix says nothing about what a mount serves.
 //
-// 🔴 WHY THIS EXISTS, MEASURED RATHER THAN ASSUMED. `/radio1965/` played its
+// 🔴 WHY THIS EXISTS, MEASURED RATHER THAN ASSUMED. `/radio/` played its
 // station through `<audio>` and tapped it with `createMediaElementSource`. On an
 // iPhone (iOS 18.7, Safari 26.6.1) that tap is silent: across a 50-second run
 // the analyser read **0.0000 on every single line** while the element played
@@ -72,7 +72,7 @@ export function createMp3Stream(ctx, { url, blockMs = 250, floorMs = 600, ceilin
   };
   /**
    * 🔴 WHAT THE WIRE DID, RECORDED HERE SO NOBODY OPENS A SECOND CONNECTION FOR
-   * IT. `/radio1965/` used to fetch the mount TWICE on every visit — once to
+   * IT. `/radio/` used to fetch the mount TWICE on every visit — once to
    * listen and once, for five seconds, to measure the bitrate, the arrival gaps
    * and the ICY headers. Two listeners per visitor on somebody else's Icecast,
    * for numbers this loop already had in front of it.

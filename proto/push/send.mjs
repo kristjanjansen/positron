@@ -11,7 +11,7 @@
 // second is the real one:
 //
 //   1. It separates "is Firebase configured" from "is some server broken".
-//      Right now those are indistinguishable — radio1965's own `config.py`
+//      Right now those are indistinguishable — radio's own `config.py`
 //      RAISES AT IMPORT without a MySQL URL, so a database problem and a
 //      credential problem produce the same silence.
 //   2. 🔴 IT IS THE PROTOTYPE OF THE WORKER, NOT A THROWAWAY. `firebase-admin`
@@ -111,7 +111,7 @@ async function send(sa, bearer, target, title, body) {
     ...target,
     notification: { title, body },
     // ⚠️ EVERY VALUE IN `data` MUST BE A STRING. FCM refuses nested objects, so
-    // an item travels as a JSON string — which is exactly what radio1965's
+    // an item travels as a JSON string — which is exactly what radio's
     // server does, and why its client has to `JSON.parse` it back out.
     data: {
       sent_at: new Date().toISOString(),

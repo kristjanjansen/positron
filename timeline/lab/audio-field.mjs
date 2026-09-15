@@ -51,7 +51,7 @@
 // ⚠️ WE DO NOT EDIT THE PAGE. The analyser capture is installed with
 // `Page.addScriptToEvaluateOnNewDocument`, which patches
 // `AudioContext.prototype.createAnalyser` before any page script runs; the rest
-// is monkey-patching after load. So this measures `/radio1965/` as deployed,
+// is monkey-patching after load. So this measures `/radio/` as deployed,
 // which is the only version worth measuring.
 //
 // ── TWO THINGS THE ENGINE SOURCE GIVES US FOR FREE ─────────────────────────
@@ -106,14 +106,14 @@ const SWEEP = !argv.includes('--no-sweep');
 //
 // 🔴 A SHARED MEASUREMENT IN TWO FILES IS A MEASUREMENT THAT WILL DISAGREE
 // (CLAUDE.md, `--sld-col`). The spec table that decides what a modulation MEANS
-// lives inside `startModulator`'s closure in `demo/radio1965/index.html` and is
+// lives inside `startModulator`'s closure in `demo/radio/index.html` and is
 // not exported, so it is extracted from the source by brace matching rather
 // than copied. If the block moves or stops being a plain literal this says so
 // and the report falls back to engine units. It never quietly substitutes a
 // table of its own, because a lane table that has drifted would make every
 // "fraction of its lane" number below wrong in a way nothing could see.
 async function readLanes() {
-  const path = `${REPO}/demo/radio1965/index.html`;
+  const path = `${REPO}/demo/radio/index.html`;
   try {
     const src = await readFile(path, 'utf8');
     const i = src.indexOf('specs: {');
@@ -278,7 +278,7 @@ await S('Page.addScriptToEvaluateOnNewDocument', {
   })();`,
 });
 
-await S('Page.navigate', { url: `${BASE}/radio1965/` });
+await S('Page.navigate', { url: `${BASE}/radio/` });
 
 // The page starts listening from the transport bar's own click and from nowhere
 // else. `startListening` is wired into the bar in the capture phase. ⚠️ AND
@@ -666,7 +666,7 @@ if (LANE_WHY) console.log(`  ⚠️  the lane table could not be read (${LANE_WH
 console.log(`\n  collecting ${SECONDS} s …`);
 
 // 🔴 THE NEAR SIDE'S OWN CLAIM, READ OFF THE PAGE. `moving` is a count of
-// ROUTINGS the modulator holds (READ demo/radio1965/index.html, `d.set('moving',
+// ROUTINGS the modulator holds (READ demo/radio/index.html, `d.set('moving',
 // modulator.moving().length)`), which is a fact about what the page intends.
 // §2 puts it beside a count of what actually crossed the wire.
 const readoutMoving = await ev(`window.__demo?.readout?.moving ?? null`).catch(() => null);
@@ -985,7 +985,7 @@ say('═══ 2 · THE PARAMETER STREAM · NEAR SIDE ════════�
   const ever = A.s.ever || {};
   const all = LANES ? Object.keys(LANES) : [];
   say(`  MEASURED: ${A.s.n} control writes in ${f2(A_SEC, 1)} s = ${f2(A.s.n / A_SEC, 2)} a second, across ${Object.keys(by).length} names.`);
-  say(`  The modulator's own clock is 25 Hz (READ demo/radio1965/index.html, MOD_HZ = 25).`);
+  say(`  The modulator's own clock is 25 Hz (READ demo/radio/index.html, MOD_HZ = 25).`);
   say(`  Declared destinations: ${all.length} (${all.length - 1} scalars + probs x8 = ${all.length - 1 + 8} numbers).`);
   say(`  The page's own readout says moving = ${JSON.stringify(readoutMoving)}. That is a count of ROUTINGS on the near side.`);
   say('  ⚠️ the `ever` column counts from the instant this probe went on, which is after the page has');

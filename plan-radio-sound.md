@@ -1,16 +1,16 @@
-# plan-radio-sound — making `/radio1965/` more than one wash
+# plan-radio-sound — making `/radio/` more than one wash
 
 > ⚠️ **NOTHING IN THIS FILE IS BUILT.** It is a proposal. No page, module or
 > definition has been changed; every value below is read off
 > `rig/box/norns/Engine_Pappus.sc` and has not been heard.
 
-Live page today: <https://positron.studio/radio1965/>
+Live page today: <https://positron.studio/radio/>
 
 ---
 
 ## 0 · The picture, which was broken and is being repaired by somebody else
 
-⚠️ **`demo/radio1965/index.html` WAS BEING EDITED WHILE THIS WAS WRITTEN** —
+⚠️ **`demo/radio/index.html` WAS BEING EDITED WHILE THIS WAS WRITTEN** —
 mtime 16:27:05, eleven seconds before the last check. Everything below about
 that file is *as found at that minute* and needs re-reading before it is acted
 on. The engine citations do not move.

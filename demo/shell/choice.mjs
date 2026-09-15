@@ -57,7 +57,7 @@ export function createChoice({ label, options, at = 0, onPick } = {}) {
    * Mark one option as PRESSED BUT NOT YET ARRIVED, or `null` for none.
    *
    * 🔴 A CONTROL WHOSE EFFECT IS SECONDS AWAY LOOKS BROKEN WITHOUT THIS, and
-   * `/radio1965/` is where it was reported: a speed button lights the moment it
+   * `/radio/` is where it was reported: a speed button lights the moment it
    * is pressed and the sound takes about a second to get there — 600 ms of
    * already-scheduled audio plus the glide — so the first thing a listener does
    * is press it again. REPORTED as *"can we track when 0.5 etc happens and

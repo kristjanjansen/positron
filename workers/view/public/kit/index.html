@@ -295,7 +295,7 @@ s.set(v, { quiet: true, glideMs: GLIDE_MS })`,
     const cut = t.split(/\s+[—–-]\s+|,\s+/)[0];
     return cut.length > 12 ? cut : t;
   };
-  const pick = ['held', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio1965', 'wire', 'strip'];
+  const pick = ['held', 'tapes', 'kurenniemi', 'rack', 'floor', 'radio', 'wire', 'strip'];
   const rows = pick.map((n) => DEMOS.find((x) => x.name === n)).filter(Boolean);
   const cardsFor = (extra = {}) => rows.map((r) => createCard({
     title: r.name,

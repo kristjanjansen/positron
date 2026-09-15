@@ -593,8 +593,16 @@ await mkdir(OUT, { recursive: true });
   // sequence — and it REFUSES a row with no group rather than quietly leaving
   // it off the one page everybody opens.
   const rows = byGroup(DEMO_MANIFEST).map((g) => '  ' + groupHTML(g)).join('\n');
-  const notes = '<h2 class="pos-act-h">notes</h2>\n<ol class="pos-acts">'
-    + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>';
+  // 🔴 NO HEADING AND NO LIST WHEN THERE ARE NO NOTES. `NOTES` has been empty
+  // since the last one was struck, and this wrote the word `notes` over an
+  // `<ol>` with nothing in it on every build: a section that promises something
+  // and delivers a gap, which is `shell.css`'s empty-readout rule one page up.
+  // Reported as *"rm empty notes"*. A container with nothing in it must not
+  // paint its edges, and a heading is an edge.
+  const notes = NOTES_MANIFEST.length
+    ? '<h2 class="pos-act-h">notes</h2>\n<ol class="pos-acts">'
+      + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>'
+    : '';
   const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
   if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
   if (!menu.includes('<!--NOTES-->')) throw new Error('menu.html lost its <!--NOTES--> marker');

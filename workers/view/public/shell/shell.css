@@ -66,6 +66,17 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 @media (min-width: 600px) {
   .pos-back { margin-bottom: 30px; }
   .pos-what { margin-top: 12px; }
+  /* 🔴 THE FRONT PAGE HAS NO BACK LINK, SO IT HAD NO AIR EITHER. Asked for:
+     *"add more space on top of frontpage title in desktop"*. On a demo page the
+     30 px above belongs to `.pos-back`, and the index has nothing to go back
+     to, so its name sat hard against the top of the window while every page it
+     links to breathes. 38 is the back link's own line plus that margin, which
+     is what the eye is comparing it against.
+     ⚠️ A CLASS, NOT `:has(.pos-back)`. A browser that does not know a
+     pseudo-class discards the whole selector list it appears in, and this file
+     already records what that cost on `:fullscreen`. A class cannot be
+     discarded by a browser that has never heard of it. */
+  .pos-head.pos-index { margin-top: 38px; }
 }
 .pos-back:hover { color: var(--hi); }
 /* 🔴 `center`, NOT `baseline`, AND THE BASELINE WAS FOR SOMETHING THAT NO
@@ -359,7 +370,14 @@ button.pos-pri[data-busy="1"] {
 .tbar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   background: var(--card); border: 1px solid var(--line);
-  border-radius: 4px; padding: 8px 10px;
+  /* 🔴 ONE PADDING ON BOTH AXES, AND THE THREE NUMBERS BELOW ARE ONE SUM.
+     MEASURED with the bar mounted in headless Chrome: the play toggle sat at
+     11 px from the left edge and 9 px from the top, because the padding read
+     `8px 10px` and a 1 px border goes on both. Reported as *"unify paddings and
+     button sizes"*. At a flat 8 the inset is 9 each way, and `--tbar-btn` (34)
+     plus twice the padding plus twice the border IS the 52 below, so the height
+     can no longer disagree with the padding that produces it. */
+  border-radius: 4px; padding: 8px;
   min-height: 52px;
 }
 /* 🔴 ONE HEIGHT FOR EVERY BUTTON ON THE BAR, SET RATHER THAN IMPLIED. There
@@ -802,7 +820,7 @@ video[hidden] { display: none; }
    content-sized column between one slider and the next, which is what made the
    gaps look uneven when they were all the same number. */
 /* 🔴 THE COLUMN GAP IS A NUMBER OTHER THINGS HAVE TO AGREE WITH, so it is named
-   rather than typed. `/radio1965/` puts a picker in the same column as these
+   rather than typed. `/radio/` puts a picker in the same column as these
    sliders and has to start its control at the same x — it set its own gap to 0
    against a grid that has twelve, and the row sat 12 px to the left of every
    lane under it. REPORTED three times, the last one after a component swap had
@@ -1127,20 +1145,29 @@ video[hidden] { display: none; }
    panel under it and the name row pushed to the floor. The rows attribute says
    how tall the box is, so nothing here may add to it. */
 .pos-fb-box > .pos-field { flex: 0 0 auto; align-self: stretch; }
-/* 🔴 CENTRE, NOT BASELINE, AND THIS IS WHERE THE TOP PADDING WENT. The close
-   glyph is `18px/1` and the title is `13px/1.2`, so baseline alignment makes
-   the row as tall as the TALLER line box and pushes the title down inside it.
-   The gap over the title then reads as padding that is not there: the box says
-   18 and the eye measures about 30. `.pos-title` in this same file was changed
-   from baseline to centre for exactly this reason and the note is still on it. */
+/* Centre, not baseline: `.pos-title` in this same file was changed the same way
+   and carries the reason. What made the row tall is on `.pos-fb-x` below. */
 .pos-fb-top { display: flex; align-items: center; gap: 10px; min-height: 0; }
 .pos-fb-top .pos-fb-h, .pos-fb-top .pos-fb-x { line-height: 1; }
 /* uppercase to match the FEEDBACK button that opens it: the panel and the
    control share a name, so they should share its shape too. */
 .pos-fb-h { font: 600 13px/1.2 var(--mono); margin: 0; text-transform: uppercase; letter-spacing: .06em; }
+/* 🔴 IT HAS TO GIVE UP THE 34 px HEIGHT EVERY BUTTON GETS, AND THAT IS WHERE
+   THE TOP PADDING WENT. REPORTED as *"reduce top padding to match horiz
+   padding"*, photographed with the title sitting about 30 px below an 18 px
+   edge. The panel's padding was 18 on every side and always had been: the gap
+   was the CLOSE BUTTON. `button` in this file sets `height: 34px`, this rule
+   reset the border, the background and the padding and never the height, so the
+   title row was 34 px tall around a 15.6 px line box and `align-items: center`
+   put nine of those pixels above the title. The row is the title's height now,
+   and the glyph is centred in a square inside it.
+   ⚠️ THE NOTE ABOVE `.pos-fb-top` BLAMED BASELINE ALIGNMENT AND WAS WRONG. It
+   was already centred when the report came in, which is how a fix that reads
+   correct can sit on top of the defect it names. */
 .pos-fb-x {
   margin-left: auto; background: transparent; border: 0; color: var(--dim2);
-  font: 400 18px/1 var(--mono); cursor: pointer; padding: 0 2px;
+  font: 400 18px/1 var(--mono); cursor: pointer;
+  width: 22px; height: 16px; padding: 0; display: grid; place-items: center;
 }
 .pos-fb-x:hover { color: var(--fg); }
 .pos-fb-note { margin: 0; color: var(--dim); font-size: 12.5px; }
@@ -1595,7 +1622,7 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    that brings its own `title` was getting the body's ordinary 22 px rhythm
    instead: two headings over two pictures on two pages at two distances, which
    is the defect CLAUDE.md's vertical spacing rule exists to stop. Photographed
-   against `/radio1965/`, which uses the standing heading and therefore looked
+   against `/radio/`, which uses the standing heading and therefore looked
    right. 44 in both cases, declared in one place. */
 .pos-body > .pos-dg { margin-top: 44px; }
 .pos-dg-t[hidden] { display: none; }
@@ -1853,14 +1880,49 @@ a.pos-card-t:hover, a.pos-card-t:focus-visible { color: var(--hi); }
 /* The word changes with the state because the NEXT press is what a reader
    needs to know, not the current mode: `LOOP` when there is none, `END` when a
    start is waiting for its other mark, `LOOP` lit while one is running. */
-.tbar-loop[data-loop="armed"] { color: var(--hi); border-color: var(--hi); }
-.tbar-loop[data-loop="on"] { color: var(--bg); background: var(--hi); border-color: var(--hi); }
+/* 🔴 ONE SEGMENTED CONTROL: `[→|LOOP]`. The buttons keep their own sizes and
+   their own faces; what joins them is a shared edge and no gap. The overlap is
+   a NEGATIVE MARGIN rather than a dropped border, so the pair is the same total
+   width as two buttons minus one hairline and the seam is one line rather than
+   two stacked. `position: relative` on hover/focus lifts the pressed one over
+   its neighbour, or the shared edge belongs to whichever came last in source
+   order and a focused left button looks clipped. */
+.tbar-loopgrp { flex: none; display: flex; align-items: center; }
+.tbar-loopgrp > * { border-radius: 0; }
+.tbar-loopgrp > :first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.tbar-loopgrp > :last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.tbar-loopgrp > * + * { margin-left: -1px; }
+/* 🔴 BOTH SEGMENTS SHARE ONE EDGE COLOUR, OR THE PAIR IS NOT A PAIR.
+   PHOTOGRAPHED with LOOP lit: a solid `--fg` pill next to a button whose border
+   is `--line2` on a `--card2` face, which against the bar's own `--card` is
+   almost invisible. The two measure the same 34 px high, so nothing was wrong
+   with the sizes; what read as a smaller button was a block of white beside a
+   hole. `--dim2` is the border the lit half already uses, so the unlit half
+   borrows it and the group reads as one control with one segment on. */
+.tbar-loopgrp > .tbar-x { border-color: var(--dim2); }
+.tbar-loopgrp > :hover, .tbar-loopgrp > :focus-visible { position: relative; z-index: 1; }
+/* 🔴 A LOOP IS GREY, NOT YELLOW, AND THAT IS ABOUT WHAT `--hi` IS FOR. ASKED
+   FOR: *"find another color for loop button enabled bg and loop info viz
+   colors: just grayscale?"*. Yellow was paying for four things at once on one
+   bar — the playhead, the fill behind it, this button, and the band round the
+   loop — so the accent said "look here" about the whole row and therefore about
+   nothing in it. A loop is a STATE and a REGION: where the sound is coming from
+   and for how long. That is structure, and grey is what structure is drawn in.
+   The accent goes back to the thing that moves.
+   ⚠️ SOLID, THOUGH, AND STILL THE LOUDEST GREY THERE IS. `on` is not an offer,
+   it is something that is happening, so it keeps the filled pill and changes
+   only hue. An outline would have made a running loop quieter than the armed
+   state it came from. */
+.tbar-loop[data-loop="armed"] { color: var(--fg); border-color: var(--dim2); }
+.tbar-loop[data-loop="on"] { color: var(--bg); background: var(--fg); border-color: var(--fg); }
 /* ⚠️ UNDER the fill and the head — it is the ground the playhead runs over, and
-   a band drawn on top of the playhead hides the one thing that moves. */
+   a band drawn on top of the playhead hides the one thing that moves. Which is
+   also why the band is grey and the head above it is not: they are stacked in
+   the same few pixels, and two marks in one colour in one place is one mark. */
 .tbar-loopspan {
   position: absolute; top: 0; bottom: 0;
-  background: color-mix(in srgb, var(--hi) 16%, transparent);
-  border-left: 1px solid var(--hi); border-right: 1px solid var(--hi);
+  background: color-mix(in srgb, var(--fg) 9%, transparent);
+  border-left: 1px solid var(--dim2); border-right: 1px solid var(--dim2);
   pointer-events: none;
 }
 

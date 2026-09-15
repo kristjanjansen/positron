@@ -1,6 +1,6 @@
 # positron and U:
 
-Read from the code, not the pitch: `tarmoj/radio1965` cloned, the other 40
+Read from the code, not the pitch: `tarmoj/radio` cloned, the other 40
 repos read over the API. Both projects make media happen at the right time in
 more than one place. They answer it differently, and each answer follows from
 where the work happens.
@@ -74,10 +74,10 @@ and the server copies bytes to them. No manifest, no segments, no playlist —
 which is why `<audio src="https://icecast.err.ee/vikerraadio.mp3">` needs no
 library at all, and equally why there is no seeking and no DVR.
 
-Three things follow in `radio1965`:
+Three things follow in `radio`:
 
 - **The mounts are declared in advance, and that is the capacity limit.**
-  `icecast.xml` defines five — `radio1965`, `user1`–`user4` — and a mount holds
+  `icecast.xml` defines five — `radio`, `user1`–`user4` — and a mount holds
   one source at a time. Five simultaneous broadcasters is architectural, not a
   knob. The app polls `status-json.xsl` to grey out the occupied ones.
 - **The Qt app is a source client, hand-written.** `icecastbroadcaster.cpp`
@@ -142,7 +142,7 @@ HLS and theirs scrub two hours.
 
 ### 1. Play their channels today — zero work either side
 
-`radio1965`'s Icecast mounts and the nginx HLS endpoints are already
+`radio`'s Icecast mounts and the nginx HLS endpoints are already
 `Access-Control-Allow-Origin: *`:
 
 ```
@@ -379,7 +379,7 @@ whether it worked. None of that needs an uplink.
 
 `uuu.ee` is not in version control. It appears across the repos only as a deploy
 target in `deploy.sh` scripts. The only infrastructure code that exists anywhere
-is `radio1965`'s two Icecast hook scripts and an nginx snippet pasted into a
+is `radio`'s two Icecast hook scripts and an nginx snippet pasted into a
 markdown file. If that machine dies it is rebuilt by hand from prose.
 
 Their own `TODOs.md` is candid about the live path still settling: *"When video
